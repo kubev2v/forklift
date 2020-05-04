@@ -81,6 +81,8 @@ type Reconciler struct {
 // Reconcile a Plan CR.
 func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var err error
+
+	// Reset the logger.
 	log.Reset()
 
 	// Fetch the CR.
@@ -107,8 +109,8 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	}
 
 	// Apply changes.
-	//plan.MarkReconciled()
-	err = r.Update(context.TODO(), plan)
+	plan.Status.ObservedGeneration = plan.Generation
+	err = r.Status().Update(context.TODO(), plan)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil

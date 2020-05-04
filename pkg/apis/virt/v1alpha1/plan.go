@@ -32,13 +32,18 @@ type PlanSpec struct {
 //
 // PlanStatus defines the observed state of Plan
 type PlanStatus struct {
+	// Conditions.
 	libcnd.Conditions
+	// The most recent generation observed by the controller.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 //
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:openapi-gen=true
+// +kubebuilder:subresource:status
 type Plan struct {
 	v1.TypeMeta   `json:",inline"`
 	v1.ObjectMeta `json:"metadata,omitempty"`
