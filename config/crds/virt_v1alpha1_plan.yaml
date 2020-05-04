@@ -11,6 +11,8 @@ spec:
     kind: Plan
     plural: plans
   scope: Namespaced
+  subresources:
+    status: {}
   validation:
     openAPIV3Schema:
       properties:
@@ -29,6 +31,11 @@ spec:
         spec:
           type: object
         status:
+          properties:
+            observedGeneration:
+              description: The most recent generation observed by the controller.
+              format: int64
+              type: integer
           type: object
   version: v1alpha1
 status:

@@ -3,7 +3,6 @@ package plan
 import (
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
@@ -23,21 +22,15 @@ func (r PlanPredicate) Create(e event.CreateEvent) bool {
 }
 
 func (r PlanPredicate) Update(e event.UpdateEvent) bool {
-	old, cast := e.ObjectOld.(*api.Plan)
+	object, cast := e.ObjectNew.(*api.Plan)
 	if !cast {
 		return false
 	}
-	new, cast := e.ObjectNew.(*api.Plan)
-	if !cast {
-		return false
-	}
-	changed := !reflect.DeepEqual(old.Spec, new.Spec) ||
-		!reflect.DeepEqual(
-			old.DeletionTimestamp,
-			new.DeletionTimestamp)
+	changed := object.Status.ObservedGeneration < object.Generation
 	if changed {
 		libref.Mapper.Update(e)
 	}
+
 	return changed
 }
 
