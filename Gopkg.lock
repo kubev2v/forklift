@@ -215,7 +215,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:5fe373e44f697e61c89fa12acb0e3509d9cf634541fbca313cb4dfcb94c19c70"
+  digest = "1:87615ce7f58a0ac1bffff041db2d10d1ac3d436f296748eb1c69f34b42c25244"
   name = "github.com/konveyor/controller"
   packages = [
     "pkg/condition",
@@ -223,7 +223,7 @@
     "pkg/ref",
   ]
   pruneopts = "T"
-  revision = "4779d92deb1a41d811c153cf0c80b2973ba5330f"
+  revision = "4f99f7e44fc3d282c7dbc722709dc849cc4cb37a"
 
 [[projects]]
   digest = "1:3804a3a02964db8e6db3e5e7960ac1c1a9b12835642dd4f4ac4e56c749ec73eb"
@@ -973,6 +973,7 @@
     "github.com/prometheus/client_golang/prometheus/promauto",
     "github.com/prometheus/client_golang/prometheus/promhttp",
     "golang.org/x/net/context",
+    "k8s.io/api/core/v1",
     "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1",
     "k8s.io/apimachinery/pkg/api/errors",
     "k8s.io/apimachinery/pkg/apis/meta/v1",

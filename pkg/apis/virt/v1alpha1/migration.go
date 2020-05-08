@@ -18,17 +18,21 @@ package v1alpha1
 
 import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
+	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 //
-// PlanSpec defines the desired state of Plan
-type PlanSpec struct {
+// MigrationSpec defines the desired state of Migration
+type MigrationSpec struct {
+	// Reference to the associated Plan.
+	// +optional
+	Plan *core.ObjectReference `json:"plan,omitempty" ref:"Plan"`
 }
 
 //
-// PlanStatus defines the observed state of Plan
-type PlanStatus struct {
+// MigrationStatus defines the observed state of Migration
+type MigrationStatus struct {
 	// Conditions.
 	libcnd.Conditions
 	// The most recent generation observed by the controller.
@@ -41,21 +45,21 @@ type PlanStatus struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
-type Plan struct {
+type Migration struct {
 	meta.TypeMeta   `json:",inline"`
 	meta.ObjectMeta `json:"metadata,omitempty"`
-	Spec            PlanSpec   `json:"spec,omitempty"`
-	Status          PlanStatus `json:"status,omitempty"`
+	Spec            MigrationSpec   `json:"spec,omitempty"`
+	Status          MigrationStatus `json:"status,omitempty"`
 }
 
 //
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type PlanList struct {
+type MigrationList struct {
 	meta.TypeMeta `json:",inline"`
 	meta.ListMeta `json:"metadata,omitempty"`
-	Items         []Plan `json:"items"`
+	Items         []Migration `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Plan{}, &PlanList{})
+	SchemeBuilder.Register(&Migration{}, &MigrationList{})
 }

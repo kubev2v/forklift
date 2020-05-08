@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package plan
+package migration
 
 import (
 	"context"
-	"github.com/konveyor/virt-controller/pkg/settings"
-
 	"github.com/konveyor/controller/pkg/logging"
+	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
+	"github.com/konveyor/virt-controller/pkg/settings"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,21 +32,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logging.WithName("plan")
+var log = logging.WithName("migration")
 
 //
 // Application settings.
 var Settings = &settings.Settings
 
 //
-// Creates a new Plan Controller and adds it to the Manager.
+// Creates a new Migration Controller and adds it to the Manager.
 func Add(mgr manager.Manager) error {
 	reconciler := &Reconciler{
 		Client: mgr.GetClient(),
 		scheme: mgr.GetScheme(),
 	}
 	cnt, err := controller.New(
-		"plan-controller",
+		"migration-controller",
 		mgr,
 		controller.Options{
 			Reconciler: reconciler,
@@ -56,9 +56,20 @@ func Add(mgr manager.Manager) error {
 		return err
 	}
 	err = cnt.Watch(
-		&source.Kind{Type: &api.Plan{}},
+		&source.Kind{
+			Type: &api.Migration{},
+		},
 		&handler.EnqueueRequestForObject{},
-		&PlanPredicate{})
+		&MigrationPredicate{})
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	err = cnt.Watch(
+		&source.Kind{
+			Type: &api.Plan{},
+		},
+		libref.Handler())
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -70,14 +81,14 @@ func Add(mgr manager.Manager) error {
 var _ reconcile.Reconciler = &Reconciler{}
 
 //
-// Reconciles a Plan object.
+// Reconciles a Migration object.
 type Reconciler struct {
 	client.Client
 	scheme *runtime.Scheme
 }
 
 //
-// Reconcile a Plan CR.
+// Reconcile a Migration CR.
 func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var err error
 
@@ -85,8 +96,8 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	log.Reset()
 
 	// Fetch the CR.
-	plan := &api.Plan{}
-	err = r.Get(context.TODO(), request.NamespacedName, plan)
+	migration := &api.Migration{}
+	err = r.Get(context.TODO(), request.NamespacedName, migration)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil
@@ -96,20 +107,20 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	}
 
 	// Validations.
-	err = r.validate(plan)
+	err = r.validate(migration)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Ready condition.
-	if !plan.Status.HasBlockerCondition() {
-		plan.Status.SetReady(true, ReadyMessage)
+	if !migration.Status.HasBlockerCondition() {
+		migration.Status.SetReady(true, ReadyMessage)
 	}
 
 	// Apply changes.
-	plan.Status.ObservedGeneration = plan.Generation
-	err = r.Status().Update(context.TODO(), plan)
+	migration.Status.ObservedGeneration = migration.Generation
+	err = r.Status().Update(context.TODO(), migration)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil

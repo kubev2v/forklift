@@ -86,6 +86,11 @@ func (r *EventMapper) findRefs(object interface{}) []Target {
 	for i := 0; i < rt.NumField(); i++ {
 		ft := rt.Field(i)
 		fv := rv.Field(i)
+		if fv.Kind() == reflect.Struct {
+			nested := r.findRefs(fv.Interface())
+			list = append(list, nested...)
+			continue
+		}
 		if kind, found := ft.Tag.Lookup(Tag); found {
 			ref, cast := fv.Interface().(*v1.ObjectReference)
 			if !cast || !RefSet(ref) {
