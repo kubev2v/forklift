@@ -9,8 +9,25 @@ import (
 )
 
 //
+// Build an event handler.
+// Example:
+//   err = cnt.Watch(
+//      &source.Kind{
+//         Type: &api.Plan{},
+//      },
+//      libref.Handler())
+func Handler() handler.EventHandler {
+	return &handler.EnqueueRequestsFromMapFunc{
+		ToRequests: handler.ToRequestsFunc(
+			func(a handler.MapObject) []reconcile.Request {
+				return GetRequests(a)
+			}),
+	}
+}
+
+//
 // Impl the handler interface.
-func GetRequests(a handler.MapObject, source interface{}) []reconcile.Request {
+func GetRequests(a handler.MapObject) []reconcile.Request {
 	target := Target{
 		Kind:      ToKind(a.Object),
 		Name:      a.Meta.GetName(),
