@@ -1,6 +1,6 @@
 ---
 kind: Migration
-apiVersion: virt.migration.openshift.io/v1alpha1
+apiVersion: virt.konveyor.io/v1alpha1
 metadata:
   name: test
   namespace: openshift-migration

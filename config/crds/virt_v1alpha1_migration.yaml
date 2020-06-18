@@ -4,9 +4,9 @@ metadata:
   creationTimestamp: null
   labels:
     controller-tools.k8s.io: "1.0"
-  name: migrations.virt.migration.openshift.io
+  name: migrations.virt.konveyor.io
 spec:
-  group: virt.migration.openshift.io
+  group: virt.konveyor.io
   names:
     kind: Migration
     plural: migrations
@@ -31,6 +31,7 @@ spec:
         spec:
           properties:
             plan:
+              description: Reference to the associated Plan.
               type: object
           type: object
         status:
