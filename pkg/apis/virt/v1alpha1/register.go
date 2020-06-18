@@ -19,7 +19,7 @@ limitations under the License.
 // +k8s:deepcopy-gen=package,register
 // +k8s:conversion-gen=github.com/konveyor/virt-controller/pkg/apis/migration
 // +k8s:defaulter-gen=TypeMeta
-// +groupName=virt.migration.openshift.io
+// +groupName=virt.konveyor.io
 package v1alpha1
 
 import (
@@ -28,7 +28,7 @@ import (
 )
 
 var SchemeGroupVersion = schema.GroupVersion{
-	Group:   "virt.migration.openshift.io",
+	Group:   "virt.konveyor.io",
 	Version: "v1alpha1",
 }
 

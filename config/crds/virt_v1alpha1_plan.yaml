@@ -4,9 +4,9 @@ metadata:
   creationTimestamp: null
   labels:
     controller-tools.k8s.io: "1.0"
-  name: plans.virt.migration.openshift.io
+  name: plans.virt.konveyor.io
 spec:
-  group: virt.migration.openshift.io
+  group: virt.konveyor.io
   names:
     kind: Plan
     plural: plans
