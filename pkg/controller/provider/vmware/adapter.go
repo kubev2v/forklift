@@ -13,7 +13,7 @@ type Adapter interface {
 	// The adapter model.
 	Model() model.Model
 	// Apply the update to the model.
-	With(types.ObjectUpdate)
+	Apply(types.ObjectUpdate)
 }
 
 //
@@ -23,7 +23,7 @@ type Base struct {
 
 //
 // Apply the update to the model `Base`.
-func (v *Base) With(m *model.Base, u types.ObjectUpdate) {
+func (v *Base) Apply(m *model.Base, u types.ObjectUpdate) {
 	object := model.Object{}
 	if m.Object != "" {
 		object = m.DecodeObject()
@@ -37,7 +37,7 @@ func (v *Base) With(m *model.Base, u types.ObjectUpdate) {
 					m.Name = s
 				}
 			case "parent":
-				ref := vRef{}
+				ref := Ref{}
 				ref.With(p.Val)
 				m.EncodeParent(ref.Ref)
 			}
@@ -49,15 +49,15 @@ func (v *Base) With(m *model.Base, u types.ObjectUpdate) {
 }
 
 //
-// Ref adapter.
-type vRef struct {
-	// The adapter model.
+// Ref.
+type Ref struct {
+	// A wrapped ref.
 	model.Ref
 }
 
 //
-// Apply the update to the model.
-func (v *vRef) With(ref types.AnyType) {
+// Set the ref properties.
+func (v *Ref) With(ref types.AnyType) {
 	if r, cast := ref.(types.ManagedObjectReference); cast {
 		v.ID = r.Value
 		switch r.Type {
@@ -74,19 +74,19 @@ func (v *vRef) With(ref types.AnyType) {
 }
 
 //
-// RefList adapter.
-type vRefList struct {
-	// The adapter model.
+// RefList
+type RefList struct {
+	// A wrapped list.
 	list model.RefList
 }
 
 //
-// Apply the update to the model.
-func (v *vRefList) With(ref types.AnyType) {
+// Set the list content.
+func (v *RefList) With(ref types.AnyType) {
 	if a, cast := ref.(types.ArrayOfManagedObjectReference); cast {
 		list := a.ManagedObjectReference
 		for _, r := range list {
-			ref := vRef{}
+			ref := Ref{}
 			ref.With(r)
 			v.list = append(
 				v.list,
@@ -100,7 +100,7 @@ func (v *vRefList) With(ref types.AnyType) {
 
 //
 // Encode the enclosed list.
-func (v *vRefList) Encode() string {
+func (v *RefList) Encode() string {
 	return v.list.Encode()
 }
 
@@ -114,14 +114,14 @@ type FolderAdapter struct {
 
 //
 // Apply the update to the model.
-func (v *FolderAdapter) With(u types.ObjectUpdate) {
-	v.Base.With(&v.model.Base, u)
+func (v *FolderAdapter) Apply(u types.ObjectUpdate) {
+	v.Base.Apply(&v.model.Base, u)
 	for _, p := range u.ChangeSet {
 		switch p.Op {
 		case Assign:
 			switch p.Name {
 			case ChildEntity:
-				list := vRefList{}
+				list := RefList{}
 				list.With(p.Val)
 				v.model.Children = list.Encode()
 			}
@@ -151,26 +151,26 @@ func (v *DatacenterAdapter) Model() model.Model {
 
 //
 // Apply the update to the model.
-func (v *DatacenterAdapter) With(u types.ObjectUpdate) {
-	v.Base.With(&v.model.Base, u)
+func (v *DatacenterAdapter) Apply(u types.ObjectUpdate) {
+	v.Base.Apply(&v.model.Base, u)
 	for _, p := range u.ChangeSet {
 		switch p.Op {
 		case Assign:
 			switch p.Name {
 			case VmFolder:
-				ref := vRef{}
+				ref := Ref{}
 				ref.With(p.Val)
 				v.model.VM = ref.Encode()
 			case HostFolder:
-				ref := vRef{}
+				ref := Ref{}
 				ref.With(p.Val)
 				v.model.Cluster = ref.Encode()
 			case NetFolder:
-				ref := vRef{}
+				ref := Ref{}
 				ref.With(p.Val)
 				v.model.Network = ref.Encode()
 			case DsFolder:
-				ref := vRef{}
+				ref := Ref{}
 				ref.With(p.Val)
 				v.model.Datastore = ref.Encode()
 			}
@@ -192,14 +192,14 @@ func (v *ClusterAdapter) Model() model.Model {
 	return &v.model
 }
 
-func (v *ClusterAdapter) With(u types.ObjectUpdate) {
-	v.Base.With(&v.model.Base, u)
+func (v *ClusterAdapter) Apply(u types.ObjectUpdate) {
+	v.Base.Apply(&v.model.Base, u)
 	for _, p := range u.ChangeSet {
 		switch p.Op {
 		case Assign:
 			switch p.Name {
 			case "host":
-				refList := vRefList{}
+				refList := RefList{}
 				refList.With(p.Val)
 				v.model.Host = refList.Encode()
 			}
@@ -221,8 +221,8 @@ func (v *HostAdapter) Model() model.Model {
 	return &v.model
 }
 
-func (v *HostAdapter) With(u types.ObjectUpdate) {
-	v.Base.With(&v.model.Base, u)
+func (v *HostAdapter) Apply(u types.ObjectUpdate) {
+	v.Base.Apply(&v.model.Base, u)
 	for _, p := range u.ChangeSet {
 		switch p.Op {
 		case Assign:
@@ -232,7 +232,7 @@ func (v *HostAdapter) With(u types.ObjectUpdate) {
 					v.model.Maintenance = strconv.FormatBool(b)
 				}
 			case "vm":
-				refList := vRefList{}
+				refList := RefList{}
 				refList.With(p.Val)
 				v.model.VM = refList.Encode()
 			}
@@ -256,8 +256,8 @@ func (v *NetworkAdapter) Model() model.Model {
 
 //
 // Apply the update to the model.
-func (v *NetworkAdapter) With(u types.ObjectUpdate) {
-	v.Base.With(&v.model.Base, u)
+func (v *NetworkAdapter) Apply(u types.ObjectUpdate) {
+	v.Base.Apply(&v.model.Base, u)
 	for _, p := range u.ChangeSet {
 		switch p.Op {
 		case Assign:
@@ -287,8 +287,8 @@ func (v *DatastoreAdapter) Model() model.Model {
 
 //
 // Apply the update to the model.
-func (v *DatastoreAdapter) With(u types.ObjectUpdate) {
-	v.Base.With(&v.model.Base, u)
+func (v *DatastoreAdapter) Apply(u types.ObjectUpdate) {
+	v.Base.Apply(&v.model.Base, u)
 	for _, p := range u.ChangeSet {
 		switch p.Op {
 		case Assign:
@@ -330,6 +330,6 @@ func (v *VmAdapter) Model() model.Model {
 
 //
 // Apply the update to the model.
-func (v *VmAdapter) With(u types.ObjectUpdate) {
-	v.Base.With(&v.model.Base, u)
+func (v *VmAdapter) Apply(u types.ObjectUpdate) {
+	v.Base.Apply(&v.model.Base, u)
 }
