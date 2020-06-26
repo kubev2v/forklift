@@ -3,10 +3,17 @@ package logging
 import (
 	"fmt"
 	"github.com/go-logr/logr"
+	liberr "github.com/konveyor/controller/pkg/error"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/storage/names"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sync"
+)
+
+const (
+	Stack = "stacktrace"
+	Error = "error"
+	None  = ""
 )
 
 //
@@ -44,8 +51,8 @@ func WithName(name string) Logger {
 // Updates the generated correlation suffix in the name and
 // clears the reported error history.
 func (l *Logger) Reset() {
-	mutex.RLock()
-	defer mutex.RUnlock()
+	mutex.Lock()
+	defer mutex.Unlock()
 	name := fmt.Sprintf("%s|", l.name)
 	name = names.SimpleNameGenerator.GenerateName(name)
 	l.Real = logf.Log.WithName(name)
@@ -72,20 +79,37 @@ func (l Logger) Error(err error, message string, kvpair ...interface{}) {
 	if err == nil {
 		return
 	}
-	mutex.RLock()
-	defer mutex.RUnlock()
-	_, found := l.history[err]
-	if found || errors.IsConflict(err) {
-		return
+	mutex.Lock()
+	defer mutex.Unlock()
+	le, wrapped := err.(*liberr.Error)
+	if wrapped {
+		err = le.Unwrap()
+		_, found := l.history[err]
+		if found || errors.IsConflict(err) {
+			return
+		}
+		kvpair = append(
+			kvpair,
+			Error,
+			le.Error(),
+			Stack,
+			le.Stack())
+		l.Real.Info(message, kvpair...)
+		l.history[err] = true
+	} else {
+		_, found := l.history[err]
+		if found || errors.IsConflict(err) {
+			return
+		}
+		l.Real.Error(err, message, kvpair...)
+		l.history[err] = true
 	}
-	l.Real.Error(err, message, kvpair...)
-	l.history[err] = true
 }
 
 //
 // Logs an error without a description.
 func (l Logger) Trace(err error, kvpair ...interface{}) {
-	l.Error(err, "", kvpair...)
+	l.Error(err, None, kvpair...)
 }
 
 //
