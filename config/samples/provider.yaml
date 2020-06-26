@@ -1,0 +1,12 @@
+---
+kind: Provider
+apiVersion: virt.konveyor.io/v1alpha1
+metadata:
+  name: test
+  namespace: openshift-migration
+spec:
+  type: "vmware"
+  secret:
+    namespce: ""
+    name: ""
+  url: ""

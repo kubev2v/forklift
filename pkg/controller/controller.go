@@ -19,6 +19,7 @@ package controller
 import (
 	"github.com/konveyor/virt-controller/pkg/controller/migration"
 	"github.com/konveyor/virt-controller/pkg/controller/plan"
+	"github.com/konveyor/virt-controller/pkg/controller/provider"
 	"github.com/konveyor/virt-controller/pkg/settings"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -33,6 +34,7 @@ type AddFunction func(manager.Manager) error
 var Controllers = []AddFunction{
 	migration.Add,
 	plan.Add,
+	provider.Add,
 }
 
 //
