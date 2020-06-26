@@ -4,12 +4,12 @@ metadata:
   creationTimestamp: null
   labels:
     controller-tools.k8s.io: "1.0"
-  name: plans.virt.virt.konveyor.io
+  name: providers.virt.virt.konveyor.io
 spec:
   group: virt.virt.konveyor.io
   names:
-    kind: Plan
-    plural: plans
+    kind: Provider
+    plural: providers
   scope: Namespaced
   subresources:
     status: {}
@@ -29,6 +29,20 @@ spec:
         metadata:
           type: object
         spec:
+          properties:
+            secret:
+              description: References a secret containing credentials and other confidential
+                information.
+              type: object
+            type:
+              description: Provider type.
+              type: string
+            url:
+              description: The (external) provider URL.
+              type: string
+          required:
+          - type
+          - url
           type: object
         status:
           properties:
