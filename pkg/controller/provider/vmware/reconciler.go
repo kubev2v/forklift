@@ -518,7 +518,7 @@ func (r Reconciler) applyEnter(ctx context.Context, u types.ObjectUpdate) error 
 	if !selected {
 		return nil
 	}
-	adapter.With(u)
+	adapter.Apply(u)
 	err := r.db.Insert(adapter.Model())
 	if err != nil {
 		return liberr.Wrap(err)
@@ -542,7 +542,7 @@ func (r Reconciler) applyModify(ctx context.Context, u types.ObjectUpdate) error
 			Log.Trace(err)
 			continue
 		}
-		adapter.With(u)
+		adapter.Apply(u)
 		err = r.db.Update(adapter.Model())
 		if err == nil {
 			break
