@@ -1,3 +1,3 @@
 version: "1"
-domain: virt.konveyor.io
+domain: konveyor.io
 repo: github.com/konveyor/virt-controller
