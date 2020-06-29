@@ -4,9 +4,9 @@ metadata:
   creationTimestamp: null
   labels:
     controller-tools.k8s.io: "1.0"
-  name: providers.virt.virt.konveyor.io
+  name: providers.virt.konveyor.io
 spec:
-  group: virt.virt.konveyor.io
+  group: virt.konveyor.io
   names:
     kind: Provider
     plural: providers
