@@ -20,7 +20,7 @@ type _Thing struct {
 	meta.ObjectMeta `json:"metadata,omitempty"`
 	RefA            *v1.ObjectReference `json:"refA" ref:"ThingA"`
 	RefB            *v1.ObjectReference `json:"refB" ref:"ThingB"`
-	RefC            *v1.ObjectReference `json:"refC" ref:"ThingC"`
+	RefC            v1.ObjectReference  `json:"refC" ref:"ThingC"`
 	Spec            _ThingSpec
 }
 
@@ -49,7 +49,7 @@ func TestFindRefs(t *testing.T) {
 			Namespace: "nsB",
 			Name:      "thingB",
 		},
-		RefC: &v1.ObjectReference{
+		RefC: v1.ObjectReference{
 			Namespace: "",
 			Name:      "thingC",
 		},
@@ -83,7 +83,7 @@ func TestMapperCreate(t *testing.T) {
 			Namespace: "nsB",
 			Name:      "thingB",
 		},
-		RefC: &v1.ObjectReference{
+		RefC: v1.ObjectReference{
 			Namespace: "",
 			Name:      "thingC",
 		},
@@ -138,7 +138,7 @@ func TestMapperUpdate(t *testing.T) {
 			Namespace: "nsB",
 			Name:      "thingB",
 		},
-		RefC: &v1.ObjectReference{
+		RefC: v1.ObjectReference{
 			Namespace: "",
 			Name:      "thingC",
 		},
@@ -152,7 +152,7 @@ func TestMapperUpdate(t *testing.T) {
 			Namespace: "nsB",
 			Name:      "thingB",
 		},
-		RefC: &v1.ObjectReference{
+		RefC: v1.ObjectReference{
 			Namespace: "nsC",
 			Name:      "thingC",
 		},
@@ -220,7 +220,7 @@ func TestMapperDelete(t *testing.T) {
 			Namespace: "nsB",
 			Name:      "thingB",
 		},
-		RefC: &v1.ObjectReference{
+		RefC: v1.ObjectReference{
 			Namespace: "",
 			Name:      "thingC",
 		},
@@ -280,7 +280,7 @@ func TestHandler(t *testing.T) {
 			Namespace: "nsB",
 			Name:      "thingB",
 		},
-		RefC: &v1.ObjectReference{
+		RefC: v1.ObjectReference{
 			Namespace: "",
 			Name:      "thingC",
 		},

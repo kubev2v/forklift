@@ -18,16 +18,28 @@ package v1alpha1
 
 import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
+	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 //
-// PlanSpec defines the desired state of Plan
-type PlanSpec struct {
+// The pair of provider associated with the plan.
+type ProviderPair struct {
+	// Source.
+	Source core.ObjectReference `json:"source" ref:"Provider"`
+	// Destination.
+	Destination core.ObjectReference `json:"destination" ref:"Provider"`
 }
 
 //
-// PlanStatus defines the observed state of Plan
+// PlanSpec defines the desired state of Plan.
+type PlanSpec struct {
+	// Providers.
+	Provider ProviderPair `json:"provider"`
+}
+
+//
+// PlanStatus defines the observed state of Plan.
 type PlanStatus struct {
 	// Conditions.
 	libcnd.Conditions
