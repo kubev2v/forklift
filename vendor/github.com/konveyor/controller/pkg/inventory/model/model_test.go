@@ -85,7 +85,7 @@ func TestModels(t *testing.T) {
 		ListOptions{
 			Labels: Labels{
 				"role": "main",
-		}},
+			}},
 		&list)
 	g.Expect(err).To(gomega.BeNil())
 	g.Expect(len(list)).To(gomega.Equal(1))

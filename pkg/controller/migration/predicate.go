@@ -43,3 +43,47 @@ func (r MigrationPredicate) Delete(e event.DeleteEvent) bool {
 
 	return false
 }
+
+type PlanPredicate struct {
+	predicate.Funcs
+}
+
+func (r PlanPredicate) Create(e event.CreateEvent) bool {
+	p, cast := e.Object.(*api.Plan)
+	if cast {
+		reconciled := p.Status.ObservedGeneration == p.Generation
+		return reconciled
+	}
+
+	return false
+}
+
+func (r PlanPredicate) Update(e event.UpdateEvent) bool {
+	p, cast := e.ObjectNew.(*api.Plan)
+	if cast {
+		reconciled := p.Status.ObservedGeneration == p.Generation
+		return reconciled
+	}
+
+	return false
+}
+
+func (r PlanPredicate) Delete(e event.DeleteEvent) bool {
+	p, cast := e.Object.(*api.Plan)
+	if cast {
+		reconciled := p.Status.ObservedGeneration == p.Generation
+		return reconciled
+	}
+
+	return false
+}
+
+func (r PlanPredicate) Generic(e event.GenericEvent) bool {
+	p, cast := e.Object.(*api.Plan)
+	if cast {
+		reconciled := p.Status.ObservedGeneration == p.Generation
+		return reconciled
+	}
+
+	return false
+}

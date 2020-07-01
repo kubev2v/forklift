@@ -29,6 +29,22 @@ spec:
         metadata:
           type: object
         spec:
+          properties:
+            provider:
+              description: Providers.
+              properties:
+                destination:
+                  description: Destination.
+                  type: object
+                source:
+                  description: Source.
+                  type: object
+              required:
+              - source
+              - destination
+              type: object
+          required:
+          - provider
           type: object
         status:
           properties:

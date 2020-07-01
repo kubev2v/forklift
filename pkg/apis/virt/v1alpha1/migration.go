@@ -26,8 +26,7 @@ import (
 // MigrationSpec defines the desired state of Migration
 type MigrationSpec struct {
 	// Reference to the associated Plan.
-	// +optional
-	Plan *core.ObjectReference `json:"plan,omitempty" ref:"Plan"`
+	Plan core.ObjectReference `json:"plan" ref:"Plan"`
 }
 
 //

@@ -55,6 +55,7 @@ func Add(mgr manager.Manager) error {
 		log.Trace(err)
 		return err
 	}
+	// Primary CR.
 	err = cnt.Watch(
 		&source.Kind{
 			Type: &api.Migration{},
@@ -65,11 +66,13 @@ func Add(mgr manager.Manager) error {
 		log.Trace(err)
 		return err
 	}
+	// References.
 	err = cnt.Watch(
 		&source.Kind{
 			Type: &api.Plan{},
 		},
-		libref.Handler())
+		libref.Handler(),
+		&PlanPredicate{})
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -106,6 +109,9 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		return reconcile.Result{}, err
 	}
 
+	// Begin staging conditions.
+	migration.Status.BeginStagingConditions()
+
 	// Validations.
 	err = r.validate(migration)
 	if err != nil {
@@ -117,6 +123,9 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	if !migration.Status.HasBlockerCondition() {
 		migration.Status.SetReady(true, ReadyMessage)
 	}
+
+	// End staging conditions.
+	migration.Status.EndStagingConditions()
 
 	// Apply changes.
 	migration.Status.ObservedGeneration = migration.Generation
