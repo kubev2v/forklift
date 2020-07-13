@@ -33,6 +33,8 @@ spec:
             plan:
               description: Reference to the associated Plan.
               type: object
+          required:
+          - plan
           type: object
         status:
           properties:

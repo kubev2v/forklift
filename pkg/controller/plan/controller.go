@@ -18,10 +18,10 @@ package plan
 
 import (
 	"context"
-	"github.com/konveyor/virt-controller/pkg/settings"
-
 	"github.com/konveyor/controller/pkg/logging"
+	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
+	"github.com/konveyor/virt-controller/pkg/settings"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -55,10 +55,22 @@ func Add(mgr manager.Manager) error {
 		log.Trace(err)
 		return err
 	}
+	// Primary CR.
 	err = cnt.Watch(
 		&source.Kind{Type: &api.Plan{}},
 		&handler.EnqueueRequestForObject{},
 		&PlanPredicate{})
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	// References.
+	err = cnt.Watch(
+		&source.Kind{
+			Type: &api.Provider{},
+		},
+		libref.Handler(),
+		&ProviderPredicate{})
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -95,6 +107,9 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		return reconcile.Result{}, err
 	}
 
+	// Begin staging conditions.
+	plan.Status.BeginStagingConditions()
+
 	// Validations.
 	err = r.validate(plan)
 	if err != nil {
@@ -106,6 +121,9 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	if !plan.Status.HasBlockerCondition() {
 		plan.Status.SetReady(true, ReadyMessage)
 	}
+
+	// End staging conditions.
+	plan.Status.EndStagingConditions()
 
 	// Apply changes.
 	plan.Status.ObservedGeneration = plan.Generation

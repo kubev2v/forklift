@@ -23,6 +23,7 @@ import (
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	libweb "github.com/konveyor/controller/pkg/inventory/web"
 	"github.com/konveyor/controller/pkg/logging"
+	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/model"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/vmware"
@@ -92,10 +93,21 @@ func Add(mgr manager.Manager) error {
 		log.Trace(err)
 		return err
 	}
+	// Primary CR.
 	err = cnt.Watch(
 		&source.Kind{Type: &api.Provider{}},
 		&handler.EnqueueRequestForObject{},
 		&ProviderPredicate{})
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	// References.
+	err = cnt.Watch(
+		&source.Kind{
+			Type: &core.Secret{},
+		},
+		libref.Handler())
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -143,6 +155,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		return reconcile.Result{}, err
 	}
 
+	// Begin staging conditions.
 	provider.Status.BeginStagingConditions()
 
 	// Validations.
@@ -166,6 +179,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		provider.Status.SetReady(true, ReadyMessage)
 	}
 
+	// End staging conditions.
 	provider.Status.EndStagingConditions()
 
 	// Apply changes.

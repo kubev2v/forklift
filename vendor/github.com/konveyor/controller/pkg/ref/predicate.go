@@ -86,23 +86,41 @@ func (r *EventMapper) findRefs(object interface{}) []Target {
 	for i := 0; i < rt.NumField(); i++ {
 		ft := rt.Field(i)
 		fv := rv.Field(i)
+		add := func(kind string) {
+			ptr, cast := fv.Interface().(*v1.ObjectReference)
+			if cast {
+				if RefSet(ptr) {
+					list = append(
+						list,
+						Target{
+							Kind:      kind,
+							Namespace: ptr.Namespace,
+							Name:      ptr.Name,
+						})
+				}
+				return
+			}
+			ref, cast := fv.Interface().(v1.ObjectReference)
+			if cast {
+				if RefSet(&ref) {
+					list = append(
+						list,
+						Target{
+							Kind:      kind,
+							Namespace: ref.Namespace,
+							Name:      ref.Name,
+						})
+				}
+				return
+			}
+		}
+		if kind, found := ft.Tag.Lookup(Tag); found {
+			add(kind)
+			continue
+		}
 		if fv.Kind() == reflect.Struct {
 			nested := r.findRefs(fv.Interface())
 			list = append(list, nested...)
-			continue
-		}
-		if kind, found := ft.Tag.Lookup(Tag); found {
-			ref, cast := fv.Interface().(*v1.ObjectReference)
-			if !cast || !RefSet(ref) {
-				continue
-			}
-			list = append(
-				list,
-				Target{
-					Kind:      kind,
-					Namespace: ref.Namespace,
-					Name:      ref.Name,
-				})
 		}
 	}
 

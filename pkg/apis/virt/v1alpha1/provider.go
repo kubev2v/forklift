@@ -18,7 +18,7 @@ package v1alpha1
 
 import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
-	"k8s.io/api/core/v1"
+	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -40,7 +40,7 @@ type ProviderSpec struct {
 	URL string `json:"url"`
 	// References a secret containing credentials and
 	// other confidential information.
-	Secret *v1.ObjectReference `json:"secret,omitempty"`
+	Secret core.ObjectReference `json:"secret" ref:"Secret"`
 }
 
 //
