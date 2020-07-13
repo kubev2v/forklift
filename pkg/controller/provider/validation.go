@@ -54,7 +54,7 @@ const (
 
 //
 // Validate the provider resource.
-func (r Reconciler) validate(provider *api.Provider) error {
+func (r *Reconciler) validate(provider *api.Provider) error {
 	err := r.validateType(provider)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -73,7 +73,7 @@ func (r Reconciler) validate(provider *api.Provider) error {
 
 //
 // Validate types.
-func (r Reconciler) validateType(provider *api.Provider) error {
+func (r *Reconciler) validateType(provider *api.Provider) error {
 	switch provider.Spec.Type {
 	case api.Openshift,
 		api.VMWare:
@@ -93,7 +93,7 @@ func (r Reconciler) validateType(provider *api.Provider) error {
 
 //
 // Validate the URL.
-func (r Reconciler) validateURL(provider *api.Provider) error {
+func (r *Reconciler) validateURL(provider *api.Provider) error {
 	if provider.Spec.URL == "" {
 		provider.Status.SetCondition(
 			cnd.Condition{
@@ -113,9 +113,9 @@ func (r Reconciler) validateURL(provider *api.Provider) error {
 //   1. The references is complete.
 //   2. The secret exists.
 //   3. the content of the secret is valid.
-func (r Reconciler) validateSecret(provider *api.Provider) error {
-	sRef := provider.Spec.Secret
-	if !libref.RefSet(sRef) {
+func (r *Reconciler) validateSecret(provider *api.Provider) error {
+	ref := provider.Spec.Secret
+	if !libref.RefSet(&ref) {
 		provider.Status.SetCondition(
 			cnd.Condition{
 				Type:     SecretNotValid,
@@ -128,8 +128,8 @@ func (r Reconciler) validateSecret(provider *api.Provider) error {
 	}
 	secret := &core.Secret{}
 	key := client.ObjectKey{
-		Namespace: sRef.Namespace,
-		Name:      sRef.Name,
+		Namespace: ref.Namespace,
+		Name:      ref.Name,
 	}
 	err := r.Get(context.TODO(), key, secret)
 	if errors.IsNotFound(err) {
