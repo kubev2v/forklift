@@ -6,6 +6,7 @@ import (
 	"github.com/konveyor/controller/pkg/inventory/model"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -29,7 +30,7 @@ type Paged struct {
 
 //
 // Prepare the handler to fulfil the request.
-// Set the `token` and `page` fields using passed parameters.
+// Set the `page` field using passed parameters.
 func (h *Paged) Prepare(ctx *gin.Context) int {
 	status := h.setPage(ctx)
 	if status != http.StatusOK {
@@ -92,6 +93,31 @@ func (c *Consistent) EnsureConsistency(r container.Reconciler, w time.Duration) 
 	}
 
 	return http.StatusPartialContent
+}
+
+//
+// Authorized by k8s bearer token.
+type Authorized struct {
+	// Bearer token.
+	Token string
+}
+
+//
+// Prepare the handler to fulfil the request.
+// Set the `token` field using passed parameters.
+func (h *Authorized) Prepare(ctx *gin.Context) int {
+	h.setToken(ctx)
+	return http.StatusOK
+}
+
+//
+// Set the `Token` field.
+func (h *Authorized) setToken(ctx *gin.Context) {
+	header := ctx.GetHeader("Authorization")
+	fields := strings.Fields(header)
+	if len(fields) == 2 && fields[0] == "Bearer" {
+		h.Token = fields[1]
+	}
 }
 
 //

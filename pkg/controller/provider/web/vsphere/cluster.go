@@ -4,21 +4,26 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/model"
+	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"
+	"github.com/konveyor/virt-controller/pkg/controller/provider/web/base"
 	"net/http"
 )
 
+//
+// Routes.
 const (
 	ClustersRoot     = Root + "/clusters"
 	ClusterRoot      = ClustersRoot + "/:cluster"
 	ClusterVmsRoot   = ClusterRoot + "/vms"
 	ClusterHostsRoot = ClusterRoot + "/hosts"
+	ClusterVmTree    = ClusterRoot + "/tree/vm"
 )
 
 //
 // Cluster handler.
 type ClusterHandler struct {
-	Base
+	base.Handler
+	// Selected cluster.
 	cluster *model.Cluster
 }
 
@@ -30,13 +35,15 @@ func (h *ClusterHandler) AddRoutes(e *gin.Engine) {
 	e.GET(ClusterRoot, h.Get)
 	e.GET(ClusterVmsRoot, h.ListVM)
 	e.GET(ClusterHostsRoot, h.ListHost)
+	e.GET(ClusterVmTree, h.VmTree)
 }
 
 //
 // Prepare to handle the request.
 func (h *ClusterHandler) Prepare(ctx *gin.Context) int {
-	status := h.Base.Prepare(ctx)
+	status := h.Handler.Prepare(ctx)
 	if status != http.StatusOK {
+		ctx.Status(status)
 		return status
 	}
 	id := ctx.Param("cluster")
@@ -82,11 +89,12 @@ func (h ClusterHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	content := []*Cluster{}
+	content := []interface{}{}
 	for _, m := range list {
 		r := &Cluster{}
-		r.With(&m, false)
-		content = append(content, r)
+		r.With(&m)
+		obj := r.Object(h.Detail)
+		content = append(content, obj)
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -101,7 +109,7 @@ func (h ClusterHandler) Get(ctx *gin.Context) {
 		return
 	}
 	r := &Cluster{}
-	r.With(h.cluster, true)
+	r.With(h.cluster)
 
 	ctx.JSON(http.StatusOK, r)
 }
@@ -115,21 +123,24 @@ func (h ClusterHandler) ListVM(ctx *gin.Context) {
 		return
 	}
 	db := h.Reconciler.DB()
-	content := []VM{}
-	tr := model.ClusterTraversal{
-		Root: h.cluster,
-		DB:   db,
+	tr := Tree{
+		Root:    h.cluster,
+		Leaf:    model.VmKind,
+		DB:      db,
+		Flatten: true,
+		Detail: map[string]bool{
+			model.VmKind: h.Detail,
+		},
 	}
-	traversed, err := tr.VmList()
+	content := []interface{}{}
+	tree, err := tr.Build()
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	for _, vm := range traversed {
-		r := VM{}
-		r.With(vm, false)
-		content = append(content, r)
+	for _, node := range tree.Children {
+		content = append(content, node.Object)
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -144,21 +155,51 @@ func (h ClusterHandler) ListHost(ctx *gin.Context) {
 		return
 	}
 	db := h.Reconciler.DB()
-	content := []Host{}
-	tr := model.ClusterTraversal{
-		Root: h.cluster,
-		DB:   db,
+	tr := Tree{
+		Root:    h.cluster,
+		Leaf:    model.HostKind,
+		DB:      db,
+		Flatten: true,
+		Detail: map[string]bool{
+			model.HostKind: h.Detail,
+		},
 	}
-	traversed, err := tr.HostList()
+	content := []interface{}{}
+	tree, err := tr.Build()
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	for _, host := range traversed {
-		r := Host{}
-		r.With(host, false)
-		content = append(content, r)
+	for _, node := range tree.Children {
+		content = append(content, node.Object)
+	}
+
+	ctx.JSON(http.StatusOK, content)
+}
+
+//
+// Get VM Tree.
+func (h ClusterHandler) VmTree(ctx *gin.Context) {
+	status := h.Prepare(ctx)
+	if status != http.StatusOK {
+		ctx.Status(status)
+		return
+	}
+	db := h.Reconciler.DB()
+	tr := Tree{
+		Root: h.cluster,
+		Leaf: model.VmKind,
+		DB:   db,
+		Detail: map[string]bool{
+			model.VmKind: h.Detail,
+		},
+	}
+	content, err := tr.Build()
+	if err != nil {
+		Log.Trace(err)
+		ctx.Status(http.StatusInternalServerError)
+		return
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -167,17 +208,35 @@ func (h ClusterHandler) ListHost(ctx *gin.Context) {
 //
 // REST Resource.
 type Cluster struct {
-	ID     string       `json:"id"`
-	Name   string       `json:"name"`
-	Object model.Object `json:"object,omitempty"`
+	base.Resource
+	Networks    model.RefList `json:"networks"`
+	Datastores  model.RefList `json:"datastores"`
+	DasEnabled  model.Bool    `json:"dasEnabled"`
+	DasVms      model.RefList `json:"DasVms"`
+	DrsEnabled  model.Bool    `json:"drsEnabled"`
+	DrsBehavior string        `json:"drsBehavior"`
+	DrsVms      model.RefList `json:"drsVms"`
 }
 
 //
 // Build the resource using the model.
-func (r *Cluster) With(m *model.Cluster, detail bool) {
-	r.ID = m.ID
-	r.Name = m.Name
-	if detail {
-		r.Object = m.DecodeObject()
+func (r *Cluster) With(m *model.Cluster) {
+	r.Resource.With(&m.Base)
+	r.DasEnabled = *model.BoolPtr(false).With(m.DasEnabled)
+	r.DrsEnabled = *model.BoolPtr(false).With(m.DrsEnabled)
+	r.DrsBehavior = m.DrsBehavior
+	r.Networks = *model.RefListPtr().With(m.Networks)
+	r.Datastores = *model.RefListPtr().With(m.Datastores)
+	r.DasVms = *model.RefListPtr().With(m.DasVms)
+	r.DrsVms = *model.RefListPtr().With(m.DasVms)
+}
+
+//
+// Render.
+func (r *Cluster) Object(detail bool) interface{} {
+	if !detail {
+		return r.Resource
 	}
+
+	return r
 }

@@ -1,4 +1,4 @@
-package vmware
+package vsphere
 
 import (
 	"context"
@@ -6,13 +6,15 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	"github.com/konveyor/controller/pkg/logging"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/model"
+	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
+	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	liburl "net/url"
 	"time"
 )
@@ -33,11 +35,48 @@ const (
 //
 // Fields
 const (
-	VmFolder    = "vmFolder"
-	HostFolder  = "hostFolder"
-	NetFolder   = "networkFolder"
-	DsFolder    = "datastoreFolder"
-	ChildEntity = "childEntity"
+	// Common
+	fName      = "name"
+	fParent    = "parent"
+	fHost      = "host"
+	fNetwork   = "network"
+	fDatastore = "datastore"
+	// Folders
+	fVmFolder    = "vmFolder"
+	fHostFolder  = "hostFolder"
+	fNetFolder   = "networkFolder"
+	fDsFolder    = "datastoreFolder"
+	fChildEntity = "childEntity"
+	// Cluster
+	fDasEnabled    = "configuration.dasConfig.enabled"
+	fDasVmCfg      = "configuration.dasVmConfig"
+	fDrsEnabled    = "configuration.drsConfig.enabled"
+	fDrsVmBehavior = "configuration.drsConfig.defaultVmBehavior"
+	fDrsVmCfg      = "configuration.drsVmConfig"
+	// Host
+	fVm             = "vm"
+	fProductName    = "config.product.name"
+	fProductVersion = "config.product.version"
+	fInMaintMode    = "summary.runtime.inMaintenanceMode"
+	// Network
+	fTag = "tag"
+	// Datastore
+	fDsType      = "summary.type"
+	fCapacity    = "summary.capacity"
+	fFreeSpace   = "summary.freeSpace"
+	fDsMaintMode = "summary.maintenanceMode"
+	// VM
+	fUUID                = "config.uuid"
+	fFirmware            = "config.firmware"
+	fCpuAffinity         = "config.cpuAffinity"
+	fCpuHotAddEnabled    = "config.cpuHotAddEnabled"
+	fCpuHotRemoveEnabled = "config.cpuHotRemoveEnabled"
+	fMemoryHotAddEnabled = "config.memoryHotAddEnabled"
+	fNumCpu              = "summary.config.numCpu"
+	fMemorySize          = "summary.config.memorySizeMB"
+	fGuestName           = "summary.config.guestFullName"
+	fBalloonedMemory     = "summary.quickStats.balloonedMemory"
+	fVmIpAddress         = "summary.guest.ipAddress"
 )
 
 //
@@ -59,7 +98,7 @@ const (
 // Folder traversal Spec.
 var TsDFolder = &types.TraversalSpec{
 	Type: Folder,
-	Path: ChildEntity,
+	Path: fChildEntity,
 	SelectSet: []types.BaseSelectionSpec{
 		&types.SelectionSpec{
 			Name: TraverseFolders,
@@ -71,7 +110,7 @@ var TsDFolder = &types.TraversalSpec{
 // Datacenter/VM traversal Spec.
 var TsDatacenterVM = &types.TraversalSpec{
 	Type: Datacenter,
-	Path: VmFolder,
+	Path: fVmFolder,
 	SelectSet: []types.BaseSelectionSpec{
 		&types.SelectionSpec{
 			Name: TraverseFolders,
@@ -83,7 +122,7 @@ var TsDatacenterVM = &types.TraversalSpec{
 // Datacenter/Host traversal Spec.
 var TsDatacenterHost = &types.TraversalSpec{
 	Type: Datacenter,
-	Path: HostFolder,
+	Path: fHostFolder,
 	SelectSet: []types.BaseSelectionSpec{
 		&types.SelectionSpec{
 			Name: TraverseFolders,
@@ -95,7 +134,7 @@ var TsDatacenterHost = &types.TraversalSpec{
 // Datacenter/Host traversal Spec.
 var TsClusterHostSystem = &types.TraversalSpec{
 	Type: Cluster,
-	Path: "host",
+	Path: fHost,
 	SelectSet: []types.BaseSelectionSpec{
 		&types.SelectionSpec{
 			Name: TraverseFolders,
@@ -107,7 +146,7 @@ var TsClusterHostSystem = &types.TraversalSpec{
 // Datacenter/Host traversal Spec.
 var TsDatacenterNet = &types.TraversalSpec{
 	Type: Datacenter,
-	Path: NetFolder,
+	Path: fNetFolder,
 	SelectSet: []types.BaseSelectionSpec{
 		&types.SelectionSpec{
 			Name: TraverseFolders,
@@ -119,7 +158,7 @@ var TsDatacenterNet = &types.TraversalSpec{
 // Datacenter/Datastore traversal Spec.
 var TsDatacenterDatastore = &types.TraversalSpec{
 	Type: Datacenter,
-	Path: DsFolder,
+	Path: fDsFolder,
 	SelectSet: []types.BaseSelectionSpec{
 		&types.SelectionSpec{
 			Name: TraverseFolders,
@@ -134,7 +173,7 @@ var TsRootFolder = &types.TraversalSpec{
 		Name: TraverseFolders,
 	},
 	Type: Folder,
-	Path: ChildEntity,
+	Path: fChildEntity,
 	SelectSet: []types.BaseSelectionSpec{
 		TsDFolder,
 		TsDatacenterVM,
@@ -146,7 +185,7 @@ var TsRootFolder = &types.TraversalSpec{
 }
 
 func init() {
-	logger := logging.WithName("")
+	logger := logging.WithName("vsphere")
 	logger.Reset()
 	Log = &logger
 }
@@ -154,8 +193,10 @@ func init() {
 //
 // A VMWare reconciler.
 type Reconciler struct {
-	// The vcenter host.
+	// The vsphere host.
 	host string
+	// Provider
+	provider *api.Provider
 	// Credentials secret: {user:,password}.
 	secret *core.Secret
 	// DB client.
@@ -170,11 +211,12 @@ type Reconciler struct {
 
 //
 // New reconciler.
-func New(host string, secret *core.Secret, db libmodel.DB) *Reconciler {
+func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) *Reconciler {
 	return &Reconciler{
-		host:   host,
-		secret: secret,
-		db:     db,
+		host:     provider.Spec.URL,
+		provider: provider,
+		secret:   secret,
+		db:       db,
 	}
 }
 
@@ -182,6 +224,12 @@ func New(host string, secret *core.Secret, db libmodel.DB) *Reconciler {
 // The name.
 func (r *Reconciler) Name() string {
 	return r.host
+}
+
+//
+// The owner.
+func (r *Reconciler) Owner() meta.Object {
+	return r.provider
 }
 
 //
@@ -352,72 +400,86 @@ func (r *Reconciler) propertySpec() []types.PropertySpec {
 		{ // Folder
 			Type: Folder,
 			PathSet: []string{
-				"name",
-				"childEntity",
-				"parent",
+				fName,
+				fParent,
+				fChildEntity,
 			},
 		},
 		{ // Datacenter
 			Type: Datacenter,
 			PathSet: []string{
-				"name",
-				VmFolder,
-				HostFolder,
-				NetFolder,
-				DsFolder,
-				"parent",
+				fName,
+				fParent,
+				fVmFolder,
+				fHostFolder,
+				fNetFolder,
+				fDsFolder,
 			},
 		},
 		{ // Cluster
 			Type: Cluster,
 			PathSet: []string{
-				"name",
-				"configuration.dasVmConfig",
-				"configuration.dasConfig.enabled",
-				"configuration.drsConfig",
-				"host",
-				"parent",
+				fName,
+				fParent,
+				fDasEnabled,
+				fDasVmCfg,
+				fDrsEnabled,
+				fDrsVmBehavior,
+				fDrsVmCfg,
+				fHost,
+				fNetwork,
+				fDatastore,
 			},
 		},
 		{ // Host
 			Type: Host,
 			PathSet: []string{
-				"name",
-				"config.product.name",
-				"config.product.version",
-				"summary.runtime.inMaintenanceMode",
-				"datastore",
-				"network",
-				"vm",
-				"parent",
+				fName,
+				fParent,
+				fProductName,
+				fProductVersion,
+				fInMaintMode,
+				fDatastore,
+				fNetwork,
+				fVm,
 			},
 		},
 		{ // Network
 			Type: Network,
 			PathSet: []string{
-				"name",
-				"tag",
-				"parent",
+				fName,
+				fParent,
+				fTag,
 			},
 		},
 		{ // Datastore
 			Type: Datastore,
 			PathSet: []string{
-				"name",
-				"summary.type",
-				"summary.capacity",
-				"summary.freeSpace",
-				"summary.maintenanceMode",
-				"host",
-				"parent",
+				fName,
+				fParent,
+				fDsType,
+				fCapacity,
+				fFreeSpace,
+				fDsMaintMode,
+				fHost,
 			},
 		},
 		{ // VM
 			Type: VirtualMachine,
 			PathSet: []string{
-				"name",
-				"summary",
-				"parent",
+				fName,
+				fParent,
+				fUUID,
+				fFirmware,
+				fCpuAffinity,
+				fCpuHotAddEnabled,
+				fCpuHotRemoveEnabled,
+				fMemoryHotAddEnabled,
+				fNumCpu,
+				fMemorySize,
+				fGuestName,
+				fBalloonedMemory,
+				fVmIpAddress,
 			},
 		},
 	}
