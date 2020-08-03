@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"github.com/go-logr/logr"
 	liberr "github.com/konveyor/controller/pkg/error"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/storage/names"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
-	"sync"
 )
 
 const (
@@ -17,22 +16,15 @@ const (
 )
 
 //
-// Protect the history.
-// Cannot be part of Logger as logr interface requires
-// some by-value method receivers.
-var mutex sync.RWMutex
-
-//
 // Logger
 // Delegates functionality to the wrapped `Real` logger.
 // Provides:
-//   - Prevents duplicate logging of the same error.
 //   - Provides a `Trace()` method for convenience and brevity.
 //   - Prevent spamming the log with `Conflict` errors.
+//   - Handles wrapped errors.
 type Logger struct {
-	Real    logr.Logger
-	history map[error]bool
-	name    string
+	Real logr.Logger
+	name string
 }
 
 //
@@ -48,15 +40,11 @@ func WithName(name string) Logger {
 
 //
 // Reset the logger.
-// Updates the generated correlation suffix in the name and
-// clears the reported error history.
+// Updates the generated correlation suffix in the name.
 func (l *Logger) Reset() {
-	mutex.Lock()
-	defer mutex.Unlock()
 	name := fmt.Sprintf("%s|", l.name)
 	name = names.SimpleNameGenerator.GenerateName(name)
 	l.Real = logf.Log.WithName(name)
-	l.history = make(map[error]bool)
 }
 
 //
@@ -73,19 +61,14 @@ func (l Logger) Info(message string, kvpair ...interface{}) {
 
 //
 // Logs an error.
-// Previously logged errors are ignored.
-// `Conflict` errors are not logged.
 func (l Logger) Error(err error, message string, kvpair ...interface{}) {
 	if err == nil {
 		return
 	}
-	mutex.Lock()
-	defer mutex.Unlock()
 	le, wrapped := err.(*liberr.Error)
 	if wrapped {
 		err = le.Unwrap()
-		_, found := l.history[err]
-		if found || errors.IsConflict(err) {
+		if k8serr.IsConflict(err) {
 			return
 		}
 		kvpair = append(
@@ -95,15 +78,18 @@ func (l Logger) Error(err error, message string, kvpair ...interface{}) {
 			Stack,
 			le.Stack())
 		l.Real.Info(message, kvpair...)
-		l.history[err] = true
-	} else {
-		_, found := l.history[err]
-		if found || errors.IsConflict(err) {
-			return
-		}
-		l.Real.Error(err, message, kvpair...)
-		l.history[err] = true
+		return
 	}
+	if wErr, wrapped := err.(interface {
+		Unwrap() error
+	}); wrapped {
+		err = wErr.Unwrap()
+	}
+	if err == nil || k8serr.IsConflict(err) {
+		return
+	}
+
+	l.Real.Error(err, message, kvpair...)
 }
 
 //

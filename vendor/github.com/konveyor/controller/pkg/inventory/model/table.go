@@ -458,6 +458,9 @@ func (t Table) Fields(model interface{}) ([]*Field, error) {
 					Value: &fv,
 				})
 		case reflect.Int,
+			reflect.Int8,
+			reflect.Int16,
+			reflect.Int32,
 			reflect.Int64:
 			fields = append(
 				fields,
@@ -769,6 +772,9 @@ func (f *Field) Validate() error {
 			return liberr.Wrap(err)
 		}
 	case reflect.Int,
+		reflect.Int8,
+		reflect.Int16,
+		reflect.Int32,
 		reflect.Int64:
 	default:
 		err := errors.New("must be: (string, int)")
@@ -788,6 +794,9 @@ func (f *Field) Pull() interface{} {
 		f.string = f.Value.String()
 		return f.string
 	case reflect.Int,
+		reflect.Int8,
+		reflect.Int16,
+		reflect.Int32,
 		reflect.Int64:
 		f.int = f.Value.Int()
 		return f.int
@@ -803,6 +812,9 @@ func (f *Field) Ptr() interface{} {
 	case reflect.String:
 		return &f.string
 	case reflect.Int,
+		reflect.Int8,
+		reflect.Int16,
+		reflect.Int32,
 		reflect.Int64:
 		return &f.int
 	}
@@ -818,6 +830,9 @@ func (f *Field) Push() {
 	case reflect.String:
 		f.Value.SetString(f.string)
 	case reflect.Int,
+		reflect.Int8,
+		reflect.Int16,
+		reflect.Int32,
 		reflect.Int64:
 		f.Value.SetInt(f.int)
 	}
@@ -835,6 +850,9 @@ func (f *Field) DDL() string {
 	case reflect.String:
 		part[1] = "TEXT"
 	case reflect.Int,
+		reflect.Int8,
+		reflect.Int16,
+		reflect.Int32,
 		reflect.Int64:
 		part[1] = "INTEGER"
 	}
@@ -862,6 +880,9 @@ func (f *Field) Empty() bool {
 	case reflect.String:
 		return len(f.string) == 0
 	case reflect.Int,
+		reflect.Int8,
+		reflect.Int16,
+		reflect.Int32,
 		reflect.Int64:
 		return f.int == 0
 	}

@@ -25,10 +25,10 @@ import (
 //
 // Provider types.
 const (
-	// Openshift
-	Openshift = "openshift"
-	// VMWare
-	VMWare = "vmware"
+	// OpenShift
+	OpenShift = "openshift"
+	// vSphere
+	VSphere = "vsphere"
 )
 
 //
@@ -75,4 +75,10 @@ type ProviderList struct {
 
 func init() {
 	SchemeBuilder.Register(&Provider{}, &ProviderList{})
+}
+
+//
+// The provider type.
+func (p *Provider) Type() string {
+	return p.Spec.Type
 }
