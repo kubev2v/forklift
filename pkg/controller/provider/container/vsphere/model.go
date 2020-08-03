@@ -1,9 +1,8 @@
-package vmware
+package vsphere
 
 import (
-	"github.com/konveyor/virt-controller/pkg/controller/provider/model"
+	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"
 	"github.com/vmware/govmomi/vim25/types"
-	"strconv"
 )
 
 //
@@ -24,28 +23,21 @@ type Base struct {
 //
 // Apply the update to the model `Base`.
 func (v *Base) Apply(m *model.Base, u types.ObjectUpdate) {
-	object := model.Object{}
-	if m.Object != "" {
-		object = m.DecodeObject()
-	}
 	for _, p := range u.ChangeSet {
 		switch p.Op {
 		case Assign:
 			switch p.Name {
-			case "name":
+			case fName:
 				if s, cast := p.Val.(string); cast {
 					m.Name = s
 				}
-			case "parent":
+			case fParent:
 				ref := Ref{}
 				ref.With(p.Val)
-				m.EncodeParent(ref.Ref)
+				m.Parent = ref.Encode()
 			}
-			object[p.Name] = p.Val
 		}
 	}
-
-	m.EncodeObject(object)
 }
 
 //
@@ -61,8 +53,16 @@ func (v *Ref) With(ref types.AnyType) {
 	if r, cast := ref.(types.ManagedObjectReference); cast {
 		v.ID = r.Value
 		switch r.Type {
+		case Folder:
+			v.Kind = model.FolderKind
+		case Datacenter:
+			v.Kind = model.DatacenterKind
 		case Cluster:
 			v.Kind = model.ClusterKind
+		case Network:
+			v.Kind = model.NetKind
+		case Datastore:
+			v.Kind = model.DsKind
 		case Host:
 			v.Kind = model.HostKind
 		case VirtualMachine:
@@ -86,16 +86,22 @@ func (v *RefList) With(ref types.AnyType) {
 	if a, cast := ref.(types.ArrayOfManagedObjectReference); cast {
 		list := a.ManagedObjectReference
 		for _, r := range list {
-			ref := Ref{}
-			ref.With(r)
-			v.list = append(
-				v.list,
-				model.Ref{
-					Kind: ref.Kind,
-					ID:   ref.ID,
-				})
+			v.Append(r)
 		}
 	}
+}
+
+//
+// Append reference.
+func (v *RefList) Append(r types.ManagedObjectReference) {
+	ref := Ref{}
+	ref.With(r)
+	v.list = append(
+		v.list,
+		model.Ref{
+			Kind: ref.Kind,
+			ID:   ref.ID,
+		})
 }
 
 //
@@ -120,7 +126,7 @@ func (v *FolderAdapter) Apply(u types.ObjectUpdate) {
 		switch p.Op {
 		case Assign:
 			switch p.Name {
-			case ChildEntity:
+			case fChildEntity:
 				list := RefList{}
 				list.With(p.Val)
 				v.model.Children = list.Encode()
@@ -157,22 +163,22 @@ func (v *DatacenterAdapter) Apply(u types.ObjectUpdate) {
 		switch p.Op {
 		case Assign:
 			switch p.Name {
-			case VmFolder:
+			case fVmFolder:
 				ref := Ref{}
 				ref.With(p.Val)
-				v.model.VM = ref.Encode()
-			case HostFolder:
+				v.model.Vms = ref.Encode()
+			case fHostFolder:
 				ref := Ref{}
 				ref.With(p.Val)
-				v.model.Cluster = ref.Encode()
-			case NetFolder:
+				v.model.Clusters = ref.Encode()
+			case fNetFolder:
 				ref := Ref{}
 				ref.With(p.Val)
-				v.model.Network = ref.Encode()
-			case DsFolder:
+				v.model.Networks = ref.Encode()
+			case fDsFolder:
 				ref := Ref{}
 				ref.With(p.Val)
-				v.model.Datastore = ref.Encode()
+				v.model.Datastores = ref.Encode()
 			}
 		}
 	}
@@ -198,10 +204,48 @@ func (v *ClusterAdapter) Apply(u types.ObjectUpdate) {
 		switch p.Op {
 		case Assign:
 			switch p.Name {
-			case "host":
+			case fHost:
 				refList := RefList{}
 				refList.With(p.Val)
-				v.model.Host = refList.Encode()
+				v.model.Hosts = refList.Encode()
+			case fNetwork:
+				refList := RefList{}
+				refList.With(p.Val)
+				v.model.Networks = refList.Encode()
+			case fDatastore:
+				refList := RefList{}
+				refList.With(p.Val)
+				v.model.Datastores = refList.Encode()
+			case fDasEnabled:
+				if b, cast := p.Val.(bool); cast {
+					jb := model.Bool(b)
+					v.model.DasEnabled = jb.Encode()
+				}
+			case fDasVmCfg:
+				refList := RefList{}
+				if list, cast := p.Val.([]types.ClusterDasVmConfigInfo); cast {
+					for _, v := range list {
+						refList.Append(v.Key)
+					}
+				}
+				v.model.DasVms = refList.Encode()
+			case fDrsEnabled:
+				if b, cast := p.Val.(bool); cast {
+					jb := model.Bool(b)
+					v.model.DrsEnabled = jb.Encode()
+				}
+			case fDrsVmCfg:
+				refList := RefList{}
+				if list, cast := p.Val.([]types.ClusterDrsVmConfigInfo); cast {
+					for _, v := range list {
+						refList.Append(v.Key)
+					}
+				}
+				v.model.DrsVms = refList.Encode()
+			case fDrsVmBehavior:
+				if b, cast := p.Val.(types.DrsBehavior); cast {
+					v.model.DrsBehavior = string(b)
+				}
 			}
 		}
 	}
@@ -227,14 +271,31 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 		switch p.Op {
 		case Assign:
 			switch p.Name {
-			case "summary.runtime.inMaintenanceMode":
+			case fInMaintMode:
 				if b, cast := p.Val.(bool); cast {
-					v.model.Maintenance = strconv.FormatBool(b)
+					jb := model.Bool(b)
+					v.model.InMaintenanceMode = jb.Encode()
 				}
-			case "vm":
+			case fVm:
 				refList := RefList{}
 				refList.With(p.Val)
-				v.model.VM = refList.Encode()
+				v.model.Vms = refList.Encode()
+			case fProductName:
+				if s, cast := p.Val.(string); cast {
+					v.model.ProductName = s
+				}
+			case fProductVersion:
+				if s, cast := p.Val.(string); cast {
+					v.model.ProductVersion = s
+				}
+			case fNetwork:
+				refList := RefList{}
+				refList.With(p.Val)
+				v.model.Networks = refList.Encode()
+			case fDatastore:
+				refList := RefList{}
+				refList.With(p.Val)
+				v.model.Datastores = refList.Encode()
 			}
 		}
 	}
@@ -262,7 +323,7 @@ func (v *NetworkAdapter) Apply(u types.ObjectUpdate) {
 		switch p.Op {
 		case Assign:
 			switch p.Name {
-			case "tag":
+			case fTag:
 				if s, cast := p.Val.(string); cast {
 					v.model.Tag = s
 				}
@@ -293,21 +354,21 @@ func (v *DatastoreAdapter) Apply(u types.ObjectUpdate) {
 		switch p.Op {
 		case Assign:
 			switch p.Name {
-			case "summary.type":
+			case fDsType:
 				if s, cast := p.Val.(string); cast {
 					v.model.Type = s
 				}
-			case "summary.capacity":
+			case fCapacity:
 				if n, cast := p.Val.(int64); cast {
 					v.model.Capacity = n
 				}
-			case "summary.freeSpace":
+			case fFreeSpace:
 				if n, cast := p.Val.(int64); cast {
 					v.model.Free = n
 				}
-			case "summary.maintenanceMode":
+			case fDsMaintMode:
 				if s, cast := p.Val.(string); cast {
-					v.model.Maintenance = s
+					v.model.MaintenanceMode = s
 				}
 			}
 		}
@@ -332,4 +393,58 @@ func (v *VmAdapter) Model() model.Model {
 // Apply the update to the model.
 func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 	v.Base.Apply(&v.model.Base, u)
+	for _, p := range u.ChangeSet {
+		switch p.Op {
+		case Assign:
+			switch p.Name {
+			case fUUID:
+				if s, cast := p.Val.(string); cast {
+					v.model.UUID = s
+				}
+			case fFirmware:
+				if s, cast := p.Val.(string); cast {
+					v.model.Firmware = s
+				}
+			case fCpuAffinity:
+				if s, cast := p.Val.(string); cast {
+					v.model.CpuAffinity = string(s)
+				}
+			case fCpuHotAddEnabled:
+				if b, cast := p.Val.(bool); cast {
+					jb := model.Bool(b)
+					v.model.CpuHotAddEnabled = jb.Encode()
+				}
+			case fCpuHotRemoveEnabled:
+				if b, cast := p.Val.(bool); cast {
+					jb := model.Bool(b)
+					v.model.CpuHotRemoveEnabled = jb.Encode()
+				}
+			case fMemoryHotAddEnabled:
+				if b, cast := p.Val.(bool); cast {
+					jb := model.Bool(b)
+					v.model.MemoryHotAddEnabled = jb.Encode()
+				}
+			case fNumCpu:
+				if n, cast := p.Val.(int32); cast {
+					v.model.CpuCount = n
+				}
+			case fMemorySize:
+				if n, cast := p.Val.(int32); cast {
+					v.model.MemorySizeMB = n
+				}
+			case fGuestName:
+				if s, cast := p.Val.(string); cast {
+					v.model.GuestName = s
+				}
+			case fBalloonedMemory:
+				if n, cast := p.Val.(int32); cast {
+					v.model.BalloonedMemory = n
+				}
+			case fVmIpAddress:
+				if s, cast := p.Val.(string); cast {
+					v.model.IpAddress = s
+				}
+			}
+		}
+	}
 }

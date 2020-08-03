@@ -4,10 +4,13 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/model"
+	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"
+	"github.com/konveyor/virt-controller/pkg/controller/provider/web/base"
 	"net/http"
 )
 
+//
+// Routes.
 const (
 	NetworksRoot = Root + "/networks"
 	NetworkRoot  = NetworksRoot + "/:network"
@@ -16,7 +19,7 @@ const (
 //
 // Network handler.
 type NetworkHandler struct {
-	Base
+	base.Handler
 }
 
 //
@@ -25,12 +28,6 @@ func (h *NetworkHandler) AddRoutes(e *gin.Engine) {
 	e.GET(NetworksRoot, h.List)
 	e.GET(NetworksRoot+"/", h.List)
 	e.GET(NetworkRoot, h.Get)
-}
-
-//
-// Prepare to handle the request.
-func (h *NetworkHandler) Prepare(ctx *gin.Context) int {
-	return h.Base.Prepare(ctx)
 }
 
 //
@@ -53,11 +50,12 @@ func (h NetworkHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	content := []*Network{}
+	content := []interface{}{}
 	for _, m := range list {
 		r := &Network{}
-		r.With(&m, false)
-		content = append(content, r)
+		r.With(&m)
+		obj := r.Object(h.Detail)
+		content = append(content, obj)
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -88,7 +86,7 @@ func (h NetworkHandler) Get(ctx *gin.Context) {
 		return
 	}
 	r := &Network{}
-	r.With(m, true)
+	r.With(m)
 
 	ctx.JSON(http.StatusOK, r)
 }
@@ -96,19 +94,23 @@ func (h NetworkHandler) Get(ctx *gin.Context) {
 //
 // REST Resource.
 type Network struct {
-	ID     string       `json:"id"`
-	Name   string       `json:"name"`
-	Tag    string       `json:"tag"`
-	Object model.Object `json:"object,omitempty"`
+	base.Resource
+	Tag string `json:"tag"`
 }
 
 //
 // Build the resource using the model.
-func (r *Network) With(m *model.Network, detail bool) {
-	r.ID = m.ID
-	r.Name = m.Name
+func (r *Network) With(m *model.Network) {
+	r.Resource.With(&m.Base)
 	r.Tag = m.Tag
-	if detail {
-		r.Object = m.DecodeObject()
+}
+
+//
+// Render.
+func (r *Network) Object(detail bool) interface{} {
+	if !detail {
+		return r.Resource
 	}
+
+	return r
 }

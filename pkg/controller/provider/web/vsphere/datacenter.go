@@ -4,10 +4,13 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/model"
+	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"
+	"github.com/konveyor/virt-controller/pkg/controller/provider/web/base"
 	"net/http"
 )
 
+//
+// Routes.
 const (
 	DatacentersRoot = Root + "/datacenters"
 	DatacenterRoot  = DatacentersRoot + "/:datacenter"
@@ -16,12 +19,15 @@ const (
 	DcHostsRoot     = DatacenterRoot + "/hosts"
 	DcNetsRoot      = DatacenterRoot + "/networks"
 	DcDssRoot       = DatacenterRoot + "/datastores"
+	DcHostTree      = DatacenterRoot + "/tree/host"
+	DcVmTree        = DatacenterRoot + "/tree/vm"
 )
 
 //
 // Datacenter handler.
 type DatacenterHandler struct {
-	Base
+	base.Handler
+	// Selected Datacenter.
 	datacenter *model.Datacenter
 }
 
@@ -36,13 +42,16 @@ func (h *DatacenterHandler) AddRoutes(e *gin.Engine) {
 	e.GET(DcHostsRoot, h.ListHost)
 	e.GET(DcNetsRoot, h.ListNetwork)
 	e.GET(DcDssRoot, h.ListDatastore)
+	e.GET(DcHostTree, h.HostTree)
+	e.GET(DcVmTree, h.VmTree)
 }
 
 //
 // Prepare to handle the request.
 func (h *DatacenterHandler) Prepare(ctx *gin.Context) int {
-	status := h.Base.Prepare(ctx)
+	status := h.Handler.Prepare(ctx)
 	if status != http.StatusOK {
+		ctx.Status(status)
 		return status
 	}
 	id := ctx.Param("datacenter")
@@ -88,11 +97,12 @@ func (h DatacenterHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	content := []*Datacenter{}
+	content := []interface{}{}
 	for _, m := range list {
 		r := &Datacenter{}
-		r.With(&m, false)
-		content = append(content, r)
+		r.With(&m)
+		obj := r.Object(h.Detail)
+		content = append(content, obj)
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -107,7 +117,7 @@ func (h DatacenterHandler) Get(ctx *gin.Context) {
 		return
 	}
 	r := &Datacenter{}
-	r.With(h.datacenter, true)
+	r.With(h.datacenter)
 
 	ctx.JSON(http.StatusOK, r)
 }
@@ -121,23 +131,25 @@ func (h DatacenterHandler) ListVM(ctx *gin.Context) {
 		return
 	}
 	db := h.Reconciler.DB()
-	content := []VM{}
-	tr := model.DatacenterTraversal{
-		Root: h.datacenter,
-		DB:   db,
+	tr := Tree{
+		Root:    h.datacenter,
+		Leaf:    model.VmKind,
+		DB:      db,
+		Flatten: true,
+		Detail: map[string]bool{
+			model.VmKind: h.Detail,
+		},
 	}
-	traversed, err := tr.VmList()
+	content := []interface{}{}
+	tree, err := tr.Build()
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	for _, vm := range traversed {
-		r := VM{}
-		r.With(vm, false)
-		content = append(content, r)
+	for _, node := range tree.Children {
+		content = append(content, node.Object)
 	}
-
 	ctx.JSON(http.StatusOK, content)
 }
 
@@ -150,21 +162,24 @@ func (h DatacenterHandler) ListCluster(ctx *gin.Context) {
 		return
 	}
 	db := h.Reconciler.DB()
-	content := []Cluster{}
-	tr := model.DatacenterTraversal{
-		Root: h.datacenter,
-		DB:   db,
+	tr := Tree{
+		Root:    h.datacenter,
+		Leaf:    model.ClusterKind,
+		DB:      db,
+		Flatten: true,
+		Detail: map[string]bool{
+			model.ClusterKind: h.Detail,
+		},
 	}
-	traversed, err := tr.ClusterList()
+	content := []interface{}{}
+	tree, err := tr.Build()
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	for _, cluster := range traversed {
-		r := Cluster{}
-		r.With(cluster, false)
-		content = append(content, r)
+	for _, node := range tree.Children {
+		content = append(content, node.Object)
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -179,21 +194,24 @@ func (h DatacenterHandler) ListHost(ctx *gin.Context) {
 		return
 	}
 	db := h.Reconciler.DB()
-	content := []Host{}
-	tr := model.DatacenterTraversal{
-		Root: h.datacenter,
-		DB:   db,
+	tr := Tree{
+		Root:    h.datacenter,
+		Leaf:    model.HostKind,
+		DB:      db,
+		Flatten: true,
+		Detail: map[string]bool{
+			model.HostKind: h.Detail,
+		},
 	}
-	traversed, err := tr.HostList()
+	content := []interface{}{}
+	tree, err := tr.Build()
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	for _, host := range traversed {
-		r := Host{}
-		r.With(host, false)
-		content = append(content, r)
+	for _, node := range tree.Children {
+		content = append(content, node.Object)
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -208,21 +226,24 @@ func (h DatacenterHandler) ListNetwork(ctx *gin.Context) {
 		return
 	}
 	db := h.Reconciler.DB()
-	content := []Network{}
-	tr := model.DatacenterTraversal{
-		Root: h.datacenter,
-		DB:   db,
+	tr := Tree{
+		Root:    h.datacenter,
+		Leaf:    model.NetKind,
+		DB:      db,
+		Flatten: true,
+		Detail: map[string]bool{
+			model.NetKind: h.Detail,
+		},
 	}
-	traversed, err := tr.NetList()
+	content := []interface{}{}
+	tree, err := tr.Build()
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	for _, net := range traversed {
-		r := Network{}
-		r.With(net, false)
-		content = append(content, r)
+	for _, node := range tree.Children {
+		content = append(content, node.Object)
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -237,21 +258,78 @@ func (h DatacenterHandler) ListDatastore(ctx *gin.Context) {
 		return
 	}
 	db := h.Reconciler.DB()
-	content := []Datastore{}
-	tr := model.DatacenterTraversal{
-		Root: h.datacenter,
-		DB:   db,
+	tr := Tree{
+		Root:    h.datacenter,
+		Leaf:    model.DsKind,
+		DB:      db,
+		Flatten: true,
+		Detail: map[string]bool{
+			model.DsKind: h.Detail,
+		},
 	}
-	traversed, err := tr.DsList()
+	content := []interface{}{}
+	tree, err := tr.Build()
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	for _, ds := range traversed {
-		r := Datastore{}
-		r.With(ds, false)
-		content = append(content, r)
+	for _, node := range tree.Children {
+		content = append(content, node.Object)
+	}
+
+	ctx.JSON(http.StatusOK, content)
+}
+
+//
+// VM Tree.
+func (h DatacenterHandler) VmTree(ctx *gin.Context) {
+	status := h.Prepare(ctx)
+	if status != http.StatusOK {
+		ctx.Status(status)
+		return
+	}
+	db := h.Reconciler.DB()
+	tr := Tree{
+		Root: h.datacenter,
+		Leaf: model.VmKind,
+		DB:   db,
+		Detail: map[string]bool{
+			model.VmKind: h.Detail,
+		},
+	}
+	content, err := tr.Build()
+	if err != nil {
+		Log.Trace(err)
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, content)
+}
+
+//
+// Host Tree.
+func (h DatacenterHandler) HostTree(ctx *gin.Context) {
+	status := h.Prepare(ctx)
+	if status != http.StatusOK {
+		ctx.Status(status)
+		return
+	}
+	db := h.Reconciler.DB()
+	tr := Tree{
+		Root: h.datacenter,
+		Leaf: model.HostKind,
+		DB:   db,
+		Detail: map[string]bool{
+			model.HostKind: h.Detail,
+		},
+	}
+	content, err := tr.Build()
+	if err != nil {
+		Log.Trace(err)
+		ctx.Status(http.StatusInternalServerError)
+		return
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -260,17 +338,21 @@ func (h DatacenterHandler) ListDatastore(ctx *gin.Context) {
 //
 // REST Resource.
 type Datacenter struct {
-	ID     string       `json:"id"`
-	Name   string       `json:"name"`
-	Object model.Object `json:"object,omitempty"`
+	base.Resource
 }
 
 //
 // Build the resource using the model.
-func (r *Datacenter) With(m *model.Datacenter, detail bool) {
-	r.ID = m.ID
-	r.Name = m.Name
-	if detail {
-		r.Object = m.DecodeObject()
+func (r *Datacenter) With(m *model.Datacenter) {
+	r.Resource.With(&m.Base)
+}
+
+//
+// Render.
+func (r *Datacenter) Object(detail bool) interface{} {
+	if !detail {
+		return r.Resource
 	}
+
+	return r
 }

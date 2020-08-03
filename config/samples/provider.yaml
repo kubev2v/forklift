@@ -5,7 +5,7 @@ metadata:
   name: test
   namespace: openshift-migration
 spec:
-  type: "vmware"
+  type: "vsphere"
   secret:
     namespce: ""
     name: ""

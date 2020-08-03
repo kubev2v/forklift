@@ -4,10 +4,13 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/model"
+	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"
+	"github.com/konveyor/virt-controller/pkg/controller/provider/web/base"
 	"net/http"
 )
 
+//
+// Routes.
 const (
 	VMsRoot = Root + "/vms"
 	VMRoot  = VMsRoot + "/:vm"
@@ -16,7 +19,7 @@ const (
 //
 // Virtual Machine handler.
 type VMHandler struct {
-	Base
+	base.Handler
 }
 
 //
@@ -25,12 +28,6 @@ func (h *VMHandler) AddRoutes(e *gin.Engine) {
 	e.GET(VMsRoot, h.List)
 	e.GET(VMsRoot+"/", h.List)
 	e.GET(VMRoot, h.Get)
-}
-
-//
-// Prepare to handle the request.
-func (h *VMHandler) Prepare(ctx *gin.Context) int {
-	return h.Base.Prepare(ctx)
 }
 
 //
@@ -53,11 +50,12 @@ func (h VMHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	content := []*VM{}
+	content := []interface{}{}
 	for _, m := range list {
 		r := &VM{}
-		r.With(&m, false)
-		content = append(content, r)
+		r.With(&m)
+		obj := r.Object(h.Detail)
+		content = append(content, obj)
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -88,7 +86,7 @@ func (h VMHandler) Get(ctx *gin.Context) {
 		return
 	}
 	r := &VM{}
-	r.With(m, true)
+	r.With(m)
 
 	ctx.JSON(http.StatusOK, r)
 }
@@ -96,17 +94,43 @@ func (h VMHandler) Get(ctx *gin.Context) {
 //
 // REST Resource.
 type VM struct {
-	ID     string       `json:"id"`
-	Name   string       `json:"name"`
-	Object model.Object `json:"object,omitempty"`
+	base.Resource
+	UUID                string     `json:"uuid"`
+	Firmware            string     `json:"firmware"`
+	CpuAffinity         string     `json:"cpuAffinity"`
+	CpuHotAddEnabled    model.Bool `json:"cpuHostAddEnabled"`
+	CpuHotRemoveEnabled model.Bool `json:"cpuHostRemoveEnabled"`
+	MemoryHotAddEnabled model.Bool `json:"memoryHotAddEnabled"`
+	CpuCount            int32      `json:"cpuCount"`
+	MemorySizeMB        int32      `json:"memorySizeMB"`
+	GuestName           string     `json:"guestName"`
+	BalloonedMemory     int32      `json:"balloonedMemory"`
+	IpAddress           string     `json:"ipAddress"`
 }
 
 //
 // Build the resource using the model.
-func (r *VM) With(m *model.VM, detail bool) {
-	r.ID = m.ID
-	r.Name = m.Name
-	if detail {
-		r.Object = m.DecodeObject()
+func (r *VM) With(m *model.VM) {
+	r.Resource.With(&m.Base)
+	r.UUID = m.UUID
+	r.Firmware = m.Firmware
+	r.CpuAffinity = m.CpuAffinity
+	r.CpuHotAddEnabled = *model.BoolPtr(false).With(m.CpuHotAddEnabled)
+	r.CpuHotRemoveEnabled = *model.BoolPtr(false).With(m.CpuHotRemoveEnabled)
+	r.MemoryHotAddEnabled = *model.BoolPtr(false).With(m.MemoryHotAddEnabled)
+	r.CpuCount = m.CpuCount
+	r.MemorySizeMB = m.MemorySizeMB
+	r.GuestName = m.GuestName
+	r.BalloonedMemory = m.BalloonedMemory
+	r.IpAddress = m.IpAddress
+}
+
+//
+// Render.
+func (r *VM) Object(detail bool) interface{} {
+	if !detail {
+		return r.Resource
 	}
+
+	return r
 }

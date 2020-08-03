@@ -14,6 +14,9 @@ type Thing struct {
 	ID       int    `sql:"key"`
 	Name     string `sql:"key"`
 	Revision int64  `sql:"revision"`
+	Int8     int8   `sql:"int8"`
+	Int16    int16  `sql:"int16"`
+	Int32    int32  `sql:"int32"`
 	labels   Labels
 }
 
@@ -26,7 +29,10 @@ func (m *Thing) SetPk() {
 }
 
 func (m *Thing) String() string {
-	return m.Name
+	return fmt.Sprintf(
+		"Thing: id: %d, name:%s",
+		m.ID,
+		m.Name)
 }
 
 func (m *Thing) Equals(other Model) bool {
@@ -37,21 +43,64 @@ func (m *Thing) Labels() Labels {
 	return m.labels
 }
 
+type TestHandler struct {
+	name    string
+	created []int
+	updated []int
+	deleted []int
+	err     []error
+	done    bool
+}
+
+func (w *TestHandler) Created(model Model) {
+	if thing, cast := model.(*Thing); cast {
+		w.created = append(w.created, thing.ID)
+	}
+}
+
+func (w *TestHandler) Updated(model Model) {
+	if thing, cast := model.(*Thing); cast {
+		w.updated = append(w.updated, thing.ID)
+	}
+}
+func (w *TestHandler) Deleted(model Model) {
+	if thing, cast := model.(*Thing); cast {
+		w.deleted = append(w.deleted, thing.ID)
+	}
+}
+
+func (w *TestHandler) Error(err error) {
+	w.err = append(w.err, err)
+}
+
+func (w *TestHandler) End() {
+}
+
 func TestModels(t *testing.T) {
 	var err error
+
+	g := gomega.NewGomegaWithT(t)
+
+	// Build the DB.
 	DB := New(
 		"/tmp/test.db",
 		&Label{},
 		&Thing{})
-	DB.Open(true)
-	client := DB.(*Client)
-
-	g := gomega.NewGomegaWithT(t)
+	err = DB.Open(true)
 	g.Expect(err).To(gomega.BeNil())
-	g.Expect(client.db).ToNot(gomega.BeNil())
+	g.Expect(DB.(*Client).db).ToNot(gomega.BeNil())
 
+	// Test create handler.
+	DB.Journal().Enable()
+	handlerA := &TestHandler{name: "A"}
+	watchA, err := DB.Watch(&Thing{}, handlerA)
+	g.Expect(watchA).ToNot(gomega.BeNil())
+	g.Expect(err).To(gomega.BeNil())
+
+	// Create a model.
 	thing := &Thing{
-		ID: 0,
+		ID:   0,
+		Name: "Elmer",
 		labels: Labels{
 			"role": "main",
 		},
@@ -104,18 +153,18 @@ func TestModels(t *testing.T) {
 	thing.ID = 1
 	tx, err := DB.Begin()
 	g.Expect(err).To(gomega.BeNil())
-	g.Expect(tx.ref).To(gomega.Equal(client.tx))
+	g.Expect(tx.ref).To(gomega.Equal(DB.(*Client).tx))
 	err = DB.Insert(thing)
 	g.Expect(err).To(gomega.BeNil())
 	err = DB.Get(thing)
 	g.Expect(errors.Is(err, NotFound)).To(gomega.BeTrue())
 	err = tx.Commit()
 	g.Expect(err).To(gomega.BeNil())
-	g.Expect(client.tx).To(gomega.BeNil())
+	g.Expect(DB.(*Client).tx).To(gomega.BeNil())
 	err = DB.Get(thing)
 	g.Expect(err).To(gomega.BeNil())
 
-	// Test Tx - rellback
+	// Test Tx - rollback
 	thing.ID = 2
 	tx, err = DB.Begin()
 	g.Expect(err).To(gomega.BeNil())
@@ -123,10 +172,42 @@ func TestModels(t *testing.T) {
 	g.Expect(err).To(gomega.BeNil())
 	err = DB.Get(thing)
 	g.Expect(errors.Is(err, NotFound)).To(gomega.BeTrue())
-	tx.rollback()
-	g.Expect(client.tx).To(gomega.BeNil())
+	tx.End()
+	g.Expect(DB.(*Client).tx).To(gomega.BeNil())
 	err = DB.Get(thing)
 	g.Expect(errors.Is(err, NotFound)).To(gomega.BeTrue())
+
+	handlerB := &TestHandler{name: "B"}
+	watchB, err := DB.Watch(&Thing{}, handlerB)
+	g.Expect(watchB).ToNot(gomega.BeNil())
+	g.Expect(err).To(gomega.BeNil())
+
+	created := []int{0, 1}
+	updated := []int{0, 0}
+	for i := 2; i < 100; i++ {
+		created = append(created, i)
+		thing.ID = i
+		err = DB.Insert(thing)
+		g.Expect(err).To(gomega.BeNil())
+	}
+
+	for i := 0; i < 10; i++ {
+		time.Sleep(time.Second)
+		if len(handlerA.created) != len(created) ||
+			len(handlerA.updated) != len(updated) ||
+			len(handlerB.created) != len(created) {
+			continue
+		} else {
+			break
+		}
+	}
+
+	g.Expect(handlerA.created).To(
+		gomega.Equal(created))
+	g.Expect(handlerA.updated).To(
+		gomega.Equal(updated))
+	g.Expect(handlerB.created).To(
+		gomega.Equal(created))
 }
 
 //

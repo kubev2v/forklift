@@ -4,10 +4,13 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/model"
+	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"
+	"github.com/konveyor/virt-controller/pkg/controller/provider/web/base"
 	"net/http"
 )
 
+//
+// Routes.
 const (
 	DatastoresRoot = Root + "/datastores"
 	DatastoreRoot  = DatastoresRoot + "/:datastore"
@@ -16,7 +19,7 @@ const (
 //
 // Datastore handler.
 type DatastoreHandler struct {
-	Base
+	base.Handler
 }
 
 //
@@ -25,12 +28,6 @@ func (h *DatastoreHandler) AddRoutes(e *gin.Engine) {
 	e.GET(DatastoresRoot, h.List)
 	e.GET(DatastoresRoot+"/", h.List)
 	e.GET(DatastoreRoot, h.Get)
-}
-
-//
-// Prepare to handle the request.
-func (h *DatastoreHandler) Prepare(ctx *gin.Context) int {
-	return h.Base.Prepare(ctx)
 }
 
 //
@@ -53,11 +50,12 @@ func (h DatastoreHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	content := []*Datastore{}
+	content := []interface{}{}
 	for _, m := range list {
 		r := &Datastore{}
-		r.With(&m, false)
-		content = append(content, r)
+		r.With(&m)
+		obj := r.Object(h.Detail)
+		content = append(content, obj)
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -73,7 +71,7 @@ func (h DatastoreHandler) Get(ctx *gin.Context) {
 	}
 	m := &model.Datastore{
 		Base: model.Base{
-			ID: ctx.Param("cluster"),
+			ID: ctx.Param("datastore"),
 		},
 	}
 	db := h.Reconciler.DB()
@@ -88,7 +86,7 @@ func (h DatastoreHandler) Get(ctx *gin.Context) {
 		return
 	}
 	r := &Datastore{}
-	r.With(m, true)
+	r.With(m)
 
 	ctx.JSON(http.StatusOK, r)
 }
@@ -96,25 +94,29 @@ func (h DatastoreHandler) Get(ctx *gin.Context) {
 //
 // REST Resource.
 type Datastore struct {
-	ID          string       `json:"id"`
-	Name        string       `json:"name"`
-	Type        string       `json:"type"`
-	Capacity    int64        `json:"capacity"`
-	Free        int64        `json:"free"`
-	Maintenance string       `json:"maintenance"`
-	Object      model.Object `json:"object,omitempty"`
+	base.Resource
+	Type            string `json:"type"`
+	Capacity        int64  `json:"capacity"`
+	Free            int64  `json:"free"`
+	MaintenanceMode string `json:"maintenance"`
 }
 
 //
 // Build the resource using the model.
-func (r *Datastore) With(m *model.Datastore, detail bool) {
-	r.ID = m.ID
-	r.Name = m.Name
+func (r *Datastore) With(m *model.Datastore) {
+	r.Resource.With(&m.Base)
 	r.Type = m.Type
 	r.Capacity = m.Capacity
 	r.Free = m.Free
-	r.Maintenance = m.Maintenance
-	if detail {
-		r.Object = m.DecodeObject()
+	r.MaintenanceMode = m.MaintenanceMode
+}
+
+//
+// Render.
+func (r *Datastore) Object(detail bool) interface{} {
+	if !detail {
+		return r.Resource
 	}
+
+	return r
 }
