@@ -25,16 +25,16 @@ import (
 	"github.com/konveyor/controller/pkg/logging"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
+	"github.com/konveyor/virt-controller/pkg/controller/provider/container"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/model"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/vmware"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web"
 	"github.com/konveyor/virt-controller/pkg/settings"
-	"github.com/pkg/errors"
 	core "k8s.io/api/core/v1"
 	clienterror "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
+	"os"
 	"path/filepath"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -52,9 +52,9 @@ var log = logging.WithName("provider")
 var Settings = &settings.Settings
 
 func init() {
-	model.Log = &log
+	container.Log = &log
 	web.Log = &log
-	vmware.Log = &log
+	model.Log = &log
 }
 
 //
@@ -202,18 +202,8 @@ func (r *Reconciler) updateContainer(provider *api.Provider) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	var rlr libcontainer.Reconciler
-	switch provider.Spec.Type {
-	case api.VMWare:
-		rlr = vmware.New(
-			provider.Spec.URL,
-			secret,
-			db)
-	default:
-		return errors.New("provider not supported")
-	}
 
-	r.container.Add(provider, rlr)
+	r.container.Add(container.Build(db, provider, secret))
 
 	return nil
 }
@@ -222,11 +212,13 @@ func (r *Reconciler) updateContainer(provider *api.Provider) error {
 // Build DB for provider.
 func (r *Reconciler) getDB(provider *api.Provider) libmodel.DB {
 	dir := "/tmp"
-	file := string(provider.UID)
+	dir = filepath.Join(dir, provider.Namespace)
+	os.MkdirAll(dir, 0755)
+	file := string(provider.Name)
 	file = file + ".db"
 	path := filepath.Join(dir, file)
-	db := libmodel.New(path, model.All()...)
-	return db
+	models := model.Models(provider)
+	return libmodel.New(path, models...)
 }
 
 //

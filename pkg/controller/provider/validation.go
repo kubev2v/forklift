@@ -74,9 +74,9 @@ func (r *Reconciler) validate(provider *api.Provider) error {
 //
 // Validate types.
 func (r *Reconciler) validateType(provider *api.Provider) error {
-	switch provider.Spec.Type {
-	case api.Openshift,
-		api.VMWare:
+	switch provider.Type() {
+	case api.OpenShift,
+		api.VSphere:
 	default:
 		provider.Status.SetCondition(
 			cnd.Condition{

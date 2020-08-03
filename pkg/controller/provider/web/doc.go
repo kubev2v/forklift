@@ -4,6 +4,7 @@ import (
 	"github.com/konveyor/controller/pkg/inventory/container"
 	libweb "github.com/konveyor/controller/pkg/inventory/web"
 	"github.com/konveyor/controller/pkg/logging"
+	vsphere "github.com/konveyor/virt-controller/pkg/controller/provider/web/vsphere"
 )
 
 //
@@ -11,49 +12,17 @@ import (
 var Log *logging.Logger
 
 func init() {
-	log := logging.WithName("model")
+	log := logging.WithName("web")
 	Log = &log
 }
 
 //
-// Build all handlers.
-func All(container *container.Container) []libweb.RequestHandler {
-	return []libweb.RequestHandler{
-		&libweb.SchemaHandler{},
-		&FolderHandler{
-			Base: Base{
-				Container: container,
-			},
-		},
-		&DatacenterHandler{
-			Base: Base{
-				Container: container,
-			},
-		},
-		&ClusterHandler{
-			Base: Base{
-				Container: container,
-			},
-		},
-		&HostHandler{
-			Base: Base{
-				Container: container,
-			},
-		},
-		&NetworkHandler{
-			Base: Base{
-				Container: container,
-			},
-		},
-		&DatastoreHandler{
-			Base: Base{
-				Container: container,
-			},
-		},
-		&VMHandler{
-			Base: Base{
-				Container: container,
-			},
-		},
-	}
+// All handlers.
+func All(container *container.Container) (all []libweb.RequestHandler) {
+	vsphere.Log = Log
+	all = append(
+		all,
+		vsphere.Handlers(container)...)
+
+	return
 }

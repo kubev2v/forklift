@@ -4,10 +4,13 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/model"
+	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"
+	"github.com/konveyor/virt-controller/pkg/controller/provider/web/base"
 	"net/http"
 )
 
+//
+// Routes
 const (
 	HostsRoot = Root + "/hosts"
 	HostRoot  = HostsRoot + "/:host"
@@ -16,7 +19,7 @@ const (
 //
 // Host handler.
 type HostHandler struct {
-	Base
+	base.Handler
 }
 
 //
@@ -25,12 +28,6 @@ func (h *HostHandler) AddRoutes(e *gin.Engine) {
 	e.GET(HostsRoot, h.List)
 	e.GET(HostsRoot+"/", h.List)
 	e.GET(HostRoot, h.Get)
-}
-
-//
-// Prepare to handle the request.
-func (h *HostHandler) Prepare(ctx *gin.Context) int {
-	return h.Base.Prepare(ctx)
 }
 
 //
@@ -53,11 +50,12 @@ func (h HostHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	content := []*Host{}
+	content := []interface{}{}
 	for _, m := range list {
 		r := &Host{}
-		r.With(&m, false)
-		content = append(content, r)
+		r.With(&m)
+		obj := r.Object(h.Detail)
+		content = append(content, obj)
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -88,7 +86,7 @@ func (h HostHandler) Get(ctx *gin.Context) {
 		return
 	}
 	r := &Host{}
-	r.With(m, true)
+	r.With(m)
 
 	ctx.JSON(http.StatusOK, r)
 }
@@ -96,19 +94,31 @@ func (h HostHandler) Get(ctx *gin.Context) {
 //
 // REST Resource.
 type Host struct {
-	ID          string       `json:"id"`
-	Name        string       `json:"name"`
-	Maintenance string       `json:"maintenance"`
-	Object      model.Object `json:"object,omitempty"`
+	base.Resource
+	InMaintenanceMode model.Bool    `json:"inMaintenance"`
+	ProductName       string        `json:"productName"`
+	ProductVersion    string        `json:"productVersion"`
+	Networks          model.RefList `json:"networks"`
+	Datastores        model.RefList `json:"datastores"`
 }
 
 //
 // Build the resource using the model.
-func (r *Host) With(m *model.Host, detail bool) {
-	r.ID = m.ID
-	r.Name = m.Name
-	r.Maintenance = m.Maintenance
-	if detail {
-		r.Object = m.DecodeObject()
+func (r *Host) With(m *model.Host) {
+	r.Resource.With(&m.Base)
+	r.InMaintenanceMode = *model.BoolPtr(false).With(m.InMaintenanceMode)
+	r.ProductVersion = m.ProductVersion
+	r.ProductName = m.ProductName
+	r.Networks = *model.RefListPtr().With(m.Networks)
+	r.Datastores = *model.RefListPtr().With(m.Datastores)
+}
+
+//
+// Render.
+func (r *Host) Object(detail bool) interface{} {
+	if !detail {
+		return r.Resource
 	}
+
+	return r
 }
