@@ -12,11 +12,8 @@ import (
 //
 // Routes.
 const (
-	ClustersRoot     = Root + "/clusters"
-	ClusterRoot      = ClustersRoot + "/:cluster"
-	ClusterVmsRoot   = ClusterRoot + "/vms"
-	ClusterHostsRoot = ClusterRoot + "/hosts"
-	ClusterVmTree    = ClusterRoot + "/tree/vm"
+	ClustersRoot = Root + "/clusters"
+	ClusterRoot  = ClustersRoot + "/:cluster"
 )
 
 //
@@ -33,9 +30,6 @@ func (h *ClusterHandler) AddRoutes(e *gin.Engine) {
 	e.GET(ClustersRoot, h.List)
 	e.GET(ClustersRoot+"/", h.List)
 	e.GET(ClusterRoot, h.Get)
-	e.GET(ClusterVmsRoot, h.ListVM)
-	e.GET(ClusterHostsRoot, h.ListHost)
-	e.GET(ClusterVmTree, h.VmTree)
 }
 
 //
@@ -112,97 +106,6 @@ func (h ClusterHandler) Get(ctx *gin.Context) {
 	r.With(h.cluster)
 
 	ctx.JSON(http.StatusOK, r)
-}
-
-//
-// List VMs
-func (h ClusterHandler) ListVM(ctx *gin.Context) {
-	status := h.Prepare(ctx)
-	if status != http.StatusOK {
-		ctx.Status(status)
-		return
-	}
-	db := h.Reconciler.DB()
-	tr := Tree{
-		Root:    h.cluster,
-		Leaf:    model.VmKind,
-		DB:      db,
-		Flatten: true,
-		Detail: map[string]bool{
-			model.VmKind: h.Detail,
-		},
-	}
-	content := []interface{}{}
-	tree, err := tr.Build()
-	if err != nil {
-		Log.Trace(err)
-		ctx.Status(http.StatusInternalServerError)
-		return
-	}
-	for _, node := range tree.Children {
-		content = append(content, node.Object)
-	}
-
-	ctx.JSON(http.StatusOK, content)
-}
-
-//
-// List Hosts.
-func (h ClusterHandler) ListHost(ctx *gin.Context) {
-	status := h.Prepare(ctx)
-	if status != http.StatusOK {
-		ctx.Status(status)
-		return
-	}
-	db := h.Reconciler.DB()
-	tr := Tree{
-		Root:    h.cluster,
-		Leaf:    model.HostKind,
-		DB:      db,
-		Flatten: true,
-		Detail: map[string]bool{
-			model.HostKind: h.Detail,
-		},
-	}
-	content := []interface{}{}
-	tree, err := tr.Build()
-	if err != nil {
-		Log.Trace(err)
-		ctx.Status(http.StatusInternalServerError)
-		return
-	}
-	for _, node := range tree.Children {
-		content = append(content, node.Object)
-	}
-
-	ctx.JSON(http.StatusOK, content)
-}
-
-//
-// Get VM Tree.
-func (h ClusterHandler) VmTree(ctx *gin.Context) {
-	status := h.Prepare(ctx)
-	if status != http.StatusOK {
-		ctx.Status(status)
-		return
-	}
-	db := h.Reconciler.DB()
-	tr := Tree{
-		Root: h.cluster,
-		Leaf: model.VmKind,
-		DB:   db,
-		Detail: map[string]bool{
-			model.VmKind: h.Detail,
-		},
-	}
-	content, err := tr.Build()
-	if err != nil {
-		Log.Trace(err)
-		ctx.Status(http.StatusInternalServerError)
-		return
-	}
-
-	ctx.JSON(http.StatusOK, content)
 }
 
 //

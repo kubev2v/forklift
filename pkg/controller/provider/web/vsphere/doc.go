@@ -38,6 +38,11 @@ func Handlers(container *container.Container) []libweb.RequestHandler {
 				Container: container,
 			},
 		},
+		&TreeHandler{
+			Handler: base.Handler{
+				Container: container,
+			},
+		},
 		&DatacenterHandler{
 			Handler: base.Handler{
 				Container: container,
