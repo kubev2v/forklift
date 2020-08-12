@@ -1,11 +1,168 @@
 package web
 
 import (
+	"github.com/gin-gonic/gin"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	"github.com/konveyor/controller/pkg/ref"
 	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"
+	"github.com/konveyor/virt-controller/pkg/controller/provider/web/base"
+	"net/http"
 )
+
+//
+// Routes.
+const (
+	TreeRoot     = Root + "/tree"
+	TreeHostRoot = TreeRoot + "/host"
+	TreeVmRoot   = TreeRoot + "/vm"
+)
+
+//
+// Tree handler.
+type TreeHandler struct {
+	base.Handler
+	// Datacenters list.
+	datacenters []model.Datacenter
+}
+
+//
+// Add routes to the `gin` router.
+func (h *TreeHandler) AddRoutes(e *gin.Engine) {
+	e.GET(TreeHostRoot, h.HostTree)
+	e.GET(TreeVmRoot, h.VmTree)
+}
+
+//
+// Prepare to handle the request.
+func (h *TreeHandler) Prepare(ctx *gin.Context) int {
+	status := h.Handler.Prepare(ctx)
+	if status != http.StatusOK {
+		ctx.Status(status)
+		return status
+	}
+	db := h.Reconciler.DB()
+	selector := &model.Datacenter{}
+	err := db.List(selector, libmodel.ListOptions{}, &h.datacenters)
+	if err != nil {
+		Log.Trace(err)
+		return http.StatusInternalServerError
+	}
+
+	return http.StatusOK
+}
+
+//
+// List not supported.
+func (h TreeHandler) List(ctx *gin.Context) {
+	ctx.Status(http.StatusMethodNotAllowed)
+}
+
+//
+// Get not supported.
+func (h TreeHandler) Get(ctx *gin.Context) {
+	ctx.Status(http.StatusMethodNotAllowed)
+}
+
+//
+// VM Tree.
+func (h TreeHandler) VmTree(ctx *gin.Context) {
+	status := h.Prepare(ctx)
+	if status != http.StatusOK {
+		ctx.Status(status)
+		return
+	}
+	db := h.Reconciler.DB()
+	content := TreeNode{}
+	for _, dc := range h.datacenters {
+		ref := &model.Ref{}
+		ref.With(dc.Vms)
+		folder := &model.Folder{
+			Base: model.Base{
+				ID: ref.ID,
+			},
+		}
+		err := db.Get(folder)
+		if err != nil {
+			Log.Trace(err)
+			ctx.Status(http.StatusInternalServerError)
+			return
+		}
+		tr := Tree{
+			Root: folder,
+			Leaf: model.VmKind,
+			DB:   db,
+			Detail: map[string]bool{
+				model.VmKind: h.Detail,
+			},
+		}
+		branch, err := tr.Build()
+		if err != nil {
+			Log.Trace(err)
+			ctx.Status(http.StatusInternalServerError)
+			return
+		}
+		branch.Kind = model.DatacenterKind
+		branch.Object = model.Base{
+			ID:   dc.ID,
+			Name: dc.Name,
+		}
+		content.Children = append(content.Children, branch)
+	}
+
+	ctx.JSON(http.StatusOK, content)
+}
+
+//
+// Cluster & Host Tree.
+func (h TreeHandler) HostTree(ctx *gin.Context) {
+	status := h.Prepare(ctx)
+	if status != http.StatusOK {
+		ctx.Status(status)
+		return
+	}
+	db := h.Reconciler.DB()
+	content := TreeNode{}
+	for _, dc := range h.datacenters {
+		ref := &model.Ref{}
+		ref.With(dc.Clusters)
+		folder := &model.Folder{
+			Base: model.Base{
+				ID: ref.ID,
+			},
+		}
+		err := db.Get(folder)
+		if err != nil {
+			Log.Trace(err)
+			ctx.Status(http.StatusInternalServerError)
+			return
+		}
+		tr := Tree{
+			Root: folder,
+			Leaf: model.VmKind,
+			DB:   db,
+			Detail: map[string]bool{
+				model.ClusterKind: h.Detail,
+				model.HostKind:    h.Detail,
+				model.VmKind:      h.Detail,
+			},
+		}
+		branch, err := tr.Build()
+		if err != nil {
+			Log.Trace(err)
+			ctx.Status(http.StatusInternalServerError)
+			return
+		}
+		branch.Kind = model.DatacenterKind
+		branch.Object = model.Base{
+			ID:   dc.ID,
+			Name: dc.Name,
+		}
+		content.Children = append(content.Children, branch)
+	}
+
+	ctx.JSON(http.StatusOK, content)
+}
 
 //
 // Tree.

@@ -12,9 +12,8 @@ import (
 //
 // Routes.
 const (
-	FoldersRoot    = Root + "/folders"
-	FolderRoot     = FoldersRoot + "/:folder"
-	FolderTreeRoot = FoldersRoot + "/:folder/tree/vm"
+	FoldersRoot = Root + "/folders"
+	FolderRoot  = FoldersRoot + "/:folder"
 )
 
 //
@@ -31,7 +30,6 @@ func (h *FolderHandler) AddRoutes(e *gin.Engine) {
 	e.GET(FoldersRoot, h.List)
 	e.GET(FoldersRoot+"/", h.List)
 	e.GET(FolderRoot, h.Get)
-	e.GET(FolderTreeRoot, h.VMTree)
 }
 
 //
@@ -109,33 +107,6 @@ func (h FolderHandler) Get(ctx *gin.Context) {
 	r.With(h.folder)
 
 	ctx.JSON(http.StatusOK, r)
-}
-
-//
-// Get a specific REST resource.
-func (h FolderHandler) VMTree(ctx *gin.Context) {
-	status := h.Prepare(ctx)
-	if status != http.StatusOK {
-		ctx.Status(status)
-		return
-	}
-	db := h.Reconciler.DB()
-	tr := Tree{
-		Root: h.folder,
-		Leaf: model.VmKind,
-		DB:   db,
-		Detail: map[string]bool{
-			model.VmKind: h.Detail,
-		},
-	}
-	content, err := tr.Build()
-	if err != nil {
-		Log.Trace(err)
-		ctx.Status(http.StatusInternalServerError)
-		return
-	}
-
-	ctx.JSON(http.StatusOK, content)
 }
 
 //
