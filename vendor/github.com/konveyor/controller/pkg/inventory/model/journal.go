@@ -22,17 +22,19 @@ type Event struct {
 	Model Model
 	// The event action (created|updated|deleted).
 	Action int8
+	// The updated model.
+	Updated Model
 }
 
 //
 // Event handler.
 type EventHandler interface {
 	// A model has been created.
-	Created(Model)
+	Created(Event)
 	// A model has been updated.
-	Updated(Model)
+	Updated(Event)
 	// A model has been deleted.
-	Deleted(Model)
+	Deleted(Event)
 	// An error has occurred delivering an event.
 	Error(error)
 	// An event watch has ended.
@@ -86,11 +88,11 @@ func (w *Watch) Start() {
 		for event := range w.queue {
 			switch event.Action {
 			case Created:
-				w.Handler.Created(event.Model)
+				w.Handler.Created(*event)
 			case Updated:
-				w.Handler.Updated(event.Model)
+				w.Handler.Updated(*event)
 			case Deleted:
-				w.Handler.Deleted(event.Model)
+				w.Handler.Deleted(*event)
 			default:
 				w.Handler.Error(liberr.New("unknown action"))
 			}
@@ -111,7 +113,6 @@ func (w *Watch) End() {
 //
 // Event manager.
 type Journal struct {
-	*Client
 	mutex sync.RWMutex
 	// List of registered watches.
 	watches []*Watch
@@ -203,7 +204,7 @@ func (r *Journal) Created(model Model) {
 	r.staged = append(
 		r.staged,
 		&Event{
-			Model:  r.snapshot(model),
+			Model:  r.copy(model),
 			Action: Created,
 		})
 }
@@ -211,7 +212,7 @@ func (r *Journal) Created(model Model) {
 //
 // A model has been updated.
 // Queue an event.
-func (r *Journal) Updated(model Model) {
+func (r *Journal) Updated(model Model, updated Model) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	if !r.enabled {
@@ -220,8 +221,9 @@ func (r *Journal) Updated(model Model) {
 	r.staged = append(
 		r.staged,
 		&Event{
-			Model:  r.snapshot(model),
-			Action: Updated,
+			Model:   r.copy(model),
+			Updated: r.copy(updated),
+			Action:  Updated,
 		})
 }
 
@@ -237,7 +239,7 @@ func (r *Journal) Deleted(model Model) {
 	r.staged = append(
 		r.staged,
 		&Event{
-			Model:  r.snapshot(model),
+			Model:  r.copy(model),
 			Action: Deleted,
 		})
 }
@@ -272,10 +274,10 @@ func (r *Journal) Unstage() {
 }
 
 //
-// Create a snapshot of the model.
+// Copy the model.
 // The model is a pointer must be protected against being
 // changed at it origin or by the handlers.
-func (r *Journal) snapshot(model Model) Model {
+func (r *Journal) copy(model Model) Model {
 	mt := reflect.TypeOf(model)
 	mv := reflect.ValueOf(model)
 	switch mt.Kind() {

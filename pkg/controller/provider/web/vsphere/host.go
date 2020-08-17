@@ -39,12 +39,12 @@ func (h HostHandler) List(ctx *gin.Context) {
 		return
 	}
 	db := h.Reconciler.DB()
-	selector := &model.Host{}
-	options := libmodel.ListOptions{
-		Page: &h.Page,
-	}
 	list := []model.Host{}
-	err := db.List(selector, options, &list)
+	err := db.List(
+		&list,
+		libmodel.ListOptions{
+			Page: &h.Page,
+		})
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
@@ -95,7 +95,7 @@ func (h HostHandler) Get(ctx *gin.Context) {
 // REST Resource.
 type Host struct {
 	base.Resource
-	InMaintenanceMode model.Bool    `json:"inMaintenance"`
+	InMaintenanceMode bool          `json:"inMaintenance"`
 	ProductName       string        `json:"productName"`
 	ProductVersion    string        `json:"productVersion"`
 	Networks          model.RefList `json:"networks"`
@@ -106,7 +106,7 @@ type Host struct {
 // Build the resource using the model.
 func (r *Host) With(m *model.Host) {
 	r.Resource.With(&m.Base)
-	r.InMaintenanceMode = *model.BoolPtr(false).With(m.InMaintenanceMode)
+	r.InMaintenanceMode = m.InMaintenanceMode
 	r.ProductVersion = m.ProductVersion
 	r.ProductName = m.ProductName
 	r.Networks = *model.RefListPtr().With(m.Networks)
