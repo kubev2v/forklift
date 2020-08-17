@@ -39,12 +39,12 @@ func (h NetworkHandler) List(ctx *gin.Context) {
 		return
 	}
 	db := h.Reconciler.DB()
-	selector := &model.Network{}
-	options := libmodel.ListOptions{
-		Page: &h.Page,
-	}
 	list := []model.Network{}
-	err := db.List(selector, options, &list)
+	err := db.List(
+		&list,
+		libmodel.ListOptions{
+			Page: &h.Page,
+		})
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)

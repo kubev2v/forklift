@@ -8,7 +8,6 @@ import (
 
 // Errors
 var NotFound = libmodel.NotFound
-var Conflict = libmodel.Conflict
 
 const (
 	Assign = "assign"
@@ -17,21 +16,13 @@ const (
 //
 // Types
 type Model = libmodel.Model
-type Bool = base.Bool
 type Annotation = base.Annotation
-
-var (
-	BoolPtr       = base.BoolPtr
-	AnnotationPtr = base.BoolPtr
-)
 
 //
 // Base VMWare model.
 type Base struct {
-	// Primary key (digest).
-	PK string `sql:"pk"`
-	// Provider
-	ID string `sql:"key,unique(a)"`
+	// Managed object ID.
+	ID string `sql:"pk"`
 	// Name
 	Name string `sql:""`
 	// Parent
@@ -43,13 +34,7 @@ type Base struct {
 //
 // Get the PK.
 func (m *Base) Pk() string {
-	return m.PK
-}
-
-//
-// Set the primary key.
-func (m *Base) SetPk() {
-	m.PK = m.ID
+	return m.ID
 }
 
 func (m *Base) String() string {
@@ -141,16 +126,16 @@ type Cluster struct {
 	Hosts       string `sql:""`
 	Networks    string `sql:""`
 	Datastores  string `sql:""`
-	DasEnabled  int    `sql:""`
+	DasEnabled  bool   `sql:""`
 	DasVms      string `sql:""`
-	DrsEnabled  int    `sql:""`
+	DrsEnabled  bool   `sql:""`
 	DrsBehavior string `sql:""`
 	DrsVms      string `sql:""`
 }
 
 type Host struct {
 	Base
-	InMaintenanceMode int    `sql:""`
+	InMaintenanceMode bool   `sql:""`
 	ProductName       string `sql:""`
 	ProductVersion    string `sql:""`
 	Networks          string `sql:""`
@@ -176,9 +161,9 @@ type VM struct {
 	UUID                string `sql:""`
 	Firmware            string `sql:""`
 	CpuAffinity         string `sql:""`
-	CpuHotAddEnabled    int    `sql:""`
-	CpuHotRemoveEnabled int    `sql:""`
-	MemoryHotAddEnabled int    `sql:""`
+	CpuHotAddEnabled    bool   `sql:""`
+	CpuHotRemoveEnabled bool   `sql:""`
+	MemoryHotAddEnabled bool   `sql:""`
 	CpuCount            int32  `sql:""`
 	MemorySizeMB        int32  `sql:""`
 	GuestName           string `sql:""`

@@ -39,12 +39,12 @@ func (h DatastoreHandler) List(ctx *gin.Context) {
 		return
 	}
 	db := h.Reconciler.DB()
-	selector := &model.Datastore{}
-	options := libmodel.ListOptions{
-		Page: &h.Page,
-	}
 	list := []model.Datastore{}
-	err := db.List(selector, options, &list)
+	err := db.List(
+		&list,
+		libmodel.ListOptions{
+			Page: &h.Page,
+		})
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)

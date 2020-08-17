@@ -42,8 +42,7 @@ func (h *TreeHandler) Prepare(ctx *gin.Context) int {
 		return status
 	}
 	db := h.Reconciler.DB()
-	selector := &model.Datacenter{}
-	err := db.List(selector, libmodel.ListOptions{}, &h.datacenters)
+	err := db.List(&h.datacenters, libmodel.ListOptions{})
 	if err != nil {
 		Log.Trace(err)
 		return http.StatusInternalServerError
