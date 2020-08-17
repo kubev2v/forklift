@@ -39,12 +39,12 @@ func (h VMHandler) List(ctx *gin.Context) {
 		return
 	}
 	db := h.Reconciler.DB()
-	selector := &model.VM{}
-	options := libmodel.ListOptions{
-		Page: &h.Page,
-	}
 	list := []model.VM{}
-	err := db.List(selector, options, &list)
+	err := db.List(
+		&list,
+		libmodel.ListOptions{
+			Page: &h.Page,
+		})
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
@@ -95,17 +95,17 @@ func (h VMHandler) Get(ctx *gin.Context) {
 // REST Resource.
 type VM struct {
 	base.Resource
-	UUID                string     `json:"uuid"`
-	Firmware            string     `json:"firmware"`
-	CpuAffinity         string     `json:"cpuAffinity"`
-	CpuHotAddEnabled    model.Bool `json:"cpuHostAddEnabled"`
-	CpuHotRemoveEnabled model.Bool `json:"cpuHostRemoveEnabled"`
-	MemoryHotAddEnabled model.Bool `json:"memoryHotAddEnabled"`
-	CpuCount            int32      `json:"cpuCount"`
-	MemorySizeMB        int32      `json:"memorySizeMB"`
-	GuestName           string     `json:"guestName"`
-	BalloonedMemory     int32      `json:"balloonedMemory"`
-	IpAddress           string     `json:"ipAddress"`
+	UUID                string `json:"uuid"`
+	Firmware            string `json:"firmware"`
+	CpuAffinity         string `json:"cpuAffinity"`
+	CpuHotAddEnabled    bool   `json:"cpuHostAddEnabled"`
+	CpuHotRemoveEnabled bool   `json:"cpuHostRemoveEnabled"`
+	MemoryHotAddEnabled bool   `json:"memoryHotAddEnabled"`
+	CpuCount            int32  `json:"cpuCount"`
+	MemorySizeMB        int32  `json:"memorySizeMB"`
+	GuestName           string `json:"guestName"`
+	BalloonedMemory     int32  `json:"balloonedMemory"`
+	IpAddress           string `json:"ipAddress"`
 }
 
 //
@@ -115,9 +115,9 @@ func (r *VM) With(m *model.VM) {
 	r.UUID = m.UUID
 	r.Firmware = m.Firmware
 	r.CpuAffinity = m.CpuAffinity
-	r.CpuHotAddEnabled = *model.BoolPtr(false).With(m.CpuHotAddEnabled)
-	r.CpuHotRemoveEnabled = *model.BoolPtr(false).With(m.CpuHotRemoveEnabled)
-	r.MemoryHotAddEnabled = *model.BoolPtr(false).With(m.MemoryHotAddEnabled)
+	r.CpuHotAddEnabled = m.CpuHotAddEnabled
+	r.CpuHotRemoveEnabled = m.CpuHotRemoveEnabled
+	r.MemoryHotAddEnabled = m.MemoryHotAddEnabled
 	r.CpuCount = m.CpuCount
 	r.MemorySizeMB = m.MemorySizeMB
 	r.GuestName = m.GuestName

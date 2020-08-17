@@ -218,8 +218,7 @@ func (v *ClusterAdapter) Apply(u types.ObjectUpdate) {
 				v.model.Datastores = refList.Encode()
 			case fDasEnabled:
 				if b, cast := p.Val.(bool); cast {
-					jb := model.Bool(b)
-					v.model.DasEnabled = jb.Encode()
+					v.model.DasEnabled = b
 				}
 			case fDasVmCfg:
 				refList := RefList{}
@@ -231,8 +230,7 @@ func (v *ClusterAdapter) Apply(u types.ObjectUpdate) {
 				v.model.DasVms = refList.Encode()
 			case fDrsEnabled:
 				if b, cast := p.Val.(bool); cast {
-					jb := model.Bool(b)
-					v.model.DrsEnabled = jb.Encode()
+					v.model.DrsEnabled = b
 				}
 			case fDrsVmCfg:
 				refList := RefList{}
@@ -273,8 +271,7 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 			switch p.Name {
 			case fInMaintMode:
 				if b, cast := p.Val.(bool); cast {
-					jb := model.Bool(b)
-					v.model.InMaintenanceMode = jb.Encode()
+					v.model.InMaintenanceMode = b
 				}
 			case fVm:
 				refList := RefList{}
@@ -411,18 +408,15 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				}
 			case fCpuHotAddEnabled:
 				if b, cast := p.Val.(bool); cast {
-					jb := model.Bool(b)
-					v.model.CpuHotAddEnabled = jb.Encode()
+					v.model.CpuHotAddEnabled = b
 				}
 			case fCpuHotRemoveEnabled:
 				if b, cast := p.Val.(bool); cast {
-					jb := model.Bool(b)
-					v.model.CpuHotRemoveEnabled = jb.Encode()
+					v.model.CpuHotRemoveEnabled = b
 				}
 			case fMemoryHotAddEnabled:
 				if b, cast := p.Val.(bool); cast {
-					jb := model.Bool(b)
-					v.model.MemoryHotAddEnabled = jb.Encode()
+					v.model.MemoryHotAddEnabled = b
 				}
 			case fNumCpu:
 				if n, cast := p.Val.(int32); cast {
