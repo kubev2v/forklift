@@ -2,7 +2,6 @@ package vsphere
 
 import (
 	"context"
-	"errors"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	"github.com/konveyor/controller/pkg/logging"
@@ -16,7 +15,6 @@ import (
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	liburl "net/url"
-	"time"
 )
 
 //
@@ -492,11 +490,11 @@ func (r *Reconciler) apply(ctx context.Context, updates []types.ObjectUpdate) {
 	for _, u := range updates {
 		switch string(u.Kind) {
 		case Enter:
-			err = r.applyEnter(ctx, u)
+			err = r.applyEnter(u)
 		case Modify:
-			err = r.applyModify(ctx, u)
+			err = r.applyModify(u)
 		case Leave:
-			err = r.applyLeave(ctx, u)
+			err = r.applyLeave(u)
 		}
 	}
 	if err != nil {
@@ -575,7 +573,7 @@ func (r *Reconciler) selectAdapter(u types.ObjectUpdate) (Adapter, bool) {
 
 //
 // Object created.
-func (r Reconciler) applyEnter(ctx context.Context, u types.ObjectUpdate) error {
+func (r Reconciler) applyEnter(u types.ObjectUpdate) error {
 	adapter, selected := r.selectAdapter(u)
 	if !selected {
 		return nil
@@ -591,35 +589,21 @@ func (r Reconciler) applyEnter(ctx context.Context, u types.ObjectUpdate) error 
 
 //
 // Object modified.
-func (r Reconciler) applyModify(ctx context.Context, u types.ObjectUpdate) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	for {
-		adapter, selected := r.selectAdapter(u)
-		if !selected {
-			return nil
-		}
-		err := r.db.Get(adapter.Model())
-		if err != nil {
-			Log.Trace(err)
-			continue
-		}
-		adapter.Apply(u)
-		err = r.db.Update(adapter.Model())
-		if err == nil {
-			break
-		}
-		if errors.Is(err, libmodel.Conflict) {
-			Log.Info(err.Error())
-			select {
-			case <-time.After(time.Second):
-			case <-ctx.Done():
-				break
-			}
-			continue
-		} else {
-			return liberr.Wrap(err)
-		}
+func (r Reconciler) applyModify(u types.ObjectUpdate) error {
+	adapter, selected := r.selectAdapter(u)
+	if !selected {
+		return nil
+	}
+	tx, err := r.db.GetForUpdate(adapter.Model())
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	adapter.Apply(u)
+	err = r.db.Update(adapter.Model())
+	if err == nil {
+		tx.Commit()
+	} else {
+		return liberr.Wrap(err)
 	}
 
 	return nil
@@ -627,7 +611,7 @@ func (r Reconciler) applyModify(ctx context.Context, u types.ObjectUpdate) error
 
 //
 // Object deleted.
-func (r Reconciler) applyLeave(ctx context.Context, u types.ObjectUpdate) error {
+func (r Reconciler) applyLeave(u types.ObjectUpdate) error {
 	var deleted model.Model
 	switch u.Obj.Type {
 	case Folder:

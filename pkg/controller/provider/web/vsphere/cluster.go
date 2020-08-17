@@ -72,12 +72,12 @@ func (h ClusterHandler) List(ctx *gin.Context) {
 		return
 	}
 	db := h.Reconciler.DB()
-	selector := &model.Cluster{}
-	options := libmodel.ListOptions{
-		Page: &h.Page,
-	}
 	list := []model.Cluster{}
-	err := db.List(selector, options, &list)
+	err := db.List(
+		&list,
+		libmodel.ListOptions{
+			Page: &h.Page,
+		})
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
@@ -114,9 +114,9 @@ type Cluster struct {
 	base.Resource
 	Networks    model.RefList `json:"networks"`
 	Datastores  model.RefList `json:"datastores"`
-	DasEnabled  model.Bool    `json:"dasEnabled"`
+	DasEnabled  bool          `json:"dasEnabled"`
 	DasVms      model.RefList `json:"DasVms"`
-	DrsEnabled  model.Bool    `json:"drsEnabled"`
+	DrsEnabled  bool          `json:"drsEnabled"`
 	DrsBehavior string        `json:"drsBehavior"`
 	DrsVms      model.RefList `json:"drsVms"`
 }
@@ -125,8 +125,8 @@ type Cluster struct {
 // Build the resource using the model.
 func (r *Cluster) With(m *model.Cluster) {
 	r.Resource.With(&m.Base)
-	r.DasEnabled = *model.BoolPtr(false).With(m.DasEnabled)
-	r.DrsEnabled = *model.BoolPtr(false).With(m.DrsEnabled)
+	r.DasEnabled = m.DasEnabled
+	r.DrsEnabled = m.DrsEnabled
 	r.DrsBehavior = m.DrsBehavior
 	r.Networks = *model.RefListPtr().With(m.Networks)
 	r.Datastores = *model.RefListPtr().With(m.Datastores)
