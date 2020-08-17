@@ -23,7 +23,16 @@ type Container struct {
 }
 
 //
-// List reconcilers.
+// Get a reconciler by (CR) object.
+func (c *Container) Get(owner meta.Object) (Reconciler, bool) {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+	p, found := c.content[c.key(owner)]
+	return p, found
+}
+
+//
+// List all reconcilers.
 func (c *Container) List() []Reconciler {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
@@ -33,16 +42,6 @@ func (c *Container) List() []Reconciler {
 	}
 
 	return list
-}
-
-//
-// Get a reconciler by (CR) object.
-func (c *Container) Get(owner meta.Object) (Reconciler, bool) {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-	p, found := c.content[c.key(owner)]
-
-	return p, found
 }
 
 //

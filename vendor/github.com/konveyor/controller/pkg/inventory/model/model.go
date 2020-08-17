@@ -2,14 +2,12 @@ package model
 
 import (
 	"database/sql"
-	"errors"
 	_ "github.com/mattn/go-sqlite3"
 	"reflect"
 )
 
 //
 // Errors.
-var Conflict = errors.New("conflict")
 var NotFound = sql.ErrNoRows
 
 //
@@ -72,8 +70,6 @@ func (p *Page) Slice(collection interface{}) {
 type Model interface {
 	// Get the primary key.
 	Pk() string
-	// Set the primary key based on natural keys.
-	SetPk()
 	// Get description of the model.
 	String() string
 	// Equal comparison.
