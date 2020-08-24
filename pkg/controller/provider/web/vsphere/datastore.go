@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
+	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
 	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web/base"
 	"net/http"
@@ -12,8 +13,10 @@ import (
 //
 // Routes.
 const (
-	DatastoresRoot = Root + "/datastores"
-	DatastoreRoot  = DatastoresRoot + "/:datastore"
+	DatastoreParam      = "datastore"
+	DatastoreCollection = "datastores"
+	DatastoresRoot      = Root + "/" + DatastoreCollection
+	DatastoreRoot       = DatastoresRoot + "/:" + DatastoreParam
 )
 
 //
@@ -54,8 +57,8 @@ func (h DatastoreHandler) List(ctx *gin.Context) {
 	for _, m := range list {
 		r := &Datastore{}
 		r.With(&m)
-		obj := r.Object(h.Detail)
-		content = append(content, obj)
+		r.SelfLink = h.Link(h.Provider, &m)
+		content = append(content, r.Content(h.Detail))
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -71,7 +74,7 @@ func (h DatastoreHandler) Get(ctx *gin.Context) {
 	}
 	m := &model.Datastore{
 		Base: model.Base{
-			ID: ctx.Param("datastore"),
+			ID: ctx.Param(DatastoreParam),
 		},
 	}
 	db := h.Reconciler.DB()
@@ -87,14 +90,28 @@ func (h DatastoreHandler) Get(ctx *gin.Context) {
 	}
 	r := &Datastore{}
 	r.With(m)
+	r.SelfLink = h.Link(h.Provider, m)
+	content := r.Content(true)
 
-	ctx.JSON(http.StatusOK, r)
+	ctx.JSON(http.StatusOK, content)
+}
+
+//
+// Build self link (URI).
+func (h DatastoreHandler) Link(p *api.Provider, m *model.Datastore) string {
+	return h.Handler.Link(
+		DatastoreRoot,
+		base.Params{
+			base.NsParam:       p.Namespace,
+			base.ProviderParam: p.Name,
+			DatastoreParam:     m.ID,
+		})
 }
 
 //
 // REST Resource.
 type Datastore struct {
-	base.Resource
+	Resource
 	Type            string `json:"type"`
 	Capacity        int64  `json:"capacity"`
 	Free            int64  `json:"free"`
@@ -112,8 +129,8 @@ func (r *Datastore) With(m *model.Datastore) {
 }
 
 //
-// Render.
-func (r *Datastore) Object(detail bool) interface{} {
+// As content.
+func (r *Datastore) Content(detail bool) interface{} {
 	if !detail {
 		return r.Resource
 	}

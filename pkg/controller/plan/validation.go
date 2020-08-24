@@ -6,7 +6,12 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
+	"github.com/konveyor/virt-controller/pkg/controller/provider/web"
+	"github.com/konveyor/virt-controller/pkg/controller/provider/web/ocp"
+	vsphere "github.com/konveyor/virt-controller/pkg/controller/provider/web/vsphere"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"net/http"
+	"path"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -15,6 +20,7 @@ import (
 const (
 	SourceNotValid      = "SourceProviderNotValid"
 	DestinationNotValid = "DestinationProviderNotValid"
+	VmNotValid          = "VmNotValid"
 )
 
 //
@@ -41,14 +47,23 @@ const (
 // Messages
 const (
 	ReadyMessage               = "The migration plan is ready."
-	SourceNotValidMessage      = "`providers.source` not valid."
-	DestinationNotValidMessage = "`providers.destination` not valid."
+	SourceNotValidMessage      = "The `providers.source` not valid."
+	DestinationNotValidMessage = "The `providers.destination` not valid."
+	VmNotValidMessage          = "The vms (list) contains invalid VMs."
+)
+
+var (
+	ProviderInvNotReady = liberr.New("provider inventory API not ready")
 )
 
 //
 // Validate the plan resource.
 func (r *Reconciler) validate(plan *api.Plan) error {
 	err := r.validateProvider(plan)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	err = r.validateVMs(plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -92,6 +107,17 @@ func (r *Reconciler) validateProvider(plan *api.Plan) error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
+		pClient := vsphere.Client{Provider: *provider}
+		pid := path.Join(provider.Namespace, provider.Name)
+		status, err := pClient.Get(&ocp.Provider{}, pid)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		switch status {
+		case http.StatusOK:
+		case http.StatusNotFound:
+			return ProviderInvNotReady
+		}
 	}
 	//
 	// Destination
@@ -127,6 +153,63 @@ func (r *Reconciler) validateProvider(plan *api.Plan) error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
+	}
+
+	return nil
+}
+
+//
+// Validate listed VMs.
+func (r *Reconciler) validateVMs(plan *api.Plan) error {
+	ref := plan.Spec.Provider.Source
+	provider := api.Provider{}
+	key := client.ObjectKey{
+		Namespace: ref.Namespace,
+		Name:      ref.Name,
+	}
+	err := r.Get(context.TODO(), key, &provider)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			liberr.Wrap(err)
+		} else {
+			return nil
+		}
+	}
+	notValid := []string{}
+	var pClient web.Client
+	var resource web.ClientResource
+	switch provider.Type() {
+	case api.VSphere:
+		pClient = &vsphere.Client{Provider: provider}
+		resource = &vsphere.VM{}
+	default:
+		return liberr.New("provider not supported.")
+	}
+	for _, vm := range plan.Spec.VMs {
+		status, err := pClient.Get(resource, vm.ID)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		switch status {
+		case http.StatusOK:
+		case http.StatusPartialContent:
+			return ProviderInvNotReady
+		case http.StatusNotFound:
+			notValid = append(notValid, vm.ID)
+		default:
+			return liberr.New("")
+		}
+	}
+	if len(notValid) > 0 {
+		plan.Status.SetCondition(
+			cnd.Condition{
+				Type:     VmNotValid,
+				Status:   True,
+				Reason:   NotFound,
+				Category: Critical,
+				Message:  VmNotValidMessage,
+				Items:    notValid,
+			})
 	}
 
 	return nil

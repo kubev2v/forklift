@@ -70,8 +70,10 @@ const (
 	fCpuHotAddEnabled    = "config.cpuHotAddEnabled"
 	fCpuHotRemoveEnabled = "config.cpuHotRemoveEnabled"
 	fMemoryHotAddEnabled = "config.memoryHotAddEnabled"
-	fNumCpu              = "summary.config.numCpu"
-	fMemorySize          = "summary.config.memorySizeMB"
+	fNumCpu              = "config.hardware.numCPU"
+	fNumCoresPerSocket   = "config.hardware.numCoresPerSocket"
+	fMemorySize          = "config.hardware.memoryMB"
+	fDevices             = "config.hardware.device"
 	fGuestName           = "summary.config.guestFullName"
 	fBalloonedMemory     = "summary.quickStats.balloonedMemory"
 	fVmIpAddress         = "summary.guest.ipAddress"
@@ -474,10 +476,14 @@ func (r *Reconciler) propertySpec() []types.PropertySpec {
 				fCpuHotRemoveEnabled,
 				fMemoryHotAddEnabled,
 				fNumCpu,
+				fNumCoresPerSocket,
 				fMemorySize,
+				fDevices,
 				fGuestName,
 				fBalloonedMemory,
 				fVmIpAddress,
+				fDatastore,
+				fNetwork,
 			},
 		},
 	}

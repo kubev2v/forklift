@@ -422,9 +422,13 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				if n, cast := p.Val.(int32); cast {
 					v.model.CpuCount = n
 				}
+			case fNumCoresPerSocket:
+				if n, cast := p.Val.(int32); cast {
+					v.model.CoresPerSocket = n
+				}
 			case fMemorySize:
 				if n, cast := p.Val.(int32); cast {
-					v.model.MemorySizeMB = n
+					v.model.MemoryMB = n
 				}
 			case fGuestName:
 				if s, cast := p.Val.(string); cast {
@@ -438,6 +442,26 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				if s, cast := p.Val.(string); cast {
 					v.model.IpAddress = s
 				}
+			case fDevices:
+				disks := []model.Disk{}
+				if devArray, cast := p.Val.(types.ArrayOfVirtualDevice); cast {
+					for _, dev := range devArray.VirtualDevice {
+						switch dev.(type) {
+						case *types.VirtualDisk:
+							disk := dev.(*types.VirtualDisk)
+							backing := disk.Backing.(*types.VirtualDiskFlatVer2BackingInfo)
+							md := model.Disk{
+								File: backing.FileName,
+								Datastore: model.Ref{
+									Kind: model.DsKind,
+									ID:   backing.Datastore.Value,
+								},
+							}
+							disks = append(disks, md)
+						}
+					}
+				}
+				v.model.EncodeDisks(disks)
 			}
 		}
 	}

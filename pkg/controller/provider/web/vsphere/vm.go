@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
+	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
 	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web/base"
 	"net/http"
@@ -12,8 +13,10 @@ import (
 //
 // Routes.
 const (
-	VMsRoot = Root + "/vms"
-	VMRoot  = VMsRoot + "/:vm"
+	VMParam      = "vm"
+	VMCollection = "vms"
+	VMsRoot      = Root + "/" + VMCollection
+	VMRoot       = VMsRoot + "/:" + VMParam
 )
 
 //
@@ -54,8 +57,8 @@ func (h VMHandler) List(ctx *gin.Context) {
 	for _, m := range list {
 		r := &VM{}
 		r.With(&m)
-		obj := r.Object(h.Detail)
-		content = append(content, obj)
+		r.SelfLink = h.Link(h.Provider, &m)
+		content = append(content, r.Content(h.Detail))
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -71,7 +74,7 @@ func (h VMHandler) Get(ctx *gin.Context) {
 	}
 	m := &model.VM{
 		Base: model.Base{
-			ID: ctx.Param("vm"),
+			ID: ctx.Param(VMParam),
 		},
 	}
 	db := h.Reconciler.DB()
@@ -87,25 +90,41 @@ func (h VMHandler) Get(ctx *gin.Context) {
 	}
 	r := &VM{}
 	r.With(m)
+	r.SelfLink = h.Link(h.Provider, m)
+	content := r.Content(true)
 
-	ctx.JSON(http.StatusOK, r)
+	ctx.JSON(http.StatusOK, content)
+}
+
+//
+// Build self link (URI).
+func (h VMHandler) Link(p *api.Provider, m *model.VM) string {
+	return h.Handler.Link(
+		VMRoot,
+		base.Params{
+			base.NsParam:       p.Namespace,
+			base.ProviderParam: p.Name,
+			VMParam:            m.ID,
+		})
 }
 
 //
 // REST Resource.
 type VM struct {
-	base.Resource
-	UUID                string `json:"uuid"`
-	Firmware            string `json:"firmware"`
-	CpuAffinity         string `json:"cpuAffinity"`
-	CpuHotAddEnabled    bool   `json:"cpuHostAddEnabled"`
-	CpuHotRemoveEnabled bool   `json:"cpuHostRemoveEnabled"`
-	MemoryHotAddEnabled bool   `json:"memoryHotAddEnabled"`
-	CpuCount            int32  `json:"cpuCount"`
-	MemorySizeMB        int32  `json:"memorySizeMB"`
-	GuestName           string `json:"guestName"`
-	BalloonedMemory     int32  `json:"balloonedMemory"`
-	IpAddress           string `json:"ipAddress"`
+	Resource
+	UUID                string       `json:"uuid"`
+	Firmware            string       `json:"firmware"`
+	CpuAffinity         string       `json:"cpuAffinity"`
+	CpuHotAddEnabled    bool         `json:"cpuHostAddEnabled"`
+	CpuHotRemoveEnabled bool         `json:"cpuHostRemoveEnabled"`
+	MemoryHotAddEnabled bool         `json:"memoryHotAddEnabled"`
+	CpuCount            int32        `json:"cpuCount"`
+	CoresPerSocket      int32        `json:"coresPerSocket"`
+	MemoryMB            int32        `json:"memoryMB"`
+	GuestName           string       `json:"guestName"`
+	BalloonedMemory     int32        `json:"balloonedMemory"`
+	IpAddress           string       `json:"ipAddress"`
+	Disks               []model.Disk `json:"disks"`
 }
 
 //
@@ -119,15 +138,17 @@ func (r *VM) With(m *model.VM) {
 	r.CpuHotRemoveEnabled = m.CpuHotRemoveEnabled
 	r.MemoryHotAddEnabled = m.MemoryHotAddEnabled
 	r.CpuCount = m.CpuCount
-	r.MemorySizeMB = m.MemorySizeMB
+	r.CoresPerSocket = m.CoresPerSocket
+	r.MemoryMB = m.MemoryMB
 	r.GuestName = m.GuestName
 	r.BalloonedMemory = m.BalloonedMemory
 	r.IpAddress = m.IpAddress
+	r.Disks = m.DecodeDisks()
 }
 
 //
-// Render.
-func (r *VM) Object(detail bool) interface{} {
+// As content.
+func (r *VM) Content(detail bool) interface{} {
 	if !detail {
 		return r.Resource
 	}
