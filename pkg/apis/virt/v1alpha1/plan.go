@@ -23,19 +23,37 @@ import (
 )
 
 //
-// The pair of provider associated with the plan.
-type ProviderPair struct {
-	// Source.
-	Source core.ObjectReference `json:"source" ref:"Provider"`
-	// Destination.
-	Destination core.ObjectReference `json:"destination" ref:"Provider"`
+// A VM listed on the plan.
+type PlanVM struct {
+	// The VM identifier.
+	// For:
+	//   - vSphere: The managed object ID.
+	ID string `json:"id"`
+	// Enable hooks.
+	Hook struct {
+		// Run hook before migration.
+		Before bool `json:"before,omitempty"`
+		// Run hook after migration.
+		After bool `json:"after,omitempty"`
+	} `json:"hook,omitempty"`
+	// Host
+	Host core.ObjectReference `json:"host,omitempty" ref:"Host"`
 }
 
 //
 // PlanSpec defines the desired state of Plan.
 type PlanSpec struct {
 	// Providers.
-	Provider ProviderPair `json:"provider"`
+	Provider struct {
+		// Source.
+		Source core.ObjectReference `json:"source" ref:"Provider"`
+		// Destination.
+		Destination core.ObjectReference `json:"destination" ref:"Provider"`
+	} `json:"provider"`
+	// Resource map.
+	Map core.ObjectReference `json:"map" ref:"Map"`
+	// List of VMs.
+	VMs []PlanVM `json:"vms"`
 }
 
 //

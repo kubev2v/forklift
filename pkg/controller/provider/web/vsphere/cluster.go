@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
+	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
 	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web/base"
 	"net/http"
@@ -12,8 +13,10 @@ import (
 //
 // Routes.
 const (
-	ClustersRoot = Root + "/clusters"
-	ClusterRoot  = ClustersRoot + "/:cluster"
+	ClusterParam      = "cluster"
+	ClusterCollection = "clusters"
+	ClustersRoot      = Root + "/" + ClusterCollection
+	ClusterRoot       = ClustersRoot + "/:" + ClusterParam
 )
 
 //
@@ -40,7 +43,7 @@ func (h *ClusterHandler) Prepare(ctx *gin.Context) int {
 		ctx.Status(status)
 		return status
 	}
-	id := ctx.Param("cluster")
+	id := ctx.Param(ClusterParam)
 	if id != "" {
 		m := &model.Cluster{
 			Base: model.Base{
@@ -87,8 +90,8 @@ func (h ClusterHandler) List(ctx *gin.Context) {
 	for _, m := range list {
 		r := &Cluster{}
 		r.With(&m)
-		obj := r.Object(h.Detail)
-		content = append(content, obj)
+		r.SelfLink = h.Link(h.Provider, &m)
+		content = append(content, r.Content(h.Detail))
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -104,14 +107,28 @@ func (h ClusterHandler) Get(ctx *gin.Context) {
 	}
 	r := &Cluster{}
 	r.With(h.cluster)
+	r.SelfLink = h.Link(h.Provider, h.cluster)
+	content := r.Content(true)
 
-	ctx.JSON(http.StatusOK, r)
+	ctx.JSON(http.StatusOK, content)
+}
+
+//
+// Build self link (URI).
+func (h ClusterHandler) Link(p *api.Provider, m *model.Cluster) string {
+	return h.Handler.Link(
+		ClusterRoot,
+		base.Params{
+			base.NsParam:       p.Namespace,
+			base.ProviderParam: p.Name,
+			ClusterParam:       m.ID,
+		})
 }
 
 //
 // REST Resource.
 type Cluster struct {
-	base.Resource
+	Resource
 	Networks    model.RefList `json:"networks"`
 	Datastores  model.RefList `json:"datastores"`
 	DasEnabled  bool          `json:"dasEnabled"`
@@ -135,8 +152,8 @@ func (r *Cluster) With(m *model.Cluster) {
 }
 
 //
-// Render.
-func (r *Cluster) Object(detail bool) interface{} {
+// As content.
+func (r *Cluster) Content(detail bool) interface{} {
 	if !detail {
 		return r.Resource
 	}

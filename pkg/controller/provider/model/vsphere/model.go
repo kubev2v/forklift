@@ -165,8 +165,34 @@ type VM struct {
 	CpuHotRemoveEnabled bool   `sql:""`
 	MemoryHotAddEnabled bool   `sql:""`
 	CpuCount            int32  `sql:""`
-	MemorySizeMB        int32  `sql:""`
+	CoresPerSocket      int32  `sql:""`
+	MemoryMB            int32  `sql:""`
 	GuestName           string `sql:""`
 	BalloonedMemory     int32  `sql:""`
 	IpAddress           string `sql:""`
+	Disks               string `sql:""`
+}
+
+//
+// Virtual Disk.
+type Disk struct {
+	// Backing file.
+	File string `json:"file"`
+	// Datastore.
+	Datastore Ref `json:"datastore"`
+}
+
+//
+// Encode disks.
+func (m *VM) EncodeDisks(d []Disk) {
+	j, _ := json.Marshal(d)
+	m.Disks = string(j)
+}
+
+//
+// Decode disks.
+func (m *VM) DecodeDisks() []Disk {
+	list := []Disk{}
+	json.Unmarshal([]byte(m.Disks), &list)
+	return list
 }

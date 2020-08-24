@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
+	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
 	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web/base"
 	"net/http"
@@ -12,8 +13,10 @@ import (
 //
 // Routes.
 const (
-	FoldersRoot = Root + "/folders"
-	FolderRoot  = FoldersRoot + "/:folder"
+	FolderParam      = "folder"
+	FolderCollection = "folders"
+	FoldersRoot      = Root + "/" + FolderCollection
+	FolderRoot       = FoldersRoot + "/:" + FolderParam
 )
 
 //
@@ -40,7 +43,7 @@ func (h *FolderHandler) Prepare(ctx *gin.Context) int {
 		ctx.Status(status)
 		return status
 	}
-	id := ctx.Param("folder")
+	id := ctx.Param(FolderParam)
 	if id != "" {
 		m := &model.Folder{
 			Base: model.Base{
@@ -87,8 +90,8 @@ func (h FolderHandler) List(ctx *gin.Context) {
 	for _, m := range list {
 		r := &Folder{}
 		r.With(&m)
-		obj := r.Object(h.Detail)
-		content = append(content, obj)
+		r.SelfLink = h.Link(h.Provider, &m)
+		content = append(content, r.Content(h.Detail))
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -105,14 +108,28 @@ func (h FolderHandler) Get(ctx *gin.Context) {
 
 	r := &Folder{}
 	r.With(h.folder)
+	r.SelfLink = h.Link(h.Provider, h.folder)
+	content := r.Content(true)
 
-	ctx.JSON(http.StatusOK, r)
+	ctx.JSON(http.StatusOK, content)
+}
+
+//
+// Build self link (URI).
+func (h FolderHandler) Link(p *api.Provider, m *model.Folder) string {
+	return h.Handler.Link(
+		FolderRoot,
+		base.Params{
+			base.NsParam:       p.Namespace,
+			base.ProviderParam: p.Name,
+			FolderParam:        m.ID,
+		})
 }
 
 //
 // REST Resource.
 type Folder struct {
-	base.Resource
+	Resource
 	Children model.RefList `json:"children"`
 }
 
@@ -124,8 +141,8 @@ func (r *Folder) With(m *model.Folder) {
 }
 
 //
-// Render.
-func (r *Folder) Object(detail bool) interface{} {
+// Content.
+func (r *Folder) Content(detail bool) interface{} {
 	if !detail {
 		return r.Resource
 	}

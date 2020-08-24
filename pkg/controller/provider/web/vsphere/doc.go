@@ -6,12 +6,13 @@ import (
 	"github.com/konveyor/controller/pkg/logging"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web/base"
+	"github.com/konveyor/virt-controller/pkg/controller/provider/web/ocp"
 )
 
 //
 // Routes
 const (
-	Root = base.ProviderRoot + "/" + api.VSphere
+	Root = ocp.ProviderRoot + "/" + api.VSphere
 )
 
 //
@@ -27,18 +28,12 @@ func init() {
 // Build all handlers.
 func Handlers(container *container.Container) []libweb.RequestHandler {
 	return []libweb.RequestHandler{
-		&libweb.SchemaHandler{},
-		&base.ProviderHandler{
+		&TreeHandler{
 			Handler: base.Handler{
 				Container: container,
 			},
 		},
 		&FolderHandler{
-			Handler: base.Handler{
-				Container: container,
-			},
-		},
-		&TreeHandler{
 			Handler: base.Handler{
 				Container: container,
 			},
