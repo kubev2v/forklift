@@ -1,0 +1,12 @@
+---
+kind: Host
+apiVersion: virt.konveyor.io/v1alpha1
+metadata:
+  name: test
+  namespace: openshift-migration
+spec:
+  provider:
+    namespce: ""
+    name: ""
+  id: ""
+  ipAddress: ""

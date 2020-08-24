@@ -1,0 +1,22 @@
+---
+kind: Map
+apiVersion: virt.konveyor.io/v1alpha1
+metadata:
+  name: test
+  namespace: openshift-migration
+spec:
+  provider:
+    namespce: ""
+    name: ""
+  networks:
+    - source:
+        id: ""
+      destination:
+        type: "pod"
+        namespace: ""
+        name: ""
+  datastores:
+    - source:
+        id: ""
+      destination:
+        storageClass: ""

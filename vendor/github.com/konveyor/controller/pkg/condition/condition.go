@@ -1,11 +1,8 @@
 package condition
 
 import (
-	"fmt"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
-	"regexp"
-	"strings"
 	"time"
 )
 
@@ -51,8 +48,8 @@ type Condition struct {
 	LastTransitionTime v1.Time `json:"lastTransitionTime"`
 	// The condition is durable - never un-staged.
 	Durable bool `json:"durable,omitempty"`
-	// A list of associated `items` used to replace [] in `Message`.
-	Items []string `json:"-"`
+	// A list of items referenced in the `Message`.
+	Items []string `json:"items,omitempty"`
 	// A condition has been explicitly set/updated.
 	staged bool
 }
@@ -87,30 +84,6 @@ func (r *Condition) Equal(other Condition) bool {
 }
 
 //
-// Replace [] in `Message` with the content of `Items`.
-func (r *Condition) ExpandItems() {
-	re := regexp.MustCompile(`\[\]`)
-	list := fmt.Sprintf("[%s]", strings.Join(r.Items, ","))
-	r.Message = re.ReplaceAllString(r.Message, list)
-}
-
-//
-// Build the `Items` list by parsing the `Message`.
-func (r *Condition) BuildItems() {
-	re := regexp.MustCompile(`\[[^]]+\]`)
-	found := re.FindString(r.Message)
-	if found == "" {
-		return
-	}
-	r.Items = []string{}
-	found = strings.Trim(found, "[]")
-	r.Message = re.ReplaceAllString(r.Message, "[]")
-	for _, s := range strings.Split(found, ",") {
-		r.Items = append(r.Items, strings.TrimSpace(s))
-	}
-}
-
-//
 // Managed collection of conditions.
 // Intended to be included in resource Status.
 // List - The list of conditions.
@@ -142,7 +115,6 @@ func (r *Conditions) BeginStagingConditions() {
 	}
 	for index := range r.List {
 		condition := &r.List[index]
-		condition.BuildItems()
 		condition.staged = condition.Durable
 	}
 }
@@ -158,7 +130,6 @@ func (r *Conditions) EndStagingConditions() {
 	for index := range r.List {
 		condition := r.List[index]
 		if condition.staged {
-			condition.ExpandItems()
 			kept = append(kept, condition)
 		}
 	}

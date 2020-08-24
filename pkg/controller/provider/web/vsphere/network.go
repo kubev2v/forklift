@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
+	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
 	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web/base"
 	"net/http"
@@ -12,8 +13,10 @@ import (
 //
 // Routes.
 const (
-	NetworksRoot = Root + "/networks"
-	NetworkRoot  = NetworksRoot + "/:network"
+	NetworkParam      = "network"
+	NetworkCollection = "networks"
+	NetworksRoot      = Root + "/" + NetworkCollection
+	NetworkRoot       = NetworksRoot + "/:" + NetworkParam
 )
 
 //
@@ -54,8 +57,8 @@ func (h NetworkHandler) List(ctx *gin.Context) {
 	for _, m := range list {
 		r := &Network{}
 		r.With(&m)
-		obj := r.Object(h.Detail)
-		content = append(content, obj)
+		r.SelfLink = h.Link(h.Provider, &m)
+		content = append(content, r.Content(h.Detail))
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -71,7 +74,7 @@ func (h NetworkHandler) Get(ctx *gin.Context) {
 	}
 	m := &model.Network{
 		Base: model.Base{
-			ID: ctx.Param("network"),
+			ID: ctx.Param(NetworkParam),
 		},
 	}
 	db := h.Reconciler.DB()
@@ -87,14 +90,28 @@ func (h NetworkHandler) Get(ctx *gin.Context) {
 	}
 	r := &Network{}
 	r.With(m)
+	r.SelfLink = h.Link(h.Provider, m)
+	content := r.Content(true)
 
-	ctx.JSON(http.StatusOK, r)
+	ctx.JSON(http.StatusOK, content)
+}
+
+//
+// Build self link (URI).
+func (h NetworkHandler) Link(p *api.Provider, m *model.Network) string {
+	return h.Handler.Link(
+		NetworkRoot,
+		base.Params{
+			base.NsParam:       p.Namespace,
+			base.ProviderParam: p.Name,
+			NetworkParam:       m.ID,
+		})
 }
 
 //
 // REST Resource.
 type Network struct {
-	base.Resource
+	Resource
 	Tag string `json:"tag"`
 }
 
@@ -106,8 +123,8 @@ func (r *Network) With(m *model.Network) {
 }
 
 //
-// Render.
-func (r *Network) Object(detail bool) interface{} {
+// As content.
+func (r *Network) Content(detail bool) interface{} {
 	if !detail {
 		return r.Resource
 	}

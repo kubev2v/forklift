@@ -5,6 +5,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	"github.com/konveyor/controller/pkg/ref"
+	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
 	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web/base"
 	"net/http"
@@ -88,9 +89,10 @@ func (h TreeHandler) VmTree(ctx *gin.Context) {
 			return
 		}
 		tr := Tree{
-			Root: folder,
-			Leaf: model.VmKind,
-			DB:   db,
+			Provider: h.Provider,
+			Root:     folder,
+			Leaf:     model.VmKind,
+			DB:       db,
 			Detail: map[string]bool{
 				model.VmKind: h.Detail,
 			},
@@ -101,11 +103,11 @@ func (h TreeHandler) VmTree(ctx *gin.Context) {
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
+		r := Datacenter{}
+		r.With(&dc)
+		r.SelfLink = DatacenterHandler{}.Link(h.Provider, &dc)
 		branch.Kind = model.DatacenterKind
-		branch.Object = model.Base{
-			ID:   dc.ID,
-			Name: dc.Name,
-		}
+		branch.Object = r
 		content.Children = append(content.Children, branch)
 	}
 
@@ -137,9 +139,10 @@ func (h TreeHandler) HostTree(ctx *gin.Context) {
 			return
 		}
 		tr := Tree{
-			Root: folder,
-			Leaf: model.VmKind,
-			DB:   db,
+			Provider: h.Provider,
+			Root:     folder,
+			Leaf:     model.VmKind,
+			DB:       db,
 			Detail: map[string]bool{
 				model.ClusterKind: h.Detail,
 				model.HostKind:    h.Detail,
@@ -152,11 +155,10 @@ func (h TreeHandler) HostTree(ctx *gin.Context) {
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
+		r := Datacenter{}
+		r.SelfLink = DatacenterHandler{}.Link(h.Provider, &dc)
 		branch.Kind = model.DatacenterKind
-		branch.Object = model.Base{
-			ID:   dc.ID,
-			Name: dc.Name,
-		}
+		branch.Object = r
 		content.Children = append(content.Children, branch)
 	}
 
@@ -166,6 +168,8 @@ func (h TreeHandler) HostTree(ctx *gin.Context) {
 //
 // Tree.
 type Tree struct {
+	// Provider.
+	Provider *api.Provider
 	// DB connection.
 	DB libmodel.DB
 	// Tree root.
@@ -224,7 +228,9 @@ func (r *Tree) node(parent *TreeNode, m model.Model) *TreeNode {
 	case model.FolderKind:
 		resource := &Folder{}
 		resource.With(m.(*model.Folder))
-		object := resource.Object(r.detail(kind))
+		resource.SelfLink =
+			FolderHandler{}.Link(r.Provider, m.(*model.Folder))
+		object := resource.Content(r.detail(kind))
 		node = &TreeNode{
 			parent: parent,
 			Kind:   kind,
@@ -233,7 +239,9 @@ func (r *Tree) node(parent *TreeNode, m model.Model) *TreeNode {
 	case model.DatacenterKind:
 		resource := &Datacenter{}
 		resource.With(m.(*model.Datacenter))
-		object := resource.Object(r.detail(kind))
+		resource.SelfLink =
+			DatacenterHandler{}.Link(r.Provider, m.(*model.Datacenter))
+		object := resource.Content(r.detail(kind))
 		node = &TreeNode{
 			parent: parent,
 			Kind:   kind,
@@ -242,7 +250,9 @@ func (r *Tree) node(parent *TreeNode, m model.Model) *TreeNode {
 	case model.ClusterKind:
 		resource := &Cluster{}
 		resource.With(m.(*model.Cluster))
-		object := resource.Object(r.detail(kind))
+		resource.SelfLink =
+			ClusterHandler{}.Link(r.Provider, m.(*model.Cluster))
+		object := resource.Content(r.detail(kind))
 		node = &TreeNode{
 			parent: parent,
 			Kind:   kind,
@@ -251,7 +261,9 @@ func (r *Tree) node(parent *TreeNode, m model.Model) *TreeNode {
 	case model.HostKind:
 		resource := &Host{}
 		resource.With(m.(*model.Host))
-		object := resource.Object(r.detail(kind))
+		resource.SelfLink =
+			HostHandler{}.Link(r.Provider, m.(*model.Host))
+		object := resource.Content(r.detail(kind))
 		node = &TreeNode{
 			parent: parent,
 			Kind:   kind,
@@ -260,7 +272,9 @@ func (r *Tree) node(parent *TreeNode, m model.Model) *TreeNode {
 	case model.VmKind:
 		resource := &VM{}
 		resource.With(m.(*model.VM))
-		object := resource.Object(r.detail(kind))
+		resource.SelfLink =
+			VMHandler{}.Link(r.Provider, m.(*model.VM))
+		object := resource.Content(r.detail(kind))
 		node = &TreeNode{
 			parent: parent,
 			Kind:   kind,
@@ -269,7 +283,9 @@ func (r *Tree) node(parent *TreeNode, m model.Model) *TreeNode {
 	case model.NetKind:
 		resource := &Network{}
 		resource.With(m.(*model.Network))
-		object := resource.Object(r.detail(kind))
+		resource.SelfLink =
+			NetworkHandler{}.Link(r.Provider, m.(*model.Network))
+		object := resource.Content(r.detail(kind))
 		node = &TreeNode{
 			parent: parent,
 			Kind:   kind,
@@ -278,7 +294,9 @@ func (r *Tree) node(parent *TreeNode, m model.Model) *TreeNode {
 	case model.DsKind:
 		resource := &Datastore{}
 		resource.With(m.(*model.Datastore))
-		object := resource.Object(r.detail(kind))
+		resource.SelfLink =
+			DatastoreHandler{}.Link(r.Provider, m.(*model.Datastore))
+		object := resource.Content(r.detail(kind))
 		node = &TreeNode{
 			parent: parent,
 			Kind:   kind,

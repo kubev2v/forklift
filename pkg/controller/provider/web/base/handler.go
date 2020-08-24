@@ -5,18 +5,25 @@ import (
 	libcontainer "github.com/konveyor/controller/pkg/inventory/container"
 	libweb "github.com/konveyor/controller/pkg/inventory/web"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
-	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
 //
 // Root - all routes.
 const (
-	Root = libweb.Root
+	Root          = libweb.Root
+	NsParam       = libweb.NsParam
+	ProviderParam = "provider"
+	DetailParam   = "detail"
 )
+
+//
+// Params
+type Params = map[string]string
 
 //
 // Base handler.
@@ -58,8 +65,8 @@ func (h *Handler) setProvider(ctx *gin.Context) int {
 	var found bool
 	h.Provider = &api.Provider{
 		ObjectMeta: meta.ObjectMeta{
-			Namespace: ctx.Param("ns1"),
-			Name:      ctx.Param("provider"),
+			Namespace: ctx.Param(NsParam),
+			Name:      ctx.Param(ProviderParam),
 		},
 	}
 	if h.Provider.Name != "" {
@@ -80,7 +87,7 @@ func (h *Handler) setProvider(ctx *gin.Context) int {
 // Set detail
 func (h *Handler) setDetail(ctx *gin.Context) int {
 	q := ctx.Request.URL.Query()
-	pDetail := q.Get("detail")
+	pDetail := q.Get(DetailParam)
 	if len(pDetail) > 0 {
 		b, err := strconv.ParseBool(pDetail)
 		if err == nil {
@@ -94,15 +101,11 @@ func (h *Handler) setDetail(ctx *gin.Context) int {
 }
 
 //
-// REST Resource.
-type Resource struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-}
+// Build link.
+func (h *Handler) Link(path string, params Params) string {
+	for k, v := range params {
+		path = strings.Replace(path, ":"+k, v, 1)
+	}
 
-//
-// Build the resource using the model.
-func (r *Resource) With(m *model.Base) {
-	r.ID = m.ID
-	r.Name = m.Name
+	return path
 }
