@@ -14,16 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package plan
+package mp
 
 import (
 	"context"
-	"errors"
 	"github.com/konveyor/controller/pkg/logging"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
 	"github.com/konveyor/virt-controller/pkg/settings"
-	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -31,27 +30,23 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"time"
 )
 
-var log = logging.WithName("plan")
+var log = logging.WithName("map")
 
 //
 // Application settings.
-var (
-	Settings = &settings.Settings
-	FastReQ  = time.Second * 3
-)
+var Settings = &settings.Settings
 
 //
-// Creates a new Plan Controller and adds it to the Manager.
+// Creates a new Map Controller and adds it to the Manager.
 func Add(mgr manager.Manager) error {
 	reconciler := &Reconciler{
 		Client: mgr.GetClient(),
 		scheme: mgr.GetScheme(),
 	}
 	cnt, err := controller.New(
-		"plan-controller",
+		"map-controller",
 		mgr,
 		controller.Options{
 			Reconciler: reconciler,
@@ -62,9 +57,9 @@ func Add(mgr manager.Manager) error {
 	}
 	// Primary CR.
 	err = cnt.Watch(
-		&source.Kind{Type: &api.Plan{}},
+		&source.Kind{Type: &api.Map{}},
 		&handler.EnqueueRequestForObject{},
-		&PlanPredicate{})
+		&MapPredicate{})
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -80,26 +75,6 @@ func Add(mgr manager.Manager) error {
 		log.Trace(err)
 		return err
 	}
-	err = cnt.Watch(
-		&source.Kind{
-			Type: &api.Map{},
-		},
-		libref.Handler(),
-		&MapPredicate{})
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-	err = cnt.Watch(
-		&source.Kind{
-			Type: &api.Host{},
-		},
-		libref.Handler(),
-		&MapPredicate{})
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
 
 	return nil
 }
@@ -107,14 +82,14 @@ func Add(mgr manager.Manager) error {
 var _ reconcile.Reconciler = &Reconciler{}
 
 //
-// Reconciles a Plan object.
+// Reconciles a Map object.
 type Reconciler struct {
 	client.Client
 	scheme *runtime.Scheme
 }
 
 //
-// Reconcile a Plan CR.
+// Reconcile a Map CR.
 func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var err error
 
@@ -122,10 +97,10 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	log.Reset()
 
 	// Fetch the CR.
-	plan := &api.Plan{}
-	err = r.Get(context.TODO(), request.NamespacedName, plan)
+	mp := &api.Map{}
+	err = r.Get(context.TODO(), request.NamespacedName, mp)
 	if err != nil {
-		if k8serr.IsNotFound(err) {
+		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil
 		}
 		log.Trace(err)
@@ -133,34 +108,29 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	}
 
 	// Begin staging conditions.
-	plan.Status.BeginStagingConditions()
+	mp.Status.BeginStagingConditions()
 
 	// Validations.
-	err = r.validate(plan)
+	err = r.validate(mp)
 	if err != nil {
-		if errors.Is(err, ProviderInvNotReady) {
-			return reconcile.Result{
-				RequeueAfter: FastReQ,
-			}, nil
-		}
 		log.Trace(err)
-		return reconcile.Result{RequeueAfter: FastReQ}, nil
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Ready condition.
-	if !plan.Status.HasBlockerCondition() {
-		plan.Status.SetReady(true, ReadyMessage)
+	if !mp.Status.HasBlockerCondition() {
+		mp.Status.SetReady(true, ReadyMessage)
 	}
 
 	// End staging conditions.
-	plan.Status.EndStagingConditions()
+	mp.Status.EndStagingConditions()
 
 	// Apply changes.
-	plan.Status.ObservedGeneration = plan.Generation
-	err = r.Status().Update(context.TODO(), plan)
+	mp.Status.ObservedGeneration = mp.Generation
+	err = r.Status().Update(context.TODO(), mp)
 	if err != nil {
 		log.Trace(err)
-		return reconcile.Result{RequeueAfter: FastReQ}, nil
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Done

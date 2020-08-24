@@ -42,6 +42,45 @@ spec:
               description: The most recent generation observed by the controller.
               format: int64
               type: integer
+            vms:
+              description: VM status
+              items:
+                properties:
+                  pipeline:
+                    description: Migration pipeline.
+                    items:
+                      properties:
+                        name:
+                          description: Name.
+                          type: string
+                        progress:
+                          description: Progress.
+                          properties:
+                            complete:
+                              description: Number Completed.
+                              format: int64
+                              type: integer
+                            total:
+                              description: Total.
+                              format: int64
+                              type: integer
+                          required:
+                          - total
+                          - complete
+                          type: object
+                      required:
+                      - name
+                      - progress
+                      type: object
+                    type: array
+                  vm:
+                    description: VM ID
+                    type: string
+                required:
+                - vm
+                - pipeline
+                type: object
+              type: array
           type: object
   version: v1alpha1
 status:

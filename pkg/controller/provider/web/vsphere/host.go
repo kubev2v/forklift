@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
+	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
 	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web/base"
 	"net/http"
@@ -12,8 +13,10 @@ import (
 //
 // Routes
 const (
-	HostsRoot = Root + "/hosts"
-	HostRoot  = HostsRoot + "/:host"
+	HostParam      = "host"
+	HostCollection = "hosts"
+	HostsRoot      = Root + "/" + HostCollection
+	HostRoot       = HostsRoot + "/:" + HostParam
 )
 
 //
@@ -54,8 +57,8 @@ func (h HostHandler) List(ctx *gin.Context) {
 	for _, m := range list {
 		r := &Host{}
 		r.With(&m)
-		obj := r.Object(h.Detail)
-		content = append(content, obj)
+		r.SelfLink = h.Link(h.Provider, &m)
+		content = append(content, r.Content(h.Detail))
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -71,7 +74,7 @@ func (h HostHandler) Get(ctx *gin.Context) {
 	}
 	m := &model.Host{
 		Base: model.Base{
-			ID: ctx.Param("host"),
+			ID: ctx.Param(HostParam),
 		},
 	}
 	db := h.Reconciler.DB()
@@ -87,19 +90,34 @@ func (h HostHandler) Get(ctx *gin.Context) {
 	}
 	r := &Host{}
 	r.With(m)
+	r.SelfLink = h.Link(h.Provider, m)
+	content := r.Content(true)
 
-	ctx.JSON(http.StatusOK, r)
+	ctx.JSON(http.StatusOK, content)
+}
+
+//
+// Build self link (URI).
+func (h HostHandler) Link(p *api.Provider, m *model.Host) string {
+	return h.Handler.Link(
+		HostRoot,
+		base.Params{
+			base.NsParam:       p.Namespace,
+			base.ProviderParam: p.Name,
+			HostParam:          m.ID,
+		})
 }
 
 //
 // REST Resource.
 type Host struct {
-	base.Resource
+	Resource
 	InMaintenanceMode bool          `json:"inMaintenance"`
 	ProductName       string        `json:"productName"`
 	ProductVersion    string        `json:"productVersion"`
 	Networks          model.RefList `json:"networks"`
 	Datastores        model.RefList `json:"datastores"`
+	VMs               model.RefList `json:"vms"`
 }
 
 //
@@ -111,11 +129,12 @@ func (r *Host) With(m *model.Host) {
 	r.ProductName = m.ProductName
 	r.Networks = *model.RefListPtr().With(m.Networks)
 	r.Datastores = *model.RefListPtr().With(m.Datastores)
+	r.VMs = *model.RefListPtr().With(m.Vms)
 }
 
 //
-// Render.
-func (r *Host) Object(detail bool) interface{} {
+// As content.
+func (r *Host) Content(detail bool) interface{} {
 	if !detail {
 		return r.Resource
 	}

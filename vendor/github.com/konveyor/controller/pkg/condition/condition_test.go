@@ -66,35 +66,6 @@ func TestCondition_Update(t *testing.T) {
 	g.Expect(condA).To(gomega.Equal(condB))
 }
 
-func TestCondition_ExpandItems(t *testing.T) {
-	g := gomega.NewGomegaWithT(t)
-
-	condition := Condition{
-		Message: "The following [] need to be fixed.",
-	}
-
-	condition.Items = append(condition.Items, "A", "B")
-
-	// Test
-	condition.ExpandItems()
-
-	// Validation
-	g.Expect(condition.Message).To(gomega.Equal("The following [A,B] need to be fixed."))
-}
-
-func TestCondition_BuildItems(t *testing.T) {
-	g := gomega.NewGomegaWithT(t)
-	condition := Condition{
-		Message: "The following [A, B,C] need to be fixed.",
-	}
-
-	// Test
-	condition.BuildItems()
-
-	// Validation
-	g.Expect(condition.Items).To(gomega.Equal([]string{"A", "B", "C"}))
-}
-
 //
 // Conditions
 //
@@ -413,38 +384,4 @@ func TestConditions_HasConditionCategoryStaging(t *testing.T) {
 	g.Expect(conditions.HasConditionCategory(Error, Warn)).To(gomega.BeTrue())
 	// Test Staging and not staged.
 	g.Expect(conditions.HasConditionCategory(Critical)).To(gomega.BeFalse())
-}
-
-func TestConditions_AppendingItems(t *testing.T) {
-	g := gomega.NewGomegaWithT(t)
-
-	// Setup
-	conditions := Conditions{
-		List: []Condition{
-			{Type: "A", staged: true},
-			{Type: "B", staged: true},
-			{Type: "C", staged: true},
-		},
-	}
-
-	// Test
-	conditions.BeginStagingConditions()
-
-	for _, name := range []string{"Dog", "Cat"} {
-		condition := conditions.FindCondition("A")
-		if condition == nil {
-			conditions.SetCondition(Condition{
-				Type:    "A",
-				Message: "These things [] not found.",
-				Items:   []string{name},
-			})
-		} else {
-			condition.Items = append(condition.Items, name)
-		}
-	}
-
-	conditions.EndStagingConditions()
-
-	// Validation
-	g.Expect(conditions.List[0].Message).To(gomega.Equal("These things [Dog,Cat] not found."))
 }

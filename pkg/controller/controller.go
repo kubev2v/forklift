@@ -17,6 +17,8 @@ limitations under the License.
 package controller
 
 import (
+	"github.com/konveyor/virt-controller/pkg/controller/host"
+	"github.com/konveyor/virt-controller/pkg/controller/map"
 	"github.com/konveyor/virt-controller/pkg/controller/migration"
 	"github.com/konveyor/virt-controller/pkg/controller/plan"
 	"github.com/konveyor/virt-controller/pkg/controller/provider"
@@ -35,6 +37,8 @@ var Controllers = []AddFunction{
 	migration.Add,
 	plan.Add,
 	provider.Add,
+	mp.Add,
+	host.Add,
 }
 
 //

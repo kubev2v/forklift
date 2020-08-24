@@ -10,7 +10,9 @@ import (
 
 // Root - all routes.
 const (
-	Root = "/namespaces/:ns1"
+	NsParam      = "ns1"
+	NsCollection = "namespaces"
+	Root         = "/" + NsCollection + "/:" + NsParam
 )
 
 //

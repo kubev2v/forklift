@@ -23,49 +23,26 @@ import (
 )
 
 //
-// Progress.
-type Progress struct {
-	// Total.
-	Total int `json:"total"`
-	// Number Completed.
-	Complete int `json:"complete"`
+// HostSpec defines the desired state of Host
+type HostSpec struct {
+	// Provider
+	Provider core.ObjectReference `json:"provider" ref:"Provider"`
+	// The host identifier.
+	// For:
+	//   - vSphere: The managed object ID.
+	ID string `json:"id"`
+	// IP address used for disk transfer.
+	IpAddress string `json:"ipAddress"`
 }
 
 //
-// Pipeline step.
-type Step struct {
-	// Name.
-	Name string `json:"name"`
-	// Progress.
-	Progress Progress `json:"progress"`
-}
-
-//
-// VM Status
-type VMStatus struct {
-	// VM ID
-	ID string `json:"vm"`
-	// Migration pipeline.
-	Pipeline []Step `json:"pipeline"`
-}
-
-//
-// MigrationSpec defines the desired state of Migration
-type MigrationSpec struct {
-	// Reference to the associated Plan.
-	Plan core.ObjectReference `json:"plan" ref:"Plan"`
-}
-
-//
-// MigrationStatus defines the observed state of Migration
-type MigrationStatus struct {
+// HostStatus defines the observed state of Host
+type HostStatus struct {
 	// Conditions.
 	libcnd.Conditions
 	// The most recent generation observed by the controller.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-	// VM status
-	VMs []VMStatus `json:"vms,omitempty"`
 }
 
 //
@@ -73,21 +50,21 @@ type MigrationStatus struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
-type Migration struct {
+type Host struct {
 	meta.TypeMeta   `json:",inline"`
 	meta.ObjectMeta `json:"metadata,omitempty"`
-	Spec            MigrationSpec   `json:"spec,omitempty"`
-	Status          MigrationStatus `json:"status,omitempty"`
+	Spec            HostSpec   `json:"spec,omitempty"`
+	Status          HostStatus `json:"status,omitempty"`
 }
 
 //
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type MigrationList struct {
+type HostList struct {
 	meta.TypeMeta `json:",inline"`
 	meta.ListMeta `json:"metadata,omitempty"`
-	Items         []Migration `json:"items"`
+	Items         []Host `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Migration{}, &MigrationList{})
+	SchemeBuilder.Register(&Host{}, &HostList{})
 }

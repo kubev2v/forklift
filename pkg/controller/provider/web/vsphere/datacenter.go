@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
+	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
 	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web/base"
 	"net/http"
@@ -12,8 +13,10 @@ import (
 //
 // Routes.
 const (
-	DatacentersRoot = Root + "/datacenters"
-	DatacenterRoot  = DatacentersRoot + "/:datacenter"
+	DatacenterParam      = "datacenter"
+	DatacenterCollection = "datacenters"
+	DatacentersRoot      = Root + "/" + DatacenterCollection
+	DatacenterRoot       = DatacentersRoot + "/:" + DatacenterParam
 )
 
 //
@@ -40,7 +43,7 @@ func (h *DatacenterHandler) Prepare(ctx *gin.Context) int {
 		ctx.Status(status)
 		return status
 	}
-	id := ctx.Param("datacenter")
+	id := ctx.Param(DatacenterParam)
 	if id != "" {
 		m := &model.Datacenter{
 			Base: model.Base{
@@ -87,8 +90,8 @@ func (h DatacenterHandler) List(ctx *gin.Context) {
 	for _, m := range list {
 		r := &Datacenter{}
 		r.With(&m)
-		obj := r.Object(h.Detail)
-		content = append(content, obj)
+		r.SelfLink = h.Link(h.Provider, &m)
+		content = append(content, r.Content(h.Detail))
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -104,14 +107,28 @@ func (h DatacenterHandler) Get(ctx *gin.Context) {
 	}
 	r := &Datacenter{}
 	r.With(h.datacenter)
+	r.SelfLink = h.Link(h.Provider, h.datacenter)
+	content := r.Content(true)
 
-	ctx.JSON(http.StatusOK, r)
+	ctx.JSON(http.StatusOK, content)
+}
+
+//
+// Build self link (URI).
+func (h DatacenterHandler) Link(p *api.Provider, m *model.Datacenter) string {
+	return h.Handler.Link(
+		DatacenterRoot,
+		base.Params{
+			base.NsParam:       p.Namespace,
+			base.ProviderParam: p.Name,
+			DatacenterParam:    m.ID,
+		})
 }
 
 //
 // REST Resource.
 type Datacenter struct {
-	base.Resource
+	Resource
 }
 
 //
@@ -121,8 +138,8 @@ func (r *Datacenter) With(m *model.Datacenter) {
 }
 
 //
-// Render.
-func (r *Datacenter) Object(detail bool) interface{} {
+// As content.
+func (r *Datacenter) Content(detail bool) interface{} {
 	if !detail {
 		return r.Resource
 	}

@@ -4,12 +4,12 @@ metadata:
   creationTimestamp: null
   labels:
     controller-tools.k8s.io: "1.0"
-  name: plans.virt.konveyor.io
+  name: hosts.virt.konveyor.io
 spec:
   group: virt.konveyor.io
   names:
-    kind: Plan
-    plural: plans
+    kind: Host
+    plural: hosts
   scope: Namespaced
   subresources:
     status: {}
@@ -30,51 +30,20 @@ spec:
           type: object
         spec:
           properties:
-            map:
-              description: Resource map.
-              type: object
+            id:
+              description: 'The host identifier. For:   - vSphere: The managed object
+                ID.'
+              type: string
+            ipAddress:
+              description: IP address used for disk transfer.
+              type: string
             provider:
-              description: Providers.
-              properties:
-                destination:
-                  description: Destination.
-                  type: object
-                source:
-                  description: Source.
-                  type: object
-              required:
-              - source
-              - destination
+              description: Provider
               type: object
-            vms:
-              description: List of VMs.
-              items:
-                properties:
-                  hook:
-                    description: Enable hooks.
-                    properties:
-                      after:
-                        description: Run hook after migration.
-                        type: boolean
-                      before:
-                        description: Run hook before migration.
-                        type: boolean
-                    type: object
-                  host:
-                    description: Host
-                    type: object
-                  id:
-                    description: 'The VM identifier. For:   - vSphere: The managed
-                      object ID.'
-                    type: string
-                required:
-                - id
-                type: object
-              type: array
           required:
           - provider
-          - map
-          - vms
+          - id
+          - ipAddress
           type: object
         status:
           properties:
