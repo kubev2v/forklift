@@ -31,8 +31,10 @@ type DB interface {
 	Get(Model) error
 	// Get for update of the specified model.
 	GetForUpdate(Model) (*Tx, error)
-	// List models based on `selector` model.
+	// List models based on the type of slice.
 	List(interface{}, ListOptions) error
+	// Count based on the specified model.
+	Count(Model, Predicate) (int64, error)
 	// Begin a transaction.
 	Begin() (*Tx, error)
 	// Insert a model.
@@ -149,6 +151,12 @@ func (r *Client) GetForUpdate(model Model) (*Tx, error) {
 // The `list` must be: *[]Model.
 func (r *Client) List(list interface{}, options ListOptions) error {
 	return Table{r.db}.List(list, options)
+}
+
+//
+// Count models.
+func (r *Client) Count(model Model, predicate Predicate) (int64, error) {
+	return Table{r.db}.Count(model, predicate)
 }
 
 //
