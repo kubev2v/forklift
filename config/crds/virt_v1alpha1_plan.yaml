@@ -54,11 +54,11 @@ spec:
                     description: Enable hooks.
                     properties:
                       after:
-                        description: Run hook after migration.
-                        type: boolean
+                        description: Post-migration hook.
+                        type: object
                       before:
-                        description: Run hook before migration.
-                        type: boolean
+                        description: Pre-migration hook.
+                        type: object
                     type: object
                   host:
                     description: Host
