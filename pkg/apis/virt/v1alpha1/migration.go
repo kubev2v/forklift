@@ -18,18 +18,10 @@ package v1alpha1
 
 import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
+	libitr "github.com/konveyor/controller/pkg/itinerary"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-//
-// Progress.
-type Progress struct {
-	// Total.
-	Total int `json:"total"`
-	// Number Completed.
-	Complete int `json:"complete"`
-}
 
 //
 // Pipeline step.
@@ -37,16 +29,27 @@ type Step struct {
 	// Name.
 	Name string `json:"name"`
 	// Progress.
-	Progress Progress `json:"progress"`
+	Progress libitr.Progress `json:"progress"`
+}
+
+//
+// VM errors.
+type VMError struct {
+	Phase   string   `json:"phase"`
+	Reasons []string `json:"reasons"`
 }
 
 //
 // VM Status
 type VMStatus struct {
-	// VM ID
-	ID string `json:"vm"`
+	// Planned VM.
+	Planned PlanVM `json:"planned"`
 	// Migration pipeline.
 	Pipeline []Step `json:"pipeline"`
+	// Phase
+	Phase string `json:"phase"`
+	// Errors
+	Error *VMError `json:"error,omitempty"`
 }
 
 //

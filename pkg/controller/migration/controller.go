@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"time"
 )
 
 var log = logging.WithName("migration")
@@ -94,6 +95,7 @@ type Reconciler struct {
 // Reconcile a Migration CR.
 func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var err error
+	reQ := time.Duration(0)
 
 	// Reset the logger.
 	log.Reset()
@@ -124,6 +126,17 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		migration.Status.SetReady(true, ReadyMessage)
 	}
 
+	// Run migration.
+	task := Task{
+		Client:    r,
+		Migration: migration,
+	}
+	reQ, err = task.Run()
+	if err != nil {
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
+	}
+
 	// End staging conditions.
 	migration.Status.EndStagingConditions()
 
@@ -135,6 +148,9 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-	// Done
+	if reQ > NoReQ {
+		return reconcile.Result{RequeueAfter: reQ}, nil
+	}
+
 	return reconcile.Result{}, nil
 }
