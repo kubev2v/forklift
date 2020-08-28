@@ -32,17 +32,22 @@ import (
 type AddFunction func(manager.Manager) error
 
 //
-// List of controllers
-var Controllers = []AddFunction{
+// List of main controllers
+var MainControllers = []AddFunction{
 	migration.Add,
 	plan.Add,
-	provider.Add,
 	mp.Add,
 	host.Add,
 }
 
 //
-// Add controllers to the manager.
+// List of Inventory controllers
+var InventoryControllers = []AddFunction{
+	provider.Add,
+}
+
+//
+// Add controllers to the manager based on role.
 func AddToManager(m manager.Manager) error {
 	err := settings.Settings.Load()
 	if err != nil {
@@ -56,9 +61,19 @@ func AddToManager(m manager.Manager) error {
 		}
 		return nil
 	}
-	err = load(Controllers)
-	if err != nil {
-		return err
+	if settings.Settings.Role.Has(settings.InventoryRole) {
+		err := load(InventoryControllers)
+		if err != nil {
+			return err
+		}
+
+	}
+	if settings.Settings.Role.Has(settings.MtvRole) {
+		err := load(MainControllers)
+		if err != nil {
+			return err
+		}
+
 	}
 
 	return nil
