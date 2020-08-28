@@ -74,6 +74,7 @@ func Add(mgr manager.Manager) error {
 	}
 	container := libcontainer.New()
 	web := libweb.New(container, web.All(container)...)
+	web.AllowedOrigins = Settings.CORS.AllowedOrigins
 	reconciler := &Reconciler{
 		Client:    nClient,
 		scheme:    mgr.GetScheme(),
@@ -211,7 +212,7 @@ func (r *Reconciler) updateContainer(provider *api.Provider) error {
 //
 // Build DB for provider.
 func (r *Reconciler) getDB(provider *api.Provider) libmodel.DB {
-	dir := "/tmp"
+	dir := Settings.Inventory.WorkingDir
 	dir = filepath.Join(dir, provider.Namespace)
 	os.MkdirAll(dir, 0755)
 	file := string(provider.Name)
