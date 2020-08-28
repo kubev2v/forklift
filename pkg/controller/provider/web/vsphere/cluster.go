@@ -1,4 +1,4 @@
-package web
+package vsphere
 
 import (
 	"errors"
@@ -15,7 +15,7 @@ import (
 const (
 	ClusterParam      = "cluster"
 	ClusterCollection = "clusters"
-	ClustersRoot      = Root + "/" + ClusterCollection
+	ClustersRoot      = ProviderRoot + "/" + ClusterCollection
 	ClusterRoot       = ClustersRoot + "/:" + ClusterParam
 )
 

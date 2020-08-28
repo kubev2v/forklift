@@ -1,4 +1,4 @@
-package web
+package vsphere
 
 import (
 	"errors"
@@ -15,7 +15,7 @@ import (
 const (
 	DatastoreParam      = "datastore"
 	DatastoreCollection = "datastores"
-	DatastoresRoot      = Root + "/" + DatastoreCollection
+	DatastoresRoot      = ProviderRoot + "/" + DatastoreCollection
 	DatastoreRoot       = DatastoresRoot + "/:" + DatastoreParam
 )
 

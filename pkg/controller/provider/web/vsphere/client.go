@@ -1,13 +1,15 @@
-package web
+package vsphere
 
 import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
+	ocpmodel "github.com/konveyor/virt-controller/pkg/controller/provider/model/ocp"
 	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web/base"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/web/ocp"
+	pathlib "path"
 	"reflect"
+	"strings"
 )
 
 //
@@ -81,11 +83,20 @@ func (c *Client) List(list interface{}) (int, error) {
 // Build the URL path.
 func (c *Client) Path(resource interface{}, id string) (path string, err error) {
 	switch resource.(type) {
-	case *ocp.Provider:
-		client := ocp.Client{
-			Provider: c.Provider,
+	case *Provider:
+		ns, name := pathlib.Split(id)
+		ns = strings.TrimSuffix(ns, "/")
+		if id == "" { // list
+			ns = c.Provider.Namespace
 		}
-		return client.Path(resource, id)
+		h := ProviderHandler{}
+		path = h.Link(
+			&ocpmodel.Provider{
+				Base: ocpmodel.Base{
+					Namespace: ns,
+					Name:      name,
+				},
+			})
 	case *Datacenter:
 		h := DatacenterHandler{}
 		path = h.Link(

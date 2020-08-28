@@ -9,10 +9,6 @@ import (
 // Errors
 var NotFound = libmodel.NotFound
 
-const (
-	Assign = "assign"
-)
-
 //
 // Types
 type Model = libmodel.Model
