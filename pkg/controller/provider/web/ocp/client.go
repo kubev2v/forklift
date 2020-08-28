@@ -4,8 +4,8 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
+	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web/base"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pathlib "path"
 	"reflect"
 	"strings"
@@ -91,8 +91,8 @@ func (c *Client) Path(object interface{}, id string) (path string, err error) {
 			ns = c.Provider.Namespace
 		}
 		h := ProviderHandler{}
-		path = h.Link(&api.Provider{
-			ObjectMeta: meta.ObjectMeta{
+		path = h.Link(&model.Provider{
+			Base: model.Base{
 				Namespace: ns,
 				Name:      name,
 			},

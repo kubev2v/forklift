@@ -1,13 +1,16 @@
 package vsphere
 
-import "github.com/konveyor/controller/pkg/logging"
+import (
+	"github.com/konveyor/controller/pkg/logging"
+	"github.com/konveyor/virt-controller/pkg/controller/provider/model/ocp"
+)
 
 //
 // Shared logger.
 var Log *logging.Logger
 
 func init() {
-	log := logging.WithName("container")
+	log := logging.WithName("vsphere")
 	Log = &log
 }
 
@@ -15,6 +18,7 @@ func init() {
 // Build all models.
 func All() []interface{} {
 	return []interface{}{
+		&ocp.Provider{},
 		&Folder{},
 		&Datacenter{},
 		&Cluster{},

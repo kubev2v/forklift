@@ -1,4 +1,4 @@
-package web
+package vsphere
 
 import (
 	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"

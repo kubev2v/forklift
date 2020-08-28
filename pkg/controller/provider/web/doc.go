@@ -4,8 +4,9 @@ import (
 	"github.com/konveyor/controller/pkg/inventory/container"
 	libweb "github.com/konveyor/controller/pkg/inventory/web"
 	"github.com/konveyor/controller/pkg/logging"
+	"github.com/konveyor/virt-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web/ocp"
-	vsphere "github.com/konveyor/virt-controller/pkg/controller/provider/web/vsphere"
+	"github.com/konveyor/virt-controller/pkg/controller/provider/web/vsphere"
 )
 
 //
@@ -23,6 +24,16 @@ func All(container *container.Container) (all []libweb.RequestHandler) {
 	vsphere.Log = Log
 	all = []libweb.RequestHandler{
 		&libweb.SchemaHandler{},
+		&NsHandler{
+			Handler: base.Handler{
+				Container: container,
+			},
+		},
+		&ProviderHandler{
+			Handler: base.Handler{
+				Container: container,
+			},
+		},
 	}
 	all = append(
 		all,

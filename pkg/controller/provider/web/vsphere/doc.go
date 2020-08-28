@@ -1,4 +1,4 @@
-package web
+package vsphere
 
 import (
 	"github.com/konveyor/controller/pkg/inventory/container"
@@ -6,14 +6,15 @@ import (
 	"github.com/konveyor/controller/pkg/logging"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web/base"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/web/ocp"
 )
 
 //
 // Routes
 const (
-	Root = ocp.ProviderRoot + "/" + api.VSphere
+	Root = base.ProvidersRoot + "/" + api.VSphere
 )
+
+type Handler = base.Handler
 
 //
 // Shared logger.
@@ -28,6 +29,11 @@ func init() {
 // Build all handlers.
 func Handlers(container *container.Container) []libweb.RequestHandler {
 	return []libweb.RequestHandler{
+		&ProviderHandler{
+			Handler: base.Handler{
+				Container: container,
+			},
+		},
 		&TreeHandler{
 			Handler: base.Handler{
 				Container: container,
