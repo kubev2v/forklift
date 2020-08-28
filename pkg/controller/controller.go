@@ -68,7 +68,7 @@ func AddToManager(m manager.Manager) error {
 		}
 
 	}
-	if settings.Settings.Role.Has(settings.MtvRole) {
+	if settings.Settings.Role.Has(settings.MainRole) {
 		err := load(MainControllers)
 		if err != nil {
 			return err
