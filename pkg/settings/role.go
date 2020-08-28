@@ -12,7 +12,7 @@ import (
 const (
 	Roles         = "ROLE"
 	InventoryRole = "inventory"
-	MtvRole       = "mtv"
+	MainRole      = "main"
 )
 
 //
@@ -30,11 +30,11 @@ func (r *Role) Load() error {
 		for _, role := range strings.Split(s, ",") {
 			role = strings.ToLower(strings.TrimSpace(role))
 			switch role {
-			case MtvRole, InventoryRole:
+			case MainRole, InventoryRole:
 				r.Roles[role] = true
 			default:
 				list := strings.Join([]string{
-					MtvRole,
+					MainRole,
 					InventoryRole},
 					"|")
 				return liberr.New(
@@ -46,7 +46,7 @@ func (r *Role) Load() error {
 		}
 	} else {
 		r.Roles[InventoryRole] = true
-		r.Roles[MtvRole] = true
+		r.Roles[MainRole] = true
 	}
 
 	return nil
