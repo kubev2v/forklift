@@ -14,6 +14,9 @@ import (
 // Types
 const (
 	PlanNotValid = "PlanNotValid"
+	PlanNotReady = "PlanNotReady"
+	Running      = "Running"
+	Failed       = "Failed"
 )
 
 //
@@ -41,6 +44,9 @@ const (
 const (
 	ReadyMessage        = "The migration is ready."
 	PlanNotValidMessage = "`plan` not valid."
+	PlanNotReadyMessage = "`plan` does not have Ready condition."
+	RunningMessage      = "The migration is running."
+	FailedMessage       = "The migration failed."
 )
 
 //
@@ -88,6 +94,16 @@ func (r *Reconciler) validatePlan(migration *api.Migration) error {
 	}
 	if err != nil {
 		return liberr.Wrap(err)
+	}
+	if !plan.Status.HasCondition(cnd.Ready) {
+		migration.Status.SetCondition(
+			cnd.Condition{
+				Type:     PlanNotReady,
+				Status:   True,
+				Reason:   NotFound,
+				Category: Critical,
+				Message:  PlanNotReadyMessage,
+			})
 	}
 
 	return nil
