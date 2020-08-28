@@ -7,8 +7,7 @@ import (
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/web/ocp"
-	vsphere "github.com/konveyor/virt-controller/pkg/controller/provider/web/vsphere"
+	"github.com/konveyor/virt-controller/pkg/controller/provider/web/vsphere"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"net/http"
 	"path"
@@ -107,9 +106,19 @@ func (r *Reconciler) validateProvider(plan *api.Plan) error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		pClient := vsphere.Client{Provider: *provider}
+		var pClient web.Client
+		var resource web.ClientResource
+		switch provider.Type() {
+		case api.VSphere:
+			resource = &vsphere.Provider{}
+			pClient = &vsphere.Client{
+				Provider: *provider,
+			}
+		default:
+			return liberr.New("provider not supported.")
+		}
 		pid := path.Join(provider.Namespace, provider.Name)
-		status, err := pClient.Get(&ocp.Provider{}, pid)
+		status, err := pClient.Get(resource, pid)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -180,8 +189,10 @@ func (r *Reconciler) validateVMs(plan *api.Plan) error {
 	var resource web.ClientResource
 	switch provider.Type() {
 	case api.VSphere:
-		pClient = &vsphere.Client{Provider: provider}
 		resource = &vsphere.VM{}
+		pClient = &vsphere.Client{
+			Provider: provider,
+		}
 	default:
 		return liberr.New("provider not supported.")
 	}

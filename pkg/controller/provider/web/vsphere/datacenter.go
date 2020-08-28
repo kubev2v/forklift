@@ -1,4 +1,4 @@
-package web
+package vsphere
 
 import (
 	"errors"
@@ -15,7 +15,7 @@ import (
 const (
 	DatacenterParam      = "datacenter"
 	DatacenterCollection = "datacenters"
-	DatacentersRoot      = Root + "/" + DatacenterCollection
+	DatacentersRoot      = ProviderRoot + "/" + DatacenterCollection
 	DatacenterRoot       = DatacentersRoot + "/:" + DatacenterParam
 )
 

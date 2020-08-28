@@ -297,6 +297,14 @@ func TestList(t *testing.T) {
 	g.Expect(len(list)).To(gomega.Equal(2))
 	g.Expect(list[0].ID).To(gomega.Equal(4))
 	g.Expect(list[1].ID).To(gomega.Equal(8))
+	// Test count all.
+	count, err := DB.Count(&TestObject{}, nil)
+	g.Expect(err).To(gomega.BeNil())
+	g.Expect(count).To(gomega.Equal(int64(10)))
+	// Test count with predicate.
+	count, err = DB.Count(&TestObject{}, Gt("ID", 0))
+	g.Expect(err).To(gomega.BeNil())
+	g.Expect(count).To(gomega.Equal(int64(9)))
 }
 
 func TestWatch(t *testing.T) {

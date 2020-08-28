@@ -1,4 +1,4 @@
-package web
+package vsphere
 
 import (
 	"errors"
@@ -15,7 +15,7 @@ import (
 const (
 	NetworkParam      = "network"
 	NetworkCollection = "networks"
-	NetworksRoot      = Root + "/" + NetworkCollection
+	NetworksRoot      = ProviderRoot + "/" + NetworkCollection
 	NetworkRoot       = NetworksRoot + "/:" + NetworkParam
 )
 

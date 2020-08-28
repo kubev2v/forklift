@@ -382,7 +382,7 @@ func (t Table) List(list interface{}, options ListOptions) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	params := append(t.Params(fields), options.Params()...)
+	params := options.Params()
 	cursor, err := t.DB.Query(stmt, params...)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -411,18 +411,18 @@ func (t Table) List(list interface{}, options ListOptions) error {
 // Qualified by the model field values and list options.
 // Expects natural keys to be set.
 // Else, ALL models counted.
-func (t Table) Count(model interface{}, options ListOptions) (int64, error) {
+func (t Table) Count(model interface{}, predicate Predicate) (int64, error) {
 	fields, err := t.Fields(model)
 	if err != nil {
 		return 0, liberr.Wrap(err)
 	}
-	options.Count = true
-	stmt, err := t.listSQL(t.Name(model), fields, &options)
+	options := ListOptions{Predicate: predicate}
+	stmt, err := t.countSQL(t.Name(model), fields, &options)
 	if err != nil {
 		return 0, liberr.Wrap(err)
 	}
 	count := int64(0)
-	params := t.Params(fields)
+	params := options.Params()
 	row := t.DB.QueryRow(stmt, params...)
 	if err != nil {
 		return 0, liberr.Wrap(err)
@@ -720,6 +720,35 @@ func (t Table) listSQL(table string, fields []*Field, options *ListOptions) (str
 			Table:   table,
 			Fields:  fields,
 			Options: options,
+			Pk:      t.PkField(fields),
+		})
+	if err != nil {
+		return "", liberr.Wrap(err)
+	}
+
+	return bfr.String(), nil
+}
+
+//
+// Build model count SQL.
+func (t Table) countSQL(table string, fields []*Field, options *ListOptions) (string, error) {
+	tpl := template.New("")
+	tpl, err := tpl.Parse(ListSQL)
+	if err != nil {
+		return "", liberr.Wrap(err)
+	}
+	err = options.Build(table, fields)
+	if err != nil {
+		return "", liberr.Wrap(err)
+	}
+	bfr := &bytes.Buffer{}
+	err = tpl.Execute(
+		bfr,
+		TmplData{
+			Table:   table,
+			Fields:  fields,
+			Options: options,
+			Count:   true,
 			Pk:      t.PkField(fields),
 		})
 	if err != nil {
@@ -1099,6 +1128,8 @@ type TmplData struct {
 	Pk *Field
 	// List options.
 	Options *ListOptions
+	// Count
+	Count bool
 }
 
 //
@@ -1120,16 +1151,8 @@ func (t TmplData) Sort() []int {
 }
 
 //
-// Count only.
-func (t TmplData) Count() bool {
-	return t.Options.Count
-}
-
-//
 // List options.
 type ListOptions struct {
-	// Row count.
-	Count bool
 	// Pagination.
 	Page *Page
 	// Sort by field position.

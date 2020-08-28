@@ -1,4 +1,4 @@
-package web
+package vsphere
 
 import (
 	"errors"
@@ -15,7 +15,7 @@ import (
 const (
 	VMParam      = "vm"
 	VMCollection = "vms"
-	VMsRoot      = Root + "/" + VMCollection
+	VMsRoot      = ProviderRoot + "/" + VMCollection
 	VMRoot       = VMsRoot + "/:" + VMParam
 )
 

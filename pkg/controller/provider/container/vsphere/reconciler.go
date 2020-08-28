@@ -253,13 +253,9 @@ func (r *Reconciler) HasConsistency() bool {
 //
 // Start the reconciler.
 func (r *Reconciler) Start() error {
-	err := r.db.Open(true)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
 	ctx := context.Background()
 	ctx, r.cancel = context.WithCancel(ctx)
-	err = r.connect(ctx)
+	err := r.connect(ctx)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
