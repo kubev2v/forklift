@@ -1,11 +1,13 @@
-package ocp
+package vsphere
 
 import (
 	"github.com/gin-gonic/gin"
 	liberr "github.com/konveyor/controller/pkg/error"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
 	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/ocp"
+	"github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web/base"
+	"github.com/konveyor/virt-controller/pkg/controller/provider/web/ocp"
 	"net/http"
 )
 
@@ -57,7 +59,7 @@ func (h ProviderHandler) Get(ctx *gin.Context) {
 		ctx.Status(status)
 		return
 	}
-	if h.Provider.Type() != api.OpenShift {
+	if h.Provider.Type() != api.VSphere {
 		ctx.Status(http.StatusNotFound)
 		return
 	}
@@ -86,10 +88,10 @@ func (h *ProviderHandler) ListContent(ctx *gin.Context) (content []interface{}, 
 	ns := ctx.Param(base.NsParam)
 	for _, reconciler := range list {
 		if p, cast := reconciler.Owner().(*api.Provider); cast {
-			if p.Type() != api.OpenShift {
+			if p.Type() != api.VSphere {
 				continue
 			}
-			if p.Namespace != ns {
+			if ns != "" && ns != p.Namespace {
 				continue
 			}
 			if reconciler, found := h.Container.Get(p); found {
@@ -119,12 +121,48 @@ func (h *ProviderHandler) ListContent(ctx *gin.Context) (content []interface{}, 
 //
 // Add counts.
 func (h ProviderHandler) AddCount(r *Provider) error {
+	var err error
+	var n int64
 	if !h.Detail {
 		return nil
 	}
-
-	//
-	// TODO:
+	db := h.Reconciler.DB()
+	// Datacenter
+	n, err = db.Count(&vsphere.Datacenter{}, nil)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	r.DatacenterCount = n
+	// Cluster
+	n, err = db.Count(&vsphere.Cluster{}, nil)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	r.ClusterCount = n
+	// Host
+	n, err = db.Count(&vsphere.Host{}, nil)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	r.HostCount = n
+	// VM
+	n, err = db.Count(&vsphere.VM{}, nil)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	r.VMCount = n
+	// Network
+	n, err = db.Count(&vsphere.Network{}, nil)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	r.NetworkCount = n
+	// Datastore
+	n, err = db.Count(&vsphere.Datastore{}, nil)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	r.DatastoreCount = n
 
 	return nil
 }
@@ -143,13 +181,16 @@ func (h ProviderHandler) Link(m *model.Provider) string {
 //
 // REST Resource.
 type Provider struct {
-	Resource
-	Type           string      `json:"type"`
-	Extension      interface{} `json:"extension,omitempty"`
-	Object         interface{} `json:"object"`
-	VMCount        int64       `json:"vmCount"`
-	NetworkCount   int64       `json:"networkCount"`
-	NamespaceCount int64       `json:"namespaceCount"`
+	ocp.Resource
+	Type            string      `json:"type"`
+	Extension       interface{} `json:"extension,omitempty"`
+	Object          interface{} `json:"object"`
+	DatacenterCount int64       `json:"datacenterCount"`
+	ClusterCount    int64       `json:"clusterCount"`
+	HostCount       int64       `json:"hostCount"`
+	VMCount         int64       `json:"vmCount"`
+	NetworkCount    int64       `json:"networkCount"`
+	DatastoreCount  int64       `json:"datastoreCount"`
 }
 
 //

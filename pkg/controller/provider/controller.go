@@ -27,6 +27,7 @@ import (
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/container"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/model"
+	ocpmodel "github.com/konveyor/virt-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web"
 	"github.com/konveyor/virt-controller/pkg/settings"
 	core "k8s.io/api/core/v1"
@@ -199,6 +200,16 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 func (r *Reconciler) updateContainer(provider *api.Provider) error {
 	db := r.getDB(provider)
 	secret, err := r.getSecret(provider)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	err = db.Open(true)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	pModel := &ocpmodel.Provider{}
+	pModel.With(provider)
+	err = db.Insert(pModel)
 	if err != nil {
 		return liberr.Wrap(err)
 	}

@@ -15,10 +15,12 @@ import (
 //
 // Root - all routes.
 const (
-	Root          = libweb.Root
-	NsParam       = libweb.NsParam
-	ProviderParam = "provider"
-	DetailParam   = "detail"
+	Root               = libweb.Root
+	ProviderCollection = "providers"
+	ProvidersRoot      = Root + "/" + ProviderCollection
+	NsParam            = libweb.NsParam
+	ProviderParam      = "provider"
+	DetailParam        = "detail"
 )
 
 //

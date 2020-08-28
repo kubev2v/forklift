@@ -1,4 +1,4 @@
-package web
+package vsphere
 
 import (
 	"errors"
@@ -15,7 +15,7 @@ import (
 const (
 	FolderParam      = "folder"
 	FolderCollection = "folders"
-	FoldersRoot      = Root + "/" + FolderCollection
+	FoldersRoot      = ProviderRoot + "/" + FolderCollection
 	FolderRoot       = FoldersRoot + "/:" + FolderParam
 )
 

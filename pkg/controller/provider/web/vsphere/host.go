@@ -1,4 +1,4 @@
-package web
+package vsphere
 
 import (
 	"errors"
@@ -15,7 +15,7 @@ import (
 const (
 	HostParam      = "host"
 	HostCollection = "hosts"
-	HostsRoot      = Root + "/" + HostCollection
+	HostsRoot      = ProviderRoot + "/" + HostCollection
 	HostRoot       = HostsRoot + "/:" + HostParam
 )
 

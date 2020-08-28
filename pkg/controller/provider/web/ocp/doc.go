@@ -11,7 +11,7 @@ import (
 //
 // Routes
 const (
-	Root = libweb.Root + "/" + api.OpenShift
+	Root = base.ProvidersRoot + "/" + api.OpenShift
 )
 
 type Handler = base.Handler

@@ -1,4 +1,4 @@
-package web
+package vsphere
 
 import (
 	"github.com/gin-gonic/gin"
@@ -14,7 +14,7 @@ import (
 //
 // Routes.
 const (
-	TreeRoot     = Root + "/tree"
+	TreeRoot     = ProviderRoot + "/tree"
 	TreeHostRoot = TreeRoot + "/host"
 	TreeVmRoot   = TreeRoot + "/vm"
 )
