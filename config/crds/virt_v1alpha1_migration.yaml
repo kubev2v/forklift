@@ -46,6 +46,22 @@ spec:
               description: VM status
               items:
                 properties:
+                  error:
+                    description: Errors
+                    properties:
+                      phase:
+                        type: string
+                      reasons:
+                        items:
+                          type: string
+                        type: array
+                    required:
+                    - phase
+                    - reasons
+                    type: object
+                  phase:
+                    description: Phase
+                    type: string
                   pipeline:
                     description: Migration pipeline.
                     items:
@@ -56,29 +72,50 @@ spec:
                         progress:
                           description: Progress.
                           properties:
-                            complete:
-                              description: Number Completed.
+                            completed:
+                              description: Completed units.
                               format: int64
                               type: integer
                             total:
-                              description: Total.
+                              description: Total units.
                               format: int64
                               type: integer
                           required:
+                          - completed
                           - total
-                          - complete
                           type: object
                       required:
                       - name
                       - progress
                       type: object
                     type: array
-                  vm:
-                    description: VM ID
-                    type: string
+                  planned:
+                    description: Planned VM.
+                    properties:
+                      hook:
+                        description: Enable hooks.
+                        properties:
+                          after:
+                            description: Post-migration hook.
+                            type: object
+                          before:
+                            description: Pre-migration hook.
+                            type: object
+                        type: object
+                      host:
+                        description: Host
+                        type: object
+                      id:
+                        description: 'The VM identifier. For:   - vSphere: The managed
+                          object ID.'
+                        type: string
+                    required:
+                    - id
+                    type: object
                 required:
-                - vm
+                - planned
                 - pipeline
+                - phase
                 type: object
               type: array
           type: object

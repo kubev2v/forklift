@@ -23,6 +23,15 @@ import (
 )
 
 //
+// Plan hook.
+type PlanHook struct {
+	// Pre-migration hook.
+	Before *core.ObjectReference `json:"before,omitempty"`
+	// Post-migration hook.
+	After *core.ObjectReference `json:"after,omitempty"`
+}
+
+//
 // A VM listed on the plan.
 type PlanVM struct {
 	// The VM identifier.
@@ -30,12 +39,7 @@ type PlanVM struct {
 	//   - vSphere: The managed object ID.
 	ID string `json:"id"`
 	// Enable hooks.
-	Hook struct {
-		// Run hook before migration.
-		Before bool `json:"before,omitempty"`
-		// Run hook after migration.
-		After bool `json:"after,omitempty"`
-	} `json:"hook,omitempty"`
+	Hook *PlanHook `json:"hook,omitempty"`
 	// Host
 	Host core.ObjectReference `json:"host,omitempty" ref:"Host"`
 }
