@@ -10,7 +10,6 @@ import (
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web/vsphere"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"net/http"
-	"path"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -106,25 +105,15 @@ func (r *Reconciler) validateProvider(plan *api.Plan) error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		var pClient web.Client
-		var resource web.ClientResource
-		switch provider.Type() {
-		case api.VSphere:
-			resource = &vsphere.Provider{}
-			pClient = &vsphere.Client{
-				Provider: *provider,
-			}
-		default:
-			return liberr.New("provider not supported.")
-		}
-		pid := path.Join(provider.Namespace, provider.Name)
-		status, err := pClient.Get(resource, pid)
+		client, err := web.NewClient(*provider)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		switch status {
-		case http.StatusOK:
-		case http.StatusNotFound:
+		ready, err := client.Ready()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if !ready {
 			return ProviderInvNotReady
 		}
 	}
@@ -185,19 +174,21 @@ func (r *Reconciler) validateVMs(plan *api.Plan) error {
 		}
 	}
 	notValid := []string{}
-	var pClient web.Client
-	var resource web.ClientResource
+	client, err := web.NewClient(provider)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	var resource interface{}
 	switch provider.Type() {
+	case api.OpenShift:
+		// TODO:
 	case api.VSphere:
 		resource = &vsphere.VM{}
-		pClient = &vsphere.Client{
-			Provider: provider,
-		}
 	default:
-		return liberr.New("provider not supported.")
+		return web.ProviderNotSupported
 	}
 	for _, vm := range plan.Spec.VMs {
-		status, err := pClient.Get(resource, vm.ID)
+		status, err := client.Get(resource, vm.ID)
 		if err != nil {
 			return liberr.Wrap(err)
 		}

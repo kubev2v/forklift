@@ -7,6 +7,7 @@ import (
 	ocpmodel "github.com/konveyor/virt-controller/pkg/controller/provider/model/ocp"
 	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web/base"
+	"net/http"
 	pathlib "path"
 	"reflect"
 	"strings"
@@ -79,6 +80,22 @@ func (c *Client) List(list interface{}) (int, error) {
 	return status, nil
 }
 
+// Get whether the provider has been reconciled.
+func (c *Client) Ready() (found bool, err error) {
+	p := &Provider{}
+	id := pathlib.Join(
+		c.Provider.Namespace,
+		c.Provider.Name)
+	status, err := c.Get(p, id)
+	if err != nil {
+		return
+	}
+
+	found = status != http.StatusNotFound
+
+	return
+}
+
 //
 // Build the URL path.
 func (c *Client) Path(resource interface{}, id string) (path string, err error) {
@@ -140,7 +157,7 @@ func (c *Client) Path(resource interface{}, id string) (path string, err error) 
 				Base: model.Base{ID: id},
 			})
 	default:
-		err = liberr.New("unknown")
+		err = base.ResourceNotSupported
 	}
 
 	return
