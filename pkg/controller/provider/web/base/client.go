@@ -12,6 +12,13 @@ import (
 )
 
 //
+// Errors
+var (
+	ProviderNotSupported = liberr.New("provider not supported")
+	ResourceNotSupported = liberr.New("resource not supported")
+)
+
+//
 // Thin REST API client.
 type Client struct {
 	// Bearer token.
