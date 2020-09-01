@@ -19,7 +19,14 @@ var (
 	VmKind         = libref.ToKind(VM{})
 )
 
-var InvalidRefErr = liberr.New("invalid ref")
+//
+// Errors
+var (
+	// Invalid ref.
+	InvalidRefErr = liberr.New("invalid ref")
+	// Invalid kind in ref encountered during tree traversal.
+	InvalidKindErr = liberr.New("invalid kind")
+)
 
 //
 // Tree.
@@ -79,7 +86,14 @@ func (r *Tree) Build() (*TreeNode, error) {
 			folder := model.(*Folder)
 			refList := RefList{}
 			refList.With(folder.Children)
+		next:
 			for _, ref := range refList {
+				switch r.Leaf {
+				case FolderKind:
+					if ref.Kind != r.Leaf {
+						continue next
+					}
+				}
 				m, err := r.getRef(ref)
 				if err != nil {
 					if errors.Is(err, InvalidRefErr) {
@@ -107,7 +121,7 @@ func (r *Tree) Build() (*TreeNode, error) {
 			case DatacenterKind:
 				// Leaf
 			default:
-				return liberr.New("invalid kind")
+				return InvalidKindErr
 			}
 			m, err := r.getRef(ref)
 			if err != nil {
@@ -133,7 +147,7 @@ func (r *Tree) Build() (*TreeNode, error) {
 			case ClusterKind:
 				// Leaf
 			default:
-				return liberr.New("invalid kind")
+				return InvalidKindErr
 			}
 			for _, ref := range refList {
 				m, err := r.getRef(ref)
@@ -161,7 +175,7 @@ func (r *Tree) Build() (*TreeNode, error) {
 			case HostKind:
 				// Leaf
 			default:
-				return liberr.New("invalid kind")
+				return InvalidKindErr
 			}
 			for _, ref := range refList {
 				m, err := r.getRef(ref)
@@ -183,7 +197,7 @@ func (r *Tree) Build() (*TreeNode, error) {
 		case DsKind:
 			// Leaf
 		default:
-			return liberr.New("invalid kind")
+			return InvalidKindErr
 		}
 
 		return nil
