@@ -18,6 +18,12 @@ import (
 )
 
 //
+// Settings
+const (
+	MaxObjectUpdates = 10000
+)
+
+//
 // Types
 const (
 	Folder         = "Folder"
@@ -294,6 +300,7 @@ func (r *Reconciler) getUpdates(ctx context.Context) error {
 	}
 	defer pc.Destroy(context.Background())
 	filter := r.filter(pc)
+	filter.Options.MaxObjectUpdates = MaxObjectUpdates
 	err = pc.CreateFilter(ctx, filter.CreateFilter)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -581,7 +588,9 @@ func (r Reconciler) applyEnter(u types.ObjectUpdate) error {
 		return nil
 	}
 	adapter.Apply(u)
-	err := r.db.Insert(adapter.Model())
+	m := adapter.Model()
+	Log.Info("Create", "model", m.String())
+	err := r.db.Insert(m)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -596,12 +605,14 @@ func (r Reconciler) applyModify(u types.ObjectUpdate) error {
 	if !selected {
 		return nil
 	}
-	tx, err := r.db.GetForUpdate(adapter.Model())
+	m := adapter.Model()
+	Log.Info("Update", "model", m.String())
+	tx, err := r.db.GetForUpdate(m)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 	adapter.Apply(u)
-	err = r.db.Update(adapter.Model())
+	err = r.db.Update(m)
 	if err == nil {
 		tx.Commit()
 	} else {
@@ -662,6 +673,7 @@ func (r Reconciler) applyLeave(u types.ObjectUpdate) error {
 		Log.Info("Unknown", "kind", u.Obj.Type)
 		return nil
 	}
+	Log.Info("Delete", "model", deleted.String())
 	err := r.db.Delete(deleted)
 	if err != nil {
 		return liberr.Wrap(err)
