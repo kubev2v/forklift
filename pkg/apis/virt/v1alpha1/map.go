@@ -23,56 +23,70 @@ import (
 )
 
 //
+// Mapped source.
+type MapSourceObject struct {
+	// The object identifier.
+	// For:
+	//   - vsphere: The managed object ID.
+	ID string `json:"id"`
+}
+
+//
+// Mapped network destination.
+type MapDestinationNetwork struct {
+	// The network type (pod|multus)
+	Type string `json:"type"`
+	// The namespace (multus only).
+	Namespace string `json:"namespace"`
+	// The name.
+	Name string `json:"name"`
+}
+
+//
 // Mapped network.
 type NetworkPair struct {
 	// Source network.
-	Source struct {
-		// The network identifier.
-		// For:
-		//   - vsphere: The managed object ID.
-		ID string `json:"id"`
-	} `json:"source"`
+	Source MapSourceObject `json:"source"`
 	// Destination network.
-	Destination struct {
-		// The network type (pod|multus)
-		Type string `json:"type"`
-		// The namespace (multus only).
-		Namespace string `json:"namespace"`
-		// The name.
-		Name string `json:"name"`
-	} `json:"destination"`
+	Destination MapDestinationNetwork `json:"destination"`
+}
+
+//
+// Mapped storage destination.
+type MapDestinationStorage struct {
+	// A storage class.
+	StorageClass string `json:"storageClass"`
 }
 
 //
 // Mapped storage.
 type StoragePair struct {
 	// Source storage.
-	Source struct {
-		// The storage identifier.
-		// For:
-		//   - vsphere: The managed object ID.
-		ID string `json:"id"`
-	} `json:"source"`
+	Source MapSourceObject `json:"source"`
 	// Destination storage.
-	Destination struct {
-		// A storage class.
-		StorageClass string `json:"storageClass"`
-	} `json:"destination"`
+	Destination MapDestinationStorage `json:"destination"`
 }
 
 //
-// MapSpec defines the desired state of Map.
-type MapSpec struct {
+// Network map spec.
+type NetworkMapSpec struct {
 	// Provider
 	Provider core.ObjectReference `json:"provider" ref:"Provider"`
-	// Network map.
-	Networks []NetworkPair `json:"networks"`
-	// Datastore map.
-	Datastores []StoragePair `json:"datastores"`
+	// Map.
+	Map []NetworkPair `json:"map"`
 }
 
 //
-// MapStatus defines the observed state of Map.
+// Storage map spec.
+type StorageMapSpec struct {
+	// Provider
+	Provider core.ObjectReference `json:"provider" ref:"Provider"`
+	// Map.
+	Map []StoragePair `json:"map"`
+}
+
+//
+// MapStatus defines the observed state of Maps.
 type MapStatus struct {
 	// Conditions.
 	libcnd.Conditions
@@ -86,21 +100,45 @@ type MapStatus struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
-type Map struct {
+type NetworkMap struct {
 	meta.TypeMeta   `json:",inline"`
 	meta.ObjectMeta `json:"metadata,omitempty"`
-	Spec            MapSpec   `json:"spec,omitempty"`
-	Status          MapStatus `json:"status,omitempty"`
+	Spec            NetworkMapSpec `json:"spec,omitempty"`
+	Status          MapStatus      `json:"status,omitempty"`
 }
 
 //
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type MapList struct {
+type NetworkMapList struct {
 	meta.TypeMeta `json:",inline"`
 	meta.ListMeta `json:"metadata,omitempty"`
-	Items         []Map `json:"items"`
+	Items         []NetworkMap `json:"items"`
+}
+
+//
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:openapi-gen=true
+// +kubebuilder:subresource:status
+type StorageMap struct {
+	meta.TypeMeta   `json:",inline"`
+	meta.ObjectMeta `json:"metadata,omitempty"`
+	Spec            StorageMapSpec `json:"spec,omitempty"`
+	Status          MapStatus      `json:"status,omitempty"`
+}
+
+//
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type StorageMapList struct {
+	meta.TypeMeta `json:",inline"`
+	meta.ListMeta `json:"metadata,omitempty"`
+	Items         []StorageMap `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Map{}, &MapList{})
+	SchemeBuilder.Register(
+		&NetworkMap{},
+		&NetworkMapList{},
+		&StorageMap{},
+		&StorageMapList{})
 }
