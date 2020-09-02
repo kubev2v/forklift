@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mp
+package network
 
 import (
 	"context"
@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logging.WithName("map")
+var log = logging.WithName("network-map")
 
 //
 // Application settings.
@@ -46,7 +46,7 @@ func Add(mgr manager.Manager) error {
 		scheme: mgr.GetScheme(),
 	}
 	cnt, err := controller.New(
-		"map-controller",
+		"network-map-controller",
 		mgr,
 		controller.Options{
 			Reconciler: reconciler,
@@ -57,7 +57,7 @@ func Add(mgr manager.Manager) error {
 	}
 	// Primary CR.
 	err = cnt.Watch(
-		&source.Kind{Type: &api.Map{}},
+		&source.Kind{Type: &api.NetworkMap{}},
 		&handler.EnqueueRequestForObject{},
 		&MapPredicate{})
 	if err != nil {
@@ -97,7 +97,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	log.Reset()
 
 	// Fetch the CR.
-	mp := &api.Map{}
+	mp := &api.NetworkMap{}
 	err = r.Get(context.TODO(), request.NamespacedName, mp)
 	if err != nil {
 		if errors.IsNotFound(err) {

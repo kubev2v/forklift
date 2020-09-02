@@ -32,6 +32,71 @@ spec:
           properties:
             map:
               description: Resource map.
+              properties:
+                datastores:
+                  description: Datastores.
+                  items:
+                    properties:
+                      destination:
+                        description: Destination storage.
+                        properties:
+                          storageClass:
+                            description: A storage class.
+                            type: string
+                        required:
+                        - storageClass
+                        type: object
+                      source:
+                        description: Source storage.
+                        properties:
+                          id:
+                            description: 'The object identifier. For:   - vsphere:
+                              The managed object ID.'
+                            type: string
+                        required:
+                        - id
+                        type: object
+                    required:
+                    - source
+                    - destination
+                    type: object
+                  type: array
+                networks:
+                  description: Networks.
+                  items:
+                    properties:
+                      destination:
+                        description: Destination network.
+                        properties:
+                          name:
+                            description: The name.
+                            type: string
+                          namespace:
+                            description: The namespace (multus only).
+                            type: string
+                          type:
+                            description: The network type (pod|multus)
+                            type: string
+                        required:
+                        - type
+                        - namespace
+                        - name
+                        type: object
+                      source:
+                        description: Source network.
+                        properties:
+                          id:
+                            description: 'The object identifier. For:   - vsphere:
+                              The managed object ID.'
+                            type: string
+                        required:
+                        - id
+                        type: object
+                    required:
+                    - source
+                    - destination
+                    type: object
+                  type: array
               type: object
             provider:
               description: Providers.
@@ -73,7 +138,6 @@ spec:
               type: array
           required:
           - provider
-          - map
           - vms
           type: object
         status:
