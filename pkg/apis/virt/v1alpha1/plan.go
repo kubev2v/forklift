@@ -23,6 +23,15 @@ import (
 )
 
 //
+// Plan provider pair.
+type ProviderPair struct {
+	// Source.
+	Source core.ObjectReference `json:"source" ref:"Provider"`
+	// Destination.
+	Destination core.ObjectReference `json:"destination" ref:"Provider"`
+}
+
+//
 // Plan hook.
 type PlanHook struct {
 	// Pre-migration hook.
@@ -45,17 +54,21 @@ type PlanVM struct {
 }
 
 //
+// Resource map.
+type PlanMap struct {
+	// Networks.
+	Networks []NetworkPair `json:"networks,omitempty"`
+	// Datastores.
+	Datastores []StoragePair `json:"datastores,omitempty"`
+}
+
+//
 // PlanSpec defines the desired state of Plan.
 type PlanSpec struct {
 	// Providers.
-	Provider struct {
-		// Source.
-		Source core.ObjectReference `json:"source" ref:"Provider"`
-		// Destination.
-		Destination core.ObjectReference `json:"destination" ref:"Provider"`
-	} `json:"provider"`
+	Provider ProviderPair `json:"provider"`
 	// Resource map.
-	Map core.ObjectReference `json:"map" ref:"Map"`
+	Map PlanMap `json:"map,omitempty"`
 	// List of VMs.
 	VMs []PlanVM `json:"vms"`
 }

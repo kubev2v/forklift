@@ -1,4 +1,4 @@
-package plan
+package network
 
 import (
 	libref "github.com/konveyor/controller/pkg/ref"
@@ -7,12 +7,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-type PlanPredicate struct {
+type MapPredicate struct {
 	predicate.Funcs
 }
 
-func (r PlanPredicate) Create(e event.CreateEvent) bool {
-	_, cast := e.Object.(*api.Plan)
+func (r MapPredicate) Create(e event.CreateEvent) bool {
+	_, cast := e.Object.(*api.NetworkMap)
 	if cast {
 		libref.Mapper.Create(e)
 		return true
@@ -21,8 +21,8 @@ func (r PlanPredicate) Create(e event.CreateEvent) bool {
 	return false
 }
 
-func (r PlanPredicate) Update(e event.UpdateEvent) bool {
-	object, cast := e.ObjectNew.(*api.Plan)
+func (r MapPredicate) Update(e event.UpdateEvent) bool {
+	object, cast := e.ObjectNew.(*api.NetworkMap)
 	if !cast {
 		return false
 	}
@@ -34,8 +34,8 @@ func (r PlanPredicate) Update(e event.UpdateEvent) bool {
 	return changed
 }
 
-func (r PlanPredicate) Delete(e event.DeleteEvent) bool {
-	_, cast := e.Object.(*api.Plan)
+func (r MapPredicate) Delete(e event.DeleteEvent) bool {
+	_, cast := e.Object.(*api.NetworkMap)
 	if cast {
 		libref.Mapper.Delete(e)
 		return true
@@ -80,50 +80,6 @@ func (r ProviderPredicate) Delete(e event.DeleteEvent) bool {
 
 func (r ProviderPredicate) Generic(e event.GenericEvent) bool {
 	p, cast := e.Object.(*api.Provider)
-	if cast {
-		reconciled := p.Status.ObservedGeneration == p.Generation
-		return reconciled
-	}
-
-	return false
-}
-
-type HostPredicate struct {
-	predicate.Funcs
-}
-
-func (r HostPredicate) Create(e event.CreateEvent) bool {
-	p, cast := e.Object.(*api.Host)
-	if cast {
-		reconciled := p.Status.ObservedGeneration == p.Generation
-		return reconciled
-	}
-
-	return false
-}
-
-func (r HostPredicate) Update(e event.UpdateEvent) bool {
-	p, cast := e.ObjectNew.(*api.Host)
-	if cast {
-		reconciled := p.Status.ObservedGeneration == p.Generation
-		return reconciled
-	}
-
-	return false
-}
-
-func (r HostPredicate) Delete(e event.DeleteEvent) bool {
-	p, cast := e.Object.(*api.Host)
-	if cast {
-		reconciled := p.Status.ObservedGeneration == p.Generation
-		return reconciled
-	}
-
-	return false
-}
-
-func (r HostPredicate) Generic(e event.GenericEvent) bool {
-	p, cast := e.Object.(*api.Host)
 	if cast {
 		reconciled := p.Status.ObservedGeneration == p.Generation
 		return reconciled

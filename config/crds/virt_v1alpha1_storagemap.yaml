@@ -4,12 +4,12 @@ metadata:
   creationTimestamp: null
   labels:
     controller-tools.k8s.io: "1.0"
-  name: maps.virt.konveyor.io
+  name: storagemaps.virt.konveyor.io
 spec:
   group: virt.konveyor.io
   names:
-    kind: Map
-    plural: maps
+    kind: StorageMap
+    plural: storagemaps
   scope: Namespaced
   subresources:
     status: {}
@@ -30,8 +30,8 @@ spec:
           type: object
         spec:
           properties:
-            datastores:
-              description: Datastore map.
+            map:
+              description: Map.
               items:
                 properties:
                   destination:
@@ -47,43 +47,7 @@ spec:
                     description: Source storage.
                     properties:
                       id:
-                        description: 'The network identifier. For:   - vsphere: The
-                          managed object ID.'
-                        type: string
-                    required:
-                    - id
-                    type: object
-                required:
-                - source
-                - destination
-                type: object
-              type: array
-            networks:
-              description: Network map.
-              items:
-                properties:
-                  destination:
-                    description: Destination network.
-                    properties:
-                      name:
-                        description: The name.
-                        type: string
-                      namespace:
-                        description: The namespace (multus only).
-                        type: string
-                      type:
-                        description: The network type (pod|multus)
-                        type: string
-                    required:
-                    - type
-                    - namespace
-                    - name
-                    type: object
-                  source:
-                    description: Source network.
-                    properties:
-                      id:
-                        description: 'The network identifier. For:   - vsphere: The
+                        description: 'The object identifier. For:   - vsphere: The
                           managed object ID.'
                         type: string
                     required:
@@ -99,8 +63,7 @@ spec:
               type: object
           required:
           - provider
-          - networks
-          - datastores
+          - map
           type: object
         status:
           properties:
