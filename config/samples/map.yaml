@@ -1,5 +1,5 @@
 ---
-kind: Map
+kind: NetworkMap
 apiVersion: virt.konveyor.io/v1alpha1
 metadata:
   name: test
@@ -8,14 +8,25 @@ spec:
   provider:
     namespce: ""
     name: ""
-  networks:
+  map:
     - source:
         id: ""
       destination:
         type: "pod"
         namespace: ""
         name: ""
-  datastores:
+
+---
+kind: StorageMap
+apiVersion: virt.konveyor.io/v1alpha1
+metadata:
+  name: test
+  namespace: openshift-migration
+spec:
+  provider:
+    namespce: ""
+    name: ""
+  map:
     - source:
         id: ""
       destination:

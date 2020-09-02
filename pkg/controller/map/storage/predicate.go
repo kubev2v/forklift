@@ -1,4 +1,4 @@
-package mp
+package storage
 
 import (
 	libref "github.com/konveyor/controller/pkg/ref"
@@ -12,7 +12,7 @@ type MapPredicate struct {
 }
 
 func (r MapPredicate) Create(e event.CreateEvent) bool {
-	_, cast := e.Object.(*api.Map)
+	_, cast := e.Object.(*api.StorageMap)
 	if cast {
 		libref.Mapper.Create(e)
 		return true
@@ -22,7 +22,7 @@ func (r MapPredicate) Create(e event.CreateEvent) bool {
 }
 
 func (r MapPredicate) Update(e event.UpdateEvent) bool {
-	object, cast := e.ObjectNew.(*api.Map)
+	object, cast := e.ObjectNew.(*api.StorageMap)
 	if !cast {
 		return false
 	}
@@ -35,7 +35,7 @@ func (r MapPredicate) Update(e event.UpdateEvent) bool {
 }
 
 func (r MapPredicate) Delete(e event.DeleteEvent) bool {
-	_, cast := e.Object.(*api.Map)
+	_, cast := e.Object.(*api.StorageMap)
 	if cast {
 		libref.Mapper.Delete(e)
 		return true

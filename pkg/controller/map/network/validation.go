@@ -1,4 +1,4 @@
-package mp
+package network
 
 import (
 	"context"
@@ -39,13 +39,13 @@ const (
 
 // Messages
 const (
-	ReadyMessage            = "The resource map is ready."
+	ReadyMessage            = "The map is ready."
 	ProviderNotValidMessage = "`provider` not valid."
 )
 
 //
 // Validate the mp resource.
-func (r *Reconciler) validate(mp *api.Map) error {
+func (r *Reconciler) validate(mp *api.NetworkMap) error {
 	err := r.validateProvider(mp)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -56,7 +56,7 @@ func (r *Reconciler) validate(mp *api.Map) error {
 
 //
 // Validate provider field.
-func (r *Reconciler) validateProvider(mp *api.Map) error {
+func (r *Reconciler) validateProvider(mp *api.NetworkMap) error {
 	ref := mp.Spec.Provider
 	if !libref.RefSet(&ref) {
 		mp.Status.SetCondition(

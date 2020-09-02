@@ -18,7 +18,8 @@ package controller
 
 import (
 	"github.com/konveyor/virt-controller/pkg/controller/host"
-	"github.com/konveyor/virt-controller/pkg/controller/map"
+	"github.com/konveyor/virt-controller/pkg/controller/map/network"
+	"github.com/konveyor/virt-controller/pkg/controller/map/storage"
 	"github.com/konveyor/virt-controller/pkg/controller/migration"
 	"github.com/konveyor/virt-controller/pkg/controller/plan"
 	"github.com/konveyor/virt-controller/pkg/controller/provider"
@@ -36,7 +37,8 @@ type AddFunction func(manager.Manager) error
 var MainControllers = []AddFunction{
 	migration.Add,
 	plan.Add,
-	mp.Add,
+	network.Add,
+	storage.Add,
 	host.Add,
 }
 
