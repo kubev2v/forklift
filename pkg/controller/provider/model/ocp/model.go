@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
 	"path"
+	"strconv"
 )
 
 // Errors
@@ -62,6 +63,14 @@ func (m *Base) EncodeObject(r interface{}) {
 }
 
 //
+// Get kubernetes resource version.
+// Needed by the data reconciler.
+func (m *Base) ResourceVersion() uint64 {
+	n, _ := strconv.ParseUint(m.Version, 10, 64)
+	return n
+}
+
+//
 // Decode the object field.
 // `r` must be pointer to the appropriate k8s object.
 func (m *Base) DecodeObject(r interface{}) interface{} {
@@ -90,6 +99,8 @@ func (m *Base) Labels() libmodel.Labels {
 	return m.labels
 }
 
+//
+// Provider
 type Provider struct {
 	Base
 	Type string `sql:""`
@@ -98,4 +109,16 @@ type Provider struct {
 func (m *Provider) With(p *api.Provider) {
 	m.Base.With(p)
 	m.Type = p.Type()
+}
+
+//
+// StorageClass
+type StorageClass struct {
+	Base
+}
+
+//
+// NetworkAttachmentDefinition
+type NetworkAttachmentDefinition struct {
+	Base
 }

@@ -34,5 +34,15 @@ func Handlers(container *container.Container) []libweb.RequestHandler {
 				Container: container,
 			},
 		},
+		&StorageClassHandler{
+			Handler: base.Handler{
+				Container: container,
+			},
+		},
+		&NetworkAttachmentDefinitionHandler{
+			Handler: base.Handler{
+				Container: container,
+			},
+		},
 	}
 }
