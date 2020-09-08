@@ -16,5 +16,7 @@ func init() {
 func All() []interface{} {
 	return []interface{}{
 		&Provider{},
+		&NetworkAttachmentDefinition{},
+		&StorageClass{},
 	}
 }

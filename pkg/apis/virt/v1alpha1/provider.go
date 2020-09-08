@@ -20,6 +20,7 @@ import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/rest"
 )
 
 //
@@ -29,6 +30,12 @@ const (
 	OpenShift = "openshift"
 	// vSphere
 	VSphere = "vsphere"
+)
+
+//
+// Secret fields.
+const (
+	Token = "token"
 )
 
 //
@@ -75,6 +82,18 @@ type ProviderList struct {
 
 func init() {
 	SchemeBuilder.Register(&Provider{}, &ProviderList{})
+}
+
+//
+// Build REST configuration.
+func (r *Provider) RestCfg(secret *core.Secret) *rest.Config {
+	return &rest.Config{
+		Host:            r.Spec.URL,
+		BearerToken:     string(secret.Data[Token]),
+		TLSClientConfig: rest.TLSClientConfig{Insecure: true},
+		Burst:           1000,
+		QPS:             100,
+	}
 }
 
 //
