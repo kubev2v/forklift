@@ -145,7 +145,6 @@ func (h ProviderHandler) Link(m *model.Provider) string {
 type Provider struct {
 	Resource
 	Type           string      `json:"type"`
-	Extension      interface{} `json:"extension,omitempty"`
 	Object         interface{} `json:"object"`
 	VMCount        int64       `json:"vmCount"`
 	NetworkCount   int64       `json:"networkCount"`

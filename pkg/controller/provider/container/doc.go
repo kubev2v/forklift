@@ -5,6 +5,7 @@ import (
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	"github.com/konveyor/controller/pkg/logging"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
+	"github.com/konveyor/virt-controller/pkg/controller/provider/container/ocp"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/container/vsphere"
 	core "k8s.io/api/core/v1"
 )
@@ -26,6 +27,9 @@ func Build(
 	secret *core.Secret) libcontainer.Reconciler {
 	//
 	switch provider.Type() {
+	case api.OpenShift:
+		ocp.Log = Log
+		return ocp.New(db, provider, secret)
 	case api.VSphere:
 		vsphere.Log = Log
 		return vsphere.New(db, provider, secret)

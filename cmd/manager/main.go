@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"os"
 
+	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	"github.com/konveyor/virt-controller/pkg/apis"
 	"github.com/konveyor/virt-controller/pkg/controller"
 	"github.com/konveyor/virt-controller/pkg/webhook"
@@ -66,6 +67,10 @@ func main() {
 		os.Exit(1)
 	}
 	if err := appsv1.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "unable to add OpenShift apps APIs to scheme")
+		os.Exit(1)
+	}
+	if err := net.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Error(err, "unable to add OpenShift apps APIs to scheme")
 		os.Exit(1)
 	}

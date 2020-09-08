@@ -86,10 +86,11 @@ func Add(mgr manager.Manager) error {
 	web.Start()
 
 	cnt, err := controller.New(
-		"provider-controller",
+		"provider",
 		mgr,
 		controller.Options{
-			Reconciler: reconciler,
+			MaxConcurrentReconciles: 10,
+			Reconciler:              reconciler,
 		})
 	if err != nil {
 		log.Trace(err)
