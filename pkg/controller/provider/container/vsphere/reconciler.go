@@ -322,9 +322,17 @@ func (r *Reconciler) getUpdates(ctx context.Context) error {
 		if updateSet == nil {
 			break
 		}
+		transaction, err := r.db.Begin()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
 		req.Version = updateSet.Version
 		for _, fs := range updateSet.FilterSet {
 			r.apply(ctx, fs.ObjectSet)
+		}
+		err = transaction.Commit()
+		if err != nil {
+			return liberr.Wrap(err)
 		}
 		if updateSet.Truncated == nil || !*updateSet.Truncated {
 			r.consistent = true
