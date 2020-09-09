@@ -89,7 +89,7 @@ func (h *ProviderHandler) ListContent(ctx *gin.Context) (content []interface{}, 
 			if p.Type() != api.OpenShift {
 				continue
 			}
-			if p.Namespace != ns {
+			if ns != "" && ns != p.Namespace {
 				continue
 			}
 			if reconciler, found := h.Container.Get(p); found {

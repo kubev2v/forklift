@@ -10,3 +10,13 @@ spec:
     namespce: ""
     name: ""
   url: ""
+
+---
+kind: Provider
+apiVersion: virt.konveyor.io/v1alpha1
+metadata:
+  name: host
+  namespace: openshift-migration
+spec:
+  type: openshift
+  secret: {}

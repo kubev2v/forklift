@@ -94,6 +94,9 @@ func (r *Reconciler) validateType(provider *api.Provider) error {
 //
 // Validate the URL.
 func (r *Reconciler) validateURL(provider *api.Provider) error {
+	if provider.IsHost() {
+		return nil
+	}
 	if provider.Spec.URL == "" {
 		provider.Status.SetCondition(
 			cnd.Condition{
@@ -114,6 +117,9 @@ func (r *Reconciler) validateURL(provider *api.Provider) error {
 //   2. The secret exists.
 //   3. the content of the secret is valid.
 func (r *Reconciler) validateSecret(provider *api.Provider) error {
+	if provider.IsHost() {
+		return nil
+	}
 	ref := provider.Spec.Secret
 	if !libref.RefSet(&ref) {
 		provider.Status.SetCondition(
