@@ -38,11 +38,10 @@ spec:
               description: Provider type.
               type: string
             url:
-              description: The (external) provider URL.
+              description: The provider URL. Empty may be used for the `host` provider.
               type: string
           required:
           - type
-          - url
           - secret
           type: object
         status:
