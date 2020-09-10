@@ -21,6 +21,7 @@ import (
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 //
@@ -43,8 +44,9 @@ const (
 type ProviderSpec struct {
 	// Provider type.
 	Type string `json:"type"`
-	// The (external) provider URL.
-	URL string `json:"url"`
+	// The provider URL.
+	// Empty may be used for the `host` provider.
+	URL string `json:"url,omitempty"`
 	// References a secret containing credentials and
 	// other confidential information.
 	Secret core.ObjectReference `json:"secret" ref:"Secret"`
@@ -86,18 +88,30 @@ func init() {
 
 //
 // Build REST configuration.
-func (r *Provider) RestCfg(secret *core.Secret) *rest.Config {
-	return &rest.Config{
-		Host:            r.Spec.URL,
+func (p *Provider) RestCfg(secret *core.Secret) (cfg *rest.Config) {
+	if p.IsHost() {
+		cfg, _ = config.GetConfig()
+		return
+	}
+	cfg = &rest.Config{
+		Host:            p.Spec.URL,
 		BearerToken:     string(secret.Data[Token]),
 		TLSClientConfig: rest.TLSClientConfig{Insecure: true},
-		Burst:           1000,
-		QPS:             100,
 	}
+
+	cfg.Burst = 1000
+	cfg.QPS = 100
+	return
 }
 
 //
 // The provider type.
 func (p *Provider) Type() string {
 	return p.Spec.Type
+}
+
+//
+// This provider is the `host` cluster.
+func (p *Provider) IsHost() bool {
+	return p.Type() == OpenShift && p.Spec.URL == ""
 }
