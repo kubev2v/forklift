@@ -227,8 +227,7 @@ func (r *Reconciler) getDB(provider *api.Provider) libmodel.DB {
 	dir := Settings.Inventory.WorkingDir
 	dir = filepath.Join(dir, provider.Namespace)
 	os.MkdirAll(dir, 0755)
-	file := string(provider.Name)
-	file = file + ".db"
+	file := provider.Name + ".db"
 	path := filepath.Join(dir, file)
 	models := model.Models(provider)
 	return libmodel.New(path, models...)
@@ -237,8 +236,11 @@ func (r *Reconciler) getDB(provider *api.Provider) libmodel.DB {
 //
 // Get the secret referenced by the provider.
 func (r *Reconciler) getSecret(provider *api.Provider) (*core.Secret, error) {
-	ref := provider.Spec.Secret
 	secret := &core.Secret{}
+	if provider.IsHost() {
+		return secret, nil
+	}
+	ref := provider.Spec.Secret
 	key := client.ObjectKey{
 		Namespace: ref.Namespace,
 		Name:      ref.Name,
