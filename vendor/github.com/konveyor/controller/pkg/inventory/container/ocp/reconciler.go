@@ -1,13 +1,13 @@
 package ocp
 
 import (
+	"context"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	"github.com/konveyor/controller/pkg/logging"
 	"github.com/konveyor/controller/pkg/ref"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -15,6 +15,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"time"
+)
+
+const (
+	RetryDelay = time.Second * 5
 )
 
 //
@@ -35,10 +40,10 @@ type Reconciler struct {
 	db libmodel.DB
 	// Credentials secret.
 	secret *core.Secret
+	// Logger.
+	log logging.Logger
 	// Collections
 	collections []Collection
-	// The k8s client.
-	client client.Client
 	// The k8s manager.
 	manager manager.Manager
 	// The k8s manager/controller `stop` channel.
@@ -52,8 +57,8 @@ type Reconciler struct {
 	versionThreshold uint64
 	// The reconciler has (initial) consistency.
 	consistent bool
-	// Event logger.
-	log *logging.Logger
+	// cancel function.
+	cancel func()
 }
 
 //
@@ -62,9 +67,9 @@ func New(
 	db libmodel.DB,
 	cluster Cluster,
 	secret *core.Secret,
-	log *logging.Logger,
 	collections ...Collection) *Reconciler {
 	//
+	log := logging.WithName(cluster.GetName())
 	return &Reconciler{
 		collections: collections,
 		cluster:     cluster,
@@ -95,7 +100,7 @@ func (r *Reconciler) DB() libmodel.DB {
 //
 // Get the Client.
 func (r *Reconciler) Client() client.Client {
-	return r.client
+	return r.manager.GetClient()
 }
 
 //
@@ -123,45 +128,109 @@ func (r *Reconciler) UpdateThreshold(m libmodel.Model) {
 
 //
 // Start the reconciler.
-func (r *Reconciler) Start() (err error) {
-	r.versionThreshold = 0
-	r.eventChannel = make(chan ModelEvent, 100)
-	r.stopChannel = make(chan struct{})
+func (r *Reconciler) Start() error {
+	ctx := context.Background()
+	ctx, r.cancel = context.WithCancel(ctx)
 	for _, collection := range r.collections {
 		collection.Bind(r)
 	}
-	err = r.buildClient()
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
+	start := func() {
+	try:
+		for {
+			select {
+			case <-ctx.Done():
+				break try
+			default:
+				err := r.start(ctx)
+				if err != nil {
+					r.log.Trace(err, "retry", RetryDelay)
+					time.Sleep(RetryDelay)
+					continue try
+				}
+				break try
+			}
+		}
 	}
+
+	go start()
+
+	return nil
+}
+
+//
+// Start details.
+//   1. Build and start the manager.
+//   2. Reconcile all of the collections.
+//   3. Mark consistent.
+//   4. Start apply events (coroutine).
+func (r *Reconciler) start(ctx context.Context) (err error) {
+	r.versionThreshold = 0
+	r.eventChannel = make(chan ModelEvent, 100)
+	r.stopChannel = make(chan struct{})
+	defer func() {
+		if err != nil {
+			r.terminate()
+		}
+	}()
+	mark := time.Now()
+	r.log.Info("Start")
 	err = r.buildManager()
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
 	go r.manager.Start(r.stopChannel)
+	err = r.reconcileCollections(ctx)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	go r.applyEvents()
+
+	r.log.Info("Started", "duration", time.Since(mark))
+
+	return
+}
+
+//
+// Reconcile collections.
+func (r *Reconciler) reconcileCollections(ctx context.Context) (err error) {
+	mark := time.Now()
 	for _, collection := range r.collections {
-		err = collection.Reconcile()
+		err = collection.Reconcile(ctx)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
 		}
 	}
+
+	r.log.Info("Initial consistency.", "duration", time.Since(mark))
 	r.consistent = true
-	go r.applyEvents()
 
 	return
 }
 
 //
 // Shutdown the reconciler.
-func (r *Reconciler) Shutdown(purge bool) {
+//   1. Close manager stop channel.
+//   2. Close watch event coroutine channel.
+//   3. Cancel the context.
+func (r *Reconciler) Shutdown() {
+	r.log.Info("Shutdown")
+	r.terminate()
+	if r.cancel != nil {
+		r.cancel()
+	}
+}
+
+//
+// Terminate coroutines.
+func (r *Reconciler) terminate() {
+	defer func() {
+		recover()
+	}()
 	close(r.stopChannel)
 	close(r.eventChannel)
-	r.db.Close(true)
-
-	r.log.Info("Shutdown", "name", r.Name())
 }
 
 //
@@ -204,21 +273,6 @@ func (r *Reconciler) Delete(m libmodel.Model) {
 }
 
 //
-// Build k8s client.
-func (r *Reconciler) buildClient() (err error) {
-	r.client, err = client.New(
-		r.cluster.RestCfg(r.secret),
-		client.Options{
-			Scheme: scheme.Scheme,
-		})
-	if err != nil {
-		err = liberr.Wrap(err)
-	}
-
-	return
-}
-
-//
 // Build the k8s manager.
 func (r *Reconciler) buildManager() (err error) {
 	r.manager, err = manager.New(
@@ -257,6 +311,8 @@ func (r *Reconciler) buildManager() (err error) {
 //
 // Apply model events.
 func (r *Reconciler) applyEvents() {
+	r.log.Info("Apply - started")
+	defer r.log.Info("Apply - ended")
 	for event := range r.eventChannel {
 		err := event.Apply(r)
 		if err != nil {

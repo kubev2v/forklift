@@ -1,6 +1,7 @@
 package ocp
 
 import (
+	"context"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
@@ -14,7 +15,7 @@ type Collection interface {
 	// Get kubernetes resource object.
 	Object() runtime.Object
 	// Initial reconcile.
-	Reconcile() error
+	Reconcile(context.Context) error
 }
 
 //
