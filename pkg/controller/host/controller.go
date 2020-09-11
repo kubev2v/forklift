@@ -30,9 +30,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"time"
 )
 
-var log = logging.WithName("map")
+const (
+	// Controller name.
+	Name = "host"
+	// Fast re-queue delay.
+	FastReQ = time.Millisecond * 100
+)
+
+//
+// Package logger.
+var log = logging.WithName(Name)
 
 //
 // Application settings.
@@ -46,7 +56,7 @@ func Add(mgr manager.Manager) error {
 		scheme: mgr.GetScheme(),
 	}
 	cnt, err := controller.New(
-		"host-controller",
+		Name,
 		mgr,
 		controller.Options{
 			Reconciler: reconciler,
@@ -91,20 +101,23 @@ type Reconciler struct {
 //
 // Reconcile a Host CR.
 func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	fastReQ := reconcile.Result{RequeueAfter: FastReQ}
+	noReQ := reconcile.Result{}
 	var err error
 
 	// Reset the logger.
 	log.Reset()
+	log.SetValues("host", request.Name)
 
 	// Fetch the CR.
 	host := &api.Host{}
 	err = r.Get(context.TODO(), request.NamespacedName, host)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return reconcile.Result{}, nil
+			return noReQ, nil
 		}
 		log.Trace(err)
-		return reconcile.Result{}, err
+		return noReQ, err
 	}
 
 	// Begin staging conditions.
@@ -114,7 +127,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	err = r.validate(host)
 	if err != nil {
 		log.Trace(err)
-		return reconcile.Result{Requeue: true}, nil
+		return fastReQ, nil
 	}
 
 	// Ready condition.
@@ -130,9 +143,9 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	err = r.Status().Update(context.TODO(), host)
 	if err != nil {
 		log.Trace(err)
-		return reconcile.Result{Requeue: true}, nil
+		return fastReQ, nil
 	}
 
 	// Done
-	return reconcile.Result{}, nil
+	return noReQ, nil
 }

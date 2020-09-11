@@ -33,7 +33,16 @@ import (
 	"time"
 )
 
-var log = logging.WithName("migration")
+const (
+	// Controller name.
+	Name = "migration"
+	// Fast re-queue delay.
+	FastReQ = time.Millisecond * 100
+)
+
+//
+// Package logger.
+var log = logging.WithName(Name)
 
 //
 // Application settings.
@@ -47,7 +56,7 @@ func Add(mgr manager.Manager) error {
 		scheme: mgr.GetScheme(),
 	}
 	cnt, err := controller.New(
-		"migration-controller",
+		Name,
 		mgr,
 		controller.Options{
 			Reconciler: reconciler,
@@ -94,21 +103,24 @@ type Reconciler struct {
 //
 // Reconcile a Migration CR.
 func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	var err error
+	fastReQ := reconcile.Result{RequeueAfter: FastReQ}
+	noReQ := reconcile.Result{}
 	reQ := time.Duration(0)
+	var err error
 
 	// Reset the logger.
 	log.Reset()
+	log.SetValues("migration", request.Name)
 
 	// Fetch the CR.
 	migration := &api.Migration{}
 	err = r.Get(context.TODO(), request.NamespacedName, migration)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return reconcile.Result{}, nil
+			return noReQ, nil
 		}
 		log.Trace(err)
-		return reconcile.Result{}, err
+		return noReQ, err
 	}
 
 	// Begin staging conditions.
@@ -118,7 +130,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	err = r.validate(migration)
 	if err != nil {
 		log.Trace(err)
-		return reconcile.Result{Requeue: true}, nil
+		return fastReQ, nil
 	}
 
 	// Ready condition.
@@ -134,7 +146,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	reQ, err = task.Run()
 	if err != nil {
 		log.Trace(err)
-		return reconcile.Result{Requeue: true}, nil
+		return fastReQ, nil
 	}
 
 	// End staging conditions.
@@ -152,5 +164,5 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		return reconcile.Result{RequeueAfter: reQ}, nil
 	}
 
-	return reconcile.Result{}, nil
+	return noReQ, nil
 }
