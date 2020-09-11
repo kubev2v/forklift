@@ -30,9 +30,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"time"
 )
 
-var log = logging.WithName("storage-map")
+const (
+	// Controller name.
+	Name = "storage-map"
+	// Fast re-queue delay.
+	FastReQ = time.Millisecond * 100
+)
+
+//
+// Package logger.
+var log = logging.WithName(Name)
 
 //
 // Application settings.
@@ -46,7 +56,7 @@ func Add(mgr manager.Manager) error {
 		scheme: mgr.GetScheme(),
 	}
 	cnt, err := controller.New(
-		"storage-map-controller",
+		Name,
 		mgr,
 		controller.Options{
 			Reconciler: reconciler,
@@ -91,20 +101,23 @@ type Reconciler struct {
 //
 // Reconcile a Map CR.
 func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	fastReQ := reconcile.Result{RequeueAfter: FastReQ}
+	noReQ := reconcile.Result{}
 	var err error
 
 	// Reset the logger.
 	log.Reset()
+	log.SetValues("map", request.Name)
 
 	// Fetch the CR.
 	mp := &api.StorageMap{}
 	err = r.Get(context.TODO(), request.NamespacedName, mp)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return reconcile.Result{}, nil
+			return noReQ, nil
 		}
 		log.Trace(err)
-		return reconcile.Result{}, err
+		return noReQ, err
 	}
 
 	// Begin staging conditions.
@@ -114,7 +127,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	err = r.validate(mp)
 	if err != nil {
 		log.Trace(err)
-		return reconcile.Result{Requeue: true}, nil
+		return fastReQ, nil
 	}
 
 	// Ready condition.
@@ -130,9 +143,9 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	err = r.Status().Update(context.TODO(), mp)
 	if err != nil {
 		log.Trace(err)
-		return reconcile.Result{Requeue: true}, nil
+		return fastReQ, nil
 	}
 
 	// Done
-	return reconcile.Result{}, nil
+	return noReQ, nil
 }

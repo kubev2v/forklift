@@ -15,11 +15,15 @@ import (
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	liburl "net/url"
+	"time"
 )
 
 //
 // Settings
 const (
+	// Connect retry delay.
+	RetryDelay = time.Second * 5
+	// Max object in each update.
 	MaxObjectUpdates = 10000
 )
 
@@ -207,6 +211,8 @@ type Reconciler struct {
 	secret *core.Secret
 	// DB client.
 	db libmodel.DB
+	// logger.
+	log logging.Logger
 	// client.
 	client *govmomi.Client
 	// cancel function.
@@ -218,11 +224,13 @@ type Reconciler struct {
 //
 // New reconciler.
 func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) *Reconciler {
+	log := logging.WithName(provider.GetName())
 	return &Reconciler{
 		host:     provider.Spec.URL,
 		provider: provider,
 		secret:   secret,
 		db:       db,
+		log:      log,
 	}
 }
 
@@ -261,40 +269,51 @@ func (r *Reconciler) HasConsistency() bool {
 func (r *Reconciler) Start() error {
 	ctx := context.Background()
 	ctx, r.cancel = context.WithCancel(ctx)
-	err := r.connect(ctx)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-	run := func() {
-		Log.Info("Started.", "name", r.Name())
-		err := r.getUpdates(ctx)
-		if err != nil {
-			Log.Trace(err)
-			return
+	start := func() {
+	try:
+		for {
+			select {
+			case <-ctx.Done():
+				break try
+			default:
+				err := r.getUpdates(ctx)
+				if err != nil {
+					r.log.Trace(err, "retry", RetryDelay)
+					time.Sleep(RetryDelay)
+					continue try
+				}
+				break try
+			}
 		}
-		r.client.Logout(ctx)
-		Log.Info("Shutdown.", "name", r.Name())
 	}
 
-	go run()
+	go start()
 
 	return nil
 }
 
 //
 // Shutdown the reconciler.
-func (r *Reconciler) Shutdown(purge bool) {
-	r.db.Close(true)
+func (r *Reconciler) Shutdown() {
+	r.log.Info("Shutdown.")
 	if r.cancel != nil {
 		r.cancel()
 	}
 }
 
 //
-// Get updates.
+// Get object updates.
+//  1. connect.
+//  2. apply updates.
+// Blocks waiting on updates until canceled.
 func (r *Reconciler) getUpdates(ctx context.Context) error {
+	err := r.connect(ctx)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	defer r.client.Logout(ctx)
 	pc := property.DefaultCollector(r.client.Client)
-	pc, err := pc.Create(ctx)
+	pc, err = pc.Create(ctx)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -305,12 +324,14 @@ func (r *Reconciler) getUpdates(ctx context.Context) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	mark := time.Now()
 	req := types.WaitForUpdatesEx{
 		This:    pc.Reference(),
 		Options: filter.Options,
 	}
+next:
 	for {
-		res, err := methods.WaitForUpdatesEx(ctx, r.client, &req)
+		response, err := methods.WaitForUpdatesEx(ctx, r.client, &req)
 		if err != nil {
 			if ctx.Err() == context.Canceled {
 				pc.CancelWaitForUpdates(context.Background())
@@ -318,9 +339,14 @@ func (r *Reconciler) getUpdates(ctx context.Context) error {
 			}
 			return liberr.Wrap(err)
 		}
-		updateSet := res.Returnval
+		updateSet := response.Returnval
 		if updateSet == nil {
-			break
+			err := r.connect(ctx)
+			if err != nil {
+				r.log.Trace(err)
+				time.Sleep(RetryDelay)
+			}
+			continue next
 		}
 		transaction, err := r.db.Begin()
 		if err != nil {
@@ -335,7 +361,10 @@ func (r *Reconciler) getUpdates(ctx context.Context) error {
 			return liberr.Wrap(err)
 		}
 		if updateSet.Truncated == nil || !*updateSet.Truncated {
-			r.consistent = true
+			if !r.consistent {
+				r.log.Info("Initial consistency.", "duration", time.Since(mark))
+				r.consistent = true
+			}
 		}
 	}
 
@@ -346,6 +375,10 @@ func (r *Reconciler) getUpdates(ctx context.Context) error {
 // Build the client.
 func (r *Reconciler) connect(ctx context.Context) error {
 	insecure := true
+	if r.client != nil {
+		r.client.Logout(ctx)
+		r.client = nil
+	}
 	url := &liburl.URL{
 		Scheme: "https",
 		User:   liburl.UserPassword(r.user(), r.password()),
@@ -515,7 +548,7 @@ func (r *Reconciler) apply(ctx context.Context, updates []types.ObjectUpdate) {
 		}
 	}
 	if err != nil {
-		Log.Trace(err)
+		r.log.Trace(err)
 	}
 }
 
@@ -581,7 +614,7 @@ func (r *Reconciler) selectAdapter(u types.ObjectUpdate) (Adapter, bool) {
 			},
 		}
 	default:
-		Log.Info("Unknown", "kind", u.Obj.Type)
+		r.log.Info("Unknown", "kind", u.Obj.Type)
 		return nil, false
 	}
 
@@ -597,7 +630,7 @@ func (r Reconciler) applyEnter(u types.ObjectUpdate) error {
 	}
 	adapter.Apply(u)
 	m := adapter.Model()
-	Log.Info("Create", "model", m.String())
+	r.log.Info("Create", "model", m.String())
 	err := r.db.Insert(m)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -614,7 +647,7 @@ func (r Reconciler) applyModify(u types.ObjectUpdate) error {
 		return nil
 	}
 	m := adapter.Model()
-	Log.Info("Update", "model", m.String())
+	r.log.Info("Update", "model", m.String())
 	tx, err := r.db.GetForUpdate(m)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -678,10 +711,10 @@ func (r Reconciler) applyLeave(u types.ObjectUpdate) error {
 			},
 		}
 	default:
-		Log.Info("Unknown", "kind", u.Obj.Type)
+		r.log.Info("Unknown", "kind", u.Obj.Type)
 		return nil
 	}
-	Log.Info("Delete", "model", deleted.String())
+	r.log.Info("Delete", "model", deleted.String())
 	err := r.db.Delete(deleted)
 	if err != nil {
 		return liberr.Wrap(err)
