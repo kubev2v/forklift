@@ -34,14 +34,20 @@ import (
 	"time"
 )
 
-var log = logging.WithName("plan")
+const (
+	// Controller name.
+	Name = "plan"
+	// Fast re-queue delay.
+	FastReQ = time.Millisecond * 100
+)
+
+//
+// Package logger.
+var log = logging.WithName(Name)
 
 //
 // Application settings.
-var (
-	Settings = &settings.Settings
-	FastReQ  = time.Second * 3
-)
+var Settings = &settings.Settings
 
 //
 // Creates a new Plan Controller and adds it to the Manager.
@@ -51,7 +57,7 @@ func Add(mgr manager.Manager) error {
 		scheme: mgr.GetScheme(),
 	}
 	cnt, err := controller.New(
-		"plan-controller",
+		Name,
 		mgr,
 		controller.Options{
 			Reconciler: reconciler,
@@ -106,20 +112,23 @@ type Reconciler struct {
 //
 // Reconcile a Plan CR.
 func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	fastReQ := reconcile.Result{RequeueAfter: FastReQ}
+	noReQ := reconcile.Result{}
 	var err error
 
 	// Reset the logger.
 	log.Reset()
+	log.SetValues("plan", request.Name)
 
 	// Fetch the CR.
 	plan := &api.Plan{}
 	err = r.Get(context.TODO(), request.NamespacedName, plan)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
-			return reconcile.Result{}, nil
+			return noReQ, nil
 		}
 		log.Trace(err)
-		return reconcile.Result{}, err
+		return noReQ, err
 	}
 
 	// Begin staging conditions.
@@ -129,12 +138,10 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	err = r.validate(plan)
 	if err != nil {
 		if errors.Is(err, ProviderInvNotReady) {
-			return reconcile.Result{
-				RequeueAfter: FastReQ,
-			}, nil
+			return fastReQ, nil
 		}
 		log.Trace(err)
-		return reconcile.Result{RequeueAfter: FastReQ}, nil
+		return fastReQ, nil
 	}
 
 	// Ready condition.
@@ -150,9 +157,9 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	err = r.Status().Update(context.TODO(), plan)
 	if err != nil {
 		log.Trace(err)
-		return reconcile.Result{RequeueAfter: FastReQ}, nil
+		return fastReQ, nil
 	}
 
 	// Done
-	return reconcile.Result{}, nil
+	return noReQ, nil
 }

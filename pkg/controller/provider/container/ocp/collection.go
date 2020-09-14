@@ -27,7 +27,7 @@ func (r *StorageClass) Object() runtime.Object {
 //
 // Reconcile.
 // Achieve initial consistency.
-func (r *StorageClass) Reconcile() (err error) {
+func (r *StorageClass) Reconcile(ctx context.Context) (err error) {
 	pClient := r.Reconciler.Client()
 	list := &storage.StorageClassList{}
 	err = pClient.List(context.TODO(), nil, list)
@@ -43,6 +43,11 @@ func (r *StorageClass) Reconcile() (err error) {
 	}
 	defer tx.End()
 	for _, resource := range list.Items {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
 		m := &model.StorageClass{}
 		m.With(&resource)
 		r.Reconciler.UpdateThreshold(m)
@@ -65,7 +70,6 @@ func (r *StorageClass) Reconcile() (err error) {
 //
 // Resource created watch event.
 func (r *StorageClass) Create(e event.CreateEvent) bool {
-	Log.Reset()
 	object, cast := e.Object.(*storage.StorageClass)
 	if !cast {
 		return false
@@ -80,7 +84,6 @@ func (r *StorageClass) Create(e event.CreateEvent) bool {
 //
 // Resource updated watch event.
 func (r *StorageClass) Update(e event.UpdateEvent) bool {
-	Log.Reset()
 	object, cast := e.ObjectNew.(*storage.StorageClass)
 	if !cast {
 		return false
@@ -95,7 +98,6 @@ func (r *StorageClass) Update(e event.UpdateEvent) bool {
 //
 // Resource deleted watch event.
 func (r *StorageClass) Delete(e event.DeleteEvent) bool {
-	Log.Reset()
 	object, cast := e.Object.(*storage.StorageClass)
 	if !cast {
 		return false
@@ -128,7 +130,7 @@ func (r *NetworkAttachmentDefinition) Object() runtime.Object {
 //
 // Reconcile.
 // Achieve initial consistency.
-func (r *NetworkAttachmentDefinition) Reconcile() (err error) {
+func (r *NetworkAttachmentDefinition) Reconcile(ctx context.Context) (err error) {
 	pClient := r.Reconciler.Client()
 	list := &net.NetworkAttachmentDefinitionList{}
 	err = pClient.List(context.TODO(), nil, list)
@@ -144,6 +146,11 @@ func (r *NetworkAttachmentDefinition) Reconcile() (err error) {
 	}
 	defer tx.End()
 	for _, resource := range list.Items {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
 		m := &model.NetworkAttachmentDefinition{}
 		m.With(&resource)
 		r.Reconciler.UpdateThreshold(m)
@@ -166,7 +173,6 @@ func (r *NetworkAttachmentDefinition) Reconcile() (err error) {
 //
 // Resource created watch event.
 func (r *NetworkAttachmentDefinition) Create(e event.CreateEvent) bool {
-	Log.Reset()
 	object, cast := e.Object.(*net.NetworkAttachmentDefinition)
 	if !cast {
 		return false
@@ -181,7 +187,6 @@ func (r *NetworkAttachmentDefinition) Create(e event.CreateEvent) bool {
 //
 // Resource updated watch event.
 func (r *NetworkAttachmentDefinition) Update(e event.UpdateEvent) bool {
-	Log.Reset()
 	object, cast := e.ObjectNew.(*net.NetworkAttachmentDefinition)
 	if !cast {
 		return false
@@ -196,7 +201,6 @@ func (r *NetworkAttachmentDefinition) Update(e event.UpdateEvent) bool {
 //
 // Resource deleted watch event.
 func (r *NetworkAttachmentDefinition) Delete(e event.DeleteEvent) bool {
-	Log.Reset()
 	object, cast := e.Object.(*net.NetworkAttachmentDefinition)
 	if !cast {
 		return false

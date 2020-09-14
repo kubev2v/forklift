@@ -44,9 +44,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"time"
 )
 
-var log = logging.WithName("provider")
+const (
+	// Controller name.
+	Name = "provider"
+	// Fast re-queue delay.
+	FastReQ = time.Millisecond * 100
+	// Slow re-queue delay.
+	SlowReQ = time.Second * 10
+)
+
+//
+// Package logger.
+var log = logging.WithName(Name)
 
 //
 // Application settings.
@@ -86,7 +98,7 @@ func Add(mgr manager.Manager) error {
 	web.Start()
 
 	cnt, err := controller.New(
-		"provider",
+		Name,
 		mgr,
 		controller.Options{
 			MaxConcurrentReconciles: 10,
@@ -133,10 +145,14 @@ type Reconciler struct {
 //
 // Reconcile a Inventory CR.
 func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	fastReQ := reconcile.Result{RequeueAfter: FastReQ}
+	slowReQ := reconcile.Result{RequeueAfter: SlowReQ}
+	noReQ := reconcile.Result{}
 	var err error
 
 	// Reset the logger.
 	log.Reset()
+	log.SetValues("provider", request.Name)
 
 	// Fetch the CR.
 	provider := &api.Provider{}
@@ -149,13 +165,14 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 					Name:      request.Name,
 				},
 			}
-			if r, found := r.container.Get(deleted); found {
-				r.Shutdown(true)
+			if r, found := r.container.Delete(deleted); found {
+				r.Shutdown()
+				r.DB().Close(true)
 			}
-			return reconcile.Result{}, nil
+			return noReQ, nil
 		}
 		log.Trace(err)
-		return reconcile.Result{}, err
+		return noReQ, err
 	}
 
 	// Begin staging conditions.
@@ -165,7 +182,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	err = r.validate(provider)
 	if err != nil {
 		log.Trace(err)
-		return reconcile.Result{Requeue: true}, nil
+		return fastReQ, nil
 	}
 
 	// Update the container.
@@ -173,7 +190,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		err = r.updateContainer(provider)
 		if err != nil {
 			log.Trace(err)
-			return reconcile.Result{Requeue: true}, nil
+			return slowReQ, nil
 		}
 	}
 
@@ -190,11 +207,11 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	err = r.Status().Update(context.TODO(), provider)
 	if err != nil {
 		log.Trace(err)
-		return reconcile.Result{Requeue: true}, nil
+		return fastReQ, nil
 	}
 
 	// Done
-	return reconcile.Result{}, nil
+	return noReQ, nil
 }
 
 //
@@ -215,8 +232,14 @@ func (r *Reconciler) updateContainer(provider *api.Provider) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-
-	r.container.Add(container.Build(db, provider, secret))
+	new := container.Build(db, provider, secret)
+	current, found, err := r.container.Replace(new)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	if found {
+		current.DB().Close(true)
+	}
 
 	return nil
 }
