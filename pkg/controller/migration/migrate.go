@@ -15,8 +15,7 @@ import (
 // Requeue
 const (
 	NoReQ   = time.Duration(0)
-	FastReQ = time.Millisecond * 100
-	SlowReQ = time.Second * 3
+	PollReQ = time.Second * 3
 )
 
 //
@@ -85,7 +84,7 @@ type Task struct {
 //
 // Run the migration.
 func (r *Task) Run() (reQ time.Duration, err error) {
-	reQ = SlowReQ // TODO: SHOULD BE -NoReQ
+	reQ = PollReQ // TODO: SHOULD BE -NoReQ
 	pErr := r.setPlan()
 	if pErr != nil {
 		err = liberr.Wrap(pErr)
