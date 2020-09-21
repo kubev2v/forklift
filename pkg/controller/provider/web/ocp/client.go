@@ -114,6 +114,28 @@ func (c *Client) Path(object interface{}, id string) (path string, err error) {
 				Name:      name,
 			},
 		})
+	case *StorageClass:
+		h := StorageClassHandler{}
+		path = h.Link(
+			&c.Provider,
+			&model.StorageClass{
+				Base: model.Base{
+					Name: name,
+				},
+			})
+	case *NetworkAttachmentDefinition:
+		if id == "" { // list
+			ns = c.Provider.Namespace
+		}
+		h := NetworkAttachmentDefinitionHandler{}
+		path = h.Link(
+			&c.Provider,
+			&model.NetworkAttachmentDefinition{
+				Base: model.Base{
+					Namespace: ns,
+					Name:      name,
+				},
+			})
 	default:
 		err = base.ResourceNotSupported
 	}

@@ -178,7 +178,7 @@ func (r *Task) begin() {
 			Type:     Running,
 			Status:   True,
 			Category: Advisory,
-			Message:  RunningMessage,
+			Message:  "The migration is RUNNING.",
 			Durable:  true,
 		})
 	list := []api.VMStatus{}

@@ -18,6 +18,7 @@ package migration
 
 import (
 	"context"
+	cnd "github.com/konveyor/controller/pkg/condition"
 	"github.com/konveyor/controller/pkg/logging"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
@@ -135,7 +136,12 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 
 	// Ready condition.
 	if !migration.Status.HasBlockerCondition() {
-		migration.Status.SetReady(true, ReadyMessage)
+		migration.Status.SetCondition(cnd.Condition{
+			Type:     cnd.Ready,
+			Status:   True,
+			Category: Required,
+			Message:  "The migration is ready.",
+		})
 	}
 
 	// Run migration.

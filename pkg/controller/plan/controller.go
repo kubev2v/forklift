@@ -19,6 +19,7 @@ package plan
 import (
 	"context"
 	"errors"
+	cnd "github.com/konveyor/controller/pkg/condition"
 	"github.com/konveyor/controller/pkg/logging"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
@@ -146,7 +147,12 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 
 	// Ready condition.
 	if !plan.Status.HasBlockerCondition() {
-		plan.Status.SetReady(true, ReadyMessage)
+		plan.Status.SetCondition(cnd.Condition{
+			Type:     cnd.Ready,
+			Status:   True,
+			Category: Required,
+			Message:  "The migration plan is ready.",
+		})
 	}
 
 	// End staging conditions.
