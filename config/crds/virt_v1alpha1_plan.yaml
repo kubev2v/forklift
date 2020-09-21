@@ -30,6 +30,9 @@ spec:
           type: object
         spec:
           properties:
+            description:
+              description: Description
+              type: string
             map:
               description: Resource map.
               properties:

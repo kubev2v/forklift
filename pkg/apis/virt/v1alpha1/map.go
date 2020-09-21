@@ -18,7 +18,6 @@ package v1alpha1
 
 import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
-	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -71,7 +70,7 @@ type StoragePair struct {
 // Network map spec.
 type NetworkMapSpec struct {
 	// Provider
-	Provider core.ObjectReference `json:"provider" ref:"Provider"`
+	Provider ProviderPair `json:"provider" ref:"Provider"`
 	// Map.
 	Map []NetworkPair `json:"map"`
 }
@@ -80,7 +79,7 @@ type NetworkMapSpec struct {
 // Storage map spec.
 type StorageMapSpec struct {
 	// Provider
-	Provider core.ObjectReference `json:"provider" ref:"Provider"`
+	Provider ProviderPair `json:"provider" ref:"Provider"`
 	// Map.
 	Map []StoragePair `json:"map"`
 }
