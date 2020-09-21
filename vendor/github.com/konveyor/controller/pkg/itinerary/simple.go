@@ -1,6 +1,9 @@
 package itinerary
 
-import liberr "github.com/konveyor/controller/pkg/error"
+import (
+	"errors"
+	liberr "github.com/konveyor/controller/pkg/error"
+)
 
 //
 // List of steps.
@@ -47,7 +50,7 @@ type Itinerary struct {
 //
 // Errors.
 var (
-	StepNotFound = liberr.New("step not found")
+	StepNotFound = errors.New("step not found")
 )
 
 //
@@ -59,7 +62,7 @@ func (r *Itinerary) Get(name string) (step Step, err error) {
 		}
 	}
 
-	err = StepNotFound
+	err = liberr.Wrap(StepNotFound)
 	return
 }
 
@@ -74,7 +77,7 @@ func (r *Itinerary) First() (step Step, err error) {
 	if len(list) > 0 {
 		step = list[0]
 	} else {
-		err = StepNotFound
+		err = liberr.Wrap(StepNotFound)
 	}
 
 	return

@@ -144,7 +144,7 @@ type EqPredicate struct {
 func (p *EqPredicate) Build(options *ListOptions) error {
 	f, found := p.match(options.fields)
 	if !found {
-		return PredicateRefErr
+		return liberr.Wrap(PredicateRefErr)
 	}
 	v, err := f.AsValue(p.Value)
 	if err != nil {
@@ -171,7 +171,7 @@ type NeqPredicate struct {
 func (p *NeqPredicate) Build(options *ListOptions) error {
 	f, found := p.match(options.fields)
 	if !found {
-		return PredicateRefErr
+		return liberr.Wrap(PredicateRefErr)
 	}
 	v, err := f.AsValue(p.Value)
 	if err != nil {
@@ -198,7 +198,7 @@ type GtPredicate struct {
 func (p *GtPredicate) Build(options *ListOptions) error {
 	f, found := p.match(options.fields)
 	if !found {
-		return PredicateRefErr
+		return liberr.Wrap(PredicateRefErr)
 	}
 	switch f.Value.Kind() {
 	case reflect.String,
@@ -237,7 +237,7 @@ type LtPredicate struct {
 func (p *LtPredicate) Build(options *ListOptions) error {
 	f, found := p.match(options.fields)
 	if !found {
-		return PredicateRefErr
+		return liberr.Wrap(PredicateRefErr)
 	}
 	switch f.Value.Kind() {
 	case reflect.String,
