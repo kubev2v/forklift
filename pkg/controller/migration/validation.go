@@ -22,6 +22,7 @@ const (
 //
 // Categories
 const (
+	Required = cnd.Required
 	Advisory = cnd.Advisory
 	Critical = cnd.Critical
 	Error    = cnd.Error
@@ -40,15 +41,6 @@ const (
 	False = cnd.False
 )
 
-// Messages
-const (
-	ReadyMessage        = "The migration is ready."
-	PlanNotValidMessage = "`plan` not valid."
-	PlanNotReadyMessage = "`plan` does not have Ready condition."
-	RunningMessage      = "The migration is running."
-	FailedMessage       = "The migration failed."
-)
-
 //
 // Validate the plan resource.
 func (r *Reconciler) validate(migration *api.Migration) error {
@@ -63,16 +55,16 @@ func (r *Reconciler) validate(migration *api.Migration) error {
 //
 // Validate plan reference.
 func (r *Reconciler) validatePlan(migration *api.Migration) error {
+	newCnd := cnd.Condition{
+		Type:     PlanNotValid,
+		Status:   True,
+		Reason:   NotSet,
+		Category: Critical,
+		Message:  "The `plan` is not valid.",
+	}
 	ref := migration.Spec.Plan
 	if !libref.RefSet(&ref) {
-		migration.Status.SetCondition(
-			cnd.Condition{
-				Type:     PlanNotValid,
-				Status:   True,
-				Reason:   NotSet,
-				Category: Critical,
-				Message:  PlanNotValidMessage,
-			})
+		migration.Status.SetCondition(newCnd)
 		return nil
 	}
 	plan := &api.Plan{}
@@ -83,14 +75,8 @@ func (r *Reconciler) validatePlan(migration *api.Migration) error {
 	err := r.Get(context.TODO(), key, plan)
 	if errors.IsNotFound(err) {
 		err = nil
-		migration.Status.SetCondition(
-			cnd.Condition{
-				Type:     PlanNotValid,
-				Status:   True,
-				Reason:   NotFound,
-				Category: Critical,
-				Message:  PlanNotValidMessage,
-			})
+		newCnd.Reason = NotFound
+		migration.Status.SetCondition(newCnd)
 	}
 	if err != nil {
 		return liberr.Wrap(err)
@@ -102,7 +88,7 @@ func (r *Reconciler) validatePlan(migration *api.Migration) error {
 				Status:   True,
 				Reason:   NotFound,
 				Category: Critical,
-				Message:  PlanNotReadyMessage,
+				Message:  "The `plan` does not have Ready condition.",
 			})
 	}
 

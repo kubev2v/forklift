@@ -18,11 +18,13 @@ package storage
 
 import (
 	"context"
+	"errors"
+	cnd "github.com/konveyor/controller/pkg/condition"
 	"github.com/konveyor/controller/pkg/logging"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
 	"github.com/konveyor/virt-controller/pkg/settings"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -113,7 +115,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	mp := &api.StorageMap{}
 	err = r.Get(context.TODO(), request.NamespacedName, mp)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if k8serr.IsNotFound(err) {
 			return noReQ, nil
 		}
 		log.Trace(err)
@@ -126,13 +128,21 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	// Validations.
 	err = r.validate(mp)
 	if err != nil {
+		if errors.Is(err, ProviderInvNotReady) {
+			return fastReQ, nil
+		}
 		log.Trace(err)
 		return fastReQ, nil
 	}
 
 	// Ready condition.
 	if !mp.Status.HasBlockerCondition() {
-		mp.Status.SetReady(true, ReadyMessage)
+		mp.Status.SetCondition(cnd.Condition{
+			Type:     cnd.Ready,
+			Status:   True,
+			Category: Required,
+			Message:  "The storage map is ready.",
+		})
 	}
 
 	// End staging conditions.
