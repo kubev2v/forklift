@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	cnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libref "github.com/konveyor/controller/pkg/ref"
@@ -22,6 +23,7 @@ const (
 //
 // Categories
 const (
+	Required = cnd.Required
 	Advisory = cnd.Advisory
 	Critical = cnd.Critical
 	Error    = cnd.Error
@@ -41,15 +43,6 @@ const (
 const (
 	True  = cnd.True
 	False = cnd.False
-)
-
-//
-// Messages
-const (
-	ReadyMessage            = "The provider is ready."
-	UrlNotValidMessage      = "The `url` is not valid."
-	TypeNotSupportedMessage = "The `type` not supported."
-	SecretNotValidMessage   = "The `secret` ref not valid."
 )
 
 //
@@ -78,13 +71,17 @@ func (r *Reconciler) validateType(provider *api.Provider) error {
 	case api.OpenShift,
 		api.VSphere:
 	default:
+		valid := []string{
+			api.OpenShift,
+			api.VSphere,
+		}
 		provider.Status.SetCondition(
 			cnd.Condition{
 				Type:     TypeNotSupported,
 				Status:   True,
 				Reason:   NotSupported,
 				Category: Critical,
-				Message:  TypeNotSupportedMessage,
+				Message:  fmt.Sprintf("The `type` must be: %s", valid),
 			})
 	}
 
@@ -104,7 +101,7 @@ func (r *Reconciler) validateURL(provider *api.Provider) error {
 				Status:   True,
 				Reason:   NotSet,
 				Category: Critical,
-				Message:  UrlNotValidMessage,
+				Message:  "The `url` is not valid.",
 			})
 	}
 
@@ -120,16 +117,16 @@ func (r *Reconciler) validateSecret(provider *api.Provider) error {
 	if provider.IsHost() {
 		return nil
 	}
+	newCnd := cnd.Condition{
+		Type:     SecretNotValid,
+		Status:   True,
+		Reason:   NotSet,
+		Category: Critical,
+		Message:  "The `secret` is not valid.",
+	}
 	ref := provider.Spec.Secret
 	if !libref.RefSet(&ref) {
-		provider.Status.SetCondition(
-			cnd.Condition{
-				Type:     SecretNotValid,
-				Status:   True,
-				Reason:   NotSet,
-				Category: Critical,
-				Message:  SecretNotValidMessage,
-			})
+		provider.Status.SetCondition(newCnd)
 		return nil
 	}
 	secret := &core.Secret{}
@@ -140,14 +137,8 @@ func (r *Reconciler) validateSecret(provider *api.Provider) error {
 	err := r.Get(context.TODO(), key, secret)
 	if errors.IsNotFound(err) {
 		err = nil
-		provider.Status.SetCondition(
-			cnd.Condition{
-				Type:     SecretNotValid,
-				Status:   True,
-				Reason:   NotFound,
-				Category: Critical,
-				Message:  SecretNotValidMessage,
-			})
+		newCnd.Reason = NotFound
+		provider.Status.SetCondition(newCnd)
 	}
 	if err != nil {
 		return liberr.Wrap(err)

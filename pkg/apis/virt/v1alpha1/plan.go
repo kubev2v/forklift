@@ -23,15 +23,6 @@ import (
 )
 
 //
-// Plan provider pair.
-type ProviderPair struct {
-	// Source.
-	Source core.ObjectReference `json:"source" ref:"Provider"`
-	// Destination.
-	Destination core.ObjectReference `json:"destination" ref:"Provider"`
-}
-
-//
 // Plan hook.
 type PlanHook struct {
 	// Pre-migration hook.
@@ -65,6 +56,8 @@ type PlanMap struct {
 //
 // PlanSpec defines the desired state of Plan.
 type PlanSpec struct {
+	// Description
+	Description string `json:"description,omitempty"`
 	// Providers.
 	Provider ProviderPair `json:"provider"`
 	// Resource map.

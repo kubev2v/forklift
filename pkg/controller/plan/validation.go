@@ -1,156 +1,78 @@
 package plan
 
 import (
-	"context"
 	cnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
-	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web/vsphere"
-	"k8s.io/apimachinery/pkg/api/errors"
+	"github.com/konveyor/virt-controller/pkg/controller/validation"
 	"net/http"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 //
 // Types
 const (
-	SourceNotValid      = "SourceProviderNotValid"
-	DestinationNotValid = "DestinationProviderNotValid"
-	VmNotValid          = "VmNotValid"
+	VMNotValid = "VMNotValid"
 )
 
 //
 // Categories
 const (
+	Required = cnd.Required
 	Advisory = cnd.Advisory
 	Critical = cnd.Critical
 	Error    = cnd.Error
 	Warn     = cnd.Warn
 )
 
+//
 // Reasons
 const (
 	NotSet   = "NotSet"
 	NotFound = "NotFound"
 )
 
+//
 // Statuses
 const (
 	True  = cnd.True
 	False = cnd.False
 )
 
-// Messages
-const (
-	ReadyMessage               = "The migration plan is ready."
-	SourceNotValidMessage      = "The `providers.source` not valid."
-	DestinationNotValidMessage = "The `providers.destination` not valid."
-	VmNotValidMessage          = "The vms (list) contains invalid VMs."
-)
-
+//
+// Errors
 var (
-	ProviderInvNotReady = liberr.New("provider inventory API not ready")
+	ProviderInvNotReady = validation.ProviderInvNotReady
 )
 
 //
 // Validate the plan resource.
 func (r *Reconciler) validate(plan *api.Plan) error {
-	err := r.validateProvider(plan)
+	// Provider.
+	provider := validation.ProviderPair{Client: r}
+	conditions, err := provider.Validate(plan.Spec.Provider)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = r.validateVMs(plan)
+	plan.Status.SetCondition(conditions.List...)
+	// Map
+	network := validation.NetworkPair{Client: r, Provider: provider.Referenced}
+	conditions, err = network.Validate(plan.Spec.Map.Networks)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-
-	return nil
-}
-
-//
-// Validate provider field.
-func (r *Reconciler) validateProvider(plan *api.Plan) error {
-	//
-	// Source
-	ref := plan.Spec.Provider.Source
-	if !libref.RefSet(&ref) {
-		plan.Status.SetCondition(
-			cnd.Condition{
-				Type:     SourceNotValid,
-				Status:   True,
-				Reason:   NotSet,
-				Category: Critical,
-				Message:  SourceNotValidMessage,
-			})
-	} else {
-		provider := &api.Provider{}
-		key := client.ObjectKey{
-			Namespace: ref.Namespace,
-			Name:      ref.Name,
-		}
-		err := r.Get(context.TODO(), key, provider)
-		if errors.IsNotFound(err) {
-			err = nil
-			plan.Status.SetCondition(
-				cnd.Condition{
-					Type:     SourceNotValid,
-					Status:   True,
-					Reason:   NotFound,
-					Category: Critical,
-					Message:  SourceNotValidMessage,
-				})
-		}
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		client, err := web.NewClient(*provider)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		ready, err := client.Ready()
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		if !ready {
-			return ProviderInvNotReady
-		}
+	plan.Status.SetCondition(conditions.List...)
+	storage := validation.StoragePair{Client: r, Provider: provider.Referenced}
+	conditions, err = storage.Validate(plan.Spec.Map.Datastores)
+	if err != nil {
+		return liberr.Wrap(err)
 	}
-	//
-	// Destination
-	ref = plan.Spec.Provider.Destination
-	if !libref.RefSet(&ref) {
-		plan.Status.SetCondition(
-			cnd.Condition{
-				Type:     DestinationNotValid,
-				Status:   True,
-				Reason:   NotSet,
-				Category: Critical,
-				Message:  DestinationNotValidMessage,
-			})
-		return nil
-	} else {
-		provider := &api.Provider{}
-		key := client.ObjectKey{
-			Namespace: ref.Namespace,
-			Name:      ref.Name,
-		}
-		err := r.Get(context.TODO(), key, provider)
-		if errors.IsNotFound(err) {
-			err = nil
-			plan.Status.SetCondition(
-				cnd.Condition{
-					Type:     DestinationNotValid,
-					Status:   True,
-					Reason:   NotFound,
-					Category: Critical,
-					Message:  DestinationNotValidMessage,
-				})
-		}
-		if err != nil {
-			return liberr.Wrap(err)
-		}
+	plan.Status.SetCondition(conditions.List...)
+	// VM list.
+	err = r.validateVM(provider.Referenced.Source, plan)
+	if err != nil {
+		return liberr.Wrap(err)
 	}
 
 	return nil
@@ -158,39 +80,28 @@ func (r *Reconciler) validateProvider(plan *api.Plan) error {
 
 //
 // Validate listed VMs.
-func (r *Reconciler) validateVMs(plan *api.Plan) error {
-	ref := plan.Spec.Provider.Source
-	provider := api.Provider{}
-	key := client.ObjectKey{
-		Namespace: ref.Namespace,
-		Name:      ref.Name,
-	}
-	err := r.Get(context.TODO(), key, &provider)
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			liberr.Wrap(err)
-		} else {
-			return nil
-		}
+func (r *Reconciler) validateVM(provider *api.Provider, plan *api.Plan) error {
+	if provider == nil {
+		return nil
 	}
 	notValid := []string{}
-	client, err := web.NewClient(provider)
-	if err != nil {
-		return liberr.Wrap(err)
+	pClient, pErr := web.NewClient(*provider)
+	if pErr != nil {
+		return liberr.Wrap(pErr)
 	}
 	var resource interface{}
 	switch provider.Type() {
 	case api.OpenShift:
-		// TODO:
+		return nil
 	case api.VSphere:
 		resource = &vsphere.VM{}
 	default:
 		return web.ProviderNotSupported
 	}
 	for _, vm := range plan.Spec.VMs {
-		status, err := client.Get(resource, vm.ID)
-		if err != nil {
-			return liberr.Wrap(err)
+		status, pErr := pClient.Get(resource, vm.ID)
+		if pErr != nil {
+			return liberr.Wrap(pErr)
 		}
 		switch status {
 		case http.StatusOK:
@@ -199,19 +110,17 @@ func (r *Reconciler) validateVMs(plan *api.Plan) error {
 		case http.StatusNotFound:
 			notValid = append(notValid, vm.ID)
 		default:
-			return liberr.New("")
+			return liberr.New(http.StatusText(status))
 		}
 	}
 	if len(notValid) > 0 {
-		plan.Status.SetCondition(
-			cnd.Condition{
-				Type:     VmNotValid,
-				Status:   True,
-				Reason:   NotFound,
-				Category: Critical,
-				Message:  VmNotValidMessage,
-				Items:    notValid,
-			})
+		plan.Status.SetCondition(cnd.Condition{
+			Type:     VMNotValid,
+			Status:   True,
+			Reason:   NotFound,
+			Category: Critical,
+			Message:  "The VMs (list) contains invalid VMs.",
+		})
 	}
 
 	return nil
