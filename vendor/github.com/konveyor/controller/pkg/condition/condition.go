@@ -172,17 +172,19 @@ func (r *Conditions) FindCondition(cndType string) *Condition {
 
 //
 // Set (add/update) the specified condition to the collection.
-func (r *Conditions) SetCondition(condition Condition) {
+func (r *Conditions) SetCondition(conditions ...Condition) {
 	if r.List == nil {
 		r.List = []Condition{}
 	}
-	condition.staged = true
-	found := r.find(condition.Type)
-	if found == nil {
-		condition.LastTransitionTime = v1.NewTime(time.Now())
-		r.List = append(r.List, condition)
-	} else {
-		found.Update(condition)
+	for _, condition := range conditions {
+		condition.staged = true
+		found := r.find(condition.Type)
+		if found == nil {
+			condition.LastTransitionTime = v1.NewTime(time.Now())
+			r.List = append(r.List, condition)
+		} else {
+			found.Update(condition)
+		}
 	}
 }
 
@@ -313,21 +315,6 @@ func (r *Conditions) HasBlockerCondition() bool {
 }
 
 //
-// Set `Ready` condition.
-func (r *Conditions) SetReady(ready bool, message string) {
-	if ready {
-		r.SetCondition(Condition{
-			Type:     Ready,
-			Status:   True,
-			Category: Required,
-			Message:  message,
-		})
-	} else {
-		r.DeleteCondition(Ready)
-	}
-}
-
-//
 // The collection contains the `Ready` condition.
 func (r *Conditions) IsReady() bool {
 	condition := r.FindCondition(Ready)
@@ -336,20 +323,4 @@ func (r *Conditions) IsReady() bool {
 	}
 
 	return true
-}
-
-//
-// Set the `ReconcileFailed` condition.
-// Clear the `Ready` condition.
-// Ends staging.
-func (r *Conditions) SetReconcileFailed(err error) {
-	r.DeleteCondition(Ready)
-	r.SetCondition(Condition{
-		Type:     ReconcileFailed,
-		Status:   True,
-		Category: Critical,
-		Message:  "Reconcile failed: []. See controller logs for details.",
-		Items:    []string{err.Error()},
-	})
-	r.EndStagingConditions()
 }

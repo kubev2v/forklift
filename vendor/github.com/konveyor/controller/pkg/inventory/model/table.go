@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/mattn/go-sqlite3"
@@ -126,25 +127,25 @@ LIMIT {{.Page.Limit}} OFFSET {{.Page.Offset}}
 // Errors
 var (
 	// Must have PK.
-	MustHavePkErr = liberr.New("must have PK field")
+	MustHavePkErr = errors.New("must have PK field")
 	// Parameter must be pointer error.
-	MustBePtrErr = liberr.New("must be pointer")
+	MustBePtrErr = errors.New("must be pointer")
 	// Must be slice pointer.
-	MustBeSlicePtrErr = liberr.New("must be slice pointer")
+	MustBeSlicePtrErr = errors.New("must be slice pointer")
 	// Parameter must be struct error.
-	MustBeObjectErr = liberr.New("must be object")
+	MustBeObjectErr = errors.New("must be object")
 	// Field type error.
-	FieldTypeErr = liberr.New("field type must be (int, str, bool")
+	FieldTypeErr = errors.New("field type must be (int, str, bool")
 	// PK field type error.
-	PkTypeErr = liberr.New("pk field must be (int, str)")
+	PkTypeErr = errors.New("pk field must be (int, str)")
 	// Generated PK error.
-	GenPkTypeErr = liberr.New("PK field must be `str` when generated")
+	GenPkTypeErr = errors.New("PK field must be `str` when generated")
 	// Invalid field referenced in predicate.
-	PredicateRefErr = liberr.New("predicate referenced unknown field")
+	PredicateRefErr = errors.New("predicate referenced unknown field")
 	// Invalid predicate for type of field.
-	PredicateTypeErr = liberr.New("predicate type not valid for field")
+	PredicateTypeErr = errors.New("predicate type not valid for field")
 	// Invalid predicate value.
-	PredicateValueErr = liberr.New("predicate value not valid")
+	PredicateValueErr = errors.New("predicate value not valid")
 )
 
 //
@@ -184,7 +185,7 @@ func (t Table) Validate(fields []*Field) error {
 	}
 	pk := t.PkField(fields)
 	if pk == nil {
-		return MustHavePkErr
+		return liberr.Wrap(MustHavePkErr)
 	}
 
 	return nil
@@ -366,13 +367,13 @@ func (t Table) List(list interface{}, options ListOptions) error {
 		lt = lt.Elem()
 		lv = lv.Elem()
 	default:
-		return MustBeSlicePtrErr
+		return liberr.Wrap(MustBeSlicePtrErr)
 	}
 	switch lt.Kind() {
 	case reflect.Slice:
 		model = reflect.New(lt.Elem()).Interface()
 	default:
-		return MustBeSlicePtrErr
+		return liberr.Wrap(MustBeSlicePtrErr)
 	}
 	fields, err := t.Fields(model)
 	if err != nil {
@@ -445,10 +446,10 @@ func (t Table) Fields(model interface{}) ([]*Field, error) {
 		mt = mt.Elem()
 		mv = mv.Elem()
 	} else {
-		return nil, MustBePtrErr
+		return nil, liberr.Wrap(MustBePtrErr)
 	}
 	if mv.Kind() != reflect.Struct {
-		return nil, MustBeObjectErr
+		return nil, liberr.Wrap(MustBeObjectErr)
 	}
 	for i := 0; i < mt.NumField(); i++ {
 		ft := mt.Field(i)
@@ -516,7 +517,7 @@ func (t Table) SetPk(fields []*Field) error {
 			return nil
 		}
 	default:
-		return GenPkTypeErr
+		return liberr.Wrap(GenPkTypeErr)
 	}
 	h := sha1.New()
 	for _, f := range t.KeyFields(fields) {
@@ -820,7 +821,7 @@ func (f *Field) Validate() error {
 	switch f.Value.Kind() {
 	case reflect.Bool:
 		if f.Pk() {
-			return PkTypeErr
+			return liberr.Wrap(PkTypeErr)
 		}
 	case reflect.String,
 		reflect.Int,
@@ -829,7 +830,7 @@ func (f *Field) Validate() error {
 		reflect.Int32,
 		reflect.Int64:
 	default:
-		return FieldTypeErr
+		return liberr.Wrap(FieldTypeErr)
 	}
 
 	return nil
@@ -1000,7 +1001,7 @@ func (f *Field) AsValue(object interface{}) (value interface{}, err error) {
 	case reflect.Ptr:
 		val = val.Elem()
 	case reflect.Struct:
-		err = PredicateValueErr
+		err = liberr.Wrap(PredicateValueErr)
 		return
 	}
 	switch f.Value.Kind() {
@@ -1019,7 +1020,7 @@ func (f *Field) AsValue(object interface{}) (value interface{}, err error) {
 			n := val.Int()
 			value = strconv.FormatInt(n, 0)
 		default:
-			err = PredicateValueErr
+			err = liberr.Wrap(PredicateValueErr)
 		}
 	case reflect.Bool:
 		switch val.Kind() {
@@ -1045,7 +1046,7 @@ func (f *Field) AsValue(object interface{}) (value interface{}, err error) {
 				value = false
 			}
 		default:
-			err = PredicateValueErr
+			err = liberr.Wrap(PredicateValueErr)
 		}
 	case reflect.Int,
 		reflect.Int8,
@@ -1072,10 +1073,10 @@ func (f *Field) AsValue(object interface{}) (value interface{}, err error) {
 			reflect.Int64:
 			value = val.Int()
 		default:
-			err = PredicateValueErr
+			err = liberr.Wrap(PredicateValueErr)
 		}
 	default:
-		err = FieldTypeErr
+		err = liberr.Wrap(FieldTypeErr)
 	}
 
 	return
