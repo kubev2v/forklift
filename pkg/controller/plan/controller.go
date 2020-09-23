@@ -131,6 +131,13 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		log.Trace(err)
 		return noReQ, err
 	}
+	// Load the snapshot.
+	snapshot := plan.Snapshot()
+	err = snapshot.Read(r)
+	if err != nil {
+		log.Trace(err)
+		return fastReQ, nil
+	}
 
 	// Begin staging conditions.
 	plan.Status.BeginStagingConditions()
@@ -153,6 +160,13 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 			Category: Required,
 			Message:  "The migration plan is ready.",
 		})
+	}
+
+	// Update the snapshot.
+	err = snapshot.Write(r)
+	if err != nil {
+		log.Trace(err)
+		return fastReQ, nil
 	}
 
 	// End staging conditions.
