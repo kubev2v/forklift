@@ -67,6 +67,10 @@ type MigrationStatus struct {
 	// The most recent generation observed by the controller.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	// Started timestamp.
+	Started *meta.Time `json:"started,omitempty"`
+	// Completed timestamp.
+	Completed *meta.Time `json:"completed,omitempty"`
 	// VM status
 	VMs []VMStatus `json:"vms,omitempty"`
 }
@@ -81,6 +85,27 @@ type Migration struct {
 	meta.ObjectMeta `json:"metadata,omitempty"`
 	Spec            MigrationSpec   `json:"spec,omitempty"`
 	Status          MigrationStatus `json:"status,omitempty"`
+	snapshot        *Snapshot
+}
+
+func (r *Migration) Snapshot() *Snapshot {
+	if r.snapshot == nil {
+		r.snapshot = &Snapshot{Owner: r}
+	}
+
+	return r.snapshot
+}
+
+//
+// Get whether the migration has started.
+func (r *Migration) HasStarted() bool {
+	return r.Status.Started != nil
+}
+
+//
+// Get whether the migration has completed.
+func (r *Migration) HasCompleted() bool {
+	return r.Status.Completed != nil
 }
 
 //
