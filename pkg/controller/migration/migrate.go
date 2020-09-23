@@ -1,12 +1,12 @@
 package migration
 
 import (
-	"context"
 	cnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libitr "github.com/konveyor/controller/pkg/itinerary"
 	"github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"time"
 )
@@ -84,7 +84,11 @@ type Task struct {
 //
 // Run the migration.
 func (r *Task) Run() (reQ time.Duration, err error) {
-	reQ = PollReQ // TODO: SHOULD BE -NoReQ
+	reQ = PollReQ
+	if r.Migration.HasCompleted() {
+		reQ = NoReQ
+		return
+	}
 	pErr := r.setPlan()
 	if pErr != nil {
 		err = liberr.Wrap(pErr)
@@ -140,6 +144,7 @@ func (r *Task) Run() (reQ time.Duration, err error) {
 			}
 		case Completed:
 			reQ = NoReQ
+			r.end()
 		default:
 			err = liberr.New("phase: unknown")
 		}
@@ -170,9 +175,11 @@ func (r *Task) next(phase string) (next string) {
 //
 // Begin the migration.
 func (r *Task) begin() {
-	if r.Migration.Status.HasCondition(Running) {
+	if r.Migration.HasStarted() {
 		return
 	}
+	now := meta.Now()
+	r.Migration.Status.Started = &now
 	r.Migration.Status.SetCondition(
 		cnd.Condition{
 			Type:     Running,
@@ -237,25 +244,54 @@ func (r *Task) begin() {
 }
 
 //
+// End the migration.
+func (r *Task) end() {
+	failed := false
+	for _, vm := range r.Migration.Status.VMs {
+		if vm.Error != nil {
+			failed = true
+			break
+		}
+	}
+	now := meta.Now()
+	r.Migration.Status.Completed = &now
+	r.Migration.Status.DeleteCondition(Running)
+	if failed {
+		r.Migration.Status.SetCondition(
+			cnd.Condition{
+				Type:     Failed,
+				Status:   True,
+				Category: Advisory,
+				Message:  "The migration has FAILED.",
+				Durable:  true,
+			})
+	} else {
+		r.Migration.Status.SetCondition(
+			cnd.Condition{
+				Type:     Succeeded,
+				Status:   True,
+				Category: Advisory,
+				Message:  "The migration has SUCCEEDED.",
+				Durable:  true,
+			})
+	}
+}
+
+//
 // Get the associated plan.
-func (r *Task) setPlan() error {
-	if r.Plan != nil {
-		return nil
+func (r *Task) setPlan() (err error) {
+	r.Plan = &api.Plan{
+		ObjectMeta: meta.ObjectMeta{
+			Namespace: r.Migration.Spec.Plan.Namespace,
+			Name:      r.Migration.Spec.Plan.Name,
+		},
 	}
-	ref := r.Migration.Spec.Plan
-	plan := &api.Plan{}
-	key := client.ObjectKey{
-		Namespace: ref.Namespace,
-		Name:      ref.Name,
-	}
-	err := r.Client.Get(context.TODO(), key, plan)
+	err = r.Migration.Snapshot().Get(r.Plan)
 	if err != nil {
-		return liberr.Wrap(err)
+		err = liberr.Wrap(err)
 	}
 
-	r.Plan = plan
-
-	return nil
+	return
 }
 
 //
@@ -268,6 +304,9 @@ type Predicate struct {
 //
 // Evaluate predicate flags.
 func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
+	if r.vm.Hook == nil {
+		return
+	}
 	switch flag {
 	case HasPreHook:
 		allowed = ref.RefSet(r.vm.Hook.Before)

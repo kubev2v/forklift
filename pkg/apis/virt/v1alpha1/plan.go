@@ -41,7 +41,7 @@ type PlanVM struct {
 	// Enable hooks.
 	Hook *PlanHook `json:"hook,omitempty"`
 	// Host
-	Host core.ObjectReference `json:"host,omitempty" ref:"Host"`
+	Host *core.ObjectReference `json:"host,omitempty" ref:"Host"`
 }
 
 //
@@ -86,6 +86,15 @@ type Plan struct {
 	meta.ObjectMeta `json:"metadata,omitempty"`
 	Spec            PlanSpec   `json:"spec,omitempty"`
 	Status          PlanStatus `json:"status,omitempty"`
+	snapshot        *Snapshot
+}
+
+func (r *Plan) Snapshot() *Snapshot {
+	if r.snapshot == nil {
+		r.snapshot = &Snapshot{Owner: r}
+	}
+
+	return r.snapshot
 }
 
 //

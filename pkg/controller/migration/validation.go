@@ -16,6 +16,7 @@ const (
 	PlanNotValid = "PlanNotValid"
 	PlanNotReady = "PlanNotReady"
 	Running      = "Running"
+	Succeeded    = "Succeeded"
 	Failed       = "Failed"
 )
 
@@ -55,6 +56,9 @@ func (r *Reconciler) validate(migration *api.Migration) error {
 //
 // Validate plan reference.
 func (r *Reconciler) validatePlan(migration *api.Migration) error {
+	if migration.HasStarted() {
+		return nil
+	}
 	newCnd := cnd.Condition{
 		Type:     PlanNotValid,
 		Status:   True,
@@ -77,10 +81,12 @@ func (r *Reconciler) validatePlan(migration *api.Migration) error {
 		err = nil
 		newCnd.Reason = NotFound
 		migration.Status.SetCondition(newCnd)
+		return nil
 	}
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	migration.Snapshot().Set(plan)
 	if !plan.Status.HasCondition(cnd.Ready) {
 		migration.Status.SetCondition(
 			cnd.Condition{
@@ -90,6 +96,7 @@ func (r *Reconciler) validatePlan(migration *api.Migration) error {
 				Category: Critical,
 				Message:  "The `plan` does not have Ready condition.",
 			})
+		return nil
 	}
 
 	return nil

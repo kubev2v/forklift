@@ -38,10 +38,18 @@ spec:
           type: object
         status:
           properties:
+            completed:
+              description: Completed timestamp.
+              format: date-time
+              type: string
             observedGeneration:
               description: The most recent generation observed by the controller.
               format: int64
               type: integer
+            started:
+              description: Started timestamp.
+              format: date-time
+              type: string
             vms:
               description: VM status
               items:
