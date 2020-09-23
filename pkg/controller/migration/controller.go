@@ -123,6 +123,18 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		log.Trace(err)
 		return noReQ, err
 	}
+	// Load the snapshot.
+	snapshot := migration.Snapshot()
+	err = snapshot.Read(r)
+	if err != nil {
+		log.Trace(err)
+		return fastReQ, nil
+	}
+	// The cached client is not reliable.
+	if migration.HasStarted() && snapshot.NotFound() {
+		log.Info("Snapshot not found, ReQ.")
+		return fastReQ, nil
+	}
 
 	// Begin staging conditions.
 	migration.Status.BeginStagingConditions()
@@ -144,6 +156,15 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		})
 	}
 
+	// Update the snapshot.
+	if !migration.HasStarted() {
+		err = snapshot.Write(r)
+		if err != nil {
+			log.Trace(err)
+			return fastReQ, nil
+		}
+	}
+
 	// Run migration.
 	task := Task{
 		Client:    r,
@@ -163,7 +184,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	err = r.Status().Update(context.TODO(), migration)
 	if err != nil {
 		log.Trace(err)
-		return reconcile.Result{Requeue: true}, nil
+		return fastReQ, nil
 	}
 
 	if reQ > NoReQ {

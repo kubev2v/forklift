@@ -191,6 +191,10 @@ func (in *Migration) DeepCopyInto(out *Migration) {
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	out.Spec = in.Spec
 	in.Status.DeepCopyInto(&out.Status)
+	if in.snapshot != nil {
+		in, out := &in.snapshot, &out.snapshot
+		*out = (*in).DeepCopy()
+	}
 	return
 }
 
@@ -266,6 +270,14 @@ func (in *MigrationSpec) DeepCopy() *MigrationSpec {
 func (in *MigrationStatus) DeepCopyInto(out *MigrationStatus) {
 	*out = *in
 	in.Conditions.DeepCopyInto(&out.Conditions)
+	if in.Started != nil {
+		in, out := &in.Started, &out.Started
+		*out = (*in).DeepCopy()
+	}
+	if in.Completed != nil {
+		in, out := &in.Completed, &out.Completed
+		*out = (*in).DeepCopy()
+	}
 	if in.VMs != nil {
 		in, out := &in.VMs, &out.VMs
 		*out = make([]VMStatus, len(*in))
@@ -394,6 +406,10 @@ func (in *Plan) DeepCopyInto(out *Plan) {
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	in.Spec.DeepCopyInto(&out.Spec)
 	in.Status.DeepCopyInto(&out.Status)
+	if in.snapshot != nil {
+		in, out := &in.snapshot, &out.snapshot
+		*out = (*in).DeepCopy()
+	}
 	return
 }
 
@@ -550,7 +566,11 @@ func (in *PlanVM) DeepCopyInto(out *PlanVM) {
 		*out = new(PlanHook)
 		(*in).DeepCopyInto(*out)
 	}
-	out.Host = in.Host
+	if in.Host != nil {
+		in, out := &in.Host, &out.Host
+		*out = new(v1.ObjectReference)
+		**out = **in
+	}
 	return
 }
 
