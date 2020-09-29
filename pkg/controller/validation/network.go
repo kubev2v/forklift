@@ -62,7 +62,7 @@ func (r *NetworkPair) validateSource(list []api.NetworkPair) (result cnd.Conditi
 	if provider == nil {
 		return
 	}
-	pClient, err := web.NewClient(*provider)
+	pClient, err := web.NewClient(provider)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -75,7 +75,7 @@ func (r *NetworkPair) validateSource(list []api.NetworkPair) (result cnd.Conditi
 	case api.VSphere:
 		resource = &vsphere.Network{}
 	default:
-		err = web.ProviderNotSupported
+		err = liberr.Wrap(web.ProviderNotSupportedErr)
 		return
 	}
 	for _, entry := range list {
@@ -86,9 +86,6 @@ func (r *NetworkPair) validateSource(list []api.NetworkPair) (result cnd.Conditi
 		}
 		switch status {
 		case http.StatusOK:
-		case http.StatusPartialContent:
-			err = liberr.Wrap(ProviderInvNotReady)
-			return
 		case http.StatusNotFound:
 			notValid = append(notValid, entry.Source.ID)
 		default:
@@ -116,7 +113,7 @@ func (r *NetworkPair) validateDestination(list []api.NetworkPair) (result cnd.Co
 	if provider == nil {
 		return
 	}
-	pClient, err := web.NewClient(*provider)
+	pClient, err := web.NewClient(provider)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -130,7 +127,7 @@ func (r *NetworkPair) validateDestination(list []api.NetworkPair) (result cnd.Co
 	case api.VSphere:
 		return
 	default:
-		err = web.ProviderNotSupported
+		err = liberr.Wrap(web.ProviderNotSupportedErr)
 		return
 	}
 next:
@@ -149,9 +146,6 @@ next:
 			}
 			switch status {
 			case http.StatusOK:
-			case http.StatusPartialContent:
-				err = liberr.Wrap(ProviderInvNotReady)
-				return
 			case http.StatusNotFound:
 				notFound = append(notFound, entry.Source.ID)
 			default:
