@@ -156,6 +156,7 @@ func (h TreeHandler) HostTree(ctx *gin.Context) {
 			return
 		}
 		r := Datacenter{}
+		r.With(&dc)
 		r.SelfLink = DatacenterHandler{}.Link(h.Provider, &dc)
 		branch.Kind = model.DatacenterKind
 		branch.Object = r
