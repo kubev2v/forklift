@@ -2,12 +2,10 @@ package validation
 
 import (
 	"context"
-	"errors"
 	cnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/web"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -44,10 +42,6 @@ const (
 const (
 	True  = cnd.True
 	False = cnd.False
-)
-
-var (
-	ProviderInvNotReady = errors.New("provider inventory API not ready")
 )
 
 //
@@ -111,19 +105,6 @@ func (r *Provider) Validate(ref core.ObjectReference) (result cnd.Conditions, er
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
-	}
-	pClient, err := web.NewClient(provider)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	ready, err := pClient.Ready()
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	if !ready {
-		err = liberr.Wrap(ProviderInvNotReady)
 	}
 
 	return

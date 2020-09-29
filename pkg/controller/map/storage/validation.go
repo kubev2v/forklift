@@ -32,12 +32,6 @@ const (
 )
 
 //
-// Errors
-var (
-	ProviderInvNotReady = validation.ProviderInvNotReady
-)
-
-//
 // Validate the mp resource.
 func (r *Reconciler) validate(mp *api.StorageMap) error {
 	provider := validation.ProviderPair{Client: r}
