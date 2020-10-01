@@ -1,26 +1,34 @@
 package base
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
+	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	"io/ioutil"
 	"net/http"
 	liburl "net/url"
+	"reflect"
 )
 
 //
 // Errors
 var (
-	ProviderNotSupported = liberr.New("provider not supported")
-	ResourceNotSupported = liberr.New("resource not supported")
+	ResourceNotResolvedErr = errors.New("resource (kind) not resolved")
 )
 
 //
-// Thin REST API client.
+// Resolves resources to API paths.
+type Resolver interface {
+	// Find the API path for the specified resource.
+	Path(resource interface{}, id string) (string, error)
+}
+
+//
+// REST API client.
 type Client struct {
+	Resolver
 	// Bearer token.
 	Token string
 	// Host <host>:<port>
@@ -30,8 +38,60 @@ type Client struct {
 }
 
 //
+// Get a resource.
+func (c *Client) Get(resource interface{}, id string) (status int, err error) {
+	if c.Resolver == nil {
+		err = liberr.Wrap(ResourceNotResolvedErr)
+		return
+	}
+	lv := reflect.ValueOf(resource)
+	switch lv.Kind() {
+	case reflect.Ptr:
+	default:
+		return -1, libmodel.MustBePtrErr
+	}
+	path, err := c.Resolver.Path(resource, id)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	status, err = c.get(path, resource)
+
+	return
+}
+
+//
+// List resources in a collection.
+func (c *Client) List(list interface{}) (status int, err error) {
+	var resource interface{}
+	lt := reflect.TypeOf(list)
+	lv := reflect.ValueOf(list)
+	switch lv.Kind() {
+	case reflect.Ptr:
+		lt := lt.Elem()
+		lv = lv.Elem()
+		switch lv.Kind() {
+		case reflect.Slice:
+			resource = reflect.New(lt.Elem()).Interface()
+		default:
+			return -1, libmodel.MustBeSlicePtrErr
+		}
+	default:
+		return -1, libmodel.MustBeSlicePtrErr
+	}
+	path, err := c.Resolver.Path(resource, "")
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	status, err = c.get(path, resource)
+
+	return
+}
+
+//
 // Http GET
-func (c *Client) Get(path string, resource interface{}) (int, error) {
+func (c *Client) get(path string, resource interface{}) (status int, err error) {
 	header := http.Header{}
 	if c.Token != "" {
 		header["Authorization"] = []string{
@@ -46,65 +106,30 @@ func (c *Client) Get(path string, resource interface{}) (int, error) {
 	client := http.Client{}
 	response, err := client.Do(request)
 	if err != nil {
-		return -1, liberr.Wrap(err)
+		err = liberr.Wrap(err)
+		return
 	}
-	if response.StatusCode == http.StatusOK {
+	status = response.StatusCode
+	content := []byte{}
+	if status == http.StatusOK {
 		defer response.Body.Close()
-		content, err := ioutil.ReadAll(response.Body)
+		content, err = ioutil.ReadAll(response.Body)
 		if err != nil {
-			return -1, liberr.Wrap(err)
+			err = liberr.Wrap(err)
+			return
 		}
 		err = json.Unmarshal(content, resource)
 		if err != nil {
-			return -1, liberr.Wrap(err)
+			err = liberr.Wrap(err)
+			return
 		}
-		return response.StatusCode,
-			nil
 	}
 
-	return response.StatusCode, nil
+	return
 }
 
 //
-// Http POST
-func (c *Client) Post(path string, resource interface{}) error {
-	header := http.Header{}
-	if c.Token != "" {
-		header["Authorization"] = []string{
-			fmt.Sprintf("Bearer %s", c.Token),
-		}
-	}
-	body, _ := json.Marshal(resource)
-	reader := bytes.NewReader(body)
-	request := &http.Request{
-		Body:   ioutil.NopCloser(reader),
-		Method: http.MethodPost,
-		Header: header,
-		URL:    c.url(path),
-	}
-	client := http.Client{}
-	response, err := client.Do(request)
-	if err != nil {
-		return err
-	}
-	if response.StatusCode == http.StatusCreated {
-		defer response.Body.Close()
-		content, err := ioutil.ReadAll(response.Body)
-		if err != nil {
-			return err
-		}
-		err = json.Unmarshal(content, resource)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-
-	return errors.New(response.Status)
-}
-
-//
-// Get the URL.
+// Build the URL.
 func (c *Client) url(path string) *liburl.URL {
 	if c.Host == "" {
 		c.Host = "localhost:8080"

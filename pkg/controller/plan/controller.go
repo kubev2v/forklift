@@ -23,6 +23,7 @@ import (
 	"github.com/konveyor/controller/pkg/logging"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
+	"github.com/konveyor/virt-controller/pkg/controller/provider/web"
 	"github.com/konveyor/virt-controller/pkg/settings"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -145,7 +146,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	// Validations.
 	err = r.validate(plan)
 	if err != nil {
-		if errors.Is(err, ProviderInvNotReady) {
+		if errors.Is(err, web.ProviderNotReadyErr) {
 			return fastReQ, nil
 		}
 		log.Trace(err)
