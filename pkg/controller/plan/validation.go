@@ -48,12 +48,6 @@ const (
 )
 
 //
-// Errors
-var (
-	ProviderInvNotReady = validation.ProviderInvNotReady
-)
-
-//
 // Validate the plan resource.
 func (r *Reconciler) validate(plan *api.Plan) error {
 	// Provider.
@@ -94,7 +88,7 @@ func (r *Reconciler) validateVM(provider *api.Provider, plan *api.Plan) error {
 	if provider == nil {
 		return nil
 	}
-	pClient, pErr := web.NewClient(*provider)
+	pClient, pErr := web.NewClient(provider)
 	if pErr != nil {
 		return liberr.Wrap(pErr)
 	}
@@ -105,7 +99,7 @@ func (r *Reconciler) validateVM(provider *api.Provider, plan *api.Plan) error {
 	case api.VSphere:
 		resource = &vsphere.VM{}
 	default:
-		return web.ProviderNotSupported
+		return liberr.Wrap(web.ProviderNotSupportedErr)
 	}
 	notValid := cnd.Condition{
 		Type:     VMNotValid,
@@ -124,8 +118,6 @@ func (r *Reconciler) validateVM(provider *api.Provider, plan *api.Plan) error {
 		}
 		switch status {
 		case http.StatusOK:
-		case http.StatusPartialContent:
-			return ProviderInvNotReady
 		case http.StatusNotFound:
 			notValid.Items = append(notValid.Items, vm.ID)
 		default:

@@ -54,7 +54,7 @@ func (r *StoragePair) validateSource(list []api.StoragePair) (result cnd.Conditi
 	if provider == nil {
 		return
 	}
-	pClient, err := web.NewClient(*provider)
+	pClient, err := web.NewClient(provider)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -67,7 +67,7 @@ func (r *StoragePair) validateSource(list []api.StoragePair) (result cnd.Conditi
 	case api.VSphere:
 		resource = &vsphere.Datastore{}
 	default:
-		err = web.ProviderNotSupported
+		err = liberr.Wrap(web.ProviderNotSupportedErr)
 		return
 	}
 	for _, entry := range list {
@@ -78,9 +78,6 @@ func (r *StoragePair) validateSource(list []api.StoragePair) (result cnd.Conditi
 		}
 		switch status {
 		case http.StatusOK:
-		case http.StatusPartialContent:
-			err = liberr.Wrap(ProviderInvNotReady)
-			return
 		case http.StatusNotFound:
 			notValid = append(notValid, entry.Source.ID)
 		default:
@@ -108,7 +105,7 @@ func (r *StoragePair) validateDestination(list []api.StoragePair) (result cnd.Co
 	if provider == nil {
 		return
 	}
-	pClient, err := web.NewClient(*provider)
+	pClient, err := web.NewClient(provider)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -121,7 +118,7 @@ func (r *StoragePair) validateDestination(list []api.StoragePair) (result cnd.Co
 	case api.VSphere:
 		return
 	default:
-		err = web.ProviderNotSupported
+		err = liberr.Wrap(web.ProviderNotSupportedErr)
 		return
 	}
 	for _, entry := range list {
@@ -133,9 +130,6 @@ func (r *StoragePair) validateDestination(list []api.StoragePair) (result cnd.Co
 		}
 		switch status {
 		case http.StatusOK:
-		case http.StatusPartialContent:
-			err = liberr.Wrap(ProviderInvNotReady)
-			return
 		case http.StatusNotFound:
 			notValid = append(notValid, entry.Source.ID)
 		default:
