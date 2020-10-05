@@ -8,6 +8,7 @@ import (
 	"github.com/konveyor/controller/pkg/ref"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -46,6 +47,8 @@ type Reconciler struct {
 	collections []Collection
 	// The k8s manager.
 	manager manager.Manager
+	// A k8s non-cached client.
+	client client.Client
 	// The k8s manager/controller `stop` channel.
 	stopChannel chan struct{}
 	// Model event channel.
@@ -100,7 +103,7 @@ func (r *Reconciler) DB() libmodel.DB {
 //
 // Get the Client.
 func (r *Reconciler) Client() client.Client {
-	return r.manager.GetClient()
+	return r.client
 }
 
 //
@@ -175,6 +178,11 @@ func (r *Reconciler) start(ctx context.Context) (err error) {
 	mark := time.Now()
 	r.log.Info("Start")
 	err = r.buildManager()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	err = r.buildClient()
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -304,6 +312,18 @@ func (r *Reconciler) buildManager() (err error) {
 			return
 		}
 	}
+
+	return
+}
+
+//
+// Build non-cached client.
+func (r *Reconciler) buildClient() (err error) {
+	r.client, err = client.New(
+		r.cluster.RestCfg(r.secret),
+		client.Options{
+			Scheme: scheme.Scheme,
+		})
 
 	return
 }
