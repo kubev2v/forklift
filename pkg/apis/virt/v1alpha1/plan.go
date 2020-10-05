@@ -18,8 +18,11 @@ package v1alpha1
 
 import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
+	libitr "github.com/konveyor/controller/pkg/itinerary"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"strings"
 )
 
 //
@@ -54,6 +57,32 @@ type PlanMap struct {
 }
 
 //
+// Find network map for source ID.
+func (r *PlanMap) FindNetwork(networkID string) (pair NetworkPair, found bool) {
+	for _, pair = range r.Networks {
+		if pair.Source.ID == networkID {
+			found = true
+			break
+		}
+	}
+
+	return
+}
+
+//
+// Find storage map for source ID.
+func (r *PlanMap) FindStorage(storageID string) (pair StoragePair, found bool) {
+	for _, pair = range r.Datastores {
+		if pair.Source.ID == storageID {
+			found = true
+			break
+		}
+	}
+
+	return
+}
+
+//
 // PlanSpec defines the desired state of Plan.
 type PlanSpec struct {
 	// Description
@@ -67,6 +96,175 @@ type PlanSpec struct {
 }
 
 //
+// Find a planned VM.
+func (r *PlanSpec) FindVM(vmID string) (v *PlanVM, found bool) {
+	for _, vm := range r.VMs {
+		if vm.ID == vmID {
+			found = true
+			v = &vm
+			return
+		}
+	}
+
+	return
+}
+
+//
+// Pipeline step.
+type Step struct {
+	// Name.
+	Name string `json:"name"`
+	// Progress.
+	Progress libitr.Progress `json:"progress"`
+}
+
+//
+// VM errors.
+type VMError struct {
+	Phase   string   `json:"phase"`
+	Reasons []string `json:"reasons"`
+}
+
+//
+// Migration status.
+type PlanMigrationStatus struct {
+	// Started timestamp.
+	Started *meta.Time `json:"started,omitempty"`
+	// Completed timestamp.
+	Completed *meta.Time `json:"completed,omitempty"`
+	// Provider pair.
+	Provider struct {
+		// Source.
+		Source struct {
+			Namespace string       `json:"namespace,omitempty"`
+			Name      string       `json:"name,omitempty"`
+			Spec      ProviderSpec `json:"spec,omitempty"`
+		}
+		// Destination.
+		Destination struct {
+			Namespace string       `json:"namespace,omitempty"`
+			Name      string       `json:"name,omitempty"`
+			Spec      ProviderSpec `json:"spec,omitempty"`
+		}
+	} `json:"provider"`
+	// Resource map.
+	Map PlanMap `json:"map"`
+	// Active migration.
+	Active types.UID `json:"active"`
+	// VM status
+	VMs []VMStatus `json:"vms,omitempty"`
+}
+
+//
+// Set the source provider.
+func (r *PlanMigrationStatus) SetSource(provider *Provider) {
+	if provider == nil {
+		return
+	}
+	s := &r.Provider.Source
+	s.Spec = provider.Spec
+	s.Namespace = provider.Namespace
+	s.Name = provider.Name
+}
+
+//
+// Set the destination provider.
+func (r *PlanMigrationStatus) SetDestination(provider *Provider) {
+	if provider == nil {
+		return
+	}
+	d := &r.Provider.Destination
+	d.Spec = provider.Spec
+	d.Namespace = provider.Namespace
+	d.Name = provider.Name
+}
+
+//
+// Get the source provider.
+func (r *PlanMigrationStatus) GetSource() (provider *Provider) {
+	s := &r.Provider.Source
+	provider = &Provider{}
+	provider.ObjectMeta.Namespace = s.Namespace
+	provider.ObjectMeta.Name = s.Name
+	provider.Spec = s.Spec
+	return
+}
+
+//
+// Get the destination provider.
+func (r *PlanMigrationStatus) GetDestination() (provider *Provider) {
+	d := &r.Provider.Destination
+	provider = &Provider{}
+	provider.ObjectMeta.Namespace = d.Namespace
+	provider.ObjectMeta.Name = d.Name
+	provider.Spec = d.Spec
+	return
+}
+
+//
+// Find a VM status.
+func (r *PlanMigrationStatus) FindVM(vmID string) (v *VMStatus, found bool) {
+	for _, vm := range r.VMs {
+		if vm.Planned.ID == vmID {
+			found = true
+			v = &vm
+			return
+		}
+	}
+
+	return
+}
+
+//
+// VM Status
+type VMStatus struct {
+	// Planned VM.
+	Planned PlanVM `json:"planned"`
+	// Migration pipeline.
+	Pipeline []Step `json:"pipeline"`
+	// Phase
+	Phase string `json:"phase"`
+	// Started timestamp.
+	Started *meta.Time `json:"started,omitempty"`
+	// Completed timestamp.
+	Completed *meta.Time `json:"completed,omitempty"`
+	// Errors
+	Error *VMError `json:"error,omitempty"`
+}
+
+//
+// Find step by name.
+func (r *VMStatus) Step(name string) (step *Step, found bool) {
+	for i := range r.Pipeline {
+		step = &r.Pipeline[i]
+		if step.Name == name {
+			found = true
+			break
+		}
+	}
+
+	return
+}
+
+//
+// Pending migration.
+func (r *VMStatus) Pending() bool {
+	return r.Started == nil
+}
+
+//
+// Is migrating.
+func (r *VMStatus) Migrating() bool {
+	return r.Started != nil && r.Completed == nil
+}
+
+//
+// Migration done.
+func (r *VMStatus) Done() bool {
+	return r.Completed != nil
+}
+
+//
 // PlanStatus defines the observed state of Plan.
 type PlanStatus struct {
 	// Conditions.
@@ -74,6 +272,8 @@ type PlanStatus struct {
 	// The most recent generation observed by the controller.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	// Migration
+	Migration PlanMigrationStatus `json:"migration,omitempty"`
 }
 
 //
@@ -86,15 +286,46 @@ type Plan struct {
 	meta.ObjectMeta `json:"metadata,omitempty"`
 	Spec            PlanSpec   `json:"spec,omitempty"`
 	Status          PlanStatus `json:"status,omitempty"`
-	snapshot        *Snapshot
 }
 
-func (r *Plan) Snapshot() *Snapshot {
-	if r.snapshot == nil {
-		r.snapshot = &Snapshot{Owner: r}
+//
+// Generated name for kubevirt VM Import mapping CR.
+func (r *Plan) NameForMapping() string {
+	uid := string(r.GetUID())
+	parts := []string{
+		"plan",
+		r.Name,
+		uid[len(uid)-4:],
 	}
 
-	return r.snapshot
+	return strings.Join(parts, "-")
+}
+
+//
+// Generated name for kubevirt VM Import CR secret.
+func (r *Plan) NameForSecret() string {
+	uid := string(r.GetUID())
+	parts := []string{
+		"plan",
+		r.Name,
+		uid[len(uid)-4:],
+	}
+
+	return strings.Join(parts, "-")
+}
+
+//
+// Generated name for kubevirt VM Import CR.
+func (r *Plan) NameForImport(vmID string) string {
+	uid := string(r.Status.Migration.Active)
+	parts := []string{
+		"plan",
+		r.Name,
+		vmID,
+		uid[len(uid)-4:],
+	}
+
+	return strings.Join(parts, "-")
 }
 
 //

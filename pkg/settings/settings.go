@@ -17,6 +17,8 @@ type ControllerSettings struct {
 	Role
 	// Inventory settings.
 	Inventory
+	// Migration settings.
+	Migration
 }
 
 //
@@ -27,6 +29,10 @@ func (r *ControllerSettings) Load() error {
 		return liberr.Wrap(err)
 	}
 	err = r.Inventory.Load()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	err = r.Migration.Load()
 	if err != nil {
 		return liberr.Wrap(err)
 	}

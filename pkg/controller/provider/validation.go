@@ -36,6 +36,7 @@ const (
 	NotSet       = "NotSet"
 	NotFound     = "NotFound"
 	NotSupported = "NotSupported"
+	DataErr      = "DataErr"
 )
 
 //
@@ -117,6 +118,7 @@ func (r *Reconciler) validateSecret(provider *api.Provider) error {
 	if provider.IsHost() {
 		return nil
 	}
+	// NotSet
 	newCnd := cnd.Condition{
 		Type:     SecretNotValid,
 		Status:   True,
@@ -129,6 +131,7 @@ func (r *Reconciler) validateSecret(provider *api.Provider) error {
 		provider.Status.SetCondition(newCnd)
 		return nil
 	}
+	// NotFound
 	secret := &core.Secret{}
 	key := client.ObjectKey{
 		Namespace: ref.Namespace,
@@ -139,9 +142,31 @@ func (r *Reconciler) validateSecret(provider *api.Provider) error {
 		err = nil
 		newCnd.Reason = NotFound
 		provider.Status.SetCondition(newCnd)
+		return nil
 	}
 	if err != nil {
 		return liberr.Wrap(err)
+	}
+	// DataErr
+	keyList := []string{}
+	switch provider.Type() {
+	case api.OpenShift:
+		keyList = []string{"token"}
+	case api.VSphere:
+		keyList = []string{
+			"user",
+			"password",
+			"thumbprint",
+		}
+	}
+	for _, key := range keyList {
+		if _, found := secret.Data[key]; !found {
+			newCnd.Items = append(newCnd.Items, key)
+		}
+	}
+	if len(newCnd.Items) > 0 {
+		newCnd.Reason = DataErr
+		provider.Status.SetCondition(newCnd)
 	}
 
 	return nil
