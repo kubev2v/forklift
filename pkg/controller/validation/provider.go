@@ -14,12 +14,12 @@ import (
 //
 // Types
 const (
-	ProviderNotValid                  = "ProviderNotValid"
-	ProviderSecretNotValid            = "ProviderSecretNotValid"
-	SourceProviderNotValid            = "SourceProviderNotValid"
-	SourceProviderSecretNotValid      = "SourceProviderSecretNotValid"
-	DestinationProviderNotValid       = "DestinationProviderNotValid"
-	DestinationProviderSecretNotValid = "DestinationProviderSecretNotValid"
+	ProviderNotValid            = "ProviderNotValid"
+	ProviderNotReady            = "ProviderNotReady"
+	SourceProviderNotValid      = "SourceProviderNotValid"
+	SourceProviderNotReady      = "SourceProviderNotReady"
+	DestinationProviderNotValid = "DestinationProviderNotValid"
+	DestinationProviderNotReady = "DestinationProviderNotReady"
 )
 
 //
@@ -45,7 +45,7 @@ const (
 )
 
 //
-// Provider validation.
+// Referenced Provider validation.
 type Provider struct {
 	client.Client
 	// Found and populated by Validate().
@@ -83,28 +83,14 @@ func (r *Provider) Validate(ref core.ObjectReference) (result cnd.Conditions, er
 		return
 	}
 	r.Referenced = &provider
-	newCnd = cnd.Condition{
-		Type:     ProviderSecretNotValid,
-		Status:   True,
-		Category: Critical,
-		Message:  "The provider secret is not valid.",
-	}
-	ref = provider.Spec.Secret
-	key = client.ObjectKey{
-		Namespace: ref.Namespace,
-		Name:      ref.Name,
-	}
-	secret := core.Secret{}
-	err = r.Get(context.TODO(), key, &secret)
-	if k8serr.IsNotFound(err) {
-		err = nil
-		newCnd.Reason = NotFound
-		result.SetCondition(newCnd)
-		return
-	}
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
+
+	if !provider.Status.HasCondition(cnd.Ready) {
+		result.SetCondition(cnd.Condition{
+			Type:     ProviderNotReady,
+			Status:   True,
+			Category: Critical,
+			Message:  "The provider does not have the Ready condition.",
+		})
 	}
 
 	return
@@ -129,13 +115,13 @@ func (r *ProviderPair) Validate(pair api.ProviderPair) (result cnd.Conditions, e
 		err = liberr.Wrap(err)
 		return
 	}
-	result.SetCondition(conditions.List...)
+	result.UpdateConditions(conditions)
 	conditions, err = r.validateDestination(pair)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	result.SetCondition(conditions.List...)
+	result.UpdateConditions(conditions)
 
 	return
 }
@@ -155,9 +141,9 @@ func (r *ProviderPair) validateSource(pair api.ProviderPair) (result cnd.Conditi
 		case ProviderNotValid:
 			newCnd.Type = SourceProviderNotValid
 			newCnd.Message = "The source provider is not valid."
-		case ProviderSecretNotValid:
-			newCnd.Type = SourceProviderSecretNotValid
-			newCnd.Message = "The source provider secret is not valid."
+		case ProviderNotReady:
+			newCnd.Type = SourceProviderNotReady
+			newCnd.Message = "The source provider does not have the Ready condition."
 		default:
 			err = liberr.New("unknown")
 			return
@@ -195,9 +181,9 @@ func (r *ProviderPair) validateDestination(pair api.ProviderPair) (result cnd.Co
 		case ProviderNotValid:
 			newCnd.Type = DestinationProviderNotValid
 			newCnd.Message = "The destination provider is not valid."
-		case ProviderSecretNotValid:
-			newCnd.Type = DestinationProviderSecretNotValid
-			newCnd.Message = "The destination provider secret is not valid."
+		case ProviderNotReady:
+			newCnd.Type = DestinationProviderNotReady
+			newCnd.Message = "The destination provider does not have the Ready condition."
 		default:
 			err = liberr.New("unknown")
 			return

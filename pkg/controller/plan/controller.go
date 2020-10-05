@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	cnd "github.com/konveyor/controller/pkg/condition"
+	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
@@ -27,12 +28,14 @@ import (
 	"github.com/konveyor/virt-controller/pkg/settings"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"path"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"sort"
 	"time"
 )
 
@@ -41,6 +44,8 @@ const (
 	Name = "plan"
 	// Fast re-queue delay.
 	FastReQ = time.Millisecond * 100
+	// Slow re-queue delay.
+	SlowReQ = time.Second * 3
 )
 
 //
@@ -98,6 +103,18 @@ func Add(mgr manager.Manager) error {
 		log.Trace(err)
 		return err
 	}
+	err = cnt.Watch(
+		&source.Kind{
+			Type: &api.Migration{},
+		},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: handler.ToRequestsFunc(RequestForMigration),
+		},
+		&MigrationPredicate{})
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
 
 	return nil
 }
@@ -115,12 +132,15 @@ type Reconciler struct {
 // Reconcile a Plan CR.
 func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	fastReQ := reconcile.Result{RequeueAfter: FastReQ}
+	slowReQ := reconcile.Result{RequeueAfter: SlowReQ}
 	noReQ := reconcile.Result{}
 	var err error
 
 	// Reset the logger.
 	log.Reset()
 	log.SetValues("plan", request.Name)
+
+	log.Info("Reconcile", "plan", request) // TODO: REMOVE
 
 	// Fetch the CR.
 	plan := &api.Plan{}
@@ -132,13 +152,6 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		log.Trace(err)
 		return noReQ, err
 	}
-	// Load the snapshot.
-	snapshot := plan.Snapshot()
-	err = snapshot.Read(r)
-	if err != nil {
-		log.Trace(err)
-		return fastReQ, nil
-	}
 
 	// Begin staging conditions.
 	plan.Status.BeginStagingConditions()
@@ -147,8 +160,16 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	err = r.validate(plan)
 	if err != nil {
 		if errors.Is(err, web.ProviderNotReadyErr) {
-			return fastReQ, nil
+			return slowReQ, nil
 		}
+		log.Trace(err)
+		return fastReQ, nil
+	}
+
+	//
+	// Execute.
+	reQ, err := r.execute(plan)
+	if err != nil {
 		log.Trace(err)
 		return fastReQ, nil
 	}
@@ -163,13 +184,6 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		})
 	}
 
-	// Update the snapshot.
-	err = snapshot.Write(r)
-	if err != nil {
-		log.Trace(err)
-		return fastReQ, nil
-	}
-
 	// End staging conditions.
 	plan.Status.EndStagingConditions()
 
@@ -182,5 +196,83 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	}
 
 	// Done
-	return noReQ, nil
+	if reQ > 0 {
+		return reconcile.Result{RequeueAfter: reQ}, nil
+	} else {
+		return noReQ, nil
+	}
+}
+
+//
+// Execute the plan.
+func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
+	if plan.Status.HasBlockerCondition() {
+		return
+	}
+	list, err := r.pendingMigrations(plan)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	var migration *api.Migration
+	for _, migration = range list {
+		if migration.Status.Started == nil {
+			plan.Status.Migration.Started = nil
+			plan.Status.Migration.Completed = nil
+			plan.Status.DeleteCondition(Succeeded, Failed)
+		}
+		break
+	}
+	if migration == nil {
+		return
+	}
+	plan.Status.Migration.Active = migration.UID
+	reQ, err = Migration{Client: r, Plan: plan}.Run()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	if len(list) > 1 && reQ == 0 {
+		reQ = FastReQ
+	}
+
+	return
+}
+
+//
+// Sorted list of pending migrations.
+func (r *Reconciler) pendingMigrations(plan *api.Plan) (list []*api.Migration, err error) {
+	all := &api.MigrationList{}
+	err = r.List(context.TODO(), nil, all)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	list = []*api.Migration{}
+	for i := range all.Items {
+		migration := &all.Items[i]
+		if !migration.Match(plan) {
+			continue
+		}
+		if migration.Status.Completed != nil {
+			continue
+		}
+		list = append(list, migration)
+	}
+	sort.Slice(
+		list,
+		func(i, j int) bool {
+			mA := list[i].ObjectMeta
+			mB := list[j].ObjectMeta
+			tA := mA.CreationTimestamp
+			tB := mB.CreationTimestamp
+			if !tA.Equal(&tB) {
+				return tA.Before(&tB)
+			}
+			nA := path.Join(mA.Namespace, mA.Name)
+			nB := path.Join(mB.Namespace, mB.Name)
+			return nA < nB
+		})
+
+	return
 }

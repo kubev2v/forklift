@@ -19,8 +19,12 @@ import (
 // Types
 const (
 	VMNotValid   = "VMNotValid"
+	DuplicateVM  = "DuplicateVM"
 	HostNotValid = "HostNotValid"
 	HookNotValid = "HookNotValid"
+	Executing    = "Executing"
+	Succeeded    = "Succeeded"
+	Failed       = "Failed"
 )
 
 //
@@ -36,8 +40,9 @@ const (
 //
 // Reasons
 const (
-	NotSet   = "NotSet"
-	NotFound = "NotFound"
+	NotSet    = "NotSet"
+	NotFound  = "NotFound"
+	NotUnique = "NotUnique"
 )
 
 //
@@ -50,34 +55,45 @@ const (
 //
 // Validate the plan resource.
 func (r *Reconciler) validate(plan *api.Plan) error {
+	if plan.Status.HasAnyCondition(Executing) {
+		return nil
+	}
 	// Provider.
-	snapshot := plan.Snapshot()
 	provider := validation.ProviderPair{Client: r}
 	conditions, err := provider.Validate(plan.Spec.Provider)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 	plan.Status.SetCondition(conditions.List...)
-	snapshot.Set(provider.Referenced.Source)
-	snapshot.Set(provider.Referenced.Destination)
+	if plan.Status.HasCondition(validation.SourceProviderNotReady) {
+		return nil
+	}
+	plan.Status.Migration.SetSource(provider.Referenced.Source)
+	plan.Status.Migration.SetDestination(provider.Referenced.Destination)
+	//
 	// Map
 	network := validation.NetworkPair{Client: r, Provider: provider.Referenced}
 	conditions, err = network.Validate(plan.Spec.Map.Networks)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	plan.Status.SetCondition(conditions.List...)
+	plan.Status.UpdateConditions(conditions)
 	storage := validation.StoragePair{Client: r, Provider: provider.Referenced}
 	conditions, err = storage.Validate(plan.Spec.Map.Datastores)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	plan.Status.SetCondition(conditions.List...)
+	plan.Status.UpdateConditions(conditions)
+	//
 	// VM list.
 	err = r.validateVM(provider.Referenced.Source, plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+
+	//
+	// Map status.
+	plan.Status.Migration.Map = plan.Spec.Map
 
 	return nil
 }
@@ -109,9 +125,22 @@ func (r *Reconciler) validateVM(provider *api.Provider, plan *api.Plan) error {
 		Message:  "The VMs (list) contains invalid VMs.",
 		Items:    []string{},
 	}
+	notUnique := cnd.Condition{
+		Type:     DuplicateVM,
+		Status:   True,
+		Reason:   NotUnique,
+		Category: Critical,
+		Message:  "The VMs (list) contains duplicate VMs.",
+		Items:    []string{},
+	}
 	//
 	// Referenced VMs.
+	setOf := map[string]bool{}
 	for _, vm := range plan.Spec.VMs {
+		if _, found := setOf[vm.ID]; found {
+			notUnique.Items = append(notUnique.Items, vm.ID)
+			setOf[vm.ID] = true
+		}
 		status, pErr := pClient.Get(resource, vm.ID)
 		if pErr != nil {
 			return liberr.Wrap(pErr)
@@ -127,6 +156,9 @@ func (r *Reconciler) validateVM(provider *api.Provider, plan *api.Plan) error {
 	if len(notValid.Items) > 0 {
 		plan.Status.SetCondition(notValid)
 	}
+	if len(notUnique.Items) > 0 {
+		plan.Status.SetCondition(notUnique)
+	}
 	//
 	// Hosts referenced by VMs.
 	notValid = cnd.Condition{
@@ -137,7 +169,6 @@ func (r *Reconciler) validateVM(provider *api.Provider, plan *api.Plan) error {
 		Message:  "Host referenced by VM not valid.",
 		Items:    []string{},
 	}
-	snapshot := plan.Snapshot()
 	for _, vm := range plan.Spec.VMs {
 		if !ref.RefSet(vm.Host) {
 			continue
@@ -157,7 +188,6 @@ func (r *Reconciler) validateVM(provider *api.Provider, plan *api.Plan) error {
 				return liberr.Wrap(err)
 			}
 		}
-		snapshot.Set(host)
 	}
 	if len(notValid.Items) > 0 {
 		plan.Status.SetCondition(notValid)

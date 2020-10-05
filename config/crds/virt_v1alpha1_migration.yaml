@@ -54,6 +54,10 @@ spec:
               description: VM status
               items:
                 properties:
+                  completed:
+                    description: Completed timestamp.
+                    format: date-time
+                    type: string
                   error:
                     description: Errors
                     properties:
@@ -120,6 +124,10 @@ spec:
                     required:
                     - id
                     type: object
+                  started:
+                    description: Started timestamp.
+                    format: date-time
+                    type: string
                 required:
                 - planned
                 - pipeline

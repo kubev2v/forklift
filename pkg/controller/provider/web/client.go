@@ -60,6 +60,8 @@ type ProviderClient struct {
 	base.Client
 	// The provider.
 	provider *api.Provider
+	// Ready.
+	found bool
 }
 
 //
@@ -67,21 +69,15 @@ type ProviderClient struct {
 // Raises ProviderNotReadyErr on 404 and 206
 // when the provider is not yet in the inventory.
 func (r *ProviderClient) Get(resource interface{}, id string) (status int, err error) {
-	status, err = r.Client.Get(resource, id)
-	switch status {
-	case http.StatusNotFound:
-		ready := false
-		ready, err = r.Ready()
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-		if !ready {
-			err = liberr.Wrap(ProviderNotReadyErr)
-		}
-	case http.StatusPartialContent:
-		err = liberr.Wrap(ProviderNotReadyErr)
+	err = r.Find()
+	if err != nil {
+		return
 	}
+	if !r.found {
+		err = liberr.Wrap(ProviderNotReadyErr)
+		return
+	}
+	status, err = r.Client.Get(resource, id)
 
 	return
 }
@@ -91,28 +87,25 @@ func (r *ProviderClient) Get(resource interface{}, id string) (status int, err e
 // Raises ProviderNotReadyErr on 404 and 206
 // when the provider is not yet in the inventory.
 func (r *ProviderClient) List(resource interface{}) (status int, err error) {
-	status, err = r.Client.List(resource)
-	switch status {
-	case http.StatusNotFound:
-		ready := false
-		ready, err = r.Ready()
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-		if !ready {
-			err = liberr.Wrap(ProviderNotReadyErr)
-		}
-	case http.StatusPartialContent:
-		err = liberr.Wrap(ProviderNotReadyErr)
+	err = r.Find()
+	if err != nil {
+		return
 	}
+	if !r.found {
+		err = liberr.Wrap(ProviderNotReadyErr)
+		return
+	}
+	status, err = r.Client.List(resource)
 
 	return
 }
 
 //
-// Get whether the provider is ready.has been inventoried.
-func (r *ProviderClient) Ready() (ready bool, err error) {
+// Find the provider.
+func (r *ProviderClient) Find() (err error) {
+	if r.found {
+		return
+	}
 	id := path.Join(
 		r.provider.Namespace,
 		r.provider.Name)
@@ -124,14 +117,14 @@ func (r *ProviderClient) Ready() (ready bool, err error) {
 			err = liberr.Wrap(err)
 			return
 		}
-		ready = status == http.StatusOK
+		r.found = status == http.StatusOK
 	case api.VSphere:
 		status, err = r.Client.Get(&vsphere.Provider{}, id)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
 		}
-		ready = status == http.StatusOK
+		r.found = status == http.StatusOK
 	default:
 		err = liberr.Wrap(ProviderNotSupportedErr)
 	}
