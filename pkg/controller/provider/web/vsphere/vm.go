@@ -114,7 +114,7 @@ type VM struct {
 	Resource
 	UUID                string       `json:"uuid"`
 	Firmware            string       `json:"firmware"`
-	CpuAffinity         string       `json:"cpuAffinity"`
+	CpuAffinity         []int32      `json:"cpuAffinity"`
 	CpuHotAddEnabled    bool         `json:"cpuHostAddEnabled"`
 	CpuHotRemoveEnabled bool         `json:"cpuHostRemoveEnabled"`
 	MemoryHotAddEnabled bool         `json:"memoryHotAddEnabled"`
@@ -133,7 +133,7 @@ func (r *VM) With(m *model.VM) {
 	r.Resource.With(&m.Base)
 	r.UUID = m.UUID
 	r.Firmware = m.Firmware
-	r.CpuAffinity = m.CpuAffinity
+	r.CpuAffinity = m.DecodeCpuAffinity()
 	r.CpuHotAddEnabled = m.CpuHotAddEnabled
 	r.CpuHotRemoveEnabled = m.CpuHotRemoveEnabled
 	r.MemoryHotAddEnabled = m.MemoryHotAddEnabled

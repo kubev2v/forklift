@@ -170,6 +170,21 @@ type VM struct {
 }
 
 //
+// Encode CPU Affinity.
+func (m *VM) EncodeCpuAffinity(n []int32) {
+	j, _ := json.Marshal(n)
+	m.CpuAffinity = string(j)
+}
+
+//
+// Decode CPU affinity.
+func (m *VM) DecodeCpuAffinity() []int32 {
+	list := []int32{}
+	json.Unmarshal([]byte(m.CpuAffinity), &list)
+	return list
+}
+
+//
 // Virtual Disk.
 type Disk struct {
 	// Backing file.
