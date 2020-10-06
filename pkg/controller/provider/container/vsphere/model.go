@@ -403,8 +403,8 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 					v.model.Firmware = s
 				}
 			case fCpuAffinity:
-				if s, cast := p.Val.(string); cast {
-					v.model.CpuAffinity = string(s)
+				if a, cast := p.Val.(types.VirtualMachineAffinityInfo); cast {
+					v.model.EncodeCpuAffinity(a.AffinitySet)
 				}
 			case fCpuHotAddEnabled:
 				if b, cast := p.Val.(bool); cast {
