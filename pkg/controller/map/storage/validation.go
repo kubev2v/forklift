@@ -39,13 +39,16 @@ func (r *Reconciler) validate(mp *api.StorageMap) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	mp.Status.SetCondition(conditions.List...)
+	mp.Status.UpdateConditions(conditions)
+	if mp.Status.HasCondition(validation.SourceProviderNotReady) {
+		return nil
+	}
 	storage := validation.StoragePair{Client: r, Provider: provider.Referenced}
 	conditions, err = storage.Validate(mp.Spec.Map)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	mp.Status.SetCondition(conditions.List...)
+	mp.Status.UpdateConditions(conditions)
 
 	return nil
 }

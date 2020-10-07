@@ -36,13 +36,13 @@ func (r *StoragePair) Validate(list []api.StoragePair) (result cnd.Conditions, e
 		err = liberr.Wrap(err)
 		return
 	}
-	result.SetCondition(conditions.List...)
+	result.UpdateConditions(conditions)
 	conditions, err = r.validateDestination(list)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	result.SetCondition(conditions.List...)
+	result.UpdateConditions(conditions)
 
 	return
 }
@@ -92,6 +92,7 @@ func (r *StoragePair) validateSource(list []api.StoragePair) (result cnd.Conditi
 			Reason:   NotFound,
 			Category: Critical,
 			Message:  "Source storage not valid.",
+			Items:    notValid,
 		})
 	}
 
@@ -131,7 +132,7 @@ func (r *StoragePair) validateDestination(list []api.StoragePair) (result cnd.Co
 		switch status {
 		case http.StatusOK:
 		case http.StatusNotFound:
-			notValid = append(notValid, entry.Source.ID)
+			notValid = append(notValid, entry.Destination.StorageClass)
 		default:
 			err = liberr.New(http.StatusText(status))
 			return
@@ -144,6 +145,7 @@ func (r *StoragePair) validateDestination(list []api.StoragePair) (result cnd.Co
 			Reason:   NotFound,
 			Category: Critical,
 			Message:  "Destination storage not valid.",
+			Items:    notValid,
 		})
 	}
 

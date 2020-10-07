@@ -18,39 +18,9 @@ package v1alpha1
 
 import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
-	libitr "github.com/konveyor/controller/pkg/itinerary"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-//
-// Pipeline step.
-type Step struct {
-	// Name.
-	Name string `json:"name"`
-	// Progress.
-	Progress libitr.Progress `json:"progress"`
-}
-
-//
-// VM errors.
-type VMError struct {
-	Phase   string   `json:"phase"`
-	Reasons []string `json:"reasons"`
-}
-
-//
-// VM Status
-type VMStatus struct {
-	// Planned VM.
-	Planned PlanVM `json:"planned"`
-	// Migration pipeline.
-	Pipeline []Step `json:"pipeline"`
-	// Phase
-	Phase string `json:"phase"`
-	// Errors
-	Error *VMError `json:"error,omitempty"`
-}
 
 //
 // MigrationSpec defines the desired state of Migration
@@ -85,27 +55,20 @@ type Migration struct {
 	meta.ObjectMeta `json:"metadata,omitempty"`
 	Spec            MigrationSpec   `json:"spec,omitempty"`
 	Status          MigrationStatus `json:"status,omitempty"`
-	snapshot        *Snapshot
-}
-
-func (r *Migration) Snapshot() *Snapshot {
-	if r.snapshot == nil {
-		r.snapshot = &Snapshot{Owner: r}
-	}
-
-	return r.snapshot
 }
 
 //
-// Get whether the migration has started.
-func (r *Migration) HasStarted() bool {
-	return r.Status.Started != nil
+// Match plan.
+func (r *Migration) Match(plan *Plan) bool {
+	ref := r.Spec.Plan
+	return ref.Namespace == plan.Namespace &&
+		ref.Name == plan.Name
 }
 
 //
-// Get whether the migration has completed.
-func (r *Migration) HasCompleted() bool {
-	return r.Status.Completed != nil
+// Is active for the plan.
+func (r *Migration) Active(plan *Plan) bool {
+	return plan.Status.Migration.Active == r.UID
 }
 
 //

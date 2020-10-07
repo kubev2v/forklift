@@ -189,6 +189,12 @@ func (r *Conditions) SetCondition(conditions ...Condition) {
 }
 
 //
+// Update conditions.
+func (r *Conditions) UpdateConditions(other Conditions) {
+	r.SetCondition(other.List...)
+}
+
+//
 // Stage an existing condition by type.
 func (r *Conditions) StageCondition(types ...string) {
 	if r.List == nil {

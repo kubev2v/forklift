@@ -41,6 +41,8 @@ const (
 	Name = "storage-map"
 	// Fast re-queue delay.
 	FastReQ = time.Millisecond * 100
+	// Slow re-queue delay.
+	SlowReQ = time.Second * 3
 )
 
 //
@@ -105,6 +107,7 @@ type Reconciler struct {
 // Reconcile a Map CR.
 func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	fastReQ := reconcile.Result{RequeueAfter: FastReQ}
+	slowReQ := reconcile.Result{RequeueAfter: SlowReQ}
 	noReQ := reconcile.Result{}
 	var err error
 
@@ -130,7 +133,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	err = r.validate(mp)
 	if err != nil {
 		if errors.Is(err, web.ProviderNotReadyErr) {
-			return fastReQ, nil
+			return slowReQ, nil
 		}
 		log.Trace(err)
 		return fastReQ, nil

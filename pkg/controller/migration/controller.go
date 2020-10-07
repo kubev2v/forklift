@@ -22,6 +22,7 @@ import (
 	"github.com/konveyor/controller/pkg/logging"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
+	plancnt "github.com/konveyor/virt-controller/pkg/controller/plan"
 	"github.com/konveyor/virt-controller/pkg/settings"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -106,12 +107,13 @@ type Reconciler struct {
 func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	fastReQ := reconcile.Result{RequeueAfter: FastReQ}
 	noReQ := reconcile.Result{}
-	reQ := time.Duration(0)
 	var err error
 
 	// Reset the logger.
 	log.Reset()
 	log.SetValues("migration", request.Name)
+
+	log.Info("Reconcile", "migration", request) // TODO: REMOVE
 
 	// Fetch the CR.
 	migration := &api.Migration{}
@@ -123,28 +125,24 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		log.Trace(err)
 		return noReQ, err
 	}
-	// Load the snapshot.
-	snapshot := migration.Snapshot()
-	err = snapshot.Read(r)
-	if err != nil {
-		log.Trace(err)
-		return fastReQ, nil
-	}
-	// The cached client is not reliable.
-	if migration.HasStarted() && snapshot.NotFound() {
-		log.Info("Snapshot not found, ReQ.")
-		return fastReQ, nil
+
+	// Detected completed.
+	if migration.Status.Completed != nil {
+		return noReQ, nil
 	}
 
 	// Begin staging conditions.
 	migration.Status.BeginStagingConditions()
 
 	// Validations.
-	err = r.validate(migration)
+	plan, err := r.validate(migration)
 	if err != nil {
 		log.Trace(err)
 		return fastReQ, nil
 	}
+
+	// Reflect plan.
+	r.reflectPlan(plan, migration)
 
 	// Ready condition.
 	if !migration.Status.HasBlockerCondition() {
@@ -154,26 +152,6 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 			Category: Required,
 			Message:  "The migration is ready.",
 		})
-	}
-
-	// Update the snapshot.
-	if !migration.HasStarted() {
-		err = snapshot.Write(r)
-		if err != nil {
-			log.Trace(err)
-			return fastReQ, nil
-		}
-	}
-
-	// Run migration.
-	task := Task{
-		Client:    r,
-		Migration: migration,
-	}
-	reQ, err = task.Run()
-	if err != nil {
-		log.Trace(err)
-		return fastReQ, nil
 	}
 
 	// End staging conditions.
@@ -187,9 +165,45 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		return fastReQ, nil
 	}
 
-	if reQ > NoReQ {
-		return reconcile.Result{RequeueAfter: reQ}, nil
-	}
-
 	return noReQ, nil
+}
+
+//
+// Reflect the plan status.
+func (r *Reconciler) reflectPlan(plan *api.Plan, migration *api.Migration) {
+	if migration.Status.HasBlockerCondition() {
+		return
+	}
+	if !migration.Active(plan) {
+		return
+	}
+	migration.Status.Started = plan.Status.Migration.Started
+	migration.Status.Completed = plan.Status.Migration.Completed
+	migration.Status.VMs = plan.Status.Migration.VMs
+	if plan.Status.HasCondition(plancnt.Executing) {
+		migration.Status.SetCondition(cnd.Condition{
+			Type:     Running,
+			Status:   True,
+			Category: Required,
+			Message:  "The migration is RUNNING.",
+		})
+	}
+	if plan.Status.HasCondition(Succeeded) {
+		migration.Status.SetCondition(cnd.Condition{
+			Type:     Succeeded,
+			Status:   True,
+			Category: Required,
+			Message:  "The migration has SUCCEEDED.",
+			Durable:  true,
+		})
+	}
+	if plan.Status.HasCondition(Failed) {
+		migration.Status.SetCondition(cnd.Condition{
+			Type:     Failed,
+			Status:   True,
+			Category: Required,
+			Message:  "The migration has FAILED.",
+			Durable:  true,
+		})
+	}
 }
