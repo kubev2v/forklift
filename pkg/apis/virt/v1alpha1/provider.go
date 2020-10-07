@@ -18,9 +18,12 @@ package v1alpha1
 
 import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
+	liberr "github.com/konveyor/controller/pkg/error"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
@@ -96,7 +99,7 @@ func init() {
 }
 
 //
-// Build REST configuration.
+// Build k8s REST configuration.
 func (p *Provider) RestCfg(secret *core.Secret) (cfg *rest.Config) {
 	if p.IsHost() {
 		cfg, _ = config.GetConfig()
@@ -107,9 +110,24 @@ func (p *Provider) RestCfg(secret *core.Secret) (cfg *rest.Config) {
 		BearerToken:     string(secret.Data[Token]),
 		TLSClientConfig: rest.TLSClientConfig{Insecure: true},
 	}
-
 	cfg.Burst = 1000
 	cfg.QPS = 100
+
+	return
+}
+
+//
+// Build a k8s client.
+func (p *Provider) Client(secret *core.Secret) (c client.Client, err error) {
+	c, err = client.New(
+		p.RestCfg(secret),
+		client.Options{
+			Scheme: scheme.Scheme,
+		})
+	if err != nil {
+		err = liberr.Wrap(err)
+	}
+
 	return
 }
 

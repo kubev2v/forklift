@@ -9,7 +9,6 @@ import (
 	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/property"
-	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
@@ -203,8 +202,8 @@ func init() {
 //
 // A VMWare reconciler.
 type Reconciler struct {
-	// The vsphere host.
-	host string
+	// The vsphere url.
+	url string
 	// Provider
 	provider *api.Provider
 	// Credentials secret: {user:,password}.
@@ -226,7 +225,7 @@ type Reconciler struct {
 func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) *Reconciler {
 	log := logging.WithName(provider.GetName())
 	return &Reconciler{
-		host:     provider.Spec.URL,
+		url:      provider.Spec.URL,
 		provider: provider,
 		secret:   secret,
 		db:       db,
@@ -237,7 +236,12 @@ func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) *Reconcile
 //
 // The name.
 func (r *Reconciler) Name() string {
-	return r.host
+	url, err := liburl.Parse(r.url)
+	if err == nil {
+		return url.Host
+	}
+
+	return r.url
 }
 
 //
@@ -379,12 +383,13 @@ func (r *Reconciler) connect(ctx context.Context) error {
 		r.client.Logout(ctx)
 		r.client = nil
 	}
-	url := &liburl.URL{
-		Scheme: "https",
-		User:   liburl.UserPassword(r.user(), r.password()),
-		Host:   r.host,
-		Path:   vim25.Path,
+	url, err := liburl.Parse(r.url)
+	if err != nil {
+		return liberr.Wrap(err)
 	}
+	url.User = liburl.UserPassword(
+		r.user(),
+		r.password())
 	client, err := govmomi.NewClient(ctx, url, insecure)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -398,15 +403,21 @@ func (r *Reconciler) connect(ctx context.Context) error {
 //
 // User.
 func (r *Reconciler) user() string {
-	user := string(r.secret.Data["user"])
-	return user
+	if user, found := r.secret.Data["user"]; found {
+		return string(user)
+	}
+
+	return ""
 }
 
 //
 // Password.
 func (r *Reconciler) password() string {
-	password := string(r.secret.Data["password"])
-	return password
+	if password, found := r.secret.Data["password"]; found {
+		return string(password)
+	}
+
+	return ""
 }
 
 //

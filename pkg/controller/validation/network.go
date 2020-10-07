@@ -44,13 +44,13 @@ func (r *NetworkPair) Validate(list []api.NetworkPair) (result cnd.Conditions, e
 		err = liberr.Wrap(err)
 		return
 	}
-	result.SetCondition(conditions.List...)
+	result.UpdateConditions(conditions)
 	conditions, err = r.validateDestination(list)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	result.SetCondition(conditions.List...)
+	result.UpdateConditions(conditions)
 
 	return
 }

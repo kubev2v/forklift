@@ -24,7 +24,7 @@ import (
 	"github.com/konveyor/virt-controller/pkg/apis"
 	"github.com/konveyor/virt-controller/pkg/controller"
 	"github.com/konveyor/virt-controller/pkg/webhook"
-	appsv1 "github.com/openshift/api/apps/v1"
+	kubevirt "github.com/kubevirt/vm-import-operator/pkg/apis/v2v/v1beta1"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -66,28 +66,25 @@ func main() {
 		log.Error(err, "unable to add K8s APIs to scheme")
 		os.Exit(1)
 	}
-	if err := appsv1.AddToScheme(mgr.GetScheme()); err != nil {
-		log.Error(err, "unable to add OpenShift apps APIs to scheme")
-		os.Exit(1)
-	}
 	if err := net.AddToScheme(mgr.GetScheme()); err != nil {
-		log.Error(err, "unable to add OpenShift apps APIs to scheme")
+		log.Error(err, "unable to add CNI APIs to scheme")
 		os.Exit(1)
 	}
-
+	if err := kubevirt.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "unable to add kubevirt APIs to scheme")
+		os.Exit(1)
+	}
 	// Setup all Controllers
 	log.Info("Setting up controller")
 	if err := controller.AddToManager(mgr); err != nil {
 		log.Error(err, "unable to register controllers to the manager")
 		os.Exit(1)
 	}
-
 	log.Info("setting up webhooks")
 	if err := webhook.AddToManager(mgr); err != nil {
 		log.Error(err, "unable to register webhooks to the manager")
 		os.Exit(1)
 	}
-
 	// Start the Cmd
 	log.Info("Starting the Cmd.")
 	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {

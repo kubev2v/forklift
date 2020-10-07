@@ -39,13 +39,16 @@ func (r *Reconciler) validate(mp *api.NetworkMap) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	mp.Status.SetCondition(conditions.List...)
+	mp.Status.UpdateConditions(conditions)
+	if mp.Status.HasCondition(validation.SourceProviderNotReady) {
+		return nil
+	}
 	network := validation.NetworkPair{Client: r, Provider: provider.Referenced}
 	conditions, err = network.Validate(mp.Spec.Map)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	mp.Status.SetCondition(conditions.List...)
+	mp.Status.UpdateConditions(conditions)
 
 	return nil
 }
