@@ -333,6 +333,12 @@ func (r *Reconciler) getUpdates(ctx context.Context) error {
 		This:    pc.Reference(),
 		Options: filter.Options,
 	}
+	var transaction *libmodel.Tx
+	defer func() {
+		if transaction != nil {
+			transaction.End()
+		}
+	}()
 next:
 	for {
 		response, err := methods.WaitForUpdatesEx(ctx, r.client, &req)
@@ -352,17 +358,27 @@ next:
 			}
 			continue next
 		}
-		transaction, err := r.db.Begin()
-		if err != nil {
-			return liberr.Wrap(err)
-		}
 		req.Version = updateSet.Version
-		for _, fs := range updateSet.FilterSet {
-			r.apply(ctx, fs.ObjectSet)
-		}
-		err = transaction.Commit()
+		transaction, err = r.db.Begin()
 		if err != nil {
 			return liberr.Wrap(err)
+		}
+		for _, fs := range updateSet.FilterSet {
+			err = r.apply(ctx, fs.ObjectSet)
+			if err != nil {
+				err = liberr.Wrap(err)
+				Log.Trace(err)
+				break
+			}
+		}
+		if err == nil {
+			err = transaction.Commit()
+		} else {
+			err = transaction.End()
+		}
+		transaction = nil
+		if err != nil {
+			Log.Trace(err)
 		}
 		if updateSet.Truncated == nil || !*updateSet.Truncated {
 			if !r.consistent {
@@ -546,8 +562,7 @@ func (r *Reconciler) propertySpec() []types.PropertySpec {
 
 //
 // Apply updates.
-func (r *Reconciler) apply(ctx context.Context, updates []types.ObjectUpdate) {
-	var err error
+func (r *Reconciler) apply(ctx context.Context, updates []types.ObjectUpdate) (err error) {
 	for _, u := range updates {
 		switch string(u.Kind) {
 		case Enter:
@@ -557,10 +572,13 @@ func (r *Reconciler) apply(ctx context.Context, updates []types.ObjectUpdate) {
 		case Leave:
 			err = r.applyLeave(u)
 		}
+		if err != nil {
+			err = liberr.Wrap(err)
+			break
+		}
 	}
-	if err != nil {
-		r.log.Trace(err)
-	}
+
+	return
 }
 
 //
@@ -659,15 +677,13 @@ func (r Reconciler) applyModify(u types.ObjectUpdate) error {
 	}
 	m := adapter.Model()
 	r.log.Info("Update", "model", m.String())
-	tx, err := r.db.GetForUpdate(m)
+	err := r.db.Get(m)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 	adapter.Apply(u)
 	err = r.db.Update(m)
-	if err == nil {
-		tx.Commit()
-	} else {
+	if err != nil {
 		return liberr.Wrap(err)
 	}
 
