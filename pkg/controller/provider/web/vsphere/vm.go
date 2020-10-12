@@ -112,19 +112,21 @@ func (h VMHandler) Link(p *api.Provider, m *model.VM) string {
 // REST Resource.
 type VM struct {
 	Resource
-	UUID                string       `json:"uuid"`
-	Firmware            string       `json:"firmware"`
-	CpuAffinity         []int32      `json:"cpuAffinity"`
-	CpuHotAddEnabled    bool         `json:"cpuHostAddEnabled"`
-	CpuHotRemoveEnabled bool         `json:"cpuHostRemoveEnabled"`
-	MemoryHotAddEnabled bool         `json:"memoryHotAddEnabled"`
-	CpuCount            int32        `json:"cpuCount"`
-	CoresPerSocket      int32        `json:"coresPerSocket"`
-	MemoryMB            int32        `json:"memoryMB"`
-	GuestName           string       `json:"guestName"`
-	BalloonedMemory     int32        `json:"balloonedMemory"`
-	IpAddress           string       `json:"ipAddress"`
-	Disks               []model.Disk `json:"disks"`
+	UUID                string          `json:"uuid"`
+	Firmware            string          `json:"firmware"`
+	CpuAffinity         []int32         `json:"cpuAffinity"`
+	CpuHotAddEnabled    bool            `json:"cpuHostAddEnabled"`
+	CpuHotRemoveEnabled bool            `json:"cpuHostRemoveEnabled"`
+	MemoryHotAddEnabled bool            `json:"memoryHotAddEnabled"`
+	CpuCount            int32           `json:"cpuCount"`
+	CoresPerSocket      int32           `json:"coresPerSocket"`
+	MemoryMB            int32           `json:"memoryMB"`
+	GuestName           string          `json:"guestName"`
+	BalloonedMemory     int32           `json:"balloonedMemory"`
+	IpAddress           string          `json:"ipAddress"`
+	Networks            model.RefList   `json:"networks"`
+	Disks               []model.Disk    `json:"disks"`
+	Concerns            []model.Concern `json:"concerns"`
 }
 
 //
@@ -143,7 +145,16 @@ func (r *VM) With(m *model.VM) {
 	r.GuestName = m.GuestName
 	r.BalloonedMemory = m.BalloonedMemory
 	r.IpAddress = m.IpAddress
+	r.Networks = *model.RefListPtr().With(m.Networks)
 	r.Disks = m.DecodeDisks()
+	r.Concerns = m.DecodeConcerns()
+	// TODO: EXAMPLE FOR UI DEV --REMOVE THIS.
+	r.Concerns = append(
+		r.Concerns,
+		model.Concern{
+			Name:     "Example",
+			Severity: "Warning",
+		})
 }
 
 //
