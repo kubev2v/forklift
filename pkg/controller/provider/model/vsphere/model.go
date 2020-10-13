@@ -167,6 +167,8 @@ type VM struct {
 	BalloonedMemory     int32  `sql:""`
 	IpAddress           string `sql:""`
 	Disks               string `sql:""`
+	Networks            string `sql:""`
+	Concerns            string `sql:""`
 }
 
 //
@@ -185,15 +187,6 @@ func (m *VM) DecodeCpuAffinity() []int32 {
 }
 
 //
-// Virtual Disk.
-type Disk struct {
-	// Backing file.
-	File string `json:"file"`
-	// Datastore.
-	Datastore Ref `json:"datastore"`
-}
-
-//
 // Encode disks.
 func (m *VM) EncodeDisks(d []Disk) {
 	j, _ := json.Marshal(d)
@@ -206,4 +199,39 @@ func (m *VM) DecodeDisks() []Disk {
 	list := []Disk{}
 	json.Unmarshal([]byte(m.Disks), &list)
 	return list
+}
+
+//
+// Encode concerns.
+func (m *VM) EncodeConcerns(c []Concern) {
+	j, _ := json.Marshal(c)
+	m.Concerns = string(j)
+}
+
+//
+// Decode concerns.
+// Returns `nil` when has not been analyzed.
+func (m *VM) DecodeConcerns() (list []Concern) {
+	if len(m.Concerns) > 0 {
+		list = []Concern{}
+		json.Unmarshal([]byte(m.Concerns), &list)
+	}
+
+	return
+}
+
+//
+// Virtual Disk.
+type Disk struct {
+	// Backing file.
+	File string `json:"file"`
+	// Datastore.
+	Datastore Ref `json:"datastore"`
+}
+
+//
+// VM concerns.
+type Concern struct {
+	Name     string `json:"name"`
+	Severity string `json:"severity"`
 }
