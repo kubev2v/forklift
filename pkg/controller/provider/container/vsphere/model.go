@@ -442,6 +442,10 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				if s, cast := p.Val.(string); cast {
 					v.model.IpAddress = s
 				}
+			case fNetwork:
+				refList := RefList{}
+				refList.With(p.Val)
+				v.model.Networks = refList.Encode()
 			case fDevices:
 				disks := []model.Disk{}
 				if devArray, cast := p.Val.(types.ArrayOfVirtualDevice); cast {
