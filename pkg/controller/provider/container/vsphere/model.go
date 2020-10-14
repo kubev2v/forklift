@@ -456,6 +456,7 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 							backing := disk.Backing.(*types.VirtualDiskFlatVer2BackingInfo)
 							md := model.Disk{
 								File: backing.FileName,
+								Capacity: disk.CapacityInBytes,
 								Datastore: model.Ref{
 									Kind: model.DsKind,
 									ID:   backing.Datastore.Value,
