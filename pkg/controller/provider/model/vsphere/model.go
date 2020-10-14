@@ -227,6 +227,8 @@ type Disk struct {
 	File string `json:"file"`
 	// Datastore.
 	Datastore Ref `json:"datastore"`
+	// Capacity
+	Capacity int64 `json:"capacity"`
 }
 
 //
