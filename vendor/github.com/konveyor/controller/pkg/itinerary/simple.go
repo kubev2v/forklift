@@ -143,7 +143,7 @@ func (r *Itinerary) Progress(step string) (report Progress, err error) {
 	if err != nil {
 		return
 	}
-	report.Total = len(list)
+	report.Total = int64(len(list))
 	for _, s := range list {
 		if s.Name != step {
 			report.Completed++
@@ -201,7 +201,7 @@ func (r *Itinerary) hasAll(step Step) (pTrue bool, err error) {
 // Progress report.
 type Progress struct {
 	// Completed units.
-	Completed int `json:"completed"`
+	Completed int64 `json:"completed"`
 	// Total units.
-	Total int `json:"total"`
+	Total int64 `json:"total"`
 }

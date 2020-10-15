@@ -174,7 +174,7 @@ func TestProgress(t *testing.T) {
 	for i, step := range list {
 		report, err := itinerary.Progress(step.Name)
 		g.Expect(err).To(gomega.BeNil())
-		g.Expect(report.Total).To(gomega.Equal(len(list)))
-		g.Expect(report.Completed).To(gomega.Equal(i))
+		g.Expect(report.Total).To(gomega.Equal(int64(len(list))))
+		g.Expect(report.Completed).To(gomega.Equal(int64(i)))
 	}
 }
