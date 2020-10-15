@@ -1,0 +1,15 @@
+.idea
+_out/*
+bin/*
+manifests/generated/*
+.coverprofile
+release-announcement
+.project
+cluster/.*
+.history
+.gradle
+hack/gen-swagger-doc/*.adoc
+hack/gen-swagger-doc/*.md
+hack/gen-swagger-doc/html5
+**/*.swp
+_ci-configs/*
