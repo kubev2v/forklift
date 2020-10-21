@@ -2,7 +2,7 @@ package validation
 
 import (
 	"context"
-	cnd "github.com/konveyor/controller/pkg/condition"
+	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
@@ -25,10 +25,10 @@ const (
 //
 // Categories
 const (
-	Advisory = cnd.Advisory
-	Critical = cnd.Critical
-	Error    = cnd.Error
-	Warn     = cnd.Warn
+	Advisory = libcnd.Advisory
+	Critical = libcnd.Critical
+	Error    = libcnd.Error
+	Warn     = libcnd.Warn
 )
 
 // Reasons
@@ -40,8 +40,8 @@ const (
 
 // Statuses
 const (
-	True  = cnd.True
-	False = cnd.False
+	True  = libcnd.True
+	False = libcnd.False
 )
 
 //
@@ -54,8 +54,8 @@ type Provider struct {
 
 //
 // Validate a provider.
-func (r *Provider) Validate(ref core.ObjectReference) (result cnd.Conditions, err error) {
-	newCnd := cnd.Condition{
+func (r *Provider) Validate(ref core.ObjectReference) (result libcnd.Conditions, err error) {
+	newCnd := libcnd.Condition{
 		Type:     ProviderNotValid,
 		Status:   True,
 		Category: Critical,
@@ -84,8 +84,8 @@ func (r *Provider) Validate(ref core.ObjectReference) (result cnd.Conditions, er
 	}
 	r.Referenced = &provider
 
-	if !provider.Status.HasCondition(cnd.Ready) {
-		result.SetCondition(cnd.Condition{
+	if !provider.Status.HasCondition(libcnd.Ready) {
+		result.SetCondition(libcnd.Condition{
 			Type:     ProviderNotReady,
 			Status:   True,
 			Category: Critical,
@@ -109,7 +109,7 @@ type ProviderPair struct {
 
 //
 // Validate the pair.
-func (r *ProviderPair) Validate(pair api.ProviderPair) (result cnd.Conditions, err error) {
+func (r *ProviderPair) Validate(pair api.ProviderPair) (result libcnd.Conditions, err error) {
 	conditions, err := r.validateSource(pair)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -128,7 +128,7 @@ func (r *ProviderPair) Validate(pair api.ProviderPair) (result cnd.Conditions, e
 
 //
 // Validate the source.
-func (r *ProviderPair) validateSource(pair api.ProviderPair) (result cnd.Conditions, err error) {
+func (r *ProviderPair) validateSource(pair api.ProviderPair) (result libcnd.Conditions, err error) {
 	validation := Provider{Client: r.Client}
 	conditions, err := validation.Validate(pair.Source)
 	if err != nil {
@@ -153,7 +153,7 @@ func (r *ProviderPair) validateSource(pair api.ProviderPair) (result cnd.Conditi
 	// An openshift source is not supported.
 	r.Referenced.Source = validation.Referenced
 	if r.Referenced.Source != nil && r.Referenced.Source.Type() == api.OpenShift {
-		result.SetCondition(cnd.Condition{
+		result.SetCondition(libcnd.Condition{
 			Type:     SourceProviderNotValid,
 			Status:   True,
 			Reason:   TypeNotValid,
@@ -168,7 +168,7 @@ func (r *ProviderPair) validateSource(pair api.ProviderPair) (result cnd.Conditi
 
 //
 // Validate the destination.
-func (r *ProviderPair) validateDestination(pair api.ProviderPair) (result cnd.Conditions, err error) {
+func (r *ProviderPair) validateDestination(pair api.ProviderPair) (result libcnd.Conditions, err error) {
 	validation := Provider{Client: r.Client}
 	conditions, err := validation.Validate(pair.Destination)
 	if err != nil {
@@ -193,7 +193,7 @@ func (r *ProviderPair) validateDestination(pair api.ProviderPair) (result cnd.Co
 	// A non-openshift destination is not supported.
 	r.Referenced.Destination = validation.Referenced
 	if r.Referenced.Destination != nil && r.Referenced.Destination.Type() != api.OpenShift {
-		result.SetCondition(cnd.Condition{
+		result.SetCondition(libcnd.Condition{
 			Type:     DestinationProviderNotValid,
 			Status:   True,
 			Reason:   TypeNotValid,

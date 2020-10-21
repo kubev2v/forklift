@@ -24,7 +24,8 @@ import (
 	"github.com/konveyor/virt-controller/pkg/apis"
 	"github.com/konveyor/virt-controller/pkg/controller"
 	"github.com/konveyor/virt-controller/pkg/webhook"
-	kubevirt "github.com/kubevirt/vm-import-operator/pkg/apis/v2v/v1beta1"
+	cdi "github.com/kubevirt/containerized-data-importer/pkg/apis/core/v1beta1"
+	vmio "github.com/kubevirt/vm-import-operator/pkg/apis/v2v/v1beta1"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -70,8 +71,12 @@ func main() {
 		log.Error(err, "unable to add CNI APIs to scheme")
 		os.Exit(1)
 	}
-	if err := kubevirt.AddToScheme(mgr.GetScheme()); err != nil {
-		log.Error(err, "unable to add kubevirt APIs to scheme")
+	if err := vmio.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "unable to add kubevirt VMIO APIs to scheme")
+		os.Exit(1)
+	}
+	if err := cdi.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "unable to add kubevirt CDI APIs to scheme")
 		os.Exit(1)
 	}
 	// Setup all Controllers

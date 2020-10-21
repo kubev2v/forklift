@@ -18,8 +18,17 @@ package v1alpha1
 
 import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
+	"github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1/plan"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+//
+// Snapshot keys.
+const (
+	SourceSnapshot      = "provider.source"
+	DestinationSnapshot = "provider.destination"
+	MapSnapshot         = "map"
 )
 
 //
@@ -32,17 +41,14 @@ type MigrationSpec struct {
 //
 // MigrationStatus defines the observed state of Migration
 type MigrationStatus struct {
+	plan.Timed
 	// Conditions.
 	libcnd.Conditions
 	// The most recent generation observed by the controller.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-	// Started timestamp.
-	Started *meta.Time `json:"started,omitempty"`
-	// Completed timestamp.
-	Completed *meta.Time `json:"completed,omitempty"`
 	// VM status
-	VMs []VMStatus `json:"vms,omitempty"`
+	VMs []*plan.VMStatus `json:"vms,omitempty"`
 }
 
 //

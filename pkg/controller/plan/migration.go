@@ -2,15 +2,16 @@ package plan
 
 import (
 	"context"
-	cnd "github.com/konveyor/controller/pkg/condition"
+	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libitr "github.com/konveyor/controller/pkg/itinerary"
 	"github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
+	"github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1/plan"
+	"github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1/snapshot"
+	"github.com/konveyor/virt-controller/pkg/controller/plan/builder"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web"
-	kubevirt "github.com/kubevirt/vm-import-operator/pkg/apis/v2v/v1beta1"
 	core "k8s.io/api/core/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"time"
 )
@@ -25,10 +26,8 @@ const (
 //
 // Status pipeline/progress steps.
 const (
-	PreHook      = "PreHook"
-	Import       = "Import"
-	DiskTransfer = "DiskTransfer"
-	PostHook     = "PostHook"
+	PreHook  = "PreHook"
+	PostHook = "PostHook"
 )
 
 //
@@ -51,6 +50,13 @@ const (
 	Completed       = "Completed"
 )
 
+//
+// Steps.
+const (
+	DiskTransfer    = "DiskTransfer"
+	ImageConversion = "ImageConversion"
+)
+
 var (
 	itinerary = libitr.Itinerary{
 		Name: "",
@@ -70,16 +76,20 @@ var (
 //
 // Migration.
 type Migration struct {
-	// Host client.
-	Client client.Client
+	// Migration
+	Migration *api.Migration
 	// The plan.
 	Plan *api.Plan
+	// Host client.
+	Client client.Client
 	// Source.
 	source struct {
 		// Provider
 		provider *api.Provider
 		// Secret.
 		secret *core.Secret
+		// Provider API client.
+		client web.Client
 	}
 	// Destination.
 	destination struct {
@@ -90,10 +100,18 @@ type Migration struct {
 		// k8s client.
 		client client.Client
 	}
+	// Builder
+	builder builder.Builder
 	// kubevirt.
 	kubevirt KubeVirt
 	// VM import CRs.
 	importMap ImportMap
+}
+
+//
+// Type of migration.
+func (r *Migration) Type() string {
+	return r.source.provider.Type()
 }
 
 //
@@ -113,47 +131,54 @@ func (r Migration) Run() (reQ time.Duration, err error) {
 
 	inFlight := 0
 	list := r.Plan.Status.Migration.VMs
-	for n := range list {
-		vm := &list[n]
-		if vm.Done() {
+	for _, vm := range list {
+		if vm.MarkedCompleted() {
 			continue
 		}
 		if inFlight > Settings.Migration.MaxInFlight {
 			break
 		}
 		inFlight++
-		log.Info("Migrate:", "vm", vm.Planned.ID, "phase", vm.Phase)
 		itinerary.Predicate = &Predicate{
-			vm: &vm.Planned,
+			vm: &vm.VM,
 		}
+		log.Info("Migration [RUN]:", "vm", vm)
 		switch vm.Phase {
 		case Started:
-			now := meta.Now()
-			vm.Started = &now
+			vm.MarkStarted()
 			vm.Phase = r.next(vm.Phase)
 		case CreatePreHook:
 			vm.Phase = r.next(vm.Phase)
 		case PreHookCreated:
 			vm.Phase = r.next(vm.Phase)
 		case CreateImport:
-			err = r.kubevirt.CreateImport(vm.Planned.ID)
+			err = r.kubevirt.CreateImport(vm.ID)
 			if err != nil {
 				err = liberr.Wrap(err)
 				return
 			}
 			vm.Phase = r.next(vm.Phase)
 		case ImportCreated:
-			r.reflectImport(vm)
+			completed, failed, rErr := r.updateVM(vm)
+			if rErr != nil {
+				err = liberr.Wrap(rErr)
+				return
+			}
+			if completed {
+				if !failed {
+					vm.Phase = r.next(vm.Phase)
+				} else {
+					vm.Phase = Completed
+				}
+			}
 		case CreatePostHook:
 			vm.Phase = r.next(vm.Phase)
 		case PostHookCreated:
 			vm.Phase = r.next(vm.Phase)
 		case Completed:
+			vm.MarkCompleted()
+			log.Info("Migration [COMPLETED]:", "vm", vm)
 			inFlight--
-			if vm.Completed == nil {
-				now := meta.Now()
-				vm.Completed = &now
-			}
 		default:
 			err = liberr.New("phase: unknown")
 		}
@@ -171,9 +196,15 @@ func (r Migration) Run() (reQ time.Duration, err error) {
 //
 // Get/Build resources.
 func (r *Migration) init() (err error) {
+	sn := snapshot.New(r.Migration)
 	//
 	// Source.
-	r.source.provider = r.Plan.Status.Migration.GetSource()
+	r.source.provider = &api.Provider{}
+	err = sn.Get(api.SourceSnapshot, r.source.provider)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
 	ref := r.source.provider.Spec.Secret
 	r.source.secret = &core.Secret{}
 	err = r.Client.Get(
@@ -185,10 +216,21 @@ func (r *Migration) init() (err error) {
 		r.source.secret)
 	if err != nil {
 		err = liberr.Wrap(err)
+		return
+	}
+	r.source.client, err = web.NewClient(r.source.provider)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
 	}
 	//
 	// Destination.
-	r.destination.provider = r.Plan.Status.Migration.GetDestination()
+	r.destination.provider = &api.Provider{}
+	err = sn.Get(api.DestinationSnapshot, r.destination.provider)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
 	ref = r.destination.provider.Spec.Secret
 	r.destination.secret = &core.Secret{}
 	err = r.Client.Get(
@@ -200,30 +242,29 @@ func (r *Migration) init() (err error) {
 		r.destination.secret)
 	if err != nil {
 		err = liberr.Wrap(err)
+		return
 	}
 	r.destination.client, err =
 		r.destination.provider.Client(r.destination.secret)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	//
+	// Builder & Reflector
+	r.builder, err = builder.New(r.source.provider, r.source.client)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
 	//
 	// kubevirt.
 	r.kubevirt = KubeVirt{
-		Plan: r.Plan,
-	}
-	pClient, err := web.NewClient(r.source.provider)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	r.kubevirt.Source.Provider = r.source.provider
-	r.kubevirt.Source.Secret = r.source.secret
-	r.kubevirt.Source.Client = pClient
-	r.kubevirt.Destination.Provider = r.destination.provider
-	r.kubevirt.Destination.Client = r.destination.client
-	//
-	// Import Map
-	r.importMap, err = r.kubevirt.ListImports()
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
+		Builder:   r.builder,
+		Secret:    r.source.secret,
+		Client:    r.destination.client,
+		Migration: r.Migration,
+		Plan:      r.Plan,
 	}
 
 	return
@@ -251,11 +292,9 @@ func (r *Migration) begin() (err error) {
 	if r.Plan.Status.HasAnyCondition(Executing, Succeeded, Failed) {
 		return
 	}
-	now := meta.Now()
-	r.Plan.Status.Migration.Started = &now
-	r.Plan.Status.Migration.Completed = nil
+	r.Plan.Status.Migration.MarkStarted()
 	r.Plan.Status.SetCondition(
-		cnd.Condition{
+		libcnd.Condition{
 			Type:     Executing,
 			Status:   True,
 			Category: Advisory,
@@ -280,28 +319,32 @@ func (r *Migration) begin() (err error) {
 	//
 	// Delete
 	for _, status := range r.Plan.Status.Migration.VMs {
-		kept := []api.VMStatus{}
-		if _, found := r.Plan.Spec.FindVM(status.Planned.ID); found {
+		kept := []*plan.VMStatus{}
+		if _, found := r.Plan.Spec.FindVM(status.ID); found {
 			kept = append(kept, status)
 		}
 		r.Plan.Status.Migration.VMs = kept
 	}
 	//
 	// Add/Update.
-	list := []api.VMStatus{}
+	list := []*plan.VMStatus{}
 	for _, vm := range r.Plan.Spec.VMs {
-		var status api.VMStatus
+		var status *plan.VMStatus
 		itinerary.Predicate = &Predicate{vm: &vm}
 		step, _ := itinerary.First()
 		if current, found := r.Plan.Status.Migration.FindVM(vm.ID); !found {
-			status = api.VMStatus{Planned: vm}
+			status = &plan.VMStatus{VM: vm}
 		} else {
-			status = *current
+			status = current
 		}
 		if status.Phase != Completed || status.Error != nil {
-			status.Started = nil
-			status.Completed = nil
-			status.Pipeline = r.buildPipeline(&vm)
+			pipeline, pErr := r.buildPipeline(&vm)
+			if pErr != nil {
+				err = liberr.Wrap(pErr)
+				return
+			}
+			status.MarkReset()
+			status.Pipeline = pipeline
 			status.Phase = step.Name
 			status.Error = nil
 		}
@@ -310,12 +353,14 @@ func (r *Migration) begin() (err error) {
 
 	r.Plan.Status.Migration.VMs = list
 
+	log.Info("Execution [STARTED]:", "migration", r.Plan.Status.Migration)
+
 	return
 }
 
 //
 // Build the pipeline for a VM status.
-func (r *Migration) buildPipeline(vm *api.PlanVM) (pipeline []api.Step) {
+func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error) {
 	itinerary.Predicate = &Predicate{vm: vm}
 	step, _ := itinerary.First()
 	for {
@@ -323,29 +368,52 @@ func (r *Migration) buildPipeline(vm *api.PlanVM) (pipeline []api.Step) {
 		case CreatePreHook:
 			pipeline = append(
 				pipeline,
-				api.Step{
-					Name:     PreHook,
-					Progress: libitr.Progress{Total: 1},
+				&plan.Step{
+					Task: plan.Task{
+						Name:     PreHook,
+						Progress: libitr.Progress{Total: 1},
+					},
 				})
 		case CreateImport:
+			tasks, pErr := r.builder.Tasks(vm.ID)
+			if pErr != nil {
+				err = liberr.Wrap(pErr)
+				return
+			}
+			total := int64(0)
+			for _, task := range tasks {
+				total += task.Progress.Total
+			}
 			pipeline = append(
 				pipeline,
-				api.Step{
-					Name:     DiskTransfer,
-					Progress: libitr.Progress{Total: 1},
+				&plan.Step{
+					Task: plan.Task{
+						Name: DiskTransfer,
+						Progress: libitr.Progress{
+							Total: total,
+						},
+						Annotations: map[string]string{
+							"unit": "MB",
+						},
+					},
+					Tasks: tasks,
 				})
 			pipeline = append(
 				pipeline,
-				api.Step{
-					Name:     Import,
-					Progress: libitr.Progress{Total: 1},
+				&plan.Step{
+					Task: plan.Task{
+						Name:     ImageConversion,
+						Progress: libitr.Progress{Total: 1},
+					},
 				})
 		case CreatePostHook:
 			pipeline = append(
 				pipeline,
-				api.Step{
-					Name:     PostHook,
-					Progress: libitr.Progress{Total: 1},
+				&plan.Step{
+					Task: plan.Task{
+						Name:     PostHook,
+						Progress: libitr.Progress{Total: 1},
+					},
 				})
 		}
 		next, done, _ := itinerary.Next(step.Name)
@@ -364,7 +432,7 @@ func (r *Migration) buildPipeline(vm *api.PlanVM) (pipeline []api.Step) {
 func (r *Migration) end() (completed bool) {
 	failed := false
 	for _, vm := range r.Plan.Status.Migration.VMs {
-		if !vm.Done() {
+		if !vm.MarkedCompleted() {
 			return
 		}
 		if vm.Error != nil {
@@ -372,12 +440,12 @@ func (r *Migration) end() (completed bool) {
 			break
 		}
 	}
-	now := meta.Now()
-	r.Plan.Status.Migration.Completed = &now
+	r.Plan.Status.Migration.MarkCompleted()
 	r.Plan.Status.DeleteCondition(Executing)
 	if failed {
+		log.Info("Execution [FAILED]")
 		r.Plan.Status.SetCondition(
-			cnd.Condition{
+			libcnd.Condition{
 				Type:     Failed,
 				Status:   True,
 				Category: Advisory,
@@ -385,8 +453,9 @@ func (r *Migration) end() (completed bool) {
 				Durable:  true,
 			})
 	} else {
+		log.Info("Execution [SUCCEEDED]")
 		r.Plan.Status.SetCondition(
-			cnd.Condition{
+			libcnd.Condition{
 				Type:     Succeeded,
 				Status:   True,
 				Category: Advisory,
@@ -400,38 +469,104 @@ func (r *Migration) end() (completed bool) {
 }
 
 //
-// Apply VM Import status.
-func (r *Migration) reflectImport(vm *api.VMStatus) {
-	var _import *kubevirt.VirtualMachineImport
-	found := false
-	addErr := func(reason *string) {
-		if reason == nil {
+// Update VM migration status.
+func (r *Migration) updateVM(vm *plan.VMStatus) (completed bool, failed bool, err error) {
+	if r.importMap == nil {
+		r.importMap, err = r.kubevirt.ImportMap()
+		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
-		if vm.Error == nil {
-			vm.Error = &api.VMError{
-				Reasons: []string{*reason},
-				Phase:   vm.Phase,
-			}
-		} else {
-			vm.Error.Reasons = append(vm.Error.Reasons, *reason)
-		}
 	}
-	if _import, found = r.importMap[vm.Planned.ID]; !found {
+	var imp VmImport
+	found := false
+	if imp, found = r.importMap[vm.ID]; !found {
 		msg := "Import CR not found."
-		addErr(&msg)
+		vm.AddError(msg)
 		return
 	}
-	for _, condition := range _import.Status.Conditions {
-		switch condition.Type {
-		case "Succeeded":
-			if condition.Status == False {
-				addErr(condition.Message)
+	r.updatePipeline(vm, &imp)
+	vm.ReflectPipeline()
+	conditions := imp.Conditions()
+	cnd := conditions.FindCondition(Succeeded)
+	if cnd != nil {
+		vm.MarkedCompleted()
+		completed = true
+		if cnd.Status != True {
+			vm.AddError(cnd.Message)
+			failed = true
+		}
+	}
+
+	return
+}
+
+//
+// Update the pipeline.
+func (r *Migration) updatePipeline(vm *plan.VMStatus, imp *VmImport) {
+	for _, step := range vm.Pipeline {
+		if step.MarkedCompleted() {
+			continue
+		}
+		switch step.Name {
+		case DiskTransfer:
+			var name string
+			var task *plan.Task
+		nextDv:
+			for _, dv := range imp.DataVolumes {
+				switch r.Type() {
+				case api.VSphere:
+					name = dv.Spec.Source.VDDK.BackingFile
+				default:
+					continue nextDv
+				}
+				found := false
+				task, found = step.FindTask(name)
+				if !found {
+					continue nextDv
+				}
+				conditions := dv.Conditions()
+				cnd := conditions.FindCondition("Running")
+				if cnd == nil {
+					continue nextDv
+				}
+				task.MarkStarted()
+				task.Phase = cnd.Reason
+				pct := dv.PercentComplete()
+				completed := pct * float64(task.Progress.Total)
+				task.Progress.Completed = int64(completed)
+				if conditions.HasCondition("Ready") {
+					task.Progress.Completed = task.Progress.Total
+					task.MarkCompleted()
+				}
 			}
-		case "Valid":
-			if condition.Status == False {
-				addErr(condition.Message)
+		case ImageConversion:
+			conditions := imp.Conditions()
+			cnd := conditions.FindCondition("Processing")
+			if cnd != nil {
+				if cnd.Status == True && cnd.Reason == "ConvertingGuest" {
+					step.MarkStarted()
+				}
+				if step.MarkedStarted() {
+					step.Phase = cnd.Reason
+				}
 			}
+			pct := imp.PercentComplete()
+			completed := pct * float64(step.Progress.Total)
+			step.Progress.Completed = int64(completed)
+			cnd = conditions.FindCondition("Succeeded")
+			if cnd != nil {
+				step.MarkCompleted()
+				step.Progress.Completed = step.Progress.Total
+				if cnd.Status != True {
+					step.AddError(cnd.Message)
+					step.Phase = cnd.Reason
+				}
+			}
+		}
+		step.ReflectTasks()
+		if step.Error != nil {
+			vm.AddError(step.Error.Reasons...)
 		}
 	}
 }
@@ -440,7 +575,7 @@ func (r *Migration) reflectImport(vm *api.VMStatus) {
 // Step predicate.
 type Predicate struct {
 	// VM listed on the plan.
-	vm *api.PlanVM
+	vm *plan.VM
 }
 
 //

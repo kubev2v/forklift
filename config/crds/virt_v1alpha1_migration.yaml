@@ -38,26 +38,14 @@ spec:
           type: object
         status:
           properties:
-            completed:
-              description: Completed timestamp.
-              format: date-time
-              type: string
             observedGeneration:
               description: The most recent generation observed by the controller.
               format: int64
               type: integer
-            started:
-              description: Started timestamp.
-              format: date-time
-              type: string
             vms:
               description: VM status
               items:
                 properties:
-                  completed:
-                    description: Completed timestamp.
-                    format: date-time
-                    type: string
                   error:
                     description: Errors
                     properties:
@@ -78,58 +66,55 @@ spec:
                     description: Migration pipeline.
                     items:
                       properties:
-                        name:
-                          description: Name.
-                          type: string
-                        progress:
-                          description: Progress.
-                          properties:
-                            completed:
-                              description: Completed units.
-                              format: int64
-                              type: integer
-                            total:
-                              description: Total units.
-                              format: int64
-                              type: integer
-                          required:
-                          - completed
-                          - total
-                          type: object
-                      required:
-                      - name
-                      - progress
+                        tasks:
+                          description: Nested tasks.
+                          items:
+                            properties:
+                              annotations:
+                                description: Annotations.
+                                type: object
+                              error:
+                                description: Error.
+                                properties:
+                                  phase:
+                                    type: string
+                                  reasons:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - phase
+                                - reasons
+                                type: object
+                              name:
+                                description: Name.
+                                type: string
+                              phase:
+                                description: Phase
+                                type: string
+                              progress:
+                                description: Progress.
+                                properties:
+                                  completed:
+                                    description: Completed units.
+                                    format: int64
+                                    type: integer
+                                  total:
+                                    description: Total units.
+                                    format: int64
+                                    type: integer
+                                required:
+                                - completed
+                                - total
+                                type: object
+                            required:
+                            - name
+                            - progress
+                            type: object
+                          type: array
                       type: object
                     type: array
-                  planned:
-                    description: Planned VM.
-                    properties:
-                      hook:
-                        description: Enable hooks.
-                        properties:
-                          after:
-                            description: Post-migration hook.
-                            type: object
-                          before:
-                            description: Pre-migration hook.
-                            type: object
-                        type: object
-                      host:
-                        description: Host
-                        type: object
-                      id:
-                        description: 'The VM identifier. For:   - vSphere: The managed
-                          object ID.'
-                        type: string
-                    required:
-                    - id
-                    type: object
-                  started:
-                    description: Started timestamp.
-                    format: date-time
-                    type: string
                 required:
-                - planned
                 - pipeline
                 - phase
                 type: object

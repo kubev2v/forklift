@@ -18,53 +18,9 @@ package v1alpha1
 
 import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
+	"github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1/mapped"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-//
-// Mapped source.
-type MapSourceObject struct {
-	// The object identifier.
-	// For:
-	//   - vsphere: The managed object ID.
-	ID string `json:"id"`
-}
-
-//
-// Mapped network destination.
-type MapDestinationNetwork struct {
-	// The network type (pod|multus)
-	Type string `json:"type"`
-	// The namespace (multus only).
-	Namespace string `json:"namespace"`
-	// The name.
-	Name string `json:"name"`
-}
-
-//
-// Mapped network.
-type NetworkPair struct {
-	// Source network.
-	Source MapSourceObject `json:"source"`
-	// Destination network.
-	Destination MapDestinationNetwork `json:"destination"`
-}
-
-//
-// Mapped storage destination.
-type MapDestinationStorage struct {
-	// A storage class.
-	StorageClass string `json:"storageClass"`
-}
-
-//
-// Mapped storage.
-type StoragePair struct {
-	// Source storage.
-	Source MapSourceObject `json:"source"`
-	// Destination storage.
-	Destination MapDestinationStorage `json:"destination"`
-}
 
 //
 // Network map spec.
@@ -72,7 +28,7 @@ type NetworkMapSpec struct {
 	// Provider
 	Provider ProviderPair `json:"provider" ref:"Provider"`
 	// Map.
-	Map []NetworkPair `json:"map"`
+	Map []mapped.NetworkPair `json:"map"`
 }
 
 //
@@ -81,7 +37,7 @@ type StorageMapSpec struct {
 	// Provider
 	Provider ProviderPair `json:"provider" ref:"Provider"`
 	// Map.
-	Map []StoragePair `json:"map"`
+	Map []mapped.StoragePair `json:"map"`
 }
 
 //
