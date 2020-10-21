@@ -1,9 +1,10 @@
 package validation
 
 import (
-	cnd "github.com/konveyor/controller/pkg/condition"
+	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
+	"github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1/mapped"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web/ocp"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web/vsphere"
@@ -30,7 +31,7 @@ type StoragePair struct {
 
 //
 // Validate pairs.
-func (r *StoragePair) Validate(list []api.StoragePair) (result cnd.Conditions, err error) {
+func (r *StoragePair) Validate(list []mapped.StoragePair) (result libcnd.Conditions, err error) {
 	conditions, err := r.validateSource(list)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -49,7 +50,7 @@ func (r *StoragePair) Validate(list []api.StoragePair) (result cnd.Conditions, e
 
 //
 // Validate source storage.
-func (r *StoragePair) validateSource(list []api.StoragePair) (result cnd.Conditions, err error) {
+func (r *StoragePair) validateSource(list []mapped.StoragePair) (result libcnd.Conditions, err error) {
 	provider := r.Provider.Source
 	if provider == nil {
 		return
@@ -86,7 +87,7 @@ func (r *StoragePair) validateSource(list []api.StoragePair) (result cnd.Conditi
 		}
 	}
 	if len(notValid) > 0 {
-		result.SetCondition(cnd.Condition{
+		result.SetCondition(libcnd.Condition{
 			Type:     SourceStorageNotValid,
 			Status:   True,
 			Reason:   NotFound,
@@ -101,7 +102,7 @@ func (r *StoragePair) validateSource(list []api.StoragePair) (result cnd.Conditi
 
 //
 // Validate destination storage.
-func (r *StoragePair) validateDestination(list []api.StoragePair) (result cnd.Conditions, err error) {
+func (r *StoragePair) validateDestination(list []mapped.StoragePair) (result libcnd.Conditions, err error) {
 	provider := r.Provider.Destination
 	if provider == nil {
 		return
@@ -139,7 +140,7 @@ func (r *StoragePair) validateDestination(list []api.StoragePair) (result cnd.Co
 		}
 	}
 	if len(notValid) > 0 {
-		result.SetCondition(cnd.Condition{
+		result.SetCondition(libcnd.Condition{
 			Type:     DestinationStorageNotValid,
 			Status:   True,
 			Reason:   NotFound,

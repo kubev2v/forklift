@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
-	cnd "github.com/konveyor/controller/pkg/condition"
+	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
@@ -23,11 +23,11 @@ const (
 //
 // Categories
 const (
-	Required = cnd.Required
-	Advisory = cnd.Advisory
-	Critical = cnd.Critical
-	Error    = cnd.Error
-	Warn     = cnd.Warn
+	Required = libcnd.Required
+	Advisory = libcnd.Advisory
+	Critical = libcnd.Critical
+	Error    = libcnd.Error
+	Warn     = libcnd.Warn
 )
 
 //
@@ -42,8 +42,8 @@ const (
 //
 // Statuses
 const (
-	True  = cnd.True
-	False = cnd.False
+	True  = libcnd.True
+	False = libcnd.False
 )
 
 //
@@ -77,7 +77,7 @@ func (r *Reconciler) validateType(provider *api.Provider) error {
 			api.VSphere,
 		}
 		provider.Status.SetCondition(
-			cnd.Condition{
+			libcnd.Condition{
 				Type:     TypeNotSupported,
 				Status:   True,
 				Reason:   NotSupported,
@@ -97,7 +97,7 @@ func (r *Reconciler) validateURL(provider *api.Provider) error {
 	}
 	if provider.Spec.URL == "" {
 		provider.Status.SetCondition(
-			cnd.Condition{
+			libcnd.Condition{
 				Type:     UrlNotValid,
 				Status:   True,
 				Reason:   NotSet,
@@ -119,7 +119,7 @@ func (r *Reconciler) validateSecret(provider *api.Provider) error {
 		return nil
 	}
 	// NotSet
-	newCnd := cnd.Condition{
+	newCnd := libcnd.Condition{
 		Type:     SecretNotValid,
 		Status:   True,
 		Reason:   NotSet,

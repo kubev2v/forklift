@@ -19,11 +19,12 @@ package plan
 import (
 	"context"
 	"errors"
-	cnd "github.com/konveyor/controller/pkg/condition"
+	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
+	"github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1/snapshot"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web"
 	"github.com/konveyor/virt-controller/pkg/settings"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -138,9 +139,8 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 
 	// Reset the logger.
 	log.Reset()
-	log.SetValues("plan", request.Name)
-
-	log.Info("Reconcile", "plan", request) // TODO: REMOVE
+	log.SetValues("plan", request)
+	log.Info("Reconcile", "plan", request)
 
 	// Fetch the CR.
 	plan := &api.Plan{}
@@ -176,8 +176,8 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 
 	// Ready condition.
 	if !plan.Status.HasBlockerCondition() {
-		plan.Status.SetCondition(cnd.Condition{
-			Type:     cnd.Ready,
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     libcnd.Ready,
 			Status:   True,
 			Category: Required,
 			Message:  "The migration plan is ready.",
@@ -186,6 +186,11 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 
 	// End staging conditions.
 	plan.Status.EndStagingConditions()
+
+	//
+	// Purge snapshots.
+	sn := snapshot.New(plan)
+	sn.Purge()
 
 	// Apply changes.
 	plan.Status.ObservedGeneration = plan.Generation
@@ -216,9 +221,8 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	}
 	var migration *api.Migration
 	for _, migration = range list {
-		if migration.Status.Started == nil {
-			plan.Status.Migration.Started = nil
-			plan.Status.Migration.Completed = nil
+		if !migration.Status.MarkedStarted() {
+			plan.Status.Migration.MarkReset()
 			plan.Status.DeleteCondition(Succeeded, Failed)
 		}
 		break
@@ -227,7 +231,22 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 		return
 	}
 	plan.Status.Migration.Active = migration.UID
-	reQ, err = Migration{Client: r, Plan: plan}.Run()
+	sn := snapshot.New(migration)
+	if !sn.Contains("plan.UID") {
+		sn.Set("plan.UID", plan.UID)
+		sn.Update(plan)
+		err = r.Update(context.TODO(), migration)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+	}
+	runner := Migration{
+		Migration: migration,
+		Plan:      plan,
+		Client:    r,
+	}
+	reQ, err = runner.Run()
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -254,7 +273,7 @@ func (r *Reconciler) pendingMigrations(plan *api.Plan) (list []*api.Migration, e
 		if !migration.Match(plan) {
 			continue
 		}
-		if migration.Status.Completed != nil {
+		if migration.Status.MarkedCompleted() {
 			continue
 		}
 		list = append(list, migration)
