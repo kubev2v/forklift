@@ -120,7 +120,7 @@ func (r MigrationPredicate) Create(e event.CreateEvent) bool {
 	if !cast {
 		return false
 	}
-	pending := object.Status.Completed == nil
+	pending := !object.Status.MarkedCompleted()
 	return pending
 }
 
@@ -142,7 +142,7 @@ func (r MigrationPredicate) Delete(e event.DeleteEvent) bool {
 	if !cast {
 		return false
 	}
-	started := object.Status.Started != nil
+	started := object.Status.MarkedStarted()
 	return started
 }
 

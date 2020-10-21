@@ -2,10 +2,11 @@ package plan
 
 import (
 	"context"
-	cnd "github.com/konveyor/controller/pkg/condition"
+	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
+	"github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1/snapshot"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web/vsphere"
 	"github.com/konveyor/virt-controller/pkg/controller/validation"
@@ -30,11 +31,11 @@ const (
 //
 // Categories
 const (
-	Required = cnd.Required
-	Advisory = cnd.Advisory
-	Critical = cnd.Critical
-	Error    = cnd.Error
-	Warn     = cnd.Warn
+	Required = libcnd.Required
+	Advisory = libcnd.Advisory
+	Critical = libcnd.Critical
+	Error    = libcnd.Error
+	Warn     = libcnd.Warn
 )
 
 //
@@ -48,8 +49,8 @@ const (
 //
 // Statuses
 const (
-	True  = cnd.True
-	False = cnd.False
+	True  = libcnd.True
+	False = libcnd.False
 )
 
 //
@@ -68,8 +69,6 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	if plan.Status.HasCondition(validation.SourceProviderNotReady) {
 		return nil
 	}
-	plan.Status.Migration.SetSource(provider.Referenced.Source)
-	plan.Status.Migration.SetDestination(provider.Referenced.Destination)
 	//
 	// Map
 	network := validation.NetworkPair{Client: r, Provider: provider.Referenced}
@@ -90,10 +89,11 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-
-	//
-	// Map status.
-	plan.Status.Migration.Map = plan.Spec.Map
+	// Snapshot resources.
+	sn := snapshot.New(plan)
+	sn.Set(api.SourceSnapshot, provider.Referenced.Source)
+	sn.Set(api.DestinationSnapshot, provider.Referenced.Destination)
+	sn.Set(api.MapSnapshot, plan.Spec.Map)
 
 	return nil
 }
@@ -117,7 +117,7 @@ func (r *Reconciler) validateVM(provider *api.Provider, plan *api.Plan) error {
 	default:
 		return liberr.Wrap(web.ProviderNotSupportedErr)
 	}
-	notValid := cnd.Condition{
+	notValid := libcnd.Condition{
 		Type:     VMNotValid,
 		Status:   True,
 		Reason:   NotFound,
@@ -125,7 +125,7 @@ func (r *Reconciler) validateVM(provider *api.Provider, plan *api.Plan) error {
 		Message:  "The VMs (list) contains invalid VMs.",
 		Items:    []string{},
 	}
-	notUnique := cnd.Condition{
+	notUnique := libcnd.Condition{
 		Type:     DuplicateVM,
 		Status:   True,
 		Reason:   NotUnique,
@@ -161,7 +161,7 @@ func (r *Reconciler) validateVM(provider *api.Provider, plan *api.Plan) error {
 	}
 	//
 	// Hosts referenced by VMs.
-	notValid = cnd.Condition{
+	notValid = libcnd.Condition{
 		Type:     HostNotValid,
 		Status:   True,
 		Reason:   NotFound,
