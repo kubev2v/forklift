@@ -18,7 +18,7 @@ package provider
 
 import (
 	"context"
-	cnd "github.com/konveyor/controller/pkg/condition"
+	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libcontainer "github.com/konveyor/controller/pkg/inventory/container"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
@@ -153,7 +153,8 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 
 	// Reset the logger.
 	log.Reset()
-	log.SetValues("provider", request.Name)
+	log.SetValues("provider", request)
+	log.Info("Reconcile")
 
 	// Fetch the CR.
 	provider := &api.Provider{}
@@ -197,8 +198,8 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 
 	// Ready condition.
 	if !provider.Status.HasBlockerCondition() {
-		provider.Status.SetCondition(cnd.Condition{
-			Type:     cnd.Ready,
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     libcnd.Ready,
 			Status:   True,
 			Category: Required,
 			Message:  "The provider is ready.",

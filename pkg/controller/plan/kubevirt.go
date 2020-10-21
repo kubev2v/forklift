@@ -2,19 +2,21 @@ package plan
 
 import (
 	"context"
-	"fmt"
+	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/web"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/web/vsphere"
-	kubevirt "github.com/kubevirt/vm-import-operator/pkg/apis/v2v/v1beta1"
-	"gopkg.in/yaml.v2"
+	"github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1/plan"
+	"github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1/snapshot"
+	"github.com/konveyor/virt-controller/pkg/controller/plan/builder"
+	cdi "github.com/kubevirt/containerized-data-importer/pkg/apis/core/v1beta1"
+	vmio "github.com/kubevirt/vm-import-operator/pkg/apis/v2v/v1beta1"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"net/http"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strconv"
+	"strings"
 )
 
 const (
@@ -27,70 +29,104 @@ const (
 )
 
 //
+// Map of VmImport keyed by vmID.
+type ImportMap map[string]VmImport
+
+//
 // Represents kubevirt.
 type KubeVirt struct {
 	// Plan.
-	Plan *api.Plan
-	// Source.
-	Source struct {
-		// Provider.
-		Provider *api.Provider
-		// Secret.
-		Secret *core.Secret
-		// Provider API client.
-		Client web.Client
-	}
-	// Destination.
-	Destination struct {
-		// Provider.
-		Provider *api.Provider
-		// k8s client.
-		Client client.Client
-	}
+	*api.Plan
+	// Migration.
+	*api.Migration
+	// Builder
+	Builder builder.Builder
+	// Secret.
+	Secret *core.Secret
+	// k8s client.
+	Client client.Client
 }
 
 //
-// Map of VM Import CRs keyed by vmID.
-type ImportMap map[string]*kubevirt.VirtualMachineImport
+// Build a ImportMap.
+func (r *KubeVirt) ImportMap() (mp ImportMap, err error) {
+	list, err := r.ListImports()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	mp = ImportMap{}
+	for _, object := range list {
+		mp[object.Labels[kVM]] = object
+	}
+
+	return
+}
 
 //
-// List related VM Import CRs.
-func (r *KubeVirt) ListImports() (ImportMap, error) {
-	result := ImportMap{}
+// List import CRs.
+// Each VmImport represents a VMIO VirtualMachineImport
+// with associated DataVolumes.
+func (r *KubeVirt) ListImports() ([]VmImport, error) {
 	selector := labels.SelectorFromSet(
 		map[string]string{
 			kMigration: string(r.Plan.Status.Migration.Active),
 			kPlan:      string(r.Plan.GetUID()),
 		})
-	list := &kubevirt.VirtualMachineImportList{}
-	err := r.Destination.Client.List(
+	vList := &vmio.VirtualMachineImportList{}
+	err := r.Client.List(
 		context.TODO(),
 		&client.ListOptions{
 			Namespace:     r.Plan.Namespace,
 			LabelSelector: selector,
 		},
-		list)
+		vList)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
-	for _, vmImport := range list.Items {
-		if vmImport.Labels != nil {
-			vmID := vmImport.Labels[kVM]
-			result[vmID] = &vmImport
+	list := []VmImport{}
+	for _, object := range vList.Items {
+		list = append(
+			list,
+			VmImport{
+				VirtualMachineImport: &object,
+			})
+	}
+	dvList := &cdi.DataVolumeList{}
+	err = r.Client.List(
+		context.TODO(),
+		&client.ListOptions{
+			Namespace: r.Plan.Namespace,
+		},
+		dvList)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	for i := range list {
+		vmImport := &list[i]
+		for i := range dvList.Items {
+			dv := &dvList.Items[i]
+			if vmImport.Owner(dv) {
+				vmImport.DataVolumes = append(
+					vmImport.DataVolumes,
+					DataVolume{
+						DataVolume: dv,
+					})
+			}
 		}
 	}
 
-	return result, nil
+	return list, nil
 }
 
 //
-// Create the VM Import CR on the destination.
+// Create the VMIO CR on the destination.
 func (r *KubeVirt) CreateImport(vmID string) (err error) {
 	newImport, err := r.buildImport(vmID)
 	if err != nil {
 		return
 	}
-	err = r.Destination.Client.Create(context.TODO(), newImport)
+	err = r.Client.Create(context.TODO(), newImport)
 	if err != nil {
 		if errors.IsAlreadyExists(err) {
 			err = nil
@@ -110,7 +146,7 @@ func (r *KubeVirt) EnsureNamespace() (err error) {
 			Name: r.Plan.Namespace,
 		},
 	}
-	err = r.Destination.Client.Create(context.TODO(), ns)
+	err = r.Client.Create(context.TODO(), ns)
 	if err != nil {
 		if errors.IsAlreadyExists(err) {
 			err = nil
@@ -121,18 +157,18 @@ func (r *KubeVirt) EnsureNamespace() (err error) {
 }
 
 //
-// Ensure the VM Import mapping exists on the destination.
+// Ensure the VMIO mapping exists on the destination.
 func (r *KubeVirt) EnsureMapping() (err error) {
 	mapping, err := r.buildMapping()
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	err = r.Destination.Client.Create(context.TODO(), mapping)
+	err = r.Client.Create(context.TODO(), mapping)
 	if err != nil {
 		if errors.IsAlreadyExists(err) {
-			found := &kubevirt.ResourceMapping{}
-			err = r.Destination.Client.Get(
+			found := &vmio.ResourceMapping{}
+			err = r.Client.Get(
 				context.TODO(),
 				client.ObjectKey{
 					Namespace: mapping.Namespace,
@@ -144,7 +180,7 @@ func (r *KubeVirt) EnsureMapping() (err error) {
 				return
 			}
 			found.Spec = mapping.Spec
-			err = r.Destination.Client.Update(context.TODO(), found)
+			err = r.Client.Update(context.TODO(), found)
 			if err != nil {
 				err = liberr.Wrap(err)
 			}
@@ -157,18 +193,18 @@ func (r *KubeVirt) EnsureMapping() (err error) {
 }
 
 //
-// Ensure the VM Import secret exists on the destination.
+// Ensure the VMIO secret exists on the destination.
 func (r *KubeVirt) EnsureSecret() (err error) {
 	secret, err := r.buildSecret()
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	err = r.Destination.Client.Create(context.TODO(), secret)
+	err = r.Client.Create(context.TODO(), secret)
 	if err != nil {
 		if errors.IsAlreadyExists(err) {
 			found := &core.Secret{}
-			err = r.Destination.Client.Get(
+			err = r.Client.Get(
 				context.TODO(),
 				client.ObjectKey{
 					Namespace: secret.Namespace,
@@ -180,7 +216,7 @@ func (r *KubeVirt) EnsureSecret() (err error) {
 				return
 			}
 			found.StringData = secret.StringData
-			err = r.Destination.Client.Update(context.TODO(), found)
+			err = r.Client.Update(context.TODO(), found)
 			if err != nil {
 				err = liberr.Wrap(err)
 			}
@@ -193,30 +229,29 @@ func (r *KubeVirt) EnsureSecret() (err error) {
 }
 
 //
-// Build the VM Import CR.
-func (r *KubeVirt) buildImport(vmID string) (object *kubevirt.VirtualMachineImport, err error) {
+// Build the VMIO CR.
+func (r *KubeVirt) buildImport(vmID string) (object *vmio.VirtualMachineImport, err error) {
 	source, err := r.buildSource(vmID)
 	if err != nil {
 		return
 	}
-	labels := map[string]string{
-		kMigration: string(r.Plan.Status.Migration.Active),
-		kPlan:      string(r.Plan.UID),
-		kVM:        vmID,
-	}
-	object = &kubevirt.VirtualMachineImport{
+	object = &vmio.VirtualMachineImport{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace: r.Plan.Namespace,
 			Name:      r.Plan.NameForImport(vmID),
-			Labels:    labels,
+			Labels: map[string]string{
+				kMigration: string(r.Plan.Status.Migration.Active),
+				kPlan:      string(r.Plan.UID),
+				kVM:        vmID,
+			},
 		},
-		Spec: kubevirt.VirtualMachineImportSpec{
+		Spec: vmio.VirtualMachineImportSpec{
 			Source: *source,
-			ProviderCredentialsSecret: kubevirt.ObjectIdentifier{
+			ProviderCredentialsSecret: vmio.ObjectIdentifier{
 				Namespace: &r.Plan.Namespace,
 				Name:      r.Plan.NameForSecret(),
 			},
-			ResourceMapping: &kubevirt.ObjectIdentifier{
+			ResourceMapping: &vmio.ObjectIdentifier{
 				Namespace: &r.Plan.Namespace,
 				Name:      r.Plan.NameForMapping(),
 			},
@@ -228,86 +263,98 @@ func (r *KubeVirt) buildImport(vmID string) (object *kubevirt.VirtualMachineImpo
 
 //
 // Build the ResourceMapping CR.
-func (r *KubeVirt) buildMapping() (object *kubevirt.ResourceMapping, err error) {
-	labels := map[string]string{
-		kMigration: string(r.Plan.Status.Migration.Active),
-		kPlan:      string(r.Plan.UID),
-	}
-	object = &kubevirt.ResourceMapping{
+func (r *KubeVirt) buildMapping() (object *vmio.ResourceMapping, err error) {
+	object = &vmio.ResourceMapping{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace: r.Plan.Namespace,
 			Name:      r.Plan.NameForMapping(),
-			Labels:    labels,
+			Labels: map[string]string{
+				kMigration: string(r.Plan.Status.Migration.Active),
+				kPlan:      string(r.Plan.UID),
+			},
 		},
 	}
-	switch r.Source.Provider.Type() {
-	case api.VSphere:
-		netMap := []kubevirt.NetworkResourceMappingItem{}
-		dsMap := []kubevirt.StorageResourceMappingItem{}
-		for _, network := range r.Plan.Status.Migration.Map.Networks {
-			netMap = append(
-				netMap,
-				kubevirt.NetworkResourceMappingItem{
-					Source: kubevirt.Source{
-						ID: &network.Source.ID,
-					},
-					Target: kubevirt.ObjectIdentifier{
-						Namespace: &network.Destination.Namespace,
-						Name:      network.Destination.Name,
-					},
-				})
-		}
-		for _, ds := range r.Plan.Status.Migration.Map.Datastores {
-			dsMap = append(
-				dsMap,
-				kubevirt.StorageResourceMappingItem{
-					Source: kubevirt.Source{
-						ID: &ds.Source.ID,
-					},
-					Target: kubevirt.ObjectIdentifier{
-						Name: ds.Destination.StorageClass,
-					},
-				})
-		}
-		object.Spec.VmwareMappings = &kubevirt.VmwareMappings{
-			NetworkMappings: &netMap,
-			StorageMappings: &dsMap,
-		}
+	sn := snapshot.New(r.Migration)
+	mp := &plan.Map{}
+	err = sn.Get(api.MapSnapshot, mp)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	err = r.Builder.Mapping(mp, object)
+	if err != nil {
+		err = liberr.Wrap(err)
 	}
 
 	return
 }
 
 //
-// Build the VM Import secret.
+// Build the VMIO secret.
 func (r *KubeVirt) buildSecret() (object *core.Secret, err error) {
-	labels := map[string]string{
-		kMigration: string(r.Plan.Status.Migration.Active),
-		kPlan:      string(r.Plan.UID),
-	}
 	object = &core.Secret{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace: r.Plan.Namespace,
 			Name:      r.Plan.NameForSecret(),
-			Labels:    labels,
+			Labels: map[string]string{
+				kMigration: string(r.Plan.Status.Migration.Active),
+				kPlan:      string(r.Plan.UID),
+			},
 		},
 	}
-	switch r.Source.Provider.Type() {
-	case api.VSphere:
-		in := r.Source.Secret.Data
-		out := map[string]string{
-			"apiUrl":     r.Source.Provider.Spec.URL,
-			"username":   string(in["user"]),
-			"password":   string(in["password"]),
-			"thumbprint": string(in["thumbprint"]),
-		}
-		content, mErr := yaml.Marshal(out)
-		if mErr != nil {
-			mErr = liberr.Wrap(err)
-			return
-		}
-		object.StringData = map[string]string{
-			"vmware": string(content),
+	err = r.Builder.Secret(r.Secret, object)
+	if err != nil {
+		err = liberr.Wrap(err)
+	}
+
+	return
+}
+
+//
+// Build the VMIO Source.
+func (r *KubeVirt) buildSource(vmID string) (object *vmio.VirtualMachineImportSourceSpec, err error) {
+	object = &vmio.VirtualMachineImportSourceSpec{}
+	err = r.Builder.Source(vmID, object)
+	if err != nil {
+		err = liberr.Wrap(err)
+	}
+
+	return
+}
+
+//
+// Represents a CDI DataVolume and add behavior.
+type DataVolume struct {
+	*cdi.DataVolume
+}
+
+//
+// Get conditions.
+func (r *DataVolume) Conditions() (cnd *libcnd.Conditions) {
+	cnd = &libcnd.Conditions{}
+	for _, c := range r.Status.Conditions {
+		cnd.SetCondition(libcnd.Condition{
+			Type:               string(c.Type),
+			Status:             string(c.Status),
+			Reason:             c.Reason,
+			Message:            c.Message,
+			LastTransitionTime: c.LastTransitionTime,
+		})
+	}
+
+	return
+}
+
+//
+// Convert the Status.Progress into a
+// percentage (float).
+func (r *DataVolume) PercentComplete() (pct float64) {
+	s := string(r.Status.Progress)
+	if strings.HasSuffix(s, "%") {
+		s = s[:len(s)-1]
+		n, err := strconv.ParseFloat(s, 64)
+		if err == nil {
+			pct = n / 100
 		}
 	}
 
@@ -315,32 +362,59 @@ func (r *KubeVirt) buildSecret() (object *core.Secret, err error) {
 }
 
 //
-// Build the VM Import Source.
-func (r *KubeVirt) buildSource(vmID string) (object *kubevirt.VirtualMachineImportSourceSpec, err error) {
-	object = &kubevirt.VirtualMachineImportSourceSpec{}
-	switch r.Source.Provider.Type() {
-	case api.VSphere:
-		vm := &vsphere.VM{}
-		status, pErr := r.Source.Client.Get(vm, vmID)
-		if pErr != nil {
-			err = liberr.Wrap(pErr)
+// Represents VMIO VirtualMachineImport with associated DataVolumes.
+type VmImport struct {
+	*vmio.VirtualMachineImport
+	DataVolumes []DataVolume
+}
+
+//
+// Determine if `this` VMIO VirtualMachineImport is the
+// owner of the CDI DataVolume.
+func (r *VmImport) Owner(dv *cdi.DataVolume) bool {
+	for _, ref := range r.Status.DataVolumes {
+		if dv.Name == ref.Name {
+			return true
+		}
+	}
+
+	return false
+}
+
+//
+// Get conditions.
+func (r *VmImport) Conditions() (cnd *libcnd.Conditions) {
+	cnd = &libcnd.Conditions{}
+	for _, c := range r.Status.Conditions {
+		newCnd := libcnd.Condition{
+			Type:   string(c.Type),
+			Status: string(c.Status),
+		}
+		if c.Reason != nil {
+			newCnd.Reason = *c.Reason
+		}
+		if c.Message != nil {
+			newCnd.Message = *c.Message
+		}
+		if c.LastTransitionTime != nil {
+			newCnd.LastTransitionTime = *c.LastTransitionTime
+		}
+		cnd.SetCondition(newCnd)
+	}
+
+	return
+}
+
+//
+// Convert the progress annotation into an int64.
+func (r *VmImport) PercentComplete() (pct float64) {
+	name := "vmimport.v2v.kubevirt.io/progress"
+	if meta.HasAnnotation(r.ObjectMeta, name) {
+		n, err := strconv.ParseFloat(r.Annotations[name], 64)
+		if err != err {
 			return
 		}
-		switch status {
-		case http.StatusOK:
-			uuid := vm.UUID
-			object.Vmware = &kubevirt.VirtualMachineImportVmwareSourceSpec{
-				VM: kubevirt.VirtualMachineImportVmwareSourceVMSpec{
-					ID: &uuid,
-				},
-			}
-		default:
-			err = liberr.New(
-				fmt.Sprintf(
-					"VM %s uuid lookup failed: %s",
-					vmID,
-					http.StatusText(status)))
-		}
+		pct = n / 100
 	}
 
 	return

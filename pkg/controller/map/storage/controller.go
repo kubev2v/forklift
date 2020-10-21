@@ -19,7 +19,7 @@ package storage
 import (
 	"context"
 	"errors"
-	cnd "github.com/konveyor/controller/pkg/condition"
+	libcnd "github.com/konveyor/controller/pkg/condition"
 	"github.com/konveyor/controller/pkg/logging"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
@@ -114,6 +114,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	// Reset the logger.
 	log.Reset()
 	log.SetValues("map", request.Name)
+	log.Info("Reconcile")
 
 	// Fetch the CR.
 	mp := &api.StorageMap{}
@@ -141,8 +142,8 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 
 	// Ready condition.
 	if !mp.Status.HasBlockerCondition() {
-		mp.Status.SetCondition(cnd.Condition{
-			Type:     cnd.Ready,
+		mp.Status.SetCondition(libcnd.Condition{
+			Type:     libcnd.Ready,
 			Status:   True,
 			Category: Required,
 			Message:  "The storage map is ready.",

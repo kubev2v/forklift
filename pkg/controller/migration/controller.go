@@ -18,7 +18,7 @@ package migration
 
 import (
 	"context"
-	cnd "github.com/konveyor/controller/pkg/condition"
+	libcnd "github.com/konveyor/controller/pkg/condition"
 	"github.com/konveyor/controller/pkg/logging"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
@@ -112,8 +112,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	// Reset the logger.
 	log.Reset()
 	log.SetValues("migration", request.Name)
-
-	log.Info("Reconcile", "migration", request) // TODO: REMOVE
+	log.Info("Reconcile")
 
 	// Fetch the CR.
 	migration := &api.Migration{}
@@ -127,7 +126,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	}
 
 	// Detected completed.
-	if migration.Status.Completed != nil {
+	if migration.Status.MarkedCompleted() {
 		return noReQ, nil
 	}
 
@@ -146,8 +145,8 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 
 	// Ready condition.
 	if !migration.Status.HasBlockerCondition() {
-		migration.Status.SetCondition(cnd.Condition{
-			Type:     cnd.Ready,
+		migration.Status.SetCondition(libcnd.Condition{
+			Type:     libcnd.Ready,
 			Status:   True,
 			Category: Required,
 			Message:  "The migration is ready.",
@@ -177,11 +176,10 @@ func (r *Reconciler) reflectPlan(plan *api.Plan, migration *api.Migration) {
 	if !migration.Active(plan) {
 		return
 	}
-	migration.Status.Started = plan.Status.Migration.Started
-	migration.Status.Completed = plan.Status.Migration.Completed
+	migration.Status.Timed = plan.Status.Migration.Timed
 	migration.Status.VMs = plan.Status.Migration.VMs
 	if plan.Status.HasCondition(plancnt.Executing) {
-		migration.Status.SetCondition(cnd.Condition{
+		migration.Status.SetCondition(libcnd.Condition{
 			Type:     Running,
 			Status:   True,
 			Category: Required,
@@ -189,7 +187,7 @@ func (r *Reconciler) reflectPlan(plan *api.Plan, migration *api.Migration) {
 		})
 	}
 	if plan.Status.HasCondition(Succeeded) {
-		migration.Status.SetCondition(cnd.Condition{
+		migration.Status.SetCondition(libcnd.Condition{
 			Type:     Succeeded,
 			Status:   True,
 			Category: Required,
@@ -198,7 +196,7 @@ func (r *Reconciler) reflectPlan(plan *api.Plan, migration *api.Migration) {
 		})
 	}
 	if plan.Status.HasCondition(Failed) {
-		migration.Status.SetCondition(cnd.Condition{
+		migration.Status.SetCondition(libcnd.Condition{
 			Type:     Failed,
 			Status:   True,
 			Category: Required,
