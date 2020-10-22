@@ -18,6 +18,7 @@ func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) *libocp.Re
 		db,
 		provider,
 		secret,
+		&Namespace{},
 		&NetworkAttachmentDefinition{},
 		&StorageClass{})
 }
