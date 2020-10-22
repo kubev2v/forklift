@@ -82,8 +82,6 @@ spec:
                             type: string
                         required:
                         - type
-                        - namespace
-                        - name
                         type: object
                       source:
                         description: Source network.
@@ -114,6 +112,9 @@ spec:
               - source
               - destination
               type: object
+            targetNamespace:
+              description: Target namespace.
+              type: string
             vms:
               description: List of VMs.
               items:

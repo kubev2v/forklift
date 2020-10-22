@@ -7,6 +7,7 @@ import (
 	libocp "github.com/konveyor/controller/pkg/inventory/container/ocp"
 	libref "github.com/konveyor/controller/pkg/ref"
 	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/ocp"
+	core "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -215,5 +216,108 @@ func (r *NetworkAttachmentDefinition) Delete(e event.DeleteEvent) bool {
 //
 // Ignored.
 func (r *NetworkAttachmentDefinition) Generic(e event.GenericEvent) bool {
+	return false
+}
+
+//
+// Namespace
+type Namespace struct {
+	libocp.BaseCollection
+}
+
+//
+// Get the kubernetes object being collected.
+func (r *Namespace) Object() runtime.Object {
+	return &storage.StorageClass{}
+}
+
+//
+// Reconcile.
+// Achieve initial consistency.
+func (r *Namespace) Reconcile(ctx context.Context) (err error) {
+	pClient := r.Reconciler.Client()
+	list := &core.NamespaceList{}
+	err = pClient.List(context.TODO(), nil, list)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	db := r.Reconciler.DB()
+	tx, err := db.Begin()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	defer tx.End()
+	for _, resource := range list.Items {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+		m := &model.Namespace{}
+		m.With(&resource)
+		r.Reconciler.UpdateThreshold(m)
+		Log.Info("Create", libref.ToKind(m), m.String())
+		err = db.Insert(m)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+	}
+	err = tx.Commit()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	return
+}
+
+//
+// Resource created watch event.
+func (r *Namespace) Create(e event.CreateEvent) bool {
+	object, cast := e.Object.(*core.Namespace)
+	if !cast {
+		return false
+	}
+	m := &model.Namespace{}
+	m.With(object)
+	r.Reconciler.Create(m)
+
+	return false
+}
+
+//
+// Resource updated watch event.
+func (r *Namespace) Update(e event.UpdateEvent) bool {
+	object, cast := e.ObjectNew.(*core.Namespace)
+	if !cast {
+		return false
+	}
+	m := &model.Namespace{}
+	m.With(object)
+	r.Reconciler.Update(m)
+
+	return false
+}
+
+//
+// Resource deleted watch event.
+func (r *Namespace) Delete(e event.DeleteEvent) bool {
+	object, cast := e.Object.(*core.Namespace)
+	if !cast {
+		return false
+	}
+	m := &model.Namespace{}
+	m.With(object)
+	r.Reconciler.Delete(m)
+
+	return false
+}
+
+//
+// Ignored.
+func (r *Namespace) Generic(e event.GenericEvent) bool {
 	return false
 }

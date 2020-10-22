@@ -112,6 +112,12 @@ func (m *Provider) With(p *api.Provider) {
 }
 
 //
+// Namespace
+type Namespace struct {
+	Base
+}
+
+//
 // StorageClass
 type StorageClass struct {
 	Base

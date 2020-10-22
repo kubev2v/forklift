@@ -14,9 +14,11 @@ import (
 //
 // Routes.
 const (
-	NetworkAttachmentDefinitionParam = "network"
-	NetworkAttachmentDefinitionsRoot = ProviderRoot + "/networkattachmentdefinitions"
-	NetworkAttachmentDefinitionRoot  = NetworkAttachmentDefinitionsRoot + "/:" + NetworkAttachmentDefinitionParam
+	NetworkAttachmentDefinitionParam    = "network"
+	NetworkAttachmentDefinitionsRoot    = NamespaceRoot + "/networkattachmentdefinitions"
+	AllNetworkAttachmentDefinitionsRoot = ProviderRoot + "/networkattachmentdefinitions"
+	NetworkAttachmentDefinitionRoot     = NetworkAttachmentDefinitionsRoot + "/:" +
+		NetworkAttachmentDefinitionParam
 )
 
 //
@@ -28,14 +30,15 @@ type NetworkAttachmentDefinitionHandler struct {
 //
 // Add routes to the `gin` router.
 func (h *NetworkAttachmentDefinitionHandler) AddRoutes(e *gin.Engine) {
+	e.GET(AllNetworkAttachmentDefinitionsRoot, h.ListAll)
 	e.GET(NetworkAttachmentDefinitionsRoot, h.List)
 	e.GET(NetworkAttachmentDefinitionsRoot+"/", h.List)
 	e.GET(NetworkAttachmentDefinitionRoot, h.Get)
 }
 
 //
-// List resources in a REST collection.
-func (h NetworkAttachmentDefinitionHandler) List(ctx *gin.Context) {
+// List resources in a REST collection (all namespaces).
+func (h NetworkAttachmentDefinitionHandler) ListAll(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
@@ -65,6 +68,38 @@ func (h NetworkAttachmentDefinitionHandler) List(ctx *gin.Context) {
 }
 
 //
+// List resources in a REST collection.
+func (h NetworkAttachmentDefinitionHandler) List(ctx *gin.Context) {
+	status := h.Prepare(ctx)
+	if status != http.StatusOK {
+		ctx.Status(status)
+		return
+	}
+	db := h.Reconciler.DB()
+	list := []model.NetworkAttachmentDefinition{}
+	err := db.List(
+		&list,
+		libmodel.ListOptions{
+			Predicate: libmodel.Eq("Namespace", ctx.Param(Ns2Param)),
+			Page:      &h.Page,
+		})
+	if err != nil {
+		Log.Trace(err)
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
+	content := []interface{}{}
+	for _, m := range list {
+		r := &NetworkAttachmentDefinition{}
+		r.With(&m)
+		r.SelfLink = h.Link(h.Provider, &m)
+		content = append(content, r.Content(h.Detail))
+	}
+
+	ctx.JSON(http.StatusOK, content)
+}
+
+//
 // Get a specific REST resource.
 func (h NetworkAttachmentDefinitionHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -74,7 +109,8 @@ func (h NetworkAttachmentDefinitionHandler) Get(ctx *gin.Context) {
 	}
 	m := &model.NetworkAttachmentDefinition{
 		Base: model.Base{
-			Name: ctx.Param(NetworkAttachmentDefinitionParam),
+			Namespace: ctx.Param(Ns2Param),
+			Name:      ctx.Param(NetworkAttachmentDefinitionParam),
 		},
 	}
 	db := h.Reconciler.DB()
@@ -104,6 +140,7 @@ func (h NetworkAttachmentDefinitionHandler) Link(p *api.Provider, m *model.Netwo
 		base.Params{
 			base.NsParam:                     p.Namespace,
 			base.ProviderParam:               p.Name,
+			Ns2Param:                         p.Namespace,
 			NetworkAttachmentDefinitionParam: m.Name,
 		})
 }

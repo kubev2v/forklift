@@ -28,6 +28,8 @@ import (
 type PlanSpec struct {
 	// Description
 	Description string `json:"description,omitempty"`
+	// Target namespace.
+	TargetNamespace string `json:"targetNamespace,omitempty"`
 	// Providers.
 	Provider ProviderPair `json:"provider"`
 	// Resource map.
