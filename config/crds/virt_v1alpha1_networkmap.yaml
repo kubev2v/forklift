@@ -48,8 +48,6 @@ spec:
                         type: string
                     required:
                     - type
-                    - namespace
-                    - name
                     type: object
                   source:
                     description: Source network.

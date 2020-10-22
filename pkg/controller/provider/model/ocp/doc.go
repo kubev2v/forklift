@@ -18,5 +18,6 @@ func All() []interface{} {
 		&Provider{},
 		&NetworkAttachmentDefinition{},
 		&StorageClass{},
+		&Namespace{},
 	}
 }

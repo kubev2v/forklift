@@ -32,6 +32,15 @@ func (r *Resolver) Path(object interface{}, id string) (path string, err error) 
 				Name:      name,
 			},
 		})
+	case *Namespace:
+		h := NamespaceHandler{}
+		path = h.Link(
+			r.Provider,
+			&model.Namespace{
+				Base: model.Base{
+					Name: name,
+				},
+			})
 	case *StorageClass:
 		h := StorageClassHandler{}
 		path = h.Link(
