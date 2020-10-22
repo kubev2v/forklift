@@ -34,6 +34,11 @@ func Handlers(container *container.Container) []libweb.RequestHandler {
 				Container: container,
 			},
 		},
+		&NamespaceHandler{
+			Handler: base.Handler{
+				Container: container,
+			},
+		},
 		&StorageClassHandler{
 			Handler: base.Handler{
 				Container: container,

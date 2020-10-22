@@ -77,7 +77,7 @@ func (r *KubeVirt) ListImports() ([]VmImport, error) {
 	err := r.Client.List(
 		context.TODO(),
 		&client.ListOptions{
-			Namespace:     r.Plan.Namespace,
+			Namespace:     r.namespace(),
 			LabelSelector: selector,
 		},
 		vList)
@@ -96,7 +96,7 @@ func (r *KubeVirt) ListImports() ([]VmImport, error) {
 	err = r.Client.List(
 		context.TODO(),
 		&client.ListOptions{
-			Namespace: r.Plan.Namespace,
+			Namespace: r.namespace(),
 		},
 		dvList)
 	if err != nil {
@@ -143,7 +143,7 @@ func (r *KubeVirt) CreateImport(vmID string) (err error) {
 func (r *KubeVirt) EnsureNamespace() (err error) {
 	ns := &core.Namespace{
 		ObjectMeta: meta.ObjectMeta{
-			Name: r.Plan.Namespace,
+			Name: r.namespace(),
 		},
 	}
 	err = r.Client.Create(context.TODO(), ns)
@@ -235,9 +235,10 @@ func (r *KubeVirt) buildImport(vmID string) (object *vmio.VirtualMachineImport, 
 	if err != nil {
 		return
 	}
+	namespace := r.namespace()
 	object = &vmio.VirtualMachineImport{
 		ObjectMeta: meta.ObjectMeta{
-			Namespace: r.Plan.Namespace,
+			Namespace: r.namespace(),
 			Name:      r.Plan.NameForImport(vmID),
 			Labels: map[string]string{
 				kMigration: string(r.Plan.Status.Migration.Active),
@@ -248,11 +249,11 @@ func (r *KubeVirt) buildImport(vmID string) (object *vmio.VirtualMachineImport, 
 		Spec: vmio.VirtualMachineImportSpec{
 			Source: *source,
 			ProviderCredentialsSecret: vmio.ObjectIdentifier{
-				Namespace: &r.Plan.Namespace,
+				Namespace: &namespace,
 				Name:      r.Plan.NameForSecret(),
 			},
 			ResourceMapping: &vmio.ObjectIdentifier{
-				Namespace: &r.Plan.Namespace,
+				Namespace: &namespace,
 				Name:      r.Plan.NameForMapping(),
 			},
 		},
@@ -266,7 +267,7 @@ func (r *KubeVirt) buildImport(vmID string) (object *vmio.VirtualMachineImport, 
 func (r *KubeVirt) buildMapping() (object *vmio.ResourceMapping, err error) {
 	object = &vmio.ResourceMapping{
 		ObjectMeta: meta.ObjectMeta{
-			Namespace: r.Plan.Namespace,
+			Namespace: r.namespace(),
 			Name:      r.Plan.NameForMapping(),
 			Labels: map[string]string{
 				kMigration: string(r.Plan.Status.Migration.Active),
@@ -294,7 +295,7 @@ func (r *KubeVirt) buildMapping() (object *vmio.ResourceMapping, err error) {
 func (r *KubeVirt) buildSecret() (object *core.Secret, err error) {
 	object = &core.Secret{
 		ObjectMeta: meta.ObjectMeta{
-			Namespace: r.Plan.Namespace,
+			Namespace: r.namespace(),
 			Name:      r.Plan.NameForSecret(),
 			Labels: map[string]string{
 				kMigration: string(r.Plan.Status.Migration.Active),
@@ -415,6 +416,19 @@ func (r *VmImport) PercentComplete() (pct float64) {
 			return
 		}
 		pct = n / 100
+	}
+
+	return
+}
+
+//
+// Get the target namespace.
+// Default to `plan` namespace when not specified
+// in the plan spec.
+func (r *KubeVirt) namespace() (ns string) {
+	ns = r.Plan.Spec.TargetNamespace
+	if ns == "" {
+		ns = r.Plan.Namespace
 	}
 
 	return

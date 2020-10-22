@@ -106,7 +106,9 @@ func (h *Handler) setDetail(ctx *gin.Context) int {
 // Build link.
 func (h *Handler) Link(path string, params Params) string {
 	for k, v := range params {
-		path = strings.Replace(path, ":"+k, v, 1)
+		if len(v) > 0 {
+			path = strings.Replace(path, ":"+k, v, 1)
+		}
 	}
 
 	return path
