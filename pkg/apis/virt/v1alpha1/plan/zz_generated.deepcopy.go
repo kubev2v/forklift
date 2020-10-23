@@ -215,11 +215,6 @@ func (in *VM) DeepCopyInto(out *VM) {
 		*out = new(Hook)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.Host != nil {
-		in, out := &in.Host, &out.Host
-		*out = new(v1.ObjectReference)
-		**out = **in
-	}
 	return
 }
 

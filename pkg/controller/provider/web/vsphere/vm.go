@@ -126,6 +126,7 @@ type VM struct {
 	IpAddress           string          `json:"ipAddress"`
 	Networks            model.RefList   `json:"networks"`
 	Disks               []model.Disk    `json:"disks"`
+	Host                model.Ref       `json:"host"`
 	Concerns            []model.Concern `json:"concerns"`
 }
 
@@ -147,6 +148,7 @@ func (r *VM) With(m *model.VM) {
 	r.IpAddress = m.IpAddress
 	r.Networks = *model.RefListPtr().With(m.Networks)
 	r.Disks = m.DecodeDisks()
+	r.Host = *(&model.Ref{}).With(m.Host)
 	r.Concerns = m.DecodeConcerns()
 	// TODO: EXAMPLE FOR UI DEV --REMOVE THIS.
 	r.Concerns = append(

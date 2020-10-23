@@ -1,6 +1,7 @@
 package vsphere
 
 import (
+	"context"
 	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libitr "github.com/konveyor/controller/pkg/itinerary"
@@ -11,27 +12,35 @@ import (
 	vmio "github.com/kubevirt/vm-import-operator/pkg/apis/v2v/v1beta1"
 	"gopkg.in/yaml.v2"
 	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"net/http"
-)
-
-//
-// Annotations.
-const (
-	Disk = "Disk"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 //
 // vSphere builder.
 type Builder struct {
-	// Provider.
-	Provider *api.Provider
 	// Client.
-	Client web.Client
+	Client client.Client
+	// Provider API client.
+	Inventory web.Client
+	// Source provider.
+	Provider *api.Provider
+	// Host map.
+	HostMap map[string]*api.Host
 }
 
 //
 // Build the VMIO secret.
-func (r *Builder) Secret(in, object *core.Secret) (err error) {
+func (r *Builder) Secret(vmID string, in, object *core.Secret) (err error) {
+	hostSecret, sErr := r.hostSecret(vmID)
+	if sErr != nil {
+		err = liberr.Wrap(sErr)
+		return
+	}
+	if hostSecret != nil {
+		in = hostSecret
+	}
 	content, mErr := yaml.Marshal(
 		map[string]string{
 			"apiUrl":     r.Provider.Spec.URL,
@@ -40,11 +49,56 @@ func (r *Builder) Secret(in, object *core.Secret) (err error) {
 			"thumbprint": string(in.Data["thumbprint"]),
 		})
 	if mErr != nil {
-		mErr = liberr.Wrap(err)
+		err = liberr.Wrap(mErr)
 		return
 	}
 	object.StringData = map[string]string{
 		"vmware": string(content),
+	}
+
+	return
+}
+
+//
+// Get the host secret.
+func (r *Builder) hostSecret(vmID string) (secret *core.Secret, err error) {
+	host, fErr := r.host(vmID)
+	if fErr != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	ref := host.Spec.Secret
+	secret = &core.Secret{}
+	err = r.Client.Get(
+		context.TODO(),
+		client.ObjectKey{
+			Namespace: ref.Namespace,
+			Name:      ref.Name,
+		},
+		secret)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			secret = nil
+		} else {
+			err = liberr.Wrap(err)
+		}
+	}
+
+	return
+}
+
+//
+// Find host ID for VM.
+func (r *Builder) host(vmID string) (host *api.Host, err error) {
+	vm := &vsphere.VM{}
+	status, pErr := r.Inventory.Get(vm, vmID)
+	if pErr != nil {
+		err = liberr.Wrap(pErr)
+		return
+	}
+	switch status {
+	case http.StatusOK:
+		host = r.HostMap[vm.Host.ID]
 	}
 
 	return
@@ -92,7 +146,7 @@ func (r *Builder) Mapping(mp *plan.Map, object *vmio.ResourceMapping) (err error
 // Build the VMIO VM Source.
 func (r *Builder) Source(vmID string, object *vmio.VirtualMachineImportSourceSpec) (err error) {
 	vm := &vsphere.VM{}
-	status, pErr := r.Client.Get(vm, vmID)
+	status, pErr := r.Inventory.Get(vm, vmID)
 	if pErr != nil {
 		err = liberr.Wrap(pErr)
 		return
@@ -120,7 +174,7 @@ func (r *Builder) Source(vmID string, object *vmio.VirtualMachineImportSourceSpe
 // Build tasks.
 func (r *Builder) Tasks(vmID string) (list []*plan.Task, err error) {
 	vm := &vsphere.VM{}
-	status, pErr := r.Client.Get(vm, vmID)
+	status, pErr := r.Inventory.Get(vm, vmID)
 	if pErr != nil {
 		err = liberr.Wrap(pErr)
 		return

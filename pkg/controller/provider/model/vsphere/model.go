@@ -168,6 +168,7 @@ type VM struct {
 	IpAddress           string `sql:""`
 	Disks               string `sql:""`
 	Networks            string `sql:""`
+	Host                string `sql:""`
 	Concerns            string `sql:""`
 }
 

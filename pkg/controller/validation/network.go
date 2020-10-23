@@ -63,7 +63,7 @@ func (r *NetworkPair) validateSource(list []mapped.NetworkPair) (result libcnd.C
 	if provider == nil {
 		return
 	}
-	pClient, err := web.NewClient(provider)
+	inventory, err := web.NewClient(provider)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -80,7 +80,7 @@ func (r *NetworkPair) validateSource(list []mapped.NetworkPair) (result libcnd.C
 		return
 	}
 	for _, entry := range list {
-		status, pErr := pClient.Get(resource, entry.Source.ID)
+		status, pErr := inventory.Get(resource, entry.Source.ID)
 		if pErr != nil {
 			err = liberr.Wrap(pErr)
 			return
@@ -114,7 +114,7 @@ func (r *NetworkPair) validateDestination(list []mapped.NetworkPair) (result lib
 	if provider == nil {
 		return
 	}
-	pClient, err := web.NewClient(provider)
+	inventory, err := web.NewClient(provider)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -140,7 +140,7 @@ next:
 			id := path.Join(
 				entry.Destination.Namespace,
 				entry.Destination.Name)
-			status, pErr := pClient.Get(resource, id)
+			status, pErr := inventory.Get(resource, id)
 			if pErr != nil {
 				err = liberr.Wrap(pErr)
 				return
