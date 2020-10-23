@@ -1,9 +1,5 @@
 package plan
 
-import (
-	core "k8s.io/api/core/v1"
-)
-
 //
 // A VM listed on the plan.
 type VM struct {
@@ -13,8 +9,6 @@ type VM struct {
 	ID string `json:"id"`
 	// Enable hooks.
 	Hook *Hook `json:"hook,omitempty"`
-	// Host
-	Host *core.ObjectReference `json:"host,omitempty" ref:"Host"`
 }
 
 //

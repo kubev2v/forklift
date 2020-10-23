@@ -129,9 +129,6 @@ spec:
                         description: Pre-migration hook.
                         type: object
                     type: object
-                  host:
-                    description: Host
-                    type: object
                   id:
                     description: 'The VM identifier. For:   - vSphere: The managed
                       object ID.'

@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strconv"
 	"strings"
@@ -121,18 +122,15 @@ func (r *KubeVirt) ListImports() ([]VmImport, error) {
 
 //
 // Create the VMIO CR on the destination.
-func (r *KubeVirt) CreateImport(vmID string) (err error) {
+func (r *KubeVirt) EnsureImport(vmID string) (err error) {
 	newImport, err := r.buildImport(vmID)
 	if err != nil {
 		return
 	}
-	err = r.Client.Create(context.TODO(), newImport)
+	err = r.ensureObject(newImport)
 	if err != nil {
-		if errors.IsAlreadyExists(err) {
-			err = nil
-		} else {
-			err = liberr.Wrap(err)
-		}
+		err = liberr.Wrap(err)
+		return
 	}
 
 	return
@@ -164,29 +162,10 @@ func (r *KubeVirt) EnsureMapping() (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
-	err = r.Client.Create(context.TODO(), mapping)
+	err = r.ensureObject(mapping)
 	if err != nil {
-		if errors.IsAlreadyExists(err) {
-			found := &vmio.ResourceMapping{}
-			err = r.Client.Get(
-				context.TODO(),
-				client.ObjectKey{
-					Namespace: mapping.Namespace,
-					Name:      mapping.Name,
-				},
-				found)
-			if err != nil {
-				err = liberr.Wrap(err)
-				return
-			}
-			found.Spec = mapping.Spec
-			err = r.Client.Update(context.TODO(), found)
-			if err != nil {
-				err = liberr.Wrap(err)
-			}
-		}
-	} else {
 		err = liberr.Wrap(err)
+		return
 	}
 
 	return
@@ -194,35 +173,16 @@ func (r *KubeVirt) EnsureMapping() (err error) {
 
 //
 // Ensure the VMIO secret exists on the destination.
-func (r *KubeVirt) EnsureSecret() (err error) {
-	secret, err := r.buildSecret()
+func (r *KubeVirt) EnsureSecret(vmID string) (err error) {
+	secret, err := r.buildSecret(vmID)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	err = r.Client.Create(context.TODO(), secret)
+	err = r.ensureObject(secret)
 	if err != nil {
-		if errors.IsAlreadyExists(err) {
-			found := &core.Secret{}
-			err = r.Client.Get(
-				context.TODO(),
-				client.ObjectKey{
-					Namespace: secret.Namespace,
-					Name:      secret.Name,
-				},
-				found)
-			if err != nil {
-				err = liberr.Wrap(err)
-				return
-			}
-			found.StringData = secret.StringData
-			err = r.Client.Update(context.TODO(), found)
-			if err != nil {
-				err = liberr.Wrap(err)
-			}
-		}
-	} else {
 		err = liberr.Wrap(err)
+		return
 	}
 
 	return
@@ -239,7 +199,7 @@ func (r *KubeVirt) buildImport(vmID string) (object *vmio.VirtualMachineImport, 
 	object = &vmio.VirtualMachineImport{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace: r.namespace(),
-			Name:      r.Plan.NameForImport(vmID),
+			Name:      r.nameForImport(vmID),
 			Labels: map[string]string{
 				kMigration: string(r.Plan.Status.Migration.Active),
 				kPlan:      string(r.Plan.UID),
@@ -250,11 +210,11 @@ func (r *KubeVirt) buildImport(vmID string) (object *vmio.VirtualMachineImport, 
 			Source: *source,
 			ProviderCredentialsSecret: vmio.ObjectIdentifier{
 				Namespace: &namespace,
-				Name:      r.Plan.NameForSecret(),
+				Name:      r.nameForSecret(vmID),
 			},
 			ResourceMapping: &vmio.ObjectIdentifier{
 				Namespace: &namespace,
-				Name:      r.Plan.NameForMapping(),
+				Name:      r.nameForMapping(),
 			},
 		},
 	}
@@ -268,7 +228,7 @@ func (r *KubeVirt) buildMapping() (object *vmio.ResourceMapping, err error) {
 	object = &vmio.ResourceMapping{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace: r.namespace(),
-			Name:      r.Plan.NameForMapping(),
+			Name:      r.nameForMapping(),
 			Labels: map[string]string{
 				kMigration: string(r.Plan.Status.Migration.Active),
 				kPlan:      string(r.Plan.UID),
@@ -292,18 +252,18 @@ func (r *KubeVirt) buildMapping() (object *vmio.ResourceMapping, err error) {
 
 //
 // Build the VMIO secret.
-func (r *KubeVirt) buildSecret() (object *core.Secret, err error) {
+func (r *KubeVirt) buildSecret(vmID string) (object *core.Secret, err error) {
 	object = &core.Secret{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace: r.namespace(),
-			Name:      r.Plan.NameForSecret(),
+			Name:      r.nameForSecret(vmID),
 			Labels: map[string]string{
 				kMigration: string(r.Plan.Status.Migration.Active),
 				kPlan:      string(r.Plan.UID),
 			},
 		},
 	}
-	err = r.Builder.Secret(r.Secret, object)
+	err = r.Builder.Secret(vmID, r.Secret, object)
 	if err != nil {
 		err = liberr.Wrap(err)
 	}
@@ -321,6 +281,47 @@ func (r *KubeVirt) buildSource(vmID string) (object *vmio.VirtualMachineImportSo
 	}
 
 	return
+}
+
+//
+// Generated name for kubevirt VM Import mapping CR.
+func (r *KubeVirt) nameForMapping() string {
+	uid := string(r.Plan.UID)
+	parts := []string{
+		"plan",
+		r.Plan.Name,
+		uid[len(uid)-4:],
+	}
+
+	return strings.Join(parts, "-")
+}
+
+//
+// Generated name for kubevirt VM Import CR secret.
+func (r *KubeVirt) nameForSecret(vmID string) string {
+	uid := string(r.Plan.UID)
+	parts := []string{
+		"plan",
+		r.Plan.Name,
+		vmID,
+		uid[len(uid)-4:],
+	}
+
+	return strings.Join(parts, "-")
+}
+
+//
+// Generated name for kubevirt VM Import CR.
+func (r *KubeVirt) nameForImport(vmID string) string {
+	uid := string(r.Plan.Status.Migration.Active)
+	parts := []string{
+		"plan",
+		r.Plan.Name,
+		vmID,
+		uid[len(uid)-4:],
+	}
+
+	return strings.Join(parts, "-")
 }
 
 //
@@ -429,6 +430,43 @@ func (r *KubeVirt) namespace() (ns string) {
 	ns = r.Plan.Spec.TargetNamespace
 	if ns == "" {
 		ns = r.Plan.Namespace
+	}
+
+	return
+}
+
+//
+// Ensure resource.
+// Resource is created/updated as needed.
+func (r *KubeVirt) ensureObject(object runtime.Object) (err error) {
+	retry := 3
+	defer func() {
+		err = liberr.Wrap(err)
+	}()
+	for {
+		err = r.Client.Create(context.TODO(), object)
+		if errors.IsAlreadyExists(err) && retry > 0 {
+			retry--
+			err = r.deleteObject(object)
+			if err != nil {
+				break
+			}
+		} else {
+			break
+		}
+	}
+
+	return
+}
+
+//
+// Delete a resource.
+func (r *KubeVirt) deleteObject(object runtime.Object) (err error) {
+	err = r.Client.Delete(context.TODO(), object)
+	if !errors.IsNotFound(err) {
+		err = liberr.Wrap(err)
+	} else {
+		err = nil
 	}
 
 	return
