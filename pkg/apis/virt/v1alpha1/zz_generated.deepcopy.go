@@ -32,6 +32,7 @@ func (in *Host) DeepCopyInto(out *Host) {
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	out.Spec = in.Spec
 	in.Status.DeepCopyInto(&out.Status)
+	in.Referenced.DeepCopyInto(&out.Referenced)
 	return
 }
 
@@ -90,6 +91,7 @@ func (in *HostList) DeepCopyObject() runtime.Object {
 func (in *HostSpec) DeepCopyInto(out *HostSpec) {
 	*out = *in
 	out.Provider = in.Provider
+	out.Secret = in.Secret
 	return
 }
 

@@ -88,8 +88,6 @@ type Migration struct {
 		provider *api.Provider
 		// Secret.
 		secret *core.Secret
-		// Provider API client.
-		client web.Client
 	}
 	// Destination.
 	destination struct {
@@ -100,12 +98,16 @@ type Migration struct {
 		// k8s client.
 		client client.Client
 	}
+	// Provider API client.
+	inventory web.Client
 	// Builder
 	builder builder.Builder
 	// kubevirt.
 	kubevirt KubeVirt
 	// VM import CRs.
 	importMap ImportMap
+	// Host map.
+	hostMap map[string]*api.Host
 }
 
 //
@@ -152,7 +154,12 @@ func (r Migration) Run() (reQ time.Duration, err error) {
 		case PreHookCreated:
 			vm.Phase = r.next(vm.Phase)
 		case CreateImport:
-			err = r.kubevirt.CreateImport(vm.ID)
+			err = r.kubevirt.EnsureSecret(vm.ID)
+			if err != nil {
+				err = liberr.Wrap(err)
+				return
+			}
+			err = r.kubevirt.EnsureImport(vm.ID)
 			if err != nil {
 				err = liberr.Wrap(err)
 				return
@@ -218,7 +225,7 @@ func (r *Migration) init() (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
-	r.source.client, err = web.NewClient(r.source.provider)
+	r.inventory, err = web.NewClient(r.source.provider)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -250,9 +257,18 @@ func (r *Migration) init() (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
+	err = r.buildHostMap()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
 	//
 	// Builder & Reflector
-	r.builder, err = builder.New(r.source.provider, r.source.client)
+	r.builder, err = builder.New(
+		r.Client,
+		r.inventory,
+		r.source.provider,
+		r.hostMap)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -302,11 +318,6 @@ func (r *Migration) begin() (err error) {
 			Durable:  true,
 		})
 	err = r.kubevirt.EnsureNamespace()
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	err = r.kubevirt.EnsureSecret()
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -569,6 +580,32 @@ func (r *Migration) updatePipeline(vm *plan.VMStatus, imp *VmImport) {
 			vm.AddError(step.Error.Reasons...)
 		}
 	}
+}
+
+//
+// Build the host map (as needed).
+func (r *Migration) buildHostMap() (err error) {
+	list := &api.HostList{}
+	err = r.Client.List(
+		context.TODO(),
+		&client.ListOptions{Namespace: r.Migration.Namespace},
+		list)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	r.hostMap = map[string]*api.Host{}
+	for _, host := range list.Items {
+		if !host.Status.HasCondition(libcnd.Ready) {
+			continue
+		}
+		if r.source.provider.Namespace == host.Spec.Provider.Namespace &&
+			r.source.provider.Name == host.Spec.Provider.Name {
+			r.hostMap[host.Spec.ID] = &host
+		}
+	}
+
+	return
 }
 
 //

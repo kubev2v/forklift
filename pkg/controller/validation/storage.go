@@ -55,7 +55,7 @@ func (r *StoragePair) validateSource(list []mapped.StoragePair) (result libcnd.C
 	if provider == nil {
 		return
 	}
-	pClient, err := web.NewClient(provider)
+	inventory, err := web.NewClient(provider)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -72,7 +72,7 @@ func (r *StoragePair) validateSource(list []mapped.StoragePair) (result libcnd.C
 		return
 	}
 	for _, entry := range list {
-		status, pErr := pClient.Get(resource, entry.Source.ID)
+		status, pErr := inventory.Get(resource, entry.Source.ID)
 		if pErr != nil {
 			err = liberr.Wrap(pErr)
 			return
@@ -107,7 +107,7 @@ func (r *StoragePair) validateDestination(list []mapped.StoragePair) (result lib
 	if provider == nil {
 		return
 	}
-	pClient, err := web.NewClient(provider)
+	inventory, err := web.NewClient(provider)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -125,7 +125,7 @@ func (r *StoragePair) validateDestination(list []mapped.StoragePair) (result lib
 	}
 	for _, entry := range list {
 		name := entry.Destination.StorageClass
-		status, pErr := pClient.Get(resource, name)
+		status, pErr := inventory.Get(resource, name)
 		if pErr != nil {
 			err = liberr.Wrap(pErr)
 			return
