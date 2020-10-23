@@ -438,6 +438,10 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				if n, cast := p.Val.(int32); cast {
 					v.model.BalloonedMemory = n
 				}
+			case fRuntimeHost:
+				ref := Ref{}
+				ref.With(p.Val)
+				v.model.Host = ref.Encode()
 			case fVmIpAddress:
 				if s, cast := p.Val.(string); cast {
 					v.model.IpAddress = s

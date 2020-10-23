@@ -33,6 +33,8 @@ type HostSpec struct {
 	ID string `json:"id"`
 	// IP address used for disk transfer.
 	IpAddress string `json:"ipAddress"`
+	// Credentials.
+	Secret core.ObjectReference `json:"secret,omitempty"`
 }
 
 //
@@ -55,6 +57,9 @@ type Host struct {
 	meta.ObjectMeta `json:"metadata,omitempty"`
 	Spec            HostSpec   `json:"spec,omitempty"`
 	Status          HostStatus `json:"status,omitempty"`
+	// Referenced resources populated
+	// during validation.
+	Referenced `json:"-"`
 }
 
 //

@@ -8,6 +8,7 @@ import (
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web"
 	vmio "github.com/kubevirt/vm-import-operator/pkg/apis/v2v/v1beta1"
 	core "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 //
@@ -16,7 +17,7 @@ import (
 // specific constructs.
 type Builder interface {
 	// Build secret.
-	Secret(in, object *core.Secret) (err error)
+	Secret(vmID string, in, object *core.Secret) (err error)
 	// Build VMIO resource mapping.
 	Mapping(mp *plan.Map, object *vmio.ResourceMapping) error
 	// Build VMIO import source.
@@ -27,12 +28,19 @@ type Builder interface {
 
 //
 // Builder factory.
-func New(provider *api.Provider, client web.Client) (builder Builder, err error) {
+func New(
+	client client.Client,
+	inventory web.Client,
+	provider *api.Provider,
+	hostMap map[string]*api.Host) (builder Builder, err error) {
+	//
 	switch provider.Type() {
 	case api.VSphere:
 		builder = &vsphere.Builder{
-			Provider: provider,
-			Client:   client,
+			Client:    client,
+			Inventory: inventory,
+			Provider:  provider,
+			HostMap:   hostMap,
 		}
 	default:
 		liberr.New("provider not supported.")

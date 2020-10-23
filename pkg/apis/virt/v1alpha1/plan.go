@@ -20,7 +20,6 @@ import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	"github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1/plan"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"strings"
 )
 
 //
@@ -74,46 +73,6 @@ type Plan struct {
 	meta.ObjectMeta `json:"metadata,omitempty"`
 	Spec            PlanSpec   `json:"spec,omitempty"`
 	Status          PlanStatus `json:"status,omitempty"`
-}
-
-//
-// Generated name for kubevirt VM Import mapping CR.
-func (r *Plan) NameForMapping() string {
-	uid := string(r.GetUID())
-	parts := []string{
-		"plan",
-		r.Name,
-		uid[len(uid)-4:],
-	}
-
-	return strings.Join(parts, "-")
-}
-
-//
-// Generated name for kubevirt VM Import CR secret.
-func (r *Plan) NameForSecret() string {
-	uid := string(r.GetUID())
-	parts := []string{
-		"plan",
-		r.Name,
-		uid[len(uid)-4:],
-	}
-
-	return strings.Join(parts, "-")
-}
-
-//
-// Generated name for kubevirt VM Import CR.
-func (r *Plan) NameForImport(vmID string) string {
-	uid := string(r.Status.Migration.Active)
-	parts := []string{
-		"plan",
-		r.Name,
-		vmID,
-		uid[len(uid)-4:],
-	}
-
-	return strings.Join(parts, "-")
 }
 
 //

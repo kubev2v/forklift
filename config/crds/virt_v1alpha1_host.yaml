@@ -40,6 +40,9 @@ spec:
             provider:
               description: Provider
               type: object
+            secret:
+              description: Credentials.
+              type: object
           required:
           - provider
           - id

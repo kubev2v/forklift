@@ -86,6 +86,7 @@ const (
 	fGuestName           = "summary.config.guestFullName"
 	fBalloonedMemory     = "summary.quickStats.balloonedMemory"
 	fVmIpAddress         = "summary.guest.ipAddress"
+	fRuntimeHost         = "runtime.host"
 )
 
 //
@@ -555,6 +556,7 @@ func (r *Reconciler) propertySpec() []types.PropertySpec {
 				fVmIpAddress,
 				fDatastore,
 				fNetwork,
+				fRuntimeHost,
 			},
 		},
 	}
