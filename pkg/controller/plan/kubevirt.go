@@ -86,11 +86,12 @@ func (r *KubeVirt) ListImports() ([]VmImport, error) {
 		return nil, liberr.Wrap(err)
 	}
 	list := []VmImport{}
-	for _, object := range vList.Items {
+	for i := range vList.Items {
+		vmImport := &vList.Items[i]
 		list = append(
 			list,
 			VmImport{
-				VirtualMachineImport: &object,
+				VirtualMachineImport: vmImport,
 			})
 	}
 	dvList := &cdi.DataVolumeList{}
