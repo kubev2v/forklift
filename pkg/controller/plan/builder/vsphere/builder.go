@@ -10,10 +10,11 @@ import (
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web/vsphere"
 	vmio "github.com/kubevirt/vm-import-operator/pkg/apis/v2v/v1beta1"
+	"github.com/vmware/govmomi/vim25"
 	"gopkg.in/yaml.v2"
 	core "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"net/http"
+	liburl "net/url"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -33,17 +34,32 @@ type Builder struct {
 //
 // Build the VMIO secret.
 func (r *Builder) Secret(vmID string, in, object *core.Secret) (err error) {
-	hostSecret, sErr := r.hostSecret(vmID)
-	if sErr != nil {
-		err = liberr.Wrap(sErr)
+	url := r.Provider.Spec.URL
+	var hostFound bool
+	var host *api.Host
+	host, hostFound, err = r.host(vmID)
+	if err != nil {
+		err = liberr.Wrap(err)
 		return
 	}
-	if hostSecret != nil {
+	if hostFound {
+		hostURL := liburl.URL{
+			Scheme: "https",
+			Host: host.Spec.IpAddress,
+			Path: vim25.Path,
+		}
+		hostSecret, nErr := r.hostSecret(host)
+		if nErr != nil {
+			err = liberr.Wrap(nErr)
+			return
+		}
+		url = hostURL.String()
 		in = hostSecret
+
 	}
 	content, mErr := yaml.Marshal(
 		map[string]string{
-			"apiUrl":     r.Provider.Spec.URL,
+			"apiUrl":     url,
 			"username":   string(in.Data["user"]),
 			"password":   string(in.Data["password"]),
 			"thumbprint": string(in.Data["thumbprint"]),
@@ -60,16 +76,8 @@ func (r *Builder) Secret(vmID string, in, object *core.Secret) (err error) {
 }
 
 //
-// Get the host secret.
-func (r *Builder) hostSecret(vmID string) (secret *core.Secret, err error) {
-	host, fErr := r.host(vmID)
-	if fErr != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	if host == nil {
-		return
-	}
+// Get the (optional) host and secret.
+func (r *Builder) hostSecret(host *api.Host) (secret *core.Secret, err error) {
 	ref := host.Spec.Secret
 	secret = &core.Secret{}
 	err = r.Client.Get(
@@ -80,11 +88,7 @@ func (r *Builder) hostSecret(vmID string) (secret *core.Secret, err error) {
 		},
 		secret)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			secret = nil
-		} else {
-			err = liberr.Wrap(err)
-		}
+		err = liberr.Wrap(err)
 	}
 
 	return
@@ -92,7 +96,7 @@ func (r *Builder) hostSecret(vmID string) (secret *core.Secret, err error) {
 
 //
 // Find host ID for VM.
-func (r *Builder) host(vmID string) (host *api.Host, err error) {
+func (r *Builder) host(vmID string) (host *api.Host, found bool, err error) {
 	vm := &vsphere.VM{}
 	status, pErr := r.Inventory.Get(vm, vmID)
 	if pErr != nil {
@@ -101,7 +105,7 @@ func (r *Builder) host(vmID string) (host *api.Host, err error) {
 	}
 	switch status {
 	case http.StatusOK:
-		host = r.HostMap[vm.Host.ID]
+		host, found = r.HostMap[vm.Host.ID]
 	}
 
 	return
