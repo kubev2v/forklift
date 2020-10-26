@@ -67,6 +67,9 @@ func (r *Builder) hostSecret(vmID string) (secret *core.Secret, err error) {
 		err = liberr.Wrap(err)
 		return
 	}
+	if host == nil {
+		return
+	}
 	ref := host.Spec.Secret
 	secret = &core.Secret{}
 	err = r.Client.Get(
@@ -109,7 +112,8 @@ func (r *Builder) host(vmID string) (host *api.Host, err error) {
 func (r *Builder) Mapping(mp *plan.Map, object *vmio.ResourceMapping) (err error) {
 	netMap := []vmio.NetworkResourceMappingItem{}
 	dsMap := []vmio.StorageResourceMappingItem{}
-	for _, network := range mp.Networks {
+	for i := range mp.Networks {
+		network := &mp.Networks[i]
 		netMap = append(
 			netMap,
 			vmio.NetworkResourceMappingItem{
@@ -122,7 +126,8 @@ func (r *Builder) Mapping(mp *plan.Map, object *vmio.ResourceMapping) (err error
 				},
 			})
 	}
-	for _, ds := range mp.Datastores {
+	for i := range mp.Datastores {
+		ds := &mp.Datastores[i]
 		dsMap = append(
 			dsMap,
 			vmio.StorageResourceMappingItem{
