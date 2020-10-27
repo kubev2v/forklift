@@ -85,7 +85,7 @@ func (r *Annotation) Get(key string, object interface{}) (err error) {
 //
 // Contains key.
 func (r *Annotation) Contains(key string) (found bool) {
-	_, found = r.GetAnnotations()[key]
+	_, found = r.GetAnnotations()[r.key(key)]
 	return
 }
 
