@@ -166,14 +166,6 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		return fastReQ, nil
 	}
 
-	//
-	// Execute.
-	reQ, err := r.execute(plan)
-	if err != nil {
-		log.Trace(err)
-		return fastReQ, nil
-	}
-
 	// Ready condition.
 	if !plan.Status.HasBlockerCondition() {
 		plan.Status.SetCondition(libcnd.Condition{
@@ -187,13 +179,21 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	// End staging conditions.
 	plan.Status.EndStagingConditions()
 
-	//
-	// Purge snapshots.
-	sn := snapshot.New(plan)
-	sn.Purge()
-
 	// Apply changes.
 	plan.Status.ObservedGeneration = plan.Generation
+	err = r.Status().Update(context.TODO(), plan)
+	if err != nil {
+		log.Trace(err)
+		return fastReQ, nil
+	}
+
+	//
+	// Execute.
+	reQ, err := r.execute(plan)
+	if err != nil {
+		log.Trace(err)
+		return fastReQ, nil
+	}
 	err = r.Status().Update(context.TODO(), plan)
 	if err != nil {
 		log.Trace(err)
@@ -234,7 +234,9 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	sn := snapshot.New(migration)
 	if !sn.Contains("plan.UID") {
 		sn.Set("plan.UID", plan.UID)
-		sn.Update(plan)
+		sn.Set(api.SourceSnapshot, plan.Referenced.Provider.Source)
+		sn.Set(api.DestinationSnapshot, plan.Referenced.Provider.Destination)
+		sn.Set(api.MapSnapshot, plan.Spec.Map)
 		err = r.Update(context.TODO(), migration)
 		if err != nil {
 			err = liberr.Wrap(err)

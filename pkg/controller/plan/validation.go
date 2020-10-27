@@ -4,7 +4,6 @@ import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
-	"github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1/snapshot"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web/vsphere"
 	"github.com/konveyor/virt-controller/pkg/controller/validation"
@@ -82,11 +81,9 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	// Snapshot resources.
-	sn := snapshot.New(plan)
-	sn.Set(api.SourceSnapshot, provider.Referenced.Source)
-	sn.Set(api.DestinationSnapshot, provider.Referenced.Destination)
-	sn.Set(api.MapSnapshot, plan.Spec.Map)
+
+	plan.Referenced.Provider.Source = provider.Referenced.Source
+	plan.Referenced.Provider.Destination = provider.Referenced.Destination
 
 	return nil
 }
