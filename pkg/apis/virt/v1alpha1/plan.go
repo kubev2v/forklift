@@ -73,6 +73,9 @@ type Plan struct {
 	meta.ObjectMeta `json:"metadata,omitempty"`
 	Spec            PlanSpec   `json:"spec,omitempty"`
 	Status          PlanStatus `json:"status,omitempty"`
+	// Referenced resources populated
+	// during validation.
+	Referenced `json:"-"`
 }
 
 //
