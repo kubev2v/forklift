@@ -93,8 +93,6 @@ type Migration struct {
 	destination struct {
 		// Provider.
 		provider *api.Provider
-		// Secret.
-		secret *core.Secret
 		// k8s client.
 		client client.Client
 	}
@@ -238,24 +236,28 @@ func (r *Migration) init() (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
-	ref = r.destination.provider.Spec.Secret
-	r.destination.secret = &core.Secret{}
-	err = r.Client.Get(
-		context.TODO(),
-		client.ObjectKey{
-			Namespace: ref.Namespace,
-			Name:      ref.Name,
-		},
-		r.destination.secret)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	r.destination.client, err =
-		r.destination.provider.Client(r.destination.secret)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
+	if !r.destination.provider.IsHost() {
+		ref = r.destination.provider.Spec.Secret
+		secret := &core.Secret{}
+		err = r.Client.Get(
+			context.TODO(),
+			client.ObjectKey{
+				Namespace: ref.Namespace,
+				Name:      ref.Name,
+			},
+			secret)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+		r.destination.client, err =
+			r.destination.provider.Client(secret)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+	} else {
+		r.destination.client = r.Client
 	}
 	err = r.buildHostMap()
 	if err != nil {
