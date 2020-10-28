@@ -20,8 +20,8 @@ type Builder interface {
 	Secret(vmID string, in, object *core.Secret) (err error)
 	// Build VMIO resource mapping.
 	Mapping(mp *plan.Map, object *vmio.ResourceMapping) error
-	// Build VMIO import source.
-	Source(vmID string, object *vmio.VirtualMachineImportSourceSpec) error
+	// Build VMIO import spec.
+	Import(vmID string, object *vmio.VirtualMachineImportSpec) error
 	// Build tasks.
 	Tasks(vmID string) ([]*plan.Task, error)
 }
