@@ -189,12 +189,8 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 
 	//
 	// Execute.
+	// The plan is updated as needed to reflect status.
 	reQ, err := r.execute(plan)
-	if err != nil {
-		log.Trace(err)
-		return fastReQ, nil
-	}
-	err = r.Status().Update(context.TODO(), plan)
 	if err != nil {
 		log.Trace(err)
 		return fastReQ, nil
@@ -252,6 +248,10 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
+	}
+	err = r.Status().Update(context.TODO(), plan)
+	if err != nil {
+		err = liberr.Wrap(err)
 	}
 	if len(list) > 1 && reQ == 0 {
 		reQ = FastReQ
