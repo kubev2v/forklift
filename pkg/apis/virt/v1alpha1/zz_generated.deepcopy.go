@@ -336,6 +336,7 @@ func (in *Plan) DeepCopyInto(out *Plan) {
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	in.Spec.DeepCopyInto(&out.Spec)
 	in.Status.DeepCopyInto(&out.Status)
+	in.Referenced.DeepCopyInto(&out.Referenced)
 	return
 }
 
