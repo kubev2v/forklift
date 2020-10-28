@@ -45,8 +45,8 @@ func (r *Builder) Secret(vmID string, in, object *core.Secret) (err error) {
 	if hostFound {
 		hostURL := liburl.URL{
 			Scheme: "https",
-			Host: host.Spec.IpAddress,
-			Path: vim25.Path,
+			Host:   host.Spec.IpAddress,
+			Path:   vim25.Path,
 		}
 		hostSecret, nErr := r.hostSecret(host)
 		if nErr != nil {
