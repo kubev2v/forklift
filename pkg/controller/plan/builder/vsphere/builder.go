@@ -45,8 +45,8 @@ func (r *Builder) Secret(vmID string, in, object *core.Secret) (err error) {
 	if hostFound {
 		hostURL := liburl.URL{
 			Scheme: "https",
-			Host: host.Spec.IpAddress,
-			Path: vim25.Path,
+			Host:   host.Spec.IpAddress,
+			Path:   vim25.Path,
 		}
 		hostSecret, nErr := r.hostSecret(host)
 		if nErr != nil {
@@ -152,8 +152,8 @@ func (r *Builder) Mapping(mp *plan.Map, object *vmio.ResourceMapping) (err error
 }
 
 //
-// Build the VMIO VM Source.
-func (r *Builder) Source(vmID string, object *vmio.VirtualMachineImportSourceSpec) (err error) {
+// Build the VMIO VM Import Spec.
+func (r *Builder) Import(vmID string, object *vmio.VirtualMachineImportSpec) (err error) {
 	vm := &vsphere.VM{}
 	status, pErr := r.Inventory.Get(vm, vmID)
 	if pErr != nil {
@@ -163,7 +163,8 @@ func (r *Builder) Source(vmID string, object *vmio.VirtualMachineImportSourceSpe
 	switch status {
 	case http.StatusOK:
 		uuid := vm.UUID
-		object.Vmware = &vmio.VirtualMachineImportVmwareSourceSpec{
+		object.TargetVMName = &vm.Name
+		object.Source.Vmware = &vmio.VirtualMachineImportVmwareSourceSpec{
 			VM: vmio.VirtualMachineImportVmwareSourceVMSpec{
 				ID: &uuid,
 			},

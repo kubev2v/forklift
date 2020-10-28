@@ -192,10 +192,6 @@ func (r *KubeVirt) EnsureSecret(vmID string) (err error) {
 //
 // Build the VMIO CR.
 func (r *KubeVirt) buildImport(vmID string) (object *vmio.VirtualMachineImport, err error) {
-	source, err := r.buildSource(vmID)
-	if err != nil {
-		return
-	}
 	namespace := r.namespace()
 	object = &vmio.VirtualMachineImport{
 		ObjectMeta: meta.ObjectMeta{
@@ -208,7 +204,6 @@ func (r *KubeVirt) buildImport(vmID string) (object *vmio.VirtualMachineImport, 
 			},
 		},
 		Spec: vmio.VirtualMachineImportSpec{
-			Source: *source,
 			ProviderCredentialsSecret: vmio.ObjectIdentifier{
 				Namespace: &namespace,
 				Name:      r.nameForSecret(vmID),
@@ -218,6 +213,10 @@ func (r *KubeVirt) buildImport(vmID string) (object *vmio.VirtualMachineImport, 
 				Name:      r.nameForMapping(),
 			},
 		},
+	}
+	err = r.Builder.Import(vmID, &object.Spec)
+	if err != nil {
+		err = liberr.Wrap(err)
 	}
 
 	return
@@ -265,18 +264,6 @@ func (r *KubeVirt) buildSecret(vmID string) (object *core.Secret, err error) {
 		},
 	}
 	err = r.Builder.Secret(vmID, r.Secret, object)
-	if err != nil {
-		err = liberr.Wrap(err)
-	}
-
-	return
-}
-
-//
-// Build the VMIO Source.
-func (r *KubeVirt) buildSource(vmID string) (object *vmio.VirtualMachineImportSourceSpec, err error) {
-	object = &vmio.VirtualMachineImportSourceSpec{}
-	err = r.Builder.Source(vmID, object)
 	if err != nil {
 		err = liberr.Wrap(err)
 	}
