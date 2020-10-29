@@ -157,7 +157,7 @@ func (r Migration) Run() (reQ time.Duration, err error) {
 				err = liberr.Wrap(err)
 				return
 			}
-			err = r.kubevirt.EnsureImport(vm.ID)
+			err = r.kubevirt.EnsureImport(vm)
 			if err != nil {
 				err = liberr.Wrap(err)
 				return
