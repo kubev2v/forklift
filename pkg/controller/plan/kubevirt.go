@@ -123,8 +123,8 @@ func (r *KubeVirt) ListImports() ([]VmImport, error) {
 
 //
 // Create the VMIO CR on the destination.
-func (r *KubeVirt) EnsureImport(vmID string) (err error) {
-	newImport, err := r.buildImport(vmID)
+func (r *KubeVirt) EnsureImport(vm *plan.VMStatus) (err error) {
+	newImport, err := r.buildImport(vm)
 	if err != nil {
 		return
 	}
@@ -191,22 +191,22 @@ func (r *KubeVirt) EnsureSecret(vmID string) (err error) {
 
 //
 // Build the VMIO CR.
-func (r *KubeVirt) buildImport(vmID string) (object *vmio.VirtualMachineImport, err error) {
+func (r *KubeVirt) buildImport(vm *plan.VMStatus) (object *vmio.VirtualMachineImport, err error) {
 	namespace := r.namespace()
 	object = &vmio.VirtualMachineImport{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace: r.namespace(),
-			Name:      r.nameForImport(vmID),
+			Name:      r.nameForImport(vm.ID),
 			Labels: map[string]string{
 				kMigration: string(r.Plan.Status.Migration.Active),
 				kPlan:      string(r.Plan.UID),
-				kVM:        vmID,
+				kVM:        vm.ID,
 			},
 		},
 		Spec: vmio.VirtualMachineImportSpec{
 			ProviderCredentialsSecret: vmio.ObjectIdentifier{
 				Namespace: &namespace,
-				Name:      r.nameForSecret(vmID),
+				Name:      r.nameForSecret(vm.ID),
 			},
 			ResourceMapping: &vmio.ObjectIdentifier{
 				Namespace: &namespace,
@@ -214,9 +214,12 @@ func (r *KubeVirt) buildImport(vmID string) (object *vmio.VirtualMachineImport, 
 			},
 		},
 	}
-	err = r.Builder.Import(vmID, &object.Spec)
+	err = r.Builder.Import(vm.ID, &object.Spec)
 	if err != nil {
 		err = liberr.Wrap(err)
+	}
+	if vm.Name != "" {
+		object.Spec.TargetVMName = &vm.Name
 	}
 
 	return

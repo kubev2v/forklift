@@ -7,6 +7,8 @@ type VM struct {
 	// For:
 	//   - vSphere: The managed object ID.
 	ID string `json:"id"`
+	// Name
+	Name string `json:"name,omitempty"`
 	// Enable hooks.
 	Hook *Hook `json:"hook,omitempty"`
 }
