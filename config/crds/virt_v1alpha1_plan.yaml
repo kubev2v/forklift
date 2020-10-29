@@ -133,6 +133,9 @@ spec:
                     description: 'The VM identifier. For:   - vSphere: The managed
                       object ID.'
                     type: string
+                  name:
+                    description: Name
+                    type: string
                 required:
                 - id
                 type: object
