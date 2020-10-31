@@ -134,6 +134,7 @@ type Host struct {
 	InMaintenanceMode bool   `sql:""`
 	ProductName       string `sql:""`
 	ProductVersion    string `sql:""`
+	Thumbprint        string `sql:""`
 	Networks          string `sql:""`
 	Datastores        string `sql:""`
 	Vms               string `sql:""`

@@ -65,6 +65,7 @@ const (
 	fProductName    = "config.product.name"
 	fProductVersion = "config.product.version"
 	fInMaintMode    = "summary.runtime.inMaintenanceMode"
+	fThumbprint     = "summary.config.sslThumbprint"
 	// Network
 	fTag = "tag"
 	// Datastore
@@ -511,6 +512,7 @@ func (r *Reconciler) propertySpec() []types.PropertySpec {
 				fProductName,
 				fProductVersion,
 				fInMaintMode,
+				fThumbprint,
 				fDatastore,
 				fNetwork,
 				fVm,
