@@ -115,6 +115,7 @@ type Host struct {
 	InMaintenanceMode bool          `json:"inMaintenance"`
 	ProductName       string        `json:"productName"`
 	ProductVersion    string        `json:"productVersion"`
+	Thumbprint        string        `json:"thumbprint"`
 	Networks          model.RefList `json:"networks"`
 	Datastores        model.RefList `json:"datastores"`
 	VMs               model.RefList `json:"vms"`
@@ -127,6 +128,7 @@ func (r *Host) With(m *model.Host) {
 	r.InMaintenanceMode = m.InMaintenanceMode
 	r.ProductVersion = m.ProductVersion
 	r.ProductName = m.ProductName
+	r.Thumbprint = m.Thumbprint
 	r.Networks = *model.RefListPtr().With(m.Networks)
 	r.Datastores = *model.RefListPtr().With(m.Datastores)
 	r.VMs = *model.RefListPtr().With(m.Vms)

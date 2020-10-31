@@ -285,6 +285,10 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 				if s, cast := p.Val.(string); cast {
 					v.model.ProductVersion = s
 				}
+			case fThumbprint:
+				if s, cast := p.Val.(string); cast {
+					v.model.Thumbprint = s
+				}
 			case fNetwork:
 				refList := RefList{}
 				refList.With(p.Val)
