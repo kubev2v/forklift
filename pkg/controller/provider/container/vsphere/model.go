@@ -3,6 +3,7 @@ package vsphere
 import (
 	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"
 	"github.com/vmware/govmomi/vim25/types"
+	"sort"
 )
 
 //
@@ -59,7 +60,8 @@ func (v *Ref) With(ref types.AnyType) {
 			v.Kind = model.DatacenterKind
 		case Cluster:
 			v.Kind = model.ClusterKind
-		case Network:
+		case Network,
+			DVSwitch:
 			v.Kind = model.NetKind
 		case Datastore:
 			v.Kind = model.DsKind
@@ -273,6 +275,18 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 				if b, cast := p.Val.(bool); cast {
 					v.model.InMaintenanceMode = b
 				}
+			case fThumbprint:
+				if s, cast := p.Val.(string); cast {
+					v.model.Thumbprint = s
+				}
+			case fCpuSockets:
+				if b, cast := p.Val.(int16); cast {
+					v.model.CpuSockets = b
+				}
+			case fCpuCores:
+				if b, cast := p.Val.(int16); cast {
+					v.model.CpuCores = b
+				}
 			case fVm:
 				refList := RefList{}
 				refList.With(p.Val)
@@ -285,10 +299,6 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 				if s, cast := p.Val.(string); cast {
 					v.model.ProductVersion = s
 				}
-			case fThumbprint:
-				if s, cast := p.Val.(string); cast {
-					v.model.Thumbprint = s
-				}
 			case fNetwork:
 				refList := RefList{}
 				refList.With(p.Val)
@@ -297,6 +307,81 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 				refList := RefList{}
 				refList.With(p.Val)
 				v.model.Datastores = refList.Encode()
+			case fVSwitch:
+				if array, cast := p.Val.(types.ArrayOfHostVirtualSwitch); cast {
+					network := v.model.DecodeNetwork()
+					for _, vSwitch := range array.HostVirtualSwitch {
+						network.Switches = append(
+							network.Switches,
+							model.Switch{
+								Key:        vSwitch.Key,
+								Name:       vSwitch.Name,
+								PortGroups: vSwitch.Portgroup,
+								PNICs:      vSwitch.Pnic,
+							})
+					}
+					v.model.EncodeNetwork(network)
+				}
+			case fPortGroup:
+				if array, cast := p.Val.(types.ArrayOfHostPortGroup); cast {
+					network := v.model.DecodeNetwork()
+					for _, portGroup := range array.HostPortGroup {
+						network.PortGroups = append(
+							network.PortGroups,
+							model.PortGroup{
+								Key:    portGroup.Key,
+								Name:   portGroup.Spec.Name,
+								Switch: portGroup.Vswitch,
+							})
+					}
+					v.model.EncodeNetwork(network)
+				}
+			case fPNIC:
+				if array, cast := p.Val.(types.ArrayOfPhysicalNic); cast {
+					network := v.model.DecodeNetwork()
+					for _, nic := range array.PhysicalNic {
+						network.PNICs = append(
+							network.PNICs,
+							model.PNIC{
+								Key:       nic.Key,
+								LinkSpeed: nic.Spec.LinkSpeed.SpeedMb,
+							})
+					}
+					sort.Slice(
+						network.PNICs,
+						func(i, j int) bool {
+							return network.PNICs[i].LinkSpeed > network.PNICs[j].LinkSpeed
+						})
+					v.model.EncodeNetwork(network)
+				}
+			case fVNIC:
+				if array, cast := p.Val.(types.ArrayOfHostVirtualNic); cast {
+					network := v.model.DecodeNetwork()
+					for _, nic := range array.HostVirtualNic {
+						dGroup := func() (key string) {
+							dp := nic.Spec.DistributedVirtualPort
+							if dp != nil {
+								key = dp.PortgroupKey
+							}
+							return
+						}
+						network.VNICs = append(
+							network.VNICs,
+							model.VNIC{
+								Key:        nic.Key,
+								PortGroup:  nic.Portgroup,
+								DPortGroup: dGroup(),
+								IpAddress:  nic.Spec.Ip.IpAddress,
+								MTU:        nic.Spec.Mtu,
+							})
+					}
+					sort.Slice(
+						network.VNICs,
+						func(i, j int) bool {
+							return network.VNICs[i].MTU > network.VNICs[j].MTU
+						})
+					v.model.EncodeNetwork(network)
+				}
 			}
 		}
 	}
@@ -328,9 +413,67 @@ func (v *NetworkAdapter) Apply(u types.ObjectUpdate) {
 				if s, cast := p.Val.(string); cast {
 					v.model.Tag = s
 				}
+			case fDVSwitch:
+				ref := Ref{}
+				ref.With(p.Val)
+				v.model.DVSwitch = ref.Encode()
 			}
 		}
 	}
+}
+
+//
+// DVSwitch model adapter.
+type DVSwitchAdapter struct {
+	Base
+	// The adapter model.
+	model model.DVSwitch
+}
+
+//
+// The adapter model.
+func (v *DVSwitchAdapter) Model() model.Model {
+	return &v.model
+}
+
+//
+// Apply the update to the model.
+func (v *DVSwitchAdapter) Apply(u types.ObjectUpdate) {
+	v.Base.Apply(&v.model.Base, u)
+	for _, p := range u.ChangeSet {
+		switch p.Op {
+		case Assign:
+			switch p.Name {
+			case fDVSwitchHost:
+				if array, cast := p.Val.(types.ArrayOfDistributedVirtualSwitchHostMember); cast {
+					v.addHost(array)
+				}
+			}
+		}
+	}
+}
+
+//
+// Add hosts.
+func (v *DVSwitchAdapter) addHost(array types.ArrayOfDistributedVirtualSwitchHostMember) {
+	list := []model.DVSHost{}
+	for _, member := range array.DistributedVirtualSwitchHostMember {
+		hostRef := Ref{}
+		hostRef.With(*member.Config.Host)
+		if backing, cast := member.Config.Backing.(*types.DistributedVirtualSwitchHostMemberPnicBacking); cast {
+			names := []string{}
+			for _, pn := range backing.PnicSpec {
+				names = append(names, pn.PnicDevice)
+			}
+			list = append(list,
+				model.DVSHost{
+					Host: hostRef.Encode(),
+					PNIC: names,
+				})
+		}
+	}
+
+	v.model.EncodeHost(list)
 }
 
 //
@@ -434,6 +577,10 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				if n, cast := p.Val.(int32); cast {
 					v.model.MemoryMB = n
 				}
+			case fStorageUsed:
+				if n, cast := p.Val.(int64); cast {
+					v.model.StorageUsed = n
+				}
 			case fGuestName:
 				if s, cast := p.Val.(string); cast {
 					v.model.GuestName = s
@@ -450,32 +597,64 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				if s, cast := p.Val.(string); cast {
 					v.model.IpAddress = s
 				}
+			case fFtInfo:
+				if _, cast := p.Val.(types.FaultToleranceConfigInfo); cast {
+					v.model.FaultToleranceEnabled = true
+				}
 			case fNetwork:
 				refList := RefList{}
 				refList.With(p.Val)
 				v.model.Networks = refList.Encode()
 			case fDevices:
-				disks := []model.Disk{}
 				if devArray, cast := p.Val.(types.ArrayOfVirtualDevice); cast {
 					for _, dev := range devArray.VirtualDevice {
 						switch dev.(type) {
-						case *types.VirtualDisk:
-							disk := dev.(*types.VirtualDisk)
-							backing := disk.Backing.(*types.VirtualDiskFlatVer2BackingInfo)
-							md := model.Disk{
-								File:     backing.FileName,
-								Capacity: disk.CapacityInBytes,
-								Datastore: model.Ref{
-									Kind: model.DsKind,
-									ID:   backing.Datastore.Value,
-								},
-							}
-							disks = append(disks, md)
+						case *types.VirtualSriovEthernetCard:
+							v.model.SriovSupported = true
 						}
 					}
+					v.updateDisks(&devArray)
 				}
-				v.model.EncodeDisks(disks)
 			}
 		}
 	}
+}
+
+//
+// Update virtual disk devices.
+func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
+	disks := []model.Disk{}
+	for _, dev := range devArray.VirtualDevice {
+		switch dev.(type) {
+		case *types.VirtualDisk:
+			disk := dev.(*types.VirtualDisk)
+			switch disk.Backing.(type) {
+			case *types.VirtualDiskFlatVer1BackingInfo:
+				backing := disk.Backing.(*types.VirtualDiskFlatVer1BackingInfo)
+				md := model.Disk{
+					File:     backing.FileName,
+					Capacity: disk.CapacityInBytes,
+					Datastore: model.Ref{
+						Kind: model.DsKind,
+						ID:   backing.Datastore.Value,
+					},
+				}
+				disks = append(disks, md)
+			case *types.VirtualDiskFlatVer2BackingInfo:
+				backing := disk.Backing.(*types.VirtualDiskFlatVer2BackingInfo)
+				md := model.Disk{
+					File:     backing.FileName,
+					Capacity: disk.CapacityInBytes,
+					Shared:   backing.Sharing != "sharingNone",
+					Datastore: model.Ref{
+						Kind: model.DsKind,
+						ID:   backing.Datastore.Value,
+					},
+				}
+				disks = append(disks, md)
+			}
+		}
+	}
+
+	v.model.EncodeDisks(disks)
 }

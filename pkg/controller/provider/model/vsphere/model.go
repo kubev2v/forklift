@@ -132,17 +132,121 @@ type Cluster struct {
 type Host struct {
 	Base
 	InMaintenanceMode bool   `sql:""`
+	Thumbprint        string `sql:""`
+	CpuSockets        int16  `sql:""`
+	CpuCores          int16  `sql:""`
 	ProductName       string `sql:""`
 	ProductVersion    string `sql:""`
-	Thumbprint        string `sql:""`
+	Network           string `sql:""`
 	Networks          string `sql:""`
 	Datastores        string `sql:""`
 	Vms               string `sql:""`
 }
 
+func (r *Host) EncodeNetwork(network *HostNetwork) {
+	b, _ := json.Marshal(network)
+	r.Network = string(b)
+}
+
+func (r *Host) DecodeNetwork() *HostNetwork {
+	network := &HostNetwork{}
+	json.Unmarshal([]byte(r.Network), network)
+	return network
+}
+
+type HostNetwork struct {
+	PNICs      []PNIC      `json:"vNICs"`
+	VNICs      []VNIC      `json:"pNICs"`
+	PortGroups []PortGroup `json:"portGroups"`
+	Switches   []Switch    `json:"switches"`
+}
+
+func (n *HostNetwork) Switch(key string) (vSwitch *Switch, found bool) {
+	for _, object := range n.Switches {
+		if key == object.Key {
+			vSwitch = &object
+			found = true
+			break
+		}
+	}
+
+	return
+}
+func (n *HostNetwork) PortGroup(name string) (portGroup *PortGroup, found bool) {
+	for _, object := range n.PortGroups {
+		if name == object.Name {
+			portGroup = &object
+			found = true
+			break
+		}
+	}
+
+	return
+}
+
+func (n *HostNetwork) PNIC(key string) (nic *PNIC, found bool) {
+	for _, object := range n.PNICs {
+		if key == object.Key {
+			nic = &object
+			found = true
+			break
+		}
+	}
+
+	return
+}
+
+type PNIC struct {
+	Key       string `json:"key"`
+	LinkSpeed int32  `json:"linkSpeed"`
+}
+
+type VNIC struct {
+	Key        string `json:"key"`
+	PortGroup  string `json:"portGroup"`
+	DPortGroup string `json:"dPortGroup"`
+	IpAddress  string `json:"ipAddress"`
+	MTU        int32  `json:"mtu"`
+}
+
+type PortGroup struct {
+	Key    string `json:"key"`
+	Name   string `json:"name"`
+	Switch string `json:"vSwitch"`
+}
+
+type Switch struct {
+	Key        string   `json:"key"`
+	Name       string   `json:"name"`
+	PortGroups []string `json:"portGroups"`
+	PNICs      []string `json:"pNICs"`
+}
+
 type Network struct {
 	Base
-	Tag string `sql:""`
+	Tag      string `sql:""`
+	DVSwitch string `sql:""`
+}
+
+type DVSwitch struct {
+	Base
+	Host string `sql:""`
+}
+
+type DVSHost struct {
+	Host string
+	PNIC []string
+}
+
+func (m *DVSwitch) EncodeHost(host []DVSHost) {
+	j, _ := json.Marshal(host)
+	m.Host = string(j)
+}
+
+func (m *DVSwitch) DecodeHost() []DVSHost {
+	list := []DVSHost{}
+	json.Unmarshal([]byte(m.Host), &list)
+	return list
 }
 
 type Datastore struct {
@@ -155,22 +259,25 @@ type Datastore struct {
 
 type VM struct {
 	Base
-	UUID                string `sql:""`
-	Firmware            string `sql:""`
-	CpuAffinity         string `sql:""`
-	CpuHotAddEnabled    bool   `sql:""`
-	CpuHotRemoveEnabled bool   `sql:""`
-	MemoryHotAddEnabled bool   `sql:""`
-	CpuCount            int32  `sql:""`
-	CoresPerSocket      int32  `sql:""`
-	MemoryMB            int32  `sql:""`
-	GuestName           string `sql:""`
-	BalloonedMemory     int32  `sql:""`
-	IpAddress           string `sql:""`
-	Disks               string `sql:""`
-	Networks            string `sql:""`
-	Host                string `sql:""`
-	Concerns            string `sql:""`
+	UUID                  string `sql:""`
+	Firmware              string `sql:""`
+	CpuAffinity           string `sql:""`
+	CpuHotAddEnabled      bool   `sql:""`
+	CpuHotRemoveEnabled   bool   `sql:""`
+	MemoryHotAddEnabled   bool   `sql:""`
+	FaultToleranceEnabled bool   `sql:""`
+	CpuCount              int32  `sql:""`
+	CoresPerSocket        int32  `sql:""`
+	MemoryMB              int32  `sql:""`
+	GuestName             string `sql:""`
+	BalloonedMemory       int32  `sql:""`
+	IpAddress             string `sql:""`
+	StorageUsed           int64  `sql:""`
+	SriovSupported        bool   `sql:""`
+	Disks                 string `sql:""`
+	Networks              string `sql:""`
+	Host                  string `sql:""`
+	Concerns              string `sql:""`
 }
 
 //
@@ -225,12 +332,10 @@ func (m *VM) DecodeConcerns() (list []Concern) {
 //
 // Virtual Disk.
 type Disk struct {
-	// Backing file.
-	File string `json:"file"`
-	// Datastore.
-	Datastore Ref `json:"datastore"`
-	// Capacity
-	Capacity int64 `json:"capacity"`
+	File      string `json:"file"`
+	Datastore Ref    `json:"datastore"`
+	Capacity  int64  `json:"capacity"`
+	Shared    bool   `json:"shared"`
 }
 
 //
