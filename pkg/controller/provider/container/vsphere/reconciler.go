@@ -35,7 +35,8 @@ const (
 	Cluster        = "ClusterComputeResource"
 	Host           = "HostSystem"
 	Network        = "Network"
-	NetDVPG        = "DistributedVirtualPortgroup"
+	DVPortGroup    = "DistributedVirtualPortgroup"
+	DVSwitch       = "VmwareDistributedVirtualSwitch"
 	Datastore      = "Datastore"
 )
 
@@ -64,10 +65,20 @@ const (
 	fVm             = "vm"
 	fProductName    = "config.product.name"
 	fProductVersion = "config.product.version"
+	fVSwitch        = "config.network.vswitch"
+	fPortGroup      = "config.network.portgroup"
+	fPNIC           = "config.network.pnic"
+	fVNIC           = "config.network.vnic"
 	fInMaintMode    = "summary.runtime.inMaintenanceMode"
+	fCpuSockets     = "summary.hardware.numCpuPkgs"
+	fCpuCores       = "summary.hardware.numCpuCores"
 	fThumbprint     = "summary.config.sslThumbprint"
 	// Network
 	fTag = "tag"
+	// PortGroup
+	fDVSwitch = "config.distributedVirtualSwitch"
+	// DV Switch
+	fDVSwitchHost = "config.host"
 	// Datastore
 	fDsType      = "summary.type"
 	fCapacity    = "summary.capacity"
@@ -76,6 +87,7 @@ const (
 	// VM
 	fUUID                = "config.uuid"
 	fFirmware            = "config.firmware"
+	fFtInfo              = "config.ftInfo"
 	fCpuAffinity         = "config.cpuAffinity"
 	fCpuHotAddEnabled    = "config.cpuHotAddEnabled"
 	fCpuHotRemoveEnabled = "config.cpuHotRemoveEnabled"
@@ -87,6 +99,7 @@ const (
 	fGuestName           = "summary.config.guestFullName"
 	fBalloonedMemory     = "summary.quickStats.balloonedMemory"
 	fVmIpAddress         = "summary.guest.ipAddress"
+	fStorageUsed         = "summary.storage.committed"
 	fRuntimeHost         = "runtime.host"
 )
 
@@ -511,11 +524,17 @@ func (r *Reconciler) propertySpec() []types.PropertySpec {
 				fParent,
 				fProductName,
 				fProductVersion,
-				fInMaintMode,
 				fThumbprint,
+				fInMaintMode,
+				fCpuSockets,
+				fCpuCores,
 				fDatastore,
 				fNetwork,
 				fVm,
+				fVSwitch,
+				fPortGroup,
+				fPNIC,
+				fVNIC,
 			},
 		},
 		{ // Network
@@ -524,6 +543,21 @@ func (r *Reconciler) propertySpec() []types.PropertySpec {
 				fName,
 				fParent,
 				fTag,
+			},
+		},
+		{
+			Type: DVPortGroup,
+			PathSet: []string{
+				fName,
+				fDVSwitch,
+				fTag,
+			},
+		},
+		{
+			Type: DVSwitch,
+			PathSet: []string{
+				fName,
+				fDVSwitchHost,
 			},
 		},
 		{ // Datastore
@@ -545,6 +579,7 @@ func (r *Reconciler) propertySpec() []types.PropertySpec {
 				fParent,
 				fUUID,
 				fFirmware,
+				fFtInfo,
 				fCpuAffinity,
 				fCpuHotAddEnabled,
 				fCpuHotRemoveEnabled,
@@ -556,6 +591,7 @@ func (r *Reconciler) propertySpec() []types.PropertySpec {
 				fGuestName,
 				fBalloonedMemory,
 				fVmIpAddress,
+				fStorageUsed,
 				fDatastore,
 				fNetwork,
 				fRuntimeHost,
@@ -622,9 +658,25 @@ func (r *Reconciler) selectAdapter(u types.ObjectUpdate) (Adapter, bool) {
 				},
 			},
 		}
-	case Network, NetDVPG:
+	case Network:
 		adapter = &NetworkAdapter{
 			model: model.Network{
+				Base: model.Base{
+					ID: u.Obj.Value,
+				},
+			},
+		}
+	case DVPortGroup:
+		adapter = &NetworkAdapter{
+			model: model.Network{
+				Base: model.Base{
+					ID: u.Obj.Value,
+				},
+			},
+		}
+	case DVSwitch:
+		adapter = &DVSwitchAdapter{
+			model: model.DVSwitch{
 				Base: model.Base{
 					ID: u.Obj.Value,
 				},

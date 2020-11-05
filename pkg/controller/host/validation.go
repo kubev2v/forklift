@@ -212,7 +212,6 @@ func (r *Reconciler) validateSecret(host *api.Host) error {
 			keyList = []string{
 				"user",
 				"password",
-				"thumbprint",
 			}
 		}
 	}

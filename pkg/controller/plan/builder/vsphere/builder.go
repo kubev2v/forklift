@@ -35,27 +35,30 @@ type Builder struct {
 // Build the VMIO secret.
 func (r *Builder) Secret(vmID string, in, object *core.Secret) (err error) {
 	url := r.Provider.Spec.URL
-	var hostFound bool
-	var host *api.Host
-	host, hostFound, err = r.host(vmID)
+	hostID, err := r.hostID(vmID)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	if hostFound {
+	if host, found := r.HostMap[hostID]; found {
 		hostURL := liburl.URL{
 			Scheme: "https",
 			Host:   host.Spec.IpAddress,
 			Path:   vim25.Path,
 		}
+		url = hostURL.String()
 		hostSecret, nErr := r.hostSecret(host)
 		if nErr != nil {
 			err = liberr.Wrap(nErr)
 			return
 		}
-		url = hostURL.String()
+		h, nErr := r.host(hostID)
+		if nErr != nil {
+			err = liberr.Wrap(nErr)
+			return
+		}
+		hostSecret.Data["thumbprint"] = []byte(h.Thumbprint)
 		in = hostSecret
-
 	}
 	content, mErr := yaml.Marshal(
 		map[string]string{
@@ -76,7 +79,30 @@ func (r *Builder) Secret(vmID string, in, object *core.Secret) (err error) {
 }
 
 //
-// Get the (optional) host and secret.
+// Find host ID for VM.
+func (r *Builder) hostID(vmID string) (hostID string, err error) {
+	vm := &vsphere.VM{}
+	status, pErr := r.Inventory.Get(vm, vmID)
+	if pErr != nil {
+		err = liberr.Wrap(pErr)
+		return
+	}
+	switch status {
+	case http.StatusOK:
+		hostID = vm.Host.ID
+	default:
+		err = liberr.New(
+			fmt.Sprintf(
+				"VM %s lookup failed: %s",
+				vmID,
+				http.StatusText(status)))
+	}
+
+	return
+}
+
+//
+// Find host CR secret.
 func (r *Builder) hostSecret(host *api.Host) (secret *core.Secret, err error) {
 	ref := host.Spec.Secret
 	secret = &core.Secret{}
@@ -95,17 +121,23 @@ func (r *Builder) hostSecret(host *api.Host) (secret *core.Secret, err error) {
 }
 
 //
-// Find host ID for VM.
-func (r *Builder) host(vmID string) (host *api.Host, found bool, err error) {
-	vm := &vsphere.VM{}
-	status, pErr := r.Inventory.Get(vm, vmID)
-	if pErr != nil {
-		err = liberr.Wrap(pErr)
+// Find host in the inventory.
+func (r *Builder) host(hostID string) (host *vsphere.Host, err error) {
+	host = &vsphere.Host{}
+	status, err := r.Inventory.Get(host, hostID)
+	if err != nil {
+		err = liberr.Wrap(err)
 		return
 	}
 	switch status {
 	case http.StatusOK:
-		host, found = r.HostMap[vm.Host.ID]
+	default:
+		err = liberr.New(
+			fmt.Sprintf(
+				"Host %s lookup failed: %s",
+				hostID,
+				http.StatusText(status)))
+		return
 	}
 
 	return
