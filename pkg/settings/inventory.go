@@ -2,6 +2,7 @@ package settings
 
 import (
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -11,6 +12,8 @@ const (
 	AllowedOrigins = "CORS_ALLOWED_ORIGINS"
 	WorkingDir     = "WORKING_DIR"
 	AuthOptional   = "AUTH_OPTIONAL"
+	Host           = "API_HOST"
+	Port           = "API_PORT"
 )
 
 //
@@ -29,6 +32,10 @@ type Inventory struct {
 	WorkingDir string
 	// Authorization disabled.
 	AuthOptional bool
+	// Host.
+	Host string
+	// Port
+	Port int
 }
 
 //
@@ -54,6 +61,18 @@ func (r *Inventory) Load() error {
 	}
 	// Auth
 	r.AuthOptional = getEnvBool(AuthOptional, false)
+	// Host
+	if s, found := os.LookupEnv(Host); found {
+		r.Host = s
+	} else {
+		r.Host = "localhost"
+	}
+	// Port
+	if s, found := os.LookupEnv(Port); found {
+		r.Port, _ = strconv.Atoi(s)
+	} else {
+		r.Port = 8080
+	}
 
 	return nil
 }
