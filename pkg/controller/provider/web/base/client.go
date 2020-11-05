@@ -6,11 +6,16 @@ import (
 	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
+	"github.com/konveyor/virt-controller/pkg/settings"
 	"io/ioutil"
 	"net/http"
 	liburl "net/url"
 	"reflect"
 )
+
+//
+// Application settings.
+var Settings = &settings.Settings
 
 //
 // Errors
@@ -132,7 +137,10 @@ func (c *Client) get(path string, resource interface{}) (status int, err error) 
 // Build the URL.
 func (c *Client) url(path string) *liburl.URL {
 	if c.Host == "" {
-		c.Host = "localhost:8080"
+		c.Host = fmt.Sprintf(
+			"%s:%d",
+			Settings.Inventory.Host,
+			Settings.Inventory.Port)
 	}
 	path = (&Handler{}).Link(path, c.Params)
 	url, _ := liburl.Parse(path)

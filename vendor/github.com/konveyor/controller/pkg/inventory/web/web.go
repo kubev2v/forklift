@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/konveyor/controller/pkg/inventory/container"
@@ -18,6 +19,8 @@ const (
 //
 // Web server
 type WebServer struct {
+	// The optional port.  Default: 8080
+	Port int
 	// Allowed CORS origins.
 	AllowedOrigins []string
 	// Reference to the container.
@@ -32,8 +35,8 @@ type WebServer struct {
 // Start the web-server.
 // Initializes `gin` with routes and CORS origins.
 func (w *WebServer) Start() {
-	r := gin.Default()
-	r.Use(cors.New(cors.Config{
+	router := gin.Default()
+	router.Use(cors.New(cors.Config{
 		AllowMethods:     []string{"GET"},
 		AllowHeaders:     []string{"Authorization", "Origin"},
 		AllowOriginFunc:  w.allow,
@@ -41,8 +44,18 @@ func (w *WebServer) Start() {
 		MaxAge:           12 * time.Hour,
 	}))
 	w.buildOrigins()
-	w.addRoutes(r)
-	go r.Run()
+	w.addRoutes(router)
+	go router.Run(w.address())
+}
+
+//
+// Determine the address.
+func (w *WebServer) address() string {
+	if w.Port == 0 {
+		w.Port = 8080
+	}
+
+	return fmt.Sprintf(":%d", w.Port)
 }
 
 //
