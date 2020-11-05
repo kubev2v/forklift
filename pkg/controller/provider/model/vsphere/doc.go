@@ -23,6 +23,7 @@ func All() []interface{} {
 		&Datacenter{},
 		&Cluster{},
 		&Network{},
+		&DVSwitch{},
 		&Datastore{},
 		&Host{},
 		&VM{},

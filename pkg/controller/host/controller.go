@@ -18,12 +18,14 @@ package host
 
 import (
 	"context"
+	"errors"
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	"github.com/konveyor/controller/pkg/logging"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
+	"github.com/konveyor/virt-controller/pkg/controller/provider/web"
 	"github.com/konveyor/virt-controller/pkg/settings"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -39,6 +41,8 @@ const (
 	Name = "host"
 	// Fast re-queue delay.
 	FastReQ = time.Millisecond * 100
+	// Slow re-queue delay.
+	SlowReQ = time.Second * 3
 )
 
 //
@@ -103,6 +107,7 @@ type Reconciler struct {
 // Reconcile a Host CR.
 func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	fastReQ := reconcile.Result{RequeueAfter: FastReQ}
+	slowReQ := reconcile.Result{RequeueAfter: SlowReQ}
 	noReQ := reconcile.Result{}
 	var err error
 
@@ -115,7 +120,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	host := &api.Host{}
 	err = r.Get(context.TODO(), request.NamespacedName, host)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if k8serr.IsNotFound(err) {
 			return noReQ, nil
 		}
 		log.Trace(err)
@@ -128,6 +133,9 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	// Validations.
 	err = r.validate(host)
 	if err != nil {
+		if errors.Is(err, web.ProviderNotReadyErr) {
+			return slowReQ, nil
+		}
 		log.Trace(err)
 		return fastReQ, nil
 	}

@@ -112,22 +112,25 @@ func (h VMHandler) Link(p *api.Provider, m *model.VM) string {
 // REST Resource.
 type VM struct {
 	Resource
-	UUID                string          `json:"uuid"`
-	Firmware            string          `json:"firmware"`
-	CpuAffinity         []int32         `json:"cpuAffinity"`
-	CpuHotAddEnabled    bool            `json:"cpuHostAddEnabled"`
-	CpuHotRemoveEnabled bool            `json:"cpuHostRemoveEnabled"`
-	MemoryHotAddEnabled bool            `json:"memoryHotAddEnabled"`
-	CpuCount            int32           `json:"cpuCount"`
-	CoresPerSocket      int32           `json:"coresPerSocket"`
-	MemoryMB            int32           `json:"memoryMB"`
-	GuestName           string          `json:"guestName"`
-	BalloonedMemory     int32           `json:"balloonedMemory"`
-	IpAddress           string          `json:"ipAddress"`
-	Networks            model.RefList   `json:"networks"`
-	Disks               []model.Disk    `json:"disks"`
-	Host                model.Ref       `json:"host"`
-	Concerns            []model.Concern `json:"concerns"`
+	UUID                  string          `json:"uuid"`
+	Firmware              string          `json:"firmware"`
+	CpuAffinity           []int32         `json:"cpuAffinity"`
+	CpuHotAddEnabled      bool            `json:"cpuHostAddEnabled"`
+	CpuHotRemoveEnabled   bool            `json:"cpuHostRemoveEnabled"`
+	MemoryHotAddEnabled   bool            `json:"memoryHotAddEnabled"`
+	FaultToleranceEnabled bool            `json:"faultToleranceEnabled"`
+	CpuCount              int32           `json:"cpuCount"`
+	CoresPerSocket        int32           `json:"coresPerSocket"`
+	MemoryMB              int32           `json:"memoryMB"`
+	GuestName             string          `json:"guestName"`
+	BalloonedMemory       int32           `json:"balloonedMemory"`
+	IpAddress             string          `json:"ipAddress"`
+	StorageUsed           int64           `json:"storageUsed"`
+	SriovSupported        bool            `json:"sriovSupported"`
+	Networks              model.RefList   `json:"networks"`
+	Disks                 []model.Disk    `json:"disks"`
+	Host                  model.Ref       `json:"host"`
+	Concerns              []model.Concern `json:"concerns"`
 }
 
 //
@@ -146,6 +149,9 @@ func (r *VM) With(m *model.VM) {
 	r.GuestName = m.GuestName
 	r.BalloonedMemory = m.BalloonedMemory
 	r.IpAddress = m.IpAddress
+	r.StorageUsed = m.StorageUsed
+	r.FaultToleranceEnabled = m.FaultToleranceEnabled
+	r.SriovSupported = m.SriovSupported
 	r.Networks = *model.RefListPtr().With(m.Networks)
 	r.Disks = m.DecodeDisks()
 	r.Host = *(&model.Ref{}).With(m.Host)
