@@ -340,11 +340,15 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 				if array, cast := p.Val.(types.ArrayOfPhysicalNic); cast {
 					network := v.model.DecodeNetwork()
 					for _, nic := range array.PhysicalNic {
+						linkSpeed := int32(0)
+						if nic.LinkSpeed != nil {
+							linkSpeed = nic.LinkSpeed.SpeedMb
+						}
 						network.PNICs = append(
 							network.PNICs,
 							model.PNIC{
 								Key:       nic.Key,
-								LinkSpeed: nic.Spec.LinkSpeed.SpeedMb,
+								LinkSpeed: linkSpeed,
 							})
 					}
 					sort.Slice(
