@@ -140,7 +140,7 @@ func (h NetworkAttachmentDefinitionHandler) Link(p *api.Provider, m *model.Netwo
 		base.Params{
 			base.NsParam:                     p.Namespace,
 			base.ProviderParam:               p.Name,
-			Ns2Param:                         p.Namespace,
+			Ns2Param:                         m.Namespace,
 			NetworkAttachmentDefinitionParam: m.Name,
 		})
 }
