@@ -4,6 +4,7 @@ import (
 	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"
 	"github.com/vmware/govmomi/vim25/types"
 	"sort"
+	"strings"
 )
 
 //
@@ -61,6 +62,7 @@ func (v *Ref) With(ref types.AnyType) {
 		case Cluster:
 			v.Kind = model.ClusterKind
 		case Network,
+			DVPortGroup,
 			DVSwitch:
 			v.Kind = model.NetKind
 		case Datastore:
@@ -110,6 +112,57 @@ func (v *RefList) Append(r types.ManagedObjectReference) {
 // Encode the enclosed list.
 func (v *RefList) Encode() string {
 	return v.list.Encode()
+}
+
+//
+// RefList
+type List struct {
+	// A wrapped list.
+	list model.List
+}
+
+//
+// Encode the enclosed list.
+func (v *List) Encode() string {
+	return v.list.Encode()
+}
+
+//
+// Set the list content.
+func (v *List) With(in interface{}) {
+	v.list = model.List{}
+	switch in.(type) {
+	case []int:
+		list := in.([]int)
+		for _, n := range list {
+			v.list = append(v.list, n)
+		}
+	case []int8:
+		list := in.([]int8)
+		for _, n := range list {
+			v.list = append(v.list, n)
+		}
+	case []int16:
+		list := in.([]int16)
+		for _, n := range list {
+			v.list = append(v.list, n)
+		}
+	case []int32:
+		list := in.([]int32)
+		for _, n := range list {
+			v.list = append(v.list, n)
+		}
+	case []int64:
+		list := in.([]int64)
+		for _, n := range list {
+			v.list = append(v.list, n)
+		}
+	case []string:
+		list := in.([]string)
+		for _, s := range list {
+			v.list = append(v.list, s)
+		}
+	}
 }
 
 //
@@ -555,7 +608,9 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				}
 			case fCpuAffinity:
 				if a, cast := p.Val.(types.VirtualMachineAffinityInfo); cast {
-					v.model.EncodeCpuAffinity(a.AffinitySet)
+					list := List{}
+					list.With(a.AffinitySet)
+					v.model.CpuAffinity = list.Encode()
 				}
 			case fCpuHotAddEnabled:
 				if b, cast := p.Val.(bool); cast {
@@ -609,12 +664,31 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				refList := RefList{}
 				refList.With(p.Val)
 				v.model.Networks = refList.Encode()
+			case fExtraConfig:
+				if options, cast := p.Val.(types.ArrayOfOptionValue); cast {
+					for _, val := range options.OptionValue {
+						opt := val.GetOptionValue()
+						switch opt.Key {
+						case "numa.nodeAffinity":
+							if s, cast := opt.Value.(string); cast {
+								list := List{}
+								list.With(strings.Split(s, ","))
+								v.model.NumaNodeAffinity = list.Encode()
+							}
+						}
+					}
+				}
 			case fDevices:
 				if devArray, cast := p.Val.(types.ArrayOfVirtualDevice); cast {
 					for _, dev := range devArray.VirtualDevice {
 						switch dev.(type) {
 						case *types.VirtualSriovEthernetCard:
 							v.model.SriovSupported = true
+						case *types.VirtualPCIPassthrough,
+							*types.VirtualSCSIPassthrough:
+							v.model.PassthroughSupported = true
+						case *types.VirtualUSBController:
+							v.model.UsbSupported = true
 						}
 					}
 					v.updateDisks(&devArray)
@@ -654,6 +728,27 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 						Kind: model.DsKind,
 						ID:   backing.Datastore.Value,
 					},
+				}
+				disks = append(disks, md)
+			case *types.VirtualDiskRawDiskMappingVer1BackingInfo:
+				backing := disk.Backing.(*types.VirtualDiskRawDiskMappingVer1BackingInfo)
+				md := model.Disk{
+					File:     backing.FileName,
+					Capacity: disk.CapacityInBytes,
+					Shared:   backing.Sharing != "sharingNone",
+					Datastore: model.Ref{
+						Kind: model.DsKind,
+						ID:   backing.Datastore.Value,
+					},
+					RDM: true,
+				}
+				disks = append(disks, md)
+			case *types.VirtualDiskRawDiskVer2BackingInfo:
+				backing := disk.Backing.(*types.VirtualDiskRawDiskVer2BackingInfo)
+				md := model.Disk{
+					Capacity: disk.CapacityInBytes,
+					Shared:   backing.Sharing != "sharingNone",
+					RDM:      true,
 				}
 				disks = append(disks, md)
 			}

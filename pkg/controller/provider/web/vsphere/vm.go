@@ -114,7 +114,7 @@ type VM struct {
 	Resource
 	UUID                  string          `json:"uuid"`
 	Firmware              string          `json:"firmware"`
-	CpuAffinity           []int32         `json:"cpuAffinity"`
+	CpuAffinity           model.List      `json:"cpuAffinity"`
 	CpuHotAddEnabled      bool            `json:"cpuHostAddEnabled"`
 	CpuHotRemoveEnabled   bool            `json:"cpuHostRemoveEnabled"`
 	MemoryHotAddEnabled   bool            `json:"memoryHotAddEnabled"`
@@ -126,7 +126,10 @@ type VM struct {
 	BalloonedMemory       int32           `json:"balloonedMemory"`
 	IpAddress             string          `json:"ipAddress"`
 	StorageUsed           int64           `json:"storageUsed"`
+	NumaNodeAffinity      model.List      `json:"numaNodeAffinity"`
 	SriovSupported        bool            `json:"sriovSupported"`
+	PassthroughSupported  bool            `json:"passthroughSupported"`
+	UsbSupported          bool            `json:"usbSupported"`
 	Networks              model.RefList   `json:"networks"`
 	Disks                 []model.Disk    `json:"disks"`
 	Host                  model.Ref       `json:"host"`
@@ -139,7 +142,7 @@ func (r *VM) With(m *model.VM) {
 	r.Resource.With(&m.Base)
 	r.UUID = m.UUID
 	r.Firmware = m.Firmware
-	r.CpuAffinity = m.DecodeCpuAffinity()
+	r.CpuAffinity = *(&model.List{}).With(m.CpuAffinity)
 	r.CpuHotAddEnabled = m.CpuHotAddEnabled
 	r.CpuHotRemoveEnabled = m.CpuHotRemoveEnabled
 	r.MemoryHotAddEnabled = m.MemoryHotAddEnabled
@@ -152,6 +155,9 @@ func (r *VM) With(m *model.VM) {
 	r.StorageUsed = m.StorageUsed
 	r.FaultToleranceEnabled = m.FaultToleranceEnabled
 	r.SriovSupported = m.SriovSupported
+	r.PassthroughSupported = m.PassthroughSupported
+	r.UsbSupported = m.UsbSupported
+	r.NumaNodeAffinity = *(&model.List{}).With(m.NumaNodeAffinity)
 	r.Networks = *model.RefListPtr().With(m.Networks)
 	r.Disks = m.DecodeDisks()
 	r.Host = *(&model.Ref{}).With(m.Host)
