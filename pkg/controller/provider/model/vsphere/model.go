@@ -53,9 +53,9 @@ func (m *Base) Equals(other libmodel.Model) bool {
 // An object reference.
 type Ref struct {
 	// The kind (type) of the referenced.
-	Kind string
+	Kind string `json:"kind"`
 	// The ID of object referenced.
-	ID string
+	ID string `json:"id"`
 }
 
 //
@@ -102,6 +102,28 @@ func (r *RefList) With(j string) *RefList {
 func RefListPtr() *RefList {
 	r := RefList{}
 	return &r
+}
+
+//
+// List
+type List []interface{}
+
+func (r *List) Encode() string {
+	j, _ := json.Marshal(r)
+	return string(j)
+}
+
+//
+// Unmarshal the json `j` into self.
+func (r *List) With(j string) *List {
+	json.Unmarshal([]byte(j), r)
+	return r
+}
+
+type About struct {
+	Base
+	APIVersion string `sql:""`
+	Product    string `sql:""`
 }
 
 type Folder struct {
@@ -272,27 +294,15 @@ type VM struct {
 	GuestName             string `sql:""`
 	BalloonedMemory       int32  `sql:""`
 	IpAddress             string `sql:""`
+	NumaNodeAffinity      string `sql:""`
 	StorageUsed           int64  `sql:""`
 	SriovSupported        bool   `sql:""`
+	PassthroughSupported  bool   `sql:""`
+	UsbSupported          bool   `sql:""`
 	Disks                 string `sql:""`
 	Networks              string `sql:""`
 	Host                  string `sql:""`
 	Concerns              string `sql:""`
-}
-
-//
-// Encode CPU Affinity.
-func (m *VM) EncodeCpuAffinity(n []int32) {
-	j, _ := json.Marshal(n)
-	m.CpuAffinity = string(j)
-}
-
-//
-// Decode CPU affinity.
-func (m *VM) DecodeCpuAffinity() []int32 {
-	list := []int32{}
-	json.Unmarshal([]byte(m.CpuAffinity), &list)
-	return list
 }
 
 //
@@ -336,6 +346,7 @@ type Disk struct {
 	Datastore Ref    `json:"datastore"`
 	Capacity  int64  `json:"capacity"`
 	Shared    bool   `json:"shared"`
+	RDM       bool   `json:"rdm"`
 }
 
 //
