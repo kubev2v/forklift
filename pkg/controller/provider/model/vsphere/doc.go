@@ -19,6 +19,7 @@ func init() {
 func All() []interface{} {
 	return []interface{}{
 		&ocp.Provider{},
+		&About{},
 		&Folder{},
 		&Datacenter{},
 		&Cluster{},

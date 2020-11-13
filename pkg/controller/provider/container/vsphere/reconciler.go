@@ -96,6 +96,7 @@ const (
 	fNumCoresPerSocket   = "config.hardware.numCoresPerSocket"
 	fMemorySize          = "config.hardware.memoryMB"
 	fDevices             = "config.hardware.device"
+	fExtraConfig         = "config.extraConfig"
 	fGuestName           = "summary.config.guestFullName"
 	fBalloonedMemory     = "summary.quickStats.balloonedMemory"
 	fVmIpAddress         = "summary.guest.ipAddress"
@@ -425,6 +426,15 @@ func (r *Reconciler) connect(ctx context.Context) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	about := client.ServiceContent.About
+	err = r.db.Insert(
+		&model.About{
+			APIVersion: about.ApiVersion,
+			Product:    about.LicenseProductName,
+		})
+	if err != nil {
+		return liberr.Wrap(err)
+	}
 
 	r.client = client
 
@@ -588,6 +598,7 @@ func (r *Reconciler) propertySpec() []types.PropertySpec {
 				fNumCoresPerSocket,
 				fMemorySize,
 				fDevices,
+				fExtraConfig,
 				fGuestName,
 				fBalloonedMemory,
 				fVmIpAddress,
