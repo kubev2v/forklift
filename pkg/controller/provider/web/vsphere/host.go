@@ -80,6 +80,7 @@ func (h HostHandler) Get(ctx *gin.Context) {
 		ctx.Status(status)
 		return
 	}
+	h.Detail = true
 	m := &model.Host{
 		Base: model.Base{
 			ID: ctx.Param(HostParam),

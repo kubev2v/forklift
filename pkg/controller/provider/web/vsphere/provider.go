@@ -68,7 +68,7 @@ func (h ProviderHandler) Get(ctx *gin.Context) {
 	m.With(h.Provider)
 	r := Provider{}
 	r.With(m)
-	err := h.AddCount(&r)
+	err := h.AddDerived(&r)
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
@@ -103,7 +103,7 @@ func (h *ProviderHandler) ListContent(ctx *gin.Context) (content []interface{}, 
 			m.With(p)
 			r := Provider{}
 			r.With(m)
-			aErr := h.AddCount(&r)
+			aErr := h.AddDerived(&r)
 			if aErr != nil {
 				err = liberr.Wrap(aErr)
 				return
@@ -119,52 +119,66 @@ func (h *ProviderHandler) ListContent(ctx *gin.Context) (content []interface{}, 
 }
 
 //
-// Add counts.
-func (h ProviderHandler) AddCount(r *Provider) error {
-	var err error
+// Add derived fields.
+func (h ProviderHandler) AddDerived(r *Provider) (err error) {
 	var n int64
 	if !h.Detail {
-		return nil
+		return
 	}
 	db := h.Reconciler.DB()
+	// About
+	about := &vsphere.About{}
+	err = db.Get(about)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	r.APIVersion = about.APIVersion
+	r.Product = about.Product
 	// Datacenter
 	n, err = db.Count(&vsphere.Datacenter{}, nil)
 	if err != nil {
-		return liberr.Wrap(err)
+		err = liberr.Wrap(err)
+		return
 	}
 	r.DatacenterCount = n
 	// Cluster
 	n, err = db.Count(&vsphere.Cluster{}, nil)
 	if err != nil {
-		return liberr.Wrap(err)
+		err = liberr.Wrap(err)
+		return
 	}
 	r.ClusterCount = n
 	// Host
 	n, err = db.Count(&vsphere.Host{}, nil)
 	if err != nil {
-		return liberr.Wrap(err)
+		err = liberr.Wrap(err)
+		return
 	}
 	r.HostCount = n
 	// VM
 	n, err = db.Count(&vsphere.VM{}, nil)
 	if err != nil {
-		return liberr.Wrap(err)
+		err = liberr.Wrap(err)
+		return
 	}
 	r.VMCount = n
 	// Network
 	n, err = db.Count(&vsphere.Network{}, nil)
 	if err != nil {
-		return liberr.Wrap(err)
+		err = liberr.Wrap(err)
+		return
 	}
 	r.NetworkCount = n
 	// Datastore
 	n, err = db.Count(&vsphere.Datastore{}, nil)
 	if err != nil {
-		return liberr.Wrap(err)
+		err = liberr.Wrap(err)
+		return
 	}
 	r.DatastoreCount = n
 
-	return nil
+	return
 }
 
 //
@@ -183,8 +197,9 @@ func (h ProviderHandler) Link(m *model.Provider) string {
 type Provider struct {
 	ocp.Resource
 	Type            string      `json:"type"`
-	Extension       interface{} `json:"extension,omitempty"`
 	Object          interface{} `json:"object"`
+	APIVersion      string      `json:"apiVersion"`
+	Product         string      `json:"product"`
 	DatacenterCount int64       `json:"datacenterCount"`
 	ClusterCount    int64       `json:"clusterCount"`
 	HostCount       int64       `json:"hostCount"`
