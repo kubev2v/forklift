@@ -37,15 +37,15 @@ spec:
             ipAddress:
               description: IP address used for disk transfer.
               type: string
-            thumbprint:
-              description: Certificate SHA-1 fingerprint, called thumbprint by VMware.
-              type: string
             provider:
               description: Provider
               type: object
             secret:
               description: Credentials.
               type: object
+            thumbprint:
+              description: Certificate SHA-1 fingerprint, called thumbprint by VMware.
+              type: string
           required:
           - provider
           - id
