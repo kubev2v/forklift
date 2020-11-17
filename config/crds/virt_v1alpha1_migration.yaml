@@ -73,6 +73,9 @@ spec:
                               annotations:
                                 description: Annotations.
                                 type: object
+                              description:
+                                description: Name
+                                type: string
                               error:
                                 description: Error.
                                 properties:

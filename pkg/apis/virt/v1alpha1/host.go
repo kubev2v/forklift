@@ -33,8 +33,8 @@ type HostSpec struct {
 	ID string `json:"id"`
 	// IP address used for disk transfer.
 	IpAddress string `json:"ipAddress"`
-	// Certificate SHA-1 fingerprint. Usually call thumbprint.
-	Thumbprint string `json:"thumbprint"`
+	// Certificate SHA-1 fingerprint, called thumbprint by VMware.
+	Thumbprint string `json:"thumbprint,omitempty"`
 	// Credentials.
 	Secret core.ObjectReference `json:"secret,omitempty"`
 }

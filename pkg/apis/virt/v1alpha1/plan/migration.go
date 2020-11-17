@@ -98,6 +98,8 @@ type Task struct {
 	Timed
 	// Name.
 	Name string `json:"name"`
+	// Name
+	Description string `json:"description,omitempty"`
 	// Phase
 	Phase string `json:"phase,omitempty"`
 	// Progress.
