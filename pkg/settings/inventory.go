@@ -14,6 +14,7 @@ const (
 	AuthOptional   = "AUTH_OPTIONAL"
 	Host           = "API_HOST"
 	Port           = "API_PORT"
+	TLSSecretName  = "TLS_SECRET_NAME"
 )
 
 //
@@ -36,6 +37,15 @@ type Inventory struct {
 	Host string
 	// Port
 	Port int
+	// TLS
+	TLS struct {
+		// Enabled.
+		Enabled bool
+		// Certificate path
+		Certificate string
+		// Key path
+		Key string
+	}
 }
 
 //
@@ -72,6 +82,14 @@ func (r *Inventory) Load() error {
 		r.Port, _ = strconv.Atoi(s)
 	} else {
 		r.Port = 8080
+	}
+	// TLS
+	if s, found := os.LookupEnv(TLSSecretName); found {
+		r.TLS.Enabled = true
+		r.TLS.Certificate = "/var/run/secrets/" + s + "/tls.crt"
+		r.TLS.Key = "/var/run/secrets/" + s + "/tls.key"
+	} else {
+		r.TLS.Enabled = false
 	}
 
 	return nil

@@ -29,11 +29,21 @@ type WebServer struct {
 	Handlers []RequestHandler
 	// Compiled CORS origins.
 	allowedOrigins []*regexp.Regexp
+	// TLS.
+	TLS struct {
+		// Enabled.
+		Enabled bool
+		// Certificate path.
+		Certificate string
+		// Key path
+		Key string
+	}
 }
 
 //
 // Start the web-server.
 // Initializes `gin` with routes and CORS origins.
+// Creates an http server to handle TLS
 func (w *WebServer) Start() {
 	router := gin.Default()
 	router.Use(cors.New(cors.Config{
@@ -45,14 +55,22 @@ func (w *WebServer) Start() {
 	}))
 	w.buildOrigins()
 	w.addRoutes(router)
-	go router.Run(w.address())
+	if w.TLS.Enabled {
+		go router.RunTLS(w.address(), w.TLS.Certificate, w.TLS.Key)
+	} else {
+		go router.Run(w.address())
+	}
 }
 
 //
 // Determine the address.
 func (w *WebServer) address() string {
 	if w.Port == 0 {
-		w.Port = 8080
+		if w.TLS.Enabled {
+			w.Port = 8443
+		} else {
+			w.Port = 8080
+		}
 	}
 
 	return fmt.Sprintf(":%d", w.Port)
