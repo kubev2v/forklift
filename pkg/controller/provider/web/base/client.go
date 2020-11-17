@@ -1,6 +1,8 @@
 package base
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +14,8 @@ import (
 	liburl "net/url"
 	"reflect"
 )
+
+const ServiceCAFile = "/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt"
 
 //
 // Application settings.
@@ -108,7 +112,18 @@ func (c *Client) get(path string, resource interface{}) (status int, err error) 
 		Header: header,
 		URL:    c.url(path),
 	}
-	client := http.Client{}
+	rootCAPool := x509.NewCertPool()
+	rootCA, err := ioutil.ReadFile(ServiceCAFile)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	rootCAPool.AppendCertsFromPEM(rootCA)
+	client := http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{RootCAs: rootCAPool},
+		},
+	}
 	response, err := client.Do(request)
 	if err != nil {
 		err = liberr.Wrap(err)
