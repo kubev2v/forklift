@@ -383,8 +383,9 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 				pipeline,
 				&plan.Step{
 					Task: plan.Task{
-						Name:     PreHook,
-						Progress: libitr.Progress{Total: 1},
+						Name:        PreHook,
+						Description: "Run pre-migration hook.",
+						Progress:    libitr.Progress{Total: 1},
 					},
 				})
 		case CreateImport:
@@ -401,7 +402,8 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 				pipeline,
 				&plan.Step{
 					Task: plan.Task{
-						Name: DiskTransfer,
+						Name:        DiskTransfer,
+						Description: "Transfer disks.",
 						Progress: libitr.Progress{
 							Total: total,
 						},
@@ -415,8 +417,9 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 				pipeline,
 				&plan.Step{
 					Task: plan.Task{
-						Name:     ImageConversion,
-						Progress: libitr.Progress{Total: 1},
+						Name:        ImageConversion,
+						Description: "Convert image to kubevirt.",
+						Progress:    libitr.Progress{Total: 1},
 					},
 				})
 		case CreatePostHook:
@@ -424,8 +427,9 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 				pipeline,
 				&plan.Step{
 					Task: plan.Task{
-						Name:     PostHook,
-						Progress: libitr.Progress{Total: 1},
+						Name:        PostHook,
+						Description: "Run post-migration hook.",
+						Progress:    libitr.Progress{Total: 1},
 					},
 				})
 		}
