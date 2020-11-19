@@ -15,8 +15,6 @@ import (
 	"reflect"
 )
 
-const ServiceCAFile = "/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt"
-
 //
 // Application settings.
 var Settings = &settings.Settings
@@ -44,6 +42,8 @@ type Client struct {
 	Host string
 	// Parameters
 	Params Params
+	// http Transport.
+	transport http.RoundTripper
 }
 
 //
@@ -99,6 +99,32 @@ func (c *Client) List(list interface{}) (status int, err error) {
 }
 
 //
+// Build and set the transport as needed.
+func (c *Client) buildTransport() (err error) {
+	if c.transport != nil {
+		return
+	}
+	if !Settings.Inventory.TLS.Enabled {
+		c.transport = http.DefaultTransport
+		return
+	}
+	pool := x509.NewCertPool()
+	ca, err := ioutil.ReadFile(Settings.Inventory.TLS.CA)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	pool.AppendCertsFromPEM(ca)
+	c.transport = &http.Transport{
+		TLSClientConfig: &tls.Config{
+			RootCAs: pool,
+		},
+	}
+
+	return
+}
+
+//
 // Http GET
 func (c *Client) get(path string, resource interface{}) (status int, err error) {
 	header := http.Header{}
@@ -112,18 +138,12 @@ func (c *Client) get(path string, resource interface{}) (status int, err error) 
 		Header: header,
 		URL:    c.url(path),
 	}
-	rootCAPool := x509.NewCertPool()
-	rootCA, err := ioutil.ReadFile(ServiceCAFile)
+	err = c.buildTransport()
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	rootCAPool.AppendCertsFromPEM(rootCA)
-	client := http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{RootCAs: rootCAPool},
-		},
-	}
+	client := http.Client{Transport: c.transport}
 	response, err := client.Do(request)
 	if err != nil {
 		err = liberr.Wrap(err)
