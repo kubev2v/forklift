@@ -14,6 +14,7 @@ const (
 	AuthOptional   = "AUTH_OPTIONAL"
 	Host           = "API_HOST"
 	Port           = "API_PORT"
+	TLSEnabled     = "API_TLS_ENABLED"
 	TLSCertificate = "API_TLS_CERTIFICATE"
 	TLSKey         = "API_TLS_KEY"
 )
@@ -85,14 +86,16 @@ func (r *Inventory) Load() error {
 		r.Port = 8080
 	}
 	// TLS
-	if cert, found := os.LookupEnv(TLSCertificate); found {
-		if key, found := os.LookupEnv(TLSKey); found {
-			r.TLS.Certificate = cert
-			r.TLS.Key = key
-			r.TLS.Enabled = true
+	r.TLS.Enabled = false
+	if s, found := os.LookupEnv(TLSEnabled); found {
+		if r.TLS.Enabled, _ = strconv.ParseBool(s); r.TLS.Enabled {
+			if cert, found := os.LookupEnv(TLSCertificate); found {
+				if key, found := os.LookupEnv(TLSKey); found {
+					r.TLS.Certificate = cert
+					r.TLS.Key = key
+				}
+			}
 		}
-	} else {
-		r.TLS.Enabled = false
 	}
 
 	return nil
