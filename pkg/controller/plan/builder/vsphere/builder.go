@@ -160,6 +160,7 @@ func (r *Builder) Mapping(mp *plan.Map, object *vmio.ResourceMapping) (err error
 					Namespace: &network.Destination.Namespace,
 					Name:      network.Destination.Name,
 				},
+				Type: &network.Destination.Type,
 			})
 	}
 	for i := range mp.Datastores {
