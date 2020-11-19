@@ -160,7 +160,11 @@ func (c *Client) url(path string) *liburl.URL {
 	path = (&Handler{}).Link(path, c.Params)
 	url, _ := liburl.Parse(path)
 	if url.Host == "" {
-		url.Scheme = "http"
+		if Settings.Inventory.TLS.Enabled {
+			url.Scheme = "https"
+		} else {
+			url.Scheme = "http"
+		}
 		url.Host = c.Host
 	}
 
