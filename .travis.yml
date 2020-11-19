@@ -1,0 +1,32 @@
+language: go
+sudo: false
+install: true
+
+matrix:
+  include:
+    - os: linux
+      go: "1.14.7"
+      sudo: true
+      cache:
+        directories:
+          - $HOME/.cache/go-build
+          - $HOME/gopath/pkg/mod
+
+    - os: osx
+      go: "1.14.7"
+      sudo: true
+      cache:
+        directories:
+          - $HOME/.cache/go-build
+          - $HOME/gopath/pkg/mod
+
+script:
+  - export os=$(go env GOOS)
+  - export arch=$(go env GOARCH)
+  - curl -sL https://go.kubebuilder.io/dl/2.0.0-beta.0/${os}/${arch} | tar -xz -C /tmp/
+  - sudo mv /tmp/kubebuilder_2.0.0-beta.0_${os}_${arch} /usr/local/kubebuilder
+  - export PATH=$PATH:/usr/local/kubebuilder/bin
+  - env GO111MODULE=off KUBEBUILDER_CONTROLPLANE_START_TIMEOUT=60s make ci
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)

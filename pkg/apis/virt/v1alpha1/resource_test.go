@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"testing"
 
+	"github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1/plan"
 	"github.com/onsi/gomega"
 	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,7 +35,15 @@ func TestPlan(t *testing.T) {
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "foo",
 			Namespace: "default",
-		}}
+		},
+		Spec: PlanSpec{
+			VMs: []plan.VM{
+				{
+					ID: "vm-42",
+				},
+			},
+		},
+	}
 	g := gomega.NewGomegaWithT(t)
 
 	// Test Create
