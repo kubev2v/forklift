@@ -145,7 +145,7 @@ func (r *Builder) host(hostID string) (host *vsphere.Host, err error) {
 
 //
 // Build the VMIO ResourceMapping CR.
-func (r *Builder) Mapping(mp *plan.Map, object *vmio.ResourceMapping) (err error) {
+func (r *Builder) Mapping(mp *plan.Map, object *vmio.VirtualMachineImportSpec) (err error) {
 	netMap := []vmio.NetworkResourceMappingItem{}
 	dsMap := []vmio.StorageResourceMappingItem{}
 	for i := range mp.Networks {
@@ -176,7 +176,7 @@ func (r *Builder) Mapping(mp *plan.Map, object *vmio.ResourceMapping) (err error
 				},
 			})
 	}
-	object.Spec.VmwareMappings = &vmio.VmwareMappings{
+	object.Source.Vmware.Mappings = &vmio.VmwareMappings{
 		NetworkMappings: &netMap,
 		StorageMappings: &dsMap,
 	}
@@ -186,7 +186,7 @@ func (r *Builder) Mapping(mp *plan.Map, object *vmio.ResourceMapping) (err error
 
 //
 // Build the VMIO VM Import Spec.
-func (r *Builder) Import(vmID string, object *vmio.VirtualMachineImportSpec) (err error) {
+func (r *Builder) Import(vmID string, mp *plan.Map, object *vmio.VirtualMachineImportSpec) (err error) {
 	vm := &vsphere.VM{}
 	status, pErr := r.Inventory.Get(vm, vmID)
 	if pErr != nil {
@@ -202,6 +202,7 @@ func (r *Builder) Import(vmID string, object *vmio.VirtualMachineImportSpec) (er
 				ID: &uuid,
 			},
 		}
+		r.Mapping(mp, object)
 	default:
 		err = liberr.New(
 			fmt.Sprintf(
