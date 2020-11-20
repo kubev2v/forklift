@@ -324,11 +324,6 @@ func (r *Migration) begin() (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
-	err = r.kubevirt.EnsureMapping()
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
 	//
 	// Delete
 	for _, status := range r.Plan.Status.Migration.VMs {

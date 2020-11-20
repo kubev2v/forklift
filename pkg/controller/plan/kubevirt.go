@@ -156,23 +156,6 @@ func (r *KubeVirt) EnsureNamespace() (err error) {
 }
 
 //
-// Ensure the VMIO mapping exists on the destination.
-func (r *KubeVirt) EnsureMapping() (err error) {
-	mapping, err := r.buildMapping()
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	err = r.ensureObject(mapping)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-
-	return
-}
-
-//
 // Ensure the VMIO secret exists on the destination.
 func (r *KubeVirt) EnsureSecret(vmID string) (err error) {
 	secret, err := r.buildSecret(vmID)
@@ -193,6 +176,13 @@ func (r *KubeVirt) EnsureSecret(vmID string) (err error) {
 // Build the VMIO CR.
 func (r *KubeVirt) buildImport(vm *plan.VMStatus) (object *vmio.VirtualMachineImport, err error) {
 	namespace := r.namespace()
+	sn := snapshot.New(r.Migration)
+	mp := &plan.Map{}
+	err = sn.Get(api.MapSnapshot, mp)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
 	object = &vmio.VirtualMachineImport{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace: r.namespace(),
@@ -208,46 +198,14 @@ func (r *KubeVirt) buildImport(vm *plan.VMStatus) (object *vmio.VirtualMachineIm
 				Namespace: &namespace,
 				Name:      r.nameForSecret(vm.ID),
 			},
-			ResourceMapping: &vmio.ObjectIdentifier{
-				Namespace: &namespace,
-				Name:      r.nameForMapping(),
-			},
 		},
 	}
-	err = r.Builder.Import(vm.ID, &object.Spec)
+	err = r.Builder.Import(vm.ID, mp, &object.Spec)
 	if err != nil {
 		err = liberr.Wrap(err)
 	}
 	if vm.Name != "" {
 		object.Spec.TargetVMName = &vm.Name
-	}
-
-	return
-}
-
-//
-// Build the ResourceMapping CR.
-func (r *KubeVirt) buildMapping() (object *vmio.ResourceMapping, err error) {
-	object = &vmio.ResourceMapping{
-		ObjectMeta: meta.ObjectMeta{
-			Namespace: r.namespace(),
-			Name:      r.nameForMapping(),
-			Labels: map[string]string{
-				kMigration: string(r.Plan.Status.Migration.Active),
-				kPlan:      string(r.Plan.UID),
-			},
-		},
-	}
-	sn := snapshot.New(r.Migration)
-	mp := &plan.Map{}
-	err = sn.Get(api.MapSnapshot, mp)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	err = r.Builder.Mapping(mp, object)
-	if err != nil {
-		err = liberr.Wrap(err)
 	}
 
 	return
@@ -272,19 +230,6 @@ func (r *KubeVirt) buildSecret(vmID string) (object *core.Secret, err error) {
 	}
 
 	return
-}
-
-//
-// Generated name for kubevirt VM Import mapping CR.
-func (r *KubeVirt) nameForMapping() string {
-	uid := string(r.Plan.UID)
-	parts := []string{
-		"plan",
-		r.Plan.Name,
-		uid[len(uid)-4:],
-	}
-
-	return strings.Join(parts, "-")
 }
 
 //
