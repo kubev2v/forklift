@@ -7,6 +7,12 @@ import (
 )
 
 //
+// k8s pod default.
+const (
+	ServiceCAFile = "/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt"
+)
+
+//
 // Environment variables.
 const (
 	AllowedOrigins = "CORS_ALLOWED_ORIGINS"
@@ -17,6 +23,7 @@ const (
 	TLSEnabled     = "API_TLS_ENABLED"
 	TLSCertificate = "API_TLS_CERTIFICATE"
 	TLSKey         = "API_TLS_KEY"
+	TLSCa          = "API_TLS_CA"
 )
 
 //
@@ -47,6 +54,8 @@ type Inventory struct {
 		Certificate string
 		// Key path
 		Key string
+		// CA path
+		CA string
 	}
 }
 
@@ -86,15 +95,18 @@ func (r *Inventory) Load() error {
 		r.Port = 8080
 	}
 	// TLS
-	r.TLS.Enabled = false
-	if s, found := os.LookupEnv(TLSEnabled); found {
-		if r.TLS.Enabled, _ = strconv.ParseBool(s); r.TLS.Enabled {
-			if cert, found := os.LookupEnv(TLSCertificate); found {
-				if key, found := os.LookupEnv(TLSKey); found {
-					r.TLS.Certificate = cert
-					r.TLS.Key = key
-				}
-			}
+	r.TLS.Enabled = getEnvBool(TLSEnabled, false)
+	if r.TLS.Enabled {
+		if s, found := os.LookupEnv(TLSCertificate); found {
+			r.TLS.Certificate = s
+		}
+		if s, found := os.LookupEnv(TLSKey); found {
+			r.TLS.Key = s
+		}
+		if s, found := os.LookupEnv(TLSCa); found {
+			r.TLS.CA = s
+		} else {
+			r.TLS.CA = ServiceCAFile
 		}
 	}
 
