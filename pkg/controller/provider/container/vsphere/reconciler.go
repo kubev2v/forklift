@@ -349,10 +349,15 @@ func (r *Reconciler) getUpdates(ctx context.Context) error {
 		This:    pc.Reference(),
 		Options: filter.Options,
 	}
-	var transaction *libmodel.Tx
+	var tx *libmodel.Tx
+	watchList := []*libmodel.Watch{}
 	defer func() {
-		if transaction != nil {
-			transaction.End()
+		r.consistent = false
+		for _, w := range watchList {
+			r.db.EndWatch(w)
+		}
+		if tx != nil {
+			tx.End()
 		}
 	}()
 next:
@@ -375,12 +380,12 @@ next:
 			continue next
 		}
 		req.Version = updateSet.Version
-		transaction, err = r.db.Begin()
+		tx, err = r.db.Begin()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
 		for _, fs := range updateSet.FilterSet {
-			err = r.apply(ctx, fs.ObjectSet)
+			err = r.apply(ctx, tx, fs.ObjectSet)
 			if err != nil {
 				err = liberr.Wrap(err)
 				Log.Trace(err)
@@ -388,23 +393,44 @@ next:
 			}
 		}
 		if err == nil {
-			err = transaction.Commit()
+			err = tx.Commit()
 		} else {
-			err = transaction.End()
+			err = tx.End()
 		}
-		transaction = nil
 		if err != nil {
 			Log.Trace(err)
 		}
 		if updateSet.Truncated == nil || !*updateSet.Truncated {
 			if !r.consistent {
-				r.log.Info("Initial consistency.", "duration", time.Since(mark))
 				r.consistent = true
+				r.log.Info("Initial consistency.", "duration", time.Since(mark))
+				watchList = r.watch()
 			}
 		}
 	}
 
 	return nil
+}
+
+//
+// Add model watches.
+func (r *Reconciler) watch() (list []*libmodel.Watch) {
+	// Cluster
+	w, err := r.db.Watch(&model.Cluster{}, &WatchCluster{r.db})
+	if err != nil {
+		Log.Trace(liberr.Wrap(err))
+	} else {
+		list = append(list, w)
+	}
+	// VM
+	w, err = r.db.Watch(&model.VM{}, &WatchVM{r.db})
+	if err != nil {
+		Log.Trace(liberr.Wrap(err))
+	} else {
+		list = append(list, w)
+	}
+
+	return
 }
 
 //
@@ -613,15 +639,15 @@ func (r *Reconciler) propertySpec() []types.PropertySpec {
 
 //
 // Apply updates.
-func (r *Reconciler) apply(ctx context.Context, updates []types.ObjectUpdate) (err error) {
+func (r *Reconciler) apply(ctx context.Context, tx *libmodel.Tx, updates []types.ObjectUpdate) (err error) {
 	for _, u := range updates {
 		switch string(u.Kind) {
 		case Enter:
-			err = r.applyEnter(u)
+			err = r.applyEnter(tx, u)
 		case Modify:
-			err = r.applyModify(u)
+			err = r.applyModify(tx, u)
 		case Leave:
-			err = r.applyLeave(u)
+			err = r.applyLeave(tx, u)
 		}
 		if err != nil {
 			err = liberr.Wrap(err)
@@ -719,15 +745,18 @@ func (r *Reconciler) selectAdapter(u types.ObjectUpdate) (Adapter, bool) {
 
 //
 // Object created.
-func (r Reconciler) applyEnter(u types.ObjectUpdate) error {
+func (r Reconciler) applyEnter(tx *libmodel.Tx, u types.ObjectUpdate) error {
 	adapter, selected := r.selectAdapter(u)
 	if !selected {
 		return nil
 	}
 	adapter.Apply(u)
 	m := adapter.Model()
+	if mX, cast := m.(interface{ Created() }); cast {
+		mX.Created()
+	}
 	r.log.Info("Create", "model", m.String())
-	err := r.db.Insert(m)
+	err := tx.Insert(m)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -737,19 +766,22 @@ func (r Reconciler) applyEnter(u types.ObjectUpdate) error {
 
 //
 // Object modified.
-func (r Reconciler) applyModify(u types.ObjectUpdate) error {
+func (r Reconciler) applyModify(tx *libmodel.Tx, u types.ObjectUpdate) error {
 	adapter, selected := r.selectAdapter(u)
 	if !selected {
 		return nil
 	}
 	m := adapter.Model()
 	r.log.Info("Update", "model", m.String())
-	err := r.db.Get(m)
+	err := tx.Get(m)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 	adapter.Apply(u)
-	err = r.db.Update(m)
+	if mX, cast := m.(interface{ Updated() }); cast {
+		mX.Updated()
+	}
+	err = tx.Update(m)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -759,7 +791,7 @@ func (r Reconciler) applyModify(u types.ObjectUpdate) error {
 
 //
 // Object deleted.
-func (r Reconciler) applyLeave(u types.ObjectUpdate) error {
+func (r Reconciler) applyLeave(tx *libmodel.Tx, u types.ObjectUpdate) error {
 	var deleted model.Model
 	switch u.Obj.Type {
 	case Folder:
@@ -809,7 +841,7 @@ func (r Reconciler) applyLeave(u types.ObjectUpdate) error {
 		return nil
 	}
 	r.log.Info("Delete", "model", deleted.String())
-	err := r.db.Delete(deleted)
+	err := tx.Delete(deleted)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
