@@ -7,8 +7,10 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
+	"github.com/konveyor/virt-controller/pkg/controller/provider/container"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"net/url"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -18,6 +20,10 @@ const (
 	UrlNotValid      = "UrlNotValid"
 	TypeNotSupported = "ProviderTypeNotSupported"
 	SecretNotValid   = "SecretNotValid"
+	Validated        = "Validated"
+	ConnectionTested = "ConnectionTested"
+	InventoryCreated = "InventoryCreated"
+	LoadInventory    = "LoadInventory"
 )
 
 //
@@ -37,6 +43,11 @@ const (
 	NotFound     = "NotFound"
 	NotSupported = "NotSupported"
 	DataErr      = "DataErr"
+	Malformed    = "Malformed"
+	Failed       = "Failed"
+	Completed    = "Completed"
+	Tested       = "Tested"
+	Started      = "Started"
 )
 
 //
@@ -57,9 +68,27 @@ func (r *Reconciler) validate(provider *api.Provider) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = r.validateSecret(provider)
+	secret, err := r.validateSecret(provider)
 	if err != nil {
 		return liberr.Wrap(err)
+	}
+	err = r.testConnection(provider, secret)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	err = r.inventoryCreated(provider)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	if !provider.Status.HasBlockerCondition() {
+		provider.Status.SetCondition(
+			libcnd.Condition{
+				Type:     Validated,
+				Status:   True,
+				Reason:   Completed,
+				Category: Advisory,
+				Message:  "Validation has been completed.",
+			})
 	}
 
 	return nil
@@ -105,6 +134,17 @@ func (r *Reconciler) validateURL(provider *api.Provider) error {
 				Message:  "The `url` is not valid.",
 			})
 	}
+	_, err := url.Parse(provider.Spec.URL)
+	if err != nil {
+		provider.Status.SetCondition(
+			libcnd.Condition{
+				Type:     UrlNotValid,
+				Status:   True,
+				Reason:   Malformed,
+				Category: Critical,
+				Message:  fmt.Sprintf("The `url` is malformed: %s", err.Error()),
+			})
+	}
 
 	return nil
 }
@@ -114,9 +154,9 @@ func (r *Reconciler) validateURL(provider *api.Provider) error {
 //   1. The references is complete.
 //   2. The secret exists.
 //   3. the content of the secret is valid.
-func (r *Reconciler) validateSecret(provider *api.Provider) error {
+func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret, err error) {
 	if provider.IsHost() {
-		return nil
+		return
 	}
 	// NotSet
 	newCnd := libcnd.Condition{
@@ -129,23 +169,23 @@ func (r *Reconciler) validateSecret(provider *api.Provider) error {
 	ref := provider.Spec.Secret
 	if !libref.RefSet(&ref) {
 		provider.Status.SetCondition(newCnd)
-		return nil
+		return
 	}
 	// NotFound
-	secret := &core.Secret{}
+	secret = &core.Secret{}
 	key := client.ObjectKey{
 		Namespace: ref.Namespace,
 		Name:      ref.Name,
 	}
-	err := r.Get(context.TODO(), key, secret)
+	err = r.Get(context.TODO(), key, secret)
 	if errors.IsNotFound(err) {
 		err = nil
 		newCnd.Reason = NotFound
 		provider.Status.SetCondition(newCnd)
-		return nil
+		return
 	}
 	if err != nil {
-		return liberr.Wrap(err)
+		err = liberr.Wrap(err)
 	}
 	// DataErr
 	keyList := []string{}
@@ -167,6 +207,64 @@ func (r *Reconciler) validateSecret(provider *api.Provider) error {
 	if len(newCnd.Items) > 0 {
 		newCnd.Reason = DataErr
 		provider.Status.SetCondition(newCnd)
+	}
+
+	return
+}
+
+//
+// Test connection.
+func (r *Reconciler) testConnection(provider *api.Provider, secret *core.Secret) error {
+	if provider.Status.HasBlockerCondition() {
+		return nil
+	}
+	rl := container.Build(nil, provider, secret)
+	err := rl.Test()
+	cnd := libcnd.Condition{
+		Type:     ConnectionTested,
+		Category: Required,
+	}
+	if err == nil {
+		cnd.Status = True
+		cnd.Reason = Tested
+		cnd.Message = "Connection test, succeeded."
+	} else {
+		cnd.Status = False
+		cnd.Reason = Failed
+		cnd.Message = fmt.Sprintf("Connection test, failed: %s", err.Error())
+	}
+
+	provider.Status.SetCondition(cnd)
+
+	return nil
+}
+
+//
+// Validate inventory created.
+func (r *Reconciler) inventoryCreated(provider *api.Provider) error {
+	if provider.Status.HasBlockerCondition() {
+		return nil
+	}
+	if r, found := r.container.Get(provider); found {
+		if r.HasConsistency() {
+			provider.Status.SetCondition(
+				libcnd.Condition{
+					Type:     InventoryCreated,
+					Status:   True,
+					Reason:   Completed,
+					Category: Required,
+					Message:  "The inventory has been loaded.",
+				})
+		} else {
+			provider.Status.SetCondition(
+				libcnd.Condition{
+					Type:     LoadInventory,
+					Status:   True,
+					Reason:   Started,
+					Category: Advisory,
+					Message:  "Loading the inventory.",
+				})
+		}
 	}
 
 	return nil

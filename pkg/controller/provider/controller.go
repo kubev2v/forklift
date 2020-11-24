@@ -32,10 +32,11 @@ import (
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web"
 	"github.com/konveyor/virt-controller/pkg/settings"
 	core "k8s.io/api/core/v1"
-	clienterror "k8s.io/apimachinery/pkg/api/errors"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/record"
 	"os"
 	"path/filepath"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -94,10 +95,11 @@ func Add(mgr manager.Manager) error {
 	web.TLS.Key = Settings.Inventory.TLS.Key
 	web.AllowedOrigins = Settings.CORS.AllowedOrigins
 	reconciler := &Reconciler{
-		Client:    nClient,
-		scheme:    mgr.GetScheme(),
-		container: container,
-		web:       web,
+		Client:        nClient,
+		EventRecorder: mgr.GetRecorder(Name),
+		scheme:        mgr.GetScheme(),
+		container:     container,
+		web:           web,
 	}
 
 	web.Start()
@@ -142,6 +144,7 @@ var _ reconcile.Reconciler = &Reconciler{}
 // Reconciles an provider object.
 type Reconciler struct {
 	client.Client
+	record.EventRecorder
 	scheme    *runtime.Scheme
 	container *libcontainer.Container
 	web       *libweb.WebServer
@@ -160,11 +163,18 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	log.SetValues("provider", request)
 	log.Info("Reconcile")
 
+	defer func() {
+		if err != nil {
+			log.Trace(err)
+		}
+	}()
+
 	// Fetch the CR.
 	provider := &api.Provider{}
 	err = r.Get(context.TODO(), request.NamespacedName, provider)
 	if err != nil {
-		if clienterror.IsNotFound(err) {
+		if k8serr.IsNotFound(err) {
+			err = nil
 			deleted := &api.Provider{
 				ObjectMeta: meta.ObjectMeta{
 					Namespace: request.Namespace,
@@ -177,8 +187,18 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 			}
 			return noReQ, nil
 		}
-		log.Trace(err)
 		return noReQ, err
+	}
+	defer func() {
+		log.Info("Conditions.", "all", provider.Status.Conditions)
+	}()
+
+	// Updated.
+	if !provider.HasReconciled() {
+		if r, found := r.container.Delete(provider); found {
+			r.Shutdown()
+			r.DB().Close(true)
+		}
 	}
 
 	// Begin staging conditions.
@@ -187,38 +207,43 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	// Validations.
 	err = r.validate(provider)
 	if err != nil {
-		log.Trace(err)
 		return fastReQ, nil
 	}
 
 	// Update the container.
-	if !provider.Status.HasBlockerCondition() {
-		err = r.updateContainer(provider)
-		if err != nil {
-			log.Trace(err)
-			return slowReQ, nil
-		}
+	err = r.updateContainer(provider)
+	if err != nil {
+		return slowReQ, nil
 	}
 
 	// Ready condition.
-	if !provider.Status.HasBlockerCondition() {
-		provider.Status.SetCondition(libcnd.Condition{
-			Type:     libcnd.Ready,
-			Status:   True,
-			Category: Required,
-			Message:  "The provider is ready.",
-		})
+	if !provider.Status.HasBlockerCondition() &&
+		provider.Status.HasCondition(ConnectionTested, InventoryCreated) {
+		provider.Status.SetCondition(
+			libcnd.Condition{
+				Type:     libcnd.Ready,
+				Status:   True,
+				Category: Required,
+				Message:  "The provider is ready.",
+			})
 	}
 
 	// End staging conditions.
 	provider.Status.EndStagingConditions()
 
+	// Record events.
+	provider.Status.RecordEvents(provider, r)
+
 	// Apply changes.
 	provider.Status.ObservedGeneration = provider.Generation
 	err = r.Status().Update(context.TODO(), provider)
 	if err != nil {
-		log.Trace(err)
 		return fastReQ, nil
+	}
+
+	// ReQ.
+	if !provider.Status.HasCondition(ConnectionTested, InventoryCreated) {
+		return slowReQ, nil
 	}
 
 	// Done
@@ -227,7 +252,16 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 
 //
 // Update the container.
-func (r *Reconciler) updateContainer(provider *api.Provider) error {
+func (r *Reconciler) updateContainer(provider *api.Provider) (err error) {
+	if _, found := r.container.Get(provider); found {
+		if provider.HasReconciled() {
+			return
+		}
+	}
+	if provider.Status.HasBlockerCondition() ||
+		!provider.Status.HasCondition(ConnectionTested) {
+		return nil
+	}
 	db := r.getDB(provider)
 	secret, err := r.getSecret(provider)
 	if err != nil {
