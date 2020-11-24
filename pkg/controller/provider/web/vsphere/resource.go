@@ -11,6 +11,8 @@ type Resource struct {
 	ID string `json:"id"`
 	// Parent.
 	Parent *model.Ref `json:"parent"`
+	// Revision
+	Revision int64 `json:"revision"`
 	// Object name.
 	Name string `json:"name"`
 	// Self link.
@@ -22,5 +24,6 @@ type Resource struct {
 func (r *Resource) With(m *model.Base) {
 	r.ID = m.ID
 	r.Parent = (&model.Ref{}).With(m.Parent)
+	r.Revision = m.Revision
 	r.Name = m.Name
 }

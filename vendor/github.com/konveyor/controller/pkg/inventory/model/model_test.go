@@ -74,6 +74,41 @@ func (w *TestHandler) Error(err error) {
 func (w *TestHandler) End() {
 }
 
+type MutatingHandler struct {
+	DB
+	name    string
+	created []int
+	updated []int
+}
+
+func (w *MutatingHandler) Created(e Event) {
+	tx, _ := w.DB.Begin()
+	tx.Get(e.Model)
+	e.Model.(*TestObject).Age++
+	tx.Update(e.Model)
+	tx.Commit()
+	w.created = append(w.created, e.Model.(*TestObject).ID)
+}
+
+func (w *MutatingHandler) Updated(e Event) {
+	tx, _ := w.DB.Begin()
+	tx.Get(e.Model)
+	e.Model.(*TestObject).Age++
+	tx.Update(e.Model)
+	tx.Commit()
+	w.updated = append(w.updated, e.Model.(*TestObject).ID)
+}
+
+func (w *MutatingHandler) Deleted(e Event) {
+}
+
+func (w *MutatingHandler) Error(err error) {
+	return
+}
+
+func (w *MutatingHandler) End() {
+}
+
 func TestCRUD(t *testing.T) {
 	var err error
 	g := gomega.NewGomegaWithT(t)
@@ -156,12 +191,13 @@ func TestTransactions(t *testing.T) {
 	tx, err := DB.Begin()
 	defer tx.End()
 	g.Expect(err).To(gomega.BeNil())
-	g.Expect(tx.ref).To(gomega.Equal(DB.(*Client).tx))
+	g.Expect(tx.dbMutex).To(gomega.Equal(&DB.(*Client).dbMutex))
+	g.Expect(tx.journal).To(gomega.Equal(&DB.(*Client).journal))
 	object := &TestObject{
 		ID:   0,
 		Name: "Elmer",
 	}
-	err = DB.Insert(object)
+	err = tx.Insert(object)
 	g.Expect(err).To(gomega.BeNil())
 	// Get (not found)
 	object = &TestObject{ID: object.ID}
@@ -172,27 +208,6 @@ func TestTransactions(t *testing.T) {
 	object = &TestObject{ID: object.ID}
 	err = DB.Get(object)
 	g.Expect(err).To(gomega.BeNil())
-}
-
-func TestGetForUpdate(t *testing.T) {
-	g := gomega.NewGomegaWithT(t)
-	DB := New(
-		"/tmp/test.db",
-		&Label{},
-		&TestObject{})
-	err := DB.Open(true)
-	g.Expect(err).To(gomega.BeNil())
-	// Insert
-	object := &TestObject{
-		ID:   0,
-		Name: "Elmer",
-	}
-	err = DB.Insert(object)
-	g.Expect(err).To(gomega.BeNil())
-	tx, err := DB.GetForUpdate(object)
-	g.Expect(err).To(gomega.BeNil())
-	g.Expect(tx.ref).To(gomega.Equal(DB.(*Client).tx))
-	tx.Commit()
 }
 
 func TestList(t *testing.T) {
@@ -375,6 +390,50 @@ func TestWatch(t *testing.T) {
 	}
 }
 
+func TestMutatingWatch(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+	DB := New(
+		"/tmp/test.db",
+		&Label{},
+		&TestObject{})
+	err := DB.Open(true)
+	g.Expect(err).To(gomega.BeNil())
+	DB.Journal().Enable()
+	// Handler A
+	handlerA := &MutatingHandler{
+		name: "A",
+		DB:   DB,
+	}
+	watchA, err := DB.Watch(&TestObject{}, handlerA)
+	g.Expect(err).To(gomega.BeNil())
+	g.Expect(watchA).ToNot(gomega.BeNil())
+	// Handler B
+	handlerB := &MutatingHandler{
+		name: "A",
+		DB:   DB,
+	}
+	watchB, err := DB.Watch(&TestObject{}, handlerB)
+	g.Expect(err).To(gomega.BeNil())
+	g.Expect(watchB).ToNot(gomega.BeNil())
+	N := 10
+	// Insert
+	for i := 0; i < N; i++ {
+		object := &TestObject{
+			ID:   i,
+			Name: "Elmer",
+		}
+		err = DB.Insert(object)
+		g.Expect(err).To(gomega.BeNil())
+	}
+
+	for {
+		time.Sleep(time.Millisecond * 10)
+		if len(handlerA.updated) > 100 {
+			break
+		}
+	}
+}
+
 //
 // Remove leading __ to enable.
 func __TestConcurrency(t *testing.T) {
@@ -418,7 +477,7 @@ func __TestConcurrency(t *testing.T) {
 				}
 				fmt.Printf("read|%d\n", i)
 			}()
-			time.Sleep(time.Millisecond * time.Duration(100))
+			time.Sleep(time.Millisecond * 100)
 		}
 		done <- 0
 	}
@@ -439,7 +498,7 @@ func __TestConcurrency(t *testing.T) {
 				}
 				fmt.Printf("del|%d\n", i)
 			}()
-			time.Sleep(time.Millisecond * time.Duration(300))
+			time.Sleep(time.Millisecond * 300)
 		}
 		done <- 0
 	}
@@ -460,15 +519,24 @@ func __TestConcurrency(t *testing.T) {
 				}
 				fmt.Printf("update|%d\n", i)
 			}()
-			time.Sleep(time.Millisecond * time.Duration(20))
+			time.Sleep(time.Millisecond * 20)
 		}
 		done <- 0
 	}
 	transaction := func(done chan int) {
+		time.Sleep(time.Millisecond * 100)
 		var tx *Tx
+		defer func() {
+			if tx != nil {
+				err := tx.Commit()
+				if err != nil {
+					panic(err)
+				}
+			}
+		}()
 		threshold := float64(10)
 		for i := N; i < N*2; i++ {
-			if i == N || math.Mod(float64(i), threshold) == 0 {
+			if tx == nil {
 				tx, err = DB.Begin()
 				if err != nil {
 					panic(err)
@@ -478,7 +546,7 @@ func __TestConcurrency(t *testing.T) {
 				ID:   i,
 				Name: "transaction",
 			}
-			DB.Insert(m)
+			err = tx.Insert(m)
 			if err != nil {
 				panic(err)
 			}
@@ -488,10 +556,11 @@ func __TestConcurrency(t *testing.T) {
 				if err != nil {
 					panic(err)
 				}
+				tx = nil
 				fmt.Printf("commit|%d\n", i)
 			}
 			fmt.Printf("transaction|%d\n", i)
-			time.Sleep(time.Millisecond * time.Duration(100))
+			time.Sleep(time.Millisecond * 100)
 		}
 		done <- 0
 	}
