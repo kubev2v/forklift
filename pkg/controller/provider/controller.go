@@ -30,6 +30,7 @@ import (
 	"github.com/konveyor/virt-controller/pkg/controller/provider/model"
 	ocpmodel "github.com/konveyor/virt-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web"
+	"github.com/konveyor/virt-controller/pkg/controller/provider/xavier"
 	"github.com/konveyor/virt-controller/pkg/settings"
 	core "k8s.io/api/core/v1"
 	clienterror "k8s.io/apimachinery/pkg/api/errors"
@@ -69,6 +70,7 @@ func init() {
 	container.Log = &log
 	web.Log = &log
 	model.Log = &log
+	xavier.Log = &log
 }
 
 //
@@ -257,14 +259,16 @@ func (r *Reconciler) updateContainer(provider *api.Provider) error {
 
 //
 // Build DB for provider.
-func (r *Reconciler) getDB(provider *api.Provider) libmodel.DB {
+func (r *Reconciler) getDB(provider *api.Provider) (db libmodel.DB) {
 	dir := Settings.Inventory.WorkingDir
 	dir = filepath.Join(dir, provider.Namespace)
 	os.MkdirAll(dir, 0755)
 	file := provider.Name + ".db"
 	path := filepath.Join(dir, file)
 	models := model.Models(provider)
-	return libmodel.New(path, models...)
+	db = libmodel.New(path, models...)
+	db.Journal().Enable()
+	return
 }
 
 //

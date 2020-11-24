@@ -2,10 +2,20 @@ package vsphere
 
 import (
 	"encoding/json"
+	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/model/base"
 )
 
+//
+// Concern severity.
+const (
+	Advisory = "Advisory"
+	Warning  = "Warning"
+	Critical = "Critical"
+)
+
+//
 // Errors
 var NotFound = libmodel.NotFound
 
@@ -23,8 +33,8 @@ type Base struct {
 	Name string `sql:""`
 	// Parent
 	Parent string `sql:"index(a)"`
-	// Annotations
-	Annotations string `sql:""`
+	// Revision
+	Revision int64 `sql:""`
 }
 
 //
@@ -33,10 +43,14 @@ func (m *Base) Pk() string {
 	return m.ID
 }
 
+//
+// String representation.
 func (m *Base) String() string {
 	return m.ID
 }
 
+//
+// Get labels.
 func (m *Base) Labels() libmodel.Labels {
 	return nil
 }
@@ -47,6 +61,26 @@ func (m *Base) Equals(other libmodel.Model) bool {
 	}
 
 	return false
+}
+
+//
+// Populate PK using the ref.
+func (m *Base) WithRef(ref Ref) {
+	m.ID = ref.ID
+}
+
+//
+// Created.
+func (m *Base) Created() {
+	m.Revision = 1
+}
+
+//
+// Updated.
+// Increment revision. Should ONLY be called by
+// the reconciler.
+func (m *Base) Updated() {
+	m.Revision++
 }
 
 //
@@ -302,7 +336,14 @@ type VM struct {
 	Disks                 string `sql:""`
 	Networks              string `sql:""`
 	Host                  string `sql:""`
+	RevisionAnalyzed      int64  `sql:""`
 	Concerns              string `sql:""`
+}
+
+//
+// Determine if current revision has been analyzed.
+func (m *VM) Analyzed() bool {
+	return m.RevisionAnalyzed == m.Revision
 }
 
 //
@@ -321,20 +362,29 @@ func (m *VM) DecodeDisks() []Disk {
 }
 
 //
-// Encode concerns.
-func (m *VM) EncodeConcerns(c []Concern) {
-	j, _ := json.Marshal(c)
-	m.Concerns = string(j)
-}
-
-//
-// Decode concerns.
-// Returns `nil` when has not been analyzed.
-func (m *VM) DecodeConcerns() (list []Concern) {
-	if len(m.Concerns) > 0 {
-		list = []Concern{}
-		json.Unmarshal([]byte(m.Concerns), &list)
+// Find associated cluster.
+// returns err = libmodel.NotFound when cannot be resolved.
+func (m *VM) Cluster(db libmodel.DB) (matched *Cluster, err error) {
+	list := []Cluster{}
+	err = db.List(&list, libmodel.ListOptions{})
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
 	}
+	hostRef := Ref{}
+	hostRef.With(m.Host)
+	for _, cluster := range list {
+		refList := RefList{}
+		refList.With(cluster.Hosts)
+		for _, ref := range refList {
+			if ref.ID == hostRef.ID {
+				matched = &cluster
+				return
+			}
+		}
+	}
+
+	err = liberr.Wrap(libmodel.NotFound)
 
 	return
 }

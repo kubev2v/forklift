@@ -53,7 +53,7 @@ func (r *StorageClass) Reconcile(ctx context.Context) (err error) {
 		m.With(&resource)
 		r.Reconciler.UpdateThreshold(m)
 		Log.Info("Create", libref.ToKind(m), m.String())
-		err = db.Insert(m)
+		err = tx.Insert(m)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
@@ -156,7 +156,7 @@ func (r *NetworkAttachmentDefinition) Reconcile(ctx context.Context) (err error)
 		m.With(&resource)
 		r.Reconciler.UpdateThreshold(m)
 		Log.Info("Create", libref.ToKind(m), m.String())
-		err = db.Insert(m)
+		err = tx.Insert(m)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
@@ -259,7 +259,7 @@ func (r *Namespace) Reconcile(ctx context.Context) (err error) {
 		m.With(&resource)
 		r.Reconciler.UpdateThreshold(m)
 		Log.Info("Create", libref.ToKind(m), m.String())
-		err = db.Insert(m)
+		err = tx.Insert(m)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
