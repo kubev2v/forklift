@@ -60,15 +60,6 @@ type Inventory struct {
 		// CA path
 		CA string
 	}
-	// Xavier settings.
-	Xavier struct {
-		// URL.
-		URL string
-		// User name.
-		User string
-		// Password.
-		Password string
-	}
 }
 
 //
@@ -120,16 +111,6 @@ func (r *Inventory) Load() error {
 		} else {
 			r.TLS.CA = ServiceCAFile
 		}
-	}
-	// Xavier.
-	if s, found := os.LookupEnv(XavierURL); found {
-		r.Xavier.URL = s
-	}
-	if s, found := os.LookupEnv(XavierUser); found {
-		r.Xavier.User = s
-	}
-	if s, found := os.LookupEnv(XavierPassword); found {
-		r.Xavier.Password = s
 	}
 
 	return nil
