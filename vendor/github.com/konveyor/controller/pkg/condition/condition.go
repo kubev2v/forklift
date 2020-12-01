@@ -1,7 +1,10 @@
 package condition
 
 import (
+	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"reflect"
 	"time"
 )
@@ -293,6 +296,24 @@ func (r *Conditions) HasConditionCategory(names ...string) bool {
 	}
 
 	return false
+}
+
+//
+// Record events.
+func (r *Conditions) RecordEvents(object runtime.Object, recorder record.EventRecorder) {
+	for _, cnd := range r.List {
+		if cnd.Status != True {
+			continue
+		}
+		eventType := core.EventTypeNormal
+		switch cnd.Category {
+		case Critical,
+			Error,
+			Warn:
+			eventType = core.EventTypeWarning
+		}
+		recorder.Event(object, eventType, cnd.Type, cnd.Message)
+	}
 }
 
 //

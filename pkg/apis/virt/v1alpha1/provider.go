@@ -142,3 +142,9 @@ func (p *Provider) Type() string {
 func (p *Provider) IsHost() bool {
 	return p.Type() == OpenShift && p.Spec.URL == ""
 }
+
+//
+// Current generation has been reconciled.
+func (p *Provider) HasReconciled() bool {
+	return p.Generation == p.Status.ObservedGeneration
+}
