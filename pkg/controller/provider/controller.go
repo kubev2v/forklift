@@ -30,7 +30,6 @@ import (
 	"github.com/konveyor/virt-controller/pkg/controller/provider/model"
 	ocpmodel "github.com/konveyor/virt-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/virt-controller/pkg/controller/provider/web"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/xavier"
 	"github.com/konveyor/virt-controller/pkg/settings"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -71,7 +70,6 @@ func init() {
 	container.Log = &log
 	web.Log = &log
 	model.Log = &log
-	xavier.Log = &log
 }
 
 //

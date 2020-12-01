@@ -4,8 +4,6 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"
-	xavier "github.com/konveyor/virt-controller/pkg/controller/provider/xavier/base"
-	xadapter "github.com/konveyor/virt-controller/pkg/controller/provider/xavier/vsphere"
 )
 
 //
@@ -74,12 +72,10 @@ func (r WatchVM) analyze(vm *model.VM) {
 		Log.Trace(liberr.Wrap(err))
 		return
 	}
-	client := xavier.New(r.DB, &xadapter.Adapter{DB: r.DB})
-	err = client.Analyze(vm)
-	if err != nil {
-		Log.Trace(liberr.Wrap(err))
-		return
-	}
+
+	// TODO: Open Policy Agent - HERE
+
+	vm.RevisionAnalyzed = vm.Revision
 	err = tx.Update(vm)
 	if err != nil {
 		Log.Trace(liberr.Wrap(err))
