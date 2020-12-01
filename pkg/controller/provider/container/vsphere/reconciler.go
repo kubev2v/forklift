@@ -285,6 +285,22 @@ func (r *Reconciler) HasConsistency() bool {
 }
 
 //
+// Test connect/logout.
+func (r *Reconciler) Test() (err error) {
+	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	err = r.connect(ctx)
+	if err != nil {
+		err = liberr.Wrap(err)
+	} else {
+		r.client.Logout(ctx)
+	}
+
+	return
+}
+
+//
 // Start the reconciler.
 func (r *Reconciler) Start() error {
 	ctx := context.Background()
@@ -332,6 +348,15 @@ func (r *Reconciler) getUpdates(ctx context.Context) error {
 		return liberr.Wrap(err)
 	}
 	defer r.client.Logout(ctx)
+	about := r.client.ServiceContent.About
+	err = r.db.Insert(
+		&model.About{
+			APIVersion: about.ApiVersion,
+			Product:    about.LicenseProductName,
+		})
+	if err != nil {
+		return liberr.Wrap(err)
+	}
 	pc := property.DefaultCollector(r.client.Client)
 	pc, err = pc.Create(ctx)
 	if err != nil {
@@ -449,15 +474,6 @@ func (r *Reconciler) connect(ctx context.Context) error {
 		r.user(),
 		r.password())
 	client, err := govmomi.NewClient(ctx, url, insecure)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-	about := client.ServiceContent.About
-	err = r.db.Insert(
-		&model.About{
-			APIVersion: about.ApiVersion,
-			Product:    about.LicenseProductName,
-		})
 	if err != nil {
 		return liberr.Wrap(err)
 	}
