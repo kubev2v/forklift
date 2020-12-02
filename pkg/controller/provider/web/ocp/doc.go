@@ -14,8 +14,6 @@ const (
 	Root = base.ProvidersRoot + "/" + api.OpenShift
 )
 
-type Handler = base.Handler
-
 //
 // Shared logger.
 var Log *logging.Logger
@@ -35,18 +33,18 @@ func Handlers(container *container.Container) []libweb.RequestHandler {
 			},
 		},
 		&NamespaceHandler{
-			Handler: base.Handler{
-				Container: container,
+			Handler: Handler{
+				base.Handler{Container: container},
 			},
 		},
 		&StorageClassHandler{
-			Handler: base.Handler{
-				Container: container,
+			Handler: Handler{
+				base.Handler{Container: container},
 			},
 		},
 		&NetworkAttachmentDefinitionHandler{
-			Handler: base.Handler{
-				Container: container,
+			Handler: Handler{
+				base.Handler{Container: container},
 			},
 		},
 	}

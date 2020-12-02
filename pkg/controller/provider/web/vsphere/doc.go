@@ -14,8 +14,6 @@ const (
 	Root = base.ProvidersRoot + "/" + api.VSphere
 )
 
-type Handler = base.Handler
-
 //
 // Shared logger.
 var Log *logging.Logger
@@ -35,43 +33,43 @@ func Handlers(container *container.Container) []libweb.RequestHandler {
 			},
 		},
 		&TreeHandler{
-			Handler: base.Handler{
-				Container: container,
+			Handler: Handler{
+				base.Handler{Container: container},
 			},
 		},
 		&FolderHandler{
-			Handler: base.Handler{
-				Container: container,
+			Handler: Handler{
+				base.Handler{Container: container},
 			},
 		},
 		&DatacenterHandler{
-			Handler: base.Handler{
-				Container: container,
+			Handler: Handler{
+				base.Handler{Container: container},
 			},
 		},
 		&ClusterHandler{
-			Handler: base.Handler{
-				Container: container,
+			Handler: Handler{
+				base.Handler{Container: container},
 			},
 		},
 		&HostHandler{
-			Handler: base.Handler{
-				Container: container,
+			Handler: Handler{
+				base.Handler{Container: container},
 			},
 		},
 		&NetworkHandler{
-			Handler: base.Handler{
-				Container: container,
+			Handler: Handler{
+				base.Handler{Container: container},
 			},
 		},
 		&DatastoreHandler{
-			Handler: base.Handler{
-				Container: container,
+			Handler: Handler{
+				base.Handler{Container: container},
 			},
 		},
 		&VMHandler{
-			Handler: base.Handler{
-				Container: container,
+			Handler: Handler{
+				base.Handler{Container: container},
 			},
 		},
 	}
