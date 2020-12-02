@@ -2,7 +2,7 @@ package vsphere
 
 import (
 	"github.com/konveyor/controller/pkg/logging"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/model/ocp"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 )
 
 //

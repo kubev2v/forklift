@@ -1,6 +1,6 @@
 package plan
 
-import "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1/mapped"
+import "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/mapped"
 
 //
 // Mapped resources.

@@ -3,8 +3,8 @@ package web
 import (
 	"github.com/gin-gonic/gin"
 	libweb "github.com/konveyor/controller/pkg/inventory/web"
-	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/web/base"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"net/http"
 )
 

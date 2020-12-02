@@ -3,10 +3,10 @@ package plan
 import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
-	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/web"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/web/vsphere"
-	"github.com/konveyor/virt-controller/pkg/controller/validation"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
+	"github.com/konveyor/forklift-controller/pkg/controller/validation"
 	"net/http"
 )
 

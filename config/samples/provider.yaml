@@ -1,6 +1,6 @@
 ---
 kind: Provider
-apiVersion: virt.konveyor.io/v1alpha1
+apiVersion: forklift.konveyor.io/v1alpha1
 metadata:
   name: test
   namespace: openshift-migration
@@ -13,7 +13,7 @@ spec:
 
 ---
 kind: Provider
-apiVersion: virt.konveyor.io/v1alpha1
+apiVersion: forklift.konveyor.io/v1alpha1
 metadata:
   name: host
   namespace: openshift-migration

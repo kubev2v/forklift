@@ -3,7 +3,7 @@ package vsphere
 import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
-	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/vsphere"
+	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 )
 
 //

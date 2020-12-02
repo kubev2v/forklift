@@ -2,10 +2,10 @@ package builder
 
 import (
 	liberr "github.com/konveyor/controller/pkg/error"
-	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
-	"github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1/plan"
-	"github.com/konveyor/virt-controller/pkg/controller/plan/builder/vsphere"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/web"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
+	"github.com/konveyor/forklift-controller/pkg/controller/plan/builder/vsphere"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	vmio "github.com/kubevirt/vm-import-operator/pkg/apis/v2v/v1beta1"
 	core "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"

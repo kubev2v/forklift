@@ -19,7 +19,7 @@ package v1alpha1
 import (
 	"testing"
 
-	"github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1/plan"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
 	"github.com/onsi/gomega"
 	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -21,9 +21,9 @@ import (
 	"os"
 
 	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
-	"github.com/konveyor/virt-controller/pkg/apis"
-	"github.com/konveyor/virt-controller/pkg/controller"
-	"github.com/konveyor/virt-controller/pkg/webhook"
+	"github.com/konveyor/forklift-controller/pkg/apis"
+	"github.com/konveyor/forklift-controller/pkg/controller"
+	"github.com/konveyor/forklift-controller/pkg/webhook"
 	cdi "github.com/kubevirt/containerized-data-importer/pkg/apis/core/v1beta1"
 	vmio "github.com/kubevirt/vm-import-operator/pkg/apis/v2v/v1beta1"
 	"github.com/prometheus/client_golang/prometheus/promhttp"

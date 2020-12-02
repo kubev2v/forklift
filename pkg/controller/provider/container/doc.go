@@ -4,9 +4,9 @@ import (
 	libcontainer "github.com/konveyor/controller/pkg/inventory/container"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	"github.com/konveyor/controller/pkg/logging"
-	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/container/ocp"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/container/vsphere"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/ocp"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/vsphere"
 	core "k8s.io/api/core/v1"
 )
 

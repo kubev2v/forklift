@@ -5,7 +5,7 @@ import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libref "github.com/konveyor/controller/pkg/ref"
-	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )

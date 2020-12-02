@@ -14,5 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package migration contains migration API versions
-package virt
+// Package v1alpha1 contains API Schema definitions for the migration v1alpha1 API group
+// +k8s:openapi-gen=true
+// +k8s:deepcopy-gen=package,register
+// +k8s:conversion-gen=github.com/konveyor/forklift-controller/pkg/apis
+// +k8s:defaulter-gen=TypeMeta
+// +groupName=forklift.konveyor.io
+package v1alpha1

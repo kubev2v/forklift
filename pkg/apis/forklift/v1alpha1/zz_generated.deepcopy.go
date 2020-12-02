@@ -20,8 +20,8 @@ limitations under the License.
 package v1alpha1
 
 import (
-	mapped "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1/mapped"
-	plan "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1/plan"
+	mapped "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/mapped"
+	plan "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 

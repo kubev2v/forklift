@@ -6,7 +6,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	libocp "github.com/konveyor/controller/pkg/inventory/container/ocp"
 	libref "github.com/konveyor/controller/pkg/ref"
-	model "github.com/konveyor/virt-controller/pkg/controller/provider/model/ocp"
+	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	core "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
