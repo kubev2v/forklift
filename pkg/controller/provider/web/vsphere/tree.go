@@ -7,7 +7,6 @@ import (
 	"github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"net/http"
 )
 
@@ -22,7 +21,7 @@ const (
 //
 // Tree handler.
 type TreeHandler struct {
-	base.Handler
+	Handler
 	// Datacenters list.
 	datacenters []model.Datacenter
 }
