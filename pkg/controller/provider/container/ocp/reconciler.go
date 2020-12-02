@@ -4,7 +4,7 @@ import (
 	libcontainer "github.com/konveyor/controller/pkg/inventory/container"
 	libocp "github.com/konveyor/controller/pkg/inventory/container/ocp"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
-	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	core "k8s.io/api/core/v1"
 )
 

@@ -17,13 +17,13 @@ limitations under the License.
 package controller
 
 import (
-	"github.com/konveyor/virt-controller/pkg/controller/host"
-	"github.com/konveyor/virt-controller/pkg/controller/map/network"
-	"github.com/konveyor/virt-controller/pkg/controller/map/storage"
-	"github.com/konveyor/virt-controller/pkg/controller/migration"
-	"github.com/konveyor/virt-controller/pkg/controller/plan"
-	"github.com/konveyor/virt-controller/pkg/controller/provider"
-	"github.com/konveyor/virt-controller/pkg/settings"
+	"github.com/konveyor/forklift-controller/pkg/controller/host"
+	"github.com/konveyor/forklift-controller/pkg/controller/map/network"
+	"github.com/konveyor/forklift-controller/pkg/controller/map/storage"
+	"github.com/konveyor/forklift-controller/pkg/controller/migration"
+	"github.com/konveyor/forklift-controller/pkg/controller/plan"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider"
+	"github.com/konveyor/forklift-controller/pkg/settings"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 

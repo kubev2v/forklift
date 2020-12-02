@@ -4,9 +4,9 @@ import (
 	"github.com/konveyor/controller/pkg/inventory/container"
 	libweb "github.com/konveyor/controller/pkg/inventory/web"
 	"github.com/konveyor/controller/pkg/logging"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/web/base"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/web/ocp"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/web/vsphere"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 )
 
 //

@@ -4,9 +4,9 @@ metadata:
   creationTimestamp: null
   labels:
     controller-tools.k8s.io: "1.0"
-  name: networkmaps.virt.konveyor.io
+  name: networkmaps.forklift.konveyor.io
 spec:
-  group: virt.konveyor.io
+  group: forklift.konveyor.io
   names:
     kind: NetworkMap
     plural: networkmaps

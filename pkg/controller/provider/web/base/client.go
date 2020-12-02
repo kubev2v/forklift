@@ -8,7 +8,7 @@ import (
 	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
-	"github.com/konveyor/virt-controller/pkg/settings"
+	"github.com/konveyor/forklift-controller/pkg/settings"
 	"io/ioutil"
 	"net/http"
 	liburl "net/url"

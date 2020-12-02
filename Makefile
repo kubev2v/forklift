@@ -1,5 +1,5 @@
 # Image URL to use all building/pushing image targets
-IMG ?= quay.io/ocpmigrate/virt-controller:latest
+IMG ?= quay.io/ocpmigrate/forklift-controller:latest
 GOOS ?= `go env GOOS`
 
 ci: all
@@ -12,7 +12,7 @@ test: generate fmt vet manifests
 
 # Build manager binary
 manager: generate fmt vet
-	go build -o bin/manager github.com/konveyor/virt-controller/cmd/manager
+	go build -o bin/manager github.com/konveyor/forklift-controller/cmd/manager
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate fmt vet

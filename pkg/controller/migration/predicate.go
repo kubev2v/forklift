@@ -2,7 +2,7 @@ package migration
 
 import (
 	libref "github.com/konveyor/controller/pkg/ref"
-	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )

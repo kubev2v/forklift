@@ -4,7 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	libcontainer "github.com/konveyor/controller/pkg/inventory/container"
 	libweb "github.com/konveyor/controller/pkg/inventory/web"
-	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/http"
 	"strconv"

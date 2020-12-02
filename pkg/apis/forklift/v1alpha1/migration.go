@@ -18,49 +18,37 @@ package v1alpha1
 
 import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
-	"github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1/plan"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
+	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 //
-// PlanSpec defines the desired state of Plan.
-type PlanSpec struct {
-	// Description
-	Description string `json:"description,omitempty"`
-	// Target namespace.
-	TargetNamespace string `json:"targetNamespace,omitempty"`
-	// Providers.
-	Provider ProviderPair `json:"provider"`
-	// Resource map.
-	Map plan.Map `json:"map,omitempty"`
-	// List of VMs.
-	VMs []plan.VM `json:"vms"`
+// Snapshot keys.
+const (
+	SourceSnapshot      = "provider.source"
+	DestinationSnapshot = "provider.destination"
+	MapSnapshot         = "map"
+)
+
+//
+// MigrationSpec defines the desired state of Migration
+type MigrationSpec struct {
+	// Reference to the associated Plan.
+	Plan core.ObjectReference `json:"plan" ref:"Plan"`
 }
 
 //
-// Find a planned VM.
-func (r *PlanSpec) FindVM(vmID string) (v *plan.VM, found bool) {
-	for _, vm := range r.VMs {
-		if vm.ID == vmID {
-			found = true
-			v = &vm
-			return
-		}
-	}
-
-	return
-}
-
-//
-// PlanStatus defines the observed state of Plan.
-type PlanStatus struct {
+// MigrationStatus defines the observed state of Migration
+type MigrationStatus struct {
+	plan.Timed
 	// Conditions.
 	libcnd.Conditions
 	// The most recent generation observed by the controller.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-	// Migration
-	Migration plan.MigrationStatus `json:"migration,omitempty"`
+	// VM status
+	VMs []*plan.VMStatus `json:"vms,omitempty"`
 }
 
 //
@@ -68,24 +56,35 @@ type PlanStatus struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
-type Plan struct {
+type Migration struct {
 	meta.TypeMeta   `json:",inline"`
 	meta.ObjectMeta `json:"metadata,omitempty"`
-	Spec            PlanSpec   `json:"spec,omitempty"`
-	Status          PlanStatus `json:"status,omitempty"`
-	// Referenced resources populated
-	// during validation.
-	Referenced `json:"-"`
+	Spec            MigrationSpec   `json:"spec,omitempty"`
+	Status          MigrationStatus `json:"status,omitempty"`
+}
+
+//
+// Match plan.
+func (r *Migration) Match(plan *Plan) bool {
+	ref := r.Spec.Plan
+	return ref.Namespace == plan.Namespace &&
+		ref.Name == plan.Name
+}
+
+//
+// Is active for the plan.
+func (r *Migration) Active(plan *Plan) bool {
+	return plan.Status.Migration.Active == r.UID
 }
 
 //
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type PlanList struct {
+type MigrationList struct {
 	meta.TypeMeta `json:",inline"`
 	meta.ListMeta `json:"metadata,omitempty"`
-	Items         []Plan `json:"items"`
+	Items         []Migration `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Plan{}, &PlanList{})
+	SchemeBuilder.Register(&Migration{}, &MigrationList{})
 }

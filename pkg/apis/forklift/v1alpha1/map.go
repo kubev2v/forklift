@@ -18,7 +18,7 @@ package v1alpha1
 
 import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
-	"github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1/mapped"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/mapped"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

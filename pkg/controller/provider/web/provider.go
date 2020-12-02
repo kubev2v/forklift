@@ -2,10 +2,10 @@ package web
 
 import (
 	"github.com/gin-gonic/gin"
-	api "github.com/konveyor/virt-controller/pkg/apis/virt/v1alpha1"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/web/base"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/web/ocp"
-	"github.com/konveyor/virt-controller/pkg/controller/provider/web/vsphere"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 
 	"net/http"
 )

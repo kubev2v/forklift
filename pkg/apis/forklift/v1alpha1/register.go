@@ -17,9 +17,9 @@ limitations under the License.
 // Package v1alpha1 contains API Schema definitions for the migration v1alpha1 API group.
 // +k8s:openapi-gen=true
 // +k8s:deepcopy-gen=package,register
-// +k8s:conversion-gen=github.com/konveyor/virt-controller/pkg/apis/migration
+// +k8s:conversion-gen=github.com/konveyor/forklift-controller/pkg/apis/migration
 // +k8s:defaulter-gen=TypeMeta
-// +groupName=virt.konveyor.io
+// +groupName=forklift.konveyor.io
 package v1alpha1
 
 import (
@@ -28,7 +28,7 @@ import (
 )
 
 var SchemeGroupVersion = schema.GroupVersion{
-	Group:   "virt.konveyor.io",
+	Group:   "forklift.konveyor.io",
 	Version: "v1alpha1",
 }
 

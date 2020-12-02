@@ -1,6 +1,6 @@
-# Hacking on virt-controller
+# Hacking on forklift-controller
 
-## Building and running virt-controller with `make run`
+## Building and running forklift-controller with `make run`
 
 __1. Install prerequisites__
 
@@ -9,7 +9,7 @@ __1. Install prerequisites__
 
 __2. Clone the project to your `$GOPATH`__
 
-Clone virt-controller to your $GOPATH so that dependencies in `vendor` will be found 
+Clone forklift-controller to your $GOPATH so that dependencies in `vendor` will be found 
 at build time.
 
 ```
@@ -17,12 +17,12 @@ at build time.
 mkdir -p $HOME/go
 export GOPATH="$HOME/go"
 
-# Running 'go get -d' will clone the virt-controller repo into the proper
+# Running 'go get -d' will clone the forklift-controller repo into the proper
 # location on your $GOPATH
-go get -d github.com/konveyor/virt-controller
+go get -d github.com/konveyor/forklift-controller
 
 # Take a peek at the newly cloned files
-ls -Fal $GOPATH/src/github.com/konveyor/virt-controller
+ls -Fal $GOPATH/src/github.com/konveyor/forklift-controller
 ```
 
 __5. Login __
@@ -55,7 +55,7 @@ go run ./cmd/manager/main.go
 
 ## Useful `make` targets
 
-There are several useful Makefile targets for virt-controller that developers
+There are several useful Makefile targets for forklift-controller that developers
 should be aware of.
 
 | Command | Description |
