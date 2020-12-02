@@ -1,6 +1,7 @@
 package vsphere
 
 import (
+	libref "github.com/konveyor/controller/pkg/ref"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	"github.com/vmware/govmomi/vim25/types"
 	"sort"
@@ -680,17 +681,21 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				}
 			case fDevices:
 				if devArray, cast := p.Val.(types.ArrayOfVirtualDevice); cast {
+					list := []model.Device{}
 					for _, dev := range devArray.VirtualDevice {
 						switch dev.(type) {
-						case *types.VirtualSriovEthernetCard:
-							v.model.SriovSupported = true
-						case *types.VirtualPCIPassthrough,
-							*types.VirtualSCSIPassthrough:
-							v.model.PassthroughSupported = true
-						case *types.VirtualUSBController:
-							v.model.UsbSupported = true
+						case *types.VirtualSriovEthernetCard,
+							*types.VirtualPCIPassthrough,
+							*types.VirtualSCSIPassthrough,
+							*types.VirtualUSBController:
+							list = append(
+								list,
+								model.Device{
+									Kind: libref.ToKind(dev),
+								})
 						}
 					}
+					v.model.EncodeDevices(list)
 					v.updateDisks(&devArray)
 				}
 			}
