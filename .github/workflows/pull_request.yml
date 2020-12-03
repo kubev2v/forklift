@@ -28,6 +28,7 @@ jobs:
 
       - name: Some debug
         run: |
+          ls -l ${GITHUB_WORKSPACE}
           ls -l ${GITHUB_WORKSPACE}/go/src/github.com/${GITHUB_REPOSITORY}
 
       - name: Setup Golang
