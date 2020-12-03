@@ -119,29 +119,27 @@ func (h VMHandler) Link(p *api.Provider, m *model.VM) string {
 // REST Resource.
 type VM struct {
 	Resource
-	UUID                  string        `json:"uuid"`
-	Firmware              string        `json:"firmware"`
-	CpuAffinity           model.List    `json:"cpuAffinity"`
-	CpuHotAddEnabled      bool          `json:"cpuHostAddEnabled"`
-	CpuHotRemoveEnabled   bool          `json:"cpuHostRemoveEnabled"`
-	MemoryHotAddEnabled   bool          `json:"memoryHotAddEnabled"`
-	FaultToleranceEnabled bool          `json:"faultToleranceEnabled"`
-	CpuCount              int32         `json:"cpuCount"`
-	CoresPerSocket        int32         `json:"coresPerSocket"`
-	MemoryMB              int32         `json:"memoryMB"`
-	GuestName             string        `json:"guestName"`
-	BalloonedMemory       int32         `json:"balloonedMemory"`
-	IpAddress             string        `json:"ipAddress"`
-	StorageUsed           int64         `json:"storageUsed"`
-	NumaNodeAffinity      model.List    `json:"numaNodeAffinity"`
-	SriovSupported        bool          `json:"sriovSupported"`
-	PassthroughSupported  bool          `json:"passthroughSupported"`
-	UsbSupported          bool          `json:"usbSupported"`
-	Networks              model.RefList `json:"networks"`
-	Disks                 []model.Disk  `json:"disks"`
-	Host                  model.Ref     `json:"host"`
-	RevisionAnalyzed      int64         `json:"revisionAnalyzed"`
-	Concerns              model.List    `json:"concerns"`
+	UUID                  string         `json:"uuid"`
+	Firmware              string         `json:"firmware"`
+	CpuAffinity           model.List     `json:"cpuAffinity"`
+	CpuHotAddEnabled      bool           `json:"cpuHostAddEnabled"`
+	CpuHotRemoveEnabled   bool           `json:"cpuHostRemoveEnabled"`
+	MemoryHotAddEnabled   bool           `json:"memoryHotAddEnabled"`
+	FaultToleranceEnabled bool           `json:"faultToleranceEnabled"`
+	CpuCount              int32          `json:"cpuCount"`
+	CoresPerSocket        int32          `json:"coresPerSocket"`
+	MemoryMB              int32          `json:"memoryMB"`
+	GuestName             string         `json:"guestName"`
+	BalloonedMemory       int32          `json:"balloonedMemory"`
+	IpAddress             string         `json:"ipAddress"`
+	StorageUsed           int64          `json:"storageUsed"`
+	NumaNodeAffinity      model.List     `json:"numaNodeAffinity"`
+	Devices               []model.Device `json:"devices"`
+	Networks              model.RefList  `json:"networks"`
+	Disks                 []model.Disk   `json:"disks"`
+	Host                  model.Ref      `json:"host"`
+	RevisionAnalyzed      int64          `json:"revisionAnalyzed"`
+	Concerns              model.List     `json:"concerns"`
 }
 
 //
@@ -162,9 +160,7 @@ func (r *VM) With(m *model.VM) {
 	r.IpAddress = m.IpAddress
 	r.StorageUsed = m.StorageUsed
 	r.FaultToleranceEnabled = m.FaultToleranceEnabled
-	r.SriovSupported = m.SriovSupported
-	r.PassthroughSupported = m.PassthroughSupported
-	r.UsbSupported = m.UsbSupported
+	r.Devices = m.DecodeDevices()
 	r.NumaNodeAffinity = *(&model.List{}).With(m.NumaNodeAffinity)
 	r.Networks = *model.RefListPtr().With(m.Networks)
 	r.Disks = m.DecodeDisks()
