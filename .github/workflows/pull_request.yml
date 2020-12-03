@@ -35,7 +35,7 @@ jobs:
           env GO111MODULE=off KUBEBUILDER_CONTROLPLANE_START_TIMEOUT=60s make ci
 
       # Push code coverage using Codecov Action
-      - name: Push code coverage result to Codecov
+      - name: Push code coverage to Codecov
         uses: codecov/codecov-action@v1
         with:
           fail_ci_if_error: true
