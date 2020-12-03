@@ -22,7 +22,7 @@ const (
 //
 // Provider handler.
 type ProviderHandler struct {
-	Handler
+	base.Handler
 }
 
 //

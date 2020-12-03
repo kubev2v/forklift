@@ -22,7 +22,7 @@ const (
 //
 // Network handler.
 type NetworkHandler struct {
-	base.Handler
+	Handler
 }
 
 //
@@ -46,7 +46,8 @@ func (h NetworkHandler) List(ctx *gin.Context) {
 	err := db.List(
 		&list,
 		libmodel.ListOptions{
-			Page: &h.Page,
+			Predicate: h.Predicate(ctx),
+			Page:      &h.Page,
 		})
 	if err != nil {
 		Log.Trace(err)
@@ -90,6 +91,12 @@ func (h NetworkHandler) Get(ctx *gin.Context) {
 	}
 	r := &Network{}
 	r.With(m)
+	r.Path, err = m.Path(db)
+	if err != nil {
+		Log.Trace(err)
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
 	r.SelfLink = h.Link(h.Provider, m)
 	content := r.Content(true)
 
@@ -112,7 +119,9 @@ func (h NetworkHandler) Link(p *api.Provider, m *model.Network) string {
 // REST Resource.
 type Network struct {
 	Resource
-	Tag string `json:"tag"`
+	Type     string     `json:"type"`
+	DVSwitch *model.Ref `json:"dvSwitch,omitempty"`
+	Tag      string     `json:"tag,omitempty"`
 }
 
 //
@@ -120,6 +129,12 @@ type Network struct {
 func (r *Network) With(m *model.Network) {
 	r.Resource.With(&m.Base)
 	r.Tag = m.Tag
+	if len(m.DVSwitch) > 0 {
+		r.DVSwitch = (&model.Ref{}).With(m.DVSwitch)
+		r.Type = "dvportgroup"
+	} else {
+		r.Type = "standard"
+	}
 }
 
 //

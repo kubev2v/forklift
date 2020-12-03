@@ -22,7 +22,7 @@ const (
 //
 // Cluster handler.
 type ClusterHandler struct {
-	base.Handler
+	Handler
 	// Selected cluster.
 	cluster *model.Cluster
 }
@@ -33,37 +33,6 @@ func (h *ClusterHandler) AddRoutes(e *gin.Engine) {
 	e.GET(ClustersRoot, h.List)
 	e.GET(ClustersRoot+"/", h.List)
 	e.GET(ClusterRoot, h.Get)
-}
-
-//
-// Prepare to handle the request.
-func (h *ClusterHandler) Prepare(ctx *gin.Context) int {
-	status := h.Handler.Prepare(ctx)
-	if status != http.StatusOK {
-		ctx.Status(status)
-		return status
-	}
-	id := ctx.Param(ClusterParam)
-	if id != "" {
-		m := &model.Cluster{
-			Base: model.Base{
-				ID: id,
-			},
-		}
-		db := h.Reconciler.DB()
-		err := db.Get(m)
-		if errors.Is(err, model.NotFound) {
-			return http.StatusNotFound
-		}
-		if err != nil {
-			Log.Trace(err)
-			return http.StatusInternalServerError
-		}
-
-		h.cluster = m
-	}
-
-	return http.StatusOK
 }
 
 //
@@ -79,7 +48,8 @@ func (h ClusterHandler) List(ctx *gin.Context) {
 	err := db.List(
 		&list,
 		libmodel.ListOptions{
-			Page: &h.Page,
+			Predicate: h.Predicate(ctx),
+			Page:      &h.Page,
 		})
 	if err != nil {
 		Log.Trace(err)
@@ -105,9 +75,31 @@ func (h ClusterHandler) Get(ctx *gin.Context) {
 		ctx.Status(status)
 		return
 	}
+	m := &model.Cluster{
+		Base: model.Base{
+			ID: ctx.Param(ClusterParam),
+		},
+	}
+	db := h.Reconciler.DB()
+	err := db.Get(m)
+	if errors.Is(err, model.NotFound) {
+		ctx.Status(http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		Log.Trace(err)
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
 	r := &Cluster{}
-	r.With(h.cluster)
-	r.SelfLink = h.Link(h.Provider, h.cluster)
+	r.With(m)
+	r.Path, err = m.Path(db)
+	if err != nil {
+		Log.Trace(err)
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
+	r.SelfLink = h.Link(h.Provider, m)
 	content := r.Content(true)
 
 	ctx.JSON(http.StatusOK, content)
