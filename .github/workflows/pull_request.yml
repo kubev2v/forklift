@@ -34,11 +34,11 @@ jobs:
         run: |
           export os=$(go env GOOS)
           export arch=$(go env GOARCH)
-          curl -sL -o /usr/local/bin/dep https://github.com/golang/dep/releases/download/v0.5.4/dep-${os}-${arch}
+          #curl -sL -o /usr/local/bin/dep https://github.com/golang/dep/releases/download/v0.5.4/dep-${os}-${arch}
           mkdir -p /usr/local/kubebuilder
           curl -sL https://go.kubebuilder.io/dl/2.0.0-beta.0/${os}/${arch} | tar -xz --strip-component 1 -C /usr/local/kubebuilder kubebuilder_2.0.0-beta.0_${os}_${arch}/bin
           export PATH=$PATH:/usr/local/kubebuilder/bin
-          GO111MODULE=off dep ensure --vendor-only
+          #GO111MODULE=off dep ensure --vendor-only
           GO111MODULE=off KUBEBUILDER_CONTROLPLANE_START_TIMEOUT=60s make ci
 
       # Push code coverage using Codecov Action
