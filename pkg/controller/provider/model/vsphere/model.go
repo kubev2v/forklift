@@ -410,9 +410,7 @@ type VM struct {
 	IpAddress             string `sql:""`
 	NumaNodeAffinity      string `sql:""`
 	StorageUsed           int64  `sql:""`
-	SriovSupported        bool   `sql:""`
-	PassthroughSupported  bool   `sql:""`
-	UsbSupported          bool   `sql:""`
+	Devices               string `sql:""`
 	Disks                 string `sql:""`
 	Networks              string `sql:""`
 	Host                  string `sql:""`
@@ -438,6 +436,21 @@ func (m *VM) EncodeDisks(d []Disk) {
 func (m *VM) DecodeDisks() []Disk {
 	list := []Disk{}
 	json.Unmarshal([]byte(m.Disks), &list)
+	return list
+}
+
+//
+// Encode devices.
+func (m *VM) EncodeDevices(d []Device) {
+	j, _ := json.Marshal(d)
+	m.Devices = string(j)
+}
+
+//
+// Decode devices.
+func (m *VM) DecodeDevices() []Device {
+	list := []Device{}
+	json.Unmarshal([]byte(m.Devices), &list)
 	return list
 }
 
@@ -477,6 +490,12 @@ type Disk struct {
 	Capacity  int64  `json:"capacity"`
 	Shared    bool   `json:"shared"`
 	RDM       bool   `json:"rdm"`
+}
+
+//
+// Virtual Device.
+type Device struct {
+	Kind string `json:"kind"`
 }
 
 //
