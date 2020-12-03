@@ -22,7 +22,7 @@ const (
 //
 // Datastore handler.
 type DatastoreHandler struct {
-	base.Handler
+	Handler
 }
 
 //
@@ -46,7 +46,8 @@ func (h DatastoreHandler) List(ctx *gin.Context) {
 	err := db.List(
 		&list,
 		libmodel.ListOptions{
-			Page: &h.Page,
+			Predicate: h.Predicate(ctx),
+			Page:      &h.Page,
 		})
 	if err != nil {
 		Log.Trace(err)
@@ -90,6 +91,12 @@ func (h DatastoreHandler) Get(ctx *gin.Context) {
 	}
 	r := &Datastore{}
 	r.With(m)
+	r.Path, err = m.Path(db)
+	if err != nil {
+		Log.Trace(err)
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
 	r.SelfLink = h.Link(h.Provider, m)
 	content := r.Content(true)
 

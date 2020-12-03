@@ -124,8 +124,9 @@ type SimplePredicate struct {
 //
 // Find referenced field.
 func (p *SimplePredicate) match(fields []*Field) (*Field, bool) {
+	name := strings.ToLower(p.Field)
 	for _, f := range fields {
-		if f.Name == p.Field {
+		if name == strings.ToLower(f.Name) {
 			return f, true
 		}
 	}

@@ -11,6 +11,8 @@ type Resource struct {
 	ID string `json:"id"`
 	// Parent.
 	Parent *model.Ref `json:"parent"`
+	// Path
+	Path string `json:"path,omitempty"`
 	// Revision
 	Revision int64 `json:"revision"`
 	// Object name.
