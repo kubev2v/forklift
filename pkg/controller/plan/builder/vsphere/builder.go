@@ -5,6 +5,7 @@ import (
 	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libitr "github.com/konveyor/controller/pkg/itinerary"
+	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
@@ -47,18 +48,20 @@ func (r *Builder) Secret(vmID string, in, object *core.Secret) (err error) {
 			Path:   vim25.Path,
 		}
 		url = hostURL.String()
-		hostSecret, nErr := r.hostSecret(host)
-		if nErr != nil {
-			err = liberr.Wrap(nErr)
-			return
+		if libref.RefSet(host.Spec.Secret) {
+			hostSecret, nErr := r.hostSecret(host)
+			if nErr != nil {
+				err = liberr.Wrap(nErr)
+				return
+			}
+			h, nErr := r.host(hostID)
+			if nErr != nil {
+				err = liberr.Wrap(nErr)
+				return
+			}
+			hostSecret.Data["thumbprint"] = []byte(h.Thumbprint)
+			in = hostSecret
 		}
-		h, nErr := r.host(hostID)
-		if nErr != nil {
-			err = liberr.Wrap(nErr)
-			return
-		}
-		hostSecret.Data["thumbprint"] = []byte(h.Thumbprint)
-		in = hostSecret
 	}
 	content, mErr := yaml.Marshal(
 		map[string]string{

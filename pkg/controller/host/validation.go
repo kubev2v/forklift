@@ -174,18 +174,16 @@ func (r *Reconciler) validateIp(host *api.Host) error {
 //   2. The secret exists.
 //   3. the content of the secret is valid.
 func (r *Reconciler) validateSecret(host *api.Host) error {
-	// NotSet
+	ref := host.Spec.Secret
+	if !libref.RefSet(ref) {
+		return nil
+	}
 	newCnd := libcnd.Condition{
 		Type:     SecretNotValid,
 		Status:   True,
-		Reason:   NotSet,
+		Reason:   NotFound,
 		Category: Critical,
 		Message:  "The `secret` is not valid.",
-	}
-	ref := host.Spec.Secret
-	if !libref.RefSet(&ref) {
-		host.Status.SetCondition(newCnd)
-		return nil
 	}
 	// NotFound
 	secret := &core.Secret{}
