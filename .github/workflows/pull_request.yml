@@ -34,5 +34,7 @@ jobs:
           export PATH=$PATH:/usr/local/kubebuilder/bin
           env GO111MODULE=off KUBEBUILDER_CONTROLPLANE_START_TIMEOUT=60s make ci
 
-       - name: Push code coverage result to Codecov
-         run: bash <(curl -s https://codecov.io/bash)
+      - name: Push code coverage result to Codecov
+        uses: codecov/codecov-action@v1
+        with:
+          fail_ci_if_error: true
