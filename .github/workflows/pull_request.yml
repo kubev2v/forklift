@@ -24,7 +24,7 @@ jobs:
       - name: Checks-out repository under $GITHUB_WORKSPACE
         uses: actions/checkout@v2
         with:
-          path: go/src/github.com/${GITHUB_REPOSITORY}
+          path: go/src/github.com/${{github.repository}}
 
       - name: Some debug
         run: |
