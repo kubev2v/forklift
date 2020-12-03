@@ -24,7 +24,7 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
 
-      # Runs a single command using the runners shell
+      # Setup the run environment and run CI test suite
       - name: Run test suite
         run: |
           export os=$(go env GOOS)
@@ -34,6 +34,7 @@ jobs:
           export PATH=$PATH:/usr/local/kubebuilder/bin
           env GO111MODULE=off KUBEBUILDER_CONTROLPLANE_START_TIMEOUT=60s make ci
 
+      # Push code coverage using Codecov Action
       - name: Push code coverage result to Codecov
         uses: codecov/codecov-action@v1
         with:
