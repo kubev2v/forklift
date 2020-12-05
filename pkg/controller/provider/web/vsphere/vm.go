@@ -122,8 +122,8 @@ type VM struct {
 	UUID                  string         `json:"uuid"`
 	Firmware              string         `json:"firmware"`
 	CpuAffinity           model.List     `json:"cpuAffinity"`
-	CpuHotAddEnabled      bool           `json:"cpuHostAddEnabled"`
-	CpuHotRemoveEnabled   bool           `json:"cpuHostRemoveEnabled"`
+	CpuHotAddEnabled      bool           `json:"cpuHotAddEnabled"`
+	CpuHotRemoveEnabled   bool           `json:"cpuHotRemoveEnabled"`
 	MemoryHotAddEnabled   bool           `json:"memoryHotAddEnabled"`
 	FaultToleranceEnabled bool           `json:"faultToleranceEnabled"`
 	CpuCount              int32          `json:"cpuCount"`
