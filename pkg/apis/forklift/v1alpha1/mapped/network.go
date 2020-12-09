@@ -1,5 +1,7 @@
 package mapped
 
+import "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
+
 //
 // Mapped network destination.
 type DestinationNetwork struct {
@@ -15,7 +17,7 @@ type DestinationNetwork struct {
 // Mapped network.
 type NetworkPair struct {
 	// Source network.
-	Source SourceObject `json:"source"`
+	Source ref.Ref `json:"source"`
 	// Destination network.
 	Destination DestinationNetwork `json:"destination"`
 }

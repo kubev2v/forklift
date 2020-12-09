@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -25,12 +26,9 @@ import (
 //
 // HostSpec defines the desired state of Host
 type HostSpec struct {
+	ref.Ref `json:",inline"`
 	// Provider
 	Provider core.ObjectReference `json:"provider" ref:"Provider"`
-	// The host identifier.
-	// For:
-	//   - vSphere: The managed object ID.
-	ID string `json:"id"`
 	// IP address used for disk transfer.
 	IpAddress string `json:"ipAddress"`
 	// Certificate SHA-1 fingerprint, called thumbprint by VMware.

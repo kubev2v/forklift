@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
 	"testing"
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
@@ -39,7 +40,7 @@ func TestPlan(t *testing.T) {
 		Spec: PlanSpec{
 			VMs: []plan.VM{
 				{
-					ID: "vm-42",
+					Ref: ref.Ref{ID: "vm-42"},
 				},
 			},
 		},

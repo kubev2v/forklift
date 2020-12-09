@@ -3,11 +3,13 @@ package vsphere
 import (
 	"errors"
 	"github.com/gin-gonic/gin"
+	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"net/http"
+	"strings"
 )
 
 //
@@ -49,6 +51,12 @@ func (h NetworkHandler) List(ctx *gin.Context) {
 			Predicate: h.Predicate(ctx),
 			Page:      &h.Page,
 		})
+	if err != nil {
+		Log.Trace(err)
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
+	err = h.filter(ctx, &list)
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
@@ -113,6 +121,39 @@ func (h NetworkHandler) Link(p *api.Provider, m *model.Network) string {
 			base.ProviderParam: p.Name,
 			NetworkParam:       m.ID,
 		})
+}
+
+//
+// Filter result set.
+// Filter by path for `name` query.
+func (h NetworkHandler) filter(ctx *gin.Context, list *[]model.Network) (err error) {
+	if len(*list) < 2 {
+		return
+	}
+	q := ctx.Request.URL.Query()
+	name := q.Get(NameParam)
+	if len(name) == 0 {
+		return
+	}
+	if len(strings.Split(name, "/")) < 2 {
+		return
+	}
+	db := h.Reconciler.DB()
+	kept := []model.Network{}
+	for _, m := range *list {
+		path, pErr := m.Path(db)
+		if pErr != nil {
+			err = liberr.Wrap(pErr)
+			return
+		}
+		if h.PathMatchRoot(path, name) {
+			kept = append(kept, m)
+		}
+	}
+
+	*list = kept
+
+	return
 }
 
 //

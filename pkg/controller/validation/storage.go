@@ -1,14 +1,13 @@
 package validation
 
 import (
+	"errors"
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/mapped"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
-	"net/http"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -61,28 +60,30 @@ func (r *StoragePair) validateSource(list []mapped.StoragePair) (result libcnd.C
 		return
 	}
 	notValid := []string{}
-	var resource interface{}
-	switch provider.Type() {
-	case api.OpenShift:
-		return
-	case api.VSphere:
-		resource = &vsphere.Datastore{}
-	default:
-		err = liberr.Wrap(web.ProviderNotSupportedErr)
-		return
-	}
+	ambiguous := []string{}
 	for _, entry := range list {
-		status, pErr := inventory.Get(resource, entry.Source.ID)
-		if pErr != nil {
-			err = liberr.Wrap(pErr)
-			return
+		ref := entry.Source
+		if ref.NotSet() {
+			result.SetCondition(libcnd.Condition{
+				Type:     DestinationNetworkNotValid,
+				Status:   True,
+				Reason:   NotSet,
+				Category: Critical,
+				Message:  "Destination network: either `ID` or `Name` required.",
+			})
+			continue
 		}
-		switch status {
-		case http.StatusOK:
-		case http.StatusNotFound:
-			notValid = append(notValid, entry.Source.ID)
-		default:
-			err = liberr.New(http.StatusText(status))
+		_, pErr := inventory.Storage(&ref)
+		if pErr != nil {
+			if errors.Is(pErr, web.NotFoundErr) {
+				notValid = append(notValid, entry.Source.String())
+				continue
+			}
+			if errors.Is(pErr, web.RefNotUniqueErr) {
+				ambiguous = append(ambiguous, entry.Source.String())
+				continue
+			}
+			err = liberr.Wrap(pErr)
 			return
 		}
 	}
@@ -92,8 +93,18 @@ func (r *StoragePair) validateSource(list []mapped.StoragePair) (result libcnd.C
 			Status:   True,
 			Reason:   NotFound,
 			Category: Critical,
-			Message:  "Source storage not valid.",
+			Message:  "Source storage not found.",
 			Items:    notValid,
+		})
+	}
+	if len(ambiguous) > 0 {
+		result.SetCondition(libcnd.Condition{
+			Type:     SourceStorageNotValid,
+			Status:   True,
+			Reason:   Ambiguous,
+			Category: Critical,
+			Message:  "Source storage has ambiguous ref.",
+			Items:    ambiguous,
 		})
 	}
 
@@ -125,18 +136,14 @@ func (r *StoragePair) validateDestination(list []mapped.StoragePair) (result lib
 	}
 	for _, entry := range list {
 		name := entry.Destination.StorageClass
-		status, pErr := inventory.Get(resource, name)
+		pErr := inventory.Get(resource, name)
 		if pErr != nil {
-			err = liberr.Wrap(pErr)
-			return
-		}
-		switch status {
-		case http.StatusOK:
-		case http.StatusNotFound:
-			notValid = append(notValid, entry.Destination.StorageClass)
-		default:
-			err = liberr.New(http.StatusText(status))
-			return
+			if errors.Is(pErr, web.NotFoundErr) {
+				notValid = append(notValid, entry.Destination.StorageClass)
+			} else {
+				err = liberr.Wrap(pErr)
+				return
+			}
 		}
 	}
 	if len(notValid) > 0 {
