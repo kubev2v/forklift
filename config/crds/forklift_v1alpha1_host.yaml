@@ -31,11 +31,13 @@ spec:
         spec:
           properties:
             id:
-              description: 'The host identifier. For:   - vSphere: The managed object
-                ID.'
+              description: 'The object ID. vsphere:   The managed object ID.'
               type: string
             ipAddress:
               description: IP address used for disk transfer.
+              type: string
+            name:
+              description: 'An object Name. vsphere:   A qualified name.'
               type: string
             provider:
               description: Provider
@@ -46,9 +48,11 @@ spec:
             thumbprint:
               description: Certificate SHA-1 fingerprint, called thumbprint by VMware.
               type: string
+            type:
+              description: Type used to qualify the name.
+              type: string
           required:
           - provider
-          - id
           - ipAddress
           type: object
         status:

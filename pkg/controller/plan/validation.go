@@ -1,13 +1,12 @@
 package plan
 
 import (
+	"errors"
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/validation"
-	"net/http"
 )
 
 //
@@ -36,6 +35,7 @@ const (
 	NotSet    = "NotSet"
 	NotFound  = "NotFound"
 	NotUnique = "NotUnique"
+	Ambiguous = "Ambiguous"
 )
 
 //
@@ -98,21 +98,12 @@ func (r *Reconciler) validateVM(provider *api.Provider, plan *api.Plan) error {
 	if pErr != nil {
 		return liberr.Wrap(pErr)
 	}
-	var resource interface{}
-	switch provider.Type() {
-	case api.OpenShift:
-		return nil
-	case api.VSphere:
-		resource = &vsphere.VM{}
-	default:
-		return liberr.Wrap(web.ProviderNotSupportedErr)
-	}
 	notValid := libcnd.Condition{
 		Type:     VMNotValid,
 		Status:   True,
 		Reason:   NotFound,
 		Category: Critical,
-		Message:  "The VMs (list) contains invalid VMs.",
+		Message:  "VM not found.",
 		Items:    []string{},
 	}
 	notUnique := libcnd.Condition{
@@ -120,27 +111,48 @@ func (r *Reconciler) validateVM(provider *api.Provider, plan *api.Plan) error {
 		Status:   True,
 		Reason:   NotUnique,
 		Category: Critical,
-		Message:  "The VMs (list) contains duplicate VMs.",
+		Message:  "Duplicate VM.",
 		Items:    []string{},
 	}
+	ambiguous := libcnd.Condition{
+		Type:     DuplicateVM,
+		Status:   True,
+		Reason:   Ambiguous,
+		Category: Critical,
+		Message:  "VM reference is ambiguous.",
+		Items:    []string{},
+	}
+	setOf := map[string]bool{}
 	//
 	// Referenced VMs.
-	setOf := map[string]bool{}
 	for _, vm := range plan.Spec.VMs {
-		if _, found := setOf[vm.ID]; found {
-			notUnique.Items = append(notUnique.Items, vm.ID)
-			setOf[vm.ID] = true
+		ref := vm.Ref
+		if ref.NotSet() {
+			plan.Status.SetCondition(libcnd.Condition{
+				Type:     VMNotValid,
+				Status:   True,
+				Reason:   NotSet,
+				Category: Critical,
+				Message:  "Either `ID` or `Name` required.",
+			})
+			continue
 		}
-		status, pErr := inventory.Get(resource, vm.ID)
+		_, pErr := inventory.VM(&ref)
 		if pErr != nil {
+			if errors.Is(pErr, web.NotFoundErr) {
+				notValid.Items = append(notValid.Items, ref.String())
+				continue
+			}
+			if errors.Is(pErr, web.RefNotUniqueErr) {
+				ambiguous.Items = append(ambiguous.Items, ref.String())
+				continue
+			}
 			return liberr.Wrap(pErr)
 		}
-		switch status {
-		case http.StatusOK:
-		case http.StatusNotFound:
-			notValid.Items = append(notValid.Items, vm.ID)
-		default:
-			return liberr.New(http.StatusText(status))
+		if _, found := setOf[ref.ID]; found {
+			notUnique.Items = append(notUnique.Items, ref.String())
+		} else {
+			setOf[ref.ID] = true
 		}
 	}
 	if len(notValid.Items) > 0 {
@@ -148,6 +160,9 @@ func (r *Reconciler) validateVM(provider *api.Provider, plan *api.Plan) error {
 	}
 	if len(notUnique.Items) > 0 {
 		plan.Status.SetCondition(notUnique)
+	}
+	if len(ambiguous.Items) > 0 {
+		plan.Status.SetCondition(ambiguous)
 	}
 
 	return nil

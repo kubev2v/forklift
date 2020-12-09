@@ -1,6 +1,7 @@
 package validation
 
 import (
+	"errors"
 	"fmt"
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
@@ -8,8 +9,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/mapped"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
-	"net/http"
 	"path"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -22,6 +21,14 @@ const (
 	NetworkTypeNotValid        = "NetworkTypeNotValid"
 )
 
+//
+// Reasons
+const (
+	Ambiguous = "Ambiguous"
+)
+
+//
+// Network types.
 const (
 	Pod    = "pod"
 	Multus = "multus"
@@ -69,28 +76,30 @@ func (r *NetworkPair) validateSource(list []mapped.NetworkPair) (result libcnd.C
 		return
 	}
 	notValid := []string{}
-	var resource interface{}
-	switch provider.Type() {
-	case api.OpenShift:
-		return
-	case api.VSphere:
-		resource = &vsphere.Network{}
-	default:
-		err = liberr.Wrap(web.ProviderNotSupportedErr)
-		return
-	}
+	ambiguous := []string{}
 	for _, entry := range list {
-		status, pErr := inventory.Get(resource, entry.Source.ID)
-		if pErr != nil {
-			err = liberr.Wrap(pErr)
-			return
+		ref := entry.Source
+		if ref.NotSet() {
+			result.SetCondition(libcnd.Condition{
+				Type:     SourceNetworkNotValid,
+				Status:   True,
+				Reason:   NotSet,
+				Category: Critical,
+				Message:  "Source network: either `ID` or `Name` required.",
+			})
+			continue
 		}
-		switch status {
-		case http.StatusOK:
-		case http.StatusNotFound:
-			notValid = append(notValid, entry.Source.ID)
-		default:
-			err = liberr.New(http.StatusText(status))
+		_, pErr := inventory.Network(&ref)
+		if pErr != nil {
+			if errors.Is(pErr, web.NotFoundErr) {
+				notValid = append(notValid, entry.Source.String())
+				continue
+			}
+			if errors.Is(pErr, web.RefNotUniqueErr) {
+				ambiguous = append(ambiguous, entry.Source.String())
+				continue
+			}
+			err = liberr.Wrap(pErr)
 			return
 		}
 	}
@@ -100,7 +109,18 @@ func (r *NetworkPair) validateSource(list []mapped.NetworkPair) (result libcnd.C
 			Status:   True,
 			Reason:   NotFound,
 			Category: Critical,
-			Message:  "Source network not valid.",
+			Message:  "Source network not found.",
+			Items:    notValid,
+		})
+	}
+	if len(ambiguous) > 0 {
+		result.SetCondition(libcnd.Condition{
+			Type:     SourceNetworkNotValid,
+			Status:   True,
+			Reason:   Ambiguous,
+			Category: Critical,
+			Message:  "Source network has ambiguous ref.",
+			Items:    ambiguous,
 		})
 	}
 
@@ -140,18 +160,14 @@ next:
 			id := path.Join(
 				entry.Destination.Namespace,
 				entry.Destination.Name)
-			status, pErr := inventory.Get(resource, id)
+			pErr := inventory.Get(resource, id)
 			if pErr != nil {
-				err = liberr.Wrap(pErr)
-				return
-			}
-			switch status {
-			case http.StatusOK:
-			case http.StatusNotFound:
-				notFound = append(notFound, entry.Source.ID)
-			default:
-				err = liberr.New(http.StatusText(status))
-				return
+				if errors.Is(pErr, web.NotFoundErr) {
+					notFound = append(notFound, entry.Source.ID)
+				} else {
+					err = liberr.Wrap(pErr)
+					return
+				}
 			}
 		default:
 			notValid = append(notValid, entry.Source.ID)

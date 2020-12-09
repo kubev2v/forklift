@@ -4,6 +4,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/builder/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	vmio "github.com/kubevirt/vm-import-operator/pkg/apis/v2v/v1beta1"
@@ -17,13 +18,11 @@ import (
 // specific constructs.
 type Builder interface {
 	// Build secret.
-	Secret(vmID string, in, object *core.Secret) (err error)
-	// Build VMIO resource mapping.
-	Mapping(mp *plan.Map, object *vmio.VirtualMachineImportSpec) error
+	Secret(vmRef ref.Ref, in, object *core.Secret) error
 	// Build VMIO import spec.
-	Import(vmID string, mp *plan.Map, object *vmio.VirtualMachineImportSpec) error
+	Import(vmRef ref.Ref, mp *plan.Map, object *vmio.VirtualMachineImportSpec) error
 	// Build tasks.
-	Tasks(vmID string) ([]*plan.Task, error)
+	Tasks(vmRef ref.Ref) ([]*plan.Task, error)
 }
 
 //
@@ -31,16 +30,20 @@ type Builder interface {
 func New(
 	client client.Client,
 	inventory web.Client,
-	provider *api.Provider,
-	hostMap map[string]*api.Host) (builder Builder, err error) {
+	provider *api.Provider) (builder Builder, err error) {
 	//
 	switch provider.Type() {
 	case api.VSphere:
-		builder = &vsphere.Builder{
+		b := &vsphere.Builder{
 			Client:    client,
 			Inventory: inventory,
 			Provider:  provider,
-			HostMap:   hostMap,
+		}
+		bErr := b.Load()
+		if bErr != nil {
+			err = liberr.Wrap(bErr)
+		} else {
+			builder = b
 		}
 	default:
 		liberr.New("provider not supported.")
