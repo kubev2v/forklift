@@ -8,6 +8,7 @@ import (
 	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	"io/ioutil"
 	"net/http"
@@ -23,13 +24,117 @@ var Settings = &settings.Settings
 // Errors
 var (
 	ResourceNotResolvedErr = errors.New("resource (kind) not resolved")
+	RefNotUniqueErr        = errors.New("ref matched multiple resources")
+	NotFoundErr            = errors.New("not found")
 )
+
+//
+// Reference.
+type Ref = ref.Ref
 
 //
 // Resolves resources to API paths.
 type Resolver interface {
 	// Find the API path for the specified resource.
 	Path(resource interface{}, id string) (string, error)
+}
+
+//
+// Resource Finder.
+type Finder interface {
+	// Finder with client.
+	With(client Client) Finder
+	// Find a resource by ref.
+	// Returns:
+	//   ProviderNotSupportedErr
+	//   ProviderNotReadyErr
+	//   NotFoundErr
+	//   RefNotUniqueErr
+	ByRef(resource interface{}, ref Ref) error
+	// Find a VM by ref.
+	// Returns the matching resource and:
+	//   ProviderNotSupportedErr
+	//   ProviderNotReadyErr
+	//   NotFoundErr
+	//   RefNotUniqueErr
+	VM(ref *Ref) (interface{}, error)
+	// Find a Network by ref.
+	// Returns the matching resource and:
+	//   ProviderNotSupportedErr
+	//   ProviderNotReadyErr
+	//   NotFoundErr
+	//   RefNotUniqueErr
+	Network(ref *Ref) (interface{}, error)
+	// Find storage by ref.
+	// Returns the matching resource and:
+	//   ProviderNotSupportedErr
+	//   ProviderNotReadyErr
+	//   NotFoundErr
+	//   RefNotUniqueErr
+	Storage(ref *Ref) (interface{}, error)
+	// Find host by ref.
+	// Returns the matching resource and:
+	//   ProviderNotSupportedErr
+	//   ProviderNotReadyErr
+	//   NotFoundErr
+	//   RefNotUniqueErr
+	Host(ref *Ref) (interface{}, error)
+}
+
+//
+// REST Client.
+type Client interface {
+	// Finder
+	Finder() Finder
+	// Get a resource.
+	// The `resource` must be a pointer to a resource object.
+	// Returns:
+	//   ProviderNotSupportedErr
+	//   ProviderNotReadyErr
+	//   NotFoundErr
+	Get(resource interface{}, id string) error
+	// List a collection.
+	// The `list` must be a pointer to a slice of resource object.
+	// Returns:
+	//   ProviderNotSupportedErr
+	//   ProviderNotReadyErr
+	//   NotFoundErr
+	List(list interface{}, param ...Param) error
+	// Get a resource by ref.
+	// Returns:
+	//   ProviderNotSupportedErr
+	//   ProviderNotReadyErr
+	//   NotFoundErr
+	//   RefNotUniqueErr
+	Find(resource interface{}, ref Ref) error
+	// Find a VM by ref.
+	// Returns the matching resource and:
+	//   ProviderNotSupportedErr
+	//   ProviderNotReadyErr
+	//   NotFoundErr
+	//   RefNotUniqueErr
+	VM(ref *Ref) (interface{}, error)
+	// Find a Network by ref.
+	// Returns the matching resource and:
+	//   ProviderNotSupportedErr
+	//   ProviderNotReadyErr
+	//   NotFoundErr
+	//   RefNotUniqueErr
+	Network(ref *Ref) (interface{}, error)
+	// Find storage by ref.
+	// Returns the matching resource and:
+	//   ProviderNotSupportedErr
+	//   ProviderNotReadyErr
+	//   NotFoundErr
+	//   RefNotUniqueErr
+	Storage(ref *Ref) (interface{}, error)
+	// Find host by ref.
+	// Returns the matching resource and:
+	//   ProviderNotSupportedErr
+	//   ProviderNotReadyErr
+	//   NotFoundErr
+	//   RefNotUniqueErr
+	Host(ref *Ref) (interface{}, error)
 }
 
 //
@@ -41,7 +146,7 @@ type Param struct {
 
 //
 // REST API client.
-type Client struct {
+type RestClient struct {
 	Resolver
 	// Bearer token.
 	Token string
@@ -55,7 +160,7 @@ type Client struct {
 
 //
 // Get a resource.
-func (c *Client) Get(resource interface{}, id string) (status int, err error) {
+func (c *RestClient) Get(resource interface{}, id string) (status int, err error) {
 	if c.Resolver == nil {
 		err = liberr.Wrap(ResourceNotResolvedErr)
 		return
@@ -78,7 +183,7 @@ func (c *Client) Get(resource interface{}, id string) (status int, err error) {
 
 //
 // List resources in a collection.
-func (c *Client) List(list interface{}, param ...Param) (status int, err error) {
+func (c *RestClient) List(list interface{}, param ...Param) (status int, err error) {
 	var resource interface{}
 	lt := reflect.TypeOf(list)
 	lv := reflect.ValueOf(list)
@@ -95,7 +200,7 @@ func (c *Client) List(list interface{}, param ...Param) (status int, err error) 
 	default:
 		return -1, libmodel.MustBeSlicePtrErr
 	}
-	path, err := c.Resolver.Path(resource, "")
+	path, err := c.Resolver.Path(resource, "/")
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -107,14 +212,15 @@ func (c *Client) List(list interface{}, param ...Param) (status int, err error) 
 		}
 		path += "?" + q.Encode()
 	}
-	status, err = c.get(path, resource)
+
+	status, err = c.get(path, list)
 
 	return
 }
 
 //
 // Build and set the transport as needed.
-func (c *Client) buildTransport() (err error) {
+func (c *RestClient) buildTransport() (err error) {
 	if c.transport != nil {
 		return
 	}
@@ -140,7 +246,7 @@ func (c *Client) buildTransport() (err error) {
 
 //
 // Http GET
-func (c *Client) get(path string, resource interface{}) (status int, err error) {
+func (c *RestClient) get(path string, resource interface{}) (status int, err error) {
 	header := http.Header{}
 	if c.Token != "" {
 		header["Authorization"] = []string{
@@ -184,7 +290,7 @@ func (c *Client) get(path string, resource interface{}) (status int, err error) 
 
 //
 // Build the URL.
-func (c *Client) url(path string) *liburl.URL {
+func (c *RestClient) url(path string) *liburl.URL {
 	if c.Host == "" {
 		c.Host = fmt.Sprintf(
 			"%s:%d",

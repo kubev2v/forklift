@@ -1,14 +1,11 @@
 package plan
 
+import "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
+
 //
 // A VM listed on the plan.
 type VM struct {
-	// The VM identifier.
-	// For:
-	//   - vSphere: The managed object ID.
-	ID string `json:"id"`
-	// Name
-	Name string `json:"name,omitempty"`
+	ref.Ref `json:",inline"`
 	// Enable hooks.
 	Hook *Hook `json:"hook,omitempty"`
 }

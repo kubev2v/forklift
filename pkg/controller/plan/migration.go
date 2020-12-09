@@ -104,8 +104,6 @@ type Migration struct {
 	kubevirt KubeVirt
 	// VM import CRs.
 	importMap ImportMap
-	// Host map.
-	hostMap map[string]*api.Host
 }
 
 //
@@ -152,7 +150,7 @@ func (r Migration) Run() (reQ time.Duration, err error) {
 		case PreHookCreated:
 			vm.Phase = r.next(vm.Phase)
 		case CreateImport:
-			err = r.kubevirt.EnsureSecret(vm.ID)
+			err = r.kubevirt.EnsureSecret(vm.Ref)
 			if err != nil {
 				err = liberr.Wrap(err)
 				return
@@ -259,18 +257,12 @@ func (r *Migration) init() (err error) {
 	} else {
 		r.destination.client = r.Client
 	}
-	err = r.buildHostMap()
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
 	//
 	// Builder & Reflector
 	r.builder, err = builder.New(
 		r.Client,
 		r.inventory,
-		r.source.provider,
-		r.hostMap)
+		r.source.provider)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -280,6 +272,7 @@ func (r *Migration) init() (err error) {
 	r.kubevirt = KubeVirt{
 		Builder:   r.builder,
 		Secret:    r.source.secret,
+		Inventory: r.inventory,
 		Client:    r.destination.client,
 		Migration: r.Migration,
 		Plan:      r.Plan,
@@ -384,7 +377,7 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 					},
 				})
 		case CreateImport:
-			tasks, pErr := r.builder.Tasks(vm.ID)
+			tasks, pErr := r.builder.Tasks(vm.Ref)
 			if pErr != nil {
 				err = liberr.Wrap(pErr)
 				return
@@ -581,32 +574,6 @@ func (r *Migration) updatePipeline(vm *plan.VMStatus, imp *VmImport) {
 			vm.AddError(step.Error.Reasons...)
 		}
 	}
-}
-
-//
-// Build the host map (as needed).
-func (r *Migration) buildHostMap() (err error) {
-	list := &api.HostList{}
-	err = r.Client.List(
-		context.TODO(),
-		&client.ListOptions{Namespace: r.Migration.Namespace},
-		list)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	r.hostMap = map[string]*api.Host{}
-	for _, host := range list.Items {
-		if !host.Status.HasCondition(libcnd.Ready) {
-			continue
-		}
-		if r.source.provider.Namespace == host.Spec.Provider.Namespace &&
-			r.source.provider.Name == host.Spec.Provider.Name {
-			r.hostMap[host.Spec.ID] = &host
-		}
-	}
-
-	return
 }
 
 //

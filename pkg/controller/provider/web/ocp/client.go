@@ -22,7 +22,7 @@ func (r *Resolver) Path(object interface{}, id string) (path string, err error) 
 	ns = strings.TrimSuffix(ns, "/")
 	switch object.(type) {
 	case *Provider:
-		if id == "" { // list
+		if id == "/" { // list
 			ns = r.Provider.Namespace
 		}
 		h := ProviderHandler{}
@@ -67,5 +67,73 @@ func (r *Resolver) Path(object interface{}, id string) (path string, err error) 
 		err = liberr.Wrap(base.ResourceNotResolvedErr)
 	}
 
+	return
+}
+
+//
+// Resource finder.
+type Finder struct {
+	base.Client
+}
+
+//
+// With client.
+func (r *Finder) With(client base.Client) base.Finder {
+	r.Client = client
+	return r
+}
+
+//
+// Find a resource by ref.
+// Returns:
+//   ProviderNotSupportedErr
+//   ProviderNotReadyErr
+//   NotFoundErr
+//   RefNotUniqueErr
+func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
+	return
+}
+
+//
+// Find a VM by ref.
+// Returns the matching resource and:
+//   ProviderNotSupportedErr
+//   ProviderNotReadyErr
+//   NotFoundErr
+//   RefNotUniqueErr
+func (r *Finder) VM(ref *base.Ref) (object interface{}, err error) {
+	return
+}
+
+//
+// Find a Network by ref.
+//Returns the matching resource and:
+//   ProviderNotSupportedErr
+//   ProviderNotReadyErr
+//   NotFoundErr
+//   RefNotUniqueErr
+func (r *Finder) Network(ref *base.Ref) (object interface{}, err error) {
+	return
+}
+
+//
+// Find storage by ref.
+// Returns the matching resource and:
+//   ProviderNotSupportedErr
+//   ProviderNotReadyErr
+//   NotFoundErr
+//   RefNotUniqueErr
+func (r *Finder) Storage(ref *base.Ref) (object interface{}, err error) {
+	return
+}
+
+//
+// Find host by ref.
+// Returns the matching resource and:
+//   ProviderNotSupportedErr
+//   ProviderNotReadyErr
+//   NotFoundErr
+//   RefNotUniqueErr
+func (r *Finder) Host(ref *base.Ref) (object interface{}, err error) {
 	return
 }

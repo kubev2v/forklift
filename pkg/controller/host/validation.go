@@ -2,26 +2,26 @@ package host
 
 import (
 	"context"
+	"errors"
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/validation"
 	core "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"net/http"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 //
 // Types
 const (
-	HostNotValid   = "HostNotValid"
-	SecretNotValid = "SecretNotValid"
-	TypeNotValid   = "TypeNotValid"
-	IpNotValid     = "IpNotValid"
+	ProviderNotValid = "ProviderNotValid"
+	HostNotValid     = "HostNotValid"
+	SecretNotValid   = "SecretNotValid"
+	TypeNotValid     = "TypeNotValid"
+	IpNotValid       = "IpNotValid"
 )
 
 //
@@ -37,10 +37,11 @@ const (
 //
 // Reasons
 const (
-	NotSet   = "NotSet"
-	NotFound = "NotFound"
-	DataErr  = "DataErr"
-	TypeErr  = "TypeErr"
+	NotSet    = "NotSet"
+	NotFound  = "NotFound"
+	DataErr   = "DataErr"
+	TypeErr   = "TypeErr"
+	Ambiguous = "Ambiguous"
 )
 
 //
@@ -57,7 +58,7 @@ func (r *Reconciler) validate(host *api.Host) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = r.validateID(host)
+	err = r.validateRef(host)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -105,9 +106,10 @@ func (r *Reconciler) validateProvider(host *api.Host) error {
 }
 
 //
-// Validate host ID field.
-func (r *Reconciler) validateID(host *api.Host) error {
-	if host.Spec.ID == "" {
+// Validate host ref.
+func (r *Reconciler) validateRef(host *api.Host) error {
+	ref := host.Spec.Ref
+	if ref.NotSet() {
 		host.Status.SetCondition(
 			libcnd.Condition{
 				Type:     HostNotValid,
@@ -126,26 +128,31 @@ func (r *Reconciler) validateID(host *api.Host) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	var resource interface{}
-	switch provider.Type() {
-	case api.VSphere:
-		resource = &vsphere.Host{}
-	default:
-		return nil
-	}
-	status, err := inventory.Get(resource, host.Spec.ID)
+	_, err = inventory.Host(&ref)
 	if err != nil {
+		if errors.Is(err, web.NotFoundErr) {
+			host.Status.SetCondition(
+				libcnd.Condition{
+					Type:     HostNotValid,
+					Status:   True,
+					Reason:   NotFound,
+					Category: Critical,
+					Message:  "Referenced host not found.",
+				})
+			return nil
+		}
+		if errors.Is(err, web.RefNotUniqueErr) {
+			host.Status.SetCondition(
+				libcnd.Condition{
+					Type:     HostNotValid,
+					Status:   True,
+					Reason:   Ambiguous,
+					Category: Critical,
+					Message:  "Host reference is ambiguous.",
+				})
+			return nil
+		}
 		return liberr.Wrap(err)
-	}
-	if status != http.StatusOK {
-		host.Status.SetCondition(
-			libcnd.Condition{
-				Type:     HostNotValid,
-				Status:   True,
-				Reason:   NotFound,
-				Category: Critical,
-				Message:  "The `id` is not valid.",
-			})
 	}
 
 	return nil
@@ -192,7 +199,7 @@ func (r *Reconciler) validateSecret(host *api.Host) error {
 		Name:      ref.Name,
 	}
 	err := r.Get(context.TODO(), key, secret)
-	if errors.IsNotFound(err) {
+	if k8serr.IsNotFound(err) {
 		err = nil
 		newCnd.Reason = NotFound
 		host.Status.SetCondition(newCnd)
