@@ -11,23 +11,20 @@ import (
 	"path"
 )
 
+//
+// Errors.
 var (
 	ProviderNotSupportedErr = errors.New("provider (type) not supported")
 	ProviderNotReadyErr     = errors.New("provider API not ready")
+	RefNotUniqueErr         = base.RefNotUniqueErr
+	NotFoundErr             = base.NotFoundErr
 )
 
 //
-// REST Client.
-type Client interface {
-	// Get a resource.
-	// The `resource` must be a pointer to a resource object.
-	// Returns: The HTTP code and error.
-	Get(resource interface{}, id string) (int, error)
-	// List a collection.
-	// The `list` must be a pointer to a slice of resource object.
-	// Returns: The HTTP code and error.
-	List(list interface{}) (int, error)
-}
+// Interfaces.
+type Client = base.Client
+type Finder = base.Finder
+type Param = base.Param
 
 //
 // Build an appropriate client.
@@ -36,14 +33,16 @@ func NewClient(provider *api.Provider) (client Client, err error) {
 	case api.OpenShift:
 		client = &ProviderClient{
 			provider: provider,
-			Client: base.Client{
+			finder:   &ocp.Finder{},
+			restClient: base.RestClient{
 				Resolver: &ocp.Resolver{Provider: provider},
 			},
 		}
 	case api.VSphere:
 		client = &ProviderClient{
 			provider: provider,
-			Client: base.Client{
+			finder:   &vsphere.Finder{},
+			restClient: base.RestClient{
 				Resolver: &vsphere.Resolver{Provider: provider},
 			},
 		}
@@ -57,19 +56,29 @@ func NewClient(provider *api.Provider) (client Client, err error) {
 //
 // Provider API client.
 type ProviderClient struct {
-	base.Client
+	restClient base.RestClient
 	// The provider.
 	provider *api.Provider
+	// Finder.
+	finder Finder
 	// Ready.
 	found bool
 }
 
 //
+// Finder.
+func (r *ProviderClient) Finder() Finder {
+	return r.finder.With(r)
+}
+
+//
 // Get a resource.
-// Raises ProviderNotReadyErr on 404 and 206
-// when the provider is not yet in the inventory.
-func (r *ProviderClient) Get(resource interface{}, id string) (status int, err error) {
-	err = r.Find()
+// Returns:
+//   ProviderNotSupportedErr
+//   ProviderNotReadyErr
+//   NotFoundErr
+func (r *ProviderClient) Get(resource interface{}, id string) (err error) {
+	err = r.find()
 	if err != nil {
 		return
 	}
@@ -77,17 +86,30 @@ func (r *ProviderClient) Get(resource interface{}, id string) (status int, err e
 		err = liberr.Wrap(ProviderNotReadyErr)
 		return
 	}
-	status, err = r.Client.Get(resource, id)
+	status, err := r.restClient.Get(resource, id)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	switch status {
+	case http.StatusOK:
+	case http.StatusNotFound:
+		err = liberr.Wrap(NotFoundErr)
+	default:
+		err = liberr.New(http.StatusText(status))
+	}
 
 	return
 }
 
 //
 // List a resource collection.
-// Raises ProviderNotReadyErr on 404 and 206
-// when the provider is not yet in the inventory.
-func (r *ProviderClient) List(resource interface{}) (status int, err error) {
-	err = r.Find()
+// Returns:
+//   ProviderNotSupportedErr
+//   ProviderNotReadyErr
+//   NotFoundErr
+func (r *ProviderClient) List(resource interface{}, param ...Param) (err error) {
+	err = r.find()
 	if err != nil {
 		return
 	}
@@ -95,14 +117,84 @@ func (r *ProviderClient) List(resource interface{}) (status int, err error) {
 		err = liberr.Wrap(ProviderNotReadyErr)
 		return
 	}
-	status, err = r.Client.List(resource)
+	status, err := r.restClient.List(resource, param...)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	switch status {
+	case http.StatusOK:
+		switch status {
+		case http.StatusOK:
+		case http.StatusNotFound:
+			err = liberr.Wrap(NotFoundErr)
+		default:
+			err = liberr.New(http.StatusText(status))
+		}
+	}
 
 	return
 }
 
 //
+// Find an object by ref.
+// Returns:
+//   ProviderNotSupportedErr
+//   ProviderNotReadyErr
+//   NotFoundErr
+//   RefNotUniqueErr
+func (r *ProviderClient) Find(resource interface{}, ref base.Ref) (err error) {
+	err = r.Finder().ByRef(resource, ref)
+	return
+}
+
+//
+// Find a VM by ref.
+// Returns the matching resource and:
+//   ProviderNotSupportedErr
+//   ProviderNotReadyErr
+//   NotFoundErr
+//   RefNotUniqueErr
+func (r *ProviderClient) VM(ref *base.Ref) (object interface{}, err error) {
+	return r.Finder().VM(ref)
+}
+
+//
+// Find a network by ref.
+// Returns the matching resource and:
+//   ProviderNotSupportedErr
+//   ProviderNotReadyErr
+//   NotFoundErr
+//   RefNotUniqueErr
+func (r *ProviderClient) Network(ref *base.Ref) (object interface{}, err error) {
+	return r.Finder().Network(ref)
+}
+
+//
+// Find a storage object by ref.
+// Returns the matching resource and:
+//   ProviderNotSupportedErr
+//   ProviderNotReadyErr
+//   NotFoundErr
+//   RefNotUniqueErr
+func (r *ProviderClient) Storage(ref *base.Ref) (object interface{}, err error) {
+	return r.Finder().Storage(ref)
+}
+
+//
+// Find a Host by ref.
+// Returns the matching resource and:
+//   ProviderNotSupportedErr
+//   ProviderNotReadyErr
+//   NotFoundErr
+//   RefNotUniqueErr
+func (r *ProviderClient) Host(ref *base.Ref) (object interface{}, err error) {
+	return r.Finder().Host(ref)
+}
+
+//
 // Find the provider.
-func (r *ProviderClient) Find() (err error) {
+func (r *ProviderClient) find() (err error) {
 	if r.found {
 		return
 	}
@@ -112,14 +204,14 @@ func (r *ProviderClient) Find() (err error) {
 	status := 0
 	switch r.provider.Type() {
 	case api.OpenShift:
-		status, err = r.Client.Get(&ocp.Provider{}, id)
+		status, err = r.restClient.Get(&ocp.Provider{}, id)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
 		}
 		r.found = status == http.StatusOK
 	case api.VSphere:
-		status, err = r.Client.Get(&vsphere.Provider{}, id)
+		status, err = r.restClient.Get(&vsphere.Provider{}, id)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return

@@ -6,8 +6,10 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/snapshot"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/builder"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	cdi "github.com/kubevirt/containerized-data-importer/pkg/apis/core/v1beta1"
 	vmio "github.com/kubevirt/vm-import-operator/pkg/apis/v2v/v1beta1"
 	core "k8s.io/api/core/v1"
@@ -40,6 +42,8 @@ type KubeVirt struct {
 	*api.Plan
 	// Migration.
 	*api.Migration
+	// Provider API client.
+	Inventory web.Client
 	// Builder
 	Builder builder.Builder
 	// Secret.
@@ -157,8 +161,13 @@ func (r *KubeVirt) EnsureNamespace() (err error) {
 
 //
 // Ensure the VMIO secret exists on the destination.
-func (r *KubeVirt) EnsureSecret(vmID string) (err error) {
-	secret, err := r.buildSecret(vmID)
+func (r *KubeVirt) EnsureSecret(vmRef ref.Ref) (err error) {
+	_, err = r.Inventory.VM(&vmRef)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	secret, err := r.buildSecret(vmRef)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -183,10 +192,15 @@ func (r *KubeVirt) buildImport(vm *plan.VMStatus) (object *vmio.VirtualMachineIm
 		err = liberr.Wrap(err)
 		return
 	}
+	_, err = r.Inventory.VM(&vm.Ref)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
 	object = &vmio.VirtualMachineImport{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace: r.namespace(),
-			Name:      r.nameForImport(vm.ID),
+			Name:      r.nameForImport(vm.Ref),
 			Labels: map[string]string{
 				kMigration: string(r.Plan.Status.Migration.Active),
 				kPlan:      string(r.Plan.UID),
@@ -196,11 +210,11 @@ func (r *KubeVirt) buildImport(vm *plan.VMStatus) (object *vmio.VirtualMachineIm
 		Spec: vmio.VirtualMachineImportSpec{
 			ProviderCredentialsSecret: vmio.ObjectIdentifier{
 				Namespace: &namespace,
-				Name:      r.nameForSecret(vm.ID),
+				Name:      r.nameForSecret(vm.Ref),
 			},
 		},
 	}
-	err = r.Builder.Import(vm.ID, mp, &object.Spec)
+	err = r.Builder.Import(vm.Ref, mp, &object.Spec)
 	if err != nil {
 		err = liberr.Wrap(err)
 	}
@@ -213,18 +227,18 @@ func (r *KubeVirt) buildImport(vm *plan.VMStatus) (object *vmio.VirtualMachineIm
 
 //
 // Build the VMIO secret.
-func (r *KubeVirt) buildSecret(vmID string) (object *core.Secret, err error) {
+func (r *KubeVirt) buildSecret(vmRef ref.Ref) (object *core.Secret, err error) {
 	object = &core.Secret{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace: r.namespace(),
-			Name:      r.nameForSecret(vmID),
+			Name:      r.nameForSecret(vmRef),
 			Labels: map[string]string{
 				kMigration: string(r.Plan.Status.Migration.Active),
 				kPlan:      string(r.Plan.UID),
 			},
 		},
 	}
-	err = r.Builder.Secret(vmID, r.Secret, object)
+	err = r.Builder.Secret(vmRef, r.Secret, object)
 	if err != nil {
 		err = liberr.Wrap(err)
 	}
@@ -234,12 +248,12 @@ func (r *KubeVirt) buildSecret(vmID string) (object *core.Secret, err error) {
 
 //
 // Generated name for kubevirt VM Import CR secret.
-func (r *KubeVirt) nameForSecret(vmID string) string {
+func (r *KubeVirt) nameForSecret(vmRef ref.Ref) string {
 	uid := string(r.Plan.UID)
 	parts := []string{
 		"plan",
 		r.Plan.Name,
-		vmID,
+		vmRef.ID,
 		uid[len(uid)-4:],
 	}
 
@@ -248,12 +262,12 @@ func (r *KubeVirt) nameForSecret(vmID string) string {
 
 //
 // Generated name for kubevirt VM Import CR.
-func (r *KubeVirt) nameForImport(vmID string) string {
+func (r *KubeVirt) nameForImport(vmRef ref.Ref) string {
 	uid := string(r.Plan.Status.Migration.Active)
 	parts := []string{
 		"plan",
 		r.Plan.Name,
-		vmID,
+		vmRef.ID,
 		uid[len(uid)-4:],
 	}
 

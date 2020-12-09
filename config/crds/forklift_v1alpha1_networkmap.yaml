@@ -53,11 +53,15 @@ spec:
                     description: Source network.
                     properties:
                       id:
-                        description: 'The object identifier. For:   - vsphere: The
-                          managed object ID.'
+                        description: 'The object ID. vsphere:   The managed object
+                          ID.'
                         type: string
-                    required:
-                    - id
+                      name:
+                        description: 'An object Name. vsphere:   A qualified name.'
+                        type: string
+                      type:
+                        description: Type used to qualify the name.
+                        type: string
                     type: object
                 required:
                 - source

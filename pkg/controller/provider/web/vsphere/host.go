@@ -10,6 +10,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"net/http"
 	"sort"
+	"strings"
 )
 
 //
@@ -51,6 +52,12 @@ func (h HostHandler) List(ctx *gin.Context) {
 			Predicate: h.Predicate(ctx),
 			Page:      &h.Page,
 		})
+	if err != nil {
+		Log.Trace(err)
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
+	err = h.filter(ctx, &list)
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
@@ -128,6 +135,39 @@ func (h HostHandler) Link(p *api.Provider, m *model.Host) string {
 			base.ProviderParam: p.Name,
 			HostParam:          m.ID,
 		})
+}
+
+//
+// Filter result set.
+// Filter by path for `name` query.
+func (h HostHandler) filter(ctx *gin.Context, list *[]model.Host) (err error) {
+	if len(*list) < 2 {
+		return
+	}
+	q := ctx.Request.URL.Query()
+	name := q.Get(NameParam)
+	if len(name) == 0 {
+		return
+	}
+	if len(strings.Split(name, "/")) < 2 {
+		return
+	}
+	db := h.Reconciler.DB()
+	kept := []model.Host{}
+	for _, m := range *list {
+		path, pErr := m.Path(db)
+		if pErr != nil {
+			err = liberr.Wrap(pErr)
+			return
+		}
+		if h.PathMatchRoot(path, name) {
+			kept = append(kept, m)
+		}
+	}
+
+	*list = kept
+
+	return
 }
 
 //
