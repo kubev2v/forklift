@@ -2,6 +2,7 @@ package vsphere
 
 import (
 	"errors"
+	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	libref "github.com/konveyor/controller/pkg/ref"
@@ -20,13 +21,24 @@ var (
 )
 
 //
-// Errors
-var (
-	// Invalid ref.
-	InvalidRefErr = liberr.New("invalid ref")
-	// Invalid kind in ref encountered during tree traversal.
-	InvalidKindErr = liberr.New("invalid kind")
-)
+// Invalid reference.
+type InvalidRefError struct {
+	Ref
+}
+
+func (r InvalidRefError) Error() string {
+	return fmt.Sprintf("Reference %#v not valid.", r.Ref)
+}
+
+//
+// Invalid kind.
+type InvalidKindError struct {
+	Object interface{}
+}
+
+func (r InvalidKindError) Error() string {
+	return fmt.Sprintf("Kind %#v not valid.", r.Object)
+}
 
 //
 // Tree.
@@ -96,7 +108,7 @@ func (r *Tree) Build() (*TreeNode, error) {
 				}
 				m, err := r.getRef(ref)
 				if err != nil {
-					if errors.Is(err, InvalidRefErr) {
+					if errors.As(err, &InvalidRefError{}) {
 						continue
 					}
 					return liberr.Wrap(err)
@@ -121,11 +133,11 @@ func (r *Tree) Build() (*TreeNode, error) {
 			case DatacenterKind:
 				// Leaf
 			default:
-				return InvalidKindErr
+				return InvalidKindError{kind}
 			}
 			m, err := r.getRef(ref)
 			if err != nil {
-				if errors.Is(err, InvalidRefErr) {
+				if errors.As(err, &InvalidRefError{}) {
 					return nil
 				}
 				return liberr.Wrap(err)
@@ -147,12 +159,12 @@ func (r *Tree) Build() (*TreeNode, error) {
 			case ClusterKind:
 				// Leaf
 			default:
-				return InvalidKindErr
+				return InvalidKindError{kind}
 			}
 			for _, ref := range refList {
 				m, err := r.getRef(ref)
 				if err != nil {
-					if errors.Is(err, InvalidRefErr) {
+					if errors.As(err, &InvalidRefError{}) {
 						return nil
 					}
 					return liberr.Wrap(err)
@@ -175,12 +187,12 @@ func (r *Tree) Build() (*TreeNode, error) {
 			case HostKind:
 				// Leaf
 			default:
-				return InvalidKindErr
+				return InvalidKindError{kind}
 			}
 			for _, ref := range refList {
 				m, err := r.getRef(ref)
 				if err != nil {
-					if errors.Is(err, InvalidRefErr) {
+					if errors.As(err, &InvalidRefError{}) {
 						return nil
 					}
 					return liberr.Wrap(err)
@@ -197,7 +209,7 @@ func (r *Tree) Build() (*TreeNode, error) {
 		case DsKind:
 			// Leaf
 		default:
-			return InvalidKindErr
+			return InvalidKindError{kind}
 		}
 
 		return nil
@@ -232,7 +244,7 @@ func (r *Tree) getRef(ref Ref) (model Model, err error) {
 	case DsKind:
 		model = &Datastore{Base: base}
 	default:
-		err = InvalidRefErr
+		err = InvalidRefError{ref}
 	}
 	if model != nil {
 		err = r.DB.Get(model)

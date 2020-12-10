@@ -130,7 +130,7 @@ func (r *Reconciler) validateRef(host *api.Host) error {
 	}
 	_, err = inventory.Host(&ref)
 	if err != nil {
-		if errors.Is(err, web.NotFoundErr) {
+		if errors.As(err, &web.NotFoundError{}) {
 			host.Status.SetCondition(
 				libcnd.Condition{
 					Type:     HostNotValid,
@@ -141,7 +141,7 @@ func (r *Reconciler) validateRef(host *api.Host) error {
 				})
 			return nil
 		}
-		if errors.Is(err, web.RefNotUniqueErr) {
+		if errors.As(err, &web.RefNotUniqueError{}) {
 			host.Status.SetCondition(
 				libcnd.Condition{
 					Type:     HostNotValid,

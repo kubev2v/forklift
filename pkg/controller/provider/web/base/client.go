@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
-	"errors"
 	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
@@ -21,12 +20,34 @@ import (
 var Settings = &settings.Settings
 
 //
-// Errors
-var (
-	ResourceNotResolvedErr = errors.New("resource (kind) not resolved")
-	RefNotUniqueErr        = errors.New("ref matched multiple resources")
-	NotFoundErr            = errors.New("not found")
-)
+// Resource kind cannot be resolved.
+type ResourceNotResolvedError struct {
+	Object interface{}
+}
+
+func (r ResourceNotResolvedError) Error() string {
+	return fmt.Sprintf("Resource %#v cannot be resolved.", r.Object)
+}
+
+//
+// Reference matches multiple resources.
+type RefNotUniqueError struct {
+	Ref
+}
+
+func (r RefNotUniqueError) Error() string {
+	return fmt.Sprintf("Reference %#v matched multiple resources.", r.Ref)
+}
+
+//
+// Resource not found.
+type NotFoundError struct {
+	Ref
+}
+
+func (r NotFoundError) Error() string {
+	return fmt.Sprintf("Resource %#v not found.", r.Ref)
+}
 
 //
 // Reference.
@@ -162,7 +183,7 @@ type RestClient struct {
 // Get a resource.
 func (c *RestClient) Get(resource interface{}, id string) (status int, err error) {
 	if c.Resolver == nil {
-		err = liberr.Wrap(ResourceNotResolvedErr)
+		err = liberr.Wrap(ResourceNotResolvedError{resource})
 		return
 	}
 	lv := reflect.ValueOf(resource)

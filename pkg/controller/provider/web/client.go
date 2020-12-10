@@ -1,7 +1,7 @@
 package web
 
 import (
-	"errors"
+	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
@@ -12,13 +12,27 @@ import (
 )
 
 //
-// Errors.
-var (
-	ProviderNotSupportedErr = errors.New("provider (type) not supported")
-	ProviderNotReadyErr     = errors.New("provider API not ready")
-	RefNotUniqueErr         = base.RefNotUniqueErr
-	NotFoundErr             = base.NotFoundErr
-)
+// Resource kind cannot be resolved.
+type ProviderNotSupportedError struct {
+	*api.Provider
+}
+
+func (r ProviderNotSupportedError) Error() string {
+	return fmt.Sprintf("Provider (type) not supported: %#v", r.Provider)
+}
+
+//
+// Resource kind cannot be resolved.
+type ProviderNotReadyError struct {
+	*api.Provider
+}
+
+func (r ProviderNotReadyError) Error() string {
+	return fmt.Sprintf("Provider not ready: %#v", r.Provider)
+}
+
+type RefNotUniqueError = base.RefNotUniqueError
+type NotFoundError = base.NotFoundError
 
 //
 // Interfaces.
@@ -47,7 +61,10 @@ func NewClient(provider *api.Provider) (client Client, err error) {
 			},
 		}
 	default:
-		err = liberr.Wrap(ProviderNotSupportedErr)
+		err = liberr.Wrap(
+			ProviderNotSupportedError{
+				Provider: provider,
+			})
 	}
 
 	return
@@ -83,7 +100,7 @@ func (r *ProviderClient) Get(resource interface{}, id string) (err error) {
 		return
 	}
 	if !r.found {
-		err = liberr.Wrap(ProviderNotReadyErr)
+		err = liberr.Wrap(ProviderNotReadyError{r.provider})
 		return
 	}
 	status, err := r.restClient.Get(resource, id)
@@ -94,7 +111,7 @@ func (r *ProviderClient) Get(resource interface{}, id string) (err error) {
 	switch status {
 	case http.StatusOK:
 	case http.StatusNotFound:
-		err = liberr.Wrap(NotFoundErr)
+		err = liberr.Wrap(NotFoundError{Ref: base.Ref{ID: id}})
 	default:
 		err = liberr.New(http.StatusText(status))
 	}
@@ -114,7 +131,7 @@ func (r *ProviderClient) List(resource interface{}, param ...Param) (err error) 
 		return
 	}
 	if !r.found {
-		err = liberr.Wrap(ProviderNotReadyErr)
+		err = liberr.Wrap(ProviderNotReadyError{r.provider})
 		return
 	}
 	status, err := r.restClient.List(resource, param...)
@@ -127,7 +144,7 @@ func (r *ProviderClient) List(resource interface{}, param ...Param) (err error) 
 		switch status {
 		case http.StatusOK:
 		case http.StatusNotFound:
-			err = liberr.Wrap(NotFoundErr)
+			err = liberr.Wrap(NotFoundError{})
 		default:
 			err = liberr.New(http.StatusText(status))
 		}
@@ -218,7 +235,7 @@ func (r *ProviderClient) find() (err error) {
 		}
 		r.found = status == http.StatusOK
 	default:
-		err = liberr.Wrap(ProviderNotSupportedErr)
+		err = liberr.Wrap(ProviderNotReadyError{r.provider})
 	}
 
 	return
