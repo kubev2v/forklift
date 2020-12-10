@@ -27,6 +27,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -57,8 +58,9 @@ var Settings = &settings.Settings
 // Creates a new Host Controller and adds it to the Manager.
 func Add(mgr manager.Manager) error {
 	reconciler := &Reconciler{
-		Client: mgr.GetClient(),
-		scheme: mgr.GetScheme(),
+		EventRecorder: mgr.GetRecorder(Name),
+		Client:        mgr.GetClient(),
+		scheme:        mgr.GetScheme(),
 	}
 	cnt, err := controller.New(
 		Name,
@@ -99,6 +101,7 @@ var _ reconcile.Reconciler = &Reconciler{}
 //
 // Reconciles a Host object.
 type Reconciler struct {
+	record.EventRecorder
 	client.Client
 	scheme *runtime.Scheme
 }
@@ -116,6 +119,12 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	log.SetValues("host", request)
 	log.Info("Reconcile")
 
+	defer func() {
+		if err != nil {
+			log.Trace(err)
+		}
+	}()
+
 	// Fetch the CR.
 	host := &api.Host{}
 	err = r.Get(context.TODO(), request.NamespacedName, host)
@@ -126,6 +135,9 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		log.Trace(err)
 		return noReQ, err
 	}
+	defer func() {
+		log.Info("Conditions.", "all", host.Status.Conditions)
+	}()
 
 	// Begin staging conditions.
 	host.Status.BeginStagingConditions()
@@ -141,7 +153,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	}
 
 	// Ready condition.
-	if !host.Status.HasBlockerCondition() {
+	if !host.Status.HasBlockerCondition() && host.Status.HasCondition(ConnectionTested) {
 		host.Status.SetCondition(libcnd.Condition{
 			Type:     libcnd.Ready,
 			Status:   True,
@@ -152,6 +164,9 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 
 	// End staging conditions.
 	host.Status.EndStagingConditions()
+
+	// Record events.
+	host.Status.RecordEvents(host, r)
 
 	// Apply changes.
 	host.Status.ObservedGeneration = host.Generation

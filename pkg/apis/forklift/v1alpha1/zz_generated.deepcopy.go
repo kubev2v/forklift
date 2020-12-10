@@ -22,7 +22,6 @@ package v1alpha1
 import (
 	mapped "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/mapped"
 	plan "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
-	v1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -31,7 +30,7 @@ func (in *Host) DeepCopyInto(out *Host) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
-	in.Spec.DeepCopyInto(&out.Spec)
+	out.Spec = in.Spec
 	in.Status.DeepCopyInto(&out.Status)
 	in.Referenced.DeepCopyInto(&out.Referenced)
 	return
@@ -93,11 +92,7 @@ func (in *HostSpec) DeepCopyInto(out *HostSpec) {
 	*out = *in
 	out.Ref = in.Ref
 	out.Provider = in.Provider
-	if in.Secret != nil {
-		in, out := &in.Secret, &out.Secret
-		*out = new(v1.ObjectReference)
-		**out = **in
-	}
+	out.Secret = in.Secret
 	return
 }
 
