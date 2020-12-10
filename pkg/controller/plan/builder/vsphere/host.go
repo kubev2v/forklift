@@ -10,21 +10,36 @@ import (
 	"github.com/vmware/govmomi/vim25"
 	core "k8s.io/api/core/v1"
 	liburl "net/url"
+	"time"
 )
 
 //
 // ESX Host.
 type EsxHost struct {
 	// Host url.
-	url string
+	URL string
 	// Host secret.
-	secret *core.Secret
+	Secret *core.Secret
 	// Inventory client.
-	inventory web.Client
+	Inventory web.Client
 	// Host client.
 	client *govmomi.Client
 	// Finder
 	finder *find.Finder
+}
+
+//
+// Test the connection.
+func (r *EsxHost) TestConnection() (err error) {
+	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+	defer cancel()
+	err = r.connect(ctx)
+	if err != nil {
+		liberr.Wrap(err)
+	}
+
+	return
 }
 
 //
@@ -84,7 +99,7 @@ func (r *EsxHost) connect(ctx context.Context) (err error) {
 	if r.client != nil {
 		return
 	}
-	url, err := liburl.Parse(r.url)
+	url, err := liburl.Parse(r.URL)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -109,7 +124,7 @@ func (r *EsxHost) connect(ctx context.Context) (err error) {
 //
 // User.
 func (r *EsxHost) user() string {
-	if user, found := r.secret.Data["user"]; found {
+	if user, found := r.Secret.Data["user"]; found {
 		return string(user)
 	}
 
@@ -119,7 +134,7 @@ func (r *EsxHost) user() string {
 //
 // Password.
 func (r *EsxHost) password() string {
-	if password, found := r.secret.Data["password"]; found {
+	if password, found := r.Secret.Data["password"]; found {
 		return string(password)
 	}
 

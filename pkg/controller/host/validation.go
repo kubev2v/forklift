@@ -3,10 +3,12 @@ package host
 import (
 	"context"
 	"errors"
+	"fmt"
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
+	"github.com/konveyor/forklift-controller/pkg/controller/plan/builder/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/controller/validation"
 	core "k8s.io/api/core/v1"
@@ -17,11 +19,12 @@ import (
 //
 // Types
 const (
-	ProviderNotValid = "ProviderNotValid"
-	HostNotValid     = "HostNotValid"
+	Validated        = "Validated"
+	RefNotValid      = "HostNotValid"
 	SecretNotValid   = "SecretNotValid"
 	TypeNotValid     = "TypeNotValid"
 	IpNotValid       = "IpNotValid"
+	ConnectionTested = "ConnectionTested"
 )
 
 //
@@ -42,6 +45,9 @@ const (
 	DataErr   = "DataErr"
 	TypeErr   = "TypeErr"
 	Ambiguous = "Ambiguous"
+	Completed = "Completed"
+	Tested    = "Tested"
+	Failed    = "Failed"
 )
 
 //
@@ -67,6 +73,18 @@ func (r *Reconciler) validate(host *api.Host) error {
 		return liberr.Wrap(err)
 	}
 	err = r.validateSecret(host)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	host.Status.SetCondition(
+		libcnd.Condition{
+			Type:     Validated,
+			Status:   True,
+			Reason:   Completed,
+			Category: Advisory,
+			Message:  "The host has been validated.",
+		})
+	err = r.testConnection(host)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -112,7 +130,7 @@ func (r *Reconciler) validateRef(host *api.Host) error {
 	if ref.NotSet() {
 		host.Status.SetCondition(
 			libcnd.Condition{
-				Type:     HostNotValid,
+				Type:     RefNotValid,
 				Status:   True,
 				Reason:   NotSet,
 				Category: Critical,
@@ -133,7 +151,7 @@ func (r *Reconciler) validateRef(host *api.Host) error {
 		if errors.Is(err, web.NotFoundErr) {
 			host.Status.SetCondition(
 				libcnd.Condition{
-					Type:     HostNotValid,
+					Type:     RefNotValid,
 					Status:   True,
 					Reason:   NotFound,
 					Category: Critical,
@@ -144,7 +162,7 @@ func (r *Reconciler) validateRef(host *api.Host) error {
 		if errors.Is(err, web.RefNotUniqueErr) {
 			host.Status.SetCondition(
 				libcnd.Condition{
-					Type:     HostNotValid,
+					Type:     RefNotValid,
 					Status:   True,
 					Reason:   Ambiguous,
 					Category: Critical,
@@ -180,17 +198,18 @@ func (r *Reconciler) validateIp(host *api.Host) error {
 //   1. The references is complete.
 //   2. The secret exists.
 //   3. the content of the secret is valid.
-func (r *Reconciler) validateSecret(host *api.Host) error {
+func (r *Reconciler) validateSecret(host *api.Host) (err error) {
 	ref := host.Spec.Secret
-	if !libref.RefSet(ref) {
-		return nil
-	}
-	newCnd := libcnd.Condition{
+	cnd := libcnd.Condition{
 		Type:     SecretNotValid,
 		Status:   True,
-		Reason:   NotFound,
+		Reason:   NotSet,
 		Category: Critical,
-		Message:  "The `secret` is not valid.",
+		Message:  "The `secret` is not set.",
+	}
+	if !libref.RefSet(&ref) {
+		host.Status.SetCondition(cnd)
+		return
 	}
 	// NotFound
 	secret := &core.Secret{}
@@ -198,16 +217,19 @@ func (r *Reconciler) validateSecret(host *api.Host) error {
 		Namespace: ref.Namespace,
 		Name:      ref.Name,
 	}
-	err := r.Get(context.TODO(), key, secret)
+	err = r.Get(context.TODO(), key, secret)
 	if k8serr.IsNotFound(err) {
 		err = nil
-		newCnd.Reason = NotFound
-		host.Status.SetCondition(newCnd)
-		return nil
+		cnd.Reason = NotFound
+		cnd.Message = "The `secret` cannot be found."
+		host.Status.SetCondition(cnd)
+		return
 	}
 	if err != nil {
-		return liberr.Wrap(err)
+		err = liberr.Wrap(err)
+		return
 	}
+	host.Referenced.Secret = secret
 	// DataErr
 	keyList := []string{}
 	provider := host.Referenced.Provider.Source
@@ -222,13 +244,59 @@ func (r *Reconciler) validateSecret(host *api.Host) error {
 	}
 	for _, key := range keyList {
 		if _, found := secret.Data[key]; !found {
-			newCnd.Items = append(newCnd.Items, key)
+			cnd.Items = append(cnd.Items, key)
 		}
 	}
-	if len(newCnd.Items) > 0 {
-		newCnd.Reason = DataErr
-		host.Status.SetCondition(newCnd)
+	if len(cnd.Items) > 0 {
+		cnd.Reason = DataErr
+		cnd.Message = "The `secret` missing required data."
+		host.Status.SetCondition(cnd)
 	}
 
-	return nil
+	return
+}
+
+//
+// Test connection.
+func (r *Reconciler) testConnection(host *api.Host) (err error) {
+	if host.Status.HasBlockerCondition() {
+		return
+	}
+	cnd := libcnd.Condition{
+		Type:     ConnectionTested,
+		Category: Required,
+	}
+	provider := host.Referenced.Provider.Source
+	secret := host.Referenced.Secret
+	inventory, pErr := web.NewClient(provider)
+	if pErr != nil {
+		return liberr.Wrap(pErr)
+	}
+	switch provider.Type() {
+	case api.VSphere:
+		url := fmt.Sprintf("https://%s/sdk", host.Spec.IpAddress)
+		h := vsphere.EsxHost{
+			URL:       url,
+			Inventory: inventory,
+			Secret:    secret,
+		}
+		tErr := h.TestConnection()
+		switch tErr {
+		case web.ProviderNotReadyErr:
+			err = liberr.Wrap(tErr)
+		case nil:
+			cnd.Status = True
+			cnd.Reason = Tested
+			cnd.Message = "Connection test, succeeded."
+		default:
+			cnd.Status = False
+			cnd.Reason = Failed
+			cnd.Message = fmt.Sprintf(
+				"Connection test, failed: %s",
+				tErr.Error())
+		}
+		host.Status.SetCondition(cnd)
+	}
+
+	return
 }

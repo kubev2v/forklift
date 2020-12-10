@@ -34,7 +34,7 @@ type HostSpec struct {
 	// Certificate SHA-1 fingerprint, called thumbprint by VMware.
 	Thumbprint string `json:"thumbprint,omitempty"`
 	// Credentials.
-	Secret *core.ObjectReference `json:"secret,omitempty"`
+	Secret core.ObjectReference `json:"secret"`
 }
 
 //

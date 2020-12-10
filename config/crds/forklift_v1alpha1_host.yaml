@@ -54,6 +54,7 @@ spec:
           required:
           - provider
           - ipAddress
+          - secret
           type: object
         status:
           properties:
