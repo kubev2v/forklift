@@ -75,11 +75,11 @@ func (r *StoragePair) validateSource(list []mapped.StoragePair) (result libcnd.C
 		}
 		_, pErr := inventory.Storage(&ref)
 		if pErr != nil {
-			if errors.Is(pErr, web.NotFoundErr) {
+			if errors.As(pErr, &web.NotFoundError{}) {
 				notValid = append(notValid, entry.Source.String())
 				continue
 			}
-			if errors.Is(pErr, web.RefNotUniqueErr) {
+			if errors.As(pErr, &web.RefNotUniqueError{}) {
 				ambiguous = append(ambiguous, entry.Source.String())
 				continue
 			}
@@ -131,14 +131,17 @@ func (r *StoragePair) validateDestination(list []mapped.StoragePair) (result lib
 	case api.VSphere:
 		return
 	default:
-		err = liberr.Wrap(web.ProviderNotSupportedErr)
+		err = liberr.Wrap(
+			web.ProviderNotSupportedError{
+				Provider: provider,
+			})
 		return
 	}
 	for _, entry := range list {
 		name := entry.Destination.StorageClass
 		pErr := inventory.Get(resource, name)
 		if pErr != nil {
-			if errors.Is(pErr, web.NotFoundErr) {
+			if errors.As(pErr, &web.NotFoundError{}) {
 				notValid = append(notValid, entry.Destination.StorageClass)
 			} else {
 				err = liberr.Wrap(pErr)

@@ -12,10 +12,9 @@ import (
 
 //
 // Errors.
-var (
-	RefNotUniqueErr = base.RefNotUniqueErr
-	NotFoundErr     = base.NotFoundErr
-)
+type ResourceNotResolvedError = base.ResourceNotResolvedError
+type RefNotUniqueError = base.RefNotUniqueError
+type NotFoundError = base.NotFoundError
 
 //
 // API path resolver.
@@ -84,7 +83,10 @@ func (r *Resolver) Path(resource interface{}, id string) (path string, err error
 				Base: model.Base{ID: id},
 			})
 	default:
-		err = liberr.Wrap(base.ResourceNotResolvedErr)
+		err = liberr.Wrap(
+			base.ResourceNotResolvedError{
+				Object: resource,
+			})
 	}
 
 	return
@@ -131,11 +133,11 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				break
 			}
 			if len(list) == 0 {
-				err = liberr.Wrap(NotFoundErr)
+				err = liberr.Wrap(NotFoundError{Ref: ref})
 				break
 			}
 			if len(list) > 1 {
-				err = liberr.Wrap(RefNotUniqueErr)
+				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
 				break
 			}
 			*resource.(*Network) = list[0]
@@ -159,11 +161,11 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				break
 			}
 			if len(list) == 0 {
-				err = liberr.Wrap(NotFoundErr)
+				err = liberr.Wrap(NotFoundError{Ref: ref})
 				break
 			}
 			if len(list) > 1 {
-				err = liberr.Wrap(RefNotUniqueErr)
+				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
 				break
 			}
 			*resource.(*Datastore) = list[0]
@@ -187,11 +189,11 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				break
 			}
 			if len(list) == 0 {
-				err = liberr.Wrap(NotFoundErr)
+				err = liberr.Wrap(NotFoundError{Ref: ref})
 				break
 			}
 			if len(list) > 1 {
-				err = liberr.Wrap(RefNotUniqueErr)
+				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
 				break
 			}
 			*resource.(*Host) = list[0]
@@ -215,17 +217,20 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				break
 			}
 			if len(list) == 0 {
-				err = liberr.Wrap(NotFoundErr)
+				err = liberr.Wrap(NotFoundError{Ref: ref})
 				break
 			}
 			if len(list) > 1 {
-				err = liberr.Wrap(RefNotUniqueErr)
+				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
 				break
 			}
 			*resource.(*VM) = list[0]
 		}
 	default:
-		err = liberr.Wrap(base.ResourceNotResolvedErr)
+		err = liberr.Wrap(
+			ResourceNotResolvedError{
+				Object: resource,
+			})
 	}
 
 	return

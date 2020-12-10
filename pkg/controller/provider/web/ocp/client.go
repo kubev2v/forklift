@@ -10,6 +10,12 @@ import (
 )
 
 //
+// Errors.
+type ResourceNotResolvedError = base.ResourceNotResolvedError
+type RefNotUniqueError = base.RefNotUniqueError
+type NotFoundError = base.NotFoundError
+
+//
 // API path resolver.
 type Resolver struct {
 	*api.Provider
@@ -64,7 +70,10 @@ func (r *Resolver) Path(object interface{}, id string) (path string, err error) 
 				},
 			})
 	default:
-		err = liberr.Wrap(base.ResourceNotResolvedErr)
+		err = liberr.Wrap(
+			ResourceNotResolvedError{
+				Object: object,
+			})
 	}
 
 	return
