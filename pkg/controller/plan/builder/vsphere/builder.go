@@ -163,7 +163,7 @@ func (r *Builder) Load() (err error) {
 		m := &model.Host{}
 		pErr := r.Inventory.Find(m, ref)
 		if pErr != nil {
-			if errors.Is(pErr, web.NotFoundErr) {
+			if errors.As(pErr, &web.NotFoundError{}) {
 				continue
 			} else {
 				err = liberr.Wrap(pErr)

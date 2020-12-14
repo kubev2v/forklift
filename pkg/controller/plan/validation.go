@@ -185,11 +185,11 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		}
 		_, pErr := inventory.VM(&ref)
 		if pErr != nil {
-			if errors.Is(pErr, web.NotFoundErr) {
+			if errors.As(pErr, &web.NotFoundError{}) {
 				notValid.Items = append(notValid.Items, ref.String())
 				continue
 			}
-			if errors.Is(pErr, web.RefNotUniqueErr) {
+			if errors.As(pErr, &web.RefNotUniqueError{}) {
 				ambiguous.Items = append(ambiguous.Items, ref.String())
 				continue
 			}

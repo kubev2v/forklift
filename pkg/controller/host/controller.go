@@ -145,7 +145,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	// Validations.
 	err = r.validate(host)
 	if err != nil {
-		if errors.Is(err, web.ProviderNotReadyErr) {
+		if errors.As(err, &web.ProviderNotReadyError{}) {
 			return slowReQ, nil
 		}
 		log.Trace(err)

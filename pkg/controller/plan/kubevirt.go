@@ -13,7 +13,7 @@ import (
 	cdi "github.com/kubevirt/containerized-data-importer/pkg/apis/core/v1beta1"
 	vmio "github.com/kubevirt/vm-import-operator/pkg/apis/v2v/v1beta1"
 	core "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -151,7 +151,7 @@ func (r *KubeVirt) EnsureNamespace() (err error) {
 	}
 	err = r.Client.Create(context.TODO(), ns)
 	if err != nil {
-		if errors.IsAlreadyExists(err) {
+		if k8serr.IsAlreadyExists(err) {
 			err = nil
 		}
 	}
@@ -395,7 +395,7 @@ func (r *KubeVirt) ensureObject(object runtime.Object) (err error) {
 	}()
 	for {
 		err = r.Client.Create(context.TODO(), object)
-		if errors.IsAlreadyExists(err) && retry > 0 {
+		if k8serr.IsAlreadyExists(err) && retry > 0 {
 			retry--
 			err = r.deleteObject(object)
 			if err != nil {
@@ -413,7 +413,7 @@ func (r *KubeVirt) ensureObject(object runtime.Object) (err error) {
 // Delete a resource.
 func (r *KubeVirt) deleteObject(object runtime.Object) (err error) {
 	err = r.Client.Delete(context.TODO(), object)
-	if !errors.IsNotFound(err) {
+	if !k8serr.IsNotFound(err) {
 		err = liberr.Wrap(err)
 	} else {
 		err = nil
