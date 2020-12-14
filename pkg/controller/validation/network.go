@@ -91,11 +91,11 @@ func (r *NetworkPair) validateSource(list []mapped.NetworkPair) (result libcnd.C
 		}
 		_, pErr := inventory.Network(&ref)
 		if pErr != nil {
-			if errors.Is(pErr, web.NotFoundErr) {
+			if errors.As(pErr, &web.NotFoundError{}) {
 				notValid = append(notValid, entry.Source.String())
 				continue
 			}
-			if errors.Is(pErr, web.RefNotUniqueErr) {
+			if errors.As(pErr, &web.RefNotUniqueError{}) {
 				ambiguous = append(ambiguous, entry.Source.String())
 				continue
 			}
@@ -148,7 +148,10 @@ func (r *NetworkPair) validateDestination(list []mapped.NetworkPair) (result lib
 	case api.VSphere:
 		return
 	default:
-		err = liberr.Wrap(web.ProviderNotSupportedErr)
+		err = liberr.Wrap(
+			web.ProviderNotSupportedError{
+				Provider: provider,
+			})
 		return
 	}
 next:
@@ -162,7 +165,7 @@ next:
 				entry.Destination.Name)
 			pErr := inventory.Get(resource, id)
 			if pErr != nil {
-				if errors.Is(pErr, web.NotFoundErr) {
+				if errors.As(pErr, &web.NotFoundError{}) {
 					notFound = append(notFound, entry.Source.ID)
 				} else {
 					err = liberr.Wrap(pErr)

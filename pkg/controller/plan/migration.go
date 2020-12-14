@@ -2,6 +2,7 @@ package plan
 
 import (
 	"context"
+	"errors"
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libitr "github.com/konveyor/controller/pkg/itinerary"
@@ -152,13 +153,23 @@ func (r Migration) Run() (reQ time.Duration, err error) {
 		case CreateImport:
 			err = r.kubevirt.EnsureSecret(vm.Ref)
 			if err != nil {
-				err = liberr.Wrap(err)
-				return
+				if !errors.As(err, &web.ProviderNotReadyError{}) {
+					vm.AddError(err.Error())
+					err = nil
+					break
+				} else {
+					return
+				}
 			}
 			err = r.kubevirt.EnsureImport(vm)
 			if err != nil {
-				err = liberr.Wrap(err)
-				return
+				if !errors.As(err, &web.ProviderNotReadyError{}) {
+					vm.AddError(err.Error())
+					err = nil
+					break
+				} else {
+					return
+				}
 			}
 			vm.Phase = r.next(vm.Phase)
 		case ImportCreated:
