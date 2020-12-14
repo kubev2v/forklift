@@ -20,7 +20,7 @@ import (
 // Types
 const (
 	Validated        = "Validated"
-	RefNotValid      = "HostNotValid"
+	RefNotValid      = "RefNotValid"
 	SecretNotValid   = "SecretNotValid"
 	TypeNotValid     = "TypeNotValid"
 	IpNotValid       = "IpNotValid"
@@ -281,14 +281,15 @@ func (r *Reconciler) testConnection(host *api.Host) (err error) {
 			Secret:    secret,
 		}
 		tErr := h.TestConnection()
-		switch tErr {
-		case web.ProviderNotReadyErr:
+		if errors.As(tErr, &web.ProviderNotReadyError{}) {
 			err = liberr.Wrap(tErr)
-		case nil:
+			return
+		}
+		if tErr == nil {
 			cnd.Status = True
 			cnd.Reason = Tested
 			cnd.Message = "Connection test, succeeded."
-		default:
+		} else {
 			cnd.Status = False
 			cnd.Reason = Failed
 			cnd.Message = fmt.Sprintf(
