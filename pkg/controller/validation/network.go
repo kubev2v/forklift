@@ -2,7 +2,6 @@ package validation
 
 import (
 	"errors"
-	"fmt"
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
@@ -18,7 +17,6 @@ import (
 const (
 	SourceNetworkNotValid      = "SourceNetworkNotValid"
 	DestinationNetworkNotValid = "DestinationNetworkNotValid"
-	NetworkTypeNotValid        = "NetworkTypeNotValid"
 )
 
 //
@@ -140,7 +138,6 @@ func (r *NetworkPair) validateDestination(list []mapped.NetworkPair) (result lib
 		return
 	}
 	notFound := []string{}
-	notValid := []string{}
 	var resource interface{}
 	switch provider.Type() {
 	case api.OpenShift:
@@ -172,8 +169,6 @@ next:
 					return
 				}
 			}
-		default:
-			notValid = append(notValid, entry.Source.ID)
 		}
 	}
 	if len(notFound) > 0 {
@@ -183,19 +178,7 @@ next:
 			Reason:   NotFound,
 			Category: Critical,
 			Message:  "Destination network not found.",
-		})
-	}
-	if len(notValid) > 0 {
-		valid := []string{
-			Pod,
-			Multus,
-		}
-		result.SetCondition(libcnd.Condition{
-			Type:     NetworkTypeNotValid,
-			Status:   True,
-			Reason:   NotFound,
-			Category: Critical,
-			Message:  fmt.Sprintf("Network `type` must be: %s.", valid),
+			Items:    notFound,
 		})
 	}
 

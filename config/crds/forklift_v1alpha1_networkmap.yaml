@@ -44,7 +44,10 @@ spec:
                         description: The namespace (multus only).
                         type: string
                       type:
-                        description: The network type (pod|multus)
+                        description: The network type.
+                        enum:
+                        - pod
+                        - multus
                         type: string
                     required:
                     - type
