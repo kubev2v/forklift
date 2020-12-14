@@ -29,6 +29,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"path"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -61,8 +62,9 @@ var Settings = &settings.Settings
 // Creates a new Plan Controller and adds it to the Manager.
 func Add(mgr manager.Manager) error {
 	reconciler := &Reconciler{
-		Client: mgr.GetClient(),
-		scheme: mgr.GetScheme(),
+		EventRecorder: mgr.GetRecorder(Name),
+		Client:        mgr.GetClient(),
+		scheme:        mgr.GetScheme(),
 	}
 	cnt, err := controller.New(
 		Name,
@@ -98,7 +100,7 @@ func Add(mgr manager.Manager) error {
 		&source.Kind{
 			Type: &api.Host{},
 		},
-		libref.Handler(),
+		&handler.EnqueueRequestForObject{},
 		&HostPredicate{})
 	if err != nil {
 		log.Trace(err)
@@ -125,6 +127,7 @@ var _ reconcile.Reconciler = &Reconciler{}
 //
 // Reconciles a Plan object.
 type Reconciler struct {
+	record.EventRecorder
 	client.Client
 	scheme *runtime.Scheme
 }
@@ -142,6 +145,12 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	log.SetValues("plan", request)
 	log.Info("Reconcile", "plan", request)
 
+	defer func() {
+		if err != nil {
+			log.Trace(err)
+		}
+	}()
+
 	// Fetch the CR.
 	plan := &api.Plan{}
 	err = r.Get(context.TODO(), request.NamespacedName, plan)
@@ -152,6 +161,9 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		log.Trace(err)
 		return noReQ, err
 	}
+	defer func() {
+		log.Info("Conditions.", "all", plan.Status.Conditions)
+	}()
 
 	// Begin staging conditions.
 	plan.Status.BeginStagingConditions()
@@ -178,6 +190,9 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 
 	// End staging conditions.
 	plan.Status.EndStagingConditions()
+
+	// Record events.
+	plan.Status.RecordEvents(plan, r)
 
 	// Apply changes.
 	plan.Status.ObservedGeneration = plan.Generation

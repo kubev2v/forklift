@@ -1,22 +1,26 @@
 package plan
 
 import (
+	"context"
 	"errors"
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/controller/validation"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 //
 // Types
 const (
-	VMNotValid  = "VMNotValid"
-	DuplicateVM = "DuplicateVM"
-	Executing   = "Executing"
-	Succeeded   = "Succeeded"
-	Failed      = "Failed"
+	HostNotReady  = "HostNotReady"
+	VMNotValid    = "VMNotValid"
+	DuplicateVM   = "DuplicateVM"
+	DupTargetName = "DuplicateTargetName"
+	Executing     = "Executing"
+	Succeeded     = "Succeeded"
+	Failed        = "Failed"
 )
 
 //
@@ -61,6 +65,8 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	if plan.Status.HasCondition(validation.SourceProviderNotReady) {
 		return nil
 	}
+	plan.Referenced.Provider.Source = provider.Referenced.Source
+	plan.Referenced.Provider.Destination = provider.Referenced.Destination
 	//
 	// Map
 	network := validation.NetworkPair{Client: r, Provider: provider.Referenced}
@@ -76,21 +82,61 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	}
 	plan.Status.UpdateConditions(conditions)
 	//
-	// VM list.
-	err = r.validateVM(provider.Referenced.Source, plan)
+	// Hosts.
+	err = r.validateHosts(plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-
-	plan.Referenced.Provider.Source = provider.Referenced.Source
-	plan.Referenced.Provider.Destination = provider.Referenced.Destination
+	//
+	// VM list.
+	err = r.validateVM(plan)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
 
 	return nil
 }
 
 //
+// Validate hosts in the same ns as the source provider.
+func (r *Reconciler) validateHosts(plan *api.Plan) (err error) {
+	provider := plan.Referenced.Provider.Source
+	if provider == nil {
+		return nil
+	}
+	list := api.HostList{}
+	options := &client.ListOptions{
+		Namespace: provider.Namespace,
+	}
+	err = r.List(context.TODO(), options, &list)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	cnd := libcnd.Condition{
+		Type:     HostNotReady,
+		Status:   True,
+		Reason:   NotSet,
+		Category: Critical,
+		Message:  "Host does not have the Ready condition.",
+		Items:    []string{},
+	}
+	for _, host := range list.Items {
+		if !host.Status.HasCondition(libcnd.Ready) {
+			cnd.Items = append(cnd.Items, host.Name)
+		}
+	}
+	if len(cnd.Items) > 0 {
+		plan.Status.SetCondition(cnd)
+	}
+
+	return
+}
+
+//
 // Validate listed VMs.
-func (r *Reconciler) validateVM(provider *api.Provider, plan *api.Plan) error {
+func (r *Reconciler) validateVM(plan *api.Plan) error {
+	provider := plan.Referenced.Provider.Source
 	if provider == nil {
 		return nil
 	}
@@ -111,7 +157,7 @@ func (r *Reconciler) validateVM(provider *api.Provider, plan *api.Plan) error {
 		Status:   True,
 		Reason:   NotUnique,
 		Category: Critical,
-		Message:  "Duplicate VM.",
+		Message:  "Duplicate (source) VM.",
 		Items:    []string{},
 	}
 	ambiguous := libcnd.Condition{
