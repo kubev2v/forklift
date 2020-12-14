@@ -241,6 +241,12 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		return fastReQ, nil
 	}
 
+	// Update the DB.
+	err = r.updateProvider(provider)
+	if err != nil {
+		return fastReQ, nil
+	}
+
 	// ReQ.
 	if !provider.Status.HasCondition(ConnectionTested, InventoryCreated) {
 		return slowReQ, nil
@@ -248,6 +254,32 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 
 	// Done
 	return noReQ, nil
+}
+
+//
+// Update the provider.
+func (r *Reconciler) updateProvider(provider *api.Provider) (err error) {
+	rl, found  := r.container.Get(provider)
+	if !found {
+		return
+	}
+	*(rl.Owner().(*api.Provider)) = *provider
+	db := rl.DB()
+	tx, err := db.Begin()
+	if err != nil {
+		return
+	}
+	defer func() {
+		_ = tx.End()
+	}()
+	p := &ocpmodel.Provider{}
+	p.With(provider)
+	err = tx.Update(p)
+	if err == nil {
+		err = tx.Commit()
+	}
+
+	return
 }
 
 //
