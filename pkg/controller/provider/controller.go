@@ -259,7 +259,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 //
 // Update the provider.
 func (r *Reconciler) updateProvider(provider *api.Provider) (err error) {
-	rl, found  := r.container.Get(provider)
+	rl, found := r.container.Get(provider)
 	if !found {
 		return
 	}
