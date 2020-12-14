@@ -7,7 +7,6 @@ import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libitr "github.com/konveyor/controller/pkg/itinerary"
-	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
@@ -50,20 +49,18 @@ func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
 			Path:   vim25.Path,
 		}
 		url = hostURL.String()
-		if libref.RefSet(hostDef.Spec.Secret) {
-			hostSecret, nErr := r.hostSecret(hostDef)
-			if nErr != nil {
-				err = liberr.Wrap(nErr)
-				return
-			}
-			h, nErr := r.host(hostID)
-			if nErr != nil {
-				err = liberr.Wrap(nErr)
-				return
-			}
-			hostSecret.Data["thumbprint"] = []byte(h.Thumbprint)
-			in = hostSecret
+		hostSecret, nErr := r.hostSecret(hostDef)
+		if nErr != nil {
+			err = liberr.Wrap(nErr)
+			return
 		}
+		h, nErr := r.host(hostID)
+		if nErr != nil {
+			err = liberr.Wrap(nErr)
+			return
+		}
+		hostSecret.Data["thumbprint"] = []byte(h.Thumbprint)
+		in = hostSecret
 	}
 	content, mErr := yaml.Marshal(
 		map[string]string{
@@ -394,9 +391,9 @@ func (r *Builder) esxHost(vm *model.VM) (esxHost *EsxHost, found bool, err error
 	}
 	secret.Data["thumbprint"] = []byte(hostModel.Thumbprint)
 	esxHost = &EsxHost{
-		inventory: r.Inventory,
-		secret:    secret,
-		url:       url,
+		Inventory: r.Inventory,
+		Secret:    secret,
+		URL:       url,
 	}
 
 	return
