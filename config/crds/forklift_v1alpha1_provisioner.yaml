@@ -50,6 +50,10 @@ spec:
                           type: array
                         name:
                           description: Name.
+                          enum:
+                          - ReadWriteOnce
+                          - ReadWriteMany
+                          - ReadOnlyMany
                           type: string
                         priority:
                           description: Priority
@@ -67,6 +71,9 @@ spec:
                     type: array
                   name:
                     description: Name.
+                    enum:
+                    - Filesystem
+                    - Block
                     type: string
                   priority:
                     description: Priority

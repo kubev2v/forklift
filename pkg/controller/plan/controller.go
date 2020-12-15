@@ -25,6 +25,7 @@ import (
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/snapshot"
+	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -254,11 +255,12 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 			return
 		}
 	}
-	runner := Migration{
-		Migration: migration,
-		Plan:      plan,
-		Client:    r,
+	ctx, err := plancontext.New(r, plan, migration)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
 	}
+	runner := Migration{Context: ctx}
 	reQ, err = runner.Run()
 	if err != nil {
 		err = liberr.Wrap(err)

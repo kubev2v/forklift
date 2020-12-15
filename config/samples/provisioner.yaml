@@ -2,44 +2,22 @@
 kind: Provisioner
 apiVersion: forklift.konveyor.io/v1alpha1
 metadata:
-  name: test
+  name: cinder
   namespace: openshift-migration
 spec:
-  name: kubernetes.io/rbd
-  features:
-    - SmartCloning
-    - Snapshots
+  name: kubernetes.io/cinder
   volumeModes:
   - name: Block
     priority: 0
-    features:
-    - SmartCloning
-    - Snapshots
     accessModes:
     - name: ReadWriteOnce
       priority: 0
-      features:
-      - featureA
-      - featureB
     - name: ReadWriteMany
       priority: 1
-      features:
-      - featureA
-      - featureB
   - name: Filesystem
     priority: 1
-    features:
-    - SmartCloning
-    - Snapshots
     accessModes:
     - name: ReadWriteOnce
       priority: 0
-      features:
-      - featureA
-      - featureB
     - name: ReadWriteMany
       priority: 1
-      features:
-      - featureA
-      - featureB
-

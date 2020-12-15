@@ -112,14 +112,14 @@ func (h NamespaceHandler) Link(p *api.Provider, m *model.Namespace) string {
 // REST Resource.
 type Namespace struct {
 	Resource
-	Object interface{} `json:"object"`
+	Object core.Namespace `json:"object"`
 }
 
 //
 // Set fields with the specified object.
 func (r *Namespace) With(m *model.Namespace) {
 	r.Resource.With(&m.Base)
-	r.Object = m.DecodeObject(&core.Namespace{})
+	m.DecodeObject(&r.Object)
 }
 
 //

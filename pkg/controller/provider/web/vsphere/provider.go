@@ -196,23 +196,23 @@ func (h ProviderHandler) Link(m *model.Provider) string {
 // REST Resource.
 type Provider struct {
 	ocp.Resource
-	Type            string      `json:"type"`
-	Object          interface{} `json:"object"`
-	APIVersion      string      `json:"apiVersion"`
-	Product         string      `json:"product"`
-	DatacenterCount int64       `json:"datacenterCount"`
-	ClusterCount    int64       `json:"clusterCount"`
-	HostCount       int64       `json:"hostCount"`
-	VMCount         int64       `json:"vmCount"`
-	NetworkCount    int64       `json:"networkCount"`
-	DatastoreCount  int64       `json:"datastoreCount"`
+	Type            string       `json:"type"`
+	Object          api.Provider `json:"object"`
+	APIVersion      string       `json:"apiVersion"`
+	Product         string       `json:"product"`
+	DatacenterCount int64        `json:"datacenterCount"`
+	ClusterCount    int64        `json:"clusterCount"`
+	HostCount       int64        `json:"hostCount"`
+	VMCount         int64        `json:"vmCount"`
+	NetworkCount    int64        `json:"networkCount"`
+	DatastoreCount  int64        `json:"datastoreCount"`
 }
 
 //
 // Set fields with the specified object.
 func (r *Provider) With(m *model.Provider) {
 	r.Resource.With(&m.Base)
-	r.Object = m.DecodeObject(&api.Provider{})
+	m.DecodeObject(&r.Object)
 	r.Type = m.Type
 }
 

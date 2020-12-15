@@ -112,14 +112,14 @@ func (h StorageClassHandler) Link(p *api.Provider, m *model.StorageClass) string
 // REST Resource.
 type StorageClass struct {
 	Resource
-	Object interface{} `json:"object"`
+	Object storage.StorageClass `json:"object"`
 }
 
 //
 // Set fields with the specified object.
 func (r *StorageClass) With(m *model.StorageClass) {
 	r.Resource.With(&m.Base)
-	r.Object = m.DecodeObject(&storage.StorageClass{})
+	m.DecodeObject(&r.Object)
 }
 
 //
