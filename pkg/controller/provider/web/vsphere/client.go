@@ -126,7 +126,11 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 			err = r.List(
 				&list,
 				base.Param{
-					Key:   "name",
+					Key:   DetailParam,
+					Value: "1",
+				},
+				base.Param{
+					Key:   NameParam,
 					Value: name,
 				})
 			if err != nil {
@@ -154,7 +158,11 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 			err = r.List(
 				&list,
 				base.Param{
-					Key:   "name",
+					Key:   DetailParam,
+					Value: "1",
+				},
+				base.Param{
+					Key:   NameParam,
 					Value: name,
 				})
 			if err != nil {
@@ -182,7 +190,11 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 			err = r.List(
 				&list,
 				base.Param{
-					Key:   "name",
+					Key:   DetailParam,
+					Value: "1",
+				},
+				base.Param{
+					Key:   NameParam,
 					Value: name,
 				})
 			if err != nil {
@@ -210,7 +222,11 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 			err = r.List(
 				&list,
 				base.Param{
-					Key:   "name",
+					Key:   DetailParam,
+					Value: "1",
+				},
+				base.Param{
+					Key:   NameParam,
 					Value: name,
 				})
 			if err != nil {

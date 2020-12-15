@@ -10,7 +10,8 @@ import (
 //
 // Fields.
 const (
-	NameParam = "name"
+	DetailParam = base.DetailParam
+	NameParam   = base.NameParam
 )
 
 //
