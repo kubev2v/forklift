@@ -272,6 +272,11 @@ func (in *StorageResourceMappingItem) DeepCopyInto(out *StorageResourceMappingIt
 		*out = new(v1.PersistentVolumeMode)
 		**out = **in
 	}
+	if in.AccessMode != nil {
+		in, out := &in.AccessMode, &out.AccessMode
+		*out = new(v1.PersistentVolumeAccessMode)
+		**out = **in
+	}
 	return
 }
 

@@ -9,7 +9,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/snapshot"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/builder"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
+	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	cdi "github.com/kubevirt/containerized-data-importer/pkg/apis/core/v1beta1"
 	vmio "github.com/kubevirt/vm-import-operator/pkg/apis/v2v/v1beta1"
 	core "k8s.io/api/core/v1"
@@ -38,18 +38,9 @@ type ImportMap map[string]VmImport
 //
 // Represents kubevirt.
 type KubeVirt struct {
-	// Plan.
-	*api.Plan
-	// Migration.
-	*api.Migration
-	// Provider API client.
-	Inventory web.Client
+	*plancontext.Context
 	// Builder
 	Builder builder.Builder
-	// Secret.
-	Secret *core.Secret
-	// k8s client.
-	Client client.Client
 }
 
 //
@@ -79,7 +70,7 @@ func (r *KubeVirt) ListImports() ([]VmImport, error) {
 			kPlan:      string(r.Plan.GetUID()),
 		})
 	vList := &vmio.VirtualMachineImportList{}
-	err := r.Client.List(
+	err := r.Destination.Client.List(
 		context.TODO(),
 		&client.ListOptions{
 			Namespace:     r.namespace(),
@@ -99,7 +90,7 @@ func (r *KubeVirt) ListImports() ([]VmImport, error) {
 			})
 	}
 	dvList := &cdi.DataVolumeList{}
-	err = r.Client.List(
+	err = r.Destination.Client.List(
 		context.TODO(),
 		&client.ListOptions{
 			Namespace: r.namespace(),
@@ -149,7 +140,7 @@ func (r *KubeVirt) EnsureNamespace() (err error) {
 			Name: r.namespace(),
 		},
 	}
-	err = r.Client.Create(context.TODO(), ns)
+	err = r.Destination.Client.Create(context.TODO(), ns)
 	if err != nil {
 		if k8serr.IsAlreadyExists(err) {
 			err = nil
@@ -162,7 +153,7 @@ func (r *KubeVirt) EnsureNamespace() (err error) {
 //
 // Ensure the VMIO secret exists on the destination.
 func (r *KubeVirt) EnsureSecret(vmRef ref.Ref) (err error) {
-	_, err = r.Inventory.VM(&vmRef)
+	_, err = r.Source.Inventory.VM(&vmRef)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -192,7 +183,7 @@ func (r *KubeVirt) buildImport(vm *plan.VMStatus) (object *vmio.VirtualMachineIm
 		err = liberr.Wrap(err)
 		return
 	}
-	_, err = r.Inventory.VM(&vm.Ref)
+	_, err = r.Source.Inventory.VM(&vm.Ref)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -238,7 +229,7 @@ func (r *KubeVirt) buildSecret(vmRef ref.Ref) (object *core.Secret, err error) {
 			},
 		},
 	}
-	err = r.Builder.Secret(vmRef, r.Secret, object)
+	err = r.Builder.Secret(vmRef, r.Source.Secret, object)
 	if err != nil {
 		err = liberr.Wrap(err)
 	}
@@ -394,7 +385,7 @@ func (r *KubeVirt) ensureObject(object runtime.Object) (err error) {
 		err = liberr.Wrap(err)
 	}()
 	for {
-		err = r.Client.Create(context.TODO(), object)
+		err = r.Destination.Client.Create(context.TODO(), object)
 		if k8serr.IsAlreadyExists(err) && retry > 0 {
 			retry--
 			err = r.deleteObject(object)
@@ -412,7 +403,7 @@ func (r *KubeVirt) ensureObject(object runtime.Object) (err error) {
 //
 // Delete a resource.
 func (r *KubeVirt) deleteObject(object runtime.Object) (err error) {
-	err = r.Client.Delete(context.TODO(), object)
+	err = r.Destination.Client.Delete(context.TODO(), object)
 	if !k8serr.IsNotFound(err) {
 		err = liberr.Wrap(err)
 	} else {

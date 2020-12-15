@@ -1,7 +1,6 @@
 package plan
 
 import (
-	"context"
 	"errors"
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
@@ -9,11 +8,9 @@ import (
 	"github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/snapshot"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/builder"
+	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
-	core "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"time"
 )
 
@@ -77,28 +74,7 @@ var (
 //
 // Migration.
 type Migration struct {
-	// Migration
-	Migration *api.Migration
-	// The plan.
-	Plan *api.Plan
-	// Host client.
-	Client client.Client
-	// Source.
-	source struct {
-		// Provider
-		provider *api.Provider
-		// Secret.
-		secret *core.Secret
-	}
-	// Destination.
-	destination struct {
-		// Provider.
-		provider *api.Provider
-		// k8s client.
-		client client.Client
-	}
-	// Provider API client.
-	inventory web.Client
+	*plancontext.Context
 	// Builder
 	builder builder.Builder
 	// kubevirt.
@@ -110,7 +86,7 @@ type Migration struct {
 //
 // Type of migration.
 func (r *Migration) Type() string {
-	return r.source.provider.Type()
+	return r.Context.Source.Provider.Type()
 }
 
 //
@@ -129,7 +105,7 @@ func (r Migration) Run() (reQ time.Duration, err error) {
 	}
 
 	inFlight := 0
-	list := r.Plan.Status.Migration.VMs
+	list := r.Context.Plan.Status.Migration.VMs
 	for _, vm := range list {
 		if vm.MarkedCompleted() {
 			continue
@@ -210,83 +186,14 @@ func (r Migration) Run() (reQ time.Duration, err error) {
 //
 // Get/Build resources.
 func (r *Migration) init() (err error) {
-	sn := snapshot.New(r.Migration)
-	//
-	// Source.
-	r.source.provider = &api.Provider{}
-	err = sn.Get(api.SourceSnapshot, r.source.provider)
+	r.builder, err = builder.New(r.Context)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	ref := r.source.provider.Spec.Secret
-	r.source.secret = &core.Secret{}
-	err = r.Client.Get(
-		context.TODO(),
-		client.ObjectKey{
-			Namespace: ref.Namespace,
-			Name:      ref.Name,
-		},
-		r.source.secret)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	r.inventory, err = web.NewClient(r.source.provider)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	//
-	// Destination.
-	r.destination.provider = &api.Provider{}
-	err = sn.Get(api.DestinationSnapshot, r.destination.provider)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	if !r.destination.provider.IsHost() {
-		ref = r.destination.provider.Spec.Secret
-		secret := &core.Secret{}
-		err = r.Client.Get(
-			context.TODO(),
-			client.ObjectKey{
-				Namespace: ref.Namespace,
-				Name:      ref.Name,
-			},
-			secret)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-		r.destination.client, err =
-			r.destination.provider.Client(secret)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-	} else {
-		r.destination.client = r.Client
-	}
-	//
-	// Builder & Reflector
-	r.builder, err = builder.New(
-		r.Client,
-		r.inventory,
-		r.source.provider)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	//
-	// kubevirt.
 	r.kubevirt = KubeVirt{
-		Builder:   r.builder,
-		Secret:    r.source.secret,
-		Inventory: r.inventory,
-		Client:    r.destination.client,
-		Migration: r.Migration,
-		Plan:      r.Plan,
+		Context: r.Context,
+		Builder: r.builder,
 	}
 
 	return
