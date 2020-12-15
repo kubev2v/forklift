@@ -144,18 +144,18 @@ func (h ProviderHandler) Link(m *model.Provider) string {
 // REST Resource.
 type Provider struct {
 	Resource
-	Type           string      `json:"type"`
-	Object         interface{} `json:"object"`
-	VMCount        int64       `json:"vmCount"`
-	NetworkCount   int64       `json:"networkCount"`
-	NamespaceCount int64       `json:"namespaceCount"`
+	Type           string       `json:"type"`
+	Object         api.Provider `json:"object"`
+	VMCount        int64        `json:"vmCount"`
+	NetworkCount   int64        `json:"networkCount"`
+	NamespaceCount int64        `json:"namespaceCount"`
 }
 
 //
 // Set fields with the specified object.
 func (r *Provider) With(m *model.Provider) {
 	r.Resource.With(&m.Base)
-	r.Object = m.DecodeObject(&api.Provider{})
+	m.DecodeObject(&r.Object)
 	r.Type = m.Type
 }
 

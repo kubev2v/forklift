@@ -6,10 +6,9 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/builder/vsphere"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
+	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	vmio "github.com/kubevirt/vm-import-operator/pkg/apis/v2v/v1beta1"
 	core "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 //
@@ -27,18 +26,11 @@ type Builder interface {
 
 //
 // Builder factory.
-func New(
-	client client.Client,
-	inventory web.Client,
-	provider *api.Provider) (builder Builder, err error) {
+func New(ctx *plancontext.Context) (builder Builder, err error) {
 	//
-	switch provider.Type() {
+	switch ctx.Source.Provider.Type() {
 	case api.VSphere:
-		b := &vsphere.Builder{
-			Client:    client,
-			Inventory: inventory,
-			Provider:  provider,
-		}
+		b := &vsphere.Builder{Context: ctx}
 		bErr := b.Load()
 		if bErr != nil {
 			err = liberr.Wrap(bErr)

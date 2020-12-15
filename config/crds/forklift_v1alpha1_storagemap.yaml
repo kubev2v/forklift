@@ -37,8 +37,21 @@ spec:
                   destination:
                     description: Destination storage.
                     properties:
+                      accessMode:
+                        description: Access mode.
+                        enum:
+                        - ReadWriteOnce
+                        - ReadWriteMany
+                        - ReadOnlyMany
+                        type: string
                       storageClass:
                         description: A storage class.
+                        type: string
+                      volumeMode:
+                        description: Volume mode.
+                        enum:
+                        - Filesystem
+                        - Block
                         type: string
                     required:
                     - storageClass

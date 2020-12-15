@@ -149,14 +149,14 @@ func (h NetworkAttachmentDefinitionHandler) Link(p *api.Provider, m *model.Netwo
 // REST Resource.
 type NetworkAttachmentDefinition struct {
 	Resource
-	Object interface{} `json:"object"`
+	Object net.NetworkAttachmentDefinition `json:"object"`
 }
 
 //
 // Set fields with the specified object.
 func (r *NetworkAttachmentDefinition) With(m *model.NetworkAttachmentDefinition) {
 	r.Resource.With(&m.Base)
-	r.Object = m.DecodeObject(&net.NetworkAttachmentDefinition{})
+	m.DecodeObject(&r.Object)
 }
 
 //
