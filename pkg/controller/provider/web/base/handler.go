@@ -21,6 +21,7 @@ const (
 	NsParam            = libweb.NsParam
 	ProviderParam      = "provider"
 	DetailParam        = "detail"
+	NameParam          = "name"
 )
 
 //
