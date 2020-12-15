@@ -73,9 +73,8 @@ func (m *Base) ResourceVersion() uint64 {
 //
 // Decode the object field.
 // `r` must be pointer to the appropriate k8s object.
-func (m *Base) DecodeObject(r interface{}) interface{} {
-	json.Unmarshal([]byte(m.Object), r)
-	return r
+func (m *Base) DecodeObject(r interface{}) {
+	_ = json.Unmarshal([]byte(m.Object), r)
 }
 
 func (m *Base) Pk() string {

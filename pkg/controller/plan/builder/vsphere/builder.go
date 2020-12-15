@@ -8,9 +8,12 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	libitr "github.com/konveyor/controller/pkg/itinerary"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/mapped"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
+	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	vmio "github.com/kubevirt/vm-import-operator/pkg/apis/v2v/v1beta1"
 	"github.com/vmware/govmomi/vim25"
@@ -23,26 +26,23 @@ import (
 //
 // vSphere builder.
 type Builder struct {
-	// Client.
-	Client client.Client
-	// Provider API client.
-	Inventory web.Client
-	// Source provider.
-	Provider *api.Provider
-	// Host map.
-	hostMap map[string]*api.Host
+	*plancontext.Context
+	// Provisioner CRs.
+	provisioners map[string]*api.Provisioner
+	// Host CRs.
+	hosts map[string]*api.Host
 }
 
 //
 // Build the VMIO secret.
 func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
-	url := r.Provider.Spec.URL
+	url := r.Source.Provider.Spec.URL
 	hostID, err := r.hostID(vmRef)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	if hostDef, found := r.hostMap[hostID]; found {
+	if hostDef, found := r.hosts[hostID]; found {
 		hostURL := liburl.URL{
 			Scheme: "https",
 			Host:   hostDef.Spec.IpAddress,
@@ -84,7 +84,7 @@ func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
 // Build the VMIO VM Import Spec.
 func (r *Builder) Import(vmRef ref.Ref, mp *plan.Map, object *vmio.VirtualMachineImportSpec) (err error) {
 	vm := &model.VM{}
-	pErr := r.Inventory.Find(vm, vmRef)
+	pErr := r.Source.Inventory.Find(vm, vmRef)
 	if pErr != nil {
 		err = liberr.New(
 			fmt.Sprintf(
@@ -113,7 +113,7 @@ func (r *Builder) Import(vmRef ref.Ref, mp *plan.Map, object *vmio.VirtualMachin
 // Build tasks.
 func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 	vm := &model.VM{}
-	pErr := r.Inventory.Find(vm, vmRef)
+	pErr := r.Source.Inventory.Find(vm, vmRef)
 	if pErr != nil {
 		err = liberr.New(
 			fmt.Sprintf(
@@ -141,13 +141,28 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 }
 
 //
-// Load (as needed).
+// Load
 func (r *Builder) Load() (err error) {
+	err = r.loadProvisioners()
+	if err != nil {
+		return
+	}
+	err = r.loadHosts()
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+//
+// Load host CRs.
+func (r *Builder) loadHosts() (err error) {
 	list := &api.HostList{}
-	err = r.Client.List(
+	err = r.List(
 		context.TODO(),
 		&client.ListOptions{
-			Namespace: r.Provider.Namespace,
+			Namespace: r.Source.Provider.Namespace,
 		},
 		list)
 	if err != nil {
@@ -161,7 +176,7 @@ func (r *Builder) Load() (err error) {
 			continue
 		}
 		m := &model.Host{}
-		pErr := r.Inventory.Find(m, ref)
+		pErr := r.Source.Inventory.Find(m, ref)
 		if pErr != nil {
 			if errors.As(pErr, &web.NotFoundError{}) {
 				continue
@@ -175,7 +190,30 @@ func (r *Builder) Load() (err error) {
 		hostMap[ref.ID] = &host
 	}
 
-	r.hostMap = hostMap
+	r.hosts = hostMap
+
+	return
+}
+
+//
+// Load provisioner CRs.
+func (r *Builder) loadProvisioners() (err error) {
+	list := &api.ProvisionerList{}
+	err = r.List(
+		context.TODO(),
+		&client.ListOptions{
+			Namespace: r.Source.Provider.Namespace,
+		},
+		list)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	r.provisioners = map[string]*api.Provisioner{}
+	for i := range list.Items {
+		p := &list.Items[i]
+		r.provisioners[p.Spec.Name] = p
+	}
 
 	return
 }
@@ -184,7 +222,7 @@ func (r *Builder) Load() (err error) {
 // Find host ID for VM.
 func (r *Builder) hostID(vmRef ref.Ref) (hostID string, err error) {
 	vm := &model.VM{}
-	pErr := r.Inventory.Find(vm, vmRef)
+	pErr := r.Source.Inventory.Find(vm, vmRef)
 	if pErr != nil {
 		err = liberr.New(
 			fmt.Sprintf(
@@ -204,7 +242,7 @@ func (r *Builder) hostID(vmRef ref.Ref) (hostID string, err error) {
 func (r *Builder) hostSecret(host *api.Host) (secret *core.Secret, err error) {
 	ref := host.Spec.Secret
 	secret = &core.Secret{}
-	err = r.Client.Get(
+	err = r.Get(
 		context.TODO(),
 		client.ObjectKey{
 			Namespace: ref.Namespace,
@@ -222,7 +260,7 @@ func (r *Builder) hostSecret(host *api.Host) (secret *core.Secret, err error) {
 // Find host in the inventory.
 func (r *Builder) host(hostID string) (host *model.Host, err error) {
 	host = &model.Host{}
-	pErr := r.Inventory.Get(host, hostID)
+	pErr := r.Source.Inventory.Get(host, hostID)
 	if pErr != nil {
 		err = liberr.New(
 			fmt.Sprintf(
@@ -244,7 +282,7 @@ func (r *Builder) mapping(in *plan.Map, vm *model.VM) (out *vmio.VmwareMappings,
 		mapped := &in.Networks[i]
 		ref := mapped.Source
 		network := &model.Network{}
-		fErr := r.Inventory.Find(network, ref)
+		fErr := r.Source.Inventory.Find(network, ref)
 		if fErr != nil {
 			err = liberr.Wrap(fErr)
 			return
@@ -281,7 +319,7 @@ func (r *Builder) mapping(in *plan.Map, vm *model.VM) (out *vmio.VmwareMappings,
 		mapped := &in.Datastores[i]
 		ref := mapped.Source
 		ds := &model.Datastore{}
-		fErr := r.Inventory.Find(ds, ref)
+		fErr := r.Source.Inventory.Find(ds, ref)
 		if fErr != nil {
 			err = liberr.Wrap(fErr)
 			return
@@ -301,9 +339,16 @@ func (r *Builder) mapping(in *plan.Map, vm *model.VM) (out *vmio.VmwareMappings,
 			err = liberr.Wrap(pErr)
 			return
 		}
+		mErr := r.defaultModes(&mapped.Destination)
+		if mErr != nil {
+			err = liberr.Wrap(pErr)
+			return
+		}
 		dsMap = append(
 			dsMap,
 			vmio.StorageResourceMappingItem{
+				VolumeMode: &mapped.Destination.VolumeMode,
+				AccessMode: &mapped.Destination.AccessMode,
 				Source: vmio.Source{
 					ID: &id,
 				},
@@ -368,8 +413,8 @@ func (r *Builder) datastoreID(vm *model.VM, ds *model.Datastore) (id string, err
 // Get ESX host.
 // Find may matching a `Host` CR.
 func (r *Builder) esxHost(vm *model.VM) (esxHost *EsxHost, found bool, err error) {
-	url := r.Provider.Spec.URL
-	hostDef, found := r.hostMap[vm.Host.ID]
+	url := r.Source.Provider.Spec.URL
+	hostDef, found := r.hosts[vm.Host.ID]
 	if !found {
 		return
 	}
@@ -391,9 +436,34 @@ func (r *Builder) esxHost(vm *model.VM) (esxHost *EsxHost, found bool, err error
 	}
 	secret.Data["thumbprint"] = []byte(hostModel.Thumbprint)
 	esxHost = &EsxHost{
-		Inventory: r.Inventory,
+		Inventory: r.Source.Inventory,
 		Secret:    secret,
 		URL:       url,
+	}
+
+	return
+}
+
+//
+// Set volume and access modes.
+func (r *Builder) defaultModes(dm *mapped.DestinationStorage) (err error) {
+	model := &ocp.StorageClass{}
+	err = r.Destination.Inventory.Get(model, dm.StorageClass)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	if dm.VolumeMode == "" || dm.AccessMode == "" {
+		if provisioner, found := r.provisioners[model.Object.Provisioner]; found {
+			volumeMode := provisioner.VolumeMode(dm.VolumeMode)
+			accessMode := volumeMode.AccessMode(dm.AccessMode)
+			if dm.VolumeMode == "" {
+				dm.VolumeMode = volumeMode.Name
+			}
+			if dm.AccessMode == "" {
+				dm.AccessMode = accessMode.Name
+			}
+		}
 	}
 
 	return
