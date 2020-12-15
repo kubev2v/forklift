@@ -5,7 +5,8 @@ import "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
 //
 // Mapped network destination.
 type DestinationNetwork struct {
-	// The network type (pod|multus)
+	// The network type.
+	// +kubebuilder:validation:Enum=pod,multus
 	Type string `json:"type"`
 	// The namespace (multus only).
 	Namespace string `json:"namespace,omitempty"`
