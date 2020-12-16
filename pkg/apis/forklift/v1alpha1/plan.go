@@ -55,7 +55,7 @@ func (r *PlanSpec) FindVM(vmID string) (v *plan.VM, found bool) {
 // PlanStatus defines the observed state of Plan.
 type PlanStatus struct {
 	// Conditions.
-	libcnd.Conditions
+	libcnd.Conditions `json:",inline"`
 	// The most recent generation observed by the controller.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`

@@ -108,7 +108,7 @@ func (r *Reconciler) validateHosts(plan *api.Plan) (err error) {
 	options := &client.ListOptions{
 		Namespace: provider.Namespace,
 	}
-	err = r.List(context.TODO(), options, &list)
+	err = r.List(context.TODO(), &list, options)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return

@@ -10,13 +10,13 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/snapshot"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/builder"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	cdi "github.com/kubevirt/containerized-data-importer/pkg/apis/core/v1beta1"
-	vmio "github.com/kubevirt/vm-import-operator/pkg/apis/v2v/v1beta1"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	cdi "kubevirt.io/containerized-data-importer/pkg/apis/core/v1beta1"
+	vmio "kubevirt.io/vm-import-operator/pkg/apis/v2v/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strconv"
 	"strings"
@@ -72,11 +72,12 @@ func (r *KubeVirt) ListImports() ([]VmImport, error) {
 	vList := &vmio.VirtualMachineImportList{}
 	err := r.Destination.Client.List(
 		context.TODO(),
+		vList,
 		&client.ListOptions{
 			Namespace:     r.namespace(),
 			LabelSelector: selector,
 		},
-		vList)
+	)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
@@ -92,10 +93,11 @@ func (r *KubeVirt) ListImports() ([]VmImport, error) {
 	dvList := &cdi.DataVolumeList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
+		dvList,
 		&client.ListOptions{
 			Namespace: r.namespace(),
 		},
-		dvList)
+	)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}

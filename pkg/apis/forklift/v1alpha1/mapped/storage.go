@@ -20,9 +20,9 @@ type DestinationStorage struct {
 	// A storage class.
 	StorageClass string `json:"storageClass"`
 	// Volume mode.
-	// +kubebuilder:validation:Enum=Filesystem,Block
+	// +kubebuilder:validation:Enum=Filesystem;Block
 	VolumeMode core.PersistentVolumeMode `json:"volumeMode,omitempty"`
 	// Access mode.
-	// +kubebuilder:validation:Enum=ReadWriteOnce,ReadWriteMany,ReadOnlyMany
+	// +kubebuilder:validation:Enum=ReadWriteOnce;ReadWriteMany;ReadOnlyMany
 	AccessMode core.PersistentVolumeAccessMode `json:"accessMode,omitempty"`
 }

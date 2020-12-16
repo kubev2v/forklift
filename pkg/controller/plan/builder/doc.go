@@ -7,8 +7,8 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/builder/vsphere"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	vmio "github.com/kubevirt/vm-import-operator/pkg/apis/v2v/v1beta1"
 	core "k8s.io/api/core/v1"
+	vmio "kubevirt.io/vm-import-operator/pkg/apis/v2v/v1beta1"
 )
 
 //

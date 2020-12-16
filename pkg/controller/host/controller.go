@@ -58,7 +58,7 @@ var Settings = &settings.Settings
 // Creates a new Host Controller and adds it to the Manager.
 func Add(mgr manager.Manager) error {
 	reconciler := &Reconciler{
-		EventRecorder: mgr.GetRecorder(Name),
+		EventRecorder: mgr.GetEventRecorderFor(Name),
 		Client:        mgr.GetClient(),
 		scheme:        mgr.GetScheme(),
 	}

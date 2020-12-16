@@ -96,7 +96,7 @@ func Add(mgr manager.Manager) error {
 	web.AllowedOrigins = Settings.CORS.AllowedOrigins
 	reconciler := &Reconciler{
 		Client:        nClient,
-		EventRecorder: mgr.GetRecorder(Name),
+		EventRecorder: mgr.GetEventRecorderFor(Name),
 		scheme:        mgr.GetScheme(),
 		container:     container,
 		web:           web,

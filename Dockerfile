@@ -1,5 +1,5 @@
 # Builder image
-FROM registry.access.redhat.com/ubi8/go-toolset:1.14.7 as builder
+FROM registry.access.redhat.com/ubi8/go-toolset:1.14.12 as builder
 ENV GOPATH=$APP_ROOT
 COPY pkg    $APP_ROOT/src/github.com/konveyor/forklift-controller/pkg
 COPY cmd    $APP_ROOT/src/github.com/konveyor/forklift-controller/cmd
