@@ -9,7 +9,10 @@ import (
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/property"
+	"github.com/vmware/govmomi/session"
+	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
+	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -461,9 +464,8 @@ func (r *Reconciler) watch() (list []*libmodel.Watch) {
 //
 // Build the client.
 func (r *Reconciler) connect(ctx context.Context) error {
-	insecure := true
 	if r.client != nil {
-		r.client.Logout(ctx)
+		_ = r.client.Logout(ctx)
 		r.client = nil
 	}
 	url, err := liburl.Parse(r.url)
@@ -473,12 +475,20 @@ func (r *Reconciler) connect(ctx context.Context) error {
 	url.User = liburl.UserPassword(
 		r.user(),
 		r.password())
-	client, err := govmomi.NewClient(ctx, url, insecure)
+	soapClient := soap.NewClient(url, false)
+	soapClient.SetThumbprint(url.Host, r.thumbprint())
+	vimClient, err := vim25.NewClient(ctx, soapClient)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-
-	r.client = client
+	r.client = &govmomi.Client{
+		SessionManager: session.NewManager(vimClient),
+		Client:         vimClient,
+	}
+	err = r.client.Login(ctx, url.User)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
 
 	return nil
 }
@@ -497,6 +507,16 @@ func (r *Reconciler) user() string {
 // Password.
 func (r *Reconciler) password() string {
 	if password, found := r.secret.Data["password"]; found {
+		return string(password)
+	}
+
+	return ""
+}
+
+//
+// Thumbprint.
+func (r *Reconciler) thumbprint() string {
+	if password, found := r.secret.Data["thumbprint"]; found {
 		return string(password)
 	}
 

@@ -7,7 +7,9 @@ import (
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
+	"github.com/vmware/govmomi/session"
 	"github.com/vmware/govmomi/vim25"
+	"github.com/vmware/govmomi/vim25/soap"
 	core "k8s.io/api/core/v1"
 	liburl "net/url"
 	"time"
@@ -95,7 +97,6 @@ func (r *EsxHost) DatastoreID(ds *model.Datastore) (id string, err error) {
 //
 // Build the client and finder.
 func (r *EsxHost) connect(ctx context.Context) (err error) {
-	insecure := true
 	if r.client != nil {
 		return
 	}
@@ -106,17 +107,22 @@ func (r *EsxHost) connect(ctx context.Context) (err error) {
 	url.User = liburl.UserPassword(
 		r.user(),
 		r.password())
-
-	r.client, err = govmomi.NewClient(ctx, url, insecure)
+	soapClient := soap.NewClient(url, false)
+	soapClient.SetThumbprint(url.Host, r.thumbprint())
+	vimClient, err := vim25.NewClient(ctx, soapClient)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	client, err := vim25.NewClient(ctx, r.client)
+	r.client = &govmomi.Client{
+		SessionManager: session.NewManager(vimClient),
+		Client:         vimClient,
+	}
+	err = r.client.Login(ctx, url.User)
 	if err != nil {
-		err = liberr.Wrap(err)
+		return liberr.Wrap(err)
 	}
 
-	r.finder = find.NewFinder(client)
+	r.finder = find.NewFinder(vimClient)
 
 	return nil
 }
@@ -135,6 +141,16 @@ func (r *EsxHost) user() string {
 // Password.
 func (r *EsxHost) password() string {
 	if password, found := r.Secret.Data["password"]; found {
+		return string(password)
+	}
+
+	return ""
+}
+
+//
+// Thumbprint.
+func (r *EsxHost) thumbprint() string {
+	if password, found := r.Secret.Data["thumbprint"]; found {
 		return string(password)
 	}
 
