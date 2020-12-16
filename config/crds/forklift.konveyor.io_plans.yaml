@@ -1,0 +1,635 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.3.0
+  creationTimestamp: null
+  name: plans.forklift.konveyor.io
+spec:
+  group: forklift.konveyor.io
+  names:
+    kind: Plan
+    listKind: PlanList
+    plural: plans
+    singular: plan
+  scope: Namespaced
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: PlanSpec defines the desired state of Plan.
+          properties:
+            description:
+              description: Description
+              type: string
+            map:
+              description: Resource map.
+              properties:
+                datastores:
+                  description: Datastores.
+                  items:
+                    description: Mapped storage.
+                    properties:
+                      destination:
+                        description: Destination storage.
+                        properties:
+                          accessMode:
+                            description: Access mode.
+                            enum:
+                            - ReadWriteOnce
+                            - ReadWriteMany
+                            - ReadOnlyMany
+                            type: string
+                          storageClass:
+                            description: A storage class.
+                            type: string
+                          volumeMode:
+                            description: Volume mode.
+                            enum:
+                            - Filesystem
+                            - Block
+                            type: string
+                        required:
+                        - storageClass
+                        type: object
+                      source:
+                        description: Source storage.
+                        properties:
+                          id:
+                            description: 'The object ID. vsphere:   The managed object
+                              ID.'
+                            type: string
+                          name:
+                            description: 'An object Name. vsphere:   A qualified name.'
+                            type: string
+                          type:
+                            description: Type used to qualify the name.
+                            type: string
+                        type: object
+                    required:
+                    - destination
+                    - source
+                    type: object
+                  type: array
+                networks:
+                  description: Networks.
+                  items:
+                    description: Mapped network.
+                    properties:
+                      destination:
+                        description: Destination network.
+                        properties:
+                          name:
+                            description: The name.
+                            type: string
+                          namespace:
+                            description: The namespace (multus only).
+                            type: string
+                          type:
+                            description: The network type.
+                            enum:
+                            - pod
+                            - multus
+                            type: string
+                        required:
+                        - type
+                        type: object
+                      source:
+                        description: Source network.
+                        properties:
+                          id:
+                            description: 'The object ID. vsphere:   The managed object
+                              ID.'
+                            type: string
+                          name:
+                            description: 'An object Name. vsphere:   A qualified name.'
+                            type: string
+                          type:
+                            description: Type used to qualify the name.
+                            type: string
+                        type: object
+                    required:
+                    - destination
+                    - source
+                    type: object
+                  type: array
+              type: object
+            provider:
+              description: Providers.
+              properties:
+                destination:
+                  description: Destination.
+                  properties:
+                    apiVersion:
+                      description: API version of the referent.
+                      type: string
+                    fieldPath:
+                      description: 'If referring to a piece of an object instead of
+                        an entire object, this string should contain a valid JSON/Go
+                        field access statement, such as desiredState.manifest.containers[2].
+                        For example, if the object reference is to a container within
+                        a pod, this would take on a value like: "spec.containers{name}"
+                        (where "name" refers to the name of the container that triggered
+                        the event) or if no container name is specified "spec.containers[2]"
+                        (container with index 2 in this pod). This syntax is chosen
+                        only to have some well-defined way of referencing a part of
+                        an object. TODO: this design is not final and this field is
+                        subject to change in the future.'
+                      type: string
+                    kind:
+                      description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                      type: string
+                    name:
+                      description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                      type: string
+                    namespace:
+                      description: 'Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
+                      type: string
+                    resourceVersion:
+                      description: 'Specific resourceVersion to which this reference
+                        is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
+                      type: string
+                    uid:
+                      description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+                      type: string
+                  type: object
+                source:
+                  description: Source.
+                  properties:
+                    apiVersion:
+                      description: API version of the referent.
+                      type: string
+                    fieldPath:
+                      description: 'If referring to a piece of an object instead of
+                        an entire object, this string should contain a valid JSON/Go
+                        field access statement, such as desiredState.manifest.containers[2].
+                        For example, if the object reference is to a container within
+                        a pod, this would take on a value like: "spec.containers{name}"
+                        (where "name" refers to the name of the container that triggered
+                        the event) or if no container name is specified "spec.containers[2]"
+                        (container with index 2 in this pod). This syntax is chosen
+                        only to have some well-defined way of referencing a part of
+                        an object. TODO: this design is not final and this field is
+                        subject to change in the future.'
+                      type: string
+                    kind:
+                      description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                      type: string
+                    name:
+                      description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                      type: string
+                    namespace:
+                      description: 'Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
+                      type: string
+                    resourceVersion:
+                      description: 'Specific resourceVersion to which this reference
+                        is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
+                      type: string
+                    uid:
+                      description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+                      type: string
+                  type: object
+              required:
+              - destination
+              - source
+              type: object
+            targetNamespace:
+              description: Target namespace.
+              type: string
+            vms:
+              description: List of VMs.
+              items:
+                description: A VM listed on the plan.
+                properties:
+                  hook:
+                    description: Enable hooks.
+                    properties:
+                      after:
+                        description: Post-migration hook.
+                        properties:
+                          apiVersion:
+                            description: API version of the referent.
+                            type: string
+                          fieldPath:
+                            description: 'If referring to a piece of an object instead
+                              of an entire object, this string should contain a valid
+                              JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                              For example, if the object reference is to a container
+                              within a pod, this would take on a value like: "spec.containers{name}"
+                              (where "name" refers to the name of the container that
+                              triggered the event) or if no container name is specified
+                              "spec.containers[2]" (container with index 2 in this
+                              pod). This syntax is chosen only to have some well-defined
+                              way of referencing a part of an object. TODO: this design
+                              is not final and this field is subject to change in
+                              the future.'
+                            type: string
+                          kind:
+                            description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                            type: string
+                          name:
+                            description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                            type: string
+                          namespace:
+                            description: 'Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
+                            type: string
+                          resourceVersion:
+                            description: 'Specific resourceVersion to which this reference
+                              is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
+                            type: string
+                          uid:
+                            description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+                            type: string
+                        type: object
+                      before:
+                        description: Pre-migration hook.
+                        properties:
+                          apiVersion:
+                            description: API version of the referent.
+                            type: string
+                          fieldPath:
+                            description: 'If referring to a piece of an object instead
+                              of an entire object, this string should contain a valid
+                              JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                              For example, if the object reference is to a container
+                              within a pod, this would take on a value like: "spec.containers{name}"
+                              (where "name" refers to the name of the container that
+                              triggered the event) or if no container name is specified
+                              "spec.containers[2]" (container with index 2 in this
+                              pod). This syntax is chosen only to have some well-defined
+                              way of referencing a part of an object. TODO: this design
+                              is not final and this field is subject to change in
+                              the future.'
+                            type: string
+                          kind:
+                            description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                            type: string
+                          name:
+                            description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                            type: string
+                          namespace:
+                            description: 'Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
+                            type: string
+                          resourceVersion:
+                            description: 'Specific resourceVersion to which this reference
+                              is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
+                            type: string
+                          uid:
+                            description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+                            type: string
+                        type: object
+                    type: object
+                  id:
+                    description: 'The object ID. vsphere:   The managed object ID.'
+                    type: string
+                  name:
+                    description: 'An object Name. vsphere:   A qualified name.'
+                    type: string
+                  type:
+                    description: Type used to qualify the name.
+                    type: string
+                type: object
+              type: array
+          required:
+          - provider
+          - vms
+          type: object
+        status:
+          description: PlanStatus defines the observed state of Plan.
+          properties:
+            conditions:
+              items:
+                description: Condition
+                properties:
+                  category:
+                    description: The condition category.
+                    type: string
+                  durable:
+                    description: The condition is durable - never un-staged.
+                    type: boolean
+                  items:
+                    description: A list of items referenced in the `Message`.
+                    items:
+                      type: string
+                    type: array
+                  lastTransitionTime:
+                    description: When the last status transition occurred.
+                    format: date-time
+                    type: string
+                  message:
+                    description: The human readable description of the condition.
+                    type: string
+                  reason:
+                    description: The reason for the condition or transition.
+                    type: string
+                  status:
+                    description: The condition status [true,false].
+                    type: string
+                  type:
+                    description: The condition type.
+                    type: string
+                required:
+                - category
+                - lastTransitionTime
+                - status
+                - type
+                type: object
+              type: array
+            migration:
+              description: Migration
+              properties:
+                active:
+                  description: Active migration.
+                  type: string
+                completed:
+                  description: Completed timestamp.
+                  format: date-time
+                  type: string
+                started:
+                  description: Started timestamp.
+                  format: date-time
+                  type: string
+                vms:
+                  description: VM status
+                  items:
+                    description: VM Status
+                    properties:
+                      completed:
+                        description: Completed timestamp.
+                        format: date-time
+                        type: string
+                      error:
+                        description: Errors
+                        properties:
+                          phase:
+                            type: string
+                          reasons:
+                            items:
+                              type: string
+                            type: array
+                        required:
+                        - phase
+                        - reasons
+                        type: object
+                      hook:
+                        description: Enable hooks.
+                        properties:
+                          after:
+                            description: Post-migration hook.
+                            properties:
+                              apiVersion:
+                                description: API version of the referent.
+                                type: string
+                              fieldPath:
+                                description: 'If referring to a piece of an object
+                                  instead of an entire object, this string should
+                                  contain a valid JSON/Go field access statement,
+                                  such as desiredState.manifest.containers[2]. For
+                                  example, if the object reference is to a container
+                                  within a pod, this would take on a value like: "spec.containers{name}"
+                                  (where "name" refers to the name of the container
+                                  that triggered the event) or if no container name
+                                  is specified "spec.containers[2]" (container with
+                                  index 2 in this pod). This syntax is chosen only
+                                  to have some well-defined way of referencing a part
+                                  of an object. TODO: this design is not final and
+                                  this field is subject to change in the future.'
+                                type: string
+                              kind:
+                                description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                                type: string
+                              name:
+                                description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                                type: string
+                              namespace:
+                                description: 'Namespace of the referent. More info:
+                                  https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
+                                type: string
+                              resourceVersion:
+                                description: 'Specific resourceVersion to which this
+                                  reference is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
+                                type: string
+                              uid:
+                                description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+                                type: string
+                            type: object
+                          before:
+                            description: Pre-migration hook.
+                            properties:
+                              apiVersion:
+                                description: API version of the referent.
+                                type: string
+                              fieldPath:
+                                description: 'If referring to a piece of an object
+                                  instead of an entire object, this string should
+                                  contain a valid JSON/Go field access statement,
+                                  such as desiredState.manifest.containers[2]. For
+                                  example, if the object reference is to a container
+                                  within a pod, this would take on a value like: "spec.containers{name}"
+                                  (where "name" refers to the name of the container
+                                  that triggered the event) or if no container name
+                                  is specified "spec.containers[2]" (container with
+                                  index 2 in this pod). This syntax is chosen only
+                                  to have some well-defined way of referencing a part
+                                  of an object. TODO: this design is not final and
+                                  this field is subject to change in the future.'
+                                type: string
+                              kind:
+                                description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                                type: string
+                              name:
+                                description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                                type: string
+                              namespace:
+                                description: 'Namespace of the referent. More info:
+                                  https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
+                                type: string
+                              resourceVersion:
+                                description: 'Specific resourceVersion to which this
+                                  reference is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
+                                type: string
+                              uid:
+                                description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+                                type: string
+                            type: object
+                        type: object
+                      id:
+                        description: 'The object ID. vsphere:   The managed object
+                          ID.'
+                        type: string
+                      name:
+                        description: 'An object Name. vsphere:   A qualified name.'
+                        type: string
+                      phase:
+                        description: Phase
+                        type: string
+                      pipeline:
+                        description: Migration pipeline.
+                        items:
+                          description: Pipeline step.
+                          properties:
+                            annotations:
+                              additionalProperties:
+                                type: string
+                              description: Annotations.
+                              type: object
+                            completed:
+                              description: Completed timestamp.
+                              format: date-time
+                              type: string
+                            description:
+                              description: Name
+                              type: string
+                            error:
+                              description: Error.
+                              properties:
+                                phase:
+                                  type: string
+                                reasons:
+                                  items:
+                                    type: string
+                                  type: array
+                              required:
+                              - phase
+                              - reasons
+                              type: object
+                            name:
+                              description: Name.
+                              type: string
+                            phase:
+                              description: Phase
+                              type: string
+                            progress:
+                              description: Progress.
+                              properties:
+                                completed:
+                                  description: Completed units.
+                                  format: int64
+                                  type: integer
+                                total:
+                                  description: Total units.
+                                  format: int64
+                                  type: integer
+                              required:
+                              - completed
+                              - total
+                              type: object
+                            started:
+                              description: Started timestamp.
+                              format: date-time
+                              type: string
+                            tasks:
+                              description: Nested tasks.
+                              items:
+                                description: Migration task.
+                                properties:
+                                  annotations:
+                                    additionalProperties:
+                                      type: string
+                                    description: Annotations.
+                                    type: object
+                                  completed:
+                                    description: Completed timestamp.
+                                    format: date-time
+                                    type: string
+                                  description:
+                                    description: Name
+                                    type: string
+                                  error:
+                                    description: Error.
+                                    properties:
+                                      phase:
+                                        type: string
+                                      reasons:
+                                        items:
+                                          type: string
+                                        type: array
+                                    required:
+                                    - phase
+                                    - reasons
+                                    type: object
+                                  name:
+                                    description: Name.
+                                    type: string
+                                  phase:
+                                    description: Phase
+                                    type: string
+                                  progress:
+                                    description: Progress.
+                                    properties:
+                                      completed:
+                                        description: Completed units.
+                                        format: int64
+                                        type: integer
+                                      total:
+                                        description: Total units.
+                                        format: int64
+                                        type: integer
+                                    required:
+                                    - completed
+                                    - total
+                                    type: object
+                                  started:
+                                    description: Started timestamp.
+                                    format: date-time
+                                    type: string
+                                required:
+                                - name
+                                - progress
+                                type: object
+                              type: array
+                          required:
+                          - name
+                          - progress
+                          type: object
+                        type: array
+                      started:
+                        description: Started timestamp.
+                        format: date-time
+                        type: string
+                      type:
+                        description: Type used to qualify the name.
+                        type: string
+                    required:
+                    - phase
+                    - pipeline
+                    type: object
+                  type: array
+              required:
+              - active
+              type: object
+            observedGeneration:
+              description: The most recent generation observed by the controller.
+              format: int64
+              type: integer
+          required:
+          - conditions
+          type: object
+      type: object
+  version: v1alpha1
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

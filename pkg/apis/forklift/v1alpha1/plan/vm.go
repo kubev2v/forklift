@@ -13,8 +13,8 @@ type VM struct {
 //
 // VM Status
 type VMStatus struct {
-	Timed
-	VM
+	Timed `json:",inline"`
+	VM    `json:",inline"`
 	// Migration pipeline.
 	Pipeline []*Step `json:"pipeline"`
 	// Phase

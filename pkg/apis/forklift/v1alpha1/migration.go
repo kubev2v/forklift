@@ -41,9 +41,9 @@ type MigrationSpec struct {
 //
 // MigrationStatus defines the observed state of Migration
 type MigrationStatus struct {
-	plan.Timed
+	plan.Timed `json:",inline"`
 	// Conditions.
-	libcnd.Conditions
+	libcnd.Conditions `json:",inline"`
 	// The most recent generation observed by the controller.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`

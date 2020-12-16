@@ -68,7 +68,7 @@ type ProviderSpec struct {
 // ProviderStatus defines the observed state of Provider
 type ProviderStatus struct {
 	// Conditions.
-	libcnd.Conditions
+	libcnd.Conditions `json:",inline"`
 	// The most recent generation observed by the controller.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`

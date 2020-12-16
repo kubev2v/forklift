@@ -31,7 +31,7 @@ func (r *StorageClass) Object() runtime.Object {
 func (r *StorageClass) Reconcile(ctx context.Context) (err error) {
 	pClient := r.Reconciler.Client()
 	list := &storage.StorageClassList{}
-	err = pClient.List(context.TODO(), nil, list)
+	err = pClient.List(context.TODO(), list)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -134,7 +134,7 @@ func (r *NetworkAttachmentDefinition) Object() runtime.Object {
 func (r *NetworkAttachmentDefinition) Reconcile(ctx context.Context) (err error) {
 	pClient := r.Reconciler.Client()
 	list := &net.NetworkAttachmentDefinitionList{}
-	err = pClient.List(context.TODO(), nil, list)
+	err = pClient.List(context.TODO(), list)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -237,7 +237,7 @@ func (r *Namespace) Object() runtime.Object {
 func (r *Namespace) Reconcile(ctx context.Context) (err error) {
 	pClient := r.Reconciler.Client()
 	list := &core.NamespaceList{}
-	err = pClient.List(context.TODO(), nil, list)
+	err = pClient.List(context.TODO(), list)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return

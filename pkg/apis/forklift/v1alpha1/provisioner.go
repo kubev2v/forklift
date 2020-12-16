@@ -27,7 +27,7 @@ import (
 // Volume mode.
 type VolumeMode struct {
 	// Name.
-	// +kubebuilder:validation:Enum=Filesystem,Block
+	// +kubebuilder:validation:Enum=Filesystem;Block
 	Name core.PersistentVolumeMode `json:"name"`
 	// Priority
 	Priority int `json:"priority"`
@@ -67,7 +67,7 @@ func (r *VolumeMode) AccessMode(name core.PersistentVolumeAccessMode) (m *Access
 // Access mode.
 type AccessMode struct {
 	// Name.
-	// +kubebuilder:validation:Enum=ReadWriteOnce,ReadWriteMany,ReadOnlyMany
+	// +kubebuilder:validation:Enum=ReadWriteOnce;ReadWriteMany;ReadOnlyMany
 	Name core.PersistentVolumeAccessMode `json:"name"`
 	// Priority
 	Priority int `json:"priority"`
@@ -87,7 +87,7 @@ type ProvisionerSpec struct {
 // ProvisionerStatus defines the observed state of Provisioner
 type ProvisionerStatus struct {
 	// Conditions.
-	libcnd.Conditions
+	libcnd.Conditions `json:",inline"`
 	// The most recent generation observed by the controller.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`

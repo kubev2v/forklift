@@ -34,7 +34,7 @@ func (e *Error) Add(reason ...string) {
 //
 // Migration status.
 type MigrationStatus struct {
-	Timed
+	Timed `json:",inline"`
 	// Active migration.
 	Active types.UID `json:"active"`
 	// VM status
@@ -44,7 +44,7 @@ type MigrationStatus struct {
 //
 // Pipeline step.
 type Step struct {
-	Task
+	Task `json:",inline"`
 	// Nested tasks.
 	Tasks []*Task `json:"tasks,omitempty"`
 }
@@ -95,7 +95,7 @@ func (r *Step) ReflectTasks() {
 //
 // Migration task.
 type Task struct {
-	Timed
+	Timed `json:",inline"`
 	// Name.
 	Name string `json:"name"`
 	// Name

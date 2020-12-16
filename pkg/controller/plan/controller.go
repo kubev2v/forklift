@@ -63,7 +63,7 @@ var Settings = &settings.Settings
 // Creates a new Plan Controller and adds it to the Manager.
 func Add(mgr manager.Manager) error {
 	reconciler := &Reconciler{
-		EventRecorder: mgr.GetRecorder(Name),
+		EventRecorder: mgr.GetEventRecorderFor(Name),
 		Client:        mgr.GetClient(),
 		scheme:        mgr.GetScheme(),
 	}
@@ -281,7 +281,7 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 // Sorted list of pending migrations.
 func (r *Reconciler) pendingMigrations(plan *api.Plan) (list []*api.Migration, err error) {
 	all := &api.MigrationList{}
-	err = r.List(context.TODO(), nil, all)
+	err = r.List(context.TODO(), all)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return

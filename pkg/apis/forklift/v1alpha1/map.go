@@ -44,7 +44,7 @@ type StorageMapSpec struct {
 // MapStatus defines the observed state of Maps.
 type MapStatus struct {
 	// Conditions.
-	libcnd.Conditions
+	libcnd.Conditions `json:",inline"`
 	// The most recent generation observed by the controller.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
