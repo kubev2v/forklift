@@ -17,14 +17,13 @@ limitations under the License.
 package main
 
 import (
-	"net/http"
+	"github.com/konveyor/forklift-controller/pkg/settings"
 	"os"
 
 	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	"github.com/konveyor/forklift-controller/pkg/apis"
 	"github.com/konveyor/forklift-controller/pkg/controller"
 	"github.com/konveyor/forklift-controller/pkg/webhook"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	cdi "kubevirt.io/containerized-data-importer/pkg/apis/core/v1beta1"
 	vmio "kubevirt.io/vm-import-operator/pkg/apis/v2v/v1beta1"
@@ -34,14 +33,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
 )
 
+//
+// Application settings.
+var Settings = &settings.Settings
+
 func main() {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("entrypoint")
 
-	// Start prometheus metrics HTTP handler
-	log.Info("setting up prometheus endpoint :2112/metrics")
-	http.Handle("/metrics", promhttp.Handler())
-	go http.ListenAndServe(":2112", nil)
+	// Load settings.
+	err := Settings.Load()
+	if err != nil {
+		log.Error(err, "unable to load settings")
+		os.Exit(1)
+	}
 
 	// Get a config to talk to the apiserver
 	log.Info("setting up client for manager")
@@ -53,7 +58,9 @@ func main() {
 
 	// Create a new Cmd to provide shared dependencies and start components
 	log.Info("setting up manager")
-	mgr, err := manager.New(cfg, manager.Options{})
+	mgr, err := manager.New(cfg, manager.Options{
+		MetricsBindAddress: Settings.Metrics.Address(),
+	})
 	if err != nil {
 		log.Error(err, "unable to set up overall controller manager")
 		os.Exit(1)
