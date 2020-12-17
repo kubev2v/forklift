@@ -346,17 +346,22 @@ func (r *Builder) mapping(in *plan.Map, vm *model.VM) (out *vmio.VmwareMappings,
 			err = liberr.Wrap(pErr)
 			return
 		}
-		dsMap = append(
-			dsMap,
-			vmio.StorageResourceMappingItem{
-				VolumeMode: &mapped.Destination.VolumeMode,
-				Source: vmio.Source{
-					ID: &id,
-				},
-				Target: vmio.ObjectIdentifier{
-					Name: mapped.Destination.StorageClass,
-				},
-			})
+		item := vmio.StorageResourceMappingItem{
+			Source: vmio.Source{
+				ID: &id,
+			},
+			Target: vmio.ObjectIdentifier{
+				Name: mapped.Destination.StorageClass,
+			},
+		}
+		if mapped.Destination.VolumeMode != "" {
+			item.VolumeMode = &mapped.Destination.VolumeMode
+		}
+		/* VMIO > 0.2.5 needed.
+		if mapped.Destination.AccessMode != "" {
+			item = &mapped.Destination.AccessMode
+		}*/
+		dsMap = append(dsMap, item)
 	}
 	out = &vmio.VmwareMappings{
 		NetworkMappings: &netMap,
