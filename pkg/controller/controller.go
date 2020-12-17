@@ -28,6 +28,10 @@ import (
 )
 
 //
+// Application settings.
+var Settings = &settings.Settings
+
+//
 // Function provided by controller packages to add
 // them self to the manager.
 type AddFunction func(manager.Manager) error
@@ -51,10 +55,6 @@ var InventoryControllers = []AddFunction{
 //
 // Add controllers to the manager based on role.
 func AddToManager(m manager.Manager) error {
-	err := settings.Settings.Load()
-	if err != nil {
-		return err
-	}
 	load := func(functions []AddFunction) error {
 		for _, f := range functions {
 			if err := f(m); err != nil {
@@ -63,14 +63,14 @@ func AddToManager(m manager.Manager) error {
 		}
 		return nil
 	}
-	if settings.Settings.Role.Has(settings.InventoryRole) {
+	if Settings.Role.Has(settings.InventoryRole) {
 		err := load(InventoryControllers)
 		if err != nil {
 			return err
 		}
 
 	}
-	if settings.Settings.Role.Has(settings.MainRole) {
+	if Settings.Role.Has(settings.MainRole) {
 		err := load(MainControllers)
 		if err != nil {
 			return err
