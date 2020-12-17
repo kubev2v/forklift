@@ -15,6 +15,8 @@ var Settings = ControllerSettings{}
 type ControllerSettings struct {
 	// Roles.
 	Role
+	// Metrics settings.
+	Metrics
 	// Inventory settings.
 	Inventory
 	// Migration settings.
@@ -25,6 +27,10 @@ type ControllerSettings struct {
 // Load settings.
 func (r *ControllerSettings) Load() error {
 	err := r.Role.Load()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	err = r.Metrics.Load()
 	if err != nil {
 		return liberr.Wrap(err)
 	}
