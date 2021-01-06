@@ -16,6 +16,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	"github.com/vmware/govmomi/vim25"
+	"github.com/vmware/govmomi/vim25/types"
 	"gopkg.in/yaml.v2"
 	core "k8s.io/api/core/v1"
 	vmio "kubevirt.io/vm-import-operator/pkg/apis/v2v/v1beta1"
@@ -95,6 +96,8 @@ func (r *Builder) Import(vmRef ref.Ref, mp *plan.Map, object *vmio.VirtualMachin
 	}
 	uuid := vm.UUID
 	object.TargetVMName = &vm.Name
+	start := vm.PowerState == string(types.VirtualMachinePowerStatePoweredOn)
+	object.StartVM = &start
 	object.Source.Vmware = &vmio.VirtualMachineImportVmwareSourceSpec{
 		VM: vmio.VirtualMachineImportVmwareSourceVMSpec{
 			ID: &uuid,

@@ -105,6 +105,7 @@ const (
 	fVmIpAddress         = "summary.guest.ipAddress"
 	fStorageUsed         = "summary.storage.committed"
 	fRuntimeHost         = "runtime.host"
+	fPowerState          = "runtime.powerState"
 )
 
 //
@@ -668,6 +669,7 @@ func (r *Reconciler) propertySpec() []types.PropertySpec {
 				fDatastore,
 				fNetwork,
 				fRuntimeHost,
+				fPowerState,
 			},
 		},
 	}
