@@ -85,32 +85,6 @@ func (r ProviderPredicate) Generic(e event.GenericEvent) bool {
 	return false
 }
 
-type HostPredicate struct {
-	predicate.Funcs
-}
-
-func (r HostPredicate) Create(e event.CreateEvent) bool {
-	return false
-}
-
-func (r HostPredicate) Update(e event.UpdateEvent) bool {
-	p, cast := e.ObjectNew.(*api.Host)
-	if cast {
-		reconciled := p.Status.ObservedGeneration == p.Generation
-		return reconciled
-	}
-
-	return false
-}
-
-func (r HostPredicate) Delete(e event.DeleteEvent) bool {
-	return true
-}
-
-func (r HostPredicate) Generic(e event.GenericEvent) bool {
-	return false
-}
-
 type MigrationPredicate struct {
 	predicate.Funcs
 }

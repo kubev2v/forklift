@@ -99,16 +99,6 @@ func Add(mgr manager.Manager) error {
 	}
 	err = cnt.Watch(
 		&source.Kind{
-			Type: &api.Host{},
-		},
-		&handler.EnqueueRequestForObject{},
-		&HostPredicate{})
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-	err = cnt.Watch(
-		&source.Kind{
 			Type: &api.Migration{},
 		},
 		&handler.EnqueueRequestsFromMapFunc{
