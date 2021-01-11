@@ -166,6 +166,17 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		log.Info("Conditions.", "all", plan.Status.Conditions)
 	}()
 
+	// Postpone as needed.
+	postpone, err := r.postpone()
+	if err != nil {
+		log.Trace(err)
+		return slowReQ, err
+	}
+	if postpone {
+		log.Info("Postponed")
+		return slowReQ, nil
+	}
+
 	// Begin staging conditions.
 	plan.Status.BeginStagingConditions()
 
@@ -311,6 +322,38 @@ func (r *Reconciler) pendingMigrations(plan *api.Plan) (list []*api.Migration, e
 			nB := path.Join(mB.Namespace, mB.Name)
 			return nA < nB
 		})
+
+	return
+}
+
+//
+// Postpone reconciliation.
+// Ensure that dependencies (CRs) have been reconciled.
+func (r *Reconciler) postpone() (postpone bool, err error) {
+	providerList := &api.PlanList{}
+	err = r.List(context.TODO(), providerList)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	for _, provider := range providerList.Items {
+		if provider.Status.ObservedGeneration < provider.Generation {
+			postpone = true
+			return
+		}
+	}
+	hostList := &api.HostList{}
+	err = r.List(context.TODO(), hostList)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	for _, host := range providerList.Items {
+		if host.Status.ObservedGeneration < host.Generation {
+			postpone = true
+			return
+		}
+	}
 
 	return
 }
