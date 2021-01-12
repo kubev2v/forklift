@@ -18,13 +18,15 @@ package migration
 
 import (
 	"context"
+	"errors"
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	"github.com/konveyor/controller/pkg/logging"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	plancnt "github.com/konveyor/forklift-controller/pkg/controller/plan"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/settings"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -39,7 +41,9 @@ const (
 	// Controller name.
 	Name = "migration"
 	// Fast re-queue delay.
-	FastReQ = time.Millisecond * 100
+	FastReQ = time.Millisecond * 500
+	// Slow re-queue delay.
+	SlowReQ = time.Second * 3
 )
 
 //
@@ -104,30 +108,41 @@ type Reconciler struct {
 
 //
 // Reconcile a Migration CR.
-func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *Reconciler) Reconcile(request reconcile.Request) (result reconcile.Result, err error) {
 	fastReQ := reconcile.Result{RequeueAfter: FastReQ}
+	slowReQ := reconcile.Result{RequeueAfter: SlowReQ}
 	noReQ := reconcile.Result{}
-	var err error
+	result = noReQ
 
 	// Reset the logger.
 	log.Reset()
 	log.SetValues("migration", request.Name)
 	log.Info("Reconcile")
 
+	defer func() {
+		if err != nil {
+			log.Trace(err)
+			err = nil
+		}
+	}()
+
 	// Fetch the CR.
 	migration := &api.Migration{}
 	err = r.Get(context.TODO(), request.NamespacedName, migration)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			return noReQ, nil
+		if k8serr.IsNotFound(err) {
+			err = nil
 		}
-		log.Trace(err)
-		return noReQ, err
+		return
 	}
+	defer func() {
+		log.Info("Conditions.", "all", migration.Status.Conditions)
+	}()
 
 	// Detected completed.
 	if migration.Status.MarkedCompleted() {
-		return noReQ, nil
+		result = noReQ
+		return
 	}
 
 	// Begin staging conditions.
@@ -136,8 +151,13 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	// Validations.
 	plan, err := r.validate(migration)
 	if err != nil {
-		log.Trace(err)
-		return fastReQ, nil
+		if errors.As(err, &web.ProviderNotReadyError{}) {
+			result = slowReQ
+			err = nil
+		} else {
+			result = fastReQ
+		}
+		return
 	}
 
 	// Reflect plan.
@@ -161,10 +181,12 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	err = r.Status().Update(context.TODO(), migration)
 	if err != nil {
 		log.Trace(err)
-		return fastReQ, nil
+		result = fastReQ
+		return
 	}
 
-	return noReQ, nil
+	// Done
+	return
 }
 
 //

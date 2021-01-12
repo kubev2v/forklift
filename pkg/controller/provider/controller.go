@@ -53,7 +53,7 @@ const (
 	// Controller name.
 	Name = "provider"
 	// Fast re-queue delay.
-	FastReQ = time.Millisecond * 100
+	FastReQ = time.Millisecond * 500
 	// Slow re-queue delay.
 	SlowReQ = time.Second * 10
 )
@@ -152,11 +152,11 @@ type Reconciler struct {
 
 //
 // Reconcile a Inventory CR.
-func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *Reconciler) Reconcile(request reconcile.Request) (result reconcile.Result, err error) {
 	fastReQ := reconcile.Result{RequeueAfter: FastReQ}
 	slowReQ := reconcile.Result{RequeueAfter: SlowReQ}
 	noReQ := reconcile.Result{}
-	var err error
+	result = noReQ
 
 	// Reset the logger.
 	log.Reset()
@@ -166,6 +166,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	defer func() {
 		if err != nil {
 			log.Trace(err)
+			err = nil
 		}
 	}()
 
@@ -185,9 +186,10 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 				r.Shutdown()
 				r.DB().Close(true)
 			}
-			return noReQ, nil
+		} else {
+			result = fastReQ
 		}
-		return noReQ, err
+		return
 	}
 	defer func() {
 		log.Info("Conditions.", "all", provider.Status.Conditions)
@@ -207,13 +209,15 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	// Validations.
 	err = r.validate(provider)
 	if err != nil {
-		return fastReQ, nil
+		result = fastReQ
+		return
 	}
 
 	// Update the container.
 	err = r.updateContainer(provider)
 	if err != nil {
-		return slowReQ, nil
+		result = slowReQ
+		return
 	}
 
 	// Ready condition.
@@ -238,22 +242,24 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	provider.Status.ObservedGeneration = provider.Generation
 	err = r.Status().Update(context.TODO(), provider)
 	if err != nil {
-		return fastReQ, nil
+		result = fastReQ
+		return
 	}
 
 	// Update the DB.
 	err = r.updateProvider(provider)
 	if err != nil {
-		return fastReQ, nil
+		result = fastReQ
+		return
 	}
 
 	// ReQ.
 	if !provider.Status.HasCondition(ConnectionTested, InventoryCreated) {
-		return slowReQ, nil
+		result = slowReQ
 	}
 
 	// Done
-	return noReQ, nil
+	return
 }
 
 //
