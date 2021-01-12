@@ -147,6 +147,16 @@ func (r Migration) Run() (reQ time.Duration, err error) {
 					return
 				}
 			}
+			err = r.kubevirt.SetSecretOwner(vm)
+			if err != nil {
+				if !errors.As(err, &web.ProviderNotReadyError{}) {
+					vm.AddError(err.Error())
+					err = nil
+					break
+				} else {
+					return
+				}
+			}
 			vm.Phase = r.next(vm.Phase)
 		case ImportCreated:
 			completed, failed, rErr := r.updateVM(vm)
