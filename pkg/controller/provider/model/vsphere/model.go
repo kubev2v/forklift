@@ -397,6 +397,7 @@ type VM struct {
 	Base
 	UUID                  string `sql:""`
 	Firmware              string `sql:""`
+	PowerState            string `sql:""`
 	CpuAffinity           string `sql:""`
 	CpuHotAddEnabled      bool   `sql:""`
 	CpuHotRemoveEnabled   bool   `sql:""`

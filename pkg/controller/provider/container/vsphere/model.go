@@ -607,6 +607,10 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				if s, cast := p.Val.(string); cast {
 					v.model.Firmware = s
 				}
+			case fPowerState:
+				if s, cast := p.Val.(types.VirtualMachinePowerState); cast {
+					v.model.PowerState = string(s)
+				}
 			case fCpuAffinity:
 				if a, cast := p.Val.(types.VirtualMachineAffinityInfo); cast {
 					list := List{}
