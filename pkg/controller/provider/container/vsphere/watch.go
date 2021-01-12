@@ -140,9 +140,7 @@ func (r WatchCluster) analyze(cluster *model.Cluster) {
 		return
 	}
 	defer tx.End()
-	hostList := model.RefList{}
-	hostList.With(cluster.Hosts)
-	for _, ref := range hostList {
+	for _, ref := range cluster.Hosts {
 		host := &model.Host{}
 		host.WithRef(ref)
 		err = tx.Get(host)
@@ -150,9 +148,7 @@ func (r WatchCluster) analyze(cluster *model.Cluster) {
 			Log.Trace(liberr.Wrap(err))
 			return
 		}
-		vmList := model.RefList{}
-		vmList.With(host.Vms)
-		for _, ref := range vmList {
+		for _, ref := range host.Vms {
 			vm := &model.VM{}
 			vm.WithRef(ref)
 			err = tx.Get(vm)

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	liberr "github.com/konveyor/controller/pkg/error"
-	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
@@ -45,12 +44,7 @@ func (h NetworkHandler) List(ctx *gin.Context) {
 	}
 	db := h.Reconciler.DB()
 	list := []model.Network{}
-	err := db.List(
-		&list,
-		libmodel.ListOptions{
-			Predicate: h.Predicate(ctx),
-			Page:      &h.Page,
-		})
+	err := db.List(&list, h.ListOptions(ctx))
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
@@ -170,8 +164,8 @@ type Network struct {
 func (r *Network) With(m *model.Network) {
 	r.Resource.With(&m.Base)
 	r.Tag = m.Tag
-	if len(m.DVSwitch) > 0 {
-		r.DVSwitch = (&model.Ref{}).With(m.DVSwitch)
+	if len(m.DVSwitch.ID) > 0 {
+		r.DVSwitch = &m.DVSwitch
 		r.Type = "dvportgroup"
 	} else {
 		r.Type = "standard"

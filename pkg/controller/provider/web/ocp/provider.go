@@ -155,8 +155,8 @@ type Provider struct {
 // Set fields with the specified object.
 func (r *Provider) With(m *model.Provider) {
 	r.Resource.With(&m.Base)
-	m.DecodeObject(&r.Object)
 	r.Type = m.Type
+	r.Object = m.Object
 }
 
 //
