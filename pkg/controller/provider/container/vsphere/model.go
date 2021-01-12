@@ -25,7 +25,7 @@ type Base struct {
 
 //
 // Apply the update to the model `Base`.
-func (v *Base) Apply(m *model.Base, u types.ObjectUpdate) {
+func (b *Base) Apply(m *model.Base, u types.ObjectUpdate) {
 	for _, p := range u.ChangeSet {
 		switch p.Op {
 		case Assign:
@@ -35,135 +35,52 @@ func (v *Base) Apply(m *model.Base, u types.ObjectUpdate) {
 					m.Name = s
 				}
 			case fParent:
-				ref := Ref{}
-				ref.With(p.Val)
-				m.Parent = ref.Encode()
+				m.Parent = b.Ref(p.Val)
 			}
 		}
 	}
 }
 
 //
-// Ref.
-type Ref struct {
-	// A wrapped ref.
-	model.Ref
-}
-
-//
-// Set the ref properties.
-func (v *Ref) With(ref types.AnyType) {
-	if r, cast := ref.(types.ManagedObjectReference); cast {
-		v.ID = r.Value
+// Build ref.
+func (b *Base) Ref(in types.AnyType) (ref model.Ref) {
+	if r, cast := in.(types.ManagedObjectReference); cast {
+		ref.ID = r.Value
 		switch r.Type {
 		case Folder:
-			v.Kind = model.FolderKind
+			ref.Kind = model.FolderKind
 		case Datacenter:
-			v.Kind = model.DatacenterKind
+			ref.Kind = model.DatacenterKind
 		case Cluster:
-			v.Kind = model.ClusterKind
+			ref.Kind = model.ClusterKind
 		case Network,
 			DVPortGroup,
 			DVSwitch:
-			v.Kind = model.NetKind
+			ref.Kind = model.NetKind
 		case Datastore:
-			v.Kind = model.DsKind
+			ref.Kind = model.DsKind
 		case Host:
-			v.Kind = model.HostKind
+			ref.Kind = model.HostKind
 		case VirtualMachine:
-			v.Kind = model.VmKind
+			ref.Kind = model.VmKind
 		default:
-			v.Kind = r.Type
+			ref.Kind = r.Type
 		}
 	}
+
+	return
 }
 
 //
-// RefList
-type RefList struct {
-	// A wrapped list.
-	list model.RefList
-}
-
-//
-// Set the list content.
-func (v *RefList) With(ref types.AnyType) {
-	if a, cast := ref.(types.ArrayOfManagedObjectReference); cast {
-		list := a.ManagedObjectReference
-		for _, r := range list {
-			v.Append(r)
+// Build a []Ref.
+func (b *Base) RefList(in types.AnyType) (list []model.Ref) {
+	if a, cast := in.(types.ArrayOfManagedObjectReference); cast {
+		for _, r := range a.ManagedObjectReference {
+			list = append(list, b.Ref(r))
 		}
 	}
-}
 
-//
-// Append reference.
-func (v *RefList) Append(r types.ManagedObjectReference) {
-	ref := Ref{}
-	ref.With(r)
-	v.list = append(
-		v.list,
-		model.Ref{
-			Kind: ref.Kind,
-			ID:   ref.ID,
-		})
-}
-
-//
-// Encode the enclosed list.
-func (v *RefList) Encode() string {
-	return v.list.Encode()
-}
-
-//
-// RefList
-type List struct {
-	// A wrapped list.
-	list model.List
-}
-
-//
-// Encode the enclosed list.
-func (v *List) Encode() string {
-	return v.list.Encode()
-}
-
-//
-// Set the list content.
-func (v *List) With(in interface{}) {
-	v.list = model.List{}
-	switch in.(type) {
-	case []int:
-		list := in.([]int)
-		for _, n := range list {
-			v.list = append(v.list, n)
-		}
-	case []int8:
-		list := in.([]int8)
-		for _, n := range list {
-			v.list = append(v.list, n)
-		}
-	case []int16:
-		list := in.([]int16)
-		for _, n := range list {
-			v.list = append(v.list, n)
-		}
-	case []int32:
-		list := in.([]int32)
-		for _, n := range list {
-			v.list = append(v.list, n)
-		}
-	case []int64:
-		list := in.([]int64)
-		for _, n := range list {
-			v.list = append(v.list, n)
-		}
-	case []string:
-		list := in.([]string)
-		for _, s := range list {
-			v.list = append(v.list, s)
-		}
-	}
+	return
 }
 
 //
@@ -183,9 +100,7 @@ func (v *FolderAdapter) Apply(u types.ObjectUpdate) {
 		case Assign:
 			switch p.Name {
 			case fChildEntity:
-				list := RefList{}
-				list.With(p.Val)
-				v.model.Children = list.Encode()
+				v.model.Children = v.RefList(p.Val)
 			}
 		}
 	}
@@ -220,21 +135,13 @@ func (v *DatacenterAdapter) Apply(u types.ObjectUpdate) {
 		case Assign:
 			switch p.Name {
 			case fVmFolder:
-				ref := Ref{}
-				ref.With(p.Val)
-				v.model.Vms = ref.Encode()
+				v.model.Vms = v.Ref(p.Val)
 			case fHostFolder:
-				ref := Ref{}
-				ref.With(p.Val)
-				v.model.Clusters = ref.Encode()
+				v.model.Clusters = v.Ref(p.Val)
 			case fNetFolder:
-				ref := Ref{}
-				ref.With(p.Val)
-				v.model.Networks = ref.Encode()
+				v.model.Networks = v.Ref(p.Val)
 			case fDsFolder:
-				ref := Ref{}
-				ref.With(p.Val)
-				v.model.Datastores = ref.Encode()
+				v.model.Datastores = v.Ref(p.Val)
 			}
 		}
 	}
@@ -261,41 +168,35 @@ func (v *ClusterAdapter) Apply(u types.ObjectUpdate) {
 		case Assign:
 			switch p.Name {
 			case fHost:
-				refList := RefList{}
-				refList.With(p.Val)
-				v.model.Hosts = refList.Encode()
+				v.model.Hosts = v.RefList(p.Val)
 			case fNetwork:
-				refList := RefList{}
-				refList.With(p.Val)
-				v.model.Networks = refList.Encode()
+				v.model.Networks = v.RefList(p.Val)
 			case fDatastore:
-				refList := RefList{}
-				refList.With(p.Val)
-				v.model.Datastores = refList.Encode()
+				v.model.Datastores = v.RefList(p.Val)
 			case fDasEnabled:
 				if b, cast := p.Val.(bool); cast {
 					v.model.DasEnabled = b
 				}
 			case fDasVmCfg:
-				refList := RefList{}
+				refList := []model.Ref{}
 				if list, cast := p.Val.([]types.ClusterDasVmConfigInfo); cast {
-					for _, v := range list {
-						refList.Append(v.Key)
+					for _, val := range list {
+						refList = append(refList, v.Ref(val.Key))
 					}
 				}
-				v.model.DasVms = refList.Encode()
+				v.model.DasVms = refList
 			case fDrsEnabled:
 				if b, cast := p.Val.(bool); cast {
 					v.model.DrsEnabled = b
 				}
 			case fDrsVmCfg:
-				refList := RefList{}
+				refList := []model.Ref{}
 				if list, cast := p.Val.([]types.ClusterDrsVmConfigInfo); cast {
-					for _, v := range list {
-						refList.Append(v.Key)
+					for _, val := range list {
+						refList = append(refList, v.Ref(val.Key))
 					}
 				}
-				v.model.DrsVms = refList.Encode()
+				v.model.DrsVms = refList
 			case fDrsVmBehavior:
 				if b, cast := p.Val.(types.DrsBehavior); cast {
 					v.model.DrsBehavior = string(b)
@@ -342,9 +243,7 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 					v.model.CpuCores = b
 				}
 			case fVm:
-				refList := RefList{}
-				refList.With(p.Val)
-				v.model.Vms = refList.Encode()
+				v.model.Vms = v.RefList(p.Val)
 			case fProductName:
 				if s, cast := p.Val.(string); cast {
 					v.model.ProductName = s
@@ -354,16 +253,12 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 					v.model.ProductVersion = s
 				}
 			case fNetwork:
-				refList := RefList{}
-				refList.With(p.Val)
-				v.model.Networks = refList.Encode()
+				v.model.Networks = v.RefList(p.Val)
 			case fDatastore:
-				refList := RefList{}
-				refList.With(p.Val)
-				v.model.Datastores = refList.Encode()
+				v.model.Datastores = v.RefList(p.Val)
 			case fVSwitch:
 				if array, cast := p.Val.(types.ArrayOfHostVirtualSwitch); cast {
-					network := v.model.DecodeNetwork()
+					network := &v.model.Network
 					for _, vSwitch := range array.HostVirtualSwitch {
 						network.Switches = append(
 							network.Switches,
@@ -374,11 +269,10 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 								PNICs:      vSwitch.Pnic,
 							})
 					}
-					v.model.EncodeNetwork(network)
 				}
 			case fPortGroup:
 				if array, cast := p.Val.(types.ArrayOfHostPortGroup); cast {
-					network := v.model.DecodeNetwork()
+					network := &v.model.Network
 					for _, portGroup := range array.HostPortGroup {
 						network.PortGroups = append(
 							network.PortGroups,
@@ -388,11 +282,10 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 								Switch: portGroup.Vswitch,
 							})
 					}
-					v.model.EncodeNetwork(network)
 				}
 			case fPNIC:
 				if array, cast := p.Val.(types.ArrayOfPhysicalNic); cast {
-					network := v.model.DecodeNetwork()
+					network := &v.model.Network
 					for _, nic := range array.PhysicalNic {
 						linkSpeed := int32(0)
 						if nic.LinkSpeed != nil {
@@ -410,11 +303,10 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 						func(i, j int) bool {
 							return network.PNICs[i].LinkSpeed > network.PNICs[j].LinkSpeed
 						})
-					v.model.EncodeNetwork(network)
 				}
 			case fVNIC:
 				if array, cast := p.Val.(types.ArrayOfHostVirtualNic); cast {
-					network := v.model.DecodeNetwork()
+					network := &v.model.Network
 					for _, nic := range array.HostVirtualNic {
 						dGroup := func() (key string) {
 							dp := nic.Spec.DistributedVirtualPort
@@ -438,7 +330,6 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 						func(i, j int) bool {
 							return network.VNICs[i].MTU > network.VNICs[j].MTU
 						})
-					v.model.EncodeNetwork(network)
 				}
 			}
 		}
@@ -472,9 +363,7 @@ func (v *NetworkAdapter) Apply(u types.ObjectUpdate) {
 					v.model.Tag = s
 				}
 			case fDVSwitch:
-				ref := Ref{}
-				ref.With(p.Val)
-				v.model.DVSwitch = ref.Encode()
+				v.model.DVSwitch = v.Ref(p.Val)
 			}
 		}
 	}
@@ -516,8 +405,7 @@ func (v *DVSwitchAdapter) Apply(u types.ObjectUpdate) {
 func (v *DVSwitchAdapter) addHost(array types.ArrayOfDistributedVirtualSwitchHostMember) {
 	list := []model.DVSHost{}
 	for _, member := range array.DistributedVirtualSwitchHostMember {
-		hostRef := Ref{}
-		hostRef.With(*member.Config.Host)
+		hostRef := v.Ref(*member.Config.Host)
 		if backing, cast := member.Config.Backing.(*types.DistributedVirtualSwitchHostMemberPnicBacking); cast {
 			names := []string{}
 			for _, pn := range backing.PnicSpec {
@@ -525,13 +413,13 @@ func (v *DVSwitchAdapter) addHost(array types.ArrayOfDistributedVirtualSwitchHos
 			}
 			list = append(list,
 				model.DVSHost{
-					Host: hostRef.Encode(),
+					Host: hostRef,
 					PNIC: names,
 				})
 		}
 	}
 
-	v.model.EncodeHost(list)
+	v.model.Host = list
 }
 
 //
@@ -613,9 +501,7 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				}
 			case fCpuAffinity:
 				if a, cast := p.Val.(types.VirtualMachineAffinityInfo); cast {
-					list := List{}
-					list.With(a.AffinitySet)
-					v.model.CpuAffinity = list.Encode()
+					v.model.CpuAffinity = a.AffinitySet
 				}
 			case fCpuHotAddEnabled:
 				if b, cast := p.Val.(bool); cast {
@@ -654,9 +540,7 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 					v.model.BalloonedMemory = n
 				}
 			case fRuntimeHost:
-				ref := Ref{}
-				ref.With(p.Val)
-				v.model.Host = ref.Encode()
+				v.model.Host = v.Ref(p.Val)
 			case fVmIpAddress:
 				if s, cast := p.Val.(string); cast {
 					v.model.IpAddress = s
@@ -666,9 +550,7 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 					v.model.FaultToleranceEnabled = true
 				}
 			case fNetwork:
-				refList := RefList{}
-				refList.With(p.Val)
-				v.model.Networks = refList.Encode()
+				v.model.Networks = v.RefList(p.Val)
 			case fExtraConfig:
 				if options, cast := p.Val.(types.ArrayOfOptionValue); cast {
 					for _, val := range options.OptionValue {
@@ -676,9 +558,7 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 						switch opt.Key {
 						case "numa.nodeAffinity":
 							if s, cast := opt.Value.(string); cast {
-								list := List{}
-								list.With(strings.Split(s, ","))
-								v.model.NumaNodeAffinity = list.Encode()
+								v.model.NumaNodeAffinity = strings.Split(s, ",")
 							}
 						}
 					}
@@ -699,7 +579,7 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 								})
 						}
 					}
-					v.model.EncodeDevices(list)
+					v.model.Devices = list
 					v.updateDisks(&devArray)
 				}
 			}
@@ -764,5 +644,5 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 		}
 	}
 
-	v.model.EncodeDisks(disks)
+	v.model.Disks = disks
 }

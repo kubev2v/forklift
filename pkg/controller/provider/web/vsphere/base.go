@@ -35,6 +35,20 @@ func (h Handler) Predicate(ctx *gin.Context) (p libmodel.Predicate) {
 }
 
 //
+// Build list options.
+func (h Handler) ListOptions(ctx *gin.Context) libmodel.ListOptions {
+	detail := 0
+	if h.Detail {
+		detail = 1
+	}
+	return libmodel.ListOptions{
+		Predicate: h.Predicate(ctx),
+		Detail:    detail,
+		Page:      &h.Page,
+	}
+}
+
+//
 // Match (compare) paths.
 // Determine if the relative path is contained
 // in the absolute path.

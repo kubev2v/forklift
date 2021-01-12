@@ -3,7 +3,6 @@ package ocp
 import (
 	"errors"
 	"github.com/gin-gonic/gin"
-	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
@@ -43,11 +42,7 @@ func (h NamespaceHandler) List(ctx *gin.Context) {
 	}
 	db := h.Reconciler.DB()
 	list := []model.Namespace{}
-	err := db.List(
-		&list,
-		libmodel.ListOptions{
-			Page: &h.Page,
-		})
+	err := db.List(&list, h.ListOptions(ctx))
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
@@ -119,7 +114,7 @@ type Namespace struct {
 // Set fields with the specified object.
 func (r *Namespace) With(m *model.Namespace) {
 	r.Resource.With(&m.Base)
-	m.DecodeObject(&r.Object)
+	r.Object = m.Object
 }
 
 //
