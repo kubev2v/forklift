@@ -15,9 +15,11 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes/scheme"
 	cdi "kubevirt.io/containerized-data-importer/pkg/apis/core/v1beta1"
 	vmio "kubevirt.io/vm-import-operator/pkg/apis/v2v/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	k8sutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"strconv"
 	"strings"
 )
@@ -135,6 +137,47 @@ func (r *KubeVirt) EnsureImport(vm *plan.VMStatus) (err error) {
 }
 
 //
+// Set VMIO secret owner references.
+func (r *KubeVirt) SetSecretOwner(vm *plan.VMStatus) (err error) {
+	vmImport := &vmio.VirtualMachineImport{}
+	err = r.Destination.Client.Get(
+		context.TODO(),
+		client.ObjectKey{
+			Namespace: r.namespace(),
+			Name:      r.nameForImport(vm.Ref),
+		},
+		vmImport)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	secret := &core.Secret{}
+	err = r.Destination.Client.Get(
+		context.TODO(),
+		client.ObjectKey{
+			Namespace: r.namespace(),
+			Name:      r.nameForSecret(vm.Ref),
+		},
+		secret)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	err = k8sutil.SetOwnerReference(vmImport, secret, scheme.Scheme)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	err = r.Destination.Client.Update(context.TODO(), secret)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	return
+}
+
+//
 // Ensure the namespace exists on the destination.
 func (r *KubeVirt) EnsureNamespace() (err error) {
 	ns := &core.Namespace{
@@ -242,7 +285,7 @@ func (r *KubeVirt) buildSecret(vmRef ref.Ref) (object *core.Secret, err error) {
 //
 // Generated name for kubevirt VM Import CR secret.
 func (r *KubeVirt) nameForSecret(vmRef ref.Ref) string {
-	uid := string(r.Plan.UID)
+	uid := string(r.Plan.Status.Migration.Active)
 	parts := []string{
 		"plan",
 		r.Plan.Name,
