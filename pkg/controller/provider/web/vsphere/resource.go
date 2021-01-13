@@ -10,7 +10,7 @@ type Resource struct {
 	// Object ID.
 	ID string `json:"id"`
 	// Parent.
-	Parent *model.Ref `json:"parent"`
+	Parent model.Ref `json:"parent"`
 	// Path
 	Path string `json:"path,omitempty"`
 	// Revision
@@ -25,7 +25,7 @@ type Resource struct {
 // Build the resource using the model.
 func (r *Resource) With(m *model.Base) {
 	r.ID = m.ID
-	r.Parent = (&model.Ref{}).With(m.Parent)
+	r.Parent = m.Parent
 	r.Revision = m.Revision
 	r.Name = m.Name
 }

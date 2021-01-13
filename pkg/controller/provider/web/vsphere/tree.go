@@ -42,7 +42,11 @@ func (h *TreeHandler) Prepare(ctx *gin.Context) int {
 		return status
 	}
 	db := h.Reconciler.DB()
-	err := db.List(&h.datacenters, libmodel.ListOptions{})
+	err := db.List(
+		&h.datacenters,
+		libmodel.ListOptions{
+			Detail: 1,
+		})
 	if err != nil {
 		Log.Trace(err)
 		return http.StatusInternalServerError
@@ -74,8 +78,7 @@ func (h TreeHandler) VmTree(ctx *gin.Context) {
 	db := h.Reconciler.DB()
 	content := TreeNode{}
 	for _, dc := range h.datacenters {
-		ref := &model.Ref{}
-		ref.With(dc.Vms)
+		ref := dc.Vms
 		folder := &model.Folder{
 			Base: model.Base{
 				ID: ref.ID,
@@ -124,8 +127,7 @@ func (h TreeHandler) HostTree(ctx *gin.Context) {
 	db := h.Reconciler.DB()
 	content := TreeNode{}
 	for _, dc := range h.datacenters {
-		ref := &model.Ref{}
-		ref.With(dc.Clusters)
+		ref := dc.Clusters
 		folder := &model.Folder{
 			Base: model.Base{
 				ID: ref.ID,

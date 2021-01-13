@@ -1,12 +1,13 @@
 package ocp
 
 import (
+	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/base"
+	core "k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/json"
 	"path"
 	"strconv"
 )
@@ -17,7 +18,6 @@ var NotFound = libmodel.NotFound
 //
 // Types
 type Model = libmodel.Model
-type Annotation = base.Annotation
 
 //
 // k8s Resource.
@@ -32,15 +32,13 @@ type Base struct {
 	// PK
 	PK string `sql:"pk"`
 	// Object UID.
-	UID string `sql:""`
+	UID string `sql:"d0"`
 	// Resource version.
-	Version string `sql:""`
+	Version string `sql:"d0"`
 	// Namespace.
 	Namespace string `sql:"key"`
 	// Name.
 	Name string `sql:"key"`
-	// Json encoded (raw) object.
-	Object string `sql:""`
 	// Labels
 	labels libmodel.Labels
 }
@@ -52,14 +50,6 @@ func (m *Base) With(r Resource) {
 	m.Version = r.GetResourceVersion()
 	m.Namespace = r.GetNamespace()
 	m.Name = r.GetName()
-	m.EncodeObject(r)
-}
-
-//
-// Encode (set) the object field.
-func (m *Base) EncodeObject(r interface{}) {
-	b, _ := json.Marshal(r)
-	m.Object = string(b)
 }
 
 //
@@ -68,13 +58,6 @@ func (m *Base) EncodeObject(r interface{}) {
 func (m *Base) ResourceVersion() uint64 {
 	n, _ := strconv.ParseUint(m.Version, 10, 64)
 	return n
-}
-
-//
-// Decode the object field.
-// `r` must be pointer to the appropriate k8s object.
-func (m *Base) DecodeObject(r interface{}) {
-	_ = json.Unmarshal([]byte(m.Object), r)
 }
 
 func (m *Base) Pk() string {
@@ -102,28 +85,48 @@ func (m *Base) Labels() libmodel.Labels {
 // Provider
 type Provider struct {
 	Base
-	Type string `sql:""`
+	Type   string       `sql:""`
+	Object api.Provider `sql:""`
 }
 
 func (m *Provider) With(p *api.Provider) {
 	m.Base.With(p)
 	m.Type = p.Type()
+	m.Object = *p
 }
 
 //
 // Namespace
 type Namespace struct {
 	Base
+	Object core.Namespace `sql:""`
+}
+
+func (m *Namespace) With(n *core.Namespace) {
+	m.Base.With(n)
+	m.Object = *n
 }
 
 //
 // StorageClass
 type StorageClass struct {
 	Base
+	Object storage.StorageClass `sql:""`
+}
+
+func (m *StorageClass) With(s *storage.StorageClass) {
+	m.Base.With(s)
+	m.Object = *s
 }
 
 //
 // NetworkAttachmentDefinition
 type NetworkAttachmentDefinition struct {
 	Base
+	Object net.NetworkAttachmentDefinition `sql:""`
+}
+
+func (m *NetworkAttachmentDefinition) With(n *net.NetworkAttachmentDefinition) {
+	m.Base.With(n)
+	m.Object = *n
 }

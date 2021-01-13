@@ -1,10 +1,8 @@
 package vsphere
 
 import (
-	"encoding/json"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/base"
 	"strings"
 )
 
@@ -23,7 +21,6 @@ var NotFound = libmodel.NotFound
 //
 // Types
 type Model = libmodel.Model
-type Annotation = base.Annotation
 
 //
 // Base VMWare model.
@@ -33,7 +30,7 @@ type Base struct {
 	// Name
 	Name string `sql:"index(b)"`
 	// Parent
-	Parent string `sql:"index(a)"`
+	Parent Ref `sql:"index(a)"`
 	// Revision
 	Revision int64 `sql:""`
 }
@@ -90,8 +87,7 @@ func (m *Base) Path(db libmodel.DB) (path string, err error) {
 	node := m
 Walk:
 	for {
-		parent := Ref{}
-		parent.With(node.Parent)
+		parent := node.Parent
 		switch parent.Kind {
 		case FolderKind:
 			f := &Folder{}
@@ -172,68 +168,6 @@ type Ref struct {
 	ID string `json:"id"`
 }
 
-//
-// Encode the ref.
-func (r *Ref) Encode() string {
-	j, _ := json.Marshal(r)
-	return string(j)
-}
-
-//
-// Unmarshal the json `j` into self.
-func (r *Ref) With(j string) *Ref {
-	json.Unmarshal([]byte(j), r)
-	return r
-}
-
-//
-// Ref pointer.
-func RefPtr() *Ref {
-	r := Ref{}
-	return &r
-}
-
-//
-// List of `Ref`.
-type RefList []Ref
-
-//
-// Encode the list.
-func (r *RefList) Encode() string {
-	j, _ := json.Marshal(r)
-	return string(j)
-}
-
-//
-// Unmarshal the json `j` into self.
-func (r *RefList) With(j string) *RefList {
-	json.Unmarshal([]byte(j), r)
-	return r
-}
-
-//
-// RefList pointer.
-func RefListPtr() *RefList {
-	r := RefList{}
-	return &r
-}
-
-//
-// List
-type List []interface{}
-
-func (r *List) Encode() string {
-	j, _ := json.Marshal(r)
-	return string(j)
-}
-
-//
-// Unmarshal the json `j` into self.
-func (r *List) With(j string) *List {
-	json.Unmarshal([]byte(j), r)
-	return r
-}
-
 type About struct {
 	Base
 	APIVersion string `sql:""`
@@ -242,52 +176,41 @@ type About struct {
 
 type Folder struct {
 	Base
-	Children string `sql:""`
+	Children []Ref `sql:""`
 }
 
 type Datacenter struct {
 	Base
-	Clusters   string `sql:""`
-	Networks   string `sql:""`
-	Datastores string `sql:""`
-	Vms        string `sql:""`
+	Clusters   Ref `sql:""`
+	Networks   Ref `sql:""`
+	Datastores Ref `sql:""`
+	Vms        Ref `sql:""`
 }
 
 type Cluster struct {
 	Base
-	Hosts       string `sql:""`
-	Networks    string `sql:""`
-	Datastores  string `sql:""`
+	Hosts       []Ref  `sql:""`
+	Networks    []Ref  `sql:""`
+	Datastores  []Ref  `sql:""`
 	DasEnabled  bool   `sql:""`
-	DasVms      string `sql:""`
+	DasVms      []Ref  `sql:""`
 	DrsEnabled  bool   `sql:""`
 	DrsBehavior string `sql:""`
-	DrsVms      string `sql:""`
+	DrsVms      []Ref  `sql:""`
 }
 
 type Host struct {
 	Base
-	InMaintenanceMode bool   `sql:""`
-	Thumbprint        string `sql:""`
-	CpuSockets        int16  `sql:""`
-	CpuCores          int16  `sql:""`
-	ProductName       string `sql:""`
-	ProductVersion    string `sql:""`
-	Network           string `sql:""`
-	Networks          string `sql:""`
-	Datastores        string `sql:""`
-	Vms               string `sql:""`
-}
-
-func (r *Host) EncodeNetwork(network *HostNetwork) {
-	b, _ := json.Marshal(network)
-	r.Network = string(b)
-}
-
-func (r *Host) DecodeNetwork() *HostNetwork {
-	network := &HostNetwork{}
-	json.Unmarshal([]byte(r.Network), network)
-	return network
+	InMaintenanceMode bool        `sql:""`
+	Thumbprint        string      `sql:""`
+	CpuSockets        int16       `sql:""`
+	CpuCores          int16       `sql:""`
+	ProductName       string      `sql:""`
+	ProductVersion    string      `sql:""`
+	Network           HostNetwork `sql:""`
+	Networks          []Ref       `sql:""`
+	Datastores        []Ref       `sql:""`
+	Vms               []Ref       `sql:""`
 }
 
 type HostNetwork struct {
@@ -361,28 +284,17 @@ type Switch struct {
 type Network struct {
 	Base
 	Tag      string `sql:""`
-	DVSwitch string `sql:""`
+	DVSwitch Ref    `sql:""`
 }
 
 type DVSwitch struct {
 	Base
-	Host string `sql:""`
+	Host []DVSHost `sql:""`
 }
 
 type DVSHost struct {
-	Host string
+	Host Ref
 	PNIC []string
-}
-
-func (m *DVSwitch) EncodeHost(host []DVSHost) {
-	j, _ := json.Marshal(host)
-	m.Host = string(j)
-}
-
-func (m *DVSwitch) DecodeHost() []DVSHost {
-	list := []DVSHost{}
-	json.Unmarshal([]byte(m.Host), &list)
-	return list
 }
 
 type Datastore struct {
@@ -395,28 +307,28 @@ type Datastore struct {
 
 type VM struct {
 	Base
-	UUID                  string `sql:""`
-	Firmware              string `sql:""`
-	PowerState            string `sql:""`
-	CpuAffinity           string `sql:""`
-	CpuHotAddEnabled      bool   `sql:""`
-	CpuHotRemoveEnabled   bool   `sql:""`
-	MemoryHotAddEnabled   bool   `sql:""`
-	FaultToleranceEnabled bool   `sql:""`
-	CpuCount              int32  `sql:""`
-	CoresPerSocket        int32  `sql:""`
-	MemoryMB              int32  `sql:""`
-	GuestName             string `sql:""`
-	BalloonedMemory       int32  `sql:""`
-	IpAddress             string `sql:""`
-	NumaNodeAffinity      string `sql:""`
-	StorageUsed           int64  `sql:""`
-	Devices               string `sql:""`
-	Disks                 string `sql:""`
-	Networks              string `sql:""`
-	Host                  string `sql:""`
-	RevisionAnalyzed      int64  `sql:""`
-	Concerns              string `sql:""`
+	UUID                  string    `sql:""`
+	Firmware              string    `sql:""`
+	PowerState            string    `sql:""`
+	CpuAffinity           []int32   `sql:""`
+	CpuHotAddEnabled      bool      `sql:""`
+	CpuHotRemoveEnabled   bool      `sql:""`
+	MemoryHotAddEnabled   bool      `sql:""`
+	FaultToleranceEnabled bool      `sql:""`
+	CpuCount              int32     `sql:""`
+	CoresPerSocket        int32     `sql:""`
+	MemoryMB              int32     `sql:""`
+	GuestName             string    `sql:""`
+	BalloonedMemory       int32     `sql:""`
+	IpAddress             string    `sql:""`
+	NumaNodeAffinity      []string  `sql:""`
+	StorageUsed           int64     `sql:""`
+	Devices               []Device  `sql:""`
+	Disks                 []Disk    `sql:""`
+	Networks              []Ref     `sql:""`
+	Host                  Ref       `sql:""`
+	RevisionAnalyzed      int64     `sql:""`
+	Concerns              []Concern `sql:""`
 }
 
 //
@@ -426,50 +338,18 @@ func (m *VM) Analyzed() bool {
 }
 
 //
-// Encode disks.
-func (m *VM) EncodeDisks(d []Disk) {
-	j, _ := json.Marshal(d)
-	m.Disks = string(j)
-}
-
-//
-// Decode disks.
-func (m *VM) DecodeDisks() []Disk {
-	list := []Disk{}
-	json.Unmarshal([]byte(m.Disks), &list)
-	return list
-}
-
-//
-// Encode devices.
-func (m *VM) EncodeDevices(d []Device) {
-	j, _ := json.Marshal(d)
-	m.Devices = string(j)
-}
-
-//
-// Decode devices.
-func (m *VM) DecodeDevices() []Device {
-	list := []Device{}
-	json.Unmarshal([]byte(m.Devices), &list)
-	return list
-}
-
-//
 // Find associated cluster.
 // returns err = libmodel.NotFound when cannot be resolved.
 func (m *VM) Cluster(db libmodel.DB) (matched *Cluster, err error) {
 	list := []Cluster{}
-	err = db.List(&list, libmodel.ListOptions{})
+	err = db.List(&list, libmodel.ListOptions{Detail: 1})
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	hostRef := Ref{}
-	hostRef.With(m.Host)
+	hostRef := m.Host
 	for _, cluster := range list {
-		refList := RefList{}
-		refList.With(cluster.Hosts)
+		refList := cluster.Hosts
 		for _, ref := range refList {
 			if ref.ID == hostRef.ID {
 				matched = &cluster

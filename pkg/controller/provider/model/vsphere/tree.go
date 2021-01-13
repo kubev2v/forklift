@@ -96,10 +96,8 @@ func (r *Tree) Build() (*TreeNode, error) {
 		switch kind {
 		case FolderKind:
 			folder := model.(*Folder)
-			refList := RefList{}
-			refList.With(folder.Children)
 		next:
-			for _, ref := range refList {
+			for _, ref := range folder.Children {
 				switch r.Leaf {
 				case FolderKind:
 					if ref.Kind != r.Leaf {
@@ -123,13 +121,13 @@ func (r *Tree) Build() (*TreeNode, error) {
 			dc := model.(*Datacenter)
 			switch r.Leaf {
 			case ClusterKind, HostKind:
-				ref.With(dc.Clusters)
+				ref = dc.Clusters
 			case VmKind:
-				ref.With(dc.Vms)
+				ref = dc.Vms
 			case NetKind:
-				ref.With(dc.Networks)
+				ref = dc.Networks
 			case DsKind:
-				ref.With(dc.Datastores)
+				ref = dc.Datastores
 			case DatacenterKind:
 				// Leaf
 			default:
@@ -147,15 +145,15 @@ func (r *Tree) Build() (*TreeNode, error) {
 				return liberr.Wrap(err)
 			}
 		case ClusterKind:
-			refList := RefList{}
+			refList := []Ref{}
 			cluster := model.(*Cluster)
 			switch r.Leaf {
 			case HostKind, VmKind:
-				refList.With(cluster.Hosts)
+				refList = cluster.Hosts
 			case NetKind:
-				refList.With(cluster.Networks)
+				refList = cluster.Networks
 			case DsKind:
-				refList.With(cluster.Datastores)
+				refList = cluster.Datastores
 			case ClusterKind:
 				// Leaf
 			default:
@@ -175,15 +173,15 @@ func (r *Tree) Build() (*TreeNode, error) {
 				}
 			}
 		case HostKind:
-			refList := RefList{}
+			refList := []Ref{}
 			host := model.(*Host)
 			switch r.Leaf {
 			case VmKind:
-				refList.With(host.Vms)
+				refList = host.Vms
 			case NetKind:
-				refList.With(host.Networks)
+				refList = host.Networks
 			case DsKind:
-				refList.With(host.Datastores)
+				refList = host.Datastores
 			case HostKind:
 				// Leaf
 			default:

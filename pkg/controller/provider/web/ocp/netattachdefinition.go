@@ -4,7 +4,6 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
-	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
@@ -46,11 +45,7 @@ func (h NetworkAttachmentDefinitionHandler) ListAll(ctx *gin.Context) {
 	}
 	db := h.Reconciler.DB()
 	list := []model.NetworkAttachmentDefinition{}
-	err := db.List(
-		&list,
-		libmodel.ListOptions{
-			Page: &h.Page,
-		})
+	err := db.List(&list, h.ListOptions(ctx))
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
@@ -77,12 +72,7 @@ func (h NetworkAttachmentDefinitionHandler) List(ctx *gin.Context) {
 	}
 	db := h.Reconciler.DB()
 	list := []model.NetworkAttachmentDefinition{}
-	err := db.List(
-		&list,
-		libmodel.ListOptions{
-			Predicate: libmodel.Eq("Namespace", ctx.Param(Ns2Param)),
-			Page:      &h.Page,
-		})
+	err := db.List(&list, h.ListOptions(ctx))
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
@@ -156,7 +146,7 @@ type NetworkAttachmentDefinition struct {
 // Set fields with the specified object.
 func (r *NetworkAttachmentDefinition) With(m *model.NetworkAttachmentDefinition) {
 	r.Resource.With(&m.Base)
-	m.DecodeObject(&r.Object)
+	r.Object = m.Object
 }
 
 //
