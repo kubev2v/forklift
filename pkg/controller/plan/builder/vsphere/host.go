@@ -3,7 +3,6 @@ package vsphere
 import (
 	"context"
 	liberr "github.com/konveyor/controller/pkg/error"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
@@ -22,8 +21,6 @@ type EsxHost struct {
 	URL string
 	// Host secret.
 	Secret *core.Secret
-	// Inventory client.
-	Inventory web.Client
 	// Host client.
 	client *govmomi.Client
 	// Finder
