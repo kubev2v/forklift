@@ -8,8 +8,9 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
-	"github.com/konveyor/forklift-controller/pkg/controller/plan/builder/vsphere"
+	builder "github.com/konveyor/forklift-controller/pkg/controller/plan/builder/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/validation"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -275,16 +276,17 @@ func (r *Reconciler) testConnection(host *api.Host) (err error) {
 	switch provider.Type() {
 	case api.VSphere:
 		url := fmt.Sprintf("https://%s/sdk", host.Spec.IpAddress)
-		h := vsphere.EsxHost{
-			URL:       url,
-			Inventory: inventory,
-			Secret:    secret,
+		hostModel := &vsphere.Host{}
+		pErr = inventory.Find(hostModel, host.Spec.Ref)
+		if pErr != nil {
+			return liberr.Wrap(pErr)
+		}
+		secret.Data["thumbprint"] = []byte(hostModel.Thumbprint)
+		h := builder.EsxHost{
+			Secret: secret,
+			URL:    url,
 		}
 		tErr := h.TestConnection()
-		if errors.As(tErr, &web.ProviderNotReadyError{}) {
-			err = liberr.Wrap(tErr)
-			return
-		}
 		if tErr == nil {
 			cnd.Status = True
 			cnd.Reason = Tested

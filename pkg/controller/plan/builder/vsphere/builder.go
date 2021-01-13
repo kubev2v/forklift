@@ -445,9 +445,8 @@ func (r *Builder) esxHost(vm *model.VM) (esxHost *EsxHost, found bool, err error
 	}
 	secret.Data["thumbprint"] = []byte(hostModel.Thumbprint)
 	esxHost = &EsxHost{
-		Inventory: r.Source.Inventory,
-		Secret:    secret,
-		URL:       url,
+		Secret: secret,
+		URL:    url,
 	}
 
 	return
