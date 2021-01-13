@@ -3,7 +3,6 @@ package vsphere
 import (
 	"errors"
 	"github.com/gin-gonic/gin"
-	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
@@ -45,12 +44,7 @@ func (h FolderHandler) List(ctx *gin.Context) {
 	}
 	db := h.Reconciler.DB()
 	list := []model.Folder{}
-	err := db.List(
-		&list,
-		libmodel.ListOptions{
-			Predicate: h.Predicate(ctx),
-			Page:      &h.Page,
-		})
+	err := db.List(&list, h.ListOptions(ctx))
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
@@ -121,14 +115,14 @@ func (h FolderHandler) Link(p *api.Provider, m *model.Folder) string {
 // REST Resource.
 type Folder struct {
 	Resource
-	Children model.RefList `json:"children"`
+	Children []model.Ref `json:"children"`
 }
 
 //
 // Build the resource using the model.
 func (r *Folder) With(m *model.Folder) {
 	r.Resource.With(&m.Base)
-	r.Children = *model.RefListPtr().With(m.Children)
+	r.Children = m.Children
 }
 
 //

@@ -3,7 +3,6 @@ package vsphere
 import (
 	"errors"
 	"github.com/gin-gonic/gin"
-	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
@@ -45,12 +44,7 @@ func (h ClusterHandler) List(ctx *gin.Context) {
 	}
 	db := h.Reconciler.DB()
 	list := []model.Cluster{}
-	err := db.List(
-		&list,
-		libmodel.ListOptions{
-			Predicate: h.Predicate(ctx),
-			Page:      &h.Page,
-		})
+	err := db.List(&list, h.ListOptions(ctx))
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
@@ -121,13 +115,13 @@ func (h ClusterHandler) Link(p *api.Provider, m *model.Cluster) string {
 // REST Resource.
 type Cluster struct {
 	Resource
-	Networks    model.RefList `json:"networks"`
-	Datastores  model.RefList `json:"datastores"`
-	DasEnabled  bool          `json:"dasEnabled"`
-	DasVms      model.RefList `json:"DasVms"`
-	DrsEnabled  bool          `json:"drsEnabled"`
-	DrsBehavior string        `json:"drsBehavior"`
-	DrsVms      model.RefList `json:"drsVms"`
+	Networks    []model.Ref `json:"networks"`
+	Datastores  []model.Ref `json:"datastores"`
+	DasEnabled  bool        `json:"dasEnabled"`
+	DasVms      []model.Ref `json:"DasVms"`
+	DrsEnabled  bool        `json:"drsEnabled"`
+	DrsBehavior string      `json:"drsBehavior"`
+	DrsVms      []model.Ref `json:"drsVms"`
 }
 
 //
@@ -137,10 +131,10 @@ func (r *Cluster) With(m *model.Cluster) {
 	r.DasEnabled = m.DasEnabled
 	r.DrsEnabled = m.DrsEnabled
 	r.DrsBehavior = m.DrsBehavior
-	r.Networks = *model.RefListPtr().With(m.Networks)
-	r.Datastores = *model.RefListPtr().With(m.Datastores)
-	r.DasVms = *model.RefListPtr().With(m.DasVms)
-	r.DrsVms = *model.RefListPtr().With(m.DasVms)
+	r.Networks = m.Networks
+	r.Datastores = m.Datastores
+	r.DasVms = m.DasVms
+	r.DrsVms = m.DasVms
 }
 
 //

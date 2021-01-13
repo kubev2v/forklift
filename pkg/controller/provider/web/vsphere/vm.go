@@ -4,7 +4,6 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	liberr "github.com/konveyor/controller/pkg/error"
-	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
@@ -45,12 +44,7 @@ func (h VMHandler) List(ctx *gin.Context) {
 	}
 	db := h.Reconciler.DB()
 	list := []model.VM{}
-	err := db.List(
-		&list,
-		libmodel.ListOptions{
-			Predicate: h.Predicate(ctx),
-			Page:      &h.Page,
-		})
+	err := db.List(&list, h.ListOptions(ctx))
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
@@ -160,28 +154,28 @@ func (h VMHandler) filter(ctx *gin.Context, list *[]model.VM) (err error) {
 // REST Resource.
 type VM struct {
 	Resource
-	UUID                  string         `json:"uuid"`
-	Firmware              string         `json:"firmware"`
-	PowerState            string         `json:"powerState"`
-	CpuAffinity           model.List     `json:"cpuAffinity"`
-	CpuHotAddEnabled      bool           `json:"cpuHotAddEnabled"`
-	CpuHotRemoveEnabled   bool           `json:"cpuHotRemoveEnabled"`
-	MemoryHotAddEnabled   bool           `json:"memoryHotAddEnabled"`
-	FaultToleranceEnabled bool           `json:"faultToleranceEnabled"`
-	CpuCount              int32          `json:"cpuCount"`
-	CoresPerSocket        int32          `json:"coresPerSocket"`
-	MemoryMB              int32          `json:"memoryMB"`
-	GuestName             string         `json:"guestName"`
-	BalloonedMemory       int32          `json:"balloonedMemory"`
-	IpAddress             string         `json:"ipAddress"`
-	StorageUsed           int64          `json:"storageUsed"`
-	NumaNodeAffinity      model.List     `json:"numaNodeAffinity"`
-	Devices               []model.Device `json:"devices"`
-	Networks              model.RefList  `json:"networks"`
-	Disks                 []model.Disk   `json:"disks"`
-	Host                  model.Ref      `json:"host"`
-	RevisionAnalyzed      int64          `json:"revisionAnalyzed"`
-	Concerns              model.List     `json:"concerns"`
+	UUID                  string          `json:"uuid"`
+	Firmware              string          `json:"firmware"`
+	PowerState            string          `json:"powerState"`
+	CpuAffinity           []int32         `json:"cpuAffinity"`
+	CpuHotAddEnabled      bool            `json:"cpuHotAddEnabled"`
+	CpuHotRemoveEnabled   bool            `json:"cpuHotRemoveEnabled"`
+	MemoryHotAddEnabled   bool            `json:"memoryHotAddEnabled"`
+	FaultToleranceEnabled bool            `json:"faultToleranceEnabled"`
+	CpuCount              int32           `json:"cpuCount"`
+	CoresPerSocket        int32           `json:"coresPerSocket"`
+	MemoryMB              int32           `json:"memoryMB"`
+	GuestName             string          `json:"guestName"`
+	BalloonedMemory       int32           `json:"balloonedMemory"`
+	IpAddress             string          `json:"ipAddress"`
+	StorageUsed           int64           `json:"storageUsed"`
+	NumaNodeAffinity      []string        `json:"numaNodeAffinity"`
+	Devices               []model.Device  `json:"devices"`
+	Networks              []model.Ref     `json:"networks"`
+	Disks                 []model.Disk    `json:"disks"`
+	Host                  model.Ref       `json:"host"`
+	RevisionAnalyzed      int64           `json:"revisionAnalyzed"`
+	Concerns              []model.Concern `json:"concerns"`
 }
 
 //
@@ -191,7 +185,7 @@ func (r *VM) With(m *model.VM) {
 	r.UUID = m.UUID
 	r.Firmware = m.Firmware
 	r.PowerState = m.PowerState
-	r.CpuAffinity = *(&model.List{}).With(m.CpuAffinity)
+	r.CpuAffinity = m.CpuAffinity
 	r.CpuHotAddEnabled = m.CpuHotAddEnabled
 	r.CpuHotRemoveEnabled = m.CpuHotRemoveEnabled
 	r.MemoryHotAddEnabled = m.MemoryHotAddEnabled
@@ -203,13 +197,13 @@ func (r *VM) With(m *model.VM) {
 	r.IpAddress = m.IpAddress
 	r.StorageUsed = m.StorageUsed
 	r.FaultToleranceEnabled = m.FaultToleranceEnabled
-	r.Devices = m.DecodeDevices()
-	r.NumaNodeAffinity = *(&model.List{}).With(m.NumaNodeAffinity)
-	r.Networks = *model.RefListPtr().With(m.Networks)
-	r.Disks = m.DecodeDisks()
-	r.Host = *(&model.Ref{}).With(m.Host)
+	r.Devices = m.Devices
+	r.NumaNodeAffinity = m.NumaNodeAffinity
+	r.Networks = m.Networks
+	r.Disks = m.Disks
+	r.Host = m.Host
 	r.RevisionAnalyzed = m.RevisionAnalyzed
-	r.Concerns = *(&model.List{}).With(m.Concerns)
+	r.Concerns = m.Concerns
 }
 
 //

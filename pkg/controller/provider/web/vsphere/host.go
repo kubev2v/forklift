@@ -46,12 +46,7 @@ func (h HostHandler) List(ctx *gin.Context) {
 	}
 	db := h.Reconciler.DB()
 	list := []model.Host{}
-	err := db.List(
-		&list,
-		libmodel.ListOptions{
-			Predicate: h.Predicate(ctx),
-			Page:      &h.Page,
-		})
+	err := db.List(&list, h.ListOptions(ctx))
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
@@ -189,17 +184,17 @@ func (h *HostHandler) buildAdapters(host *Host) (err error) {
 // REST Resource.
 type Host struct {
 	Resource
-	InMaintenanceMode bool               `json:"inMaintenance"`
-	Thumbprint        string             `json:"thumbprint"`
-	CpuSockets        int16              `json:"cpuSockets"`
-	CpuCores          int16              `json:"cpuCores"`
-	ProductName       string             `json:"productName"`
-	ProductVersion    string             `json:"productVersion"`
-	Network           *model.HostNetwork `json:"networking"`
-	Networks          model.RefList      `json:"networks"`
-	Datastores        model.RefList      `json:"datastores"`
-	VMs               model.RefList      `json:"vms"`
-	NetworkAdapters   []NetworkAdapter   `json:"networkAdapters"`
+	InMaintenanceMode bool              `json:"inMaintenance"`
+	Thumbprint        string            `json:"thumbprint"`
+	CpuSockets        int16             `json:"cpuSockets"`
+	CpuCores          int16             `json:"cpuCores"`
+	ProductName       string            `json:"productName"`
+	ProductVersion    string            `json:"productVersion"`
+	Network           model.HostNetwork `json:"networking"`
+	Networks          []model.Ref       `json:"networks"`
+	Datastores        []model.Ref       `json:"datastores"`
+	VMs               []model.Ref       `json:"vms"`
+	NetworkAdapters   []NetworkAdapter  `json:"networkAdapters"`
 }
 
 //
@@ -212,10 +207,10 @@ func (r *Host) With(m *model.Host) {
 	r.CpuCores = m.CpuCores
 	r.ProductVersion = m.ProductVersion
 	r.ProductName = m.ProductName
-	r.Network = m.DecodeNetwork()
-	r.Networks = *model.RefListPtr().With(m.Networks)
-	r.Datastores = *model.RefListPtr().With(m.Datastores)
-	r.VMs = *model.RefListPtr().With(m.Vms)
+	r.Network = m.Network
+	r.Networks = m.Networks
+	r.Datastores = m.Datastores
+	r.VMs = m.Vms
 	r.NetworkAdapters = []NetworkAdapter{}
 }
 
@@ -324,8 +319,7 @@ func (r AdapterBuilder) withDPG(host *Host, vNIC *model.VNIC, adapter *NetworkAd
 		}
 		return
 	}
-	ref := model.Ref{}
-	ref.With(portGroup.DVSwitch)
+	ref := portGroup.DVSwitch
 	vSwitch := &model.DVSwitch{
 		Base: model.Base{
 			ID: ref.ID,
@@ -339,9 +333,8 @@ func (r AdapterBuilder) withDPG(host *Host, vNIC *model.VNIC, adapter *NetworkAd
 		return
 	}
 	adapter.Name = vSwitch.Name
-	for _, dvsHost := range vSwitch.DecodeHost() {
-		hostRef := model.Ref{}
-		hostRef.With(dvsHost.Host)
+	for _, dvsHost := range vSwitch.Host {
+		hostRef := dvsHost.Host
 		if hostRef.ID != host.ID {
 			continue
 		}
@@ -359,7 +352,7 @@ func (r AdapterBuilder) withDPG(host *Host, vNIC *model.VNIC, adapter *NetworkAd
 				return
 			}
 		}
-		network := host.DecodeNetwork()
+		network := host.Network
 		for _, pnic := range network.PNICs {
 			adapter.LinkSpeed = pnic.LinkSpeed
 			return
