@@ -1,20 +1,17 @@
 package plan
 
 import (
-	"context"
 	"errors"
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/controller/validation"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 //
 // Types
 const (
-	HostNotReady  = "HostNotReady"
 	VMNotValid    = "VMNotValid"
 	DuplicateVM   = "DuplicateVM"
 	DupTargetName = "DuplicateTargetName"
@@ -82,12 +79,6 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	}
 	plan.Status.UpdateConditions(conditions)
 	//
-	// Hosts.
-	err = r.validateHosts(plan)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-	//
 	// VM list.
 	err = r.validateVM(plan)
 	if err != nil {
@@ -95,42 +86,6 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	}
 
 	return nil
-}
-
-//
-// Validate hosts in the same ns as the source provider.
-func (r *Reconciler) validateHosts(plan *api.Plan) (err error) {
-	provider := plan.Referenced.Provider.Source
-	if provider == nil {
-		return nil
-	}
-	list := api.HostList{}
-	options := &client.ListOptions{
-		Namespace: provider.Namespace,
-	}
-	err = r.List(context.TODO(), &list, options)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	cnd := libcnd.Condition{
-		Type:     HostNotReady,
-		Status:   True,
-		Reason:   NotSet,
-		Category: Critical,
-		Message:  "Host does not have the Ready condition.",
-		Items:    []string{},
-	}
-	for _, host := range list.Items {
-		if !host.Status.HasCondition(libcnd.Ready) {
-			cnd.Items = append(cnd.Items, host.Name)
-		}
-	}
-	if len(cnd.Items) > 0 {
-		plan.Status.SetCondition(cnd)
-	}
-
-	return
 }
 
 //
