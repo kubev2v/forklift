@@ -320,7 +320,7 @@ func (r *Reconciler) pendingMigrations(plan *api.Plan) (list []*api.Migration, e
 // Postpone reconciliation.
 // Ensure that dependencies (CRs) have been reconciled.
 func (r *Reconciler) postpone() (postpone bool, err error) {
-	providerList := &api.PlanList{}
+	providerList := &api.ProviderList{}
 	err = r.List(context.TODO(), providerList)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -338,7 +338,7 @@ func (r *Reconciler) postpone() (postpone bool, err error) {
 		err = liberr.Wrap(err)
 		return
 	}
-	for _, host := range providerList.Items {
+	for _, host := range hostList.Items {
 		if host.Status.ObservedGeneration < host.Generation {
 			postpone = true
 			return
