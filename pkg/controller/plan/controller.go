@@ -46,7 +46,7 @@ const (
 	// Controller name.
 	Name = "plan"
 	// Fast re-queue delay.
-	FastReQ = time.Millisecond * 100
+	FastReQ = time.Millisecond * 500
 	// Slow re-queue delay.
 	SlowReQ = time.Second * 3
 )
@@ -125,11 +125,11 @@ type Reconciler struct {
 
 //
 // Reconcile a Plan CR.
-func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *Reconciler) Reconcile(request reconcile.Request) (result reconcile.Result, err error) {
 	fastReQ := reconcile.Result{RequeueAfter: FastReQ}
 	slowReQ := reconcile.Result{RequeueAfter: SlowReQ}
 	noReQ := reconcile.Result{}
-	var err error
+	result = noReQ
 
 	// Reset the logger.
 	log.Reset()
@@ -139,6 +139,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	defer func() {
 		if err != nil {
 			log.Trace(err)
+			err = nil
 		}
 	}()
 
@@ -147,10 +148,9 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	err = r.Get(context.TODO(), request.NamespacedName, plan)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
-			return noReQ, nil
+			err = nil
 		}
-		log.Trace(err)
-		return noReQ, err
+		return
 	}
 	defer func() {
 		log.Info("Conditions.", "all", plan.Status.Conditions)
@@ -174,10 +174,12 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	err = r.validate(plan)
 	if err != nil {
 		if errors.As(err, &web.ProviderNotReadyError{}) {
-			return slowReQ, nil
+			result = slowReQ
+			err = nil
+		} else {
+			result = fastReQ
 		}
-		log.Trace(err)
-		return fastReQ, nil
+		return
 	}
 
 	// Ready condition.
@@ -200,8 +202,8 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	plan.Status.ObservedGeneration = plan.Generation
 	err = r.Status().Update(context.TODO(), plan)
 	if err != nil {
-		log.Trace(err)
-		return fastReQ, nil
+		result = fastReQ
+		return
 	}
 
 	//
@@ -209,16 +211,18 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	// The plan is updated as needed to reflect status.
 	reQ, err := r.execute(plan)
 	if err != nil {
-		log.Trace(err)
-		return fastReQ, nil
+		result = fastReQ
+		return
 	}
 
 	// Done
 	if reQ > 0 {
-		return reconcile.Result{RequeueAfter: reQ}, nil
+		result = reconcile.Result{RequeueAfter: reQ}
 	} else {
-		return noReQ, nil
+		result = noReQ
 	}
+
+	return
 }
 
 //

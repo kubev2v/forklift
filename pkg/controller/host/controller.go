@@ -41,7 +41,7 @@ const (
 	// Controller name.
 	Name = "host"
 	// Fast re-queue delay.
-	FastReQ = time.Millisecond * 100
+	FastReQ = time.Millisecond * 500
 	// Slow re-queue delay.
 	SlowReQ = time.Second * 3
 )
@@ -108,11 +108,11 @@ type Reconciler struct {
 
 //
 // Reconcile a Host CR.
-func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *Reconciler) Reconcile(request reconcile.Request) (result reconcile.Result, err error) {
 	fastReQ := reconcile.Result{RequeueAfter: FastReQ}
 	slowReQ := reconcile.Result{RequeueAfter: SlowReQ}
 	noReQ := reconcile.Result{}
-	var err error
+	result = noReQ
 
 	// Reset the logger.
 	log.Reset()
@@ -122,6 +122,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	defer func() {
 		if err != nil {
 			log.Trace(err)
+			err = nil
 		}
 	}()
 
@@ -130,10 +131,9 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	err = r.Get(context.TODO(), request.NamespacedName, host)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
-			return noReQ, nil
+			err = nil
 		}
-		log.Trace(err)
-		return noReQ, err
+		return
 	}
 	defer func() {
 		log.Info("Conditions.", "all", host.Status.Conditions)
@@ -146,10 +146,12 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	err = r.validate(host)
 	if err != nil {
 		if errors.As(err, &web.ProviderNotReadyError{}) {
-			return slowReQ, nil
+			result = slowReQ
+			err = nil
+		} else {
+			result = fastReQ
 		}
-		log.Trace(err)
-		return fastReQ, nil
+		return
 	}
 
 	// Ready condition.
@@ -172,10 +174,10 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	host.Status.ObservedGeneration = host.Generation
 	err = r.Status().Update(context.TODO(), host)
 	if err != nil {
-		log.Trace(err)
-		return fastReQ, nil
+		result = fastReQ
+		return
 	}
 
 	// Done
-	return noReQ, nil
+	return
 }
