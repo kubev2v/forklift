@@ -40,7 +40,7 @@ const (
 	// Controller name.
 	Name = "network-map"
 	// Fast re-queue delay.
-	FastReQ = time.Millisecond * 100
+	FastReQ = time.Millisecond * 500
 	// Slow re-queue delay.
 	SlowReQ = time.Second * 3
 )
@@ -105,27 +105,36 @@ type Reconciler struct {
 
 //
 // Reconcile a Map CR.
-func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *Reconciler) Reconcile(request reconcile.Request) (result reconcile.Result, err error) {
 	fastReQ := reconcile.Result{RequeueAfter: FastReQ}
 	slowReQ := reconcile.Result{RequeueAfter: SlowReQ}
 	noReQ := reconcile.Result{}
-	var err error
+	result = noReQ
 
 	// Reset the logger.
 	log.Reset()
 	log.SetValues("map", request)
 	log.Info("Reconcile")
 
+	defer func() {
+		if err != nil {
+			log.Trace(err)
+			err = nil
+		}
+	}()
+
 	// Fetch the CR.
 	mp := &api.NetworkMap{}
 	err = r.Get(context.TODO(), request.NamespacedName, mp)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
-			return noReQ, nil
+			err = nil
 		}
-		log.Trace(err)
-		return noReQ, err
+		return
 	}
+	defer func() {
+		log.Info("Conditions.", "all", mp.Status.Conditions)
+	}()
 
 	// Begin staging conditions.
 	mp.Status.BeginStagingConditions()
@@ -134,10 +143,12 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	err = r.validate(mp)
 	if err != nil {
 		if errors.As(err, &web.ProviderNotReadyError{}) {
-			return slowReQ, nil
+			result = slowReQ
+			err = nil
+		} else {
+			result = fastReQ
 		}
-		log.Trace(err)
-		return fastReQ, nil
+		return
 	}
 
 	// Ready condition.
@@ -158,9 +169,10 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	err = r.Status().Update(context.TODO(), mp)
 	if err != nil {
 		log.Trace(err)
-		return fastReQ, nil
+		result = fastReQ
+		return
 	}
 
 	// Done
-	return noReQ, nil
+	return
 }
