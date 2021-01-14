@@ -7,14 +7,16 @@ import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/controller/validation"
+	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 )
 
 //
 // Types
 const (
-	VMNotValid    = "VMNotValid"
+	VMRefNotValid = "VMRefNotValid"
+	VMNotFound    = "VMNotFound"
 	DuplicateVM   = "DuplicateVM"
-	DupTargetName = "DuplicateTargetName"
+	NameNotValid  = "TargetNameNotValid"
 	Executing     = "Executing"
 	Succeeded     = "Succeeded"
 	Failed        = "Failed"
@@ -37,6 +39,7 @@ const (
 	NotFound  = "NotFound"
 	NotUnique = "NotUnique"
 	Ambiguous = "Ambiguous"
+	NotValid  = "NotValid"
 )
 
 //
@@ -99,8 +102,8 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	if pErr != nil {
 		return liberr.Wrap(pErr)
 	}
-	notValid := libcnd.Condition{
-		Type:     VMNotValid,
+	notFound := libcnd.Condition{
+		Type:     VMNotFound,
 		Status:   True,
 		Reason:   NotFound,
 		Category: Critical,
@@ -123,6 +126,14 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "VM reference is ambiguous.",
 		Items:    []string{},
 	}
+	nameNotValid := libcnd.Condition{
+		Type:     NameNotValid,
+		Status:   True,
+		Reason:   NotValid,
+		Category: Critical,
+		Message:  "Target VM name not valid.",
+		Items:    []string{},
+	}
 	setOf := map[string]bool{}
 	//
 	// Referenced VMs.
@@ -130,7 +141,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		ref := vm.Ref
 		if ref.NotSet() {
 			plan.Status.SetCondition(libcnd.Condition{
-				Type:     VMNotValid,
+				Type:     VMRefNotValid,
 				Status:   True,
 				Reason:   NotSet,
 				Category: Critical,
@@ -141,7 +152,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		_, pErr := inventory.VM(&ref)
 		if pErr != nil {
 			if errors.As(pErr, &web.NotFoundError{}) {
-				notValid.Items = append(notValid.Items, ref.String())
+				notFound.Items = append(notFound.Items, ref.String())
 				continue
 			}
 			if errors.As(pErr, &web.RefNotUniqueError{}) {
@@ -150,17 +161,23 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			}
 			return liberr.Wrap(pErr)
 		}
+		if len(k8svalidation.IsQualifiedName(ref.Name)) > 0 {
+			nameNotValid.Items = append(nameNotValid.Items, ref.String())
+		}
 		if _, found := setOf[ref.ID]; found {
 			notUnique.Items = append(notUnique.Items, ref.String())
 		} else {
 			setOf[ref.ID] = true
 		}
 	}
-	if len(notValid.Items) > 0 {
-		plan.Status.SetCondition(notValid)
+	if len(notFound.Items) > 0 {
+		plan.Status.SetCondition(notFound)
 	}
 	if len(notUnique.Items) > 0 {
 		plan.Status.SetCondition(notUnique)
+	}
+	if len(nameNotValid.Items) > 0 {
+		plan.Status.SetCondition(nameNotValid)
 	}
 	if len(ambiguous.Items) > 0 {
 		plan.Status.SetCondition(ambiguous)
