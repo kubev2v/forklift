@@ -1,7 +1,6 @@
 package vsphere
 
 import (
-	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	"strings"
 )
@@ -166,6 +165,37 @@ type Ref struct {
 	Kind string `json:"kind"`
 	// The ID of object referenced.
 	ID string `json:"id"`
+}
+
+//
+// Get referenced model.
+func (r *Ref) Get(db libmodel.DB) (model Model, err error) {
+	base := Base{
+		ID: r.ID,
+	}
+	switch r.Kind {
+	case FolderKind:
+		model = &Folder{Base: base}
+	case DatacenterKind:
+		model = &Datacenter{Base: base}
+	case ClusterKind:
+		model = &Cluster{Base: base}
+	case HostKind:
+		model = &Host{Base: base}
+	case VmKind:
+		model = &VM{Base: base}
+	case NetKind:
+		model = &Network{Base: base}
+	case DsKind:
+		model = &Datastore{Base: base}
+	default:
+		err = InvalidRefError{*r}
+	}
+	if model != nil {
+		err = db.Get(model)
+	}
+
+	return
 }
 
 type About struct {
@@ -335,32 +365,6 @@ type VM struct {
 // Determine if current revision has been analyzed.
 func (m *VM) Analyzed() bool {
 	return m.RevisionAnalyzed == m.Revision
-}
-
-//
-// Find associated cluster.
-// returns err = libmodel.NotFound when cannot be resolved.
-func (m *VM) Cluster(db libmodel.DB) (matched *Cluster, err error) {
-	list := []Cluster{}
-	err = db.List(&list, libmodel.ListOptions{Detail: 1})
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	hostRef := m.Host
-	for _, cluster := range list {
-		refList := cluster.Hosts
-		for _, ref := range refList {
-			if ref.ID == hostRef.ID {
-				matched = &cluster
-				return
-			}
-		}
-	}
-
-	err = liberr.Wrap(libmodel.NotFound)
-
-	return
 }
 
 //
