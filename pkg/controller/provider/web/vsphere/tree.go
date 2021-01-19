@@ -4,7 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
-	"github.com/konveyor/controller/pkg/ref"
+	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	"net/http"
@@ -90,16 +90,22 @@ func (h TreeHandler) VmTree(ctx *gin.Context) {
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
+		navigator := func(m libmodel.Model) (refs []model.Ref) {
+			switch m.(type) {
+			case *model.Folder:
+				refs = m.(*model.Folder).Children
+			}
+
+			return
+		}
 		tr := Tree{
 			Provider: h.Provider,
-			Root:     folder,
-			Leaf:     model.VmKind,
 			DB:       db,
 			Detail: map[string]bool{
 				model.VmKind: h.Detail,
 			},
 		}
-		branch, err := tr.Build()
+		branch, err := tr.Build(folder, navigator)
 		if err != nil {
 			Log.Trace(err)
 			ctx.Status(http.StatusInternalServerError)
@@ -139,10 +145,18 @@ func (h TreeHandler) HostTree(ctx *gin.Context) {
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
+		navigator := func(m libmodel.Model) (refs []model.Ref) {
+			switch m.(type) {
+			case *model.Folder:
+				refs = m.(*model.Folder).Children
+			case *model.Cluster:
+				refs = m.(*model.Cluster).Hosts
+			}
+
+			return
+		}
 		tr := Tree{
 			Provider: h.Provider,
-			Root:     folder,
-			Leaf:     model.VmKind,
 			DB:       db,
 			Detail: map[string]bool{
 				model.ClusterKind: h.Detail,
@@ -150,7 +164,7 @@ func (h TreeHandler) HostTree(ctx *gin.Context) {
 				model.VmKind:      h.Detail,
 			},
 		}
-		branch, err := tr.Build()
+		branch, err := tr.Build(folder, navigator)
 		if err != nil {
 			Log.Trace(err)
 			ctx.Status(http.StatusInternalServerError)
@@ -174,12 +188,6 @@ type Tree struct {
 	Provider *api.Provider
 	// DB connection.
 	DB libmodel.DB
-	// Tree root.
-	Root model.Model
-	// Leaf kind.
-	Leaf string
-	// Flatten the tree (root & leafs).
-	Flatten bool
 	// Depth limit.
 	Depth int
 	// Resource details by kind.
@@ -188,8 +196,8 @@ type Tree struct {
 
 //
 // Build the tree
-func (r *Tree) Build() (*TreeNode, error) {
-	root := r.node(nil, r.Root)
+func (r *Tree) Build(m model.Model, navigator model.BranchNavigator) (*TreeNode, error) {
+	root := r.node(nil, m)
 	node := root
 	var walk func(*model.TreeNode)
 	walk = func(n *model.TreeNode) {
@@ -204,13 +212,10 @@ func (r *Tree) Build() (*TreeNode, error) {
 		}
 	}
 	tree := model.Tree{
-		DB:      r.DB,
-		Root:    r.Root,
-		Leaf:    r.Leaf,
-		Flatten: r.Flatten,
-		Depth:   r.Depth,
+		DB:    r.DB,
+		Depth: r.Depth,
 	}
-	modelRoot, err := tree.Build()
+	modelRoot, err := tree.Build(m, navigator)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
@@ -222,9 +227,43 @@ func (r *Tree) Build() (*TreeNode, error) {
 }
 
 //
+// Ancestry (Tree).
+func (r *Tree) Ancestry(leaf model.Model, navigator model.ParentNavigator) (*TreeNode, error) {
+	root := &TreeNode{}
+	node := root
+	var walk func(*model.TreeNode)
+	walk = func(n *model.TreeNode) {
+		child := r.node(node, n.Model)
+		node.Children = append(node.Children, child)
+		node = child
+		defer func() {
+			node = node.parent
+		}()
+		for _, mt := range n.Children {
+			walk(mt)
+		}
+	}
+	tree := model.Tree{
+		DB:    r.DB,
+		Depth: r.Depth,
+	}
+	modelRoot, err := tree.Ancestry(leaf, navigator)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	root = r.node(nil, modelRoot.Model)
+	node = root
+	for _, child := range modelRoot.Children {
+		walk(child)
+	}
+
+	return root, nil
+}
+
+//
 // Build a node for the model.
 func (r *Tree) node(parent *TreeNode, m model.Model) *TreeNode {
-	kind := ref.ToKind(m)
+	kind := libref.ToKind(m)
 	node := &TreeNode{}
 	switch kind {
 	case model.FolderKind:
