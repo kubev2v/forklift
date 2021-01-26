@@ -24,14 +24,6 @@ import (
 )
 
 //
-// Snapshot keys.
-const (
-	SourceSnapshot      = "provider.source"
-	DestinationSnapshot = "provider.destination"
-	MapSnapshot         = "map"
-)
-
-//
 // MigrationSpec defines the desired state of Migration
 type MigrationSpec struct {
 	// Reference to the associated Plan.
@@ -69,12 +61,6 @@ func (r *Migration) Match(plan *Plan) bool {
 	ref := r.Spec.Plan
 	return ref.Namespace == plan.Namespace &&
 		ref.Name == plan.Name
-}
-
-//
-// Is active for the plan.
-func (r *Migration) Active(plan *Plan) bool {
-	return plan.Status.Migration.Active == r.UID
 }
 
 //

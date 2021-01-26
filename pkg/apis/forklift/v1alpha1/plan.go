@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/provider"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -30,7 +31,7 @@ type PlanSpec struct {
 	// Target namespace.
 	TargetNamespace string `json:"targetNamespace,omitempty"`
 	// Providers.
-	Provider ProviderPair `json:"provider"`
+	Provider provider.Pair `json:"provider"`
 	// Resource map.
 	Map plan.Map `json:"map,omitempty"`
 	// List of VMs.

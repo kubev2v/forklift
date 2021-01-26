@@ -4,7 +4,6 @@ import (
 	"context"
 	liberr "github.com/konveyor/controller/pkg/error"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/snapshot"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	core "k8s.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -45,13 +44,12 @@ type Context struct {
 //
 // Build.
 func (r *Context) build() (err error) {
-	sn := snapshot.New(r.Migration)
-	err = r.Source.build(r, sn)
+	err = r.Source.build(r)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	err = r.Destination.build(r, sn)
+	err = r.Destination.build(r)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -73,16 +71,11 @@ type Source struct {
 
 //
 // Build.
-func (r *Source) build(client k8sclient.Client, sn snapshot.Snapshot) (err error) {
-	r.Provider = &api.Provider{}
-	err = sn.Get(api.SourceSnapshot, r.Provider)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
+func (r *Source) build(ctx *Context) (err error) {
+	r.Provider = ctx.Plan.Referenced.Provider.Source
 	ref := r.Provider.Spec.Secret
 	r.Secret = &core.Secret{}
-	err = client.Get(
+	err = ctx.Get(
 		context.TODO(),
 		k8sclient.ObjectKey{
 			Namespace: ref.Namespace,
@@ -114,17 +107,12 @@ type Destination struct {
 
 //
 // Build.
-func (r *Destination) build(client k8sclient.Client, sn snapshot.Snapshot) (err error) {
-	r.Provider = &api.Provider{}
-	err = sn.Get(api.DestinationSnapshot, r.Provider)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
+func (r *Destination) build(ctx *Context) (err error) {
+	r.Provider = ctx.Plan.Referenced.Provider.Destination
 	if !r.Provider.IsHost() {
 		ref := r.Provider.Spec.Secret
 		secret := &core.Secret{}
-		err = client.Get(
+		err = ctx.Get(
 			context.TODO(),
 			k8sclient.ObjectKey{
 				Namespace: ref.Namespace,
@@ -141,7 +129,7 @@ func (r *Destination) build(client k8sclient.Client, sn snapshot.Snapshot) (err 
 			return
 		}
 	} else {
-		r.Client = client
+		r.Client = ctx
 	}
 	r.Inventory, err = web.NewClient(r.Provider)
 	if err != nil {

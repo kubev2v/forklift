@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/mapped"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/provider"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -26,7 +27,7 @@ import (
 // Network map spec.
 type NetworkMapSpec struct {
 	// Provider
-	Provider ProviderPair `json:"provider" ref:"Provider"`
+	Provider provider.Pair `json:"provider" ref:"Provider"`
 	// Map.
 	Map []mapped.NetworkPair `json:"map"`
 }
@@ -35,7 +36,7 @@ type NetworkMapSpec struct {
 // Storage map spec.
 type StorageMapSpec struct {
 	// Provider
-	Provider ProviderPair `json:"provider" ref:"Provider"`
+	Provider provider.Pair `json:"provider" ref:"Provider"`
 	// Map.
 	Map []mapped.StoragePair `json:"map"`
 }

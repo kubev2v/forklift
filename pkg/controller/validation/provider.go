@@ -6,6 +6,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/provider"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -109,7 +110,7 @@ type ProviderPair struct {
 
 //
 // Validate the pair.
-func (r *ProviderPair) Validate(pair api.ProviderPair) (result libcnd.Conditions, err error) {
+func (r *ProviderPair) Validate(pair provider.Pair) (result libcnd.Conditions, err error) {
 	conditions, err := r.validateSource(pair)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -128,7 +129,7 @@ func (r *ProviderPair) Validate(pair api.ProviderPair) (result libcnd.Conditions
 
 //
 // Validate the source.
-func (r *ProviderPair) validateSource(pair api.ProviderPair) (result libcnd.Conditions, err error) {
+func (r *ProviderPair) validateSource(pair provider.Pair) (result libcnd.Conditions, err error) {
 	validation := Provider{Client: r.Client}
 	conditions, err := validation.Validate(pair.Source)
 	if err != nil {
@@ -168,7 +169,7 @@ func (r *ProviderPair) validateSource(pair api.ProviderPair) (result libcnd.Cond
 
 //
 // Validate the destination.
-func (r *ProviderPair) validateDestination(pair api.ProviderPair) (result libcnd.Conditions, err error) {
+func (r *ProviderPair) validateDestination(pair provider.Pair) (result libcnd.Conditions, err error) {
 	validation := Provider{Client: r.Client}
 	conditions, err := validation.Validate(pair.Destination)
 	if err != nil {

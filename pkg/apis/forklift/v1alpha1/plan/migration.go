@@ -34,11 +34,42 @@ func (e *Error) Add(reason ...string) {
 //
 // Migration status.
 type MigrationStatus struct {
-	Timed `json:",inline"`
-	// Active migration.
-	Active types.UID `json:"active"`
+	Timed `json:",inline,omitempty"`
+	// History
+	History []Snapshot `json:"history,omitempty"`
 	// VM status
 	VMs []*VMStatus `json:"vms,omitempty"`
+}
+
+//
+// The active snapshot.
+// This is the last snapshot in the history.
+func (r *MigrationStatus) ActiveSnapshot() *Snapshot {
+	if len(r.History) > 0 {
+		return &r.History[len(r.History)-1]
+	}
+
+	return &Snapshot{}
+}
+
+//
+// Find snapshot for migration by UID.
+func (r *MigrationStatus) SnapshotWithMigration(uid types.UID) (found bool, snapshot *Snapshot) {
+	for i := range r.History {
+		sn := &r.History[i]
+		if sn.Migration.UID == uid {
+			snapshot = sn
+			found = true
+		}
+	}
+
+	return
+}
+
+//
+// Add new snapshot.
+func (r *MigrationStatus) NewSnapshot(snapshot Snapshot) {
+	r.History = append(r.History, snapshot)
 }
 
 //
