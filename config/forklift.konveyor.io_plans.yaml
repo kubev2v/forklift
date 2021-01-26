@@ -354,13 +354,157 @@ spec:
             migration:
               description: Migration
               properties:
-                active:
-                  description: Active migration.
-                  type: string
                 completed:
                   description: Completed timestamp.
                   format: date-time
                   type: string
+                history:
+                  description: History
+                  items:
+                    description: Snapshot
+                    properties:
+                      conditions:
+                        items:
+                          description: Condition
+                          properties:
+                            category:
+                              description: The condition category.
+                              type: string
+                            durable:
+                              description: The condition is durable - never un-staged.
+                              type: boolean
+                            items:
+                              description: A list of items referenced in the `Message`.
+                              items:
+                                type: string
+                              type: array
+                            lastTransitionTime:
+                              description: When the last status transition occurred.
+                              format: date-time
+                              type: string
+                            message:
+                              description: The human readable description of the condition.
+                              type: string
+                            reason:
+                              description: The reason for the condition or transition.
+                              type: string
+                            status:
+                              description: The condition status [true,false].
+                              type: string
+                            type:
+                              description: The condition type.
+                              type: string
+                          required:
+                          - category
+                          - lastTransitionTime
+                          - status
+                          - type
+                          type: object
+                        type: array
+                      migration:
+                        description: Migration
+                        properties:
+                          generation:
+                            format: int64
+                            type: integer
+                          name:
+                            type: string
+                          namespace:
+                            type: string
+                          uid:
+                            description: UID is a type that holds unique ID values,
+                              including UUIDs.  Because we don't ONLY use UUIDs, this
+                              is an alias to string.  Being a type captures intent
+                              and helps make sure that UIDs and names do not get conflated.
+                            type: string
+                        required:
+                        - generation
+                        - name
+                        - namespace
+                        - uid
+                        type: object
+                      plan:
+                        description: Plan
+                        properties:
+                          generation:
+                            format: int64
+                            type: integer
+                          name:
+                            type: string
+                          namespace:
+                            type: string
+                          uid:
+                            description: UID is a type that holds unique ID values,
+                              including UUIDs.  Because we don't ONLY use UUIDs, this
+                              is an alias to string.  Being a type captures intent
+                              and helps make sure that UIDs and names do not get conflated.
+                            type: string
+                        required:
+                        - generation
+                        - name
+                        - namespace
+                        - uid
+                        type: object
+                      provider:
+                        description: Provider
+                        properties:
+                          destination:
+                            description: Snapshot object reference.
+                            properties:
+                              generation:
+                                format: int64
+                                type: integer
+                              name:
+                                type: string
+                              namespace:
+                                type: string
+                              uid:
+                                description: UID is a type that holds unique ID values,
+                                  including UUIDs.  Because we don't ONLY use UUIDs,
+                                  this is an alias to string.  Being a type captures
+                                  intent and helps make sure that UIDs and names do
+                                  not get conflated.
+                                type: string
+                            required:
+                            - generation
+                            - name
+                            - namespace
+                            - uid
+                            type: object
+                          source:
+                            description: Snapshot object reference.
+                            properties:
+                              generation:
+                                format: int64
+                                type: integer
+                              name:
+                                type: string
+                              namespace:
+                                type: string
+                              uid:
+                                description: UID is a type that holds unique ID values,
+                                  including UUIDs.  Because we don't ONLY use UUIDs,
+                                  this is an alias to string.  Being a type captures
+                                  intent and helps make sure that UIDs and names do
+                                  not get conflated.
+                                type: string
+                            required:
+                            - generation
+                            - name
+                            - namespace
+                            - uid
+                            type: object
+                        required:
+                        - destination
+                        - source
+                        type: object
+                    required:
+                    - conditions
+                    - migration
+                    - plan
+                    - provider
+                    type: object
+                  type: array
                 started:
                   description: Started timestamp.
                   format: date-time
@@ -611,8 +755,6 @@ spec:
                     - pipeline
                     type: object
                   type: array
-              required:
-              - active
               type: object
             observedGeneration:
               description: The most recent generation observed by the controller.

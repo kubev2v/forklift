@@ -4,10 +4,8 @@ import (
 	"context"
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/snapshot"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/builder"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	core "k8s.io/api/core/v1"
@@ -68,7 +66,7 @@ func (r *KubeVirt) ImportMap() (mp ImportMap, err error) {
 func (r *KubeVirt) ListImports() ([]VmImport, error) {
 	selector := labels.SelectorFromSet(
 		map[string]string{
-			kMigration: string(r.Plan.Status.Migration.Active),
+			kMigration: string(r.Migration.UID),
 			kPlan:      string(r.Plan.GetUID()),
 		})
 	vList := &vmio.VirtualMachineImportList{}
@@ -221,9 +219,7 @@ func (r *KubeVirt) EnsureSecret(vmRef ref.Ref) (err error) {
 // Build the VMIO CR.
 func (r *KubeVirt) buildImport(vm *plan.VMStatus) (object *vmio.VirtualMachineImport, err error) {
 	namespace := r.namespace()
-	sn := snapshot.New(r.Migration)
-	mp := &plan.Map{}
-	err = sn.Get(api.MapSnapshot, mp)
+	mp := r.Context.Plan.Spec.Map
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -238,7 +234,7 @@ func (r *KubeVirt) buildImport(vm *plan.VMStatus) (object *vmio.VirtualMachineIm
 			Namespace: r.namespace(),
 			Name:      r.nameForImport(vm.Ref),
 			Labels: map[string]string{
-				kMigration: string(r.Plan.Status.Migration.Active),
+				kMigration: string(r.Migration.UID),
 				kPlan:      string(r.Plan.UID),
 				kVM:        vm.ID,
 			},
@@ -250,7 +246,7 @@ func (r *KubeVirt) buildImport(vm *plan.VMStatus) (object *vmio.VirtualMachineIm
 			},
 		},
 	}
-	err = r.Builder.Import(vm.Ref, mp, &object.Spec)
+	err = r.Builder.Import(vm.Ref, &mp, &object.Spec)
 	if err != nil {
 		err = liberr.Wrap(err)
 	}
@@ -269,7 +265,7 @@ func (r *KubeVirt) buildSecret(vmRef ref.Ref) (object *core.Secret, err error) {
 			Namespace: r.namespace(),
 			Name:      r.nameForSecret(vmRef),
 			Labels: map[string]string{
-				kMigration: string(r.Plan.Status.Migration.Active),
+				kMigration: string(r.Migration.UID),
 				kPlan:      string(r.Plan.UID),
 			},
 		},
@@ -285,7 +281,7 @@ func (r *KubeVirt) buildSecret(vmRef ref.Ref) (object *core.Secret, err error) {
 //
 // Generated name for kubevirt VM Import CR secret.
 func (r *KubeVirt) nameForSecret(vmRef ref.Ref) string {
-	uid := string(r.Plan.Status.Migration.Active)
+	uid := string(r.Migration.UID)
 	parts := []string{
 		"plan",
 		r.Plan.Name,
@@ -299,7 +295,7 @@ func (r *KubeVirt) nameForSecret(vmRef ref.Ref) string {
 //
 // Generated name for kubevirt VM Import CR.
 func (r *KubeVirt) nameForImport(vmRef ref.Ref) string {
-	uid := string(r.Plan.Status.Migration.Active)
+	uid := string(r.Migration.UID)
 	parts := []string{
 		"plan",
 		r.Plan.Name,

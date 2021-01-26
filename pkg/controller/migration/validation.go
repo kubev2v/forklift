@@ -6,6 +6,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
+	plancnt "github.com/konveyor/forklift-controller/pkg/controller/plan"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -16,8 +17,10 @@ const (
 	PlanNotValid = "PlanNotValid"
 	PlanNotReady = "PlanNotReady"
 	Running      = "Running"
-	Succeeded    = "Succeeded"
-	Failed       = "Failed"
+	Executing    = plancnt.Executing
+	Succeeded    = plancnt.Succeeded
+	Failed       = plancnt.Failed
+	Canceled     = plancnt.Canceled
 )
 
 //
