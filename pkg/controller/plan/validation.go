@@ -20,6 +20,8 @@ const (
 	Executing     = "Executing"
 	Succeeded     = "Succeeded"
 	Failed        = "Failed"
+	Canceled      = "Canceled"
+	Deleted       = "Deleted"
 )
 
 //
@@ -40,6 +42,7 @@ const (
 	NotUnique = "NotUnique"
 	Ambiguous = "Ambiguous"
 	NotValid  = "NotValid"
+	Modified  = "Modified"
 )
 
 //
@@ -52,9 +55,6 @@ const (
 //
 // Validate the plan resource.
 func (r *Reconciler) validate(plan *api.Plan) error {
-	if plan.Status.HasAnyCondition(Executing) {
-		return nil
-	}
 	// Provider.
 	provider := validation.ProviderPair{Client: r}
 	conditions, err := provider.Validate(plan.Spec.Provider)

@@ -23,7 +23,6 @@ import (
 	"github.com/konveyor/controller/pkg/logging"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
-	plancnt "github.com/konveyor/forklift-controller/pkg/controller/plan"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -195,33 +194,45 @@ func (r *Reconciler) reflectPlan(plan *api.Plan, migration *api.Migration) {
 	if migration.Status.HasBlockerCondition() {
 		return
 	}
-	if !migration.Active(plan) {
+	if migration.Status.HasAnyCondition(Canceled, Succeeded, Failed) {
 		return
 	}
-	migration.Status.Timed = plan.Status.Migration.Timed
-	migration.Status.VMs = plan.Status.Migration.VMs
-	if plan.Status.HasCondition(plancnt.Executing) {
+	found, snapshot := plan.Status.Migration.SnapshotWithMigration(migration.UID)
+	if !found {
+		return
+	}
+	if cnd := snapshot.FindCondition(Canceled); cnd != nil {
+		cnd.Durable = true
+		migration.Status.SetCondition(*cnd)
+		migration.Status.MarkedCompleted()
+		return
+	}
+	if snapshot.HasCondition(Executing) {
+		migration.Status.MarkStarted()
+		migration.Status.VMs = plan.Status.Migration.VMs
 		migration.Status.SetCondition(libcnd.Condition{
 			Type:     Running,
 			Status:   True,
-			Category: Required,
+			Category: Advisory,
 			Message:  "The migration is RUNNING.",
 		})
 	}
-	if plan.Status.HasCondition(Succeeded) {
+	if snapshot.HasCondition(Succeeded) {
+		migration.Status.MarkCompleted()
 		migration.Status.SetCondition(libcnd.Condition{
 			Type:     Succeeded,
 			Status:   True,
-			Category: Required,
+			Category: Advisory,
 			Message:  "The migration has SUCCEEDED.",
 			Durable:  true,
 		})
 	}
-	if plan.Status.HasCondition(Failed) {
+	if snapshot.HasCondition(Failed) {
+		migration.Status.MarkCompleted()
 		migration.Status.SetCondition(libcnd.Condition{
 			Type:     Failed,
 			Status:   True,
-			Category: Required,
+			Category: Advisory,
 			Message:  "The migration has FAILED.",
 			Durable:  true,
 		})
