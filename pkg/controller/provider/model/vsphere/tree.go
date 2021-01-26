@@ -1,7 +1,6 @@
 package vsphere
 
 import (
-	"errors"
 	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
@@ -45,25 +44,18 @@ func (r InvalidKindError) Error() string {
 type Tree struct {
 	// DB connection.
 	DB libmodel.DB
-	// Tree root.
-	Root Model
-	// Leaf kind.
-	Leaf string
-	// Flatten the tree (root & leafs).
-	Flatten bool
 	// Depth limit (0=unlimited).
 	Depth int
 }
 
 //
 // Build the tree.
-func (r *Tree) Build() (*TreeNode, error) {
-	kind := libref.ToKind(r.Root)
-	root := &TreeNode{
-		Kind:  kind,
-		Model: r.Root,
+func (r *Tree) Build(root Model, navigator BranchNavigator) (*TreeNode, error) {
+	node := &TreeNode{
+		Kind:  libref.ToKind(root),
+		Model: root,
 	}
-	node := root
+	treeRoot := node
 	depth := 0
 	var walk func(Model, bool) error
 	walk = func(model Model, asChild bool) error {
@@ -74,181 +66,67 @@ func (r *Tree) Build() (*TreeNode, error) {
 				Kind:   kind,
 				Model:  model,
 			}
-			if !r.Flatten {
-				depth++
-				defer func() {
-					depth--
-				}()
-			}
+			depth++
+			defer func() {
+				depth--
+			}()
 			if r.Depth > 0 && depth > r.Depth {
 				return nil
 			}
-			if !r.Flatten || kind == r.Leaf {
-				node.Children = append(node.Children, child)
-			}
-			if !r.Flatten {
-				node = child
-				defer func() {
-					node = node.Parent
-				}()
-			}
+			node.Children = append(node.Children, child)
+			node = child
+			defer func() {
+				node = node.Parent
+			}()
 		}
-		switch kind {
-		case FolderKind:
-			folder := model.(*Folder)
-		next:
-			for _, ref := range folder.Children {
-				switch r.Leaf {
-				case FolderKind:
-					if ref.Kind != r.Leaf {
-						continue next
-					}
-				}
-				m, err := r.getRef(ref)
-				if err != nil {
-					if errors.As(err, &InvalidRefError{}) {
-						continue
-					}
-					return liberr.Wrap(err)
-				}
-				err = walk(m, true)
-				if err != nil {
-					return liberr.Wrap(err)
-				}
-			}
-		case DatacenterKind:
-			var ref Ref
-			dc := model.(*Datacenter)
-			switch r.Leaf {
-			case ClusterKind, HostKind:
-				ref = dc.Clusters
-			case VmKind:
-				ref = dc.Vms
-			case NetKind:
-				ref = dc.Networks
-			case DsKind:
-				ref = dc.Datastores
-			case DatacenterKind:
-				// Leaf
-			default:
-				return InvalidKindError{kind}
-			}
-			m, err := r.getRef(ref)
+		for _, ref := range navigator(model) {
+			m, err := ref.Get(r.DB)
 			if err != nil {
-				if errors.As(err, &InvalidRefError{}) {
-					return nil
-				}
 				return liberr.Wrap(err)
 			}
 			err = walk(m, true)
 			if err != nil {
 				return liberr.Wrap(err)
 			}
-		case ClusterKind:
-			refList := []Ref{}
-			cluster := model.(*Cluster)
-			switch r.Leaf {
-			case HostKind, VmKind:
-				refList = cluster.Hosts
-			case NetKind:
-				refList = cluster.Networks
-			case DsKind:
-				refList = cluster.Datastores
-			case ClusterKind:
-				// Leaf
-			default:
-				return InvalidKindError{kind}
-			}
-			for _, ref := range refList {
-				m, err := r.getRef(ref)
-				if err != nil {
-					if errors.As(err, &InvalidRefError{}) {
-						return nil
-					}
-					return liberr.Wrap(err)
-				}
-				err = walk(m, true)
-				if err != nil {
-					return liberr.Wrap(err)
-				}
-			}
-		case HostKind:
-			refList := []Ref{}
-			host := model.(*Host)
-			switch r.Leaf {
-			case VmKind:
-				refList = host.Vms
-			case NetKind:
-				refList = host.Networks
-			case DsKind:
-				refList = host.Datastores
-			case HostKind:
-				// Leaf
-			default:
-				return InvalidKindError{kind}
-			}
-			for _, ref := range refList {
-				m, err := r.getRef(ref)
-				if err != nil {
-					if errors.As(err, &InvalidRefError{}) {
-						return nil
-					}
-					return liberr.Wrap(err)
-				}
-				err = walk(m, true)
-				if err != nil {
-					return liberr.Wrap(err)
-				}
-			}
-		case VmKind:
-			// Leaf
-		case NetKind:
-			// Leaf
-		case DsKind:
-			// Leaf
-		default:
-			return InvalidKindError{kind}
 		}
 
 		return nil
 	}
-	err := walk(r.Root, false)
+	err := walk(root, false)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
 
-	return root, nil
+	return treeRoot, nil
 }
 
 //
-// Get referenced model.
-func (r *Tree) getRef(ref Ref) (model Model, err error) {
-	base := Base{
-		ID: ref.ID,
+// Build the (ancestry) tree.
+func (r *Tree) Ancestry(leaf Model, navigator ParentNavigator) (*TreeNode, error) {
+	node := &TreeNode{
+		Kind:  libref.ToKind(leaf),
+		Model: leaf,
 	}
-	switch ref.Kind {
-	case FolderKind:
-		model = &Folder{Base: base}
-	case DatacenterKind:
-		model = &Datacenter{Base: base}
-	case ClusterKind:
-		model = &Cluster{Base: base}
-	case HostKind:
-		model = &Host{Base: base}
-	case VmKind:
-		model = &VM{Base: base}
-	case NetKind:
-		model = &Network{Base: base}
-	case DsKind:
-		model = &Datastore{Base: base}
-	default:
-		err = InvalidRefError{ref}
-	}
-	if model != nil {
-		err = r.DB.Get(model)
+	root := node
+	for {
+		ref := navigator(node.Model)
+		if ref.Kind == "" {
+			break
+		}
+		m, err := ref.Get(r.DB)
+		if err != nil {
+			return nil, liberr.Wrap(err)
+		}
+		root = &TreeNode{
+			Kind:  ref.Kind,
+			Model: m,
+		}
+		root.Children = append(root.Children, node)
+		node.Parent = root
+		node = root
 	}
 
-	return
+	return root, nil
 }
 
 //
@@ -263,3 +141,13 @@ type TreeNode struct {
 	// Child nodes.
 	Children []*TreeNode
 }
+
+//
+// Tree navigator.
+// Navigate up the parent tree.
+type ParentNavigator func(Model) Ref
+
+//
+// Tree navigator.
+// Navigate down the children.
+type BranchNavigator func(Model) []Ref
