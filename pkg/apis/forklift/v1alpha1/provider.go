@@ -43,15 +43,6 @@ const (
 )
 
 //
-// Provider pair.
-type ProviderPair struct {
-	// Source.
-	Source core.ObjectReference `json:"source" ref:"Provider"`
-	// Destination.
-	Destination core.ObjectReference `json:"destination" ref:"Provider"`
-}
-
-//
 // Defines the desired state of Provider.
 type ProviderSpec struct {
 	// Provider type.
