@@ -14,6 +14,7 @@ require (
 	k8s.io/api v0.19.3
 	k8s.io/apimachinery v0.19.3
 	k8s.io/client-go v12.0.0+incompatible
+	kubevirt.io/client-go v0.26.2
 	kubevirt.io/containerized-data-importer v1.23.1
 	kubevirt.io/vm-import-operator v0.0.0-00010101000000-000000000000
 	sigs.k8s.io/controller-runtime v0.6.4

@@ -74,7 +74,7 @@ func (r *KubeVirt) ListImports() ([]VmImport, error) {
 		context.TODO(),
 		vList,
 		&client.ListOptions{
-			Namespace:     r.namespace(),
+			Namespace:     r.Plan.TargetNamespace(),
 			LabelSelector: selector,
 		},
 	)
@@ -95,7 +95,7 @@ func (r *KubeVirt) ListImports() ([]VmImport, error) {
 		context.TODO(),
 		dvList,
 		&client.ListOptions{
-			Namespace: r.namespace(),
+			Namespace: r.Plan.TargetNamespace(),
 		},
 	)
 	if err != nil {
@@ -135,13 +135,44 @@ func (r *KubeVirt) EnsureImport(vm *plan.VMStatus) (err error) {
 }
 
 //
+// Delete the VMIO CR for the migration on the destination.
+func (r *KubeVirt) DeleteImport(vm *plan.VMStatus) (err error) {
+	object := &vmio.VirtualMachineImport{}
+	err = r.Context.Destination.Client.Get(
+		context.TODO(),
+		client.ObjectKey{
+			Namespace: r.Plan.TargetNamespace(),
+			Name:      r.nameForImport(vm.Ref),
+		},
+		object)
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			err = nil
+		} else {
+			err = liberr.Wrap(err)
+		}
+		return
+	}
+	err = r.Context.Destination.Client.Delete(context.TODO(), object)
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			err = nil
+		} else {
+			return liberr.Wrap(err)
+		}
+	}
+
+	return
+}
+
+//
 // Set VMIO secret owner references.
 func (r *KubeVirt) SetSecretOwner(vm *plan.VMStatus) (err error) {
 	vmImport := &vmio.VirtualMachineImport{}
 	err = r.Destination.Client.Get(
 		context.TODO(),
 		client.ObjectKey{
-			Namespace: r.namespace(),
+			Namespace: r.Plan.TargetNamespace(),
 			Name:      r.nameForImport(vm.Ref),
 		},
 		vmImport)
@@ -153,7 +184,7 @@ func (r *KubeVirt) SetSecretOwner(vm *plan.VMStatus) (err error) {
 	err = r.Destination.Client.Get(
 		context.TODO(),
 		client.ObjectKey{
-			Namespace: r.namespace(),
+			Namespace: r.Plan.TargetNamespace(),
 			Name:      r.nameForSecret(vm.Ref),
 		},
 		secret)
@@ -180,7 +211,7 @@ func (r *KubeVirt) SetSecretOwner(vm *plan.VMStatus) (err error) {
 func (r *KubeVirt) EnsureNamespace() (err error) {
 	ns := &core.Namespace{
 		ObjectMeta: meta.ObjectMeta{
-			Name: r.namespace(),
+			Name: r.Plan.TargetNamespace(),
 		},
 	}
 	err = r.Destination.Client.Create(context.TODO(), ns)
@@ -218,7 +249,7 @@ func (r *KubeVirt) EnsureSecret(vmRef ref.Ref) (err error) {
 //
 // Build the VMIO CR.
 func (r *KubeVirt) buildImport(vm *plan.VMStatus) (object *vmio.VirtualMachineImport, err error) {
-	namespace := r.namespace()
+	namespace := r.Plan.TargetNamespace()
 	mp := r.Context.Plan.Spec.Map
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -231,7 +262,7 @@ func (r *KubeVirt) buildImport(vm *plan.VMStatus) (object *vmio.VirtualMachineIm
 	}
 	object = &vmio.VirtualMachineImport{
 		ObjectMeta: meta.ObjectMeta{
-			Namespace: r.namespace(),
+			Namespace: r.Plan.TargetNamespace(),
 			Name:      r.nameForImport(vm.Ref),
 			Labels: map[string]string{
 				kMigration: string(r.Migration.UID),
@@ -262,7 +293,7 @@ func (r *KubeVirt) buildImport(vm *plan.VMStatus) (object *vmio.VirtualMachineIm
 func (r *KubeVirt) buildSecret(vmRef ref.Ref) (object *core.Secret, err error) {
 	object = &core.Secret{
 		ObjectMeta: meta.ObjectMeta{
-			Namespace: r.namespace(),
+			Namespace: r.Plan.TargetNamespace(),
 			Name:      r.nameForSecret(vmRef),
 			Labels: map[string]string{
 				kMigration: string(r.Migration.UID),
@@ -399,19 +430,6 @@ func (r *VmImport) PercentComplete() (pct float64) {
 			return
 		}
 		pct = n / 100
-	}
-
-	return
-}
-
-//
-// Get the target namespace.
-// Default to `plan` namespace when not specified
-// in the plan spec.
-func (r *KubeVirt) namespace() (ns string) {
-	ns = r.Plan.Spec.TargetNamespace
-	if ns == "" {
-		ns = r.Plan.Namespace
 	}
 
 	return

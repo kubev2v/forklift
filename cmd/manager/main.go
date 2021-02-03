@@ -25,8 +25,11 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller"
 	"github.com/konveyor/forklift-controller/pkg/webhook"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	cnv "kubevirt.io/client-go/api/v1"
 	cdi "kubevirt.io/containerized-data-importer/pkg/apis/core/v1beta1"
+
 	vmio "kubevirt.io/vm-import-operator/pkg/apis/v2v/v1beta1"
+
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
@@ -76,6 +79,10 @@ func main() {
 	}
 	if err := net.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Error(err, "unable to add CNI APIs to scheme")
+		os.Exit(1)
+	}
+	if err := cnv.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "unable to add kubevirt APIs to scheme")
 		os.Exit(1)
 	}
 	if err := vmio.AddToScheme(mgr.GetScheme()); err != nil {

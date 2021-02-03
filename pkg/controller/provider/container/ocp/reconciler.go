@@ -18,7 +18,8 @@ func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) libcontain
 			secret,
 			&Namespace{},
 			&NetworkAttachmentDefinition{},
-			&StorageClass{}),
+			&StorageClass{},
+			&VM{}),
 	}
 }
 

@@ -69,6 +69,19 @@ func (r *Resolver) Path(object interface{}, id string) (path string, err error) 
 					Name:      name,
 				},
 			})
+	case *VM:
+		if id == "" { // list
+			ns = r.Provider.Namespace
+		}
+		h := VMHandler{}
+		path = h.Link(
+			r.Provider,
+			&model.VM{
+				Base: model.Base{
+					Namespace: ns,
+					Name:      name,
+				},
+			})
 	default:
 		err = liberr.Wrap(
 			ResourceNotResolvedError{

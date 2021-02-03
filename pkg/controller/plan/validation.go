@@ -6,22 +6,25 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/validation"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
+	"path"
 )
 
 //
 // Types
 const (
-	VMRefNotValid = "VMRefNotValid"
-	VMNotFound    = "VMNotFound"
-	DuplicateVM   = "DuplicateVM"
-	NameNotValid  = "TargetNameNotValid"
-	Executing     = "Executing"
-	Succeeded     = "Succeeded"
-	Failed        = "Failed"
-	Canceled      = "Canceled"
-	Deleted       = "Deleted"
+	VMRefNotValid   = "VMRefNotValid"
+	VMNotFound      = "VMNotFound"
+	VMAlreadyExists = "VMAlreadyExists"
+	DuplicateVM     = "DuplicateVM"
+	NameNotValid    = "TargetNameNotValid"
+	Executing       = "Executing"
+	Succeeded       = "Succeeded"
+	Failed          = "Failed"
+	Canceled        = "Canceled"
+	Deleted         = "Deleted"
 )
 
 //
@@ -94,13 +97,8 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 //
 // Validate listed VMs.
 func (r *Reconciler) validateVM(plan *api.Plan) error {
-	provider := plan.Referenced.Provider.Source
-	if provider == nil {
+	if plan.Status.HasCondition(Executing) {
 		return nil
-	}
-	inventory, pErr := web.NewClient(provider)
-	if pErr != nil {
-		return liberr.Wrap(pErr)
 	}
 	notFound := libcnd.Condition{
 		Type:     VMNotFound,
@@ -134,6 +132,14 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "Target VM name not valid.",
 		Items:    []string{},
 	}
+	alreadyExists := libcnd.Condition{
+		Type:     VMAlreadyExists,
+		Status:   True,
+		Reason:   NotUnique,
+		Category: Critical,
+		Message:  "Target VM already exists.",
+		Items:    []string{},
+	}
 	setOf := map[string]bool{}
 	//
 	// Referenced VMs.
@@ -149,7 +155,16 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			})
 			continue
 		}
-		_, pErr := inventory.VM(&ref)
+		// Source.
+		provider := plan.Referenced.Provider.Source
+		if provider == nil {
+			return nil
+		}
+		inventory, pErr := web.NewClient(provider)
+		if pErr != nil {
+			return liberr.Wrap(pErr)
+		}
+		_, pErr = inventory.VM(&ref)
 		if pErr != nil {
 			if errors.As(pErr, &web.NotFoundError{}) {
 				notFound.Items = append(notFound.Items, ref.String())
@@ -169,12 +184,42 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		} else {
 			setOf[ref.ID] = true
 		}
+		// Destination.
+		provider = plan.Referenced.Provider.Destination
+		if provider == nil {
+			return nil
+		}
+		inventory, pErr = web.NewClient(provider)
+		if pErr != nil {
+			return liberr.Wrap(pErr)
+		}
+		id := path.Join(
+			plan.TargetNamespace(),
+			ref.Name)
+		pErr = inventory.Get(&ocp.VM{}, id)
+		if pErr == nil {
+			if vm, found := plan.Status.Migration.FindVM(ref.ID); found {
+				if vm.Completed != nil && vm.Error == nil {
+					continue // migrated.
+				}
+			}
+			alreadyExists.Items = append(
+				alreadyExists.Items,
+				ref.String())
+		} else {
+			if !errors.As(pErr, &web.NotFoundError{}) {
+				return liberr.Wrap(pErr)
+			}
+		}
 	}
 	if len(notFound.Items) > 0 {
 		plan.Status.SetCondition(notFound)
 	}
 	if len(notUnique.Items) > 0 {
 		plan.Status.SetCondition(notUnique)
+	}
+	if len(alreadyExists.Items) > 0 {
+		plan.Status.SetCondition(alreadyExists)
 	}
 	if len(nameNotValid.Items) > 0 {
 		plan.Status.SetCondition(nameNotValid)
