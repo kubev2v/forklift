@@ -10,6 +10,15 @@ import (
 )
 
 //
+// Not enough data to build the context.
+type NotEnoughDataError struct {
+}
+
+func (e NotEnoughDataError) Error() string {
+	return "Not enough data to build plan context."
+}
+
+//
 // Factory.
 func New(client k8sclient.Client, plan *api.Plan, migration *api.Migration) (ctx *Context, err error) {
 	ctx = &Context{
@@ -71,8 +80,14 @@ type Source struct {
 
 //
 // Build.
+// Returns: NotEnoughDataError when:
+//   Plan.Referenced.Source is not complete.
 func (r *Source) build(ctx *Context) (err error) {
 	r.Provider = ctx.Plan.Referenced.Provider.Source
+	if r.Provider == nil {
+		err = liberr.Wrap(NotEnoughDataError{})
+		return
+	}
 	ref := r.Provider.Spec.Secret
 	r.Secret = &core.Secret{}
 	err = ctx.Get(
@@ -107,8 +122,14 @@ type Destination struct {
 
 //
 // Build.
+// Returns: NotEnoughDataError when:
+//   Plan.Referenced.Destination is not complete.
 func (r *Destination) build(ctx *Context) (err error) {
 	r.Provider = ctx.Plan.Referenced.Provider.Destination
+	if r.Provider == nil {
+		err = liberr.Wrap(NotEnoughDataError{})
+		return
+	}
 	if !r.Provider.IsHost() {
 		ref := r.Provider.Spec.Secret
 		secret := &core.Secret{}

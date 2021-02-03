@@ -80,6 +80,19 @@ type Plan struct {
 }
 
 //
+// Get the target namespace.
+// Default to `plan` namespace when not specified
+// in the plan spec.
+func (r *Plan) TargetNamespace() (ns string) {
+	ns = r.Spec.TargetNamespace
+	if ns == "" {
+		ns = r.Plan.Namespace
+	}
+
+	return
+}
+
+//
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type PlanList struct {
 	meta.TypeMeta `json:",inline"`

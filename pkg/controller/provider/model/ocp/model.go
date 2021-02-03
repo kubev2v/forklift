@@ -8,6 +8,7 @@ import (
 	storage "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	cnv "kubevirt.io/client-go/api/v1"
 	"path"
 	"strconv"
 )
@@ -129,4 +130,16 @@ type NetworkAttachmentDefinition struct {
 func (m *NetworkAttachmentDefinition) With(n *net.NetworkAttachmentDefinition) {
 	m.Base.With(n)
 	m.Object = *n
+}
+
+//
+// VM
+type VM struct {
+	Base
+	Object cnv.VirtualMachine `sql:""`
+}
+
+func (m *VM) With(v *cnv.VirtualMachine) {
+	m.Base.With(v)
+	m.Object = *v
 }

@@ -10,6 +10,7 @@ import (
 	core "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	cnv "kubevirt.io/client-go/api/v1"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
@@ -319,5 +320,108 @@ func (r *Namespace) Delete(e event.DeleteEvent) bool {
 //
 // Ignored.
 func (r *Namespace) Generic(e event.GenericEvent) bool {
+	return false
+}
+
+//
+// VM
+type VM struct {
+	libocp.BaseCollection
+}
+
+//
+// Get the kubernetes object being collected.
+func (r *VM) Object() runtime.Object {
+	return &cnv.VirtualMachine{}
+}
+
+//
+// Reconcile.
+// Achieve initial consistency.
+func (r *VM) Reconcile(ctx context.Context) (err error) {
+	pClient := r.Reconciler.Client()
+	list := &cnv.VirtualMachineList{}
+	err = pClient.List(context.TODO(), list)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	db := r.Reconciler.DB()
+	tx, err := db.Begin()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	defer tx.End()
+	for _, resource := range list.Items {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+		m := &model.VM{}
+		m.With(&resource)
+		r.Reconciler.UpdateThreshold(m)
+		Log.Info("Create", libref.ToKind(m), m.String())
+		err = tx.Insert(m)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+	}
+	err = tx.Commit()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	return
+}
+
+//
+// Resource created watch event.
+func (r *VM) Create(e event.CreateEvent) bool {
+	object, cast := e.Object.(*cnv.VirtualMachine)
+	if !cast {
+		return false
+	}
+	m := &model.VM{}
+	m.With(object)
+	r.Reconciler.Create(m)
+
+	return false
+}
+
+//
+// Resource updated watch event.
+func (r *VM) Update(e event.UpdateEvent) bool {
+	object, cast := e.ObjectNew.(*cnv.VirtualMachine)
+	if !cast {
+		return false
+	}
+	m := &model.VM{}
+	m.With(object)
+	r.Reconciler.Update(m)
+
+	return false
+}
+
+//
+// Resource deleted watch event.
+func (r *VM) Delete(e event.DeleteEvent) bool {
+	object, cast := e.Object.(*cnv.VirtualMachine)
+	if !cast {
+		return false
+	}
+	m := &model.VM{}
+	m.With(object)
+	r.Reconciler.Delete(m)
+
+	return false
+}
+
+//
+// Ignored.
+func (r *VM) Generic(e event.GenericEvent) bool {
 	return false
 }

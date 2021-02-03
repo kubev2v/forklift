@@ -29,6 +29,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"path"
@@ -228,17 +229,13 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resu
 //
 // Execute the plan.
 //   1. Find active (current) migration.
-//   2. If not, find the next pending migration.
-//   3. If a new migration is being started, update the snapshot.
-//   4. If not, detect that CRs hae been updated while the active migration is running and cancel.
-//   5. Run the migration.
+//   2. If found, update the context and match the snapshot.
+//   3. Cancel as needed.
+//   4. If not, find the next pending migration.
+//   5. If a new migration is being started, update the context and snapshot.
+//   6. Run the migration.
 func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	if plan.Status.HasBlockerCondition() {
-		return
-	}
-	migration, err := r.activeMigration(plan)
-	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	defer func() {
@@ -249,59 +246,82 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 			}
 		}
 	}()
-	canceled := false
-	newMigration := false
+	var migration *api.Migration
+	snapshot := plan.Status.Migration.ActiveSnapshot()
+	ctx, err := plancontext.New(
+		r,
+		plan,
+		&api.Migration{
+			ObjectMeta: meta.ObjectMeta{
+				Namespace: snapshot.Migration.Namespace,
+				Name:      snapshot.Migration.Name,
+				UID:       snapshot.Migration.UID,
+			},
+		})
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	//
+	// Find and validate the current (active) migration.
+	migration, err = r.activeMigration(plan)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	if migration != nil {
+		ctx.Migration = migration
+		r.matchSnapshot(ctx)
+	}
+	//
+	// The active snapshot may be marked canceled by:
+	//   activeMigration()
+	//   matchSnapshot()
+	if snapshot.HasCondition(Canceled) {
+		migration = nil
+		runner := Migration{Context: ctx}
+		err = runner.Cancel()
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+	}
+	//
+	// Find pending migrations.
 	pending := []*api.Migration{}
 	pending, err = r.pendingMigrations(plan)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
+	//
+	// No active migration.
+	// Select the next pending migration as the (active) migration.
 	if migration == nil && len(pending) > 0 {
 		migration = pending[0]
-		newMigration = true
+		ctx.Migration = migration
+		snapshot = r.newSnapshot(ctx)
 	}
+	//
+	// No (active) migration.
+	// Done.
 	if migration == nil {
 		plan.Status.DeleteCondition(Executing)
 		reQ = NoReQ
 		return
 	}
-	ctx, err := plancontext.New(r, plan, migration)
+	//
+	// Run the migration.
+	snapshot.BeginStagingConditions()
+	runner := Migration{Context: ctx}
+	reQ, err = runner.Run()
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	if newMigration {
-		r.newSnapshot(ctx)
-	} else {
-		if !r.matchSnapshot(ctx) {
-			canceled = true
-		}
-	}
-	snapshot := plan.Status.Migration.ActiveSnapshot()
-	snapshot.BeginStagingConditions()
-	if !canceled {
-		runner := Migration{Context: ctx}
-		reQ, err = runner.Run()
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-	} else {
-		plan.Status.DeleteCondition(Executing)
-		plan.Status.Migration.MarkCompleted()
-		snapshot.DeleteCondition(Executing)
-		snapshot.SetCondition(
-			libcnd.Condition{
-				Type:     Canceled,
-				Status:   True,
-				Category: Advisory,
-				Reason:   Modified,
-				Message:  "The migration has been canceled.",
-				Durable:  true,
-			})
-		reQ = NoReQ
-	}
+	//
+	// Reflect the plan status on the active
+	// snapshot in the history.
 	for _, t := range []string{Executing, Succeeded, Failed} {
 		if cnd := plan.Status.FindCondition(t); cnd != nil {
 			snapshot.SetCondition(*cnd)
@@ -317,7 +337,8 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 
 //
 // Create a new snapshot.
-func (r *Reconciler) newSnapshot(ctx *plancontext.Context) {
+// Return: The new active snapshot.
+func (r *Reconciler) newSnapshot(ctx *plancontext.Context) *planapi.Snapshot {
 	plan := ctx.Plan
 	migration := ctx.Migration
 	snapshot := planapi.Snapshot{}
@@ -326,13 +347,32 @@ func (r *Reconciler) newSnapshot(ctx *plancontext.Context) {
 	snapshot.Provider.Source.With(plan.Referenced.Provider.Source)
 	snapshot.Provider.Destination.With(plan.Referenced.Provider.Destination)
 	plan.Status.Migration.NewSnapshot(snapshot)
+	return plan.Status.Migration.ActiveSnapshot()
 }
 
 //
 // Match the snapshot and detect mutation.
-func (r *Reconciler) matchSnapshot(ctx *plancontext.Context) bool {
+// When detected, the (active) snapshot will get marked as canceled.
+func (r *Reconciler) matchSnapshot(ctx *plancontext.Context) (matched bool) {
 	plan := ctx.Plan
 	snapshot := plan.Status.Migration.ActiveSnapshot()
+	defer func() {
+		if !matched {
+			plan := ctx.Plan
+			plan.Status.DeleteCondition(Executing)
+			plan.Status.Migration.MarkCompleted()
+			snapshot.DeleteCondition(Executing)
+			snapshot.SetCondition(
+				libcnd.Condition{
+					Type:     Canceled,
+					Status:   True,
+					Category: Advisory,
+					Reason:   Modified,
+					Message:  "The migration has been canceled.",
+					Durable:  true,
+				})
+		}
+	}()
 	if !snapshot.Plan.Match(plan) {
 		return false
 	}
@@ -348,7 +388,7 @@ func (r *Reconciler) matchSnapshot(ctx *plancontext.Context) bool {
 
 //
 // Get the current (active) migration referenced in the snapshot.
-// Reset the migration in the snapshot when not found or UID not matched.
+// The active snapshot will be marked canceled.
 // Returns: nil when not-found.
 func (r *Reconciler) activeMigration(plan *api.Plan) (migration *api.Migration, err error) {
 	snapshot := plan.Status.Migration.ActiveSnapshot()
@@ -360,6 +400,14 @@ func (r *Reconciler) activeMigration(plan *api.Plan) (migration *api.Migration, 
 	if snapshot.HasCondition(Canceled) {
 		return
 	}
+	deleted := libcnd.Condition{
+		Type:     Canceled,
+		Status:   True,
+		Category: Advisory,
+		Reason:   Deleted,
+		Message:  "The migration has been deleted.",
+		Durable:  true,
+	}
 	active := &api.Migration{}
 	err = r.Get(
 		context.TODO(),
@@ -370,23 +418,19 @@ func (r *Reconciler) activeMigration(plan *api.Plan) (migration *api.Migration, 
 		active)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
-			snapshot.SetCondition(libcnd.Condition{
-				Type:     Canceled,
-				Status:   True,
-				Category: Advisory,
-				Reason:   Deleted,
-				Message:  "The migration has been deleted.",
-				Durable:  true,
-			})
+			snapshot.SetCondition(deleted)
 			err = nil
 		} else {
 			err = liberr.Wrap(err)
 		}
 		return
 	}
-	if active.UID == snapshot.Migration.UID {
-		migration = active
+	if active.UID != snapshot.Migration.UID {
+		snapshot.SetCondition(deleted)
+		active = nil
 	}
+
+	migration = active
 
 	return
 }
