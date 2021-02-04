@@ -40,12 +40,13 @@ const (
 //
 // Reasons
 const (
-	NotSet    = "NotSet"
-	NotFound  = "NotFound"
-	NotUnique = "NotUnique"
-	Ambiguous = "Ambiguous"
-	NotValid  = "NotValid"
-	Modified  = "Modified"
+	NotSet        = "NotSet"
+	NotFound      = "NotFound"
+	NotUnique     = "NotUnique"
+	Ambiguous     = "Ambiguous"
+	NotValid      = "NotValid"
+	Modified      = "Modified"
+	UserRequested = "UserRequested"
 )
 
 //
@@ -198,7 +199,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			ref.Name)
 		pErr = inventory.Get(&ocp.VM{}, id)
 		if pErr == nil {
-			if vm, found := plan.Status.Migration.FindVM(ref.ID); found {
+			if vm, found := plan.Status.Migration.FindVM(ref); found {
 				if vm.Completed != nil && vm.Error == nil {
 					continue // migrated.
 				}

@@ -1,6 +1,9 @@
 package plan
 
-import "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
+import (
+	libcnd "github.com/konveyor/controller/pkg/condition"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
+)
 
 //
 // A VM listed on the plan.
@@ -21,13 +24,15 @@ type VMStatus struct {
 	Phase string `json:"phase"`
 	// Errors
 	Error *Error `json:"error,omitempty"`
+	// Conditions.
+	libcnd.Conditions `json:",inline"`
 }
 
 //
 // Find a VM status.
-func (r *MigrationStatus) FindVM(vmID string) (v *VMStatus, found bool) {
+func (r *MigrationStatus) FindVM(ref ref.Ref) (v *VMStatus, found bool) {
 	for _, vm := range r.VMs {
-		if vm.ID == vmID {
+		if vm.ID == ref.ID || vm.Name == ref.Name {
 			found = true
 			v = vm
 			return
@@ -63,7 +68,7 @@ func (r *VMStatus) ReflectPipeline() {
 		}
 	}
 	if nStarted > 0 {
-		r.MarkedStarted()
+		r.MarkStarted()
 	}
 	if nCompleted == len(r.Pipeline) {
 		r.MarkCompleted()
