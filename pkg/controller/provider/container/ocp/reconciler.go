@@ -29,9 +29,3 @@ type Reconciler struct {
 	*libocp.Reconciler
 }
 
-//
-// Test api-server URL and token.
-func (r *Reconciler) Test() error {
-	// TODO: SAR check the token has access to kubevirt.
-	return nil
-}
