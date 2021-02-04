@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -28,6 +29,22 @@ import (
 type MigrationSpec struct {
 	// Reference to the associated Plan.
 	Plan core.ObjectReference `json:"plan" ref:"Plan"`
+	// List of VMs which will have their imports canceled.
+	Cancel []ref.Ref `json:"cancel,omitempty"`
+}
+
+//
+// Canceled indicates whether a VM ref is present
+// in the list of VM refs to be canceled.
+func (r *MigrationSpec) Canceled(ref ref.Ref) (found bool) {
+	for _, vm := range r.Cancel {
+		if vm.ID == ref.ID || vm.Name == ref.Name {
+			found = true
+			return
+		}
+	}
+
+	return
 }
 
 //

@@ -110,6 +110,23 @@ func (r Migration) Run() (reQ time.Duration, err error) {
 		if vm.MarkedCompleted() {
 			continue
 		}
+
+		// check whether the VM has been canceled by the user
+		if r.Context.Migration.Spec.Canceled(vm.Ref) {
+			vm.SetCondition(
+				libcnd.Condition{
+					Type:     Canceled,
+					Status:   True,
+					Category: Advisory,
+					Reason:   UserRequested,
+					Message:  "The migration has been canceled.",
+					Durable:  true,
+				})
+			vm.Phase = Completed
+			log.Info("Migration [CANCELED]:", "vm", vm)
+			continue
+		}
+
 		if inFlight > Settings.Migration.MaxInFlight {
 			break
 		}
@@ -196,21 +213,22 @@ func (r Migration) Run() (reQ time.Duration, err error) {
 
 //
 // Cancel the migration.
-// Delete resources associated with un-migrated VMs.
+// Delete resources associated with VMs that have failed or been marked canceled.
 func (r *Migration) Cancel() (err error) {
 	err = r.init()
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
+
 	for _, vm := range r.Plan.Status.Migration.VMs {
-		if vm.MarkedCompleted() && vm.Error == nil {
-			continue // migrated.
-		}
-		err = r.kubevirt.DeleteImport(vm)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
+		if vm.HasCondition(Canceled, Failed) {
+			err = r.kubevirt.DeleteImport(vm)
+			if err != nil {
+				err = liberr.Wrap(err)
+				return
+			}
+			vm.MarkCompleted()
 		}
 	}
 
@@ -272,8 +290,17 @@ func (r *Migration) begin() (err error) {
 	//
 	// Delete
 	for _, status := range r.Plan.Status.Migration.VMs {
+
 		kept := []*plan.VMStatus{}
-		if _, found := r.Plan.Spec.FindVM(status.ID); found {
+
+		// resolve the VM ref
+		_, err = r.Source.Inventory.VM(&status.Ref)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+
+		if _, found := r.Plan.Spec.FindVM(status.Ref); found {
 			kept = append(kept, status)
 		}
 		r.Plan.Status.Migration.VMs = kept
@@ -283,19 +310,28 @@ func (r *Migration) begin() (err error) {
 	list := []*plan.VMStatus{}
 	for _, vm := range r.Plan.Spec.VMs {
 		var status *plan.VMStatus
+
+		// resolve the VM ref
+		_, err = r.Source.Inventory.VM(&vm.Ref)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+
 		itinerary.Predicate = &Predicate{vm: &vm}
 		step, _ := itinerary.First()
-		if current, found := r.Plan.Status.Migration.FindVM(vm.ID); !found {
+		if current, found := r.Plan.Status.Migration.FindVM(vm.Ref); !found {
 			status = &plan.VMStatus{VM: vm}
 		} else {
 			status = current
 		}
-		if status.Phase != Completed || status.Error != nil {
+		if status.Phase != Completed || status.HasAnyCondition(Canceled, Failed) {
 			pipeline, pErr := r.buildPipeline(&vm)
 			if pErr != nil {
 				err = liberr.Wrap(pErr)
 				return
 			}
+			status.DeleteCondition(Canceled, Failed)
 			status.MarkReset()
 			status.Pipeline = pipeline
 			status.Phase = step.Name
@@ -454,8 +490,25 @@ func (r *Migration) updateVM(vm *plan.VMStatus) (completed bool, failed bool, er
 		vm.MarkedCompleted()
 		completed = true
 		if cnd.Status != True {
+			vm.SetCondition(
+				libcnd.Condition{
+					Type:     Failed,
+					Status:   True,
+					Category: Advisory,
+					Message:  "The VM migration has FAILED.",
+					Durable:  true,
+				})
 			vm.AddError(cnd.Message)
 			failed = true
+		} else {
+			vm.SetCondition(
+				libcnd.Condition{
+					Type:     Succeeded,
+					Status:   True,
+					Category: Advisory,
+					Message:  "The VM migration has SUCCEEDED.",
+					Durable:  true,
+				})
 		}
 	}
 

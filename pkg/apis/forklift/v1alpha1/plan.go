@@ -20,6 +20,7 @@ import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/provider"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -40,9 +41,9 @@ type PlanSpec struct {
 
 //
 // Find a planned VM.
-func (r *PlanSpec) FindVM(vmID string) (v *plan.VM, found bool) {
+func (r *PlanSpec) FindVM(ref ref.Ref) (v *plan.VM, found bool) {
 	for _, vm := range r.VMs {
-		if vm.ID == vmID {
+		if vm.ID == ref.ID || vm.Name == ref.Name {
 			found = true
 			v = &vm
 			return

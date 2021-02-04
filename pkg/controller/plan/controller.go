@@ -278,14 +278,28 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	//   activeMigration()
 	//   matchSnapshot()
 	if snapshot.HasCondition(Canceled) {
-		migration = nil
-		runner := Migration{Context: ctx}
-		err = runner.Cancel()
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
+		for _, vm := range plan.Status.Migration.VMs {
+			if !vm.HasCondition(Succeeded) {
+				vm.SetCondition(
+					libcnd.Condition{
+						Type:     Canceled,
+						Status:   True,
+						Category: Advisory,
+						Reason:   Modified,
+						Message:  "The migration has been canceled.",
+						Durable:  true,
+					})
+			}
 		}
 	}
+
+	runner := Migration{Context: ctx}
+	err = runner.Cancel()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
 	//
 	// Find pending migrations.
 	pending := []*api.Migration{}
@@ -313,7 +327,7 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	//
 	// Run the migration.
 	snapshot.BeginStagingConditions()
-	runner := Migration{Context: ctx}
+	runner = Migration{Context: ctx}
 	reQ, err = runner.Run()
 	if err != nil {
 		err = liberr.Wrap(err)
