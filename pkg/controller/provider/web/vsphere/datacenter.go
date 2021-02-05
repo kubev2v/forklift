@@ -115,12 +115,20 @@ func (h DatacenterHandler) Link(p *api.Provider, m *model.Datacenter) string {
 // REST Resource.
 type Datacenter struct {
 	Resource
+	Datastores model.Ref `json:"datastores"`
+	Networks   model.Ref `json:"networks"`
+	Clusters   model.Ref `json:"clusters"`
+	VMs        model.Ref `json:"vms"`
 }
 
 //
 // Build the resource using the model.
 func (r *Datacenter) With(m *model.Datacenter) {
 	r.Resource.With(&m.Base)
+	r.Datastores = m.Datastores
+	r.Networks = m.Networks
+	r.Clusters = m.Clusters
+	r.VMs = m.Vms
 }
 
 //
