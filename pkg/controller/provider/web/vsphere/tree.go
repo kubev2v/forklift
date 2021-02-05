@@ -151,6 +151,8 @@ func (h TreeHandler) HostTree(ctx *gin.Context) {
 				refs = m.(*model.Folder).Children
 			case *model.Cluster:
 				refs = m.(*model.Cluster).Hosts
+			case *model.Host:
+				refs = m.(*model.Host).Vms
 			}
 
 			return

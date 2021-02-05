@@ -118,7 +118,7 @@ type Cluster struct {
 	Networks    []model.Ref `json:"networks"`
 	Datastores  []model.Ref `json:"datastores"`
 	DasEnabled  bool        `json:"dasEnabled"`
-	DasVms      []model.Ref `json:"DasVms"`
+	DasVms      []model.Ref `json:"dasVms"`
 	DrsEnabled  bool        `json:"drsEnabled"`
 	DrsBehavior string      `json:"drsBehavior"`
 	DrsVms      []model.Ref `json:"drsVms"`
