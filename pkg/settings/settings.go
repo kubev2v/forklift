@@ -21,6 +21,8 @@ type ControllerSettings struct {
 	Inventory
 	// Migration settings.
 	Migration
+	// Policy agent settings.
+	PolicyAgent
 }
 
 //
@@ -39,6 +41,10 @@ func (r *ControllerSettings) Load() error {
 		return liberr.Wrap(err)
 	}
 	err = r.Migration.Load()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	err = r.PolicyAgent.Load()
 	if err != nil {
 		return liberr.Wrap(err)
 	}

@@ -119,41 +119,12 @@ func (h *ProviderHandler) ListContent(ctx *gin.Context) (content []interface{}, 
 //
 // Add counts.
 func (h ProviderHandler) AddCount(r *Provider) error {
-	var err error
-	var n int64
-
 	if !h.Detail {
 		return nil
 	}
-	db := h.Reconciler.DB()
 
-	// VM
-	n, err = db.Count(&model.VM{}, nil)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-	r.VMCount = n
-
-	// Network
-	n, err = db.Count(&model.NetworkAttachmentDefinition{}, nil)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-	r.NetworkCount = n + 1
-
-	// Namespace
-	n, err = db.Count(&model.Namespace{}, nil)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-	r.NamespaceCount = n
-
-	// StorageClass
-	n, err = db.Count(&model.StorageClass{}, nil)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-	r.StorageClassCount = n
+	//
+	// TODO:
 
 	return nil
 }
@@ -173,12 +144,11 @@ func (h ProviderHandler) Link(m *model.Provider) string {
 // REST Resource.
 type Provider struct {
 	Resource
-	Type              string       `json:"type"`
-	Object            api.Provider `json:"object"`
-	VMCount           int64        `json:"vmCount"`
-	NetworkCount      int64        `json:"networkCount"`
-	NamespaceCount    int64        `json:"namespaceCount"`
-	StorageClassCount int64        `json:"storageclassCount"`
+	Type           string       `json:"type"`
+	Object         api.Provider `json:"object"`
+	VMCount        int64        `json:"vmCount"`
+	NetworkCount   int64        `json:"networkCount"`
+	NamespaceCount int64        `json:"namespaceCount"`
 }
 
 //

@@ -27,11 +27,11 @@ type Base struct {
 	// Managed object ID.
 	ID string `sql:"pk"`
 	// Name
-	Name string `sql:"index(b)"`
+	Name string `sql:"d0,index(b)"`
 	// Parent
-	Parent Ref `sql:"index(a)"`
+	Parent Ref `sql:"d0,index(a)"`
 	// Revision
-	Revision int64 `sql:""`
+	Revision int64 `sql:"d0"`
 }
 
 //
@@ -337,6 +337,8 @@ type Datastore struct {
 
 type VM struct {
 	Base
+	RevisionValidated     int64     `sql:"d0"`
+	PolicyVersion         int       `sql:"d0"`
 	UUID                  string    `sql:""`
 	Firmware              string    `sql:""`
 	PowerState            string    `sql:""`
@@ -357,14 +359,13 @@ type VM struct {
 	Disks                 []Disk    `sql:""`
 	Networks              []Ref     `sql:""`
 	Host                  Ref       `sql:""`
-	RevisionAnalyzed      int64     `sql:""`
 	Concerns              []Concern `sql:""`
 }
 
 //
-// Determine if current revision has been analyzed.
-func (m *VM) Analyzed() bool {
-	return m.RevisionAnalyzed == m.Revision
+// Determine if current revision has been validated.
+func (m *VM) Validated() bool {
+	return m.RevisionValidated == m.Revision
 }
 
 //
@@ -386,6 +387,7 @@ type Device struct {
 //
 // VM concerns.
 type Concern struct {
-	Name     string `json:"name"`
-	Severity string `json:"severity"`
+	Label      string `json:"label"`
+	Category   string `json:"category"`
+	Assessment string `json:"assessment"`
 }
