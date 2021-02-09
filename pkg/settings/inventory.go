@@ -24,9 +24,6 @@ const (
 	TLSCertificate = "API_TLS_CERTIFICATE"
 	TLSKey         = "API_TLS_KEY"
 	TLSCa          = "API_TLS_CA"
-	XavierURL      = "XAVIER_URL"
-	XavierUser     = "XAVIER_USER"
-	XavierPassword = "XAVIER_PASSWORD"
 )
 
 //

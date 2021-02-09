@@ -337,7 +337,6 @@ func (r *Reconciler) getDB(provider *api.Provider) (db libmodel.DB) {
 	path := filepath.Join(dir, file)
 	models := model.Models(provider)
 	db = libmodel.New(path, models...)
-	db.Journal().Enable()
 	return
 }
 

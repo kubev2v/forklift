@@ -445,14 +445,27 @@ next:
 // Add model watches.
 func (r *Reconciler) watch() (list []*libmodel.Watch) {
 	// Cluster
-	w, err := r.db.Watch(&model.Cluster{}, &WatchCluster{r.db})
+	w, err := r.db.Watch(
+		&model.Cluster{},
+		&ClusterEventHandler{DB: r.db})
+	if err != nil {
+		Log.Trace(liberr.Wrap(err))
+	} else {
+		list = append(list, w)
+	}
+	// Host
+	w, err = r.db.Watch(
+		&model.Host{},
+		&HostEventHandler{DB: r.db})
 	if err != nil {
 		Log.Trace(liberr.Wrap(err))
 	} else {
 		list = append(list, w)
 	}
 	// VM
-	w, err = r.db.Watch(&model.VM{}, &WatchVM{r.db})
+	w, err = r.db.Watch(
+		&model.VM{},
+		&VMEventHandler{Provider: r.provider, DB: r.db})
 	if err != nil {
 		Log.Trace(liberr.Wrap(err))
 	} else {
