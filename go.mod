@@ -5,7 +5,7 @@ go 1.14
 require (
 	github.com/gin-gonic/gin v1.6.3
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.1.0
-	github.com/konveyor/controller v0.2.5
+	github.com/konveyor/controller v0.2.7
 	github.com/onsi/gomega v1.10.3
 	github.com/prometheus/client_golang v1.8.0
 	github.com/vmware/govmomi v0.23.1
