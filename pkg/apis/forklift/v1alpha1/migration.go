@@ -38,7 +38,7 @@ type MigrationSpec struct {
 // in the list of VM refs to be canceled.
 func (r *MigrationSpec) Canceled(ref ref.Ref) (found bool) {
 	for _, vm := range r.Cancel {
-		if vm.ID == ref.ID || vm.Name == ref.Name {
+		if vm.ID == ref.ID {
 			found = true
 			return
 		}

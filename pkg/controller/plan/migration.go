@@ -311,13 +311,6 @@ func (r *Migration) begin() (err error) {
 	for _, vm := range r.Plan.Spec.VMs {
 		var status *plan.VMStatus
 
-		// resolve the VM ref
-		_, err = r.Source.Inventory.VM(&vm.Ref)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-
 		itinerary.Predicate = &Predicate{vm: &vm}
 		step, _ := itinerary.First()
 		if current, found := r.Plan.Status.Migration.FindVM(vm.Ref); !found {
@@ -487,7 +480,7 @@ func (r *Migration) updateVM(vm *plan.VMStatus) (completed bool, failed bool, er
 	conditions := imp.Conditions()
 	cnd := conditions.FindCondition(Succeeded)
 	if cnd != nil {
-		vm.MarkedCompleted()
+		vm.MarkCompleted()
 		completed = true
 		if cnd.Status != True {
 			vm.SetCondition(

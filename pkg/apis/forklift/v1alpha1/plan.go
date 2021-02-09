@@ -43,7 +43,7 @@ type PlanSpec struct {
 // Find a planned VM.
 func (r *PlanSpec) FindVM(ref ref.Ref) (v *plan.VM, found bool) {
 	for _, vm := range r.VMs {
-		if vm.ID == ref.ID || vm.Name == ref.Name {
+		if vm.ID == ref.ID {
 			found = true
 			v = &vm
 			return

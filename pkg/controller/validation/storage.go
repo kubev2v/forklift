@@ -62,7 +62,7 @@ func (r *StoragePair) validateSource(list []mapped.StoragePair) (result libcnd.C
 	notValid := []string{}
 	ambiguous := []string{}
 	for _, entry := range list {
-		ref := entry.Source
+		ref := &entry.Source
 		if ref.NotSet() {
 			result.SetCondition(libcnd.Condition{
 				Type:     DestinationNetworkNotValid,
@@ -73,14 +73,14 @@ func (r *StoragePair) validateSource(list []mapped.StoragePair) (result libcnd.C
 			})
 			continue
 		}
-		_, pErr := inventory.Storage(&ref)
+		_, pErr := inventory.Storage(ref)
 		if pErr != nil {
 			if errors.As(pErr, &web.NotFoundError{}) {
-				notValid = append(notValid, entry.Source.String())
+				notValid = append(notValid, ref.String())
 				continue
 			}
 			if errors.As(pErr, &web.RefNotUniqueError{}) {
-				ambiguous = append(ambiguous, entry.Source.String())
+				ambiguous = append(ambiguous, ref.String())
 				continue
 			}
 			err = liberr.Wrap(pErr)

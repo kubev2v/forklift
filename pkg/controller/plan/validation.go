@@ -145,7 +145,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	//
 	// Referenced VMs.
 	for _, vm := range plan.Spec.VMs {
-		ref := vm.Ref
+		ref := &vm.Ref
 		if ref.NotSet() {
 			plan.Status.SetCondition(libcnd.Condition{
 				Type:     VMRefNotValid,
@@ -165,7 +165,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		if pErr != nil {
 			return liberr.Wrap(pErr)
 		}
-		_, pErr = inventory.VM(&ref)
+		_, pErr = inventory.VM(ref)
 		if pErr != nil {
 			if errors.As(pErr, &web.NotFoundError{}) {
 				notFound.Items = append(notFound.Items, ref.String())
@@ -199,7 +199,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			ref.Name)
 		pErr = inventory.Get(&ocp.VM{}, id)
 		if pErr == nil {
-			if vm, found := plan.Status.Migration.FindVM(ref); found {
+			if vm, found := plan.Status.Migration.FindVM(*ref); found {
 				if vm.Completed != nil && vm.Error == nil {
 					continue // migrated.
 				}
