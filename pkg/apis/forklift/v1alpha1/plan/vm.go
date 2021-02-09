@@ -32,7 +32,7 @@ type VMStatus struct {
 // Find a VM status.
 func (r *MigrationStatus) FindVM(ref ref.Ref) (v *VMStatus, found bool) {
 	for _, vm := range r.VMs {
-		if vm.ID == ref.ID || vm.Name == ref.Name {
+		if vm.ID == ref.ID {
 			found = true
 			v = vm
 			return

@@ -76,7 +76,7 @@ func (r *NetworkPair) validateSource(list []mapped.NetworkPair) (result libcnd.C
 	notValid := []string{}
 	ambiguous := []string{}
 	for _, entry := range list {
-		ref := entry.Source
+		ref := &entry.Source
 		if ref.NotSet() {
 			result.SetCondition(libcnd.Condition{
 				Type:     SourceNetworkNotValid,
@@ -87,14 +87,14 @@ func (r *NetworkPair) validateSource(list []mapped.NetworkPair) (result libcnd.C
 			})
 			continue
 		}
-		_, pErr := inventory.Network(&ref)
+		_, pErr := inventory.Network(ref)
 		if pErr != nil {
 			if errors.As(pErr, &web.NotFoundError{}) {
-				notValid = append(notValid, entry.Source.String())
+				notValid = append(notValid, ref.String())
 				continue
 			}
 			if errors.As(pErr, &web.RefNotUniqueError{}) {
-				ambiguous = append(ambiguous, entry.Source.String())
+				ambiguous = append(ambiguous, ref.String())
 				continue
 			}
 			err = liberr.Wrap(pErr)
