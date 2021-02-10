@@ -37,7 +37,17 @@ type MigrationSpec struct {
 // Canceled indicates whether a VM ref is present
 // in the list of VM refs to be canceled.
 func (r *MigrationSpec) Canceled(ref ref.Ref) (found bool) {
+	if ref.ID == "" {
+		return
+	}
+
 	for _, vm := range r.Cancel {
+		// the refs in the Cancel array might not have
+		// all been resolved successfully, so skip
+		// over any VMs that don't have an ID set.
+		if vm.ID == "" {
+			continue
+		}
 		if vm.ID == ref.ID {
 			found = true
 			return

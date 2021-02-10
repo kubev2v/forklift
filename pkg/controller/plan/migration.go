@@ -5,7 +5,7 @@ import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libitr "github.com/konveyor/controller/pkg/itinerary"
-	"github.com/konveyor/controller/pkg/ref"
+	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/builder"
@@ -103,6 +103,8 @@ func (r Migration) Run() (reQ time.Duration, err error) {
 		err = liberr.Wrap(err)
 		return
 	}
+
+	r.resolveCanceledRefs()
 
 	inFlight := 0
 	list := r.Context.Plan.Status.Migration.VMs
@@ -233,6 +235,15 @@ func (r *Migration) Cancel() (err error) {
 	}
 
 	return
+}
+
+//
+// Best effort attempt to resolve canceled refs.
+func (r *Migration) resolveCanceledRefs() {
+	for _, ref := range r.Context.Migration.Spec.Cancel {
+		// resolve the VM ref in place
+		_, _ = r.Source.Inventory.VM(&ref)
+	}
 }
 
 //
@@ -593,9 +604,9 @@ func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 	}
 	switch flag {
 	case HasPreHook:
-		allowed = ref.RefSet(r.vm.Hook.Before)
+		allowed = libref.RefSet(r.vm.Hook.Before)
 	case HasPostHook:
-		allowed = ref.RefSet(r.vm.Hook.After)
+		allowed = libref.RefSet(r.vm.Hook.After)
 	}
 
 	return
