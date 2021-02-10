@@ -28,4 +28,3 @@ func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) libcontain
 type Reconciler struct {
 	*libocp.Reconciler
 }
-
