@@ -240,9 +240,10 @@ func (r *Migration) Cancel() (err error) {
 //
 // Best effort attempt to resolve canceled refs.
 func (r *Migration) resolveCanceledRefs() {
-	for _, ref := range r.Context.Migration.Spec.Cancel {
+	for i := range r.Context.Migration.Spec.Cancel {
 		// resolve the VM ref in place
-		_, _ = r.Source.Inventory.VM(&ref)
+		ref := &r.Context.Migration.Spec.Cancel[i]
+		_, _ = r.Source.Inventory.VM(ref)
 	}
 }
 
@@ -301,7 +302,6 @@ func (r *Migration) begin() (err error) {
 	//
 	// Delete
 	for _, status := range r.Plan.Status.Migration.VMs {
-
 		kept := []*plan.VMStatus{}
 
 		// resolve the VM ref

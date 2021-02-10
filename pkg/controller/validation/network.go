@@ -75,8 +75,8 @@ func (r *NetworkPair) validateSource(list []mapped.NetworkPair) (result libcnd.C
 	}
 	notValid := []string{}
 	ambiguous := []string{}
-	for _, entry := range list {
-		ref := &entry.Source
+	for i := range list {
+		ref := &list[i].Source
 		if ref.NotSet() {
 			result.SetCondition(libcnd.Condition{
 				Type:     SourceNetworkNotValid,
