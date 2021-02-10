@@ -282,7 +282,7 @@ func (r *Migration) next(phase string) (next string) {
 //
 // Begin the migration.
 func (r *Migration) begin() (err error) {
-	if r.Plan.Status.HasAnyCondition(Executing, Succeeded, Failed) {
+	if r.Plan.Status.HasAnyCondition(Executing, Succeeded, Failed, Canceled) {
 		return
 	}
 	r.Plan.Status.Migration.MarkStarted()
@@ -427,21 +427,27 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 //
 // End the migration.
 func (r *Migration) end() (completed bool, err error) {
-	failed := false
+	failed := 0
+	succeeded := 0
 	for _, vm := range r.Plan.Status.Migration.VMs {
 		if !vm.MarkedCompleted() {
 			return
 		}
-		if vm.Error != nil {
-			failed = true
-			break
+		if vm.HasCondition(Failed) {
+			failed++
+		}
+		if vm.HasCondition(Succeeded) {
+			succeeded++
 		}
 	}
 	r.Plan.Status.Migration.MarkCompleted()
-	r.Plan.Status.DeleteCondition(Executing)
-	if failed {
+	snapshot := r.Plan.Status.Migration.ActiveSnapshot()
+	snapshot.DeleteCondition(Executing)
+
+	if failed > 0 {
+		// if any VMs failed, the migration failed.
 		log.Info("Execution [FAILED]")
-		r.Plan.Status.SetCondition(
+		snapshot.SetCondition(
 			libcnd.Condition{
 				Type:     Failed,
 				Status:   True,
@@ -453,14 +459,30 @@ func (r *Migration) end() (completed bool, err error) {
 		if err != nil {
 			err = liberr.Wrap(err)
 		}
-	} else {
+
+	} else if succeeded > 0 {
+		// if the migration didn't fail and at least one VM succeeded,
+		// then the migration succeeded.
 		log.Info("Execution [SUCCEEDED]")
-		r.Plan.Status.SetCondition(
+		snapshot.SetCondition(
 			libcnd.Condition{
 				Type:     Succeeded,
 				Status:   True,
 				Category: Advisory,
 				Message:  "The plan execution has SUCCEEDED.",
+				Durable:  true,
+			})
+	} else {
+		// if there were no failures or successes, but
+		// all the VMs are complete, then the migration must
+		// have been canceled.
+		log.Info("Execution [CANCELED]")
+		snapshot.SetCondition(
+			libcnd.Condition{
+				Type:     Canceled,
+				Status:   True,
+				Category: Advisory,
+				Message:  "The plan execution has been CANCELED.",
 				Durable:  true,
 			})
 	}
