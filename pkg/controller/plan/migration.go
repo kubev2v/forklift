@@ -224,7 +224,7 @@ func (r *Migration) Cancel() (err error) {
 	}
 
 	for _, vm := range r.Plan.Status.Migration.VMs {
-		if vm.HasCondition(Canceled, Failed) {
+		if vm.HasAnyCondition(Canceled, Failed) {
 			err = r.kubevirt.DeleteImport(vm)
 			if err != nil {
 				err = liberr.Wrap(err)
@@ -286,7 +286,8 @@ func (r *Migration) begin() (err error) {
 		return
 	}
 	r.Plan.Status.Migration.MarkStarted()
-	r.Plan.Status.SetCondition(
+	snapshot := r.Plan.Status.Migration.ActiveSnapshot()
+	snapshot.SetCondition(
 		libcnd.Condition{
 			Type:     Executing,
 			Status:   True,
@@ -433,7 +434,7 @@ func (r *Migration) end() (completed bool, err error) {
 		if !vm.MarkedCompleted() {
 			return
 		}
-		if vm.HasCondition(Failed) {
+		if vm.HasCondition(Failed) || vm.Error != nil {
 			failed++
 		}
 		if vm.HasCondition(Succeeded) {

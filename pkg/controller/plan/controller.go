@@ -334,13 +334,16 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 		err = liberr.Wrap(err)
 		return
 	}
+	snapshot.EndStagingConditions()
+
 	// Reflect the active snapshot status on the plan.
-	for _, t := range []string{Executing, Succeeded, Failed} {
+	for _, t := range []string{Executing, Succeeded, Failed, Canceled} {
 		if cnd := snapshot.FindCondition(t); cnd != nil {
 			plan.Status.SetCondition(*cnd)
+		} else {
+			plan.Status.DeleteCondition(t)
 		}
 	}
-	snapshot.EndStagingConditions()
 	if len(pending) > 1 && reQ == 0 {
 		reQ = FastReQ
 	}
@@ -411,7 +414,7 @@ func (r *Reconciler) activeMigration(plan *api.Plan) (migration *api.Migration, 
 		}
 	}()
 	// the migration is inactive if it's reached a terminal state
-	if snapshot.HasCondition(Canceled, Failed, Succeeded) {
+	if snapshot.HasAnyCondition(Canceled, Failed, Succeeded) {
 		return
 	}
 	deleted := libcnd.Condition{
