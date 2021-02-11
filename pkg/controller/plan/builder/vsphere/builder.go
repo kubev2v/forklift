@@ -174,7 +174,8 @@ func (r *Builder) loadHosts() (err error) {
 		return
 	}
 	hostMap := map[string]*api.Host{}
-	for _, host := range list.Items {
+	for i := range list.Items {
+		host := &list.Items[i]
 		ref := host.Spec.Ref
 		if !host.Status.HasCondition(libcnd.Ready) {
 			continue
@@ -191,7 +192,7 @@ func (r *Builder) loadHosts() (err error) {
 		}
 		ref.ID = m.ID
 		ref.Name = m.Name
-		hostMap[ref.ID] = &host
+		hostMap[ref.ID] = host
 	}
 
 	r.hosts = hostMap
