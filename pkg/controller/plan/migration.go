@@ -5,7 +5,7 @@ import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libitr "github.com/konveyor/controller/pkg/itinerary"
-	"github.com/konveyor/controller/pkg/ref"
+	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/builder"
@@ -104,12 +104,31 @@ func (r Migration) Run() (reQ time.Duration, err error) {
 		return
 	}
 
+	r.resolveCanceledRefs()
+
 	inFlight := 0
 	list := r.Context.Plan.Status.Migration.VMs
 	for _, vm := range list {
 		if vm.MarkedCompleted() {
 			continue
 		}
+
+		// check whether the VM has been canceled by the user
+		if r.Context.Migration.Spec.Canceled(vm.Ref) {
+			vm.SetCondition(
+				libcnd.Condition{
+					Type:     Canceled,
+					Status:   True,
+					Category: Advisory,
+					Reason:   UserRequested,
+					Message:  "The migration has been canceled.",
+					Durable:  true,
+				})
+			vm.Phase = Completed
+			log.Info("Migration [CANCELED]:", "vm", vm)
+			continue
+		}
+
 		if inFlight > Settings.Migration.MaxInFlight {
 			break
 		}
@@ -196,25 +215,36 @@ func (r Migration) Run() (reQ time.Duration, err error) {
 
 //
 // Cancel the migration.
-// Delete resources associated with un-migrated VMs.
+// Delete resources associated with VMs that have failed or been marked canceled.
 func (r *Migration) Cancel() (err error) {
 	err = r.init()
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
+
 	for _, vm := range r.Plan.Status.Migration.VMs {
-		if vm.MarkedCompleted() && vm.Error == nil {
-			continue // migrated.
-		}
-		err = r.kubevirt.DeleteImport(vm)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
+		if vm.HasCondition(Canceled, Failed) {
+			err = r.kubevirt.DeleteImport(vm)
+			if err != nil {
+				err = liberr.Wrap(err)
+				return
+			}
+			vm.MarkCompleted()
 		}
 	}
 
 	return
+}
+
+//
+// Best effort attempt to resolve canceled refs.
+func (r *Migration) resolveCanceledRefs() {
+	for i := range r.Context.Migration.Spec.Cancel {
+		// resolve the VM ref in place
+		ref := &r.Context.Migration.Spec.Cancel[i]
+		_, _ = r.Source.Inventory.VM(ref)
+	}
 }
 
 //
@@ -252,7 +282,7 @@ func (r *Migration) next(phase string) (next string) {
 //
 // Begin the migration.
 func (r *Migration) begin() (err error) {
-	if r.Plan.Status.HasAnyCondition(Executing, Succeeded, Failed) {
+	if r.Plan.Status.HasAnyCondition(Executing, Succeeded, Failed, Canceled) {
 		return
 	}
 	r.Plan.Status.Migration.MarkStarted()
@@ -273,7 +303,15 @@ func (r *Migration) begin() (err error) {
 	// Delete
 	for _, status := range r.Plan.Status.Migration.VMs {
 		kept := []*plan.VMStatus{}
-		if _, found := r.Plan.Spec.FindVM(status.ID); found {
+
+		// resolve the VM ref
+		_, err = r.Source.Inventory.VM(&status.Ref)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+
+		if _, found := r.Plan.Spec.FindVM(status.Ref); found {
 			kept = append(kept, status)
 		}
 		r.Plan.Status.Migration.VMs = kept
@@ -283,19 +321,21 @@ func (r *Migration) begin() (err error) {
 	list := []*plan.VMStatus{}
 	for _, vm := range r.Plan.Spec.VMs {
 		var status *plan.VMStatus
+
 		itinerary.Predicate = &Predicate{vm: &vm}
 		step, _ := itinerary.First()
-		if current, found := r.Plan.Status.Migration.FindVM(vm.ID); !found {
+		if current, found := r.Plan.Status.Migration.FindVM(vm.Ref); !found {
 			status = &plan.VMStatus{VM: vm}
 		} else {
 			status = current
 		}
-		if status.Phase != Completed || status.Error != nil {
+		if status.Phase != Completed || status.HasAnyCondition(Canceled, Failed) {
 			pipeline, pErr := r.buildPipeline(&vm)
 			if pErr != nil {
 				err = liberr.Wrap(pErr)
 				return
 			}
+			status.DeleteCondition(Canceled, Failed)
 			status.MarkReset()
 			status.Pipeline = pipeline
 			status.Phase = step.Name
@@ -387,21 +427,27 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 //
 // End the migration.
 func (r *Migration) end() (completed bool, err error) {
-	failed := false
+	failed := 0
+	succeeded := 0
 	for _, vm := range r.Plan.Status.Migration.VMs {
 		if !vm.MarkedCompleted() {
 			return
 		}
-		if vm.Error != nil {
-			failed = true
-			break
+		if vm.HasCondition(Failed) {
+			failed++
+		}
+		if vm.HasCondition(Succeeded) {
+			succeeded++
 		}
 	}
 	r.Plan.Status.Migration.MarkCompleted()
-	r.Plan.Status.DeleteCondition(Executing)
-	if failed {
+	snapshot := r.Plan.Status.Migration.ActiveSnapshot()
+	snapshot.DeleteCondition(Executing)
+
+	if failed > 0 {
+		// if any VMs failed, the migration failed.
 		log.Info("Execution [FAILED]")
-		r.Plan.Status.SetCondition(
+		snapshot.SetCondition(
 			libcnd.Condition{
 				Type:     Failed,
 				Status:   True,
@@ -413,14 +459,30 @@ func (r *Migration) end() (completed bool, err error) {
 		if err != nil {
 			err = liberr.Wrap(err)
 		}
-	} else {
+
+	} else if succeeded > 0 {
+		// if the migration didn't fail and at least one VM succeeded,
+		// then the migration succeeded.
 		log.Info("Execution [SUCCEEDED]")
-		r.Plan.Status.SetCondition(
+		snapshot.SetCondition(
 			libcnd.Condition{
 				Type:     Succeeded,
 				Status:   True,
 				Category: Advisory,
 				Message:  "The plan execution has SUCCEEDED.",
+				Durable:  true,
+			})
+	} else {
+		// if there were no failures or successes, but
+		// all the VMs are complete, then the migration must
+		// have been canceled.
+		log.Info("Execution [CANCELED]")
+		snapshot.SetCondition(
+			libcnd.Condition{
+				Type:     Canceled,
+				Status:   True,
+				Category: Advisory,
+				Message:  "The plan execution has been CANCELED.",
 				Durable:  true,
 			})
 	}
@@ -451,11 +513,28 @@ func (r *Migration) updateVM(vm *plan.VMStatus) (completed bool, failed bool, er
 	conditions := imp.Conditions()
 	cnd := conditions.FindCondition(Succeeded)
 	if cnd != nil {
-		vm.MarkedCompleted()
+		vm.MarkCompleted()
 		completed = true
 		if cnd.Status != True {
+			vm.SetCondition(
+				libcnd.Condition{
+					Type:     Failed,
+					Status:   True,
+					Category: Advisory,
+					Message:  "The VM migration has FAILED.",
+					Durable:  true,
+				})
 			vm.AddError(cnd.Message)
 			failed = true
+		} else {
+			vm.SetCondition(
+				libcnd.Condition{
+					Type:     Succeeded,
+					Status:   True,
+					Category: Advisory,
+					Message:  "The VM migration has SUCCEEDED.",
+					Durable:  true,
+				})
 		}
 	}
 
@@ -547,9 +626,9 @@ func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 	}
 	switch flag {
 	case HasPreHook:
-		allowed = ref.RefSet(r.vm.Hook.Before)
+		allowed = libref.RefSet(r.vm.Hook.Before)
 	case HasPostHook:
-		allowed = ref.RefSet(r.vm.Hook.After)
+		allowed = libref.RefSet(r.vm.Hook.After)
 	}
 
 	return

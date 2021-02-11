@@ -278,14 +278,28 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	//   activeMigration()
 	//   matchSnapshot()
 	if snapshot.HasCondition(Canceled) {
-		migration = nil
-		runner := Migration{Context: ctx}
-		err = runner.Cancel()
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
+		for _, vm := range plan.Status.Migration.VMs {
+			if !vm.HasCondition(Succeeded) {
+				vm.SetCondition(
+					libcnd.Condition{
+						Type:     Canceled,
+						Status:   True,
+						Category: Advisory,
+						Reason:   Modified,
+						Message:  "The migration has been canceled.",
+						Durable:  true,
+					})
+			}
 		}
 	}
+
+	runner := Migration{Context: ctx}
+	err = runner.Cancel()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
 	//
 	// Find pending migrations.
 	pending := []*api.Migration{}
@@ -301,6 +315,7 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 		migration = pending[0]
 		ctx.Migration = migration
 		snapshot = r.newSnapshot(ctx)
+		plan.Status.DeleteCondition(Failed, Canceled)
 	}
 	//
 	// No (active) migration.
@@ -313,18 +328,16 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	//
 	// Run the migration.
 	snapshot.BeginStagingConditions()
-	runner := Migration{Context: ctx}
+	runner = Migration{Context: ctx}
 	reQ, err = runner.Run()
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	//
-	// Reflect the plan status on the active
-	// snapshot in the history.
+	// Reflect the active snapshot status on the plan.
 	for _, t := range []string{Executing, Succeeded, Failed} {
-		if cnd := plan.Status.FindCondition(t); cnd != nil {
-			snapshot.SetCondition(*cnd)
+		if cnd := snapshot.FindCondition(t); cnd != nil {
+			plan.Status.SetCondition(*cnd)
 		}
 	}
 	snapshot.EndStagingConditions()
@@ -397,7 +410,8 @@ func (r *Reconciler) activeMigration(plan *api.Plan) (migration *api.Migration, 
 			snapshot.DeleteCondition(Executing)
 		}
 	}()
-	if snapshot.HasCondition(Canceled) {
+	// the migration is inactive if it's reached a terminal state
+	if snapshot.HasCondition(Canceled, Failed, Succeeded) {
 		return
 	}
 	deleted := libcnd.Condition{

@@ -35,6 +35,22 @@ spec:
         spec:
           description: MigrationSpec defines the desired state of Migration
           properties:
+            cancel:
+              description: List of VMs which will have their imports canceled.
+              items:
+                description: Source reference. Either the ID or Name must be specified.
+                properties:
+                  id:
+                    description: 'The object ID. vsphere:   The managed object ID.'
+                    type: string
+                  name:
+                    description: 'An object Name. vsphere:   A qualified name.'
+                    type: string
+                  type:
+                    description: Type used to qualify the name.
+                    type: string
+                type: object
+              type: array
             plan:
               description: Reference to the associated Plan.
               properties:
@@ -136,6 +152,44 @@ spec:
                     description: Completed timestamp.
                     format: date-time
                     type: string
+                  conditions:
+                    items:
+                      description: Condition
+                      properties:
+                        category:
+                          description: The condition category.
+                          type: string
+                        durable:
+                          description: The condition is durable - never un-staged.
+                          type: boolean
+                        items:
+                          description: A list of items referenced in the `Message`.
+                          items:
+                            type: string
+                          type: array
+                        lastTransitionTime:
+                          description: When the last status transition occurred.
+                          format: date-time
+                          type: string
+                        message:
+                          description: The human readable description of the condition.
+                          type: string
+                        reason:
+                          description: The reason for the condition or transition.
+                          type: string
+                        status:
+                          description: The condition status [true,false].
+                          type: string
+                        type:
+                          description: The condition type.
+                          type: string
+                      required:
+                      - category
+                      - lastTransitionTime
+                      - status
+                      - type
+                      type: object
+                    type: array
                   error:
                     description: Errors
                     properties:
@@ -364,6 +418,7 @@ spec:
                     description: Type used to qualify the name.
                     type: string
                 required:
+                - conditions
                 - phase
                 - pipeline
                 type: object
