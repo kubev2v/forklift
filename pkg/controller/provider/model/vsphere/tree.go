@@ -2,7 +2,6 @@ package vsphere
 
 import (
 	"fmt"
-	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	libref "github.com/konveyor/controller/pkg/ref"
 )
@@ -82,11 +81,11 @@ func (r *Tree) Build(root Model, navigator BranchNavigator) (*TreeNode, error) {
 		for _, ref := range navigator(model) {
 			m, err := ref.Get(r.DB)
 			if err != nil {
-				return liberr.Wrap(err)
+				return err
 			}
 			err = walk(m, true)
 			if err != nil {
-				return liberr.Wrap(err)
+				return err
 			}
 		}
 
@@ -94,7 +93,7 @@ func (r *Tree) Build(root Model, navigator BranchNavigator) (*TreeNode, error) {
 	}
 	err := walk(root, false)
 	if err != nil {
-		return nil, liberr.Wrap(err)
+		return nil, err
 	}
 
 	return treeRoot, nil
@@ -115,7 +114,7 @@ func (r *Tree) Ancestry(leaf Model, navigator ParentNavigator) (*TreeNode, error
 		}
 		m, err := ref.Get(r.DB)
 		if err != nil {
-			return nil, liberr.Wrap(err)
+			return nil, err
 		}
 		root = &TreeNode{
 			Kind:  ref.Kind,

@@ -2,7 +2,6 @@ package storage
 
 import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
-	liberr "github.com/konveyor/controller/pkg/error"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/controller/validation"
 )
@@ -37,7 +36,7 @@ func (r *Reconciler) validate(mp *api.StorageMap) error {
 	provider := validation.ProviderPair{Client: r}
 	conditions, err := provider.Validate(mp.Spec.Provider)
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 	mp.Status.UpdateConditions(conditions)
 	if mp.Status.HasCondition(validation.SourceProviderNotReady) {
@@ -46,7 +45,7 @@ func (r *Reconciler) validate(mp *api.StorageMap) error {
 	storage := validation.StoragePair{Client: r, Provider: provider.Referenced}
 	conditions, err = storage.Validate(mp.Spec.Map)
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 	mp.Status.UpdateConditions(conditions)
 

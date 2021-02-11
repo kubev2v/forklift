@@ -295,9 +295,7 @@ func (r *Reconciler) Test() (err error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	err = r.connect(ctx)
-	if err != nil {
-		err = liberr.Wrap(err)
-	} else {
+	if err == nil {
 		r.client.Logout(ctx)
 	}
 
@@ -349,7 +347,7 @@ func (r *Reconciler) Shutdown() {
 func (r *Reconciler) getUpdates(ctx context.Context) error {
 	err := r.connect(ctx)
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 	defer r.client.Logout(ctx)
 	about := r.client.ServiceContent.About
@@ -359,7 +357,7 @@ func (r *Reconciler) getUpdates(ctx context.Context) error {
 			Product:    about.LicenseProductName,
 		})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 	pc := property.DefaultCollector(r.client.Client)
 	pc, err = pc.Create(ctx)
@@ -411,12 +409,11 @@ next:
 		req.Version = updateSet.Version
 		tx, err = r.db.Begin()
 		if err != nil {
-			return liberr.Wrap(err)
+			return err
 		}
 		for _, fs := range updateSet.FilterSet {
 			err = r.apply(ctx, tx, fs.ObjectSet)
 			if err != nil {
-				err = liberr.Wrap(err)
 				Log.Trace(err)
 				break
 			}
@@ -449,7 +446,7 @@ func (r *Reconciler) watch() (list []*libmodel.Watch) {
 		&model.Cluster{},
 		&ClusterEventHandler{DB: r.db})
 	if err != nil {
-		Log.Trace(liberr.Wrap(err))
+		Log.Trace(err)
 	} else {
 		list = append(list, w)
 	}
@@ -458,7 +455,7 @@ func (r *Reconciler) watch() (list []*libmodel.Watch) {
 		&model.Host{},
 		&HostEventHandler{DB: r.db})
 	if err != nil {
-		Log.Trace(liberr.Wrap(err))
+		Log.Trace(err)
 	} else {
 		list = append(list, w)
 	}

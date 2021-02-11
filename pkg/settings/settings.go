@@ -30,23 +30,23 @@ type ControllerSettings struct {
 func (r *ControllerSettings) Load() error {
 	err := r.Role.Load()
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 	err = r.Metrics.Load()
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 	err = r.Inventory.Load()
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 	err = r.Migration.Load()
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 	err = r.PolicyAgent.Load()
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	return nil

@@ -194,7 +194,6 @@ func (c *RestClient) Get(resource interface{}, id string) (status int, err error
 	}
 	path, err := c.Resolver.Path(resource, id)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	status, err = c.get(path, resource)
@@ -223,7 +222,6 @@ func (c *RestClient) List(list interface{}, param ...Param) (status int, err err
 	}
 	path, err := c.Resolver.Path(resource, "/")
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	if len(param) > 0 {
@@ -281,7 +279,6 @@ func (c *RestClient) get(path string, resource interface{}) (status int, err err
 	}
 	err = c.buildTransport()
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	client := http.Client{Transport: c.transport}

@@ -2,7 +2,6 @@ package ocp
 
 import (
 	"github.com/gin-gonic/gin"
-	liberr "github.com/konveyor/controller/pkg/error"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
@@ -103,7 +102,7 @@ func (h *ProviderHandler) ListContent(ctx *gin.Context) (content []interface{}, 
 			r.With(m)
 			aErr := h.AddCount(&r)
 			if aErr != nil {
-				err = liberr.Wrap(aErr)
+				err = aErr
 				return
 			}
 			r.SelfLink = h.Link(m)

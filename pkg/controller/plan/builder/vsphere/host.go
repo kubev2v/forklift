@@ -34,10 +34,6 @@ func (r *EsxHost) TestConnection() (err error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
 	err = r.connect(ctx)
-	if err != nil {
-		liberr.Wrap(err)
-	}
-
 	return
 }
 
@@ -49,7 +45,6 @@ func (r *EsxHost) networkID(network *model.Network) (id string, err error) {
 	defer cancel()
 	err = r.connect(ctx)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	defer func() {
@@ -57,7 +52,7 @@ func (r *EsxHost) networkID(network *model.Network) (id string, err error) {
 	}()
 	object, fErr := r.finder.Network(ctx, network.Name)
 	if fErr != nil {
-		err = liberr.Wrap(fErr)
+		err = fErr
 		return
 	}
 
@@ -74,7 +69,6 @@ func (r *EsxHost) DatastoreID(ds *model.Datastore) (id string, err error) {
 	defer cancel()
 	err = r.connect(ctx)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	defer func() {
@@ -82,7 +76,7 @@ func (r *EsxHost) DatastoreID(ds *model.Datastore) (id string, err error) {
 	}()
 	object, fErr := r.finder.Datastore(ctx, ds.Name)
 	if fErr != nil {
-		err = liberr.Wrap(fErr)
+		err = fErr
 		return
 	}
 

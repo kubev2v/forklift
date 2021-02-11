@@ -259,14 +259,12 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 			},
 		})
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	//
 	// Find and validate the current (active) migration.
 	migration, err = r.activeMigration(plan)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	if migration != nil {
@@ -296,7 +294,6 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	runner := Migration{Context: ctx}
 	err = runner.Cancel()
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 
@@ -305,7 +302,6 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	pending := []*api.Migration{}
 	pending, err = r.pendingMigrations(plan)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	//
@@ -331,7 +327,6 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	runner = Migration{Context: ctx}
 	reQ, err = runner.Run()
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	snapshot.EndStagingConditions()
