@@ -33,13 +33,11 @@ type StoragePair struct {
 func (r *StoragePair) Validate(list []mapped.StoragePair) (result libcnd.Conditions, err error) {
 	conditions, err := r.validateSource(list)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	result.UpdateConditions(conditions)
 	conditions, err = r.validateDestination(list)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	result.UpdateConditions(conditions)
@@ -56,7 +54,6 @@ func (r *StoragePair) validateSource(list []mapped.StoragePair) (result libcnd.C
 	}
 	inventory, err := web.NewClient(provider)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	notValid := []string{}
@@ -83,7 +80,7 @@ func (r *StoragePair) validateSource(list []mapped.StoragePair) (result libcnd.C
 				ambiguous = append(ambiguous, ref.String())
 				continue
 			}
-			err = liberr.Wrap(pErr)
+			err = pErr
 			return
 		}
 	}
@@ -120,7 +117,6 @@ func (r *StoragePair) validateDestination(list []mapped.StoragePair) (result lib
 	}
 	inventory, err := web.NewClient(provider)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	notValid := []string{}
@@ -144,7 +140,7 @@ func (r *StoragePair) validateDestination(list []mapped.StoragePair) (result lib
 			if errors.As(pErr, &web.NotFoundError{}) {
 				notValid = append(notValid, entry.Destination.StorageClass)
 			} else {
-				err = liberr.Wrap(pErr)
+				err = pErr
 				return
 			}
 		}

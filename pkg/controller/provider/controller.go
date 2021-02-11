@@ -303,22 +303,22 @@ func (r *Reconciler) updateContainer(provider *api.Provider) (err error) {
 	db := r.getDB(provider)
 	secret, err := r.getSecret(provider)
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 	err = db.Open(true)
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 	pModel := &ocpmodel.Provider{}
 	pModel.With(provider)
 	err = db.Insert(pModel)
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 	new := container.Build(db, provider, secret)
 	current, found, err := r.container.Replace(new)
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 	if found {
 		current.DB().Close(true)

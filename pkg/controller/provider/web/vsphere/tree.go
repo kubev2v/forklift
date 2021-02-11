@@ -2,7 +2,6 @@ package vsphere
 
 import (
 	"github.com/gin-gonic/gin"
-	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
@@ -219,7 +218,7 @@ func (r *Tree) Build(m model.Model, navigator model.BranchNavigator) (*TreeNode,
 	}
 	modelRoot, err := tree.Build(m, navigator)
 	if err != nil {
-		return nil, liberr.Wrap(err)
+		return nil, err
 	}
 	for _, child := range modelRoot.Children {
 		walk(child)
@@ -251,7 +250,7 @@ func (r *Tree) Ancestry(leaf model.Model, navigator model.ParentNavigator) (*Tre
 	}
 	modelRoot, err := tree.Ancestry(leaf, navigator)
 	if err != nil {
-		return nil, liberr.Wrap(err)
+		return nil, err
 	}
 	root = r.node(nil, modelRoot.Model)
 	node = root

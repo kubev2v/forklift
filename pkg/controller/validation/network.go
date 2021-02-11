@@ -47,13 +47,11 @@ type NetworkPair struct {
 func (r *NetworkPair) Validate(list []mapped.NetworkPair) (result libcnd.Conditions, err error) {
 	conditions, err := r.validateSource(list)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	result.UpdateConditions(conditions)
 	conditions, err = r.validateDestination(list)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	result.UpdateConditions(conditions)
@@ -70,7 +68,6 @@ func (r *NetworkPair) validateSource(list []mapped.NetworkPair) (result libcnd.C
 	}
 	inventory, err := web.NewClient(provider)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	notValid := []string{}
@@ -97,7 +94,7 @@ func (r *NetworkPair) validateSource(list []mapped.NetworkPair) (result libcnd.C
 				ambiguous = append(ambiguous, ref.String())
 				continue
 			}
-			err = liberr.Wrap(pErr)
+			err = pErr
 			return
 		}
 	}
@@ -134,7 +131,6 @@ func (r *NetworkPair) validateDestination(list []mapped.NetworkPair) (result lib
 	}
 	inventory, err := web.NewClient(provider)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	notFound := []string{}
@@ -165,7 +161,7 @@ next:
 				if errors.As(pErr, &web.NotFoundError{}) {
 					notFound = append(notFound, entry.Source.ID)
 				} else {
-					err = liberr.Wrap(pErr)
+					err = pErr
 					return
 				}
 			}

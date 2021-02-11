@@ -119,7 +119,7 @@ func (r *VMEventHandler) Updated(event libmodel.Event) {
 //
 // Report errors.
 func (r *VMEventHandler) Error(err error) {
-	Log.Trace(liberr.Wrap(err))
+	Log.Trace(err)
 }
 
 //
@@ -178,7 +178,7 @@ func (r *VMEventHandler) search() {
 	Log.Info("Search for VMs that need to be validated.")
 	version, err := r.policyAgent.Version()
 	if err != nil {
-		Log.Trace(liberr.Wrap(err))
+		Log.Trace(err)
 		return
 	}
 	list := []model.VM{}

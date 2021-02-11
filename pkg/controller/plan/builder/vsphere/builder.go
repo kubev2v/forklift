@@ -40,7 +40,6 @@ func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
 	url := r.Source.Provider.Spec.URL
 	hostID, err := r.hostID(vmRef)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	if hostDef, found := r.hosts[hostID]; found {
@@ -52,12 +51,12 @@ func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
 		url = hostURL.String()
 		hostSecret, nErr := r.hostSecret(hostDef)
 		if nErr != nil {
-			err = liberr.Wrap(nErr)
+			err = nErr
 			return
 		}
 		h, nErr := r.host(hostID)
 		if nErr != nil {
-			err = liberr.Wrap(nErr)
+			err = nErr
 			return
 		}
 		hostSecret.Data["thumbprint"] = []byte(h.Thumbprint)
@@ -71,7 +70,7 @@ func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
 			"thumbprint": string(in.Data["thumbprint"]),
 		})
 	if mErr != nil {
-		err = liberr.Wrap(mErr)
+		err = mErr
 		return
 	}
 	object.StringData = map[string]string{
@@ -105,7 +104,6 @@ func (r *Builder) Import(vmRef ref.Ref, mp *plan.Map, object *vmio.VirtualMachin
 	}
 	object.Source.Vmware.Mappings, err = r.mapping(mp, vm)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 
@@ -186,7 +184,7 @@ func (r *Builder) loadHosts() (err error) {
 			if errors.As(pErr, &web.NotFoundError{}) {
 				continue
 			} else {
-				err = liberr.Wrap(pErr)
+				err = pErr
 				return
 			}
 		}
@@ -255,9 +253,6 @@ func (r *Builder) hostSecret(host *api.Host) (secret *core.Secret, err error) {
 			Name:      ref.Name,
 		},
 		secret)
-	if err != nil {
-		err = liberr.Wrap(err)
-	}
 
 	return
 }
@@ -290,7 +285,7 @@ func (r *Builder) mapping(in *plan.Map, vm *model.VM) (out *vmio.VmwareMappings,
 		network := &model.Network{}
 		fErr := r.Source.Inventory.Find(network, ref)
 		if fErr != nil {
-			err = liberr.Wrap(fErr)
+			err = fErr
 			return
 		}
 		needed := false

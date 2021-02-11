@@ -113,13 +113,11 @@ type ProviderPair struct {
 func (r *ProviderPair) Validate(pair provider.Pair) (result libcnd.Conditions, err error) {
 	conditions, err := r.validateSource(pair)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	result.UpdateConditions(conditions)
 	conditions, err = r.validateDestination(pair)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	result.UpdateConditions(conditions)
@@ -133,7 +131,6 @@ func (r *ProviderPair) validateSource(pair provider.Pair) (result libcnd.Conditi
 	validation := Provider{Client: r.Client}
 	conditions, err := validation.Validate(pair.Source)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	// Remap the condition to be source oriented.
@@ -173,7 +170,6 @@ func (r *ProviderPair) validateDestination(pair provider.Pair) (result libcnd.Co
 	validation := Provider{Client: r.Client}
 	conditions, err := validation.Validate(pair.Destination)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	// Remap the condition to be destination oriented.
