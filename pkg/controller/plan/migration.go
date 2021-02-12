@@ -203,6 +203,14 @@ func (r Migration) Run() (reQ time.Duration, err error) {
 		}
 		if vm.Error != nil {
 			vm.Phase = Completed
+			vm.SetCondition(
+				libcnd.Condition{
+					Type:     Failed,
+					Status:   True,
+					Category: Advisory,
+					Message:  "The VM migration has FAILED.",
+					Durable:  true,
+				})
 		}
 	}
 	completed, err := r.end()
@@ -224,7 +232,7 @@ func (r *Migration) Cancel() (err error) {
 	}
 
 	for _, vm := range r.Plan.Status.Migration.VMs {
-		if vm.HasCondition(Canceled, Failed) {
+		if vm.HasAnyCondition(Canceled, Failed) {
 			err = r.kubevirt.DeleteImport(vm)
 			if err != nil {
 				err = liberr.Wrap(err)
@@ -282,11 +290,12 @@ func (r *Migration) next(phase string) (next string) {
 //
 // Begin the migration.
 func (r *Migration) begin() (err error) {
-	if r.Plan.Status.HasAnyCondition(Executing, Succeeded, Failed, Canceled) {
+	snapshot := r.Plan.Status.Migration.ActiveSnapshot()
+	if snapshot.HasAnyCondition(Executing, Succeeded, Failed, Canceled) {
 		return
 	}
 	r.Plan.Status.Migration.MarkStarted()
-	r.Plan.Status.SetCondition(
+	snapshot.SetCondition(
 		libcnd.Condition{
 			Type:     Executing,
 			Status:   True,
@@ -516,14 +525,6 @@ func (r *Migration) updateVM(vm *plan.VMStatus) (completed bool, failed bool, er
 		vm.MarkCompleted()
 		completed = true
 		if cnd.Status != True {
-			vm.SetCondition(
-				libcnd.Condition{
-					Type:     Failed,
-					Status:   True,
-					Category: Advisory,
-					Message:  "The VM migration has FAILED.",
-					Durable:  true,
-				})
 			vm.AddError(cnd.Message)
 			failed = true
 		} else {
