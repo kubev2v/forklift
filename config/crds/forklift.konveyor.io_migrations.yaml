@@ -418,7 +418,6 @@ spec:
                     description: Type used to qualify the name.
                     type: string
                 required:
-                - conditions
                 - phase
                 - pipeline
                 type: object
