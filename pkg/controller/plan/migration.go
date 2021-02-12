@@ -203,6 +203,14 @@ func (r Migration) Run() (reQ time.Duration, err error) {
 		}
 		if vm.Error != nil {
 			vm.Phase = Completed
+			vm.SetCondition(
+				libcnd.Condition{
+					Type:     Failed,
+					Status:   True,
+					Category: Advisory,
+					Message:  "The VM migration has FAILED.",
+					Durable:  true,
+				})
 		}
 	}
 	completed, err := r.end()
@@ -282,11 +290,11 @@ func (r *Migration) next(phase string) (next string) {
 //
 // Begin the migration.
 func (r *Migration) begin() (err error) {
-	if r.Plan.Status.HasAnyCondition(Executing, Succeeded, Failed, Canceled) {
+	snapshot := r.Plan.Status.Migration.ActiveSnapshot()
+	if snapshot.HasAnyCondition(Executing, Succeeded, Failed, Canceled) {
 		return
 	}
 	r.Plan.Status.Migration.MarkStarted()
-	snapshot := r.Plan.Status.Migration.ActiveSnapshot()
 	snapshot.SetCondition(
 		libcnd.Condition{
 			Type:     Executing,
@@ -434,7 +442,7 @@ func (r *Migration) end() (completed bool, err error) {
 		if !vm.MarkedCompleted() {
 			return
 		}
-		if vm.HasCondition(Failed) || vm.Error != nil {
+		if vm.HasCondition(Failed) {
 			failed++
 		}
 		if vm.HasCondition(Succeeded) {
@@ -517,14 +525,6 @@ func (r *Migration) updateVM(vm *plan.VMStatus) (completed bool, failed bool, er
 		vm.MarkCompleted()
 		completed = true
 		if cnd.Status != True {
-			vm.SetCondition(
-				libcnd.Condition{
-					Type:     Failed,
-					Status:   True,
-					Category: Advisory,
-					Message:  "The VM migration has FAILED.",
-					Durable:  true,
-				})
 			vm.AddError(cnd.Message)
 			failed = true
 		} else {
