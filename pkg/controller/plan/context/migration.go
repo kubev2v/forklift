@@ -150,7 +150,11 @@ func (r *Destination) build(ctx *Context) (err error) {
 			return
 		}
 	} else {
-		r.Client = ctx
+		r.Client, err = r.Provider.Client(nil)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
 	}
 	r.Inventory, err = web.NewClient(r.Provider)
 	if err != nil {
