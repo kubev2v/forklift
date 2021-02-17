@@ -31,6 +31,9 @@ type MigrationSpec struct {
 	Plan core.ObjectReference `json:"plan" ref:"Plan"`
 	// List of VMs which will have their imports canceled.
 	Cancel []ref.Ref `json:"cancel,omitempty"`
+	// Date and time to finalize a warm migration.
+	// If present, this will override the value set on the Plan.
+	Cutover *meta.Time `json:"cutover,omitempty"`
 }
 
 //

@@ -25,6 +25,7 @@ const (
 	Failed          = "Failed"
 	Canceled        = "Canceled"
 	Deleted         = "Deleted"
+	Paused          = "Paused"
 )
 
 //
