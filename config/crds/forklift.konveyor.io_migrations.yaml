@@ -51,6 +51,11 @@ spec:
                     type: string
                 type: object
               type: array
+            cutover:
+              description: Date and time to finalize a warm migration. If present,
+                this will override the value set on the Plan.
+              format: date-time
+              type: string
             plan:
               description: Reference to the associated Plan.
               properties:
