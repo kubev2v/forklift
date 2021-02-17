@@ -640,6 +640,7 @@ func (r *Reconciler) propertySpec() []types.PropertySpec {
 			Type: DVSwitch,
 			PathSet: []string{
 				fName,
+				fParent,
 				fDVSwitchHost,
 			},
 		},
@@ -749,6 +750,7 @@ func (r *Reconciler) selectAdapter(u types.ObjectUpdate) (Adapter, bool) {
 				Base: model.Base{
 					ID: u.Obj.Value,
 				},
+				Variant: model.NetStandard,
 			},
 		}
 	case DVPortGroup:
@@ -757,14 +759,16 @@ func (r *Reconciler) selectAdapter(u types.ObjectUpdate) (Adapter, bool) {
 				Base: model.Base{
 					ID: u.Obj.Value,
 				},
+				Variant: model.NetDvPortGroup,
 			},
 		}
 	case DVSwitch:
 		adapter = &DVSwitchAdapter{
-			model: model.DVSwitch{
+			model: model.Network{
 				Base: model.Base{
 					ID: u.Obj.Value,
 				},
+				Variant: model.NetDvSwitch,
 			},
 		}
 	case Datastore:

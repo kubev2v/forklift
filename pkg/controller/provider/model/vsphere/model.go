@@ -6,11 +6,11 @@ import (
 )
 
 //
-// Concern severity.
+// Networks (variant).
 const (
-	Advisory = "Advisory"
-	Warning  = "Warning"
-	Critical = "Critical"
+	NetStandard    = "Standard"
+	NetDvPortGroup = "DvPortGroup"
+	NetDvSwitch    = "DvSwitch"
 )
 
 //
@@ -313,13 +313,10 @@ type Switch struct {
 
 type Network struct {
 	Base
-	Tag      string `sql:""`
-	DVSwitch Ref    `sql:""`
-}
-
-type DVSwitch struct {
-	Base
-	Host []DVSHost `sql:""`
+	Variant  string    `sql:"d0"`
+	Tag      string    `sql:""`
+	DVSwitch Ref       `sql:""`
+	Host     []DVSHost `sql:""`
 }
 
 type DVSHost struct {

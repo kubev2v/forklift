@@ -374,7 +374,7 @@ func (v *NetworkAdapter) Apply(u types.ObjectUpdate) {
 type DVSwitchAdapter struct {
 	Base
 	// The adapter model.
-	model model.DVSwitch
+	model model.Network
 }
 
 //
