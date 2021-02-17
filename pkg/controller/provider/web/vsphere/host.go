@@ -318,7 +318,7 @@ func (r AdapterBuilder) withDPG(host *Host, vNIC *model.VNIC, adapter *NetworkAd
 		return
 	}
 	ref := portGroup.DVSwitch
-	vSwitch := &model.DVSwitch{
+	vSwitch := &model.Network{
 		Base: model.Base{
 			ID: ref.ID,
 		},

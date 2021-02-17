@@ -153,21 +153,24 @@ func (h NetworkHandler) filter(ctx *gin.Context, list *[]model.Network) (err err
 // REST Resource.
 type Network struct {
 	Resource
-	Type     string     `json:"type"`
-	DVSwitch *model.Ref `json:"dvSwitch,omitempty"`
-	Tag      string     `json:"tag,omitempty"`
+	Variant  string          `json:"variant"`
+	DVSwitch *model.Ref      `json:"dvSwitch,omitempty"`
+	Host     []model.DVSHost `json:"host"`
+	Tag      string          `json:"tag,omitempty"`
 }
 
 //
 // Build the resource using the model.
 func (r *Network) With(m *model.Network) {
 	r.Resource.With(&m.Base)
-	r.Tag = m.Tag
-	if len(m.DVSwitch.ID) > 0 {
+	r.Variant = m.Variant
+	switch m.Variant {
+	case model.NetStandard:
+		r.Tag = m.Tag
+	case model.NetDvPortGroup:
 		r.DVSwitch = &m.DVSwitch
-		r.Type = "dvportgroup"
-	} else {
-		r.Type = "standard"
+	case model.NetDvSwitch:
+		r.Host = m.Host
 	}
 }
 
