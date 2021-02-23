@@ -76,6 +76,7 @@ const (
 	fCpuSockets     = "summary.hardware.numCpuPkgs"
 	fCpuCores       = "summary.hardware.numCpuCores"
 	fThumbprint     = "summary.config.sslThumbprint"
+	fMgtServerIp    = "summary.managementServerIp"
 	// Network
 	fTag = "tag"
 	// PortGroup
@@ -608,6 +609,7 @@ func (r *Reconciler) propertySpec() []types.PropertySpec {
 				fProductName,
 				fProductVersion,
 				fThumbprint,
+				fMgtServerIp,
 				fInMaintMode,
 				fCpuSockets,
 				fCpuCores,
