@@ -1,20 +1,28 @@
 package plan
 
 import (
+	"context"
 	"errors"
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
+	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/validation"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	"path"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 //
 // Types
 const (
+	NetRefNotValid  = "NetworkMapRefNotValid"
+	NetMapNotReady  = "NetworkMapNotReady"
+	DsMapNotReady   = "StorageMapNotReady"
+	DsRefNotValid   = "StorageRefNotValid"
 	VMRefNotValid   = "VMRefNotValid"
 	VMNotFound      = "VMNotFound"
 	VMAlreadyExists = "VMAlreadyExists"
@@ -60,8 +68,8 @@ const (
 // Validate the plan resource.
 func (r *Reconciler) validate(plan *api.Plan) error {
 	// Provider.
-	provider := validation.ProviderPair{Client: r}
-	conditions, err := provider.Validate(plan.Spec.Provider)
+	pv := validation.ProviderPair{Client: r}
+	conditions, err := pv.Validate(plan.Spec.Provider)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -69,30 +77,116 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	if plan.Status.HasCondition(validation.SourceProviderNotReady) {
 		return nil
 	}
-	plan.Referenced.Provider.Source = provider.Referenced.Source
-	plan.Referenced.Provider.Destination = provider.Referenced.Destination
+	plan.Referenced.Provider.Source = pv.Referenced.Source
+	plan.Referenced.Provider.Destination = pv.Referenced.Destination
 	//
-	// Map
-	network := validation.NetworkPair{Client: r, Provider: provider.Referenced}
-	conditions, err = network.Validate(plan.Spec.Map.Networks)
+	// Mapping
+	err = r.validateNetworkMap(plan)
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
-	plan.Status.UpdateConditions(conditions)
-	storage := validation.StoragePair{Client: r, Provider: provider.Referenced}
-	conditions, err = storage.Validate(plan.Spec.Map.Datastores)
+	err = r.validateStorageMap(plan)
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
-	plan.Status.UpdateConditions(conditions)
 	//
 	// VM list.
 	err = r.validateVM(plan)
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	return nil
+}
+
+//
+// Validate network mapping ref.
+func (r *Reconciler) validateNetworkMap(plan *api.Plan) (err error) {
+	ref := plan.Spec.Map.Network
+	newCnd := libcnd.Condition{
+		Type:     NetRefNotValid,
+		Status:   True,
+		Category: Critical,
+		Message:  "Map.Network is not valid.",
+	}
+	if !libref.RefSet(&ref) {
+		newCnd.Reason = NotSet
+		plan.Status.SetCondition(newCnd)
+		return
+	}
+	key := client.ObjectKey{
+		Namespace: ref.Namespace,
+		Name:      ref.Name,
+	}
+	mp := &api.NetworkMap{}
+	err = r.Get(context.TODO(), key, mp)
+	if k8serr.IsNotFound(err) {
+		err = nil
+		newCnd.Reason = NotFound
+		plan.Status.SetCondition(newCnd)
+		return
+	}
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	if !mp.Status.HasCondition(libcnd.Ready) {
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     NetMapNotReady,
+			Status:   True,
+			Category: Critical,
+			Message:  "Map.Network does not have Ready condition.",
+		})
+	}
+
+	plan.Referenced.Map.Network = mp
+
+	return
+}
+
+//
+// Validate storage mapping ref.
+func (r *Reconciler) validateStorageMap(plan *api.Plan) (err error) {
+	ref := plan.Spec.Map.Storage
+	newCnd := libcnd.Condition{
+		Type:     DsRefNotValid,
+		Status:   True,
+		Category: Critical,
+		Message:  "Map.Storage is not valid.",
+	}
+	if !libref.RefSet(&ref) {
+		newCnd.Reason = NotSet
+		plan.Status.SetCondition(newCnd)
+		return
+	}
+	key := client.ObjectKey{
+		Namespace: ref.Namespace,
+		Name:      ref.Name,
+	}
+	mp := &api.StorageMap{}
+	err = r.Get(context.TODO(), key, mp)
+	if k8serr.IsNotFound(err) {
+		err = nil
+		newCnd.Reason = NotFound
+		plan.Status.SetCondition(newCnd)
+		return
+	}
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	if !mp.Status.HasCondition(libcnd.Ready) {
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     DsMapNotReady,
+			Status:   True,
+			Category: Critical,
+			Message:  "Map.Storage does not have Ready condition.",
+		})
+	}
+
+	plan.Referenced.Map.Storage = mp
+
+	return
 }
 
 //

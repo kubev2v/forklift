@@ -100,6 +100,26 @@ func Add(mgr manager.Manager) error {
 	}
 	err = cnt.Watch(
 		&source.Kind{
+			Type: &api.NetworkMap{},
+		},
+		libref.Handler(),
+		&NetMapPredicate{})
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	err = cnt.Watch(
+		&source.Kind{
+			Type: &api.StorageMap{},
+		},
+		libref.Handler(),
+		&DsMapPredicate{})
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	err = cnt.Watch(
+		&source.Kind{
 			Type: &api.Migration{},
 		},
 		&handler.EnqueueRequestsFromMapFunc{
@@ -357,6 +377,8 @@ func (r *Reconciler) newSnapshot(ctx *plancontext.Context) *planapi.Snapshot {
 	snapshot.Migration.With(migration)
 	snapshot.Provider.Source.With(plan.Referenced.Provider.Source)
 	snapshot.Provider.Destination.With(plan.Referenced.Provider.Destination)
+	snapshot.Map.Network.With(plan.Referenced.Map.Network)
+	snapshot.Map.Storage.With(plan.Referenced.Map.Storage)
 	plan.Status.Migration.NewSnapshot(snapshot)
 	return plan.Status.Migration.ActiveSnapshot()
 }
@@ -391,6 +413,12 @@ func (r *Reconciler) matchSnapshot(ctx *plancontext.Context) (matched bool) {
 		return false
 	}
 	if !snapshot.Provider.Destination.Match(plan.Referenced.Provider.Destination) {
+		return false
+	}
+	if !snapshot.Map.Network.Match(plan.Referenced.Map.Network) {
+		return false
+	}
+	if !snapshot.Map.Storage.Match(plan.Referenced.Map.Storage) {
 		return false
 	}
 
@@ -494,6 +522,7 @@ func (r *Reconciler) pendingMigrations(plan *api.Plan) (list []*api.Migration, e
 // Postpone reconciliation.
 // Ensure that dependencies (CRs) have been reconciled.
 func (r *Reconciler) postpone() (postpone bool, err error) {
+	// Provider.
 	providerList := &api.ProviderList{}
 	err = r.List(context.TODO(), providerList)
 	if err != nil {
@@ -506,6 +535,33 @@ func (r *Reconciler) postpone() (postpone bool, err error) {
 			return
 		}
 	}
+	// NetworkMap
+	netMapList := &api.NetworkMapList{}
+	err = r.List(context.TODO(), netMapList)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	for _, netMap := range netMapList.Items {
+		if netMap.Status.ObservedGeneration < netMap.Generation {
+			postpone = true
+			return
+		}
+	}
+	// StorageMap
+	dsMapList := &api.StorageMapList{}
+	err = r.List(context.TODO(), dsMapList)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	for _, dsMap := range netMapList.Items {
+		if dsMap.Status.ObservedGeneration < dsMap.Generation {
+			postpone = true
+			return
+		}
+	}
+	// Host
 	hostList := &api.HostList{}
 	err = r.List(context.TODO(), hostList)
 	if err != nil {
