@@ -16,6 +16,13 @@ type Referenced struct {
 	Secret *core.Secret
 	// Plan
 	Plan *Plan
+	// Map
+	Map struct {
+		// Network
+		Network *NetworkMap
+		// Storage
+		Storage *StorageMap
+	}
 }
 
 func (in *Referenced) DeepCopyInto(*Referenced) {

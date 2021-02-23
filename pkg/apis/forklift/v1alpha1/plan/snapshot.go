@@ -23,6 +23,13 @@ type SnapshotRefPair struct {
 }
 
 //
+// Mapping.
+type SnapshotMap struct {
+	Network SnapshotRef `json:"network"`
+	Storage SnapshotRef `json:"storage"`
+}
+
+//
 // Snapshot
 type Snapshot struct {
 	// Conditions.
@@ -31,6 +38,8 @@ type Snapshot struct {
 	Provider SnapshotRefPair `json:"provider"`
 	// Plan
 	Plan SnapshotRef `json:"plan"`
+	// Map.
+	Map SnapshotMap `json:"map"`
 	// Migration
 	Migration SnapshotRef `json:"migration"`
 }

@@ -250,11 +250,6 @@ func (r *KubeVirt) EnsureSecret(vmRef ref.Ref) (err error) {
 // Build the VMIO CR.
 func (r *KubeVirt) buildImport(vm *plan.VMStatus) (object *vmio.VirtualMachineImport, err error) {
 	namespace := r.Plan.TargetNamespace()
-	mp := r.Context.Plan.Spec.Map
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
 	_, err = r.Source.Inventory.VM(&vm.Ref)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -277,7 +272,7 @@ func (r *KubeVirt) buildImport(vm *plan.VMStatus) (object *vmio.VirtualMachineIm
 			},
 		},
 	}
-	err = r.Builder.Import(vm.Ref, &mp, &object.Spec)
+	err = r.Builder.Import(vm.Ref, &object.Spec)
 	if err != nil {
 		err = liberr.Wrap(err)
 	}

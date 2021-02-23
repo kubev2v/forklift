@@ -8,7 +8,6 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	libitr "github.com/konveyor/controller/pkg/itinerary"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/mapped"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
@@ -82,7 +81,7 @@ func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
 
 //
 // Build the VMIO VM Import Spec.
-func (r *Builder) Import(vmRef ref.Ref, mp *plan.Map, object *vmio.VirtualMachineImportSpec) (err error) {
+func (r *Builder) Import(vmRef ref.Ref, object *vmio.VirtualMachineImportSpec) (err error) {
 	vm := &model.VM{}
 	pErr := r.Source.Inventory.Find(vm, vmRef)
 	if pErr != nil {
@@ -102,7 +101,7 @@ func (r *Builder) Import(vmRef ref.Ref, mp *plan.Map, object *vmio.VirtualMachin
 			ID: &uuid,
 		},
 	}
-	object.Source.Vmware.Mappings, err = r.mapping(mp, vm)
+	object.Source.Vmware.Mappings, err = r.mapping(vm)
 	if err != nil {
 		return
 	}
@@ -276,11 +275,12 @@ func (r *Builder) host(hostID string) (host *model.Host, err error) {
 
 //
 // Build the VMIO ResourceMapping CR.
-func (r *Builder) mapping(in *plan.Map, vm *model.VM) (out *vmio.VmwareMappings, err error) {
+func (r *Builder) mapping(vm *model.VM) (out *vmio.VmwareMappings, err error) {
 	netMap := []vmio.NetworkResourceMappingItem{}
 	dsMap := []vmio.StorageResourceMappingItem{}
-	for i := range in.Networks {
-		mapped := &in.Networks[i]
+	netMapIn := r.Context.Map.Network.Spec.Map
+	for i := range netMapIn {
+		mapped := &netMapIn[i]
 		ref := mapped.Source
 		network := &model.Network{}
 		fErr := r.Source.Inventory.Find(network, ref)
@@ -316,8 +316,9 @@ func (r *Builder) mapping(in *plan.Map, vm *model.VM) (out *vmio.VmwareMappings,
 				Type: &mapped.Destination.Type,
 			})
 	}
-	for i := range in.Datastores {
-		mapped := &in.Datastores[i]
+	dsMapIn := r.Context.Map.Storage.Spec.Map
+	for i := range dsMapIn {
+		mapped := &dsMapIn[i]
 		ref := mapped.Source
 		ds := &model.Datastore{}
 		fErr := r.Source.Inventory.Find(ds, ref)
@@ -450,7 +451,7 @@ func (r *Builder) esxHost(vm *model.VM) (esxHost *EsxHost, found bool, err error
 
 //
 // Set volume and access modes.
-func (r *Builder) defaultModes(dm *mapped.DestinationStorage) (err error) {
+func (r *Builder) defaultModes(dm *api.DestinationStorage) (err error) {
 	model := &ocp.StorageClass{}
 	err = r.Destination.Inventory.Get(model, dm.StorageClass)
 	if err != nil {

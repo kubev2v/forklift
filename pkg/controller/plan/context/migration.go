@@ -42,6 +42,13 @@ type Context struct {
 	k8sclient.Client
 	// Plan.
 	Plan *api.Plan
+	// Map.
+	Map struct {
+		// Network
+		Network *api.NetworkMap
+		// Storage
+		Storage *api.StorageMap
+	}
 	// Migration
 	Migration *api.Migration
 	// Source.
@@ -53,6 +60,16 @@ type Context struct {
 //
 // Build.
 func (r *Context) build() (err error) {
+	r.Map.Network = r.Plan.Referenced.Map.Network
+	if r.Map.Network == nil {
+		err = liberr.Wrap(NotEnoughDataError{})
+		return
+	}
+	r.Map.Storage = r.Plan.Referenced.Map.Storage
+	if r.Map.Storage == nil {
+		err = liberr.Wrap(NotEnoughDataError{})
+		return
+	}
 	err = r.Source.build(r)
 	if err != nil {
 		err = liberr.Wrap(err)

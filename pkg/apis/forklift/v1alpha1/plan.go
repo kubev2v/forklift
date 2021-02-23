@@ -33,8 +33,8 @@ type PlanSpec struct {
 	TargetNamespace string `json:"targetNamespace,omitempty"`
 	// Providers.
 	Provider provider.Pair `json:"provider"`
-	// Resource map.
-	Map plan.Map `json:"map,omitempty"`
+	// Resource mapping.
+	Map plan.Map `json:"map"`
 	// List of VMs.
 	VMs []plan.VM `json:"vms"`
 }

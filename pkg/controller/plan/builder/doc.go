@@ -19,7 +19,7 @@ type Builder interface {
 	// Build secret.
 	Secret(vmRef ref.Ref, in, object *core.Secret) error
 	// Build VMIO import spec.
-	Import(vmRef ref.Ref, mp *plan.Map, object *vmio.VirtualMachineImportSpec) error
+	Import(vmRef ref.Ref, object *vmio.VirtualMachineImportSpec) error
 	// Build tasks.
 	Tasks(vmRef ref.Ref) ([]*plan.Task, error)
 }

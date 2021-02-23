@@ -128,8 +128,8 @@ func (r *ProviderPair) Validate(pair provider.Pair) (result libcnd.Conditions, e
 //
 // Validate the source.
 func (r *ProviderPair) validateSource(pair provider.Pair) (result libcnd.Conditions, err error) {
-	validation := Provider{Client: r.Client}
-	conditions, err := validation.Validate(pair.Source)
+	pv := Provider{Client: r.Client}
+	conditions, err := pv.Validate(pair.Source)
 	if err != nil {
 		return
 	}
@@ -149,7 +149,7 @@ func (r *ProviderPair) validateSource(pair provider.Pair) (result libcnd.Conditi
 		result.SetCondition(newCnd)
 	}
 	// An openshift source is not supported.
-	r.Referenced.Source = validation.Referenced
+	r.Referenced.Source = pv.Referenced
 	if r.Referenced.Source != nil && r.Referenced.Source.Type() == api.OpenShift {
 		result.SetCondition(libcnd.Condition{
 			Type:     SourceProviderNotValid,
@@ -167,8 +167,8 @@ func (r *ProviderPair) validateSource(pair provider.Pair) (result libcnd.Conditi
 //
 // Validate the destination.
 func (r *ProviderPair) validateDestination(pair provider.Pair) (result libcnd.Conditions, err error) {
-	validation := Provider{Client: r.Client}
-	conditions, err := validation.Validate(pair.Destination)
+	pv := Provider{Client: r.Client}
+	conditions, err := pv.Validate(pair.Destination)
 	if err != nil {
 		return
 	}
@@ -188,7 +188,7 @@ func (r *ProviderPair) validateDestination(pair provider.Pair) (result libcnd.Co
 		result.SetCondition(newCnd)
 	}
 	// A non-openshift destination is not supported.
-	r.Referenced.Destination = validation.Referenced
+	r.Referenced.Destination = pv.Referenced
 	if r.Referenced.Destination != nil && r.Referenced.Destination.Type() != api.OpenShift {
 		result.SetCondition(libcnd.Condition{
 			Type:     DestinationProviderNotValid,

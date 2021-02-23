@@ -85,6 +85,82 @@ func (r ProviderPredicate) Generic(e event.GenericEvent) bool {
 	return false
 }
 
+type NetMapPredicate struct {
+	predicate.Funcs
+}
+
+func (r NetMapPredicate) Create(e event.CreateEvent) bool {
+	return false
+}
+
+func (r NetMapPredicate) Update(e event.UpdateEvent) bool {
+	p, cast := e.ObjectNew.(*api.NetworkMap)
+	if cast {
+		reconciled := p.Status.ObservedGeneration == p.Generation
+		return reconciled
+	}
+
+	return false
+}
+
+func (r NetMapPredicate) Delete(e event.DeleteEvent) bool {
+	p, cast := e.Object.(*api.NetworkMap)
+	if cast {
+		reconciled := p.Status.ObservedGeneration == p.Generation
+		return reconciled
+	}
+
+	return false
+}
+
+func (r NetMapPredicate) Generic(e event.GenericEvent) bool {
+	p, cast := e.Object.(*api.NetworkMap)
+	if cast {
+		reconciled := p.Status.ObservedGeneration == p.Generation
+		return reconciled
+	}
+
+	return false
+}
+
+type DsMapPredicate struct {
+	predicate.Funcs
+}
+
+func (r DsMapPredicate) Create(e event.CreateEvent) bool {
+	return false
+}
+
+func (r DsMapPredicate) Update(e event.UpdateEvent) bool {
+	p, cast := e.ObjectNew.(*api.StorageMap)
+	if cast {
+		reconciled := p.Status.ObservedGeneration == p.Generation
+		return reconciled
+	}
+
+	return false
+}
+
+func (r DsMapPredicate) Delete(e event.DeleteEvent) bool {
+	p, cast := e.Object.(*api.StorageMap)
+	if cast {
+		reconciled := p.Status.ObservedGeneration == p.Generation
+		return reconciled
+	}
+
+	return false
+}
+
+func (r DsMapPredicate) Generic(e event.GenericEvent) bool {
+	p, cast := e.Object.(*api.StorageMap)
+	if cast {
+		reconciled := p.Status.ObservedGeneration == p.Generation
+		return reconciled
+	}
+
+	return false
+}
+
 type MigrationPredicate struct {
 	predicate.Funcs
 }

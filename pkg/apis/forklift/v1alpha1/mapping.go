@@ -18,10 +18,54 @@ package v1alpha1
 
 import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/mapped"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/provider"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
+	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+//
+// Mapped network destination.
+type DestinationNetwork struct {
+	// The network type.
+	// +kubebuilder:validation:Enum=pod;multus
+	Type string `json:"type"`
+	// The namespace (multus only).
+	Namespace string `json:"namespace,omitempty"`
+	// The name.
+	Name string `json:"name,omitempty"`
+}
+
+//
+// Mapped network.
+type NetworkPair struct {
+	// Source network.
+	Source ref.Ref `json:"source"`
+	// Destination network.
+	Destination DestinationNetwork `json:"destination"`
+}
+
+//
+// Mapped storage.
+type StoragePair struct {
+	// Source storage.
+	Source ref.Ref `json:"source"`
+	// Destination storage.
+	Destination DestinationStorage `json:"destination"`
+}
+
+//
+// Mapped storage destination.
+type DestinationStorage struct {
+	// A storage class.
+	StorageClass string `json:"storageClass"`
+	// Volume mode.
+	// +kubebuilder:validation:Enum=Filesystem;Block
+	VolumeMode core.PersistentVolumeMode `json:"volumeMode,omitempty"`
+	// Access mode.
+	// +kubebuilder:validation:Enum=ReadWriteOnce;ReadWriteMany;ReadOnlyMany
+	AccessMode core.PersistentVolumeAccessMode `json:"accessMode,omitempty"`
+}
 
 //
 // Network map spec.
@@ -29,7 +73,7 @@ type NetworkMapSpec struct {
 	// Provider
 	Provider provider.Pair `json:"provider" ref:"Provider"`
 	// Map.
-	Map []mapped.NetworkPair `json:"map"`
+	Map []NetworkPair `json:"map"`
 }
 
 //
@@ -38,7 +82,7 @@ type StorageMapSpec struct {
 	// Provider
 	Provider provider.Pair `json:"provider" ref:"Provider"`
 	// Map.
-	Map []mapped.StoragePair `json:"map"`
+	Map []StoragePair `json:"map"`
 }
 
 //
@@ -61,6 +105,22 @@ type NetworkMap struct {
 	meta.ObjectMeta `json:"metadata,omitempty"`
 	Spec            NetworkMapSpec `json:"spec,omitempty"`
 	Status          MapStatus      `json:"status,omitempty"`
+	// Referenced resources populated
+	// during validation.
+	Referenced `json:"-"`
+}
+
+//
+// Find network map for source ID.
+func (r *NetworkMap) FindNetwork(networkID string) (pair NetworkPair, found bool) {
+	for _, pair = range r.Spec.Map {
+		if pair.Source.ID == networkID {
+			found = true
+			break
+		}
+	}
+
+	return
 }
 
 //
@@ -81,6 +141,22 @@ type StorageMap struct {
 	meta.ObjectMeta `json:"metadata,omitempty"`
 	Spec            StorageMapSpec `json:"spec,omitempty"`
 	Status          MapStatus      `json:"status,omitempty"`
+	// Referenced resources populated
+	// during validation.
+	Referenced `json:"-"`
+}
+
+//
+// Find storage map for source ID.
+func (r *StorageMap) FindStorage(storageID string) (pair StoragePair, found bool) {
+	for _, pair = range r.Spec.Map {
+		if pair.Source.ID == storageID {
+			found = true
+			break
+		}
+	}
+
+	return
 }
 
 //
