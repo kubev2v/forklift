@@ -231,21 +231,22 @@ type Cluster struct {
 
 type Host struct {
 	Base
-	InMaintenanceMode bool        `sql:""`
-	Thumbprint        string      `sql:""`
-	CpuSockets        int16       `sql:""`
-	CpuCores          int16       `sql:""`
-	ProductName       string      `sql:""`
-	ProductVersion    string      `sql:""`
-	Network           HostNetwork `sql:""`
-	Networks          []Ref       `sql:""`
-	Datastores        []Ref       `sql:""`
-	Vms               []Ref       `sql:""`
+	InMaintenanceMode  bool        `sql:""`
+	ManagementServerIp string      `sql:""`
+	Thumbprint         string      `sql:""`
+	CpuSockets         int16       `sql:""`
+	CpuCores           int16       `sql:""`
+	ProductName        string      `sql:""`
+	ProductVersion     string      `sql:""`
+	Network            HostNetwork `sql:""`
+	Networks           []Ref       `sql:""`
+	Datastores         []Ref       `sql:""`
+	Vms                []Ref       `sql:""`
 }
 
 type HostNetwork struct {
-	PNICs      []PNIC      `json:"vNICs"`
-	VNICs      []VNIC      `json:"pNICs"`
+	PNICs      []PNIC      `json:"pNICs"`
+	VNICs      []VNIC      `json:"vNICs"`
 	PortGroups []PortGroup `json:"portGroups"`
 	Switches   []Switch    `json:"switches"`
 }
@@ -295,6 +296,7 @@ type VNIC struct {
 	PortGroup  string `json:"portGroup"`
 	DPortGroup string `json:"dPortGroup"`
 	IpAddress  string `json:"ipAddress"`
+	SubnetMask string `json:"subnetMask"`
 	MTU        int32  `json:"mtu"`
 }
 

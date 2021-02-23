@@ -183,17 +183,18 @@ func (h *HostHandler) buildAdapters(host *Host) (err error) {
 // REST Resource.
 type Host struct {
 	Resource
-	InMaintenanceMode bool              `json:"inMaintenance"`
-	Thumbprint        string            `json:"thumbprint"`
-	CpuSockets        int16             `json:"cpuSockets"`
-	CpuCores          int16             `json:"cpuCores"`
-	ProductName       string            `json:"productName"`
-	ProductVersion    string            `json:"productVersion"`
-	Network           model.HostNetwork `json:"networking"`
-	Networks          []model.Ref       `json:"networks"`
-	Datastores        []model.Ref       `json:"datastores"`
-	VMs               []model.Ref       `json:"vms"`
-	NetworkAdapters   []NetworkAdapter  `json:"networkAdapters"`
+	InMaintenanceMode  bool              `json:"inMaintenance"`
+	ManagementServerIp string            `json:"managementServerIp"`
+	Thumbprint         string            `json:"thumbprint"`
+	CpuSockets         int16             `json:"cpuSockets"`
+	CpuCores           int16             `json:"cpuCores"`
+	ProductName        string            `json:"productName"`
+	ProductVersion     string            `json:"productVersion"`
+	Network            model.HostNetwork `json:"networking"`
+	Networks           []model.Ref       `json:"networks"`
+	Datastores         []model.Ref       `json:"datastores"`
+	VMs                []model.Ref       `json:"vms"`
+	NetworkAdapters    []NetworkAdapter  `json:"networkAdapters"`
 }
 
 //
@@ -201,6 +202,7 @@ type Host struct {
 func (r *Host) With(m *model.Host) {
 	r.Resource.With(&m.Base)
 	r.InMaintenanceMode = m.InMaintenanceMode
+	r.ManagementServerIp = m.ManagementServerIp
 	r.Thumbprint = m.Thumbprint
 	r.CpuSockets = m.CpuSockets
 	r.CpuCores = m.CpuCores
@@ -226,10 +228,11 @@ func (r *Host) Content(detail bool) interface{} {
 //
 // Host network adapter.
 type NetworkAdapter struct {
-	Name      string `json:"name"`
-	IpAddress string `json:"ipAddress"`
-	LinkSpeed int32  `json:"linkSpeed"`
-	MTU       int32  `json:"mtu"`
+	Name       string `json:"name"`
+	IpAddress  string `json:"ipAddress"`
+	SubnetMask string `json:"subnetMask"`
+	LinkSpeed  int32  `json:"linkSpeed"`
+	MTU        int32  `json:"mtu"`
 }
 
 //
@@ -246,8 +249,9 @@ func (r *AdapterBuilder) build(host *Host) (err error) {
 	networking := host.Network
 	for _, vNIC := range networking.VNICs {
 		adapter := NetworkAdapter{
-			IpAddress: vNIC.IpAddress,
-			MTU:       vNIC.MTU,
+			IpAddress:  vNIC.IpAddress,
+			SubnetMask: vNIC.SubnetMask,
+			MTU:        vNIC.MTU,
 		}
 		if vNIC.PortGroup != "" {
 			r.withPG(host, &vNIC, &adapter)

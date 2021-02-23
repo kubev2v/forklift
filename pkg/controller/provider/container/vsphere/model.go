@@ -230,6 +230,10 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 				if b, cast := p.Val.(bool); cast {
 					v.model.InMaintenanceMode = b
 				}
+			case fMgtServerIp:
+				if s, cast := p.Val.(string); cast {
+					v.model.ManagementServerIp = s
+				}
 			case fThumbprint:
 				if s, cast := p.Val.(string); cast {
 					v.model.Thumbprint = s
@@ -322,6 +326,7 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 								PortGroup:  nic.Portgroup,
 								DPortGroup: dGroup(),
 								IpAddress:  nic.Spec.Ip.IpAddress,
+								SubnetMask: nic.Spec.Ip.SubnetMask,
 								MTU:        nic.Spec.Mtu,
 							})
 					}
