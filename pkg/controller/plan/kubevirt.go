@@ -29,6 +29,9 @@ const (
 	kPlan = "plan"
 	// VM label (value=vmID)
 	kVM = "vmID"
+
+	// transfer network annotation (value=network-attachment-definition name)
+	annDefaultNetwork = "v1.multus-cni.io/default-network"
 )
 
 //
@@ -255,6 +258,12 @@ func (r *KubeVirt) buildImport(vm *plan.VMStatus) (object *vmio.VirtualMachineIm
 		err = liberr.Wrap(err)
 		return
 	}
+
+	annotations := make(map[string]string)
+	if r.Plan.Spec.TransferNetwork != "" {
+		annotations[annDefaultNetwork] = r.Plan.Spec.TransferNetwork
+	}
+
 	object = &vmio.VirtualMachineImport{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace: r.Plan.TargetNamespace(),
@@ -264,6 +273,7 @@ func (r *KubeVirt) buildImport(vm *plan.VMStatus) (object *vmio.VirtualMachineIm
 				kPlan:      string(r.Plan.UID),
 				kVM:        vm.ID,
 			},
+			Annotations: annotations,
 		},
 		Spec: vmio.VirtualMachineImportSpec{
 			ProviderCredentialsSecret: vmio.ObjectIdentifier{

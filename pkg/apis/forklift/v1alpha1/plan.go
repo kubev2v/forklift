@@ -41,6 +41,9 @@ type PlanSpec struct {
 	Warm bool `json:"warm,omitempty"`
 	// Date and time to finalize a warm migration.
 	Cutover *meta.Time `json:"cutover,omitempty"`
+	// Name of the network attachment definition in the target namespace
+	// which should be used for disk transfer.
+	TransferNetwork string `json:"transferNetwork,omitempty"`
 }
 
 //
