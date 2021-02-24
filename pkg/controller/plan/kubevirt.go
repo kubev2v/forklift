@@ -22,6 +22,13 @@ import (
 	"strings"
 )
 
+// Annotations
+const (
+	// transfer network annotation (value=network-attachment-definition name)
+	annDefaultNetwork = "v1.multus-cni.io/default-network"
+)
+
+// Labels
 const (
 	// migration label (value=UID)
 	kMigration = "migration"
@@ -29,9 +36,6 @@ const (
 	kPlan = "plan"
 	// VM label (value=vmID)
 	kVM = "vmID"
-
-	// transfer network annotation (value=network-attachment-definition name)
-	annDefaultNetwork = "v1.multus-cni.io/default-network"
 )
 
 //
