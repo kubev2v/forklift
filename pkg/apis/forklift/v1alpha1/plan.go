@@ -37,6 +37,10 @@ type PlanSpec struct {
 	Map plan.Map `json:"map"`
 	// List of VMs.
 	VMs []plan.VM `json:"vms"`
+	// Whether this is a warm migration.
+	Warm bool `json:"warm,omitempty"`
+	// Date and time to finalize a warm migration.
+	Cutover *meta.Time `json:"cutover,omitempty"`
 }
 
 //

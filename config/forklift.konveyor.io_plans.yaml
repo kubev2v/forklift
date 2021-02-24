@@ -35,6 +35,10 @@ spec:
         spec:
           description: PlanSpec defines the desired state of Plan.
           properties:
+            cutover:
+              description: Date and time to finalize a warm migration.
+              format: date-time
+              type: string
             description:
               description: Description
               type: string
@@ -293,6 +297,9 @@ spec:
                     type: string
                 type: object
               type: array
+            warm:
+              description: Whether this is a warm migration.
+              type: boolean
           required:
           - map
           - provider
