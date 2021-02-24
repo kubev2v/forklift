@@ -3,6 +3,7 @@ package plan
 import (
 	"context"
 	"errors"
+	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libref "github.com/konveyor/controller/pkg/ref"
@@ -19,21 +20,22 @@ import (
 //
 // Types
 const (
-	NetRefNotValid  = "NetworkMapRefNotValid"
-	NetMapNotReady  = "NetworkMapNotReady"
-	DsMapNotReady   = "StorageMapNotReady"
-	DsRefNotValid   = "StorageRefNotValid"
-	VMRefNotValid   = "VMRefNotValid"
-	VMNotFound      = "VMNotFound"
-	VMAlreadyExists = "VMAlreadyExists"
-	DuplicateVM     = "DuplicateVM"
-	NameNotValid    = "TargetNameNotValid"
-	Executing       = "Executing"
-	Succeeded       = "Succeeded"
-	Failed          = "Failed"
-	Canceled        = "Canceled"
-	Deleted         = "Deleted"
-	Paused          = "Paused"
+	TransferNetNotValid = "TransferNetworkNotValid"
+	NetRefNotValid      = "NetworkMapRefNotValid"
+	NetMapNotReady      = "NetworkMapNotReady"
+	DsMapNotReady       = "StorageMapNotReady"
+	DsRefNotValid       = "StorageRefNotValid"
+	VMRefNotValid       = "VMRefNotValid"
+	VMNotFound          = "VMNotFound"
+	VMAlreadyExists     = "VMAlreadyExists"
+	DuplicateVM         = "DuplicateVM"
+	NameNotValid        = "TargetNameNotValid"
+	Executing           = "Executing"
+	Succeeded           = "Succeeded"
+	Failed              = "Failed"
+	Canceled            = "Canceled"
+	Deleted             = "Deleted"
+	Paused              = "Paused"
 )
 
 //
@@ -93,6 +95,12 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	//
 	// VM list.
 	err = r.validateVM(plan)
+	if err != nil {
+		return err
+	}
+	//
+	// Transfer network
+	err = r.validateTransferNetwork(plan)
 	if err != nil {
 		return err
 	}
@@ -325,4 +333,35 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 
 	return nil
+}
+
+//
+// Validate transfer network selection.
+func (r *Reconciler) validateTransferNetwork(plan *api.Plan) (err error) {
+	if plan.Spec.TransferNetwork == "" {
+		return
+	}
+	notFound := libcnd.Condition{
+		Type:     TransferNetNotValid,
+		Status:   True,
+		Category: Critical,
+		Reason:   NotFound,
+		Message:  "Transfer network is not valid.",
+	}
+	key := client.ObjectKey{
+		Namespace: plan.TargetNamespace(),
+		Name:      plan.Spec.TransferNetwork,
+	}
+	netAttachDef := &net.NetworkAttachmentDefinition{}
+	err = r.Get(context.TODO(), key, netAttachDef)
+	if k8serr.IsNotFound(err) {
+		err = nil
+		plan.Status.SetCondition(notFound)
+		return
+	}
+	if err != nil {
+		err = liberr.Wrap(err)
+	}
+
+	return
 }
