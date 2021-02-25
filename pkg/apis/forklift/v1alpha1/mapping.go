@@ -71,7 +71,7 @@ type DestinationStorage struct {
 // Network map spec.
 type NetworkMapSpec struct {
 	// Provider
-	Provider provider.Pair `json:"provider" ref:"Provider"`
+	Provider provider.Pair `json:"provider"`
 	// Map.
 	Map []NetworkPair `json:"map"`
 }
@@ -80,7 +80,7 @@ type NetworkMapSpec struct {
 // Storage map spec.
 type StorageMapSpec struct {
 	// Provider
-	Provider provider.Pair `json:"provider" ref:"Provider"`
+	Provider provider.Pair `json:"provider"`
 	// Map.
 	Map []StoragePair `json:"map"`
 }
