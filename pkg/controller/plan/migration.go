@@ -243,6 +243,11 @@ func (r *Migration) Cancel() (err error) {
 				return
 			}
 			vm.MarkCompleted()
+			for _, step := range vm.Pipeline {
+				if step.MarkedStarted() {
+					step.MarkCompleted()
+				}
+			}
 		}
 	}
 
