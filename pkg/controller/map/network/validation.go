@@ -59,7 +59,7 @@ func (r *Reconciler) validate(mp *api.NetworkMap) error {
 		return err
 	}
 	mp.Status.UpdateConditions(conditions)
-	if mp.Status.HasCondition(validation.SourceProviderNotReady) {
+	if mp.Status.HasAnyCondition(validation.SourceProviderNotReady, validation.SourceProviderNotValid) {
 		return nil
 	}
 	mp.Referenced.Provider.Source = pv.Referenced.Source
