@@ -27,6 +27,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -57,8 +58,9 @@ var Settings = &settings.Settings
 // Creates a new Map Controller and adds it to the Manager.
 func Add(mgr manager.Manager) error {
 	reconciler := &Reconciler{
-		Client: mgr.GetClient(),
-		scheme: mgr.GetScheme(),
+		EventRecorder: mgr.GetEventRecorderFor(Name),
+		Client:        mgr.GetClient(),
+		scheme:        mgr.GetScheme(),
 	}
 	cnt, err := controller.New(
 		Name,
@@ -101,6 +103,7 @@ var _ reconcile.Reconciler = &Reconciler{}
 type Reconciler struct {
 	client.Client
 	scheme *runtime.Scheme
+	record.EventRecorder
 }
 
 //
@@ -163,6 +166,9 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resu
 
 	// End staging conditions.
 	mp.Status.EndStagingConditions()
+
+	// Record events.
+	mp.Status.RecordEvents(mp, r)
 
 	// Apply changes.
 	mp.Status.ObservedGeneration = mp.Generation

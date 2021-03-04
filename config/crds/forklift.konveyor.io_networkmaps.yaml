@@ -8,6 +8,13 @@ metadata:
   creationTimestamp: null
   name: networkmaps.forklift.konveyor.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.conditions[?(@.type=='Ready')].status
+    name: READY
+    type: string
+  - JSONPath: .metadata.creationTimestamp
+    name: AGE
+    type: date
   group: forklift.konveyor.io
   names:
     kind: NetworkMap
