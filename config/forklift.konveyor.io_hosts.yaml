@@ -8,6 +8,16 @@ metadata:
   creationTimestamp: null
   name: hosts.forklift.konveyor.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.conditions[?(@.type=='Ready')].status
+    name: READY
+    type: string
+  - JSONPath: .status.conditions[?(@.type=='ConnectionTested')].status
+    name: CONNECTED
+    type: string
+  - JSONPath: .metadata.creationTimestamp
+    name: AGE
+    type: date
   group: forklift.konveyor.io
   names:
     kind: Host

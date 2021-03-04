@@ -8,6 +8,25 @@ metadata:
   creationTimestamp: null
   name: providers.forklift.konveyor.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .spec.type
+    name: TYPE
+    type: string
+  - JSONPath: .status.conditions[?(@.type=='Ready')].status
+    name: READY
+    type: string
+  - JSONPath: .status.conditions[?(@.type=='ConnectionTested')].status
+    name: CONNECTED
+    type: string
+  - JSONPath: .status.conditions[?(@.type=='InventoryCreated')].status
+    name: INVENTORY
+    type: string
+  - JSONPath: .spec.url
+    name: URL
+    type: string
+  - JSONPath: .metadata.creationTimestamp
+    name: AGE
+    type: date
   group: forklift.konveyor.io
   names:
     kind: Provider

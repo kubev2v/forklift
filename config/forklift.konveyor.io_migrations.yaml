@@ -8,6 +8,22 @@ metadata:
   creationTimestamp: null
   name: migrations.forklift.konveyor.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.conditions[?(@.type=='Ready')].status
+    name: READY
+    type: string
+  - JSONPath: .status.conditions[?(@.type=='Running')].status
+    name: RUNNING
+    type: string
+  - JSONPath: .status.conditions[?(@.type=='Succeeded')].status
+    name: SUCCEEDED
+    type: string
+  - JSONPath: .status.conditions[?(@.type=='Failed')].status
+    name: FAILED
+    type: string
+  - JSONPath: .metadata.creationTimestamp
+    name: AGE
+    type: date
   group: forklift.konveyor.io
   names:
     kind: Migration
