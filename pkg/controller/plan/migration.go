@@ -5,7 +5,6 @@ import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libitr "github.com/konveyor/controller/pkg/itinerary"
-	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/builder"
@@ -23,13 +22,6 @@ const (
 )
 
 //
-// Status pipeline/progress steps.
-const (
-	PreHook  = "PreHook"
-	PostHook = "PostHook"
-)
-
-//
 // Predicates.
 var (
 	HasPreHook  libitr.Flag = 0x01
@@ -39,14 +31,12 @@ var (
 //
 // Phases.
 const (
-	Started         = "Started"
-	CreatePreHook   = "CreatePreHook"
-	PreHookCreated  = "PreHookCreated"
-	CreateImport    = "CreateImport"
-	ImportCreated   = "ImportCreated"
-	CreatePostHook  = "CreatePostHook"
-	PostHookCreated = "PostHookCreated"
-	Completed       = "Completed"
+	Started       = "Started"
+	PreHook       = "PreHook"
+	CreateImport  = "CreateImport"
+	ImportCreated = "ImportCreated"
+	PostHook      = "PostHook"
+	Completed     = "Completed"
 )
 
 //
@@ -61,12 +51,10 @@ var (
 		Name: "",
 		Pipeline: libitr.Pipeline{
 			{Name: Started},
-			{Name: CreatePreHook, All: HasPreHook},
-			{Name: PreHookCreated, All: HasPreHook},
+			{Name: PreHook, All: HasPreHook},
 			{Name: CreateImport},
 			{Name: ImportCreated},
-			{Name: CreatePostHook, All: HasPostHook},
-			{Name: PostHookCreated, All: HasPostHook},
+			{Name: PostHook, All: HasPostHook},
 			{Name: Completed},
 		},
 	}
@@ -142,10 +130,19 @@ func (r Migration) Run() (reQ time.Duration, err error) {
 		case Started:
 			vm.MarkStarted()
 			vm.Phase = r.next(vm.Phase)
-		case CreatePreHook:
-			vm.Phase = r.next(vm.Phase)
-		case PreHookCreated:
-			vm.Phase = r.next(vm.Phase)
+		case PreHook, PostHook:
+			runner := HookRunner{Context: r.Context}
+			err = runner.Run(vm)
+			if err != nil {
+				return
+			}
+			if step, found := vm.ActiveStep(); found {
+				if step.MarkedCompleted() && step.Error == nil {
+					vm.Phase = r.next(vm.Phase)
+				}
+			} else {
+				vm.Phase = Completed
+			}
 		case CreateImport:
 			err = r.kubevirt.EnsureSecret(vm.Ref)
 			if err != nil {
@@ -194,10 +191,6 @@ func (r Migration) Run() (reQ time.Duration, err error) {
 			if vm.HasCondition(Paused) {
 				inFlight--
 			}
-		case CreatePostHook:
-			vm.Phase = r.next(vm.Phase)
-		case PostHookCreated:
-			vm.Phase = r.next(vm.Phase)
 		case Completed:
 			vm.MarkCompleted()
 			log.Info("Migration [COMPLETED]:", "vm", vm)
@@ -205,6 +198,7 @@ func (r Migration) Run() (reQ time.Duration, err error) {
 		default:
 			err = liberr.New("phase: unknown")
 		}
+		vm.ReflectPipeline()
 		if vm.Error != nil {
 			vm.Phase = Completed
 			vm.SetCondition(
@@ -376,7 +370,7 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 	step, _ := itinerary.First()
 	for {
 		switch step.Name {
-		case CreatePreHook:
+		case PreHook:
 			pipeline = append(
 				pipeline,
 				&plan.Step{
@@ -420,7 +414,7 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 						Progress:    libitr.Progress{Total: 1},
 					},
 				})
-		case CreatePostHook:
+		case PostHook:
 			pipeline = append(
 				pipeline,
 				&plan.Step{
@@ -527,7 +521,6 @@ func (r *Migration) updateVM(vm *plan.VMStatus) (completed bool, failed bool, er
 		return
 	}
 	r.updatePipeline(vm, &imp)
-	vm.ReflectPipeline()
 	conditions := imp.Conditions()
 	cnd := conditions.FindCondition(Succeeded)
 	if cnd != nil {
@@ -643,14 +636,14 @@ type Predicate struct {
 //
 // Evaluate predicate flags.
 func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
-	if r.vm.Hook == nil {
+	if len(r.vm.Hooks) == 0 {
 		return
 	}
 	switch flag {
 	case HasPreHook:
-		allowed = libref.RefSet(r.vm.Hook.Before)
+		_, allowed = r.vm.FindHook(PreHook)
 	case HasPostHook:
-		allowed = libref.RefSet(r.vm.Hook.After)
+		_, allowed = r.vm.FindHook(PostHook)
 	}
 
 	return

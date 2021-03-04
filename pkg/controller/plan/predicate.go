@@ -161,6 +161,44 @@ func (r DsMapPredicate) Generic(e event.GenericEvent) bool {
 	return false
 }
 
+type HookPredicate struct {
+	predicate.Funcs
+}
+
+func (r HookPredicate) Create(e event.CreateEvent) bool {
+	return false
+}
+
+func (r HookPredicate) Update(e event.UpdateEvent) bool {
+	p, cast := e.ObjectNew.(*api.Hook)
+	if cast {
+		reconciled := p.Status.ObservedGeneration == p.Generation
+		return reconciled
+	}
+
+	return false
+}
+
+func (r HookPredicate) Delete(e event.DeleteEvent) bool {
+	p, cast := e.Object.(*api.Hook)
+	if cast {
+		reconciled := p.Status.ObservedGeneration == p.Generation
+		return reconciled
+	}
+
+	return false
+}
+
+func (r HookPredicate) Generic(e event.GenericEvent) bool {
+	p, cast := e.Object.(*api.Hook)
+	if cast {
+		reconciled := p.Status.ObservedGeneration == p.Generation
+		return reconciled
+	}
+
+	return false
+}
+
 type MigrationPredicate struct {
 	predicate.Funcs
 }

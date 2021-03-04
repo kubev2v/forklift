@@ -55,6 +55,8 @@ type Context struct {
 	Source Source
 	// Destination.
 	Destination Destination
+	// Hooks.
+	Hooks []*api.Hook
 }
 
 //
@@ -80,6 +82,7 @@ func (r *Context) build() (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
+	r.Hooks = r.Plan.Hooks
 
 	return
 }
@@ -177,6 +180,20 @@ func (r *Destination) build(ctx *Context) (err error) {
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
+	}
+
+	return
+}
+
+//
+// Find a Hook by ref.
+func (r *Context) FindHook(ref core.ObjectReference) (hook *api.Hook, found bool) {
+	for _, h := range r.Hooks {
+		if h.Namespace == ref.Namespace && h.Name == ref.Name {
+			found = true
+			hook = h
+			break
+		}
 	}
 
 	return

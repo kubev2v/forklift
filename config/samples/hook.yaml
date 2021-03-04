@@ -1,0 +1,14 @@
+---
+kind: Hook
+apiVersion: forklift.konveyor.io/v1alpha1
+metadata:
+  name: test
+  namespace: openshift-migration
+spec:
+  image: quay.io/konveyor/hook-runner
+  playbook: |
+    LS0tCi0gbmFtZTogTWFpbgogIGhvc3RzOiBsb2NhbGhvc3QKICB0YXNrczoKICAtIG5hbWU6IExv
+    YWQgUGxhbgogICAgaW5jbHVkZV92YXJzOgogICAgICBmaWxlOiAiL3RtcC9ob29rL3BsYW4ueW1s
+    IgogICAgICBuYW1lOiBwbGFuCiAgLSBuYW1lOiBMb2FkIFdvcmtsb2FkCiAgICBpbmNsdWRlX3Zh
+    cnM6CiAgICAgIGZpbGU6ICIvdG1wL2hvb2svd29ya2xvYWQueW1sIgogICAgICBuYW1lOiB3b3Jr
+    bG9hZAoK
