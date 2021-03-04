@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"github.com/konveyor/forklift-controller/pkg/controller/hook"
 	"github.com/konveyor/forklift-controller/pkg/controller/host"
 	"github.com/konveyor/forklift-controller/pkg/controller/map/network"
 	"github.com/konveyor/forklift-controller/pkg/controller/map/storage"
@@ -44,6 +45,7 @@ var MainControllers = []AddFunction{
 	network.Add,
 	storage.Add,
 	host.Add,
+	hook.Add,
 }
 
 //

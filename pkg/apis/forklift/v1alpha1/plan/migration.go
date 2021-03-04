@@ -2,6 +2,7 @@ package plan
 
 import (
 	libitr "github.com/konveyor/controller/pkg/itinerary"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -70,6 +71,20 @@ func (r *MigrationStatus) SnapshotWithMigration(uid types.UID) (found bool, snap
 // Add new snapshot.
 func (r *MigrationStatus) NewSnapshot(snapshot Snapshot) {
 	r.History = append(r.History, snapshot)
+}
+
+//
+// Find a VM status.
+func (r *MigrationStatus) FindVM(ref ref.Ref) (v *VMStatus, found bool) {
+	for _, vm := range r.VMs {
+		if vm.ID == ref.ID {
+			found = true
+			v = vm
+			return
+		}
+	}
+
+	return
 }
 
 //

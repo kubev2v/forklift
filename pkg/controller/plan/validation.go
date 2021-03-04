@@ -3,6 +3,7 @@ package plan
 import (
 	"context"
 	"errors"
+	"fmt"
 	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
@@ -30,6 +31,9 @@ const (
 	VMAlreadyExists     = "VMAlreadyExists"
 	DuplicateVM         = "DuplicateVM"
 	NameNotValid        = "TargetNameNotValid"
+	HookNotValid        = "HookNotValid"
+	HookNotReady        = "HookNotReady"
+	HookStepNotValid    = "HookStepNotValid"
 	Executing           = "Executing"
 	Succeeded           = "Succeeded"
 	Failed              = "Failed"
@@ -101,6 +105,11 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	//
 	// Transfer network
 	err = r.validateTransferNetwork(plan)
+	if err != nil {
+		return err
+	}
+	// VM Hooks.
+	err = r.validateHooks(plan)
 	if err != nil {
 		return err
 	}
@@ -361,6 +370,108 @@ func (r *Reconciler) validateTransferNetwork(plan *api.Plan) (err error) {
 	}
 	if err != nil {
 		err = liberr.Wrap(err)
+	}
+
+	return
+}
+
+// Validate referenced hooks.
+func (r *Reconciler) validateHooks(plan *api.Plan) (err error) {
+	notSet := libcnd.Condition{
+		Type:     HookNotValid,
+		Status:   True,
+		Reason:   NotSet,
+		Category: Critical,
+		Message:  "Hook specified by: `namespace` and `name`.",
+		Items:    []string{},
+	}
+	notFound := libcnd.Condition{
+		Type:     HookNotValid,
+		Status:   True,
+		Reason:   NotFound,
+		Category: Critical,
+		Message:  "Hook not found.",
+		Items:    []string{},
+	}
+	notReady := libcnd.Condition{
+		Type:     HookNotReady,
+		Status:   True,
+		Reason:   NotFound,
+		Category: Critical,
+		Message:  "Hook does not have `Ready` condition.",
+		Items:    []string{},
+	}
+	stepNotValid := libcnd.Condition{
+		Type:     HookStepNotValid,
+		Status:   True,
+		Reason:   NotValid,
+		Category: Critical,
+		Message:  "Hook step not valid.",
+		Items:    []string{},
+	}
+	for _, vm := range plan.Spec.VMs {
+		for _, ref := range vm.Hooks {
+			// Step not valid.
+			if _, found := map[string]int{PreHook: 1, PostHook: 1}[ref.Step]; !found {
+				description := fmt.Sprintf(
+					"VM: %s step: %s",
+					vm.String(),
+					ref.Step)
+				stepNotValid.Items = append(
+					stepNotValid.Items,
+					description)
+			}
+			// Not Set.
+			if !libref.RefSet(&ref.Hook) {
+				description := fmt.Sprintf("VM: %s", vm.String())
+				notSet.Items = append(
+					notSet.Items,
+					description)
+				continue
+			}
+			// Not Found.
+			hook := &api.Hook{}
+			err = r.Get(
+				context.TODO(),
+				client.ObjectKey{
+					Namespace: ref.Hook.Namespace,
+					Name:      ref.Hook.Name,
+				},
+				hook)
+			if err != nil {
+				if k8serr.IsNotFound(err) {
+					description := fmt.Sprintf(
+						"VM: %s hook: %s",
+						vm.String(),
+						ref.Hook.String())
+					notFound.Items = append(
+						notFound.Items,
+						description)
+					continue
+				} else {
+					return
+				}
+			} else {
+				plan.Referenced.Hooks = append(
+					plan.Referenced.Hooks,
+					hook)
+			}
+			// Not Ready.
+			if !hook.Status.HasCondition(libcnd.Ready) {
+				description := fmt.Sprintf(
+					"VM: %s hook: %s",
+					vm.String(),
+					ref.Hook.String())
+				notReady.Items = append(
+					notReady.Items,
+					description)
+			}
+		}
+	}
+	for _, cnd := range []libcnd.Condition{} {
+		if len(cnd.Items) > 0 {
+			plan.Status.SetCondition(cnd)
+		}
 	}
 
 	return

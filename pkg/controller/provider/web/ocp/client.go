@@ -113,6 +113,9 @@ func (r *Finder) With(client base.Client) base.Finder {
 //   NotFoundErr
 //   RefNotUniqueErr
 func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
+	err = liberr.Wrap(&NotFoundError{
+		Ref: ref,
+	})
 	return
 }
 
@@ -124,6 +127,9 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 //   NotFoundErr
 //   RefNotUniqueErr
 func (r *Finder) VM(ref *base.Ref) (object interface{}, err error) {
+	err = liberr.Wrap(&NotFoundError{
+		Ref: *ref,
+	})
 	return
 }
 
@@ -135,6 +141,9 @@ func (r *Finder) VM(ref *base.Ref) (object interface{}, err error) {
 //   NotFoundErr
 //   RefNotUniqueErr
 func (r *Finder) Network(ref *base.Ref) (object interface{}, err error) {
+	err = liberr.Wrap(&NotFoundError{
+		Ref: *ref,
+	})
 	return
 }
 
@@ -146,6 +155,9 @@ func (r *Finder) Network(ref *base.Ref) (object interface{}, err error) {
 //   NotFoundErr
 //   RefNotUniqueErr
 func (r *Finder) Storage(ref *base.Ref) (object interface{}, err error) {
+	err = liberr.Wrap(&NotFoundError{
+		Ref: *ref,
+	})
 	return
 }
 
@@ -157,5 +169,8 @@ func (r *Finder) Storage(ref *base.Ref) (object interface{}, err error) {
 //   NotFoundErr
 //   RefNotUniqueErr
 func (r *Finder) Host(ref *base.Ref) (object interface{}, err error) {
+	err = liberr.Wrap(&NotFoundError{
+		Ref: *ref,
+	})
 	return
 }

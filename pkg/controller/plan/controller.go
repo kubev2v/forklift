@@ -88,6 +88,7 @@ func Add(mgr manager.Manager) error {
 		return err
 	}
 	// References.
+	// Provider.
 	err = cnt.Watch(
 		&source.Kind{
 			Type: &api.Provider{},
@@ -98,6 +99,7 @@ func Add(mgr manager.Manager) error {
 		log.Trace(err)
 		return err
 	}
+	// NetworkMap.
 	err = cnt.Watch(
 		&source.Kind{
 			Type: &api.NetworkMap{},
@@ -108,6 +110,7 @@ func Add(mgr manager.Manager) error {
 		log.Trace(err)
 		return err
 	}
+	// StorageMap.
 	err = cnt.Watch(
 		&source.Kind{
 			Type: &api.StorageMap{},
@@ -118,6 +121,20 @@ func Add(mgr manager.Manager) error {
 		log.Trace(err)
 		return err
 	}
+	// Hook..
+	err = cnt.Watch(
+		&source.Kind{
+			Type: &api.Hook{},
+		},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: handler.ToRequestsFunc(RequestForMigration),
+		},
+		&HookPredicate{})
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	// Migration.
 	err = cnt.Watch(
 		&source.Kind{
 			Type: &api.Migration{},
@@ -570,6 +587,19 @@ func (r *Reconciler) postpone() (postpone bool, err error) {
 	}
 	for _, host := range hostList.Items {
 		if host.Status.ObservedGeneration < host.Generation {
+			postpone = true
+			return
+		}
+	}
+	// Hook.
+	hookList := &api.HookList{}
+	err = r.List(context.TODO(), hookList)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	for _, hook := range hookList.Items {
+		if hook.Status.ObservedGeneration < hook.Generation {
 			postpone = true
 			return
 		}

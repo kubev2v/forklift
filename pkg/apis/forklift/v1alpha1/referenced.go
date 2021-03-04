@@ -23,6 +23,21 @@ type Referenced struct {
 		// Storage
 		Storage *StorageMap
 	}
+	// Hooks.
+	Hooks []*Hook
+}
+
+//
+// Find hook by ref.
+func (in *Referenced) FindHook(ref core.ObjectReference) (found bool, hook *Hook) {
+	for _, hook = range in.Hooks {
+		if hook.Namespace == ref.Namespace && hook.Name == ref.Name {
+			found = true
+			break
+		}
+	}
+
+	return
 }
 
 func (in *Referenced) DeepCopyInto(*Referenced) {
