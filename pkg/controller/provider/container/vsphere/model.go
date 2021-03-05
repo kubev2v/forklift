@@ -504,6 +504,13 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				if s, cast := p.Val.(types.VirtualMachinePowerState); cast {
 					v.model.PowerState = string(s)
 				}
+			case fSnapshot:
+				if snapshot, cast := p.Val.(types.VirtualMachineSnapshotInfo); cast {
+					ref := snapshot.CurrentSnapshot
+					if ref != nil {
+						v.model.Snapshot = v.Ref(*ref)
+					}
+				}
 			case fCpuAffinity:
 				if a, cast := p.Val.(types.VirtualMachineAffinityInfo); cast {
 					v.model.CpuAffinity = a.AffinitySet
