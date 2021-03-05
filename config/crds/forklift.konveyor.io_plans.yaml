@@ -219,6 +219,10 @@ spec:
             targetNamespace:
               description: Target namespace.
               type: string
+            transferNetwork:
+              description: Name of the network attachment definition in the target
+                namespace which should be used for disk transfer.
+              type: string
             vms:
               description: List of VMs.
               items:
