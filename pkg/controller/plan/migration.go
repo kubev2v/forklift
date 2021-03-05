@@ -144,27 +144,7 @@ func (r Migration) Run() (reQ time.Duration, err error) {
 				vm.Phase = Completed
 			}
 		case CreateImport:
-			err = r.kubevirt.EnsureSecret(vm.Ref)
-			if err != nil {
-				if !errors.As(err, &web.ProviderNotReadyError{}) {
-					vm.AddError(err.Error())
-					err = nil
-					break
-				} else {
-					return
-				}
-			}
 			err = r.kubevirt.EnsureImport(vm)
-			if err != nil {
-				if !errors.As(err, &web.ProviderNotReadyError{}) {
-					vm.AddError(err.Error())
-					err = nil
-					break
-				} else {
-					return
-				}
-			}
-			err = r.kubevirt.SetSecretOwner(vm)
 			if err != nil {
 				if !errors.As(err, &web.ProviderNotReadyError{}) {
 					vm.AddError(err.Error())

@@ -12,7 +12,6 @@ import (
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	cdi "kubevirt.io/containerized-data-importer/pkg/apis/core/v1beta1"
 	vmio "kubevirt.io/vm-import-operator/pkg/apis/v2v/v1beta1"
@@ -71,18 +70,13 @@ func (r *KubeVirt) ImportMap() (mp ImportMap, err error) {
 // Each VmImport represents a VMIO VirtualMachineImport
 // with associated DataVolumes.
 func (r *KubeVirt) ListImports() ([]VmImport, error) {
-	selector := labels.SelectorFromSet(
-		map[string]string{
-			kMigration: string(r.Migration.UID),
-			kPlan:      string(r.Plan.GetUID()),
-		})
 	vList := &vmio.VirtualMachineImportList{}
 	err := r.Destination.Client.List(
 		context.TODO(),
 		vList,
 		&client.ListOptions{
+			LabelSelector: labels.SelectorFromSet(r.planLabels()),
 			Namespace:     r.Plan.TargetNamespace(),
-			LabelSelector: selector,
 		},
 	)
 	if err != nil {
@@ -128,11 +122,42 @@ func (r *KubeVirt) ListImports() ([]VmImport, error) {
 //
 // Create the VMIO CR on the destination.
 func (r *KubeVirt) EnsureImport(vm *plan.VMStatus) (err error) {
-	newImport, err := r.buildImport(vm)
+	secret, err := r.ensureSecret(vm.Ref)
 	if err != nil {
 		return
 	}
-	err = r.ensureObject(newImport)
+	vmImport, err := r.vmImport(vm, secret)
+	if err != nil {
+		return
+	}
+	list := &vmio.VirtualMachineImportList{}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: labels.SelectorFromSet(r.vmLabels(vm.Ref)),
+			Namespace:     r.Plan.TargetNamespace(),
+		},
+	)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	if len(list.Items) == 0 {
+		err = r.Destination.Client.Create(context.TODO(), vmImport)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+	} else {
+		vmImport = &list.Items[0]
+	}
+	err = k8sutil.SetOwnerReference(vmImport, secret, scheme.Scheme)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	err = r.Destination.Client.Update(context.TODO(), secret)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -144,70 +169,28 @@ func (r *KubeVirt) EnsureImport(vm *plan.VMStatus) (err error) {
 //
 // Delete the VMIO CR for the migration on the destination.
 func (r *KubeVirt) DeleteImport(vm *plan.VMStatus) (err error) {
-	object := &vmio.VirtualMachineImport{}
-	err = r.Context.Destination.Client.Get(
+	list := &vmio.VirtualMachineImportList{}
+	err = r.Destination.Client.List(
 		context.TODO(),
-		client.ObjectKey{
-			Namespace: r.Plan.TargetNamespace(),
-			Name:      r.nameForImport(vm.Ref),
+		list,
+		&client.ListOptions{
+			LabelSelector: labels.SelectorFromSet(r.vmLabels(vm.Ref)),
+			Namespace:     r.Plan.TargetNamespace(),
 		},
-		object)
+	)
 	if err != nil {
-		if k8serr.IsNotFound(err) {
-			err = nil
-		} else {
-			err = liberr.Wrap(err)
+		err = liberr.Wrap(err)
+		return
+	}
+	for _, object := range list.Items {
+		err = r.Destination.Client.Delete(context.TODO(), &object)
+		if err != nil {
+			if k8serr.IsNotFound(err) {
+				err = nil
+			} else {
+				return liberr.Wrap(err)
+			}
 		}
-		return
-	}
-	err = r.Context.Destination.Client.Delete(context.TODO(), object)
-	if err != nil {
-		if k8serr.IsNotFound(err) {
-			err = nil
-		} else {
-			return liberr.Wrap(err)
-		}
-	}
-
-	return
-}
-
-//
-// Set VMIO secret owner references.
-func (r *KubeVirt) SetSecretOwner(vm *plan.VMStatus) (err error) {
-	vmImport := &vmio.VirtualMachineImport{}
-	err = r.Destination.Client.Get(
-		context.TODO(),
-		client.ObjectKey{
-			Namespace: r.Plan.TargetNamespace(),
-			Name:      r.nameForImport(vm.Ref),
-		},
-		vmImport)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	secret := &core.Secret{}
-	err = r.Destination.Client.Get(
-		context.TODO(),
-		client.ObjectKey{
-			Namespace: r.Plan.TargetNamespace(),
-			Name:      r.nameForSecret(vm.Ref),
-		},
-		secret)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	err = k8sutil.SetOwnerReference(vmImport, secret, scheme.Scheme)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	err = r.Destination.Client.Update(context.TODO(), secret)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
 	}
 
 	return
@@ -233,21 +216,38 @@ func (r *KubeVirt) EnsureNamespace() (err error) {
 
 //
 // Ensure the VMIO secret exists on the destination.
-func (r *KubeVirt) EnsureSecret(vmRef ref.Ref) (err error) {
+func (r *KubeVirt) ensureSecret(vmRef ref.Ref) (secret *core.Secret, err error) {
 	_, err = r.Source.Inventory.VM(&vmRef)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	secret, err := r.buildSecret(vmRef)
+	secret, err = r.secret(vmRef)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	err = r.ensureObject(secret)
+	list := &core.SecretList{}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: labels.SelectorFromSet(r.vmLabels(vmRef)),
+			Namespace:     r.Plan.TargetNamespace(),
+		},
+	)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
+	}
+	if len(list.Items) == 0 {
+		err = r.Destination.Client.Create(context.TODO(), secret)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+	} else {
+		secret = &list.Items[0]
 	}
 
 	return
@@ -255,34 +255,33 @@ func (r *KubeVirt) EnsureSecret(vmRef ref.Ref) (err error) {
 
 //
 // Build the VMIO CR.
-func (r *KubeVirt) buildImport(vm *plan.VMStatus) (object *vmio.VirtualMachineImport, err error) {
-	namespace := r.Plan.TargetNamespace()
+func (r *KubeVirt) vmImport(
+	vm *plan.VMStatus,
+	secret *core.Secret) (object *vmio.VirtualMachineImport, err error) {
 	_, err = r.Source.Inventory.VM(&vm.Ref)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-
 	annotations := make(map[string]string)
 	if r.Plan.Spec.TransferNetwork != "" {
 		annotations[annDefaultNetwork] = r.Plan.Spec.TransferNetwork
 	}
-
 	object = &vmio.VirtualMachineImport{
 		ObjectMeta: meta.ObjectMeta{
-			Namespace: r.Plan.TargetNamespace(),
-			Name:      r.nameForImport(vm.Ref),
-			Labels: map[string]string{
-				kMigration: string(r.Migration.UID),
-				kPlan:      string(r.Plan.UID),
-				kVM:        vm.ID,
-			},
+			Namespace:   r.Plan.TargetNamespace(),
+			Labels:      r.vmLabels(vm.Ref),
 			Annotations: annotations,
+			GenerateName: strings.Join(
+				[]string{
+					r.Plan.Name,
+					vm.ID},
+				"-") + "-",
 		},
 		Spec: vmio.VirtualMachineImportSpec{
 			ProviderCredentialsSecret: vmio.ObjectIdentifier{
-				Namespace: &namespace,
-				Name:      r.nameForSecret(vm.Ref),
+				Namespace: &secret.Namespace,
+				Name:      secret.Name,
 			},
 		},
 	}
@@ -312,15 +311,16 @@ func (r *KubeVirt) buildImport(vm *plan.VMStatus) (object *vmio.VirtualMachineIm
 
 //
 // Build the VMIO secret.
-func (r *KubeVirt) buildSecret(vmRef ref.Ref) (object *core.Secret, err error) {
+func (r *KubeVirt) secret(vmRef ref.Ref) (object *core.Secret, err error) {
 	object = &core.Secret{
 		ObjectMeta: meta.ObjectMeta{
+			Labels:    r.vmLabels(vmRef),
 			Namespace: r.Plan.TargetNamespace(),
-			Name:      r.nameForSecret(vmRef),
-			Labels: map[string]string{
-				kMigration: string(r.Migration.UID),
-				kPlan:      string(r.Plan.UID),
-			},
+			GenerateName: strings.Join(
+				[]string{
+					r.Plan.Name,
+					vmRef.ID},
+				"-") + "-",
 		},
 	}
 	err = r.Builder.Secret(vmRef, r.Source.Secret, object)
@@ -332,31 +332,20 @@ func (r *KubeVirt) buildSecret(vmRef ref.Ref) (object *core.Secret, err error) {
 }
 
 //
-// Generated name for kubevirt VM Import CR secret.
-func (r *KubeVirt) nameForSecret(vmRef ref.Ref) string {
-	uid := string(r.Migration.UID)
-	parts := []string{
-		"plan",
-		r.Plan.Name,
-		vmRef.ID,
-		uid[len(uid)-4:],
+// Labels for plan and migration.
+func (r *KubeVirt) planLabels() map[string]string {
+	return map[string]string{
+		kMigration: string(r.Migration.UID),
+		kPlan:      string(r.Plan.GetUID()),
 	}
-
-	return strings.Join(parts, "-")
 }
 
 //
-// Generated name for kubevirt VM Import CR.
-func (r *KubeVirt) nameForImport(vmRef ref.Ref) string {
-	uid := string(r.Migration.UID)
-	parts := []string{
-		"plan",
-		r.Plan.Name,
-		vmRef.ID,
-		uid[len(uid)-4:],
-	}
-
-	return strings.Join(parts, "-")
+// Labels for a VM on a plan.
+func (r *KubeVirt) vmLabels(vmRef ref.Ref) (labels map[string]string) {
+	labels = r.planLabels()
+	labels[kVM] = vmRef.ID
+	return
 }
 
 //
@@ -452,43 +441,6 @@ func (r *VmImport) PercentComplete() (pct float64) {
 			return
 		}
 		pct = n / 100
-	}
-
-	return
-}
-
-//
-// Ensure resource.
-// Resource is created/updated as needed.
-func (r *KubeVirt) ensureObject(object runtime.Object) (err error) {
-	retry := 3
-	defer func() {
-		err = liberr.Wrap(err)
-	}()
-	for {
-		err = r.Destination.Client.Create(context.TODO(), object)
-		if k8serr.IsAlreadyExists(err) && retry > 0 {
-			retry--
-			err = r.deleteObject(object)
-			if err != nil {
-				break
-			}
-		} else {
-			break
-		}
-	}
-
-	return
-}
-
-//
-// Delete a resource.
-func (r *KubeVirt) deleteObject(object runtime.Object) (err error) {
-	err = r.Destination.Client.Delete(context.TODO(), object)
-	if !k8serr.IsNotFound(err) {
-		err = liberr.Wrap(err)
-	} else {
-		err = nil
 	}
 
 	return
