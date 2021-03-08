@@ -279,11 +279,11 @@ func (r *HookRunner) configMap() (mp *core.ConfigMap, err error) {
 // Workload
 func (r *HookRunner) workload() (workload string, err error) {
 	inventory := r.Source.Inventory
-	vm, err := inventory.VM(&r.vm.Ref)
+	object, err := inventory.Workload(&r.vm.Ref)
 	if err != nil {
 		return
 	}
-	b, err := yaml.Marshal(vm)
+	b, err := yaml.Marshal(object)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return

@@ -177,6 +177,17 @@ func (r *ProviderClient) VM(ref *base.Ref) (object interface{}, err error) {
 }
 
 //
+// Find a workload by ref.
+// Returns the matching resource and:
+//   ProviderNotSupportedErr
+//   ProviderNotReadyErr
+//   NotFoundErr
+//   RefNotUniqueErr
+func (r *ProviderClient) Workload(ref *base.Ref) (object interface{}, err error) {
+	return r.Finder().Workload(ref)
+}
+
+//
 // Find a network by ref.
 // Returns the matching resource and:
 //   ProviderNotSupportedErr

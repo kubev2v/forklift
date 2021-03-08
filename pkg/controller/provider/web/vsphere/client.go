@@ -82,6 +82,13 @@ func (r *Resolver) Path(resource interface{}, id string) (path string, err error
 			&model.VM{
 				Base: model.Base{ID: id},
 			})
+	case *Workload:
+		h := WorkloadHandler{}
+		path = h.Link(
+			r.Provider,
+			&model.VM{
+				Base: model.Base{ID: id},
+			})
 	default:
 		err = liberr.Wrap(
 			base.ResourceNotResolvedError{
@@ -242,6 +249,38 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 			}
 			*resource.(*VM) = list[0]
 		}
+	case *Workload:
+		id := ref.ID
+		if id != "" {
+			err = r.Get(resource, id)
+			return
+		}
+		name := ref.Name
+		if name != "" {
+			list := []Workload{}
+			err = r.List(
+				&list,
+				base.Param{
+					Key:   DetailParam,
+					Value: "1",
+				},
+				base.Param{
+					Key:   NameParam,
+					Value: name,
+				})
+			if err != nil {
+				break
+			}
+			if len(list) == 0 {
+				err = liberr.Wrap(NotFoundError{Ref: ref})
+				break
+			}
+			if len(list) > 1 {
+				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
+				break
+			}
+			*resource.(*Workload) = list[0]
+		}
 	default:
 		err = liberr.Wrap(
 			ResourceNotResolvedError{
@@ -266,6 +305,25 @@ func (r *Finder) VM(ref *base.Ref) (object interface{}, err error) {
 		ref.ID = vm.ID
 		ref.Name = vm.Name
 		object = vm
+	}
+
+	return
+}
+
+//
+// Find workload by ref.
+// Returns the matching resource and:
+//   ProviderNotSupportedErr
+//   ProviderNotReadyErr
+//   NotFoundErr
+//   RefNotUniqueErr
+func (r *Finder) Workload(ref *base.Ref) (object interface{}, err error) {
+	workload := &Workload{}
+	err = r.ByRef(workload, *ref)
+	if err == nil {
+		ref.ID = workload.ID
+		ref.Name = workload.Name
+		object = workload
 	}
 
 	return
