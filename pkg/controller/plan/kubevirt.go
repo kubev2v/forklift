@@ -126,7 +126,7 @@ func (r *KubeVirt) EnsureImport(vm *plan.VMStatus) (err error) {
 	if err != nil {
 		return
 	}
-	vmImport, err := r.vmImport(vm, secret)
+	newImport, err := r.vmImport(vm, secret)
 	if err != nil {
 		return
 	}
@@ -143,14 +143,22 @@ func (r *KubeVirt) EnsureImport(vm *plan.VMStatus) (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
-	if len(list.Items) == 0 {
-		err = r.Destination.Client.Create(context.TODO(), vmImport)
+	vmImport := &vmio.VirtualMachineImport{}
+	if len(list.Items) > 0 {
+		vmImport = &list.Items[0]
+		vmImport.Spec = newImport.Spec
+		err = r.Destination.Client.Update(context.TODO(), vmImport)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
 		}
 	} else {
-		vmImport = &list.Items[0]
+		vmImport = newImport
+		err = r.Destination.Client.Create(context.TODO(), vmImport)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
 	}
 	err = k8sutil.SetOwnerReference(vmImport, secret, scheme.Scheme)
 	if err != nil {
@@ -222,7 +230,7 @@ func (r *KubeVirt) ensureSecret(vmRef ref.Ref) (secret *core.Secret, err error) 
 		err = liberr.Wrap(err)
 		return
 	}
-	secret, err = r.secret(vmRef)
+	newSecret, err := r.secret(vmRef)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -240,14 +248,21 @@ func (r *KubeVirt) ensureSecret(vmRef ref.Ref) (secret *core.Secret, err error) 
 		err = liberr.Wrap(err)
 		return
 	}
-	if len(list.Items) == 0 {
-		err = r.Destination.Client.Create(context.TODO(), secret)
+	if len(list.Items) > 0 {
+		secret = &list.Items[0]
+		secret.Data = newSecret.Data
+		err = r.Destination.Client.Update(context.TODO(), secret)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
 		}
 	} else {
-		secret = &list.Items[0]
+		secret = newSecret
+		err = r.Destination.Client.Create(context.TODO(), secret)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
 	}
 
 	return
