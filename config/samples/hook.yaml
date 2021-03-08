@@ -1,3 +1,16 @@
+# ---
+# - name: Test
+#   hosts: localhost
+#   tasks:
+#     - name: Load Plan
+#       include_vars:
+#         file: plan.yml
+#         name: plan
+#     - name: Load Workload
+#       include_vars:
+#         file: workload.yml
+#         name: workload
+#
 ---
 kind: Hook
 apiVersion: forklift.konveyor.io/v1alpha1
