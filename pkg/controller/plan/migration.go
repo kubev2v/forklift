@@ -9,6 +9,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/builder"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	"github.com/konveyor/forklift-controller/pkg/controller/plan/scheduler"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	vmio "kubevirt.io/vm-import-operator/pkg/apis/v2v/v1beta1"
 	"time"
@@ -70,6 +71,8 @@ type Migration struct {
 	kubevirt KubeVirt
 	// VM import CRs.
 	importMap ImportMap
+	// VM scheduler
+	scheduler scheduler.Scheduler
 }
 
 //
@@ -95,119 +98,113 @@ func (r Migration) Run() (reQ time.Duration, err error) {
 
 	r.resolveCanceledRefs()
 
-	inFlight := 0
-	list := r.Context.Plan.Status.Migration.VMs
-	for _, vm := range list {
-		if vm.MarkedCompleted() {
-			continue
-		}
-
-		// check whether the VM has been canceled by the user
-		if r.Context.Migration.Spec.Canceled(vm.Ref) {
-			vm.SetCondition(
-				libcnd.Condition{
-					Type:     Canceled,
-					Status:   True,
-					Category: Advisory,
-					Reason:   UserRequested,
-					Message:  "The migration has been canceled.",
-					Durable:  true,
-				})
-			vm.Phase = Completed
-			log.Info("Migration [CANCELED]:", "vm", vm)
-			continue
-		}
-
-		if inFlight > Settings.Migration.MaxInFlight {
-			break
-		}
-		inFlight++
-		itinerary.Predicate = &Predicate{
-			vm: &vm.VM,
-		}
-		log.Info("Migration [RUN]:", "vm", vm)
-		switch vm.Phase {
-		case Started:
-			vm.MarkStarted()
-			vm.Phase = r.next(vm.Phase)
-		case PreHook, PostHook:
-			runner := HookRunner{Context: r.Context}
-			err = runner.Run(vm)
-			if err != nil {
-				return
-			}
-			if step, found := vm.ActiveStep(); found {
-				if step.MarkedCompleted() && step.Error == nil {
-					vm.Phase = r.next(vm.Phase)
-				}
-			} else {
-				vm.Phase = Completed
-			}
-		case CreateImport:
-			err = r.kubevirt.EnsureImport(vm)
-			if err != nil {
-				if !errors.As(err, &web.ProviderNotReadyError{}) {
-					vm.AddError(err.Error())
-					err = nil
-					break
-				} else {
-					return
-				}
-			}
-			vm.Phase = r.next(vm.Phase)
-		case ImportCreated:
-			// update the VM if the cutover
-			// changed on the Migration
-			err = r.kubevirt.EnsureImport(vm)
-			if err != nil {
-				if !errors.As(err, &web.ProviderNotReadyError{}) {
-					vm.AddError(err.Error())
-					err = nil
-					break
-				} else {
-					return
-				}
-			}
-			completed, failed, rErr := r.updateVM(vm)
-			if rErr != nil {
-				err = liberr.Wrap(rErr)
-				return
-			}
-			if completed {
-				if !failed {
-					vm.Phase = r.next(vm.Phase)
-				} else {
-					vm.Phase = Completed
-				}
-			}
-			if vm.HasCondition(Paused) {
-				inFlight--
-			}
-		case Completed:
-			vm.MarkCompleted()
-			log.Info("Migration [COMPLETED]:", "vm", vm)
-			inFlight--
-		default:
-			err = liberr.New("phase: unknown")
-		}
-		vm.ReflectPipeline()
-		if vm.Error != nil {
-			vm.Phase = Completed
-			vm.SetCondition(
-				libcnd.Condition{
-					Type:     Failed,
-					Status:   True,
-					Category: Advisory,
-					Message:  "The VM migration has FAILED.",
-					Durable:  true,
-				})
+	for _, vm := range r.runningVMs() {
+		err = r.step(vm)
+		if err != nil {
+			return
 		}
 	}
+
+	vm, err := r.scheduler.Next()
+	if err != nil {
+		return
+	}
+	if vm != nil {
+		err = r.step(vm)
+		if err != nil {
+			return
+		}
+	}
+
 	completed, err := r.end()
 	if completed {
 		reQ = NoReQ
 	}
 
+	return
+}
+
+func (r Migration) step(vm *plan.VMStatus) (err error) {
+	// check whether the VM has been canceled by the user
+	if r.Context.Migration.Spec.Canceled(vm.Ref) {
+		vm.SetCondition(
+			libcnd.Condition{
+				Type:     Canceled,
+				Status:   True,
+				Category: Advisory,
+				Reason:   UserRequested,
+				Message:  "The migration has been canceled.",
+				Durable:  true,
+			})
+		vm.Phase = Completed
+		log.Info("Migration [CANCELED]:", "vm", vm)
+		return
+	}
+
+	itinerary.Predicate = &Predicate{
+		vm: &vm.VM,
+	}
+
+	log.Info("Migration [RUN]:", "vm", vm)
+	switch vm.Phase {
+	case Started:
+		vm.MarkStarted()
+		vm.Phase = r.next(vm.Phase)
+	case CreateImport:
+		err = r.kubevirt.EnsureImport(vm)
+		if err != nil {
+			if !errors.As(err, &web.ProviderNotReadyError{}) {
+				vm.AddError(err.Error())
+				err = nil
+				break
+			} else {
+				return
+			}
+		}
+		vm.Phase = r.next(vm.Phase)
+	case ImportCreated:
+		// update the VM if the cutover
+		// changed on the Migration
+		err = r.kubevirt.EnsureImport(vm)
+		if err != nil {
+			if !errors.As(err, &web.ProviderNotReadyError{}) {
+				vm.AddError(err.Error())
+				err = nil
+				break
+			} else {
+				return
+			}
+		}
+		completed, failed, rErr := r.updateVM(vm)
+		if rErr != nil {
+			err = liberr.Wrap(rErr)
+			return
+		}
+		if completed {
+			if !failed {
+				vm.Phase = r.next(vm.Phase)
+			} else {
+				vm.Phase = Completed
+			}
+		}
+	case Completed:
+		vm.MarkCompleted()
+		log.Info("Migration [COMPLETED]:", "vm", vm)
+	default:
+		err = liberr.New("phase: unknown")
+	}
+	vm.ReflectPipeline()
+	if vm.Error != nil {
+		vm.Phase = Completed
+		vm.SetCondition(
+			libcnd.Condition{
+				Type:     Failed,
+				Status:   True,
+				Category: Advisory,
+				Message:  "The VM migration has FAILED.",
+				Durable:  true,
+			})
+	}
 	return
 }
 
@@ -251,6 +248,18 @@ func (r *Migration) resolveCanceledRefs() {
 }
 
 //
+func (r *Migration) runningVMs() (vms []*plan.VMStatus) {
+	vms = make([]*plan.VMStatus, 0)
+	for i := range r.Plan.Status.Migration.VMs {
+		vm := r.Plan.Status.Migration.VMs[i]
+		if vm.Running() {
+			vms = append(vms, vm)
+		}
+	}
+	return
+}
+
+//
 // Get/Build resources.
 func (r *Migration) init() (err error) {
 	r.builder, err = builder.New(r.Context)
@@ -261,6 +270,11 @@ func (r *Migration) init() (err error) {
 	r.kubevirt = KubeVirt{
 		Context: r.Context,
 		Builder: r.builder,
+	}
+	r.scheduler, err = scheduler.New(r.Context)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
 	}
 
 	return
