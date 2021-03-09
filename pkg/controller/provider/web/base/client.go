@@ -155,7 +155,6 @@ type Client interface {
 	//   ProviderNotReadyErr
 	//   NotFoundErr
 	//   RefNotUniqueErr
-
 	Network(ref *Ref) (interface{}, error)
 	// Find storage by ref.
 	// Returns the matching resource and:
