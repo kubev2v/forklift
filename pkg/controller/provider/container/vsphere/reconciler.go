@@ -101,6 +101,7 @@ const (
 	fMemorySize          = "config.hardware.memoryMB"
 	fDevices             = "config.hardware.device"
 	fExtraConfig         = "config.extraConfig"
+	fChangeTracking      = "config.changeTrackingEnabled"
 	fGuestName           = "summary.config.guestFullName"
 	fBalloonedMemory     = "summary.quickStats.balloonedMemory"
 	fVmIpAddress         = "summary.guest.ipAddress"
@@ -685,6 +686,7 @@ func (r *Reconciler) propertySpec() []types.PropertySpec {
 				fRuntimeHost,
 				fPowerState,
 				fSnapshot,
+				fChangeTracking,
 			},
 		},
 	}

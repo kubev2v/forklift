@@ -511,6 +511,10 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 						v.model.Snapshot = v.Ref(*ref)
 					}
 				}
+			case fChangeTracking:
+				if b, cast := p.Val.(bool); cast {
+					v.model.ChangeTrackingEnabled = b
+				}
 			case fCpuAffinity:
 				if a, cast := p.Val.(types.VirtualMachineAffinityInfo); cast {
 					v.model.CpuAffinity = a.AffinitySet

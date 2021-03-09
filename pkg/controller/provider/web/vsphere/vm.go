@@ -160,6 +160,7 @@ type VM struct {
 	Firmware              string          `json:"firmware"`
 	PowerState            string          `json:"powerState"`
 	Snapshot              model.Ref       `json:"snapshot"`
+	ChangeTrackingEnabled bool            `json:"changeTrackingEnabled"`
 	CpuAffinity           []int32         `json:"cpuAffinity"`
 	CpuHotAddEnabled      bool            `json:"cpuHotAddEnabled"`
 	CpuHotRemoveEnabled   bool            `json:"cpuHotRemoveEnabled"`
@@ -190,6 +191,7 @@ func (r *VM) With(m *model.VM) {
 	r.Firmware = m.Firmware
 	r.PowerState = m.PowerState
 	r.Snapshot = m.Snapshot
+	r.ChangeTrackingEnabled = m.ChangeTrackingEnabled
 	r.CpuAffinity = m.CpuAffinity
 	r.CpuHotAddEnabled = m.CpuHotAddEnabled
 	r.CpuHotRemoveEnabled = m.CpuHotRemoveEnabled
