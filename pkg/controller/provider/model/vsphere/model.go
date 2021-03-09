@@ -355,6 +355,7 @@ type VM struct {
 	NumaNodeAffinity      []string  `sql:""`
 	StorageUsed           int64     `sql:""`
 	Snapshot              Ref       `sql:""`
+	ChangeTrackingEnabled bool      `sql:""`
 	Devices               []Device  `sql:""`
 	Disks                 []Disk    `sql:""`
 	Networks              []Ref     `sql:""`
