@@ -79,6 +79,13 @@ type Finder interface {
 	//   NotFoundErr
 	//   RefNotUniqueErr
 	VM(ref *Ref) (interface{}, error)
+	// Find a workload by ref.
+	// Returns the matching resource and:
+	//   ProviderNotSupportedErr
+	//   ProviderNotReadyErr
+	//   NotFoundErr
+	//   RefNotUniqueErr
+	Workload(ref *Ref) (interface{}, error)
 	// Find a Network by ref.
 	// Returns the matching resource and:
 	//   ProviderNotSupportedErr
@@ -135,6 +142,13 @@ type Client interface {
 	//   NotFoundErr
 	//   RefNotUniqueErr
 	VM(ref *Ref) (interface{}, error)
+	// Find a Workload by ref.
+	// Returns the matching resource and:
+	//   ProviderNotSupportedErr
+	//   ProviderNotReadyErr
+	//   NotFoundErr
+	//   RefNotUniqueErr
+	Workload(ref *Ref) (interface{}, error)
 	// Find a Network by ref.
 	// Returns the matching resource and:
 	//   ProviderNotSupportedErr

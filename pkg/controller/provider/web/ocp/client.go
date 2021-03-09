@@ -134,6 +134,20 @@ func (r *Finder) VM(ref *base.Ref) (object interface{}, err error) {
 }
 
 //
+// Find workload by ref.
+// Returns the matching resource and:
+//   ProviderNotSupportedErr
+//   ProviderNotReadyErr
+//   NotFoundErr
+//   RefNotUniqueErr
+func (r *Finder) Workload(ref *base.Ref) (object interface{}, err error) {
+	err = liberr.Wrap(&NotFoundError{
+		Ref: *ref,
+	})
+	return
+}
+
+//
 // Find a Network by ref.
 //Returns the matching resource and:
 //   ProviderNotSupportedErr
