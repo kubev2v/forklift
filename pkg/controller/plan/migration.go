@@ -156,6 +156,18 @@ func (r Migration) Run() (reQ time.Duration, err error) {
 			}
 			vm.Phase = r.next(vm.Phase)
 		case ImportCreated:
+			// update the VM if the cutover
+			// changed on the Migration
+			err = r.kubevirt.EnsureImport(vm)
+			if err != nil {
+				if !errors.As(err, &web.ProviderNotReadyError{}) {
+					vm.AddError(err.Error())
+					err = nil
+					break
+				} else {
+					return
+				}
+			}
 			completed, failed, rErr := r.updateVM(vm)
 			if rErr != nil {
 				err = liberr.Wrap(rErr)
