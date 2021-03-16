@@ -250,7 +250,7 @@ func (r *KubeVirt) ensureSecret(vmRef ref.Ref) (secret *core.Secret, err error) 
 	}
 	if len(list.Items) > 0 {
 		secret = &list.Items[0]
-		secret.Data = newSecret.Data
+		secret.StringData = newSecret.StringData
 		err = r.Destination.Client.Update(context.TODO(), secret)
 		if err != nil {
 			err = liberr.Wrap(err)
