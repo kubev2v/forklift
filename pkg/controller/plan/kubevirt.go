@@ -313,11 +313,8 @@ func (r *KubeVirt) vmImport(
 		object.Spec.Warm = true
 		if r.Migration.Spec.Cutover != nil {
 			object.Spec.FinalizeDate = r.Migration.Spec.Cutover
-		} else if r.Plan.Spec.Cutover != nil {
-			object.Spec.FinalizeDate = r.Plan.Spec.Cutover
 		} else {
-			now := meta.Now()
-			object.Spec.FinalizeDate = &now
+			object.Spec.FinalizeDate = r.Plan.Spec.Cutover
 		}
 	}
 
