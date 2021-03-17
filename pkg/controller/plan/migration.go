@@ -545,7 +545,40 @@ func (r *Migration) updateVM(vm *plan.VMStatus) (completed bool, failed bool, er
 		}
 	}
 
+	if imp.Spec.Warm {
+		updateWarmStatus(vm, imp)
+	}
+
 	return
+}
+
+func updateWarmStatus(vm *plan.VMStatus, imp VmImport) {
+	if vm.Warm == nil {
+		vm.Warm = &plan.Warm{
+			Precopies: make([]plan.Precopy, 0),
+		}
+	}
+	vm.Warm.Successes = imp.Status.WarmImport.Successes
+	vm.Warm.Failures = imp.Status.WarmImport.Failures
+	vm.Warm.ConsecutiveFailures = imp.Status.WarmImport.ConsecutiveFailures
+	vm.Warm.NextPrecopyAt = imp.Status.WarmImport.NextStageTime
+
+	// Use VMI Processing condition transition times to figure
+	// out the start and stop times of the precopies.
+	conditions := imp.Conditions()
+	cnd := conditions.FindCondition(string(vmio.Processing))
+	if cnd != nil {
+		switch cnd.Reason {
+		case string(vmio.CopyingStage):
+			if len(vm.Warm.Precopies) == 0 || vm.Warm.Precopies[len(vm.Warm.Precopies)-1].End != nil {
+				vm.Warm.Precopies = append(vm.Warm.Precopies, plan.Precopy{Start: &cnd.LastTransitionTime})
+			}
+		case string(vmio.CopyingPaused):
+			if len(vm.Warm.Precopies) != 0 && vm.Warm.Precopies[len(vm.Warm.Precopies)-1].End == nil {
+				vm.Warm.Precopies[len(vm.Warm.Precopies)-1].End = &cnd.LastTransitionTime
+			}
+		}
+	}
 }
 
 //

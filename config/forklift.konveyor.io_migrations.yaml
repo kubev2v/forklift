@@ -411,6 +411,35 @@ spec:
                   type:
                     description: Type used to qualify the name.
                     type: string
+                  warm:
+                    description: Warm migration status
+                    properties:
+                      consecutiveFailures:
+                        type: integer
+                      failures:
+                        type: integer
+                      nextPrecopyAt:
+                        format: date-time
+                        type: string
+                      precopies:
+                        items:
+                          description: Precopy durations
+                          properties:
+                            end:
+                              format: date-time
+                              type: string
+                            start:
+                              format: date-time
+                              type: string
+                          type: object
+                        type: array
+                      successes:
+                        type: integer
+                    required:
+                    - consecutiveFailures
+                    - failures
+                    - successes
+                    type: object
                 required:
                 - phase
                 - pipeline
