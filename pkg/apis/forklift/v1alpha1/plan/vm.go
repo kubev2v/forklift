@@ -5,6 +5,7 @@ import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
 	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"path"
 )
 
@@ -57,8 +58,27 @@ type VMStatus struct {
 	Phase string `json:"phase"`
 	// Errors
 	Error *Error `json:"error,omitempty"`
+	// Warm migration status
+	Warm *Warm `json:"warm,omitempty"`
+
 	// Conditions.
 	libcnd.Conditions `json:",inline"`
+}
+
+//
+// Warm Migration status
+type Warm struct {
+	Successes           int        `json:"successes"`
+	Failures            int        `json:"failures"`
+	ConsecutiveFailures int        `json:"consecutiveFailures"`
+	NextPrecopyAt       *meta.Time `json:"nextPrecopyAt,omitempty"`
+	Precopies           []Precopy  `json:"precopies,omitempty"`
+}
+
+// Precopy durations
+type Precopy struct {
+	Start *meta.Time `json:"start,omitempty"`
+	End   *meta.Time `json:"end,omitempty"`
 }
 
 //
