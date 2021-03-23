@@ -2,6 +2,10 @@ package plan
 
 import (
 	"context"
+	"reflect"
+	"strconv"
+	"strings"
+
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
@@ -17,8 +21,6 @@ import (
 	vmio "kubevirt.io/vm-import-operator/pkg/apis/v2v/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"strconv"
-	"strings"
 )
 
 // Annotations
@@ -146,11 +148,15 @@ func (r *KubeVirt) EnsureImport(vm *plan.VMStatus) (err error) {
 	vmImport := &vmio.VirtualMachineImport{}
 	if len(list.Items) > 0 {
 		vmImport = &list.Items[0]
-		vmImport.Spec = newImport.Spec
-		err = r.Destination.Client.Update(context.TODO(), vmImport)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
+		// Update the existing VM import if the cutover date has changed.
+		if !reflect.DeepEqual(vmImport.Spec.FinalizeDate, newImport.Spec.FinalizeDate) {
+			patch := vmImport.DeepCopy()
+			patch.Spec.FinalizeDate = newImport.Spec.FinalizeDate
+			err = r.Destination.Client.Patch(context.TODO(), patch, client.MergeFrom(vmImport))
+			if err != nil {
+				err = liberr.Wrap(err)
+				return
+			}
 		}
 	} else {
 		vmImport = newImport
