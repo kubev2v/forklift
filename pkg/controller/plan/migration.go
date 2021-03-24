@@ -105,11 +105,11 @@ func (r Migration) Run() (reQ time.Duration, err error) {
 		}
 	}
 
-	vm, err := r.scheduler.Next()
+	vm, hasNext, err := r.scheduler.Next()
 	if err != nil {
 		return
 	}
-	if vm != nil {
+	if hasNext {
 		err = r.step(vm)
 		if err != nil {
 			return
@@ -124,6 +124,9 @@ func (r Migration) Run() (reQ time.Duration, err error) {
 	return
 }
 
+//
+// Steps a VM through the migration itinerary
+// and updates its status.
 func (r Migration) step(vm *plan.VMStatus) (err error) {
 	// check whether the VM has been canceled by the user
 	if r.Context.Migration.Spec.Canceled(vm.Ref) {

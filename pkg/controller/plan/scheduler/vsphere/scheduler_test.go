@@ -13,7 +13,7 @@ func TestScheduler(t *testing.T) {
 	hostC := "hostC"
 
 	scheduler := Scheduler{MaxInFlight: 10}
-	scheduler.inflight = map[string]int{
+	scheduler.inFlight = map[string]int{
 		hostA: 6,
 		hostB: 10,
 		hostC: 0,
