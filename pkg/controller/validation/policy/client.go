@@ -86,15 +86,15 @@ func (r *Client) Validate(ref refapi.Ref) (version int, concerns []model.Concern
 	in := &struct {
 		Input struct {
 			Provider struct {
+				UID       string `json:"uid"`
 				Namespace string `json:"namespace"`
 				Name      string `json:"name"`
 			} `json:"provider"`
-			ID string `json:"vm_moref"`
+			VmID string `json:"vm_moref"`
 		} `json:"input"`
 	}{}
-	in.Input.Provider.Namespace = r.Provider.Namespace
-	in.Input.Provider.Name = r.Provider.Name
-	in.Input.ID = ref.ID
+	in.Input.Provider.UID = string(r.Provider.UID)
+	in.Input.VmID = ref.ID
 	out := &struct {
 		Result struct {
 			Version  int             `json:"rules_version"`
