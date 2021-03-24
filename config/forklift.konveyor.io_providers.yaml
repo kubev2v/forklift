@@ -15,7 +15,7 @@ spec:
   - JSONPath: .status.conditions[?(@.type=='Ready')].status
     name: READY
     type: string
-  - JSONPath: .status.conditions[?(@.type=='ConnectionTested')].status
+  - JSONPath: .status.conditions[?(@.type=='ConnectionTestSucceeded')].status
     name: CONNECTED
     type: string
   - JSONPath: .status.conditions[?(@.type=='InventoryCreated')].status

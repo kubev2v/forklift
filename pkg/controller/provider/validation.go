@@ -17,13 +17,14 @@ import (
 //
 // Types
 const (
-	UrlNotValid      = "UrlNotValid"
-	TypeNotSupported = "ProviderTypeNotSupported"
-	SecretNotValid   = "SecretNotValid"
-	Validated        = "Validated"
-	ConnectionTested = "ConnectionTested"
-	InventoryCreated = "InventoryCreated"
-	LoadInventory    = "LoadInventory"
+	UrlNotValid             = "UrlNotValid"
+	TypeNotSupported        = "ProviderTypeNotSupported"
+	SecretNotValid          = "SecretNotValid"
+	Validated               = "Validated"
+	ConnectionTestSucceeded = "ConnectionTestSucceeded"
+	ConnectionTestFailed    = "ConnectionTestFailed"
+	InventoryCreated        = "InventoryCreated"
+	LoadInventory           = "LoadInventory"
 )
 
 //
@@ -44,7 +45,6 @@ const (
 	NotSupported = "NotSupported"
 	DataErr      = "DataErr"
 	Malformed    = "Malformed"
-	Failed       = "Failed"
 	Completed    = "Completed"
 	Tested       = "Tested"
 	Started      = "Started"
@@ -220,21 +220,27 @@ func (r *Reconciler) testConnection(provider *api.Provider, secret *core.Secret)
 	}
 	rl := container.Build(nil, provider, secret)
 	err := rl.Test()
-	cnd := libcnd.Condition{
-		Type:     ConnectionTested,
-		Category: Required,
-	}
 	if err == nil {
-		cnd.Status = True
-		cnd.Reason = Tested
-		cnd.Message = "Connection test, succeeded."
+		provider.Status.SetCondition(
+			libcnd.Condition{
+				Type:     ConnectionTestSucceeded,
+				Status:   True,
+				Reason:   Tested,
+				Category: Required,
+				Message:  "Connection test, succeeded.",
+			})
 	} else {
-		cnd.Status = False
-		cnd.Reason = Failed
-		cnd.Message = fmt.Sprintf("Connection test, failed: %s", err.Error())
+		provider.Status.SetCondition(
+			libcnd.Condition{
+				Type:     ConnectionTestFailed,
+				Status:   True,
+				Reason:   Tested,
+				Category: Critical,
+				Message: fmt.Sprintf(
+					"Connection test, failed: %s",
+					err.Error()),
+			})
 	}
-
-	provider.Status.SetCondition(cnd)
 
 	return nil
 }
