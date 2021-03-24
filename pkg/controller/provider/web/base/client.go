@@ -3,10 +3,10 @@ package base
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
+	libweb "github.com/konveyor/controller/pkg/inventory/web"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	"io/ioutil"
@@ -18,6 +18,12 @@ import (
 //
 // Application settings.
 var Settings = &settings.Settings
+
+//
+// Lib.
+type EventHandler = libweb.EventHandler
+type LibClient = libweb.Client
+type Watch = libweb.Watch
 
 //
 // Resource kind cannot be resolved.
@@ -128,12 +134,19 @@ type Client interface {
 	//   ProviderNotReadyErr
 	//   NotFoundErr
 	List(list interface{}, param ...Param) error
+	// Watch a collection.
+	// Returns:
+	//   ProviderNotSupportedErr
+	//   ProviderNotReadyErr
+	//   NotFoundErr
+	Watch(list interface{}, h EventHandler) (*Watch, error)
 	// Get a resource by ref.
 	// Returns:
 	//   ProviderNotSupportedErr
 	//   ProviderNotReadyErr
 	//   NotFoundErr
 	//   RefNotUniqueErr
+
 	Find(resource interface{}, ref Ref) error
 	// Find a VM by ref.
 	// Returns the matching resource and:
@@ -182,6 +195,7 @@ type Param struct {
 //
 // REST API client.
 type RestClient struct {
+	LibClient
 	Resolver
 	// Bearer token.
 	Token string
@@ -189,8 +203,6 @@ type RestClient struct {
 	Host string
 	// Parameters
 	Params Params
-	// http Transport.
-	transport http.RoundTripper
 }
 
 //
@@ -210,6 +222,7 @@ func (c *RestClient) Get(resource interface{}, id string) (status int, err error
 	if err != nil {
 		return
 	}
+
 	status, err = c.get(path, resource)
 
 	return
@@ -252,13 +265,42 @@ func (c *RestClient) List(list interface{}, param ...Param) (status int, err err
 }
 
 //
+// Watch a resource.
+func (c *RestClient) Watch(resource interface{}, h EventHandler) (status int, w *Watch, err error) {
+	if c.Resolver == nil {
+		err = liberr.Wrap(ResourceNotResolvedError{resource})
+		return
+	}
+	lv := reflect.ValueOf(resource)
+	switch lv.Kind() {
+	case reflect.Ptr:
+	default:
+		err = libmodel.MustBePtrErr
+		return
+	}
+	path, err := c.Resolver.Path(resource, "/")
+	if err != nil {
+		return
+	}
+	err = c.buildTransport()
+	if err != nil {
+		return
+	}
+	c.buildHeader()
+	url := c.url(path)
+	status, w, err = c.LibClient.Watch(url, resource, h)
+
+	return
+}
+
+//
 // Build and set the transport as needed.
 func (c *RestClient) buildTransport() (err error) {
-	if c.transport != nil {
+	if c.Transport != nil {
 		return
 	}
 	if !Settings.Inventory.TLS.Enabled {
-		c.transport = http.DefaultTransport
+		c.Transport = http.DefaultTransport
 		return
 	}
 	pool := x509.NewCertPool()
@@ -268,7 +310,7 @@ func (c *RestClient) buildTransport() (err error) {
 		return
 	}
 	pool.AppendCertsFromPEM(ca)
-	c.transport = &http.Transport{
+	c.Transport = &http.Transport{
 		TLSClientConfig: &tls.Config{
 			RootCAs: pool,
 		},
@@ -278,51 +320,21 @@ func (c *RestClient) buildTransport() (err error) {
 }
 
 //
-// Http GET
-func (c *RestClient) get(path string, resource interface{}) (status int, err error) {
-	header := http.Header{}
-	if c.Token != "" {
-		header["Authorization"] = []string{
+// Build header.
+func (c *RestClient) buildHeader() {
+	if c.Token == "" {
+		return
+	}
+	c.Header = http.Header{
+		"Authorization": []string{
 			fmt.Sprintf("Bearer %s", c.Token),
-		}
+		},
 	}
-	request := &http.Request{
-		Method: http.MethodGet,
-		Header: header,
-		URL:    c.url(path),
-	}
-	err = c.buildTransport()
-	if err != nil {
-		return
-	}
-	client := http.Client{Transport: c.transport}
-	response, err := client.Do(request)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	status = response.StatusCode
-	content := []byte{}
-	if status == http.StatusOK {
-		defer response.Body.Close()
-		content, err = ioutil.ReadAll(response.Body)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-		err = json.Unmarshal(content, resource)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-	}
-
-	return
 }
 
 //
 // Build the URL.
-func (c *RestClient) url(path string) *liburl.URL {
+func (c *RestClient) url(path string) string {
 	if c.Host == "" {
 		c.Host = fmt.Sprintf(
 			"%s:%d",
@@ -340,5 +352,18 @@ func (c *RestClient) url(path string) *liburl.URL {
 		url.Host = c.Host
 	}
 
-	return url
+	return url.String()
+}
+
+//
+// Http GET
+func (c *RestClient) get(path string, resource interface{}) (status int, err error) {
+	err = c.buildTransport()
+	if err != nil {
+		return
+	}
+	c.buildHeader()
+	url := c.url(path)
+	status, err = c.LibClient.Get(url, resource)
+	return
 }

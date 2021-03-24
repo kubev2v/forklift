@@ -42,7 +42,7 @@ func Handlers(container *container.Container) []libweb.RequestHandler {
 				base.Handler{Container: container},
 			},
 		},
-		&NetworkAttachmentDefinitionHandler{
+		&NadHandler{
 			Handler: Handler{
 				base.Handler{Container: container},
 			},

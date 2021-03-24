@@ -9,8 +9,8 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
+	refapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/validation"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
@@ -309,7 +309,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		id := path.Join(
 			plan.TargetNamespace(),
 			ref.Name)
-		pErr = inventory.Get(&ocp.VM{}, id)
+		_, pErr = inventory.VM(&refapi.Ref{Name: id})
 		if pErr == nil {
 			if vm, found := plan.Status.Migration.FindVM(*ref); found {
 				if vm.Completed != nil && vm.Error == nil {

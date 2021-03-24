@@ -1,12 +1,11 @@
 package policy
 
 import (
-	"bytes"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
+	libweb "github.com/konveyor/controller/pkg/inventory/web"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	refapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
@@ -16,6 +15,10 @@ import (
 	liburl "net/url"
 	"time"
 )
+
+//
+// Lib.
+type LibClient = libweb.Client
 
 //
 // Application settings.
@@ -44,10 +47,9 @@ func (r *ValidationError) Error() string {
 //
 // Client.
 type Client struct {
+	LibClient
 	// Provider.
 	Provider *api.Provider
-	// Transport.
-	transport *http.Transport
 }
 
 //
@@ -128,37 +130,14 @@ func (r *Client) get(path string, out interface{}) (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
-	parsedURL.Path = path
-	request := &http.Request{
-		Method: http.MethodGet,
-		URL:    parsedURL,
-	}
 	err = r.buildTransport()
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
-	client := http.Client{Transport: r.transport}
-	response, err := client.Do(request)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	status := response.StatusCode
-	content := []byte{}
-	if status == http.StatusOK {
-		defer response.Body.Close()
-		content, err = ioutil.ReadAll(response.Body)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-		err = json.Unmarshal(content, out)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-	} else {
+	parsedURL.Path = path
+	url := parsedURL.String()
+	status, err := r.LibClient.Get(url, out)
+	if status != http.StatusOK {
 		err = liberr.New(http.StatusText(status))
 	}
 
@@ -173,40 +152,14 @@ func (r *Client) post(path string, in interface{}, out interface{}) (err error) 
 		err = liberr.Wrap(err)
 		return
 	}
-	parsedURL.Path = path
-	body, _ := json.Marshal(in)
-	reader := bytes.NewReader(body)
-	request := &http.Request{
-		Method: http.MethodPost,
-		Body:   ioutil.NopCloser(reader),
-		URL:    parsedURL,
-	}
 	err = r.buildTransport()
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
-	client := http.Client{Transport: r.transport}
-	response, err := client.Do(request)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	status := response.StatusCode
-	content := []byte{}
-	if status == http.StatusOK {
-		defer response.Body.Close()
-		content, err = ioutil.ReadAll(response.Body)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-		err = json.Unmarshal(content, out)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-	} else {
+	parsedURL.Path = path
+	url := parsedURL.String()
+	status, err := r.LibClient.Post(url, in, out)
+	if status != http.StatusOK {
 		err = liberr.New(http.StatusText(status))
 	}
 
@@ -216,7 +169,7 @@ func (r *Client) post(path string, in interface{}, out interface{}) (err error) 
 //
 // Build and set the transport as needed.
 func (c *Client) buildTransport() (err error) {
-	if c.transport != nil {
+	if c.Transport != nil {
 		return
 	}
 	pool := x509.NewCertPool()
@@ -226,7 +179,7 @@ func (c *Client) buildTransport() (err error) {
 		return
 	}
 	pool.AppendCertsFromPEM(ca)
-	c.transport = &http.Transport{
+	c.Transport = &http.Transport{
 		TLSClientConfig: &tls.Config{
 			RootCAs: pool,
 		},

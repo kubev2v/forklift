@@ -3,6 +3,7 @@ package ocp
 import (
 	"errors"
 	"github.com/gin-gonic/gin"
+	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
@@ -13,9 +14,8 @@ import (
 //
 // Routes.
 const (
-	Ns2Param       = "ns2"
 	NamespacesRoot = ProviderRoot + "/namespaces"
-	NamespaceRoot  = NamespacesRoot + "/:" + Ns2Param
+	NamespaceRoot  = NamespacesRoot + "/:" + NsParam
 )
 
 //
@@ -34,10 +34,17 @@ func (h *NamespaceHandler) AddRoutes(e *gin.Engine) {
 
 //
 // List resources in a REST collection.
+// A GET onn the collection that includes the `X-Watch`
+// header will negotiate an upgrade of the connection
+// to a websocket and push watch events.
 func (h NamespaceHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
+		return
+	}
+	if h.WatchRequest {
+		h.watch(ctx)
 		return
 	}
 	db := h.Reconciler.DB()
@@ -69,7 +76,7 @@ func (h NamespaceHandler) Get(ctx *gin.Context) {
 	}
 	m := &model.Namespace{
 		Base: model.Base{
-			Name: ctx.Param(Ns2Param),
+			PK: ctx.Param(NsParam),
 		},
 	}
 	db := h.Reconciler.DB()
@@ -97,10 +104,31 @@ func (h NamespaceHandler) Link(p *api.Provider, m *model.Namespace) string {
 	return h.Handler.Link(
 		NamespaceRoot,
 		base.Params{
-			base.NsParam:       p.Namespace,
-			base.ProviderParam: p.Name,
-			Ns2Param:           m.Name,
+			base.ProviderParam: string(p.UID),
+			NsParam:            m.PK,
 		})
+}
+
+//
+// Watch.
+func (h NamespaceHandler) watch(ctx *gin.Context) {
+	db := h.Reconciler.DB()
+	err := h.Watch(
+		ctx,
+		db,
+		&model.Namespace{},
+		func(in libmodel.Model) (r interface{}) {
+			m := in.(*model.Namespace)
+			vm := &Namespace{}
+			vm.With(m)
+			vm.SelfLink = h.Link(h.Provider, m)
+			r = vm
+			return
+		})
+	if err != nil {
+		Log.Trace(err)
+		ctx.Status(http.StatusInternalServerError)
+	}
 }
 
 //

@@ -74,6 +74,10 @@ func (h TreeHandler) VmTree(ctx *gin.Context) {
 		ctx.Status(status)
 		return
 	}
+	if h.WatchRequest {
+		ctx.Status(http.StatusBadRequest)
+		return
+	}
 	db := h.Reconciler.DB()
 	content := TreeNode{}
 	for _, dc := range h.datacenters {
@@ -127,6 +131,10 @@ func (h TreeHandler) HostTree(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
+		return
+	}
+	if h.WatchRequest {
+		ctx.Status(http.StatusBadRequest)
 		return
 	}
 	db := h.Reconciler.DB()
