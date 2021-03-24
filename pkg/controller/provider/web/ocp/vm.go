@@ -3,6 +3,7 @@ package ocp
 import (
 	"errors"
 	"github.com/gin-gonic/gin"
+	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
@@ -14,7 +15,7 @@ import (
 // Routes.
 const (
 	VmParam = "vm"
-	VMsRoot = NamespaceRoot + "/vms"
+	VMsRoot = ProviderRoot + "/vms"
 	VMRoot  = VMsRoot + "/:" + VmParam
 )
 
@@ -34,10 +35,17 @@ func (h *VMHandler) AddRoutes(e *gin.Engine) {
 
 //
 // List resources in a REST collection.
+// A GET onn the collection that includes the `X-Watch`
+// header will negotiate an upgrade of the connection
+// to a websocket and push watch events.
 func (h VMHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
+		return
+	}
+	if h.WatchRequest {
+		h.watch(ctx)
 		return
 	}
 	db := h.Reconciler.DB()
@@ -69,8 +77,7 @@ func (h VMHandler) Get(ctx *gin.Context) {
 	}
 	m := &model.VM{
 		Base: model.Base{
-			Namespace: ctx.Param(Ns2Param),
-			Name:      ctx.Param(VmParam),
+			PK: ctx.Param(VmParam),
 		},
 	}
 	db := h.Reconciler.DB()
@@ -98,11 +105,31 @@ func (h VMHandler) Link(p *api.Provider, m *model.VM) string {
 	return h.Handler.Link(
 		VMRoot,
 		base.Params{
-			base.NsParam:       p.Namespace,
-			base.ProviderParam: p.Name,
-			Ns2Param:           m.Namespace,
-			VmParam:            m.Name,
+			base.ProviderParam: string(p.UID),
+			VmParam:            m.PK,
 		})
+}
+
+//
+// Watch.
+func (h VMHandler) watch(ctx *gin.Context) {
+	db := h.Reconciler.DB()
+	err := h.Watch(
+		ctx,
+		db,
+		&model.VM{},
+		func(in libmodel.Model) (r interface{}) {
+			m := in.(*model.VM)
+			vm := &VM{}
+			vm.With(m)
+			vm.SelfLink = h.Link(h.Provider, m)
+			r = vm
+			return
+		})
+	if err != nil {
+		Log.Trace(err)
+		ctx.Status(http.StatusInternalServerError)
+	}
 }
 
 //

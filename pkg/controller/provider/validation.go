@@ -246,7 +246,7 @@ func (r *Reconciler) inventoryCreated(provider *api.Provider) error {
 		return nil
 	}
 	if r, found := r.container.Get(provider); found {
-		if r.HasConsistency() {
+		if r.HasParity() {
 			provider.Status.SetCondition(
 				libcnd.Condition{
 					Type:     InventoryCreated,

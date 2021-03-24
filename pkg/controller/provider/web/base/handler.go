@@ -6,6 +6,7 @@ import (
 	libweb "github.com/konveyor/controller/pkg/inventory/web"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"net/http"
 	"strconv"
 	"strings"
@@ -15,13 +16,11 @@ import (
 //
 // Root - all routes.
 const (
-	Root               = libweb.Root
-	ProviderCollection = "providers"
-	ProvidersRoot      = Root + "/" + ProviderCollection
-	NsParam            = libweb.NsParam
-	ProviderParam      = "provider"
-	DetailParam        = "detail"
-	NameParam          = "name"
+	ProvidersRoot = "providers"
+	ProviderParam = "provider"
+	DetailParam   = "detail"
+	NsParam       = "namespace"
+	NameParam     = "name"
 )
 
 //
@@ -31,7 +30,8 @@ type Params = map[string]string
 //
 // Base handler.
 type Handler struct {
-	libweb.Consistent
+	libweb.Parity
+	libweb.Watched
 	libweb.Paged
 	// Container
 	Container *libcontainer.Container
@@ -47,6 +47,10 @@ type Handler struct {
 // Prepare to handle the request.
 func (h *Handler) Prepare(ctx *gin.Context) int {
 	status := h.Paged.Prepare(ctx)
+	if status != http.StatusOK {
+		return status
+	}
+	status = h.Watched.Prepare(ctx)
 	if status != http.StatusOK {
 		return status
 	}
@@ -68,16 +72,15 @@ func (h *Handler) setProvider(ctx *gin.Context) int {
 	var found bool
 	h.Provider = &api.Provider{
 		ObjectMeta: meta.ObjectMeta{
-			Namespace: ctx.Param(NsParam),
-			Name:      ctx.Param(ProviderParam),
+			UID: types.UID(ctx.Param(ProviderParam)),
 		},
 	}
-	if h.Provider.Name != "" {
+	if h.Provider.UID != "" {
 		if h.Reconciler, found = h.Container.Get(h.Provider); !found {
 			return http.StatusNotFound
 		}
 		h.Provider = h.Reconciler.Owner().(*api.Provider)
-		status := h.EnsureConsistency(h.Reconciler, time.Second*30)
+		status := h.EnsureParity(h.Reconciler, time.Second*30)
 		if status != http.StatusOK {
 			return status
 		}

@@ -3,6 +3,7 @@ package ocp
 import (
 	"errors"
 	"github.com/gin-gonic/gin"
+	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
@@ -34,10 +35,17 @@ func (h *StorageClassHandler) AddRoutes(e *gin.Engine) {
 
 //
 // List resources in a REST collection.
+// A GET onn the collection that includes the `X-Watch`
+// header will negotiate an upgrade of the connection
+// to a websocket and push watch events.
 func (h StorageClassHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
+		return
+	}
+	if h.WatchRequest {
+		h.watch(ctx)
 		return
 	}
 	db := h.Reconciler.DB()
@@ -69,7 +77,7 @@ func (h StorageClassHandler) Get(ctx *gin.Context) {
 	}
 	m := &model.StorageClass{
 		Base: model.Base{
-			Name: ctx.Param(StorageClassParam),
+			PK: ctx.Param(StorageClassParam),
 		},
 	}
 	db := h.Reconciler.DB()
@@ -97,10 +105,31 @@ func (h StorageClassHandler) Link(p *api.Provider, m *model.StorageClass) string
 	return h.Handler.Link(
 		StorageClassRoot,
 		base.Params{
-			base.NsParam:       p.Namespace,
-			base.ProviderParam: p.Name,
-			StorageClassParam:  m.Name,
+			base.ProviderParam: string(p.UID),
+			StorageClassParam:  m.PK,
 		})
+}
+
+//
+// Watch.
+func (h StorageClassHandler) watch(ctx *gin.Context) {
+	db := h.Reconciler.DB()
+	err := h.Watch(
+		ctx,
+		db,
+		&model.StorageClass{},
+		func(in libmodel.Model) (r interface{}) {
+			m := in.(*model.StorageClass)
+			sc := &StorageClass{}
+			sc.With(m)
+			sc.SelfLink = h.Link(h.Provider, m)
+			r = sc
+			return
+		})
+	if err != nil {
+		Log.Trace(err)
+		ctx.Status(http.StatusInternalServerError)
+	}
 }
 
 //

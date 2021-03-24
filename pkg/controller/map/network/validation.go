@@ -3,10 +3,9 @@ package network
 import (
 	"errors"
 	libcnd "github.com/konveyor/controller/pkg/condition"
-	liberr "github.com/konveyor/controller/pkg/error"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
+	refapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/validation"
 	"path"
 )
@@ -147,19 +146,6 @@ func (r *Reconciler) validateDestination(mp *api.NetworkMap) (err error) {
 	}
 	list := mp.Spec.Map
 	notFound := []string{}
-	var resource interface{}
-	switch provider.Type() {
-	case api.OpenShift:
-		resource = &ocp.NetworkAttachmentDefinition{}
-	case api.VSphere:
-		return
-	default:
-		err = liberr.Wrap(
-			web.ProviderNotSupportedError{
-				Provider: provider,
-			})
-		return
-	}
 next:
 	for _, entry := range list {
 		switch entry.Destination.Type {
@@ -169,7 +155,7 @@ next:
 			id := path.Join(
 				entry.Destination.Namespace,
 				entry.Destination.Name)
-			pErr := inventory.Get(resource, id)
+			_, pErr := inventory.Network(&refapi.Ref{Name: id})
 			if pErr != nil {
 				if errors.As(pErr, &web.NotFoundError{}) {
 					notFound = append(notFound, entry.Source.ID)

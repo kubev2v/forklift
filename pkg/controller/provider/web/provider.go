@@ -27,8 +27,6 @@ type ProviderHandler struct {
 func (h *ProviderHandler) AddRoutes(e *gin.Engine) {
 	e.GET(base.ProvidersRoot, h.List)
 	e.GET(base.ProvidersRoot+"/", h.List)
-	e.GET(ProvidersRoot, h.List)
-	e.GET(ProvidersRoot+"/", h.List)
 }
 
 //

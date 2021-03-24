@@ -239,8 +239,8 @@ type Reconciler struct {
 	client *govmomi.Client
 	// cancel function.
 	cancel func()
-	// has consistency
-	consistent bool
+	// has parity.
+	parity bool
 }
 
 //
@@ -282,13 +282,13 @@ func (r *Reconciler) DB() libmodel.DB {
 //
 // Reset.
 func (r *Reconciler) Reset() {
-	r.consistent = false
+	r.parity = false
 }
 
 //
 // Reset.
-func (r *Reconciler) HasConsistency() bool {
-	return r.consistent
+func (r *Reconciler) HasParity() bool {
+	return r.parity
 }
 
 //
@@ -382,9 +382,9 @@ func (r *Reconciler) getUpdates(ctx context.Context) error {
 	var tx *libmodel.Tx
 	watchList := []*libmodel.Watch{}
 	defer func() {
-		r.consistent = false
+		r.parity = false
 		for _, w := range watchList {
-			r.db.EndWatch(w)
+			w.End()
 		}
 		if tx != nil {
 			tx.End()
@@ -430,9 +430,9 @@ next:
 			Log.Trace(err)
 		}
 		if updateSet.Truncated == nil || !*updateSet.Truncated {
-			if !r.consistent {
-				r.consistent = true
-				r.log.Info("Initial consistency.", "duration", time.Since(mark))
+			if !r.parity {
+				r.parity = true
+				r.log.Info("Initial parity.", "duration", time.Since(mark))
 				watchList = r.watch()
 			}
 		}

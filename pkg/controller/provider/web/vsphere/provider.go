@@ -40,6 +40,10 @@ func (h ProviderHandler) List(ctx *gin.Context) {
 		ctx.Status(status)
 		return
 	}
+	if h.WatchRequest {
+		ctx.Status(http.StatusBadRequest)
+		return
+	}
 	content, err := h.ListContent(ctx)
 	if err != nil {
 		Log.Trace(err)
@@ -179,8 +183,7 @@ func (h ProviderHandler) Link(m *model.Provider) string {
 	return h.Handler.Link(
 		ProviderRoot,
 		base.Params{
-			base.NsParam:  m.Namespace,
-			ProviderParam: m.Name,
+			base.ProviderParam: m.UID,
 		})
 }
 
