@@ -24,11 +24,6 @@ func All(container *container.Container) (all []libweb.RequestHandler) {
 	vsphere.Log = Log
 	all = []libweb.RequestHandler{
 		&libweb.SchemaHandler{},
-		&NsHandler{
-			Handler: base.Handler{
-				Container: container,
-			},
-		},
 		&ProviderHandler{
 			Handler: base.Handler{
 				Container: container,

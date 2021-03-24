@@ -134,8 +134,7 @@ func (h ProviderHandler) Link(m *model.Provider) string {
 	return h.Handler.Link(
 		ProviderRoot,
 		base.Params{
-			base.NsParam:  m.Namespace,
-			ProviderParam: m.Name,
+			ProviderParam: m.UID,
 		})
 }
 

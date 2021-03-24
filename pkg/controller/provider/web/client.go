@@ -8,7 +8,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	"net/http"
-	"path"
 )
 
 //
@@ -36,9 +35,11 @@ type NotFoundError = base.NotFoundError
 
 //
 // Interfaces.
+type EventHandler = base.EventHandler
 type Client = base.Client
 type Finder = base.Finder
 type Param = base.Param
+type Watch = base.Watch
 
 //
 // Build an appropriate client.
@@ -141,13 +142,41 @@ func (r *ProviderClient) List(resource interface{}, param ...Param) (err error) 
 	}
 	switch status {
 	case http.StatusOK:
-		switch status {
-		case http.StatusOK:
-		case http.StatusNotFound:
-			err = liberr.Wrap(NotFoundError{})
-		default:
-			err = liberr.New(http.StatusText(status))
-		}
+	case http.StatusNotFound:
+		err = liberr.Wrap(NotFoundError{})
+	default:
+		err = liberr.New(http.StatusText(status))
+	}
+
+	return
+}
+
+//
+// Watch a resource.
+// Returns:
+//   ProviderNotSupportedErr
+//   ProviderNotReadyErr
+//   NotFoundErr
+func (r *ProviderClient) Watch(resource interface{}, h EventHandler) (w *Watch, err error) {
+	err = r.find()
+	if err != nil {
+		return
+	}
+	if !r.found {
+		err = liberr.Wrap(ProviderNotReadyError{r.provider})
+		return
+	}
+	status, w, err := r.restClient.Watch(resource, h)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	switch status {
+	case http.StatusOK:
+	case http.StatusNotFound:
+		err = liberr.Wrap(NotFoundError{})
+	default:
+		err = liberr.New(http.StatusText(status))
 	}
 
 	return
@@ -226,10 +255,8 @@ func (r *ProviderClient) find() (err error) {
 	if r.found {
 		return
 	}
-	id := path.Join(
-		r.provider.Namespace,
-		r.provider.Name)
 	status := 0
+	id := string(r.provider.UID)
 	switch r.provider.Type() {
 	case api.OpenShift:
 		status, err = r.restClient.Get(&ocp.Provider{}, id)

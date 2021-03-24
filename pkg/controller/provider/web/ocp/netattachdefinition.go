@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
+	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
@@ -13,61 +14,38 @@ import (
 //
 // Routes.
 const (
-	NetworkAttachmentDefinitionParam    = "network"
-	NetworkAttachmentDefinitionsRoot    = NamespaceRoot + "/networkattachmentdefinitions"
-	AllNetworkAttachmentDefinitionsRoot = ProviderRoot + "/networkattachmentdefinitions"
-	NetworkAttachmentDefinitionRoot     = NetworkAttachmentDefinitionsRoot + "/:" +
-		NetworkAttachmentDefinitionParam
+	NadParam = "network"
+	NadsRoot = ProviderRoot + "/networkattachmentdefinitions"
+	NadRoot  = NadsRoot + "/:" + NadParam
 )
 
 //
 // NetworkAttachmentDefinition handler.
-type NetworkAttachmentDefinitionHandler struct {
+type NadHandler struct {
 	Handler
 }
 
 //
 // Add routes to the `gin` router.
-func (h *NetworkAttachmentDefinitionHandler) AddRoutes(e *gin.Engine) {
-	e.GET(AllNetworkAttachmentDefinitionsRoot, h.ListAll)
-	e.GET(NetworkAttachmentDefinitionsRoot, h.List)
-	e.GET(NetworkAttachmentDefinitionsRoot+"/", h.List)
-	e.GET(NetworkAttachmentDefinitionRoot, h.Get)
-}
-
-//
-// List resources in a REST collection (all namespaces).
-func (h NetworkAttachmentDefinitionHandler) ListAll(ctx *gin.Context) {
-	status := h.Prepare(ctx)
-	if status != http.StatusOK {
-		ctx.Status(status)
-		return
-	}
-	db := h.Reconciler.DB()
-	list := []model.NetworkAttachmentDefinition{}
-	err := db.List(&list, h.ListOptions(ctx))
-	if err != nil {
-		Log.Trace(err)
-		ctx.Status(http.StatusInternalServerError)
-		return
-	}
-	content := []interface{}{}
-	for _, m := range list {
-		r := &NetworkAttachmentDefinition{}
-		r.With(&m)
-		r.SelfLink = h.Link(h.Provider, &m)
-		content = append(content, r.Content(h.Detail))
-	}
-
-	ctx.JSON(http.StatusOK, content)
+func (h *NadHandler) AddRoutes(e *gin.Engine) {
+	e.GET(NadsRoot, h.List)
+	e.GET(NadsRoot+"/", h.List)
+	e.GET(NadRoot, h.Get)
 }
 
 //
 // List resources in a REST collection.
-func (h NetworkAttachmentDefinitionHandler) List(ctx *gin.Context) {
+// A GET onn the collection that includes the `X-Watch`
+// header will negotiate an upgrade of the connection
+// to a websocket and push watch events.
+func (h NadHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
+		return
+	}
+	if h.WatchRequest {
+		h.watch(ctx)
 		return
 	}
 	db := h.Reconciler.DB()
@@ -91,7 +69,7 @@ func (h NetworkAttachmentDefinitionHandler) List(ctx *gin.Context) {
 
 //
 // Get a specific REST resource.
-func (h NetworkAttachmentDefinitionHandler) Get(ctx *gin.Context) {
+func (h NadHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
@@ -99,8 +77,7 @@ func (h NetworkAttachmentDefinitionHandler) Get(ctx *gin.Context) {
 	}
 	m := &model.NetworkAttachmentDefinition{
 		Base: model.Base{
-			Namespace: ctx.Param(Ns2Param),
-			Name:      ctx.Param(NetworkAttachmentDefinitionParam),
+			PK: ctx.Param(NadParam),
 		},
 	}
 	db := h.Reconciler.DB()
@@ -124,15 +101,35 @@ func (h NetworkAttachmentDefinitionHandler) Get(ctx *gin.Context) {
 
 //
 // Build self link (URI).
-func (h NetworkAttachmentDefinitionHandler) Link(p *api.Provider, m *model.NetworkAttachmentDefinition) string {
+func (h NadHandler) Link(p *api.Provider, m *model.NetworkAttachmentDefinition) string {
 	return h.Handler.Link(
-		NetworkAttachmentDefinitionRoot,
+		NadRoot,
 		base.Params{
-			base.NsParam:                     p.Namespace,
-			base.ProviderParam:               p.Name,
-			Ns2Param:                         m.Namespace,
-			NetworkAttachmentDefinitionParam: m.Name,
+			base.ProviderParam: string(p.UID),
+			NadParam:           m.PK,
 		})
+}
+
+//
+// Watch.
+func (h NadHandler) watch(ctx *gin.Context) {
+	db := h.Reconciler.DB()
+	err := h.Watch(
+		ctx,
+		db,
+		&model.NetworkAttachmentDefinition{},
+		func(in libmodel.Model) (r interface{}) {
+			m := in.(*model.NetworkAttachmentDefinition)
+			nad := &NetworkAttachmentDefinition{}
+			nad.With(m)
+			nad.SelfLink = h.Link(h.Provider, m)
+			r = nad
+			return
+		})
+	if err != nil {
+		Log.Trace(err)
+		ctx.Status(http.StatusInternalServerError)
+	}
 }
 
 //

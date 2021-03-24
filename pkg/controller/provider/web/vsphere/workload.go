@@ -102,8 +102,7 @@ func (h WorkloadHandler) Link(p *api.Provider, m *model.VM) string {
 	return h.Handler.Link(
 		WorkloadRoot,
 		base.Params{
-			base.NsParam:       p.Namespace,
-			base.ProviderParam: p.Name,
+			base.ProviderParam: string(p.UID),
 			VMParam:            m.ID,
 		})
 }

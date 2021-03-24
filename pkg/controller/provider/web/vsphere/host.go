@@ -37,10 +37,17 @@ func (h *HostHandler) AddRoutes(e *gin.Engine) {
 
 //
 // List resources in a REST collection.
+// A GET onn the collection that includes the `X-Watch`
+// header will negotiate an upgrade of the connection
+// to a websocket and push watch events.
 func (h HostHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
+		return
+	}
+	if h.WatchRequest {
+		h.watch(ctx)
 		return
 	}
 	db := h.Reconciler.DB()
@@ -125,10 +132,32 @@ func (h HostHandler) Link(p *api.Provider, m *model.Host) string {
 	return h.Handler.Link(
 		HostRoot,
 		base.Params{
-			base.NsParam:       p.Namespace,
-			base.ProviderParam: p.Name,
+			base.ProviderParam: string(p.UID),
 			HostParam:          m.ID,
 		})
+}
+
+//
+// Watch.
+func (h HostHandler) watch(ctx *gin.Context) {
+	db := h.Reconciler.DB()
+	err := h.Watch(
+		ctx,
+		db,
+		&model.Host{},
+		func(in libmodel.Model) (r interface{}) {
+			m := in.(*model.Host)
+			host := &Host{}
+			host.With(m)
+			host.SelfLink = h.Link(h.Provider, m)
+			host.Path, _ = m.Path(db)
+			r = host
+			return
+		})
+	if err != nil {
+		Log.Trace(err)
+		ctx.Status(http.StatusInternalServerError)
+	}
 }
 
 //
