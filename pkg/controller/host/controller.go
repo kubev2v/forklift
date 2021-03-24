@@ -155,7 +155,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resu
 	}
 
 	// Ready condition.
-	if !host.Status.HasBlockerCondition() && host.Status.HasCondition(ConnectionTested) {
+	if !host.Status.HasBlockerCondition() && host.Status.HasCondition(ConnectionTestSucceeded) {
 		host.Status.SetCondition(libcnd.Condition{
 			Type:     libcnd.Ready,
 			Status:   True,
@@ -176,6 +176,11 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resu
 	if err != nil {
 		result = fastReQ
 		return
+	}
+
+	// ReQ.
+	if !host.Status.HasCondition(ConnectionTestSucceeded) {
+		result = slowReQ
 	}
 
 	// Done
