@@ -6,7 +6,6 @@ import (
 	ocpmodel "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	pathlib "path"
 	"strings"
 )
 
@@ -27,18 +26,17 @@ type Resolver struct {
 func (r *Resolver) Path(resource interface{}, id string) (path string, err error) {
 	switch resource.(type) {
 	case *Provider:
-		ns, name := pathlib.Split(id)
-		ns = strings.TrimSuffix(ns, "/")
-		if id == "/" { // list
-			ns = r.Provider.Namespace
-		}
 		h := ProviderHandler{}
 		path = h.Link(
 			&ocpmodel.Provider{
-				Base: ocpmodel.Base{
-					Namespace: ns,
-					Name:      name,
-				},
+				Base: ocpmodel.Base{UID: id},
+			})
+	case *Folder:
+		h := FolderHandler{}
+		path = h.Link(
+			r.Provider,
+			&model.Folder{
+				Base: model.Base{ID: id},
 			})
 	case *Datacenter:
 		h := DatacenterHandler{}
@@ -95,6 +93,8 @@ func (r *Resolver) Path(resource interface{}, id string) (path string, err error
 				Object: resource,
 			})
 	}
+
+	path = strings.TrimRight(path, "/")
 
 	return
 }

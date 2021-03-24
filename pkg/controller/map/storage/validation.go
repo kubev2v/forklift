@@ -3,10 +3,9 @@ package storage
 import (
 	"errors"
 	libcnd "github.com/konveyor/controller/pkg/condition"
-	liberr "github.com/konveyor/controller/pkg/error"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
+	refapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/validation"
 )
 
@@ -138,23 +137,10 @@ func (r *Reconciler) validateDestination(mp *api.StorageMap) (err error) {
 		return
 	}
 	notValid := []string{}
-	var resource interface{}
-	switch provider.Type() {
-	case api.OpenShift:
-		resource = &ocp.StorageClass{}
-	case api.VSphere:
-		return
-	default:
-		err = liberr.Wrap(
-			web.ProviderNotSupportedError{
-				Provider: provider,
-			})
-		return
-	}
 	list := mp.Spec.Map
 	for _, entry := range list {
 		name := entry.Destination.StorageClass
-		pErr := inventory.Get(resource, name)
+		_, pErr := inventory.Storage(&refapi.Ref{Name: name})
 		if pErr != nil {
 			if errors.As(pErr, &web.NotFoundError{}) {
 				notValid = append(notValid, entry.Destination.StorageClass)

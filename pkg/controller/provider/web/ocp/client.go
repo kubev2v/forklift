@@ -5,7 +5,7 @@ import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	pathlib "path"
+	"path"
 	"strings"
 )
 
@@ -24,63 +24,39 @@ type Resolver struct {
 //
 // Resolve the URL path.
 func (r *Resolver) Path(object interface{}, id string) (path string, err error) {
-	ns, name := pathlib.Split(id)
-	ns = strings.TrimSuffix(ns, "/")
 	switch object.(type) {
 	case *Provider:
-		if id == "/" { // list
-			ns = r.Provider.Namespace
-		}
 		h := ProviderHandler{}
 		path = h.Link(&model.Provider{
-			Base: model.Base{
-				Namespace: ns,
-				Name:      name,
-			},
+			Base: model.Base{UID: id},
 		})
 	case *Namespace:
 		h := NamespaceHandler{}
 		path = h.Link(
 			r.Provider,
 			&model.Namespace{
-				Base: model.Base{
-					Name: name,
-				},
+				Base: model.Base{PK: id},
 			})
 	case *StorageClass:
 		h := StorageClassHandler{}
 		path = h.Link(
 			r.Provider,
 			&model.StorageClass{
-				Base: model.Base{
-					Name: name,
-				},
+				Base: model.Base{PK: id},
 			})
 	case *NetworkAttachmentDefinition:
-		if id == "" { // list
-			ns = r.Provider.Namespace
-		}
-		h := NetworkAttachmentDefinitionHandler{}
+		h := NadHandler{}
 		path = h.Link(
 			r.Provider,
 			&model.NetworkAttachmentDefinition{
-				Base: model.Base{
-					Namespace: ns,
-					Name:      name,
-				},
+				Base: model.Base{PK: id},
 			})
 	case *VM:
-		if id == "" { // list
-			ns = r.Provider.Namespace
-		}
 		h := VMHandler{}
 		path = h.Link(
 			r.Provider,
 			&model.VM{
-				Base: model.Base{
-					Namespace: ns,
-					Name:      name,
-				},
+				Base: model.Base{PK: id},
 			})
 	default:
 		err = liberr.Wrap(
@@ -88,6 +64,8 @@ func (r *Resolver) Path(object interface{}, id string) (path string, err error) 
 				Object: object,
 			})
 	}
+
+	path = strings.TrimRight(path, "/")
 
 	return
 }
@@ -113,9 +91,117 @@ func (r *Finder) With(client base.Client) base.Finder {
 //   NotFoundErr
 //   RefNotUniqueErr
 func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
-	err = liberr.Wrap(&NotFoundError{
-		Ref: ref,
-	})
+	switch resource.(type) {
+	case *NetworkAttachmentDefinition:
+		id := ref.ID
+		if id != "" {
+			err = r.Get(resource, id)
+			return
+		}
+		name := ref.Name
+		if name != "" {
+			ns, name := path.Split(name)
+			ns = strings.TrimRight(ns, "/")
+			list := []NetworkAttachmentDefinition{}
+			err = r.List(
+				&list,
+				base.Param{
+					Key:   DetailParam,
+					Value: "1",
+				},
+				base.Param{
+					Key:   NsParam,
+					Value: ns,
+				},
+				base.Param{
+					Key:   NameParam,
+					Value: name,
+				})
+			if err != nil {
+				break
+			}
+			if len(list) == 0 {
+				err = liberr.Wrap(NotFoundError{Ref: ref})
+				break
+			}
+			if len(list) > 1 {
+				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
+				break
+			}
+			*resource.(*NetworkAttachmentDefinition) = list[0]
+		}
+	case *StorageClass:
+		id := ref.ID
+		if id != "" {
+			err = r.Get(resource, id)
+			return
+		}
+		name := ref.Name
+		if name != "" {
+			list := []StorageClass{}
+			err = r.List(
+				&list,
+				base.Param{
+					Key:   DetailParam,
+					Value: "1",
+				},
+				base.Param{
+					Key:   NameParam,
+					Value: name,
+				})
+			if err != nil {
+				break
+			}
+			if len(list) == 0 {
+				err = liberr.Wrap(NotFoundError{Ref: ref})
+				break
+			}
+			if len(list) > 1 {
+				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
+				break
+			}
+			*resource.(*StorageClass) = list[0]
+		}
+	case *VM:
+		id := ref.ID
+		if id != "" {
+			err = r.Get(resource, id)
+			return
+		}
+		name := ref.Name
+		if name != "" {
+			ns, name := path.Split(name)
+			ns = strings.TrimRight(ns, "/")
+			list := []VM{}
+			err = r.List(
+				&list,
+				base.Param{
+					Key:   DetailParam,
+					Value: "1",
+				},
+				base.Param{
+					Key:   NsParam,
+					Value: ns,
+				},
+				base.Param{
+					Key:   NameParam,
+					Value: name,
+				})
+			if err != nil {
+				break
+			}
+			if len(list) == 0 {
+				err = liberr.Wrap(NotFoundError{Ref: ref})
+				break
+			}
+			if len(list) > 1 {
+				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
+				break
+			}
+			*resource.(*VM) = list[0]
+		}
+	}
+
 	return
 }
 
@@ -127,9 +213,14 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 //   NotFoundErr
 //   RefNotUniqueErr
 func (r *Finder) VM(ref *base.Ref) (object interface{}, err error) {
-	err = liberr.Wrap(&NotFoundError{
-		Ref: *ref,
-	})
+	vm := &VM{}
+	err = r.ByRef(vm, *ref)
+	if err == nil {
+		ref.ID = vm.UID
+		ref.Name = path.Join(vm.Namespace, vm.Name)
+		object = vm
+	}
+
 	return
 }
 
@@ -141,9 +232,14 @@ func (r *Finder) VM(ref *base.Ref) (object interface{}, err error) {
 //   NotFoundErr
 //   RefNotUniqueErr
 func (r *Finder) Workload(ref *base.Ref) (object interface{}, err error) {
-	err = liberr.Wrap(&NotFoundError{
-		Ref: *ref,
-	})
+	vm := &VM{}
+	err = r.ByRef(vm, *ref)
+	if err == nil {
+		ref.ID = vm.UID
+		ref.Name = path.Join(vm.Namespace, vm.Name)
+		object = vm
+	}
+
 	return
 }
 
@@ -155,9 +251,14 @@ func (r *Finder) Workload(ref *base.Ref) (object interface{}, err error) {
 //   NotFoundErr
 //   RefNotUniqueErr
 func (r *Finder) Network(ref *base.Ref) (object interface{}, err error) {
-	err = liberr.Wrap(&NotFoundError{
-		Ref: *ref,
-	})
+	nad := &NetworkAttachmentDefinition{}
+	err = r.ByRef(nad, *ref)
+	if err == nil {
+		ref.ID = nad.UID
+		ref.Name = path.Join(nad.Namespace, nad.Name)
+		object = nad
+	}
+
 	return
 }
 
@@ -169,9 +270,14 @@ func (r *Finder) Network(ref *base.Ref) (object interface{}, err error) {
 //   NotFoundErr
 //   RefNotUniqueErr
 func (r *Finder) Storage(ref *base.Ref) (object interface{}, err error) {
-	err = liberr.Wrap(&NotFoundError{
-		Ref: *ref,
-	})
+	sc := &StorageClass{}
+	err = r.ByRef(sc, *ref)
+	if err == nil {
+		ref.ID = sc.UID
+		ref.Name = sc.Name
+		object = sc
+	}
+
 	return
 }
 

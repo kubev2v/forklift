@@ -3,6 +3,7 @@ package vsphere
 import (
 	"errors"
 	"github.com/gin-gonic/gin"
+	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
@@ -35,10 +36,17 @@ func (h *NetworkHandler) AddRoutes(e *gin.Engine) {
 
 //
 // List resources in a REST collection.
+// A GET onn the collection that includes the `X-Watch`
+// header will negotiate an upgrade of the connection
+// to a websocket and push watch events.
 func (h NetworkHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
+		return
+	}
+	if h.WatchRequest {
+		h.watch(ctx)
 		return
 	}
 	db := h.Reconciler.DB()
@@ -110,10 +118,32 @@ func (h NetworkHandler) Link(p *api.Provider, m *model.Network) string {
 	return h.Handler.Link(
 		NetworkRoot,
 		base.Params{
-			base.NsParam:       p.Namespace,
-			base.ProviderParam: p.Name,
+			base.ProviderParam: string(p.UID),
 			NetworkParam:       m.ID,
 		})
+}
+
+//
+// Watch.
+func (h NetworkHandler) watch(ctx *gin.Context) {
+	db := h.Reconciler.DB()
+	err := h.Watch(
+		ctx,
+		db,
+		&model.Network{},
+		func(in libmodel.Model) (r interface{}) {
+			m := in.(*model.Network)
+			network := &Network{}
+			network.With(m)
+			network.SelfLink = h.Link(h.Provider, m)
+			network.Path, _ = m.Path(db)
+			r = network
+			return
+		})
+	if err != nil {
+		Log.Trace(err)
+		ctx.Status(http.StatusInternalServerError)
+	}
 }
 
 //
