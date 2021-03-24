@@ -10,7 +10,7 @@ import (
 )
 
 type Scheduler interface {
-	Next() (*plan.VMStatus, error)
+	Next() (*plan.VMStatus, bool, error)
 }
 
 //
