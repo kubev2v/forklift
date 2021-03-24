@@ -146,7 +146,6 @@ type Client interface {
 	//   ProviderNotReadyErr
 	//   NotFoundErr
 	//   RefNotUniqueErr
-
 	Find(resource interface{}, ref Ref) error
 	// Find a VM by ref.
 	// Returns the matching resource and:
