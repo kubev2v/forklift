@@ -20,12 +20,13 @@ import (
 //
 // Types
 const (
-	Validated        = "Validated"
-	RefNotValid      = "RefNotValid"
-	SecretNotValid   = "SecretNotValid"
-	TypeNotValid     = "TypeNotValid"
-	IpNotValid       = "IpNotValid"
-	ConnectionTested = "ConnectionTested"
+	Validated               = "Validated"
+	RefNotValid             = "RefNotValid"
+	SecretNotValid          = "SecretNotValid"
+	TypeNotValid            = "TypeNotValid"
+	IpNotValid              = "IpNotValid"
+	ConnectionTestSucceeded = "ConnectionTestSucceeded"
+	ConnectionTestFailed    = "ConnectionTestFailed"
 )
 
 //
@@ -48,7 +49,6 @@ const (
 	Ambiguous = "Ambiguous"
 	Completed = "Completed"
 	Tested    = "Tested"
-	Failed    = "Failed"
 )
 
 //
@@ -263,42 +263,52 @@ func (r *Reconciler) testConnection(host *api.Host) (err error) {
 	if host.Status.HasBlockerCondition() {
 		return
 	}
-	cnd := libcnd.Condition{
-		Type:     ConnectionTested,
-		Category: Required,
-	}
 	provider := host.Referenced.Provider.Source
 	secret := host.Referenced.Secret
-	inventory, pErr := web.NewClient(provider)
-	if pErr != nil {
-		return liberr.Wrap(pErr)
+	inventory, err := web.NewClient(provider)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
 	}
+	var testErr error
 	switch provider.Type() {
 	case api.VSphere:
 		url := fmt.Sprintf("https://%s/sdk", host.Spec.IpAddress)
 		hostModel := &vsphere.Host{}
-		pErr = inventory.Find(hostModel, host.Spec.Ref)
+		pErr := inventory.Find(hostModel, host.Spec.Ref)
 		if pErr != nil {
-			return liberr.Wrap(pErr)
+			err = liberr.Wrap(pErr)
+			return
 		}
 		secret.Data["thumbprint"] = []byte(hostModel.Thumbprint)
 		h := builder.EsxHost{
 			Secret: secret,
 			URL:    url,
 		}
-		tErr := h.TestConnection()
-		if tErr == nil {
-			cnd.Status = True
-			cnd.Reason = Tested
-			cnd.Message = "Connection test, succeeded."
-		} else {
-			cnd.Status = False
-			cnd.Reason = Failed
-			cnd.Message = fmt.Sprintf(
-				"Connection test, failed: %s",
-				tErr.Error())
-		}
-		host.Status.SetCondition(cnd)
+		testErr = h.TestConnection()
+	default:
+		return
+	}
+	if testErr == nil {
+		host.Status.SetCondition(
+			libcnd.Condition{
+				Type:     ConnectionTestSucceeded,
+				Status:   True,
+				Reason:   Tested,
+				Category: Required,
+				Message:  "Connection test, succeeded.",
+			})
+	} else {
+		host.Status.SetCondition(
+			libcnd.Condition{
+				Type:     ConnectionTestFailed,
+				Status:   True,
+				Reason:   Tested,
+				Category: Critical,
+				Message: fmt.Sprintf(
+					"Connection test, failed: %s",
+					testErr.Error()),
+			})
 	}
 
 	return

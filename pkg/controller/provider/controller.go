@@ -222,7 +222,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resu
 
 	// Ready condition.
 	if !provider.Status.HasBlockerCondition() &&
-		provider.Status.HasCondition(ConnectionTested, InventoryCreated) {
+		provider.Status.HasCondition(ConnectionTestSucceeded, InventoryCreated) {
 		provider.Status.SetCondition(
 			libcnd.Condition{
 				Type:     libcnd.Ready,
@@ -254,7 +254,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resu
 	}
 
 	// ReQ.
-	if !provider.Status.HasCondition(ConnectionTested, InventoryCreated) {
+	if !provider.Status.HasCondition(ConnectionTestSucceeded, InventoryCreated) {
 		result = slowReQ
 	}
 
@@ -297,7 +297,7 @@ func (r *Reconciler) updateContainer(provider *api.Provider) (err error) {
 		}
 	}
 	if provider.Status.HasBlockerCondition() ||
-		!provider.Status.HasCondition(ConnectionTested) {
+		!provider.Status.HasCondition(ConnectionTestSucceeded) {
 		return nil
 	}
 	db := r.getDB(provider)
