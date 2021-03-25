@@ -9,8 +9,11 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/settings"
 )
 
+// Scheduler API
+// Determines which of the plan's VMs can have their migrations started.
 type Scheduler interface {
-	Next() (*plan.VMStatus, bool, error)
+	// Return the next VM that can be migrated.
+	Next() (vm *plan.VMStatus, hasNext bool, err error)
 }
 
 //
