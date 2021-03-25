@@ -276,7 +276,6 @@ func (r *Migration) init() (err error) {
 	}
 	r.scheduler, err = scheduler.New(r.Context)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 
