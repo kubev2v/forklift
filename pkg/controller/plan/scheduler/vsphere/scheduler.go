@@ -8,7 +8,7 @@ import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
+	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 )
 
 //
