@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
+
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libitr "github.com/konveyor/controller/pkg/itinerary"
@@ -18,10 +20,16 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 	"gopkg.in/yaml.v2"
 	core "k8s.io/api/core/v1"
+	cdi "kubevirt.io/containerized-data-importer/pkg/apis/core/v1beta1"
 	vmio "kubevirt.io/vm-import-operator/pkg/apis/v2v/v1beta1"
 	liburl "net/url"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+//
+// Regex which matches the snapshot identifier suffix of a
+// vSphere disk backing file.
+var backingFilePattern = regexp.MustCompile("-\\d+.vmdk")
 
 //
 // vSphere builder.
@@ -127,7 +135,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 		list = append(
 			list,
 			&plan.Task{
-				Name: disk.File,
+				Name: r.trimBackingFileName(disk.File),
 				Progress: libitr.Progress{
 					Total: mB,
 				},
@@ -138,6 +146,12 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 	}
 
 	return
+}
+
+//
+// Return a stable identifier for a VDDK DataVolume.
+func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
+	return r.trimBackingFileName(dv.Spec.Source.VDDK.BackingFile)
 }
 
 //
@@ -472,4 +486,13 @@ func (r *Builder) defaultModes(dm *api.DestinationStorage) (err error) {
 	}
 
 	return
+}
+
+//
+// Trims the snapshot suffix from a disk backing file name if there is one.
+//	Example:
+// 	Input: 	[datastore13] my-vm/disk-name-000015.vmdk
+//	Output: [datastore13] my-vm/disk-name.vmdk
+func (r *Builder) trimBackingFileName(fileName string) string {
+	return backingFilePattern.ReplaceAllString(fileName, ".vmdk")
 }

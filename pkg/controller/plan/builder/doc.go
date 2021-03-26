@@ -8,6 +8,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/builder/vsphere"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	core "k8s.io/api/core/v1"
+	cdi "kubevirt.io/containerized-data-importer/pkg/apis/core/v1beta1"
 	vmio "kubevirt.io/vm-import-operator/pkg/apis/v2v/v1beta1"
 )
 
@@ -22,6 +23,8 @@ type Builder interface {
 	Import(vmRef ref.Ref, object *vmio.VirtualMachineImportSpec) error
 	// Build tasks.
 	Tasks(vmRef ref.Ref) ([]*plan.Task, error)
+	// Return a stable identifier for a DataVolume.
+	ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string
 }
 
 //
