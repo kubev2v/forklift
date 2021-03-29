@@ -33,7 +33,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
@@ -46,6 +45,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"sync"
 	"time"
 )
 
@@ -145,6 +145,7 @@ var _ reconcile.Reconciler = &Reconciler{}
 type Reconciler struct {
 	client.Client
 	record.EventRecorder
+	catalog   Catalog
 	scheme    *runtime.Scheme
 	container *libcontainer.Container
 	web       *libweb.WebServer
@@ -176,21 +177,20 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resu
 	if err != nil {
 		if k8serr.IsNotFound(err) {
 			err = nil
-			deleted := &api.Provider{
-				ObjectMeta: meta.ObjectMeta{
-					Namespace: request.Namespace,
-					Name:      request.Name,
-				},
-			}
-			if r, found := r.container.Delete(deleted); found {
-				r.Shutdown()
-				r.DB().Close(true)
+			if deleted, found := r.catalog.get(request); found {
+				if r, found := r.container.Delete(deleted); found {
+					r.Shutdown()
+					r.DB().Close(true)
+				}
 			}
 		} else {
 			result = fastReQ
 		}
 		return
+	} else {
+		r.catalog.add(request, provider)
 	}
+
 	defer func() {
 		log.Info("Conditions.", "all", provider.Status.Conditions)
 	}()
@@ -300,6 +300,10 @@ func (r *Reconciler) updateContainer(provider *api.Provider) (err error) {
 		!provider.Status.HasCondition(ConnectionTestSucceeded) {
 		return nil
 	}
+	if current, found := r.container.Get(provider); found {
+		current.Shutdown()
+		_ = current.DB().Close(true)
+	}
 	db := r.getDB(provider)
 	secret, err := r.getSecret(provider)
 	if err != nil {
@@ -315,13 +319,9 @@ func (r *Reconciler) updateContainer(provider *api.Provider) (err error) {
 	if err != nil {
 		return err
 	}
-	new := container.Build(db, provider, secret)
-	current, found, err := r.container.Replace(new)
+	err = r.container.Add(container.Build(db, provider, secret))
 	if err != nil {
 		return err
-	}
-	if found {
-		current.DB().Close(true)
 	}
 
 	return nil
@@ -358,4 +358,34 @@ func (r *Reconciler) getSecret(provider *api.Provider) (*core.Secret, error) {
 	}
 
 	return secret, nil
+}
+
+//
+// Provider catalog.
+type Catalog struct {
+	mutex   sync.Mutex
+	content map[reconcile.Request]*api.Provider
+}
+
+//
+// Add a provider to the catalog.
+func (r *Catalog) add(request reconcile.Request, p *api.Provider) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	if r.content == nil {
+		r.content = make(map[reconcile.Request]*api.Provider)
+	}
+	r.content[request] = p
+}
+
+//
+// Get a provider from the catalog.
+func (r *Catalog) get(request reconcile.Request) (p *api.Provider, found bool) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	if r.content == nil {
+		r.content = make(map[reconcile.Request]*api.Provider)
+	}
+	p, found = r.content[request]
+	return
 }
