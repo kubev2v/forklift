@@ -5,7 +5,6 @@ import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libitr "github.com/konveyor/controller/pkg/itinerary"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/builder"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
@@ -610,12 +609,7 @@ func (r *Migration) updatePipeline(vm *plan.VMStatus, imp *VmImport) {
 			var task *plan.Task
 		nextDv:
 			for _, dv := range imp.DataVolumes {
-				switch r.Type() {
-				case api.VSphere:
-					name = dv.Spec.Source.VDDK.BackingFile
-				default:
-					continue nextDv
-				}
+				name = r.builder.ResolveDataVolumeIdentifier(dv.DataVolume)
 				found := false
 				task, found = step.FindTask(name)
 				if !found {
