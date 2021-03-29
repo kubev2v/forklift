@@ -50,7 +50,11 @@ func (r *Reconciler) validate(mp *api.StorageMap) error {
 		return err
 	}
 	mp.Status.UpdateConditions(conditions)
-	if mp.Status.HasAnyCondition(validation.SourceProviderNotReady, validation.SourceProviderNotValid) {
+	if mp.Status.HasAnyCondition(
+		validation.SourceProviderNotValid,
+		validation.SourceProviderNotReady,
+		validation.DestinationProviderNotValid,
+		validation.DestinationProviderNotReady) {
 		return nil
 	}
 	mp.Referenced.Provider.Source = pv.Referenced.Source
