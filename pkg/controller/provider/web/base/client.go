@@ -139,7 +139,7 @@ type Client interface {
 	//   ProviderNotSupportedErr
 	//   ProviderNotReadyErr
 	//   NotFoundErr
-	Watch(list interface{}, h EventHandler) (*Watch, error)
+	Watch(resource interface{}, h EventHandler) (*Watch, error)
 	// Get a resource by ref.
 	// Returns:
 	//   ProviderNotSupportedErr

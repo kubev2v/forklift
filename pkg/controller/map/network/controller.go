@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -81,13 +82,27 @@ func Add(mgr manager.Manager) error {
 		log.Trace(err)
 		return err
 	}
+	//
+	// The channel (source) provides a method of queuing
+	// events when changes to the provider inventory are detected.
+	channel := make(chan event.GenericEvent, 10)
+	err = cnt.Watch(
+		&source.Channel{Source: channel},
+		&handler.EnqueueRequestForObject{})
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
 	// References.
 	err = cnt.Watch(
 		&source.Kind{
 			Type: &api.Provider{},
 		},
 		libref.Handler(),
-		&ProviderPredicate{})
+		&ProviderPredicate{
+			client:  mgr.GetClient(),
+			channel: channel,
+		})
 	if err != nil {
 		log.Trace(err)
 		return err

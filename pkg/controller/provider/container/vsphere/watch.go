@@ -48,7 +48,7 @@ type ReportedEvent struct {
 //
 // Watch for VM changes and validate as needed.
 type VMEventHandler struct {
-	libmodel.StubEventHandler
+	libmodel.StockEventHandler
 	// Provider.
 	Provider *api.Provider
 	// DB.
@@ -275,7 +275,7 @@ func (r *VMEventHandler) validated(task *policy.Task) {
 //
 // Watch for cluster changes and validate as needed.
 type ClusterEventHandler struct {
-	libmodel.StubEventHandler
+	libmodel.StockEventHandler
 	// DB.
 	DB libmodel.DB
 }
@@ -318,7 +318,7 @@ func (r *ClusterEventHandler) validate(cluster *model.Cluster) {
 //
 // Watch for host changes and validate as needed.
 type HostEventHandler struct {
-	libmodel.StubEventHandler
+	libmodel.StockEventHandler
 	// DB.
 	DB libmodel.DB
 }
