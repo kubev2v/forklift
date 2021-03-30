@@ -17,11 +17,11 @@ type Handler struct {
 }
 
 //
-// Ensure watch on networks.
+// Ensure watch on VMs.
 func (r *Handler) Watch(watch *handler.WatchManager) (err error) {
 	_, err = watch.Ensure(
 		r.Provider(),
-		&vsphere.Network{},
+		&vsphere.VM{},
 		r)
 
 	return
@@ -33,8 +33,8 @@ func (r *Handler) Created(e libweb.Event) {
 	if !r.HasParity() {
 		return
 	}
-	if network, cast := e.Resource.(*vsphere.Network); cast {
-		r.changed(network)
+	if vm, cast := e.Resource.(*vsphere.VM); cast {
+		r.changed(vm)
 	}
 }
 
@@ -44,35 +44,35 @@ func (r *Handler) Deleted(e libweb.Event) {
 	if !r.HasParity() {
 		return
 	}
-	if network, cast := e.Resource.(*vsphere.Network); cast {
-		r.changed(network)
+	if vm, cast := e.Resource.(*vsphere.VM); cast {
+		r.changed(vm)
 	}
 }
 
 //
-// Network changed.
-// Find all of the NetworkMap CRs the reference both the
-// provider and the changed network and enqueue reconcile events.
-func (r *Handler) changed(network *vsphere.Network) {
-	list := api.NetworkMapList{}
+// VM changed.
+// Find all of the Plan CRs the reference both the
+// provider and the changed VM and enqueue reconcile events.
+func (r *Handler) changed(vm *vsphere.VM) {
+	list := api.PlanList{}
 	err := r.List(context.TODO(), &list)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	for _, mp := range list.Items {
-		ref := mp.Spec.Provider.Source
+	for _, plan := range list.Items {
+		ref := plan.Spec.Provider.Source
 		if !r.MatchProvider(ref) {
 			continue
 		}
 		inventory := r.Inventory()
-		for _, pair := range mp.Spec.Map {
-			ref := pair.Source
-			_, err = inventory.Network(&ref)
-			if ref.ID == network.ID {
+		for _, planVM := range plan.Spec.VMs {
+			ref := planVM.Ref
+			_, err = inventory.VM(&ref)
+			if ref.ID == vm.ID {
 				r.Enqueue(event.GenericEvent{
-					Meta:   &mp.ObjectMeta,
-					Object: &mp,
+					Meta:   &plan.ObjectMeta,
+					Object: &plan,
 				})
 				break
 			}
