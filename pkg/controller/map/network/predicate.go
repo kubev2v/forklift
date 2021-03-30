@@ -72,14 +72,13 @@ func (r *ProviderPredicate) Create(e event.CreateEvent) bool {
 
 //
 // Provider updated event.
-func (r *ProviderPredicate) Update(e event.UpdateEvent) bool {
+func (r *ProviderPredicate) Update(e event.UpdateEvent) (approved bool) {
 	p, cast := e.ObjectNew.(*api.Provider)
 	if cast {
 		reconciled := p.Status.ObservedGeneration == p.Generation
 		if reconciled {
 			r.ensureWatch(p)
 		}
-		return reconciled
 	}
 
 	return false
@@ -110,7 +109,8 @@ func (r *ProviderPredicate) Generic(e event.GenericEvent) bool {
 }
 
 //
-// Ensure the there is a watch for the provider and kind.
+// Ensure there is a watch for the provider
+// and inventory API kinds.
 func (r *ProviderPredicate) ensureWatch(p *api.Provider) {
 	if !p.Status.HasCondition(libcnd.Ready) {
 		return

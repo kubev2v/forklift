@@ -17,11 +17,11 @@ type Handler struct {
 }
 
 //
-// Ensure watch on networks.
+// Ensure watch on Datastore.
 func (r *Handler) Watch(watch *handler.WatchManager) (err error) {
 	_, err = watch.Ensure(
 		r.Provider(),
-		&vsphere.Network{},
+		&vsphere.Datastore{},
 		r)
 
 	return
@@ -33,8 +33,8 @@ func (r *Handler) Created(e libweb.Event) {
 	if !r.HasParity() {
 		return
 	}
-	if network, cast := e.Resource.(*vsphere.Network); cast {
-		r.changed(network)
+	if ds, cast := e.Resource.(*vsphere.Datastore); cast {
+		r.changed(ds)
 	}
 }
 
@@ -44,17 +44,17 @@ func (r *Handler) Deleted(e libweb.Event) {
 	if !r.HasParity() {
 		return
 	}
-	if network, cast := e.Resource.(*vsphere.Network); cast {
-		r.changed(network)
+	if ds, cast := e.Resource.(*vsphere.Datastore); cast {
+		r.changed(ds)
 	}
 }
 
 //
-// Network changed.
-// Find all of the NetworkMap CRs the reference both the
-// provider and the changed network and enqueue reconcile events.
-func (r *Handler) changed(network *vsphere.Network) {
-	list := api.NetworkMapList{}
+// Storage changed.
+// Find all of the StorageMap CRs the reference both the
+// provider and the changed datastore and enqueue reconcile events.
+func (r *Handler) changed(ds *vsphere.Datastore) {
+	list := api.StorageMapList{}
 	err := r.List(context.TODO(), &list)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -68,8 +68,8 @@ func (r *Handler) changed(network *vsphere.Network) {
 		inventory := r.Inventory()
 		for _, pair := range mp.Spec.Map {
 			ref := pair.Source
-			_, err = inventory.Network(&ref)
-			if ref.ID == network.ID {
+			_, err = inventory.Storage(&ref)
+			if ref.ID == ds.ID {
 				r.Enqueue(event.GenericEvent{
 					Meta:   &mp.ObjectMeta,
 					Object: &mp,
