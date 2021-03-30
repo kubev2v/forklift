@@ -17,11 +17,11 @@ type Handler struct {
 }
 
 //
-// Ensure watch on networks.
+// Ensure watch on hosts.
 func (r *Handler) Watch(watch *handler.WatchManager) (err error) {
 	_, err = watch.Ensure(
 		r.Provider(),
-		&vsphere.Network{},
+		&vsphere.Host{},
 		r)
 
 	return
@@ -33,8 +33,8 @@ func (r *Handler) Created(e libweb.Event) {
 	if !r.HasParity() {
 		return
 	}
-	if network, cast := e.Resource.(*vsphere.Network); cast {
-		r.changed(network)
+	if host, cast := e.Resource.(*vsphere.Host); cast {
+		r.changed(host)
 	}
 }
 
@@ -44,38 +44,35 @@ func (r *Handler) Deleted(e libweb.Event) {
 	if !r.HasParity() {
 		return
 	}
-	if network, cast := e.Resource.(*vsphere.Network); cast {
-		r.changed(network)
+	if host, cast := e.Resource.(*vsphere.Host); cast {
+		r.changed(host)
 	}
 }
 
 //
-// Network changed.
-// Find all of the NetworkMap CRs the reference both the
-// provider and the changed network and enqueue reconcile events.
-func (r *Handler) changed(network *vsphere.Network) {
-	list := api.NetworkMapList{}
+// Host changed.
+// Find all of the HostMap CRs the reference both the
+// provider and the changed host and enqueue reconcile events.
+func (r *Handler) changed(host *vsphere.Host) {
+	list := api.HostList{}
 	err := r.List(context.TODO(), &list)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	for _, mp := range list.Items {
-		ref := mp.Spec.Provider.Source
-		if !r.MatchProvider(ref) {
+	for _, h := range list.Items {
+		if !r.MatchProvider(h.Spec.Provider) {
 			continue
 		}
 		inventory := r.Inventory()
-		for _, pair := range mp.Spec.Map {
-			ref := pair.Source
-			_, err = inventory.Network(&ref)
-			if ref.ID == network.ID {
-				r.Enqueue(event.GenericEvent{
-					Meta:   &mp.ObjectMeta,
-					Object: &mp,
-				})
-				break
-			}
+		ref := h.Spec.Ref
+		_, err = inventory.Host(&ref)
+		if ref.ID == host.ID {
+			r.Enqueue(event.GenericEvent{
+				Meta:   &h.ObjectMeta,
+				Object: &h,
+			})
+			break
 		}
 	}
 }
