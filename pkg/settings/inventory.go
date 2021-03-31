@@ -17,7 +17,7 @@ const (
 const (
 	AllowedOrigins = "CORS_ALLOWED_ORIGINS"
 	WorkingDir     = "WORKING_DIR"
-	AuthOptional   = "AUTH_OPTIONAL"
+	AuthRequired   = "AUTH_REQUIRED"
 	Host           = "API_HOST"
 	Port           = "API_PORT"
 	TLSEnabled     = "API_TLS_ENABLED"
@@ -40,8 +40,8 @@ type Inventory struct {
 	CORS CORS
 	// DB working directory.
 	WorkingDir string
-	// Authorization disabled.
-	AuthOptional bool
+	// Authorization required.
+	AuthRequired bool
 	// Host.
 	Host string
 	// Port
@@ -81,7 +81,7 @@ func (r *Inventory) Load() error {
 		r.WorkingDir = os.TempDir()
 	}
 	// Auth
-	r.AuthOptional = getEnvBool(AuthOptional, false)
+	r.AuthRequired = getEnvBool(AuthRequired, false)
 	// Host
 	if s, found := os.LookupEnv(Host); found {
 		r.Host = s

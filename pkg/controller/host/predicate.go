@@ -78,6 +78,7 @@ func (r *ProviderPredicate) Update(e event.UpdateEvent) bool {
 		reconciled := p.Status.ObservedGeneration == p.Generation
 		if reconciled {
 			r.ensureWatch(p)
+			return true
 		}
 	}
 
