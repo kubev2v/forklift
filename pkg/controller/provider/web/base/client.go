@@ -13,6 +13,7 @@ import (
 	"net/http"
 	liburl "net/url"
 	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 //
@@ -196,8 +197,6 @@ type Param struct {
 type RestClient struct {
 	LibClient
 	Resolver
-	// Bearer token.
-	Token string
 	// Host <host>:<port>
 	Host string
 	// Parameters
@@ -321,12 +320,10 @@ func (c *RestClient) buildTransport() (err error) {
 //
 // Build header.
 func (c *RestClient) buildHeader() {
-	if c.Token == "" {
-		return
-	}
+	cfg, _ := config.GetConfig()
 	c.Header = http.Header{
 		"Authorization": []string{
-			fmt.Sprintf("Bearer %s", c.Token),
+			fmt.Sprintf("Bearer %s", cfg.BearerToken),
 		},
 	}
 }
