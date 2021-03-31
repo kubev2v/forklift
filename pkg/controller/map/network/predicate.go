@@ -72,12 +72,13 @@ func (r *ProviderPredicate) Create(e event.CreateEvent) bool {
 
 //
 // Provider updated event.
-func (r *ProviderPredicate) Update(e event.UpdateEvent) (approved bool) {
+func (r *ProviderPredicate) Update(e event.UpdateEvent) bool {
 	p, cast := e.ObjectNew.(*api.Provider)
 	if cast {
 		reconciled := p.Status.ObservedGeneration == p.Generation
 		if reconciled {
 			r.ensureWatch(p)
+			return true
 		}
 	}
 

@@ -54,16 +54,32 @@ func (h *Handler) Prepare(ctx *gin.Context) int {
 	if status != http.StatusOK {
 		return status
 	}
+	status = h.setDetail(ctx)
+	if status != http.StatusOK {
+		return status
+	}
 	status = h.setProvider(ctx)
 	if status != http.StatusOK {
 		return status
 	}
-	status = h.setDetail(ctx)
+	status = h.permit(ctx)
 	if status != http.StatusOK {
 		return status
 	}
 
 	return http.StatusOK
+}
+
+//
+// Build link.
+func (h *Handler) Link(path string, params Params) string {
+	for k, v := range params {
+		if len(v) > 0 {
+			path = strings.Replace(path, ":"+k, v, 1)
+		}
+	}
+
+	return path
 }
 
 //
@@ -107,13 +123,15 @@ func (h *Handler) setDetail(ctx *gin.Context) int {
 }
 
 //
-// Build link.
-func (h *Handler) Link(path string, params Params) string {
-	for k, v := range params {
-		if len(v) > 0 {
-			path = strings.Replace(path, ":"+k, v, 1)
-		}
+// Permit request - Authorization.
+func (h *Handler) permit(ctx *gin.Context) (status int) {
+	status = http.StatusOK
+	if h.Provider.UID == "" {
+		return
+	}
+	if Settings.AuthRequired {
+		return DefaultAuth.Permit(ctx, h.Provider)
 	}
 
-	return path
+	return
 }
