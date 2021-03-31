@@ -106,7 +106,10 @@ func Add(mgr manager.Manager) error {
 			Type: &api.Provider{},
 		},
 		libref.Handler(),
-		&ProviderPredicate{})
+		&ProviderPredicate{
+			client:  mgr.GetClient(),
+			channel: channel,
+		})
 	if err != nil {
 		log.Trace(err)
 		return err
