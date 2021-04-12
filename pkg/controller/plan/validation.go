@@ -289,7 +289,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			}
 			return liberr.Wrap(pErr)
 		}
-		if len(k8svalidation.IsQualifiedName(ref.Name)) > 0 {
+		if len(k8svalidation.IsDNS1123Label(ref.Name)) > 0 {
 			nameNotValid.Items = append(nameNotValid.Items, ref.String())
 		}
 		if _, found := setOf[ref.ID]; found {
