@@ -343,7 +343,7 @@ func (r *Scheduler) Submit(task *Task) (err error) {
 	select {
 	case r.input <- task:
 		// queued.
-	case <-time.After(10 * time.Second):
+	case <-time.After(10 * time.Minute):
 		err = liberr.Wrap(BacklogExceededError{})
 	}
 
