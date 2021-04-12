@@ -67,8 +67,8 @@ type VMEventHandler struct {
 // Search interval.
 func (r *VMEventHandler) searchInterval() time.Duration {
 	seconds := Settings.PolicyAgent.SearchInterval
-	if seconds < 10 {
-		seconds = 10
+	if seconds < 60 {
+		seconds = 60
 	}
 
 	return time.Second * time.Duration(seconds)
@@ -181,25 +181,33 @@ func (r *VMEventHandler) search() {
 		Log.Trace(err)
 		return
 	}
-	list := []model.VM{}
-	err = r.DB.List(
-		&list,
-		libmodel.ListOptions{
-			Predicate: libmodel.Or(
-				libmodel.Neq("Revision", libmodel.Field{Name: "RevisionValidated"}),
-				libmodel.Neq("PolicyVersion", version)),
-		})
-	if err != nil {
-		Log.Trace(liberr.Wrap(err))
-		return
-	}
-	for _, vm := range list {
-		if revision, found := r.reported[vm.ID]; found {
-			if vm.Revision == revision {
-				continue
-			}
+	for {
+		list := []model.VM{}
+		err = r.DB.List(
+			&list,
+			libmodel.ListOptions{
+				Predicate: libmodel.Or(
+					libmodel.Neq("Revision", libmodel.Field{Name: "RevisionValidated"}),
+					libmodel.Neq("PolicyVersion", version)),
+				Page: &libmodel.Page{
+					Limit: 250,
+				},
+			})
+		if err != nil {
+			Log.Trace(liberr.Wrap(err))
+			return
 		}
-		r.validate(&vm)
+		if len(list) == 0 {
+			return
+		}
+		for _, vm := range list {
+			if revision, found := r.reported[vm.ID]; found {
+				if vm.Revision == revision {
+					continue
+				}
+			}
+			r.validate(&vm)
+		}
 	}
 }
 
