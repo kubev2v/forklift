@@ -8,6 +8,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/watch/handler"
 	"golang.org/x/net/context"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"strings"
 )
 
 //
@@ -39,6 +40,20 @@ func (r *Handler) Created(e libweb.Event) {
 }
 
 //
+// Resource created.
+func (r *Handler) Updated(e libweb.Event) {
+	if !r.HasParity() {
+		return
+	}
+	if vm, cast := e.Resource.(*vsphere.VM); cast {
+		updated := e.Updated.(*vsphere.VM)
+		if updated.Path != vm.Path {
+			r.changed(vm, updated)
+		}
+	}
+}
+
+//
 // Resource deleted.
 func (r *Handler) Deleted(e libweb.Event) {
 	if !r.HasParity() {
@@ -53,7 +68,7 @@ func (r *Handler) Deleted(e libweb.Event) {
 // VM changed.
 // Find all of the Plan CRs the reference both the
 // provider and the changed VM and enqueue reconcile events.
-func (r *Handler) changed(vm *vsphere.VM) {
+func (r *Handler) changed(models ...*vsphere.VM) {
 	list := api.PlanList{}
 	err := r.List(context.TODO(), &list)
 	if err != nil {
@@ -65,17 +80,24 @@ func (r *Handler) changed(vm *vsphere.VM) {
 		if !r.MatchProvider(ref) {
 			continue
 		}
-		inventory := r.Inventory()
+		referenced := false
 		for _, planVM := range plan.Spec.VMs {
 			ref := planVM.Ref
-			_, err = inventory.VM(&ref)
-			if ref.ID == vm.ID {
-				r.Enqueue(event.GenericEvent{
-					Meta:   &plan.ObjectMeta,
-					Object: &plan,
-				})
+			for _, vm := range models {
+				if ref.ID == vm.ID || strings.HasSuffix(vm.Path, ref.Name) {
+					referenced = true
+					break
+				}
+			}
+			if referenced {
 				break
 			}
+		}
+		if referenced {
+			r.Enqueue(event.GenericEvent{
+				Meta:   &plan.ObjectMeta,
+				Object: &plan,
+			})
 		}
 	}
 }

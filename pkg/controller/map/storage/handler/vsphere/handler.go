@@ -8,6 +8,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/watch/handler"
 	"golang.org/x/net/context"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"strings"
 )
 
 //
@@ -39,6 +40,20 @@ func (r *Handler) Created(e libweb.Event) {
 }
 
 //
+// Resource created.
+func (r *Handler) Updated(e libweb.Event) {
+	if !r.HasParity() {
+		return
+	}
+	if ds, cast := e.Resource.(*vsphere.Datastore); cast {
+		updated := e.Updated.(*vsphere.Datastore)
+		if updated.Path != ds.Path {
+			r.changed(ds, updated)
+		}
+	}
+}
+
+//
 // Resource deleted.
 func (r *Handler) Deleted(e libweb.Event) {
 	if !r.HasParity() {
@@ -53,7 +68,7 @@ func (r *Handler) Deleted(e libweb.Event) {
 // Storage changed.
 // Find all of the StorageMap CRs the reference both the
 // provider and the changed datastore and enqueue reconcile events.
-func (r *Handler) changed(ds *vsphere.Datastore) {
+func (r *Handler) changed(models ...*vsphere.Datastore) {
 	list := api.StorageMapList{}
 	err := r.List(context.TODO(), &list)
 	if err != nil {
@@ -65,17 +80,24 @@ func (r *Handler) changed(ds *vsphere.Datastore) {
 		if !r.MatchProvider(ref) {
 			continue
 		}
-		inventory := r.Inventory()
+		referenced := false
 		for _, pair := range mp.Spec.Map {
 			ref := pair.Source
-			_, err = inventory.Storage(&ref)
-			if ref.ID == ds.ID {
-				r.Enqueue(event.GenericEvent{
-					Meta:   &mp.ObjectMeta,
-					Object: &mp,
-				})
+			for _, ds := range models {
+				if ref.ID == ds.ID || strings.HasSuffix(ds.Path, ref.Name) {
+					referenced = true
+					break
+				}
+			}
+			if referenced {
 				break
 			}
+		}
+		if referenced {
+			r.Enqueue(event.GenericEvent{
+				Meta:   &mp.ObjectMeta,
+				Object: &mp,
+			})
 		}
 	}
 }

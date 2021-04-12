@@ -20,6 +20,7 @@ import (
 	"context"
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
+	libfb "github.com/konveyor/controller/pkg/filebacked"
 	libcontainer "github.com/konveyor/controller/pkg/inventory/container"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	libweb "github.com/konveyor/controller/pkg/inventory/web"
@@ -67,6 +68,7 @@ var log = logging.WithName(Name)
 var Settings = &settings.Settings
 
 func init() {
+	libfb.WorkingDir = Settings.WorkingDir
 	container.Log = &log
 	web.Log = &log
 	model.Log = &log
