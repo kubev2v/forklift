@@ -8,6 +8,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/watch/handler"
 	"golang.org/x/net/context"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"strings"
 )
 
 //
@@ -39,6 +40,20 @@ func (r *Handler) Created(e libweb.Event) {
 }
 
 //
+// Resource created.
+func (r *Handler) Updated(e libweb.Event) {
+	if !r.HasParity() {
+		return
+	}
+	if host, cast := e.Resource.(*vsphere.Host); cast {
+		updated := e.Updated.(*vsphere.Host)
+		if updated.Path != host.Path {
+			r.changed(host, updated)
+		}
+	}
+}
+
+//
 // Resource deleted.
 func (r *Handler) Deleted(e libweb.Event) {
 	if !r.HasParity() {
@@ -53,7 +68,7 @@ func (r *Handler) Deleted(e libweb.Event) {
 // Host changed.
 // Find all of the HostMap CRs the reference both the
 // provider and the changed host and enqueue reconcile events.
-func (r *Handler) changed(host *vsphere.Host) {
+func (r *Handler) changed(models ...*vsphere.Host) {
 	list := api.HostList{}
 	err := r.List(context.TODO(), &list)
 	if err != nil {
@@ -64,15 +79,19 @@ func (r *Handler) changed(host *vsphere.Host) {
 		if !r.MatchProvider(h.Spec.Provider) {
 			continue
 		}
-		inventory := r.Inventory()
+		referenced := false
 		ref := h.Spec.Ref
-		_, err = inventory.Host(&ref)
-		if ref.ID == host.ID {
+		for _, host := range models {
+			if ref.ID == host.ID || strings.HasSuffix(host.Path, ref.Name) {
+				referenced = true
+				break
+			}
+		}
+		if referenced {
 			r.Enqueue(event.GenericEvent{
 				Meta:   &h.ObjectMeta,
 				Object: &h,
 			})
-			break
 		}
 	}
 }
