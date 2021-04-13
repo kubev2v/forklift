@@ -40,6 +40,7 @@ const (
 	Canceled            = "Canceled"
 	Deleted             = "Deleted"
 	Paused              = "Paused"
+	Pending             = "Pending"
 )
 
 //
