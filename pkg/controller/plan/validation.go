@@ -41,6 +41,8 @@ const (
 	Deleted             = "Deleted"
 	Paused              = "Paused"
 	Pending             = "Pending"
+	Running             = "Running"
+	Blocked             = "Blocked"
 )
 
 //

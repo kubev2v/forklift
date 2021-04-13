@@ -627,7 +627,8 @@ func (r *Migration) updatePipeline(vm *plan.VMStatus, imp *VmImport) {
 				conditions := dv.Conditions()
 				cnd := conditions.FindCondition("Bound")
 				if cnd != nil && cnd.Status == False {
-					task.Phase = cnd.Reason
+					task.Phase = Blocked
+					task.Reason = cnd.Reason
 					continue nextDv
 				}
 				cnd = conditions.FindCondition("Running")
@@ -635,7 +636,8 @@ func (r *Migration) updatePipeline(vm *plan.VMStatus, imp *VmImport) {
 					continue nextDv
 				}
 				task.MarkStarted()
-				task.Phase = cnd.Reason
+				task.Phase = Running
+				task.Reason = cnd.Reason
 				pct := dv.PercentComplete()
 				completed := pct * float64(task.Progress.Total)
 				task.Progress.Completed = int64(completed)
