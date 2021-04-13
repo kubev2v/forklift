@@ -557,6 +557,15 @@ func (r *Migration) updateVM(vm *plan.VMStatus) (completed bool, failed bool, er
 					Message:  "The VM migration is PAUSED.",
 					Durable:  false,
 				})
+		} else if cnd != nil && cnd.Reason == string(vmio.Pending) {
+			vm.SetCondition(
+				libcnd.Condition{
+					Type:     Pending,
+					Status:   True,
+					Category: Advisory,
+					Message:  "The VM migration is PENDING.",
+					Durable:  false,
+				})
 		}
 	}
 
@@ -616,7 +625,12 @@ func (r *Migration) updatePipeline(vm *plan.VMStatus, imp *VmImport) {
 					continue nextDv
 				}
 				conditions := dv.Conditions()
-				cnd := conditions.FindCondition("Running")
+				cnd := conditions.FindCondition("Bound")
+				if cnd != nil && cnd.Status == False {
+					task.Phase = cnd.Reason
+					continue nextDv
+				}
+				cnd = conditions.FindCondition("Running")
 				if cnd == nil {
 					continue nextDv
 				}
