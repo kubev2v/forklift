@@ -306,6 +306,9 @@ spec:
                             - completed
                             - total
                             type: object
+                          reason:
+                            description: Reason
+                            type: string
                           started:
                             description: Started timestamp.
                             format: date-time
@@ -361,6 +364,9 @@ spec:
                                   - completed
                                   - total
                                   type: object
+                                reason:
+                                  description: Reason
+                                  type: string
                                 started:
                                   description: Started timestamp.
                                   format: date-time
