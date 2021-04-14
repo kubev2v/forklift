@@ -309,6 +309,7 @@ func (r *KubeVirt) vmImport(
 	err = r.Builder.Import(vm.Ref, &object.Spec)
 	if err != nil {
 		err = liberr.Wrap(err)
+		return
 	}
 	if vm.Name != "" {
 		object.Spec.TargetVMName = &vm.Name

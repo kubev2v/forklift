@@ -357,7 +357,7 @@ func (r *Builder) mapping(vm *model.VM) (out *vmio.VmwareMappings, err error) {
 		}
 		mErr := r.defaultModes(&mapped.Destination)
 		if mErr != nil {
-			err = liberr.Wrap(pErr)
+			err = liberr.Wrap(mErr)
 			return
 		}
 		item := vmio.StorageResourceMappingItem{
@@ -467,7 +467,8 @@ func (r *Builder) esxHost(vm *model.VM) (esxHost *EsxHost, found bool, err error
 // Set volume and access modes.
 func (r *Builder) defaultModes(dm *api.DestinationStorage) (err error) {
 	model := &ocp.StorageClass{}
-	err = r.Destination.Inventory.Get(model, dm.StorageClass)
+	ref := ref.Ref{Name: dm.StorageClass}
+	err = r.Destination.Inventory.Find(model, ref)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
