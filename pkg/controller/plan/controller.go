@@ -31,6 +31,7 @@ import (
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/tools/record"
 	"path"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -68,6 +69,7 @@ func Add(mgr manager.Manager) error {
 		EventRecorder: mgr.GetEventRecorderFor(Name),
 		Client:        mgr.GetClient(),
 		scheme:        mgr.GetScheme(),
+		log:           log,
 	}
 	cnt, err := controller.New(
 		Name,
@@ -105,7 +107,7 @@ func Add(mgr manager.Manager) error {
 		&source.Kind{
 			Type: &api.Provider{},
 		},
-		libref.Handler(),
+		libref.Handler(&api.Plan{}),
 		&ProviderPredicate{
 			client:  mgr.GetClient(),
 			channel: channel,
@@ -119,7 +121,7 @@ func Add(mgr manager.Manager) error {
 		&source.Kind{
 			Type: &api.NetworkMap{},
 		},
-		libref.Handler(),
+		libref.Handler(&api.Plan{}),
 		&NetMapPredicate{})
 	if err != nil {
 		log.Trace(err)
@@ -130,7 +132,7 @@ func Add(mgr manager.Manager) error {
 		&source.Kind{
 			Type: &api.StorageMap{},
 		},
-		libref.Handler(),
+		libref.Handler(&api.Plan{}),
 		&DsMapPredicate{})
 	if err != nil {
 		log.Trace(err)
@@ -174,24 +176,33 @@ type Reconciler struct {
 	record.EventRecorder
 	client.Client
 	scheme *runtime.Scheme
+	log    *logging.Logger
 }
 
 //
 // Reconcile a Plan CR.
-func (r *Reconciler) Reconcile(request reconcile.Request) (result reconcile.Result, err error) {
+// Note: Must not a pointer receiver to ensure that the
+// logger and other state is not shared.
+func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Result, err error) {
 	fastReQ := reconcile.Result{RequeueAfter: FastReQ}
 	slowReQ := reconcile.Result{RequeueAfter: SlowReQ}
 	noReQ := reconcile.Result{}
 	result = noReQ
 
-	// Reset the logger.
-	log.Reset()
-	log.SetValues("plan", request)
-	log.Info("Reconcile", "plan", request)
+	r.log = logging.WithName(
+		names.SimpleNameGenerator.GenerateName(Name+"|"),
+		"plan",
+		request)
+
+	r.log.Info("Reconcile")
 
 	defer func() {
 		if err != nil {
-			log.Trace(err)
+			if k8serr.IsConflict(err) {
+				r.log.Info(err.Error())
+			} else {
+				r.log.Trace(err)
+			}
 			err = nil
 		}
 	}()
@@ -206,17 +217,16 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resu
 		return
 	}
 	defer func() {
-		log.Info("Conditions.", "all", plan.Status.Conditions)
+		r.log.Info("Conditions.", "all", plan.Status.Conditions)
 	}()
 
 	// Postpone as needed.
 	postpone, err := r.postpone()
 	if err != nil {
-		log.Trace(err)
 		return slowReQ, err
 	}
 	if postpone {
-		log.Info("Postponed")
+		r.log.Info("Postponed")
 		return slowReQ, nil
 	}
 
@@ -343,7 +353,14 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 		}
 	}
 
-	runner := Migration{Context: ctx}
+	runner := Migration{
+		Context: ctx,
+		log: log.WithValues(
+			"migration",
+			path.Join(
+				ctx.Migration.Namespace,
+				ctx.Migration.Name)),
+	}
 	err = runner.Cancel()
 	if err != nil {
 		return
@@ -376,7 +393,14 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	//
 	// Run the migration.
 	snapshot.BeginStagingConditions()
-	runner = Migration{Context: ctx}
+	runner = Migration{
+		Context: ctx,
+		log: log.WithValues(
+			"migration",
+			path.Join(
+				ctx.Migration.Namespace,
+				ctx.Migration.Name)),
+	}
 	reQ, err = runner.Run()
 	if err != nil {
 		return

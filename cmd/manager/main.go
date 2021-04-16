@@ -17,8 +17,10 @@ limitations under the License.
 package main
 
 import (
+	"github.com/konveyor/controller/pkg/logging"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	"os"
+	"strconv"
 
 	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	"github.com/konveyor/forklift-controller/pkg/apis"
@@ -41,7 +43,16 @@ import (
 var Settings = &settings.Settings
 
 func main() {
-	logf.SetLogger(logf.ZapLogger(false))
+	development := false
+	if s, found := os.LookupEnv(logging.EnvDevelopment); found {
+		parsed, err := strconv.ParseBool(s)
+		if err == nil {
+			development = parsed
+		}
+	}
+
+	logf.SetLogger(logf.ZapLogger(development))
+
 	log := logf.Log.WithName("entrypoint")
 
 	// Load settings.

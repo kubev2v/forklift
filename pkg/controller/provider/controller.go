@@ -35,6 +35,7 @@ import (
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	"os"
@@ -69,9 +70,6 @@ var Settings = &settings.Settings
 
 func init() {
 	libfb.WorkingDir = Settings.WorkingDir
-	container.Log = &log
-	web.Log = &log
-	model.Log = &log
 }
 
 //
@@ -99,7 +97,9 @@ func Add(mgr manager.Manager) error {
 	reconciler := &Reconciler{
 		Client:        nClient,
 		EventRecorder: mgr.GetEventRecorderFor(Name),
+		catalog:       &Catalog{},
 		scheme:        mgr.GetScheme(),
+		log:           log,
 		container:     container,
 		web:           web,
 	}
@@ -131,7 +131,7 @@ func Add(mgr manager.Manager) error {
 		&source.Kind{
 			Type: &core.Secret{},
 		},
-		libref.Handler())
+		libref.Handler(&api.Provider{}))
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -145,30 +145,39 @@ var _ reconcile.Reconciler = &Reconciler{}
 //
 // Reconciles an provider object.
 type Reconciler struct {
-	client.Client
 	record.EventRecorder
-	catalog   Catalog
+	client.Client
+	catalog   *Catalog
 	scheme    *runtime.Scheme
 	container *libcontainer.Container
 	web       *libweb.WebServer
+	log       *logging.Logger
 }
 
 //
 // Reconcile a Inventory CR.
-func (r *Reconciler) Reconcile(request reconcile.Request) (result reconcile.Result, err error) {
+// Note: Must not a pointer receiver to ensure that the
+// logger and other state is not shared.
+func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Result, err error) {
 	fastReQ := reconcile.Result{RequeueAfter: FastReQ}
 	slowReQ := reconcile.Result{RequeueAfter: SlowReQ}
 	noReQ := reconcile.Result{}
 	result = noReQ
 
-	// Reset the logger.
-	log.Reset()
-	log.SetValues("provider", request)
-	log.Info("Reconcile")
+	r.log = logging.WithName(
+		names.SimpleNameGenerator.GenerateName(Name+"|"),
+		"provider",
+		request)
+
+	r.log.Info("Reconcile")
 
 	defer func() {
 		if err != nil {
-			log.Trace(err)
+			if k8serr.IsConflict(err) {
+				r.log.Info(err.Error())
+			} else {
+				r.log.Trace(err)
+			}
 			err = nil
 		}
 	}()
@@ -194,7 +203,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resu
 	}
 
 	defer func() {
-		log.Info("Conditions.", "all", provider.Status.Conditions)
+		r.log.Info("Conditions.", "all", provider.Status.Conditions)
 	}()
 
 	// Updated.

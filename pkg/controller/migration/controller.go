@@ -27,6 +27,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/storage/names"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -59,6 +60,7 @@ func Add(mgr manager.Manager) error {
 	reconciler := &Reconciler{
 		Client: mgr.GetClient(),
 		scheme: mgr.GetScheme(),
+		log:    log,
 	}
 	cnt, err := controller.New(
 		Name,
@@ -86,7 +88,7 @@ func Add(mgr manager.Manager) error {
 		&source.Kind{
 			Type: &api.Plan{},
 		},
-		libref.Handler(),
+		libref.Handler(&api.Migration{}),
 		&PlanPredicate{})
 	if err != nil {
 		log.Trace(err)
@@ -103,24 +105,33 @@ var _ reconcile.Reconciler = &Reconciler{}
 type Reconciler struct {
 	client.Client
 	scheme *runtime.Scheme
+	log    *logging.Logger
 }
 
 //
 // Reconcile a Migration CR.
-func (r *Reconciler) Reconcile(request reconcile.Request) (result reconcile.Result, err error) {
+// Note: Must not a pointer receiver to ensure that the
+// logger and other state is not shared.
+func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Result, err error) {
 	fastReQ := reconcile.Result{RequeueAfter: FastReQ}
 	slowReQ := reconcile.Result{RequeueAfter: SlowReQ}
 	noReQ := reconcile.Result{}
 	result = noReQ
 
-	// Reset the logger.
-	log.Reset()
-	log.SetValues("migration", request.Name)
-	log.Info("Reconcile")
+	r.log = logging.WithName(
+		names.SimpleNameGenerator.GenerateName(Name+"|"),
+		"migration",
+		request)
+
+	r.log.Info("Reconcile")
 
 	defer func() {
 		if err != nil {
-			log.Trace(err)
+			if k8serr.IsConflict(err) {
+				r.log.Info(err.Error())
+			} else {
+				r.log.Trace(err)
+			}
 			err = nil
 		}
 	}()
@@ -135,7 +146,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resu
 		return
 	}
 	defer func() {
-		log.Info("Conditions.", "all", migration.Status.Conditions)
+		r.log.Info("Conditions.", "all", migration.Status.Conditions)
 	}()
 
 	// Detected completed.
@@ -179,7 +190,6 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resu
 	migration.Status.ObservedGeneration = migration.Generation
 	err = r.Status().Update(context.TODO(), migration)
 	if err != nil {
-		log.Trace(err)
 		result = fastReQ
 		return
 	}
