@@ -2,6 +2,7 @@ package handler
 
 import (
 	libweb "github.com/konveyor/controller/pkg/inventory/web"
+	"github.com/konveyor/controller/pkg/logging"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	core "k8s.io/api/core/v1"
@@ -9,6 +10,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
+
+var log = logging.WithName("watch")
 
 //
 // Generic event.
@@ -76,6 +79,7 @@ func (r *Handler) HasParity() bool {
 //
 // Inventory watch has parity.
 func (r *Handler) Parity() {
+	log.V(1).Info("event: parity.")
 	r.parity = true
 }
 
@@ -83,6 +87,7 @@ func (r *Handler) Parity() {
 // Watch ended by peer.
 // The database has been closed.
 func (r *Handler) End() {
+	log.V(1).Info("event: ended.")
 	r.parity = false
 	r.ended = true
 }
@@ -91,6 +96,10 @@ func (r *Handler) End() {
 // Watch error.
 // Repair the watch.
 func (r *Handler) Error(w *libweb.Watch, err error) {
+	log.Info(
+		"event: error.",
+		"error",
+		err.Error())
 	if !r.ended {
 		_ = w.Repair()
 	}
