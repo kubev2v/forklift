@@ -54,13 +54,19 @@ func (h HostHandler) List(ctx *gin.Context) {
 	list := []model.Host{}
 	err := db.List(&list, h.ListOptions(ctx))
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
 	err = h.filter(ctx, &list)
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
@@ -70,7 +76,10 @@ func (h HostHandler) List(ctx *gin.Context) {
 		r.With(&m)
 		err = h.buildAdapters(r)
 		if err != nil {
-			Log.Trace(err)
+			log.Trace(
+				err,
+				"url",
+				ctx.Request.URL)
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
@@ -102,7 +111,10 @@ func (h HostHandler) Get(ctx *gin.Context) {
 		return
 	}
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
@@ -110,13 +122,19 @@ func (h HostHandler) Get(ctx *gin.Context) {
 	r.With(m)
 	r.Path, err = m.Path(db)
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
 	err = h.buildAdapters(r)
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
@@ -155,7 +173,10 @@ func (h HostHandler) watch(ctx *gin.Context) {
 			return
 		})
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 	}
 }

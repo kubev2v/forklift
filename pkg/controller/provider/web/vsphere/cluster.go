@@ -54,7 +54,10 @@ func (h ClusterHandler) List(ctx *gin.Context) {
 	list := []model.Cluster{}
 	err := db.List(&list, h.ListOptions(ctx))
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
@@ -89,7 +92,10 @@ func (h ClusterHandler) Get(ctx *gin.Context) {
 		return
 	}
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
@@ -97,8 +103,10 @@ func (h ClusterHandler) Get(ctx *gin.Context) {
 	r.With(m)
 	r.Path, err = m.Path(db)
 	if err != nil {
-		Log.Trace(err)
-		ctx.Status(http.StatusInternalServerError)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		return
 	}
 	r.SelfLink = h.Link(h.Provider, m)
@@ -136,7 +144,10 @@ func (h ClusterHandler) watch(ctx *gin.Context) {
 			return
 		})
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 	}
 }
