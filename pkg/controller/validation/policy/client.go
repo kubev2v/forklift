@@ -6,6 +6,7 @@ import (
 	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libweb "github.com/konveyor/controller/pkg/inventory/web"
+	"github.com/konveyor/controller/pkg/logging"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	refapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
@@ -15,6 +16,8 @@ import (
 	liburl "net/url"
 	"time"
 )
+
+var log = logging.WithName("validation|policy")
 
 //
 // Lib.
@@ -74,6 +77,11 @@ func (r *Client) Version() (version int, err error) {
 
 	version = out.Result.Version
 
+	log.Info(
+		"version detected",
+		"version",
+		version)
+
 	return
 }
 
@@ -119,6 +127,15 @@ func (r *Client) Validate(ref refapi.Ref) (version int, concerns []model.Concern
 	concerns = out.Result.Concerns
 	version = out.Result.Version
 
+	log.V(3).Info(
+		"validate VM succeeded.",
+		"vm",
+		ref.String(),
+		"version",
+		version,
+		"concern",
+		concerns)
+
 	return
 }
 
@@ -136,6 +153,10 @@ func (r *Client) get(path string, out interface{}) (err error) {
 	}
 	parsedURL.Path = path
 	url := parsedURL.String()
+	log.V(4).Info(
+		"GET request.",
+		"url",
+		url)
 	status, err := r.LibClient.Get(url, out)
 	if status != http.StatusOK {
 		err = liberr.New(http.StatusText(status))
@@ -158,6 +179,12 @@ func (r *Client) post(path string, in interface{}, out interface{}) (err error) 
 	}
 	parsedURL.Path = path
 	url := parsedURL.String()
+	log.V(4).Info(
+		"POST request.",
+		"url",
+		url,
+		"body",
+		out)
 	status, err := r.LibClient.Post(url, in, out)
 	if status != http.StatusOK {
 		err = liberr.New(http.StatusText(status))
@@ -261,6 +288,14 @@ func (r *Worker) run() {
 		_ = recover()
 	}()
 	go func() {
+		log.Info(
+			"worker: started.",
+			"id",
+			r.id)
+		defer log.Info(
+			"worker: stopped.",
+			"id",
+			r.id)
 		for task := range r.input {
 			task.worker = r.id
 			task.started = time.Now()
@@ -302,7 +337,15 @@ func (r *Scheduler) Start() {
 		w.run()
 	}
 	go func() {
+		log.Info(
+			"scheduler: started.")
+		defer log.Info(
+			"scheduler: stopped.")
 		for task := range r.output {
+			log.V(4).Info(
+				"scheduler: dispatch completed.",
+				"task",
+				task)
 			task.notify()
 		}
 	}()
