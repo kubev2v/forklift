@@ -52,7 +52,10 @@ func (h StorageClassHandler) List(ctx *gin.Context) {
 	list := []model.StorageClass{}
 	err := db.List(&list, h.ListOptions(ctx))
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
@@ -87,7 +90,10 @@ func (h StorageClassHandler) Get(ctx *gin.Context) {
 		return
 	}
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
@@ -127,7 +133,10 @@ func (h StorageClassHandler) watch(ctx *gin.Context) {
 			return
 		})
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 	}
 }

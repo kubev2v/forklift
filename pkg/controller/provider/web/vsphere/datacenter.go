@@ -54,7 +54,10 @@ func (h DatacenterHandler) List(ctx *gin.Context) {
 	list := []model.Datacenter{}
 	err := db.List(&list, h.ListOptions(ctx))
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
@@ -89,7 +92,10 @@ func (h DatacenterHandler) Get(ctx *gin.Context) {
 		return
 	}
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
@@ -97,7 +103,10 @@ func (h DatacenterHandler) Get(ctx *gin.Context) {
 	r.With(m)
 	r.Path, err = m.Path(db)
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
@@ -136,7 +145,10 @@ func (h DatacenterHandler) watch(ctx *gin.Context) {
 			return
 		})
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 	}
 }

@@ -22,6 +22,7 @@ package vsphere
 
 import (
 	"errors"
+	"github.com/go-logr/logr"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
@@ -61,6 +62,8 @@ type VMEventHandler struct {
 	reported map[string]int64
 	// Last search.
 	lastSearch time.Time
+	// Logger.
+	log logr.Logger
 }
 
 //
@@ -83,11 +86,11 @@ func (r *VMEventHandler) reset() {
 
 //
 // Watch ended.
-func (r *VMEventHandler) Started() {
+func (r *VMEventHandler) Started(uint64) {
 	r.input = make(chan ReportedEvent)
 	r.policyAgent = policy.New(r.Provider)
 	if !Settings.PolicyAgent.Enabled() {
-		Log.Info("Policy agent not enabled.")
+		r.log.Info("Policy agent not enabled.")
 		return
 	}
 	r.policyAgent.Start()
@@ -119,7 +122,7 @@ func (r *VMEventHandler) Updated(event libmodel.Event) {
 //
 // Report errors.
 func (r *VMEventHandler) Error(err error) {
-	Log.Trace(err)
+	r.log.Error(liberr.Wrap(err), err.Error())
 }
 
 //
@@ -175,10 +178,10 @@ func (r *VMEventHandler) run() {
 // VMs that have been reported through the model event
 // watch are ignored.
 func (r *VMEventHandler) search() {
-	Log.Info("Search for VMs that need to be validated.")
+	r.log.Info("Search for VMs that need to be validated.")
 	version, err := r.policyAgent.Version()
 	if err != nil {
-		Log.Trace(err)
+		r.log.Error(err, err.Error())
 		return
 	}
 	for {
@@ -194,7 +197,7 @@ func (r *VMEventHandler) search() {
 				},
 			})
 		if err != nil {
-			Log.Trace(liberr.Wrap(err))
+			r.log.Error(err, "list VM failed.")
 			return
 		}
 		if len(list) == 0 {
@@ -228,9 +231,9 @@ func (r *VMEventHandler) validate(vm *model.VM) {
 	err = r.policyAgent.Submit(task)
 	if err != nil {
 		if errors.As(err, &policy.BacklogExceededError{}) {
-			Log.Info(err.Error())
+			r.log.Info(err.Error())
 		} else {
-			Log.Trace(liberr.Wrap(err))
+			r.log.Error(err, "submit failed.")
 		}
 	}
 }
@@ -239,19 +242,21 @@ func (r *VMEventHandler) validate(vm *model.VM) {
 // VM validated.
 func (r *VMEventHandler) validated(task *policy.Task) {
 	if task.Error != nil {
-		Log.Info(task.Error.Error())
+		r.log.Info(task.Error.Error())
 		return
 	}
 	tx, err := r.DB.Begin()
 	if err != nil {
-		Log.Trace(liberr.Wrap(err))
+		r.log.Error(err, "begin tx failed.")
 		return
 	}
-	defer tx.End()
+	defer func() {
+		_ = tx.End()
+	}()
 	latest := &model.VM{Base: model.Base{ID: task.Ref.ID}}
 	err = r.DB.Get(latest)
 	if err != nil {
-		Log.Trace(liberr.Wrap(err))
+		r.log.Error(err, "get vm failed.")
 		return
 	}
 	if task.Revision != latest.Revision {
@@ -262,15 +267,15 @@ func (r *VMEventHandler) validated(task *policy.Task) {
 	latest.Concerns = task.Concerns
 	err = tx.Update(latest)
 	if err != nil {
-		Log.Trace(liberr.Wrap(err))
+		r.log.Error(err, "update VM failed.")
 		return
 	}
 	err = tx.Commit()
 	if err != nil {
-		Log.Trace(liberr.Wrap(err))
+		r.log.Error(err, "commit failed.")
 		return
 	}
-	Log.Info(
+	r.log.Info(
 		"PolicyAgent: validated",
 		"vmID",
 		latest.ID,
@@ -286,6 +291,8 @@ type ClusterEventHandler struct {
 	libmodel.StockEventHandler
 	// DB.
 	DB libmodel.DB
+	// Logger.
+	log logr.Logger
 }
 
 //
@@ -301,7 +308,7 @@ func (r *ClusterEventHandler) Updated(event libmodel.Event) {
 //
 // Report errors.
 func (r *ClusterEventHandler) Error(err error) {
-	Log.Trace(liberr.Wrap(err))
+	r.log.Error(liberr.Wrap(err), err.Error())
 }
 
 //
@@ -315,7 +322,7 @@ func (r *ClusterEventHandler) validate(cluster *model.Cluster) {
 		host.WithRef(ref)
 		err := r.DB.Get(host)
 		if err != nil {
-			Log.Trace(liberr.Wrap(err))
+			r.log.Error(err, "get host failed.")
 			return
 		}
 		hostHandler := HostEventHandler{DB: r.DB}
@@ -329,6 +336,8 @@ type HostEventHandler struct {
 	libmodel.StockEventHandler
 	// DB.
 	DB libmodel.DB
+	// Logger.
+	log logr.Logger
 }
 
 //
@@ -344,7 +353,7 @@ func (r *HostEventHandler) Updated(event libmodel.Event) {
 //
 // Report errors.
 func (r *HostEventHandler) Error(err error) {
-	Log.Trace(liberr.Wrap(err))
+	r.log.Error(liberr.Wrap(err), err.Error())
 }
 
 //
@@ -355,28 +364,30 @@ func (r *HostEventHandler) validate(host *model.Host) {
 	}
 	tx, err := r.DB.Begin()
 	if err != nil {
-		Log.Trace(liberr.Wrap(err))
+		r.log.Error(err, "begin tx failed.")
 		return
 	}
-	defer tx.End()
+	defer func() {
+		_ = tx.End()
+	}()
 	for _, ref := range host.Vms {
 		vm := &model.VM{}
 		vm.WithRef(ref)
 		err = tx.Get(vm)
 		if err != nil {
-			Log.Trace(liberr.Wrap(err))
+			r.log.Error(err, "get VM failed.")
 			return
 		}
 		vm.RevisionValidated = 0
 		err = tx.Update(vm)
 		if err != nil {
-			Log.Trace(liberr.Wrap(err))
+			r.log.Error(err, "update VM failed.")
 			return
 		}
 	}
 	err = tx.Commit()
 	if err != nil {
-		Log.Trace(liberr.Wrap(err))
+		r.log.Error(err, "tx commit failed.")
 		return
 	}
 }

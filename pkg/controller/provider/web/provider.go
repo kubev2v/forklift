@@ -2,6 +2,7 @@ package web
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/konveyor/controller/pkg/logging"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
@@ -9,6 +10,10 @@ import (
 
 	"net/http"
 )
+
+//
+// Package logger.
+var log = logging.WithName("web|provider")
 
 //
 // Routes.
@@ -50,7 +55,10 @@ func (h ProviderHandler) List(ctx *gin.Context) {
 	}
 	ocpList, err := ocpHandler.ListContent(ctx)
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
@@ -67,7 +75,10 @@ func (h ProviderHandler) List(ctx *gin.Context) {
 	}
 	vSphereList, err := vSphereHandler.ListContent(ctx)
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}

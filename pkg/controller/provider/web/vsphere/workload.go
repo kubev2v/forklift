@@ -55,7 +55,10 @@ func (h WorkloadHandler) Get(ctx *gin.Context) {
 		return
 	}
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
@@ -85,7 +88,10 @@ func (h WorkloadHandler) Get(ctx *gin.Context) {
 	}
 	root, err := tr.Ancestry(m, navigator)
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}

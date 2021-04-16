@@ -3,9 +3,14 @@ package vsphere
 import (
 	"github.com/gin-gonic/gin"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
+	"github.com/konveyor/controller/pkg/logging"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"strings"
 )
+
+//
+// Package logger.
+var log = logging.WithName("web|vsphere")
 
 //
 // Fields.

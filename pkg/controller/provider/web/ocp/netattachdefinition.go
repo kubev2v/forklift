@@ -52,7 +52,10 @@ func (h NadHandler) List(ctx *gin.Context) {
 	list := []model.NetworkAttachmentDefinition{}
 	err := db.List(&list, h.ListOptions(ctx))
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
@@ -87,7 +90,10 @@ func (h NadHandler) Get(ctx *gin.Context) {
 		return
 	}
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
@@ -127,7 +133,10 @@ func (h NadHandler) watch(ctx *gin.Context) {
 			return
 		})
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 	}
 }

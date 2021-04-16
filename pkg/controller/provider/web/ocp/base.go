@@ -3,8 +3,13 @@ package ocp
 import (
 	"github.com/gin-gonic/gin"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
+	"github.com/konveyor/controller/pkg/logging"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 )
+
+//
+// Package logger.
+var log = logging.WithName("web|ocp")
 
 //
 // Params.

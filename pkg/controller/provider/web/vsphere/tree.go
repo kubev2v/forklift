@@ -47,7 +47,10 @@ func (h *TreeHandler) Prepare(ctx *gin.Context) int {
 			Detail: 1,
 		})
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		return http.StatusInternalServerError
 	}
 
@@ -89,7 +92,10 @@ func (h TreeHandler) VmTree(ctx *gin.Context) {
 		}
 		err := db.Get(folder)
 		if err != nil {
-			Log.Trace(err)
+			log.Trace(
+				err,
+				"url",
+				ctx.Request.URL)
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
@@ -110,7 +116,10 @@ func (h TreeHandler) VmTree(ctx *gin.Context) {
 		}
 		branch, err := tr.Build(folder, navigator)
 		if err != nil {
-			Log.Trace(err)
+			log.Trace(
+				err,
+				"url",
+				ctx.Request.URL)
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
@@ -148,7 +157,10 @@ func (h TreeHandler) HostTree(ctx *gin.Context) {
 		}
 		err := db.Get(folder)
 		if err != nil {
-			Log.Trace(err)
+			log.Trace(
+				err,
+				"url",
+				ctx.Request.URL)
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
@@ -175,7 +187,10 @@ func (h TreeHandler) HostTree(ctx *gin.Context) {
 		}
 		branch, err := tr.Build(folder, navigator)
 		if err != nil {
-			Log.Trace(err)
+			log.Trace(
+				err,
+				"url",
+				ctx.Request.URL)
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}

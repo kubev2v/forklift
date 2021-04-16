@@ -2,6 +2,7 @@ package plan
 
 import (
 	"errors"
+	"github.com/go-logr/logr"
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libitr "github.com/konveyor/controller/pkg/itinerary"
@@ -72,6 +73,8 @@ type Migration struct {
 	importMap ImportMap
 	// VM scheduler
 	scheduler scheduler.Scheduler
+	// Logger.
+	log logr.Logger
 }
 
 //
@@ -139,7 +142,7 @@ func (r Migration) step(vm *plan.VMStatus) (err error) {
 				Durable:  true,
 			})
 		vm.Phase = Completed
-		log.Info("Migration [CANCELED]:", "vm", vm)
+		r.log.Info("Migration [CANCELED]:", "vm", vm)
 		return
 	}
 
@@ -147,7 +150,7 @@ func (r Migration) step(vm *plan.VMStatus) (err error) {
 		vm: &vm.VM,
 	}
 
-	log.Info("Migration [RUN]:", "vm", vm)
+	r.log.Info("Migration [RUN]:", "vm", vm)
 	switch vm.Phase {
 	case Started:
 		vm.MarkStarted()
@@ -191,7 +194,7 @@ func (r Migration) step(vm *plan.VMStatus) (err error) {
 		}
 	case Completed:
 		vm.MarkCompleted()
-		log.Info("Migration [COMPLETED]:", "vm", vm)
+		r.log.Info("Migration [COMPLETED]:", "vm", vm)
 	default:
 		err = liberr.New("phase: unknown")
 	}
@@ -288,7 +291,7 @@ func (r *Migration) next(phase string) (next string) {
 	if done || err != nil {
 		next = Completed
 		if err != nil {
-			log.Trace(err)
+			r.log.Error(err, "next phase failed.")
 		}
 	} else {
 		next = step.Name
@@ -365,7 +368,7 @@ func (r *Migration) begin() (err error) {
 
 	r.Plan.Status.Migration.VMs = list
 
-	log.Info("Execution [STARTED]:", "migration", r.Plan.Status.Migration)
+	r.log.Info("Execution [STARTED]:", "migration", r.Plan.Status.Migration)
 
 	return
 }
@@ -465,7 +468,7 @@ func (r *Migration) end() (completed bool, err error) {
 
 	if failed > 0 {
 		// if any VMs failed, the migration failed.
-		log.Info("Execution [FAILED]")
+		r.log.Info("Execution [FAILED]")
 		snapshot.SetCondition(
 			libcnd.Condition{
 				Type:     Failed,
@@ -482,7 +485,7 @@ func (r *Migration) end() (completed bool, err error) {
 	} else if succeeded > 0 {
 		// if the migration didn't fail and at least one VM succeeded,
 		// then the migration succeeded.
-		log.Info("Execution [SUCCEEDED]")
+		r.log.Info("Execution [SUCCEEDED]")
 		snapshot.SetCondition(
 			libcnd.Condition{
 				Type:     Succeeded,
@@ -495,7 +498,7 @@ func (r *Migration) end() (completed bool, err error) {
 		// if there were no failures or successes, but
 		// all the VMs are complete, then the migration must
 		// have been canceled.
-		log.Info("Execution [CANCELED]")
+		r.log.Info("Execution [CANCELED]")
 		snapshot.SetCondition(
 			libcnd.Condition{
 				Type:     Canceled,
