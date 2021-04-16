@@ -6,7 +6,7 @@ metadata:
   namespace: openshift-migration
 spec:
   provider:
-    namespce: ""
+    namespace: ""
     name: ""
   id: ""
   ipAddress: ""
