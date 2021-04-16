@@ -36,12 +36,10 @@ import (
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	"os"
 	"path/filepath"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -75,18 +73,6 @@ func init() {
 //
 // Creates a new Inventory Controller and adds it to the Manager.
 func Add(mgr manager.Manager) error {
-	restCfg, err := config.GetConfig()
-	if err != nil {
-		panic(err)
-	}
-	nClient, err := client.New(
-		restCfg,
-		client.Options{
-			Scheme: scheme.Scheme,
-		})
-	if err != nil {
-		panic(err)
-	}
 	container := libcontainer.New()
 	web := libweb.New(container, web.All(container)...)
 	web.Port = Settings.Inventory.Port
@@ -95,7 +81,7 @@ func Add(mgr manager.Manager) error {
 	web.TLS.Key = Settings.Inventory.TLS.Key
 	web.AllowedOrigins = Settings.CORS.AllowedOrigins
 	reconciler := &Reconciler{
-		Client:        nClient,
+		Client:        mgr.GetClient(),
 		EventRecorder: mgr.GetEventRecorderFor(Name),
 		catalog:       &Catalog{},
 		scheme:        mgr.GetScheme(),
