@@ -18,21 +18,18 @@ package plan
 
 import (
 	"context"
-	"errors"
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
+	"github.com/konveyor/forklift-controller/pkg/controller/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/client-go/tools/record"
 	"path"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -46,12 +43,8 @@ import (
 )
 
 const (
-	// Controller name.
+	// Name.
 	Name = "plan"
-	// Fast re-queue delay.
-	FastReQ = time.Millisecond * 500
-	// Slow re-queue delay.
-	SlowReQ = time.Second * 3
 )
 
 //
@@ -66,10 +59,11 @@ var Settings = &settings.Settings
 // Creates a new Plan Controller and adds it to the Manager.
 func Add(mgr manager.Manager) error {
 	reconciler := &Reconciler{
-		EventRecorder: mgr.GetEventRecorderFor(Name),
-		Client:        mgr.GetClient(),
-		scheme:        mgr.GetScheme(),
-		log:           log,
+		Reconciler: base.Reconciler{
+			EventRecorder: mgr.GetEventRecorderFor(Name),
+			Client:        mgr.GetClient(),
+			Log:           log,
+		},
 	}
 	cnt, err := controller.New(
 		Name,
@@ -173,10 +167,7 @@ var _ reconcile.Reconciler = &Reconciler{}
 //
 // Reconciles a Plan object.
 type Reconciler struct {
-	record.EventRecorder
-	client.Client
-	scheme *runtime.Scheme
-	log    *logging.Logger
+	base.Reconciler
 }
 
 //
@@ -184,27 +175,16 @@ type Reconciler struct {
 // Note: Must not a pointer receiver to ensure that the
 // logger and other state is not shared.
 func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Result, err error) {
-	fastReQ := reconcile.Result{RequeueAfter: FastReQ}
-	slowReQ := reconcile.Result{RequeueAfter: SlowReQ}
-	noReQ := reconcile.Result{}
-	result = noReQ
-
-	r.log = logging.WithName(
+	r.Log = logging.WithName(
 		names.SimpleNameGenerator.GenerateName(Name+"|"),
-		"plan",
+		"hook",
 		request)
-
-	r.log.Info("Reconcile")
-
+	r.Started()
 	defer func() {
-		if err != nil {
-			if k8serr.IsConflict(err) {
-				r.log.Info(err.Error())
-			} else {
-				r.log.Trace(err)
-			}
-			err = nil
-		}
+		result.RequeueAfter = r.Ended(
+			result.RequeueAfter,
+			err)
+		err = nil
 	}()
 
 	// Fetch the CR.
@@ -212,22 +192,23 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 	err = r.Get(context.TODO(), request.NamespacedName, plan)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
+			r.Log.Info("Plan deleted.")
 			err = nil
 		}
 		return
 	}
 	defer func() {
-		r.log.Info("Conditions.", "all", plan.Status.Conditions)
+		r.Log.Info("Conditions.", "all", plan.Status.Conditions)
 	}()
 
 	// Postpone as needed.
 	postpone, err := r.postpone()
 	if err != nil {
-		return slowReQ, err
+		return
 	}
 	if postpone {
-		r.log.Info("Postponed")
-		return slowReQ, nil
+		result.RequeueAfter = base.SlowReQ
+		r.Log.Info("Plan Postponed.")
 	}
 
 	// Begin staging conditions.
@@ -236,12 +217,6 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 	// Validations.
 	err = r.validate(plan)
 	if err != nil {
-		if errors.As(err, &web.ProviderNotReadyError{}) {
-			result = slowReQ
-			err = nil
-		} else {
-			result = fastReQ
-		}
 		return
 	}
 
@@ -265,26 +240,18 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 	plan.Status.ObservedGeneration = plan.Generation
 	err = r.Status().Update(context.TODO(), plan)
 	if err != nil {
-		result = fastReQ
 		return
 	}
 
 	//
 	// Execute.
 	// The plan is updated as needed to reflect status.
-	reQ, err := r.execute(plan)
+	result.RequeueAfter, err = r.execute(plan)
 	if err != nil {
-		result = fastReQ
 		return
 	}
 
-	// Done
-	if reQ > 0 {
-		result = reconcile.Result{RequeueAfter: reQ}
-	} else {
-		result = noReQ
-	}
-
+	// Done.
 	return
 }
 
@@ -416,7 +383,7 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 		}
 	}
 	if len(pending) > 1 && reQ == 0 {
-		reQ = FastReQ
+		reQ = base.FastReQ
 	}
 
 	return

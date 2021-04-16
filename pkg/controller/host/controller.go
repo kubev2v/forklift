@@ -18,34 +18,25 @@ package host
 
 import (
 	"context"
-	"errors"
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	"github.com/konveyor/controller/pkg/logging"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
+	"github.com/konveyor/forklift-controller/pkg/controller/base"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/client-go/tools/record"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"time"
 )
 
 const (
-	// Controller name.
+	// Name.
 	Name = "host"
-	// Fast re-queue delay.
-	FastReQ = time.Millisecond * 500
-	// Slow re-queue delay.
-	SlowReQ = time.Second * 3
 )
 
 //
@@ -60,10 +51,11 @@ var Settings = &settings.Settings
 // Creates a new Host Controller and adds it to the Manager.
 func Add(mgr manager.Manager) error {
 	reconciler := &Reconciler{
-		EventRecorder: mgr.GetEventRecorderFor(Name),
-		Client:        mgr.GetClient(),
-		scheme:        mgr.GetScheme(),
-		log:           log,
+		Reconciler: base.Reconciler{
+			EventRecorder: mgr.GetEventRecorderFor(Name),
+			Client:        mgr.GetClient(),
+			Log:           log,
+		},
 	}
 	cnt, err := controller.New(
 		Name,
@@ -118,10 +110,7 @@ var _ reconcile.Reconciler = &Reconciler{}
 //
 // Reconciles a Host object.
 type Reconciler struct {
-	record.EventRecorder
-	client.Client
-	scheme *runtime.Scheme
-	log    *logging.Logger
+	base.Reconciler
 }
 
 //
@@ -129,27 +118,16 @@ type Reconciler struct {
 // Note: Must not a pointer receiver to ensure that the
 // logger and other state is not shared.
 func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Result, err error) {
-	fastReQ := reconcile.Result{RequeueAfter: FastReQ}
-	slowReQ := reconcile.Result{RequeueAfter: SlowReQ}
-	noReQ := reconcile.Result{}
-	result = noReQ
-
-	r.log = logging.WithName(
+	r.Log = logging.WithName(
 		names.SimpleNameGenerator.GenerateName(Name+"|"),
 		"host",
 		request)
-
-	r.log.Info("Reconcile")
-
+	r.Started()
 	defer func() {
-		if err != nil {
-			if k8serr.IsConflict(err) {
-				r.log.Info(err.Error())
-			} else {
-				r.log.Trace(err)
-			}
-			err = nil
-		}
+		result.RequeueAfter = r.Ended(
+			result.RequeueAfter,
+			err)
+		err = nil
 	}()
 
 	// Fetch the CR.
@@ -157,12 +135,13 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 	err = r.Get(context.TODO(), request.NamespacedName, host)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
+			r.Log.Info("Host deleted.")
 			err = nil
 		}
 		return
 	}
 	defer func() {
-		r.log.Info("Conditions.", "all", host.Status.Conditions)
+		r.Log.Info("Conditions.", "all", host.Status.Conditions)
 	}()
 
 	// Begin staging conditions.
@@ -171,12 +150,6 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 	// Validations.
 	err = r.validate(host)
 	if err != nil {
-		if errors.As(err, &web.ProviderNotReadyError{}) {
-			result = slowReQ
-			err = nil
-		} else {
-			result = fastReQ
-		}
 		return
 	}
 
@@ -200,13 +173,12 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 	host.Status.ObservedGeneration = host.Generation
 	err = r.Status().Update(context.TODO(), host)
 	if err != nil {
-		result = fastReQ
 		return
 	}
 
 	// ReQ.
 	if !host.Status.HasCondition(ConnectionTestSucceeded) {
-		result = slowReQ
+		result.RequeueAfter = base.SlowReQ
 	}
 
 	// Done
