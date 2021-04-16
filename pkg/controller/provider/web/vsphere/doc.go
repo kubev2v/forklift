@@ -3,7 +3,6 @@ package vsphere
 import (
 	"github.com/konveyor/controller/pkg/inventory/container"
 	libweb "github.com/konveyor/controller/pkg/inventory/web"
-	"github.com/konveyor/controller/pkg/logging"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 )
@@ -13,15 +12,6 @@ import (
 const (
 	Root = base.ProvidersRoot + "/" + api.VSphere
 )
-
-//
-// Shared logger.
-var Log *logging.Logger
-
-func init() {
-	log := logging.WithName("web")
-	Log = &log
-}
 
 //
 // Build all handlers.

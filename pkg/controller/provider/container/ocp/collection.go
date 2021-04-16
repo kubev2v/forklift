@@ -2,6 +2,7 @@ package ocp
 
 import (
 	"context"
+	"github.com/go-logr/logr"
 	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libocp "github.com/konveyor/controller/pkg/inventory/container/ocp"
@@ -18,6 +19,7 @@ import (
 // StorageClass
 type StorageClass struct {
 	libocp.BaseCollection
+	log logr.Logger
 }
 
 //
@@ -53,7 +55,7 @@ func (r *StorageClass) Reconcile(ctx context.Context) (err error) {
 		m := &model.StorageClass{}
 		m.With(&resource)
 		r.Reconciler.UpdateThreshold(m)
-		Log.Info("Create", libref.ToKind(m), m.String())
+		r.log.Info("Create", libref.ToKind(m), m.String())
 		err = tx.Insert(m)
 		if err != nil {
 			err = liberr.Wrap(err)
@@ -121,6 +123,7 @@ func (r *StorageClass) Generic(e event.GenericEvent) bool {
 // NetworkAttachmentDefinition
 type NetworkAttachmentDefinition struct {
 	libocp.BaseCollection
+	log logr.Logger
 }
 
 //
@@ -156,7 +159,7 @@ func (r *NetworkAttachmentDefinition) Reconcile(ctx context.Context) (err error)
 		m := &model.NetworkAttachmentDefinition{}
 		m.With(&resource)
 		r.Reconciler.UpdateThreshold(m)
-		Log.Info("Create", libref.ToKind(m), m.String())
+		r.log.Info("Create", libref.ToKind(m), m.String())
 		err = tx.Insert(m)
 		if err != nil {
 			err = liberr.Wrap(err)
@@ -224,6 +227,7 @@ func (r *NetworkAttachmentDefinition) Generic(e event.GenericEvent) bool {
 // Namespace
 type Namespace struct {
 	libocp.BaseCollection
+	log logr.Logger
 }
 
 //
@@ -259,7 +263,7 @@ func (r *Namespace) Reconcile(ctx context.Context) (err error) {
 		m := &model.Namespace{}
 		m.With(&resource)
 		r.Reconciler.UpdateThreshold(m)
-		Log.Info("Create", libref.ToKind(m), m.String())
+		r.log.Info("Create", libref.ToKind(m), m.String())
 		err = tx.Insert(m)
 		if err != nil {
 			err = liberr.Wrap(err)
@@ -327,6 +331,7 @@ func (r *Namespace) Generic(e event.GenericEvent) bool {
 // VM
 type VM struct {
 	libocp.BaseCollection
+	log logr.Logger
 }
 
 //
@@ -362,7 +367,7 @@ func (r *VM) Reconcile(ctx context.Context) (err error) {
 		m := &model.VM{}
 		m.With(&resource)
 		r.Reconciler.UpdateThreshold(m)
-		Log.Info("Create", libref.ToKind(m), m.String())
+		r.log.Info("Create", libref.ToKind(m), m.String())
 		err = tx.Insert(m)
 		if err != nil {
 			err = liberr.Wrap(err)

@@ -51,7 +51,10 @@ func (h NamespaceHandler) List(ctx *gin.Context) {
 	list := []model.Namespace{}
 	err := db.List(&list, h.ListOptions(ctx))
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
@@ -86,7 +89,10 @@ func (h NamespaceHandler) Get(ctx *gin.Context) {
 		return
 	}
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
@@ -126,7 +132,10 @@ func (h NamespaceHandler) watch(ctx *gin.Context) {
 			return
 		})
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 	}
 }

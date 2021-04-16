@@ -41,7 +41,10 @@ func (h ProviderHandler) List(ctx *gin.Context) {
 	}
 	content, err := h.ListContent(ctx)
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
@@ -68,7 +71,10 @@ func (h ProviderHandler) Get(ctx *gin.Context) {
 	r.With(m)
 	err := h.AddCount(&r)
 	if err != nil {
-		Log.Trace(err)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}

@@ -27,6 +27,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -62,6 +63,7 @@ func Add(mgr manager.Manager) error {
 		EventRecorder: mgr.GetEventRecorderFor(Name),
 		Client:        mgr.GetClient(),
 		scheme:        mgr.GetScheme(),
+		log:           log,
 	}
 	cnt, err := controller.New(
 		Name,
@@ -98,7 +100,7 @@ func Add(mgr manager.Manager) error {
 		&source.Kind{
 			Type: &api.Provider{},
 		},
-		libref.Handler(),
+		libref.Handler(&api.NetworkMap{}),
 		&ProviderPredicate{
 			client:  mgr.GetClient(),
 			channel: channel,
@@ -116,27 +118,36 @@ var _ reconcile.Reconciler = &Reconciler{}
 //
 // Reconciles a Map object.
 type Reconciler struct {
+	record.EventRecorder
 	client.Client
 	scheme *runtime.Scheme
-	record.EventRecorder
+	log    *logging.Logger
 }
 
 //
 // Reconcile a Map CR.
-func (r *Reconciler) Reconcile(request reconcile.Request) (result reconcile.Result, err error) {
+// Note: Must not a pointer receiver to ensure that the
+// logger and other state is not shared.
+func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Result, err error) {
 	fastReQ := reconcile.Result{RequeueAfter: FastReQ}
 	slowReQ := reconcile.Result{RequeueAfter: SlowReQ}
 	noReQ := reconcile.Result{}
 	result = noReQ
 
-	// Reset the logger.
-	log.Reset()
-	log.SetValues("map", request)
-	log.Info("Reconcile")
+	r.log = logging.WithName(
+		names.SimpleNameGenerator.GenerateName(Name+"|"),
+		"map",
+		request)
+
+	r.log.Info("Reconcile")
 
 	defer func() {
 		if err != nil {
-			log.Trace(err)
+			if k8serr.IsConflict(err) {
+				r.log.Info(err.Error())
+			} else {
+				r.log.Trace(err)
+			}
 			err = nil
 		}
 	}()
@@ -151,7 +162,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resu
 		return
 	}
 	defer func() {
-		log.Info("Conditions.", "all", mp.Status.Conditions)
+		r.log.Info("Conditions.", "all", mp.Status.Conditions)
 	}()
 
 	// Begin staging conditions.
@@ -189,7 +200,6 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resu
 	mp.Status.ObservedGeneration = mp.Generation
 	err = r.Status().Update(context.TODO(), mp)
 	if err != nil {
-		log.Trace(err)
 		result = fastReQ
 		return
 	}

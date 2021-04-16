@@ -2,6 +2,7 @@ package vsphere
 
 import (
 	"context"
+	"github.com/go-logr/logr"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	"github.com/konveyor/controller/pkg/logging"
@@ -17,6 +18,7 @@ import (
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	liburl "net/url"
+	"path"
 	"time"
 )
 
@@ -216,12 +218,6 @@ var TsRootFolder = &types.TraversalSpec{
 	},
 }
 
-func init() {
-	logger := logging.WithName("vsphere")
-	logger.Reset()
-	Log = &logger
-}
-
 //
 // A VMWare reconciler.
 type Reconciler struct {
@@ -234,7 +230,7 @@ type Reconciler struct {
 	// DB client.
 	db libmodel.DB
 	// logger.
-	log logging.Logger
+	log logr.Logger
 	// client.
 	client *govmomi.Client
 	// cancel function.
@@ -246,13 +242,17 @@ type Reconciler struct {
 //
 // New reconciler.
 func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) *Reconciler {
-	log := logging.WithName(provider.GetName())
+	nlog := logging.WithName("reconciler|vsphere").WithValues(
+		"provider",
+		path.Join(
+			provider.GetNamespace(),
+			provider.GetName()))
 	return &Reconciler{
 		url:      provider.Spec.URL,
 		provider: provider,
 		secret:   secret,
 		db:       db,
-		log:      log,
+		log:      nlog,
 	}
 }
 
@@ -319,7 +319,11 @@ func (r *Reconciler) Start() error {
 			default:
 				err := r.getUpdates(ctx)
 				if err != nil {
-					r.log.Trace(err, "retry", RetryDelay)
+					r.log.Error(
+						err,
+						"start failed.",
+						"retry",
+						RetryDelay)
 					time.Sleep(RetryDelay)
 					continue try
 				}
@@ -404,7 +408,11 @@ next:
 		if updateSet == nil {
 			err := r.connect(ctx)
 			if err != nil {
-				r.log.Trace(err)
+				r.log.Error(
+					err,
+					"failed to connect.",
+					"url",
+					r.url)
 				time.Sleep(RetryDelay)
 			}
 			continue next
@@ -417,7 +425,9 @@ next:
 		for _, fs := range updateSet.FilterSet {
 			err = r.apply(ctx, tx, fs.ObjectSet)
 			if err != nil {
-				Log.Trace(err)
+				r.log.Error(
+					err,
+					"apply changes failed.")
 				break
 			}
 		}
@@ -427,7 +437,9 @@ next:
 			err = tx.End()
 		}
 		if err != nil {
-			Log.Trace(err)
+			r.log.Error(
+				err,
+				"tx commit failed.")
 		}
 		if updateSet.Truncated == nil || !*updateSet.Truncated {
 			if !r.parity {
@@ -447,27 +459,43 @@ func (r *Reconciler) watch() (list []*libmodel.Watch) {
 	// Cluster
 	w, err := r.db.Watch(
 		&model.Cluster{},
-		&ClusterEventHandler{DB: r.db})
+		&ClusterEventHandler{
+			DB:  r.db,
+			log: r.log,
+		})
 	if err != nil {
-		Log.Trace(err)
+		r.log.Error(
+			err,
+			"create (cluster) watch failed.")
 	} else {
 		list = append(list, w)
 	}
 	// Host
 	w, err = r.db.Watch(
 		&model.Host{},
-		&HostEventHandler{DB: r.db})
+		&HostEventHandler{
+			DB:  r.db,
+			log: r.log,
+		})
 	if err != nil {
-		Log.Trace(err)
+		r.log.Error(
+			err,
+			"create (host) watch failed.")
 	} else {
 		list = append(list, w)
 	}
 	// VM
 	w, err = r.db.Watch(
 		&model.VM{},
-		&VMEventHandler{Provider: r.provider, DB: r.db})
+		&VMEventHandler{
+			Provider: r.provider,
+			DB:       r.db,
+			log:      r.log,
+		})
 	if err != nil {
-		Log.Trace(liberr.Wrap(err))
+		r.log.Error(
+			err,
+			"create (VM) watch failed.")
 	} else {
 		list = append(list, w)
 	}
