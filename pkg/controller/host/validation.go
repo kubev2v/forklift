@@ -285,7 +285,19 @@ func (r *Reconciler) testConnection(host *api.Host) (err error) {
 			Secret: secret,
 			URL:    url,
 		}
+		r.Log.V(1).Info(
+			"Testing connection.",
+			"url",
+			url)
 		testErr = h.TestConnection()
+		if testErr != nil {
+			r.Log.V(1).Info(
+				"Connection test, failed",
+				"url",
+				url,
+				"reason",
+				testErr.Error())
+		}
 	default:
 		return
 	}

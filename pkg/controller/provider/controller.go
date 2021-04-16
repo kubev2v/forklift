@@ -228,6 +228,8 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 
 	// ReQ.
 	if !provider.Status.HasCondition(ConnectionTestSucceeded, InventoryCreated) {
+		r.Log.Info(
+			"Waiting connection tested or inventory created.")
 		result.RequeueAfter = base.SlowReQ
 	}
 
@@ -264,40 +266,50 @@ func (r *Reconciler) updateProvider(provider *api.Provider) (err error) {
 //
 // Update the container.
 func (r *Reconciler) updateContainer(provider *api.Provider) (err error) {
+	log.Info("Update container.")
 	if _, found := r.container.Get(provider); found {
 		if provider.HasReconciled() {
+			r.Log.V(2).Info(
+				"Provider not reconciled, postponing.")
 			return
 		}
 	}
 	if provider.Status.HasBlockerCondition() ||
 		!provider.Status.HasCondition(ConnectionTestSucceeded) {
-		return nil
+		r.Log.V(2).Info(
+			"Provider not ready, postponing.")
+		return
 	}
 	if current, found := r.container.Get(provider); found {
 		current.Shutdown()
 		_ = current.DB().Close(true)
+		r.Log.V(2).Info(
+			"Shutdown found (data) reconciler.")
 	}
 	db := r.getDB(provider)
 	secret, err := r.getSecret(provider)
 	if err != nil {
-		return err
+		return
 	}
 	err = db.Open(true)
 	if err != nil {
-		return err
+		return
 	}
 	pModel := &ocpmodel.Provider{}
 	pModel.With(provider)
 	err = db.Insert(pModel)
 	if err != nil {
-		return err
+		return
 	}
 	err = r.container.Add(container.Build(db, provider, secret))
 	if err != nil {
-		return err
+		return
 	}
 
-	return nil
+	r.Log.V(2).Info(
+		"Data reconciler added/started.")
+
+	return
 }
 
 //
@@ -310,6 +322,10 @@ func (r *Reconciler) getDB(provider *api.Provider) (db libmodel.DB) {
 	path := filepath.Join(dir, file)
 	models := model.Models(provider)
 	db = libmodel.New(path, models...)
+	r.Log.Info(
+		"Opening DB.",
+		"path",
+		path)
 	return
 }
 
