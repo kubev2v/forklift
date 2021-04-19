@@ -204,6 +204,7 @@ type VM struct {
 	UUID                  string          `json:"uuid"`
 	Firmware              string          `json:"firmware"`
 	PowerState            string          `json:"powerState"`
+	ConnectionState       string          `json:"connectionState"`
 	Snapshot              model.Ref       `json:"snapshot"`
 	ChangeTrackingEnabled bool            `json:"changeTrackingEnabled"`
 	CpuAffinity           []int32         `json:"cpuAffinity"`
@@ -235,6 +236,7 @@ func (r *VM) With(m *model.VM) {
 	r.UUID = m.UUID
 	r.Firmware = m.Firmware
 	r.PowerState = m.PowerState
+	r.ConnectionState = m.ConnectionState
 	r.Snapshot = m.Snapshot
 	r.ChangeTrackingEnabled = m.ChangeTrackingEnabled
 	r.CpuAffinity = m.CpuAffinity
