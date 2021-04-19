@@ -100,6 +100,13 @@ func (r *Builder) Import(vmRef ref.Ref, object *vmio.VirtualMachineImportSpec) (
 				pErr.Error()))
 		return
 	}
+	if types.VirtualMachineConnectionState(vm.ConnectionState) != types.VirtualMachineConnectionStateConnected {
+		err = liberr.New(
+			fmt.Sprintf(
+				"VM %s is not connected",
+				vmRef.String()))
+		return
+	}
 	uuid := vm.UUID
 	object.TargetVMName = &vm.Name
 	start := vm.PowerState == string(types.VirtualMachinePowerStatePoweredOn)
