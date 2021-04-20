@@ -18,21 +18,18 @@ package plan
 
 import (
 	"context"
-	"errors"
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
+	"github.com/konveyor/forklift-controller/pkg/controller/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/client-go/tools/record"
 	"path"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -46,12 +43,8 @@ import (
 )
 
 const (
-	// Controller name.
+	// Name.
 	Name = "plan"
-	// Fast re-queue delay.
-	FastReQ = time.Millisecond * 500
-	// Slow re-queue delay.
-	SlowReQ = time.Second * 3
 )
 
 //
@@ -66,10 +59,11 @@ var Settings = &settings.Settings
 // Creates a new Plan Controller and adds it to the Manager.
 func Add(mgr manager.Manager) error {
 	reconciler := &Reconciler{
-		EventRecorder: mgr.GetEventRecorderFor(Name),
-		Client:        mgr.GetClient(),
-		scheme:        mgr.GetScheme(),
-		log:           log,
+		Reconciler: base.Reconciler{
+			EventRecorder: mgr.GetEventRecorderFor(Name),
+			Client:        mgr.GetClient(),
+			Log:           log,
+		},
 	}
 	cnt, err := controller.New(
 		Name,
@@ -173,10 +167,7 @@ var _ reconcile.Reconciler = &Reconciler{}
 //
 // Reconciles a Plan object.
 type Reconciler struct {
-	record.EventRecorder
-	client.Client
-	scheme *runtime.Scheme
-	log    *logging.Logger
+	base.Reconciler
 }
 
 //
@@ -184,27 +175,16 @@ type Reconciler struct {
 // Note: Must not a pointer receiver to ensure that the
 // logger and other state is not shared.
 func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Result, err error) {
-	fastReQ := reconcile.Result{RequeueAfter: FastReQ}
-	slowReQ := reconcile.Result{RequeueAfter: SlowReQ}
-	noReQ := reconcile.Result{}
-	result = noReQ
-
-	r.log = logging.WithName(
+	r.Log = logging.WithName(
 		names.SimpleNameGenerator.GenerateName(Name+"|"),
-		"plan",
+		"hook",
 		request)
-
-	r.log.Info("Reconcile")
-
+	r.Started()
 	defer func() {
-		if err != nil {
-			if k8serr.IsConflict(err) {
-				r.log.Info(err.Error())
-			} else {
-				r.log.Trace(err)
-			}
-			err = nil
-		}
+		result.RequeueAfter = r.Ended(
+			result.RequeueAfter,
+			err)
+		err = nil
 	}()
 
 	// Fetch the CR.
@@ -212,22 +192,23 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 	err = r.Get(context.TODO(), request.NamespacedName, plan)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
+			r.Log.Info("Plan deleted.")
 			err = nil
 		}
 		return
 	}
 	defer func() {
-		r.log.Info("Conditions.", "all", plan.Status.Conditions)
+		r.Log.V(1).Info("Conditions.", "all", plan.Status.Conditions)
 	}()
 
 	// Postpone as needed.
 	postpone, err := r.postpone()
 	if err != nil {
-		return slowReQ, err
+		return
 	}
 	if postpone {
-		r.log.Info("Postponed")
-		return slowReQ, nil
+		result.RequeueAfter = base.SlowReQ
+		r.Log.Info("Plan Postponed.")
 	}
 
 	// Begin staging conditions.
@@ -236,12 +217,6 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 	// Validations.
 	err = r.validate(plan)
 	if err != nil {
-		if errors.As(err, &web.ProviderNotReadyError{}) {
-			result = slowReQ
-			err = nil
-		} else {
-			result = fastReQ
-		}
 		return
 	}
 
@@ -259,32 +234,24 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 	plan.Status.EndStagingConditions()
 
 	// Record events.
-	plan.Status.RecordEvents(plan, r)
+	r.Record(plan, plan.Status.Conditions)
 
 	// Apply changes.
 	plan.Status.ObservedGeneration = plan.Generation
 	err = r.Status().Update(context.TODO(), plan)
 	if err != nil {
-		result = fastReQ
 		return
 	}
 
 	//
 	// Execute.
 	// The plan is updated as needed to reflect status.
-	reQ, err := r.execute(plan)
+	result.RequeueAfter, err = r.execute(plan)
 	if err != nil {
-		result = fastReQ
 		return
 	}
 
-	// Done
-	if reQ > 0 {
-		result = reconcile.Result{RequeueAfter: reQ}
-	} else {
-		result = noReQ
-	}
-
+	// Done.
 	return
 }
 
@@ -332,12 +299,19 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	if migration != nil {
 		ctx.Migration = migration
 		r.matchSnapshot(ctx)
+		r.Log.Info(
+			"Found (active) migration.",
+			"migration",
+			path.Join(
+				migration.GetNamespace(),
+				migration.GetName()))
 	}
 	//
 	// The active snapshot may be marked canceled by:
 	//   activeMigration()
 	//   matchSnapshot()
 	if snapshot.HasCondition(Canceled) {
+		r.Log.Info("migration (active) marked as canceled.")
 		for _, vm := range plan.Status.Migration.VMs {
 			if !vm.HasCondition(Succeeded) {
 				vm.SetCondition(
@@ -349,6 +323,10 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 						Message:  "The migration has been canceled.",
 						Durable:  true,
 					})
+				r.Log.Info(
+					"Snapshot canceled condition copied to VM.",
+					"vm",
+					vm.String())
 			}
 		}
 	}
@@ -386,10 +364,19 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	// No (active) migration.
 	// Done.
 	if migration == nil {
+		r.Log.Info("No pending migrations found.")
 		plan.Status.DeleteCondition(Executing)
 		reQ = NoReQ
 		return
 	}
+
+	r.Log.Info(
+		"Found (new) migration.",
+		"migration",
+		path.Join(
+			migration.GetNamespace(),
+			migration.GetName()))
+
 	//
 	// Run the migration.
 	snapshot.BeginStagingConditions()
@@ -410,13 +397,25 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	// Reflect the active snapshot status on the plan.
 	for _, t := range []string{Executing, Succeeded, Failed, Canceled} {
 		if cnd := snapshot.FindCondition(t); cnd != nil {
+			r.Log.V(1).Info(
+				"Snapshot condition copied to plan.",
+				"condition",
+				cnd)
 			plan.Status.SetCondition(*cnd)
 		} else {
 			plan.Status.DeleteCondition(t)
+			r.Log.V(1).Info(
+				"Snapshot condition cleared on plan.",
+				"condition",
+				t)
 		}
 	}
 	if len(pending) > 1 && reQ == 0 {
-		reQ = FastReQ
+		r.Log.V(1).Info(
+			"Found pending migrations.",
+			"count",
+			len(pending))
+		reQ = base.FastReQ
 	}
 
 	return
@@ -436,6 +435,10 @@ func (r *Reconciler) newSnapshot(ctx *plancontext.Context) *planapi.Snapshot {
 	snapshot.Map.Network.With(plan.Referenced.Map.Network)
 	snapshot.Map.Storage.With(plan.Referenced.Map.Storage)
 	plan.Status.Migration.NewSnapshot(snapshot)
+	log.V(1).Info(
+		"Snapshot created.",
+		"snapshot",
+		snapshot)
 	return plan.Status.Migration.ActiveSnapshot()
 }
 
@@ -463,18 +466,23 @@ func (r *Reconciler) matchSnapshot(ctx *plancontext.Context) (matched bool) {
 		}
 	}()
 	if !snapshot.Plan.Match(plan) {
+		log.V(1).Info("Snapshot: plan not matched.")
 		return false
 	}
 	if !snapshot.Provider.Source.Match(plan.Referenced.Provider.Source) {
+		log.V(1).Info("Snapshot: provider (source) not matched.")
 		return false
 	}
 	if !snapshot.Provider.Destination.Match(plan.Referenced.Provider.Destination) {
+		log.V(1).Info("Snapshot: provider (destination) not matched.")
 		return false
 	}
 	if !snapshot.Map.Network.Match(plan.Referenced.Map.Network) {
+		log.V(1).Info("Snapshot: networkMap not matched.")
 		return false
 	}
 	if !snapshot.Map.Storage.Match(plan.Referenced.Map.Storage) {
+		log.V(1).Info("Snapshot: storageMap not matched.")
 		return false
 	}
 
@@ -515,6 +523,7 @@ func (r *Reconciler) activeMigration(plan *api.Plan) (migration *api.Migration, 
 	if err != nil {
 		if k8serr.IsNotFound(err) {
 			snapshot.SetCondition(deleted)
+			r.Log.Info("Active snapshot deleted.")
 			err = nil
 		} else {
 			err = liberr.Wrap(err)
@@ -522,11 +531,17 @@ func (r *Reconciler) activeMigration(plan *api.Plan) (migration *api.Migration, 
 		return
 	}
 	if active.UID != snapshot.Migration.UID {
+		r.Log.Info("Active snapshot deleted.")
 		snapshot.SetCondition(deleted)
 		active = nil
 	}
 
 	migration = active
+
+	r.Log.Info(
+		"Found (active) snapshot",
+		"snapshot",
+		active)
 
 	return
 }
@@ -548,10 +563,22 @@ func (r *Reconciler) pendingMigrations(plan *api.Plan) (list []*api.Migration, e
 		}
 		if found, snapshot := plan.Status.Migration.SnapshotWithMigration(migration.UID); found {
 			if snapshot.HasCondition(Canceled) {
+				r.Log.Info(
+					"Migration ignored.",
+					"migration",
+					path.Join(
+						migration.GetNamespace(),
+						migration.GetName()))
 				continue
 			}
 		}
 		if migration.Status.HasAnyCondition(Succeeded, Failed, Canceled) {
+			r.Log.Info(
+				"Migration ignored.",
+				"migration",
+				path.Join(
+					migration.GetNamespace(),
+					migration.GetName()))
 			continue
 		}
 		list = append(list, migration)
@@ -588,6 +615,12 @@ func (r *Reconciler) postpone() (postpone bool, err error) {
 	for _, provider := range providerList.Items {
 		if provider.Status.ObservedGeneration < provider.Generation {
 			postpone = true
+			r.Log.V(1).Info(
+				"Postponing: provider not reconciled.",
+				"provider",
+				path.Join(
+					provider.GetNamespace(),
+					provider.GetName()))
 			return
 		}
 	}
@@ -601,6 +634,12 @@ func (r *Reconciler) postpone() (postpone bool, err error) {
 	for _, netMap := range netMapList.Items {
 		if netMap.Status.ObservedGeneration < netMap.Generation {
 			postpone = true
+			r.Log.V(1).Info(
+				"Postponing: networkMap not reconciled.",
+				"map",
+				path.Join(
+					netMap.GetNamespace(),
+					netMap.GetName()))
 			return
 		}
 	}
@@ -614,6 +653,12 @@ func (r *Reconciler) postpone() (postpone bool, err error) {
 	for _, dsMap := range netMapList.Items {
 		if dsMap.Status.ObservedGeneration < dsMap.Generation {
 			postpone = true
+			r.Log.V(1).Info(
+				"Postponing: storageMap not reconciled.",
+				"map",
+				path.Join(
+					dsMap.GetNamespace(),
+					dsMap.GetName()))
 			return
 		}
 	}
@@ -627,6 +672,12 @@ func (r *Reconciler) postpone() (postpone bool, err error) {
 	for _, host := range hostList.Items {
 		if host.Status.ObservedGeneration < host.Generation {
 			postpone = true
+			r.Log.V(1).Info(
+				"Postponing: host not reconciled.",
+				"host",
+				path.Join(
+					host.GetNamespace(),
+					host.GetName()))
 			return
 		}
 	}
@@ -640,6 +691,12 @@ func (r *Reconciler) postpone() (postpone bool, err error) {
 	for _, hook := range hookList.Items {
 		if hook.Status.ObservedGeneration < hook.Generation {
 			postpone = true
+			r.Log.V(1).Info(
+				"Postponing: hook not reconciled.",
+				"hook",
+				path.Join(
+					hook.GetNamespace(),
+					hook.GetName()))
 			return
 		}
 	}

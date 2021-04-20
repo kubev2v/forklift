@@ -221,6 +221,8 @@ func (r *Reconciler) testConnection(provider *api.Provider, secret *core.Secret)
 	rl := container.Build(nil, provider, secret)
 	err := rl.Test()
 	if err == nil {
+		log.Info(
+			"Connection test succeeded.")
 		provider.Status.SetCondition(
 			libcnd.Condition{
 				Type:     ConnectionTestSucceeded,
@@ -230,6 +232,10 @@ func (r *Reconciler) testConnection(provider *api.Provider, secret *core.Secret)
 				Message:  "Connection test, succeeded.",
 			})
 	} else {
+		log.Info(
+			"Connection test failed.",
+			"reason",
+			err.Error())
 		provider.Status.SetCondition(
 			libcnd.Condition{
 				Type:     ConnectionTestFailed,

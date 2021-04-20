@@ -27,6 +27,7 @@ import (
 	"github.com/konveyor/controller/pkg/logging"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
+	"github.com/konveyor/forklift-controller/pkg/controller/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/model"
 	ocpmodel "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
@@ -34,9 +35,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/client-go/tools/record"
 	"os"
 	"path/filepath"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,16 +45,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	"sync"
-	"time"
 )
 
 const (
-	// Controller name.
+	// Name.
 	Name = "provider"
-	// Fast re-queue delay.
-	FastReQ = time.Millisecond * 500
-	// Slow re-queue delay.
-	SlowReQ = time.Second * 10
 )
 
 //
@@ -66,13 +60,10 @@ var log = logging.WithName(Name)
 // Application settings.
 var Settings = &settings.Settings
 
-func init() {
-	libfb.WorkingDir = Settings.WorkingDir
-}
-
 //
 // Creates a new Inventory Controller and adds it to the Manager.
 func Add(mgr manager.Manager) error {
+	libfb.WorkingDir = Settings.WorkingDir
 	container := libcontainer.New()
 	web := libweb.New(container, web.All(container)...)
 	web.Port = Settings.Inventory.Port
@@ -81,13 +72,14 @@ func Add(mgr manager.Manager) error {
 	web.TLS.Key = Settings.Inventory.TLS.Key
 	web.AllowedOrigins = Settings.CORS.AllowedOrigins
 	reconciler := &Reconciler{
-		Client:        mgr.GetClient(),
-		EventRecorder: mgr.GetEventRecorderFor(Name),
-		catalog:       &Catalog{},
-		scheme:        mgr.GetScheme(),
-		log:           log,
-		container:     container,
-		web:           web,
+		Reconciler: base.Reconciler{
+			EventRecorder: mgr.GetEventRecorderFor(Name),
+			Client:        mgr.GetClient(),
+			Log:           log,
+		},
+		catalog:   &Catalog{},
+		container: container,
+		web:       web,
 	}
 
 	web.Start()
@@ -131,13 +123,10 @@ var _ reconcile.Reconciler = &Reconciler{}
 //
 // Reconciles an provider object.
 type Reconciler struct {
-	record.EventRecorder
-	client.Client
+	base.Reconciler
 	catalog   *Catalog
-	scheme    *runtime.Scheme
 	container *libcontainer.Container
 	web       *libweb.WebServer
-	log       *logging.Logger
 }
 
 //
@@ -145,27 +134,16 @@ type Reconciler struct {
 // Note: Must not a pointer receiver to ensure that the
 // logger and other state is not shared.
 func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Result, err error) {
-	fastReQ := reconcile.Result{RequeueAfter: FastReQ}
-	slowReQ := reconcile.Result{RequeueAfter: SlowReQ}
-	noReQ := reconcile.Result{}
-	result = noReQ
-
-	r.log = logging.WithName(
+	r.Log = logging.WithName(
 		names.SimpleNameGenerator.GenerateName(Name+"|"),
 		"provider",
 		request)
-
-	r.log.Info("Reconcile")
-
+	r.Started()
 	defer func() {
-		if err != nil {
-			if k8serr.IsConflict(err) {
-				r.log.Info(err.Error())
-			} else {
-				r.log.Trace(err)
-			}
-			err = nil
-		}
+		result.RequeueAfter = r.Ended(
+			result.RequeueAfter,
+			err)
+		err = nil
 	}()
 
 	// Fetch the CR.
@@ -173,15 +151,14 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 	err = r.Get(context.TODO(), request.NamespacedName, provider)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
+			r.Log.Info("Provider deleted.")
 			err = nil
 			if deleted, found := r.catalog.get(request); found {
 				if r, found := r.container.Delete(deleted); found {
 					r.Shutdown()
-					r.DB().Close(true)
+					_ = r.DB().Close(true)
 				}
 			}
-		} else {
-			result = fastReQ
 		}
 		return
 	} else {
@@ -189,14 +166,14 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 	}
 
 	defer func() {
-		r.log.Info("Conditions.", "all", provider.Status.Conditions)
+		r.Log.V(1).Info("Conditions.", "all", provider.Status.Conditions)
 	}()
 
 	// Updated.
 	if !provider.HasReconciled() {
 		if r, found := r.container.Delete(provider); found {
 			r.Shutdown()
-			r.DB().Close(true)
+			_ = r.DB().Close(true)
 		}
 	}
 
@@ -206,14 +183,12 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 	// Validations.
 	err = r.validate(provider)
 	if err != nil {
-		result = fastReQ
 		return
 	}
 
 	// Update the container.
 	err = r.updateContainer(provider)
 	if err != nil {
-		result = slowReQ
 		return
 	}
 
@@ -233,26 +208,26 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 	provider.Status.EndStagingConditions()
 
 	// Record events.
-	provider.Status.RecordEvents(provider, r)
+	r.Record(provider, provider.Status.Conditions)
 
 	// Apply changes.
 	provider.Status.ObservedGeneration = provider.Generation
 	err = r.Status().Update(context.TODO(), provider)
 	if err != nil {
-		result = fastReQ
 		return
 	}
 
 	// Update the DB.
 	err = r.updateProvider(provider)
 	if err != nil {
-		result = fastReQ
 		return
 	}
 
 	// ReQ.
 	if !provider.Status.HasCondition(ConnectionTestSucceeded, InventoryCreated) {
-		result = slowReQ
+		r.Log.Info(
+			"Waiting connection tested or inventory created.")
+		result.RequeueAfter = base.SlowReQ
 	}
 
 	// Done
@@ -288,40 +263,50 @@ func (r *Reconciler) updateProvider(provider *api.Provider) (err error) {
 //
 // Update the container.
 func (r *Reconciler) updateContainer(provider *api.Provider) (err error) {
+	log.Info("Update container.")
 	if _, found := r.container.Get(provider); found {
 		if provider.HasReconciled() {
+			r.Log.V(2).Info(
+				"Provider not reconciled, postponing.")
 			return
 		}
 	}
 	if provider.Status.HasBlockerCondition() ||
 		!provider.Status.HasCondition(ConnectionTestSucceeded) {
-		return nil
+		r.Log.V(2).Info(
+			"Provider not ready, postponing.")
+		return
 	}
 	if current, found := r.container.Get(provider); found {
 		current.Shutdown()
 		_ = current.DB().Close(true)
+		r.Log.V(2).Info(
+			"Shutdown found (data) reconciler.")
 	}
 	db := r.getDB(provider)
 	secret, err := r.getSecret(provider)
 	if err != nil {
-		return err
+		return
 	}
 	err = db.Open(true)
 	if err != nil {
-		return err
+		return
 	}
 	pModel := &ocpmodel.Provider{}
 	pModel.With(provider)
 	err = db.Insert(pModel)
 	if err != nil {
-		return err
+		return
 	}
 	err = r.container.Add(container.Build(db, provider, secret))
 	if err != nil {
-		return err
+		return
 	}
 
-	return nil
+	r.Log.V(2).Info(
+		"Data reconciler added/started.")
+
+	return
 }
 
 //
@@ -334,6 +319,10 @@ func (r *Reconciler) getDB(provider *api.Provider) (db libmodel.DB) {
 	path := filepath.Join(dir, file)
 	models := model.Models(provider)
 	db = libmodel.New(path, models...)
+	r.Log.Info(
+		"Opening DB.",
+		"path",
+		path)
 	return
 }
 
