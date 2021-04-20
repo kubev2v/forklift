@@ -56,7 +56,6 @@ type KubeVirt struct {
 func (r *KubeVirt) ImportMap() (mp ImportMap, err error) {
 	list, err := r.ListImports()
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	mp = ImportMap{}
@@ -233,12 +232,10 @@ func (r *KubeVirt) EnsureNamespace() (err error) {
 func (r *KubeVirt) ensureSecret(vmRef ref.Ref) (secret *core.Secret, err error) {
 	_, err = r.Source.Inventory.VM(&vmRef)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	newSecret, err := r.secret(vmRef)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	list := &core.SecretList{}
@@ -281,7 +278,6 @@ func (r *KubeVirt) vmImport(
 	secret *core.Secret) (object *vmio.VirtualMachineImport, err error) {
 	_, err = r.Source.Inventory.VM(&vm.Ref)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	annotations := make(map[string]string)
@@ -308,7 +304,6 @@ func (r *KubeVirt) vmImport(
 	}
 	err = r.Builder.Import(vm.Ref, &object.Spec)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	if vm.Name != "" {
@@ -343,9 +338,6 @@ func (r *KubeVirt) secret(vmRef ref.Ref) (object *core.Secret, err error) {
 		},
 	}
 	err = r.Builder.Secret(vmRef, r.Source.Secret, object)
-	if err != nil {
-		err = liberr.Wrap(err)
-	}
 
 	return
 }
