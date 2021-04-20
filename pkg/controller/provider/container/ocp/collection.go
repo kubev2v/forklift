@@ -233,7 +233,7 @@ type Namespace struct {
 //
 // Get the kubernetes object being collected.
 func (r *Namespace) Object() runtime.Object {
-	return &storage.StorageClass{}
+	return &core.Namespace{}
 }
 
 //
