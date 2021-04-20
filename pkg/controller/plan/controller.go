@@ -198,7 +198,7 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 		return
 	}
 	defer func() {
-		r.Log.Info("Conditions.", "all", plan.Status.Conditions)
+		r.Log.V(1).Info("Conditions.", "all", plan.Status.Conditions)
 	}()
 
 	// Postpone as needed.
@@ -234,7 +234,7 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 	plan.Status.EndStagingConditions()
 
 	// Record events.
-	plan.Status.RecordEvents(plan, r)
+	r.Record(plan, plan.Status.Conditions)
 
 	// Apply changes.
 	plan.Status.ObservedGeneration = plan.Generation

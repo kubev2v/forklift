@@ -143,14 +143,14 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 		return
 	}
 	defer func() {
-		r.Log.Info("Conditions.", "all", mp.Status.Conditions)
+		r.Log.V(1).Info("Conditions.", "all", mp.Status.Conditions)
 	}()
 
 	// Begin staging conditions.
 	mp.Status.BeginStagingConditions()
 
 	// Record events.
-	mp.Status.RecordEvents(mp, r)
+	r.Record(mp, mp.Status.Conditions)
 
 	// Validations.
 	err = r.validate(mp)

@@ -141,7 +141,7 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 		return
 	}
 	defer func() {
-		r.Log.Info("Conditions.", "all", host.Status.Conditions)
+		r.Log.V(1).Info("Conditions.", "all", host.Status.Conditions)
 	}()
 
 	// Begin staging conditions.
@@ -167,7 +167,7 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 	host.Status.EndStagingConditions()
 
 	// Record events.
-	host.Status.RecordEvents(host, r)
+	r.Record(host, host.Status.Conditions)
 
 	// Apply changes.
 	host.Status.ObservedGeneration = host.Generation
