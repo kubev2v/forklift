@@ -6,7 +6,7 @@ require (
 	github.com/gin-gonic/gin v1.6.3
 	github.com/go-logr/logr v0.3.0
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.1.0
-	github.com/konveyor/controller v0.3.5
+	github.com/konveyor/controller v0.3.6
 	github.com/onsi/gomega v1.10.3
 	github.com/prometheus/client_golang v1.8.0 // indirect
 	github.com/vmware/govmomi v0.23.1
