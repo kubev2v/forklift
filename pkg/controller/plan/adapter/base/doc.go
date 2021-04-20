@@ -45,4 +45,3 @@ type Validator interface {
 	// Validate that a VM's networks have been mapped.
 	NetworksMapped(vmRef ref.Ref) (bool, error)
 }
-

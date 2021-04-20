@@ -12,7 +12,7 @@ import (
 //
 // vSphere validator.
 type Validator struct {
-	plan *api.Plan
+	plan      *api.Plan
 	inventory web.Client
 }
 
