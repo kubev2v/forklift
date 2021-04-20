@@ -107,7 +107,7 @@ type Reconciler struct {
 func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Result, err error) {
 	r.Log = logging.WithName(
 		names.SimpleNameGenerator.GenerateName(Name+"|"),
-		"map",
+		"migration",
 		request)
 	r.Started()
 	defer func() {

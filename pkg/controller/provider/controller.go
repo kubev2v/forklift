@@ -60,13 +60,10 @@ var log = logging.WithName(Name)
 // Application settings.
 var Settings = &settings.Settings
 
-func init() {
-	libfb.WorkingDir = Settings.WorkingDir
-}
-
 //
 // Creates a new Inventory Controller and adds it to the Manager.
 func Add(mgr manager.Manager) error {
+	libfb.WorkingDir = Settings.WorkingDir
 	container := libcontainer.New()
 	web := libweb.New(container, web.All(container)...)
 	web.Port = Settings.Inventory.Port
@@ -139,7 +136,7 @@ type Reconciler struct {
 func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Result, err error) {
 	r.Log = logging.WithName(
 		names.SimpleNameGenerator.GenerateName(Name+"|"),
-		"hook",
+		"provider",
 		request)
 	r.Started()
 	defer func() {
