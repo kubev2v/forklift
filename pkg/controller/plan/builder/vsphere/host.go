@@ -52,7 +52,7 @@ func (r *EsxHost) networkID(network *model.Network) (id string, err error) {
 	}()
 	object, fErr := r.finder.Network(ctx, network.Name)
 	if fErr != nil {
-		err = fErr
+		err = liberr.Wrap(fErr)
 		return
 	}
 
@@ -76,7 +76,7 @@ func (r *EsxHost) DatastoreID(ds *model.Datastore) (id string, err error) {
 	}()
 	object, fErr := r.finder.Datastore(ctx, ds.Name)
 	if fErr != nil {
-		err = fErr
+		err = liberr.Wrap(fErr)
 		return
 	}
 
