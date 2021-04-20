@@ -107,7 +107,7 @@ func (r *Builder) Import(vmRef ref.Ref, object *vmio.VirtualMachineImportSpec) (
 				vmRef.String()))
 		return
 	}
-	if r.Plan.Spec.Warm && !vm.changeTrackingEnabled {
+	if r.Plan.Spec.Warm && !vm.ChangeTrackingEnabled {
 		err = liberr.New(
 			fmt.Sprintf(
 				"Changed Block Tracking (CBT) is disabled for VM %s",
