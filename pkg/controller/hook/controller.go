@@ -114,7 +114,7 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 		return
 	}
 	defer func() {
-		r.Log.Info("Conditions.", "all", hook.Status.Conditions)
+		r.Log.V(1).Info("Conditions.", "all", hook.Status.Conditions)
 	}()
 
 	// Begin staging conditions.
@@ -140,7 +140,7 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 	hook.Status.EndStagingConditions()
 
 	// Record events.
-	hook.Status.RecordEvents(hook, r)
+	r.Record(hook, hook.Status.Conditions)
 
 	// Apply changes.
 	hook.Status.ObservedGeneration = hook.Generation

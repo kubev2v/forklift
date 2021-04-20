@@ -29,6 +29,8 @@ type Handler struct {
 	provider *api.Provider
 	// Inventory API client.
 	inventory web.Client
+	// Watch ID.
+	id uint64
 	// Watch ended by peer.
 	ended bool
 	// Parity marker.
@@ -78,18 +80,34 @@ func (r *Handler) HasParity() bool {
 
 //
 // Inventory watch has parity.
+func (r *Handler) Started(id uint64) {
+	r.id = id
+	log.V(1).Info(
+		"event: started.",
+		"id",
+		r.id)
+}
+
+//
+// Inventory watch has parity.
 func (r *Handler) Parity() {
-	log.V(1).Info("event: parity.")
 	r.parity = true
+	log.V(1).Info(
+		"event: parity.",
+		"id",
+		r.id)
 }
 
 //
 // Watch ended by peer.
 // The database has been closed.
 func (r *Handler) End() {
-	log.V(1).Info("event: ended.")
 	r.parity = false
 	r.ended = true
+	log.V(1).Info(
+		"event: ended.",
+		"id",
+		r.id)
 }
 
 //
@@ -98,6 +116,8 @@ func (r *Handler) End() {
 func (r *Handler) Error(w *libweb.Watch, err error) {
 	log.Info(
 		"event: error.",
+		"id",
+		r.id,
 		"error",
 		err.Error())
 	if !r.ended {
