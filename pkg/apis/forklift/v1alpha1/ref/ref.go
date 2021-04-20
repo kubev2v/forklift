@@ -36,3 +36,21 @@ func (r *Ref) String() (s string) {
 
 	return
 }
+
+//
+// Collection of Refs.
+type Refs struct {
+	List []Ref `json:"references,omitempty"`
+}
+
+//
+// Determine whether the list of refs contains a given ref.
+func (r *Refs) Find(ref Ref) (found bool) {
+	for _, r := range r.List {
+		if r.ID == ref.ID {
+			found = true
+			break
+		}
+	}
+	return
+}
