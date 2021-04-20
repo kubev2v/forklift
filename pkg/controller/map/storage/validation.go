@@ -81,6 +81,7 @@ func (r *Reconciler) validateSource(mp *api.StorageMap) (err error) {
 	}
 	notValid := []string{}
 	ambiguous := []string{}
+	references := refapi.Refs{}
 	list := mp.Spec.Map
 	for i := range list {
 		ref := &list[i].Source
@@ -107,7 +108,9 @@ func (r *Reconciler) validateSource(mp *api.StorageMap) (err error) {
 			err = pErr
 			return
 		}
+		references.List = append(references.List, *ref)
 	}
+	mp.Status.Refs = references
 	if len(notValid) > 0 {
 		mp.Status.SetCondition(libcnd.Condition{
 			Type:     SourceStorageNotValid,
