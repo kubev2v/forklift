@@ -8,7 +8,7 @@ import (
 
 //
 // vSphere adapter.
-type Adapter struct {}
+type Adapter struct{}
 
 //
 // Constructs a vSphere builder.
