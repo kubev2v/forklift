@@ -10,6 +10,7 @@ import (
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	refapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
+	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/controller/validation"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -29,6 +30,8 @@ const (
 	VMRefNotValid       = "VMRefNotValid"
 	VMNotFound          = "VMNotFound"
 	VMAlreadyExists     = "VMAlreadyExists"
+	VMNetworksNotMapped = "VMNetworksNotMapped"
+	VMStorageNotMapped  = "VMStorageNotMapped"
 	DuplicateVM         = "DuplicateVM"
 	NameNotValid        = "TargetNameNotValid"
 	HookNotValid        = "HookNotValid"
@@ -256,6 +259,23 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "Target VM already exists.",
 		Items:    []string{},
 	}
+	unmappedNetwork := libcnd.Condition{
+		Type:     VMNetworksNotMapped,
+		Status:   True,
+		Reason:   NotValid,
+		Category: Critical,
+		Message:  "VM has unmapped networks.",
+		Items:    []string{},
+	}
+	unmappedStorage := libcnd.Condition{
+		Type:     VMStorageNotMapped,
+		Status:   True,
+		Reason:   NotValid,
+		Category: Critical,
+		Message:  "VM has unmapped storage.",
+		Items:    []string{},
+	}
+
 	setOf := map[string]bool{}
 	//
 	// Referenced VMs.
@@ -300,6 +320,28 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		} else {
 			setOf[ref.ID] = true
 		}
+		pAdapter, err := adapter.New(provider)
+		if err != nil {
+			return err
+		}
+		validator, err := pAdapter.Validator(plan)
+		if err != nil {
+			return err
+		}
+		ok, err := validator.NetworksMapped(*ref)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			unmappedNetwork.Items = append(unmappedNetwork.Items, ref.String())
+		}
+		ok, err = validator.StorageMapped(*ref)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			unmappedStorage.Items = append(unmappedStorage.Items, ref.String())
+		}
 		// Destination.
 		provider = plan.Referenced.Provider.Destination
 		if provider == nil {
@@ -342,6 +384,12 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(ambiguous.Items) > 0 {
 		plan.Status.SetCondition(ambiguous)
+	}
+	if len(unmappedNetwork.Items) > 0 {
+		plan.Status.SetCondition(unmappedNetwork)
+	}
+	if len(unmappedStorage.Items) > 0 {
+		plan.Status.SetCondition(unmappedStorage)
 	}
 
 	return nil
