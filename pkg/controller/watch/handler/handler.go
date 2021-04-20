@@ -2,6 +2,7 @@ package handler
 
 import (
 	libweb "github.com/konveyor/controller/pkg/inventory/web"
+	"github.com/konveyor/controller/pkg/logging"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	core "k8s.io/api/core/v1"
@@ -9,6 +10,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
+
+var log = logging.WithName("watch")
 
 //
 // Generic event.
@@ -26,6 +29,8 @@ type Handler struct {
 	provider *api.Provider
 	// Inventory API client.
 	inventory web.Client
+	// Watch ID.
+	id uint64
 	// Watch ended by peer.
 	ended bool
 	// Parity marker.
@@ -75,8 +80,22 @@ func (r *Handler) HasParity() bool {
 
 //
 // Inventory watch has parity.
+func (r *Handler) Started(id uint64) {
+	r.id = id
+	log.V(1).Info(
+		"event: started.",
+		"id",
+		r.id)
+}
+
+//
+// Inventory watch has parity.
 func (r *Handler) Parity() {
 	r.parity = true
+	log.V(1).Info(
+		"event: parity.",
+		"id",
+		r.id)
 }
 
 //
@@ -85,12 +104,22 @@ func (r *Handler) Parity() {
 func (r *Handler) End() {
 	r.parity = false
 	r.ended = true
+	log.V(1).Info(
+		"event: ended.",
+		"id",
+		r.id)
 }
 
 //
 // Watch error.
 // Repair the watch.
 func (r *Handler) Error(w *libweb.Watch, err error) {
+	log.Info(
+		"event: error.",
+		"id",
+		r.id,
+		"error",
+		err.Error())
 	if !r.ended {
 		_ = w.Repair()
 	}
