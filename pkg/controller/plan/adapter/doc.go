@@ -7,9 +7,13 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/vsphere"
 )
 
+type Adapter = base.Adapter
+type Builder = base.Builder
+type Validator = base.Validator
+
 //
 // Adapter factory.
-func New(provider *api.Provider) (adapter base.Adapter, err error) {
+func New(provider *api.Provider) (adapter Adapter, err error) {
 	//
 	switch provider.Type() {
 	case api.VSphere:
