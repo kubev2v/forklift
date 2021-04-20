@@ -8,7 +8,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
-	builder "github.com/konveyor/forklift-controller/pkg/controller/plan/builder/vsphere"
+	adapter "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/validation"
@@ -281,7 +281,7 @@ func (r *Reconciler) testConnection(host *api.Host) (err error) {
 			return
 		}
 		secret.Data["thumbprint"] = []byte(hostModel.Thumbprint)
-		h := builder.EsxHost{
+		h := adapter.EsxHost{
 			Secret: secret,
 			URL:    url,
 		}

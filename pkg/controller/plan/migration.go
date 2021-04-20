@@ -7,7 +7,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	libitr "github.com/konveyor/controller/pkg/itinerary"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
-	"github.com/konveyor/forklift-controller/pkg/controller/plan/builder"
+	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/scheduler"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
@@ -66,7 +66,7 @@ var (
 type Migration struct {
 	*plancontext.Context
 	// Builder
-	builder builder.Builder
+	builder adapter.Builder
 	// kubevirt.
 	kubevirt KubeVirt
 	// VM import CRs.
@@ -288,7 +288,12 @@ func (r *Migration) runningVMs() (vms []*plan.VMStatus) {
 //
 // Get/Build resources.
 func (r *Migration) init() (err error) {
-	r.builder, err = builder.New(r.Context)
+	adapter, err := adapter.New(r.Context.Source.Provider)
+	if err != nil {
+		return
+	}
+
+	r.builder, err = adapter.Builder(r.Context)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
