@@ -114,7 +114,7 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 		return
 	}
 	defer func() {
-		r.Log.V(1).Info("Conditions.", "all", hook.Status.Conditions)
+		r.Log.V(2).Info("Conditions.", "all", hook.Status.Conditions)
 	}()
 
 	// Begin staging conditions.

@@ -3,13 +3,19 @@ package vsphere
 import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	libweb "github.com/konveyor/controller/pkg/inventory/web"
+	"github.com/konveyor/controller/pkg/logging"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/watch/handler"
 	"golang.org/x/net/context"
+	"path"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"strings"
 )
+
+//
+// Package logger.
+var log = logging.WithName("networkMap|vsphere")
 
 //
 // Provider watch event handler.
@@ -20,10 +26,19 @@ type Handler struct {
 //
 // Ensure watch on networks.
 func (r *Handler) Watch(watch *handler.WatchManager) (err error) {
-	_, err = watch.Ensure(
+	w, err := watch.Ensure(
 		r.Provider(),
 		&vsphere.Network{},
 		r)
+
+	log.Info(
+		"Inventory watch ensured.",
+		"provider",
+		path.Join(
+			r.Provider().Namespace,
+			r.Provider().Name),
+		"watch",
+		w.ID())
 
 	return
 }
@@ -69,6 +84,10 @@ func (r *Handler) Deleted(e libweb.Event) {
 // Find all of the NetworkMap CRs the reference both the
 // provider and the changed network and enqueue reconcile events.
 func (r *Handler) changed(models ...*vsphere.Network) {
+	log.V(3).Info(
+		"Network changed.",
+		"id",
+		models[0].ID)
 	list := api.NetworkMapList{}
 	err := r.List(context.TODO(), &list)
 	if err != nil {
@@ -94,6 +113,12 @@ func (r *Handler) changed(models ...*vsphere.Network) {
 			}
 		}
 		if referenced {
+			log.V(3).Info(
+				"Queue reconcile event.",
+				"map",
+				path.Join(
+					mp.Namespace,
+					mp.Name))
 			r.Enqueue(event.GenericEvent{
 				Meta:   &mp.ObjectMeta,
 				Object: &mp,

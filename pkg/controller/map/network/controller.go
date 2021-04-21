@@ -36,7 +36,7 @@ import (
 
 const (
 	// Name.
-	Name = "network-map"
+	Name = "networkMap"
 )
 
 //
@@ -141,7 +141,7 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 		return
 	}
 	defer func() {
-		r.Log.V(1).Info("Conditions.", "all", mp.Status.Conditions)
+		r.Log.V(2).Info("Conditions.", "all", mp.Status.Conditions)
 	}()
 
 	// Begin staging conditions.
