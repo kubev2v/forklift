@@ -28,7 +28,6 @@ import (
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/storage/names"
 	"path"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -177,7 +176,7 @@ type Reconciler struct {
 func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Result, err error) {
 	r.Log = logging.WithName(
 		names.SimpleNameGenerator.GenerateName(Name+"|"),
-		"hook",
+		"plan",
 		request)
 	r.Started()
 	defer func() {
@@ -198,7 +197,7 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 		return
 	}
 	defer func() {
-		r.Log.V(1).Info("Conditions.", "all", plan.Status.Conditions)
+		r.Log.V(2).Info("Conditions.", "all", plan.Status.Conditions)
 	}()
 
 	// Postpone as needed.
@@ -277,16 +276,7 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	}()
 	var migration *api.Migration
 	snapshot := plan.Status.Migration.ActiveSnapshot()
-	ctx, err := plancontext.New(
-		r,
-		plan,
-		&api.Migration{
-			ObjectMeta: meta.ObjectMeta{
-				Namespace: snapshot.Migration.Namespace,
-				Name:      snapshot.Migration.Name,
-				UID:       snapshot.Migration.UID,
-			},
-		})
+	ctx, err := plancontext.New(r, plan, r.Log)
 	if err != nil {
 		return
 	}
@@ -297,7 +287,7 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 		return
 	}
 	if migration != nil {
-		ctx.Migration = migration
+		ctx.SetMigration(migration)
 		r.matchSnapshot(ctx)
 		r.Log.Info(
 			"Found (active) migration.",
@@ -330,20 +320,13 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 			}
 		}
 	}
-
-	runner := Migration{
-		Context: ctx,
-		log: log.WithValues(
-			"migration",
-			path.Join(
-				ctx.Migration.Namespace,
-				ctx.Migration.Name)),
-	}
+	//
+	// Cancel.
+	runner := Migration{Context: ctx}
 	err = runner.Cancel()
 	if err != nil {
 		return
 	}
-
 	//
 	// Find pending migrations.
 	pending := []*api.Migration{}
@@ -356,9 +339,15 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	// Select the next pending migration as the (active) migration.
 	if migration == nil && len(pending) > 0 {
 		migration = pending[0]
-		ctx.Migration = migration
+		ctx.SetMigration(migration)
 		snapshot = r.newSnapshot(ctx)
 		plan.Status.DeleteCondition(Failed, Canceled)
+		r.Log.Info(
+			"Found (new) migration.",
+			"migration",
+			path.Join(
+				migration.GetNamespace(),
+				migration.GetName()))
 	}
 	//
 	// No (active) migration.
@@ -370,24 +359,10 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 		return
 	}
 
-	r.Log.Info(
-		"Found (new) migration.",
-		"migration",
-		path.Join(
-			migration.GetNamespace(),
-			migration.GetName()))
-
 	//
 	// Run the migration.
 	snapshot.BeginStagingConditions()
-	runner = Migration{
-		Context: ctx,
-		log: log.WithValues(
-			"migration",
-			path.Join(
-				ctx.Migration.Namespace,
-				ctx.Migration.Name)),
-	}
+	runner = Migration{Context: ctx}
 	reQ, err = runner.Run()
 	if err != nil {
 		return
@@ -397,14 +372,14 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	// Reflect the active snapshot status on the plan.
 	for _, t := range []string{Executing, Succeeded, Failed, Canceled} {
 		if cnd := snapshot.FindCondition(t); cnd != nil {
-			r.Log.V(1).Info(
+			r.Log.V(2).Info(
 				"Snapshot condition copied to plan.",
 				"condition",
 				cnd)
 			plan.Status.SetCondition(*cnd)
 		} else {
 			plan.Status.DeleteCondition(t)
-			r.Log.V(1).Info(
+			r.Log.V(2).Info(
 				"Snapshot condition cleared on plan.",
 				"condition",
 				t)
@@ -466,23 +441,23 @@ func (r *Reconciler) matchSnapshot(ctx *plancontext.Context) (matched bool) {
 		}
 	}()
 	if !snapshot.Plan.Match(plan) {
-		log.V(1).Info("Snapshot: plan not matched.")
+		log.Info("Snapshot: plan not matched.")
 		return false
 	}
 	if !snapshot.Provider.Source.Match(plan.Referenced.Provider.Source) {
-		log.V(1).Info("Snapshot: provider (source) not matched.")
+		log.Info("Snapshot: provider (source) not matched.")
 		return false
 	}
 	if !snapshot.Provider.Destination.Match(plan.Referenced.Provider.Destination) {
-		log.V(1).Info("Snapshot: provider (destination) not matched.")
+		log.Info("Snapshot: provider (destination) not matched.")
 		return false
 	}
 	if !snapshot.Map.Network.Match(plan.Referenced.Map.Network) {
-		log.V(1).Info("Snapshot: networkMap not matched.")
+		log.Info("Snapshot: networkMap not matched.")
 		return false
 	}
 	if !snapshot.Map.Storage.Match(plan.Referenced.Map.Storage) {
-		log.V(1).Info("Snapshot: storageMap not matched.")
+		log.Info("Snapshot: storageMap not matched.")
 		return false
 	}
 
@@ -537,11 +512,6 @@ func (r *Reconciler) activeMigration(plan *api.Plan) (migration *api.Migration, 
 	}
 
 	migration = active
-
-	r.Log.Info(
-		"Found (active) snapshot",
-		"snapshot",
-		active)
 
 	return
 }

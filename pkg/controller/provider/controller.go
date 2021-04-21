@@ -166,7 +166,7 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 	}
 
 	defer func() {
-		r.Log.V(1).Info("Conditions.", "all", provider.Status.Conditions)
+		r.Log.V(2).Info("Conditions.", "all", provider.Status.Conditions)
 	}()
 
 	// Updated.
@@ -266,14 +266,14 @@ func (r *Reconciler) updateContainer(provider *api.Provider) (err error) {
 	log.Info("Update container.")
 	if _, found := r.container.Get(provider); found {
 		if provider.HasReconciled() {
-			r.Log.V(2).Info(
+			r.Log.V(1).Info(
 				"Provider not reconciled, postponing.")
 			return
 		}
 	}
 	if provider.Status.HasBlockerCondition() ||
 		!provider.Status.HasCondition(ConnectionTestSucceeded) {
-		r.Log.V(2).Info(
+		r.Log.V(1).Info(
 			"Provider not ready, postponing.")
 		return
 	}
