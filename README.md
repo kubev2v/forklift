@@ -7,7 +7,8 @@ Konveyor Forklift controller.
 **Logging**
 
 Logging can be configured using environment variables:
-- LOG_DEVELOPMENT: Development mode with human readable logs and (default) verbosity=4.
+- LOG_DEVELOPMENT: Development mode with human readable logs 
+  and (default) verbosity=4.
 - LOG_LEVEL: Set the verbosity.
 
 Verbosity:
@@ -36,3 +37,12 @@ Verbosity:
   - VM validation succeeded.
 - Info(4) used for `Debug` logging.
   - Policy agent HTTP request.
+
+---
+**Profiler**
+
+The profiler can be enabled using the following environment variables:
+- PROFILE_KIND: Kind of profile (memory|cpu|mutex).
+- PROFILE_PATH: Profiler output directory.
+- PROFILE_DURATION: The duration (minutes) the profiler
+  will collect data. (0=indefinately)
