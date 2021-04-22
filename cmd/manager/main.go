@@ -17,49 +17,47 @@ limitations under the License.
 package main
 
 import (
-	"github.com/konveyor/controller/pkg/logging"
-	"github.com/konveyor/forklift-controller/pkg/settings"
-	"os"
-	"strconv"
-
+	"github.com/go-logr/logr"
 	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	"github.com/konveyor/forklift-controller/pkg/apis"
 	"github.com/konveyor/forklift-controller/pkg/controller"
+	"github.com/konveyor/forklift-controller/pkg/settings"
 	"github.com/konveyor/forklift-controller/pkg/webhook"
+	"github.com/pkg/profile"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	cnv "kubevirt.io/client-go/api/v1"
 	cdi "kubevirt.io/containerized-data-importer/pkg/apis/core/v1beta1"
-
 	vmio "kubevirt.io/vm-import-operator/pkg/apis/v2v/v1beta1"
-
+	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
+	"time"
 )
 
 //
 // Application settings.
 var Settings = &settings.Settings
 
-func main() {
-	development := false
-	if s, found := os.LookupEnv(logging.EnvDevelopment); found {
-		parsed, err := strconv.ParseBool(s)
-		if err == nil {
-			development = parsed
-		}
-	}
+//
+// Logger.
+var log logr.Logger
 
-	logf.SetLogger(logf.ZapLogger(development))
-
-	log := logf.Log.WithName("entrypoint")
-
-	// Load settings.
+func init() {
 	err := Settings.Load()
 	if err != nil {
-		log.Error(err, "unable to load settings")
-		os.Exit(1)
+		panic(err)
+	}
+	logf.SetLogger(
+		logf.ZapLogger(Settings.Logging.Development))
+	log = logf.Log.WithName("entrypoint")
+}
+
+func main() {
+	// Profiler.
+	if p := profiler(); p != nil {
+		defer p.Stop()
 	}
 
 	// Get a config to talk to the apiserver
@@ -121,4 +119,43 @@ func main() {
 		log.Error(err, "unable to run the manager")
 		os.Exit(1)
 	}
+}
+
+//
+// Build and start profiler.
+func profiler() (profiler interface{Stop()}) {
+	var kind func(*profile.Profile)
+	switch Settings.Kind {
+	case settings.ProfileCpu:
+		kind = profile.CPUProfile
+	case settings.ProfileMutex:
+		kind = profile.MutexProfile
+	default:
+		kind = profile.MemProfile
+	}
+	if len(Settings.Profiler.Path) == 0 {
+		return
+	}
+	settings := Settings.Profiler
+	log = log.WithValues(
+		"duration",
+		settings.Duration,
+		"kind",
+		settings.Kind,
+		"path",
+		Settings.Path)
+	profiler = profile.Start(
+		profile.ProfilePath(settings.Path),
+		profile.NoShutdownHook,
+		kind)
+	log.Info("Profiler started.")
+	if settings.Duration > 0 {
+		go func() {
+			time.Sleep(settings.Duration)
+			profiler.Stop()
+			log.Info("Profiler stopped.")
+		}()
+	}
+
+	return
 }
