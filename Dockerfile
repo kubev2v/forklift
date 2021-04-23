@@ -27,4 +27,6 @@ LABEL name="konveyor/forklift-controller" \
 
 COPY --from=builder /opt/app-root/src/manager /usr/local/bin/manager
 
+RUN microdnf -y install tar && microdnf clean all
+
 ENTRYPOINT ["/usr/local/bin/manager"]
