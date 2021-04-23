@@ -2,6 +2,7 @@ package plan
 
 import (
 	"context"
+	"path"
 	"reflect"
 	"strconv"
 	"strings"
@@ -156,6 +157,14 @@ func (r *KubeVirt) EnsureImport(vm *plan.VMStatus) (err error) {
 				err = liberr.Wrap(err)
 				return
 			}
+			r.Log.Info(
+				"Updated VM Import.",
+				"import",
+				path.Join(
+					vmImport.Namespace,
+					vmImport.Name),
+				"vm",
+				vm.String())
 		}
 	} else {
 		vmImport = newImport
@@ -164,6 +173,14 @@ func (r *KubeVirt) EnsureImport(vm *plan.VMStatus) (err error) {
 			err = liberr.Wrap(err)
 			return
 		}
+		r.Log.Info(
+			"Created VM Import.",
+			"import",
+			path.Join(
+				vmImport.Namespace,
+				vmImport.Name),
+			"vm",
+			vm.String())
 	}
 	err = k8sutil.SetOwnerReference(vmImport, secret, scheme.Scheme)
 	if err != nil {
@@ -203,6 +220,15 @@ func (r *KubeVirt) DeleteImport(vm *plan.VMStatus) (err error) {
 			} else {
 				return liberr.Wrap(err)
 			}
+		} else {
+			r.Log.Info(
+				"Deleted VM Import.",
+				"import",
+				path.Join(
+					object.Namespace,
+					object.Name),
+				"vm",
+				vm.String())
 		}
 	}
 
@@ -223,6 +249,10 @@ func (r *KubeVirt) EnsureNamespace() (err error) {
 			err = nil
 		}
 	}
+	r.Log.Info(
+		"Created namespace.",
+		"import",
+		ns.Name)
 
 	return
 }
@@ -259,6 +289,14 @@ func (r *KubeVirt) ensureSecret(vmRef ref.Ref) (secret *core.Secret, err error) 
 			err = liberr.Wrap(err)
 			return
 		}
+		r.Log.V(1).Info(
+			"Secret updated.",
+			"secret",
+			path.Join(
+				secret.Namespace,
+				secret.Name),
+			"vm",
+			vmRef.String())
 	} else {
 		secret = newSecret
 		err = r.Destination.Client.Create(context.TODO(), secret)
@@ -266,6 +304,14 @@ func (r *KubeVirt) ensureSecret(vmRef ref.Ref) (secret *core.Secret, err error) 
 			err = liberr.Wrap(err)
 			return
 		}
+		r.Log.V(1).Info(
+			"Secret created.",
+			"secret",
+			path.Join(
+				secret.Namespace,
+				secret.Name),
+			"vm",
+			vmRef.String())
 	}
 
 	return

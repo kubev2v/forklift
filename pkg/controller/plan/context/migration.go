@@ -2,10 +2,12 @@ package context
 
 import (
 	"context"
+	"github.com/go-logr/logr"
 	liberr "github.com/konveyor/controller/pkg/error"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	core "k8s.io/api/core/v1"
+	"path"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -20,11 +22,13 @@ func (e NotEnoughDataError) Error() string {
 
 //
 // Factory.
-func New(client k8sclient.Client, plan *api.Plan, migration *api.Migration) (ctx *Context, err error) {
+func New(
+	client k8sclient.Client, plan *api.Plan, log logr.Logger) (ctx *Context, err error) {
 	ctx = &Context{
 		Client:    client,
 		Plan:      plan,
-		Migration: migration,
+		Migration: &api.Migration{},
+		Log:       log,
 	}
 	err = ctx.build()
 	if err != nil {
@@ -57,6 +61,8 @@ type Context struct {
 	Destination Destination
 	// Hooks.
 	Hooks []*api.Hook
+	// Logger.
+	Log logr.Logger
 }
 
 //
@@ -85,6 +91,21 @@ func (r *Context) build() (err error) {
 	r.Hooks = r.Plan.Hooks
 
 	return
+}
+
+//
+// Set the migration.
+// This will update the logger context.
+func (r *Context) SetMigration(migration *api.Migration) {
+	if migration == nil {
+		return
+	}
+	r.Migration = migration
+	r.Log = r.Log.WithValues(
+		"migration",
+		path.Join(
+			migration.Namespace,
+			migration.Name))
 }
 
 //

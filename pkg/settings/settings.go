@@ -23,6 +23,10 @@ type ControllerSettings struct {
 	Migration
 	// Policy agent settings.
 	PolicyAgent
+	// Logging settings.
+	Logging
+	// Profiler settings.
+	Profiler
 }
 
 //
@@ -45,6 +49,14 @@ func (r *ControllerSettings) Load() error {
 		return err
 	}
 	err = r.PolicyAgent.Load()
+	if err != nil {
+		return err
+	}
+	err = r.Logging.Load()
+	if err != nil {
+		return err
+	}
+	err = r.Profiler.Load()
 	if err != nil {
 		return err
 	}

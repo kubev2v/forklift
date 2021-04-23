@@ -78,7 +78,7 @@ func (r *Client) Version() (version int, err error) {
 	version = out.Result.Version
 
 	log.Info(
-		"version detected",
+		"Policy version detected.",
 		"version",
 		version)
 
@@ -127,15 +127,6 @@ func (r *Client) Validate(ref refapi.Ref) (version int, concerns []model.Concern
 	concerns = out.Result.Concerns
 	version = out.Result.Version
 
-	log.V(3).Info(
-		"validate VM succeeded.",
-		"vm",
-		ref.String(),
-		"version",
-		version,
-		"concern",
-		concerns)
-
 	return
 }
 
@@ -158,6 +149,9 @@ func (r *Client) get(path string, out interface{}) (err error) {
 		"url",
 		url)
 	status, err := r.LibClient.Get(url, out)
+	if err != nil {
+		return
+	}
 	if status != http.StatusOK {
 		err = liberr.New(http.StatusText(status))
 	}
@@ -186,6 +180,9 @@ func (r *Client) post(path string, in interface{}, out interface{}) (err error) 
 		"body",
 		out)
 	status, err := r.LibClient.Post(url, in, out)
+	if err != nil {
+		return
+	}
 	if status != http.StatusOK {
 		err = liberr.New(http.StatusText(status))
 	}
@@ -260,6 +257,22 @@ func (r *Task) Duration() time.Duration {
 }
 
 //
+// Description.
+func (r *Task) String() string {
+	err := ""
+	if r.Error != nil {
+		err = r.Error.Error()
+	}
+	return fmt.Sprintf(
+		"Ref:%s,Version:%d,Error:'%s',Duration:%s,Concerns:%s",
+		r.Ref.String(),
+		r.Version,
+		err,
+		r.Duration(),
+		r.Concerns)
+}
+
+//
 // Notify result handler the task has completed.
 func (r *Task) notify() {
 	if r.ResultHandler != nil {
@@ -288,12 +301,12 @@ func (r *Worker) run() {
 		_ = recover()
 	}()
 	go func() {
-		log.Info(
-			"worker: started.",
+		log.V(1).Info(
+			"Worker started.",
 			"id",
 			r.id)
-		defer log.Info(
-			"worker: stopped.",
+		defer log.V(1).Info(
+			"Worker stopped.",
 			"id",
 			r.id)
 		for task := range r.input {
@@ -337,15 +350,22 @@ func (r *Scheduler) Start() {
 		w.run()
 	}
 	go func() {
-		log.Info(
-			"scheduler: started.")
-		defer log.Info(
-			"scheduler: stopped.")
+		log.V(1).Info(
+			"Scheduler started.")
+		defer log.V(1).Info(
+			"Scheduler stopped.")
 		for task := range r.output {
-			log.V(4).Info(
-				"scheduler: dispatch completed.",
-				"task",
-				task)
+			if task.Error == nil {
+				log.V(4).Info(
+					"VM Validation succeeded.",
+					"task",
+					task.String())
+			} else {
+				log.Info(
+					"VM Validation failed.",
+					"task",
+					task)
+			}
 			task.notify()
 		}
 	}()

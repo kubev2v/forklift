@@ -445,7 +445,10 @@ next:
 		if updateSet.Truncated == nil || !*updateSet.Truncated {
 			if !r.parity {
 				r.parity = true
-				r.log.Info("Initial parity.", "duration", time.Since(mark))
+				r.log.Info(
+					"Initial parity.",
+					"duration",
+					time.Since(mark))
 				watchList = r.watch()
 			}
 		}
@@ -843,11 +846,15 @@ func (r Reconciler) applyEnter(tx *libmodel.Tx, u types.ObjectUpdate) error {
 	if mX, cast := m.(interface{ Created() }); cast {
 		mX.Created()
 	}
-	r.log.Info("Create", "model", m.String())
 	err := tx.Insert(m)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+
+	r.log.V(3).Info(
+		"Model created.",
+		"model",
+		libmodel.Describe(m))
 
 	return nil
 }
@@ -860,7 +867,6 @@ func (r Reconciler) applyModify(tx *libmodel.Tx, u types.ObjectUpdate) error {
 		return nil
 	}
 	m := adapter.Model()
-	r.log.Info("Update", "model", m.String())
 	err := tx.Get(m)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -873,6 +879,11 @@ func (r Reconciler) applyModify(tx *libmodel.Tx, u types.ObjectUpdate) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+
+	r.log.V(3).Info(
+		"Model updated.",
+		"model",
+		libmodel.Describe(m))
 
 	return nil
 }
@@ -928,11 +939,15 @@ func (r Reconciler) applyLeave(tx *libmodel.Tx, u types.ObjectUpdate) error {
 		r.log.Info("Unknown", "kind", u.Obj.Type)
 		return nil
 	}
-	r.log.Info("Delete", "model", deleted.String())
 	err := tx.Delete(deleted)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+
+	r.log.V(3).Info(
+		"Model deleted.",
+		"model",
+		libmodel.Describe(deleted))
 
 	return nil
 }

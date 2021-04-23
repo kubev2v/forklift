@@ -178,7 +178,7 @@ func (r *VMEventHandler) run() {
 // VMs that have been reported through the model event
 // watch are ignored.
 func (r *VMEventHandler) search() {
-	r.log.Info("Search for VMs that need to be validated.")
+	r.log.V(1).Info("Search for VMs that need to be validated.")
 	version, err := r.policyAgent.Version()
 	if err != nil {
 		r.log.Error(err, err.Error())
@@ -275,7 +275,7 @@ func (r *VMEventHandler) validated(task *policy.Task) {
 		r.log.Error(err, "commit failed.")
 		return
 	}
-	r.log.Info(
+	r.log.V(3).Info(
 		"PolicyAgent: validated",
 		"vmID",
 		latest.ID,

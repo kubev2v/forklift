@@ -57,6 +57,14 @@ func (r *Scheduler) Next() (vm *plan.VMStatus, hasNext bool, err error) {
 			hasNext = true
 		}
 	}
+
+	if hasNext {
+		r.Log.Info(
+			"Next scheduled VM.",
+			"vm",
+			vm.String())
+	}
+
 	return
 }
 
@@ -75,6 +83,13 @@ func (r *Scheduler) buildSchedule() (err error) {
 	if err != nil {
 		return
 	}
+
+	r.Log.V(1).Info(
+		"Schedule built.",
+		"inflight",
+		r.inFlight,
+		"pending",
+		r.pending)
 
 	return
 }
