@@ -34,6 +34,9 @@ func (r *EsxHost) TestConnection() (err error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
 	err = r.connect(ctx)
+	if err == nil {
+		r.close()
+	}
 	return
 }
 
@@ -47,9 +50,7 @@ func (r *EsxHost) networkID(network *model.Network) (id string, err error) {
 	if err != nil {
 		return
 	}
-	defer func() {
-		_ = r.client.Logout(ctx)
-	}()
+	defer r.close()
 	object, fErr := r.finder.Network(ctx, network.Name)
 	if fErr != nil {
 		err = liberr.Wrap(fErr)
@@ -71,9 +72,7 @@ func (r *EsxHost) DatastoreID(ds *model.Datastore) (id string, err error) {
 	if err != nil {
 		return
 	}
-	defer func() {
-		_ = r.client.Logout(ctx)
-	}()
+	defer r.close()
 	object, fErr := r.finder.Datastore(ctx, ds.Name)
 	if fErr != nil {
 		err = liberr.Wrap(fErr)
@@ -116,6 +115,16 @@ func (r *EsxHost) connect(ctx context.Context) (err error) {
 	r.finder = find.NewFinder(vimClient)
 
 	return nil
+}
+
+//
+// Close connections.
+func (r *EsxHost) close() {
+	if r.client != nil {
+		_ = r.client.Logout(context.TODO())
+		r.client.CloseIdleConnections()
+		r.client = nil
+	}
 }
 
 //
