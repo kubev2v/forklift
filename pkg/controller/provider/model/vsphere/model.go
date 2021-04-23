@@ -27,11 +27,11 @@ type Base struct {
 	// Managed object ID.
 	ID string `sql:"pk"`
 	// Name
-	Name string `sql:"d0,index(b)"`
+	Name string `sql:"d0,index(name)"`
 	// Parent
-	Parent Ref `sql:"d0,index(a)"`
+	Parent Ref `sql:"d0,index(parent)"`
 	// Revision
-	Revision int64 `sql:"d0"`
+	Revision int64 `sql:"d0,index(revision)"`
 }
 
 //
@@ -336,8 +336,8 @@ type Datastore struct {
 
 type VM struct {
 	Base
-	RevisionValidated     int64     `sql:"d0"`
-	PolicyVersion         int       `sql:"d0"`
+	RevisionValidated     int64     `sql:"d0,index(revisionValidated)"`
+	PolicyVersion         int       `sql:"d0,index(policyVersion)"`
 	UUID                  string    `sql:""`
 	Firmware              string    `sql:""`
 	PowerState            string    `sql:""`
