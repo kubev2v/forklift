@@ -300,7 +300,7 @@ func (r *Reconciler) Test() (err error) {
 	defer cancel()
 	err = r.connect(ctx)
 	if err == nil {
-		r.client.Logout(ctx)
+		r.close()
 	}
 
 	return
@@ -357,7 +357,7 @@ func (r *Reconciler) getUpdates(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer r.client.Logout(ctx)
+	defer r.close()
 	about := r.client.ServiceContent.About
 	err = r.db.Insert(
 		&model.About{
@@ -510,10 +510,7 @@ func (r *Reconciler) watch() (list []*libmodel.Watch) {
 //
 // Build the client.
 func (r *Reconciler) connect(ctx context.Context) error {
-	if r.client != nil {
-		_ = r.client.Logout(ctx)
-		r.client = nil
-	}
+	r.close()
 	url, err := liburl.Parse(r.url)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -537,6 +534,16 @@ func (r *Reconciler) connect(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+//
+// Close connections.
+func (r *Reconciler) close() {
+	if r.client != nil {
+		_ = r.client.Logout(context.TODO())
+		r.client.CloseIdleConnections()
+		r.client = nil
+	}
 }
 
 //
