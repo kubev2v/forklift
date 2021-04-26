@@ -148,6 +148,8 @@ type Task struct {
 	Description string `json:"description,omitempty"`
 	// Phase
 	Phase string `json:"phase,omitempty"`
+	// Reason
+	Reason string `json:"reason,omitempty"`
 	// Progress.
 	Progress libitr.Progress `json:"progress"`
 	// Annotations.
