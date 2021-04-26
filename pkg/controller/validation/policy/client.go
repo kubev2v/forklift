@@ -197,7 +197,14 @@ func (c *Client) buildTransport() (err error) {
 	if c.Transport != nil {
 		return
 	}
-	transport := &http.Transport{
+	pool := x509.NewCertPool()
+	ca, err := ioutil.ReadFile(Settings.PolicyAgent.CA)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	pool.AppendCertsFromPEM(ca)
+	c.Transport = &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
 			Timeout:   10 * time.Second,
@@ -208,21 +215,10 @@ func (c *Client) buildTransport() (err error) {
 		IdleConnTimeout:       10 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
-	}
-	if Settings.Inventory.TLS.Enabled {
-		pool := x509.NewCertPool()
-		ca, xErr := ioutil.ReadFile(Settings.PolicyAgent.CA)
-		if xErr != nil {
-			err = liberr.Wrap(xErr)
-			return
-		}
-		pool.AppendCertsFromPEM(ca)
-		transport.TLSClientConfig = &tls.Config{
+		TLSClientConfig: &tls.Config{
 			RootCAs: pool,
-		}
+		},
 	}
-
-	c.Transport = transport
 
 	return
 }
