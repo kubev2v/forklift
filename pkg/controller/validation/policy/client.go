@@ -12,6 +12,7 @@ import (
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	"io/ioutil"
+	"net"
 	"net/http"
 	liburl "net/url"
 	"time"
@@ -196,18 +197,32 @@ func (c *Client) buildTransport() (err error) {
 	if c.Transport != nil {
 		return
 	}
-	pool := x509.NewCertPool()
-	ca, err := ioutil.ReadFile(Settings.PolicyAgent.CA)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
+	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 10 * time.Second,
+		}).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          10,
+		IdleConnTimeout:       10 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
 	}
-	pool.AppendCertsFromPEM(ca)
-	c.Transport = &http.Transport{
-		TLSClientConfig: &tls.Config{
+	if Settings.Inventory.TLS.Enabled {
+		pool := x509.NewCertPool()
+		ca, xErr := ioutil.ReadFile(Settings.PolicyAgent.CA)
+		if xErr != nil {
+			err = liberr.Wrap(xErr)
+			return
+		}
+		pool.AppendCertsFromPEM(ca)
+		transport.TLSClientConfig = &tls.Config{
 			RootCAs: pool,
-		},
+		}
 	}
+
+	c.Transport = transport
 
 	return
 }
