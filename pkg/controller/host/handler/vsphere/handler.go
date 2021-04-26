@@ -94,7 +94,8 @@ func (r *Handler) changed(models ...*vsphere.Host) {
 		err = liberr.Wrap(err)
 		return
 	}
-	for _, h := range list.Items {
+	for i := range list.Items {
+		h := &list.Items[i]
 		if !r.MatchProvider(h.Spec.Provider) {
 			continue
 		}
@@ -115,7 +116,7 @@ func (r *Handler) changed(models ...*vsphere.Host) {
 					h.Name))
 			r.Enqueue(event.GenericEvent{
 				Meta:   &h.ObjectMeta,
-				Object: &h,
+				Object: h,
 			})
 		}
 	}
