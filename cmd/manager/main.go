@@ -123,7 +123,7 @@ func main() {
 
 //
 // Build and start profiler.
-func profiler() (profiler interface{Stop()}) {
+func profiler() (profiler interface{ Stop() }) {
 	var kind func(*profile.Profile)
 	switch Settings.Kind {
 	case settings.ProfileCpu:
