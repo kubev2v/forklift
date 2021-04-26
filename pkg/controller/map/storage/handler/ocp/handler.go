@@ -79,7 +79,8 @@ func (r *Handler) changed(storageClass *ocp.StorageClass) {
 		err = liberr.Wrap(err)
 		return
 	}
-	for _, mp := range list.Items {
+	for i := range list.Items {
+		mp := &list.Items[i]
 		ref := mp.Spec.Provider.Destination
 		if !r.MatchProvider(ref) {
 			continue
@@ -95,9 +96,8 @@ func (r *Handler) changed(storageClass *ocp.StorageClass) {
 						mp.Name))
 				r.Enqueue(event.GenericEvent{
 					Meta:   &mp.ObjectMeta,
-					Object: &mp,
+					Object: mp,
 				})
-				break
 			}
 		}
 	}

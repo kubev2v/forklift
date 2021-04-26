@@ -94,7 +94,8 @@ func (r *Handler) changed(models ...*vsphere.Network) {
 		err = liberr.Wrap(err)
 		return
 	}
-	for _, mp := range list.Items {
+	for i := range list.Items {
+		mp := &list.Items[i]
 		ref := mp.Spec.Provider.Source
 		if !r.MatchProvider(ref) {
 			continue
@@ -121,7 +122,7 @@ func (r *Handler) changed(models ...*vsphere.Network) {
 					mp.Name))
 			r.Enqueue(event.GenericEvent{
 				Meta:   &mp.ObjectMeta,
-				Object: &mp,
+				Object: mp,
 			})
 		}
 	}
