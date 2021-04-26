@@ -29,6 +29,9 @@ func (r *Handler) Watch(watch *handler.WatchManager) (err error) {
 		r.Provider(),
 		&ocp.VM{},
 		r)
+	if err != nil {
+		return
+	}
 
 	log.Info(
 		"Inventory watch ensured.",
