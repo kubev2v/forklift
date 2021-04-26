@@ -1,7 +1,6 @@
 package vsphere
 
 import (
-	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
@@ -27,13 +26,13 @@ func (r *Validator) Load() (err error) {
 // Validate that a VM's networks have been mapped.
 func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 	vm := &model.VM{}
-	pErr := r.inventory.Find(vm, vmRef)
-	if pErr != nil {
-		err = liberr.New(
-			fmt.Sprintf(
-				"VM %s lookup failed: %s",
-				vmRef.String(),
-				pErr.Error()))
+	err = r.inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(
+			err,
+			"VM not found in inventory.",
+			"vm",
+			vmRef.String())
 		return
 	}
 
@@ -50,13 +49,13 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 // Validate that a VM's disk backing storage has been mapped.
 func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 	vm := &model.VM{}
-	pErr := r.inventory.Find(vm, vmRef)
-	if pErr != nil {
-		err = liberr.New(
-			fmt.Sprintf(
-				"VM %s lookup failed: %s",
-				vmRef.String(),
-				pErr.Error()))
+	err = r.inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(
+			err,
+			"VM not found in inventory.",
+			"vm",
+			vmRef.String())
 		return
 	}
 
