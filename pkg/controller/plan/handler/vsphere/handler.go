@@ -94,7 +94,8 @@ func (r *Handler) changed(models ...*vsphere.VM) {
 		err = liberr.Wrap(err)
 		return
 	}
-	for _, plan := range list.Items {
+	for i := range list.Items {
+		plan := &list.Items[i]
 		ref := plan.Spec.Provider.Source
 		if !r.MatchProvider(ref) {
 			continue
@@ -121,7 +122,7 @@ func (r *Handler) changed(models ...*vsphere.VM) {
 					plan.Name))
 			r.Enqueue(event.GenericEvent{
 				Meta:   &plan.ObjectMeta,
-				Object: &plan,
+				Object: plan,
 			})
 		}
 	}
