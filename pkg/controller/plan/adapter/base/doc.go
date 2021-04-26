@@ -1,16 +1,25 @@
-package builder
+package base
 
 import (
-	liberr "github.com/konveyor/controller/pkg/error"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
-	"github.com/konveyor/forklift-controller/pkg/controller/plan/builder/vsphere"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	core "k8s.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer/pkg/apis/core/v1beta1"
 	vmio "kubevirt.io/vm-import-operator/pkg/apis/v2v/v1beta1"
 )
+
+//
+// Adapter API.
+// Constructs provider-specific implementations
+// of the Builder and Validator.
+type Adapter interface {
+	// Construct builder.
+	Builder(ctx *plancontext.Context) (Builder, error)
+	// Construct validator.
+	Validator(plan *api.Plan) (Validator, error)
+}
 
 //
 // Builder API.
@@ -28,21 +37,11 @@ type Builder interface {
 }
 
 //
-// Builder factory.
-func New(ctx *plancontext.Context) (builder Builder, err error) {
-	//
-	switch ctx.Source.Provider.Type() {
-	case api.VSphere:
-		b := &vsphere.Builder{Context: ctx}
-		bErr := b.Load()
-		if bErr != nil {
-			err = liberr.Wrap(bErr)
-		} else {
-			builder = b
-		}
-	default:
-		liberr.New("provider not supported.")
-	}
-
-	return
+// Validator API.
+// Performs provider-specific validation.
+type Validator interface {
+	// Validate that a VM's disk backing storage has been mapped.
+	StorageMapped(vmRef ref.Ref) (bool, error)
+	// Validate that a VM's networks have been mapped.
+	NetworksMapped(vmRef ref.Ref) (bool, error)
 }

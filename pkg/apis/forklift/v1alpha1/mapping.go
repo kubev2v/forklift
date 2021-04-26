@@ -90,6 +90,8 @@ type StorageMapSpec struct {
 type MapStatus struct {
 	// Conditions.
 	libcnd.Conditions `json:",inline"`
+	// References.
+	ref.Refs `json:",inline"`
 	// The most recent generation observed by the controller.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`

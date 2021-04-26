@@ -185,6 +185,21 @@ spec:
                 description: The most recent generation observed by the controller.
                 format: int64
                 type: integer
+              references:
+                items:
+                  description: Source reference. Either the ID or Name must be specified.
+                  properties:
+                    id:
+                      description: 'The object ID. vsphere:   The managed object ID.'
+                      type: string
+                    name:
+                      description: 'An object Name. vsphere:   A qualified name.'
+                      type: string
+                    type:
+                      description: Type used to qualify the name.
+                      type: string
+                  type: object
+                type: array
             type: object
         type: object
     served: true

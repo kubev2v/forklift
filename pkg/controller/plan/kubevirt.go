@@ -11,7 +11,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
-	"github.com/konveyor/forklift-controller/pkg/controller/plan/builder"
+	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -49,7 +49,7 @@ type ImportMap map[string]VmImport
 type KubeVirt struct {
 	*plancontext.Context
 	// Builder
-	Builder builder.Builder
+	Builder adapter.Builder
 }
 
 //
