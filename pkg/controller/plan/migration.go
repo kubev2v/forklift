@@ -333,6 +333,7 @@ func (r *Migration) begin() (err error) {
 	if snapshot.HasAnyCondition(Executing, Succeeded, Failed, Canceled) {
 		return
 	}
+	r.Plan.Status.Migration.MarkReset()
 	r.Plan.Status.Migration.MarkStarted()
 	snapshot.SetCondition(
 		libcnd.Condition{
