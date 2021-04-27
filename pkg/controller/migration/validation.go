@@ -6,7 +6,7 @@ import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libref "github.com/konveyor/controller/pkg/ref"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	plancnt "github.com/konveyor/forklift-controller/pkg/controller/plan"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"

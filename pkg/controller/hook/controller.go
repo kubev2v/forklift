@@ -20,7 +20,7 @@ import (
 	"context"
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	"github.com/konveyor/controller/pkg/logging"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/base"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"

@@ -35,7 +35,7 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: AGE
       type: date
-    name: v1alpha1
+    name: v1beta1
     schema:
       openAPIV3Schema:
         properties:
@@ -89,6 +89,7 @@ spec:
             description: ProviderStatus defines the observed state of Provider
             properties:
               conditions:
+                description: List of conditions.
                 items:
                   description: Condition
                   properties:

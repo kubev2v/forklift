@@ -5,8 +5,8 @@ import (
 	"sync"
 
 	liberr "github.com/konveyor/controller/pkg/error"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 )

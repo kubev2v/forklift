@@ -1,7 +1,7 @@
 package model
 
 import (
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 )

@@ -20,7 +20,7 @@ limitations under the License.
 // +k8s:conversion-gen=github.com/konveyor/forklift-controller/pkg/apis/migration
 // +k8s:defaulter-gen=TypeMeta
 // +groupName=forklift.konveyor.io
-package v1alpha1
+package v1beta1
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"

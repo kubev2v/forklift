@@ -2,8 +2,8 @@ package vsphere
 
 import (
 	liberr "github.com/konveyor/controller/pkg/error"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 )

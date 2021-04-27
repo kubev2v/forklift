@@ -3,7 +3,7 @@ package web
 import (
 	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"

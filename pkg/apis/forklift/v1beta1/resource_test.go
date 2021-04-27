@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"testing"
 
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/onsi/gomega"
 	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"

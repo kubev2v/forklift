@@ -26,7 +26,7 @@ import (
 	libweb "github.com/konveyor/controller/pkg/inventory/web"
 	"github.com/konveyor/controller/pkg/logging"
 	libref "github.com/konveyor/controller/pkg/ref"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/model"

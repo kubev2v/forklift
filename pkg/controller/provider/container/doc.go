@@ -3,7 +3,7 @@ package container
 import (
 	libcontainer "github.com/konveyor/controller/pkg/inventory/container"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/vsphere"
 	core "k8s.io/api/core/v1"
