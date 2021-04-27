@@ -23,6 +23,7 @@ package v1beta1
 import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
+	"k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -562,6 +563,11 @@ func (in *PlanSpec) DeepCopyInto(out *PlanSpec) {
 	if in.Cutover != nil {
 		in, out := &in.Cutover, &out.Cutover
 		*out = (*in).DeepCopy()
+	}
+	if in.TransferNetwork != nil {
+		in, out := &in.TransferNetwork, &out.TransferNetwork
+		*out = new(v1.ObjectReference)
+		**out = **in
 	}
 }
 

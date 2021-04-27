@@ -21,6 +21,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/provider"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
+	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -41,9 +42,8 @@ type PlanSpec struct {
 	Warm bool `json:"warm,omitempty"`
 	// Date and time to finalize a warm migration.
 	Cutover *meta.Time `json:"cutover,omitempty"`
-	// Name of the network attachment definition in the target namespace
-	// which should be used for disk transfer.
-	TransferNetwork string `json:"transferNetwork,omitempty"`
+	// The network attachment definition that should be used for disk transfer.
+	TransferNetwork *core.ObjectReference `json:"transferNetwork,omitempty"`
 }
 
 //

@@ -327,8 +327,9 @@ func (r *KubeVirt) vmImport(
 		return
 	}
 	annotations := make(map[string]string)
-	if r.Plan.Spec.TransferNetwork != "" {
-		annotations[annDefaultNetwork] = r.Plan.Spec.TransferNetwork
+	if r.Plan.Spec.TransferNetwork != nil {
+		annotations[annDefaultNetwork] = path.Join(
+			r.Plan.Spec.TransferNetwork.Namespace, r.Plan.Spec.TransferNetwork.Name)
 	}
 	object = &vmio.VirtualMachineImport{
 		ObjectMeta: meta.ObjectMeta{
