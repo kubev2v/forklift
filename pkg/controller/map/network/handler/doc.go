@@ -2,7 +2,7 @@ package handler
 
 import (
 	liberr "github.com/konveyor/controller/pkg/error"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/map/network/handler/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/map/network/handler/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/watch/handler"

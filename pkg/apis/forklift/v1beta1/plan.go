@@ -14,45 +14,45 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/plan"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
-	core "k8s.io/api/core/v1"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/provider"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 //
-// MigrationSpec defines the desired state of Migration
-type MigrationSpec struct {
-	// Reference to the associated Plan.
-	Plan core.ObjectReference `json:"plan" ref:"Plan"`
-	// List of VMs which will have their imports canceled.
-	Cancel []ref.Ref `json:"cancel,omitempty"`
+// PlanSpec defines the desired state of Plan.
+type PlanSpec struct {
+	// Description
+	Description string `json:"description,omitempty"`
+	// Target namespace.
+	TargetNamespace string `json:"targetNamespace,omitempty"`
+	// Providers.
+	Provider provider.Pair `json:"provider"`
+	// Resource mapping.
+	Map plan.Map `json:"map"`
+	// List of VMs.
+	VMs []plan.VM `json:"vms"`
+	// Whether this is a warm migration.
+	Warm bool `json:"warm,omitempty"`
 	// Date and time to finalize a warm migration.
-	// If present, this will override the value set on the Plan.
 	Cutover *meta.Time `json:"cutover,omitempty"`
+	// Name of the network attachment definition in the target namespace
+	// which should be used for disk transfer.
+	TransferNetwork string `json:"transferNetwork,omitempty"`
 }
 
 //
-// Canceled indicates whether a VM ref is present
-// in the list of VM refs to be canceled.
-func (r *MigrationSpec) Canceled(ref ref.Ref) (found bool) {
-	if ref.ID == "" {
-		return
-	}
-
-	for _, vm := range r.Cancel {
-		// the refs in the Cancel array might not have
-		// all been resolved successfully, so skip
-		// over any VMs that don't have an ID set.
-		if vm.ID == "" {
-			continue
-		}
+// Find a planned VM.
+func (r *PlanSpec) FindVM(ref ref.Ref) (v *plan.VM, found bool) {
+	for _, vm := range r.VMs {
 		if vm.ID == ref.ID {
 			found = true
+			v = &vm
 			return
 		}
 	}
@@ -61,16 +61,15 @@ func (r *MigrationSpec) Canceled(ref ref.Ref) (found bool) {
 }
 
 //
-// MigrationStatus defines the observed state of Migration
-type MigrationStatus struct {
-	plan.Timed `json:",inline"`
+// PlanStatus defines the observed state of Plan.
+type PlanStatus struct {
 	// Conditions.
 	libcnd.Conditions `json:",inline"`
 	// The most recent generation observed by the controller.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-	// VM status
-	VMs []*plan.VMStatus `json:"vms,omitempty"`
+	// Migration
+	Migration plan.MigrationStatus `json:"migration,omitempty"`
 }
 
 //
@@ -79,33 +78,41 @@ type MigrationStatus struct {
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].status"
-// +kubebuilder:printcolumn:name="RUNNING",type=string,JSONPath=".status.conditions[?(@.type=='Running')].status"
+// +kubebuilder:printcolumn:name="EXECUTING",type=string,JSONPath=".status.conditions[?(@.type=='Executing')].status"
 // +kubebuilder:printcolumn:name="SUCCEEDED",type=string,JSONPath=".status.conditions[?(@.type=='Succeeded')].status"
 // +kubebuilder:printcolumn:name="FAILED",type=string,JSONPath=".status.conditions[?(@.type=='Failed')].status"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
-type Migration struct {
+type Plan struct {
 	meta.TypeMeta   `json:",inline"`
 	meta.ObjectMeta `json:"metadata,omitempty"`
-	Spec            MigrationSpec   `json:"spec,omitempty"`
-	Status          MigrationStatus `json:"status,omitempty"`
+	Spec            PlanSpec   `json:"spec,omitempty"`
+	Status          PlanStatus `json:"status,omitempty"`
+	// Referenced resources populated
+	// during validation.
+	Referenced `json:"-"`
 }
 
 //
-// Match plan.
-func (r *Migration) Match(plan *Plan) bool {
-	ref := r.Spec.Plan
-	return ref.Namespace == plan.Namespace &&
-		ref.Name == plan.Name
+// Get the target namespace.
+// Default to `plan` namespace when not specified
+// in the plan spec.
+func (r *Plan) TargetNamespace() (ns string) {
+	ns = r.Spec.TargetNamespace
+	if ns == "" {
+		ns = r.Plan.Namespace
+	}
+
+	return
 }
 
 //
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type MigrationList struct {
+type PlanList struct {
 	meta.TypeMeta `json:",inline"`
 	meta.ListMeta `json:"metadata,omitempty"`
-	Items         []Migration `json:"items"`
+	Items         []Plan `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Migration{}, &MigrationList{})
+	SchemeBuilder.Register(&Plan{}, &PlanList{})
 }

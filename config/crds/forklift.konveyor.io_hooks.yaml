@@ -26,7 +26,7 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
-    name: v1alpha1
+    name: v1beta1
     schema:
       openAPIV3Schema:
         description: Hook is the Schema for the hooks API
@@ -62,6 +62,7 @@ spec:
             description: Hook status.
             properties:
               conditions:
+                description: List of conditions.
                 items:
                   description: Condition
                   properties:

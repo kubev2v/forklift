@@ -3,8 +3,8 @@ package storage
 import (
 	"errors"
 	libcnd "github.com/konveyor/controller/pkg/condition"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
-	refapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	refapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/controller/validation"
 )
