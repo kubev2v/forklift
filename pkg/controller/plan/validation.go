@@ -402,7 +402,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 //
 // Validate transfer network selection.
 func (r *Reconciler) validateTransferNetwork(plan *api.Plan) (err error) {
-	if plan.Spec.TransferNetwork == "" {
+	if plan.Spec.TransferNetwork == nil {
 		return
 	}
 	notFound := libcnd.Condition{
@@ -413,8 +413,8 @@ func (r *Reconciler) validateTransferNetwork(plan *api.Plan) (err error) {
 		Message:  "Transfer network is not valid.",
 	}
 	key := client.ObjectKey{
-		Namespace: plan.TargetNamespace(),
-		Name:      plan.Spec.TransferNetwork,
+		Namespace: plan.Spec.TransferNetwork.Namespace,
+		Name:      plan.Spec.TransferNetwork.Name,
 	}
 	netAttachDef := &net.NetworkAttachmentDefinition{}
 	err = r.Get(context.TODO(), key, netAttachDef)
