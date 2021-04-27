@@ -14,6 +14,7 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes/scheme"
+	"path"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"strings"
@@ -109,8 +110,20 @@ func (r *HookRunner) ensureJob() (job *batch.Job, err error) {
 			err = liberr.Wrap(err)
 			return
 		}
+		r.Log.Info(
+			"Created (hook) job.",
+			"job",
+			path.Join(
+				job.Namespace,
+				job.Name))
 	} else {
 		job = &list.Items[0]
+		r.Log.V(1).Info(
+			"Found (hook) job.",
+			"job",
+			path.Join(
+				job.Namespace,
+				job.Name))
 	}
 	err = k8sutil.SetOwnerReference(job, mp, scheme.Scheme)
 	if err != nil {
@@ -232,8 +245,20 @@ func (r *HookRunner) ensureConfigMap() (mp *core.ConfigMap, err error) {
 			err = liberr.Wrap(err)
 			return
 		}
+		r.Log.Info(
+			"Created (hook) configMap.",
+			"map",
+			path.Join(
+				mp.Namespace,
+				mp.Name))
 	} else {
 		mp = &list.Items[0]
+		r.Log.V(1).Info(
+			"Found (hook) configMap.",
+			"map",
+			path.Join(
+				mp.Namespace,
+				mp.Name))
 	}
 
 	return
