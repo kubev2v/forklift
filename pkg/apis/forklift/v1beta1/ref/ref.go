@@ -1,5 +1,7 @@
 package ref
 
+import "fmt"
+
 //
 // Source reference.
 // Either the ID or Name must be specified.
@@ -25,14 +27,16 @@ func (r Ref) NotSet() bool {
 //
 // String representation.
 func (r *Ref) String() (s string) {
-	if r.ID != "" {
-		s = r.ID
-	} else {
-		s = r.Name
-	}
 	if r.Type != "" {
-		s = "/" + r.Type + s
+		s = fmt.Sprintf(
+			"(%s)",
+			r.Type)
 	}
+	s = fmt.Sprintf(
+		"%s id:%s name:'%s' ",
+		s,
+		r.ID,
+		r.Name)
 
 	return
 }
