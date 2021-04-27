@@ -30,6 +30,9 @@ func (r *Handler) Watch(watch *handler.WatchManager) (err error) {
 		r.Provider(),
 		&vsphere.Network{},
 		r)
+	if err != nil {
+		return
+	}
 
 	log.Info(
 		"Inventory watch ensured.",

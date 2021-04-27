@@ -305,7 +305,6 @@ func (c *RestClient) buildTransport() (err error) {
 			Timeout:   10 * time.Second,
 			KeepAlive: 10 * time.Second,
 		}).DialContext,
-		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          10,
 		IdleConnTimeout:       10 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
