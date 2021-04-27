@@ -6,7 +6,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	"github.com/konveyor/controller/pkg/logging"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/property"

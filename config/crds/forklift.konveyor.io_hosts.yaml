@@ -26,7 +26,7 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: AGE
       type: date
-    name: v1alpha1
+    name: v1beta1
     schema:
       openAPIV3Schema:
         properties:
@@ -115,6 +115,7 @@ spec:
             description: HostStatus defines the observed state of Host
             properties:
               conditions:
+                description: List of conditions.
                 items:
                   description: Condition
                   properties:

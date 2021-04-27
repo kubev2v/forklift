@@ -21,7 +21,7 @@ limitations under the License.
 package apis
 
 import (
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -29,7 +29,7 @@ import (
 var AddToSchemes runtime.SchemeBuilder
 
 func init() {
-	AddToSchemes = append(AddToSchemes, v1alpha1.SchemeBuilder.AddToScheme)
+	AddToSchemes = append(AddToSchemes, v1beta1.SchemeBuilder.AddToScheme)
 }
 
 // Adds all Resources to the Scheme.

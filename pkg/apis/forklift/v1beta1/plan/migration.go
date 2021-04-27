@@ -2,7 +2,7 @@ package plan
 
 import (
 	libitr "github.com/konveyor/controller/pkg/itinerary"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"k8s.io/apimachinery/pkg/types"
 )
 
