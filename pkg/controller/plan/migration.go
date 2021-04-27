@@ -165,6 +165,19 @@ func (r *Migration) step(vm *plan.VMStatus) (err error) {
 	case Started:
 		vm.MarkStarted()
 		vm.Phase = r.next(vm.Phase)
+	case PreHook, PostHook:
+		runner := HookRunner{Context: r.Context}
+		err = runner.Run(vm)
+		if err != nil {
+			return
+		}
+		if step, found := vm.ActiveStep(); found {
+			if step.MarkedCompleted() && step.Error == nil {
+				vm.Phase = r.next(vm.Phase)
+			}
+		} else {
+			vm.Phase = Completed
+		}
 	case CreateImport:
 		err = r.kubevirt.EnsureImport(vm)
 		if err != nil {
