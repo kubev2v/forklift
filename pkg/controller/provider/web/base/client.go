@@ -7,7 +7,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	libweb "github.com/konveyor/controller/pkg/inventory/web"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1alpha1/ref"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	"io/ioutil"
 	"net"

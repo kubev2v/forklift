@@ -20,4 +20,4 @@ limitations under the License.
 // +k8s:conversion-gen=github.com/konveyor/forklift-controller/pkg/apis
 // +k8s:defaulter-gen=TypeMeta
 // +groupName=forklift.konveyor.io
-package v1alpha1
+package v1beta1
