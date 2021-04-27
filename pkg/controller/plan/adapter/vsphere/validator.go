@@ -25,6 +25,9 @@ func (r *Validator) Load() (err error) {
 //
 // Validate that a VM's networks have been mapped.
 func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
+	if r.plan.Referenced.Map.Network == nil {
+		return
+	}
 	vm := &model.VM{}
 	err = r.inventory.Find(vm, vmRef)
 	if err != nil {
@@ -48,6 +51,9 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 //
 // Validate that a VM's disk backing storage has been mapped.
 func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
+	if r.plan.Referenced.Map.Storage == nil {
+		return
+	}
 	vm := &model.VM{}
 	err = r.inventory.Find(vm, vmRef)
 	if err != nil {
