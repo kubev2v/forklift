@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"time"
 )
 
 const (
@@ -186,9 +187,11 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 		return
 	}
 
-	// ReQ.
-	if !host.Status.HasCondition(ConnectionTestSucceeded) {
-		result.RequeueAfter = base.SlowReQ
+	// Connection test failed.
+	// Determined that ESX host retry of 15 minutes
+	// will not trigger DOS response.
+	if host.Status.HasCondition(ConnectionTestFailed) {
+		result.RequeueAfter = time.Minute * 15
 	}
 
 	// Done

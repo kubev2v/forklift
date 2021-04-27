@@ -36,10 +36,12 @@ func (r *Reconciler) Started() {
 //
 // Reconcile ended.
 func (r *Reconciler) Ended(reQin time.Duration, err error) (reQ time.Duration) {
-	defer r.Log.Info(
-		"Reconcile ended.",
-		"reQ",
-		reQ)
+	defer func() {
+		r.Log.Info(
+			"Reconcile ended.",
+			"reQ",
+			reQ)
+	}()
 	reQ = reQin
 	if err == nil {
 		return
