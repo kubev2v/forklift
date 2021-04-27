@@ -328,19 +328,23 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		if err != nil {
 			return err
 		}
-		ok, err := validator.NetworksMapped(*ref)
-		if err != nil {
-			return err
+		if plan.Referenced.Map.Network != nil {
+			ok, err := validator.NetworksMapped(*ref)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				unmappedNetwork.Items = append(unmappedNetwork.Items, ref.String())
+			}
 		}
-		if !ok {
-			unmappedNetwork.Items = append(unmappedNetwork.Items, ref.String())
-		}
-		ok, err = validator.StorageMapped(*ref)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			unmappedStorage.Items = append(unmappedStorage.Items, ref.String())
+		if plan.Referenced.Map.Storage != nil {
+			ok, err := validator.StorageMapped(*ref)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				unmappedStorage.Items = append(unmappedStorage.Items, ref.String())
+			}
 		}
 		// Destination.
 		provider = plan.Referenced.Provider.Destination
