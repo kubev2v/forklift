@@ -25,7 +25,7 @@ Verbosity:
   - Connection testing.
   - Plan postpone detials.
   - Pending migration details.
-  - Migration (k8s) resources found/updated.
+  - Migration (k8s) resources found,updated.
   - Scheduler details.
 - Info(2) used for `Info++` logging.
   - Full conditions list.
