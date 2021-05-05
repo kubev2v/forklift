@@ -193,7 +193,6 @@ func (r *Reconciler) reflectPlan(plan *api.Plan, migration *api.Migration) {
 	}
 	if snapshot.HasCondition(Executing) {
 		migration.Status.MarkStarted()
-		migration.Status.VMs = plan.Status.Migration.VMs
 		migration.Status.SetCondition(libcnd.Condition{
 			Type:     Running,
 			Status:   True,
@@ -221,4 +220,5 @@ func (r *Reconciler) reflectPlan(plan *api.Plan, migration *api.Migration) {
 			Durable:  true,
 		})
 	}
+	migration.Status.VMs = plan.Status.Migration.VMs
 }
