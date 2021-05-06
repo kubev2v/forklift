@@ -2,6 +2,8 @@ package vsphere
 
 import (
 	"context"
+	"errors"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"sync"
 
 	liberr "github.com/konveyor/controller/pkg/error"
@@ -124,20 +126,34 @@ func (r *Scheduler) buildInFlight() (err error) {
 		if p.Name == r.Plan.Name && p.Namespace == r.Plan.Namespace {
 			continue
 		}
+
 		// ignore plans that aren't using the same source provider
 		if p.Spec.Provider.Source != r.Plan.Spec.Provider.Source {
 			continue
 		}
 
+		// skip plans that aren't being executed
+		snapshot := p.Status.Migration.ActiveSnapshot()
+		if !snapshot.HasCondition("Executing") {
+			continue
+		}
+
 		for _, vmStatus := range p.Status.Migration.VMs {
+			if !vmStatus.Running() {
+				continue
+			}
 			vm := &model.VM{}
 			err = r.Source.Inventory.Find(vm, vmStatus.Ref)
 			if err != nil {
+				if errors.As(err, &web.NotFoundError{}) {
+					continue
+				}
+				if errors.As(err, &web.RefNotUniqueError{}) {
+					continue
+				}
 				return err
 			}
-			if vmStatus.Running() {
-				r.inFlight[vm.Host.ID] += len(vm.Disks)
-			}
+			r.inFlight[vm.Host.ID] += len(vm.Disks)
 		}
 	}
 
