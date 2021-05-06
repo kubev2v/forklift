@@ -112,6 +112,7 @@ const (
 	fPowerState          = "runtime.powerState"
 	fConnectionState     = "runtime.connectionState"
 	fSnapshot            = "snapshot"
+	fIsTemplate          = "config.template"
 )
 
 //
@@ -725,6 +726,7 @@ func (r *Reconciler) propertySpec() []types.PropertySpec {
 				fRuntimeHost,
 				fPowerState,
 				fConnectionState,
+				fIsTemplate,
 				fSnapshot,
 				fChangeTracking,
 			},
