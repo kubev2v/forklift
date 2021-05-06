@@ -100,6 +100,13 @@ func (r *Builder) Import(vmRef ref.Ref, object *vmio.VirtualMachineImportSpec) (
 				pErr.Error()))
 		return
 	}
+	if vm.IsTemplate {
+		err = liberr.New(
+			fmt.Sprintf(
+				"VM %s is a template",
+				vmRef.String()))
+		return
+	}
 	if types.VirtualMachineConnectionState(vm.ConnectionState) != types.VirtualMachineConnectionStateConnected {
 		err = liberr.New(
 			fmt.Sprintf(

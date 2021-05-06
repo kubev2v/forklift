@@ -508,6 +508,10 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				if s, cast := p.Val.(types.VirtualMachineConnectionState); cast {
 					v.model.ConnectionState = string(s)
 				}
+			case fIsTemplate:
+				if b, cast := p.Val.(bool); cast {
+					v.model.IsTemplate = b
+				}
 			case fSnapshot:
 				if snapshot, cast := p.Val.(types.VirtualMachineSnapshotInfo); cast {
 					ref := snapshot.CurrentSnapshot
