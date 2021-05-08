@@ -401,6 +401,7 @@ func (r *Migration) begin() (err error) {
 			status.Pipeline = pipeline
 			status.Phase = step.Name
 			status.Error = nil
+			status.Warm = nil
 			log.Info(
 				"Pipeline reset.",
 				"vm",
