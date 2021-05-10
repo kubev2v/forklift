@@ -40,8 +40,6 @@ type PlanSpec struct {
 	VMs []plan.VM `json:"vms"`
 	// Whether this is a warm migration.
 	Warm bool `json:"warm,omitempty"`
-	// Date and time to finalize a warm migration.
-	Cutover *meta.Time `json:"cutover,omitempty"`
 	// The network attachment definition that should be used for disk transfer.
 	TransferNetwork *core.ObjectReference `json:"transferNetwork,omitempty"`
 }

@@ -560,10 +560,6 @@ func (in *PlanSpec) DeepCopyInto(out *PlanSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.Cutover != nil {
-		in, out := &in.Cutover, &out.Cutover
-		*out = (*in).DeepCopy()
-	}
 	if in.TransferNetwork != nil {
 		in, out := &in.TransferNetwork, &out.TransferNetwork
 		*out = new(v1.ObjectReference)
