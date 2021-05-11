@@ -6,6 +6,7 @@ import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	"net/http"
 )
@@ -59,6 +60,14 @@ func NewClient(provider *api.Provider) (client Client, err error) {
 			finder:   &vsphere.Finder{},
 			restClient: base.RestClient{
 				Resolver: &vsphere.Resolver{Provider: provider},
+			},
+		}
+	case api.OVirt:
+		client = &ProviderClient{
+			provider: provider,
+			finder:   &ovirt.Finder{},
+			restClient: base.RestClient{
+				Resolver: &ovirt.Resolver{Provider: provider},
 			},
 		}
 	default:
@@ -267,6 +276,13 @@ func (r *ProviderClient) find() (err error) {
 		r.found = status == http.StatusOK
 	case api.VSphere:
 		status, err = r.restClient.Get(&vsphere.Provider{}, id)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+		r.found = status == http.StatusOK
+	case api.OVirt:
+		status, err = r.restClient.Get(&ovirt.Provider{}, id)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
