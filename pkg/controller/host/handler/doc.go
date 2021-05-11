@@ -4,6 +4,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/host/handler/ocp"
+	"github.com/konveyor/forklift-controller/pkg/controller/host/handler/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/host/handler/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/watch/handler"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -34,6 +35,11 @@ func New(
 			provider)
 	case api.VSphere:
 		h, err = vsphere.New(
+			client,
+			channel,
+			provider)
+	case api.OVirt:
+		h, err = ovirt.New(
 			client,
 			channel,
 			provider)
