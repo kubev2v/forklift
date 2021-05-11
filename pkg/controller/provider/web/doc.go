@@ -5,6 +5,7 @@ import (
 	libweb "github.com/konveyor/controller/pkg/inventory/web"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 )
 
@@ -25,6 +26,8 @@ func All(container *container.Container) (all []libweb.RequestHandler) {
 	all = append(
 		all,
 		vsphere.Handlers(container)...)
-
+	all = append(
+		all,
+		ovirt.Handlers(container)...)
 	return
 }

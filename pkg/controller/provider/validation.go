@@ -99,11 +99,13 @@ func (r *Reconciler) validate(provider *api.Provider) error {
 func (r *Reconciler) validateType(provider *api.Provider) error {
 	switch provider.Type() {
 	case api.OpenShift,
-		api.VSphere:
+		api.VSphere,
+		api.OVirt:
 	default:
 		valid := []string{
 			api.OpenShift,
 			api.VSphere,
+			api.OVirt,
 		}
 		provider.Status.SetCondition(
 			libcnd.Condition{
@@ -197,6 +199,11 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 			"user",
 			"password",
 			"thumbprint",
+		}
+	case api.OVirt:
+		keyList = []string{
+			"user",
+			"password",
 		}
 	}
 	for _, key := range keyList {

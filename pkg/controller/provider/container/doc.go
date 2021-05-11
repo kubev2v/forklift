@@ -5,6 +5,7 @@ import (
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/ocp"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/vsphere"
 	core "k8s.io/api/core/v1"
 )
@@ -21,6 +22,8 @@ func Build(
 		return ocp.New(db, provider, secret)
 	case api.VSphere:
 		return vsphere.New(db, provider, secret)
+	case api.OVirt:
+		return ovirt.New(db, provider, secret)
 	}
 
 	return nil
