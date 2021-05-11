@@ -196,6 +196,12 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 		}
 		return
 	}
+
+	if plan.Status.HasCondition(Succeeded) {
+		r.Log.V(1).Info("Ignoring successfully completed plan.")
+		return
+	}
+
 	defer func() {
 		r.Log.V(2).Info("Conditions.", "all", plan.Status.Conditions)
 	}()
