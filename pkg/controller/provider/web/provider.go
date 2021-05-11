@@ -6,6 +6,7 @@ import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 
 	"net/http"
@@ -82,9 +83,30 @@ func (h ProviderHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
+	// oVirt
+	oVirtHandler := &ovirt.ProviderHandler{
+		Handler: base.Handler{
+			Container: h.Container,
+		},
+	}
+	status = oVirtHandler.Prepare(ctx)
+	if status != http.StatusOK {
+		ctx.Status(status)
+		return
+	}
+	oVirtList, err := oVirtHandler.ListContent(ctx)
+	if err != nil {
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
 	r := Provider{
 		api.OpenShift: ocpList,
 		api.VSphere:   vSphereList,
+		api.OVirt:     oVirtList,
 	}
 
 	content := r

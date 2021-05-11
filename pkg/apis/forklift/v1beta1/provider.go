@@ -34,6 +34,8 @@ const (
 	OpenShift = "openshift"
 	// vSphere
 	VSphere = "vsphere"
+	// oVirt
+	OVirt = "ovirt"
 )
 
 //
