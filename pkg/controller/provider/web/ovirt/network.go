@@ -145,6 +145,7 @@ func (h NetworkHandler) watch(ctx *gin.Context) {
 // REST Resource.
 type Network struct {
 	Resource
+	DataCenter   string      `json:"dataCenter"`
 	VLan         model.Ref   `json:"vlan"`
 	Usages       []string    `json:"usages"`
 	VNICProfiles []model.Ref `json:"vnicProfiles"`
@@ -154,6 +155,7 @@ type Network struct {
 // Build the resource using the model.
 func (r *Network) With(m *model.Network) {
 	r.Resource.With(&m.Base)
+	r.DataCenter = m.DataCenter
 	r.VLan = m.VLan
 	r.Usages = m.Usages
 	r.VNICProfiles = m.VNICProfiles

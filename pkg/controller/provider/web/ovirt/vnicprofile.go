@@ -145,13 +145,15 @@ func (h VNICProfileHandler) watch(ctx *gin.Context) {
 // REST Resource.
 type VNICProfile struct {
 	Resource
-	QoS model.Ref `json:"qos"`
+	DataCenter string    `json:"dataCenter"`
+	QoS        model.Ref `json:"qos"`
 }
 
 //
 // Build the resource using the model.
 func (r *VNICProfile) With(m *model.VNICProfile) {
 	r.Resource.With(&m.Base)
+	r.DataCenter = m.DataCenter
 	r.QoS = m.QoS
 }
 

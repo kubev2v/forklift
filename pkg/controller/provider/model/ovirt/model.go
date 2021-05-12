@@ -2,23 +2,26 @@ package ovirt
 
 import (
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/base"
 )
 
 //
 // Errors
 var NotFound = libmodel.NotFound
 
+type InvalidRefError = base.InvalidRefError
+
 //
 // Types
-type Model = libmodel.Model
+type Model = base.Model
+type ListOptions = base.ListOptions
+type Ref = base.Ref
 
 //
 // Base oVirt model.
 type Base struct {
 	// Managed object ID.
 	ID string `sql:"pk"`
-	// Parent
-	Parent Ref `sql:"d0,index(parent)"`
 	// Name
 	Name string `sql:"d0,index(name)"`
 	// Revision
@@ -61,54 +64,18 @@ func (m *Base) Updated() {
 	m.Revision++
 }
 
-//
-// An object reference.
-type Ref struct {
-	// The kind (type) of the referenced.
-	Kind string `json:"kind"`
-	// The ID of object referenced.
-	ID string `json:"id"`
-}
-
-//
-// Get referenced model.
-func (r *Ref) Get(db libmodel.DB) (model Model, err error) {
-	base := Base{
-		ID: r.ID,
-	}
-	switch r.Kind {
-	case DataCenterKind:
-		model = &DataCenter{Base: base}
-	case ClusterKind:
-		model = &Cluster{Base: base}
-	case HostKind:
-		model = &Host{Base: base}
-	case VmKind:
-		model = &VM{Base: base}
-	case NetKind:
-		model = &Network{Base: base}
-	case StorageKind:
-		model = &StorageDomain{Base: base}
-	default:
-		err = InvalidRefError{*r}
-	}
-	if model != nil {
-		err = db.Get(model)
-	}
-
-	return
-}
-
 type DataCenter struct {
 	Base
 }
 
 type Cluster struct {
 	Base
+	DataCenter string `sql:"d0,index(dataCenter)"`
 }
 
 type Network struct {
 	Base
+	DataCenter   string   `sql:"d0,index(dataCenter)"`
 	VLan         Ref      `sql:""`
 	Usages       []string `sql:""`
 	VNICProfiles []Ref    `sql:""`
@@ -116,13 +83,15 @@ type Network struct {
 
 type VNICProfile struct {
 	Base
-	QoS Ref `sql:""`
+	DataCenter string `sql:"d0,index(dataCenter)"`
+	QoS        Ref    `sql:""`
 }
 
 type StorageDomain struct {
 	Base
-	Type    string `sql:""`
-	Storage struct {
+	DataCenter string `sql:"d0,index(dataCenter)"`
+	Type       string `sql:""`
+	Storage    struct {
 		Type string
 	} `sql:""`
 	Available int64 `sql:""`
@@ -131,8 +100,11 @@ type StorageDomain struct {
 
 type Host struct {
 	Base
+	Cluster string `sql:"d0,index(cluster)"`
 }
 
 type VM struct {
 	Base
+	Cluster string `sql:"d0,index(cluster)"`
+	Host string `sql:"d0,index(host)"`
 }
