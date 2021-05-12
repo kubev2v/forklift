@@ -279,8 +279,8 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	setOf := map[string]bool{}
 	//
 	// Referenced VMs.
-	for _, vm := range plan.Spec.VMs {
-		ref := &vm.Ref
+	for i := range plan.Spec.VMs {
+		ref := &plan.Spec.VMs[i].Ref
 		if ref.NotSet() {
 			plan.Status.SetCondition(libcnd.Condition{
 				Type:     VMRefNotValid,
