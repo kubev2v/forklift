@@ -145,10 +145,11 @@ func (h StorageDomainHandler) watch(ctx *gin.Context) {
 // REST Resource.
 type StorageDomain struct {
 	Resource
-	Type     string `json:"type"`
-	Capacity int64  `json:"capacity"`
-	Free     int64  `json:"free"`
-	Storage  struct {
+	DataCenter string `json:"dataCenter"`
+	Type       string `json:"type"`
+	Capacity   int64  `json:"capacity"`
+	Free       int64  `json:"free"`
+	Storage    struct {
 		Type string `json:"type"`
 	} `json:"storage"`
 }
@@ -157,6 +158,7 @@ type StorageDomain struct {
 // Build the resource using the model.
 func (r *StorageDomain) With(m *model.StorageDomain) {
 	r.Resource.With(&m.Base)
+	r.DataCenter = m.DataCenter
 	r.Type = m.Type
 	r.Capacity = m.Available
 	r.Free = m.Available - m.Used
