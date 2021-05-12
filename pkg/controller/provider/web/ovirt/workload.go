@@ -1,11 +1,11 @@
-package vsphere
+package ovirt
 
 import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
+	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"net/http"
 )
@@ -66,7 +66,7 @@ func (h WorkloadHandler) Get(ctx *gin.Context) {
 		NodeBuilder: &NodeBuilder{
 			provider: h.Provider,
 			detail: map[string]bool{
-				model.DatacenterKind: true,
+				model.DataCenterKind: true,
 				model.ClusterKind:    true,
 				model.HostKind:       true,
 				model.VmKind:         true,
@@ -109,16 +109,41 @@ type WorkloadNavigator struct {
 //
 // Next parent.
 func (n *WorkloadNavigator) Next(m model.Model) (r model.Model, err error) {
-	bn := BranchNavigator{db: n.db}
 	switch m.(type) {
-	case *model.Folder:
-		r, err = bn.get(m.(*model.Folder).Parent)
 	case *model.Cluster:
-		r, err = bn.get(m.(*model.Cluster).Parent)
+		dataCenter := &model.DataCenter{
+			Base: model.Base{
+				ID: m.(*model.Cluster).DataCenter,
+			},
+		}
+		err = n.db.Get(dataCenter)
+		if err == nil {
+			r = dataCenter
+		}
 	case *model.Host:
-		r, err = bn.get(m.(*model.Host).Parent)
+		cluster := &model.Cluster{
+			Base: model.Base{
+				ID: m.(*model.Host).Cluster,
+			},
+		}
+		err = n.db.Get(cluster)
+		if err == nil {
+			r = cluster
+		}
 	case *model.VM:
-		r, err = bn.get(m.(*model.VM).Host)
+		hostId := m.(*model.VM).Host
+		if hostId == "" {
+			break
+		}
+		host := &model.Host{
+			Base: model.Base{
+				ID: hostId,
+			},
+		}
+		err = n.db.Get(host)
+		if err == nil {
+			r = host
+		}
 	}
 
 	return
@@ -133,17 +158,20 @@ type Workload struct {
 		*Host
 		Cluster struct {
 			*Cluster
-			Datacenter *Datacenter `json:"datacenter"`
+			DataCenter *DataCenter `json:"dataCenter"`
 		} `json:"cluster"`
 	} `json:"host"`
 }
 
 func (r *Workload) With(root *TreeNode) {
+	r.Host.Host = &Host{}
+	r.Host.Cluster.Cluster = &Cluster{}
+	r.Host.Cluster.DataCenter = &DataCenter{}
 	node := root
 	for {
 		switch node.Kind {
-		case model.DatacenterKind:
-			r.Host.Cluster.Datacenter = node.Object.(*Datacenter)
+		case model.DataCenterKind:
+			r.Host.Cluster.DataCenter = node.Object.(*DataCenter)
 		case model.ClusterKind:
 			r.Host.Cluster.Cluster = node.Object.(*Cluster)
 		case model.HostKind:

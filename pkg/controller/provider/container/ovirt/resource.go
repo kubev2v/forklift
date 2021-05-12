@@ -64,10 +64,7 @@ type Cluster struct {
 func (r *Cluster) ApplyTo(m *model.Cluster) {
 	m.Name = r.Name
 	m.Name = r.Description
-	m.Parent = model.Ref{
-		Kind: model.DataCenterKind,
-		ID:   r.DataCenter.ID,
-	}
+	m.DataCenter = r.DataCenter.ID
 }
 
 //
@@ -88,10 +85,7 @@ type Host struct {
 func (r *Host) ApplyTo(m *model.Host) {
 	m.Name = r.Name
 	m.Description = r.Description
-	m.Parent = model.Ref{
-		Kind: model.ClusterKind,
-		ID:   r.Cluster.ID,
-	}
+	m.Cluster = r.Cluster.ID
 }
 
 //
@@ -104,6 +98,7 @@ type HostList struct {
 // VM.
 type VM struct {
 	Base
+	Cluster Ref `json:"cluster"`
 	Host Ref `json:"host"`
 }
 
@@ -112,10 +107,8 @@ type VM struct {
 func (r *VM) ApplyTo(m *model.VM) {
 	m.Name = r.Name
 	m.Description = r.Description
-	m.Parent = model.Ref{
-		Kind: model.HostKind,
-		ID:   r.Host.ID,
-	}
+	m.Cluster = r.Cluster.ID
+	m.Host = r.Host.ID
 }
 
 //
@@ -140,10 +133,7 @@ type Network struct {
 func (r *Network) ApplyTo(m *model.Network) {
 	m.Name = r.Name
 	m.Description = r.Description
-	m.Parent = model.Ref{
-		Kind: model.DataCenterKind,
-		ID:   r.DataCenter.ID,
-	}
+	m.DataCenter = r.DataCenter.ID
 	m.VLan = model.Ref{
 		Kind: "VLan",
 		ID:   r.VLan.ID,
@@ -182,10 +172,7 @@ func (r *StorageDomain) ApplyTo(m *model.StorageDomain) {
 	m.Available, _ = strconv.ParseInt(r.Available, 10, 64)
 	m.Used, _ = strconv.ParseInt(r.Used, 10, 64)
 	for _, ref := range r.DataCenter.List {
-		m.Parent = model.Ref{
-			Kind: model.DataCenterKind,
-			ID:   ref.ID,
-		}
+		m.DataCenter = ref.ID
 		break
 	}
 }

@@ -2,6 +2,7 @@ package vsphere
 
 import (
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/base"
 	"strings"
 )
 
@@ -17,9 +18,13 @@ const (
 // Errors
 var NotFound = libmodel.NotFound
 
+type InvalidRefError = base.InvalidRefError
+
 //
 // Types
-type Model = libmodel.Model
+type Model = base.Model
+type ListOptions = base.ListOptions
+type Ref = base.Ref
 
 //
 // Base VMWare model.
@@ -154,46 +159,6 @@ Walk:
 	}
 
 	path = strings.Join(reversed, "/")
-
-	return
-}
-
-//
-// An object reference.
-type Ref struct {
-	// The kind (type) of the referenced.
-	Kind string `json:"kind"`
-	// The ID of object referenced.
-	ID string `json:"id"`
-}
-
-//
-// Get referenced model.
-func (r *Ref) Get(db libmodel.DB) (model Model, err error) {
-	base := Base{
-		ID: r.ID,
-	}
-	switch r.Kind {
-	case FolderKind:
-		model = &Folder{Base: base}
-	case DatacenterKind:
-		model = &Datacenter{Base: base}
-	case ClusterKind:
-		model = &Cluster{Base: base}
-	case HostKind:
-		model = &Host{Base: base}
-	case VmKind:
-		model = &VM{Base: base}
-	case NetKind:
-		model = &Network{Base: base}
-	case DsKind:
-		model = &Datastore{Base: base}
-	default:
-		err = InvalidRefError{*r}
-	}
-	if model != nil {
-		err = db.Get(model)
-	}
 
 	return
 }
