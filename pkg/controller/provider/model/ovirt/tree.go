@@ -1,8 +1,8 @@
 package ovirt
 
 import (
-	"fmt"
 	libref "github.com/konveyor/controller/pkg/ref"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/base"
 )
 
 //
@@ -18,11 +18,8 @@ var (
 )
 
 //
-// Invalid reference.
-type InvalidRefError struct {
-	Ref
-}
-
-func (r InvalidRefError) Error() string {
-	return fmt.Sprintf("Reference %#v not valid.", r.Ref)
-}
+// Types.
+type Tree = base.Tree
+type TreeNode = base.TreeNode
+type BranchNavigator = base.BranchNavigator
+type ParentNavigator = base.ParentNavigator

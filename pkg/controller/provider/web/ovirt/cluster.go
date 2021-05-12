@@ -147,12 +147,14 @@ func (h ClusterHandler) watch(ctx *gin.Context) {
 // REST Resource.
 type Cluster struct {
 	Resource
+	DataCenter string `json:"dataCenter"`
 }
 
 //
 // Build the resource using the model.
 func (r *Cluster) With(m *model.Cluster) {
 	r.Resource.With(&m.Base)
+	r.DataCenter = m.DataCenter
 }
 
 //
