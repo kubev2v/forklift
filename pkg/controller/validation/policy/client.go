@@ -15,6 +15,7 @@ import (
 	"net"
 	"net/http"
 	liburl "net/url"
+	"runtime"
 	"time"
 )
 
@@ -30,12 +31,19 @@ var Settings = &settings.Settings
 
 //
 // New policy agent.
-func New(provider *api.Provider) *Scheduler {
-	return &Scheduler{
+func New(provider *api.Provider) (s *Scheduler) {
+	s = &Scheduler{
 		Client: Client{
 			Provider: provider,
 		},
 	}
+	runtime.SetFinalizer(
+		s,
+		func(s *Scheduler) {
+			s.Shutdown()
+		})
+
+	return
 }
 
 //
@@ -307,10 +315,10 @@ type Worker struct {
 // Process input queue. Validation delegated to the
 // policy agent.
 func (r *Worker) run() {
-	defer func() {
-		_ = recover()
-	}()
 	go func() {
+		defer func() {
+			_ = recover()
+		}()
 		log.V(1).Info(
 			"Worker started.",
 			"id",

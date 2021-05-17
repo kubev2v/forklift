@@ -254,7 +254,7 @@ func (r *VMEventHandler) validated(task *policy.Task) {
 		_ = tx.End()
 	}()
 	latest := &model.VM{Base: model.Base{ID: task.Ref.ID}}
-	err = r.DB.Get(latest)
+	err = tx.Get(latest)
 	if err != nil {
 		r.log.Error(err, "get vm failed.")
 		return
