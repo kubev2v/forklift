@@ -93,8 +93,8 @@ func (r *ProviderPredicate) Update(e event.UpdateEvent) bool {
 func (r *ProviderPredicate) Delete(e event.DeleteEvent) bool {
 	p, cast := e.Object.(*api.Provider)
 	if cast {
-		reconciled := p.Status.ObservedGeneration == p.Generation
-		return reconciled
+		r.WatchManager.Deleted(p)
+		return true
 	}
 
 	return false
@@ -150,10 +150,9 @@ func (r NetMapPredicate) Update(e event.UpdateEvent) bool {
 }
 
 func (r NetMapPredicate) Delete(e event.DeleteEvent) bool {
-	p, cast := e.Object.(*api.NetworkMap)
+	_, cast := e.Object.(*api.NetworkMap)
 	if cast {
-		reconciled := p.Status.ObservedGeneration == p.Generation
-		return reconciled
+		return true
 	}
 
 	return false
@@ -188,10 +187,9 @@ func (r DsMapPredicate) Update(e event.UpdateEvent) bool {
 }
 
 func (r DsMapPredicate) Delete(e event.DeleteEvent) bool {
-	p, cast := e.Object.(*api.StorageMap)
+	_, cast := e.Object.(*api.StorageMap)
 	if cast {
-		reconciled := p.Status.ObservedGeneration == p.Generation
-		return reconciled
+		return true
 	}
 
 	return false
@@ -226,10 +224,9 @@ func (r HookPredicate) Update(e event.UpdateEvent) bool {
 }
 
 func (r HookPredicate) Delete(e event.DeleteEvent) bool {
-	p, cast := e.Object.(*api.Hook)
+	_, cast := e.Object.(*api.Hook)
 	if cast {
-		reconciled := p.Status.ObservedGeneration == p.Generation
-		return reconciled
+		return true
 	}
 
 	return false

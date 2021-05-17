@@ -69,10 +69,9 @@ func (r PlanPredicate) Update(e event.UpdateEvent) bool {
 }
 
 func (r PlanPredicate) Delete(e event.DeleteEvent) bool {
-	p, cast := e.Object.(*api.Plan)
+	_, cast := e.Object.(*api.Plan)
 	if cast {
-		reconciled := p.Status.ObservedGeneration == p.Generation
-		return reconciled
+		return true
 	}
 
 	return false

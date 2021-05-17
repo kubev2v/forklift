@@ -146,7 +146,7 @@ func (h VMHandler) watch(ctx *gin.Context) {
 type VM struct {
 	Resource
 	Cluster string `json:"cluster"`
-	Host string `json:"host"`
+	Host    string `json:"host"`
 }
 
 //

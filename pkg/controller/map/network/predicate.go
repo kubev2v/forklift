@@ -90,8 +90,8 @@ func (r *ProviderPredicate) Update(e event.UpdateEvent) bool {
 func (r *ProviderPredicate) Delete(e event.DeleteEvent) bool {
 	p, cast := e.Object.(*api.Provider)
 	if cast {
-		reconciled := p.Status.ObservedGeneration == p.Generation
-		return reconciled
+		r.WatchManager.Deleted(p)
+		return true
 	}
 
 	return false
