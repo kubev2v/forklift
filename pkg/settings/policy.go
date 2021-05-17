@@ -43,11 +43,11 @@ func (r *PolicyAgent) Load() (err error) {
 	} else {
 		r.CA = ServiceCAFile
 	}
-	r.Limit.Worker, err = getEnvLimit(PolicyAgentWorkerLimit, 25)
+	r.Limit.Worker, err = getEnvLimit(PolicyAgentWorkerLimit, 10)
 	if err != nil {
 		return err
 	}
-	r.Limit.Backlog, err = getEnvLimit(PolicyAgentBacklogLimit, 250)
+	r.Limit.Backlog, err = getEnvLimit(PolicyAgentBacklogLimit, 1024)
 	if err != nil {
 		return err
 	}

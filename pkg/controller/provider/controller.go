@@ -70,7 +70,7 @@ func Add(mgr manager.Manager) error {
 	web.TLS.Enabled = Settings.Inventory.TLS.Enabled
 	web.TLS.Certificate = Settings.Inventory.TLS.Certificate
 	web.TLS.Key = Settings.Inventory.TLS.Key
-	web.AllowedOrigins = Settings.CORS.AllowedOrigins
+	web.AllowedOrigins = Settings.Inventory.CORS.AllowedOrigins
 	reconciler := &Reconciler{
 		Reconciler: base.Reconciler{
 			EventRecorder: mgr.GetEventRecorderFor(Name),

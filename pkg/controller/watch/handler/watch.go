@@ -63,3 +63,18 @@ func (m *WatchManager) Ensure(
 
 	return
 }
+
+//
+// A provider has been deleted.
+// Delete associated watches.
+func (m *WatchManager) Deleted(provider *api.Provider) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if watchMap, found := m.providerMap[provider.UID]; found {
+		for _, w := range watchMap {
+			w.End()
+		}
+	}
+
+	delete(m.providerMap, provider.UID)
+}

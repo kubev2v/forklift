@@ -99,7 +99,7 @@ type HostList struct {
 type VM struct {
 	Base
 	Cluster Ref `json:"cluster"`
-	Host Ref `json:"host"`
+	Host    Ref `json:"host"`
 }
 
 //
