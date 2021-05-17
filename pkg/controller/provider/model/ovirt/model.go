@@ -106,5 +106,5 @@ type Host struct {
 type VM struct {
 	Base
 	Cluster string `sql:"d0,index(cluster)"`
-	Host string `sql:"d0,index(host)"`
+	Host    string `sql:"d0,index(host)"`
 }
