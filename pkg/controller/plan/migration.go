@@ -363,8 +363,8 @@ func (r *Migration) begin() (err error) {
 	}
 	//
 	// Delete
+	kept := []*plan.VMStatus{}
 	for _, status := range r.Plan.Status.Migration.VMs {
-		kept := []*plan.VMStatus{}
 
 		// resolve the VM ref
 		_, err = r.Source.Inventory.VM(&status.Ref)
@@ -376,8 +376,8 @@ func (r *Migration) begin() (err error) {
 		if _, found := r.Plan.Spec.FindVM(status.Ref); found {
 			kept = append(kept, status)
 		}
-		r.Plan.Status.Migration.VMs = kept
 	}
+	r.Plan.Status.Migration.VMs = kept
 	//
 	// Add/Update.
 	list := []*plan.VMStatus{}
