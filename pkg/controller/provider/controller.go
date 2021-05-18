@@ -32,6 +32,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/model"
 	ocpmodel "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
+	"github.com/konveyor/forklift-controller/pkg/controller/validation/policy"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -83,6 +84,8 @@ func Add(mgr manager.Manager) error {
 	}
 
 	web.Start()
+
+	policy.Agent.Start()
 
 	cnt, err := controller.New(
 		Name,
@@ -263,7 +266,6 @@ func (r *Reconciler) updateProvider(provider *api.Provider) (err error) {
 //
 // Update the container.
 func (r *Reconciler) updateContainer(provider *api.Provider) (err error) {
-	log.Info("Update container.")
 	if _, found := r.container.Get(provider); found {
 		if provider.HasReconciled() {
 			r.Log.V(1).Info(
@@ -277,6 +279,7 @@ func (r *Reconciler) updateContainer(provider *api.Provider) (err error) {
 			"Provider not ready, postponing.")
 		return
 	}
+	log.Info("Update container.")
 	if current, found := r.container.Get(provider); found {
 		current.Shutdown()
 		_ = current.DB().Close(true)
