@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -15,7 +16,6 @@ import (
 	"net"
 	"net/http"
 	liburl "net/url"
-	"runtime"
 	"time"
 )
 
@@ -30,21 +30,8 @@ type LibClient = libweb.Client
 var Settings = &settings.Settings
 
 //
-// New policy agent.
-func New(provider *api.Provider) (s *Scheduler) {
-	s = &Scheduler{
-		Client: Client{
-			Provider: provider,
-		},
-	}
-	runtime.SetFinalizer(
-		s,
-		func(s *Scheduler) {
-			s.Shutdown()
-		})
-
-	return
-}
+// Pool (singleton).
+var Agent Pool
 
 //
 // Error reported by the service.
@@ -60,8 +47,6 @@ func (r *ValidationError) Error() string {
 // Client.
 type Client struct {
 	LibClient
-	// Provider.
-	Provider *api.Provider
 }
 
 //
@@ -96,7 +81,10 @@ func (r *Client) Version() (version int, err error) {
 
 //
 // Validate the VM.
-func (r *Client) Validate(ref refapi.Ref) (version int, concerns []model.Concern, err error) {
+func (r *Client) Validate(
+	provider *api.Provider,
+	ref refapi.Ref) (version int, concerns []model.Concern, err error) {
+	//
 	if !r.Enabled() {
 		return
 	}
@@ -110,7 +98,7 @@ func (r *Client) Validate(ref refapi.Ref) (version int, concerns []model.Concern
 			VmID string `json:"vm_moref"`
 		} `json:"input"`
 	}{}
-	in.Input.Provider.UID = string(r.Provider.UID)
+	in.Input.Provider.UID = string(provider.UID)
 	in.Input.VmID = ref.ID
 	out := &struct {
 		Result struct {
@@ -242,12 +230,16 @@ func (r BacklogExceededError) Error() string {
 //
 // Policy agent task.
 type Task struct {
+	// Provider.
+	Provider *api.Provider
 	// VM reference.
 	Ref refapi.Ref
 	// Revision number of the VM being validated.
 	Revision interface{}
-	// Result handler.
-	ResultHandler func(*Task)
+	// Context.
+	Context context.Context
+	// Task result channel.
+	Result chan *Task
 	// Reported policy version.
 	Version int
 	// Reported concerns.
@@ -293,8 +285,22 @@ func (r *Task) String() string {
 //
 // Notify result handler the task has completed.
 func (r *Task) notify() {
-	if r.ResultHandler != nil {
-		r.ResultHandler(r)
+	func() {
+		recover()
+	}()
+	if !r.canceled() {
+		r.Result <- r
+	}
+}
+
+//
+// Task canceled.
+func (r *Task) canceled() bool {
+	select {
+	case <-r.Context.Done():
+		return true
+	default:
+		return false
 	}
 }
 
@@ -316,9 +322,6 @@ type Worker struct {
 // policy agent.
 func (r *Worker) run() {
 	go func() {
-		defer func() {
-			_ = recover()
-		}()
 		log.V(1).Info(
 			"Worker started.",
 			"id",
@@ -328,18 +331,28 @@ func (r *Worker) run() {
 			"id",
 			r.id)
 		for task := range r.input {
+			if task.canceled() {
+				continue
+			}
 			task.worker = r.id
 			task.started = time.Now()
-			task.Version, task.Concerns, task.Error = r.client.Validate(task.Ref)
+			task.Version, task.Concerns, task.Error = r.client.Validate(
+				task.Provider,
+				task.Ref)
 			task.completed = time.Now()
-			r.output <- task
+			func() {
+				defer func() {
+					_ = recover()
+				}()
+				r.output <- task
+			}()
 		}
 	}()
 }
 
 //
-// Policy agent task scheduler.
-type Scheduler struct {
+// Policy agent task pool.
+type Pool struct {
 	Client
 	// Worker input queue.
 	input chan *Task
@@ -352,12 +365,12 @@ type Scheduler struct {
 //
 // Main.
 // Start workers and process output queue.
-func (r *Scheduler) Start() {
+func (r *Pool) Start() {
 	if r.started {
 		return
 	}
+	r.output = make(chan *Task, r.backlog())
 	r.input = make(chan *Task, r.backlog())
-	r.output = make(chan *Task)
 	for id := 0; id < r.parallel(); id++ {
 		w := Worker{
 			id:     id,
@@ -369,9 +382,9 @@ func (r *Scheduler) Start() {
 	}
 	go func() {
 		log.V(1).Info(
-			"Scheduler started.")
+			"Pool started.")
 		defer log.V(1).Info(
-			"Scheduler stopped.")
+			"Pool stopped.")
 		for task := range r.output {
 			if task.Error == nil {
 				log.V(4).Info(
@@ -392,9 +405,9 @@ func (r *Scheduler) Start() {
 }
 
 //
-// Shutdown the scheduler.
+// Shutdown the pool.
 // Terminate workers and stop processing result queue.
-func (r *Scheduler) Shutdown() {
+func (r *Pool) Shutdown() {
 	if !r.started {
 		return
 	}
@@ -405,7 +418,7 @@ func (r *Scheduler) Shutdown() {
 
 //
 // Policy version.
-func (r *Scheduler) Version() (version int, err error) {
+func (r *Pool) Version() (version int, err error) {
 	return r.Client.Version()
 }
 
@@ -414,9 +427,9 @@ func (r *Scheduler) Version() (version int, err error) {
 // Queue validation request.
 // May block (no longer than 10 seconds) when backlog exceeded.
 // Returns: BacklogExceededError.
-func (r *Scheduler) Submit(task *Task) (err error) {
+func (r *Pool) Submit(task *Task) (err error) {
 	if !r.started {
-		return liberr.New("scheduler not started.")
+		return liberr.New("pool not started.")
 	}
 	defer func() {
 		_ = recover()
@@ -434,7 +447,7 @@ func (r *Scheduler) Submit(task *Task) (err error) {
 //
 // Backlog limit.
 // Input queue depth.
-func (r *Scheduler) backlog() (limit int) {
+func (r *Pool) backlog() (limit int) {
 	limit = Settings.PolicyAgent.Limit.Backlog
 	if limit < 1 {
 		limit = 1
@@ -445,7 +458,7 @@ func (r *Scheduler) backlog() (limit int) {
 
 //
 // Number of workers.
-func (r *Scheduler) parallel() (limit int) {
+func (r *Pool) parallel() (limit int) {
 	limit = Settings.PolicyAgent.Limit.Worker
 	if limit < 1 {
 		limit = 1

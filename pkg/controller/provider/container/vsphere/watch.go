@@ -21,6 +21,7 @@
 package vsphere
 
 import (
+	"context"
 	"errors"
 	"github.com/go-logr/logr"
 	liberr "github.com/konveyor/controller/pkg/error"
@@ -31,6 +32,12 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/validation/policy"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	"time"
+)
+
+//
+// The (max) number of batched task results.
+const (
+	MaxBatch = 1024
 )
 
 //
@@ -54,8 +61,6 @@ type VMEventHandler struct {
 	Provider *api.Provider
 	// DB.
 	DB libmodel.DB
-	// Policy agent.
-	policyAgent *policy.Scheduler
 	// Reported VM events.
 	input chan ReportedEvent
 	// Reported VM IDs.
@@ -64,17 +69,12 @@ type VMEventHandler struct {
 	lastSearch time.Time
 	// Logger.
 	log logr.Logger
-}
-
-//
-// Search interval.
-func (r *VMEventHandler) searchInterval() time.Duration {
-	seconds := Settings.PolicyAgent.SearchInterval
-	if seconds < 60 {
-		seconds = 60
-	}
-
-	return time.Second * time.Duration(seconds)
+	// Context
+	context context.Context
+	// Context cancel.
+	cancel context.CancelFunc
+	// Task result
+	taskResult chan *policy.Task
 }
 
 //
@@ -87,14 +87,12 @@ func (r *VMEventHandler) reset() {
 //
 // Watch ended.
 func (r *VMEventHandler) Started(uint64) {
+	r.log.Info("Started.")
+	r.taskResult = make(chan *policy.Task)
 	r.input = make(chan ReportedEvent)
-	r.policyAgent = policy.New(r.Provider)
-	if !Settings.PolicyAgent.Enabled() {
-		r.log.Info("Policy agent not enabled.")
-		return
-	}
-	r.policyAgent.Start()
+	r.context, r.cancel = context.WithCancel(context.Background())
 	go r.run()
+	go r.harvest()
 }
 
 //
@@ -128,16 +126,15 @@ func (r *VMEventHandler) Error(err error) {
 //
 // Watch ended.
 func (r *VMEventHandler) End() {
-	r.policyAgent.Shutdown()
+	r.log.Info("Ended.")
+	r.cancel()
 	close(r.input)
+	close(r.taskResult)
 }
 
 //
 // Report model event.
 func (r *VMEventHandler) report(vm *model.VM) {
-	if !r.policyAgent.Enabled() {
-		return
-	}
 	defer func() {
 		_ = recover()
 	}()
@@ -151,10 +148,10 @@ func (r *VMEventHandler) report(vm *model.VM) {
 // Run.
 // Periodically search for VMs that need to be validated.
 func (r *VMEventHandler) run() {
-	interval := r.searchInterval()
-	if !r.policyAgent.Enabled() {
-		return
-	}
+	r.log.Info("Run started.")
+	defer r.log.Info("Run stopped.")
+	interval := time.Second * time.Duration(
+		Settings.PolicyAgent.SearchInterval)
 	r.reset()
 	for {
 		select {
@@ -167,19 +164,54 @@ func (r *VMEventHandler) run() {
 			}
 		}
 		if time.Since(r.lastSearch) > interval {
-			r.search()
+			r.list()
 			r.reset()
 		}
 	}
 }
 
 //
-// Search for VMs to be validated.
+// Harvest validation task results and update VMs.
+// Collect completed tasks in batches. Apply the batch
+// to VMs when one of:
+//   - The batch is full.
+//   - No tasks have been received within
+//     the delay period.
+func (r *VMEventHandler) harvest() {
+	r.log.Info("Result started.")
+	defer r.log.Info("Result stopped.")
+	long := time.Hour
+	short := time.Second
+	delay := long
+	batch := []*policy.Task{}
+	mark := time.Now()
+	for {
+		select {
+		case <-time.After(delay):
+		case task, open := <-r.taskResult:
+			if open {
+				batch = append(batch, task)
+				delay = short
+			} else {
+				return
+			}
+		}
+		if time.Since(mark) > delay || len(batch) > MaxBatch {
+			r.validated(batch)
+			batch = []*policy.Task{}
+			delay = long
+			mark = time.Now()
+		}
+	}
+}
+
+//
+// List for VMs to be validated.
 // VMs that have been reported through the model event
 // watch are ignored.
-func (r *VMEventHandler) search() {
+func (r *VMEventHandler) list() {
 	r.log.V(1).Info("Search for VMs that need to be validated.")
-	version, err := r.policyAgent.Version()
+	version, err := policy.Agent.Version()
 	if err != nil {
 		r.log.Error(err, err.Error())
 		return
@@ -197,7 +229,7 @@ func (r *VMEventHandler) search() {
 				},
 			})
 		if err != nil {
-			r.log.Error(err, "list VM failed.")
+			r.log.Error(err, "VM (list) failed.")
 			return
 		}
 		if len(list) == 0 {
@@ -218,71 +250,76 @@ func (r *VMEventHandler) search() {
 // Analyze the VM.
 func (r *VMEventHandler) validate(vm *model.VM) {
 	var err error
-	if !Settings.PolicyAgent.Enabled() {
-		return
-	}
 	task := &policy.Task{
-		ResultHandler: r.validated,
-		Revision:      vm.Revision,
+		Context:  r.context,
+		Provider: r.Provider,
+		Result:   r.taskResult,
+		Revision: vm.Revision,
 		Ref: refapi.Ref{
 			ID: vm.ID,
 		},
 	}
-	err = r.policyAgent.Submit(task)
+	err = policy.Agent.Submit(task)
 	if err != nil {
 		if errors.As(err, &policy.BacklogExceededError{}) {
 			r.log.Info(err.Error())
 		} else {
-			r.log.Error(err, "submit failed.")
+			r.log.Error(err, "VM task (submit) failed.")
 		}
 	}
 }
 
 //
-// VM validated.
-func (r *VMEventHandler) validated(task *policy.Task) {
-	if task.Error != nil {
-		r.log.Info(task.Error.Error())
+// VMs validated.
+func (r *VMEventHandler) validated(batch []*policy.Task) {
+	r.log.V(3).Info("VM (batch) completed.", "batch", len(batch))
+	if !policy.Agent.Enabled() || len(batch) == 0 {
 		return
 	}
 	tx, err := r.DB.Begin()
 	if err != nil {
-		r.log.Error(err, "begin tx failed.")
+		r.log.Error(err, "Begin tx failed.")
 		return
 	}
 	defer func() {
 		_ = tx.End()
 	}()
-	latest := &model.VM{Base: model.Base{ID: task.Ref.ID}}
-	err = tx.Get(latest)
-	if err != nil {
-		r.log.Error(err, "get vm failed.")
-		return
-	}
-	if task.Revision != latest.Revision {
-		return
-	}
-	latest.PolicyVersion = task.Version
-	latest.RevisionValidated = latest.Revision
-	latest.Concerns = task.Concerns
-	err = tx.Update(latest)
-	if err != nil {
-		r.log.Error(err, "update VM failed.")
-		return
+	for _, task := range batch {
+		if task.Error != nil {
+			r.log.Info(task.Error.Error())
+			return
+		}
+		latest := &model.VM{Base: model.Base{ID: task.Ref.ID}}
+		err = tx.Get(latest)
+		if err != nil {
+			r.log.Error(err, "VM (get) failed.")
+			return
+		}
+		if task.Revision != latest.Revision {
+			return
+		}
+		latest.PolicyVersion = task.Version
+		latest.RevisionValidated = latest.Revision
+		latest.Concerns = task.Concerns
+		err = tx.Update(latest)
+		if err != nil {
+			r.log.Error(err, "VM update failed.")
+			return
+		}
+		r.log.V(3).Info(
+			"VM validated.",
+			"vmID",
+			latest.ID,
+			"revision",
+			latest.Revision,
+			"duration",
+			task.Duration())
 	}
 	err = tx.Commit()
 	if err != nil {
-		r.log.Error(err, "commit failed.")
+		r.log.Error(err, "Tx commit failed.")
 		return
 	}
-	r.log.V(3).Info(
-		"PolicyAgent: validated",
-		"vmID",
-		latest.ID,
-		"revision",
-		latest.Revision,
-		"duration",
-		task.Duration())
 }
 
 //
@@ -314,15 +351,12 @@ func (r *ClusterEventHandler) Error(err error) {
 //
 // Analyze all of the VMs related to the cluster.
 func (r *ClusterEventHandler) validate(cluster *model.Cluster) {
-	if !Settings.PolicyAgent.Enabled() {
-		return
-	}
 	for _, ref := range cluster.Hosts {
 		host := &model.Host{}
 		host.WithRef(ref)
 		err := r.DB.Get(host)
 		if err != nil {
-			r.log.Error(err, "get host failed.")
+			r.log.Error(err, "Host (get) failed.")
 			return
 		}
 		hostHandler := HostEventHandler{DB: r.DB}
@@ -359,9 +393,6 @@ func (r *HostEventHandler) Error(err error) {
 //
 // Analyze all of the VMs related to the host.
 func (r *HostEventHandler) validate(host *model.Host) {
-	if !Settings.PolicyAgent.Enabled() {
-		return
-	}
 	tx, err := r.DB.Begin()
 	if err != nil {
 		r.log.Error(err, "begin tx failed.")
@@ -375,19 +406,19 @@ func (r *HostEventHandler) validate(host *model.Host) {
 		vm.WithRef(ref)
 		err = tx.Get(vm)
 		if err != nil {
-			r.log.Error(err, "get VM failed.")
+			r.log.Error(err, "VM (get) failed.")
 			return
 		}
 		vm.RevisionValidated = 0
 		err = tx.Update(vm)
 		if err != nil {
-			r.log.Error(err, "update VM failed.")
+			r.log.Error(err, "VM (update) failed.")
 			return
 		}
 	}
 	err = tx.Commit()
 	if err != nil {
-		r.log.Error(err, "tx commit failed.")
+		r.log.Error(err, "Tx commit failed.")
 		return
 	}
 }

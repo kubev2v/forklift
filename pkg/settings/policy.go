@@ -47,7 +47,7 @@ func (r *PolicyAgent) Load() (err error) {
 	if err != nil {
 		return err
 	}
-	r.Limit.Backlog, err = getEnvLimit(PolicyAgentBacklogLimit, 1024)
+	r.Limit.Backlog, err = getEnvLimit(PolicyAgentBacklogLimit, 10000)
 	if err != nil {
 		return err
 	}
