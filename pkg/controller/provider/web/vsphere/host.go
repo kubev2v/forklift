@@ -233,6 +233,7 @@ func (h *HostHandler) buildAdapters(host *Host) (err error) {
 // REST Resource.
 type Host struct {
 	Resource
+	Cluster            string            `json:"cluster"`
 	InMaintenanceMode  bool              `json:"inMaintenance"`
 	ManagementServerIp string            `json:"managementServerIp"`
 	Thumbprint         string            `json:"thumbprint"`
@@ -251,6 +252,7 @@ type Host struct {
 // Build the resource using the model.
 func (r *Host) With(m *model.Host) {
 	r.Resource.With(&m.Base)
+	r.Cluster = m.Cluster
 	r.InMaintenanceMode = m.InMaintenanceMode
 	r.ManagementServerIp = m.ManagementServerIp
 	r.Thumbprint = m.Thumbprint

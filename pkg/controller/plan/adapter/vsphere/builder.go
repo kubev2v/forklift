@@ -270,7 +270,7 @@ func (r *Builder) hostID(vmRef ref.Ref) (hostID string, err error) {
 		return
 	}
 
-	hostID = vm.Host.ID
+	hostID = vm.Host
 
 	return
 }
@@ -456,7 +456,7 @@ func (r *Builder) datastoreID(vm *model.VM, ds *model.Datastore) (id string, err
 // Find may matching a `Host` CR.
 func (r *Builder) esxHost(vm *model.VM) (esxHost *EsxHost, found bool, err error) {
 	url := r.Source.Provider.Spec.URL
-	hostDef, found := r.hosts[vm.Host.ID]
+	hostDef, found := r.hosts[vm.Host]
 	if !found {
 		return
 	}
@@ -471,7 +471,7 @@ func (r *Builder) esxHost(vm *model.VM) (esxHost *EsxHost, found bool, err error
 		err = liberr.Wrap(err)
 		return
 	}
-	hostModel, nErr := r.host(vm.Host.ID)
+	hostModel, nErr := r.host(vm.Host)
 	if nErr != nil {
 		err = nErr
 		return

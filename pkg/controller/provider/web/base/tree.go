@@ -2,8 +2,12 @@ package base
 
 import (
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
+	"github.com/konveyor/controller/pkg/logging"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/base"
+	"time"
 )
+
+var log = logging.WithName("web|tree")
 
 //
 // Node builder.
@@ -39,6 +43,7 @@ func (r *Tree) Build(m model.Model, navigator model.BranchNavigator) (*TreeNode,
 	tree := model.Tree{
 		Depth: r.Depth,
 	}
+	mark := time.Now()
 	modelRoot, err := tree.Build(m, navigator)
 	if err != nil {
 		return nil, err
@@ -46,6 +51,8 @@ func (r *Tree) Build(m model.Model, navigator model.BranchNavigator) (*TreeNode,
 	for _, child := range modelRoot.Children {
 		walk(child)
 	}
+
+	log.V(1).Info("Tree built.", "duration", time.Since(mark))
 
 	return root, nil
 }
