@@ -99,6 +99,14 @@ func (v *FolderAdapter) Apply(u types.ObjectUpdate) {
 		switch p.Op {
 		case Assign:
 			switch p.Name {
+			case fParent:
+				ref := v.Ref(p.Val)
+				switch ref.Kind {
+				case model.DatacenterKind:
+					v.model.Datacenter = ref.ID
+				case model.FolderKind:
+					v.model.Folder = ref.ID
+				}
 			case fChildEntity:
 				v.model.Children = v.RefList(p.Val)
 			}
@@ -167,6 +175,8 @@ func (v *ClusterAdapter) Apply(u types.ObjectUpdate) {
 		switch p.Op {
 		case Assign:
 			switch p.Name {
+			case fParent:
+				v.model.Folder = v.Ref(p.Val).ID
 			case fHost:
 				v.model.Hosts = v.RefList(p.Val)
 			case fNetwork:
@@ -226,6 +236,8 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 		switch p.Op {
 		case Assign:
 			switch p.Name {
+			case fParent:
+				v.model.Cluster = v.Ref(p.Val).ID
 			case fInMaintMode:
 				if b, cast := p.Val.(bool); cast {
 					v.model.InMaintenanceMode = b
@@ -492,6 +504,8 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 		switch p.Op {
 		case Assign:
 			switch p.Name {
+			case fParent:
+				v.model.Folder = v.Ref(p.Val).ID
 			case fUUID:
 				if s, cast := p.Val.(string); cast {
 					v.model.UUID = s
@@ -564,7 +578,7 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 					v.model.BalloonedMemory = n
 				}
 			case fRuntimeHost:
-				v.model.Host = v.Ref(p.Val)
+				v.model.Host = v.Ref(p.Val).ID
 			case fVmIpAddress:
 				if s, cast := p.Val.(string); cast {
 					v.model.IpAddress = s

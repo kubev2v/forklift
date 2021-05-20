@@ -115,15 +115,9 @@ func (h TreeHandler) VmTree(ctx *gin.Context) {
 		}
 		branch, err := tr.Build(
 			folder,
-			&BranchNavigator{
-				db: db,
-				branch: func(m libmodel.Model) (refs []model.Ref) {
-					switch m.(type) {
-					case *model.Folder:
-						refs = m.(*model.Folder).Children
-					}
-					return
-				},
+			&VMNavigator{
+				detail: h.Detail,
+				db:     db,
 			})
 		if err != nil {
 			log.Trace(
@@ -178,28 +172,15 @@ func (h TreeHandler) HostTree(ctx *gin.Context) {
 			NodeBuilder: &NodeBuilder{
 				provider: h.Provider,
 				detail: map[string]bool{
-					model.ClusterKind: h.Detail,
-					model.HostKind:    h.Detail,
-					model.VmKind:      h.Detail,
+					model.VmKind: h.Detail,
 				},
 			},
 		}
 		branch, err := tr.Build(
 			folder,
-			&BranchNavigator{
-				db: db,
-				branch: func(m libmodel.Model) (refs []model.Ref) {
-					switch m.(type) {
-					case *model.Folder:
-						refs = m.(*model.Folder).Children
-					case *model.Cluster:
-						refs = m.(*model.Cluster).Hosts
-					case *model.Host:
-						refs = m.(*model.Host).Vms
-					}
-
-					return
-				},
+			&HostNavigator{
+				detail: h.Detail,
+				db:     db,
 			})
 		if err != nil {
 			log.Trace(
@@ -221,54 +202,154 @@ func (h TreeHandler) HostTree(ctx *gin.Context) {
 }
 
 //
-// Tree navigator.
-type BranchNavigator struct {
-	// branch navigation.
-	branch func(m libmodel.Model) (refs []model.Ref)
-	db     libmodel.DB
+// Host (tree) navigator.
+type HostNavigator struct {
+	// DB.
+	db libmodel.DB
+	// VM detail.
+	detail bool
 }
 
 //
-// Get referenced model.
-func (n *BranchNavigator) Next(p model.Model) (r []model.Model, err error) {
-	for _, ref := range n.branch(p) {
-		var m model.Model
-		m, err = n.get(ref)
+// Next (children) on the branch.
+func (n *HostNavigator) Next(p model.Model) (r []model.Model, err error) {
+	switch p.(type) {
+	case *model.Datacenter:
+		m := &model.Folder{
+			Base: model.Base{
+				ID: p.(*model.Datacenter).Clusters.ID,
+			},
+		}
+		err = n.db.Get(m)
 		if err == nil {
-			r = append(r, m)
+			r = []model.Model{m}
+		}
+	case *model.Folder:
+		folder := []model.Folder{}
+		err = n.db.List(
+			&folder,
+			model.ListOptions{
+				Predicate: libmodel.Eq("folder", p.Pk()),
+			})
+		if err == nil {
+			for i := range folder {
+				m := &folder[i]
+				r = append(r, m)
+			}
+		} else {
+			return
+		}
+		cluster := []model.Cluster{}
+		err = n.db.List(
+			&cluster,
+			model.ListOptions{
+				Predicate: libmodel.Eq("folder", p.Pk()),
+			})
+		if err == nil {
+			for i := range cluster {
+				m := &cluster[i]
+				r = append(r, m)
+			}
+		} else {
+			return
+		}
+	case *model.Cluster:
+		list := []model.Host{}
+		err = n.db.List(
+			&list,
+			model.ListOptions{
+				Predicate: libmodel.Eq("cluster", p.Pk()),
+			})
+		if err == nil {
+			for i := range list {
+				m := &list[i]
+				r = append(r, m)
+			}
+		} else {
+			return
+		}
+	case *model.Host:
+		detail := 0
+		if n.detail {
+			detail = 1
+		}
+		list := []model.VM{}
+		err = n.db.List(
+			&list,
+			model.ListOptions{
+				Predicate: libmodel.Eq("host", p.Pk()),
+				Detail:    detail,
+			})
+		if err == nil {
+			for i := range list {
+				m := &list[i]
+				r = append(r, m)
+			}
 		} else {
 			return
 		}
 	}
+
 	return
 }
 
 //
-// Get referenced model.
-func (n *BranchNavigator) get(ref model.Ref) (r model.Model, err error) {
-	base := model.Base{
-		ID: ref.ID,
-	}
-	switch ref.Kind {
-	case model.FolderKind:
-		r = &model.Folder{Base: base}
-	case model.DatacenterKind:
-		r = &model.Datacenter{Base: base}
-	case model.ClusterKind:
-		r = &model.Cluster{Base: base}
-	case model.HostKind:
-		r = &model.Host{Base: base}
-	case model.VmKind:
-		r = &model.VM{Base: base}
-	case model.NetKind:
-		r = &model.Network{Base: base}
-	case model.DsKind:
-		r = &model.Datastore{Base: base}
-	default:
-		err = model.InvalidRefError{Ref: ref}
-	}
-	if r != nil {
-		err = n.db.Get(r)
+// VM (tree) navigator.
+type VMNavigator struct {
+	// DB.
+	db libmodel.DB
+	// VM detail.
+	detail bool
+}
+
+//
+// Next (children) on the branch.
+func (n *VMNavigator) Next(p model.Model) (r []model.Model, err error) {
+	switch p.(type) {
+	case *model.Datacenter:
+		m := &model.Folder{
+			Base: model.Base{ID: p.(*model.Datacenter).Clusters.ID},
+		}
+		err = n.db.Get(m)
+		if err == nil {
+			r = []model.Model{m}
+		}
+	case *model.Folder:
+		// Folder.
+		folder := []model.Folder{}
+		err = n.db.List(
+			&folder,
+			model.ListOptions{
+				Predicate: libmodel.Eq("folder", p.Pk()),
+			})
+		if err == nil {
+			for i := range folder {
+				m := &folder[i]
+				r = append(r, m)
+			}
+		} else {
+			return
+		}
+		// VM
+		detail := 0
+		if n.detail {
+			detail = 1
+		}
+		vm := []model.VM{}
+		err = n.db.List(
+			&vm,
+			model.ListOptions{
+				Predicate: libmodel.Eq("folder", p.Pk()),
+				Detail:    detail,
+			})
+		if err == nil {
+			for i := range vm {
+				m := &vm[i]
+				r = append(r, m)
+			}
+		} else {
+			return
+		}
 	}
 
 	return

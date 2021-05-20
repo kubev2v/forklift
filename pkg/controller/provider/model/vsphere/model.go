@@ -171,7 +171,9 @@ type About struct {
 
 type Folder struct {
 	Base
-	Children []Ref `sql:""`
+	Datacenter string `sql:"d0,index(datacenter)"`
+	Folder     string `sql:"d0,index(folder)"`
+	Children   []Ref  `sql:""`
 }
 
 type Datacenter struct {
@@ -184,6 +186,7 @@ type Datacenter struct {
 
 type Cluster struct {
 	Base
+	Folder      string `sql:"d0,index(folder)"`
 	Hosts       []Ref  `sql:""`
 	Networks    []Ref  `sql:""`
 	Datastores  []Ref  `sql:""`
@@ -196,6 +199,7 @@ type Cluster struct {
 
 type Host struct {
 	Base
+	Cluster            string      `sql:"d0,index(cluster)"`
 	InMaintenanceMode  bool        `sql:""`
 	ManagementServerIp string      `sql:""`
 	Thumbprint         string      `sql:""`
@@ -301,6 +305,8 @@ type Datastore struct {
 
 type VM struct {
 	Base
+	Folder                string    `sql:"d0,index(folder)"`
+	Host                  string    `sql:"d0,index(host)"`
 	RevisionValidated     int64     `sql:"d0,index(revisionValidated)"`
 	PolicyVersion         int       `sql:"d0,index(policyVersion)"`
 	UUID                  string    `sql:""`
@@ -326,7 +332,6 @@ type VM struct {
 	Devices               []Device  `sql:""`
 	Disks                 []Disk    `sql:""`
 	Networks              []Ref     `sql:""`
-	Host                  Ref       `sql:""`
 	Concerns              []Concern `sql:""`
 }
 

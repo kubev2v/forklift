@@ -156,6 +156,7 @@ func (h ClusterHandler) watch(ctx *gin.Context) {
 // REST Resource.
 type Cluster struct {
 	Resource
+	Folder      string      `json:"folder"`
 	Networks    []model.Ref `json:"networks"`
 	Datastores  []model.Ref `json:"datastores"`
 	Hosts       []model.Ref `json:"hosts"`
@@ -169,6 +170,7 @@ type Cluster struct {
 //
 // Build the resource using the model.
 func (r *Cluster) With(m *model.Cluster) {
+	r.Folder = m.Folder
 	r.Resource.With(&m.Base)
 	r.DasEnabled = m.DasEnabled
 	r.DrsEnabled = m.DrsEnabled

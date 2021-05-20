@@ -112,7 +112,7 @@ func (r *Scheduler) buildInFlight() (err error) {
 			return
 		}
 		if vmStatus.Running() {
-			r.inFlight[vm.Host.ID] += len(vm.Disks)
+			r.inFlight[vm.Host] += len(vm.Disks)
 		}
 	}
 
@@ -153,7 +153,7 @@ func (r *Scheduler) buildInFlight() (err error) {
 				}
 				return err
 			}
-			r.inFlight[vm.Host.ID] += len(vm.Disks)
+			r.inFlight[vm.Host] += len(vm.Disks)
 		}
 	}
 
@@ -177,7 +177,7 @@ func (r *Scheduler) buildPending() (err error) {
 				status: vmStatus,
 				cost:   len(vm.Disks),
 			}
-			r.pending[vm.Host.ID] = append(r.pending[vm.Host.ID], pending)
+			r.pending[vm.Host] = append(r.pending[vm.Host], pending)
 		}
 	}
 	return
