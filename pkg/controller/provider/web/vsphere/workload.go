@@ -109,16 +109,27 @@ type WorkloadNavigator struct {
 //
 // Next parent.
 func (n *WorkloadNavigator) Next(m model.Model) (r model.Model, err error) {
-	bn := BranchNavigator{db: n.db}
 	switch m.(type) {
-	case *model.Folder:
-		r, err = bn.get(m.(*model.Folder).Parent)
-	case *model.Cluster:
-		r, err = bn.get(m.(*model.Cluster).Parent)
 	case *model.Host:
-		r, err = bn.get(m.(*model.Host).Parent)
+		m := &model.Cluster{
+			Base: model.Base{
+				ID: m.(*model.Host).Parent.ID,
+			},
+		}
+		err = n.db.Get(m)
+		if err == nil {
+			r = m
+		}
 	case *model.VM:
-		r, err = bn.get(m.(*model.VM).Host)
+		m := &model.Host{
+			Base: model.Base{
+				ID: m.(*model.VM).Host,
+			},
+		}
+		err = n.db.Get(m)
+		if err == nil {
+			r = m
+		}
 	}
 
 	return
