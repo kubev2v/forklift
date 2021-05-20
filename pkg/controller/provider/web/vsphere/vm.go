@@ -199,6 +199,8 @@ func (h VMHandler) filter(ctx *gin.Context, list *[]model.VM) (err error) {
 // REST Resource.
 type VM struct {
 	Resource
+	Folder                string          `json:"folder"`
+	Host                  string          `json:"host"`
 	PolicyVersion         int             `json:"policyVersion"`
 	RevisionValidated     int64           `json:"revisionValidated"`
 	UUID                  string          `json:"uuid"`
@@ -224,7 +226,6 @@ type VM struct {
 	Devices               []model.Device  `json:"devices"`
 	Networks              []model.Ref     `json:"networks"`
 	Disks                 []model.Disk    `json:"disks"`
-	Host                  model.Ref       `json:"host"`
 	Concerns              []model.Concern `json:"concerns"`
 }
 
@@ -232,6 +233,8 @@ type VM struct {
 // Build the resource using the model.
 func (r *VM) With(m *model.VM) {
 	r.Resource.With(&m.Base)
+	r.Host = m.Host
+	r.Folder = m.Folder
 	r.PolicyVersion = m.PolicyVersion
 	r.RevisionValidated = m.RevisionValidated
 	r.UUID = m.UUID
@@ -257,7 +260,6 @@ func (r *VM) With(m *model.VM) {
 	r.NumaNodeAffinity = m.NumaNodeAffinity
 	r.Networks = m.Networks
 	r.Disks = m.Disks
-	r.Host = m.Host
 	r.Concerns = m.Concerns
 }
 

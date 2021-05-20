@@ -157,13 +157,17 @@ func (h FolderHandler) watch(ctx *gin.Context) {
 // REST Resource.
 type Folder struct {
 	Resource
-	Children []model.Ref `json:"children"`
+	Folder     string      `json:"folder"`
+	Datacenter string      `json:"datacenter"`
+	Children   []model.Ref `json:"children"`
 }
 
 //
 // Build the resource using the model.
 func (r *Folder) With(m *model.Folder) {
 	r.Resource.With(&m.Base)
+	r.Folder = m.Folder
+	r.Datacenter = m.Datacenter
 	r.Children = m.Children
 }
 
