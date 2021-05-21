@@ -8,6 +8,7 @@ import (
 // Environment variables.
 const (
 	PolicyAgentURL            = "POLICY_AGENT_URL"
+	PolicyTLSEnabled          = "POLICY_TLS_ENABLED"
 	PolicyAgentCA             = "POLICY_AGENT_CA"
 	PolicyAgentWorkerLimit    = "POLICY_AGENT_WORKER_LIMIT"
 	PolicyAgentBacklogLimit   = "POLICY_AGENT_BACKLOG_LIMIT"
@@ -19,8 +20,13 @@ const (
 type PolicyAgent struct {
 	// URL.
 	URL string
-	// CA path
-	CA string
+	// TLS
+	TLS struct {
+		// Enabled.
+		Enabled bool
+		// CA path
+		CA string
+	}
 	// Search interval (seconds).
 	SearchInterval int
 	// Limits.
@@ -38,10 +44,12 @@ func (r *PolicyAgent) Load() (err error) {
 	if s, found := os.LookupEnv(PolicyAgentURL); found {
 		r.URL = s
 	}
+	// TLS
+	r.TLS.Enabled = getEnvBool(TLSEnabled, false)
 	if s, found := os.LookupEnv(PolicyAgentCA); found {
-		r.CA = s
+		r.TLS.CA = s
 	} else {
-		r.CA = ServiceCAFile
+		r.TLS.CA = ServiceCAFile
 	}
 	r.Limit.Worker, err = getEnvLimit(PolicyAgentWorkerLimit, 10)
 	if err != nil {

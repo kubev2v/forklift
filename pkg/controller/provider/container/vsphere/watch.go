@@ -97,22 +97,30 @@ func (r *VMEventHandler) Started(uint64) {
 
 //
 // VM Created.
+// The VM is scheduled (and reported as scheduled).
+// This is best-effort.  If the validate() fails, it wil be
+// picked up in the next search().
 func (r *VMEventHandler) Created(event libmodel.Event) {
 	if vm, cast := event.Model.(*model.VM); cast {
 		if !vm.Validated() {
-			r.report(vm)
-			r.validate(vm)
+			if r.validate(vm) == nil {
+				r.report(vm)
+			}
 		}
 	}
 }
 
 //
 // VM Updated.
+// The VM is scheduled (and reported as scheduled).
+// This is best-effort.  If the validate() fails, it wil be
+// picked up in the next search().
 func (r *VMEventHandler) Updated(event libmodel.Event) {
 	if vm, cast := event.Updated.(*model.VM); cast {
 		if !vm.Validated() {
-			r.report(vm)
-			r.validate(vm)
+			if r.validate(vm) == nil {
+				r.report(vm)
+			}
 		}
 	}
 }
@@ -210,46 +218,50 @@ func (r *VMEventHandler) harvest() {
 // VMs that have been reported through the model event
 // watch are ignored.
 func (r *VMEventHandler) list() {
-	r.log.V(1).Info("Search for VMs that need to be validated.")
+	r.log.V(1).Info("List VMs that need to be validated.")
 	version, err := policy.Agent.Version()
 	if err != nil {
 		r.log.Error(err, err.Error())
 		return
 	}
+	select {
+	case <-r.context.Done():
+		return
+	default:
+	}
+	itr, err := r.DB.Iter(
+		&model.VM{},
+		libmodel.ListOptions{
+			Predicate: libmodel.Or(
+				libmodel.Neq("Revision", libmodel.Field{Name: "RevisionValidated"}),
+				libmodel.Neq("PolicyVersion", version)),
+		})
+	if err != nil {
+		r.log.Error(err, "List VM failed.")
+		return
+	}
 	for {
-		list := []model.VM{}
-		err = r.DB.List(
-			&list,
-			libmodel.ListOptions{
-				Predicate: libmodel.Or(
-					libmodel.Neq("Revision", libmodel.Field{Name: "RevisionValidated"}),
-					libmodel.Neq("PolicyVersion", version)),
-				Page: &libmodel.Page{
-					Limit: 250,
-				},
-			})
+		vm := &model.VM{}
+		hasNext, err := itr.NextWith(vm)
 		if err != nil {
-			r.log.Error(err, "VM (list) failed.")
-			return
+			r.log.Error(err, "VM iterator failed.")
+			break
 		}
-		if len(list) == 0 {
-			return
+		if !hasNext {
+			break
 		}
-		for _, vm := range list {
-			if revision, found := r.reported[vm.ID]; found {
-				if vm.Revision == revision {
-					continue
-				}
+		if revision, found := r.reported[vm.ID]; found {
+			if vm.Revision == revision {
+				continue
 			}
-			r.validate(&vm)
 		}
+		_ = r.validate(vm)
 	}
 }
 
 //
 // Analyze the VM.
-func (r *VMEventHandler) validate(vm *model.VM) {
-	var err error
+func (r *VMEventHandler) validate(vm *model.VM) (err error) {
 	task := &policy.Task{
 		Context:  r.context,
 		Provider: r.Provider,
@@ -267,13 +279,15 @@ func (r *VMEventHandler) validate(vm *model.VM) {
 			r.log.Error(err, "VM task (submit) failed.")
 		}
 	}
+
+	return
 }
 
 //
 // VMs validated.
 func (r *VMEventHandler) validated(batch []*policy.Task) {
 	r.log.V(3).Info("VM (batch) completed.", "batch", len(batch))
-	if !policy.Agent.Enabled() || len(batch) == 0 {
+	if len(batch) == 0 {
 		return
 	}
 	tx, err := r.DB.Begin()
