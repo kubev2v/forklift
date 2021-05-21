@@ -58,6 +58,9 @@ func (r *Client) Enabled() bool {
 //
 // Policy version.
 func (r *Client) Version() (version int, err error) {
+	if !r.Enabled() {
+		return
+	}
 	out := &struct {
 		Result struct {
 			Version int `json:"rules_version"`
@@ -193,14 +196,7 @@ func (c *Client) buildTransport() (err error) {
 	if c.Transport != nil {
 		return
 	}
-	pool := x509.NewCertPool()
-	ca, err := ioutil.ReadFile(Settings.PolicyAgent.CA)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	pool.AppendCertsFromPEM(ca)
-	c.Transport = &http.Transport{
+	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
 			Timeout:   10 * time.Second,
@@ -210,10 +206,21 @@ func (c *Client) buildTransport() (err error) {
 		IdleConnTimeout:       10 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
-		TLSClientConfig: &tls.Config{
-			RootCAs: pool,
-		},
 	}
+	if Settings.PolicyAgent.TLS.Enabled {
+		pool := x509.NewCertPool()
+		ca, xErr := ioutil.ReadFile(Settings.PolicyAgent.TLS.CA)
+		if xErr != nil {
+			err = liberr.Wrap(xErr)
+			return
+		}
+		pool.AppendCertsFromPEM(ca)
+		transport.TLSClientConfig = &tls.Config{
+			RootCAs: pool,
+		}
+	}
+
+	c.Transport = transport
 
 	return
 }
@@ -224,7 +231,7 @@ type BacklogExceededError struct {
 }
 
 func (r BacklogExceededError) Error() string {
-	return "Dispatcher backlog exceeded."
+	return "Pool backlog exceeded."
 }
 
 //
@@ -425,7 +432,7 @@ func (r *Pool) Version() (version int, err error) {
 //
 // Submit validation task.
 // Queue validation request.
-// May block (no longer than 10 seconds) when backlog exceeded.
+// May block (no longer than 1 second) when backlog exceeded.
 // Returns: BacklogExceededError.
 func (r *Pool) Submit(task *Task) (err error) {
 	if !r.started {
@@ -437,7 +444,7 @@ func (r *Pool) Submit(task *Task) (err error) {
 	select {
 	case r.input <- task:
 		// queued.
-	case <-time.After(10 * time.Minute):
+	case <-time.After(time.Second):
 		err = liberr.Wrap(BacklogExceededError{})
 	}
 
