@@ -8,7 +8,6 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	libweb "github.com/konveyor/controller/pkg/inventory/web"
 	"github.com/konveyor/controller/pkg/logging"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	refapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/settings"
@@ -84,25 +83,14 @@ func (r *Client) Version() (version int, err error) {
 
 //
 // Validate the VM.
-func (r *Client) Validate(
-	provider *api.Provider,
-	ref refapi.Ref) (version int, concerns []model.Concern, err error) {
-	//
+func (r *Client) Validate(workload interface{}) (version int, concerns []model.Concern, err error) {
 	if !r.Enabled() {
 		return
 	}
 	in := &struct {
-		Input struct {
-			Provider struct {
-				UID       string `json:"uid"`
-				Namespace string `json:"namespace"`
-				Name      string `json:"name"`
-			} `json:"provider"`
-			VmID string `json:"vm_moref"`
-		} `json:"input"`
+		Input interface{} `json:"input"`
 	}{}
-	in.Input.Provider.UID = string(provider.UID)
-	in.Input.VmID = ref.ID
+	in.Input = workload
 	out := &struct {
 		Result struct {
 			Version  int             `json:"rules_version"`
@@ -178,7 +166,7 @@ func (r *Client) post(path string, in interface{}, out interface{}) (err error) 
 		"url",
 		url,
 		"body",
-		out)
+		in)
 	status, err := r.LibClient.Post(url, in, out)
 	if err != nil {
 		return
@@ -237,14 +225,14 @@ func (r BacklogExceededError) Error() string {
 //
 // Policy agent task.
 type Task struct {
-	// Provider.
-	Provider *api.Provider
 	// VM reference.
 	Ref refapi.Ref
 	// Revision number of the VM being validated.
 	Revision interface{}
 	// Context.
 	Context context.Context
+	// Workload builder.
+	Workload func(string) (interface{}, error)
 	// Task result channel.
 	Result chan *Task
 	// Reported policy version.
@@ -343,10 +331,13 @@ func (r *Worker) run() {
 			}
 			task.worker = r.id
 			task.started = time.Now()
-			task.Version, task.Concerns, task.Error = r.client.Validate(
-				task.Provider,
-				task.Ref)
-			task.completed = time.Now()
+			workload, err := task.Workload(task.Ref.ID)
+			if err == nil {
+				task.Version, task.Concerns, task.Error = r.client.Validate(workload)
+				task.completed = time.Now()
+			} else {
+				task.Error = err
+			}
 			func() {
 				defer func() {
 					_ = recover()
