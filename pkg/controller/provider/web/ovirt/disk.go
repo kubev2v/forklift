@@ -11,26 +11,26 @@ import (
 )
 
 //
-// Routes.
+// Routes
 const (
-	VNICProfileParam      = "profile"
-	VNICProfileCollection = "vnicprofiles"
-	VNICProfilesRoot      = ProviderRoot + "/" + VNICProfileCollection
-	VNICProfileRoot       = VNICProfilesRoot + "/:" + VNICProfileParam
+	DiskParam      = "disk"
+	DiskCollection = "disks"
+	DisksRoot      = ProviderRoot + "/" + DiskCollection
+	DiskRoot       = DisksRoot + "/:" + DiskParam
 )
 
 //
-// VNICProfile handler.
-type VNICProfileHandler struct {
+// Disk handler.
+type DiskHandler struct {
 	Handler
 }
 
 //
 // Add routes to the `gin` router.
-func (h *VNICProfileHandler) AddRoutes(e *gin.Engine) {
-	e.GET(VNICProfilesRoot, h.List)
-	e.GET(VNICProfilesRoot+"/", h.List)
-	e.GET(VNICProfileRoot, h.Get)
+func (h *DiskHandler) AddRoutes(e *gin.Engine) {
+	e.GET(DisksRoot, h.List)
+	e.GET(DisksRoot+"/", h.List)
+	e.GET(DiskRoot, h.Get)
 }
 
 //
@@ -38,7 +38,7 @@ func (h *VNICProfileHandler) AddRoutes(e *gin.Engine) {
 // A GET onn the collection that includes the `X-Watch`
 // header will negotiate an upgrade of the connection
 // to a websocket and push watch events.
-func (h VNICProfileHandler) List(ctx *gin.Context) {
+func (h DiskHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
@@ -49,7 +49,7 @@ func (h VNICProfileHandler) List(ctx *gin.Context) {
 		return
 	}
 	db := h.Reconciler.DB()
-	list := []model.VNICProfile{}
+	list := []model.Disk{}
 	err := db.List(&list, h.ListOptions(ctx))
 	if err != nil {
 		log.Trace(
@@ -61,7 +61,7 @@ func (h VNICProfileHandler) List(ctx *gin.Context) {
 	}
 	content := []interface{}{}
 	for _, m := range list {
-		r := &VNICProfile{}
+		r := &Disk{}
 		r.With(&m)
 		r.SelfLink = h.Link(h.Provider, &m)
 		content = append(content, r.Content(h.Detail))
@@ -72,15 +72,16 @@ func (h VNICProfileHandler) List(ctx *gin.Context) {
 
 //
 // Get a specific REST resource.
-func (h VNICProfileHandler) Get(ctx *gin.Context) {
+func (h DiskHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
 		return
 	}
-	m := &model.VNICProfile{
+	h.Detail = true
+	m := &model.Disk{
 		Base: model.Base{
-			ID: ctx.Param(VNICProfileParam),
+			ID: ctx.Param(DiskParam),
 		},
 	}
 	db := h.Reconciler.DB()
@@ -97,7 +98,7 @@ func (h VNICProfileHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	r := &VNICProfile{}
+	r := &Disk{}
 	r.With(m)
 	r.SelfLink = h.Link(h.Provider, m)
 	content := r.Content(true)
@@ -107,29 +108,29 @@ func (h VNICProfileHandler) Get(ctx *gin.Context) {
 
 //
 // Build self link (URI).
-func (h VNICProfileHandler) Link(p *api.Provider, m *model.VNICProfile) string {
+func (h DiskHandler) Link(p *api.Provider, m *model.Disk) string {
 	return h.Handler.Link(
-		VNICProfileRoot,
+		DiskRoot,
 		base.Params{
 			base.ProviderParam: string(p.UID),
-			VNICProfileParam:   m.ID,
+			DiskParam:          m.ID,
 		})
 }
 
 //
 // Watch.
-func (h VNICProfileHandler) watch(ctx *gin.Context) {
+func (h DiskHandler) watch(ctx *gin.Context) {
 	db := h.Reconciler.DB()
 	err := h.Watch(
 		ctx,
 		db,
-		&model.VNICProfile{},
+		&model.Disk{},
 		func(in libmodel.Model) (r interface{}) {
-			m := in.(*model.VNICProfile)
-			profile := &VNICProfile{}
-			profile.With(m)
-			profile.SelfLink = h.Link(h.Provider, m)
-			r = profile
+			m := in.(*model.Disk)
+			disk := &Disk{}
+			disk.With(m)
+			disk.SelfLink = h.Link(h.Provider, m)
+			r = disk
 			return
 		})
 	if err != nil {
@@ -143,23 +144,23 @@ func (h VNICProfileHandler) watch(ctx *gin.Context) {
 
 //
 // REST Resource.
-type VNICProfile struct {
+type Disk struct {
 	Resource
-	DataCenter string    `json:"dataCenter"`
-	QoS        model.Ref `json:"qos"`
+	Shared        bool   `json:"shared"`
+	StorageDomain string `json:"storageDomain"`
 }
 
 //
 // Build the resource using the model.
-func (r *VNICProfile) With(m *model.VNICProfile) {
+func (r *Disk) With(m *model.Disk) {
 	r.Resource.With(&m.Base)
-	r.DataCenter = m.DataCenter
-	r.QoS = m.QoS
+	r.Shared = m.Shared
+	r.StorageDomain = m.StorageDomain
 }
 
 //
 // As content.
-func (r *VNICProfile) Content(detail bool) interface{} {
+func (r *Disk) Content(detail bool) interface{} {
 	if !detail {
 		return r.Resource
 	}

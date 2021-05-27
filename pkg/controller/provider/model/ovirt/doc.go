@@ -11,9 +11,10 @@ func All() []interface{} {
 		&ocp.Provider{},
 		&DataCenter{},
 		&Cluster{},
-		&VNICProfile{},
+		&NICProfile{},
 		&Network{},
 		&StorageDomain{},
+		&Disk{},
 		&Host{},
 		&VM{},
 	}

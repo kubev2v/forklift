@@ -81,14 +81,14 @@ func (r *Client) list(path string, list interface{}, param ...libweb.Param) (err
 
 //
 // Get a resource.
-func (r *Client) get(path string, object interface{}) (err error) {
+func (r *Client) get(path string, object interface{}, param ...libweb.Param) (err error) {
 	url, err := liburl.Parse(r.url)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
 	url.Path = path
-	status, err := r.client.Get(url.String(), object)
+	status, err := r.client.Get(url.String(), object, param...)
 	if err != nil {
 		return
 	}

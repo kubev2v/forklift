@@ -146,7 +146,15 @@ func (h HostHandler) watch(ctx *gin.Context) {
 // REST Resource.
 type Host struct {
 	Resource
-	Cluster string `json:"cluster"`
+	Cluster        string   `json:"cluster"`
+	ProductName    string   `json:"productName"`
+	ProductVersion string   `json:"productVersion"`
+	InMaintenance  bool     `json:"inMaintenance"`
+	KsmEnabled     bool     `json:"ksmEnabled"`
+	Thumbprint     string   `json:"thumbprint"`
+	CpuSockets     int16    `json:"cpuSockets"`
+	CpuCores       int16    `json:"cpuCores"`
+	Networks       []string `json:"networks"`
 }
 
 //
@@ -154,6 +162,15 @@ type Host struct {
 func (r *Host) With(m *model.Host) {
 	r.Resource.With(&m.Base)
 	r.Cluster = m.Cluster
+	r.ProductName = m.ProductName
+	r.ProductVersion = m.ProductVersion
+	r.InMaintenance = m.InMaintenance
+	r.KsmEnabled = m.KsmEnabled
+	r.Thumbprint = m.Thumbprint
+	r.CpuSockets = m.CpuSockets
+	r.CpuCores = m.CpuCores
+	r.Networks = m.Networks
+
 }
 
 //
