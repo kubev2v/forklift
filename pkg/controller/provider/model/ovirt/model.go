@@ -233,11 +233,12 @@ type Property struct {
 
 type Disk struct {
 	Base
-	Shared        bool   `sql:""`
-	Profile       string `sql:"index(profile)"`
-	StorageDomain string `sql:"index(storageDomain)"`
-	Status        string `sql:""`
-	StorageUsed   int64  `sql:""`
-	Backup        string `sql:""`
-	StorageType   string `sql:""`
+	Shared          bool   `sql:""`
+	Profile         string `sql:"index(profile)"`
+	StorageDomain   string `sql:"index(storageDomain)"`
+	Status          string `sql:""`
+	StorageUsed     int64  `sql:""`
+	Backup          string `sql:""`
+	StorageType     string `sql:""`
+	ProvisionedSize int64  `sql:""`
 }
