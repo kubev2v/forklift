@@ -13,24 +13,24 @@ import (
 //
 // Routes.
 const (
-	NetworkParam      = "network"
-	NetworkCollection = "networks"
-	NetworksRoot      = ProviderRoot + "/" + NetworkCollection
-	NetworkRoot       = NetworksRoot + "/:" + NetworkParam
+	NICProfileParam      = "profile"
+	NICProfileCollection = "nicprofiles"
+	NICProfilesRoot      = ProviderRoot + "/" + NICProfileCollection
+	NICProfileRoot       = NICProfilesRoot + "/:" + NICProfileParam
 )
 
 //
-// Network handler.
-type NetworkHandler struct {
+// NICProfile handler.
+type NICProfileHandler struct {
 	Handler
 }
 
 //
 // Add routes to the `gin` router.
-func (h *NetworkHandler) AddRoutes(e *gin.Engine) {
-	e.GET(NetworksRoot, h.List)
-	e.GET(NetworksRoot+"/", h.List)
-	e.GET(NetworkRoot, h.Get)
+func (h *NICProfileHandler) AddRoutes(e *gin.Engine) {
+	e.GET(NICProfilesRoot, h.List)
+	e.GET(NICProfilesRoot+"/", h.List)
+	e.GET(NICProfileRoot, h.Get)
 }
 
 //
@@ -38,7 +38,7 @@ func (h *NetworkHandler) AddRoutes(e *gin.Engine) {
 // A GET onn the collection that includes the `X-Watch`
 // header will negotiate an upgrade of the connection
 // to a websocket and push watch events.
-func (h NetworkHandler) List(ctx *gin.Context) {
+func (h NICProfileHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
@@ -49,7 +49,7 @@ func (h NetworkHandler) List(ctx *gin.Context) {
 		return
 	}
 	db := h.Reconciler.DB()
-	list := []model.Network{}
+	list := []model.NICProfile{}
 	err := db.List(&list, h.ListOptions(ctx))
 	if err != nil {
 		log.Trace(
@@ -61,7 +61,7 @@ func (h NetworkHandler) List(ctx *gin.Context) {
 	}
 	content := []interface{}{}
 	for _, m := range list {
-		r := &Network{}
+		r := &NICProfile{}
 		r.With(&m)
 		r.SelfLink = h.Link(h.Provider, &m)
 		content = append(content, r.Content(h.Detail))
@@ -72,15 +72,15 @@ func (h NetworkHandler) List(ctx *gin.Context) {
 
 //
 // Get a specific REST resource.
-func (h NetworkHandler) Get(ctx *gin.Context) {
+func (h NICProfileHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
 		return
 	}
-	m := &model.Network{
+	m := &model.NICProfile{
 		Base: model.Base{
-			ID: ctx.Param(NetworkParam),
+			ID: ctx.Param(NICProfileParam),
 		},
 	}
 	db := h.Reconciler.DB()
@@ -97,7 +97,7 @@ func (h NetworkHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	r := &Network{}
+	r := &NICProfile{}
 	r.With(m)
 	r.SelfLink = h.Link(h.Provider, m)
 	content := r.Content(true)
@@ -107,29 +107,29 @@ func (h NetworkHandler) Get(ctx *gin.Context) {
 
 //
 // Build self link (URI).
-func (h NetworkHandler) Link(p *api.Provider, m *model.Network) string {
+func (h NICProfileHandler) Link(p *api.Provider, m *model.NICProfile) string {
 	return h.Handler.Link(
-		NetworkRoot,
+		NICProfileRoot,
 		base.Params{
 			base.ProviderParam: string(p.UID),
-			NetworkParam:       m.ID,
+			NICProfileParam:    m.ID,
 		})
 }
 
 //
 // Watch.
-func (h NetworkHandler) watch(ctx *gin.Context) {
+func (h NICProfileHandler) watch(ctx *gin.Context) {
 	db := h.Reconciler.DB()
 	err := h.Watch(
 		ctx,
 		db,
-		&model.Network{},
+		&model.NICProfile{},
 		func(in libmodel.Model) (r interface{}) {
-			m := in.(*model.Network)
-			network := &Network{}
-			network.With(m)
-			network.SelfLink = h.Link(h.Provider, m)
-			r = network
+			m := in.(*model.NICProfile)
+			profile := &NICProfile{}
+			profile.With(m)
+			profile.SelfLink = h.Link(h.Provider, m)
+			r = profile
 			return
 		})
 	if err != nil {
@@ -143,27 +143,23 @@ func (h NetworkHandler) watch(ctx *gin.Context) {
 
 //
 // REST Resource.
-type Network struct {
+type NICProfile struct {
 	Resource
-	DataCenter string   `json:"dataCenter"`
-	VLan       string   `json:"vlan"`
-	Usages     []string `json:"usages"`
-	Profiles   []string `json:"nicProfiles"`
+	Network string `json:"network"`
+	QoS     string `json:"qos"`
 }
 
 //
 // Build the resource using the model.
-func (r *Network) With(m *model.Network) {
+func (r *NICProfile) With(m *model.NICProfile) {
 	r.Resource.With(&m.Base)
-	r.DataCenter = m.DataCenter
-	r.VLan = m.VLan
-	r.Usages = m.Usages
-	r.Profiles = m.Profiles
+	r.Network = m.Network
+	r.QoS = m.QoS
 }
 
 //
 // As content.
-func (r *Network) Content(detail bool) interface{} {
+func (r *NICProfile) Content(detail bool) interface{} {
 	if !detail {
 		return r.Resource
 	}

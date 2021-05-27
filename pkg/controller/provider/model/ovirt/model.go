@@ -70,21 +70,22 @@ type DataCenter struct {
 
 type Cluster struct {
 	Base
-	DataCenter string `sql:"d0,index(dataCenter)"`
+	DataCenter    string `sql:"d0,index(dataCenter)"`
+	HaReservation bool   `sql:""`
 }
 
 type Network struct {
 	Base
-	DataCenter   string   `sql:"d0,index(dataCenter)"`
-	VLan         Ref      `sql:""`
-	Usages       []string `sql:""`
-	VNICProfiles []Ref    `sql:""`
+	DataCenter string   `sql:"d0,index(dataCenter)"`
+	VLan       string   `sql:""`
+	Usages     []string `sql:""`
+	Profiles   []string `sql:""`
 }
 
-type VNICProfile struct {
+type NICProfile struct {
 	Base
-	DataCenter string `sql:"d0,index(dataCenter)"`
-	QoS        Ref    `sql:""`
+	Network string `sql:"d0,index(network)"`
+	QoS     string `sql:""`
 }
 
 type StorageDomain struct {
@@ -100,11 +101,52 @@ type StorageDomain struct {
 
 type Host struct {
 	Base
-	Cluster string `sql:"d0,index(cluster)"`
+	Cluster        string   `sql:"d0,index(cluster)"`
+	ProductName    string   `sql:""`
+	ProductVersion string   `sql:""`
+	InMaintenance  bool     `sql:""`
+	KsmEnabled     bool     `sql:""`
+	Thumbprint     string   `sql:""`
+	CpuSockets     int16    `sql:""`
+	CpuCores       int16    `sql:""`
+	Networks       []string `sql:""`
 }
 
 type VM struct {
 	Base
-	Cluster string `sql:"d0,index(cluster)"`
-	Host    string `sql:"d0,index(host)"`
+	Cluster        string           `sql:"d0,index(cluster)"`
+	Host           string           `sql:"d0,index(host)"`
+	GuestName      string           `sql:""`
+	CpuSockets     int16            `sql:""`
+	CpuCores       int16            `sql:""`
+	Memory         int64            `sql:""`
+	BIOS           string           `sql:""`
+	Display        string           `sql:""`
+	CpuAffinity    []CpuPinning     `sql:""`
+	DiskAttachments []DiskAttachment `sql:""`
+	NICs            []NIC            `sql:""`
+}
+
+type DiskAttachment struct {
+	ID string `json:"id"`
+	Interface string `json:"interface"`
+	Disk      string `json:"disk"`
+}
+
+type NIC struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Interface string `json:"interface"`
+	Profile   string `json:"profile"`
+}
+
+type CpuPinning struct {
+	Set int32 `json:"set"`
+	Cpu int32 `json:"cpu"`
+}
+
+type Disk struct {
+	Base
+	Shared        bool   `sql:""`
+	StorageDomain string `sql:""`
 }
