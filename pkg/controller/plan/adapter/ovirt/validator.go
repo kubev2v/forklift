@@ -38,13 +38,12 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 			vmRef.String())
 		return
 	}
-	/*  TODO: Implement when inventory is complete.
-	for _, net := range vm.Networks {
-		if !r.plan.Referenced.Map.Network.Status.Refs.Find(ref.Ref{ID: net.ID}) {
+
+	for _, nic := range vm.NICs {
+		if !r.plan.Referenced.Map.Network.Status.Refs.Find(ref.Ref{ID: nic.Profile.Network}) {
 			return
 		}
 	}
-	*/
 	ok = true
 	return
 }
@@ -65,13 +64,11 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 			vmRef.String())
 		return
 	}
-	/*  TODO: Implement when inventory is complete.
-	for _, disk := range vm.Disks {
-		if !r.plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{ID: disk.Datastore.ID}) {
+	for _, da := range vm.DiskAttachments {
+		if !r.plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{ID: da.Disk.StorageDomain}) {
 			return
 		}
 	}
-	*/
 	ok = true
 	return
 }

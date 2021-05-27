@@ -2,6 +2,7 @@ package ovirt
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libweb "github.com/konveyor/controller/pkg/inventory/web"
@@ -30,6 +31,15 @@ func (r *Client) connect() (err error) {
 	if r.client != nil {
 		return
 	}
+
+	cacert := r.secret.Data["cacert"]
+	roots := x509.NewCertPool()
+	ok := roots.AppendCertsFromPEM(cacert)
+	if !ok {
+		err = liberr.New("failed to parse cacert")
+		return
+	}
+
 	r.url = strings.TrimRight(r.url, "/")
 	client := &libweb.Client{
 		Transport: &http.Transport{
@@ -42,7 +52,7 @@ func (r *Client) connect() (err error) {
 			IdleConnTimeout:       10 * time.Second,
 			TLSHandshakeTimeout:   10 * time.Second,
 			ExpectContinueTimeout: 1 * time.Second,
-			TLSClientConfig:       &tls.Config{InsecureSkipVerify: true}, // TODO:
+			TLSClientConfig:       &tls.Config{RootCAs: roots},
 		},
 	}
 	client.Header = http.Header{

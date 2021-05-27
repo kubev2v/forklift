@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
+	libitr "github.com/konveyor/controller/pkg/itinerary"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
@@ -35,7 +36,7 @@ func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
 			"apiUrl":   url,
 			"username": string(in.Data["user"]),
 			"password": string(in.Data["password"]),
-			"ca.cert":  string(in.Data["cacert"]),
+			"caCert":   string(in.Data["cacert"]),
 		})
 	if mErr != nil {
 		err = liberr.Wrap(mErr)
@@ -90,12 +91,14 @@ func (r *Builder) mapping(vm *model.VM) (out *vmio.OvirtMappings, err error) {
 			return
 		}
 		needed := false
-		//for _, net := range vm.Networks {
-		//	if net.ID == network.ID {
-		//		needed = true
-		//		break
-		//	}
-		//}
+		profileId := ""
+		for _, nic := range vm.NICs {
+			if nic.Profile.Network == network.ID {
+				needed = true
+				profileId = nic.Profile.ID
+				break
+			}
+		}
 		if !needed {
 			continue
 		}
@@ -103,7 +106,7 @@ func (r *Builder) mapping(vm *model.VM) (out *vmio.OvirtMappings, err error) {
 			netMap,
 			vmio.NetworkResourceMappingItem{
 				Source: vmio.Source{
-					ID: &network.ID,
+					ID: &profileId,
 				},
 				Target: vmio.ObjectIdentifier{
 					Namespace: &mapped.Destination.Namespace,
@@ -123,12 +126,12 @@ func (r *Builder) mapping(vm *model.VM) (out *vmio.OvirtMappings, err error) {
 			return
 		}
 		needed := false
-		//for _, disk := range vm.Disks {
-		//	if disk.StorageDomain.ID == domain.ID {
-		//		needed = true
-		//		break
-		//	}
-		//}
+		for _, da := range vm.DiskAttachments {
+			if da.Disk.StorageDomain == domain.ID {
+				needed = true
+				break
+			}
+		}
 		if !needed {
 			continue
 		}
@@ -160,7 +163,6 @@ func (r *Builder) mapping(vm *model.VM) (out *vmio.OvirtMappings, err error) {
 
 	return
 }
-
 
 //
 // Set volume and access modes.
@@ -201,20 +203,21 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 				pErr.Error()))
 		return
 	}
-	//for _, disk := range vm.Disks {
-	//	mB := disk.Capacity / 0x100000
-	//	list = append(
-	//		list,
-	//		&plan.Task{
-	//			Name: disk.ID,
-	//			Progress: libitr.Progress{
-	//				Total: mB,
-	//			},
-	//			Annotations: map[string]string{
-	//				"unit": "MB",
-	//			},
-	//		})
-	//}
+	for _, da := range vm.DiskAttachments {
+		//mB := da.Disk.Capacity / 0x100000
+		mB := int64(0)
+		list = append(
+			list,
+			&plan.Task{
+				Name: da.Disk.ID,
+				Progress: libitr.Progress{
+					Total: mB,
+				},
+				Annotations: map[string]string{
+					"unit": "MB",
+				},
+			})
+	}
 
 	return
 }

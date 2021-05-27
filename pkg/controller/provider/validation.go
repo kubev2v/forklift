@@ -204,6 +204,7 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 		keyList = []string{
 			"user",
 			"password",
+			"cacert",
 		}
 	}
 	for _, key := range keyList {
