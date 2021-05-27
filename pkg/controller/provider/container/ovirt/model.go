@@ -4,15 +4,15 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	fb "github.com/konveyor/controller/pkg/filebacked"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
+	libweb "github.com/konveyor/controller/pkg/inventory/web"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
-	"path"
 )
 
 //
 // Event codes.
-// VNICProfileAdded   = 1122
-// VNICProfileUpdated = 1124
-// VNICProfileDeleted = 1126
+// NICProfileAdded   = 1122
+// NICProfileUpdated = 1124
+// NICProfileDeleted = 1126
 const (
 	DataCenterAdded   = 950
 	DataCenterUpdated = 952
@@ -40,8 +40,9 @@ func init() {
 	adapterList = []Adapter{
 		&DataCenterAdapter{},
 		&StorageDomainAdapter{},
-		&VNICProfileAdapter{},
+		&NICProfileAdapter{},
 		&NetworkAdapter{},
+		&DiskAdapter{},
 		&ClusterAdapter{},
 		&HostAdapter{},
 		&VMAdapter{},
@@ -173,7 +174,7 @@ func (r *NetworkAdapter) Event() []int {
 // List the collection.
 func (r *NetworkAdapter) List(client *Client) (itr fb.Iterator, err error) {
 	networkList := NetworkList{}
-	err = client.list("networks", &networkList)
+	err = client.list("networks", &networkList, r.follow())
 	if err != nil {
 		return
 	}
@@ -181,10 +182,6 @@ func (r *NetworkAdapter) List(client *Client) (itr fb.Iterator, err error) {
 	for _, object := range networkList.Items {
 		m := &model.Network{
 			Base: model.Base{ID: object.ID},
-		}
-		m.VNICProfiles, err = r.listProfiles(client, m.ID)
-		if err != nil {
-			return
 		}
 		object.ApplyTo(m)
 		err = list.Append(m)
@@ -194,29 +191,6 @@ func (r *NetworkAdapter) List(client *Client) (itr fb.Iterator, err error) {
 	}
 
 	itr = list.Iter()
-
-	return
-}
-
-//
-// List associated vNIC profiles.
-func (r *NetworkAdapter) listProfiles(client *Client, id string) (list []model.Ref, err error) {
-	pList := struct {
-		Items []Ref `json:"vnic_profile"`
-	}{}
-	path := path.Join("networks", id, "vnicprofiles")
-	err = client.list(path, &pList)
-	if err != nil {
-		return
-	}
-	for _, ref := range pList.Items {
-		list = append(
-			list,
-			model.Ref{
-				Kind: model.VNICProfileKind,
-				ID:   ref.ID,
-			})
-	}
 
 	return
 }
@@ -232,28 +206,35 @@ func (r *NetworkAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (e
 	return
 }
 
+func (r *NetworkAdapter) follow() libweb.Param {
+	return libweb.Param{
+		Key:   "follow",
+		Value: "vnic_profiles",
+	}
+}
+
 //
-// VNICProfileAdapter adapter.
-type VNICProfileAdapter struct {
+// NICProfileAdapter adapter.
+type NICProfileAdapter struct {
 }
 
 //
 // Handled events.
-func (r *VNICProfileAdapter) Event() []int {
+func (r *NICProfileAdapter) Event() []int {
 	return []int{}
 }
 
 //
 // List the collection.
-func (r *VNICProfileAdapter) List(client *Client) (itr fb.Iterator, err error) {
-	pList := VNICProfileList{}
+func (r *NICProfileAdapter) List(client *Client) (itr fb.Iterator, err error) {
+	pList := NICProfileList{}
 	err = client.list("vnicprofiles", &pList)
 	if err != nil {
 		return
 	}
 	list := fb.NewList()
 	for _, object := range pList.Items {
-		m := &model.VNICProfile{
+		m := &model.NICProfile{
 			Base: model.Base{ID: object.ID},
 		}
 		object.ApplyTo(m)
@@ -270,7 +251,7 @@ func (r *VNICProfileAdapter) List(client *Client) (itr fb.Iterator, err error) {
 
 //
 // Apply and event tot the inventory model.
-func (r *VNICProfileAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err error) {
+func (r *NICProfileAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err error) {
 	switch event.code() {
 	default:
 		err = liberr.New("unknown event", "event", event)
@@ -432,7 +413,7 @@ func (r *HostAdapter) Event() []int {
 // List the collection.
 func (r *HostAdapter) List(client *Client) (itr fb.Iterator, err error) {
 	hostList := HostList{}
-	err = client.list("hosts", &hostList)
+	err = client.list("hosts", &hostList, r.follow())
 	if err != nil {
 		return
 	}
@@ -459,7 +440,7 @@ func (r *HostAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err 
 	switch event.code() {
 	case HostAdded:
 		object := &Host{}
-		err = client.get(event.Host.Ref, object)
+		err = client.get(event.Host.Ref, object, r.follow())
 		if err != nil {
 			break
 		}
@@ -473,7 +454,7 @@ func (r *HostAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err 
 		}
 	case HostUpdated:
 		object := &Host{}
-		err = client.get(event.Host.Ref, object)
+		err = client.get(event.Host.Ref, object, r.follow())
 		if err != nil {
 			break
 		}
@@ -500,6 +481,13 @@ func (r *HostAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err 
 	return
 }
 
+func (r *HostAdapter) follow() libweb.Param {
+	return libweb.Param{
+		Key:   "follow",
+		Value: "network_attachments",
+	}
+}
+
 //
 // VM adapter.
 type VMAdapter struct {
@@ -519,7 +507,7 @@ func (r *VMAdapter) Event() []int {
 // List the collection.
 func (r *VMAdapter) List(client *Client) (itr fb.Iterator, err error) {
 	vmList := VMList{}
-	err = client.list("vms", &vmList)
+	err = client.list("vms", &vmList, r.follow())
 	if err != nil {
 		return
 	}
@@ -546,7 +534,7 @@ func (r *VMAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err er
 	switch event.code() {
 	case VmAdded:
 		object := &VM{}
-		err = client.get(event.VM.Ref, object)
+		err = client.get(event.VM.Ref, object, r.follow())
 		if err != nil {
 			break
 		}
@@ -560,7 +548,7 @@ func (r *VMAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err er
 		}
 	case VmUpdated:
 		object := &VM{}
-		err = client.get(event.VM.Ref, object)
+		err = client.get(event.VM.Ref, object, r.follow())
 		if err != nil {
 			break
 		}
@@ -580,6 +568,60 @@ func (r *VMAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err er
 		if err != nil {
 			break
 		}
+	default:
+		err = liberr.New("unknown event", "event", event)
+	}
+
+	return
+}
+
+func (r *VMAdapter) follow() libweb.Param {
+	return libweb.Param{
+		Key:   "follow",
+		Value: "disk_attachments,nics",
+	}
+}
+
+//
+// Disk adapter.
+type DiskAdapter struct {
+}
+
+//
+// Handled events.
+func (r *DiskAdapter) Event() []int {
+	return []int{}
+}
+
+//
+// List the collection.
+func (r *DiskAdapter) List(client *Client) (itr fb.Iterator, err error) {
+	diskList := DiskList{}
+	err = client.list("disks", &diskList)
+	if err != nil {
+		return
+	}
+	list := fb.NewList()
+	for _, object := range diskList.Items {
+		m := &model.Disk{
+			Base: model.Base{ID: object.ID},
+		}
+		object.ApplyTo(m)
+		err = list.Append(m)
+		if err != nil {
+			return
+		}
+	}
+
+	itr = list.Iter()
+
+	return
+}
+
+//
+// Apply and event tot the inventory model.
+func (r *DiskAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err error) {
+	switch event.code() {
 	default:
 		err = liberr.New("unknown event", "event", event)
 	}

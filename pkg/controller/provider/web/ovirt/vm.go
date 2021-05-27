@@ -62,8 +62,15 @@ func (h VMHandler) List(ctx *gin.Context) {
 	content := []interface{}{}
 	for _, m := range list {
 		r := &VM{}
-		r.With(&m)
-		r.SelfLink = h.Link(h.Provider, &m)
+		err = h.Build(&m, r)
+		if err != nil {
+			log.Trace(
+				err,
+				"url",
+				ctx.Request.URL)
+			ctx.Status(http.StatusInternalServerError)
+			return
+		}
 		content = append(content, r.Content(h.Detail))
 	}
 
@@ -83,6 +90,7 @@ func (h VMHandler) Get(ctx *gin.Context) {
 			ID: ctx.Param(VMParam),
 		},
 	}
+	h.Detail = true
 	db := h.Reconciler.DB()
 	err := db.Get(m)
 	if errors.Is(err, model.NotFound) {
@@ -98,8 +106,15 @@ func (h VMHandler) Get(ctx *gin.Context) {
 		return
 	}
 	r := &VM{}
-	r.With(m)
-	r.SelfLink = h.Link(h.Provider, m)
+	err = h.Build(m, r)
+	if err != nil {
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
 	content := r.Content(true)
 
 	ctx.JSON(http.StatusOK, content)
@@ -114,6 +129,41 @@ func (h VMHandler) Link(p *api.Provider, m *model.VM) string {
 			base.ProviderParam: string(p.UID),
 			VMParam:            m.ID,
 		})
+}
+
+//
+// Build the resource.
+func (h VMHandler) Build(m *model.VM, r *VM) (err error) {
+	r.With(m)
+	r.SelfLink = h.Link(h.Provider, m)
+	if !h.Detail {
+		return
+	}
+	db := h.Reconciler.DB()
+	for i := range r.NICs {
+		nic := &r.NICs[i]
+		profile := model.NICProfile{
+			Base: model.Base{ID: nic.Profile.ID},
+		}
+		err = db.Get(&profile)
+		if err != nil {
+			return
+		}
+		nic.Profile = profile
+	}
+	for i := range r.DiskAttachments {
+		d := &r.DiskAttachments[i]
+		disk := model.Disk{
+			Base: model.Base{ID: d.Disk.ID},
+		}
+		err = db.Get(&disk)
+		if err != nil {
+			return
+		}
+		d.Disk = disk
+	}
+
+	return
 }
 
 //
@@ -145,8 +195,27 @@ func (h VMHandler) watch(ctx *gin.Context) {
 // REST Resource.
 type VM struct {
 	Resource
-	Cluster string `json:"cluster"`
-	Host    string `json:"host"`
+	Cluster        string             `json:"cluster"`
+	Host           string             `json:"host"`
+	GuestName      string             `json:"guestName"`
+	CpuSockets     int16              `json:"cpuSockets"`
+	CpuCores       int16              `json:"cpuCores"`
+	Memory         int64              `json:"memory"`
+	BIOS           string             `json:"bios"`
+	Display        string             `json:"display"`
+	CpuAffinity    []model.CpuPinning `json:"cpuAffinity"`
+	NICs            []vNIC             `json:"nics"`
+	DiskAttachments []vDiskAttachment  `json:"diskAttachments"`
+}
+
+type vNIC struct {
+	model.NIC
+	Profile model.NICProfile `json:"profile"`
+}
+
+type vDiskAttachment struct {
+	model.DiskAttachment
+	Disk model.Disk `json:"disk"`
 }
 
 //
@@ -155,6 +224,33 @@ func (r *VM) With(m *model.VM) {
 	r.Resource.With(&m.Base)
 	r.Cluster = m.Cluster
 	r.Host = m.Host
+	r.GuestName = m.GuestName
+	r.CpuSockets = m.CpuSockets
+	r.CpuCores = m.CpuCores
+	r.Memory = m.Memory
+	r.BIOS = m.BIOS
+	r.Display = m.Display
+	r.CpuAffinity = m.CpuAffinity
+	for _, da := range m.DiskAttachments {
+		r.DiskAttachments = append(
+			r.DiskAttachments,
+			vDiskAttachment{
+				DiskAttachment: da,
+				Disk: model.Disk{
+					Base: model.Base{ID: da.Disk},
+				},
+			})
+	}
+	//
+	for _, n := range m.NICs {
+		r.NICs = append(
+			r.NICs,
+			vNIC{
+				NIC: n,
+				Profile: model.NICProfile{
+					Base: model.Base{ID: n.Profile},
+				}})
+	}
 }
 
 //
