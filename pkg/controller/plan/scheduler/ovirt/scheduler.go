@@ -24,6 +24,14 @@ type Scheduler struct {
 func (r *Scheduler) Next() (vm *plan.VMStatus, hasNext bool, err error) {
 	mutex.Lock()
 	defer mutex.Unlock()
-	hasNext = false
+
+	for _, vmStatus := range r.Plan.Status.Migration.VMs {
+		if !vmStatus.MarkedStarted() && !vmStatus.MarkedCompleted() {
+			vm = vmStatus
+			hasNext = true
+			return
+		}
+	}
+
 	return
 }
