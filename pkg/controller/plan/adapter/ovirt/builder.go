@@ -204,8 +204,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 		return
 	}
 	for _, da := range vm.DiskAttachments {
-		//mB := da.Disk.Capacity / 0x100000
-		mB := int64(0)
+		mB := da.Disk.ProvisionedSize / 0x100000
 		list = append(
 			list,
 			&plan.Task{

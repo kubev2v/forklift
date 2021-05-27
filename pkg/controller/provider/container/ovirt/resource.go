@@ -594,9 +594,10 @@ type DiskProfileList struct {
 // Disk.
 type Disk struct {
 	Base
-	Sharable       string `json:"sharable"`
-	Profile        Ref    `json:"disk_profile"`
-	StorageDomains struct {
+	Sharable        string `json:"sharable"`
+	Profile         Ref    `json:"disk_profile"`
+	ProvisionedSize string `json:"provisioned_size"`
+	StorageDomains  struct {
 		List []Ref `json:"storage_domain"`
 	} `json:"storage_domains"`
 	Status      string `json:"status"`
@@ -616,6 +617,7 @@ func (r *Disk) ApplyTo(m *model.Disk) {
 	m.StorageUsed = r.int64(r.StorageUsed)
 	m.Backup = r.Backup
 	m.StorageType = r.StorageType
+	m.ProvisionedSize = r.int64(r.ProvisionedSize)
 	r.setStorageDomain(m)
 }
 
