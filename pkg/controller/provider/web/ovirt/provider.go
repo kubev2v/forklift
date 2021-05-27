@@ -196,7 +196,7 @@ type Provider struct {
 	HostCount          int64        `json:"hostCount"`
 	VMCount            int64        `json:"vmCount"`
 	NetworkCount       int64        `json:"networkCount"`
-	StorageDomainCount int64        `json:"StorageDomainCount"`
+	StorageDomainCount int64        `json:"storageDomainCount"`
 }
 
 //
