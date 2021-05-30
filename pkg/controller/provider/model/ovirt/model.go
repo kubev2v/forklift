@@ -114,21 +114,21 @@ type Host struct {
 
 type VM struct {
 	Base
-	Cluster        string           `sql:"d0,index(cluster)"`
-	Host           string           `sql:"d0,index(host)"`
-	GuestName      string           `sql:""`
-	CpuSockets     int16            `sql:""`
-	CpuCores       int16            `sql:""`
-	Memory         int64            `sql:""`
-	BIOS           string           `sql:""`
-	Display        string           `sql:""`
-	CpuAffinity    []CpuPinning     `sql:""`
+	Cluster         string           `sql:"d0,index(cluster)"`
+	Host            string           `sql:"d0,index(host)"`
+	GuestName       string           `sql:""`
+	CpuSockets      int16            `sql:""`
+	CpuCores        int16            `sql:""`
+	Memory          int64            `sql:""`
+	BIOS            string           `sql:""`
+	Display         string           `sql:""`
+	CpuAffinity     []CpuPinning     `sql:""`
 	DiskAttachments []DiskAttachment `sql:""`
 	NICs            []NIC            `sql:""`
 }
 
 type DiskAttachment struct {
-	ID string `json:"id"`
+	ID        string `json:"id"`
 	Interface string `json:"interface"`
 	Disk      string `json:"disk"`
 }
