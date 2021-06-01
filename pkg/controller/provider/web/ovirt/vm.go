@@ -195,15 +195,15 @@ func (h VMHandler) watch(ctx *gin.Context) {
 // REST Resource.
 type VM struct {
 	Resource
-	Cluster        string             `json:"cluster"`
-	Host           string             `json:"host"`
-	GuestName      string             `json:"guestName"`
-	CpuSockets     int16              `json:"cpuSockets"`
-	CpuCores       int16              `json:"cpuCores"`
-	Memory         int64              `json:"memory"`
-	BIOS           string             `json:"bios"`
-	Display        string             `json:"display"`
-	CpuAffinity    []model.CpuPinning `json:"cpuAffinity"`
+	Cluster         string             `json:"cluster"`
+	Host            string             `json:"host"`
+	GuestName       string             `json:"guestName"`
+	CpuSockets      int16              `json:"cpuSockets"`
+	CpuCores        int16              `json:"cpuCores"`
+	Memory          int64              `json:"memory"`
+	BIOS            string             `json:"bios"`
+	Display         string             `json:"display"`
+	CpuAffinity     []model.CpuPinning `json:"cpuAffinity"`
 	NICs            []vNIC             `json:"nics"`
 	DiskAttachments []vDiskAttachment  `json:"diskAttachments"`
 }
