@@ -214,15 +214,6 @@ func (c *Client) buildTransport() (err error) {
 }
 
 //
-// Dispatcher backlog (queue limit) exceeded.
-type BacklogExceededError struct {
-}
-
-func (r BacklogExceededError) Error() string {
-	return "Pool backlog exceeded."
-}
-
-//
 // Policy agent task.
 type Task struct {
 	// VM reference.
@@ -367,8 +358,8 @@ func (r *Pool) Start() {
 	if r.started {
 		return
 	}
-	r.output = make(chan *Task, r.backlog())
-	r.input = make(chan *Task, r.backlog())
+	r.output = make(chan *Task)
+	r.input = make(chan *Task)
 	for id := 0; id < r.parallel(); id++ {
 		w := Worker{
 			id:     id,
@@ -423,8 +414,6 @@ func (r *Pool) Version() (version int, err error) {
 //
 // Submit validation task.
 // Queue validation request.
-// May block (no longer than 1 second) when backlog exceeded.
-// Returns: BacklogExceededError.
 func (r *Pool) Submit(task *Task) (err error) {
 	if !r.started {
 		return liberr.New("pool not started.")
@@ -432,25 +421,7 @@ func (r *Pool) Submit(task *Task) (err error) {
 	defer func() {
 		_ = recover()
 	}()
-	select {
-	case r.input <- task:
-		// queued.
-	case <-time.After(time.Second):
-		err = liberr.Wrap(BacklogExceededError{})
-	}
-
-	return
-}
-
-//
-// Backlog limit.
-// Input queue depth.
-func (r *Pool) backlog() (limit int) {
-	limit = Settings.PolicyAgent.Limit.Backlog
-	if limit < 1 {
-		limit = 1
-	}
-
+	r.input <- task
 	return
 }
 

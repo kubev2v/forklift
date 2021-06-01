@@ -48,9 +48,6 @@ func (r *Handler) Watch(watch *handler.WatchManager) (err error) {
 //
 // Resource created.
 func (r *Handler) Created(e libweb.Event) {
-	if !r.HasParity() {
-		return
-	}
 	if storageClass, cast := e.Resource.(*ocp.StorageClass); cast {
 		r.changed(storageClass)
 	}
@@ -59,9 +56,6 @@ func (r *Handler) Created(e libweb.Event) {
 //
 // Resource deleted.
 func (r *Handler) Deleted(e libweb.Event) {
-	if !r.HasParity() {
-		return
-	}
 	if storageClass, cast := e.Resource.(*ocp.StorageClass); cast {
 		r.changed(storageClass)
 	}

@@ -11,7 +11,6 @@ const (
 	PolicyTLSEnabled          = "POLICY_TLS_ENABLED"
 	PolicyAgentCA             = "POLICY_AGENT_CA"
 	PolicyAgentWorkerLimit    = "POLICY_AGENT_WORKER_LIMIT"
-	PolicyAgentBacklogLimit   = "POLICY_AGENT_BACKLOG_LIMIT"
 	PolicyAgentSearchInterval = "POLICY_AGENT_SEARCH_INTERVAL"
 )
 
@@ -33,8 +32,6 @@ type PolicyAgent struct {
 	Limit struct {
 		// Number of workers.
 		Worker int
-		// Backlog depth.
-		Backlog int
 	}
 }
 
@@ -52,10 +49,6 @@ func (r *PolicyAgent) Load() (err error) {
 		r.TLS.CA = ServiceCAFile
 	}
 	r.Limit.Worker, err = getEnvLimit(PolicyAgentWorkerLimit, 10)
-	if err != nil {
-		return err
-	}
-	r.Limit.Backlog, err = getEnvLimit(PolicyAgentBacklogLimit, 10000)
 	if err != nil {
 		return err
 	}

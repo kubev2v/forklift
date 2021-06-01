@@ -88,8 +88,6 @@ type ProviderClient struct {
 	provider *api.Provider
 	// Finder.
 	finder Finder
-	// Ready.
-	found bool
 }
 
 //
@@ -105,25 +103,9 @@ func (r *ProviderClient) Finder() Finder {
 //   ProviderNotReadyErr
 //   NotFoundErr
 func (r *ProviderClient) Get(resource interface{}, id string) (err error) {
-	err = r.find()
-	if err != nil {
-		return
-	}
-	if !r.found {
-		err = liberr.Wrap(ProviderNotReadyError{r.provider})
-		return
-	}
 	status, err := r.restClient.Get(resource, id)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	switch status {
-	case http.StatusOK:
-	case http.StatusNotFound:
-		err = liberr.Wrap(NotFoundError{Ref: base.Ref{ID: id}})
-	default:
-		err = liberr.New(http.StatusText(status))
+	if err == nil {
+		err = r.asError(status, id)
 	}
 
 	return
@@ -136,25 +118,9 @@ func (r *ProviderClient) Get(resource interface{}, id string) (err error) {
 //   ProviderNotReadyErr
 //   NotFoundErr
 func (r *ProviderClient) List(resource interface{}, param ...Param) (err error) {
-	err = r.find()
-	if err != nil {
-		return
-	}
-	if !r.found {
-		err = liberr.Wrap(ProviderNotReadyError{r.provider})
-		return
-	}
 	status, err := r.restClient.List(resource, param...)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	switch status {
-	case http.StatusOK:
-	case http.StatusNotFound:
-		err = liberr.Wrap(NotFoundError{})
-	default:
-		err = liberr.New(http.StatusText(status))
+	if err == nil {
+		err = r.asError(status, "")
 	}
 
 	return
@@ -167,25 +133,9 @@ func (r *ProviderClient) List(resource interface{}, param ...Param) (err error) 
 //   ProviderNotReadyErr
 //   NotFoundErr
 func (r *ProviderClient) Watch(resource interface{}, h EventHandler) (w *Watch, err error) {
-	err = r.find()
-	if err != nil {
-		return
-	}
-	if !r.found {
-		err = liberr.Wrap(ProviderNotReadyError{r.provider})
-		return
-	}
 	status, w, err := r.restClient.Watch(resource, h)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	switch status {
-	case http.StatusOK:
-	case http.StatusNotFound:
-		err = liberr.Wrap(NotFoundError{})
-	default:
-		err = liberr.New(http.StatusText(status))
+	if err == nil {
+		err = r.asError(status, "")
 	}
 
 	return
@@ -259,37 +209,32 @@ func (r *ProviderClient) Host(ref *base.Ref) (object interface{}, err error) {
 }
 
 //
-// Find the provider.
-func (r *ProviderClient) find() (err error) {
-	if r.found {
-		return
-	}
-	status := 0
-	id := string(r.provider.UID)
-	switch r.provider.Type() {
-	case api.OpenShift:
-		status, err = r.restClient.Get(&ocp.Provider{}, id)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
+// Evaluate the status.
+// Returns:
+//  ProviderNotReady
+//  NotFound
+func (r *ProviderClient) asError(status int, id string) (err error) {
+	switch status {
+	case http.StatusOK:
+	case http.StatusPartialContent:
+		err = liberr.Wrap(
+			ProviderNotReadyError{
+				r.provider,
+			})
+	case http.StatusNotFound:
+		if _, found := r.restClient.Header[base.ProviderHeader]; found {
+			err = liberr.Wrap(
+				NotFoundError{
+					Ref: base.Ref{ID: id},
+				})
+		} else {
+			err = liberr.Wrap(
+				ProviderNotReadyError{
+					r.provider,
+				})
 		}
-		r.found = status == http.StatusOK
-	case api.VSphere:
-		status, err = r.restClient.Get(&vsphere.Provider{}, id)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-		r.found = status == http.StatusOK
-	case api.OVirt:
-		status, err = r.restClient.Get(&ovirt.Provider{}, id)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-		r.found = status == http.StatusOK
 	default:
-		err = liberr.Wrap(ProviderNotReadyError{r.provider})
+		err = liberr.New(http.StatusText(status))
 	}
 
 	return

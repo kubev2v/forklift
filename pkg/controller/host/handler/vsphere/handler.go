@@ -49,9 +49,6 @@ func (r *Handler) Watch(watch *handler.WatchManager) (err error) {
 //
 // Resource created.
 func (r *Handler) Created(e libweb.Event) {
-	if !r.HasParity() {
-		return
-	}
 	if host, cast := e.Resource.(*vsphere.Host); cast {
 		r.changed(host)
 	}
@@ -60,9 +57,6 @@ func (r *Handler) Created(e libweb.Event) {
 //
 // Resource created.
 func (r *Handler) Updated(e libweb.Event) {
-	if !r.HasParity() {
-		return
-	}
 	if host, cast := e.Resource.(*vsphere.Host); cast {
 		updated := e.Updated.(*vsphere.Host)
 		if updated.Path != host.Path {
@@ -74,9 +68,6 @@ func (r *Handler) Updated(e libweb.Event) {
 //
 // Resource deleted.
 func (r *Handler) Deleted(e libweb.Event) {
-	if !r.HasParity() {
-		return
-	}
 	if host, cast := e.Resource.(*vsphere.Host); cast {
 		r.changed(host)
 	}
