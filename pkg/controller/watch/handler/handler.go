@@ -33,8 +33,6 @@ type Handler struct {
 	id uint64
 	// Watch ended by peer.
 	ended bool
-	// Parity marker.
-	parity bool
 }
 
 //
@@ -73,13 +71,6 @@ func (r *Handler) Match(object meta.Object, ref core.ObjectReference) bool {
 
 //
 // Inventory watch has parity.
-func (r *Handler) HasParity() bool {
-	return r.parity
-
-}
-
-//
-// Inventory watch has parity.
 func (r *Handler) Started(id uint64) {
 	r.id = id
 	log.V(1).Info(
@@ -89,20 +80,9 @@ func (r *Handler) Started(id uint64) {
 }
 
 //
-// Inventory watch has parity.
-func (r *Handler) Parity() {
-	r.parity = true
-	log.V(1).Info(
-		"event: parity.",
-		"id",
-		r.id)
-}
-
-//
 // Watch ended by peer.
 // The database has been closed.
 func (r *Handler) End() {
-	r.parity = false
 	r.ended = true
 	log.V(1).Info(
 		"event: ended.",
