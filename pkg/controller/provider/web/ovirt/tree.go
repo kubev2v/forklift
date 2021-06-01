@@ -91,7 +91,7 @@ func (h TreeHandler) Tree(ctx *gin.Context) {
 	for _, dc := range h.datacenters {
 		tr := Tree{
 			NodeBuilder: &NodeBuilder{
-				provider: h.Provider,
+				provider:   h.Provider,
 				reconciler: h.Reconciler,
 				detail: map[string]bool{
 					model.VmKind: h.Detail,
@@ -102,7 +102,7 @@ func (h TreeHandler) Tree(ctx *gin.Context) {
 			&dc,
 			&BranchNavigator{
 				detail: h.Detail,
-				db: db,
+				db:     db,
 			})
 		if err != nil {
 			log.Trace(
@@ -126,7 +126,7 @@ func (h TreeHandler) Tree(ctx *gin.Context) {
 //
 // Tree (branch) navigator.
 type BranchNavigator struct {
-	db libmodel.DB
+	db     libmodel.DB
 	detail bool
 }
 
@@ -199,7 +199,7 @@ func (n *BranchNavigator) listVM(p *model.Host) (list []model.VM, err error) {
 		&list,
 		model.ListOptions{
 			Predicate: libmodel.Eq("Host", p.ID),
-			Detail: detail,
+			Detail:    detail,
 		})
 	return
 }
@@ -259,7 +259,7 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 			Handler: Handler{
 				base.Handler{
 					Reconciler: r.reconciler,
-					Provider: r.provider,
+					Provider:   r.provider,
 				},
 			},
 		}

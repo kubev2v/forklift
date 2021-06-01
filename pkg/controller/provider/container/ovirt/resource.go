@@ -185,8 +185,8 @@ type VM struct {
 	} `json:"nics"`
 	Disks struct {
 		Attachment []struct {
-			ID string `json:"id"`
-			Name string 
+			ID        string `json:"id"`
+			Name      string
 			Interface string `json:"interface"`
 			Disk      Ref    `json:"disk"`
 		} `json:"disk_attachment"`
@@ -224,7 +224,7 @@ func (r *VM) ApplyTo(m *model.VM) {
 		m.DiskAttachments = append(
 			m.DiskAttachments,
 			model.DiskAttachment{
-				ID: da.ID,
+				ID:        da.ID,
 				Interface: da.Interface,
 				Disk:      da.Disk.ID,
 			})
