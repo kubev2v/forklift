@@ -2,10 +2,8 @@ package ovirt
 
 import (
 	"github.com/gin-gonic/gin"
-	libcnt "github.com/konveyor/controller/pkg/inventory/container"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	libref "github.com/konveyor/controller/pkg/ref"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"net/http"
@@ -91,8 +89,7 @@ func (h TreeHandler) Tree(ctx *gin.Context) {
 	for _, dc := range h.datacenters {
 		tr := Tree{
 			NodeBuilder: &NodeBuilder{
-				provider:   h.Provider,
-				reconciler: h.Reconciler,
+				handler: h.Handler,
 				detail: map[string]bool{
 					model.VmKind: h.Detail,
 				},
@@ -207,10 +204,8 @@ func (n *BranchNavigator) listVM(p *model.Host) (list []model.VM, err error) {
 //
 // Tree node builder.
 type NodeBuilder struct {
-	// Data reconciler.
-	reconciler libcnt.Reconciler
-	// Provider.
-	provider *api.Provider
+	// Handler.
+	handler Handler
 	// Resource details by kind.
 	detail map[string]bool
 }
@@ -218,6 +213,7 @@ type NodeBuilder struct {
 //
 // Build a node for the model.
 func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
+	provider := r.handler.Provider
 	kind := libref.ToKind(m)
 	node := &TreeNode{}
 	switch kind {
@@ -225,7 +221,7 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 		h := DataCenterHandler{}
 		resource := &DataCenter{}
 		resource.With(m.(*model.DataCenter))
-		resource.SelfLink = h.Link(r.provider, m.(*model.DataCenter))
+		resource.SelfLink = h.Link(provider, m.(*model.DataCenter))
 		object := resource.Content(r.withDetail(kind))
 		node = &TreeNode{
 			Parent: parent,
@@ -236,7 +232,7 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 		h := ClusterHandler{}
 		resource := &Cluster{}
 		resource.With(m.(*model.Cluster))
-		resource.SelfLink = h.Link(r.provider, m.(*model.Cluster))
+		resource.SelfLink = h.Link(provider, m.(*model.Cluster))
 		object := resource.Content(r.withDetail(kind))
 		node = &TreeNode{
 			Parent: parent,
@@ -247,7 +243,7 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 		h := HostHandler{}
 		resource := &Host{}
 		resource.With(m.(*model.Host))
-		resource.SelfLink = h.Link(r.provider, m.(*model.Host))
+		resource.SelfLink = h.Link(provider, m.(*model.Host))
 		object := resource.Content(r.withDetail(kind))
 		node = &TreeNode{
 			Parent: parent,
@@ -256,12 +252,7 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 		}
 	case model.VmKind:
 		h := VMHandler{
-			Handler: Handler{
-				base.Handler{
-					Reconciler: r.reconciler,
-					Provider:   r.provider,
-				},
-			},
+			Handler: r.handler,
 		}
 		resource := &VM{}
 		h.Detail = r.withDetail(kind)
@@ -276,7 +267,7 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 		h := NetworkHandler{}
 		resource := &Network{}
 		resource.With(m.(*model.Network))
-		resource.SelfLink = h.Link(r.provider, m.(*model.Network))
+		resource.SelfLink = h.Link(provider, m.(*model.Network))
 		object := resource.Content(r.withDetail(kind))
 		node = &TreeNode{
 			Parent: parent,
@@ -287,7 +278,7 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 		h := StorageDomainHandler{}
 		resource := &StorageDomain{}
 		resource.With(m.(*model.StorageDomain))
-		resource.SelfLink = h.Link(r.provider, m.(*model.StorageDomain))
+		resource.SelfLink = h.Link(provider, m.(*model.StorageDomain))
 		object := resource.Content(r.withDetail(kind))
 		node = &TreeNode{
 			Parent: parent,

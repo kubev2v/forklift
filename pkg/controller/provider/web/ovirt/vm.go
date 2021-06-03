@@ -133,7 +133,7 @@ func (h VMHandler) Link(p *api.Provider, m *model.VM) string {
 
 //
 // Build the resource.
-func (h VMHandler) Build(m *model.VM, r *VM) (err error) {
+func (h *VMHandler) Build(m *model.VM, r *VM) (err error) {
 	r.With(m)
 	r.SelfLink = h.Link(h.Provider, m)
 	if !h.Detail {
