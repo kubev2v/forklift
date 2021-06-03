@@ -11,26 +11,26 @@ import (
 )
 
 //
-// Routes
+// Routes.
 const (
-	HostParam      = "host"
-	HostCollection = "hosts"
-	HostsRoot      = ProviderRoot + "/" + HostCollection
-	HostRoot       = HostsRoot + "/:" + HostParam
+	DiskProfileParam      = "profile"
+	DiskProfileCollection = "diskprofiles"
+	DiskProfilesRoot      = ProviderRoot + "/" + DiskProfileCollection
+	DiskProfileRoot       = DiskProfilesRoot + "/:" + DiskProfileParam
 )
 
 //
-// Host handler.
-type HostHandler struct {
+// DiskProfile handler.
+type DiskProfileHandler struct {
 	Handler
 }
 
 //
 // Add routes to the `gin` router.
-func (h *HostHandler) AddRoutes(e *gin.Engine) {
-	e.GET(HostsRoot, h.List)
-	e.GET(HostsRoot+"/", h.List)
-	e.GET(HostRoot, h.Get)
+func (h *DiskProfileHandler) AddRoutes(e *gin.Engine) {
+	e.GET(DiskProfilesRoot, h.List)
+	e.GET(DiskProfilesRoot+"/", h.List)
+	e.GET(DiskProfileRoot, h.Get)
 }
 
 //
@@ -38,7 +38,7 @@ func (h *HostHandler) AddRoutes(e *gin.Engine) {
 // A GET onn the collection that includes the `X-Watch`
 // header will negotiate an upgrade of the connection
 // to a websocket and push watch events.
-func (h HostHandler) List(ctx *gin.Context) {
+func (h DiskProfileHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
@@ -49,7 +49,7 @@ func (h HostHandler) List(ctx *gin.Context) {
 		return
 	}
 	db := h.Reconciler.DB()
-	list := []model.Host{}
+	list := []model.DiskProfile{}
 	err := db.List(&list, h.ListOptions(ctx))
 	if err != nil {
 		log.Trace(
@@ -61,7 +61,7 @@ func (h HostHandler) List(ctx *gin.Context) {
 	}
 	content := []interface{}{}
 	for _, m := range list {
-		r := &Host{}
+		r := &DiskProfile{}
 		r.With(&m)
 		r.SelfLink = h.Link(h.Provider, &m)
 		content = append(content, r.Content(h.Detail))
@@ -72,16 +72,15 @@ func (h HostHandler) List(ctx *gin.Context) {
 
 //
 // Get a specific REST resource.
-func (h HostHandler) Get(ctx *gin.Context) {
+func (h DiskProfileHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
 		return
 	}
-	h.Detail = true
-	m := &model.Host{
+	m := &model.DiskProfile{
 		Base: model.Base{
-			ID: ctx.Param(HostParam),
+			ID: ctx.Param(DiskProfileParam),
 		},
 	}
 	db := h.Reconciler.DB()
@@ -98,7 +97,7 @@ func (h HostHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	r := &Host{}
+	r := &DiskProfile{}
 	r.With(m)
 	r.SelfLink = h.Link(h.Provider, m)
 	content := r.Content(true)
@@ -108,29 +107,29 @@ func (h HostHandler) Get(ctx *gin.Context) {
 
 //
 // Build self link (URI).
-func (h HostHandler) Link(p *api.Provider, m *model.Host) string {
+func (h DiskProfileHandler) Link(p *api.Provider, m *model.DiskProfile) string {
 	return h.Handler.Link(
-		HostRoot,
+		DiskProfileRoot,
 		base.Params{
 			base.ProviderParam: string(p.UID),
-			HostParam:          m.ID,
+			DiskProfileParam:   m.ID,
 		})
 }
 
 //
 // Watch.
-func (h HostHandler) watch(ctx *gin.Context) {
+func (h DiskProfileHandler) watch(ctx *gin.Context) {
 	db := h.Reconciler.DB()
 	err := h.Watch(
 		ctx,
 		db,
-		&model.Host{},
+		&model.DiskProfile{},
 		func(in libmodel.Model) (r interface{}) {
-			m := in.(*model.Host)
-			host := &Host{}
-			host.With(m)
-			host.SelfLink = h.Link(h.Provider, m)
-			r = host
+			m := in.(*model.DiskProfile)
+			profile := &DiskProfile{}
+			profile.With(m)
+			profile.SelfLink = h.Link(h.Provider, m)
+			r = profile
 			return
 		})
 	if err != nil {
@@ -144,38 +143,23 @@ func (h HostHandler) watch(ctx *gin.Context) {
 
 //
 // REST Resource.
-type Host struct {
+type DiskProfile struct {
 	Resource
-	Cluster            string              `json:"cluster"`
-	ProductName        string              `json:"productName"`
-	ProductVersion     string              `json:"productVersion"`
-	InMaintenance      bool                `json:"inMaintenance"`
-	CpuSockets         int16               `json:"cpuSockets"`
-	CpuCores           int16               `json:"cpuCores"`
-	NetworkAttachments []NetworkAttachment `json:"networkAttachments"`
-	NICs               []hNIC              `json:"nics"`
+	StorageDomain string `json:"storageDomain"`
+	QoS           string `json:"qos"`
 }
-
-type NetworkAttachment = model.NetworkAttachment
-type hNIC = model.HostNIC
 
 //
 // Build the resource using the model.
-func (r *Host) With(m *model.Host) {
+func (r *DiskProfile) With(m *model.DiskProfile) {
 	r.Resource.With(&m.Base)
-	r.Cluster = m.Cluster
-	r.ProductName = m.ProductName
-	r.ProductVersion = m.ProductVersion
-	r.InMaintenance = m.InMaintenance
-	r.CpuSockets = m.CpuSockets
-	r.CpuCores = m.CpuCores
-	r.NetworkAttachments = m.NetworkAttachments
-	r.NICs = m.NICs
+	r.StorageDomain = m.StorageDomain
+	r.QoS = m.QoS
 }
 
 //
 // As content.
-func (r *Host) Content(detail bool) interface{} {
+func (r *DiskProfile) Content(detail bool) interface{} {
 	if !detail {
 		return r.Resource
 	}

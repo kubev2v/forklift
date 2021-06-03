@@ -36,3 +36,11 @@ type InvalidKindError struct {
 func (r InvalidKindError) Error() string {
 	return fmt.Sprintf("Kind %#v not valid.", r.Object)
 }
+
+//
+// VM concerns.
+type Concern struct {
+	Label      string `json:"label"`
+	Category   string `json:"category"`
+	Assessment string `json:"assessment"`
+}

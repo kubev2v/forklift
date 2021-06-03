@@ -24,6 +24,7 @@ type InvalidRefError = base.InvalidRefError
 // Types
 type Model = base.Model
 type ListOptions = base.ListOptions
+type Concern = base.Concern
 type Ref = base.Ref
 
 //
@@ -355,12 +356,4 @@ type Disk struct {
 // Virtual Device.
 type Device struct {
 	Kind string `json:"kind"`
-}
-
-//
-// VM concerns.
-type Concern struct {
-	Label      string `json:"label"`
-	Category   string `json:"category"`
-	Assessment string `json:"assessment"`
 }

@@ -6,6 +6,7 @@ import (
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	libweb "github.com/konveyor/controller/pkg/inventory/web"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
+	"strings"
 )
 
 //
@@ -41,6 +42,7 @@ func init() {
 		&DataCenterAdapter{},
 		&StorageDomainAdapter{},
 		&NICProfileAdapter{},
+		&DiskProfileAdapter{},
 		&NetworkAdapter{},
 		&DiskAdapter{},
 		&ClusterAdapter{},
@@ -85,6 +87,7 @@ func (r *DataCenterAdapter) List(client *Client) (itr fb.Iterator, err error) {
 		m := &model.DataCenter{
 			Base: model.Base{ID: object.ID},
 		}
+		m.Created()
 		object.ApplyTo(m)
 		err = list.Append(m)
 		if err != nil {
@@ -120,6 +123,7 @@ func (r *DataCenterAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event)
 		m := &model.DataCenter{
 			Base: model.Base{ID: object.ID},
 		}
+		m.Created()
 		object.ApplyTo(m)
 		err = tx.Insert(m)
 		if err != nil {
@@ -134,6 +138,7 @@ func (r *DataCenterAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event)
 		m := &model.DataCenter{
 			Base: model.Base{ID: object.ID},
 		}
+		m.Updated()
 		object.ApplyTo(m)
 		err = tx.Update(m)
 		if err != nil {
@@ -183,6 +188,7 @@ func (r *NetworkAdapter) List(client *Client) (itr fb.Iterator, err error) {
 		m := &model.Network{
 			Base: model.Base{ID: object.ID},
 		}
+		m.Created()
 		object.ApplyTo(m)
 		err = list.Append(m)
 		if err != nil {
@@ -208,8 +214,12 @@ func (r *NetworkAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (e
 
 func (r *NetworkAdapter) follow() libweb.Param {
 	return libweb.Param{
-		Key:   "follow",
-		Value: "vnic_profiles",
+		Key: "follow",
+		Value: strings.Join(
+			[]string{
+				"vnic_profiles",
+			},
+			","),
 	}
 }
 
@@ -237,6 +247,7 @@ func (r *NICProfileAdapter) List(client *Client) (itr fb.Iterator, err error) {
 		m := &model.NICProfile{
 			Base: model.Base{ID: object.ID},
 		}
+		m.Created()
 		object.ApplyTo(m)
 		err = list.Append(m)
 		if err != nil {
@@ -252,6 +263,54 @@ func (r *NICProfileAdapter) List(client *Client) (itr fb.Iterator, err error) {
 //
 // Apply and event tot the inventory model.
 func (r *NICProfileAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err error) {
+	switch event.code() {
+	default:
+		err = liberr.New("unknown event", "event", event)
+	}
+
+	return
+}
+
+//
+// DiskProfile adapter.
+type DiskProfileAdapter struct {
+}
+
+//
+// Handled events.
+func (r *DiskProfileAdapter) Event() []int {
+	return []int{}
+}
+
+//
+// List the collection.
+func (r *DiskProfileAdapter) List(client *Client) (itr fb.Iterator, err error) {
+	dList := DiskProfileList{}
+	err = client.list("diskprofiles", &dList)
+	if err != nil {
+		return
+	}
+	list := fb.NewList()
+	for _, object := range dList.Items {
+		m := &model.DiskProfile{
+			Base: model.Base{ID: object.ID},
+		}
+		m.Created()
+		object.ApplyTo(m)
+		err = list.Append(m)
+		if err != nil {
+			return
+		}
+	}
+
+	itr = list.Iter()
+
+	return
+}
+
+//
+// Apply and event tot the inventory model.
+func (r *DiskProfileAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err error) {
 	switch event.code() {
 	default:
 		err = liberr.New("unknown event", "event", event)
@@ -284,6 +343,7 @@ func (r *StorageDomainAdapter) List(client *Client) (itr fb.Iterator, err error)
 		m := &model.StorageDomain{
 			Base: model.Base{ID: object.ID},
 		}
+		m.Created()
 		object.ApplyTo(m)
 		err = list.Append(m)
 		if err != nil {
@@ -335,6 +395,7 @@ func (r *ClusterAdapter) List(client *Client) (itr fb.Iterator, err error) {
 		m := &model.Cluster{
 			Base: model.Base{ID: object.ID},
 		}
+		m.Created()
 		object.ApplyTo(m)
 		err = list.Append(m)
 		if err != nil {
@@ -360,6 +421,7 @@ func (r *ClusterAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (e
 		m := &model.Cluster{
 			Base: model.Base{ID: object.ID},
 		}
+		m.Created()
 		object.ApplyTo(m)
 		err = tx.Insert(m)
 		if err != nil {
@@ -374,6 +436,7 @@ func (r *ClusterAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (e
 		m := &model.Cluster{
 			Base: model.Base{ID: object.ID},
 		}
+		m.Updated()
 		object.ApplyTo(m)
 		err = tx.Update(m)
 		if err != nil {
@@ -422,6 +485,7 @@ func (r *HostAdapter) List(client *Client) (itr fb.Iterator, err error) {
 		m := &model.Host{
 			Base: model.Base{ID: object.ID},
 		}
+		m.Created()
 		object.ApplyTo(m)
 		err = list.Append(m)
 		if err != nil {
@@ -447,6 +511,7 @@ func (r *HostAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err 
 		m := &model.Host{
 			Base: model.Base{ID: object.ID},
 		}
+		m.Created()
 		object.ApplyTo(m)
 		err = tx.Insert(m)
 		if err != nil {
@@ -461,6 +526,7 @@ func (r *HostAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err 
 		m := &model.Host{
 			Base: model.Base{ID: object.ID},
 		}
+		m.Updated()
 		object.ApplyTo(m)
 		err = tx.Update(m)
 		if err != nil {
@@ -483,8 +549,13 @@ func (r *HostAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err 
 
 func (r *HostAdapter) follow() libweb.Param {
 	return libweb.Param{
-		Key:   "follow",
-		Value: "network_attachments",
+		Key: "follow",
+		Value: strings.Join(
+			[]string{
+				"network_attachments",
+				"nics",
+			},
+			","),
 	}
 }
 
@@ -516,6 +587,7 @@ func (r *VMAdapter) List(client *Client) (itr fb.Iterator, err error) {
 		m := &model.VM{
 			Base: model.Base{ID: object.ID},
 		}
+		m.Created()
 		object.ApplyTo(m)
 		err = list.Append(m)
 		if err != nil {
@@ -541,6 +613,7 @@ func (r *VMAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err er
 		m := &model.VM{
 			Base: model.Base{ID: object.ID},
 		}
+		m.Created()
 		object.ApplyTo(m)
 		err = tx.Insert(m)
 		if err != nil {
@@ -555,6 +628,7 @@ func (r *VMAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err er
 		m := &model.VM{
 			Base: model.Base{ID: object.ID},
 		}
+		m.Updated()
 		object.ApplyTo(m)
 		err = tx.Update(m)
 		if err != nil {
@@ -577,8 +651,17 @@ func (r *VMAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err er
 
 func (r *VMAdapter) follow() libweb.Param {
 	return libweb.Param{
-		Key:   "follow",
-		Value: "disk_attachments,nics",
+		Key: "follow",
+		Value: strings.Join(
+			[]string{
+				"disk_attachments",
+				"host_devices",
+				"snapshots",
+				"watchdogs",
+				"cdroms",
+				"nics",
+			},
+			","),
 	}
 }
 
@@ -606,6 +689,7 @@ func (r *DiskAdapter) List(client *Client) (itr fb.Iterator, err error) {
 		m := &model.Disk{
 			Base: model.Base{ID: object.ID},
 		}
+		m.Created()
 		object.ApplyTo(m)
 		err = list.Append(m)
 		if err != nil {

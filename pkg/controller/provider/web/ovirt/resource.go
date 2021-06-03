@@ -16,7 +16,7 @@ type Resource struct {
 	// Object name.
 	Name string `json:"name"`
 	// Object description.
-	Description string `json:"description"`
+	Description string `json:"description,omitempty"`
 	// Self link.
 	SelfLink string `json:"selfLink"`
 }
@@ -25,7 +25,7 @@ type Resource struct {
 // Build the resource using the model.
 func (r *Resource) With(m *model.Base) {
 	r.ID = m.ID
-	r.Revision = m.Revision
 	r.Name = m.Name
 	r.Description = m.Description
+	r.Revision = m.Revision
 }

@@ -142,25 +142,33 @@ func (h VMHandler) Build(m *model.VM, r *VM) (err error) {
 	db := h.Reconciler.DB()
 	for i := range r.NICs {
 		nic := &r.NICs[i]
-		profile := model.NICProfile{
+		profile := &model.NICProfile{
 			Base: model.Base{ID: nic.Profile.ID},
 		}
-		err = db.Get(&profile)
+		err = db.Get(profile)
 		if err != nil {
 			return
 		}
-		nic.Profile = profile
+		nic.Profile.SelfLink = NICProfileHandler{}.Link(h.Provider, profile)
+		nic.Profile.With(profile)
+	}
+	diskHandler := DiskHandler{
+		Handler: h.Handler,
 	}
 	for i := range r.DiskAttachments {
 		d := &r.DiskAttachments[i]
-		disk := model.Disk{
+		disk := &model.Disk{
 			Base: model.Base{ID: d.Disk.ID},
 		}
-		err = db.Get(&disk)
+		err = db.Get(disk)
 		if err != nil {
 			return
 		}
-		d.Disk = disk
+		d.Disk.SelfLink = diskHandler.Link(h.Provider, disk)
+		err = diskHandler.Build(disk, &d.Disk)
+		if err != nil {
+			return
+		}
 	}
 
 	return
@@ -195,27 +203,53 @@ func (h VMHandler) watch(ctx *gin.Context) {
 // REST Resource.
 type VM struct {
 	Resource
-	Cluster         string             `json:"cluster"`
-	Host            string             `json:"host"`
-	GuestName       string             `json:"guestName"`
-	CpuSockets      int16              `json:"cpuSockets"`
-	CpuCores        int16              `json:"cpuCores"`
-	Memory          int64              `json:"memory"`
-	BIOS            string             `json:"bios"`
-	Display         string             `json:"display"`
-	CpuAffinity     []model.CpuPinning `json:"cpuAffinity"`
-	NICs            []vNIC             `json:"nics"`
-	DiskAttachments []vDiskAttachment  `json:"diskAttachments"`
+	Cluster                     string           `json:"cluster"`
+	Host                        string           `json:"host"`
+	RevisionValidated           int64            `json:"revisionValidated"`
+	GuestName                   string           `json:"guestName"`
+	CpuSockets                  int16            `json:"cpuSockets"`
+	CpuCores                    int16            `json:"cpuCores"`
+	CpuShares                   int16            `json:"cpuShares"`
+	CpuAffinity                 []CpuPinning     `json:"cpuAffinity"`
+	Memory                      int64            `json:"memory"`
+	BalloonedMemory             bool             `json:"balloonedMemory"`
+	IOThreads                   int16            `json:"ioThreads"`
+	BIOS                        string           `json:"bios"`
+	Display                     string           `json:"display"`
+	HasIllegalImages            bool             `json:"hasIllegalImages"`
+	NumaNodeAffinity            []string         `json:"numaNodeAffinity"`
+	LeaseStorageDomain          string           `json:"leaseStorageDomain"`
+	StorageErrorResumeBehaviour string           `json:"storageErrorResumeBehaviour"`
+	HaEnabled                   bool             `json:"haEnabled"`
+	NICs                        []vNIC           `json:"nics"`
+	DiskAttachments             []DiskAttachment `json:"diskAttachments"`
+	HostDevices                 []HostDevice     `json:"hostDevices"`
+	CDROMs                      []CDROM          `json:"cdroms"`
+	WatchDogs                   []WatchDog       `json:"watchDogs"`
+	Properties                  []Property       `json:"properties"`
+	Snapshots                   []Snapshot       `json:"snapshots"`
+	Concerns                    []Concern        `json:"concerns"`
 }
+
+type IpAddress = model.IpAddress
+type CpuPinning = model.CpuPinning
+type HostDevice = model.HostDevice
+type CDROM = model.CDROM
+type WatchDog = model.WatchDog
+type Property = model.Property
+type Snapshot = model.Snapshot
+type Concern = model.Concern
 
 type vNIC struct {
 	model.NIC
-	Profile model.NICProfile `json:"profile"`
+	Profile   NICProfile  `json:"profile"`
+	Plugged   bool        `json:"plugged"`
+	IpAddress []IpAddress `json:"ipAddress"`
 }
 
-type vDiskAttachment struct {
+type DiskAttachment struct {
 	model.DiskAttachment
-	Disk model.Disk `json:"disk"`
+	Disk Disk `json:"disk"`
 }
 
 //
@@ -224,32 +258,63 @@ func (r *VM) With(m *model.VM) {
 	r.Resource.With(&m.Base)
 	r.Cluster = m.Cluster
 	r.Host = m.Host
+	r.RevisionValidated = m.RevisionValidated
 	r.GuestName = m.GuestName
 	r.CpuSockets = m.CpuSockets
 	r.CpuCores = m.CpuCores
+	r.CpuShares = m.CpuShares
+	r.CpuAffinity = m.CpuAffinity
 	r.Memory = m.Memory
+	r.BalloonedMemory = m.BalloonedMemory
+	r.IOThreads = m.IOThreads
 	r.BIOS = m.BIOS
 	r.Display = m.Display
-	r.CpuAffinity = m.CpuAffinity
-	for _, da := range m.DiskAttachments {
+	r.HasIllegalImages = m.HasIllegalImages
+	r.NumaNodeAffinity = m.NumaNodeAffinity
+	r.LeaseStorageDomain = m.LeaseStorageDomain
+	r.StorageErrorResumeBehaviour = m.StorageErrorResumeBehaviour
+	r.HaEnabled = m.HaEnabled
+	r.HostDevices = m.HostDevices
+	r.CDROMs = m.CDROMs
+	r.WatchDogs = m.WatchDogs
+	r.Properties = m.Properties
+	r.Snapshots = m.Snapshots
+	r.Concerns = m.Concerns
+	r.addDiskAttachment(m)
+	r.addNICs(m)
+}
+
+func (r *VM) addDiskAttachment(m *model.VM) {
+	r.DiskAttachments = []DiskAttachment{}
+	for _, d := range m.DiskAttachments {
 		r.DiskAttachments = append(
 			r.DiskAttachments,
-			vDiskAttachment{
-				DiskAttachment: da,
-				Disk: model.Disk{
-					Base: model.Base{ID: da.Disk},
+			DiskAttachment{
+				DiskAttachment: d,
+				Disk: Disk{
+					Resource: Resource{
+						ID: d.Disk,
+					},
 				},
 			})
 	}
-	//
+}
+
+func (r *VM) addNICs(m *model.VM) {
+	r.NICs = []vNIC{}
 	for _, n := range m.NICs {
 		r.NICs = append(
 			r.NICs,
 			vNIC{
 				NIC: n,
-				Profile: model.NICProfile{
-					Base: model.Base{ID: n.Profile},
-				}})
+				Profile: NICProfile{
+					Resource: Resource{
+						ID: n.Profile,
+					},
+				},
+				Plugged:   n.Plugged,
+				IpAddress: n.IpAddress,
+			})
 	}
 }
 
