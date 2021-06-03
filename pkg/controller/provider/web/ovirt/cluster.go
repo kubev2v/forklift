@@ -149,6 +149,7 @@ type Cluster struct {
 	Resource
 	DataCenter    string `json:"dataCenter"`
 	HaReservation bool   `json:"haReservation"`
+	KsmEnabled    bool   `json:"ksmEnabled"`
 }
 
 //
@@ -157,6 +158,7 @@ func (r *Cluster) With(m *model.Cluster) {
 	r.Resource.With(&m.Base)
 	r.DataCenter = m.DataCenter
 	r.HaReservation = m.HaReservation
+	r.KsmEnabled = m.KsmEnabled
 }
 
 //

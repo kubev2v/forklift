@@ -12,6 +12,7 @@ func All() []interface{} {
 		&DataCenter{},
 		&Cluster{},
 		&NICProfile{},
+		&DiskProfile{},
 		&Network{},
 		&StorageDomain{},
 		&Disk{},
