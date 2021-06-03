@@ -3,7 +3,6 @@ package ovirt
 import (
 	"errors"
 	"github.com/gin-gonic/gin"
-	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
@@ -62,18 +61,10 @@ func (h WorkloadHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	tr := Tree{
-		NodeBuilder: &NodeBuilder{
-			provider: h.Provider,
-			detail: map[string]bool{
-				model.DataCenterKind: true,
-				model.ClusterKind:    true,
-				model.HostKind:       true,
-				model.VmKind:         true,
-			},
-		},
-	}
-	root, err := tr.Ancestry(m, &WorkloadNavigator{db: db})
+	h.Detail = true
+	r := Workload{}
+	err = h.Build(m, &r)
+	r.SelfLink = h.Link(h.Provider, m)
 	if err != nil {
 		log.Trace(
 			err,
@@ -82,11 +73,8 @@ func (h WorkloadHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	content := Workload{}
-	content.SelfLink = h.Link(h.Provider, m)
-	content.With(root)
 
-	ctx.JSON(http.StatusOK, content)
+	ctx.JSON(http.StatusOK, r)
 }
 
 //
@@ -101,50 +89,48 @@ func (h WorkloadHandler) Link(p *api.Provider, m *model.VM) string {
 }
 
 //
-// Workload navigator.
-type WorkloadNavigator struct {
-	db libmodel.DB
-}
-
-//
-// Next parent.
-func (n *WorkloadNavigator) Next(m model.Model) (r model.Model, err error) {
-	switch m.(type) {
-	case *model.Cluster:
-		dataCenter := &model.DataCenter{
-			Base: model.Base{
-				ID: m.(*model.Cluster).DataCenter,
-			},
-		}
-		err = n.db.Get(dataCenter)
-		if err == nil {
-			r = dataCenter
-		}
-	case *model.Host:
-		cluster := &model.Cluster{
-			Base: model.Base{
-				ID: m.(*model.Host).Cluster,
-			},
-		}
-		err = n.db.Get(cluster)
-		if err == nil {
-			r = cluster
-		}
-	case *model.VM:
-		hostId := m.(*model.VM).Host
-		if hostId == "" {
-			break
-		}
-		host := &model.Host{
-			Base: model.Base{
-				ID: hostId,
-			},
-		}
-		err = n.db.Get(host)
-		if err == nil {
-			r = host
-		}
+// Build the workload.
+func (h *WorkloadHandler) Build(m *model.VM, r *Workload) (err error) {
+	db := h.Reconciler.DB()
+	// VM
+	vh := VMHandler{Handler: h.Handler}
+	err = vh.Build(m, &r.VM)
+	if err != nil {
+		return err
 	}
+	// Host
+	if m.Host == "" {
+		return
+	}
+	host := &model.Host{
+		Base: model.Base{ID: m.Host},
+	}
+	err = db.Get(host)
+	if err != nil {
+		return err
+	}
+	r.Host.Host.With(host)
+	r.Host.Host.SelfLink = HostHandler{}.Link(h.Provider, host)
+	// Cluster.
+	cluster := &model.Cluster{
+		Base: model.Base{ID: host.Cluster},
+	}
+	err = db.Get(cluster)
+	if err != nil {
+		return err
+	}
+	r.Host.Cluster.With(cluster)
+	r.Host.Cluster.SelfLink = ClusterHandler{}.Link(h.Provider, cluster)
+	// DataCenter.
+	dataCenter := &model.DataCenter{
+		Base: model.Base{ID: cluster.DataCenter},
+	}
+	err = db.Get(dataCenter)
+	if err != nil {
+		return err
+	}
+	r.Host.Cluster.DataCenter.With(dataCenter)
+	r.Host.Cluster.DataCenter.SelfLink = DataCenterHandler{}.Link(h.Provider, dataCenter)
 
 	return
 }
@@ -153,36 +139,12 @@ func (n *WorkloadNavigator) Next(m model.Model) (r model.Model, err error) {
 // Workload
 type Workload struct {
 	SelfLink string `json:"selfLink"`
-	*VM
+	VM
 	Host struct {
-		*Host
+		Host
 		Cluster struct {
-			*Cluster
-			DataCenter *DataCenter `json:"dataCenter"`
+			Cluster
+			DataCenter DataCenter `json:"dataCenter"`
 		} `json:"cluster"`
 	} `json:"host"`
-}
-
-func (r *Workload) With(root *TreeNode) {
-	r.Host.Host = &Host{}
-	r.Host.Cluster.Cluster = &Cluster{}
-	r.Host.Cluster.DataCenter = &DataCenter{}
-	node := root
-	for {
-		switch node.Kind {
-		case model.DataCenterKind:
-			r.Host.Cluster.DataCenter = node.Object.(*DataCenter)
-		case model.ClusterKind:
-			r.Host.Cluster.Cluster = node.Object.(*Cluster)
-		case model.HostKind:
-			r.Host.Host = node.Object.(*Host)
-		case model.VmKind:
-			r.VM = node.Object.(*VM)
-		}
-		if len(node.Children) > 0 {
-			node = node.Children[0]
-		} else {
-			break
-		}
-	}
 }
