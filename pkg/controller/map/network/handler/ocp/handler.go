@@ -48,9 +48,6 @@ func (r *Handler) Watch(watch *handler.WatchManager) (err error) {
 //
 // Resource created.
 func (r *Handler) Created(e libweb.Event) {
-	if !r.HasParity() {
-		return
-	}
 	if network, cast := e.Resource.(*ocp.NetworkAttachmentDefinition); cast {
 		r.changed(network)
 	}
@@ -59,9 +56,6 @@ func (r *Handler) Created(e libweb.Event) {
 //
 // Resource deleted.
 func (r *Handler) Deleted(e libweb.Event) {
-	if !r.HasParity() {
-		return
-	}
 	if network, cast := e.Resource.(*ocp.NetworkAttachmentDefinition); cast {
 		r.changed(network)
 	}
