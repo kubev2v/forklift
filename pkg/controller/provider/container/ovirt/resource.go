@@ -33,6 +33,28 @@ type Base struct {
 	Description string `json:"description"`
 }
 
+func (b *Base) bool(s string) (v bool) {
+	v, _ = strconv.ParseBool(s)
+	return
+}
+
+func (b *Base) int16(s string) (v int16) {
+	n, _ := strconv.ParseInt(s, 10, 16)
+	v = int16(n)
+	return
+}
+
+func (b *Base) int32(s string) (v int32) {
+	n, _ := strconv.ParseInt(s, 10, 32)
+	v = int32(n)
+	return
+}
+
+func (b *Base) int64(s string) (v int64) {
+	v, _ = strconv.ParseInt(s, 10, 64)
+	return
+}
+
 //
 // DataCenter.
 type DataCenter struct {
@@ -58,6 +80,9 @@ type Cluster struct {
 	Base
 	DataCenter    Ref    `json:"data_center"`
 	HaReservation string `json:"ha_reservation"`
+	KSM           struct {
+		Enabled string `json:"enabled"`
+	} `json:"ksm"`
 }
 
 //
@@ -66,7 +91,8 @@ func (r *Cluster) ApplyTo(m *model.Cluster) {
 	m.Name = r.Name
 	m.Name = r.Description
 	m.DataCenter = r.DataCenter.ID
-	m.HaReservation, _ = strconv.ParseBool(r.HaReservation)
+	m.HaReservation = r.bool(r.HaReservation)
+	m.KsmEnabled = r.bool(r.KSM.Enabled)
 }
 
 //
@@ -93,15 +119,24 @@ type Host struct {
 			Cores   string `json:"cores"`
 		} `json:"topology"`
 	} `json:"cpu"`
-	KSM struct {
-		Enabled string `json:"enabled"`
-	} `json:"ksm"`
 	SSH struct {
 		Thumbprint string `json:"thumbprint"`
 	} `json:"ssh"`
+	NICs struct {
+		List []struct {
+			ID        string `json:"id"`
+			Name      string `json:"name"`
+			LinkSpeed string `json:"speed"`
+			MTU       string `json:"mtu"`
+			VLan      struct {
+				ID string `json:"id"`
+			} `json:"vlan"`
+		} `json:"host_nic"`
+	} `json:"nics"`
 	Networks struct {
 		Attachment []struct {
-			Network Ref `json:"network"`
+			ID      string `json:"id"`
+			Network Ref    `json:"network"`
 		} `json:"network_attachment"`
 	} `json:"network_attachments"`
 }
@@ -115,25 +150,37 @@ func (r *Host) ApplyTo(m *model.Host) {
 	m.ProductName = r.OS.Type
 	m.ProductVersion = r.OS.Version.Full
 	m.InMaintenance = r.Status == "maintenance"
-	m.KsmEnabled, _ = strconv.ParseBool(r.KSM.Enabled)
-	m.Thumbprint = r.SSH.Thumbprint
-	m.CpuSockets = r.cpuSockets()
-	m.CpuCores = r.cpuCores()
-	//
-	m.Networks = []string{}
-	for _, na := range r.Networks.Attachment {
-		m.Networks = append(m.Networks, na.Network.ID)
+	m.CpuSockets = r.int16(r.CPU.Topology.Sockets)
+	m.CpuCores = r.int16(r.CPU.Topology.Cores)
+	r.addNetworkAttachment(m)
+	r.addNICs(m)
+}
+
+func (r *Host) addNetworkAttachment(m *model.Host) {
+	m.NetworkAttachments = []model.NetworkAttachment{}
+	for _, n := range r.Networks.Attachment {
+		m.NetworkAttachments = append(
+			m.NetworkAttachments,
+			model.NetworkAttachment{
+				ID:      n.ID,
+				Network: n.Network.ID,
+			})
 	}
 }
 
-func (r *Host) cpuSockets() int16 {
-	n, _ := strconv.ParseInt(r.CPU.Topology.Sockets, 10, 16)
-	return int16(n)
-}
-
-func (r *Host) cpuCores() int16 {
-	n, _ := strconv.ParseInt(r.CPU.Topology.Cores, 10, 16)
-	return int16(n)
+func (r *Host) addNICs(m *model.Host) {
+	m.NICs = []model.HostNIC{}
+	for _, n := range r.NICs.List {
+		m.NICs = append(
+			m.NICs,
+			model.HostNIC{
+				ID:        n.ID,
+				Name:      n.Name,
+				LinkSpeed: r.int64(n.LinkSpeed),
+				MTU:       r.int64(n.MTU),
+				VLan:      n.VLan.ID,
+			})
+	}
 }
 
 //
@@ -168,29 +215,96 @@ type VM struct {
 			Cores   string `json:"cores"`
 		} `json:"topology"`
 	} `json:"cpu"`
-	Memory string `json:"memory"`
-	BIOS   struct {
+	CpuShares string `json:"cpu_shares"`
+	Memory    string `json:"memory"`
+	IO        struct {
+		Threads string `json:"threads"`
+	} `json:"io"`
+	BIOS struct {
 		Type string `json:"type"`
 	} `json:"bios"`
 	Display struct {
 		Type string `json:"type"`
 	} `json:"display"`
+	HasIllegalImages string `json:"has_illegal_images"`
+	Lease            struct {
+		StorageDomain Ref `json:"storage_domain"`
+	} `json:"lease"`
+	StorageErrorResumeBehaviour string `json:"storage_error_resume_behaviour"`
+	MemoryPolicy                struct {
+		Ballooning string `json:"ballooning"`
+	} `json:"memory_policy"`
+	HA struct {
+		Enabled string `json:"enabled"`
+	} `json:"high_availability"`
+	HostDevices struct {
+		List []struct {
+			Capability string `json:"capability"`
+			Vendor     struct {
+				Name string `json:"name"`
+			} `json:"vendor"`
+			Product struct {
+				Name string `json:"name"`
+			} `json:"product"`
+		} `json:"host_device"`
+	} `json:"host_devices"`
+	CDROMs struct {
+		List []struct {
+			ID   string `json:"id"`
+			File struct {
+				ID string `json:"id"`
+			} `json:"file"`
+		} `json:"cdrom"`
+	} `json:"cdroms"`
 	NICs struct {
 		List []struct {
 			ID        string `json:"id"`
 			Name      string `json:"name"`
 			Interface string `json:"interface"`
+			Plugged   string `json:"plugged"`
 			Profile   Ref    `json:"vnic_profile"`
+			Devices   struct {
+				List []struct {
+					IPS struct {
+						IP []struct {
+							Address string `json:"address"`
+							Version string `json:"version"`
+						} `json:"ip"`
+					} `json:"ips"`
+				} `json:"reported_device"`
+			} `json:"reported_devices"`
 		} `json:"nic"`
 	} `json:"nics"`
 	Disks struct {
 		Attachment []struct {
-			ID        string `json:"id"`
-			Name      string
-			Interface string `json:"interface"`
-			Disk      Ref    `json:"disk"`
+			ID              string `json:"id"`
+			Name            string
+			Interface       string `json:"interface"`
+			SCSIReservation string `json:"uses_scsi_reservation"`
+			Disk            Ref    `json:"disk"`
 		} `json:"disk_attachment"`
 	} `json:"disk_attachments"`
+	WatchDogs struct {
+		List []struct {
+			ID     string `json:"id"`
+			Action string `json:"action"`
+			Model  string `json:"model"`
+		} `json:"watchdog"`
+	} `json:"watchdogs"`
+	Properties struct {
+		List []struct {
+			Name  string `json:"name"`
+			Value string `json:"value"`
+		} `json:"custom_property"`
+	} `json:"custom_properties"`
+	Snapshots struct {
+		List []struct {
+			ID            string `json:"id"`
+			Description   string `json:"description"`
+			PersistMemory string `json:"persist_memorystate"`
+			Type          string `json:"snapshot_type"`
+		} `json:"snapshot"`
+	} `json:"snapshots"`
 }
 
 //
@@ -201,58 +315,142 @@ func (r *VM) ApplyTo(m *model.VM) {
 	m.Cluster = r.Cluster.ID
 	m.Host = r.Host.ID
 	m.GuestName = r.Guest.Distribution + " " + r.Guest.Version.Full
-	m.CpuSockets = r.cpuSockets()
-	m.CpuCores = r.cpuCores()
-	m.Memory, _ = strconv.ParseInt(r.Memory, 10, 64)
+	m.CpuSockets = r.int16(r.CPU.Topology.Sockets)
+	m.CpuCores = r.int16(r.CPU.Topology.Cores)
+	m.CpuShares = r.int16(r.CpuShares)
+	m.Memory = r.int64(r.Memory)
 	m.BIOS = r.BIOS.Type
 	m.Display = r.Display.Type
-	m.CpuAffinity = r.cpuAffinity()
-	//
+	m.HasIllegalImages = r.bool(r.HasIllegalImages)
+	m.BalloonedMemory = r.bool(r.MemoryPolicy.Ballooning)
+	m.NumaNodeAffinity = []string{}
+	m.LeaseStorageDomain = r.Lease.StorageDomain.ID
+	m.StorageErrorResumeBehaviour = r.StorageErrorResumeBehaviour
+	m.HaEnabled = r.bool(r.HA.Enabled)
+	m.IOThreads = r.int16(r.IO.Threads)
+	r.addCpuAffinity(m)
+	r.addNICs(m)
+	r.addDiskAttachment(m)
+	r.addHostDevices(m)
+	r.addCDROMs(m)
+	r.addWatchDogs(m)
+	r.addProperties(m)
+	r.addSnapshot(m)
+}
+
+func (r *VM) addCpuAffinity(m *model.VM) {
+	m.CpuAffinity = []model.CpuPinning{}
+	for _, p := range r.CPU.Tune.Pin.List {
+		m.CpuAffinity = append(
+			m.CpuAffinity, model.CpuPinning{
+				Set: r.int32(p.Set),
+				Cpu: r.int32(p.Cpu),
+			})
+	}
+}
+
+func (r *VM) addNICs(m *model.VM) {
 	m.NICs = []model.NIC{}
 	for _, n := range r.NICs.List {
+		ips := []model.IpAddress{}
+		for _, d := range n.Devices.List {
+			for _, ip := range d.IPS.IP {
+				ips = append(
+					ips,
+					model.IpAddress{
+						Address: ip.Address,
+						Version: ip.Version,
+					})
+			}
+		}
 		m.NICs = append(
 			m.NICs, model.NIC{
 				ID:        n.ID,
 				Name:      n.Name,
-				Interface: n.Interface,
 				Profile:   n.Profile.ID,
+				Interface: n.Interface,
+				Plugged:   r.bool(n.Plugged),
+				IpAddress: ips,
 			})
 	}
-	//
+}
+
+func (r *VM) addDiskAttachment(m *model.VM) {
 	m.DiskAttachments = []model.DiskAttachment{}
 	for _, da := range r.Disks.Attachment {
 		m.DiskAttachments = append(
 			m.DiskAttachments,
 			model.DiskAttachment{
-				ID:        da.ID,
-				Interface: da.Interface,
-				Disk:      da.Disk.ID,
+				ID:              da.ID,
+				Interface:       da.Interface,
+				SCSIReservation: r.bool(da.SCSIReservation),
+				Disk:            da.Disk.ID,
 			})
 	}
 }
 
-func (r *VM) cpuSockets() int16 {
-	n, _ := strconv.ParseInt(r.CPU.Topology.Sockets, 10, 16)
-	return int16(n)
-}
-
-func (r *VM) cpuCores() int16 {
-	n, _ := strconv.ParseInt(r.CPU.Topology.Cores, 10, 16)
-	return int16(n)
-}
-
-func (r *VM) cpuAffinity() (affinity []model.CpuPinning) {
-	for _, p := range r.CPU.Tune.Pin.List {
-		set, _ := strconv.ParseInt(p.Set, 10, 32)
-		cpu, _ := strconv.ParseInt(p.Cpu, 10, 32)
-		affinity = append(
-			affinity, model.CpuPinning{
-				Set: int32(set),
-				Cpu: int32(cpu),
+func (r *VM) addHostDevices(m *model.VM) {
+	m.HostDevices = []model.HostDevice{}
+	for _, d := range r.HostDevices.List {
+		m.HostDevices = append(
+			m.HostDevices,
+			model.HostDevice{
+				Capability: d.Capability,
+				Product:    d.Product.Name,
+				Vendor:     d.Vendor.Name,
 			})
 	}
+}
 
-	return
+func (r *VM) addCDROMs(m *model.VM) {
+	m.CDROMs = []model.CDROM{}
+	for _, cd := range r.CDROMs.List {
+		m.CDROMs = append(
+			m.CDROMs,
+			model.CDROM{
+				ID:   cd.ID,
+				File: cd.File.ID,
+			})
+	}
+}
+
+func (r *VM) addWatchDogs(m *model.VM) {
+	m.WatchDogs = []model.WatchDog{}
+	for _, w := range r.WatchDogs.List {
+		m.WatchDogs = append(
+			m.WatchDogs,
+			model.WatchDog{
+				ID:     w.ID,
+				Action: w.Action,
+				Model:  w.Model,
+			})
+	}
+}
+
+func (r *VM) addProperties(m *model.VM) {
+	m.Properties = []model.Property{}
+	for _, p := range r.Properties.List {
+		m.Properties = append(
+			m.Properties,
+			model.Property{
+				Name:  p.Name,
+				Value: p.Value,
+			})
+	}
+}
+
+func (r *VM) addSnapshot(m *model.VM) {
+	m.Snapshots = []model.Snapshot{}
+	for _, sn := range r.Snapshots.List {
+		m.Snapshots = append(
+			m.Snapshots,
+			model.Snapshot{
+				ID:            sn.ID,
+				Description:   sn.Description,
+				PersistMemory: r.bool(sn.PersistMemory),
+				Type:          sn.Type,
+			})
+	}
 }
 
 //
@@ -286,7 +484,10 @@ func (r *Network) ApplyTo(m *model.Network) {
 	m.DataCenter = r.DataCenter.ID
 	m.VLan = r.VLan.ID
 	m.Usages = r.Usages.Usage
-	//
+	r.setProfiles(m)
+}
+
+func (r *Network) setProfiles(m *model.Network) {
 	m.Profiles = []string{}
 	for _, p := range r.Profiles.List {
 		m.Profiles = append(m.Profiles, p.ID)
@@ -321,8 +522,12 @@ func (r *StorageDomain) ApplyTo(m *model.StorageDomain) {
 	m.Description = r.Description
 	m.Type = r.Type
 	m.Storage.Type = r.Storage.Type
-	m.Available, _ = strconv.ParseInt(r.Available, 10, 64)
-	m.Used, _ = strconv.ParseInt(r.Used, 10, 64)
+	m.Available = r.int64(r.Available)
+	m.Used = r.int64(r.Used)
+	r.setDataCenter(m)
+}
+
+func (r *StorageDomain) setDataCenter(m *model.StorageDomain) {
 	for _, ref := range r.DataCenter.List {
 		m.DataCenter = ref.ID
 		break
@@ -339,8 +544,10 @@ type StorageDomainList struct {
 // vNIC profile.
 type NICProfile struct {
 	Base
-	Network Ref `json:"network"`
-	QoS     Ref `json:"qos"`
+	Network       Ref    `json:"network"`
+	QoS           Ref    `json:"qos"`
+	NetworkFilter Ref    `json:"network_filter"`
+	PortMirroring string `json:"port_mirroring"`
 }
 
 //
@@ -349,6 +556,8 @@ func (r *NICProfile) ApplyTo(m *model.NICProfile) {
 	m.Name = r.Name
 	m.Description = r.Description
 	m.Network = r.Network.ID
+	m.NetworkFilter = r.NetworkFilter.ID
+	m.PortMirroring = r.bool(r.PortMirroring)
 	m.QoS = r.QoS.ID
 }
 
@@ -359,13 +568,41 @@ type NICProfileList struct {
 }
 
 //
+// Disk profile.
+type DiskProfile struct {
+	Base
+	StorageDomain Ref `json:"storage_domain"`
+	QoS           Ref `json:"qos"`
+}
+
+//
+// Apply to (update) the model.
+func (r *DiskProfile) ApplyTo(m *model.DiskProfile) {
+	m.Name = r.Name
+	m.Description = r.Description
+	m.StorageDomain = r.StorageDomain.ID
+	m.QoS = r.QoS.ID
+}
+
+//
+// NICProfile (list).
+type DiskProfileList struct {
+	Items []DiskProfile `json:"disk_profile"`
+}
+
+//
 // Disk.
 type Disk struct {
 	Base
 	Sharable       string `json:"sharable"`
+	Profile        Ref    `json:"disk_profile"`
 	StorageDomains struct {
 		List []Ref `json:"storage_domain"`
 	} `json:"storage_domains"`
+	Status      string `json:"status"`
+	StorageUsed string `json:"actual_size"`
+	Backup      string `json:"backup"`
+	StorageType string `json:"storage_type"`
 }
 
 //
@@ -373,7 +610,16 @@ type Disk struct {
 func (r *Disk) ApplyTo(m *model.Disk) {
 	m.Name = r.Name
 	m.Description = r.Description
-	m.Shared, _ = strconv.ParseBool(r.Sharable)
+	m.Shared = r.bool(r.Sharable)
+	m.Profile = r.Profile.ID
+	m.Status = r.Status
+	m.StorageUsed = r.int64(r.StorageUsed)
+	m.Backup = r.Backup
+	m.StorageType = r.StorageType
+	r.setStorageDomain(m)
+}
+
+func (r *Disk) setStorageDomain(m *model.Disk) {
 	for _, ref := range r.StorageDomains.List {
 		m.StorageDomain = ref.ID
 		break

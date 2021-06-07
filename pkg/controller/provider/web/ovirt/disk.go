@@ -62,7 +62,15 @@ func (h DiskHandler) List(ctx *gin.Context) {
 	content := []interface{}{}
 	for _, m := range list {
 		r := &Disk{}
-		r.With(&m)
+		err = h.Build(&m, r)
+		if err != nil {
+			log.Trace(
+				err,
+				"url",
+				ctx.Request.URL)
+			ctx.Status(http.StatusInternalServerError)
+			return
+		}
 		r.SelfLink = h.Link(h.Provider, &m)
 		content = append(content, r.Content(h.Detail))
 	}
@@ -99,7 +107,15 @@ func (h DiskHandler) Get(ctx *gin.Context) {
 		return
 	}
 	r := &Disk{}
-	r.With(m)
+	err = h.Build(m, r)
+	if err != nil {
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
 	r.SelfLink = h.Link(h.Provider, m)
 	content := r.Content(true)
 
@@ -115,6 +131,27 @@ func (h DiskHandler) Link(p *api.Provider, m *model.Disk) string {
 			base.ProviderParam: string(p.UID),
 			DiskParam:          m.ID,
 		})
+}
+
+//
+// Build the resource.
+func (h *DiskHandler) Build(m *model.Disk, r *Disk) (err error) {
+	r.With(m)
+	r.SelfLink = h.Link(h.Provider, m)
+	if !h.Detail {
+		return
+	}
+	profile := &model.DiskProfile{
+		Base: model.Base{ID: m.Profile},
+	}
+	db := h.Reconciler.DB()
+	err = db.Get(profile)
+	if err != nil {
+		return
+	}
+	r.Profile.SelfLink = DiskProfileHandler{}.Link(h.Provider, profile)
+	r.Profile.With(profile)
+	return
 }
 
 //
@@ -146,8 +183,8 @@ func (h DiskHandler) watch(ctx *gin.Context) {
 // REST Resource.
 type Disk struct {
 	Resource
-	Shared        bool   `json:"shared"`
-	StorageDomain string `json:"storageDomain"`
+	Shared  bool        `json:"shared"`
+	Profile DiskProfile `json:"profile"`
 }
 
 //
@@ -155,7 +192,11 @@ type Disk struct {
 func (r *Disk) With(m *model.Disk) {
 	r.Resource.With(&m.Base)
 	r.Shared = m.Shared
-	r.StorageDomain = m.StorageDomain
+	r.Profile = DiskProfile{
+		Resource: Resource{
+			ID: m.Profile,
+		},
+	}
 }
 
 //
