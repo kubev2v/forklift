@@ -24,6 +24,12 @@ const (
 )
 
 //
+// Header.
+const (
+	ProviderHeader = "X-Provider"
+)
+
+//
 // Params
 type Params = map[string]string
 
@@ -84,25 +90,26 @@ func (h *Handler) Link(path string, params Params) string {
 
 //
 // Set the provider.
-func (h *Handler) setProvider(ctx *gin.Context) int {
+// Set the Provider field and the X-Provider header.
+func (h *Handler) setProvider(ctx *gin.Context) (status int) {
 	var found bool
+	uid := ctx.Param(ProviderParam)
 	h.Provider = &api.Provider{
 		ObjectMeta: meta.ObjectMeta{
-			UID: types.UID(ctx.Param(ProviderParam)),
+			UID: types.UID(uid),
 		},
 	}
 	if h.Provider.UID != "" {
 		if h.Reconciler, found = h.Container.Get(h.Provider); !found {
-			return http.StatusNotFound
+			status = http.StatusNotFound
+			return
 		}
+		ctx.Header(ProviderHeader, uid)
 		h.Provider = h.Reconciler.Owner().(*api.Provider)
-		status := h.EnsureParity(h.Reconciler, time.Second*30)
-		if status != http.StatusOK {
-			return status
-		}
+		status = h.EnsureParity(h.Reconciler, time.Second*30)
 	}
 
-	return http.StatusOK
+	return
 }
 
 //

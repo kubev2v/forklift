@@ -22,7 +22,6 @@ package vsphere
 
 import (
 	"context"
-	"errors"
 	"github.com/go-logr/logr"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
@@ -102,6 +101,9 @@ func (r *VMEventHandler) Started(uint64) {
 // This is best-effort.  If the validate() fails, it wil be
 // picked up in the next search().
 func (r *VMEventHandler) Created(event libmodel.Event) {
+	if r.canceled() {
+		return
+	}
 	if vm, cast := event.Model.(*model.VM); cast {
 		if !vm.Validated() {
 			if r.validate(vm) == nil {
@@ -117,6 +119,9 @@ func (r *VMEventHandler) Created(event libmodel.Event) {
 // This is best-effort.  If the validate() fails, it wil be
 // picked up in the next search().
 func (r *VMEventHandler) Updated(event libmodel.Event) {
+	if r.canceled() {
+		return
+	}
 	if vm, cast := event.Updated.(*model.VM); cast {
 		if !vm.Validated() {
 			if r.validate(vm) == nil {
@@ -161,6 +166,7 @@ func (r *VMEventHandler) run() {
 	defer r.log.Info("Run stopped.")
 	interval := time.Second * time.Duration(
 		Settings.PolicyAgent.SearchInterval)
+	r.list()
 	r.reset()
 	for {
 		select {
@@ -225,10 +231,8 @@ func (r *VMEventHandler) list() {
 		r.log.Error(err, err.Error())
 		return
 	}
-	select {
-	case <-r.context.Done():
+	if r.canceled() {
 		return
-	default:
 	}
 	itr, err := r.DB.Iter(
 		&model.VM{},
@@ -248,7 +252,7 @@ func (r *VMEventHandler) list() {
 			r.log.Error(err, "VM iterator failed.")
 			break
 		}
-		if !hasNext {
+		if !hasNext || r.canceled() {
 			break
 		}
 		if revision, found := r.reported[vm.ID]; found {
@@ -257,6 +261,17 @@ func (r *VMEventHandler) list() {
 			}
 		}
 		_ = r.validate(vm)
+	}
+}
+
+//
+// Handler canceled.
+func (r *VMEventHandler) canceled() bool {
+	select {
+	case <-r.context.Done():
+		return true
+	default:
+		return false
 	}
 }
 
@@ -274,11 +289,7 @@ func (r *VMEventHandler) validate(vm *model.VM) (err error) {
 	}
 	err = policy.Agent.Submit(task)
 	if err != nil {
-		if errors.As(err, &policy.BacklogExceededError{}) {
-			r.log.Info(err.Error())
-		} else {
-			r.log.Error(err, "VM task (submit) failed.")
-		}
+		r.log.Error(err, "VM task (submit) failed.")
 	}
 
 	return
