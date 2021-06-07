@@ -3,8 +3,6 @@ package ovirt
 import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	ocpmodel "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"strings"
 )
@@ -24,55 +22,43 @@ type Resolver struct {
 //
 // Build the URL path.
 func (r *Resolver) Path(resource interface{}, id string) (path string, err error) {
+	provider := r.Provider
 	switch resource.(type) {
 	case *Provider:
-		h := ProviderHandler{}
-		path = h.Link(
-			&ocpmodel.Provider{
-				Base: ocpmodel.Base{UID: id},
-			})
+		r := Provider{}
+		r.UID = id
+		r.Link()
+		path = r.SelfLink
 	case *DataCenter:
-		h := DataCenterHandler{}
-		path = h.Link(
-			r.Provider,
-			&model.DataCenter{
-				Base: model.Base{ID: id},
-			})
+		r := DataCenter{}
+		r.ID = id
+		r.Link(provider)
+		path = r.SelfLink
 	case *Cluster:
-		h := ClusterHandler{}
-		path = h.Link(
-			r.Provider,
-			&model.Cluster{
-				Base: model.Base{ID: id},
-			})
+		r := Cluster{}
+		r.ID = id
+		r.Link(provider)
+		path = r.SelfLink
 	case *Host:
-		h := HostHandler{}
-		path = h.Link(
-			r.Provider,
-			&model.Host{
-				Base: model.Base{ID: id},
-			})
+		r := Host{}
+		r.ID = id
+		r.Link(provider)
+		path = r.SelfLink
 	case *Network:
-		h := NetworkHandler{}
-		path = h.Link(
-			r.Provider,
-			&model.Network{
-				Base: model.Base{ID: id},
-			})
+		r := Network{}
+		r.ID = id
+		r.Link(provider)
+		path = r.SelfLink
 	case *StorageDomain:
-		h := StorageDomainHandler{}
-		path = h.Link(
-			r.Provider,
-			&model.StorageDomain{
-				Base: model.Base{ID: id},
-			})
+		r := StorageDomain{}
+		r.ID = id
+		r.Link(provider)
+		path = r.SelfLink
 	case *VM:
-		h := VMHandler{}
-		path = h.Link(
-			r.Provider,
-			&model.VM{
-				Base: model.Base{ID: id},
-			})
+		r := VM{}
+		r.ID = id
+		r.Link(provider)
+		path = r.SelfLink
 	default:
 		err = liberr.Wrap(
 			base.ResourceNotResolvedError{

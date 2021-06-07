@@ -3,6 +3,7 @@ package ovirt
 import (
 	"errors"
 	"github.com/gin-gonic/gin"
+	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
@@ -63,8 +64,8 @@ func (h WorkloadHandler) Get(ctx *gin.Context) {
 	}
 	h.Detail = true
 	r := Workload{}
-	err = h.Build(m, &r)
-	r.SelfLink = h.Link(h.Provider, m)
+	r.With(m)
+	err = r.Expand(h.Reconciler.DB())
 	if err != nil {
 		log.Trace(
 			err,
@@ -73,66 +74,9 @@ func (h WorkloadHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
+	r.Link(h.Provider)
 
 	ctx.JSON(http.StatusOK, r)
-}
-
-//
-// Build self link (URI).
-func (h WorkloadHandler) Link(p *api.Provider, m *model.VM) string {
-	return h.Handler.Link(
-		WorkloadRoot,
-		base.Params{
-			base.ProviderParam: string(p.UID),
-			VMParam:            m.ID,
-		})
-}
-
-//
-// Build the workload.
-func (h *WorkloadHandler) Build(m *model.VM, r *Workload) (err error) {
-	db := h.Reconciler.DB()
-	// VM
-	vh := VMHandler{Handler: h.Handler}
-	err = vh.Build(m, &r.VM)
-	if err != nil {
-		return err
-	}
-	// Host
-	if m.Host == "" {
-		return
-	}
-	host := &model.Host{
-		Base: model.Base{ID: m.Host},
-	}
-	err = db.Get(host)
-	if err != nil {
-		return err
-	}
-	r.Host.Host.With(host)
-	r.Host.Host.SelfLink = HostHandler{}.Link(h.Provider, host)
-	// Cluster.
-	cluster := &model.Cluster{
-		Base: model.Base{ID: host.Cluster},
-	}
-	err = db.Get(cluster)
-	if err != nil {
-		return err
-	}
-	r.Host.Cluster.With(cluster)
-	r.Host.Cluster.SelfLink = ClusterHandler{}.Link(h.Provider, cluster)
-	// DataCenter.
-	dataCenter := &model.DataCenter{
-		Base: model.Base{ID: cluster.DataCenter},
-	}
-	err = db.Get(dataCenter)
-	if err != nil {
-		return err
-	}
-	r.Host.Cluster.DataCenter.With(dataCenter)
-	r.Host.Cluster.DataCenter.SelfLink = DataCenterHandler{}.Link(h.Provider, dataCenter)
-
-	return
 }
 
 //
@@ -147,4 +91,60 @@ type Workload struct {
 			DataCenter DataCenter `json:"dataCenter"`
 		} `json:"cluster"`
 	} `json:"host"`
+}
+
+//
+// Build self link (URI).
+func (r *Workload) Link(p *api.Provider) {
+	r.SelfLink = base.Link(
+		WorkloadRoot,
+		base.Params{
+			base.ProviderParam: string(p.UID),
+			VMParam:            r.ID,
+		})
+	r.Host.Host.Link(p)
+	r.Host.Cluster.Link(p)
+	r.Host.Cluster.DataCenter.Link(p)
+}
+
+//
+// Expand the workload.
+func (r *Workload) Expand(db libmodel.DB) (err error) {
+	// VM
+	err = r.VM.Expand(db)
+	if err != nil {
+		return err
+	}
+	// Host
+	if r.VM.Host == "" {
+		return
+	}
+	host := &model.Host{
+		Base: model.Base{ID: r.VM.Host},
+	}
+	err = db.Get(host)
+	if err != nil {
+		return err
+	}
+	r.Host.Host.With(host)
+	// Cluster.
+	cluster := &model.Cluster{
+		Base: model.Base{ID: host.Cluster},
+	}
+	err = db.Get(cluster)
+	if err != nil {
+		return err
+	}
+	r.Host.Cluster.With(cluster)
+	// DataCenter.
+	dataCenter := &model.DataCenter{
+		Base: model.Base{ID: cluster.DataCenter},
+	}
+	err = db.Get(dataCenter)
+	if err != nil {
+		return err
+	}
+	r.Host.Cluster.DataCenter.With(dataCenter)
+
+	return
 }
