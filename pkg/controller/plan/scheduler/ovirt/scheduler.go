@@ -1,6 +1,9 @@
 package ovirt
 
 import (
+	"context"
+	liberr "github.com/konveyor/controller/pkg/error"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"sync"
@@ -24,6 +27,37 @@ type Scheduler struct {
 func (r *Scheduler) Next() (vm *plan.VMStatus, hasNext bool, err error) {
 	mutex.Lock()
 	defer mutex.Unlock()
+
+	planList := &api.PlanList{}
+	err = r.List(context.TODO(), planList)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	inFlight := 0
+	for _, p := range planList.Items {
+		// ignore plans that aren't using the same source provider
+		if p.Spec.Provider.Source != r.Plan.Spec.Provider.Source {
+			continue
+		}
+
+		// skip plans that aren't being executed
+		snapshot := p.Status.Migration.ActiveSnapshot()
+		if !snapshot.HasCondition("Executing") {
+			continue
+		}
+
+		for _, vmStatus := range p.Status.Migration.VMs {
+			if vmStatus.Running() {
+				inFlight++
+			}
+		}
+	}
+
+	if inFlight >= r.MaxInFlight {
+		return
+	}
 
 	for _, vmStatus := range r.Plan.Status.Migration.VMs {
 		if !vmStatus.MarkedStarted() && !vmStatus.MarkedCompleted() {
