@@ -34,6 +34,18 @@ const (
 type Params = map[string]string
 
 //
+// Build link.
+func Link(path string, params Params) string {
+	for k, v := range params {
+		if len(v) > 0 {
+			path = strings.Replace(path, ":"+k, v, 1)
+		}
+	}
+
+	return path
+}
+
+//
 // Base handler.
 type Handler struct {
 	libweb.Parity
@@ -79,13 +91,7 @@ func (h *Handler) Prepare(ctx *gin.Context) int {
 //
 // Build link.
 func (h *Handler) Link(path string, params Params) string {
-	for k, v := range params {
-		if len(v) > 0 {
-			path = strings.Replace(path, ":"+k, v, 1)
-		}
-	}
-
-	return path
+	return Link(path, params)
 }
 
 //

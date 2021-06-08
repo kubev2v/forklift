@@ -83,7 +83,7 @@ func (h ProviderHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	r.SelfLink = h.Link(m)
+	r.Link()
 	content := r.Content(true)
 
 	ctx.JSON(http.StatusOK, content)
@@ -117,7 +117,7 @@ func (h *ProviderHandler) ListContent(ctx *gin.Context) (content []interface{}, 
 				err = aErr
 				return
 			}
-			r.SelfLink = h.Link(m)
+			r.Link()
 			content = append(content, r.Content(h.Detail))
 		}
 	}
@@ -176,16 +176,6 @@ func (h ProviderHandler) AddDerived(r *Provider) (err error) {
 }
 
 //
-// Build self link (URI).
-func (h ProviderHandler) Link(m *model.Provider) string {
-	return h.Handler.Link(
-		ProviderRoot,
-		base.Params{
-			base.ProviderParam: m.UID,
-		})
-}
-
-//
 // REST Resource.
 type Provider struct {
 	ocp.Resource
@@ -205,6 +195,16 @@ func (r *Provider) With(m *model.Provider) {
 	r.Resource.With(&m.Base)
 	r.Type = m.Type
 	r.Object = m.Object
+}
+
+//
+// Build self link (URI).
+func (r *Provider) Link() {
+	r.SelfLink = base.Link(
+		ProviderRoot,
+		base.Params{
+			base.ProviderParam: r.UID,
+		})
 }
 
 //

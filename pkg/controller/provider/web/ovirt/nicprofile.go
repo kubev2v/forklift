@@ -63,7 +63,7 @@ func (h NICProfileHandler) List(ctx *gin.Context) {
 	for _, m := range list {
 		r := &NICProfile{}
 		r.With(&m)
-		r.SelfLink = h.Link(h.Provider, &m)
+		r.Link(h.Provider)
 		content = append(content, r.Content(h.Detail))
 	}
 
@@ -99,21 +99,10 @@ func (h NICProfileHandler) Get(ctx *gin.Context) {
 	}
 	r := &NICProfile{}
 	r.With(m)
-	r.SelfLink = h.Link(h.Provider, m)
+	r.Link(h.Provider)
 	content := r.Content(true)
 
 	ctx.JSON(http.StatusOK, content)
-}
-
-//
-// Build self link (URI).
-func (h NICProfileHandler) Link(p *api.Provider, m *model.NICProfile) string {
-	return h.Handler.Link(
-		NICProfileRoot,
-		base.Params{
-			base.ProviderParam: string(p.UID),
-			NICProfileParam:    m.ID,
-		})
 }
 
 //
@@ -128,7 +117,7 @@ func (h NICProfileHandler) watch(ctx *gin.Context) {
 			m := in.(*model.NICProfile)
 			profile := &NICProfile{}
 			profile.With(m)
-			profile.SelfLink = h.Link(h.Provider, m)
+			profile.Link(h.Provider)
 			r = profile
 			return
 		})
@@ -159,6 +148,17 @@ func (r *NICProfile) With(m *model.NICProfile) {
 	r.NetworkFilter = m.NetworkFilter
 	r.PortMirroring = m.PortMirroring
 	r.QoS = m.QoS
+}
+
+//
+// Build self link (URI).
+func (r *NICProfile) Link(p *api.Provider) {
+	r.SelfLink = base.Link(
+		NICProfileRoot,
+		base.Params{
+			base.ProviderParam: string(p.UID),
+			NICProfileParam:    r.ID,
+		})
 }
 
 //

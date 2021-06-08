@@ -62,7 +62,8 @@ func (h DiskHandler) List(ctx *gin.Context) {
 	content := []interface{}{}
 	for _, m := range list {
 		r := &Disk{}
-		err = h.Build(&m, r)
+		r.With(&m)
+		err = r.Expand(h.Reconciler.DB())
 		if err != nil {
 			log.Trace(
 				err,
@@ -71,7 +72,7 @@ func (h DiskHandler) List(ctx *gin.Context) {
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
-		r.SelfLink = h.Link(h.Provider, &m)
+		r.Link(h.Provider)
 		content = append(content, r.Content(h.Detail))
 	}
 
@@ -107,7 +108,8 @@ func (h DiskHandler) Get(ctx *gin.Context) {
 		return
 	}
 	r := &Disk{}
-	err = h.Build(m, r)
+	r.With(m)
+	err = r.Expand(h.Reconciler.DB())
 	if err != nil {
 		log.Trace(
 			err,
@@ -116,41 +118,19 @@ func (h DiskHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	r.SelfLink = h.Link(h.Provider, m)
+	r.Link(h.Provider)
 	content := r.Content(true)
 
 	ctx.JSON(http.StatusOK, content)
 }
 
 //
-// Build self link (URI).
-func (h DiskHandler) Link(p *api.Provider, m *model.Disk) string {
-	return h.Handler.Link(
-		DiskRoot,
-		base.Params{
-			base.ProviderParam: string(p.UID),
-			DiskParam:          m.ID,
-		})
-}
-
-//
-// Build the resource.
-func (h *DiskHandler) Build(m *model.Disk, r *Disk) (err error) {
-	r.With(m)
-	r.SelfLink = h.Link(h.Provider, m)
+// Expend the resource.
+func (h *DiskHandler) Expand(r *Disk) (err error) {
 	if !h.Detail {
 		return
 	}
-	profile := &model.DiskProfile{
-		Base: model.Base{ID: m.Profile},
-	}
-	db := h.Reconciler.DB()
-	err = db.Get(profile)
-	if err != nil {
-		return
-	}
-	r.Profile.SelfLink = DiskProfileHandler{}.Link(h.Provider, profile)
-	r.Profile.With(profile)
+	err = r.Expand(h.Reconciler.DB())
 	return
 }
 
@@ -166,7 +146,7 @@ func (h DiskHandler) watch(ctx *gin.Context) {
 			m := in.(*model.Disk)
 			disk := &Disk{}
 			disk.With(m)
-			disk.SelfLink = h.Link(h.Provider, m)
+			disk.Link(h.Provider)
 			r = disk
 			return
 		})
@@ -197,6 +177,35 @@ func (r *Disk) With(m *model.Disk) {
 			ID: m.Profile,
 		},
 	}
+}
+
+//
+// Expand the resource.
+func (r *Disk) Expand(db libmodel.DB) (err error) {
+	if r.Profile.ID == "" { // Optional.
+		return
+	}
+	profile := &model.DiskProfile{
+		Base: model.Base{ID: r.Profile.ID},
+	}
+	err = db.Get(profile)
+	if err != nil {
+		return
+	}
+	r.Profile.With(profile)
+	return
+}
+
+//
+// Build self link (URI).
+func (r *Disk) Link(p *api.Provider) {
+	r.SelfLink = base.Link(
+		DiskRoot,
+		base.Params{
+			base.ProviderParam: string(p.UID),
+			DiskParam:          r.ID,
+		})
+	r.Profile.Link(p)
 }
 
 //

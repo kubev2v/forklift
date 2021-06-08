@@ -62,7 +62,8 @@ func (h VMHandler) List(ctx *gin.Context) {
 	content := []interface{}{}
 	for _, m := range list {
 		r := &VM{}
-		err = h.Build(&m, r)
+		r.With(&m)
+		err = h.Expand(r)
 		if err != nil {
 			log.Trace(
 				err,
@@ -71,6 +72,7 @@ func (h VMHandler) List(ctx *gin.Context) {
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
+		r.Link(h.Provider)
 		content = append(content, r.Content(h.Detail))
 	}
 
@@ -106,7 +108,8 @@ func (h VMHandler) Get(ctx *gin.Context) {
 		return
 	}
 	r := &VM{}
-	err = h.Build(m, r)
+	r.With(m)
+	err = h.Expand(r)
 	if err != nil {
 		log.Trace(
 			err,
@@ -115,62 +118,19 @@ func (h VMHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
+	r.Link(h.Provider)
 	content := r.Content(true)
 
 	ctx.JSON(http.StatusOK, content)
 }
 
 //
-// Build self link (URI).
-func (h VMHandler) Link(p *api.Provider, m *model.VM) string {
-	return h.Handler.Link(
-		VMRoot,
-		base.Params{
-			base.ProviderParam: string(p.UID),
-			VMParam:            m.ID,
-		})
-}
-
-//
-// Build the resource.
-func (h *VMHandler) Build(m *model.VM, r *VM) (err error) {
-	r.With(m)
-	r.SelfLink = h.Link(h.Provider, m)
+// Expend the resource.
+func (h *VMHandler) Expand(r *VM) (err error) {
 	if !h.Detail {
 		return
 	}
-	db := h.Reconciler.DB()
-	for i := range r.NICs {
-		nic := &r.NICs[i]
-		profile := &model.NICProfile{
-			Base: model.Base{ID: nic.Profile.ID},
-		}
-		err = db.Get(profile)
-		if err != nil {
-			return
-		}
-		nic.Profile.SelfLink = NICProfileHandler{}.Link(h.Provider, profile)
-		nic.Profile.With(profile)
-	}
-	diskHandler := DiskHandler{
-		Handler: h.Handler,
-	}
-	for i := range r.DiskAttachments {
-		d := &r.DiskAttachments[i]
-		disk := &model.Disk{
-			Base: model.Base{ID: d.Disk.ID},
-		}
-		err = db.Get(disk)
-		if err != nil {
-			return
-		}
-		d.Disk.SelfLink = diskHandler.Link(h.Provider, disk)
-		err = diskHandler.Build(disk, &d.Disk)
-		if err != nil {
-			return
-		}
-	}
-
+	err = r.Expand(h.Reconciler.DB())
 	return
 }
 
@@ -186,7 +146,7 @@ func (h VMHandler) watch(ctx *gin.Context) {
 			m := in.(*model.VM)
 			vm := &VM{}
 			vm.With(m)
-			vm.SelfLink = h.Link(h.Provider, m)
+			vm.Link(h.Provider)
 			r = vm
 			return
 		})
@@ -282,6 +242,58 @@ func (r *VM) With(m *model.VM) {
 	r.Concerns = m.Concerns
 	r.addDiskAttachment(m)
 	r.addNICs(m)
+}
+
+//
+// Build self link (URI).
+func (r *VM) Link(p *api.Provider) {
+	r.SelfLink = base.Link(
+		VMRoot,
+		base.Params{
+			base.ProviderParam: string(p.UID),
+			VMParam:            r.ID,
+		})
+	for i := range r.NICs {
+		n := &r.NICs[i]
+		n.Profile.Link(p)
+	}
+	for i := range r.DiskAttachments {
+		d := &r.DiskAttachments[i]
+		d.Disk.Link(p)
+	}
+}
+
+//
+// Expand the resource.
+func (r *VM) Expand(db libmodel.DB) (err error) {
+	for i := range r.NICs {
+		nic := &r.NICs[i]
+		profile := &model.NICProfile{
+			Base: model.Base{ID: nic.Profile.ID},
+		}
+		err = db.Get(profile)
+		if err != nil {
+			return
+		}
+		nic.Profile.With(profile)
+	}
+	for i := range r.DiskAttachments {
+		d := &r.DiskAttachments[i]
+		disk := &model.Disk{
+			Base: model.Base{ID: d.Disk.ID},
+		}
+		err = db.Get(disk)
+		if err != nil {
+			return
+		}
+		d.Disk.With(disk)
+		err = d.Disk.Expand(db)
+		if err != nil {
+			return
+		}
+	}
+
+	return
 }
 
 func (r *VM) addDiskAttachment(m *model.VM) {
