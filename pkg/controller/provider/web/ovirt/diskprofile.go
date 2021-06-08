@@ -63,7 +63,7 @@ func (h DiskProfileHandler) List(ctx *gin.Context) {
 	for _, m := range list {
 		r := &DiskProfile{}
 		r.With(&m)
-		r.SelfLink = h.Link(h.Provider, &m)
+		r.Link(h.Provider)
 		content = append(content, r.Content(h.Detail))
 	}
 
@@ -99,21 +99,10 @@ func (h DiskProfileHandler) Get(ctx *gin.Context) {
 	}
 	r := &DiskProfile{}
 	r.With(m)
-	r.SelfLink = h.Link(h.Provider, m)
+	r.Link(h.Provider)
 	content := r.Content(true)
 
 	ctx.JSON(http.StatusOK, content)
-}
-
-//
-// Build self link (URI).
-func (h DiskProfileHandler) Link(p *api.Provider, m *model.DiskProfile) string {
-	return h.Handler.Link(
-		DiskProfileRoot,
-		base.Params{
-			base.ProviderParam: string(p.UID),
-			DiskProfileParam:   m.ID,
-		})
 }
 
 //
@@ -128,7 +117,7 @@ func (h DiskProfileHandler) watch(ctx *gin.Context) {
 			m := in.(*model.DiskProfile)
 			profile := &DiskProfile{}
 			profile.With(m)
-			profile.SelfLink = h.Link(h.Provider, m)
+			profile.Link(h.Provider)
 			r = profile
 			return
 		})
@@ -155,6 +144,17 @@ func (r *DiskProfile) With(m *model.DiskProfile) {
 	r.Resource.With(&m.Base)
 	r.StorageDomain = m.StorageDomain
 	r.QoS = m.QoS
+}
+
+//
+// Build self link (URI).
+func (r *DiskProfile) Link(p *api.Provider) {
+	r.SelfLink = base.Link(
+		DiskProfileRoot,
+		base.Params{
+			base.ProviderParam: string(p.UID),
+			DiskProfileParam:   r.ID,
+		})
 }
 
 //

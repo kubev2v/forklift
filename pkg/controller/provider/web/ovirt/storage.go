@@ -63,7 +63,7 @@ func (h StorageDomainHandler) List(ctx *gin.Context) {
 	for _, m := range list {
 		r := &StorageDomain{}
 		r.With(&m)
-		r.SelfLink = h.Link(h.Provider, &m)
+		r.Link(h.Provider)
 		content = append(content, r.Content(h.Detail))
 	}
 
@@ -99,21 +99,10 @@ func (h StorageDomainHandler) Get(ctx *gin.Context) {
 	}
 	r := &StorageDomain{}
 	r.With(m)
-	r.SelfLink = h.Link(h.Provider, m)
+	r.Link(h.Provider)
 	content := r.Content(true)
 
 	ctx.JSON(http.StatusOK, content)
-}
-
-//
-// Build self link (URI).
-func (h StorageDomainHandler) Link(p *api.Provider, m *model.StorageDomain) string {
-	return h.Handler.Link(
-		StorageDomainRoot,
-		base.Params{
-			base.ProviderParam: string(p.UID),
-			StorageDomainParam: m.ID,
-		})
 }
 
 //
@@ -128,7 +117,7 @@ func (h StorageDomainHandler) watch(ctx *gin.Context) {
 			m := in.(*model.StorageDomain)
 			ds := &StorageDomain{}
 			ds.With(m)
-			ds.SelfLink = h.Link(h.Provider, m)
+			ds.Link(h.Provider)
 			r = ds
 			return
 		})
@@ -163,6 +152,17 @@ func (r *StorageDomain) With(m *model.StorageDomain) {
 	r.Capacity = m.Available
 	r.Free = m.Available - m.Used
 	r.Storage.Type = m.Storage.Type
+}
+
+//
+// Build self link (URI).
+func (r *StorageDomain) Link(p *api.Provider) {
+	r.SelfLink = base.Link(
+		StorageDomainRoot,
+		base.Params{
+			base.ProviderParam: string(p.UID),
+			StorageDomainParam: r.ID,
+		})
 }
 
 //

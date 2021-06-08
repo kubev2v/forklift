@@ -111,7 +111,7 @@ func (h TreeHandler) Tree(ctx *gin.Context) {
 		}
 		r := DataCenter{}
 		r.With(&dc)
-		r.SelfLink = DataCenterHandler{}.Link(h.Provider, &dc)
+		r.Link(h.Provider)
 		branch.Kind = model.DataCenterKind
 		branch.Object = r
 		content.Children = append(content.Children, branch)
@@ -218,10 +218,9 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 	node := &TreeNode{}
 	switch kind {
 	case model.DataCenterKind:
-		h := DataCenterHandler{}
 		resource := &DataCenter{}
 		resource.With(m.(*model.DataCenter))
-		resource.SelfLink = h.Link(provider, m.(*model.DataCenter))
+		resource.Link(provider)
 		object := resource.Content(r.withDetail(kind))
 		node = &TreeNode{
 			Parent: parent,
@@ -229,10 +228,9 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 			Object: object,
 		}
 	case model.ClusterKind:
-		h := ClusterHandler{}
 		resource := &Cluster{}
 		resource.With(m.(*model.Cluster))
-		resource.SelfLink = h.Link(provider, m.(*model.Cluster))
+		resource.Link(provider)
 		object := resource.Content(r.withDetail(kind))
 		node = &TreeNode{
 			Parent: parent,
@@ -240,10 +238,9 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 			Object: object,
 		}
 	case model.HostKind:
-		h := HostHandler{}
 		resource := &Host{}
 		resource.With(m.(*model.Host))
-		resource.SelfLink = h.Link(provider, m.(*model.Host))
+		resource.Link(provider)
 		object := resource.Content(r.withDetail(kind))
 		node = &TreeNode{
 			Parent: parent,
@@ -251,23 +248,19 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 			Object: object,
 		}
 	case model.VmKind:
-		h := VMHandler{
-			Handler: r.handler,
-		}
 		resource := &VM{}
-		h.Detail = r.withDetail(kind)
-		_ = h.Build(m.(*model.VM), resource)
-		object := resource.Content(h.Detail)
+		resource.With(m.(*model.VM))
+		resource.Link(provider)
+		object := resource.Content(r.withDetail(kind))
 		node = &TreeNode{
 			Parent: parent,
 			Kind:   kind,
 			Object: object,
 		}
 	case model.NetKind:
-		h := NetworkHandler{}
 		resource := &Network{}
 		resource.With(m.(*model.Network))
-		resource.SelfLink = h.Link(provider, m.(*model.Network))
+		resource.Link(provider)
 		object := resource.Content(r.withDetail(kind))
 		node = &TreeNode{
 			Parent: parent,
@@ -275,10 +268,9 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 			Object: object,
 		}
 	case model.StorageKind:
-		h := StorageDomainHandler{}
 		resource := &StorageDomain{}
 		resource.With(m.(*model.StorageDomain))
-		resource.SelfLink = h.Link(provider, m.(*model.StorageDomain))
+		resource.Link(provider)
 		object := resource.Content(r.withDetail(kind))
 		node = &TreeNode{
 			Parent: parent,

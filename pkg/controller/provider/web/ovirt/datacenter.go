@@ -65,7 +65,7 @@ func (h DataCenterHandler) List(ctx *gin.Context) {
 	for _, m := range list {
 		r := &DataCenter{}
 		r.With(&m)
-		r.SelfLink = h.Link(h.Provider, &m)
+		r.Link(h.Provider)
 		content = append(content, r.Content(h.Detail))
 	}
 
@@ -101,21 +101,10 @@ func (h DataCenterHandler) Get(ctx *gin.Context) {
 	}
 	r := &DataCenter{}
 	r.With(m)
-	r.SelfLink = h.Link(h.Provider, m)
+	r.Link(h.Provider)
 	content := r.Content(true)
 
 	ctx.JSON(http.StatusOK, content)
-}
-
-//
-// Build self link (URI).
-func (h DataCenterHandler) Link(p *api.Provider, m *model.DataCenter) string {
-	return h.Handler.Link(
-		DataCenterRoot,
-		base.Params{
-			base.ProviderParam: string(p.UID),
-			DataCenterParam:    m.ID,
-		})
 }
 
 //
@@ -130,7 +119,7 @@ func (h DataCenterHandler) watch(ctx *gin.Context) {
 			m := in.(*model.DataCenter)
 			dc := &DataCenter{}
 			dc.With(m)
-			dc.SelfLink = h.Link(h.Provider, m)
+			dc.Link(h.Provider)
 			r = dc
 			return
 		})
@@ -153,6 +142,17 @@ type DataCenter struct {
 // Build the resource using the model.
 func (r *DataCenter) With(m *model.DataCenter) {
 	r.Resource.With(&m.Base)
+}
+
+//
+// Build self link (URI).
+func (r *DataCenter) Link(p *api.Provider) {
+	r.SelfLink = base.Link(
+		DataCenterRoot,
+		base.Params{
+			base.ProviderParam: string(p.UID),
+			DataCenterParam:    r.ID,
+		})
 }
 
 //
