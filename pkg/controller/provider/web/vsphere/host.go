@@ -83,7 +83,7 @@ func (h HostHandler) List(ctx *gin.Context) {
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
-		r.SelfLink = h.Link(h.Provider, &m)
+		r.Link(h.Provider)
 		content = append(content, r.Content(h.Detail))
 	}
 
@@ -138,21 +138,10 @@ func (h HostHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	r.SelfLink = h.Link(h.Provider, m)
+	r.Link(h.Provider)
 	content := r.Content(true)
 
 	ctx.JSON(http.StatusOK, content)
-}
-
-//
-// Build self link (URI).
-func (h HostHandler) Link(p *api.Provider, m *model.Host) string {
-	return h.Handler.Link(
-		HostRoot,
-		base.Params{
-			base.ProviderParam: string(p.UID),
-			HostParam:          m.ID,
-		})
 }
 
 //
@@ -167,7 +156,7 @@ func (h HostHandler) watch(ctx *gin.Context) {
 			m := in.(*model.Host)
 			host := &Host{}
 			host.With(m)
-			host.SelfLink = h.Link(h.Provider, m)
+			host.Link(h.Provider)
 			host.Path, _ = m.Path(db)
 			r = host
 			return
@@ -265,6 +254,17 @@ func (r *Host) With(m *model.Host) {
 	r.Datastores = m.Datastores
 	r.VMs = m.Vms
 	r.NetworkAdapters = []NetworkAdapter{}
+}
+
+//
+// Build self link (URI).
+func (r *Host) Link(p *api.Provider) {
+	r.SelfLink = base.Link(
+		HostRoot,
+		base.Params{
+			base.ProviderParam: string(p.UID),
+			HostParam:          r.ID,
+		})
 }
 
 //

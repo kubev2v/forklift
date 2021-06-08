@@ -73,7 +73,7 @@ func (h DatastoreHandler) List(ctx *gin.Context) {
 	for _, m := range list {
 		r := &Datastore{}
 		r.With(&m)
-		r.SelfLink = h.Link(h.Provider, &m)
+		r.Link(h.Provider)
 		content = append(content, r.Content(h.Detail))
 	}
 
@@ -118,21 +118,10 @@ func (h DatastoreHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	r.SelfLink = h.Link(h.Provider, m)
+	r.Link(h.Provider)
 	content := r.Content(true)
 
 	ctx.JSON(http.StatusOK, content)
-}
-
-//
-// Build self link (URI).
-func (h DatastoreHandler) Link(p *api.Provider, m *model.Datastore) string {
-	return h.Handler.Link(
-		DatastoreRoot,
-		base.Params{
-			base.ProviderParam: string(p.UID),
-			DatastoreParam:     m.ID,
-		})
 }
 
 //
@@ -147,7 +136,7 @@ func (h DatastoreHandler) watch(ctx *gin.Context) {
 			m := in.(*model.Datastore)
 			ds := &Datastore{}
 			ds.With(m)
-			ds.SelfLink = h.Link(h.Provider, m)
+			ds.Link(h.Provider)
 			ds.Path, _ = m.Path(db)
 			r = ds
 			return
@@ -212,6 +201,17 @@ func (r *Datastore) With(m *model.Datastore) {
 	r.Capacity = m.Capacity
 	r.Free = m.Free
 	r.MaintenanceMode = m.MaintenanceMode
+}
+
+//
+// Build self link (URI).
+func (r *Datastore) Link(p *api.Provider) {
+	r.SelfLink = base.Link(
+		DatastoreRoot,
+		base.Params{
+			base.ProviderParam: string(p.UID),
+			DatastoreParam:     r.ID,
+		})
 }
 
 //

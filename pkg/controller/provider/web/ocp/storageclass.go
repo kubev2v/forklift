@@ -63,7 +63,7 @@ func (h StorageClassHandler) List(ctx *gin.Context) {
 	for _, m := range list {
 		r := &StorageClass{}
 		r.With(&m)
-		r.SelfLink = h.Link(h.Provider, &m)
+		r.Link(h.Provider)
 		content = append(content, r.Content(h.Detail))
 	}
 
@@ -99,21 +99,10 @@ func (h StorageClassHandler) Get(ctx *gin.Context) {
 	}
 	r := &StorageClass{}
 	r.With(m)
-	r.SelfLink = h.Link(h.Provider, m)
+	r.Link(h.Provider)
 	content := r.Content(true)
 
 	ctx.JSON(http.StatusOK, content)
-}
-
-//
-// Build self link (URI).
-func (h StorageClassHandler) Link(p *api.Provider, m *model.StorageClass) string {
-	return h.Handler.Link(
-		StorageClassRoot,
-		base.Params{
-			base.ProviderParam: string(p.UID),
-			StorageClassParam:  m.PK,
-		})
 }
 
 //
@@ -128,7 +117,7 @@ func (h StorageClassHandler) watch(ctx *gin.Context) {
 			m := in.(*model.StorageClass)
 			sc := &StorageClass{}
 			sc.With(m)
-			sc.SelfLink = h.Link(h.Provider, m)
+			sc.Link(h.Provider)
 			r = sc
 			return
 		})
@@ -153,6 +142,17 @@ type StorageClass struct {
 func (r *StorageClass) With(m *model.StorageClass) {
 	r.Resource.With(&m.Base)
 	r.Object = m.Object
+}
+
+//
+// Build self link (URI).
+func (r *StorageClass) Link(p *api.Provider) {
+	r.SelfLink = base.Link(
+		StorageClassRoot,
+		base.Params{
+			base.ProviderParam: string(p.UID),
+			StorageClassParam:  r.UID,
+		})
 }
 
 //

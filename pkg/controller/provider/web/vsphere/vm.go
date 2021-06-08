@@ -74,7 +74,7 @@ func (h VMHandler) List(ctx *gin.Context) {
 	for _, m := range list {
 		r := &VM{}
 		r.With(&m)
-		r.SelfLink = h.Link(h.Provider, &m)
+		r.Link(h.Provider)
 		content = append(content, r.Content(h.Detail))
 	}
 
@@ -119,21 +119,10 @@ func (h VMHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	r.SelfLink = h.Link(h.Provider, m)
+	r.Link(h.Provider)
 	content := r.Content(true)
 
 	ctx.JSON(http.StatusOK, content)
-}
-
-//
-// Build self link (URI).
-func (h VMHandler) Link(p *api.Provider, m *model.VM) string {
-	return h.Handler.Link(
-		VMRoot,
-		base.Params{
-			base.ProviderParam: string(p.UID),
-			VMParam:            m.ID,
-		})
 }
 
 //
@@ -148,7 +137,7 @@ func (h VMHandler) watch(ctx *gin.Context) {
 			m := in.(*model.VM)
 			vm := &VM{}
 			vm.With(m)
-			vm.SelfLink = h.Link(h.Provider, m)
+			vm.Link(h.Provider)
 			vm.Path, _ = m.Path(db)
 			r = vm
 			return
@@ -261,6 +250,17 @@ func (r *VM) With(m *model.VM) {
 	r.Networks = m.Networks
 	r.Disks = m.Disks
 	r.Concerns = m.Concerns
+}
+
+//
+// Build self link (URI).
+func (r *VM) Link(p *api.Provider) {
+	r.SelfLink = base.Link(
+		VMRoot,
+		base.Params{
+			base.ProviderParam: string(p.UID),
+			VMParam:            r.ID,
+		})
 }
 
 //

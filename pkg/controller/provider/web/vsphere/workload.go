@@ -62,18 +62,9 @@ func (h WorkloadHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	tr := Tree{
-		NodeBuilder: &NodeBuilder{
-			provider: h.Provider,
-			detail: map[string]bool{
-				model.DatacenterKind: true,
-				model.ClusterKind:    true,
-				model.HostKind:       true,
-				model.VmKind:         true,
-			},
-		},
-	}
-	root, err := tr.Ancestry(m, &WorkloadNavigator{db: db})
+	r := Workload{}
+	r.With(m)
+	err = r.Expand(db)
 	if err != nil {
 		log.Trace(
 			err,
@@ -82,90 +73,63 @@ func (h WorkloadHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	content := Workload{}
-	content.SelfLink = h.Link(h.Provider, m)
-	content.With(root)
+	r.Link(h.Provider)
+	content := r
 
 	ctx.JSON(http.StatusOK, content)
-}
-
-//
-// Build self link (URI).
-func (h WorkloadHandler) Link(p *api.Provider, m *model.VM) string {
-	return h.Handler.Link(
-		WorkloadRoot,
-		base.Params{
-			base.ProviderParam: string(p.UID),
-			VMParam:            m.ID,
-		})
-}
-
-//
-// Workload navigator.
-type WorkloadNavigator struct {
-	db libmodel.DB
-}
-
-//
-// Next parent.
-func (n *WorkloadNavigator) Next(m model.Model) (r model.Model, err error) {
-	switch m.(type) {
-	case *model.Host:
-		m := &model.Cluster{
-			Base: model.Base{
-				ID: m.(*model.Host).Parent.ID,
-			},
-		}
-		err = n.db.Get(m)
-		if err == nil {
-			r = m
-		}
-	case *model.VM:
-		m := &model.Host{
-			Base: model.Base{
-				ID: m.(*model.VM).Host,
-			},
-		}
-		err = n.db.Get(m)
-		if err == nil {
-			r = m
-		}
-	}
-
-	return
 }
 
 //
 // Workload
 type Workload struct {
 	SelfLink string `json:"selfLink"`
-	*VM
+	VM
 	Host struct {
-		*Host
+		Host
 		Cluster struct {
-			*Cluster
+			Cluster
 			Datacenter *Datacenter `json:"datacenter"`
 		} `json:"cluster"`
 	} `json:"host"`
 }
 
-func (r *Workload) With(root *TreeNode) {
-	node := root
-	for {
-		switch node.Kind {
-		case model.DatacenterKind:
-			r.Host.Cluster.Datacenter = node.Object.(*Datacenter)
-		case model.ClusterKind:
-			r.Host.Cluster.Cluster = node.Object.(*Cluster)
-		case model.HostKind:
-			r.Host.Host = node.Object.(*Host)
-		case model.VmKind:
-			r.VM = node.Object.(*VM)
-		}
-		if len(node.Children) > 0 {
-			node = node.Children[0]
-		} else {
-			break
-		}
+func (r *Workload) With(m *model.VM) {
+	r.VM.With(m)
+	r.Host.ID = m.Host
+}
+
+//
+// Build self link (URI).
+func (r *Workload) Link(p *api.Provider) {
+	r.SelfLink = base.Link(
+		WorkloadRoot,
+		base.Params{
+			base.ProviderParam: string(p.UID),
+			VMParam:            r.ID,
+		})
+	r.Host.Link(p)
+	r.Host.Cluster.Link(p)
+}
+
+//
+// Expand the resource.
+func (r *Workload) Expand(db libmodel.DB) (err error) {
+	host := &model.Host{
+		Base: model.Base{ID: r.Host.ID},
 	}
+	err = db.Get(host)
+	if err != nil {
+		return
+	}
+	r.Host.Host.With(host)
+	cluster := &model.Cluster{
+		Base: model.Base{ID: host.Cluster},
+	}
+	err = db.Get(cluster)
+	if err != nil {
+		return
+	}
+	r.Host.Cluster.Cluster.With(cluster)
+
+	return
 }

@@ -65,7 +65,7 @@ func (h ClusterHandler) List(ctx *gin.Context) {
 	for _, m := range list {
 		r := &Cluster{}
 		r.With(&m)
-		r.SelfLink = h.Link(h.Provider, &m)
+		r.Link(h.Provider)
 		content = append(content, r.Content(h.Detail))
 	}
 
@@ -109,21 +109,10 @@ func (h ClusterHandler) Get(ctx *gin.Context) {
 			ctx.Request.URL)
 		return
 	}
-	r.SelfLink = h.Link(h.Provider, m)
+	r.Link(h.Provider)
 	content := r.Content(true)
 
 	ctx.JSON(http.StatusOK, content)
-}
-
-//
-// Build self link (URI).
-func (h ClusterHandler) Link(p *api.Provider, m *model.Cluster) string {
-	return h.Handler.Link(
-		ClusterRoot,
-		base.Params{
-			base.ProviderParam: string(p.UID),
-			ClusterParam:       m.ID,
-		})
 }
 
 //
@@ -138,7 +127,7 @@ func (h ClusterHandler) watch(ctx *gin.Context) {
 			m := in.(*model.Cluster)
 			cluster := &Cluster{}
 			cluster.With(m)
-			cluster.SelfLink = h.Link(h.Provider, m)
+			cluster.Link(h.Provider)
 			cluster.Path, _ = m.Path(db)
 			r = cluster
 			return
@@ -180,6 +169,17 @@ func (r *Cluster) With(m *model.Cluster) {
 	r.Hosts = m.Hosts
 	r.DasVms = m.DasVms
 	r.DrsVms = m.DasVms
+}
+
+//
+// Build self link (URI).
+func (r *Cluster) Link(p *api.Provider) {
+	r.SelfLink = base.Link(
+		ClusterRoot,
+		base.Params{
+			base.ProviderParam: string(p.UID),
+			ClusterParam:       r.ID,
+		})
 }
 
 //

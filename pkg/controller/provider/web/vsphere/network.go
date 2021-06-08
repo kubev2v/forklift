@@ -73,7 +73,7 @@ func (h NetworkHandler) List(ctx *gin.Context) {
 	for _, m := range list {
 		r := &Network{}
 		r.With(&m)
-		r.SelfLink = h.Link(h.Provider, &m)
+		r.Link(h.Provider)
 		content = append(content, r.Content(h.Detail))
 	}
 
@@ -118,21 +118,10 @@ func (h NetworkHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	r.SelfLink = h.Link(h.Provider, m)
+	r.Link(h.Provider)
 	content := r.Content(true)
 
 	ctx.JSON(http.StatusOK, content)
-}
-
-//
-// Build self link (URI).
-func (h NetworkHandler) Link(p *api.Provider, m *model.Network) string {
-	return h.Handler.Link(
-		NetworkRoot,
-		base.Params{
-			base.ProviderParam: string(p.UID),
-			NetworkParam:       m.ID,
-		})
 }
 
 //
@@ -147,7 +136,7 @@ func (h NetworkHandler) watch(ctx *gin.Context) {
 			m := in.(*model.Network)
 			network := &Network{}
 			network.With(m)
-			network.SelfLink = h.Link(h.Provider, m)
+			network.Link(h.Provider)
 			network.Path, _ = m.Path(db)
 			r = network
 			return
@@ -217,6 +206,17 @@ func (r *Network) With(m *model.Network) {
 	case model.NetDvSwitch:
 		r.Host = m.Host
 	}
+}
+
+//
+// Build self link (URI).
+func (r *Network) Link(p *api.Provider) {
+	r.SelfLink = base.Link(
+		NetworkRoot,
+		base.Params{
+			base.ProviderParam: string(p.UID),
+			NetworkParam:       r.ID,
+		})
 }
 
 //
