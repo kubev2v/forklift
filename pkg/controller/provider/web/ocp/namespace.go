@@ -62,7 +62,7 @@ func (h NamespaceHandler) List(ctx *gin.Context) {
 	for _, m := range list {
 		r := &Namespace{}
 		r.With(&m)
-		r.SelfLink = h.Link(h.Provider, &m)
+		r.Link(h.Provider)
 		content = append(content, r.Content(h.Detail))
 	}
 
@@ -98,21 +98,10 @@ func (h NamespaceHandler) Get(ctx *gin.Context) {
 	}
 	r := &Namespace{}
 	r.With(m)
-	r.SelfLink = h.Link(h.Provider, m)
+	r.Link(h.Provider)
 	content := r.Content(true)
 
 	ctx.JSON(http.StatusOK, content)
-}
-
-//
-// Build self link (URI).
-func (h NamespaceHandler) Link(p *api.Provider, m *model.Namespace) string {
-	return h.Handler.Link(
-		NamespaceRoot,
-		base.Params{
-			base.ProviderParam: string(p.UID),
-			NsParam:            m.PK,
-		})
 }
 
 //
@@ -127,7 +116,7 @@ func (h NamespaceHandler) watch(ctx *gin.Context) {
 			m := in.(*model.Namespace)
 			vm := &Namespace{}
 			vm.With(m)
-			vm.SelfLink = h.Link(h.Provider, m)
+			vm.Link(h.Provider)
 			r = vm
 			return
 		})
@@ -152,6 +141,17 @@ type Namespace struct {
 func (r *Namespace) With(m *model.Namespace) {
 	r.Resource.With(&m.Base)
 	r.Object = m.Object
+}
+
+//
+// Build self link (URI).
+func (r *Namespace) Link(p *api.Provider) {
+	r.SelfLink = base.Link(
+		NamespaceRoot,
+		base.Params{
+			base.ProviderParam: string(p.UID),
+			NsParam:            r.UID,
+		})
 }
 
 //

@@ -63,7 +63,7 @@ func (h VMHandler) List(ctx *gin.Context) {
 	for _, m := range list {
 		r := &VM{}
 		r.With(&m)
-		r.SelfLink = h.Link(h.Provider, &m)
+		r.Link(h.Provider)
 		content = append(content, r.Content(h.Detail))
 	}
 
@@ -99,21 +99,10 @@ func (h VMHandler) Get(ctx *gin.Context) {
 	}
 	r := &VM{}
 	r.With(m)
-	r.SelfLink = h.Link(h.Provider, m)
+	r.Link(h.Provider)
 	content := r.Content(true)
 
 	ctx.JSON(http.StatusOK, content)
-}
-
-//
-// Build self link (URI).
-func (h VMHandler) Link(p *api.Provider, m *model.VM) string {
-	return h.Handler.Link(
-		VMRoot,
-		base.Params{
-			base.ProviderParam: string(p.UID),
-			VmParam:            m.PK,
-		})
 }
 
 //
@@ -128,7 +117,7 @@ func (h VMHandler) watch(ctx *gin.Context) {
 			m := in.(*model.VM)
 			vm := &VM{}
 			vm.With(m)
-			vm.SelfLink = h.Link(h.Provider, m)
+			vm.Link(h.Provider)
 			r = vm
 			return
 		})
@@ -153,6 +142,17 @@ type VM struct {
 func (r *VM) With(m *model.VM) {
 	r.Resource.With(&m.Base)
 	r.Object = m.Object
+}
+
+//
+// Build self link (URI).
+func (r *VM) Link(p *api.Provider) {
+	r.SelfLink = base.Link(
+		VMRoot,
+		base.Params{
+			base.ProviderParam: string(p.UID),
+			VmParam:            r.UID,
+		})
 }
 
 //
