@@ -113,6 +113,8 @@ func (h *Handler) setProvider(ctx *gin.Context) (status int) {
 		ctx.Header(ProviderHeader, uid)
 		h.Provider = h.Reconciler.Owner().(*api.Provider)
 		status = h.EnsureParity(h.Reconciler, time.Second*30)
+	} else {
+		status = http.StatusOK
 	}
 
 	return

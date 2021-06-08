@@ -65,7 +65,7 @@ func (h FolderHandler) List(ctx *gin.Context) {
 	for _, m := range list {
 		r := &Folder{}
 		r.With(&m)
-		r.SelfLink = h.Link(h.Provider, &m)
+		r.Link(h.Provider)
 		content = append(content, r.Content(h.Detail))
 	}
 
@@ -110,21 +110,10 @@ func (h FolderHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	r.SelfLink = h.Link(h.Provider, m)
+	r.Link(h.Provider)
 	content := r.Content(true)
 
 	ctx.JSON(http.StatusOK, content)
-}
-
-//
-// Build self link (URI).
-func (h FolderHandler) Link(p *api.Provider, m *model.Folder) string {
-	return h.Handler.Link(
-		FolderRoot,
-		base.Params{
-			base.ProviderParam: string(p.UID),
-			FolderParam:        m.ID,
-		})
 }
 
 //
@@ -139,7 +128,7 @@ func (h FolderHandler) watch(ctx *gin.Context) {
 			m := in.(*model.Folder)
 			folder := &Folder{}
 			folder.With(m)
-			folder.SelfLink = h.Link(h.Provider, m)
+			folder.Link(h.Provider)
 			folder.Path, _ = m.Path(db)
 			r = folder
 			return
@@ -169,6 +158,17 @@ func (r *Folder) With(m *model.Folder) {
 	r.Folder = m.Folder
 	r.Datacenter = m.Datacenter
 	r.Children = m.Children
+}
+
+//
+// Build self link (URI).
+func (r *Folder) Link(p *api.Provider) {
+	r.SelfLink = base.Link(
+		FolderRoot,
+		base.Params{
+			base.ProviderParam: string(p.UID),
+			FolderParam:        r.ID,
+		})
 }
 
 //
