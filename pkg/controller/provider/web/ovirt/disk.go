@@ -164,6 +164,7 @@ func (h DiskHandler) watch(ctx *gin.Context) {
 type Disk struct {
 	Resource
 	Shared  bool        `json:"shared"`
+	StorageDomain string `json:"storageDomain"`
 	Profile DiskProfile `json:"profile"`
 }
 
@@ -172,6 +173,7 @@ type Disk struct {
 func (r *Disk) With(m *model.Disk) {
 	r.Resource.With(&m.Base)
 	r.Shared = m.Shared
+	r.StorageDomain = m.StorageDomain
 	r.Profile = DiskProfile{
 		Resource: Resource{
 			ID: m.Profile,
