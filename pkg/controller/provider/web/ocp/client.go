@@ -3,7 +3,6 @@ package ocp
 import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"path"
 	"strings"
@@ -24,40 +23,33 @@ type Resolver struct {
 //
 // Resolve the URL path.
 func (r *Resolver) Path(object interface{}, id string) (path string, err error) {
+	provider := r.Provider
 	switch object.(type) {
 	case *Provider:
-		h := ProviderHandler{}
-		path = h.Link(&model.Provider{
-			Base: model.Base{UID: id},
-		})
+		r := Provider{}
+		r.UID = id
+		r.Link()
+		path = r.SelfLink
 	case *Namespace:
-		h := NamespaceHandler{}
-		path = h.Link(
-			r.Provider,
-			&model.Namespace{
-				Base: model.Base{PK: id},
-			})
+		r := Namespace{}
+		r.UID = id
+		r.Link(provider)
+		path = r.SelfLink
 	case *StorageClass:
-		h := StorageClassHandler{}
-		path = h.Link(
-			r.Provider,
-			&model.StorageClass{
-				Base: model.Base{PK: id},
-			})
+		r := StorageClass{}
+		r.UID = id
+		r.Link(provider)
+		path = r.SelfLink
 	case *NetworkAttachmentDefinition:
-		h := NadHandler{}
-		path = h.Link(
-			r.Provider,
-			&model.NetworkAttachmentDefinition{
-				Base: model.Base{PK: id},
-			})
+		r := NetworkAttachmentDefinition{}
+		r.UID = id
+		r.Link(provider)
+		path = r.SelfLink
 	case *VM:
-		h := VMHandler{}
-		path = h.Link(
-			r.Provider,
-			&model.VM{
-				Base: model.Base{PK: id},
-			})
+		r := VM{}
+		r.UID = id
+		r.Link(provider)
+		path = r.SelfLink
 	default:
 		err = liberr.Wrap(
 			ResourceNotResolvedError{

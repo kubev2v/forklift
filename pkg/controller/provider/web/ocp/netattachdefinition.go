@@ -63,7 +63,7 @@ func (h NadHandler) List(ctx *gin.Context) {
 	for _, m := range list {
 		r := &NetworkAttachmentDefinition{}
 		r.With(&m)
-		r.SelfLink = h.Link(h.Provider, &m)
+		r.Link(h.Provider)
 		content = append(content, r.Content(h.Detail))
 	}
 
@@ -99,21 +99,10 @@ func (h NadHandler) Get(ctx *gin.Context) {
 	}
 	r := &NetworkAttachmentDefinition{}
 	r.With(m)
-	r.SelfLink = h.Link(h.Provider, m)
+	r.Link(h.Provider)
 	content := r.Content(true)
 
 	ctx.JSON(http.StatusOK, content)
-}
-
-//
-// Build self link (URI).
-func (h NadHandler) Link(p *api.Provider, m *model.NetworkAttachmentDefinition) string {
-	return h.Handler.Link(
-		NadRoot,
-		base.Params{
-			base.ProviderParam: string(p.UID),
-			NadParam:           m.PK,
-		})
 }
 
 //
@@ -128,7 +117,7 @@ func (h NadHandler) watch(ctx *gin.Context) {
 			m := in.(*model.NetworkAttachmentDefinition)
 			nad := &NetworkAttachmentDefinition{}
 			nad.With(m)
-			nad.SelfLink = h.Link(h.Provider, m)
+			nad.Link(h.Provider)
 			r = nad
 			return
 		})
@@ -153,6 +142,17 @@ type NetworkAttachmentDefinition struct {
 func (r *NetworkAttachmentDefinition) With(m *model.NetworkAttachmentDefinition) {
 	r.Resource.With(&m.Base)
 	r.Object = m.Object
+}
+
+//
+// Build self link (URI).
+func (r *NetworkAttachmentDefinition) Link(p *api.Provider) {
+	r.SelfLink = base.Link(
+		NadRoot,
+		base.Params{
+			base.ProviderParam: string(p.UID),
+			NadParam:           r.UID,
+		})
 }
 
 //
