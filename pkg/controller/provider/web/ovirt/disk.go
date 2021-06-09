@@ -163,15 +163,17 @@ func (h DiskHandler) watch(ctx *gin.Context) {
 // REST Resource.
 type Disk struct {
 	Resource
-	Shared  bool        `json:"shared"`
-	StorageDomain string `json:"storageDomain"`
-	Profile DiskProfile `json:"profile"`
+	Shared          bool        `json:"shared"`
+	StorageDomain   string      `json:"storageDomain"`
+	Profile         DiskProfile `json:"profile"`
+	ProvisionedSize int64       `json:"provisionedSize"`
 }
 
 //
 // Build the resource using the model.
 func (r *Disk) With(m *model.Disk) {
 	r.Resource.With(&m.Base)
+	r.ProvisionedSize = m.ProvisionedSize
 	r.Shared = m.Shared
 	r.StorageDomain = m.StorageDomain
 	r.Profile = DiskProfile{
