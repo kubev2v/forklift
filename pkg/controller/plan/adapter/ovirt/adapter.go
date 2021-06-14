@@ -13,7 +13,12 @@ type Adapter struct{}
 //
 // Constructs a oVirt builder.
 func (r *Adapter) Builder(ctx *plancontext.Context) (builder base.Builder, err error) {
-	builder = &Builder{Context: ctx}
+	b := &Builder{Context: ctx}
+	err = b.Load()
+	if err != nil {
+		return
+	}
+	builder = b
 	return
 }
 
