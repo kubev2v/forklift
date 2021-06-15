@@ -11,22 +11,16 @@ import (
 
 //
 // Event codes.
-// NICProfileAdded   = 1122
-// NICProfileUpdated = 1124
-// NICProfileDeleted = 1126
 const (
-	DataCenterAdded   = 950
-	DataCenterUpdated = 952
-	DataCenterDeleted = 954
-	ClusterAdded      = 809
-	ClusterUpdated    = 811
-	ClusterDeleted    = 813
-	HostAdded         = 42
-	HostUpdated       = 43
-	HostDeleted       = 44
-	VmAdded           = 34
-	VmUpdated         = 35
-	VmDeleted         = 113
+	USER_ADD_CLUSTER    = 809
+	USER_UPDATE_CLUSTER = 811
+	USER_REMOVE_CLUSTER = 813
+	USER_ADD_HOST       = 42
+	USER_UPDATE_HOST    = 43
+	USER_REMOVE_HOST    = 44
+	USER_ADD_VM         = 34
+	USER_UPDATE_VM      = 35
+	USER_REMOVE_VM      = 113
 )
 
 //
@@ -103,60 +97,13 @@ func (r *DataCenterAdapter) List(client *Client) (itr fb.Iterator, err error) {
 //
 // Handled events.
 func (r *DataCenterAdapter) Event() []int {
-	return []int{
-		DataCenterAdded,
-		DataCenterUpdated,
-		DataCenterDeleted,
-	}
+	return []int{}
 }
 
 //
 // Apply events to the inventory model.
 func (r *DataCenterAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err error) {
 	switch event.code() {
-	case DataCenterAdded:
-		object := &DataCenter{}
-		err = client.get(event.DataCenter.Ref, object)
-		if err != nil {
-			break
-		}
-		m := &model.DataCenter{
-			Base: model.Base{ID: object.ID},
-		}
-		m.Created()
-		object.ApplyTo(m)
-		err = tx.Insert(m)
-		if err != nil {
-			break
-		}
-	case DataCenterUpdated:
-		object := &DataCenter{}
-		err = client.get(event.DataCenter.Ref, object)
-		if err != nil {
-			break
-		}
-		m := &model.DataCenter{
-			Base: model.Base{ID: object.ID},
-		}
-		m.Updated()
-		object.ApplyTo(m)
-		err = tx.Update(m)
-		if err != nil {
-			break
-		}
-	case DataCenterDeleted:
-		object := &DataCenter{}
-		err = client.get(event.DataCenter.Ref, object)
-		if err != nil {
-			break
-		}
-		m := &model.DataCenter{
-			Base: model.Base{ID: object.ID},
-		}
-		err = tx.Delete(m)
-		if err != nil {
-			break
-		}
 	default:
 		err = liberr.New("unknown event", "event", event)
 	}
@@ -376,9 +323,9 @@ type ClusterAdapter struct {
 // Handled events.
 func (r *ClusterAdapter) Event() []int {
 	return []int{
-		ClusterAdded,
-		ClusterUpdated,
-		ClusterDeleted,
+		USER_ADD_CLUSTER,
+		USER_UPDATE_CLUSTER,
+		USER_REMOVE_CLUSTER,
 	}
 }
 
@@ -412,7 +359,7 @@ func (r *ClusterAdapter) List(client *Client) (itr fb.Iterator, err error) {
 // Apply and event tot the inventory model.
 func (r *ClusterAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err error) {
 	switch event.code() {
-	case ClusterAdded:
+	case USER_ADD_CLUSTER:
 		object := &Cluster{}
 		err = client.get(event.Cluster.Ref, object)
 		if err != nil {
@@ -427,7 +374,7 @@ func (r *ClusterAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (e
 		if err != nil {
 			break
 		}
-	case ClusterUpdated:
+	case USER_UPDATE_CLUSTER:
 		object := &Cluster{}
 		err = client.get(event.Cluster.Ref, object)
 		if err != nil {
@@ -442,7 +389,7 @@ func (r *ClusterAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (e
 		if err != nil {
 			break
 		}
-	case ClusterDeleted:
+	case USER_REMOVE_CLUSTER:
 		m := &model.Cluster{
 			Base: model.Base{ID: event.Cluster.Ref},
 		}
@@ -466,9 +413,9 @@ type HostAdapter struct {
 // Handled events.
 func (r *HostAdapter) Event() []int {
 	return []int{
-		HostAdded,
-		HostUpdated,
-		HostDeleted,
+		USER_ADD_HOST,
+		USER_UPDATE_HOST,
+		USER_REMOVE_HOST,
 	}
 }
 
@@ -502,7 +449,7 @@ func (r *HostAdapter) List(client *Client) (itr fb.Iterator, err error) {
 // Apply and event tot the inventory model.
 func (r *HostAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err error) {
 	switch event.code() {
-	case HostAdded:
+	case USER_ADD_HOST:
 		object := &Host{}
 		err = client.get(event.Host.Ref, object, r.follow())
 		if err != nil {
@@ -517,7 +464,7 @@ func (r *HostAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err 
 		if err != nil {
 			break
 		}
-	case HostUpdated:
+	case USER_UPDATE_HOST:
 		object := &Host{}
 		err = client.get(event.Host.Ref, object, r.follow())
 		if err != nil {
@@ -532,7 +479,7 @@ func (r *HostAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err 
 		if err != nil {
 			break
 		}
-	case HostDeleted:
+	case USER_REMOVE_HOST:
 		m := &model.Host{
 			Base: model.Base{ID: event.Host.Ref},
 		}
@@ -568,9 +515,9 @@ type VMAdapter struct {
 // Handled events.
 func (r *VMAdapter) Event() []int {
 	return []int{
-		VmAdded,
-		VmUpdated,
-		VmDeleted,
+		USER_ADD_VM,
+		USER_UPDATE_VM,
+		USER_REMOVE_VM,
 	}
 }
 
@@ -604,7 +551,7 @@ func (r *VMAdapter) List(client *Client) (itr fb.Iterator, err error) {
 // Apply and event tot the inventory model.
 func (r *VMAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err error) {
 	switch event.code() {
-	case VmAdded:
+	case USER_ADD_VM:
 		object := &VM{}
 		err = client.get(event.VM.Ref, object, r.follow())
 		if err != nil {
@@ -619,7 +566,7 @@ func (r *VMAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err er
 		if err != nil {
 			break
 		}
-	case VmUpdated:
+	case USER_UPDATE_VM:
 		object := &VM{}
 		err = client.get(event.VM.Ref, object, r.follow())
 		if err != nil {
@@ -634,7 +581,7 @@ func (r *VMAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err er
 		if err != nil {
 			break
 		}
-	case VmDeleted:
+	case USER_REMOVE_VM:
 		m := &model.VM{
 			Base: model.Base{ID: event.VM.Ref},
 		}
