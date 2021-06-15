@@ -38,6 +38,8 @@ type Reconciler struct {
 	log logr.Logger
 	// has parity.
 	parity bool
+	// load() completed.
+	loaded bool
 	// REST client.
 	client *Client
 	// cancel function.
@@ -126,10 +128,13 @@ func (r *Reconciler) Start() error {
 			case <-ctx.Done():
 				break try
 			default:
-				if r.parity {
+				if r.loaded {
 					err := r.refresh()
 					if err != nil {
 						r.log.Error(err, "Refresh failed.")
+						r.parity = false
+					} else {
+						r.parity = true
 					}
 				} else {
 					err := r.drainEvent()
@@ -236,6 +241,7 @@ func (r *Reconciler) load() (err error) {
 	err = tx.Commit()
 	if err == nil {
 		r.parity = true
+		r.loaded = true
 	} else {
 		return
 	}
