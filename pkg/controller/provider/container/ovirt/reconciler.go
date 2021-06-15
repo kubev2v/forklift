@@ -9,6 +9,7 @@ import (
 	libweb "github.com/konveyor/controller/pkg/inventory/web"
 	"github.com/konveyor/controller/pkg/logging"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	liburl "net/url"
@@ -121,7 +122,13 @@ func (r *Reconciler) Test() (err error) {
 func (r *Reconciler) Start() error {
 	ctx := context.Background()
 	ctx, r.cancel = context.WithCancel(ctx)
+	watchList := []*libmodel.Watch{}
 	start := func() {
+		defer func() {
+			for _, w := range watchList {
+				w.End()
+			}
+		}()
 	try:
 		for {
 			select {
@@ -142,7 +149,9 @@ func (r *Reconciler) Start() error {
 						r.log.Error(err, "Drain (event) failed.")
 					}
 					err = r.load()
-					if err != nil {
+					if err == nil {
+						watchList = r.watch()
+					} else {
 						r.log.Error(err, "Load failed.")
 					}
 				}
@@ -250,6 +259,56 @@ func (r *Reconciler) load() (err error) {
 		"Initial Parity.",
 		"duration",
 		time.Since(mark))
+
+	return
+}
+
+//
+// Add model watches.
+func (r *Reconciler) watch() (list []*libmodel.Watch) {
+	// Cluster
+	w, err := r.db.Watch(
+		&model.Cluster{},
+		&ClusterEventHandler{
+			DB:  r.db,
+			log: r.log,
+		})
+	if err != nil {
+		r.log.Error(
+			err,
+			"create (cluster) watch failed.")
+	} else {
+		list = append(list, w)
+	}
+	// Host
+	w, err = r.db.Watch(
+		&model.Host{},
+		&HostEventHandler{
+			DB:  r.db,
+			log: r.log,
+		})
+	if err != nil {
+		r.log.Error(
+			err,
+			"create (host) watch failed.")
+	} else {
+		list = append(list, w)
+	}
+	// VM
+	w, err = r.db.Watch(
+		&model.VM{},
+		&VMEventHandler{
+			Provider: r.provider,
+			DB:       r.db,
+			log:      r.log,
+		})
+	if err != nil {
+		r.log.Error(
+			err,
+			"create (VM) watch failed.")
+	} else {
+		list = append(list, w)
+	}
 
 	return
 }
