@@ -84,13 +84,9 @@ func (h WorkloadHandler) Get(ctx *gin.Context) {
 type Workload struct {
 	SelfLink string `json:"selfLink"`
 	VM
-	Host struct {
-		Host
-		Cluster struct {
-			Cluster
-			DataCenter DataCenter `json:"dataCenter"`
-		} `json:"cluster"`
-	} `json:"host"`
+	Host       *Host      `json:"host"`
+	Cluster    Cluster    `json:"cluster"`
+	DataCenter DataCenter `json:"dataCenter"`
 }
 
 //
@@ -102,9 +98,11 @@ func (r *Workload) Link(p *api.Provider) {
 			base.ProviderParam: string(p.UID),
 			VMParam:            r.ID,
 		})
-	r.Host.Host.Link(p)
-	r.Host.Cluster.Link(p)
-	r.Host.Cluster.DataCenter.Link(p)
+	r.Cluster.Link(p)
+	r.DataCenter.Link(p)
+	if r.Host != nil {
+		r.Host.Link(p)
+	}
 }
 
 //
@@ -116,26 +114,26 @@ func (r *Workload) Expand(db libmodel.DB) (err error) {
 		return err
 	}
 	// Host
-	if r.VM.Host == "" {
-		return
+	if r.VM.Host != "" {
+		r.Host = &Host{}
+		host := &model.Host{
+			Base: model.Base{ID: r.VM.Host},
+		}
+		err = db.Get(host)
+		if err != nil {
+			return err
+		}
+		r.Host.With(host)
 	}
-	host := &model.Host{
-		Base: model.Base{ID: r.VM.Host},
-	}
-	err = db.Get(host)
-	if err != nil {
-		return err
-	}
-	r.Host.Host.With(host)
 	// Cluster.
 	cluster := &model.Cluster{
-		Base: model.Base{ID: host.Cluster},
+		Base: model.Base{ID: r.VM.Cluster},
 	}
 	err = db.Get(cluster)
 	if err != nil {
 		return err
 	}
-	r.Host.Cluster.With(cluster)
+	r.Cluster.With(cluster)
 	// DataCenter.
 	dataCenter := &model.DataCenter{
 		Base: model.Base{ID: cluster.DataCenter},
@@ -144,7 +142,7 @@ func (r *Workload) Expand(db libmodel.DB) (err error) {
 	if err != nil {
 		return err
 	}
-	r.Host.Cluster.DataCenter.With(dataCenter)
+	r.DataCenter.With(dataCenter)
 
 	return
 }

@@ -12,8 +12,8 @@ import (
 //
 // Routes.
 const (
-	TreeRoot   = ProviderRoot + "/tree"
-	TreeVmRoot = TreeRoot + "/host"
+	TreeRoot        = ProviderRoot + "/tree"
+	TreeClusterRoot = TreeRoot + "/cluster"
 )
 
 //
@@ -32,7 +32,7 @@ type TreeHandler struct {
 //
 // Add routes to the `gin` router.
 func (h *TreeHandler) AddRoutes(e *gin.Engine) {
-	e.GET(TreeVmRoot, h.Tree)
+	e.GET(TreeClusterRoot, h.Tree)
 }
 
 //
@@ -142,20 +142,21 @@ func (n *BranchNavigator) Next(p libmodel.Model) (r []model.Model, err error) {
 			err = nErr
 		}
 	case *model.Cluster:
-		list, nErr := n.listHost(p.(*model.Cluster))
+		m := p.(*model.Cluster)
+		hostList, nErr := n.listHost(m)
 		if nErr == nil {
-			for i := range list {
-				m := &list[i]
+			for i := range hostList {
+				m := &hostList[i]
 				r = append(r, m)
 			}
 		} else {
 			err = nErr
+			return
 		}
-	case *model.Host:
-		list, nErr := n.listVM(p.(*model.Host))
+		vmList, nErr := n.listVM(m)
 		if nErr == nil {
-			for i := range list {
-				m := &list[i]
+			for i := range vmList {
+				m := &vmList[i]
 				r = append(r, m)
 			}
 		} else {
@@ -186,7 +187,7 @@ func (n *BranchNavigator) listHost(p *model.Cluster) (list []model.Host, err err
 	return
 }
 
-func (n *BranchNavigator) listVM(p *model.Host) (list []model.VM, err error) {
+func (n *BranchNavigator) listVM(p *model.Cluster) (list []model.VM, err error) {
 	detail := 0
 	if n.detail {
 		detail = 1
@@ -195,7 +196,7 @@ func (n *BranchNavigator) listVM(p *model.Host) (list []model.VM, err error) {
 	err = n.db.List(
 		&list,
 		model.ListOptions{
-			Predicate: libmodel.Eq("Host", p.ID),
+			Predicate: libmodel.Eq("Cluster", p.ID),
 			Detail:    detail,
 		})
 	return
