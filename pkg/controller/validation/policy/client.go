@@ -83,7 +83,10 @@ func (r *Client) Version() (version int, err error) {
 
 //
 // Validate the VM.
-func (r *Client) Validate(workload interface{}) (version int, concerns []model.Concern, err error) {
+func (r *Client) Validate(
+	path string,
+	workload interface{}) (version int, concerns []model.Concern, err error) {
+	//
 	if !r.Enabled() {
 		return
 	}
@@ -98,7 +101,6 @@ func (r *Client) Validate(workload interface{}) (version int, concerns []model.C
 			Errors   []string        `json:"errors"`
 		}
 	}{}
-	path := "/v1/data/io/konveyor/forklift/vmware/validate"
 	err = r.post(path, in, out)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -216,6 +218,8 @@ func (c *Client) buildTransport() (err error) {
 //
 // Policy agent task.
 type Task struct {
+	// Path (endpoint).
+	Path string
 	// VM reference.
 	Ref refapi.Ref
 	// Revision number of the VM being validated.
@@ -324,7 +328,7 @@ func (r *Worker) run() {
 			task.started = time.Now()
 			workload, err := task.Workload(task.Ref.ID)
 			if err == nil {
-				task.Version, task.Concerns, task.Error = r.client.Validate(workload)
+				task.Version, task.Concerns, task.Error = r.client.Validate(task.Path, workload)
 				task.completed = time.Now()
 			} else {
 				task.Error = err

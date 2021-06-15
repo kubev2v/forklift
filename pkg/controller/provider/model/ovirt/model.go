@@ -145,6 +145,7 @@ type VM struct {
 	Cluster                     string           `sql:"d0,index(cluster)"`
 	Host                        string           `sql:"d0,index(host)"`
 	RevisionValidated           int64            `sql:"d0,index(revisionValidated)"`
+	PolicyVersion               int              `sql:"d0,index(policyVersion)"`
 	GuestName                   string           `sql:""`
 	CpuSockets                  int16            `sql:""`
 	CpuCores                    int16            `sql:""`
