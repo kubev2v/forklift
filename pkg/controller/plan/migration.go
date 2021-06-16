@@ -673,6 +673,9 @@ func (r *Migration) updatePipeline(vm *plan.VMStatus, imp *VmImport) {
 		case DiskTransfer:
 			var name string
 			var task *plan.Task
+			var tasksBlocked int
+			var tasksCompleted int
+			var tasksRunning int
 		nextDv:
 			for _, dv := range imp.DataVolumes {
 				name = r.builder.ResolveDataVolumeIdentifier(dv.DataVolume)
@@ -686,6 +689,7 @@ func (r *Migration) updatePipeline(vm *plan.VMStatus, imp *VmImport) {
 				if cnd != nil && cnd.Status == False {
 					task.Phase = Blocked
 					task.Reason = cnd.Reason
+					tasksBlocked++
 					continue nextDv
 				}
 				cnd = conditions.FindCondition("Running")
@@ -695,13 +699,22 @@ func (r *Migration) updatePipeline(vm *plan.VMStatus, imp *VmImport) {
 				task.MarkStarted()
 				task.Phase = Running
 				task.Reason = cnd.Reason
+				tasksRunning++
 				pct := dv.PercentComplete()
 				completed := pct * float64(task.Progress.Total)
 				task.Progress.Completed = int64(completed)
 				if conditions.HasCondition("Ready") {
 					task.Progress.Completed = task.Progress.Total
 					task.MarkCompleted()
+					tasksCompleted++
 				}
+			}
+			if tasksCompleted == len(step.Tasks) {
+				step.Phase = Completed
+			} else if tasksBlocked > 0 {
+				step.Phase = Blocked
+			} else if tasksRunning > 0 {
+				step.Phase = Running
 			}
 		case ImageConversion:
 			conditions := imp.Conditions()
@@ -724,6 +737,8 @@ func (r *Migration) updatePipeline(vm *plan.VMStatus, imp *VmImport) {
 				if cnd.Status != True {
 					step.AddError(cnd.Message)
 					step.Phase = cnd.Reason
+				} else {
+					step.Phase = Completed
 				}
 			}
 		}
