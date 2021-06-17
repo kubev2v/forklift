@@ -27,6 +27,7 @@ const (
 	IpNotValid              = "IpNotValid"
 	ConnectionTestSucceeded = "ConnectionTestSucceeded"
 	ConnectionTestFailed    = "ConnectionTestFailed"
+	Unavailable             = "Unavailable"
 )
 
 //
@@ -42,13 +43,14 @@ const (
 //
 // Reasons
 const (
-	NotSet    = "NotSet"
-	NotFound  = "NotFound"
-	DataErr   = "DataErr"
-	TypeErr   = "TypeErr"
-	Ambiguous = "Ambiguous"
-	Completed = "Completed"
-	Tested    = "Tested"
+	NotSet            = "NotSet"
+	NotFound          = "NotFound"
+	DataErr           = "DataErr"
+	TypeErr           = "TypeErr"
+	Ambiguous         = "Ambiguous"
+	Completed         = "Completed"
+	Tested            = "Tested"
+	InMaintenanceMode = "InMaintenanceMode"
 )
 
 //
@@ -59,7 +61,7 @@ const (
 )
 
 //
-// Validate the mp resource.
+// Validate the Host resource.
 func (r *Reconciler) validate(host *api.Host) error {
 	err := r.validateProvider(host)
 	if err != nil {
@@ -280,6 +282,19 @@ func (r *Reconciler) testConnection(host *api.Host) (err error) {
 			err = liberr.Wrap(pErr)
 			return
 		}
+
+		if hostModel.InMaintenanceMode {
+			host.Status.SetCondition(
+				libcnd.Condition{
+					Type:     Unavailable,
+					Status:   True,
+					Reason:   InMaintenanceMode,
+					Category: Critical,
+					Message:  "Host is in maintenance mode.",
+				},
+			)
+		}
+
 		secret.Data["thumbprint"] = []byte(hostModel.Thumbprint)
 		h := adapter.EsxHost{
 			Secret: secret,
