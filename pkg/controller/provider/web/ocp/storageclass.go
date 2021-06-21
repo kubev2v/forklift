@@ -80,7 +80,7 @@ func (h StorageClassHandler) Get(ctx *gin.Context) {
 	}
 	m := &model.StorageClass{
 		Base: model.Base{
-			PK: ctx.Param(StorageClassParam),
+			UID: ctx.Param(StorageClassParam),
 		},
 	}
 	db := h.Reconciler.DB()

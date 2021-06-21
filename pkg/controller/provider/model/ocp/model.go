@@ -20,6 +20,10 @@ var NotFound = libmodel.NotFound
 
 type InvalidRefError = base.InvalidRefError
 
+const (
+	MaxDetail = base.MaxDetail
+)
+
 //
 // Types
 type Model = base.Model
@@ -36,10 +40,8 @@ type Resource interface {
 //
 // Base k8s model.
 type Base struct {
-	// PK
-	PK string `sql:"pk"`
 	// Object UID.
-	UID string `sql:"d0"`
+	UID string `sql:"pk"`
 	// Resource version.
 	Version string `sql:"d0"`
 	// Namespace.
@@ -68,20 +70,11 @@ func (m *Base) ResourceVersion() uint64 {
 }
 
 func (m *Base) Pk() string {
-	return m.PK
+	return m.UID
 }
 
 func (m *Base) String() string {
 	return path.Join(m.Namespace, m.Name)
-}
-
-func (m *Base) Equals(other Model) bool {
-	if b, cast := other.(*Base); cast {
-		return m.Namespace == b.Namespace &&
-			m.Name == b.Name
-	}
-
-	return false
 }
 
 func (m *Base) Labels() libmodel.Labels {

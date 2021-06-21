@@ -20,6 +20,10 @@ var NotFound = libmodel.NotFound
 
 type InvalidRefError = base.InvalidRefError
 
+const (
+	MaxDetail = base.MaxDetail
+)
+
 //
 // Types
 type Model = base.Model
@@ -37,7 +41,7 @@ type Base struct {
 	// Parent
 	Parent Ref `sql:"d0,index(parent)"`
 	// Revision
-	Revision int64 `sql:"d0,index(revision)"`
+	Revision int64 `sql:"incremented,d0,index(revision)"`
 }
 
 //

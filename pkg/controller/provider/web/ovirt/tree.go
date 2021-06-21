@@ -47,7 +47,7 @@ func (h *TreeHandler) Prepare(ctx *gin.Context) int {
 	err := db.List(
 		&h.datacenters,
 		model.ListOptions{
-			Detail: 1,
+			Detail: model.MaxDetail,
 		})
 	if err != nil {
 		log.Trace(
