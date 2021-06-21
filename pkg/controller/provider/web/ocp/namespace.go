@@ -79,7 +79,7 @@ func (h NamespaceHandler) Get(ctx *gin.Context) {
 	}
 	m := &model.Namespace{
 		Base: model.Base{
-			PK: ctx.Param(NsParam),
+			UID: ctx.Param(NsParam),
 		},
 	}
 	db := h.Reconciler.DB()
