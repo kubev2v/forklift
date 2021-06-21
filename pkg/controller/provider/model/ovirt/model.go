@@ -11,6 +11,10 @@ var NotFound = libmodel.NotFound
 
 type InvalidRefError = base.InvalidRefError
 
+const (
+	MaxDetail = base.MaxDetail
+)
+
 //
 // Types
 type Model = base.Model
@@ -28,7 +32,7 @@ type Base struct {
 	// Revision
 	Description string `sql:"d0"`
 	// Revision
-	Revision int64 `sql:"d0,index(revision)"`
+	Revision int64 `sql:"incremented,d0,index(revision)"`
 }
 
 //
@@ -41,34 +45,6 @@ func (m *Base) Pk() string {
 // String representation.
 func (m *Base) String() string {
 	return m.ID
-}
-
-//
-// Get labels.
-func (m *Base) Labels() libmodel.Labels {
-	return nil
-}
-
-func (m *Base) Equals(other libmodel.Model) bool {
-	if vm, cast := other.(*Base); cast {
-		return m.ID == vm.ID
-	}
-
-	return false
-}
-
-//
-// Created.
-func (m *Base) Created() {
-	m.Revision = 1
-}
-
-//
-// Updated.
-// Increment revision. Should ONLY be called by
-// the reconciler.
-func (m *Base) Updated() {
-	m.Revision++
 }
 
 type DataCenter struct {

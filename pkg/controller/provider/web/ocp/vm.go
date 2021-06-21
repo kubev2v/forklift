@@ -80,7 +80,7 @@ func (h VMHandler) Get(ctx *gin.Context) {
 	}
 	m := &model.VM{
 		Base: model.Base{
-			PK: ctx.Param(VmParam),
+			UID: ctx.Param(VmParam),
 		},
 	}
 	db := h.Reconciler.DB()

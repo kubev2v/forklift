@@ -81,7 +81,6 @@ func (r *DataCenterAdapter) List(client *Client) (itr fb.Iterator, err error) {
 		m := &model.DataCenter{
 			Base: model.Base{ID: object.ID},
 		}
-		m.Created()
 		object.ApplyTo(m)
 		err = list.Append(m)
 		if err != nil {
@@ -135,7 +134,6 @@ func (r *NetworkAdapter) List(client *Client) (itr fb.Iterator, err error) {
 		m := &model.Network{
 			Base: model.Base{ID: object.ID},
 		}
-		m.Created()
 		object.ApplyTo(m)
 		err = list.Append(m)
 		if err != nil {
@@ -194,7 +192,6 @@ func (r *NICProfileAdapter) List(client *Client) (itr fb.Iterator, err error) {
 		m := &model.NICProfile{
 			Base: model.Base{ID: object.ID},
 		}
-		m.Created()
 		object.ApplyTo(m)
 		err = list.Append(m)
 		if err != nil {
@@ -242,7 +239,6 @@ func (r *DiskProfileAdapter) List(client *Client) (itr fb.Iterator, err error) {
 		m := &model.DiskProfile{
 			Base: model.Base{ID: object.ID},
 		}
-		m.Created()
 		object.ApplyTo(m)
 		err = list.Append(m)
 		if err != nil {
@@ -290,7 +286,6 @@ func (r *StorageDomainAdapter) List(client *Client) (itr fb.Iterator, err error)
 		m := &model.StorageDomain{
 			Base: model.Base{ID: object.ID},
 		}
-		m.Created()
 		object.ApplyTo(m)
 		err = list.Append(m)
 		if err != nil {
@@ -342,7 +337,6 @@ func (r *ClusterAdapter) List(client *Client) (itr fb.Iterator, err error) {
 		m := &model.Cluster{
 			Base: model.Base{ID: object.ID},
 		}
-		m.Created()
 		object.ApplyTo(m)
 		err = list.Append(m)
 		if err != nil {
@@ -368,7 +362,6 @@ func (r *ClusterAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (e
 		m := &model.Cluster{
 			Base: model.Base{ID: object.ID},
 		}
-		m.Created()
 		object.ApplyTo(m)
 		err = tx.Insert(m)
 		if err != nil {
@@ -383,7 +376,6 @@ func (r *ClusterAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (e
 		m := &model.Cluster{
 			Base: model.Base{ID: object.ID},
 		}
-		m.Updated()
 		object.ApplyTo(m)
 		err = tx.Update(m)
 		if err != nil {
@@ -432,7 +424,6 @@ func (r *HostAdapter) List(client *Client) (itr fb.Iterator, err error) {
 		m := &model.Host{
 			Base: model.Base{ID: object.ID},
 		}
-		m.Created()
 		object.ApplyTo(m)
 		err = list.Append(m)
 		if err != nil {
@@ -458,7 +449,6 @@ func (r *HostAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err 
 		m := &model.Host{
 			Base: model.Base{ID: object.ID},
 		}
-		m.Created()
 		object.ApplyTo(m)
 		err = tx.Insert(m)
 		if err != nil {
@@ -473,7 +463,6 @@ func (r *HostAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err 
 		m := &model.Host{
 			Base: model.Base{ID: object.ID},
 		}
-		m.Updated()
 		object.ApplyTo(m)
 		err = tx.Update(m)
 		if err != nil {
@@ -534,7 +523,6 @@ func (r *VMAdapter) List(client *Client) (itr fb.Iterator, err error) {
 		m := &model.VM{
 			Base: model.Base{ID: object.ID},
 		}
-		m.Created()
 		object.ApplyTo(m)
 		err = list.Append(m)
 		if err != nil {
@@ -560,7 +548,6 @@ func (r *VMAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err er
 		m := &model.VM{
 			Base: model.Base{ID: object.ID},
 		}
-		m.Created()
 		object.ApplyTo(m)
 		err = tx.Insert(m)
 		if err != nil {
@@ -575,7 +562,6 @@ func (r *VMAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err er
 		m := &model.VM{
 			Base: model.Base{ID: object.ID},
 		}
-		m.Updated()
 		object.ApplyTo(m)
 		err = tx.Update(m)
 		if err != nil {
@@ -636,7 +622,6 @@ func (r *DiskAdapter) List(client *Client) (itr fb.Iterator, err error) {
 		m := &model.Disk{
 			Base: model.Base{ID: object.ID},
 		}
-		m.Created()
 		object.ApplyTo(m)
 		err = list.Append(m)
 		if err != nil {
