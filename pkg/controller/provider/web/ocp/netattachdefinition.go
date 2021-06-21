@@ -80,7 +80,7 @@ func (h NadHandler) Get(ctx *gin.Context) {
 	}
 	m := &model.NetworkAttachmentDefinition{
 		Base: model.Base{
-			PK: ctx.Param(NadParam),
+			UID: ctx.Param(NadParam),
 		},
 	}
 	db := h.Reconciler.DB()

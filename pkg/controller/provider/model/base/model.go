@@ -8,6 +8,10 @@ import (
 type Model = libmodel.Model
 type ListOptions = libmodel.ListOptions
 
+const (
+	MaxDetail = libmodel.MaxDetail
+)
+
 //
 // An object reference.
 type Ref struct {
