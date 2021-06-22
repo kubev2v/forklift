@@ -455,7 +455,7 @@ func (r *HostEventHandler) validate(host *model.Host) {
 		_ = tx.End()
 	}()
 	list := []model.VM{}
-	err = r.DB.List(
+	err = tx.List(
 		&list,
 		model.ListOptions{
 			Predicate: libmodel.Eq("host", host.ID),
@@ -470,6 +470,77 @@ func (r *HostEventHandler) validate(host *model.Host) {
 		if err != nil {
 			r.log.Error(err, "VM (update) failed.")
 			return
+		}
+	}
+	err = tx.Commit()
+	if err != nil {
+		r.log.Error(err, "Tx commit failed.")
+		return
+	}
+}
+
+//
+// Watch for NICProfile changes and validate VMs as needed.
+type NICProfileHandler struct {
+	libmodel.StockEventHandler
+	// DB.
+	DB libmodel.DB
+	// Logger.
+	log logr.Logger
+}
+
+//
+// Profile updated.
+// Analyze all referencing VMs.
+func (r *NICProfileHandler) Updated(event libmodel.Event) {
+	profile, cast := event.Model.(*model.NICProfile)
+	if cast {
+		r.validate(profile)
+	}
+}
+
+//
+// Report errors.
+func (r *NICProfileHandler) Error(err error) {
+	r.log.Error(liberr.Wrap(err), err.Error())
+}
+
+//
+// Analyze all of the VMs with NICs referencing the profile.
+func (r *NICProfileHandler) validate(profile *model.NICProfile) {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		r.log.Error(err, "begin tx failed.")
+		return
+	}
+	defer func() {
+		_ = tx.End()
+	}()
+	itr, err := tx.Iter(
+		&model.VM{},
+		model.ListOptions{
+			Detail: model.MaxDetail,
+		})
+	if err != nil {
+		r.log.Error(err, "list VM failed.")
+		return
+	}
+	for {
+		vm := &model.VM{}
+		hasNext, _ := itr.NextWith(vm)
+		if !hasNext {
+			break
+		}
+		for _, nic := range vm.NICs {
+			if nic.Profile != profile.ID {
+				continue
+			}
+			vm.RevisionValidated = 0
+			err = tx.Update(vm)
+			if err != nil {
+				r.log.Error(err, "VM (update) failed.")
+				return
+			}
 		}
 	}
 	err = tx.Commit()
