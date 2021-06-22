@@ -3,6 +3,7 @@ package ovirt
 import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	fb "github.com/konveyor/controller/pkg/filebacked"
+	libcnt "github.com/konveyor/controller/pkg/inventory/container"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	libweb "github.com/konveyor/controller/pkg/inventory/web"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
@@ -12,15 +13,26 @@ import (
 //
 // Event codes.
 const (
+	// DataCenter
+	USER_ADD_STORAGE_POOL    = 950
+	USER_UPDATE_STORAGE_POOL = 952
+	USER_REMOVE_STORAGE_POOL = 954
+	// vNIC Profile
+	ADD_VNIC_PROFILE    = 1122
+	UPDATE_VNIC_PROFILE = 1124
+	REMOVE_VNIC_PROFILE = 1126
+	// Cluster
 	USER_ADD_CLUSTER    = 809
 	USER_UPDATE_CLUSTER = 811
 	USER_REMOVE_CLUSTER = 813
-	USER_ADD_HOST       = 42
-	USER_UPDATE_HOST    = 43
-	USER_REMOVE_HOST    = 44
-	USER_ADD_VM         = 34
-	USER_UPDATE_VM      = 35
-	USER_REMOVE_VM      = 113
+	// Host
+	USER_ADD_HOST    = 42
+	USER_UPDATE_HOST = 43
+	USER_REMOVE_HOST = 44
+	// VM
+	USER_ADD_VM    = 34
+	USER_UPDATE_VM = 35
+	USER_REMOVE_VM = 113
 )
 
 //
@@ -96,13 +108,57 @@ func (r *DataCenterAdapter) List(client *Client) (itr fb.Iterator, err error) {
 //
 // Handled events.
 func (r *DataCenterAdapter) Event() []int {
-	return []int{}
+	return []int{
+		USER_ADD_STORAGE_POOL,
+		USER_UPDATE_STORAGE_POOL,
+		USER_REMOVE_STORAGE_POOL,
+	}
 }
 
 //
 // Apply events to the inventory model.
 func (r *DataCenterAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err error) {
 	switch event.code() {
+	case USER_ADD_STORAGE_POOL:
+		object := &DataCenter{}
+		err = client.get(event.DataCenter.Ref, object)
+		if err != nil {
+			break
+		}
+		m := &model.DataCenter{
+			Base: model.Base{ID: object.ID},
+		}
+		object.ApplyTo(m)
+		err = tx.Insert(m)
+		if err != nil {
+			break
+		}
+	case USER_UPDATE_STORAGE_POOL:
+		object := &DataCenter{}
+		err = client.get(event.DataCenter.Ref, object)
+		if err != nil {
+			break
+		}
+		m := &model.DataCenter{
+			Base: model.Base{ID: object.ID},
+		}
+		err = tx.Get(m)
+		if err != nil {
+			break
+		}
+		object.ApplyTo(m)
+		err = tx.Update(m)
+		if err != nil {
+			break
+		}
+	case USER_REMOVE_STORAGE_POOL:
+		m := &model.Cluster{
+			Base: model.Base{ID: event.DataCenter.Ref},
+		}
+		err = tx.Delete(m)
+		if err != nil {
+			break
+		}
 	default:
 		err = liberr.New("unknown event", "event", event)
 	}
@@ -176,7 +232,11 @@ type NICProfileAdapter struct {
 //
 // Handled events.
 func (r *NICProfileAdapter) Event() []int {
-	return []int{}
+	return []int{
+		ADD_VNIC_PROFILE,
+		UPDATE_VNIC_PROFILE,
+		REMOVE_VNIC_PROFILE,
+	}
 }
 
 //
@@ -207,7 +267,29 @@ func (r *NICProfileAdapter) List(client *Client) (itr fb.Iterator, err error) {
 //
 // Apply and event tot the inventory model.
 func (r *NICProfileAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err error) {
+	desired, err := r.List(client)
+	if err != nil {
+		return
+	}
+	stored, err := tx.Iter(
+		&model.NICProfile{},
+		model.ListOptions{
+			Detail: model.MaxDetail,
+		})
+	if err != nil {
+		return
+	}
+	collection := libcnt.Collection{
+		Stored: stored,
+		Tx:     tx,
+	}
 	switch event.code() {
+	case ADD_VNIC_PROFILE:
+		err = collection.Add(desired)
+	case UPDATE_VNIC_PROFILE:
+		err = collection.Update(desired)
+	case REMOVE_VNIC_PROFILE:
+		err = collection.Delete(desired)
 	default:
 		err = liberr.New("unknown event", "event", event)
 	}
@@ -376,6 +458,10 @@ func (r *ClusterAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (e
 		m := &model.Cluster{
 			Base: model.Base{ID: object.ID},
 		}
+		err = tx.Get(m)
+		if err != nil {
+			break
+		}
 		object.ApplyTo(m)
 		err = tx.Update(m)
 		if err != nil {
@@ -462,6 +548,10 @@ func (r *HostAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err 
 		}
 		m := &model.Host{
 			Base: model.Base{ID: object.ID},
+		}
+		err = tx.Get(m)
+		if err != nil {
+			break
 		}
 		object.ApplyTo(m)
 		err = tx.Update(m)
@@ -561,6 +651,10 @@ func (r *VMAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err er
 		}
 		m := &model.VM{
 			Base: model.Base{ID: object.ID},
+		}
+		err = tx.Get(m)
+		if err != nil {
+			break
 		}
 		object.ApplyTo(m)
 		err = tx.Update(m)

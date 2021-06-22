@@ -601,7 +601,7 @@ type Disk struct {
 		List []Ref `json:"storage_domain"`
 	} `json:"storage_domains"`
 	Status      string `json:"status"`
-	StorageUsed string `json:"actual_size"`
+	ActualSize  string `json:"actual_size"`
 	Backup      string `json:"backup"`
 	StorageType string `json:"storage_type"`
 }
@@ -614,7 +614,7 @@ func (r *Disk) ApplyTo(m *model.Disk) {
 	m.Shared = r.bool(r.Sharable)
 	m.Profile = r.Profile.ID
 	m.Status = r.Status
-	m.StorageUsed = r.int64(r.StorageUsed)
+	m.ActualSize = r.int64(r.ActualSize)
 	m.Backup = r.Backup
 	m.StorageType = r.StorageType
 	m.ProvisionedSize = r.int64(r.ProvisionedSize)
