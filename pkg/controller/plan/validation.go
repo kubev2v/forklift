@@ -32,6 +32,7 @@ const (
 	VMAlreadyExists     = "VMAlreadyExists"
 	VMNetworksNotMapped = "VMNetworksNotMapped"
 	VMStorageNotMapped  = "VMStorageNotMapped"
+	HostNotReady        = "HostNotReady"
 	DuplicateVM         = "DuplicateVM"
 	NameNotValid        = "TargetNameNotValid"
 	HookNotValid        = "HookNotValid"
@@ -61,13 +62,14 @@ const (
 //
 // Reasons
 const (
-	NotSet        = "NotSet"
-	NotFound      = "NotFound"
-	NotUnique     = "NotUnique"
-	Ambiguous     = "Ambiguous"
-	NotValid      = "NotValid"
-	Modified      = "Modified"
-	UserRequested = "UserRequested"
+	NotSet            = "NotSet"
+	NotFound          = "NotFound"
+	NotUnique         = "NotUnique"
+	Ambiguous         = "Ambiguous"
+	NotValid          = "NotValid"
+	Modified          = "Modified"
+	UserRequested     = "UserRequested"
+	InMaintenanceMode = "InMaintenanceMode"
 )
 
 //
@@ -275,6 +277,14 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "VM has unmapped storage.",
 		Items:    []string{},
 	}
+	maintenanceMode := libcnd.Condition{
+		Type:     HostNotReady,
+		Status:   True,
+		Reason:   InMaintenanceMode,
+		Category: Warn,
+		Message:  "VM host is in maintenance mode.",
+		Items:    []string{},
+	}
 
 	setOf := map[string]bool{}
 	//
@@ -345,6 +355,13 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			if !ok {
 				unmappedStorage.Items = append(unmappedStorage.Items, ref.String())
 			}
+		}
+		ok, err := validator.MaintenanceMode(*ref)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			maintenanceMode.Items = append(maintenanceMode.Items, ref.String())
 		}
 		// Destination.
 		provider = plan.Referenced.Provider.Destination

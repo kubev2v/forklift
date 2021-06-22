@@ -289,7 +289,7 @@ func (r *Reconciler) testConnection(host *api.Host) (err error) {
 					Type:     Unavailable,
 					Status:   True,
 					Reason:   InMaintenanceMode,
-					Category: Critical,
+					Category: Warn,
 					Message:  "Host is in maintenance mode.",
 				},
 			)
