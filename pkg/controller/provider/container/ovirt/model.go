@@ -21,6 +21,10 @@ const (
 	ADD_VNIC_PROFILE    = 1122
 	UPDATE_VNIC_PROFILE = 1124
 	REMOVE_VNIC_PROFILE = 1126
+	// Disk Profile
+	USER_ADD_DISK_PROFILE    = 10120
+	USER_UPDATE_DISK_PROFILE = 10124
+	USER_REMOVE_DISK_PROFILE = 10122
 	// Cluster
 	USER_ADD_CLUSTER    = 809
 	USER_UPDATE_CLUSTER = 811
@@ -30,9 +34,30 @@ const (
 	USER_UPDATE_HOST = 43
 	USER_REMOVE_HOST = 44
 	// VM
-	USER_ADD_VM    = 34
-	USER_UPDATE_VM = 35
-	USER_REMOVE_VM = 113
+	USER_ADD_VM                           = 34
+	USER_UPDATE_VM                        = 35
+	USER_REMOVE_VM                        = 113
+	USER_ADD_DISK_TO_VM_SUCCESS           = 97
+	USER_UPDATE_VM_DISK                   = 88
+	USER_REMOVE_DISK_FROM_VM              = 80
+	USER_ATTACH_DISK_TO_VM                = 2016
+	USER_DETACH_DISK_FROM_VM              = 2018
+	USER_EJECT_VM_DISK                    = 521
+	NETWORK_USER_ADD_VM_INTERFACE         = 932
+	NETWORK_USER_UPDATE_VM_INTERFACE      = 934
+	NETWORK_USER_REMOVE_VM_INTERFACE      = 930
+	USER_CREATE_SNAPSHOT_FINISHED_SUCCESS = 68
+	USER_REMOVE_SNAPSHOT_FINISHED_SUCCESS = 356
+	USER_RUN_VM                           = 32
+	USER_SUSPEND_VM_OK                    = 503
+	USER_PAUSE_VM                         = 39
+	USER_RESUME_VM                        = 40
+	VM_DOWN                               = 61
+
+	// Disk
+	USER_ADD_DISK_FINISHED_SUCCESS            = 2021
+	USER_REMOVE_DISK                          = 2014
+	USER_FINISHED_REMOVE_DISK_ATTACHED_TO_VMS = 2042
 )
 
 //
@@ -41,7 +66,7 @@ var adapterList []Adapter
 
 //
 // Event (type) mapped to adapter.
-var adapterMap = map[int]Adapter{}
+var adapterMap = map[int][]Adapter{}
 
 func init() {
 	adapterList = []Adapter{
@@ -57,7 +82,9 @@ func init() {
 	}
 	for _, adapter := range adapterList {
 		for _, event := range adapter.Event() {
-			adapterMap[event] = adapter
+			adapterMap[event] = append(
+				adapterMap[event],
+				adapter)
 		}
 	}
 }
@@ -305,7 +332,11 @@ type DiskProfileAdapter struct {
 //
 // Handled events.
 func (r *DiskProfileAdapter) Event() []int {
-	return []int{}
+	return []int{
+		USER_ADD_DISK_PROFILE,
+		USER_UPDATE_DISK_PROFILE,
+		USER_REMOVE_DISK_PROFILE,
+	}
 }
 
 //
@@ -336,7 +367,29 @@ func (r *DiskProfileAdapter) List(client *Client) (itr fb.Iterator, err error) {
 //
 // Apply and event tot the inventory model.
 func (r *DiskProfileAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err error) {
+	desired, err := r.List(client)
+	if err != nil {
+		return
+	}
+	stored, err := tx.Iter(
+		&model.DiskProfile{},
+		model.ListOptions{
+			Detail: model.MaxDetail,
+		})
+	if err != nil {
+		return
+	}
+	collection := libcnt.Collection{
+		Stored: stored,
+		Tx:     tx,
+	}
 	switch event.code() {
+	case USER_ADD_DISK_PROFILE:
+		err = collection.Add(desired)
+	case USER_UPDATE_DISK_PROFILE:
+		err = collection.Update(desired)
+	case USER_REMOVE_DISK_PROFILE:
+		err = collection.Delete(desired)
 	default:
 		err = liberr.New("unknown event", "event", event)
 	}
@@ -594,8 +647,28 @@ type VMAdapter struct {
 // Handled events.
 func (r *VMAdapter) Event() []int {
 	return []int{
+		// Add
 		USER_ADD_VM,
+		// Update
 		USER_UPDATE_VM,
+		USER_UPDATE_VM_DISK,
+		USER_ADD_DISK_TO_VM_SUCCESS,
+		USER_REMOVE_DISK_FROM_VM,
+		USER_FINISHED_REMOVE_DISK_ATTACHED_TO_VMS,
+		USER_ATTACH_DISK_TO_VM,
+		USER_DETACH_DISK_FROM_VM,
+		USER_EJECT_VM_DISK,
+		NETWORK_USER_ADD_VM_INTERFACE,
+		NETWORK_USER_UPDATE_VM_INTERFACE,
+		NETWORK_USER_REMOVE_VM_INTERFACE,
+		USER_CREATE_SNAPSHOT_FINISHED_SUCCESS,
+		USER_REMOVE_SNAPSHOT_FINISHED_SUCCESS,
+		USER_RUN_VM,
+		USER_PAUSE_VM,
+		USER_RESUME_VM,
+		USER_SUSPEND_VM_OK,
+		VM_DOWN,
+		// Delete
 		USER_REMOVE_VM,
 	}
 }
@@ -643,7 +716,23 @@ func (r *VMAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err er
 		if err != nil {
 			break
 		}
-	case USER_UPDATE_VM:
+	case USER_UPDATE_VM,
+		USER_UPDATE_VM_DISK,
+		USER_ADD_DISK_TO_VM_SUCCESS,
+		USER_REMOVE_DISK_FROM_VM,
+		USER_ATTACH_DISK_TO_VM,
+		USER_DETACH_DISK_FROM_VM,
+		USER_EJECT_VM_DISK,
+		NETWORK_USER_ADD_VM_INTERFACE,
+		NETWORK_USER_UPDATE_VM_INTERFACE,
+		NETWORK_USER_REMOVE_VM_INTERFACE,
+		USER_CREATE_SNAPSHOT_FINISHED_SUCCESS,
+		USER_REMOVE_SNAPSHOT_FINISHED_SUCCESS,
+		USER_RUN_VM,
+		USER_PAUSE_VM,
+		USER_RESUME_VM,
+		USER_SUSPEND_VM_OK,
+		VM_DOWN:
 		object := &VM{}
 		err = client.get(event.VM.Ref, object, r.follow())
 		if err != nil {
@@ -669,10 +758,35 @@ func (r *VMAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err er
 		if err != nil {
 			break
 		}
+	case USER_FINISHED_REMOVE_DISK_ATTACHED_TO_VMS:
+		err = r.update(client, tx)
 	default:
 		err = liberr.New("unknown event", "event", event)
 	}
 
+	return
+}
+
+//
+// Update all of the VMs as needed.
+func (r *VMAdapter) update(client *Client, tx *libmodel.Tx) (err error) {
+	desired, err := r.List(client)
+	if err != nil {
+		return
+	}
+	stored, err := tx.Iter(
+		&model.VM{},
+		model.ListOptions{
+			Detail: model.MaxDetail,
+		})
+	if err != nil {
+		return
+	}
+	collection := libcnt.Collection{
+		Stored: stored,
+		Tx:     tx,
+	}
+	err = collection.Update(desired)
 	return
 }
 
@@ -700,7 +814,13 @@ type DiskAdapter struct {
 //
 // Handled events.
 func (r *DiskAdapter) Event() []int {
-	return []int{}
+	return []int{
+		USER_ADD_DISK_FINISHED_SUCCESS,
+		USER_ADD_DISK_TO_VM_SUCCESS,
+		USER_REMOVE_DISK,
+		USER_REMOVE_DISK_FROM_VM,
+		USER_FINISHED_REMOVE_DISK_ATTACHED_TO_VMS,
+	}
 }
 
 //
@@ -731,7 +851,30 @@ func (r *DiskAdapter) List(client *Client) (itr fb.Iterator, err error) {
 //
 // Apply and event tot the inventory model.
 func (r *DiskAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err error) {
+	desired, err := r.List(client)
+	if err != nil {
+		return
+	}
+	stored, err := tx.Iter(
+		&model.Disk{},
+		model.ListOptions{
+			Detail: model.MaxDetail,
+		})
+	if err != nil {
+		return
+	}
+	collection := libcnt.Collection{
+		Stored: stored,
+		Tx:     tx,
+	}
 	switch event.code() {
+	case USER_ADD_DISK_FINISHED_SUCCESS,
+		USER_ADD_DISK_TO_VM_SUCCESS:
+		err = collection.Add(desired)
+	case USER_REMOVE_DISK,
+		USER_REMOVE_DISK_FROM_VM,
+		USER_FINISHED_REMOVE_DISK_ATTACHED_TO_VMS:
+		err = collection.Delete(desired)
 	default:
 		err = liberr.New("unknown event", "event", event)
 	}

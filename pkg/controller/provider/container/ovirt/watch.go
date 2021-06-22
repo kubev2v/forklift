@@ -549,3 +549,95 @@ func (r *NICProfileHandler) validate(profile *model.NICProfile) {
 		return
 	}
 }
+
+//
+// Watch for DiskProfile changes and validate VMs as needed.
+type DiskProfileHandler struct {
+	libmodel.StockEventHandler
+	// DB.
+	DB libmodel.DB
+	// Logger.
+	log logr.Logger
+}
+
+//
+// Profile updated.
+// Analyze all referencing VMs.
+func (r *DiskProfileHandler) Updated(event libmodel.Event) {
+	profile, cast := event.Model.(*model.DiskProfile)
+	if cast {
+		r.validate(profile)
+	}
+}
+
+//
+// Report errors.
+func (r *DiskProfileHandler) Error(err error) {
+	r.log.Error(liberr.Wrap(err), err.Error())
+}
+
+//
+// Analyze all of the VMs with disks referencing the profile.
+func (r *DiskProfileHandler) validate(profile *model.DiskProfile) {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		r.log.Error(err, "begin tx failed.")
+		return
+	}
+	defer func() {
+		_ = tx.End()
+	}()
+	affectedDisks := map[string]bool{}
+	itr, err := tx.Iter(
+		&model.Disk{},
+		model.ListOptions{
+			Detail: model.MaxDetail,
+		})
+	if err != nil {
+		r.log.Error(err, "list Disk failed.")
+		return
+	}
+	for {
+		disk := &model.Disk{}
+		hasNext, _ := itr.NextWith(disk)
+		if hasNext {
+			if disk.Profile == profile.ID {
+				affectedDisks[disk.ID] = true
+			}
+		} else {
+			break
+		}
+	}
+	itr, err = tx.Iter(
+		&model.VM{},
+		model.ListOptions{
+			Detail: model.MaxDetail,
+		})
+	if err != nil {
+		r.log.Error(err, "list VM failed.")
+		return
+	}
+	for {
+		vm := &model.VM{}
+		hasNext, _ := itr.NextWith(vm)
+		if !hasNext {
+			break
+		}
+		for _, da := range vm.DiskAttachments {
+			if _, affected := affectedDisks[da.Disk]; !affected {
+				continue
+			}
+			vm.RevisionValidated = 0
+			err = tx.Update(vm)
+			if err != nil {
+				r.log.Error(err, "VM (update) failed.")
+				return
+			}
+		}
+	}
+	err = tx.Commit()
+	if err != nil {
+		r.log.Error(err, "Tx commit failed.")
+		return
+	}
+}
