@@ -309,6 +309,20 @@ func (r *Reconciler) watch() (list []*libmodel.Watch) {
 	} else {
 		list = append(list, w)
 	}
+	// NICProfile
+	w, err = r.db.Watch(
+		&model.NICProfile{},
+		&NICProfileHandler{
+			DB:  r.db,
+			log: r.log,
+		})
+	if err != nil {
+		r.log.Error(
+			err,
+			"create (NICProfile) watch failed.")
+	} else {
+		list = append(list, w)
+	}
 
 	return
 }
