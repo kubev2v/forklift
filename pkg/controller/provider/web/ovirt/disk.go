@@ -167,6 +167,7 @@ type Disk struct {
 	StorageDomain   string      `json:"storageDomain"`
 	Profile         DiskProfile `json:"profile"`
 	ProvisionedSize int64       `json:"provisionedSize"`
+	ActualSize      int64       `json:"actualSize"`
 }
 
 //
@@ -174,6 +175,7 @@ type Disk struct {
 func (r *Disk) With(m *model.Disk) {
 	r.Resource.With(&m.Base)
 	r.ProvisionedSize = m.ProvisionedSize
+	r.ActualSize = m.ActualSize
 	r.Shared = m.Shared
 	r.StorageDomain = m.StorageDomain
 	r.Profile = DiskProfile{
