@@ -73,3 +73,35 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 	ok = true
 	return
 }
+
+//
+// Validate that a VM's Host isn't in maintenance mode.
+func (r *Validator) MaintenanceMode(vmRef ref.Ref) (ok bool, err error) {
+	vm := &model.VM{}
+	err = r.inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(
+			err,
+			"VM not found in inventory.",
+			"vm",
+			vmRef.String())
+		return
+	}
+
+	host := &model.Host{}
+	hostRef := ref.Ref{ID: vm.Host}
+	err = r.inventory.Find(host, hostRef)
+	if err != nil {
+		err = liberr.Wrap(
+			err,
+			"Host not found in inventory.",
+			"vm",
+			vmRef.String(),
+			"host",
+			hostRef.String())
+		return
+	}
+
+	ok = !host.InMaintenanceMode
+	return
+}
