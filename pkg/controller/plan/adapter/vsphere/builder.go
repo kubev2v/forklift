@@ -123,8 +123,11 @@ func (r *Builder) Import(vmRef ref.Ref, object *vmio.VirtualMachineImportSpec) (
 	}
 	uuid := vm.UUID
 	object.TargetVMName = &vm.Name
-	start := vm.PowerState == string(types.VirtualMachinePowerStatePoweredOn)
-	object.StartVM = &start
+	if !r.Plan.Spec.Warm {
+		// object.StartVM left nil during a warm migration so that VMIO can manage it.
+		start := vm.PowerState == string(types.VirtualMachinePowerStatePoweredOn)
+		object.StartVM = &start
+	}
 	object.Source.Vmware = &vmio.VirtualMachineImportVmwareSourceSpec{
 		VM: vmio.VirtualMachineImportVmwareSourceVMSpec{
 			ID: &uuid,
