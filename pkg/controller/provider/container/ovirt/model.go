@@ -94,10 +94,7 @@ func (r *DataCenterAdapter) List(client *Client) (itr fb.Iterator, err error) {
 			Base: model.Base{ID: object.ID},
 		}
 		object.ApplyTo(m)
-		err = list.Append(m)
-		if err != nil {
-			return
-		}
+		list.Append(m)
 	}
 
 	itr = list.Iter()
@@ -191,10 +188,7 @@ func (r *NetworkAdapter) List(client *Client) (itr fb.Iterator, err error) {
 			Base: model.Base{ID: object.ID},
 		}
 		object.ApplyTo(m)
-		err = list.Append(m)
-		if err != nil {
-			return
-		}
+		list.Append(m)
 	}
 
 	itr = list.Iter()
@@ -253,10 +247,8 @@ func (r *NICProfileAdapter) List(client *Client) (itr fb.Iterator, err error) {
 			Base: model.Base{ID: object.ID},
 		}
 		object.ApplyTo(m)
-		err = list.Append(m)
-		if err != nil {
-			return
-		}
+		list.Append(m)
+
 	}
 
 	itr = list.Iter()
@@ -322,10 +314,7 @@ func (r *DiskProfileAdapter) List(client *Client) (itr fb.Iterator, err error) {
 			Base: model.Base{ID: object.ID},
 		}
 		object.ApplyTo(m)
-		err = list.Append(m)
-		if err != nil {
-			return
-		}
+		list.Append(m)
 	}
 
 	itr = list.Iter()
@@ -369,10 +358,7 @@ func (r *StorageDomainAdapter) List(client *Client) (itr fb.Iterator, err error)
 			Base: model.Base{ID: object.ID},
 		}
 		object.ApplyTo(m)
-		err = list.Append(m)
-		if err != nil {
-			return
-		}
+		list.Append(m)
 	}
 
 	itr = list.Iter()
@@ -420,10 +406,7 @@ func (r *ClusterAdapter) List(client *Client) (itr fb.Iterator, err error) {
 			Base: model.Base{ID: object.ID},
 		}
 		object.ApplyTo(m)
-		err = list.Append(m)
-		if err != nil {
-			return
-		}
+		list.Append(m)
 	}
 
 	itr = list.Iter()
@@ -511,10 +494,7 @@ func (r *HostAdapter) List(client *Client) (itr fb.Iterator, err error) {
 			Base: model.Base{ID: object.ID},
 		}
 		object.ApplyTo(m)
-		err = list.Append(m)
-		if err != nil {
-			return
-		}
+		list.Append(m)
 	}
 
 	itr = list.Iter()
@@ -614,10 +594,7 @@ func (r *VMAdapter) List(client *Client) (itr fb.Iterator, err error) {
 			Base: model.Base{ID: object.ID},
 		}
 		object.ApplyTo(m)
-		err = list.Append(m)
-		if err != nil {
-			return
-		}
+		list.Append(m)
 	}
 
 	itr = list.Iter()
@@ -717,10 +694,7 @@ func (r *DiskAdapter) List(client *Client) (itr fb.Iterator, err error) {
 			Base: model.Base{ID: object.ID},
 		}
 		object.ApplyTo(m)
-		err = list.Append(m)
-		if err != nil {
-			return
-		}
+		list.Append(m)
 	}
 
 	itr = list.Iter()
