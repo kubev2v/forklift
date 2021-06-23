@@ -319,6 +319,20 @@ func (r *Reconciler) watch() (list []*libmodel.Watch) {
 	} else {
 		list = append(list, w)
 	}
+	// DiskProfile
+	w, err = r.db.Watch(
+		&model.DiskProfile{},
+		&DiskProfileHandler{
+			DB:  r.db,
+			log: r.log,
+		})
+	if err != nil {
+		r.log.Error(
+			err,
+			"create (DiskProfile) watch failed.")
+	} else {
+		list = append(list, w)
+	}
 
 	return
 }
@@ -354,7 +368,7 @@ func (r *Reconciler) refresh() (err error) {
 		r.log.V(3).Info("Event received.",
 			"event",
 			event)
-		if adapter, found := adapterMap[event.code()]; found {
+		for _, adapter := range adapterMap[event.code()] {
 			err = adapter.Apply(r.client, tx, event)
 			if err == nil {
 				r.log.V(3).Info(
@@ -369,11 +383,6 @@ func (r *Reconciler) refresh() (err error) {
 					event)
 				err = nil
 			}
-		} else {
-			r.log.Info(
-				"Event not mapped to adapter.",
-				"event",
-				event)
 		}
 	}
 
