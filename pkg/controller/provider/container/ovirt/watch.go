@@ -595,7 +595,7 @@ func (r *DiskProfileHandler) validate(profile *model.DiskProfile) {
 	}
 	for {
 		disk := &model.Disk{}
-		hasNext, _ := itr.NextWith(disk)
+		hasNext := itr.NextWith(disk)
 		if hasNext {
 			if disk.Profile == profile.ID {
 				affectedDisks[disk.ID] = true
@@ -615,7 +615,7 @@ func (r *DiskProfileHandler) validate(profile *model.DiskProfile) {
 	}
 	for {
 		vm := &model.VM{}
-		hasNext, _ := itr.NextWith(vm)
+		hasNext := itr.NextWith(vm)
 		if !hasNext {
 			break
 		}
