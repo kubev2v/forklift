@@ -247,11 +247,7 @@ func (r *VMEventHandler) list() {
 	}
 	for {
 		vm := &model.VM{}
-		hasNext, err := itr.NextWith(vm)
-		if err != nil {
-			r.log.Error(err, "VM iterator failed.")
-			break
-		}
+		hasNext := itr.NextWith(vm)
 		if !hasNext || r.canceled() {
 			break
 		}

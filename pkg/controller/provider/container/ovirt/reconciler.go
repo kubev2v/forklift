@@ -227,11 +227,7 @@ func (r *Reconciler) load() (err error) {
 			return
 		}
 		for {
-			object, hasNext, nErr := itr.Next()
-			if nErr != nil {
-				err = nErr
-				return
-			}
+			object, hasNext := itr.Next()
 			if !hasNext {
 				break
 			}
@@ -351,11 +347,7 @@ func (r *Reconciler) refresh() (err error) {
 	}()
 	for {
 		event := &Event{}
-		hasNext, nErr := itr.NextWith(event)
-		if nErr != nil {
-			err = nErr
-			return
-		}
+		hasNext := itr.NextWith(event)
 		if !hasNext {
 			break
 		}
@@ -430,10 +422,7 @@ func (r *Reconciler) listEvent() (itr fb.Iterator, err error) {
 			continue
 		}
 		r.event.id = e.id()
-		err = list.Append(e)
-		if err != nil {
-			return
-		}
+		list.Append(e)
 	}
 
 	itr = list.Iter()
