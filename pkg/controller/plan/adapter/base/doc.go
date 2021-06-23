@@ -44,4 +44,6 @@ type Validator interface {
 	StorageMapped(vmRef ref.Ref) (bool, error)
 	// Validate that a VM's networks have been mapped.
 	NetworksMapped(vmRef ref.Ref) (bool, error)
+	// Validate that a VM's Host isn't in maintenance mode.
+	MaintenanceMode(vmRef ref.Ref) (bool, error)
 }

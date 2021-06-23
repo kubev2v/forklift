@@ -72,3 +72,10 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 	ok = true
 	return
 }
+
+//
+// Validate that a VM's Host isn't in maintenance mode. No-op for oVirt.
+func (r *Validator) MaintenanceMode(_ ref.Ref) (ok bool, err error) {
+	ok = true
+	return
+}
