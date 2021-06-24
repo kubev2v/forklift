@@ -165,7 +165,11 @@ next:
 			_, pErr := inventory.Network(&refapi.Ref{Name: id})
 			if pErr != nil {
 				if errors.As(pErr, &web.NotFoundError{}) {
-					notFound = append(notFound, entry.Source.ID)
+					notFound = append(
+						notFound,
+						path.Join(
+							entry.Destination.Namespace,
+							entry.Destination.Name))
 				} else {
 					err = pErr
 					return
