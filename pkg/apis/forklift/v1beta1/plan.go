@@ -97,7 +97,7 @@ type Plan struct {
 func (r *Plan) TargetNamespace() (ns string) {
 	ns = r.Spec.TargetNamespace
 	if ns == "" {
-		ns = r.Plan.Namespace
+		ns = r.Namespace
 	}
 
 	return
