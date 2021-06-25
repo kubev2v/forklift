@@ -120,8 +120,8 @@ type VM struct {
 	Base
 	Cluster                     string           `sql:"d0,index(cluster)"`
 	Host                        string           `sql:"d0,index(host)"`
-	RevisionValidated           int64            `sql:"d0,index(revisionValidated)"`
-	PolicyVersion               int              `sql:"d0,index(policyVersion)"`
+	RevisionValidated           int64            `sql:"d0,index(revisionValidated)" eq:"-"`
+	PolicyVersion               int              `sql:"d0,index(policyVersion)" eq:"-"`
 	GuestName                   string           `sql:""`
 	CpuSockets                  int16            `sql:""`
 	CpuCores                    int16            `sql:""`
@@ -144,7 +144,7 @@ type VM struct {
 	WatchDogs                   []WatchDog       `sql:""`
 	Properties                  []Property       `sql:""`
 	Snapshots                   []Snapshot       `sql:""`
-	Concerns                    []Concern        `sql:""`
+	Concerns                    []Concern        `sql:"" eq:"-"`
 }
 
 //
