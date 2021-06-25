@@ -84,7 +84,7 @@ func (r *Handler) changed(vm *ocp.VM) {
 		if !r.MatchProvider(ref) {
 			continue
 		}
-		if plan.TargetNamespace() == vm.Namespace {
+		if plan.Spec.TargetNamespace == vm.Namespace {
 			log.V(3).Info(
 				"Queue reconcile event.",
 				"plan",
