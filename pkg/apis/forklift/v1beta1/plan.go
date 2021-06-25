@@ -31,7 +31,7 @@ type PlanSpec struct {
 	// Description
 	Description string `json:"description,omitempty"`
 	// Target namespace.
-	TargetNamespace string `json:"targetNamespace,omitempty"`
+	TargetNamespace string `json:"targetNamespace"`
 	// Providers.
 	Provider provider.Pair `json:"provider"`
 	// Resource mapping.
@@ -88,19 +88,6 @@ type Plan struct {
 	// Referenced resources populated
 	// during validation.
 	Referenced `json:"-"`
-}
-
-//
-// Get the target namespace.
-// Default to `plan` namespace when not specified
-// in the plan spec.
-func (r *Plan) TargetNamespace() (ns string) {
-	ns = r.Spec.TargetNamespace
-	if ns == "" {
-		ns = r.Plan.Namespace
-	}
-
-	return
 }
 
 //

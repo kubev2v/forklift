@@ -78,7 +78,7 @@ func (r *KubeVirt) ListImports() ([]VmImport, error) {
 		vList,
 		&client.ListOptions{
 			LabelSelector: labels.SelectorFromSet(r.planLabels()),
-			Namespace:     r.Plan.TargetNamespace(),
+			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
 	if err != nil {
@@ -98,7 +98,7 @@ func (r *KubeVirt) ListImports() ([]VmImport, error) {
 		context.TODO(),
 		dvList,
 		&client.ListOptions{
-			Namespace: r.Plan.TargetNamespace(),
+			Namespace: r.Plan.Spec.TargetNamespace,
 		},
 	)
 	if err != nil {
@@ -138,7 +138,7 @@ func (r *KubeVirt) EnsureImport(vm *plan.VMStatus) (err error) {
 		list,
 		&client.ListOptions{
 			LabelSelector: labels.SelectorFromSet(r.vmLabels(vm.Ref)),
-			Namespace:     r.Plan.TargetNamespace(),
+			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
 	if err != nil {
@@ -205,7 +205,7 @@ func (r *KubeVirt) DeleteImport(vm *plan.VMStatus) (err error) {
 		list,
 		&client.ListOptions{
 			LabelSelector: labels.SelectorFromSet(r.vmLabels(vm.Ref)),
-			Namespace:     r.Plan.TargetNamespace(),
+			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
 	if err != nil {
@@ -240,7 +240,7 @@ func (r *KubeVirt) DeleteImport(vm *plan.VMStatus) (err error) {
 func (r *KubeVirt) EnsureNamespace() (err error) {
 	ns := &core.Namespace{
 		ObjectMeta: meta.ObjectMeta{
-			Name: r.Plan.TargetNamespace(),
+			Name: r.Plan.Spec.TargetNamespace,
 		},
 	}
 	err = r.Destination.Client.Create(context.TODO(), ns)
@@ -274,7 +274,7 @@ func (r *KubeVirt) ensureSecret(vmRef ref.Ref) (secret *core.Secret, err error) 
 		list,
 		&client.ListOptions{
 			LabelSelector: labels.SelectorFromSet(r.vmLabels(vmRef)),
-			Namespace:     r.Plan.TargetNamespace(),
+			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
 	if err != nil {
@@ -333,7 +333,7 @@ func (r *KubeVirt) vmImport(
 	}
 	object = &vmio.VirtualMachineImport{
 		ObjectMeta: meta.ObjectMeta{
-			Namespace:   r.Plan.TargetNamespace(),
+			Namespace:   r.Plan.Spec.TargetNamespace,
 			Labels:      r.vmLabels(vm.Ref),
 			Annotations: annotations,
 			GenerateName: strings.Join(
@@ -372,7 +372,7 @@ func (r *KubeVirt) secret(vmRef ref.Ref) (object *core.Secret, err error) {
 	object = &core.Secret{
 		ObjectMeta: meta.ObjectMeta{
 			Labels:    r.vmLabels(vmRef),
-			Namespace: r.Plan.TargetNamespace(),
+			Namespace: r.Plan.Spec.TargetNamespace,
 			GenerateName: strings.Join(
 				[]string{
 					r.Plan.Name,
