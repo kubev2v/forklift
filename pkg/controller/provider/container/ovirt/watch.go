@@ -324,6 +324,7 @@ func (r *VMEventHandler) validated(batch []*policy.Task) {
 		latest.PolicyVersion = task.Version
 		latest.RevisionValidated = latest.Revision
 		latest.Concerns = task.Concerns
+		latest.Revision--
 		err = tx.Update(latest)
 		if err != nil {
 			r.log.Error(err, "VM update failed.")
