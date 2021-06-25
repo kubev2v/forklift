@@ -22,6 +22,7 @@ import (
 //
 // Types
 const (
+	NamespaceNotValid   = "NamespaceNotValid"
 	TransferNetNotValid = "TransferNetworkNotValid"
 	NetRefNotValid      = "NetworkMapRefNotValid"
 	NetMapNotReady      = "NetworkMapNotReady"
@@ -95,6 +96,12 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	plan.Referenced.Provider.Source = pv.Referenced.Source
 	plan.Referenced.Provider.Destination = pv.Referenced.Destination
 	//
+	// Target namespace
+	err = r.validateTargetNamespace(plan)
+	if err != nil {
+		return err
+	}
+	//
 	// Mapping
 	err = r.validateNetworkMap(plan)
 	if err != nil {
@@ -123,6 +130,27 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	}
 
 	return nil
+}
+
+//
+// Validate the target namespace.
+func (r *Reconciler) validateTargetNamespace(plan *api.Plan) (err error) {
+	newCnd := libcnd.Condition{
+		Type:     NamespaceNotValid,
+		Status:   True,
+		Category: Critical,
+		Message:  "Target namespace is not valid.",
+	}
+	if plan.Spec.TargetNamespace == "" {
+		newCnd.Reason = NotSet
+		plan.Status.SetCondition(newCnd)
+		return
+	}
+	if len(k8svalidation.IsDNS1123Label(plan.Spec.TargetNamespace)) > 0 {
+		newCnd.Reason = NotValid
+		plan.Status.SetCondition(newCnd)
+	}
+	return
 }
 
 //
@@ -373,7 +401,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			return liberr.Wrap(pErr)
 		}
 		id := path.Join(
-			plan.TargetNamespace(),
+			plan.Spec.TargetNamespace,
 			ref.Name)
 		_, pErr = inventory.VM(&refapi.Ref{Name: id})
 		if pErr == nil {
