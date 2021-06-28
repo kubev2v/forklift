@@ -310,16 +310,16 @@ func (r *VMEventHandler) validated(batch []*policy.Task) {
 	for _, task := range batch {
 		if task.Error != nil {
 			r.log.Info(task.Error.Error())
-			return
+			continue
 		}
 		latest := &model.VM{Base: model.Base{ID: task.Ref.ID}}
 		err = tx.Get(latest)
 		if err != nil {
 			r.log.Error(err, "VM (get) failed.")
-			return
+			continue
 		}
 		if task.Revision != latest.Revision {
-			return
+			continue
 		}
 		latest.PolicyVersion = task.Version
 		latest.RevisionValidated = latest.Revision
@@ -328,7 +328,7 @@ func (r *VMEventHandler) validated(batch []*policy.Task) {
 		err = tx.Update(latest)
 		if err != nil {
 			r.log.Error(err, "VM update failed.")
-			return
+			continue
 		}
 		r.log.V(3).Info(
 			"VM validated.",
