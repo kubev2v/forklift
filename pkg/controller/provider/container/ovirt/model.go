@@ -53,7 +53,6 @@ const (
 	USER_PAUSE_VM                         = 39
 	USER_RESUME_VM                        = 40
 	VM_DOWN                               = 61
-
 	// Disk
 	USER_ADD_DISK_FINISHED_SUCCESS            = 2021
 	USER_REMOVE_DISK                          = 2014
@@ -90,14 +89,19 @@ func init() {
 }
 
 //
+// Updates the DB based on
+// changes described by an Event.
+type Updater func(tx *libmodel.Tx) error
+
+//
 // Model adapter.
 // Provides integration between the REST resource
 // model and the inventory model.
 type Adapter interface {
 	// List REST collections.
 	List(client *Client) (itr fb.Iterator, err error)
-	// Apply and event to the inventory model.
-	Apply(client *Client, tx *libmodel.Tx, event *Event) (err error)
+	// Apply an event to the inventory model.
+	Apply(event *Event, client *Client) (updater Updater, err error)
 	// List handled event (codes).
 	Event() []int
 }
@@ -141,7 +145,7 @@ func (r *DataCenterAdapter) Event() []int {
 
 //
 // Apply events to the inventory model.
-func (r *DataCenterAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err error) {
+func (r *DataCenterAdapter) Apply(event *Event, client *Client) (updater Updater, err error) {
 	switch event.code() {
 	case USER_ADD_STORAGE_POOL:
 		object := &DataCenter{}
@@ -149,13 +153,13 @@ func (r *DataCenterAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event)
 		if err != nil {
 			break
 		}
-		m := &model.DataCenter{
-			Base: model.Base{ID: object.ID},
-		}
-		object.ApplyTo(m)
-		err = tx.Insert(m)
-		if err != nil {
-			break
+		updater = func(tx *libmodel.Tx) (err error) {
+			m := &model.DataCenter{
+				Base: model.Base{ID: object.ID},
+			}
+			object.ApplyTo(m)
+			err = tx.Insert(m)
+			return
 		}
 	case USER_UPDATE_STORAGE_POOL:
 		object := &DataCenter{}
@@ -163,25 +167,25 @@ func (r *DataCenterAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event)
 		if err != nil {
 			break
 		}
-		m := &model.DataCenter{
-			Base: model.Base{ID: object.ID},
-		}
-		err = tx.Get(m)
-		if err != nil {
-			break
-		}
-		object.ApplyTo(m)
-		err = tx.Update(m)
-		if err != nil {
-			break
+		updater = func(tx *libmodel.Tx) (err error) {
+			m := &model.DataCenter{
+				Base: model.Base{ID: object.ID},
+			}
+			err = tx.Get(m)
+			if err != nil {
+				return
+			}
+			object.ApplyTo(m)
+			err = tx.Update(m)
+			return
 		}
 	case USER_REMOVE_STORAGE_POOL:
-		m := &model.Cluster{
-			Base: model.Base{ID: event.DataCenter.Ref},
-		}
-		err = tx.Delete(m)
-		if err != nil {
-			break
+		updater = func(tx *libmodel.Tx) (err error) {
+			err = tx.Delete(
+				&model.Cluster{
+					Base: model.Base{ID: event.DataCenter.Ref},
+				})
+			return
 		}
 	default:
 		err = liberr.New("unknown event", "event", event)
@@ -225,7 +229,7 @@ func (r *NetworkAdapter) List(client *Client) (itr fb.Iterator, err error) {
 
 //
 // Apply and event tot the inventory model.
-func (r *NetworkAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err error) {
+func (r *NetworkAdapter) Apply(event *Event, client *Client) (updater Updater, err error) {
 	switch event.code() {
 	default:
 		err = liberr.New("unknown event", "event", event)
@@ -285,32 +289,36 @@ func (r *NICProfileAdapter) List(client *Client) (itr fb.Iterator, err error) {
 
 //
 // Apply and event tot the inventory model.
-func (r *NICProfileAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err error) {
-	desired, err := r.List(client)
+func (r *NICProfileAdapter) Apply(event *Event, client *Client) (updater Updater, err error) {
+	var desired fb.Iterator
+	desired, err = r.List(client)
 	if err != nil {
 		return
 	}
-	stored, err := tx.Iter(
-		&model.NICProfile{},
-		model.ListOptions{
-			Detail: model.MaxDetail,
-		})
-	if err != nil {
+	updater = func(tx *libmodel.Tx) (err error) {
+		stored, err := tx.Iter(
+			&model.NICProfile{},
+			model.ListOptions{
+				Detail: model.MaxDetail,
+			})
+		if err != nil {
+			return
+		}
+		collection := libcnt.Collection{
+			Stored: stored,
+			Tx:     tx,
+		}
+		switch event.code() {
+		case ADD_VNIC_PROFILE:
+			err = collection.Add(desired)
+		case UPDATE_VNIC_PROFILE:
+			err = collection.Update(desired)
+		case REMOVE_VNIC_PROFILE:
+			err = collection.Delete(desired)
+		default:
+			err = liberr.New("unknown event", "event", event)
+		}
 		return
-	}
-	collection := libcnt.Collection{
-		Stored: stored,
-		Tx:     tx,
-	}
-	switch event.code() {
-	case ADD_VNIC_PROFILE:
-		err = collection.Add(desired)
-	case UPDATE_VNIC_PROFILE:
-		err = collection.Update(desired)
-	case REMOVE_VNIC_PROFILE:
-		err = collection.Delete(desired)
-	default:
-		err = liberr.New("unknown event", "event", event)
 	}
 
 	return
@@ -355,32 +363,36 @@ func (r *DiskProfileAdapter) List(client *Client) (itr fb.Iterator, err error) {
 
 //
 // Apply and event tot the inventory model.
-func (r *DiskProfileAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err error) {
-	desired, err := r.List(client)
+func (r *DiskProfileAdapter) Apply(event *Event, client *Client) (updater Updater, err error) {
+	var desired fb.Iterator
+	desired, err = r.List(client)
 	if err != nil {
 		return
 	}
-	stored, err := tx.Iter(
-		&model.DiskProfile{},
-		model.ListOptions{
-			Detail: model.MaxDetail,
-		})
-	if err != nil {
+	updater = func(tx *libmodel.Tx) (err error) {
+		stored, err := tx.Iter(
+			&model.DiskProfile{},
+			model.ListOptions{
+				Detail: model.MaxDetail,
+			})
+		if err != nil {
+			return
+		}
+		collection := libcnt.Collection{
+			Stored: stored,
+			Tx:     tx,
+		}
+		switch event.code() {
+		case USER_ADD_DISK_PROFILE:
+			err = collection.Add(desired)
+		case USER_UPDATE_DISK_PROFILE:
+			err = collection.Update(desired)
+		case USER_REMOVE_DISK_PROFILE:
+			err = collection.Delete(desired)
+		default:
+			err = liberr.New("unknown event", "event", event)
+		}
 		return
-	}
-	collection := libcnt.Collection{
-		Stored: stored,
-		Tx:     tx,
-	}
-	switch event.code() {
-	case USER_ADD_DISK_PROFILE:
-		err = collection.Add(desired)
-	case USER_UPDATE_DISK_PROFILE:
-		err = collection.Update(desired)
-	case USER_REMOVE_DISK_PROFILE:
-		err = collection.Delete(desired)
-	default:
-		err = liberr.New("unknown event", "event", event)
 	}
 
 	return
@@ -421,7 +433,7 @@ func (r *StorageDomainAdapter) List(client *Client) (itr fb.Iterator, err error)
 
 //
 // Apply and event tot the inventory model.
-func (r *StorageDomainAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err error) {
+func (r *StorageDomainAdapter) Apply(event *Event, client *Client) (updater Updater, err error) {
 	switch event.code() {
 	default:
 		err = liberr.New("unknown event", "event", event)
@@ -469,7 +481,7 @@ func (r *ClusterAdapter) List(client *Client) (itr fb.Iterator, err error) {
 
 //
 // Apply and event tot the inventory model.
-func (r *ClusterAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err error) {
+func (r *ClusterAdapter) Apply(event *Event, client *Client) (updater Updater, err error) {
 	switch event.code() {
 	case USER_ADD_CLUSTER:
 		object := &Cluster{}
@@ -477,13 +489,13 @@ func (r *ClusterAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (e
 		if err != nil {
 			break
 		}
-		m := &model.Cluster{
-			Base: model.Base{ID: object.ID},
-		}
-		object.ApplyTo(m)
-		err = tx.Insert(m)
-		if err != nil {
-			break
+		updater = func(tx *libmodel.Tx) (err error) {
+			m := &model.Cluster{
+				Base: model.Base{ID: object.ID},
+			}
+			object.ApplyTo(m)
+			err = tx.Insert(m)
+			return
 		}
 	case USER_UPDATE_CLUSTER:
 		object := &Cluster{}
@@ -491,25 +503,25 @@ func (r *ClusterAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (e
 		if err != nil {
 			break
 		}
-		m := &model.Cluster{
-			Base: model.Base{ID: object.ID},
-		}
-		err = tx.Get(m)
-		if err != nil {
-			break
-		}
-		object.ApplyTo(m)
-		err = tx.Update(m)
-		if err != nil {
-			break
+		updater = func(tx *libmodel.Tx) (err error) {
+			m := &model.Cluster{
+				Base: model.Base{ID: object.ID},
+			}
+			err = tx.Get(m)
+			if err != nil {
+				return
+			}
+			object.ApplyTo(m)
+			err = tx.Update(m)
+			return
 		}
 	case USER_REMOVE_CLUSTER:
-		m := &model.Cluster{
-			Base: model.Base{ID: event.Cluster.Ref},
-		}
-		err = tx.Delete(m)
-		if err != nil {
-			break
+		updater = func(tx *libmodel.Tx) (err error) {
+			err = tx.Delete(
+				&model.Cluster{
+					Base: model.Base{ID: event.Cluster.Ref},
+				})
+			return
 		}
 	default:
 		err = liberr.New("unknown event", "event", event)
@@ -557,7 +569,7 @@ func (r *HostAdapter) List(client *Client) (itr fb.Iterator, err error) {
 
 //
 // Apply and event tot the inventory model.
-func (r *HostAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err error) {
+func (r *HostAdapter) Apply(event *Event, client *Client) (updater Updater, err error) {
 	switch event.code() {
 	case USER_ADD_HOST:
 		object := &Host{}
@@ -565,13 +577,13 @@ func (r *HostAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err 
 		if err != nil {
 			break
 		}
-		m := &model.Host{
-			Base: model.Base{ID: object.ID},
-		}
-		object.ApplyTo(m)
-		err = tx.Insert(m)
-		if err != nil {
-			break
+		updater = func(tx *libmodel.Tx) (err error) {
+			m := &model.Host{
+				Base: model.Base{ID: object.ID},
+			}
+			object.ApplyTo(m)
+			err = tx.Insert(m)
+			return
 		}
 	case USER_UPDATE_HOST:
 		object := &Host{}
@@ -579,25 +591,25 @@ func (r *HostAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err 
 		if err != nil {
 			break
 		}
-		m := &model.Host{
-			Base: model.Base{ID: object.ID},
-		}
-		err = tx.Get(m)
-		if err != nil {
-			break
-		}
-		object.ApplyTo(m)
-		err = tx.Update(m)
-		if err != nil {
-			break
+		updater = func(tx *libmodel.Tx) (err error) {
+			m := &model.Host{
+				Base: model.Base{ID: object.ID},
+			}
+			err = tx.Get(m)
+			if err != nil {
+				return
+			}
+			object.ApplyTo(m)
+			err = tx.Update(m)
+			return
 		}
 	case USER_REMOVE_HOST:
-		m := &model.Host{
-			Base: model.Base{ID: event.Host.Ref},
-		}
-		err = tx.Delete(m)
-		if err != nil {
-			break
+		updater = func(tx *libmodel.Tx) (err error) {
+			err = tx.Delete(
+				&model.Host{
+					Base: model.Base{ID: event.Host.Ref},
+				})
+			return
 		}
 	default:
 		err = liberr.New("unknown event", "event", event)
@@ -677,21 +689,21 @@ func (r *VMAdapter) List(client *Client) (itr fb.Iterator, err error) {
 
 //
 // Apply and event tot the inventory model.
-func (r *VMAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err error) {
+func (r *VMAdapter) Apply(event *Event, client *Client) (updater Updater, err error) {
 	switch event.code() {
 	case USER_ADD_VM:
 		object := &VM{}
 		err = client.get(event.VM.Ref, object, r.follow())
 		if err != nil {
-			break
+			return
 		}
-		m := &model.VM{
-			Base: model.Base{ID: object.ID},
-		}
-		object.ApplyTo(m)
-		err = tx.Insert(m)
-		if err != nil {
-			break
+		updater = func(tx *libmodel.Tx) (err error) {
+			m := &model.VM{
+				Base: model.Base{ID: object.ID},
+			}
+			object.ApplyTo(m)
+			err = tx.Insert(m)
+			return
 		}
 	case USER_UPDATE_VM,
 		USER_UPDATE_VM_DISK,
@@ -715,55 +727,52 @@ func (r *VMAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err er
 		if err != nil {
 			break
 		}
-		m := &model.VM{
-			Base: model.Base{ID: object.ID},
-		}
-		err = tx.Get(m)
-		if err != nil {
-			break
-		}
-		object.ApplyTo(m)
-		err = tx.Update(m)
-		if err != nil {
-			break
+		updater = func(tx *libmodel.Tx) (err error) {
+			m := &model.VM{
+				Base: model.Base{ID: object.ID},
+			}
+			err = tx.Get(m)
+			if err != nil {
+				return
+			}
+			object.ApplyTo(m)
+			err = tx.Update(m)
+			return
 		}
 	case USER_REMOVE_VM:
-		m := &model.VM{
-			Base: model.Base{ID: event.VM.Ref},
-		}
-		err = tx.Delete(m)
-		if err != nil {
-			break
+		updater = func(tx *libmodel.Tx) (err error) {
+			err = tx.Delete(
+				&model.VM{
+					Base: model.Base{ID: event.VM.Ref},
+				})
+			return
 		}
 	case USER_FINISHED_REMOVE_DISK_ATTACHED_TO_VMS:
-		err = r.update(client, tx)
+		var desired fb.Iterator
+		desired, err = r.List(client)
+		if err != nil {
+			return
+		}
+		updater = func(tx *libmodel.Tx) (err error) {
+			stored, err := tx.Iter(
+				&model.VM{},
+				model.ListOptions{
+					Detail: model.MaxDetail,
+				})
+			if err != nil {
+				return
+			}
+			collection := libcnt.Collection{
+				Stored: stored,
+				Tx:     tx,
+			}
+			err = collection.Update(desired)
+			return
+		}
 	default:
 		err = liberr.New("unknown event", "event", event)
 	}
 
-	return
-}
-
-//
-// Update all of the VMs as needed.
-func (r *VMAdapter) update(client *Client, tx *libmodel.Tx) (err error) {
-	desired, err := r.List(client)
-	if err != nil {
-		return
-	}
-	stored, err := tx.Iter(
-		&model.VM{},
-		model.ListOptions{
-			Detail: model.MaxDetail,
-		})
-	if err != nil {
-		return
-	}
-	collection := libcnt.Collection{
-		Stored: stored,
-		Tx:     tx,
-	}
-	err = collection.Update(desired)
 	return
 }
 
@@ -824,33 +833,38 @@ func (r *DiskAdapter) List(client *Client) (itr fb.Iterator, err error) {
 
 //
 // Apply and event tot the inventory model.
-func (r *DiskAdapter) Apply(client *Client, tx *libmodel.Tx, event *Event) (err error) {
-	desired, err := r.List(client)
+func (r *DiskAdapter) Apply(event *Event, client *Client) (updater Updater, err error) {
+	var desired fb.Iterator
+	desired, err = r.List(client)
 	if err != nil {
 		return
 	}
-	stored, err := tx.Iter(
-		&model.Disk{},
-		model.ListOptions{
-			Detail: model.MaxDetail,
-		})
-	if err != nil {
+	updater = func(tx *libmodel.Tx) (err error) {
+		stored, err := tx.Iter(
+			&model.Disk{},
+			model.ListOptions{
+				Detail: model.MaxDetail,
+			})
+		if err != nil {
+			return
+		}
+		collection := libcnt.Collection{
+			Stored: stored,
+			Tx:     tx,
+		}
+		switch event.code() {
+		case USER_ADD_DISK_FINISHED_SUCCESS,
+			USER_ADD_DISK_TO_VM_SUCCESS:
+			err = collection.Add(desired)
+		case USER_REMOVE_DISK,
+			USER_REMOVE_DISK_FROM_VM,
+			USER_FINISHED_REMOVE_DISK_ATTACHED_TO_VMS:
+			err = collection.Delete(desired)
+		default:
+			err = liberr.New("unknown event", "event", event)
+		}
+
 		return
-	}
-	collection := libcnt.Collection{
-		Stored: stored,
-		Tx:     tx,
-	}
-	switch event.code() {
-	case USER_ADD_DISK_FINISHED_SUCCESS,
-		USER_ADD_DISK_TO_VM_SUCCESS:
-		err = collection.Add(desired)
-	case USER_REMOVE_DISK,
-		USER_REMOVE_DISK_FROM_VM,
-		USER_FINISHED_REMOVE_DISK_ATTACHED_TO_VMS:
-		err = collection.Delete(desired)
-	default:
-		err = liberr.New("unknown event", "event", event)
 	}
 
 	return
