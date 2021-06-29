@@ -339,6 +339,12 @@ func (r *Reconciler) watch() (list []*libmodel.Watch) {
 
 //
 // Refresh the inventory.
+//  - List events.
+//  - Build the changeSet.
+//  - Apply the changeSet.
+// The two-phased approach ensures we do not hold the
+// DB transaction while using the provider API which
+// can block or be slow.
 func (r *Reconciler) refresh() (err error) {
 	err = r.connect()
 	if err != nil {
@@ -348,17 +354,6 @@ func (r *Reconciler) refresh() (err error) {
 	if err != nil {
 		return
 	}
-	tx, err := r.db.Begin()
-	if err != nil {
-		return
-	}
-	defer func() {
-		if err == nil {
-			_ = tx.Commit()
-		} else {
-			_ = tx.End()
-		}
-	}()
 	for {
 		event := &Event{}
 		hasNext := itr.NextWith(event)
@@ -368,24 +363,60 @@ func (r *Reconciler) refresh() (err error) {
 		r.log.V(3).Info("Event received.",
 			"event",
 			event)
-		for _, adapter := range adapterMap[event.code()] {
-			err = adapter.Apply(r.client, tx, event)
-			if err == nil {
-				r.log.V(3).Info(
-					"Event applied.",
-					"event",
-					event.Code)
-			} else {
-				r.log.Error(
-					err,
-					"Apply event failed.",
-					"event",
-					event)
-				err = nil
-			}
+		var changeSet []Updater
+		changeSet, err = r.changeSet(event)
+		if err == nil {
+			err = r.apply(changeSet)
 		}
+		if err != nil {
+			r.log.Error(
+				err,
+				"Apply event failed.",
+				"event",
+				event)
+			continue
+		}
+
+		r.log.V(3).Info(
+			"Event applied.",
+			"event",
+			event.Code)
 	}
 
+	return
+}
+
+//
+// Build the changeSet.
+func (r *Reconciler) changeSet(event *Event) (list []Updater, err error) {
+	for _, adapter := range adapterMap[event.code()] {
+		u, aErr := adapter.Apply(event, r.client)
+		if aErr != nil {
+			err = aErr
+			return
+		}
+		list = append(list, u)
+	}
+	return
+}
+
+//
+// Apply the changeSet.
+func (r *Reconciler) apply(changeSet []Updater) (err error) {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return
+	}
+	defer func() {
+		_ = tx.End()
+	}()
+	for _, updater := range changeSet {
+		err = updater(tx)
+		if err != nil {
+			return
+		}
+	}
+	err = tx.Commit()
 	return
 }
 
