@@ -17,6 +17,10 @@ const (
 	USER_ADD_STORAGE_POOL    = 950
 	USER_UPDATE_STORAGE_POOL = 952
 	USER_REMOVE_STORAGE_POOL = 954
+	// Network
+	NETWORK_ADD_NETWORK    = 942
+	NETWORK_UPDATE_NETWORK = 1114
+	NETWORK_REMOVE_NETWORK = 944
 	// vNIC Profile
 	ADD_VNIC_PROFILE    = 1122
 	UPDATE_VNIC_PROFILE = 1124
@@ -202,7 +206,11 @@ type NetworkAdapter struct {
 //
 // Handled events.
 func (r *NetworkAdapter) Event() []int {
-	return []int{}
+	return []int{
+		NETWORK_ADD_NETWORK,
+		NETWORK_UPDATE_NETWORK,
+		NETWORK_REMOVE_NETWORK,
+	}
 }
 
 //
@@ -230,9 +238,35 @@ func (r *NetworkAdapter) List(client *Client) (itr fb.Iterator, err error) {
 //
 // Apply and event tot the inventory model.
 func (r *NetworkAdapter) Apply(event *Event, client *Client) (updater Updater, err error) {
-	switch event.code() {
-	default:
-		err = liberr.New("unknown event", "event", event)
+	var desired fb.Iterator
+	desired, err = r.List(client)
+	if err != nil {
+		return
+	}
+	updater = func(tx *libmodel.Tx) (err error) {
+		stored, err := tx.Iter(
+			&model.Network{},
+			model.ListOptions{
+				Detail: model.MaxDetail,
+			})
+		if err != nil {
+			return
+		}
+		collection := libcnt.Collection{
+			Stored: stored,
+			Tx:     tx,
+		}
+		switch event.code() {
+		case NETWORK_ADD_NETWORK:
+			err = collection.Add(desired)
+		case NETWORK_UPDATE_NETWORK:
+			err = collection.Update(desired)
+		case NETWORK_REMOVE_NETWORK:
+			err = collection.Delete(desired)
+		default:
+			err = liberr.New("unknown event", "event", event)
+		}
+		return
 	}
 
 	return

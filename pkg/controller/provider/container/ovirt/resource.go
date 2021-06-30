@@ -215,13 +215,24 @@ type VM struct {
 			Cores   string `json:"cores"`
 		} `json:"topology"`
 	} `json:"cpu"`
-	CpuShares string `json:"cpu_shares"`
-	Memory    string `json:"memory"`
-	IO        struct {
+	CpuShares  string `json:"cpu_shares"`
+	UsbEnabled string `json:"usb_enabled"`
+	Timezone   struct {
+		Name string `json:"name"`
+	} `json:"time_zone"`
+	Status          string `json:"status"`
+	PlacementPolicy struct {
+		Affinity string `json:"affinity"`
+	} `json:"placement_policy"`
+	Memory string `json:"memory"`
+	IO     struct {
 		Threads string `json:"threads"`
 	} `json:"io"`
 	BIOS struct {
-		Type string `json:"type"`
+		Type     string `json:"type"`
+		BootMenu struct {
+			Enabled string `json:"enabled"`
+		} `json:"boot_menu"`
 	} `json:"bios"`
 	Display struct {
 		Type string `json:"type"`
@@ -258,12 +269,18 @@ type VM struct {
 	} `json:"cdroms"`
 	NICs struct {
 		List []struct {
-			ID        string `json:"id"`
-			Name      string `json:"name"`
-			Interface string `json:"interface"`
-			Plugged   string `json:"plugged"`
-			Profile   Ref    `json:"vnic_profile"`
-			Devices   struct {
+			ID         string `json:"id"`
+			Name       string `json:"name"`
+			Interface  string `json:"interface"`
+			Plugged    string `json:"plugged"`
+			Profile    Ref    `json:"vnic_profile"`
+			Properties struct {
+				List []struct {
+					Name  string `json:"name"`
+					Value string `json:"value"`
+				} `json:"custom_property"`
+			} `json:"custom_properties"`
+			Devices struct {
 				List []struct {
 					IPS struct {
 						IP []struct {
@@ -320,6 +337,11 @@ func (r *VM) ApplyTo(m *model.VM) {
 	m.CpuShares = r.int16(r.CpuShares)
 	m.Memory = r.int64(r.Memory)
 	m.BIOS = r.BIOS.Type
+	m.UsbEnabled = r.bool(r.UsbEnabled)
+	m.BootMenuEnabled = r.bool(r.BIOS.BootMenu.Enabled)
+	m.PlacementPolicyAffinity = r.PlacementPolicy.Affinity
+	m.Timezone = r.Timezone.Name
+	m.Status = r.Status
 	m.Display = r.Display.Type
 	m.HasIllegalImages = r.bool(r.HasIllegalImages)
 	m.BalloonedMemory = r.bool(r.MemoryPolicy.Ballooning)
@@ -363,14 +385,24 @@ func (r *VM) addNICs(m *model.VM) {
 					})
 			}
 		}
+		properties := []model.Property{}
+		for _, p := range n.Properties.List {
+			properties = append(
+				properties,
+				model.Property{
+					Name:  p.Name,
+					Value: p.Value,
+				})
+		}
 		m.NICs = append(
 			m.NICs, model.NIC{
-				ID:        n.ID,
-				Name:      n.Name,
-				Profile:   n.Profile.ID,
-				Interface: n.Interface,
-				Plugged:   r.bool(n.Plugged),
-				IpAddress: ips,
+				ID:         n.ID,
+				Name:       n.Name,
+				Profile:    n.Profile.ID,
+				Interface:  n.Interface,
+				Plugged:    r.bool(n.Plugged),
+				IpAddress:  ips,
+				Properties: properties,
 			})
 	}
 }
