@@ -181,6 +181,11 @@ type VM struct {
 	LeaseStorageDomain          string           `json:"leaseStorageDomain"`
 	StorageErrorResumeBehaviour string           `json:"storageErrorResumeBehaviour"`
 	HaEnabled                   bool             `json:"haEnabled"`
+	UsbEnabled                  bool             `json:"usbEnabled"`
+	BootMenuEnabled             bool             `json:"bootMenuEnabled"`
+	PlacementPolicyAffinity     string           `json:"placementPolicyAffinity"`
+	Timezone                    string           `json:"timezone"`
+	Status                      string           `json:"status"`
 	NICs                        []vNIC           `json:"nics"`
 	DiskAttachments             []DiskAttachment `json:"diskAttachments"`
 	HostDevices                 []HostDevice     `json:"hostDevices"`
@@ -234,6 +239,11 @@ func (r *VM) With(m *model.VM) {
 	r.LeaseStorageDomain = m.LeaseStorageDomain
 	r.StorageErrorResumeBehaviour = m.StorageErrorResumeBehaviour
 	r.HaEnabled = m.HaEnabled
+	r.UsbEnabled = m.UsbEnabled
+	r.BootMenuEnabled = m.BootMenuEnabled
+	r.PlacementPolicyAffinity = m.PlacementPolicyAffinity
+	r.Timezone = m.Timezone
+	r.Status = m.Status
 	r.HostDevices = m.HostDevices
 	r.CDROMs = m.CDROMs
 	r.WatchDogs = m.WatchDogs
