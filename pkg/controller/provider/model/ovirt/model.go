@@ -134,6 +134,11 @@ type VM struct {
 	IOThreads                   int16            `sql:""`
 	StorageErrorResumeBehaviour string           `sql:""`
 	HaEnabled                   bool             `sql:""`
+	UsbEnabled                  bool             `sql:""`
+	BootMenuEnabled             bool             `sql:""`
+	PlacementPolicyAffinity     string           `sql:""`
+	Timezone                    string           `sql:""`
+	Status                      string           `sql:""`
 	HasIllegalImages            bool             `sql:""`
 	NumaNodeAffinity            []string         `sql:""`
 	LeaseStorageDomain          string           `sql:""`
@@ -168,12 +173,13 @@ type DiskAttachment struct {
 }
 
 type NIC struct {
-	ID        string      `json:"id"`
-	Name      string      `json:"name"`
-	Interface string      `json:"interface"`
-	Plugged   bool        `json:"plugged"`
-	IpAddress []IpAddress `json:"ipAddress"`
-	Profile   string      `json:"profile"`
+	ID         string      `json:"id"`
+	Name       string      `json:"name"`
+	Interface  string      `json:"interface"`
+	Plugged    bool        `json:"plugged"`
+	IpAddress  []IpAddress `json:"ipAddress"`
+	Profile    string      `json:"profile"`
+	Properties []Property  `json:"properties"`
 }
 
 type IpAddress struct {
