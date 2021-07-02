@@ -139,6 +139,7 @@ type VM struct {
 	PlacementPolicyAffinity     string           `sql:""`
 	Timezone                    string           `sql:""`
 	Status                      string           `sql:""`
+	Stateless                   string           `sql:""`
 	HasIllegalImages            bool             `sql:""`
 	NumaNodeAffinity            []string         `sql:""`
 	LeaseStorageDomain          string           `sql:""`

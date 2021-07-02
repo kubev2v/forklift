@@ -186,6 +186,7 @@ type VM struct {
 	PlacementPolicyAffinity     string           `json:"placementPolicyAffinity"`
 	Timezone                    string           `json:"timezone"`
 	Status                      string           `json:"status"`
+	Stateless                   string           `json:"stateless"`
 	NICs                        []vNIC           `json:"nics"`
 	DiskAttachments             []DiskAttachment `json:"diskAttachments"`
 	HostDevices                 []HostDevice     `json:"hostDevices"`
@@ -244,6 +245,7 @@ func (r *VM) With(m *model.VM) {
 	r.PlacementPolicyAffinity = m.PlacementPolicyAffinity
 	r.Timezone = m.Timezone
 	r.Status = m.Status
+	r.Stateless = m.Stateless
 	r.HostDevices = m.HostDevices
 	r.CDROMs = m.CDROMs
 	r.WatchDogs = m.WatchDogs
