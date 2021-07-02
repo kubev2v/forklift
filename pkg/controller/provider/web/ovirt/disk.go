@@ -168,12 +168,16 @@ type Disk struct {
 	Profile         DiskProfile `json:"profile"`
 	ProvisionedSize int64       `json:"provisionedSize"`
 	ActualSize      int64       `json:"actualSize"`
+	StorageType     string      `json:"storageType"`
+	Status          string      `json:"status"`
 }
 
 //
 // Build the resource using the model.
 func (r *Disk) With(m *model.Disk) {
 	r.Resource.With(&m.Base)
+	r.Status = m.Status
+	r.StorageType = m.StorageType
 	r.ProvisionedSize = m.ProvisionedSize
 	r.ActualSize = m.ActualSize
 	r.Shared = m.Shared
