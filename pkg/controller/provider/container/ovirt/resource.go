@@ -221,6 +221,7 @@ type VM struct {
 		Name string `json:"name"`
 	} `json:"time_zone"`
 	Status          string `json:"status"`
+	Stateless       string `json:"stateless"`
 	PlacementPolicy struct {
 		Affinity string `json:"affinity"`
 	} `json:"placement_policy"`
@@ -342,6 +343,7 @@ func (r *VM) ApplyTo(m *model.VM) {
 	m.PlacementPolicyAffinity = r.PlacementPolicy.Affinity
 	m.Timezone = r.Timezone.Name
 	m.Status = r.Status
+	m.Stateless = r.Stateless
 	m.Display = r.Display.Type
 	m.HasIllegalImages = r.bool(r.HasIllegalImages)
 	m.BalloonedMemory = r.bool(r.MemoryPolicy.Ballooning)
