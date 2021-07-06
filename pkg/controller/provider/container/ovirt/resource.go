@@ -2,6 +2,7 @@ package ovirt
 
 import (
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
+	"sort"
 	"strconv"
 )
 
@@ -706,4 +707,14 @@ func (r *Event) code() (n int) {
 // EVent (list).
 type EventList struct {
 	Items []Event `json:"event"`
+}
+
+//
+// Sort by ID ascending.
+func (r *EventList) sort() {
+	sort.Slice(
+		r.Items,
+		func(i, j int) bool {
+			return r.Items[i].id() < r.Items[j].id()
+		})
 }
