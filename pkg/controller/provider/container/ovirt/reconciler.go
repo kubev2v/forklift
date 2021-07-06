@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-logr/logr"
-	fb "github.com/konveyor/controller/pkg/filebacked"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	libweb "github.com/konveyor/controller/pkg/inventory/web"
 	"github.com/konveyor/controller/pkg/logging"
@@ -24,8 +23,6 @@ import (
 const (
 	// Refresh interval.
 	RefreshInterval = 10 * time.Second
-	// Event page (size).
-	EventPage = 10
 )
 
 //
@@ -45,11 +42,8 @@ type Reconciler struct {
 	client *Client
 	// cancel function.
 	cancel func()
-	// Event state.
-	event struct {
-		id   int
-		page int
-	}
+	// Last event ID.
+	lastEvent int
 }
 
 //
@@ -69,8 +63,6 @@ func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) (r *Reconc
 		db:       db,
 		log:      log,
 	}
-
-	r.event.page = 1
 
 	return
 }
@@ -144,9 +136,9 @@ func (r *Reconciler) Start() error {
 						r.parity = true
 					}
 				} else {
-					err := r.drainEvent()
+					err := r.noteLastEvent()
 					if err != nil {
-						r.log.Error(err, "Drain (event) failed.")
+						r.log.Error(err, "Mark last event failed.")
 					}
 					err = r.load()
 					if err == nil {
@@ -175,30 +167,31 @@ func (r *Reconciler) Shutdown() {
 }
 
 //
-// Drain events.
-func (r *Reconciler) drainEvent() (err error) {
-	if r.event.id > 0 {
-		return
-	}
-	defer func() {
-		if err != nil {
-			r.event.page = 1
-			r.event.id = 0
-		}
-	}()
+// Fetch and note that last event.
+func (r *Reconciler) noteLastEvent() (err error) {
 	err = r.connect()
 	if err != nil {
 		return
 	}
-	for {
-		itr, lErr := r.listEvent()
-		if lErr != nil || itr.Len() == 0 {
-			err = lErr
-			break
-		} else {
-			time.Sleep(100 * time.Millisecond)
-		}
+	eventList := EventList{}
+	err = r.client.list(
+		"events",
+		&eventList,
+		libweb.Param{
+			Key:   "max",
+			Value: "1",
+		})
+	if err != nil {
+		return
 	}
+	if len(eventList.Items) > 0 {
+		r.lastEvent = eventList.Items[0].id()
+	}
+
+	r.log.Info(
+		"Last event marked.",
+		"id",
+		r.lastEvent)
 
 	return
 }
@@ -350,16 +343,12 @@ func (r *Reconciler) refresh() (err error) {
 	if err != nil {
 		return
 	}
-	itr, err := r.listEvent()
+	list, err := r.listEvent()
 	if err != nil {
 		return
 	}
-	for {
-		event := &Event{}
-		hasNext := itr.NextWith(event)
-		if !hasNext {
-			break
-		}
+	for i := range list {
+		event := &list[i]
 		r.log.V(3).Info("Event received.",
 			"event",
 			event)
@@ -422,23 +411,14 @@ func (r *Reconciler) apply(changeSet []Updater) (err error) {
 
 //
 // List Event collection.
-// Query by list of event types and date.
-func (r *Reconciler) listEvent() (itr fb.Iterator, err error) {
+// Query by list of event types since lastEvent (marked).
+func (r *Reconciler) listEvent() (list []Event, err error) {
 	eventList := EventList{}
 	codes := []string{}
 	for n, _ := range adapterMap {
 		codes = append(codes, fmt.Sprintf("type=%d", n))
 	}
-	eventQ := strings.Join(
-		[]string{
-			fmt.Sprintf("date>%s", time.Now().Format("01/02/2006")),
-			strings.Join(codes, " or "),
-		},
-		" and ")
-	search := fmt.Sprintf(
-		"%s sortby time asc page %d",
-		eventQ,
-		r.event.page)
+	search := strings.Join(codes, " or ")
 	err = r.client.list(
 		"events",
 		&eventList,
@@ -447,25 +427,24 @@ func (r *Reconciler) listEvent() (itr fb.Iterator, err error) {
 			Value: search,
 		},
 		libweb.Param{
-			Key:   "max",
-			Value: strconv.Itoa(EventPage),
+			Key:   "from",
+			Value: strconv.Itoa(r.lastEvent),
 		})
 	if err != nil {
 		return
 	}
-	if len(eventList.Items) == EventPage {
-		r.event.page++
-	}
-	list := fb.NewList()
-	for _, e := range eventList.Items {
-		if e.id() <= r.event.id {
-			continue
-		}
-		r.event.id = e.id()
-		list.Append(e)
+	if len(eventList.Items) > 0 {
+		r.lastEvent = eventList.Items[0].id()
+		eventList.sort()
+		list = eventList.Items
 	}
 
-	itr = list.Iter()
+	r.log.V(1).Info(
+		"List event succeeded.",
+		"count",
+		len(list),
+		"last-id",
+		r.lastEvent)
 
 	return
 }
