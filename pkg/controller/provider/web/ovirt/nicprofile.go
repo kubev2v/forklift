@@ -138,6 +138,7 @@ type NICProfile struct {
 	NetworkFilter string `json:"networkFilter"`
 	PortMirroring bool   `json:"portMirroring"`
 	QoS           string `json:"qos"`
+	Properties    []model.Property `json:"properties"`
 }
 
 //
@@ -148,6 +149,7 @@ func (r *NICProfile) With(m *model.NICProfile) {
 	r.NetworkFilter = m.NetworkFilter
 	r.PortMirroring = m.PortMirroring
 	r.QoS = m.QoS
+	r.Properties = m.Properties
 }
 
 //
