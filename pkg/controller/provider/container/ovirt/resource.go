@@ -217,7 +217,9 @@ type VM struct {
 		} `json:"topology"`
 	} `json:"cpu"`
 	CpuShares  string `json:"cpu_shares"`
-	UsbEnabled string `json:"usb_enabled"`
+	USB struct {
+		Enabled string `json:"enabled"`
+	} `json:"usb"`
 	Timezone   struct {
 		Name string `json:"name"`
 	} `json:"time_zone"`
@@ -276,12 +278,6 @@ type VM struct {
 			Interface  string `json:"interface"`
 			Plugged    string `json:"plugged"`
 			Profile    Ref    `json:"vnic_profile"`
-			Properties struct {
-				List []struct {
-					Name  string `json:"name"`
-					Value string `json:"value"`
-				} `json:"custom_property"`
-			} `json:"custom_properties"`
 			Devices struct {
 				List []struct {
 					IPS struct {
@@ -339,7 +335,7 @@ func (r *VM) ApplyTo(m *model.VM) {
 	m.CpuShares = r.int16(r.CpuShares)
 	m.Memory = r.int64(r.Memory)
 	m.BIOS = r.BIOS.Type
-	m.UsbEnabled = r.bool(r.UsbEnabled)
+	m.UsbEnabled = r.bool(r.USB.Enabled)
 	m.BootMenuEnabled = r.bool(r.BIOS.BootMenu.Enabled)
 	m.PlacementPolicyAffinity = r.PlacementPolicy.Affinity
 	m.Timezone = r.Timezone.Name
@@ -388,15 +384,6 @@ func (r *VM) addNICs(m *model.VM) {
 					})
 			}
 		}
-		properties := []model.Property{}
-		for _, p := range n.Properties.List {
-			properties = append(
-				properties,
-				model.Property{
-					Name:  p.Name,
-					Value: p.Value,
-				})
-		}
 		m.NICs = append(
 			m.NICs, model.NIC{
 				ID:         n.ID,
@@ -405,7 +392,6 @@ func (r *VM) addNICs(m *model.VM) {
 				Interface:  n.Interface,
 				Plugged:    r.bool(n.Plugged),
 				IpAddress:  ips,
-				Properties: properties,
 			})
 	}
 }
@@ -583,6 +569,12 @@ type NICProfile struct {
 	QoS           Ref    `json:"qos"`
 	NetworkFilter Ref    `json:"network_filter"`
 	PortMirroring string `json:"port_mirroring"`
+	Properties struct {
+		List []struct {
+			Name  string `json:"name"`
+			Value string `json:"value"`
+		} `json:"custom_property"`
+	} `json:"custom_properties"`
 }
 
 //
@@ -594,6 +586,19 @@ func (r *NICProfile) ApplyTo(m *model.NICProfile) {
 	m.NetworkFilter = r.NetworkFilter.ID
 	m.PortMirroring = r.bool(r.PortMirroring)
 	m.QoS = r.QoS.ID
+	r.addProperties(m)
+}
+
+func (r *NICProfile) addProperties(m *model.NICProfile) {
+	properties := []model.Property{}
+	for _, p := range r.Properties.List {
+		properties = append(
+			properties,
+			model.Property{
+				Name:  p.Name,
+				Value: p.Value,
+			})
+	}
 }
 
 //

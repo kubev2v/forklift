@@ -72,6 +72,7 @@ type NICProfile struct {
 	PortMirroring bool   `sql:""`
 	NetworkFilter string `sql:""`
 	QoS           string `sql:""`
+	Properties []Property  `json:"properties"`
 }
 
 type DiskProfile struct {
@@ -180,7 +181,6 @@ type NIC struct {
 	Plugged    bool        `json:"plugged"`
 	IpAddress  []IpAddress `json:"ipAddress"`
 	Profile    string      `json:"profile"`
-	Properties []Property  `json:"properties"`
 }
 
 type IpAddress struct {
