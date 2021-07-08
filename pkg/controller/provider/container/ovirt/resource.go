@@ -216,11 +216,11 @@ type VM struct {
 			Cores   string `json:"cores"`
 		} `json:"topology"`
 	} `json:"cpu"`
-	CpuShares  string `json:"cpu_shares"`
-	USB struct {
+	CpuShares string `json:"cpu_shares"`
+	USB       struct {
 		Enabled string `json:"enabled"`
 	} `json:"usb"`
-	Timezone   struct {
+	Timezone struct {
 		Name string `json:"name"`
 	} `json:"time_zone"`
 	Status          string `json:"status"`
@@ -273,12 +273,12 @@ type VM struct {
 	} `json:"cdroms"`
 	NICs struct {
 		List []struct {
-			ID         string `json:"id"`
-			Name       string `json:"name"`
-			Interface  string `json:"interface"`
-			Plugged    string `json:"plugged"`
-			Profile    Ref    `json:"vnic_profile"`
-			Devices struct {
+			ID        string `json:"id"`
+			Name      string `json:"name"`
+			Interface string `json:"interface"`
+			Plugged   string `json:"plugged"`
+			Profile   Ref    `json:"vnic_profile"`
+			Devices   struct {
 				List []struct {
 					IPS struct {
 						IP []struct {
@@ -386,12 +386,12 @@ func (r *VM) addNICs(m *model.VM) {
 		}
 		m.NICs = append(
 			m.NICs, model.NIC{
-				ID:         n.ID,
-				Name:       n.Name,
-				Profile:    n.Profile.ID,
-				Interface:  n.Interface,
-				Plugged:    r.bool(n.Plugged),
-				IpAddress:  ips,
+				ID:        n.ID,
+				Name:      n.Name,
+				Profile:   n.Profile.ID,
+				Interface: n.Interface,
+				Plugged:   r.bool(n.Plugged),
+				IpAddress: ips,
 			})
 	}
 }
@@ -569,7 +569,7 @@ type NICProfile struct {
 	QoS           Ref    `json:"qos"`
 	NetworkFilter Ref    `json:"network_filter"`
 	PortMirroring string `json:"port_mirroring"`
-	Properties struct {
+	Properties    struct {
 		List []struct {
 			Name  string `json:"name"`
 			Value string `json:"value"`
@@ -599,6 +599,7 @@ func (r *NICProfile) addProperties(m *model.NICProfile) {
 				Value: p.Value,
 			})
 	}
+	m.Properties = properties
 }
 
 //
