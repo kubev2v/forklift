@@ -68,10 +68,11 @@ type Network struct {
 
 type NICProfile struct {
 	Base
-	Network       string `sql:"d0,index(network)"`
-	PortMirroring bool   `sql:""`
-	NetworkFilter string `sql:""`
-	QoS           string `sql:""`
+	Network       string     `sql:"d0,index(network)"`
+	PortMirroring bool       `sql:""`
+	NetworkFilter string     `sql:""`
+	QoS           string     `sql:""`
+	Properties    []Property `sql:""`
 }
 
 type DiskProfile struct {
@@ -174,13 +175,12 @@ type DiskAttachment struct {
 }
 
 type NIC struct {
-	ID         string      `json:"id"`
-	Name       string      `json:"name"`
-	Interface  string      `json:"interface"`
-	Plugged    bool        `json:"plugged"`
-	IpAddress  []IpAddress `json:"ipAddress"`
-	Profile    string      `json:"profile"`
-	Properties []Property  `json:"properties"`
+	ID        string      `json:"id"`
+	Name      string      `json:"name"`
+	Interface string      `json:"interface"`
+	Plugged   bool        `json:"plugged"`
+	IpAddress []IpAddress `json:"ipAddress"`
+	Profile   string      `json:"profile"`
 }
 
 type IpAddress struct {
