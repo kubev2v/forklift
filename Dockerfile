@@ -1,13 +1,15 @@
 # Builder image
-FROM registry.access.redhat.com/ubi8/go-toolset:1.14.12 as builder
+FROM registry.access.redhat.com/ubi8/go-toolset:1.15.13 as builder
 ENV GOPATH=$APP_ROOT
-RUN env
 COPY . .
-RUN CGO_ENABLED=1 go build -o manager github.com/konveyor/forklift-controller/cmd/manager
+RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o manager github.com/konveyor/forklift-controller/cmd/manager
 
 
 # Runner image
-FROM registry.access.redhat.com/ubi8-minimal
+FROM registry.access.redhat.com/ubi8/ubi-micro:8.4
+
+COPY --from=builder /opt/app-root/src/manager /usr/local/bin/manager
+ENTRYPOINT ["/usr/local/bin/manager"]
 
 LABEL name="konveyor/forklift-controller" \
       description="Konveyor Forklift - Controller" \
@@ -24,9 +26,3 @@ LABEL name="konveyor/forklift-controller" \
       io.openshift.tags="operator,konveyor,forklift,controller" \
       io.openshift.min-cpu="100m" \
       io.openshift.min-memory="350Mi"
-
-COPY --from=builder /opt/app-root/src/manager /usr/local/bin/manager
-
-RUN microdnf -y install tar && microdnf clean all
-
-ENTRYPOINT ["/usr/local/bin/manager"]
