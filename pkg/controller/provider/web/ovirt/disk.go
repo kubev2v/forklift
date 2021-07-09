@@ -191,8 +191,9 @@ func (r *Disk) With(m *model.Disk) {
 
 //
 // Expand the resource.
+// The profile.ID is optional.
 func (r *Disk) Expand(db libmodel.DB) (err error) {
-	if r.Profile.ID == "" { // Optional.
+	if r.Profile.ID == "" {
 		return
 	}
 	profile := &model.DiskProfile{
