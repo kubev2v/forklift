@@ -90,7 +90,7 @@ type Cluster struct {
 // Apply to (update) the model.
 func (r *Cluster) ApplyTo(m *model.Cluster) {
 	m.Name = r.Name
-	m.Name = r.Description
+	m.Description = r.Description
 	m.DataCenter = r.DataCenter.ID
 	m.HaReservation = r.bool(r.HaReservation)
 	m.KsmEnabled = r.bool(r.KSM.Enabled)
