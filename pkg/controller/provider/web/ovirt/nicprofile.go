@@ -134,10 +134,11 @@ func (h NICProfileHandler) watch(ctx *gin.Context) {
 // REST Resource.
 type NICProfile struct {
 	Resource
-	Network       string `json:"network"`
-	NetworkFilter string `json:"networkFilter"`
-	PortMirroring bool   `json:"portMirroring"`
-	QoS           string `json:"qos"`
+	Network       string           `json:"network"`
+	NetworkFilter string           `json:"networkFilter"`
+	PortMirroring bool             `json:"portMirroring"`
+	QoS           string           `json:"qos"`
+	Properties    []model.Property `json:"properties"`
 }
 
 //
@@ -148,6 +149,7 @@ func (r *NICProfile) With(m *model.NICProfile) {
 	r.NetworkFilter = m.NetworkFilter
 	r.PortMirroring = m.PortMirroring
 	r.QoS = m.QoS
+	r.Properties = m.Properties
 }
 
 //
