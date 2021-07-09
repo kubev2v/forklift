@@ -277,9 +277,13 @@ func (r *VM) Link(p *api.Provider) {
 
 //
 // Expand the resource.
+// The vNIC profile.ID is optional.
 func (r *VM) Expand(db libmodel.DB) (err error) {
 	for i := range r.NICs {
 		nic := &r.NICs[i]
+		if nic.Profile.ID == "" {
+			continue
+		}
 		profile := &model.NICProfile{
 			Base: model.Base{ID: nic.Profile.ID},
 		}
