@@ -153,12 +153,21 @@ func (r *Reconciler) validateDestination(mp *api.NetworkMap) (err error) {
 	}
 	list := mp.Spec.Map
 	notFound := []string{}
+	ambiguous := []string{}
 next:
 	for _, entry := range list {
 		switch entry.Destination.Type {
 		case Pod:
 			continue next
 		case Multus:
+			if entry.Destination.Namespace == "" {
+				ambiguous = append(
+					ambiguous,
+					path.Join(
+						entry.Destination.Namespace,
+						entry.Destination.Name))
+				continue
+			}
 			id := path.Join(
 				entry.Destination.Namespace,
 				entry.Destination.Name)
@@ -183,8 +192,18 @@ next:
 			Status:   True,
 			Reason:   NotFound,
 			Category: Critical,
-			Message:  "Destination network not found.",
+			Message:  "Destination network (NAD) not found.",
 			Items:    notFound,
+		})
+	}
+	if len(ambiguous) > 0 {
+		mp.Status.SetCondition(libcnd.Condition{
+			Type:     DestinationNetworkNotValid,
+			Status:   True,
+			Reason:   Ambiguous,
+			Category: Critical,
+			Message:  "Destination network (NAD) namespace required.",
+			Items:    ambiguous,
 		})
 	}
 
