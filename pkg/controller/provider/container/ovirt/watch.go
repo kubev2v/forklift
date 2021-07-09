@@ -275,7 +275,7 @@ func (r *VMEventHandler) canceled() bool {
 // Analyze the VM.
 func (r *VMEventHandler) validate(vm *model.VM) (err error) {
 	task := &policy.Task{
-		Path:     "/v1/data/io/konveyor/forklift/vmware/validate",
+		Path:     "/v1/data/io/konveyor/forklift/ovirt/validate",
 		Context:  r.context,
 		Workload: r.workload,
 		Result:   r.taskResult,
