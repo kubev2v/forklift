@@ -294,9 +294,12 @@ func (r *Reconciler) updateContainer(provider *api.Provider) (err error) {
 // Build DB for provider.
 func (r *Reconciler) getDB(provider *api.Provider) (db libmodel.DB) {
 	dir := Settings.Inventory.WorkingDir
-	dir = filepath.Join(dir, provider.Namespace)
-	os.MkdirAll(dir, 0755)
-	file := provider.Name + ".db"
+	dir = filepath.Join(
+		dir,
+		provider.Namespace,
+		provider.Name)
+	_ = os.MkdirAll(dir, 0755)
+	file := string(provider.UID) + ".db"
 	path := filepath.Join(dir, file)
 	models := model.Models(provider)
 	db = libmodel.New(path, models...)
