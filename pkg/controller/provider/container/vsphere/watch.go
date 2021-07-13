@@ -225,7 +225,7 @@ func (r *VMEventHandler) harvest() {
 // VMs that have been reported through the model event
 // watch are ignored.
 func (r *VMEventHandler) list() {
-	r.log.V(1).Info("List VMs that need to be validated.")
+	r.log.V(3).Info("List VMs that need to be validated.")
 	version, err := policy.Agent.Version()
 	if err != nil {
 		r.log.Error(err, err.Error())
