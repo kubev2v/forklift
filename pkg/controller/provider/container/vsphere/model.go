@@ -4,6 +4,7 @@ import (
 	libref "github.com/konveyor/controller/pkg/ref"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	"github.com/vmware/govmomi/vim25/types"
+	"net/url"
 	"sort"
 	"strings"
 )
@@ -31,9 +32,7 @@ func (b *Base) Apply(m *model.Base, u types.ObjectUpdate) {
 		case Assign:
 			switch p.Name {
 			case fName:
-				if s, cast := p.Val.(string); cast {
-					m.Name = s
-				}
+				m.Name = b.Decoded(p.Val)
 			case fParent:
 				m.Parent = b.Ref(p.Val)
 			}
@@ -77,6 +76,22 @@ func (b *Base) RefList(in types.AnyType) (list []model.Ref) {
 	if a, cast := in.(types.ArrayOfManagedObjectReference); cast {
 		for _, r := range a.ManagedObjectReference {
 			list = append(list, b.Ref(r))
+		}
+	}
+
+	return
+}
+
+//
+// URL decoded string.
+// Some property values returned by the property
+// collector are URL-encoded.
+func (b *Base) Decoded(in types.AnyType) (s string) {
+	var cast bool
+	if s, cast = in.(string); cast {
+		decoded, err := url.QueryUnescape(s)
+		if err == nil {
+			s = decoded
 		}
 	}
 
