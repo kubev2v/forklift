@@ -388,7 +388,7 @@ func (r *Pool) Start() {
 				log.Info(
 					"VM Validation failed.",
 					"task",
-					task)
+					task.String())
 			}
 			task.notify()
 		}

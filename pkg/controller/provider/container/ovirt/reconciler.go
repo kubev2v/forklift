@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-logr/logr"
+	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	libweb "github.com/konveyor/controller/pkg/inventory/web"
 	"github.com/konveyor/controller/pkg/logging"
@@ -21,8 +22,20 @@ import (
 //
 // Settings
 const (
+	// Retry interval.
+	RetryInterval = 5 * time.Second
 	// Refresh interval.
 	RefreshInterval = 10 * time.Second
+)
+
+//
+// Phases
+const (
+	Started = ""
+	Load    = "load"
+	Loaded  = "loaded"
+	Parity  = "parity"
+	Refresh = "refresh"
 )
 
 //
@@ -36,14 +49,16 @@ type Reconciler struct {
 	log logr.Logger
 	// has parity.
 	parity bool
-	// load() completed.
-	loaded bool
 	// REST client.
 	client *Client
 	// cancel function.
 	cancel func()
 	// Last event ID.
 	lastEvent int
+	// Phase
+	phase string
+	// List of watches.
+	watches []*libmodel.Watch
 }
 
 //
@@ -112,42 +127,21 @@ func (r *Reconciler) Test() (err error) {
 //
 // Start the reconciler.
 func (r *Reconciler) Start() error {
-	ctx := context.Background()
-	ctx, r.cancel = context.WithCancel(ctx)
-	watchList := []*libmodel.Watch{}
+	ctx := Context{
+		client: r.client,
+		log:    r.log,
+	}
+	ctx.ctx, r.cancel = context.WithCancel(context.Background())
 	start := func() {
 		defer func() {
-			for _, w := range watchList {
-				w.End()
-			}
+			r.endWatch()
+			r.log.Info("Stopped.")
 		}()
-	try:
 		for {
-			select {
-			case <-ctx.Done():
-				break try
-			default:
-				if r.loaded {
-					err := r.refresh()
-					if err != nil {
-						r.log.Error(err, "Refresh failed.")
-						r.parity = false
-					} else {
-						r.parity = true
-					}
-				} else {
-					err := r.noteLastEvent()
-					if err != nil {
-						r.log.Error(err, "Mark last event failed.")
-					}
-					err = r.load()
-					if err == nil {
-						watchList = r.watch()
-					} else {
-						r.log.Error(err, "Load failed.")
-					}
-				}
-				time.Sleep(RefreshInterval)
+			if !ctx.canceled() {
+				_ = r.run(&ctx)
+			} else {
+				return
 			}
 		}
 	}
@@ -155,6 +149,59 @@ func (r *Reconciler) Start() error {
 	go start()
 
 	return nil
+}
+
+//
+// Run the current phase.
+func (r *Reconciler) run(ctx *Context) (err error) {
+	r.log.V(3).Info(
+		"Running.",
+		"phase",
+		r.phase)
+	switch r.phase {
+	case Started:
+		err = r.noteLastEvent()
+		if err == nil {
+			r.phase = Load
+		}
+	case Load:
+		err = r.load(ctx)
+		if err == nil {
+			r.phase = Loaded
+		}
+	case Loaded:
+		err = r.refresh(ctx)
+		if err == nil {
+			r.phase = Parity
+		}
+	case Parity:
+		r.endWatch()
+		err = r.beginWatch()
+		if err == nil {
+			r.phase = Refresh
+			r.parity = true
+		}
+	case Refresh:
+		err = r.refresh(ctx)
+		if err == nil {
+			r.parity = true
+			time.Sleep(RefreshInterval)
+		} else {
+			r.parity = false
+		}
+	default:
+		err = liberr.New("Phase unknown.")
+	}
+	if err != nil {
+		r.log.Error(
+			err,
+			"Failed.",
+			"phase",
+			r.phase)
+		time.Sleep(RetryInterval)
+	}
+
+	return
 }
 
 //
@@ -189,7 +236,7 @@ func (r *Reconciler) noteLastEvent() (err error) {
 	}
 
 	r.log.Info(
-		"Last event marked.",
+		"Last event noted.",
 		"id",
 		r.lastEvent)
 
@@ -198,7 +245,7 @@ func (r *Reconciler) noteLastEvent() (err error) {
 
 //
 // Load the inventory.
-func (r *Reconciler) load() (err error) {
+func (r *Reconciler) load(ctx *Context) (err error) {
 	err = r.connect()
 	if err != nil {
 		return
@@ -214,7 +261,10 @@ func (r *Reconciler) load() (err error) {
 	mark := time.Now()
 
 	for _, adapter := range adapterList {
-		itr, aErr := adapter.List(r.client)
+		if ctx.canceled() {
+			return
+		}
+		itr, aErr := adapter.List(ctx)
 		if aErr != nil {
 			err = aErr
 			return
@@ -223,6 +273,9 @@ func (r *Reconciler) load() (err error) {
 			object, hasNext := itr.Next()
 			if !hasNext {
 				break
+			}
+			if ctx.canceled() {
+				return
 			}
 			m := object.(libmodel.Model)
 			err = tx.Insert(m)
@@ -234,13 +287,9 @@ func (r *Reconciler) load() (err error) {
 				"model",
 				libmodel.Describe(m))
 		}
-
 	}
 	err = tx.Commit()
-	if err == nil {
-		r.parity = true
-		r.loaded = true
-	} else {
+	if err != nil {
 		return
 	}
 
@@ -254,7 +303,12 @@ func (r *Reconciler) load() (err error) {
 
 //
 // Add model watches.
-func (r *Reconciler) watch() (list []*libmodel.Watch) {
+func (r *Reconciler) beginWatch() (err error) {
+	defer func() {
+		if err != nil {
+			r.endWatch()
+		}
+	}()
 	// Cluster
 	w, err := r.db.Watch(
 		&model.Cluster{},
@@ -262,12 +316,10 @@ func (r *Reconciler) watch() (list []*libmodel.Watch) {
 			DB:  r.db,
 			log: r.log,
 		})
-	if err != nil {
-		r.log.Error(
-			err,
-			"create (cluster) watch failed.")
+	if err == nil {
+		r.watches = append(r.watches, w)
 	} else {
-		list = append(list, w)
+		return
 	}
 	// Host
 	w, err = r.db.Watch(
@@ -276,12 +328,10 @@ func (r *Reconciler) watch() (list []*libmodel.Watch) {
 			DB:  r.db,
 			log: r.log,
 		})
-	if err != nil {
-		r.log.Error(
-			err,
-			"create (host) watch failed.")
+	if err == nil {
+		r.watches = append(r.watches, w)
 	} else {
-		list = append(list, w)
+		return
 	}
 	// VM
 	w, err = r.db.Watch(
@@ -291,12 +341,10 @@ func (r *Reconciler) watch() (list []*libmodel.Watch) {
 			DB:       r.db,
 			log:      r.log,
 		})
-	if err != nil {
-		r.log.Error(
-			err,
-			"create (VM) watch failed.")
+	if err == nil {
+		r.watches = append(r.watches, w)
 	} else {
-		list = append(list, w)
+		return
 	}
 	// NICProfile
 	w, err = r.db.Watch(
@@ -305,12 +353,10 @@ func (r *Reconciler) watch() (list []*libmodel.Watch) {
 			DB:  r.db,
 			log: r.log,
 		})
-	if err != nil {
-		r.log.Error(
-			err,
-			"create (NICProfile) watch failed.")
+	if err == nil {
+		r.watches = append(r.watches, w)
 	} else {
-		list = append(list, w)
+		return
 	}
 	// DiskProfile
 	w, err = r.db.Watch(
@@ -319,15 +365,21 @@ func (r *Reconciler) watch() (list []*libmodel.Watch) {
 			DB:  r.db,
 			log: r.log,
 		})
-	if err != nil {
-		r.log.Error(
-			err,
-			"create (DiskProfile) watch failed.")
+	if err == nil {
+		r.watches = append(r.watches, w)
 	} else {
-		list = append(list, w)
+		return
 	}
 
 	return
+}
+
+//
+// End watches.
+func (r *Reconciler) endWatch() {
+	for _, watch := range r.watches {
+		watch.End()
+	}
 }
 
 //
@@ -338,7 +390,7 @@ func (r *Reconciler) watch() (list []*libmodel.Watch) {
 // The two-phased approach ensures we do not hold the
 // DB transaction while using the provider API which
 // can block or be slow.
-func (r *Reconciler) refresh() (err error) {
+func (r *Reconciler) refresh(ctx *Context) (err error) {
 	err = r.connect()
 	if err != nil {
 		return
@@ -353,7 +405,7 @@ func (r *Reconciler) refresh() (err error) {
 			"event",
 			event)
 		var changeSet []Updater
-		changeSet, err = r.changeSet(event)
+		changeSet, err = r.changeSet(ctx, event)
 		if err == nil {
 			err = r.apply(changeSet)
 		}
@@ -377,9 +429,9 @@ func (r *Reconciler) refresh() (err error) {
 
 //
 // Build the changeSet.
-func (r *Reconciler) changeSet(event *Event) (list []Updater, err error) {
+func (r *Reconciler) changeSet(ctx *Context, event *Event) (list []Updater, err error) {
 	for _, adapter := range adapterMap[event.code()] {
-		u, aErr := adapter.Apply(event, r.client)
+		u, aErr := adapter.Apply(ctx, event)
 		if aErr != nil {
 			err = aErr
 			return
