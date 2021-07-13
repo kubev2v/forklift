@@ -30,7 +30,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/model"
-	ocpmodel "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/controller/validation/policy"
 	"github.com/konveyor/forklift-controller/pkg/settings"
@@ -241,23 +240,8 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 // Update the provider.
 func (r *Reconciler) updateProvider(provider *api.Provider) (err error) {
 	rl, found := r.container.Get(provider)
-	if !found {
-		return
-	}
-	*(rl.Owner().(*api.Provider)) = *provider
-	db := rl.DB()
-	tx, err := db.Begin()
-	if err != nil {
-		return
-	}
-	defer func() {
-		_ = tx.End()
-	}()
-	p := &ocpmodel.Provider{}
-	p.With(provider)
-	err = tx.Update(p)
-	if err == nil {
-		err = tx.Commit()
+	if found {
+		*(rl.Owner().(*api.Provider)) = *provider
 	}
 
 	return
@@ -292,12 +276,6 @@ func (r *Reconciler) updateContainer(provider *api.Provider) (err error) {
 		return
 	}
 	err = db.Open(true)
-	if err != nil {
-		return
-	}
-	pModel := &ocpmodel.Provider{}
-	pModel.With(provider)
-	err = db.Insert(pModel)
 	if err != nil {
 		return
 	}
