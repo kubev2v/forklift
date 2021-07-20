@@ -405,13 +405,13 @@ func (r *Reconciler) refresh(ctx *Context) (err error) {
 			"event",
 			event)
 		var changeSet []Updater
-		changeSet, err = r.changeSet(ctx, event)
-		if err == nil {
-			err = r.apply(changeSet)
+		changeSet, applyErr := r.changeSet(ctx, event)
+		if applyErr == nil {
+			applyErr = r.apply(changeSet)
 		}
-		if err != nil {
+		if applyErr != nil {
 			r.log.Error(
-				err,
+				applyErr,
 				"Apply event failed.",
 				"event",
 				event)
