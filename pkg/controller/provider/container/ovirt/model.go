@@ -43,6 +43,8 @@ const (
 	USER_REMOVE_HOST = 44
 	// VM
 	USER_ADD_VM                           = 34
+	USER_ADD_VM_STARTED                   = 37
+	USER_ADD_VM_FINISHED_FAILED           = 52
 	USER_UPDATE_VM                        = 35
 	USER_REMOVE_VM                        = 113
 	USER_ADD_DISK_TO_VM_SUCCESS           = 97
@@ -730,6 +732,8 @@ func (r *VMAdapter) Event() []int {
 	return []int{
 		// Add
 		USER_ADD_VM,
+		USER_ADD_VM_STARTED,
+		USER_ADD_VM_FINISHED_FAILED,
 		// Update
 		USER_UPDATE_VM,
 		USER_UPDATE_VM_DISK,
@@ -803,7 +807,8 @@ func (r *VMAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 // Apply and event tot the inventory model.
 func (r *VMAdapter) Apply(ctx *Context, event *Event) (updater Updater, err error) {
 	switch event.code() {
-	case USER_ADD_VM:
+	case USER_ADD_VM,
+		USER_ADD_VM_STARTED:
 		object := &VM{}
 		err = ctx.client.get(event.VM.Ref, object, r.follow())
 		if err != nil {
@@ -851,7 +856,8 @@ func (r *VMAdapter) Apply(ctx *Context, event *Event) (updater Updater, err erro
 			err = tx.Update(m)
 			return
 		}
-	case USER_REMOVE_VM:
+	case USER_REMOVE_VM,
+		USER_ADD_VM_FINISHED_FAILED:
 		updater = func(tx *libmodel.Tx) (err error) {
 			err = tx.Delete(
 				&model.VM{
