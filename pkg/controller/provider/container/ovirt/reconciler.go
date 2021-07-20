@@ -250,6 +250,33 @@ func (r *Reconciler) load(ctx *Context) (err error) {
 	if err != nil {
 		return
 	}
+	mark := time.Now()
+	for _, adapter := range adapterList {
+		if ctx.canceled() {
+			return
+		}
+		err = r.create(ctx, adapter)
+		if err != nil {
+			return
+		}
+	}
+
+	r.log.Info(
+		"Initial Parity.",
+		"duration",
+		time.Since(mark))
+
+	return
+}
+
+//
+// List and create resources using the adapter.
+func (r *Reconciler) create(ctx *Context, adapter Adapter) (err error) {
+	itr, aErr := adapter.List(ctx)
+	if aErr != nil {
+		err = aErr
+		return
+	}
 	tx, err := r.db.Begin()
 	if err != nil {
 		return
@@ -257,46 +284,28 @@ func (r *Reconciler) load(ctx *Context) (err error) {
 	defer func() {
 		_ = tx.End()
 	}()
-
-	mark := time.Now()
-
-	for _, adapter := range adapterList {
+	for {
+		object, hasNext := itr.Next()
+		if !hasNext {
+			break
+		}
 		if ctx.canceled() {
 			return
 		}
-		itr, aErr := adapter.List(ctx)
-		if aErr != nil {
-			err = aErr
+		m := object.(libmodel.Model)
+		err = tx.Insert(m)
+		if err != nil {
 			return
 		}
-		for {
-			object, hasNext := itr.Next()
-			if !hasNext {
-				break
-			}
-			if ctx.canceled() {
-				return
-			}
-			m := object.(libmodel.Model)
-			err = tx.Insert(m)
-			if err != nil {
-				return
-			}
-			r.log.V(3).Info(
-				"Model created.",
-				"model",
-				libmodel.Describe(m))
-		}
+		r.log.V(3).Info(
+			"Model created.",
+			"model",
+			libmodel.Describe(m))
 	}
 	err = tx.Commit()
 	if err != nil {
 		return
 	}
-
-	r.log.Info(
-		"Initial Parity.",
-		"duration",
-		time.Since(mark))
 
 	return
 }
