@@ -56,7 +56,7 @@ func (r *Client) Enabled() bool {
 
 //
 // Policy version.
-func (r *Client) Version() (version int, err error) {
+func (r *Client) Version(path string) (version int, err error) {
 	if !r.Enabled() {
 		return
 	}
@@ -65,7 +65,6 @@ func (r *Client) Version() (version int, err error) {
 			Version int `json:"rules_version"`
 		} `json:"result"`
 	}{}
-	path := "/v1/data/io/konveyor/forklift/vmware/rules_version"
 	err = r.get(path, out)
 	if err != nil {
 		return
@@ -73,8 +72,10 @@ func (r *Client) Version() (version int, err error) {
 
 	version = out.Result.Version
 
-	log.Info(
+	log.V(3).Info(
 		"Policy version detected.",
+		"endpoint",
+		path,
 		"version",
 		version)
 
@@ -134,7 +135,7 @@ func (r *Client) get(path string, out interface{}) (err error) {
 	}
 	parsedURL.Path = path
 	url := parsedURL.String()
-	log.V(4).Info(
+	log.V(5).Info(
 		"GET request.",
 		"url",
 		url)
@@ -163,7 +164,7 @@ func (r *Client) post(path string, in interface{}, out interface{}) (err error) 
 	}
 	parsedURL.Path = path
 	url := parsedURL.String()
-	log.V(4).Info(
+	log.V(5).Info(
 		"POST request.",
 		"url",
 		url,
@@ -183,7 +184,7 @@ func (r *Client) post(path string, in interface{}, out interface{}) (err error) 
 //
 // Build and set the transport as needed.
 func (c *Client) buildTransport() (err error) {
-	if c.Transport != nil {
+	if c.Transport != nil || !Settings.PolicyAgent.Enabled() {
 		return
 	}
 	transport := &http.Transport{
@@ -197,7 +198,7 @@ func (c *Client) buildTransport() (err error) {
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	}
-	if Settings.PolicyAgent.TLS.Enabled {
+	if len(Settings.PolicyAgent.TLS.CA) > 0 {
 		pool := x509.NewCertPool()
 		ca, xErr := ioutil.ReadFile(Settings.PolicyAgent.TLS.CA)
 		if xErr != nil {
@@ -207,6 +208,10 @@ func (c *Client) buildTransport() (err error) {
 		pool.AppendCertsFromPEM(ca)
 		transport.TLSClientConfig = &tls.Config{
 			RootCAs: pool,
+		}
+	} else {
+		transport.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: true,
 		}
 	}
 
@@ -411,8 +416,8 @@ func (r *Pool) Shutdown() {
 
 //
 // Policy version.
-func (r *Pool) Version() (version int, err error) {
-	return r.Client.Version()
+func (r *Pool) Version(path string) (version int, err error) {
+	return r.Client.Version(path)
 }
 
 //
@@ -427,6 +432,12 @@ func (r *Pool) Submit(task *Task) (err error) {
 	}()
 	r.input <- task
 	return
+}
+
+//
+// The pool backlog.
+func (r *Pool) Backlog() int {
+	return len(r.input)
 }
 
 //
