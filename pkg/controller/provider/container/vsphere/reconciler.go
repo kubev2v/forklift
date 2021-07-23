@@ -860,11 +860,6 @@ func (r Reconciler) applyEnter(tx *libmodel.Tx, u types.ObjectUpdate) error {
 		return liberr.Wrap(err)
 	}
 
-	r.log.V(3).Info(
-		"Model created.",
-		"model",
-		libmodel.Describe(m))
-
 	return nil
 }
 
@@ -888,11 +883,6 @@ func (r Reconciler) applyModify(tx *libmodel.Tx, u types.ObjectUpdate) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-
-	r.log.V(3).Info(
-		"Model updated.",
-		"model",
-		libmodel.Describe(m))
 
 	return nil
 }
@@ -952,11 +942,6 @@ func (r Reconciler) applyLeave(tx *libmodel.Tx, u types.ObjectUpdate) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-
-	r.log.V(3).Info(
-		"Model deleted.",
-		"model",
-		libmodel.Describe(deleted))
 
 	return nil
 }
