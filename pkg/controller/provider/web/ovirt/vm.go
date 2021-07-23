@@ -166,6 +166,7 @@ type VM struct {
 	Cluster                     string           `json:"cluster"`
 	Host                        string           `json:"host"`
 	RevisionValidated           int64            `json:"revisionValidated"`
+	PolicyVersion               int              `json:"policyVersion"`
 	GuestName                   string           `json:"guestName"`
 	CpuSockets                  int16            `json:"cpuSockets"`
 	CpuCores                    int16            `json:"cpuCores"`
@@ -225,6 +226,7 @@ func (r *VM) With(m *model.VM) {
 	r.Cluster = m.Cluster
 	r.Host = m.Host
 	r.RevisionValidated = m.RevisionValidated
+	r.PolicyVersion = m.PolicyVersion
 	r.GuestName = m.GuestName
 	r.CpuSockets = m.CpuSockets
 	r.CpuCores = m.CpuCores

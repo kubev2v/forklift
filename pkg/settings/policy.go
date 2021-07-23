@@ -8,7 +8,6 @@ import (
 // Environment variables.
 const (
 	PolicyAgentURL            = "POLICY_AGENT_URL"
-	PolicyTLSEnabled          = "POLICY_TLS_ENABLED"
 	PolicyAgentCA             = "POLICY_AGENT_CA"
 	PolicyAgentWorkerLimit    = "POLICY_AGENT_WORKER_LIMIT"
 	PolicyAgentSearchInterval = "POLICY_AGENT_SEARCH_INTERVAL"
@@ -21,8 +20,6 @@ type PolicyAgent struct {
 	URL string
 	// TLS
 	TLS struct {
-		// Enabled.
-		Enabled bool
 		// CA path
 		CA string
 	}
@@ -42,7 +39,6 @@ func (r *PolicyAgent) Load() (err error) {
 		r.URL = s
 	}
 	// TLS
-	r.TLS.Enabled = getEnvBool(TLSEnabled, false)
 	if s, found := os.LookupEnv(PolicyAgentCA); found {
 		r.TLS.CA = s
 	} else {

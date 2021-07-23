@@ -41,6 +41,14 @@ const (
 )
 
 //
+// Endpoints.
+const (
+	BaseEndpoint       = "/v1/data/io/konveyor/forklift/ovirt/"
+	VersionEndpoint    = BaseEndpoint + "rules_version"
+	ValidationEndpoint = BaseEndpoint + "validate"
+)
+
+//
 // Application settings.
 var Settings = &settings.Settings
 
@@ -193,8 +201,8 @@ func (r *VMEventHandler) run() {
 //   - No tasks have been received within
 //     the delay period.
 func (r *VMEventHandler) harvest() {
-	r.log.Info("Result started.")
-	defer r.log.Info("Result stopped.")
+	r.log.Info("Harvest started.")
+	defer r.log.Info("Harvest stopped.")
 	long := time.Hour
 	short := time.Second
 	delay := long
@@ -226,7 +234,7 @@ func (r *VMEventHandler) harvest() {
 // watch are ignored.
 func (r *VMEventHandler) list() {
 	r.log.V(3).Info("List VMs that need to be validated.")
-	version, err := policy.Agent.Version()
+	version, err := policy.Agent.Version(VersionEndpoint)
 	if err != nil {
 		r.log.Error(err, err.Error())
 		return
@@ -244,6 +252,12 @@ func (r *VMEventHandler) list() {
 	if err != nil {
 		r.log.Error(err, "List VM failed.")
 		return
+	}
+	if itr.Len() > 0 {
+		r.log.V(3).Info(
+			"List (unvalidated) VMs found.",
+			"count",
+			itr.Len())
 	}
 	for {
 		vm := &model.VM{}
@@ -275,7 +289,7 @@ func (r *VMEventHandler) canceled() bool {
 // Analyze the VM.
 func (r *VMEventHandler) validate(vm *model.VM) (err error) {
 	task := &policy.Task{
-		Path:     "/v1/data/io/konveyor/forklift/ovirt/validate",
+		Path:     ValidationEndpoint,
 		Context:  r.context,
 		Workload: r.workload,
 		Result:   r.taskResult,
@@ -284,6 +298,10 @@ func (r *VMEventHandler) validate(vm *model.VM) (err error) {
 			ID: vm.ID,
 		},
 	}
+	r.log.V(4).Info(
+		"Validate VM.",
+		"vmID",
+		vm.ID)
 	err = policy.Agent.Submit(task)
 	if err != nil {
 		r.log.Error(err, "VM task (submit) failed.")
@@ -295,10 +313,13 @@ func (r *VMEventHandler) validate(vm *model.VM) (err error) {
 //
 // VMs validated.
 func (r *VMEventHandler) validated(batch []*policy.Task) {
-	r.log.V(3).Info("VM (batch) completed.", "batch", len(batch))
 	if len(batch) == 0 {
 		return
 	}
+	r.log.V(3).Info(
+		"VM (batch) completed.",
+		"count",
+		len(batch))
 	tx, err := r.DB.Begin()
 	if err != nil {
 		r.log.Error(err, "Begin tx failed.")
@@ -330,7 +351,7 @@ func (r *VMEventHandler) validated(batch []*policy.Task) {
 			r.log.Error(err, "VM update failed.")
 			continue
 		}
-		r.log.V(3).Info(
+		r.log.V(4).Info(
 			"VM validated.",
 			"vmID",
 			latest.ID,
