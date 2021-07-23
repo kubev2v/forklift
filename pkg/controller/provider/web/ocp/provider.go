@@ -90,16 +90,16 @@ func (h *ProviderHandler) ListContent(ctx *gin.Context) (content []interface{}, 
 	content = []interface{}{}
 	list := h.Container.List()
 	ns := ctx.Param(base.NsParam)
-	for _, reconciler := range list {
-		if p, cast := reconciler.Owner().(*api.Provider); cast {
+	for _, collector := range list {
+		if p, cast := collector.Owner().(*api.Provider); cast {
 			if p.Type() != api.OpenShift {
 				continue
 			}
 			if ns != "" && ns != p.Namespace {
 				continue
 			}
-			if reconciler, found := h.Container.Get(p); found {
-				h.Reconciler = reconciler
+			if collector, found := h.Container.Get(p); found {
+				h.Collector = collector
 			} else {
 				continue
 			}
@@ -128,7 +128,7 @@ func (h ProviderHandler) AddCount(r *Provider) (err error) {
 	if !h.Detail {
 		return nil
 	}
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	// VM
 	n, err := db.Count(&model.VM{}, nil)
 	if err != nil {

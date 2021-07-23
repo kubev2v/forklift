@@ -242,7 +242,7 @@ func (r *VMEventHandler) list() {
 	if r.canceled() {
 		return
 	}
-	itr, err := r.DB.Iter(
+	itr, err := r.DB.Find(
 		&model.VM{},
 		libmodel.ListOptions{
 			Predicate: libmodel.Or(

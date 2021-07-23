@@ -32,14 +32,14 @@ func (r *StorageClass) Object() runtime.Object {
 // Reconcile.
 // Achieve initial consistency.
 func (r *StorageClass) Reconcile(ctx context.Context) (err error) {
-	pClient := r.Reconciler.Client()
+	pClient := r.Collector.Client()
 	list := &storage.StorageClassList{}
 	err = pClient.List(context.TODO(), list)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	db := r.Reconciler.DB()
+	db := r.Collector.DB()
 	tx, err := db.Begin()
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -54,7 +54,7 @@ func (r *StorageClass) Reconcile(ctx context.Context) (err error) {
 		}
 		m := &model.StorageClass{}
 		m.With(&resource)
-		r.Reconciler.UpdateThreshold(m)
+		r.Collector.UpdateThreshold(m)
 		r.log.Info("Create", libref.ToKind(m), m.String())
 		err = tx.Insert(m)
 		if err != nil {
@@ -80,7 +80,7 @@ func (r *StorageClass) Create(e event.CreateEvent) bool {
 	}
 	m := &model.StorageClass{}
 	m.With(object)
-	r.Reconciler.Create(m)
+	r.Collector.Create(m)
 
 	return false
 }
@@ -94,7 +94,7 @@ func (r *StorageClass) Update(e event.UpdateEvent) bool {
 	}
 	m := &model.StorageClass{}
 	m.With(object)
-	r.Reconciler.Update(m)
+	r.Collector.Update(m)
 
 	return false
 }
@@ -108,7 +108,7 @@ func (r *StorageClass) Delete(e event.DeleteEvent) bool {
 	}
 	m := &model.StorageClass{}
 	m.With(object)
-	r.Reconciler.Delete(m)
+	r.Collector.Delete(m)
 
 	return false
 }
@@ -136,14 +136,14 @@ func (r *NetworkAttachmentDefinition) Object() runtime.Object {
 // Reconcile.
 // Achieve initial consistency.
 func (r *NetworkAttachmentDefinition) Reconcile(ctx context.Context) (err error) {
-	pClient := r.Reconciler.Client()
+	pClient := r.Collector.Client()
 	list := &net.NetworkAttachmentDefinitionList{}
 	err = pClient.List(context.TODO(), list)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	db := r.Reconciler.DB()
+	db := r.Collector.DB()
 	tx, err := db.Begin()
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -158,7 +158,7 @@ func (r *NetworkAttachmentDefinition) Reconcile(ctx context.Context) (err error)
 		}
 		m := &model.NetworkAttachmentDefinition{}
 		m.With(&resource)
-		r.Reconciler.UpdateThreshold(m)
+		r.Collector.UpdateThreshold(m)
 		r.log.Info("Create", libref.ToKind(m), m.String())
 		err = tx.Insert(m)
 		if err != nil {
@@ -184,7 +184,7 @@ func (r *NetworkAttachmentDefinition) Create(e event.CreateEvent) bool {
 	}
 	m := &model.NetworkAttachmentDefinition{}
 	m.With(object)
-	r.Reconciler.Create(m)
+	r.Collector.Create(m)
 
 	return false
 }
@@ -198,7 +198,7 @@ func (r *NetworkAttachmentDefinition) Update(e event.UpdateEvent) bool {
 	}
 	m := &model.NetworkAttachmentDefinition{}
 	m.With(object)
-	r.Reconciler.Update(m)
+	r.Collector.Update(m)
 
 	return false
 }
@@ -212,7 +212,7 @@ func (r *NetworkAttachmentDefinition) Delete(e event.DeleteEvent) bool {
 	}
 	m := &model.NetworkAttachmentDefinition{}
 	m.With(object)
-	r.Reconciler.Delete(m)
+	r.Collector.Delete(m)
 
 	return false
 }
@@ -240,14 +240,14 @@ func (r *Namespace) Object() runtime.Object {
 // Reconcile.
 // Achieve initial consistency.
 func (r *Namespace) Reconcile(ctx context.Context) (err error) {
-	pClient := r.Reconciler.Client()
+	pClient := r.Collector.Client()
 	list := &core.NamespaceList{}
 	err = pClient.List(context.TODO(), list)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	db := r.Reconciler.DB()
+	db := r.Collector.DB()
 	tx, err := db.Begin()
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -262,7 +262,7 @@ func (r *Namespace) Reconcile(ctx context.Context) (err error) {
 		}
 		m := &model.Namespace{}
 		m.With(&resource)
-		r.Reconciler.UpdateThreshold(m)
+		r.Collector.UpdateThreshold(m)
 		r.log.Info("Create", libref.ToKind(m), m.String())
 		err = tx.Insert(m)
 		if err != nil {
@@ -288,7 +288,7 @@ func (r *Namespace) Create(e event.CreateEvent) bool {
 	}
 	m := &model.Namespace{}
 	m.With(object)
-	r.Reconciler.Create(m)
+	r.Collector.Create(m)
 
 	return false
 }
@@ -302,7 +302,7 @@ func (r *Namespace) Update(e event.UpdateEvent) bool {
 	}
 	m := &model.Namespace{}
 	m.With(object)
-	r.Reconciler.Update(m)
+	r.Collector.Update(m)
 
 	return false
 }
@@ -316,7 +316,7 @@ func (r *Namespace) Delete(e event.DeleteEvent) bool {
 	}
 	m := &model.Namespace{}
 	m.With(object)
-	r.Reconciler.Delete(m)
+	r.Collector.Delete(m)
 
 	return false
 }
@@ -344,14 +344,14 @@ func (r *VM) Object() runtime.Object {
 // Reconcile.
 // Achieve initial consistency.
 func (r *VM) Reconcile(ctx context.Context) (err error) {
-	pClient := r.Reconciler.Client()
+	pClient := r.Collector.Client()
 	list := &cnv.VirtualMachineList{}
 	err = pClient.List(context.TODO(), list)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	db := r.Reconciler.DB()
+	db := r.Collector.DB()
 	tx, err := db.Begin()
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -366,7 +366,7 @@ func (r *VM) Reconcile(ctx context.Context) (err error) {
 		}
 		m := &model.VM{}
 		m.With(&resource)
-		r.Reconciler.UpdateThreshold(m)
+		r.Collector.UpdateThreshold(m)
 		r.log.Info("Create", libref.ToKind(m), m.String())
 		err = tx.Insert(m)
 		if err != nil {
@@ -392,7 +392,7 @@ func (r *VM) Create(e event.CreateEvent) bool {
 	}
 	m := &model.VM{}
 	m.With(object)
-	r.Reconciler.Create(m)
+	r.Collector.Create(m)
 
 	return false
 }
@@ -406,7 +406,7 @@ func (r *VM) Update(e event.UpdateEvent) bool {
 	}
 	m := &model.VM{}
 	m.With(object)
-	r.Reconciler.Update(m)
+	r.Collector.Update(m)
 
 	return false
 }
@@ -420,7 +420,7 @@ func (r *VM) Delete(e event.DeleteEvent) bool {
 	}
 	m := &model.VM{}
 	m.With(object)
-	r.Reconciler.Delete(m)
+	r.Collector.Delete(m)
 
 	return false
 }

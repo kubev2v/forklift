@@ -242,7 +242,7 @@ func (r *VMEventHandler) list() {
 	if r.canceled() {
 		return
 	}
-	itr, err := r.DB.Iter(
+	itr, err := r.DB.Find(
 		&model.VM{},
 		libmodel.ListOptions{
 			Predicate: libmodel.Or(
@@ -534,7 +534,7 @@ func (r *NICProfileHandler) validate(profile *model.NICProfile) {
 	defer func() {
 		_ = tx.End()
 	}()
-	itr, err := tx.Iter(
+	itr, err := tx.Find(
 		&model.VM{},
 		model.ListOptions{
 			Detail: model.MaxDetail,
@@ -606,7 +606,7 @@ func (r *DiskProfileHandler) validate(profile *model.DiskProfile) {
 		_ = tx.End()
 	}()
 	affectedDisks := map[string]bool{}
-	itr, err := tx.Iter(
+	itr, err := tx.Find(
 		&model.Disk{},
 		model.ListOptions{
 			Detail: model.MaxDetail,
@@ -626,7 +626,7 @@ func (r *DiskProfileHandler) validate(profile *model.DiskProfile) {
 			break
 		}
 	}
-	itr, err = tx.Iter(
+	itr, err = tx.Find(
 		&model.VM{},
 		model.ListOptions{
 			Detail: model.MaxDetail,

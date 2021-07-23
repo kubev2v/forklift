@@ -47,7 +47,7 @@ func (h NamespaceHandler) List(ctx *gin.Context) {
 		h.watch(ctx)
 		return
 	}
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	list := []model.Namespace{}
 	err := db.List(&list, h.ListOptions(ctx))
 	if err != nil {
@@ -82,7 +82,7 @@ func (h NamespaceHandler) Get(ctx *gin.Context) {
 			UID: ctx.Param(NsParam),
 		},
 	}
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	err := db.Get(m)
 	if errors.Is(err, model.NotFound) {
 		ctx.Status(http.StatusNotFound)
@@ -107,7 +107,7 @@ func (h NamespaceHandler) Get(ctx *gin.Context) {
 //
 // Watch.
 func (h NamespaceHandler) watch(ctx *gin.Context) {
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	err := h.Watch(
 		ctx,
 		db,

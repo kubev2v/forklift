@@ -50,7 +50,7 @@ func (h HostHandler) List(ctx *gin.Context) {
 		h.watch(ctx)
 		return
 	}
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	list := []model.Host{}
 	err := db.List(&list, h.ListOptions(ctx))
 	if err != nil {
@@ -104,7 +104,7 @@ func (h HostHandler) Get(ctx *gin.Context) {
 			ID: ctx.Param(HostParam),
 		},
 	}
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	err := db.Get(m)
 	if errors.Is(err, model.NotFound) {
 		ctx.Status(http.StatusNotFound)
@@ -147,7 +147,7 @@ func (h HostHandler) Get(ctx *gin.Context) {
 //
 // Watch.
 func (h HostHandler) watch(ctx *gin.Context) {
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	err := h.Watch(
 		ctx,
 		db,
@@ -185,7 +185,7 @@ func (h HostHandler) filter(ctx *gin.Context, list *[]model.Host) (err error) {
 	if len(strings.Split(name, "/")) < 2 {
 		return
 	}
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	kept := []model.Host{}
 	for _, m := range *list {
 		path, pErr := m.Path(db)
@@ -210,7 +210,7 @@ func (h *HostHandler) buildAdapters(host *Host) (err error) {
 		return
 	}
 	builder := AdapterBuilder{
-		db: h.Reconciler.DB(),
+		db: h.Collector.DB(),
 	}
 
 	err = builder.build(host)
