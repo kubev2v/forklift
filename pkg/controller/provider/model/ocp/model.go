@@ -63,7 +63,6 @@ func (m *Base) With(r Resource) {
 
 //
 // Get kubernetes resource version.
-// Needed by the data reconciler.
 func (m *Base) ResourceVersion() uint64 {
 	n, _ := strconv.ParseUint(m.Version, 10, 64)
 	return n

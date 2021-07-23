@@ -48,7 +48,7 @@ func (h VMHandler) List(ctx *gin.Context) {
 		h.watch(ctx)
 		return
 	}
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	list := []model.VM{}
 	err := db.List(&list, h.ListOptions(ctx))
 	if err != nil {
@@ -93,7 +93,7 @@ func (h VMHandler) Get(ctx *gin.Context) {
 		},
 	}
 	h.Detail = true
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	err := db.Get(m)
 	if errors.Is(err, model.NotFound) {
 		ctx.Status(http.StatusNotFound)
@@ -130,14 +130,14 @@ func (h *VMHandler) Expand(r *VM) (err error) {
 	if !h.Detail {
 		return
 	}
-	err = r.Expand(h.Reconciler.DB())
+	err = r.Expand(h.Collector.DB())
 	return
 }
 
 //
 // Watch.
 func (h VMHandler) watch(ctx *gin.Context) {
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	err := h.Watch(
 		ctx,
 		db,

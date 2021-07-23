@@ -221,8 +221,8 @@ var TsRootFolder = &types.TraversalSpec{
 }
 
 //
-// A VMWare reconciler.
-type Reconciler struct {
+// A VMWare collector.
+type Collector struct {
 	// The vsphere url.
 	url string
 	// Provider
@@ -242,14 +242,14 @@ type Reconciler struct {
 }
 
 //
-// New reconciler.
-func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) *Reconciler {
-	nlog := logging.WithName("reconciler|vsphere").WithValues(
+// New collector.
+func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) *Collector {
+	nlog := logging.WithName("collector|vsphere").WithValues(
 		"provider",
 		path.Join(
 			provider.GetNamespace(),
 			provider.GetName()))
-	return &Reconciler{
+	return &Collector{
 		url:      provider.Spec.URL,
 		provider: provider,
 		secret:   secret,
@@ -260,7 +260,7 @@ func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) *Reconcile
 
 //
 // The name.
-func (r *Reconciler) Name() string {
+func (r *Collector) Name() string {
 	url, err := liburl.Parse(r.url)
 	if err == nil {
 		return url.Host
@@ -271,31 +271,31 @@ func (r *Reconciler) Name() string {
 
 //
 // The owner.
-func (r *Reconciler) Owner() meta.Object {
+func (r *Collector) Owner() meta.Object {
 	return r.provider
 }
 
 //
 // Get the DB.
-func (r *Reconciler) DB() libmodel.DB {
+func (r *Collector) DB() libmodel.DB {
 	return r.db
 }
 
 //
 // Reset.
-func (r *Reconciler) Reset() {
+func (r *Collector) Reset() {
 	r.parity = false
 }
 
 //
 // Reset.
-func (r *Reconciler) HasParity() bool {
+func (r *Collector) HasParity() bool {
 	return r.parity
 }
 
 //
 // Test connect/logout.
-func (r *Reconciler) Test() (err error) {
+func (r *Collector) Test() (err error) {
 	ctx := context.Background()
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -308,8 +308,8 @@ func (r *Reconciler) Test() (err error) {
 }
 
 //
-// Start the reconciler.
-func (r *Reconciler) Start() error {
+// Start the collector.
+func (r *Collector) Start() error {
 	ctx := context.Background()
 	ctx, r.cancel = context.WithCancel(ctx)
 	start := func() {
@@ -340,8 +340,8 @@ func (r *Reconciler) Start() error {
 }
 
 //
-// Shutdown the reconciler.
-func (r *Reconciler) Shutdown() {
+// Shutdown the collector.
+func (r *Collector) Shutdown() {
 	r.log.Info("Shutdown.")
 	if r.cancel != nil {
 		r.cancel()
@@ -353,7 +353,7 @@ func (r *Reconciler) Shutdown() {
 //  1. connect.
 //  2. apply updates.
 // Blocks waiting on updates until canceled.
-func (r *Reconciler) getUpdates(ctx context.Context) error {
+func (r *Collector) getUpdates(ctx context.Context) error {
 	err := r.connect(ctx)
 	if err != nil {
 		return err
@@ -460,7 +460,7 @@ next:
 
 //
 // Add model watches.
-func (r *Reconciler) watch() (list []*libmodel.Watch) {
+func (r *Collector) watch() (list []*libmodel.Watch) {
 	// Cluster
 	w, err := r.db.Watch(
 		&model.Cluster{},
@@ -510,7 +510,7 @@ func (r *Reconciler) watch() (list []*libmodel.Watch) {
 
 //
 // Build the client.
-func (r *Reconciler) connect(ctx context.Context) error {
+func (r *Collector) connect(ctx context.Context) error {
 	r.close()
 	url, err := liburl.Parse(r.url)
 	if err != nil {
@@ -539,7 +539,7 @@ func (r *Reconciler) connect(ctx context.Context) error {
 
 //
 // Close connections.
-func (r *Reconciler) close() {
+func (r *Collector) close() {
 	if r.client != nil {
 		_ = r.client.Logout(context.TODO())
 		r.client.CloseIdleConnections()
@@ -549,7 +549,7 @@ func (r *Reconciler) close() {
 
 //
 // User.
-func (r *Reconciler) user() string {
+func (r *Collector) user() string {
 	if user, found := r.secret.Data["user"]; found {
 		return string(user)
 	}
@@ -559,7 +559,7 @@ func (r *Reconciler) user() string {
 
 //
 // Password.
-func (r *Reconciler) password() string {
+func (r *Collector) password() string {
 	if password, found := r.secret.Data["password"]; found {
 		return string(password)
 	}
@@ -569,7 +569,7 @@ func (r *Reconciler) password() string {
 
 //
 // Thumbprint.
-func (r *Reconciler) thumbprint() string {
+func (r *Collector) thumbprint() string {
 	if password, found := r.secret.Data["thumbprint"]; found {
 		return string(password)
 	}
@@ -579,7 +579,7 @@ func (r *Reconciler) thumbprint() string {
 
 //
 // Build the object Spec filter.
-func (r *Reconciler) filter(pc *property.Collector) *property.WaitFilter {
+func (r *Collector) filter(pc *property.Collector) *property.WaitFilter {
 	return &property.WaitFilter{
 		CreateFilter: types.CreateFilter{
 			This: pc.Reference(),
@@ -596,7 +596,7 @@ func (r *Reconciler) filter(pc *property.Collector) *property.WaitFilter {
 
 //
 // Build the object Spec.
-func (r *Reconciler) objectSpec() types.ObjectSpec {
+func (r *Collector) objectSpec() types.ObjectSpec {
 	return types.ObjectSpec{
 		Obj: r.client.ServiceContent.RootFolder,
 		SelectSet: []types.BaseSelectionSpec{
@@ -607,7 +607,7 @@ func (r *Reconciler) objectSpec() types.ObjectSpec {
 
 //
 // Build the property Spec.
-func (r *Reconciler) propertySpec() []types.PropertySpec {
+func (r *Collector) propertySpec() []types.PropertySpec {
 	return []types.PropertySpec{
 		{ // Folder
 			Type: Folder,
@@ -736,7 +736,7 @@ func (r *Reconciler) propertySpec() []types.PropertySpec {
 
 //
 // Apply updates.
-func (r *Reconciler) apply(ctx context.Context, tx *libmodel.Tx, updates []types.ObjectUpdate) (err error) {
+func (r *Collector) apply(ctx context.Context, tx *libmodel.Tx, updates []types.ObjectUpdate) (err error) {
 	for _, u := range updates {
 		switch string(u.Kind) {
 		case Enter:
@@ -757,7 +757,7 @@ func (r *Reconciler) apply(ctx context.Context, tx *libmodel.Tx, updates []types
 
 //
 // Select the appropriate adapter.
-func (r *Reconciler) selectAdapter(u types.ObjectUpdate) (Adapter, bool) {
+func (r *Collector) selectAdapter(u types.ObjectUpdate) (Adapter, bool) {
 	var adapter Adapter
 	switch u.Obj.Type {
 	case Folder:
@@ -845,7 +845,7 @@ func (r *Reconciler) selectAdapter(u types.ObjectUpdate) (Adapter, bool) {
 
 //
 // Object created.
-func (r Reconciler) applyEnter(tx *libmodel.Tx, u types.ObjectUpdate) error {
+func (r Collector) applyEnter(tx *libmodel.Tx, u types.ObjectUpdate) error {
 	adapter, selected := r.selectAdapter(u)
 	if !selected {
 		return nil
@@ -865,7 +865,7 @@ func (r Reconciler) applyEnter(tx *libmodel.Tx, u types.ObjectUpdate) error {
 
 //
 // Object modified.
-func (r Reconciler) applyModify(tx *libmodel.Tx, u types.ObjectUpdate) error {
+func (r Collector) applyModify(tx *libmodel.Tx, u types.ObjectUpdate) error {
 	adapter, selected := r.selectAdapter(u)
 	if !selected {
 		return nil
@@ -889,7 +889,7 @@ func (r Reconciler) applyModify(tx *libmodel.Tx, u types.ObjectUpdate) error {
 
 //
 // Object deleted.
-func (r Reconciler) applyLeave(tx *libmodel.Tx, u types.ObjectUpdate) error {
+func (r Collector) applyLeave(tx *libmodel.Tx, u types.ObjectUpdate) error {
 	var deleted model.Model
 	switch u.Obj.Type {
 	case Folder:

@@ -306,7 +306,7 @@ func (r *NetworkAdapter) Apply(ctx *Context, event *Event) (updater Updater, err
 		return
 	}
 	updater = func(tx *libmodel.Tx) (err error) {
-		stored, err := tx.Iter(
+		stored, err := tx.Find(
 			&model.Network{},
 			model.ListOptions{
 				Detail: model.MaxDetail,
@@ -387,7 +387,7 @@ func (r *NICProfileAdapter) Apply(ctx *Context, event *Event) (updater Updater, 
 		return
 	}
 	updater = func(tx *libmodel.Tx) (err error) {
-		stored, err := tx.Iter(
+		stored, err := tx.Find(
 			&model.NICProfile{},
 			model.ListOptions{
 				Detail: model.MaxDetail,
@@ -462,7 +462,7 @@ func (r *DiskProfileAdapter) Apply(ctx *Context, event *Event) (updater Updater,
 		return
 	}
 	updater = func(tx *libmodel.Tx) (err error) {
-		stored, err := tx.Iter(
+		stored, err := tx.Find(
 			&model.DiskProfile{},
 			model.ListOptions{
 				Detail: model.MaxDetail,
@@ -872,7 +872,7 @@ func (r *VMAdapter) Apply(ctx *Context, event *Event) (updater Updater, err erro
 			return
 		}
 		updater = func(tx *libmodel.Tx) (err error) {
-			stored, err := tx.Iter(
+			stored, err := tx.Find(
 				&model.VM{},
 				model.ListOptions{
 					Detail: model.MaxDetail,
@@ -954,7 +954,7 @@ func (r *DiskAdapter) Apply(ctx *Context, event *Event) (updater Updater, err er
 		return
 	}
 	updater = func(tx *libmodel.Tx) (err error) {
-		stored, err := tx.Iter(
+		stored, err := tx.Find(
 			&model.Disk{},
 			model.ListOptions{
 				Detail: model.MaxDetail,

@@ -48,7 +48,7 @@ func (h StorageClassHandler) List(ctx *gin.Context) {
 		h.watch(ctx)
 		return
 	}
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	list := []model.StorageClass{}
 	err := db.List(&list, h.ListOptions(ctx))
 	if err != nil {
@@ -83,7 +83,7 @@ func (h StorageClassHandler) Get(ctx *gin.Context) {
 			UID: ctx.Param(StorageClassParam),
 		},
 	}
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	err := db.Get(m)
 	if errors.Is(err, model.NotFound) {
 		ctx.Status(http.StatusNotFound)
@@ -108,7 +108,7 @@ func (h StorageClassHandler) Get(ctx *gin.Context) {
 //
 // Watch.
 func (h StorageClassHandler) watch(ctx *gin.Context) {
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	err := h.Watch(
 		ctx,
 		db,

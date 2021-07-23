@@ -76,20 +76,6 @@ func (m *Base) WithRef(ref Ref) {
 	m.ID = ref.ID
 }
 
-//
-// Created.
-func (m *Base) Created() {
-	m.Revision = 1
-}
-
-//
-// Updated.
-// Increment revision. Should ONLY be called by
-// the reconciler.
-func (m *Base) Updated() {
-	m.Revision++
-}
-
 // Determine object path.
 func (m *Base) Path(db libmodel.DB) (path string, err error) {
 	parts := []string{m.Name}

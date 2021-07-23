@@ -55,8 +55,8 @@ type Handler struct {
 	Container *libcontainer.Container
 	// Provider referenced in the request.
 	Provider *api.Provider
-	// Reconciler responsible for the provider.
-	Reconciler libcontainer.Reconciler
+	// Collector responsible for the provider.
+	Collector libcontainer.Collector
 	// Resources include details.
 	Detail bool
 }
@@ -106,13 +106,13 @@ func (h *Handler) setProvider(ctx *gin.Context) (status int) {
 		},
 	}
 	if h.Provider.UID != "" {
-		if h.Reconciler, found = h.Container.Get(h.Provider); !found {
+		if h.Collector, found = h.Container.Get(h.Provider); !found {
 			status = http.StatusNotFound
 			return
 		}
 		ctx.Header(ProviderHeader, uid)
-		h.Provider = h.Reconciler.Owner().(*api.Provider)
-		status = h.EnsureParity(h.Reconciler, time.Second*30)
+		h.Provider = h.Collector.Owner().(*api.Provider)
+		status = h.EnsureParity(h.Collector, time.Second*30)
 	} else {
 		status = http.StatusOK
 	}

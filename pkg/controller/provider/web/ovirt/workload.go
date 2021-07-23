@@ -48,7 +48,7 @@ func (h WorkloadHandler) Get(ctx *gin.Context) {
 			ID: ctx.Param(VMParam),
 		},
 	}
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	err := db.Get(m)
 	if errors.Is(err, model.NotFound) {
 		ctx.Status(http.StatusNotFound)
@@ -65,7 +65,7 @@ func (h WorkloadHandler) Get(ctx *gin.Context) {
 	h.Detail = true
 	r := Workload{}
 	r.With(m)
-	err = r.Expand(h.Reconciler.DB())
+	err = r.Expand(h.Collector.DB())
 	if err != nil {
 		log.Trace(
 			err,
