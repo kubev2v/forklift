@@ -15,7 +15,7 @@ import (
 func Build(
 	db libmodel.DB,
 	provider *api.Provider,
-	secret *core.Secret) libcontainer.Reconciler {
+	secret *core.Secret) libcontainer.Collector {
 	//
 	switch provider.Type() {
 	case api.OpenShift:

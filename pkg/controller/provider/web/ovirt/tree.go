@@ -43,7 +43,7 @@ func (h *TreeHandler) Prepare(ctx *gin.Context) int {
 		ctx.Status(status)
 		return status
 	}
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	err := db.List(
 		&h.datacenters,
 		model.ListOptions{
@@ -84,7 +84,7 @@ func (h TreeHandler) Tree(ctx *gin.Context) {
 		ctx.Status(http.StatusBadRequest)
 		return
 	}
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	content := TreeNode{}
 	for _, dc := range h.datacenters {
 		tr := Tree{

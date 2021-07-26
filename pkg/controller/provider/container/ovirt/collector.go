@@ -39,8 +39,8 @@ const (
 )
 
 //
-// oVirt data reconciler.
-type Reconciler struct {
+// oVirt data collector.
+type Collector struct {
 	// Provider
 	provider *api.Provider
 	// DB client.
@@ -62,14 +62,14 @@ type Reconciler struct {
 }
 
 //
-// New reconciler.
-func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) (r *Reconciler) {
-	log := logging.WithName("reconciler|ovirt").WithValues(
+// New collector.
+func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) (r *Collector) {
+	log := logging.WithName("collector|ovirt").WithValues(
 		"provider",
 		libpath.Join(
 			provider.GetNamespace(),
 			provider.GetName()))
-	r = &Reconciler{
+	r = &Collector{
 		client: &Client{
 			url:    provider.Spec.URL,
 			secret: secret,
@@ -84,7 +84,7 @@ func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) (r *Reconc
 
 //
 // The name.
-func (r *Reconciler) Name() string {
+func (r *Collector) Name() string {
 	url, err := liburl.Parse(r.client.url)
 	if err == nil {
 		return url.Host
@@ -95,38 +95,38 @@ func (r *Reconciler) Name() string {
 
 //
 // The owner.
-func (r *Reconciler) Owner() meta.Object {
+func (r *Collector) Owner() meta.Object {
 	return r.provider
 }
 
 //
 // Get the DB.
-func (r *Reconciler) DB() libmodel.DB {
+func (r *Collector) DB() libmodel.DB {
 	return r.db
 }
 
 //
 // Reset.
-func (r *Reconciler) Reset() {
+func (r *Collector) Reset() {
 	r.parity = false
 }
 
 //
 // Reset.
-func (r *Reconciler) HasParity() bool {
+func (r *Collector) HasParity() bool {
 	return r.parity
 }
 
 //
 // Test connect/logout.
-func (r *Reconciler) Test() (err error) {
+func (r *Collector) Test() (err error) {
 	_, err = r.client.system()
 	return
 }
 
 //
-// Start the reconciler.
-func (r *Reconciler) Start() error {
+// Start the collector.
+func (r *Collector) Start() error {
 	ctx := Context{
 		client: r.client,
 		log:    r.log,
@@ -153,7 +153,7 @@ func (r *Reconciler) Start() error {
 
 //
 // Run the current phase.
-func (r *Reconciler) run(ctx *Context) (err error) {
+func (r *Collector) run(ctx *Context) (err error) {
 	r.log.V(3).Info(
 		"Running.",
 		"phase",
@@ -205,8 +205,8 @@ func (r *Reconciler) run(ctx *Context) (err error) {
 }
 
 //
-// Shutdown the reconciler.
-func (r *Reconciler) Shutdown() {
+// Shutdown the collector.
+func (r *Collector) Shutdown() {
 	r.log.Info("Shutdown.")
 	if r.cancel != nil {
 		r.cancel()
@@ -215,7 +215,7 @@ func (r *Reconciler) Shutdown() {
 
 //
 // Fetch and note that last event.
-func (r *Reconciler) noteLastEvent() (err error) {
+func (r *Collector) noteLastEvent() (err error) {
 	err = r.connect()
 	if err != nil {
 		return
@@ -245,7 +245,7 @@ func (r *Reconciler) noteLastEvent() (err error) {
 
 //
 // Load the inventory.
-func (r *Reconciler) load(ctx *Context) (err error) {
+func (r *Collector) load(ctx *Context) (err error) {
 	err = r.connect()
 	if err != nil {
 		return
@@ -271,7 +271,7 @@ func (r *Reconciler) load(ctx *Context) (err error) {
 
 //
 // List and create resources using the adapter.
-func (r *Reconciler) create(ctx *Context, adapter Adapter) (err error) {
+func (r *Collector) create(ctx *Context, adapter Adapter) (err error) {
 	itr, aErr := adapter.List(ctx)
 	if aErr != nil {
 		err = aErr
@@ -312,7 +312,7 @@ func (r *Reconciler) create(ctx *Context, adapter Adapter) (err error) {
 
 //
 // Add model watches.
-func (r *Reconciler) beginWatch() (err error) {
+func (r *Collector) beginWatch() (err error) {
 	defer func() {
 		if err != nil {
 			r.endWatch()
@@ -385,7 +385,7 @@ func (r *Reconciler) beginWatch() (err error) {
 
 //
 // End watches.
-func (r *Reconciler) endWatch() {
+func (r *Collector) endWatch() {
 	for _, watch := range r.watches {
 		watch.End()
 	}
@@ -399,7 +399,7 @@ func (r *Reconciler) endWatch() {
 // The two-phased approach ensures we do not hold the
 // DB transaction while using the provider API which
 // can block or be slow.
-func (r *Reconciler) refresh(ctx *Context) (err error) {
+func (r *Collector) refresh(ctx *Context) (err error) {
 	err = r.connect()
 	if err != nil {
 		return
@@ -438,7 +438,7 @@ func (r *Reconciler) refresh(ctx *Context) (err error) {
 
 //
 // Build the changeSet.
-func (r *Reconciler) changeSet(ctx *Context, event *Event) (list []Updater, err error) {
+func (r *Collector) changeSet(ctx *Context, event *Event) (list []Updater, err error) {
 	for _, adapter := range adapterMap[event.code()] {
 		u, aErr := adapter.Apply(ctx, event)
 		if aErr != nil {
@@ -452,7 +452,7 @@ func (r *Reconciler) changeSet(ctx *Context, event *Event) (list []Updater, err 
 
 //
 // Apply the changeSet.
-func (r *Reconciler) apply(changeSet []Updater) (err error) {
+func (r *Collector) apply(changeSet []Updater) (err error) {
 	tx, err := r.db.Begin()
 	if err != nil {
 		return
@@ -473,7 +473,7 @@ func (r *Reconciler) apply(changeSet []Updater) (err error) {
 //
 // List Event collection.
 // Query by list of event types since lastEvent (marked).
-func (r *Reconciler) listEvent() (list []Event, err error) {
+func (r *Collector) listEvent() (list []Event, err error) {
 	eventList := EventList{}
 	codes := []string{}
 	for n, _ := range adapterMap {
@@ -512,6 +512,6 @@ func (r *Reconciler) listEvent() (list []Event, err error) {
 
 //
 // Connect.
-func (r *Reconciler) connect() error {
+func (r *Collector) connect() error {
 	return r.client.connect()
 }

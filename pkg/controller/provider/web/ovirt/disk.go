@@ -48,7 +48,7 @@ func (h DiskHandler) List(ctx *gin.Context) {
 		h.watch(ctx)
 		return
 	}
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	list := []model.Disk{}
 	err := db.List(&list, h.ListOptions(ctx))
 	if err != nil {
@@ -63,7 +63,7 @@ func (h DiskHandler) List(ctx *gin.Context) {
 	for _, m := range list {
 		r := &Disk{}
 		r.With(&m)
-		err = r.Expand(h.Reconciler.DB())
+		err = r.Expand(h.Collector.DB())
 		if err != nil {
 			log.Trace(
 				err,
@@ -93,7 +93,7 @@ func (h DiskHandler) Get(ctx *gin.Context) {
 			ID: ctx.Param(DiskParam),
 		},
 	}
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	err := db.Get(m)
 	if errors.Is(err, model.NotFound) {
 		ctx.Status(http.StatusNotFound)
@@ -109,7 +109,7 @@ func (h DiskHandler) Get(ctx *gin.Context) {
 	}
 	r := &Disk{}
 	r.With(m)
-	err = r.Expand(h.Reconciler.DB())
+	err = r.Expand(h.Collector.DB())
 	if err != nil {
 		log.Trace(
 			err,
@@ -130,14 +130,14 @@ func (h *DiskHandler) Expand(r *Disk) (err error) {
 	if !h.Detail {
 		return
 	}
-	err = r.Expand(h.Reconciler.DB())
+	err = r.Expand(h.Collector.DB())
 	return
 }
 
 //
 // Watch.
 func (h DiskHandler) watch(ctx *gin.Context) {
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	err := h.Watch(
 		ctx,
 		db,
