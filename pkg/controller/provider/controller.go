@@ -239,9 +239,9 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 //
 // Update the provider.
 func (r *Reconciler) updateProvider(provider *api.Provider) (err error) {
-	rl, found := r.container.Get(provider)
+	collector, found := r.container.Get(provider)
 	if found {
-		*(rl.Owner().(*api.Provider)) = *provider
+		*(collector.Owner().(*api.Provider)) = *provider
 	}
 
 	return
@@ -268,7 +268,7 @@ func (r *Reconciler) updateContainer(provider *api.Provider) (err error) {
 		current.Shutdown()
 		_ = current.DB().Close(true)
 		r.Log.V(2).Info(
-			"Shutdown found (data) reconciler.")
+			"Shutdown found collector.")
 	}
 	db := r.getDB(provider)
 	secret, err := r.getSecret(provider)
@@ -279,13 +279,14 @@ func (r *Reconciler) updateContainer(provider *api.Provider) (err error) {
 	if err != nil {
 		return
 	}
-	err = r.container.Add(container.Build(db, provider, secret))
+	collector := container.Build(db, provider, secret)
+	err = r.container.Add(collector)
 	if err != nil {
 		return
 	}
 
 	r.Log.V(2).Info(
-		"Data reconciler added/started.")
+		"Data collector added/started.")
 
 	return
 }

@@ -49,7 +49,7 @@ func (h NetworkHandler) List(ctx *gin.Context) {
 		h.watch(ctx)
 		return
 	}
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	list := []model.Network{}
 	err := db.List(&list, h.ListOptions(ctx))
 	if err != nil {
@@ -93,7 +93,7 @@ func (h NetworkHandler) Get(ctx *gin.Context) {
 			ID: ctx.Param(NetworkParam),
 		},
 	}
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	err := db.Get(m)
 	if errors.Is(err, model.NotFound) {
 		ctx.Status(http.StatusNotFound)
@@ -127,7 +127,7 @@ func (h NetworkHandler) Get(ctx *gin.Context) {
 //
 // Watch.
 func (h NetworkHandler) watch(ctx *gin.Context) {
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	err := h.Watch(
 		ctx,
 		db,
@@ -165,7 +165,7 @@ func (h NetworkHandler) filter(ctx *gin.Context, list *[]model.Network) (err err
 	if len(strings.Split(name, "/")) < 2 {
 		return
 	}
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	kept := []model.Network{}
 	for _, m := range *list {
 		path, pErr := m.Path(db)

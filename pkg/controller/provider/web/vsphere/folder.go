@@ -50,7 +50,7 @@ func (h FolderHandler) List(ctx *gin.Context) {
 		h.watch(ctx)
 		return
 	}
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	list := []model.Folder{}
 	err := db.List(&list, h.ListOptions(ctx))
 	if err != nil {
@@ -85,7 +85,7 @@ func (h FolderHandler) Get(ctx *gin.Context) {
 			ID: ctx.Param(FolderParam),
 		},
 	}
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	err := db.Get(m)
 	if errors.Is(err, model.NotFound) {
 		ctx.Status(http.StatusNotFound)
@@ -119,7 +119,7 @@ func (h FolderHandler) Get(ctx *gin.Context) {
 //
 // Watch.
 func (h FolderHandler) watch(ctx *gin.Context) {
-	db := h.Reconciler.DB()
+	db := h.Collector.DB()
 	err := h.Watch(
 		ctx,
 		db,

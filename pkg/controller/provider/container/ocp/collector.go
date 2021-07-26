@@ -11,10 +11,10 @@ import (
 )
 
 //
-// New reconciler.
-func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) libcontainer.Reconciler {
-	return &Reconciler{
-		Reconciler: libocp.New(
+// New collector.
+func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) libcontainer.Collector {
+	return &Collector{
+		Collector: libocp.New(
 			db,
 			provider,
 			secret,
@@ -50,7 +50,7 @@ func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) libcontain
 }
 
 //
-// OCP reconciler.
-type Reconciler struct {
-	*libocp.Reconciler
+// OCP collector.
+type Collector struct {
+	*libocp.Collector
 }
