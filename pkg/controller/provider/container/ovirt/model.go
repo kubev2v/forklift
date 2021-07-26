@@ -247,8 +247,8 @@ func (r *DataCenterAdapter) Apply(ctx *Context, event *Event) (updater Updater, 
 	case USER_REMOVE_STORAGE_POOL:
 		updater = func(tx *libmodel.Tx) (err error) {
 			err = tx.Delete(
-				&model.Cluster{
-					Base: model.Base{ID: event.DataCenter.Ref},
+				&model.DataCenter{
+					Base: model.Base{ID: event.DataCenter.ID},
 				})
 			return
 		}
@@ -613,7 +613,7 @@ func (r *ClusterAdapter) Apply(ctx *Context, event *Event) (updater Updater, err
 		updater = func(tx *libmodel.Tx) (err error) {
 			err = tx.Delete(
 				&model.Cluster{
-					Base: model.Base{ID: event.Cluster.Ref},
+					Base: model.Base{ID: event.Cluster.ID},
 				})
 			return
 		}
@@ -702,7 +702,7 @@ func (r *HostAdapter) Apply(ctx *Context, event *Event) (updater Updater, err er
 		updater = func(tx *libmodel.Tx) (err error) {
 			err = tx.Delete(
 				&model.Host{
-					Base: model.Base{ID: event.Host.Ref},
+					Base: model.Base{ID: event.Host.ID},
 				})
 			return
 		}
@@ -861,7 +861,7 @@ func (r *VMAdapter) Apply(ctx *Context, event *Event) (updater Updater, err erro
 		updater = func(tx *libmodel.Tx) (err error) {
 			err = tx.Delete(
 				&model.VM{
-					Base: model.Base{ID: event.VM.Ref},
+					Base: model.Base{ID: event.VM.ID},
 				})
 			return
 		}

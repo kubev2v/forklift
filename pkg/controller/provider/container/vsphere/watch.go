@@ -330,7 +330,7 @@ func (r *VMEventHandler) validated(batch []*policy.Task) {
 	}()
 	for _, task := range batch {
 		if task.Error != nil {
-			r.log.Info(task.Error.Error())
+			r.log.Error(err, task.Error.Error())
 			continue
 		}
 		latest := &model.VM{Base: model.Base{ID: task.Ref.ID}}
