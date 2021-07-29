@@ -244,8 +244,7 @@ func (r *Migration) step(vm *plan.VMStatus) (err error) {
 				Message:  "The VM migration has SUCCEEDED.",
 				Durable:  true,
 			})
-	}
-	if vm.Error != nil {
+	} else if vm.Error != nil {
 		vm.Phase = Completed
 		vm.SetCondition(
 			libcnd.Condition{
