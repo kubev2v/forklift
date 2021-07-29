@@ -36,7 +36,7 @@ type HookRunner struct {
 // Run.
 func (r *HookRunner) Run(vm *planapi.VMStatus) (err error) {
 	r.vm = vm
-	step, found := vm.ActiveStep()
+	step, found := vm.FindStep(vm.Phase)
 	if !found {
 		err = liberr.New("Step not found.")
 		return
