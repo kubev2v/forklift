@@ -235,6 +235,16 @@ func (r *Migration) step(vm *plan.VMStatus) (err error) {
 				vm.Phase))
 	}
 	vm.ReflectPipeline()
+	if vm.Phase == Completed && vm.Error == nil {
+		vm.SetCondition(
+			libcnd.Condition{
+				Type:     Succeeded,
+				Status:   True,
+				Category: Advisory,
+				Message:  "The VM migration has SUCCEEDED.",
+				Durable:  true,
+			})
+	}
 	if vm.Error != nil {
 		vm.Phase = Completed
 		vm.SetCondition(
