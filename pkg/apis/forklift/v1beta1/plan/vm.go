@@ -82,10 +82,10 @@ type Precopy struct {
 }
 
 //
-// Find the `Active` step.
-func (r *VMStatus) ActiveStep() (step *Step, found bool) {
+// Find a step by name.
+func (r *VMStatus) FindStep(name string) (step *Step, found bool) {
 	for _, s := range r.Pipeline {
-		if s.Name == r.Phase {
+		if s.Name == name {
 			found = true
 			step = s
 			break
