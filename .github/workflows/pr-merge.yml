@@ -33,5 +33,5 @@ jobs:
           bz_product: "Migration Toolkit for Virtualization"
           title: ${{ github.event.pull_request.title }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch_to_release: "release-v2.0.0-beta.0:2.0.0-beta.1,main:2.0.0"
+          branch_to_release: ${{ secrets.MTV_PR_BZ_MAP }}
           base_branch: ${{ github.base_ref }}
