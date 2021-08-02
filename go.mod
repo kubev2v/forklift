@@ -3,7 +3,7 @@ module github.com/konveyor/forklift-controller
 go 1.14
 
 require (
-	github.com/gin-gonic/gin v1.6.3
+	github.com/gin-gonic/gin v1.7.2
 	github.com/go-logr/logr v0.3.0
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.1.0
 	github.com/konveyor/controller v0.6.0
