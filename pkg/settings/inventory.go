@@ -81,7 +81,7 @@ func (r *Inventory) Load() error {
 		r.WorkingDir = os.TempDir()
 	}
 	// Auth
-	r.AuthRequired = getEnvBool(AuthRequired, false)
+	r.AuthRequired = getEnvBool(AuthRequired, true)
 	// Host
 	if s, found := os.LookupEnv(Host); found {
 		r.Host = s

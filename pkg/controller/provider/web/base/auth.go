@@ -94,6 +94,9 @@ func (r *Auth) permit(token string, p *api.Provider) (allowed bool, err error) {
 	if !tr.Status.Authenticated {
 		return
 	}
+	if p.UID == "" {
+		allowed = true
+	}
 	user := tr.Status.User
 	kind := p.GetObjectKind()
 	gvk := kind.GroupVersionKind()
