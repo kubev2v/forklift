@@ -6,7 +6,8 @@ RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o manager github.com/konv
 
 
 # Runner image
-FROM registry.access.redhat.com/ubi8/ubi-micro:8.4
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.4
+RUN microdnf -y install tar && microdnf clean all
 
 COPY --from=builder /opt/app-root/src/manager /usr/local/bin/manager
 ENTRYPOINT ["/usr/local/bin/manager"]
