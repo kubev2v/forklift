@@ -112,7 +112,7 @@ func (h *Handler) setProvider(ctx *gin.Context) (status int) {
 		}
 		ctx.Header(ProviderHeader, uid)
 		h.Provider = h.Collector.Owner().(*api.Provider)
-		status = h.EnsureParity(h.Collector, time.Second*30)
+		status = h.EnsureParity(h.Collector, time.Second*10)
 	} else {
 		status = http.StatusOK
 	}
@@ -141,9 +141,6 @@ func (h *Handler) setDetail(ctx *gin.Context) int {
 // Permit request - Authorization.
 func (h *Handler) permit(ctx *gin.Context) (status int) {
 	status = http.StatusOK
-	if h.Provider.UID == "" {
-		return
-	}
 	if Settings.AuthRequired {
 		return DefaultAuth.Permit(ctx, h.Provider)
 	}
