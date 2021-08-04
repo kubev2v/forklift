@@ -171,7 +171,7 @@ func (r *Migration) step(vm *plan.VMStatus) (err error) {
 		if err != nil {
 			return
 		}
-		if step, found := vm.ActiveStep(); found {
+		if step, found := vm.FindStep(vm.Phase); found {
 			if step.MarkedCompleted() && step.Error == nil {
 				vm.Phase = r.next(vm.Phase)
 			}
@@ -203,16 +203,18 @@ func (r *Migration) step(vm *plan.VMStatus) (err error) {
 				return
 			}
 		}
-		completed, failed, rErr := r.updateVM(vm)
+		rErr := r.updateVM(vm)
 		if rErr != nil {
 			err = liberr.Wrap(rErr)
 			return
 		}
-		if completed {
-			if !failed {
-				vm.Phase = r.next(vm.Phase)
-			} else {
-				vm.Phase = Completed
+		if step, found := vm.FindStep(ImageConversion); found {
+			if step.MarkedCompleted() {
+				if step.Error == nil {
+					vm.Phase = r.next(vm.Phase)
+				} else {
+					vm.Phase = Completed
+				}
 			}
 		}
 	case Completed:
@@ -233,7 +235,16 @@ func (r *Migration) step(vm *plan.VMStatus) (err error) {
 				vm.Phase))
 	}
 	vm.ReflectPipeline()
-	if vm.Error != nil {
+	if vm.Phase == Completed && vm.Error == nil {
+		vm.SetCondition(
+			libcnd.Condition{
+				Type:     Succeeded,
+				Status:   True,
+				Category: Advisory,
+				Message:  "The VM migration has SUCCEEDED.",
+				Durable:  true,
+			})
+	} else if vm.Error != nil {
 		vm.Phase = Completed
 		vm.SetCondition(
 			libcnd.Condition{
@@ -569,7 +580,7 @@ func (r *Migration) end() (completed bool, err error) {
 
 //
 // Update VM migration status.
-func (r *Migration) updateVM(vm *plan.VMStatus) (completed bool, failed bool, err error) {
+func (r *Migration) updateVM(vm *plan.VMStatus) (err error) {
 	if r.importMap == nil {
 		r.importMap, err = r.kubevirt.ImportMap()
 		if err != nil {
@@ -585,47 +596,6 @@ func (r *Migration) updateVM(vm *plan.VMStatus) (completed bool, failed bool, er
 		return
 	}
 	r.updatePipeline(vm, &imp)
-	conditions := imp.Conditions()
-	cnd := conditions.FindCondition(Succeeded)
-	if cnd != nil {
-		vm.MarkCompleted()
-		completed = true
-		if cnd.Status != True {
-			vm.AddError(cnd.Message)
-			failed = true
-		} else {
-			vm.SetCondition(
-				libcnd.Condition{
-					Type:     Succeeded,
-					Status:   True,
-					Category: Advisory,
-					Message:  "The VM migration has SUCCEEDED.",
-					Durable:  true,
-				})
-		}
-	} else {
-		cnd = conditions.FindCondition(string(vmio.Processing))
-		if cnd != nil && cnd.Reason == string(vmio.CopyingPaused) {
-			vm.SetCondition(
-				libcnd.Condition{
-					Type:     Paused,
-					Status:   True,
-					Category: Advisory,
-					Message:  "The VM migration is PAUSED.",
-					Durable:  false,
-				})
-		} else if cnd != nil && cnd.Reason == string(vmio.Pending) {
-			vm.SetCondition(
-				libcnd.Condition{
-					Type:     Pending,
-					Status:   True,
-					Category: Advisory,
-					Message:  "The VM migration is PENDING.",
-					Durable:  false,
-				})
-		}
-	}
-
 	if imp.Spec.Warm {
 		updateWarmStatus(vm, imp)
 	}
@@ -720,8 +690,27 @@ func (r *Migration) updatePipeline(vm *plan.VMStatus, imp *VmImport) {
 			conditions := imp.Conditions()
 			cnd := conditions.FindCondition("Processing")
 			if cnd != nil {
-				if cnd.Status == True && cnd.Reason == "ConvertingGuest" {
-					step.MarkStarted()
+				switch cnd.Reason {
+				case string(vmio.Pending):
+					vm.SetCondition(
+						libcnd.Condition{
+							Type:     Pending,
+							Status:   True,
+							Category: Advisory,
+							Message:  "The VM migration is PENDING.",
+						})
+				case string(vmio.CopyingPaused):
+					vm.SetCondition(
+						libcnd.Condition{
+							Type:     Paused,
+							Status:   True,
+							Category: Advisory,
+							Message:  "The VM migration is PAUSED.",
+						})
+				case string(vmio.ConvertingGuest):
+					if cnd.Status == True {
+						step.MarkStarted()
+					}
 				}
 				if step.MarkedStarted() {
 					step.Phase = cnd.Reason
