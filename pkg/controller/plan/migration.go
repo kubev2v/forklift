@@ -6,6 +6,7 @@ import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libitr "github.com/konveyor/controller/pkg/itinerary"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
@@ -208,7 +209,17 @@ func (r *Migration) step(vm *plan.VMStatus) (err error) {
 			err = liberr.Wrap(rErr)
 			return
 		}
+		// vSphere VMs require image conversion, other VMs are
+		// complete after the disk transfer is finished.
 		if step, found := vm.FindStep(ImageConversion); found {
+			if step.MarkedCompleted() {
+				if step.Error == nil {
+					vm.Phase = r.next(vm.Phase)
+				} else {
+					vm.Phase = Completed
+				}
+			}
+		} else if step, found = vm.FindStep(DiskTransfer); found {
 			if step.MarkedCompleted() {
 				if step.Error == nil {
 					vm.Phase = r.next(vm.Phase)
@@ -475,15 +486,18 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 					},
 					Tasks: tasks,
 				})
-			pipeline = append(
-				pipeline,
-				&plan.Step{
-					Task: plan.Task{
-						Name:        ImageConversion,
-						Description: "Convert image to kubevirt.",
-						Progress:    libitr.Progress{Total: 1},
-					},
-				})
+			// only vSphere VMs require image conversion.
+			if r.Source.Provider.Type() == api.VSphere {
+				pipeline = append(
+					pipeline,
+					&plan.Step{
+						Task: plan.Task{
+							Name:        ImageConversion,
+							Description: "Convert image to kubevirt.",
+							Progress:    libitr.Progress{Total: 1},
+						},
+					})
+			}
 		case PostHook:
 			pipeline = append(
 				pipeline,
