@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/gin-gonic/gin"
 	liberr "github.com/konveyor/controller/pkg/error"
+	"github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	auth "k8s.io/api/authentication/v1"
 	auth2 "k8s.io/api/authorization/v1"
@@ -96,18 +97,20 @@ func (r *Auth) permit(token string, p *api.Provider) (allowed bool, err error) {
 	}
 	if p.UID == "" {
 		allowed = true
+		return
+	}
+	secret := p.Spec.Secret
+	if !ref.RefSet(&secret) {
+		return
 	}
 	user := tr.Status.User
-	kind := p.GetObjectKind()
-	gvk := kind.GroupVersionKind()
 	ar := &auth2.SubjectAccessReview{
 		Spec: auth2.SubjectAccessReviewSpec{
 			ResourceAttributes: &auth2.ResourceAttributes{
-				Group:     gvk.Group,
-				Resource:  gvk.Kind,
-				Namespace: p.Namespace,
-				Name:      p.Name,
-				Verb:      "*",
+				Resource:  "secret",
+				Namespace: secret.Namespace,
+				Name:      secret.Name,
+				Verb:      "get",
 			},
 			Groups: user.Groups,
 			User:   user.UID,
