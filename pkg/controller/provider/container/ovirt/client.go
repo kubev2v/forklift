@@ -15,6 +15,15 @@ import (
 )
 
 //
+// Not found error.
+type NotFound struct {
+}
+
+func (e *NotFound) Error() string {
+	return "not found."
+}
+
+//
 // Client.
 type Client struct {
 	// Base URL.
@@ -98,13 +107,21 @@ func (r *Client) get(path string, object interface{}, param ...libweb.Param) (er
 		return
 	}
 	url.Path = path
+	defer func() {
+		if err != nil {
+			err = liberr.Wrap(err, "url", url.String())
+		}
+	}()
 	status, err := r.client.Get(url.String(), object, param...)
 	if err != nil {
 		return
 	}
-	if status != http.StatusOK {
+	switch status {
+	case http.StatusOK:
+	case http.StatusNotFound:
+		err = &NotFound{}
+	default:
 		err = liberr.New(http.StatusText(status))
-		return
 	}
 
 	return

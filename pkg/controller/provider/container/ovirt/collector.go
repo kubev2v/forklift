@@ -297,10 +297,6 @@ func (r *Collector) create(ctx *Context, adapter Adapter) (err error) {
 		if err != nil {
 			return
 		}
-		r.log.V(3).Info(
-			"Model created.",
-			"model",
-			libmodel.Describe(m))
 	}
 	err = tx.Commit()
 	if err != nil {
@@ -417,20 +413,17 @@ func (r *Collector) refresh(ctx *Context) (err error) {
 		changeSet, applyErr := r.changeSet(ctx, event)
 		if applyErr == nil {
 			applyErr = r.apply(changeSet)
-		}
-		if applyErr != nil {
+			r.log.V(3).Info(
+				"Event applied.",
+				"event",
+				event)
+		} else {
 			r.log.Error(
 				applyErr,
 				"Apply event failed.",
 				"event",
 				event)
-			continue
 		}
-
-		r.log.V(3).Info(
-			"Event applied.",
-			"event",
-			event.Code)
 	}
 
 	return
