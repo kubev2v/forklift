@@ -3,6 +3,7 @@ package ovirt
 import (
 	"errors"
 	"github.com/gin-gonic/gin"
+	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
@@ -281,6 +282,11 @@ func (r *VM) Link(p *api.Provider) {
 // Expand the resource.
 // The vNIC profile.ID is optional.
 func (r *VM) Expand(db libmodel.DB) (err error) {
+	defer func() {
+		if err != nil {
+			err = liberr.Wrap(err, "vm", r.ID)
+		}
+	}()
 	for i := range r.NICs {
 		nic := &r.NICs[i]
 		if nic.Profile.ID == "" {

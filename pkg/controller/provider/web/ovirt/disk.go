@@ -3,6 +3,7 @@ package ovirt
 import (
 	"errors"
 	"github.com/gin-gonic/gin"
+	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
@@ -196,6 +197,11 @@ func (r *Disk) Expand(db libmodel.DB) (err error) {
 	if r.Profile.ID == "" {
 		return
 	}
+	defer func() {
+		if err != nil {
+			err = liberr.Wrap(err, "disk", r.ID)
+		}
+	}()
 	profile := &model.DiskProfile{
 		Base: model.Base{ID: r.Profile.ID},
 	}
