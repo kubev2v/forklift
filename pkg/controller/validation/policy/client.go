@@ -386,12 +386,12 @@ func (r *Pool) Start() {
 		for task := range r.output {
 			if task.Error == nil {
 				log.V(4).Info(
-					"VM Validation succeeded.",
+					"VM validation succeeded.",
 					"task",
 					task.String())
 			} else {
 				log.Info(
-					"VM Validation failed.",
+					"VM validation failed.",
 					"task",
 					task.String())
 			}

@@ -2,6 +2,7 @@ package ovirt
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/go-logr/logr"
 	liberr "github.com/konveyor/controller/pkg/error"
@@ -43,8 +44,7 @@ const (
 	USER_REMOVE_HOST = 44
 	// VM
 	USER_ADD_VM                           = 34
-	USER_ADD_VM_STARTED                   = 37
-	USER_ADD_VM_FINISHED_FAILED           = 52
+	USER_ADD_VM_FINISHED_SUCCESS          = 53
 	USER_UPDATE_VM                        = 35
 	USER_REMOVE_VM                        = 113
 	USER_ADD_DISK_TO_VM_SUCCESS           = 97
@@ -211,6 +211,18 @@ func (r *DataCenterAdapter) Event() []int {
 //
 // Apply events to the inventory model.
 func (r *DataCenterAdapter) Apply(ctx *Context, event *Event) (updater Updater, err error) {
+	defer func() {
+		if errors.Is(err, &NotFound{}) {
+			updater = func(tx *libmodel.Tx) (err error) {
+				ctx.log.V(3).Info(
+					"DataCenter not found; event ignored.",
+					"event",
+					event)
+				return
+			}
+			err = nil
+		}
+	}()
 	switch event.code() {
 	case USER_ADD_STORAGE_POOL:
 		object := &DataCenter{}
@@ -576,6 +588,18 @@ func (r *ClusterAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 //
 // Apply and event tot the inventory model.
 func (r *ClusterAdapter) Apply(ctx *Context, event *Event) (updater Updater, err error) {
+	defer func() {
+		if errors.Is(err, &NotFound{}) {
+			updater = func(tx *libmodel.Tx) (err error) {
+				ctx.log.V(3).Info(
+					"Cluster not found; event ignored.",
+					"event",
+					event)
+				return
+			}
+			err = nil
+		}
+	}()
 	switch event.code() {
 	case USER_ADD_CLUSTER:
 		object := &Cluster{}
@@ -665,6 +689,18 @@ func (r *HostAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 //
 // Apply and event tot the inventory model.
 func (r *HostAdapter) Apply(ctx *Context, event *Event) (updater Updater, err error) {
+	defer func() {
+		if errors.Is(err, &NotFound{}) {
+			updater = func(tx *libmodel.Tx) (err error) {
+				ctx.log.V(3).Info(
+					"Host not found; event ignored.",
+					"event",
+					event)
+				return
+			}
+			err = nil
+		}
+	}()
 	switch event.code() {
 	case USER_ADD_HOST:
 		object := &Host{}
@@ -732,8 +768,7 @@ func (r *VMAdapter) Event() []int {
 	return []int{
 		// Add
 		USER_ADD_VM,
-		USER_ADD_VM_STARTED,
-		USER_ADD_VM_FINISHED_FAILED,
+		USER_ADD_VM_FINISHED_SUCCESS,
 		// Update
 		USER_UPDATE_VM,
 		USER_UPDATE_VM_DISK,
@@ -785,10 +820,6 @@ func (r *VMAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 		if len(vmList.Items) == 0 {
 			break
 		}
-		ctx.log.V(1).Info(
-			"List VM.",
-			"page",
-			page)
 		for _, object := range vmList.Items {
 			m := &model.VM{
 				Base: model.Base{ID: object.ID},
@@ -806,9 +837,21 @@ func (r *VMAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 //
 // Apply and event tot the inventory model.
 func (r *VMAdapter) Apply(ctx *Context, event *Event) (updater Updater, err error) {
+	defer func() {
+		if errors.Is(err, &NotFound{}) {
+			updater = func(tx *libmodel.Tx) (err error) {
+				ctx.log.V(3).Info(
+					"VM not found; event ignored.",
+					"event",
+					event)
+				return
+			}
+			err = nil
+		}
+	}()
 	switch event.code() {
 	case USER_ADD_VM,
-		USER_ADD_VM_STARTED:
+		USER_ADD_VM_FINISHED_SUCCESS:
 		object := &VM{}
 		err = ctx.client.get(event.VM.Ref, object, r.follow())
 		if err != nil {
@@ -856,8 +899,7 @@ func (r *VMAdapter) Apply(ctx *Context, event *Event) (updater Updater, err erro
 			err = tx.Update(m)
 			return
 		}
-	case USER_REMOVE_VM,
-		USER_ADD_VM_FINISHED_FAILED:
+	case USER_REMOVE_VM:
 		updater = func(tx *libmodel.Tx) (err error) {
 			err = tx.Delete(
 				&model.VM{
@@ -920,6 +962,9 @@ func (r *DiskAdapter) Event() []int {
 		USER_REMOVE_DISK,
 		USER_REMOVE_DISK_FROM_VM,
 		USER_FINISHED_REMOVE_DISK_ATTACHED_TO_VMS,
+		USER_ADD_VM,
+		USER_ADD_VM_FINISHED_SUCCESS,
+		USER_REMOVE_VM,
 	}
 }
 
@@ -947,6 +992,8 @@ func (r *DiskAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 
 //
 // Apply and event tot the inventory model.
+// Disks may be added and deleted when VMs are created
+// and deleted without generating any disk events.
 func (r *DiskAdapter) Apply(ctx *Context, event *Event) (updater Updater, err error) {
 	var desired fb.Iterator
 	desired, err = r.List(ctx)
@@ -974,6 +1021,10 @@ func (r *DiskAdapter) Apply(ctx *Context, event *Event) (updater Updater, err er
 			USER_REMOVE_DISK_FROM_VM,
 			USER_FINISHED_REMOVE_DISK_ATTACHED_TO_VMS:
 			err = collection.Delete(desired)
+		case USER_ADD_VM,
+			USER_ADD_VM_FINISHED_SUCCESS,
+			USER_REMOVE_VM:
+			err = collection.Reconcile(desired)
 		default:
 			err = liberr.New("unknown event", "event", event)
 		}
