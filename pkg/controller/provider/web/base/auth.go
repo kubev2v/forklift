@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/gin-gonic/gin"
 	liberr "github.com/konveyor/controller/pkg/error"
-	"github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	auth "k8s.io/api/authentication/v1"
 	auth2 "k8s.io/api/authorization/v1"
@@ -61,6 +60,7 @@ func (r *Auth) Permit(ctx *gin.Context, p *api.Provider) (status int) {
 	}
 	allowed, err := r.permit(token, p)
 	if err != nil {
+		log.Error(err, "Authorization failed.")
 		status = http.StatusInternalServerError
 		return
 	}
@@ -69,6 +69,10 @@ func (r *Auth) Permit(ctx *gin.Context, p *api.Provider) (status int) {
 	} else {
 		status = http.StatusForbidden
 		delete(r.cache, token)
+		log.Info(
+			http.StatusText(status),
+			"token",
+			token)
 	}
 
 	return
@@ -95,25 +99,28 @@ func (r *Auth) permit(token string, p *api.Provider) (allowed bool, err error) {
 	if !tr.Status.Authenticated {
 		return
 	}
-	if p.UID == "" {
-		allowed = true
-		return
-	}
-	secret := p.Spec.Secret
-	if !ref.RefSet(&secret) {
-		return
-	}
 	user := tr.Status.User
+	kind := p.GetObjectKind()
+	gvk := kind.GroupVersionKind()
+	extra := map[string]auth2.ExtraValue{}
+	for k, v := range user.Extra {
+		extra[k] = append(
+			auth2.ExtraValue{},
+			v...)
+	}
 	ar := &auth2.SubjectAccessReview{
 		Spec: auth2.SubjectAccessReviewSpec{
 			ResourceAttributes: &auth2.ResourceAttributes{
-				Resource:  "secret",
-				Namespace: secret.Namespace,
-				Name:      secret.Name,
-				Verb:      "get",
+				Group:     gvk.Group,
+				Resource:  gvk.Kind,
+				Namespace: p.Namespace,
+				Name:      p.Name,
+				Verb:      "*",
 			},
+			Extra:  extra,
 			Groups: user.Groups,
-			User:   user.UID,
+			User:   user.Username,
+			UID:    user.UID,
 		},
 	}
 	err = w.Create(context.TODO(), ar)
