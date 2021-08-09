@@ -131,18 +131,6 @@ const (
 )
 
 //
-// Folder traversal Spec.
-var TsDFolder = &types.TraversalSpec{
-	Type: Folder,
-	Path: fChildEntity,
-	SelectSet: []types.BaseSelectionSpec{
-		&types.SelectionSpec{
-			Name: TraverseFolders,
-		},
-	},
-}
-
-//
 // Datacenter/VM traversal Spec.
 var TsDatacenterVM = &types.TraversalSpec{
 	Type: Datacenter,
@@ -211,7 +199,9 @@ var TsRootFolder = &types.TraversalSpec{
 	Type: Folder,
 	Path: fChildEntity,
 	SelectSet: []types.BaseSelectionSpec{
-		TsDFolder,
+		&types.SelectionSpec{
+			Name: TraverseFolders,
+		},
 		TsDatacenterVM,
 		TsDatacenterHost,
 		TsDatacenterNet,
