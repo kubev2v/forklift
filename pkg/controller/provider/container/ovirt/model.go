@@ -26,6 +26,12 @@ const (
 	NETWORK_ADD_NETWORK    = 942
 	NETWORK_UPDATE_NETWORK = 1114
 	NETWORK_REMOVE_NETWORK = 944
+	// Storage Domain
+	USER_ADD_STORAGE_DOMAIN              = 956
+	USER_UPDATE_STORAGE_DOMAIN           = 958
+	USER_REMOVE_STORAGE_DOMAIN           = 960
+	USER_FORCE_REMOVE_STORAGE_DOMAIN     = 981
+	USER_DETACH_STORAGE_DOMAIN_FROM_POOL = 964
 	// vNIC Profile
 	ADD_VNIC_PROFILE    = 1122
 	UPDATE_VNIC_PROFILE = 1124
@@ -39,30 +45,40 @@ const (
 	USER_UPDATE_CLUSTER = 811
 	USER_REMOVE_CLUSTER = 813
 	// Host
-	USER_ADD_HOST    = 42
-	USER_UPDATE_HOST = 43
-	USER_REMOVE_HOST = 44
+	USER_ADD_VDS                        = 42
+	USER_UPDATE_VDS                     = 43
+	USER_REMOVE_VDS                     = 44
+	USER_VDS_MAINTENANCE                = 600
+	USER_VDS_MAINTENANCE_WITHOUT_REASON = 620
+	USER_VDS_MAINTENANCE_MANUAL_HA      = 10453
+	VDS_DETECTED                        = 13
 	// VM
-	USER_ADD_VM                           = 34
-	USER_ADD_VM_FINISHED_SUCCESS          = 53
-	USER_UPDATE_VM                        = 35
-	USER_REMOVE_VM                        = 113
-	USER_ADD_DISK_TO_VM_SUCCESS           = 97
-	USER_UPDATE_VM_DISK                   = 88
-	USER_REMOVE_DISK_FROM_VM              = 80
-	USER_ATTACH_DISK_TO_VM                = 2016
-	USER_DETACH_DISK_FROM_VM              = 2018
-	USER_EJECT_VM_DISK                    = 521
-	NETWORK_USER_ADD_VM_INTERFACE         = 932
-	NETWORK_USER_UPDATE_VM_INTERFACE      = 934
-	NETWORK_USER_REMOVE_VM_INTERFACE      = 930
-	USER_CREATE_SNAPSHOT_FINISHED_SUCCESS = 68
-	USER_REMOVE_SNAPSHOT_FINISHED_SUCCESS = 356
-	USER_RUN_VM                           = 32
-	USER_SUSPEND_VM_OK                    = 503
-	USER_PAUSE_VM                         = 39
-	USER_RESUME_VM                        = 40
-	VM_DOWN                               = 61
+	USER_ADD_VM                                    = 34
+	USER_ADD_VM_FINISHED_SUCCESS                   = 53
+	USER_UPDATE_VM                                 = 35
+	SYSTEM_UPDATE_VM                               = 253
+	USER_REMOVE_VM                                 = 113
+	USER_REMOVE_VM_FINISHED_INTERNAL               = 1130
+	USER_REMOVE_VM_FINISHED_ILLEGAL_DISKS          = 172
+	USER_REMOVE_VM_FINISHED_ILLEGAL_DISKS_INTERNAL = 1720
+	IMPORTEXPORT_IMPORT_VM                         = 1152
+	USER_ADD_DISK_TO_VM_SUCCESS                    = 97
+	USER_UPDATE_VM_DISK                            = 88
+	USER_REMOVE_DISK_FROM_VM                       = 80
+	USER_ATTACH_DISK_TO_VM                         = 2016
+	USER_DETACH_DISK_FROM_VM                       = 2018
+	USER_EJECT_VM_DISK                             = 521
+	USER_CHANGE_DISK_VM                            = 38
+	NETWORK_USER_ADD_VM_INTERFACE                  = 932
+	NETWORK_USER_UPDATE_VM_INTERFACE               = 934
+	NETWORK_USER_REMOVE_VM_INTERFACE               = 930
+	USER_CREATE_SNAPSHOT_FINISHED_SUCCESS          = 68
+	USER_REMOVE_SNAPSHOT_FINISHED_SUCCESS          = 356
+	USER_RUN_VM                                    = 32
+	USER_SUSPEND_VM_OK                             = 503
+	USER_PAUSE_VM                                  = 39
+	USER_RESUME_VM                                 = 40
+	VM_DOWN                                        = 61
 	// Disk
 	USER_ADD_DISK_FINISHED_SUCCESS            = 2021
 	USER_REMOVE_DISK                          = 2014
@@ -361,9 +377,12 @@ type NICProfileAdapter struct {
 // Handled events.
 func (r *NICProfileAdapter) Event() []int {
 	return []int{
+		// Profile.
 		ADD_VNIC_PROFILE,
 		UPDATE_VNIC_PROFILE,
 		REMOVE_VNIC_PROFILE,
+		// Network
+		NETWORK_REMOVE_NETWORK,
 	}
 }
 
@@ -416,7 +435,8 @@ func (r *NICProfileAdapter) Apply(ctx *Context, event *Event) (updater Updater, 
 			err = collection.Add(desired)
 		case UPDATE_VNIC_PROFILE:
 			err = collection.Update(desired)
-		case REMOVE_VNIC_PROFILE:
+		case REMOVE_VNIC_PROFILE,
+			NETWORK_REMOVE_NETWORK:
 			err = collection.Delete(desired)
 		default:
 			err = liberr.New("unknown event", "event", event)
@@ -437,9 +457,13 @@ type DiskProfileAdapter struct {
 // Handled events.
 func (r *DiskProfileAdapter) Event() []int {
 	return []int{
+		// Profile.
 		USER_ADD_DISK_PROFILE,
 		USER_UPDATE_DISK_PROFILE,
 		USER_REMOVE_DISK_PROFILE,
+		// StorageDomain
+		USER_REMOVE_STORAGE_DOMAIN,
+		USER_FORCE_REMOVE_STORAGE_DOMAIN,
 	}
 }
 
@@ -491,7 +515,9 @@ func (r *DiskProfileAdapter) Apply(ctx *Context, event *Event) (updater Updater,
 			err = collection.Add(desired)
 		case USER_UPDATE_DISK_PROFILE:
 			err = collection.Update(desired)
-		case USER_REMOVE_DISK_PROFILE:
+		case USER_REMOVE_DISK_PROFILE,
+			USER_REMOVE_STORAGE_DOMAIN,
+			USER_FORCE_REMOVE_STORAGE_DOMAIN:
 			err = collection.Delete(desired)
 		default:
 			err = liberr.New("unknown event", "event", event)
@@ -511,7 +537,13 @@ type StorageDomainAdapter struct {
 //
 // Handled events.
 func (r *StorageDomainAdapter) Event() []int {
-	return []int{}
+	return []int{
+		USER_ADD_STORAGE_DOMAIN,
+		USER_UPDATE_STORAGE_DOMAIN,
+		USER_REMOVE_STORAGE_DOMAIN,
+		USER_FORCE_REMOVE_STORAGE_DOMAIN,
+		USER_DETACH_STORAGE_DOMAIN_FROM_POOL,
+	}
 }
 
 //
@@ -539,9 +571,37 @@ func (r *StorageDomainAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 //
 // Apply and event tot the inventory model.
 func (r *StorageDomainAdapter) Apply(ctx *Context, event *Event) (updater Updater, err error) {
-	switch event.code() {
-	default:
-		err = liberr.New("unknown event", "event", event)
+	var desired fb.Iterator
+	desired, err = r.List(ctx)
+	if err != nil {
+		return
+	}
+	updater = func(tx *libmodel.Tx) (err error) {
+		stored, err := tx.Find(
+			&model.StorageDomain{},
+			model.ListOptions{
+				Detail: model.MaxDetail,
+			})
+		if err != nil {
+			return
+		}
+		collection := libcnt.Collection{
+			Stored: stored,
+			Tx:     tx,
+		}
+		switch event.code() {
+		case USER_ADD_STORAGE_DOMAIN:
+			err = collection.Add(desired)
+		case USER_UPDATE_STORAGE_DOMAIN,
+			USER_DETACH_STORAGE_DOMAIN_FROM_POOL:
+			err = collection.Update(desired)
+		case USER_REMOVE_STORAGE_DOMAIN,
+			USER_FORCE_REMOVE_STORAGE_DOMAIN:
+			err = collection.Delete(desired)
+		default:
+			err = liberr.New("unknown event", "event", event)
+		}
+		return
 	}
 
 	return
@@ -649,7 +709,7 @@ func (r *ClusterAdapter) Apply(ctx *Context, event *Event) (updater Updater, err
 }
 
 //
-// Host adapter.
+// Host (VDS) adapter.
 type HostAdapter struct {
 	BaseAdapter
 }
@@ -658,9 +718,13 @@ type HostAdapter struct {
 // Handled events.
 func (r *HostAdapter) Event() []int {
 	return []int{
-		USER_ADD_HOST,
-		USER_UPDATE_HOST,
-		USER_REMOVE_HOST,
+		USER_ADD_VDS,
+		USER_UPDATE_VDS,
+		USER_REMOVE_VDS,
+		USER_VDS_MAINTENANCE,
+		USER_VDS_MAINTENANCE_WITHOUT_REASON,
+		USER_VDS_MAINTENANCE_MANUAL_HA,
+		VDS_DETECTED,
 	}
 }
 
@@ -702,7 +766,7 @@ func (r *HostAdapter) Apply(ctx *Context, event *Event) (updater Updater, err er
 		}
 	}()
 	switch event.code() {
-	case USER_ADD_HOST:
+	case USER_ADD_VDS:
 		object := &Host{}
 		err = ctx.client.get(event.Host.Ref, object, r.follow())
 		if err != nil {
@@ -716,7 +780,11 @@ func (r *HostAdapter) Apply(ctx *Context, event *Event) (updater Updater, err er
 			err = tx.Insert(m)
 			return
 		}
-	case USER_UPDATE_HOST:
+	case USER_UPDATE_VDS,
+		USER_VDS_MAINTENANCE,
+		USER_VDS_MAINTENANCE_WITHOUT_REASON,
+		USER_VDS_MAINTENANCE_MANUAL_HA,
+		VDS_DETECTED:
 		object := &Host{}
 		err = ctx.client.get(event.Host.Ref, object, r.follow())
 		if err != nil {
@@ -734,7 +802,7 @@ func (r *HostAdapter) Apply(ctx *Context, event *Event) (updater Updater, err er
 			err = tx.Update(m)
 			return
 		}
-	case USER_REMOVE_HOST:
+	case USER_REMOVE_VDS:
 		updater = func(tx *libmodel.Tx) (err error) {
 			err = tx.Delete(
 				&model.Host{
@@ -771,6 +839,7 @@ func (r *VMAdapter) Event() []int {
 		USER_ADD_VM_FINISHED_SUCCESS,
 		// Update
 		USER_UPDATE_VM,
+		SYSTEM_UPDATE_VM,
 		USER_UPDATE_VM_DISK,
 		USER_ADD_DISK_TO_VM_SUCCESS,
 		USER_REMOVE_DISK_FROM_VM,
@@ -783,13 +852,20 @@ func (r *VMAdapter) Event() []int {
 		NETWORK_USER_REMOVE_VM_INTERFACE,
 		USER_CREATE_SNAPSHOT_FINISHED_SUCCESS,
 		USER_REMOVE_SNAPSHOT_FINISHED_SUCCESS,
+		IMPORTEXPORT_IMPORT_VM,
 		USER_RUN_VM,
 		USER_PAUSE_VM,
 		USER_RESUME_VM,
 		USER_SUSPEND_VM_OK,
 		VM_DOWN,
 		// Delete
+		USER_REMOVE_VM_FINISHED_INTERNAL,
+		USER_REMOVE_VM_FINISHED_ILLEGAL_DISKS,
+		USER_REMOVE_VM_FINISHED_ILLEGAL_DISKS_INTERNAL,
 		USER_REMOVE_VM,
+		// StorageDomain.
+		USER_DETACH_STORAGE_DOMAIN_FROM_POOL,
+		USER_FORCE_REMOVE_STORAGE_DOMAIN,
 	}
 }
 
@@ -866,17 +942,20 @@ func (r *VMAdapter) Apply(ctx *Context, event *Event) (updater Updater, err erro
 			return
 		}
 	case USER_UPDATE_VM,
+		SYSTEM_UPDATE_VM,
 		USER_UPDATE_VM_DISK,
 		USER_ADD_DISK_TO_VM_SUCCESS,
 		USER_REMOVE_DISK_FROM_VM,
 		USER_ATTACH_DISK_TO_VM,
 		USER_DETACH_DISK_FROM_VM,
 		USER_EJECT_VM_DISK,
+		USER_CHANGE_DISK_VM,
 		NETWORK_USER_ADD_VM_INTERFACE,
 		NETWORK_USER_UPDATE_VM_INTERFACE,
 		NETWORK_USER_REMOVE_VM_INTERFACE,
 		USER_CREATE_SNAPSHOT_FINISHED_SUCCESS,
 		USER_REMOVE_SNAPSHOT_FINISHED_SUCCESS,
+		IMPORTEXPORT_IMPORT_VM,
 		USER_RUN_VM,
 		USER_PAUSE_VM,
 		USER_RESUME_VM,
@@ -899,7 +978,10 @@ func (r *VMAdapter) Apply(ctx *Context, event *Event) (updater Updater, err erro
 			err = tx.Update(m)
 			return
 		}
-	case USER_REMOVE_VM:
+	case USER_REMOVE_VM_FINISHED_INTERNAL,
+		USER_REMOVE_VM_FINISHED_ILLEGAL_DISKS,
+		USER_REMOVE_VM_FINISHED_ILLEGAL_DISKS_INTERNAL,
+		USER_REMOVE_VM:
 		updater = func(tx *libmodel.Tx) (err error) {
 			err = tx.Delete(
 				&model.VM{
@@ -907,7 +989,9 @@ func (r *VMAdapter) Apply(ctx *Context, event *Event) (updater Updater, err erro
 				})
 			return
 		}
-	case USER_FINISHED_REMOVE_DISK_ATTACHED_TO_VMS:
+	case USER_FINISHED_REMOVE_DISK_ATTACHED_TO_VMS,
+		USER_DETACH_STORAGE_DOMAIN_FROM_POOL,
+		USER_FORCE_REMOVE_STORAGE_DOMAIN:
 		var desired fb.Iterator
 		desired, err = r.List(ctx)
 		if err != nil {
@@ -926,7 +1010,7 @@ func (r *VMAdapter) Apply(ctx *Context, event *Event) (updater Updater, err erro
 				Stored: stored,
 				Tx:     tx,
 			}
-			err = collection.Update(desired)
+			err = collection.Reconcile(desired)
 			return
 		}
 	default:
@@ -957,14 +1041,20 @@ type DiskAdapter struct {
 // Handled events.
 func (r *DiskAdapter) Event() []int {
 	return []int{
+		// Disk
 		USER_ADD_DISK_FINISHED_SUCCESS,
 		USER_ADD_DISK_TO_VM_SUCCESS,
 		USER_REMOVE_DISK,
-		USER_REMOVE_DISK_FROM_VM,
+		// VM
 		USER_FINISHED_REMOVE_DISK_ATTACHED_TO_VMS,
+		USER_REMOVE_DISK_FROM_VM,
+		USER_FORCE_REMOVE_STORAGE_DOMAIN,
 		USER_ADD_VM,
 		USER_ADD_VM_FINISHED_SUCCESS,
 		USER_REMOVE_VM,
+		// StorageDomain.
+		USER_DETACH_STORAGE_DOMAIN_FROM_POOL,
+		USER_FORCE_REMOVE_STORAGE_DOMAIN,
 	}
 }
 
@@ -1019,7 +1109,9 @@ func (r *DiskAdapter) Apply(ctx *Context, event *Event) (updater Updater, err er
 			err = collection.Add(desired)
 		case USER_REMOVE_DISK,
 			USER_REMOVE_DISK_FROM_VM,
-			USER_FINISHED_REMOVE_DISK_ATTACHED_TO_VMS:
+			USER_FINISHED_REMOVE_DISK_ATTACHED_TO_VMS,
+			USER_DETACH_STORAGE_DOMAIN_FROM_POOL,
+			USER_FORCE_REMOVE_STORAGE_DOMAIN:
 			err = collection.Delete(desired)
 		case USER_ADD_VM,
 			USER_ADD_VM_FINISHED_SUCCESS,
