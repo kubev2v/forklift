@@ -440,6 +440,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	if len(unmappedStorage.Items) > 0 {
 		plan.Status.SetCondition(unmappedStorage)
 	}
+	if len(maintenanceMode.Items) > 0 {
+		plan.Status.SetCondition(maintenanceMode)
+	}
 
 	return nil
 }
