@@ -34,10 +34,11 @@ import (
 	"time"
 )
 
-//
-// The (max) number of batched task results.
 const (
+	// The (max) number of batched task results.
 	MaxBatch = 1024
+	// Transaction label.
+	ValidationLabel = "VM-validated"
 )
 
 //
@@ -97,7 +98,7 @@ func (r *VMEventHandler) reset() {
 func (r *VMEventHandler) Started(uint64) {
 	r.log.Info("Started.")
 	r.taskResult = make(chan *policy.Task)
-	r.input = make(chan ReportedEvent)
+	r.input = make(chan ReportedEvent, 100)
 	r.context, r.cancel = context.WithCancel(context.Background())
 	go r.run()
 	go r.harvest()
@@ -128,6 +129,9 @@ func (r *VMEventHandler) Created(event libmodel.Event) {
 // picked up in the next search().
 func (r *VMEventHandler) Updated(event libmodel.Event) {
 	if r.canceled() {
+		return
+	}
+	if event.HasLabel(ValidationLabel) {
 		return
 	}
 	if vm, cast := event.Updated.(*model.VM); cast {
@@ -320,7 +324,7 @@ func (r *VMEventHandler) validated(batch []*policy.Task) {
 		"VM (batch) completed.",
 		"count",
 		len(batch))
-	tx, err := r.DB.Begin()
+	tx, err := r.DB.Begin(ValidationLabel)
 	if err != nil {
 		r.log.Error(err, "Begin tx failed.")
 		return
@@ -352,7 +356,7 @@ func (r *VMEventHandler) validated(batch []*policy.Task) {
 			r.log.Error(err, "VM update failed.")
 			continue
 		}
-		r.log.V(4).Info(
+		r.log.V(3).Info(
 			"VM validated.",
 			"vmID",
 			latest.ID,

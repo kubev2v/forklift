@@ -741,6 +741,8 @@ github.com/konveyor/controller v0.5.0 h1:PmAFidRzMwHmbt8ShA/yow60kap1JgZIAtRMdGm
 github.com/konveyor/controller v0.5.0/go.mod h1:j0DSNesS0XHmqOLcJEuwB+qIRkdJ3mSIEJFA2byC12c=
 github.com/konveyor/controller v0.6.0 h1:E6P/z64KYEBA9RjkY9xtscqPhBCsCEpTOdVK8Nao5IY=
 github.com/konveyor/controller v0.6.0/go.mod h1:j0DSNesS0XHmqOLcJEuwB+qIRkdJ3mSIEJFA2byC12c=
+github.com/konveyor/controller v0.6.1 h1:+hqgq5gCNMDw4ZVqUa4/FVb73HnzXwes313T1wVk/Gs=
+github.com/konveyor/controller v0.6.1/go.mod h1:j0DSNesS0XHmqOLcJEuwB+qIRkdJ3mSIEJFA2byC12c=
 github.com/kr/logfmt v0.0.0-20140226030751-b84e30acd515/go.mod h1:+0opPa2QZZtGFBFZlji/RkVcI2GknAs/DXo4wKdlNEc=
 github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORNo=
 github.com/kr/pretty v0.2.0 h1:s5hAObm+yFO5uHYt5dYjxi2rXrsnmRpJx4OYvIWUaQs=
