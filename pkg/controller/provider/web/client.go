@@ -222,7 +222,7 @@ func (r *ProviderClient) asError(status int, id string) (err error) {
 				r.provider,
 			})
 	case http.StatusNotFound:
-		if _, found := r.restClient.Header[base.ProviderHeader]; found {
+		if _, found := r.restClient.Reply.Header[base.ProviderHeader]; found {
 			err = liberr.Wrap(
 				NotFoundError{
 					Ref: base.Ref{ID: id},
