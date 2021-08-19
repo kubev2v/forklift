@@ -9,6 +9,7 @@ import (
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"net/http"
+	"strings"
 )
 
 //
@@ -61,6 +62,15 @@ func (h VMHandler) List(ctx *gin.Context) {
 		return
 	}
 	content := []interface{}{}
+	err = h.filter(ctx, &list)
+	if err != nil {
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
 	for _, m := range list {
 		r := &VM{}
 		r.With(&m)
@@ -158,6 +168,39 @@ func (h VMHandler) watch(ctx *gin.Context) {
 			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 	}
+}
+
+//
+// Filter result set.
+// Filter by path for `name` query.
+func (h *VMHandler) filter(ctx *gin.Context, list *[]model.VM) (err error) {
+	if len(*list) < 2 {
+		return
+	}
+	q := ctx.Request.URL.Query()
+	name := q.Get(NameParam)
+	if len(name) == 0 {
+		return
+	}
+	if len(strings.Split(name, "/")) < 2 {
+		return
+	}
+	db := h.Collector.DB()
+	kept := []model.VM{}
+	for _, m := range *list {
+		path, pErr := m.Path(db)
+		if pErr != nil {
+			err = liberr.Wrap(pErr)
+			return
+		}
+		if h.PathMatchRoot(path, name) {
+			kept = append(kept, m)
+		}
+	}
+
+	*list = kept
+
+	return
 }
 
 //
