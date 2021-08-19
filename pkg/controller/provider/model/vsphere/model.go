@@ -201,7 +201,6 @@ type Host struct {
 	Network            HostNetwork `sql:""`
 	Networks           []Ref       `sql:""`
 	Datastores         []Ref       `sql:""`
-	Vms                []Ref       `sql:""`
 }
 
 type HostNetwork struct {

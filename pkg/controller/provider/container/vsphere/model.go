@@ -273,8 +273,6 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 				if b, cast := p.Val.(int16); cast {
 					v.model.CpuCores = b
 				}
-			case fVm:
-				v.model.Vms = v.RefList(p.Val)
 			case fProductName:
 				if s, cast := p.Val.(string); cast {
 					v.model.ProductName = s

@@ -647,7 +647,6 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 				fCpuCores,
 				fDatastore,
 				fNetwork,
-				fVm,
 				fVSwitch,
 				fPortGroup,
 				fPNIC,
