@@ -252,7 +252,6 @@ func (r *Host) With(m *model.Host) {
 	r.Network = m.Network
 	r.Networks = m.Networks
 	r.Datastores = m.Datastores
-	r.VMs = m.Vms
 	r.NetworkAdapters = []NetworkAdapter{}
 }
 

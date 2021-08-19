@@ -470,16 +470,22 @@ func (r *HostEventHandler) validate(host *model.Host) {
 	defer func() {
 		_ = tx.End()
 	}()
-	for _, ref := range host.Vms {
-		vm := &model.VM{}
-		vm.WithRef(ref)
-		err = tx.Get(vm)
-		if err != nil {
-			r.log.Error(err, "VM (get) failed.")
-			return
-		}
+	list := []model.VM{}
+	err = tx.List(
+		&list,
+		model.ListOptions{
+			Detail: model.MaxDetail,
+			Predicate: libmodel.Eq(
+				"host",
+				host.ID),
+		})
+	if err != nil {
+		r.log.Error(err, "VM (list) failed.")
+		return
+	}
+	for _, vm := range list {
 		vm.RevisionValidated = 0
-		err = tx.Update(vm)
+		err = tx.Update(&vm)
 		if err != nil {
 			r.log.Error(err, "VM (update) failed.")
 			return
