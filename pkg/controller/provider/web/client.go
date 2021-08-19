@@ -9,6 +9,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	"net/http"
+	"strings"
 )
 
 //
@@ -222,15 +223,15 @@ func (r *ProviderClient) asError(status int, id string) (err error) {
 				r.provider,
 			})
 	case http.StatusNotFound:
-		if _, found := r.restClient.Reply.Header[base.ProviderHeader]; found {
-			err = liberr.Wrap(
-				NotFoundError{
-					Ref: base.Ref{ID: id},
-				})
-		} else {
+		if r.HasReason(base.UnknownProvider) {
 			err = liberr.Wrap(
 				ProviderNotReadyError{
 					r.provider,
+				})
+		} else {
+			err = liberr.Wrap(
+				NotFoundError{
+					Ref: base.Ref{ID: id},
 				})
 		}
 	default:
@@ -238,4 +239,19 @@ func (r *ProviderClient) asError(status int, id string) (err error) {
 	}
 
 	return
+}
+
+//
+// Match X-Reason reply header.
+func (r *ProviderClient) HasReason(reason string) bool {
+	reason = strings.ToLower(reason)
+	if reasons, found := r.restClient.Reply.Header[base.ReasonHeader]; found {
+		for i := range reasons {
+			if strings.ToLower(reasons[i]) == reason {
+				return true
+			}
+		}
+	}
+
+	return false
 }

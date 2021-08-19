@@ -24,9 +24,14 @@ const (
 )
 
 //
-// Header.
+// Reply Header.
 const (
-	ProviderHeader = "X-Provider"
+	// Explains reason behind status code.
+	ReasonHeader = "X-Reason"
+	// Explains 404 caused by provider not found in
+	// inventory as opposed to the requested resource
+	// not found within the provider in the inventory.
+	UnknownProvider = "ProviderNotFound"
 )
 
 //
@@ -107,10 +112,10 @@ func (h *Handler) setProvider(ctx *gin.Context) (status int) {
 	}
 	if h.Provider.UID != "" {
 		if h.Collector, found = h.Container.Get(h.Provider); !found {
+			ctx.Header(ReasonHeader, UnknownProvider)
 			status = http.StatusNotFound
 			return
 		}
-		ctx.Header(ProviderHeader, uid)
 		h.Provider = h.Collector.Owner().(*api.Provider)
 		status = h.EnsureParity(h.Collector, time.Second*10)
 	} else {
