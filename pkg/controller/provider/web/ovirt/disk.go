@@ -137,7 +137,7 @@ func (h *DiskHandler) Expand(r *Disk) (err error) {
 
 //
 // Watch.
-func (h DiskHandler) watch(ctx *gin.Context) {
+func (h *DiskHandler) watch(ctx *gin.Context) {
 	db := h.Collector.DB()
 	err := h.Watch(
 		ctx,

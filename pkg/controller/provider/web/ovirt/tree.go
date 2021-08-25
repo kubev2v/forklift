@@ -85,11 +85,13 @@ func (h TreeHandler) Tree(ctx *gin.Context) {
 		return
 	}
 	db := h.Collector.DB()
+	pb := PathBuilder{DB: db}
 	content := TreeNode{}
 	for _, dc := range h.datacenters {
 		tr := Tree{
 			NodeBuilder: &NodeBuilder{
-				handler: h.Handler,
+				handler:     h.Handler,
+				pathBuilder: pb,
 				detail: map[string]bool{
 					model.VmKind: h.Detail,
 				},
@@ -112,6 +114,7 @@ func (h TreeHandler) Tree(ctx *gin.Context) {
 		r := DataCenter{}
 		r.With(&dc)
 		r.Link(h.Provider)
+		r.Path = pb.Path(&dc)
 		branch.Kind = model.DataCenterKind
 		branch.Object = r
 		content.Children = append(content.Children, branch)
@@ -209,6 +212,8 @@ type NodeBuilder struct {
 	handler Handler
 	// Resource details by kind.
 	detail map[string]bool
+	// Path builder.
+	pathBuilder PathBuilder
 }
 
 //
@@ -222,6 +227,7 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 		resource := &DataCenter{}
 		resource.With(m.(*model.DataCenter))
 		resource.Link(provider)
+		resource.Path = r.pathBuilder.Path(m)
 		object := resource.Content(r.withDetail(kind))
 		node = &TreeNode{
 			Parent: parent,
@@ -232,6 +238,7 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 		resource := &Cluster{}
 		resource.With(m.(*model.Cluster))
 		resource.Link(provider)
+		resource.Path = r.pathBuilder.Path(m)
 		object := resource.Content(r.withDetail(kind))
 		node = &TreeNode{
 			Parent: parent,
@@ -242,6 +249,7 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 		resource := &Host{}
 		resource.With(m.(*model.Host))
 		resource.Link(provider)
+		resource.Path = r.pathBuilder.Path(m)
 		object := resource.Content(r.withDetail(kind))
 		node = &TreeNode{
 			Parent: parent,
@@ -252,6 +260,7 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 		resource := &VM{}
 		resource.With(m.(*model.VM))
 		resource.Link(provider)
+		resource.Path = r.pathBuilder.Path(m)
 		object := resource.Content(r.withDetail(kind))
 		node = &TreeNode{
 			Parent: parent,
@@ -262,6 +271,7 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 		resource := &Network{}
 		resource.With(m.(*model.Network))
 		resource.Link(provider)
+		resource.Path = r.pathBuilder.Path(m)
 		object := resource.Content(r.withDetail(kind))
 		node = &TreeNode{
 			Parent: parent,
@@ -272,6 +282,7 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 		resource := &StorageDomain{}
 		resource.With(m.(*model.StorageDomain))
 		resource.Link(provider)
+		resource.Path = r.pathBuilder.Path(m)
 		object := resource.Content(r.withDetail(kind))
 		node = &TreeNode{
 			Parent: parent,

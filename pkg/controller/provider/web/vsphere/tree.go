@@ -88,6 +88,7 @@ func (h TreeHandler) VmTree(ctx *gin.Context) {
 		return
 	}
 	db := h.Collector.DB()
+	pb := PathBuilder{DB: db}
 	content := TreeNode{}
 	for _, dc := range h.datacenters {
 		ref := dc.Vms
@@ -107,7 +108,8 @@ func (h TreeHandler) VmTree(ctx *gin.Context) {
 		}
 		tr := Tree{
 			NodeBuilder: &NodeBuilder{
-				provider: h.Provider,
+				provider:    h.Provider,
+				pathBuilder: pb,
 				detail: map[string]bool{
 					model.VmKind: h.Detail,
 				},
@@ -130,6 +132,7 @@ func (h TreeHandler) VmTree(ctx *gin.Context) {
 		r := Datacenter{}
 		r.With(&dc)
 		r.Link(h.Provider)
+		r.Path = pb.Path(&dc)
 		branch.Kind = model.DatacenterKind
 		branch.Object = r
 		content.Children = append(content.Children, branch)
@@ -151,6 +154,7 @@ func (h TreeHandler) HostTree(ctx *gin.Context) {
 		return
 	}
 	db := h.Collector.DB()
+	pb := PathBuilder{DB: db}
 	content := TreeNode{}
 	for _, dc := range h.datacenters {
 		ref := dc.Clusters
@@ -170,7 +174,8 @@ func (h TreeHandler) HostTree(ctx *gin.Context) {
 		}
 		tr := Tree{
 			NodeBuilder: &NodeBuilder{
-				provider: h.Provider,
+				provider:    h.Provider,
+				pathBuilder: pb,
 				detail: map[string]bool{
 					model.VmKind: h.Detail,
 				},
@@ -193,6 +198,7 @@ func (h TreeHandler) HostTree(ctx *gin.Context) {
 		r := Datacenter{}
 		r.With(&dc)
 		r.Link(h.Provider)
+		r.Path = pb.Path(&dc)
 		branch.Kind = model.DatacenterKind
 		branch.Object = r
 		content.Children = append(content.Children, branch)
@@ -212,7 +218,7 @@ type HostNavigator struct {
 
 //
 // Next (children) on the branch.
-func (n *HostNavigator) Next(p model.Model) (r []model.Model, err error) {
+func (n *HostNavigator) Next(p libmodel.Model) (r []libmodel.Model, err error) {
 	switch p.(type) {
 	case *model.Datacenter:
 		m := &model.Folder{
@@ -222,7 +228,7 @@ func (n *HostNavigator) Next(p model.Model) (r []model.Model, err error) {
 		}
 		err = n.db.Get(m)
 		if err == nil {
-			r = []model.Model{m}
+			r = []libmodel.Model{m}
 		}
 	case *model.Folder:
 		folder := []model.Folder{}
@@ -304,7 +310,7 @@ type VMNavigator struct {
 
 //
 // Next (children) on the branch.
-func (n *VMNavigator) Next(p model.Model) (r []model.Model, err error) {
+func (n *VMNavigator) Next(p libmodel.Model) (r []libmodel.Model, err error) {
 	switch p.(type) {
 	case *model.Datacenter:
 		m := &model.Folder{
@@ -312,7 +318,7 @@ func (n *VMNavigator) Next(p model.Model) (r []model.Model, err error) {
 		}
 		err = n.db.Get(m)
 		if err == nil {
-			r = []model.Model{m}
+			r = []libmodel.Model{m}
 		}
 	case *model.Folder:
 		// Folder.
@@ -362,11 +368,13 @@ type NodeBuilder struct {
 	provider *api.Provider
 	// Resource details by kind.
 	detail map[string]bool
+	// Path builder.
+	pathBuilder PathBuilder
 }
 
 //
 // Build a node for the model.
-func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
+func (r *NodeBuilder) Node(parent *TreeNode, m libmodel.Model) *TreeNode {
 	kind := libref.ToKind(m)
 	node := &TreeNode{}
 	switch kind {
@@ -374,6 +382,7 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 		resource := &Folder{}
 		resource.With(m.(*model.Folder))
 		resource.Link(r.provider)
+		resource.Path = r.pathBuilder.Path(m.(*model.Folder))
 		object := resource.Content(r.withDetail(kind))
 		node = &TreeNode{
 			Parent: parent,
@@ -384,6 +393,7 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 		resource := &Datacenter{}
 		resource.With(m.(*model.Datacenter))
 		resource.Link(r.provider)
+		resource.Path = r.pathBuilder.Path(m.(*model.Datacenter))
 		object := resource.Content(r.withDetail(kind))
 		node = &TreeNode{
 			Parent: parent,
@@ -394,6 +404,7 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 		resource := &Cluster{}
 		resource.With(m.(*model.Cluster))
 		resource.Link(r.provider)
+		resource.Path = r.pathBuilder.Path(m.(*model.Cluster))
 		object := resource.Content(r.withDetail(kind))
 		node = &TreeNode{
 			Parent: parent,
@@ -404,6 +415,7 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 		resource := &Host{}
 		resource.With(m.(*model.Host))
 		resource.Link(r.provider)
+		resource.Path = r.pathBuilder.Path(m.(*model.Host))
 		object := resource.Content(r.withDetail(kind))
 		node = &TreeNode{
 			Parent: parent,
@@ -414,6 +426,7 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 		resource := &VM{}
 		resource.With(m.(*model.VM))
 		resource.Link(r.provider)
+		resource.Path = r.pathBuilder.Path(m.(*model.VM))
 		object := resource.Content(r.withDetail(kind))
 		node = &TreeNode{
 			Parent: parent,
@@ -424,6 +437,7 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 		resource := &Network{}
 		resource.With(m.(*model.Network))
 		resource.Link(r.provider)
+		resource.Path = r.pathBuilder.Path(m.(*model.Network))
 		object := resource.Content(r.withDetail(kind))
 		node = &TreeNode{
 			Parent: parent,
@@ -434,6 +448,7 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 		resource := &Datastore{}
 		resource.With(m.(*model.Datastore))
 		resource.Link(r.provider)
+		resource.Path = r.pathBuilder.Path(m.(*model.Datastore))
 		object := resource.Content(r.withDetail(kind))
 		node = &TreeNode{
 			Parent: parent,
