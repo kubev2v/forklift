@@ -129,7 +129,7 @@ func (h *ProviderHandler) ListContent(ctx *gin.Context) (content []interface{}, 
 
 //
 // Add derived fields.
-func (h ProviderHandler) AddDerived(r *Provider) (err error) {
+func (h *ProviderHandler) AddDerived(r *Provider) (err error) {
 	var n int64
 	if !h.Detail {
 		return

@@ -62,10 +62,12 @@ func (h FolderHandler) List(ctx *gin.Context) {
 		return
 	}
 	content := []interface{}{}
+	pb := PathBuilder{DB: db}
 	for _, m := range list {
 		r := &Folder{}
 		r.With(&m)
 		r.Link(h.Provider)
+		r.Path = pb.Path(&m)
 		content = append(content, r.Content(h.Detail))
 	}
 
@@ -99,18 +101,11 @@ func (h FolderHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
+	pb := PathBuilder{DB: db}
 	r := &Folder{}
 	r.With(m)
-	r.Path, err = m.Path(db)
-	if err != nil {
-		log.Trace(
-			err,
-			"url",
-			ctx.Request.URL)
-		ctx.Status(http.StatusInternalServerError)
-		return
-	}
 	r.Link(h.Provider)
+	r.Path = pb.Path(m)
 	content := r.Content(true)
 
 	ctx.JSON(http.StatusOK, content)
@@ -118,18 +113,19 @@ func (h FolderHandler) Get(ctx *gin.Context) {
 
 //
 // Watch.
-func (h FolderHandler) watch(ctx *gin.Context) {
+func (h *FolderHandler) watch(ctx *gin.Context) {
 	db := h.Collector.DB()
 	err := h.Watch(
 		ctx,
 		db,
 		&model.Folder{},
 		func(in libmodel.Model) (r interface{}) {
+			pb := PathBuilder{DB: db}
 			m := in.(*model.Folder)
 			folder := &Folder{}
 			folder.With(m)
 			folder.Link(h.Provider)
-			folder.Path, _ = m.Path(db)
+			folder.Path = pb.Path(m)
 			r = folder
 			return
 		})

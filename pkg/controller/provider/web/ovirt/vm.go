@@ -50,27 +50,28 @@ func (h VMHandler) List(ctx *gin.Context) {
 		h.watch(ctx)
 		return
 	}
+	var err error
+	defer func() {
+		if err != nil {
+			log.Trace(
+				err,
+				"url",
+				ctx.Request.URL)
+			ctx.Status(http.StatusInternalServerError)
+		}
+	}()
 	db := h.Collector.DB()
 	list := []model.VM{}
-	err := db.List(&list, h.ListOptions(ctx))
+	err = db.List(&list, h.ListOptions(ctx))
 	if err != nil {
-		log.Trace(
-			err,
-			"url",
-			ctx.Request.URL)
-		ctx.Status(http.StatusInternalServerError)
 		return
 	}
 	content := []interface{}{}
 	err = h.filter(ctx, &list)
 	if err != nil {
-		log.Trace(
-			err,
-			"url",
-			ctx.Request.URL)
-		ctx.Status(http.StatusInternalServerError)
 		return
 	}
+	pb := PathBuilder{DB: db}
 	for _, m := range list {
 		r := &VM{}
 		r.With(&m)
@@ -84,6 +85,7 @@ func (h VMHandler) List(ctx *gin.Context) {
 			return
 		}
 		r.Link(h.Provider)
+		r.Path = pb.Path(&m)
 		content = append(content, r.Content(h.Detail))
 	}
 
@@ -118,6 +120,7 @@ func (h VMHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
+	pb := PathBuilder{DB: db}
 	r := &VM{}
 	r.With(m)
 	err = h.Expand(r)
@@ -130,6 +133,7 @@ func (h VMHandler) Get(ctx *gin.Context) {
 		return
 	}
 	r.Link(h.Provider)
+	r.Path = pb.Path(m)
 	content := r.Content(true)
 
 	ctx.JSON(http.StatusOK, content)
@@ -147,17 +151,19 @@ func (h *VMHandler) Expand(r *VM) (err error) {
 
 //
 // Watch.
-func (h VMHandler) watch(ctx *gin.Context) {
+func (h *VMHandler) watch(ctx *gin.Context) {
 	db := h.Collector.DB()
 	err := h.Watch(
 		ctx,
 		db,
 		&model.VM{},
 		func(in libmodel.Model) (r interface{}) {
+			pb := PathBuilder{DB: db}
 			m := in.(*model.VM)
 			vm := &VM{}
 			vm.With(m)
 			vm.Link(h.Provider)
+			vm.Path = pb.Path(m)
 			r = vm
 			return
 		})
@@ -186,13 +192,10 @@ func (h *VMHandler) filter(ctx *gin.Context, list *[]model.VM) (err error) {
 		return
 	}
 	db := h.Collector.DB()
+	pb := PathBuilder{DB: db}
 	kept := []model.VM{}
 	for _, m := range *list {
-		path, pErr := m.Path(db)
-		if pErr != nil {
-			err = liberr.Wrap(pErr)
-			return
-		}
+		path := pb.Path(&m)
 		if h.PathMatchRoot(path, name) {
 			kept = append(kept, m)
 		}

@@ -51,31 +51,33 @@ func (h ClusterHandler) List(ctx *gin.Context) {
 		h.watch(ctx)
 		return
 	}
+	var err error
+	defer func() {
+		if err != nil {
+			log.Trace(
+				err,
+				"url",
+				ctx.Request.URL)
+			ctx.Status(http.StatusInternalServerError)
+		}
+	}()
 	db := h.Collector.DB()
 	list := []model.Cluster{}
-	err := db.List(&list, h.ListOptions(ctx))
+	err = db.List(&list, h.ListOptions(ctx))
 	if err != nil {
-		log.Trace(
-			err,
-			"url",
-			ctx.Request.URL)
-		ctx.Status(http.StatusInternalServerError)
 		return
 	}
 	content := []interface{}{}
 	err = h.filter(ctx, &list)
 	if err != nil {
-		log.Trace(
-			err,
-			"url",
-			ctx.Request.URL)
-		ctx.Status(http.StatusInternalServerError)
 		return
 	}
+	pb := PathBuilder{DB: db}
 	for _, m := range list {
 		r := &Cluster{}
 		r.With(&m)
 		r.Link(h.Provider)
+		r.Path = pb.Path(&m)
 		content = append(content, r.Content(h.Detail))
 	}
 
@@ -109,9 +111,11 @@ func (h ClusterHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
+	pb := PathBuilder{DB: db}
 	r := &Cluster{}
 	r.With(m)
 	r.Link(h.Provider)
+	r.Path = pb.Path(m)
 	content := r.Content(true)
 
 	ctx.JSON(http.StatusOK, content)
@@ -119,17 +123,19 @@ func (h ClusterHandler) Get(ctx *gin.Context) {
 
 //
 // Watch.
-func (h ClusterHandler) watch(ctx *gin.Context) {
+func (h *ClusterHandler) watch(ctx *gin.Context) {
 	db := h.Collector.DB()
 	err := h.Watch(
 		ctx,
 		db,
 		&model.Cluster{},
 		func(in libmodel.Model) (r interface{}) {
+			pb := PathBuilder{DB: db}
 			m := in.(*model.Cluster)
 			cluster := &Cluster{}
 			cluster.With(m)
 			cluster.Link(h.Provider)
+			cluster.Path = pb.Path(m)
 			r = cluster
 			return
 		})
@@ -158,13 +164,10 @@ func (h *ClusterHandler) filter(ctx *gin.Context, list *[]model.Cluster) (err er
 		return
 	}
 	db := h.Collector.DB()
+	pb := PathBuilder{DB: db}
 	kept := []model.Cluster{}
 	for _, m := range *list {
-		path, pErr := m.Path(db)
-		if pErr != nil {
-			err = pErr
-			return
-		}
+		path := pb.Path(&m)
 		if h.PathMatchRoot(path, name) {
 			kept = append(kept, m)
 		}

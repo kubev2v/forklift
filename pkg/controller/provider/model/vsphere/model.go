@@ -3,7 +3,6 @@ package vsphere
 import (
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/base"
-	"strings"
 )
 
 //
@@ -26,10 +25,17 @@ const (
 
 //
 // Types
-type Model = base.Model
 type ListOptions = base.ListOptions
 type Concern = base.Concern
 type Ref = base.Ref
+
+//
+// Model.
+type Model interface {
+	base.Model
+	GetParent() Ref
+	GetName() string
+}
 
 //
 // Base VMWare model.
@@ -76,82 +82,16 @@ func (m *Base) WithRef(ref Ref) {
 	m.ID = ref.ID
 }
 
-// Determine object path.
-func (m *Base) Path(db libmodel.DB) (path string, err error) {
-	parts := []string{m.Name}
-	node := m
-Walk:
-	for {
-		parent := node.Parent
-		switch parent.Kind {
-		case FolderKind:
-			f := &Folder{}
-			f.WithRef(parent)
-			err = db.Get(f)
-			if err != nil {
-				return
-			}
-			parts = append(parts, f.Name)
-			node = &f.Base
-		case DatacenterKind:
-			m := &Datacenter{}
-			m.WithRef(parent)
-			err = db.Get(m)
-			if err != nil {
-				return
-			}
-			parts = append(parts, m.Name)
-			node = &m.Base
-			break Walk
-		case ClusterKind:
-			m := &Cluster{}
-			m.WithRef(parent)
-			err = db.Get(m)
-			if err != nil {
-				return
-			}
-			parts = append(parts, m.Name)
-			node = &m.Base
-		case HostKind:
-			m := &Host{}
-			m.WithRef(parent)
-			err = db.Get(m)
-			if err != nil {
-				return
-			}
-			parts = append(parts, m.Name)
-			node = &m.Base
-		case NetKind:
-			m := &Network{}
-			m.WithRef(parent)
-			err = db.Get(m)
-			if err != nil {
-				return
-			}
-			parts = append(parts, m.Name)
-			node = &m.Base
-		case DsKind:
-			m := &Datastore{}
-			m.WithRef(parent)
-			err = db.Get(m)
-			if err != nil {
-				return
-			}
-			parts = append(parts, m.Name)
-			node = &m.Base
-		default:
-			break Walk
-		}
-	}
+//
+// Parent.
+func (m *Base) GetParent() Ref {
+	return m.Parent
+}
 
-	reversed := []string{""}
-	for i := len(parts) - 1; i >= 0; i-- {
-		reversed = append(reversed, parts[i])
-	}
-
-	path = strings.Join(reversed, "/")
-
-	return
+//
+// Name.
+func (m *Base) GetName() string {
+	return m.Name
 }
 
 type About struct {

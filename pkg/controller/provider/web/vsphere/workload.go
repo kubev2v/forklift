@@ -54,23 +54,22 @@ func (h WorkloadHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusNotFound)
 		return
 	}
+	defer func() {
+		if err != nil {
+			log.Trace(
+				err,
+				"url",
+				ctx.Request.URL)
+			ctx.Status(http.StatusInternalServerError)
+		}
+	}()
 	if err != nil {
-		log.Trace(
-			err,
-			"url",
-			ctx.Request.URL)
-		ctx.Status(http.StatusInternalServerError)
 		return
 	}
 	r := Workload{}
 	r.With(m)
 	err = r.Expand(db)
 	if err != nil {
-		log.Trace(
-			err,
-			"url",
-			ctx.Request.URL)
-		ctx.Status(http.StatusInternalServerError)
 		return
 	}
 	r.Link(h.Provider)

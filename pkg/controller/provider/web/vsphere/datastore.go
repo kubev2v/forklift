@@ -49,31 +49,33 @@ func (h DatastoreHandler) List(ctx *gin.Context) {
 		h.watch(ctx)
 		return
 	}
+	var err error
+	defer func() {
+		if err != nil {
+			log.Trace(
+				err,
+				"url",
+				ctx.Request.URL)
+			ctx.Status(http.StatusInternalServerError)
+		}
+	}()
 	db := h.Collector.DB()
 	list := []model.Datastore{}
-	err := db.List(&list, h.ListOptions(ctx))
+	err = db.List(&list, h.ListOptions(ctx))
 	if err != nil {
-		log.Trace(
-			err,
-			"url",
-			ctx.Request.URL)
-		ctx.Status(http.StatusInternalServerError)
 		return
 	}
 	content := []interface{}{}
 	err = h.filter(ctx, &list)
 	if err != nil {
-		log.Trace(
-			err,
-			"url",
-			ctx.Request.URL)
-		ctx.Status(http.StatusInternalServerError)
 		return
 	}
+	pb := PathBuilder{DB: db}
 	for _, m := range list {
 		r := &Datastore{}
 		r.With(&m)
 		r.Link(h.Provider)
+		r.Path = pb.Path(&m)
 		content = append(content, r.Content(h.Detail))
 	}
 
@@ -107,18 +109,11 @@ func (h DatastoreHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
+	pb := PathBuilder{DB: db}
 	r := &Datastore{}
 	r.With(m)
-	r.Path, err = m.Path(db)
-	if err != nil {
-		log.Trace(
-			err,
-			"url",
-			ctx.Request.URL)
-		ctx.Status(http.StatusInternalServerError)
-		return
-	}
 	r.Link(h.Provider)
+	r.Path = pb.Path(m)
 	content := r.Content(true)
 
 	ctx.JSON(http.StatusOK, content)
@@ -126,18 +121,19 @@ func (h DatastoreHandler) Get(ctx *gin.Context) {
 
 //
 // Watch.
-func (h DatastoreHandler) watch(ctx *gin.Context) {
+func (h *DatastoreHandler) watch(ctx *gin.Context) {
 	db := h.Collector.DB()
 	err := h.Watch(
 		ctx,
 		db,
 		&model.Datastore{},
 		func(in libmodel.Model) (r interface{}) {
+			pb := PathBuilder{DB: db}
 			m := in.(*model.Datastore)
 			ds := &Datastore{}
 			ds.With(m)
 			ds.Link(h.Provider)
-			ds.Path, _ = m.Path(db)
+			ds.Path = pb.Path(m)
 			r = ds
 			return
 		})
@@ -153,7 +149,7 @@ func (h DatastoreHandler) watch(ctx *gin.Context) {
 //
 // Filter result set.
 // Filter by path for `name` query.
-func (h DatastoreHandler) filter(ctx *gin.Context, list *[]model.Datastore) (err error) {
+func (h *DatastoreHandler) filter(ctx *gin.Context, list *[]model.Datastore) (err error) {
 	if len(*list) < 2 {
 		return
 	}
@@ -166,13 +162,10 @@ func (h DatastoreHandler) filter(ctx *gin.Context, list *[]model.Datastore) (err
 		return
 	}
 	db := h.Collector.DB()
+	pb := PathBuilder{DB: db}
 	kept := []model.Datastore{}
 	for _, m := range *list {
-		path, pErr := m.Path(db)
-		if pErr != nil {
-			err = pErr
-			return
-		}
+		path := pb.Path(&m)
 		if h.PathMatchRoot(path, name) {
 			kept = append(kept, m)
 		}

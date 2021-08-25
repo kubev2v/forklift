@@ -107,7 +107,7 @@ func (h DiskProfileHandler) Get(ctx *gin.Context) {
 
 //
 // Watch.
-func (h DiskProfileHandler) watch(ctx *gin.Context) {
+func (h *DiskProfileHandler) watch(ctx *gin.Context) {
 	db := h.Collector.DB()
 	err := h.Watch(
 		ctx,

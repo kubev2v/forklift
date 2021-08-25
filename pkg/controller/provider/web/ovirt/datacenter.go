@@ -61,11 +61,13 @@ func (h DataCenterHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
+	pb := PathBuilder{DB: db}
 	content := []interface{}{}
 	for _, m := range list {
 		r := &DataCenter{}
 		r.With(&m)
 		r.Link(h.Provider)
+		r.Path = pb.Path(&m)
 		content = append(content, r.Content(h.Detail))
 	}
 
@@ -99,9 +101,11 @@ func (h DataCenterHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
+	pb := PathBuilder{DB: db}
 	r := &DataCenter{}
 	r.With(m)
 	r.Link(h.Provider)
+	r.Path = pb.Path(m)
 	content := r.Content(true)
 
 	ctx.JSON(http.StatusOK, content)
@@ -109,17 +113,19 @@ func (h DataCenterHandler) Get(ctx *gin.Context) {
 
 //
 // Watch.
-func (h DataCenterHandler) watch(ctx *gin.Context) {
+func (h *DataCenterHandler) watch(ctx *gin.Context) {
 	db := h.Collector.DB()
 	err := h.Watch(
 		ctx,
 		db,
 		&model.DataCenter{},
 		func(in libmodel.Model) (r interface{}) {
+			pb := PathBuilder{DB: db}
 			m := in.(*model.DataCenter)
 			dc := &DataCenter{}
 			dc.With(m)
 			dc.Link(h.Provider)
+			dc.Path = pb.Path(m)
 			r = dc
 			return
 		})

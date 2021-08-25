@@ -49,31 +49,33 @@ func (h NetworkHandler) List(ctx *gin.Context) {
 		h.watch(ctx)
 		return
 	}
+	var err error
+	defer func() {
+		if err != nil {
+			log.Trace(
+				err,
+				"url",
+				ctx.Request.URL)
+			ctx.Status(http.StatusInternalServerError)
+		}
+	}()
 	db := h.Collector.DB()
 	list := []model.Network{}
-	err := db.List(&list, h.ListOptions(ctx))
+	err = db.List(&list, h.ListOptions(ctx))
 	if err != nil {
-		log.Trace(
-			err,
-			"url",
-			ctx.Request.URL)
-		ctx.Status(http.StatusInternalServerError)
 		return
 	}
 	content := []interface{}{}
 	err = h.filter(ctx, &list)
 	if err != nil {
-		log.Trace(
-			err,
-			"url",
-			ctx.Request.URL)
-		ctx.Status(http.StatusInternalServerError)
 		return
 	}
+	pb := PathBuilder{DB: db}
 	for _, m := range list {
 		r := &Network{}
 		r.With(&m)
 		r.Link(h.Provider)
+		r.Path = pb.Path(&m)
 		content = append(content, r.Content(h.Detail))
 	}
 
@@ -105,11 +107,12 @@ func (h NetworkHandler) Get(ctx *gin.Context) {
 			"url",
 			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
-		return
 	}
+	pb := PathBuilder{DB: db}
 	r := &Network{}
 	r.With(m)
 	r.Link(h.Provider)
+	r.Path = pb.Path(m)
 	content := r.Content(true)
 
 	ctx.JSON(http.StatusOK, content)
@@ -117,17 +120,19 @@ func (h NetworkHandler) Get(ctx *gin.Context) {
 
 //
 // Watch.
-func (h NetworkHandler) watch(ctx *gin.Context) {
+func (h *NetworkHandler) watch(ctx *gin.Context) {
 	db := h.Collector.DB()
 	err := h.Watch(
 		ctx,
 		db,
 		&model.Network{},
 		func(in libmodel.Model) (r interface{}) {
+			pb := PathBuilder{DB: db}
 			m := in.(*model.Network)
 			network := &Network{}
 			network.With(m)
 			network.Link(h.Provider)
+			network.Path = pb.Path(m)
 			r = network
 			return
 		})
@@ -156,13 +161,10 @@ func (h *NetworkHandler) filter(ctx *gin.Context, list *[]model.Network) (err er
 		return
 	}
 	db := h.Collector.DB()
+	pb := PathBuilder{DB: db}
 	kept := []model.Network{}
 	for _, m := range *list {
-		path, pErr := m.Path(db)
-		if pErr != nil {
-			err = pErr
-			return
-		}
+		path := pb.Path(&m)
 		if h.PathMatchRoot(path, name) {
 			kept = append(kept, m)
 		}

@@ -107,7 +107,7 @@ func (h NICProfileHandler) Get(ctx *gin.Context) {
 
 //
 // Watch.
-func (h NICProfileHandler) watch(ctx *gin.Context) {
+func (h *NICProfileHandler) watch(ctx *gin.Context) {
 	db := h.Collector.DB()
 	err := h.Watch(
 		ctx,
