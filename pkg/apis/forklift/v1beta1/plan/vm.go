@@ -66,6 +66,15 @@ type VMStatus struct {
 }
 
 //
+// VM power states.
+type VMPowerState string
+const (
+	VMPowerStateOn      VMPowerState = "On"
+	VMPowerStateOff     VMPowerState = "Off"
+	VMPowerStateUnknown VMPowerState = "Unknown"
+)
+
+//
 // Warm Migration status
 type Warm struct {
 	Successes           int        `json:"successes"`
