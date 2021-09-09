@@ -141,11 +141,11 @@ func (r *Client) getVM(vmRef ref.Ref) (ovirtVm *ovirtsdk.Vm, vmService *ovirtsdk
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
-		err = liberr.New(
-			fmt.Sprintf(
-				"VM %s lookup failed: %s",
-				vmRef.String(),
-				err.Error()))
+		err = liberr.Wrap(
+			err,
+			"VM lookup failed.",
+			"vm",
+			vmRef.String())
 		return
 	}
 	vmService = r.connection.SystemService().VmsService().VmService(vm.ID)
