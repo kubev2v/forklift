@@ -10,6 +10,7 @@ import (
 
 type Adapter = base.Adapter
 type Builder = base.Builder
+type Client = base.Client
 type Validator = base.Validator
 
 //
