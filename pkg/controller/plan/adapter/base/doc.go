@@ -17,6 +17,8 @@ import (
 type Adapter interface {
 	// Construct builder.
 	Builder(ctx *plancontext.Context) (Builder, error)
+	// Construct VM client.
+	Client(ctx *plancontext.Context) (Client, error)
 	// Construct validator.
 	Validator(plan *api.Plan) (Validator, error)
 }
@@ -34,6 +36,26 @@ type Builder interface {
 	Tasks(vmRef ref.Ref) ([]*plan.Task, error)
 	// Return a stable identifier for a DataVolume.
 	ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string
+}
+
+//
+// Client API.
+// Performs provider-specific actions on the source VM.
+type Client interface {
+	// Power on the source VM.
+	PowerOn(vmRef ref.Ref) error
+	// Power off the source VM.
+	PowerOff(vmRef ref.Ref) error
+	// Return the source VM's power state.
+	PowerState(vmRef ref.Ref) (string, error)
+	// Return whether the source VM is powered off.
+	PoweredOff(vmRef ref.Ref) (bool, error)
+	// Create a snapshot of the source VM.
+	CreateSnapshot(vmRef ref.Ref) (string, error)
+	// Remove a snapshot of the source VM.
+	RemoveSnapshot(vmRef ref.Ref, snapshot string, all bool) error
+	// Close connections to the provider API.
+	Close()
 }
 
 //

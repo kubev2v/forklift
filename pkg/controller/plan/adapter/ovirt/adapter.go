@@ -33,3 +33,15 @@ func (r *Adapter) Validator(plan *api.Plan) (validator base.Validator, err error
 	validator = v
 	return
 }
+
+//
+// Constructs an oVirt client.
+func (r *Adapter) Client(ctx *plancontext.Context) (client base.Client, err error) {
+	c := &Client{Context: ctx}
+	err = c.connect()
+	if err != nil {
+		return
+	}
+	client = c
+	return
+}
