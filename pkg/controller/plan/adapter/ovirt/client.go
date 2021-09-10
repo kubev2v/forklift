@@ -3,7 +3,6 @@ package ovirt
 import (
 	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
@@ -13,6 +12,13 @@ import (
 const (
 	snapshotName = "forklift-migration-precopy"
 	snapshotDesc = "Forklift Operator warm migration precopy"
+)
+
+// VM power states
+const (
+	powerOn      = "On"
+	powerOff     = "Off"
+	powerUnknown = "Unknown"
 )
 
 //
@@ -64,7 +70,7 @@ func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, _ bool) (err err
 
 //
 // Get the power state of the VM.
-func (r *Client) PowerState(vmRef ref.Ref) (state plan.VMPowerState, err error) {
+func (r *Client) PowerState(vmRef ref.Ref) (state string, err error) {
 	vm, _, err := r.getVM(vmRef)
 	if err != nil {
 		return
@@ -72,11 +78,11 @@ func (r *Client) PowerState(vmRef ref.Ref) (state plan.VMPowerState, err error) 
 	status, _ := vm.Status()
 	switch status {
 	case ovirtsdk.VMSTATUS_DOWN, ovirtsdk.VMSTATUS_POWERING_DOWN:
-		state = plan.VMPowerStateOff
+		state = powerOff
 	case ovirtsdk.VMSTATUS_UP, ovirtsdk.VMSTATUS_POWERING_UP:
-		state = plan.VMPowerStateOn
+		state = powerOn
 	default:
-		state = plan.VMPowerStateUnknown
+		state = powerUnknown
 	}
 	return
 }
@@ -122,7 +128,7 @@ func (r *Client) PoweredOff(vmRef ref.Ref) (poweredOff bool, err error) {
 	if err != nil {
 		return
 	}
-	poweredOff = powerState == plan.VMPowerStateOff
+	poweredOff = powerState == powerOff
 	return
 }
 
