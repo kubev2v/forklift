@@ -8,6 +8,7 @@ require (
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.1.0
 	github.com/konveyor/controller v0.6.1
 	github.com/onsi/gomega v1.10.3
+	github.com/ovirt/go-ovirt v4.3.4+incompatible
 	github.com/pkg/profile v1.3.0
 	github.com/prometheus/client_golang v1.8.0 // indirect
 	github.com/vmware/govmomi v0.23.1
@@ -60,3 +61,5 @@ replace sigs.k8s.io/structured-merge-diff => sigs.k8s.io/structured-merge-diff v
 replace github.com/docker/docker => github.com/moby/moby v0.7.3-0.20190826074503-38ab9da00309
 
 replace kubevirt.io/vm-import-operator => github.com/kubevirt/vm-import-operator v0.3.0
+
+replace github.com/ovirt/go-ovirt => github.com/ovirt/go-ovirt v0.0.0-20210423075620-0fe653f1c0cd
