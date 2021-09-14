@@ -221,6 +221,38 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 			}
 			*resource.(*VM) = list[0]
 		}
+	case *Cluster:
+		id := ref.ID
+		if id != "" {
+			err = r.Get(resource, id)
+			return
+		}
+		name := ref.Name
+		if name != "" {
+			list := []Cluster{}
+			err = r.List(
+				&list,
+				base.Param{
+					Key:   DetailParam,
+					Value: "1",
+				},
+				base.Param{
+					Key:   NameParam,
+					Value: name,
+				})
+			if err != nil {
+				break
+			}
+			if len(list) == 0 {
+				err = liberr.Wrap(NotFoundError{Ref: ref})
+				break
+			}
+			if len(list) > 1 {
+				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
+				break
+			}
+			*resource.(*Cluster) = list[0]
+		}
 	default:
 		err = liberr.Wrap(
 			ResourceNotResolvedError{

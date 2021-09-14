@@ -139,6 +139,7 @@ type NICProfile struct {
 	PortMirroring bool             `json:"portMirroring"`
 	QoS           string           `json:"qos"`
 	Properties    []model.Property `json:"properties"`
+	PassThrough   bool             `json:"passThrough"`
 }
 
 //
@@ -150,6 +151,7 @@ func (r *NICProfile) With(m *model.NICProfile) {
 	r.PortMirroring = m.PortMirroring
 	r.QoS = m.QoS
 	r.Properties = m.Properties
+	r.PassThrough = m.PassThrough
 }
 
 //

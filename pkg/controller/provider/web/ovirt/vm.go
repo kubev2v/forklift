@@ -217,6 +217,7 @@ type VM struct {
 	GuestName                   string           `json:"guestName"`
 	CpuSockets                  int16            `json:"cpuSockets"`
 	CpuCores                    int16            `json:"cpuCores"`
+	CpuThreads                  int16            `json:"cpuThreads"`
 	CpuShares                   int16            `json:"cpuShares"`
 	CpuAffinity                 []CpuPinning     `json:"cpuAffinity"`
 	Memory                      int64            `json:"memory"`
@@ -235,6 +236,7 @@ type VM struct {
 	Timezone                    string           `json:"timezone"`
 	Status                      string           `json:"status"`
 	Stateless                   string           `json:"stateless"`
+	SerialNumber                string           `json:"serialNumber"`
 	NICs                        []vNIC           `json:"nics"`
 	DiskAttachments             []DiskAttachment `json:"diskAttachments"`
 	HostDevices                 []HostDevice     `json:"hostDevices"`
@@ -277,6 +279,7 @@ func (r *VM) With(m *model.VM) {
 	r.GuestName = m.GuestName
 	r.CpuSockets = m.CpuSockets
 	r.CpuCores = m.CpuCores
+	r.CpuThreads = m.CpuThreads
 	r.CpuShares = m.CpuShares
 	r.CpuAffinity = m.CpuAffinity
 	r.Memory = m.Memory
@@ -295,6 +298,7 @@ func (r *VM) With(m *model.VM) {
 	r.Timezone = m.Timezone
 	r.Status = m.Status
 	r.Stateless = m.Stateless
+	r.SerialNumber = m.SerialNumber
 	r.HostDevices = m.HostDevices
 	r.CDROMs = m.CDROMs
 	r.WatchDogs = m.WatchDogs
