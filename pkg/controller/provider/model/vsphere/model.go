@@ -274,6 +274,7 @@ func (m *VM) Validated() bool {
 //
 // Virtual Disk.
 type Disk struct {
+	Key       int32  `json:"key"`
 	File      string `json:"file"`
 	Datastore Ref    `json:"datastore"`
 	Capacity  int64  `json:"capacity"`

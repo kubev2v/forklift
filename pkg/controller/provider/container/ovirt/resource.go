@@ -84,6 +84,7 @@ type Cluster struct {
 	KSM           struct {
 		Enabled string `json:"enabled"`
 	} `json:"ksm"`
+	BiosType string `json:"bios_type"`
 }
 
 //
@@ -94,6 +95,7 @@ func (r *Cluster) ApplyTo(m *model.Cluster) {
 	m.DataCenter = r.DataCenter.ID
 	m.HaReservation = r.bool(r.HaReservation)
 	m.KsmEnabled = r.bool(r.KSM.Enabled)
+	m.BiosType = r.BiosType
 }
 
 //
@@ -214,6 +216,7 @@ type VM struct {
 		Topology struct {
 			Sockets string `json:"sockets"`
 			Cores   string `json:"cores"`
+			Threads string `json:"threads"`
 		} `json:"topology"`
 	} `json:"cpu"`
 	CpuShares string `json:"cpu_shares"`
@@ -223,8 +226,11 @@ type VM struct {
 	Timezone struct {
 		Name string `json:"name"`
 	} `json:"time_zone"`
-	Status          string `json:"status"`
-	Stateless       string `json:"stateless"`
+	Status       string `json:"status"`
+	Stateless    string `json:"stateless"`
+	SerialNumber struct {
+		Value string `json:"value"`
+	} `json:"serial_number"`
 	PlacementPolicy struct {
 		Affinity string `json:"affinity"`
 	} `json:"placement_policy"`
@@ -332,6 +338,7 @@ func (r *VM) ApplyTo(m *model.VM) {
 	m.GuestName = r.Guest.Distribution + " " + r.Guest.Version.Full
 	m.CpuSockets = r.int16(r.CPU.Topology.Sockets)
 	m.CpuCores = r.int16(r.CPU.Topology.Cores)
+	m.CpuThreads = r.int16(r.CPU.Topology.Threads)
 	m.CpuShares = r.int16(r.CpuShares)
 	m.Memory = r.int64(r.Memory)
 	m.BIOS = r.BIOS.Type
@@ -341,6 +348,7 @@ func (r *VM) ApplyTo(m *model.VM) {
 	m.Timezone = r.Timezone.Name
 	m.Status = r.Status
 	m.Stateless = r.Stateless
+	m.SerialNumber = r.SerialNumber.Value
 	m.Display = r.Display.Type
 	m.HasIllegalImages = r.bool(r.HasIllegalImages)
 	m.BalloonedMemory = r.bool(r.MemoryPolicy.Ballooning)
@@ -575,6 +583,9 @@ type NICProfile struct {
 			Value string `json:"value"`
 		} `json:"custom_property"`
 	} `json:"custom_properties"`
+	PassThrough struct {
+		Mode string `json:"mode"`
+	} `json:"pass_through"`
 }
 
 //
@@ -585,6 +596,7 @@ func (r *NICProfile) ApplyTo(m *model.NICProfile) {
 	m.Network = r.Network.ID
 	m.NetworkFilter = r.NetworkFilter.ID
 	m.PortMirroring = r.bool(r.PortMirroring)
+	m.PassThrough = r.PassThrough.Mode == "enabled"
 	m.QoS = r.QoS.ID
 	r.addProperties(m)
 }
