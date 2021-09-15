@@ -60,6 +60,8 @@ type VMStatus struct {
 	Error *Error `json:"error,omitempty"`
 	// Warm migration status
 	Warm *Warm `json:"warm,omitempty"`
+	// Source VM power state before migration.
+	RestorePowerState string `json:"restorePowerState"`
 
 	// Conditions.
 	libcnd.Conditions `json:",inline"`

@@ -126,7 +126,7 @@ func (r *Step) ReflectTasks() {
 		}
 		completed += task.Progress.Completed
 		if task.Error != nil {
-			task.AddError(task.Error.Reasons...)
+			r.AddError(task.Error.Reasons...)
 		}
 	}
 	r.Progress.Completed = completed
@@ -165,4 +165,10 @@ func (r *Task) AddError(reason ...string) {
 		r.Error = &Error{Phase: r.Phase}
 	}
 	r.Error.Add(reason...)
+}
+
+//
+// Return whether the task has an error.
+func (r *Task) HasError() bool {
+	return r.Error != nil
 }
