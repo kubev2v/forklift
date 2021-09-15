@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	cnv "kubevirt.io/client-go/api/v1"
 	"regexp"
 
 	libcnd "github.com/konveyor/controller/pkg/condition"
@@ -39,6 +40,22 @@ type Builder struct {
 	provisioners map[string]*api.Provisioner
 	// Host CRs.
 	hosts map[string]*api.Host
+}
+
+func (r *Builder) RequiresConfigMap() bool {
+	panic("implement me")
+}
+
+func (r *Builder) ConfigMap(vmRef ref.Ref, secret *core.Secret, object *core.ConfigMap) error {
+	panic("implement me")
+}
+
+func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, dataVolumes []cdi.DataVolume) error {
+	panic("implement me")
+}
+
+func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap) (dvs []cdi.DataVolumeSpec, err error) {
+	panic("implement me")
 }
 
 //
@@ -145,14 +162,13 @@ func (r *Builder) Import(vmRef ref.Ref, object *vmio.VirtualMachineImportSpec) (
 // Build tasks.
 func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 	vm := &model.VM{}
-	pErr := r.Source.Inventory.Find(vm, vmRef)
-	if pErr != nil {
-		err = liberr.New(
-			fmt.Sprintf(
-				"VM %s lookup failed: %s",
-				vmRef.String(),
-				pErr.Error()))
-		return
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(
+			err,
+			"VM lookup failed.",
+			"vm",
+			vmRef.String())
 	}
 	for _, disk := range vm.Disks {
 		mB := disk.Capacity / 0x100000

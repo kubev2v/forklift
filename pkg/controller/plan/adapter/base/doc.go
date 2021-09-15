@@ -6,6 +6,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	core "k8s.io/api/core/v1"
+	cnv "kubevirt.io/client-go/api/v1"
 	cdi "kubevirt.io/containerized-data-importer/pkg/apis/core/v1beta1"
 	vmio "kubevirt.io/vm-import-operator/pkg/apis/v2v/v1beta1"
 )
@@ -13,7 +14,7 @@ import (
 //
 // Adapter API.
 // Constructs provider-specific implementations
-// of the Builder and Validator.
+// of the Builder, Client, and Validator.
 type Adapter interface {
 	// Construct builder.
 	Builder(ctx *plancontext.Context) (Builder, error)
@@ -30,8 +31,16 @@ type Adapter interface {
 type Builder interface {
 	// Build secret.
 	Secret(vmRef ref.Ref, in, object *core.Secret) error
-	// Build VMIO import spec.
+	// Build VMIO import spec. TODO: remove
 	Import(vmRef ref.Ref, object *vmio.VirtualMachineImportSpec) error
+	// Return whether DataVolume import requires a provider-specific configmap.
+	RequiresConfigMap() bool
+	// Build DataVolume config map.
+	ConfigMap(vmRef ref.Ref, secret *core.Secret, object *core.ConfigMap) error
+	// Build the Kubevirt VirtualMachine spec.
+	VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, dataVolumes []cdi.DataVolume) error
+	// Build DataVolumes.
+	DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap) (dvs []cdi.DataVolumeSpec, err error)
 	// Build tasks.
 	Tasks(vmRef ref.Ref) ([]*plan.Task, error)
 	// Return a stable identifier for a DataVolume.
