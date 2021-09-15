@@ -185,6 +185,7 @@ type Cluster struct {
 	DataCenter    string `json:"dataCenter"`
 	HaReservation bool   `json:"haReservation"`
 	KsmEnabled    bool   `json:"ksmEnabled"`
+	BiosType      string `json:"biosType"`
 }
 
 //
@@ -194,6 +195,7 @@ func (r *Cluster) With(m *model.Cluster) {
 	r.DataCenter = m.DataCenter
 	r.HaReservation = m.HaReservation
 	r.KsmEnabled = m.KsmEnabled
+	r.BiosType = m.BiosType
 }
 
 //

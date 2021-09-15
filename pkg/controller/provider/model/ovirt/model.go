@@ -56,6 +56,7 @@ type Cluster struct {
 	DataCenter    string `sql:"d0,index(dataCenter)"`
 	HaReservation bool   `sql:""`
 	KsmEnabled    bool   `sql:""`
+	BiosType      string `sql:""`
 }
 
 type Network struct {
@@ -73,6 +74,7 @@ type NICProfile struct {
 	NetworkFilter string     `sql:""`
 	QoS           string     `sql:""`
 	Properties    []Property `sql:""`
+	PassThrough   bool       `sql:""`
 }
 
 type DiskProfile struct {
@@ -126,6 +128,7 @@ type VM struct {
 	GuestName                   string           `sql:""`
 	CpuSockets                  int16            `sql:""`
 	CpuCores                    int16            `sql:""`
+	CpuThreads                  int16            `sql:""`
 	CpuAffinity                 []CpuPinning     `sql:""`
 	CpuShares                   int16            `sql:""`
 	Memory                      int64            `sql:""`
@@ -141,6 +144,7 @@ type VM struct {
 	Timezone                    string           `sql:""`
 	Status                      string           `sql:""`
 	Stateless                   string           `sql:""`
+	SerialNumber                string           `sql:""`
 	HasIllegalImages            bool             `sql:""`
 	NumaNodeAffinity            []string         `sql:""`
 	LeaseStorageDomain          string           `sql:""`
