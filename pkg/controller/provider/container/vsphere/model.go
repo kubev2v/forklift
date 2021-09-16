@@ -269,6 +269,10 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 				if s, cast := p.Val.(string); cast {
 					v.model.Thumbprint = s
 				}
+			case fTimezone:
+				if s, cast := p.Val.(string); cast {
+					v.model.Timezone = s
+				}
 			case fCpuSockets:
 				if b, cast := p.Val.(int16); cast {
 					v.model.CpuSockets = b

@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	cnv "kubevirt.io/client-go/api/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"path"
 	"regexp"
+	"sort"
 
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
@@ -19,12 +21,33 @@ import (
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/types"
-	"gopkg.in/yaml.v2"
 	core "k8s.io/api/core/v1"
+	cnv "kubevirt.io/client-go/api/v1"
 	cdi "kubevirt.io/containerized-data-importer/pkg/apis/core/v1beta1"
 	vmio "kubevirt.io/vm-import-operator/pkg/apis/v2v/v1beta1"
 	liburl "net/url"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+// BIOS types
+const (
+	Efi = "efi"
+)
+
+// Bus types
+const (
+	Virtio = "virtio"
+)
+
+// Input types
+const (
+	Tablet = "tablet"
+)
+
+// Network types
+const (
+	Pod    = "pod"
+	Multus = "multus"
 )
 
 //
@@ -42,26 +65,59 @@ type Builder struct {
 	hosts map[string]*api.Host
 }
 
+//
+// vSphere DataVolume imports do not require a configmap.
 func (r *Builder) RequiresConfigMap() bool {
-	panic("implement me")
-}
-
-func (r *Builder) ConfigMap(vmRef ref.Ref, secret *core.Secret, object *core.ConfigMap) error {
-	panic("implement me")
-}
-
-func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, dataVolumes []cdi.DataVolume) error {
-	panic("implement me")
-}
-
-func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap) (dvs []cdi.DataVolumeSpec, err error) {
-	panic("implement me")
+	return false
 }
 
 //
-// Build the VMIO secret.
+// Create DataVolume certificate configmap.
+// No-op for vSphere.
+func (r *Builder) ConfigMap(_ ref.Ref, _ *core.Secret, _ *core.ConfigMap) (err error) {
+	return
+}
+
+//
+// Build the DataVolume credential secret.
 func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
+	hostID, err := r.hostID(vmRef)
+	if err != nil {
+		return
+	}
+	if hostDef, found := r.hosts[hostID]; found {
+		hostSecret, nErr := r.hostSecret(hostDef)
+		if nErr != nil {
+			err = nErr
+			return
+		}
+		in = hostSecret
+	}
+
+	object.StringData = map[string]string{
+		"accessKeyId": string(in.Data["user"]),
+		"secretKey":   string(in.Data["password"]),
+	}
+
+	return
+}
+
+//
+// Create DataVolume specs for the VM.
+func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.ConfigMap) (dvs []cdi.DataVolumeSpec, err error) {
+	vm := &model.VM{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(
+			err,
+			"VM lookup failed.",
+			"vm",
+			vmRef.String())
+		return
+	}
+
 	url := r.Source.Provider.Spec.URL
+	thumbprint := string(r.Source.Secret.Data["thumbprint"])
 	hostID, err := r.hostID(vmRef)
 	if err != nil {
 		return
@@ -73,35 +129,264 @@ func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
 			Path:   vim25.Path,
 		}
 		url = hostURL.String()
-		hostSecret, nErr := r.hostSecret(hostDef)
-		if nErr != nil {
-			err = nErr
-			return
-		}
 		h, nErr := r.host(hostID)
 		if nErr != nil {
 			err = nErr
 			return
 		}
-		hostSecret.Data["thumbprint"] = []byte(h.Thumbprint)
-		in = hostSecret
+		thumbprint = h.Thumbprint
 	}
-	content, mErr := yaml.Marshal(
-		map[string]string{
-			"apiUrl":     url,
-			"username":   string(in.Data["user"]),
-			"password":   string(in.Data["password"]),
-			"thumbprint": string(in.Data["thumbprint"]),
-		})
-	if mErr != nil {
-		err = liberr.Wrap(mErr)
-		return
-	}
-	object.StringData = map[string]string{
-		"vmware": string(content),
+
+	dsMapIn := r.Context.Map.Storage.Spec.Map
+	for i := range dsMapIn {
+		mapped := &dsMapIn[i]
+		ref := mapped.Source
+		ds := &model.Datastore{}
+		fErr := r.Source.Inventory.Find(ds, ref)
+		if fErr != nil {
+			err = fErr
+			return
+		}
+		mErr := r.defaultModes(&mapped.Destination)
+		if mErr != nil {
+			err = mErr
+			return
+		}
+		for _, disk := range vm.Disks {
+			if disk.Datastore.ID == ds.ID {
+				storageClass := mapped.Destination.StorageClass
+				volumeMode := core.PersistentVolumeFilesystem
+				if mapped.Destination.VolumeMode != "" {
+					volumeMode = mapped.Destination.VolumeMode
+				}
+				accessMode := core.ReadWriteOnce
+				if mapped.Destination.AccessMode != "" {
+					accessMode = mapped.Destination.AccessMode
+				}
+				dvSpec := cdi.DataVolumeSpec{
+					Source: cdi.DataVolumeSource{
+						VDDK: &cdi.DataVolumeSourceVDDK{
+							BackingFile: disk.File,
+							UUID:        vm.UUID,
+							URL:         url,
+							SecretRef:   secret.Name,
+							Thumbprint:  thumbprint,
+						},
+					},
+					PVC: &core.PersistentVolumeClaimSpec{
+						AccessModes: []core.PersistentVolumeAccessMode{
+							accessMode,
+						},
+						VolumeMode: &volumeMode,
+						Resources: core.ResourceRequirements{
+							Requests: core.ResourceList{
+								core.ResourceStorage: *resource.NewQuantity(disk.Capacity, resource.BinarySI),
+							},
+						},
+						StorageClassName: &storageClass,
+					},
+				}
+				dvs = append(dvs, dvSpec)
+			}
+		}
 	}
 
 	return
+}
+
+//
+// Create the destination Kubevirt VM.
+func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, dataVolumes []cdi.DataVolume) (err error) {
+	vm := &model.VM{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(
+			err,
+			"VM lookup failed.",
+			"vm",
+			vmRef.String())
+		return
+	}
+	if vm.IsTemplate {
+		err = liberr.New(
+			fmt.Sprintf(
+				"VM %s is a template",
+				vmRef.String()))
+		return
+	}
+	if types.VirtualMachineConnectionState(vm.ConnectionState) != types.VirtualMachineConnectionStateConnected {
+		err = liberr.New(
+			fmt.Sprintf(
+				"VM %s is not connected",
+				vmRef.String()))
+		return
+	}
+	if r.Plan.Spec.Warm && !vm.ChangeTrackingEnabled {
+		err = liberr.New(
+			fmt.Sprintf(
+				"Changed Block Tracking (CBT) is disabled for VM %s",
+				vmRef.String()))
+		return
+	}
+
+	host, err := r.host(vm.Host)
+	if err != nil {
+		return
+	}
+
+	object.Template = &cnv.VirtualMachineInstanceTemplateSpec{}
+	r.mapDisks(vm, dataVolumes, object)
+	r.mapFirmware(vm, object)
+	r.mapCPU(vm, object)
+	r.mapMemory(vm, object)
+	r.mapClock(host, object)
+	r.mapInput(object)
+	err = r.mapNetworks(vm, object)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err error) {
+	var kNetworks []cnv.Network
+	var kInterfaces []cnv.Interface
+
+	netMapIn := r.Context.Map.Network.Spec.Map
+	for i := range netMapIn {
+		mapped := &netMapIn[i]
+		ref := mapped.Source
+		network := &model.Network{}
+		fErr := r.Source.Inventory.Find(network, ref)
+		if fErr != nil {
+			err = fErr
+			return
+		}
+		needed := false
+		for _, net := range vm.Networks {
+			if net.ID == network.ID {
+				needed = true
+				break
+			}
+		}
+		if !needed {
+			continue
+		}
+		networkName := fmt.Sprintf("net-%v", i)
+		kNetwork := cnv.Network{
+			Name: networkName,
+		}
+		kInterface := cnv.Interface{
+			Name:  networkName,
+			Model: Virtio,
+		}
+		switch mapped.Destination.Type {
+		case Pod:
+			kNetwork.Pod = &cnv.PodNetwork{}
+			kInterface.Masquerade = &cnv.InterfaceMasquerade{}
+		case Multus:
+			kNetwork.Multus = &cnv.MultusNetwork{
+				NetworkName: path.Join(mapped.Destination.Namespace, mapped.Destination.Name),
+			}
+			kInterface.Bridge = &cnv.InterfaceBridge{}
+		}
+		kNetworks = append(kNetworks, kNetwork)
+		kInterfaces = append(kInterfaces, kInterface)
+	}
+	object.Template.Spec.Networks = kNetworks
+	object.Template.Spec.Domain.Devices.Interfaces = kInterfaces
+	return
+}
+
+func (r *Builder) mapInput(object *cnv.VirtualMachineSpec) {
+	tablet := cnv.Input{
+		Type: Tablet,
+		Name: Tablet,
+		Bus:  Virtio,
+	}
+	object.Template.Spec.Domain.Devices.Inputs = []cnv.Input{tablet}
+}
+
+func (r *Builder) mapClock(host *model.Host, object *cnv.VirtualMachineSpec) {
+	clock := &cnv.Clock{
+		Timer: &cnv.Timer{},
+	}
+	if host.Timezone != "" {
+		tz := cnv.ClockOffsetTimezone(host.Timezone)
+		clock.ClockOffset.Timezone = &tz
+	}
+	object.Template.Spec.Domain.Clock = clock
+}
+
+func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec) {
+	memoryBytes := int64(vm.MemoryMB) * 1024 * 1024
+	reservation := resource.NewQuantity(memoryBytes, resource.BinarySI)
+	object.Template.Spec.Domain.Resources = cnv.ResourceRequirements{
+		Requests: map[core.ResourceName]resource.Quantity{
+			core.ResourceMemory: *reservation,
+		},
+	}
+}
+
+func (r *Builder) mapCPU(vm *model.VM, object *cnv.VirtualMachineSpec) {
+	object.Template.Spec.Domain.Machine = &cnv.Machine{Type: "q35"}
+	object.Template.Spec.Domain.CPU = &cnv.CPU{
+		Sockets: uint32(vm.CpuCount / vm.CoresPerSocket),
+		Cores:   uint32(vm.CoresPerSocket),
+	}
+}
+
+func (r *Builder) mapFirmware(vm *model.VM, object *cnv.VirtualMachineSpec) {
+	features := &cnv.Features{}
+	firmware := &cnv.Firmware{
+		Serial: vm.UUID,
+	}
+	switch vm.Firmware {
+	case Efi:
+		smmEnabled := true
+		features.SMM = &cnv.FeatureState{
+			Enabled: &smmEnabled,
+		}
+		firmware.Bootloader = &cnv.Bootloader{EFI: &cnv.EFI{}}
+	default:
+		firmware.Bootloader = &cnv.Bootloader{BIOS: &cnv.BIOS{}}
+	}
+	object.Template.Spec.Domain.Features = features
+	object.Template.Spec.Domain.Firmware = firmware
+}
+
+func (r *Builder) mapDisks(vm *model.VM, dataVolumes []cdi.DataVolume, object *cnv.VirtualMachineSpec) {
+	disks := vm.Disks
+	sort.Slice(disks, func(i, j int) bool {
+		return disks[i].Key < disks[j].Key
+	})
+	dvMap := make(map[string]*cdi.DataVolume)
+	for _, dv := range dataVolumes {
+		dvMap[r.trimBackingFileName(dv.Spec.Source.VDDK.BackingFile)] = &dv
+	}
+	for i, disk := range disks {
+		dv := dvMap[r.trimBackingFileName(disk.File)]
+		volumeName := fmt.Sprintf("vol-%v", i)
+		volume := cnv.Volume{
+			Name: volumeName,
+			VolumeSource: cnv.VolumeSource{
+				DataVolume: &cnv.DataVolumeSource{
+					Name: dv.Name,
+				},
+			},
+		}
+		kubevirtDisk := cnv.Disk{
+			Name: volumeName,
+			DiskDevice: cnv.DiskDevice{
+				Disk: &cnv.DiskTarget{
+					Bus: Virtio,
+				},
+			},
+		}
+		object.Template.Spec.Volumes = append(object.Template.Spec.Volumes, volume)
+		object.Template.Spec.Domain.Devices.Disks = append(object.Template.Spec.Domain.Devices.Disks, kubevirtDisk)
+	}
 }
 
 //
@@ -169,6 +454,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 			"VM lookup failed.",
 			"vm",
 			vmRef.String())
+		return
 	}
 	for _, disk := range vm.Disks {
 		mB := disk.Capacity / 0x100000
@@ -279,13 +565,13 @@ func (r *Builder) loadProvisioners() (err error) {
 // Find host ID for VM.
 func (r *Builder) hostID(vmRef ref.Ref) (hostID string, err error) {
 	vm := &model.VM{}
-	pErr := r.Source.Inventory.Find(vm, vmRef)
-	if pErr != nil {
-		err = liberr.New(
-			fmt.Sprintf(
-				"VM %s lookup failed: %s",
-				vmRef.String(),
-				pErr.Error()))
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(
+			err,
+			"VM lookup failed.",
+			"vm",
+			vmRef.String())
 		return
 	}
 
@@ -315,14 +601,13 @@ func (r *Builder) hostSecret(host *api.Host) (secret *core.Secret, err error) {
 // Find host in the inventory.
 func (r *Builder) host(hostID string) (host *model.Host, err error) {
 	host = &model.Host{}
-	pErr := r.Source.Inventory.Get(host, hostID)
-	if pErr != nil {
-		err = liberr.New(
-			fmt.Sprintf(
-				"Host %s lookup failed: %s",
-				hostID,
-				pErr.Error()))
-		return
+	err = r.Source.Inventory.Get(host, hostID)
+	if err != nil {
+		err = liberr.Wrap(
+			err,
+			"Host lookup failed.",
+			"host",
+			hostID)
 	}
 
 	return

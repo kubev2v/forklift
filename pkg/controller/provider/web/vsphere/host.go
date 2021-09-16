@@ -215,6 +215,7 @@ type Host struct {
 	InMaintenanceMode  bool              `json:"inMaintenance"`
 	ManagementServerIp string            `json:"managementServerIp"`
 	Thumbprint         string            `json:"thumbprint"`
+	Timezone           string            `json:"timezone"`
 	CpuSockets         int16             `json:"cpuSockets"`
 	CpuCores           int16             `json:"cpuCores"`
 	ProductName        string            `json:"productName"`
@@ -235,6 +236,7 @@ func (r *Host) With(m *model.Host) {
 	r.InMaintenanceMode = m.InMaintenanceMode
 	r.ManagementServerIp = m.ManagementServerIp
 	r.Thumbprint = m.Thumbprint
+	r.Timezone = m.Timezone
 	r.CpuSockets = m.CpuSockets
 	r.CpuCores = m.CpuCores
 	r.ProductVersion = m.ProductVersion

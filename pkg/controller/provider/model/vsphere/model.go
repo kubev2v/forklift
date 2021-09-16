@@ -135,6 +135,7 @@ type Host struct {
 	InMaintenanceMode  bool        `sql:""`
 	ManagementServerIp string      `sql:""`
 	Thumbprint         string      `sql:""`
+	Timezone           string      `sql:""`
 	CpuSockets         int16       `sql:""`
 	CpuCores           int16       `sql:""`
 	ProductName        string      `sql:""`
