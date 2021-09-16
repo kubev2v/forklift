@@ -22,27 +22,27 @@ import (
 
 // BIOS types
 const (
-	biostypeClusterDefault = "cluster_default"
-	biostypeQ35Ovmf        = "q35_ovmf"
+	ClusterDefault = "cluster_default"
+	Q35Ovmf        = "q35_ovmf"
 )
 
 // Bus types
 const (
-	virtioScsi = "virtio_scsi"
-	virtio     = "virtio"
-	sata       = "sata"
-	scsi       = "scsi"
+	VirtioScsi = "virtio_scsi"
+	Virtio     = "virtio"
+	Sata       = "sata"
+	Scsi       = "scsi"
 )
 
 // Input types
 const (
-	tablet = "tablet"
+	Tablet = "tablet"
 )
 
 // Network types
 const (
-	pod    = "pod"
-	multus = "multus"
+	Pod    = "pod"
+	Multus = "multus"
 )
 
 //
@@ -217,13 +217,13 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 		}
 		kInterface := cnv.Interface{
 			Name:  networkName,
-			Model: virtio,
+			Model: Virtio,
 		}
 		switch mapped.Destination.Type {
-		case pod:
+		case Pod:
 			kNetwork.Pod = &cnv.PodNetwork{}
 			kInterface.Masquerade = &cnv.InterfaceMasquerade{}
-		case multus:
+		case Multus:
 			kNetwork.Multus = &cnv.MultusNetwork{
 				NetworkName: path.Join(mapped.Destination.Namespace, mapped.Destination.Name),
 			}
@@ -243,9 +243,9 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 
 func (r *Builder) mapInput(object *cnv.VirtualMachineSpec) {
 	tablet := cnv.Input{
-		Type: tablet,
-		Name: tablet,
-		Bus:  virtio,
+		Type: Tablet,
+		Name: Tablet,
+		Bus:  Virtio,
 	}
 	object.Template.Spec.Domain.Devices.Inputs = []cnv.Input{tablet}
 }
@@ -278,7 +278,7 @@ func (r *Builder) mapCPU(vm *model.VM, object *cnv.VirtualMachineSpec) {
 
 func (r *Builder) mapFirmware(vm *model.VM, cluster *model.Cluster, object *cnv.VirtualMachineSpec) {
 	biosType := vm.BIOS
-	if biosType == biostypeClusterDefault {
+	if biosType == ClusterDefault {
 		biosType = cluster.BiosType
 	}
 	serial := vm.SerialNumber
@@ -290,7 +290,7 @@ func (r *Builder) mapFirmware(vm *model.VM, cluster *model.Cluster, object *cnv.
 		Serial: serial,
 	}
 	switch biosType {
-	case biostypeQ35Ovmf:
+	case Q35Ovmf:
 		smmEnabled := true
 		features.SMM = &cnv.FeatureState{
 			Enabled: &smmEnabled,
@@ -322,12 +322,12 @@ func (r *Builder) mapDisks(vm *model.VM, dataVolumes []cdi.DataVolume, object *c
 		}
 		var bus string
 		switch da.Interface {
-		case virtioScsi:
-			bus = scsi
-		case sata:
-			bus = sata
+		case VirtioScsi:
+			bus = Scsi
+		case Sata:
+			bus = Sata
 		default:
-			bus = virtio
+			bus = Virtio
 		}
 		disk := cnv.Disk{
 			Name: volumeName,
