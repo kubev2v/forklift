@@ -872,41 +872,21 @@ func (r *VMAdapter) Event() []int {
 //
 // List the collection.
 func (r *VMAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
+	vmList := VMList{}
+	err = ctx.client.list("vms", &vmList, r.follow())
+	if err != nil {
+		return
+	}
 	list := fb.NewList()
-	page := 0
-	for {
-		page++
-		if ctx.canceled() {
-			break
+	for _, object := range vmList.Items {
+		m := &model.VM{
+			Base: model.Base{ID: object.ID},
 		}
-		vmList := VMList{}
-		params := append(
-			r.page(page, 500),
-			r.follow())
-
-		ctx.log.V(1).Info(
-			"List VMs.",
-			"page",
-			page)
-
-		err = ctx.client.list("vms", &vmList, params...)
-		if err != nil {
-			return
-		}
-		if len(vmList.Items) == 0 {
-			break
-		}
-		for _, object := range vmList.Items {
-			m := &model.VM{
-				Base: model.Base{ID: object.ID},
-			}
-			object.ApplyTo(m)
-			list.Append(m)
-		}
+		object.ApplyTo(m)
+		list.Append(m)
 	}
 
 	itr = list.Iter()
-
 	return
 }
 
