@@ -14,12 +14,12 @@ require (
 	github.com/vmware/govmomi v0.23.1
 	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
 	gopkg.in/yaml.v2 v2.3.0
-	k8s.io/api v0.19.3
-	k8s.io/apimachinery v0.19.3
+	k8s.io/api v0.20.2
+	k8s.io/apimachinery v0.20.2
 	k8s.io/apiserver v0.19.3
 	k8s.io/client-go v12.0.0+incompatible
-	kubevirt.io/client-go v0.33.0
-	kubevirt.io/containerized-data-importer v1.27.0
+	kubevirt.io/client-go v0.42.1
+	kubevirt.io/containerized-data-importer v1.34.0
 	kubevirt.io/vm-import-operator v0.0.0-00010101000000-000000000000
 	sigs.k8s.io/controller-runtime v0.6.4
 )
