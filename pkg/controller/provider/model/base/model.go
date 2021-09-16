@@ -8,6 +8,10 @@ import (
 type Model = libmodel.Model
 type ListOptions = libmodel.ListOptions
 
+func init() {
+	libmodel.DefaultDetail = 1
+}
+
 const (
 	MaxDetail = libmodel.MaxDetail
 )

@@ -53,7 +53,7 @@ type DataCenter struct {
 
 type Cluster struct {
 	Base
-	DataCenter    string `sql:"d0,index(dataCenter)"`
+	DataCenter    string `sql:"d0,fk(dataCenter +cascade)"`
 	HaReservation bool   `sql:""`
 	KsmEnabled    bool   `sql:""`
 	BiosType      string `sql:""`
@@ -61,7 +61,7 @@ type Cluster struct {
 
 type Network struct {
 	Base
-	DataCenter string   `sql:"d0,index(dataCenter)"`
+	DataCenter string   `sql:"d0,fk(dataCenter +cascade)"`
 	VLan       string   `sql:""`
 	Usages     []string `sql:""`
 	Profiles   []string `sql:""`
@@ -69,7 +69,7 @@ type Network struct {
 
 type NICProfile struct {
 	Base
-	Network       string     `sql:"d0,index(network)"`
+	Network       string     `sql:"d0,fk(network +cascade)"`
 	PortMirroring bool       `sql:""`
 	NetworkFilter string     `sql:""`
 	QoS           string     `sql:""`
@@ -79,13 +79,13 @@ type NICProfile struct {
 
 type DiskProfile struct {
 	Base
-	StorageDomain string `sql:"d0,index(storageDomain)"`
+	StorageDomain string `sql:"d0,fk(storageDomain +cascade)"`
 	QoS           string `sql:""`
 }
 
 type StorageDomain struct {
 	Base
-	DataCenter string `sql:"d0,index(dataCenter)"`
+	DataCenter string `sql:"d0,fk(dataCenter +cascade)"`
 	Type       string `sql:""`
 	Storage    struct {
 		Type string
@@ -96,7 +96,7 @@ type StorageDomain struct {
 
 type Host struct {
 	Base
-	Cluster            string              `sql:"d0,index(cluster)"`
+	Cluster            string              `sql:"d0,fk(cluster +cascade)"`
 	Status             string              `sql:""`
 	ProductName        string              `sql:""`
 	ProductVersion     string              `sql:""`
@@ -122,7 +122,7 @@ type HostNIC struct {
 
 type VM struct {
 	Base
-	Cluster                     string           `sql:"d0,index(cluster)"`
+	Cluster                     string           `sql:"d0,fk(cluster +cascade)"`
 	Host                        string           `sql:"d0,index(host)"`
 	RevisionValidated           int64            `sql:"d0,index(revisionValidated)" eq:"-"`
 	PolicyVersion               int              `sql:"d0,index(policyVersion)" eq:"-"`
@@ -224,7 +224,7 @@ type Disk struct {
 	Base
 	Shared          bool   `sql:""`
 	Profile         string `sql:"index(profile)"`
-	StorageDomain   string `sql:"index(storageDomain)"`
+	StorageDomain   string `sql:"fk(storageDomain +cascade)"`
 	Status          string `sql:""`
 	ActualSize      int64  `sql:""`
 	Backup          string `sql:""`
