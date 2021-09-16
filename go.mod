@@ -6,7 +6,7 @@ require (
 	github.com/gin-gonic/gin v1.7.2
 	github.com/go-logr/logr v0.3.0
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.1.0
-	github.com/konveyor/controller v0.6.1
+	github.com/konveyor/controller v0.7.0
 	github.com/onsi/gomega v1.10.3
 	github.com/ovirt/go-ovirt v4.3.4+incompatible
 	github.com/pkg/profile v1.3.0

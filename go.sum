@@ -703,6 +703,8 @@ github.com/konsorten/go-windows-terminal-sequences v1.0.2/go.mod h1:T0+1ngSBFLxv
 github.com/konsorten/go-windows-terminal-sequences v1.0.3/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=
 github.com/konveyor/controller v0.6.1 h1:+hqgq5gCNMDw4ZVqUa4/FVb73HnzXwes313T1wVk/Gs=
 github.com/konveyor/controller v0.6.1/go.mod h1:j0DSNesS0XHmqOLcJEuwB+qIRkdJ3mSIEJFA2byC12c=
+github.com/konveyor/controller v0.7.0 h1:e/BjjzwNyfGdployoXUd7hwk6ly2+Vm4+PPGMPXsJAA=
+github.com/konveyor/controller v0.7.0/go.mod h1:U2h8HnX1MXoUlLA8ySP+PJClK9+aR38mxtqLGAvAprE=
 github.com/kr/logfmt v0.0.0-20140226030751-b84e30acd515/go.mod h1:+0opPa2QZZtGFBFZlji/RkVcI2GknAs/DXo4wKdlNEc=
 github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORNo=
 github.com/kr/pretty v0.2.0 h1:s5hAObm+yFO5uHYt5dYjxi2rXrsnmRpJx4OYvIWUaQs=
