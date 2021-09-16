@@ -44,14 +44,14 @@ const (
 //
 // Reasons
 const (
-	NotSet            = "NotSet"
-	NotFound          = "NotFound"
-	DataErr           = "DataErr"
-	TypeErr           = "TypeErr"
-	Ambiguous         = "Ambiguous"
-	Completed         = "Completed"
-	Tested            = "Tested"
-	StateEvaluated    = "StateEvaluated"
+	NotSet         = "NotSet"
+	NotFound       = "NotFound"
+	DataErr        = "DataErr"
+	TypeErr        = "TypeErr"
+	Ambiguous      = "Ambiguous"
+	Completed      = "Completed"
+	Tested         = "Tested"
+	StateEvaluated = "StateEvaluated"
 )
 
 //
