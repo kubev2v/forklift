@@ -253,6 +253,10 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 			switch p.Name {
 			case fParent:
 				v.model.Cluster = v.Ref(p.Val).ID
+			case fOverallStatus:
+				if s, cast := p.Val.(types.ManagedEntityStatus); cast {
+					v.model.Status = string(s)
+				}
 			case fInMaintMode:
 				if b, cast := p.Val.(bool); cast {
 					v.model.InMaintenanceMode = b

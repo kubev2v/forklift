@@ -150,6 +150,7 @@ func (r *Host) ApplyTo(m *model.Host) {
 	m.Name = r.Name
 	m.Description = r.Description
 	m.Cluster = r.Cluster.ID
+	m.Status = r.Status
 	m.ProductName = r.OS.Type
 	m.ProductVersion = r.OS.Version.Full
 	m.InMaintenance = r.Status == "maintenance"

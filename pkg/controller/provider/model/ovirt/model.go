@@ -97,6 +97,7 @@ type StorageDomain struct {
 type Host struct {
 	Base
 	Cluster            string              `sql:"d0,index(cluster)"`
+	Status             string              `sql:""`
 	ProductName        string              `sql:""`
 	ProductVersion     string              `sql:""`
 	InMaintenance      bool                `sql:""`
