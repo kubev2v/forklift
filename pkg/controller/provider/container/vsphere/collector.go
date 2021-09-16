@@ -68,6 +68,7 @@ const (
 	fDrsVmCfg      = "configuration.drsVmConfig"
 	// Host
 	fVm             = "vm"
+	fOverallStatus  = "overallStatus"
 	fProductName    = "config.product.name"
 	fProductVersion = "config.product.version"
 	fVSwitch        = "config.network.vswitch"
@@ -638,6 +639,7 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 			PathSet: []string{
 				fName,
 				fParent,
+				fOverallStatus,
 				fProductName,
 				fProductVersion,
 				fThumbprint,

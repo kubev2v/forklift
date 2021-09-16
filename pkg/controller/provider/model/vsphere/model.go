@@ -131,6 +131,7 @@ type Cluster struct {
 type Host struct {
 	Base
 	Cluster            string      `sql:"d0,index(cluster)"`
+	Status             string      `sql:""`
 	InMaintenanceMode  bool        `sql:""`
 	ManagementServerIp string      `sql:""`
 	Thumbprint         string      `sql:""`

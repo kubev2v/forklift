@@ -182,6 +182,7 @@ func (h *HostHandler) filter(ctx *gin.Context, list *[]model.Host) (err error) {
 type Host struct {
 	Resource
 	Cluster            string              `json:"cluster"`
+	Status             string              `json:"status"`
 	ProductName        string              `json:"productName"`
 	ProductVersion     string              `json:"productVersion"`
 	InMaintenance      bool                `json:"inMaintenance"`
@@ -199,6 +200,7 @@ type hNIC = model.HostNIC
 func (r *Host) With(m *model.Host) {
 	r.Resource.With(&m.Base)
 	r.Cluster = m.Cluster
+	r.Status = m.Status
 	r.ProductName = m.ProductName
 	r.ProductVersion = m.ProductVersion
 	r.InMaintenance = m.InMaintenance

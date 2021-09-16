@@ -27,7 +27,8 @@ const (
 	IpNotValid              = "IpNotValid"
 	ConnectionTestSucceeded = "ConnectionTestSucceeded"
 	ConnectionTestFailed    = "ConnectionTestFailed"
-	Unavailable             = "Unavailable"
+	InMaintenance           = "InMaintenance"
+	NotHealthy              = "NotHealthy"
 )
 
 //
@@ -50,7 +51,7 @@ const (
 	Ambiguous         = "Ambiguous"
 	Completed         = "Completed"
 	Tested            = "Tested"
-	InMaintenanceMode = "InMaintenanceMode"
+	StateEvaluated    = "StateEvaluated"
 )
 
 //
@@ -282,19 +283,28 @@ func (r *Reconciler) testConnection(host *api.Host) (err error) {
 			err = liberr.Wrap(pErr)
 			return
 		}
-
 		if hostModel.InMaintenanceMode {
 			host.Status.SetCondition(
 				libcnd.Condition{
-					Type:     Unavailable,
+					Type:     InMaintenance,
 					Status:   True,
-					Reason:   InMaintenanceMode,
-					Category: Warn,
+					Reason:   StateEvaluated,
+					Category: Critical,
 					Message:  "Host is in maintenance mode.",
 				},
 			)
 		}
-
+		if hostModel.Status != "green" {
+			host.Status.SetCondition(
+				libcnd.Condition{
+					Type:     NotHealthy,
+					Status:   True,
+					Reason:   StateEvaluated,
+					Category: Critical,
+					Message:  "Host status not 'green'.",
+				},
+			)
+		}
 		secret.Data["thumbprint"] = []byte(hostModel.Thumbprint)
 		h := adapter.EsxHost{
 			Secret: secret,
