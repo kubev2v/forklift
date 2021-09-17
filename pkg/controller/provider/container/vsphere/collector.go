@@ -75,6 +75,7 @@ const (
 	fPortGroup      = "config.network.portgroup"
 	fPNIC           = "config.network.pnic"
 	fVNIC           = "config.network.vnic"
+	fTimezone       = "config.dateTimeInfo.timeZone.name"
 	fInMaintMode    = "summary.runtime.inMaintenanceMode"
 	fCpuSockets     = "summary.hardware.numCpuPkgs"
 	fCpuCores       = "summary.hardware.numCpuCores"
@@ -643,6 +644,7 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 				fProductName,
 				fProductVersion,
 				fThumbprint,
+				fTimezone,
 				fMgtServerIp,
 				fInMaintMode,
 				fCpuSockets,
