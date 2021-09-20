@@ -16,6 +16,12 @@ const (
 )
 
 //
+// Default virt-v2v image.
+const (
+	DefaultVirtV2vImage = "quay.io/konveyor/forklift-virt-v2v:latest"
+)
+
+//
 // Migration settings
 type Migration struct {
 	// Max VMs in-flight.
@@ -49,7 +55,11 @@ func (r *Migration) Load() (err error) {
 	if err != nil {
 		err = liberr.Wrap(err)
 	}
-	r.VirtV2vImage = os.Getenv(VirtV2vImage)
-
+	virtV2vImage, ok := os.LookupEnv(VirtV2vImage)
+	if ok {
+		r.VirtV2vImage = virtV2vImage
+	} else {
+		r.VirtV2vImage = DefaultVirtV2vImage
+	}
 	return
 }
