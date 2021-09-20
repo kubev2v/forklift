@@ -5,6 +5,7 @@ go 1.14
 require (
 	github.com/gin-gonic/gin v1.7.2
 	github.com/go-logr/logr v0.3.0
+	github.com/go-openapi/spec v0.19.4 // indirect
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.1.0
 	github.com/konveyor/controller v0.7.0
 	github.com/onsi/gomega v1.10.3
@@ -12,6 +13,7 @@ require (
 	github.com/pkg/profile v1.3.0
 	github.com/prometheus/client_golang v1.8.0 // indirect
 	github.com/vmware/govmomi v0.23.1
+	go.uber.org/zap v1.14.1 // indirect
 	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
 	gopkg.in/yaml.v2 v2.3.0
 	k8s.io/api v0.20.2
@@ -20,7 +22,7 @@ require (
 	k8s.io/client-go v12.0.0+incompatible
 	kubevirt.io/client-go v0.42.1
 	kubevirt.io/containerized-data-importer v1.34.0
-	kubevirt.io/vm-import-operator v0.0.0-00010101000000-000000000000
+	libvirt.org/libvirt-go-xml v6.6.0+incompatible
 	sigs.k8s.io/controller-runtime v0.6.4
 )
 
