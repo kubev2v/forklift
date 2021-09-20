@@ -8,7 +8,6 @@ import (
 	core "k8s.io/api/core/v1"
 	cnv "kubevirt.io/client-go/api/v1"
 	cdi "kubevirt.io/containerized-data-importer/pkg/apis/core/v1beta1"
-	vmio "kubevirt.io/vm-import-operator/pkg/apis/v2v/v1beta1"
 )
 
 //
@@ -31,8 +30,6 @@ type Adapter interface {
 type Builder interface {
 	// Build secret.
 	Secret(vmRef ref.Ref, in, object *core.Secret) error
-	// Build VMIO import spec. TODO: remove
-	Import(vmRef ref.Ref, object *vmio.VirtualMachineImportSpec) error
 	// Return whether DataVolume import requires a provider-specific configmap.
 	RequiresConfigMap() bool
 	// Build DataVolume config map.

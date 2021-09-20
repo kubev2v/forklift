@@ -15,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	cnv "kubevirt.io/client-go/api/v1"
 	cdi "kubevirt.io/containerized-data-importer/pkg/apis/core/v1beta1"
-	vmio "kubevirt.io/vm-import-operator/pkg/apis/v2v/v1beta1"
 	"path"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -126,7 +125,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 							CertConfigMap: configMap.Name,
 						},
 					},
-					PVC: &core.PersistentVolumeClaimSpec{
+					Storage: &cdi.StorageSpec{
 						AccessModes: []core.PersistentVolumeAccessMode{
 							accessMode,
 						},
@@ -340,121 +339,6 @@ func (r *Builder) mapDisks(vm *model.VM, dataVolumes []cdi.DataVolume, object *c
 		object.Template.Spec.Volumes = append(object.Template.Spec.Volumes, volume)
 		object.Template.Spec.Domain.Devices.Disks = append(object.Template.Spec.Domain.Devices.Disks, disk)
 	}
-}
-
-//
-// Build the VMIO VM Import Spec.
-func (r *Builder) Import(vmRef ref.Ref, object *vmio.VirtualMachineImportSpec) (err error) {
-	vm := &model.VM{}
-	pErr := r.Source.Inventory.Find(vm, vmRef)
-	if pErr != nil {
-		err = liberr.New(
-			fmt.Sprintf(
-				"VM %s lookup failed: %s",
-				vmRef.String(),
-				pErr.Error()))
-		return
-	}
-
-	object.TargetVMName = &vm.Name
-	object.Source.Ovirt = &vmio.VirtualMachineImportOvirtSourceSpec{
-		VM: vmio.VirtualMachineImportOvirtSourceVMSpec{
-			ID: &vm.ID,
-		},
-	}
-	object.Source.Ovirt.Mappings, err = r.mapping(vm)
-	if err != nil {
-		return
-	}
-
-	return
-}
-
-func (r *Builder) mapping(vm *model.VM) (out *vmio.OvirtMappings, err error) {
-	netMap := []vmio.NetworkResourceMappingItem{}
-	storageMap := []vmio.StorageResourceMappingItem{}
-	netMapIn := r.Context.Map.Network.Spec.Map
-	for i := range netMapIn {
-		mapped := &netMapIn[i]
-		ref := mapped.Source
-		network := &model.Network{}
-		fErr := r.Source.Inventory.Find(network, ref)
-		if err != nil {
-			err = fErr
-			return
-		}
-		needed := false
-		profileId := ""
-		for _, nic := range vm.NICs {
-			if nic.Profile.Network == network.ID {
-				needed = true
-				profileId = nic.Profile.ID
-				break
-			}
-		}
-		if !needed {
-			continue
-		}
-		netMap = append(
-			netMap,
-			vmio.NetworkResourceMappingItem{
-				Source: vmio.Source{
-					ID: &profileId,
-				},
-				Target: vmio.ObjectIdentifier{
-					Namespace: &mapped.Destination.Namespace,
-					Name:      mapped.Destination.Name,
-				},
-				Type: &mapped.Destination.Type,
-			})
-	}
-	storageMapIn := r.Context.Map.Storage.Spec.Map
-	for i := range storageMapIn {
-		mapped := &storageMapIn[i]
-		ref := mapped.Source
-		domain := &model.StorageDomain{}
-		fErr := r.Source.Inventory.Find(domain, ref)
-		if fErr != nil {
-			err = fErr
-			return
-		}
-		needed := false
-		for _, da := range vm.DiskAttachments {
-			if da.Disk.StorageDomain == domain.ID {
-				needed = true
-				break
-			}
-		}
-		if !needed {
-			continue
-		}
-		mErr := r.defaultModes(&mapped.Destination)
-		if mErr != nil {
-			err = mErr
-			return
-		}
-		item := vmio.StorageResourceMappingItem{
-			Source: vmio.Source{
-				ID: &domain.ID,
-			},
-			Target: vmio.ObjectIdentifier{
-				Name: mapped.Destination.StorageClass,
-			},
-		}
-		if mapped.Destination.VolumeMode != "" {
-			item.VolumeMode = &mapped.Destination.VolumeMode
-		}
-		if mapped.Destination.AccessMode != "" {
-			item.AccessMode = &mapped.Destination.AccessMode
-		}
-		storageMap = append(storageMap, item)
-	}
-	out = &vmio.OvirtMappings{
-		NetworkMappings: &netMap,
-		StorageMappings: &storageMap,
-	}
-
-	return
 }
 
 //
