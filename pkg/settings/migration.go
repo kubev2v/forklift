@@ -11,7 +11,7 @@ const (
 	MaxVmInFlight   = "MAX_VM_INFLIGHT"
 	HookRetry       = "HOOK_RETRY"
 	ImporterRetry   = "IMPORTER_RETRY"
-	VirtV2vImage    = "VIRTV2V_IMAGE"
+	VirtV2vImage    = "VIRT_V2V_IMAGE"
 	PrecopyInterval = "PRECOPY_INTERVAL"
 )
 
