@@ -6,13 +6,15 @@ import (
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libitr "github.com/konveyor/controller/pkg/itinerary"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/scheduler"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
-	vmio "kubevirt.io/vm-import-operator/pkg/apis/v2v/v1beta1"
+	"github.com/konveyor/forklift-controller/pkg/settings"
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	cdi "kubevirt.io/containerized-data-importer/pkg/apis/core/v1beta1"
 	"time"
 )
 
@@ -26,36 +28,86 @@ const (
 //
 // Predicates.
 var (
-	HasPreHook  libitr.Flag = 0x01
-	HasPostHook libitr.Flag = 0x02
+	HasPreHook         libitr.Flag = 0x01
+	HasPostHook        libitr.Flag = 0x02
+	RequiresConversion libitr.Flag = 0x04
 )
 
 //
 // Phases.
 const (
-	Started       = "Started"
-	PreHook       = "PreHook"
-	CreateImport  = "CreateImport"
-	ImportCreated = "ImportCreated"
-	PostHook      = "PostHook"
-	Completed     = "Completed"
+	Started                  = "Started"
+	PreHook                  = "PreHook"
+	StorePowerState          = "StorePowerState"
+	PowerOffSource           = "PowerOffSource"
+	WaitForPowerOff          = "WaitForPowerOff"
+	CreateDataVolumes        = "CreateDataVolumes"
+	CreateVM                 = "CreateVM"
+	ScheduleVM               = "ScheduleVM"
+	CopyDisks                = "CopyDisks"
+	CopyingPaused            = "CopyingPaused"
+	AddCheckpoint            = "AddCheckpoint"
+	AddFinalCheckpoint       = "AddFinalCheckpoint"
+	CreateSnapshot           = "CreateSnapshot"
+	CreateInitialSnapshot    = "CreateInitialSnapshot"
+	CreateFinalSnapshot      = "CreateFinalSnapshot"
+	Finalize                 = "Finalize"
+	CreateGuestConversionPod = "CreateGuestConversionPod"
+	ConvertGuest             = "ConvertGuest"
+	PostHook                 = "PostHook"
+	Completed                = "Completed"
 )
 
 //
 // Steps.
 const (
+	Initialize      = "Initialize"
+	Cutover         = "Cutover"
 	DiskTransfer    = "DiskTransfer"
 	ImageConversion = "ImageConversion"
+	Unknown         = "Unknown"
 )
 
 var (
-	itinerary = libitr.Itinerary{
+	coldItinerary = libitr.Itinerary{
 		Name: "",
 		Pipeline: libitr.Pipeline{
 			{Name: Started},
 			{Name: PreHook, All: HasPreHook},
-			{Name: CreateImport},
-			{Name: ImportCreated},
+			{Name: StorePowerState},
+			{Name: PowerOffSource},
+			{Name: WaitForPowerOff},
+			{Name: CreateDataVolumes},
+			{Name: CreateVM},
+			{Name: ScheduleVM},
+			{Name: CopyDisks},
+			{Name: CreateGuestConversionPod},
+			{Name: ConvertGuest},
+			{Name: PostHook, All: HasPostHook},
+			{Name: Completed},
+		},
+	}
+	warmItinerary = libitr.Itinerary{
+		Name: "Warm",
+		Pipeline: libitr.Pipeline{
+			{Name: Started},
+			{Name: PreHook, All: HasPreHook},
+			{Name: CreateInitialSnapshot},
+			{Name: CreateDataVolumes},
+			{Name: CreateVM},
+			{Name: ScheduleVM},
+			{Name: CopyDisks},
+			{Name: CopyingPaused},
+			{Name: CreateSnapshot},
+			{Name: AddCheckpoint},
+			{Name: StorePowerState},
+			{Name: PowerOffSource},
+			{Name: WaitForPowerOff},
+			{Name: CreateFinalSnapshot},
+			{Name: AddFinalCheckpoint},
+			{Name: Finalize},
+			{Name: CreateGuestConversionPod},
+			{Name: ConvertGuest},
 			{Name: PostHook, All: HasPostHook},
 			{Name: Completed},
 		},
@@ -70,8 +122,10 @@ type Migration struct {
 	builder adapter.Builder
 	// kubevirt.
 	kubevirt KubeVirt
-	// VM import CRs.
-	importMap ImportMap
+	// Source client.
+	provider adapter.Client
+	// VirtualMachine CRs.
+	vmMap VirtualMachineMap
 	// VM scheduler
 	scheduler scheduler.Scheduler
 }
@@ -85,6 +139,11 @@ func (r *Migration) Type() string {
 //
 // Run the migration.
 func (r *Migration) Run() (reQ time.Duration, err error) {
+	defer func() {
+		if r.provider != nil {
+			r.provider.Close()
+		}
+	}()
 	reQ = PollReQ
 	err = r.init()
 	if err != nil {
@@ -100,7 +159,7 @@ func (r *Migration) Run() (reQ time.Duration, err error) {
 	r.resolveCanceledRefs()
 
 	for _, vm := range r.runningVMs() {
-		err = r.step(vm)
+		err = r.execute(vm)
 		if err != nil {
 			return
 		}
@@ -111,7 +170,7 @@ func (r *Migration) Run() (reQ time.Duration, err error) {
 		return
 	}
 	if hasNext {
-		err = r.step(vm)
+		err = r.execute(vm)
 		if err != nil {
 			return
 		}
@@ -126,208 +185,13 @@ func (r *Migration) Run() (reQ time.Duration, err error) {
 }
 
 //
-// Steps a VM through the migration itinerary
-// and updates its status.
-func (r *Migration) step(vm *plan.VMStatus) (err error) {
-	// check whether the VM has been canceled by the user
-	if r.Context.Migration.Spec.Canceled(vm.Ref) {
-		vm.SetCondition(
-			libcnd.Condition{
-				Type:     Canceled,
-				Status:   True,
-				Category: Advisory,
-				Reason:   UserRequested,
-				Message:  "The migration has been canceled.",
-				Durable:  true,
-			})
-		vm.Phase = Completed
-		r.Log.Info(
-			"Migration [CANCELED]",
-			"vm",
-			vm.String())
-		return
-	}
-	itinerary.Predicate = &Predicate{
-		vm: &vm.VM,
-	}
-
-	r.Log.Info(
-		"Migration [RUN]",
-		"vm",
-		vm.String(),
-		"phase",
-		vm.Phase)
-	r.Log.V(2).Info(
-		"Migrating VM (definition).",
-		"vm",
-		vm)
-
-	switch vm.Phase {
-	case Started:
-		vm.MarkStarted()
-		vm.Phase = r.next(vm.Phase)
-	case PreHook, PostHook:
-		runner := HookRunner{Context: r.Context}
-		err = runner.Run(vm)
-		if err != nil {
-			return
-		}
-		if step, found := vm.FindStep(vm.Phase); found {
-			if step.MarkedCompleted() && step.Error == nil {
-				vm.Phase = r.next(vm.Phase)
-			}
-		} else {
-			vm.Phase = Completed
-		}
-	case CreateImport:
-		err = r.kubevirt.EnsureImport(vm)
-		if err != nil {
-			if !errors.As(err, &web.ProviderNotReadyError{}) {
-				vm.AddError(err.Error())
-				err = nil
-				break
-			} else {
-				return
-			}
-		}
-		vm.Phase = r.next(vm.Phase)
-	case ImportCreated:
-		// update the VM if the cutover
-		// changed on the Migration
-		err = r.kubevirt.EnsureImport(vm)
-		if err != nil {
-			if !errors.As(err, &web.ProviderNotReadyError{}) {
-				vm.AddError(err.Error())
-				err = nil
-				break
-			} else {
-				return
-			}
-		}
-		rErr := r.updateVM(vm)
-		if rErr != nil {
-			err = liberr.Wrap(rErr)
-			return
-		}
-		// vSphere VMs require image conversion, other VMs are
-		// complete after the disk transfer is finished.
-		if step, found := vm.FindStep(ImageConversion); found {
-			if step.MarkedCompleted() {
-				if step.Error == nil {
-					vm.Phase = r.next(vm.Phase)
-				} else {
-					vm.Phase = Completed
-				}
-			}
-		} else if step, found = vm.FindStep(DiskTransfer); found {
-			if step.MarkedCompleted() {
-				if step.Error == nil {
-					vm.Phase = r.next(vm.Phase)
-				} else {
-					vm.Phase = Completed
-				}
-			}
-		}
-	case Completed:
-		vm.MarkCompleted()
-		r.Log.Info(
-			"Migration [COMPLETED]",
-			"vm",
-			vm.String())
-	default:
-		r.Log.Info(
-			"Phase unknown.",
-			"vm",
-			vm)
-		vm.Phase = Completed
-		vm.AddError(
-			fmt.Sprintf(
-				"Phase [%s] unknown",
-				vm.Phase))
-	}
-	vm.ReflectPipeline()
-	if vm.Phase == Completed && vm.Error == nil {
-		vm.SetCondition(
-			libcnd.Condition{
-				Type:     Succeeded,
-				Status:   True,
-				Category: Advisory,
-				Message:  "The VM migration has SUCCEEDED.",
-				Durable:  true,
-			})
-	} else if vm.Error != nil {
-		vm.Phase = Completed
-		vm.SetCondition(
-			libcnd.Condition{
-				Type:     Failed,
-				Status:   True,
-				Category: Advisory,
-				Message:  "The VM migration has FAILED.",
-				Durable:  true,
-			})
-	}
-	return
-}
-
-//
-// Cancel the migration.
-// Delete resources associated with VMs that have failed or been marked canceled.
-func (r *Migration) Cancel() (err error) {
-	err = r.init()
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-
-	for _, vm := range r.Plan.Status.Migration.VMs {
-		if vm.HasAnyCondition(Canceled, Failed) {
-			err = r.kubevirt.DeleteImport(vm)
-			if err != nil {
-				err = liberr.Wrap(err)
-				return
-			}
-			vm.MarkCompleted()
-			for _, step := range vm.Pipeline {
-				if step.MarkedStarted() {
-					step.MarkCompleted()
-				}
-			}
-		}
-	}
-
-	return
-}
-
-//
-// Best effort attempt to resolve canceled refs.
-func (r *Migration) resolveCanceledRefs() {
-	for i := range r.Context.Migration.Spec.Cancel {
-		// resolve the VM ref in place
-		ref := &r.Context.Migration.Spec.Cancel[i]
-		_, _ = r.Source.Inventory.VM(ref)
-	}
-}
-
-//
-func (r *Migration) runningVMs() (vms []*plan.VMStatus) {
-	vms = make([]*plan.VMStatus, 0)
-	for i := range r.Plan.Status.Migration.VMs {
-		vm := r.Plan.Status.Migration.VMs[i]
-		if vm.Running() {
-			vms = append(vms, vm)
-		}
-	}
-	return
-}
-
-//
 // Get/Build resources.
 func (r *Migration) init() (err error) {
 	adapter, err := adapter.New(r.Context.Source.Provider)
 	if err != nil {
 		return
 	}
-
+	r.provider, err = adapter.Client(r.Context)
 	r.builder, err = adapter.Builder(r.Context)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -340,22 +204,6 @@ func (r *Migration) init() (err error) {
 	r.scheduler, err = scheduler.New(r.Context)
 	if err != nil {
 		return
-	}
-
-	return
-}
-
-//
-// Next step in the itinerary.
-func (r *Migration) next(phase string) (next string) {
-	step, done, err := itinerary.Next(phase)
-	if done || err != nil {
-		next = Completed
-		if err != nil {
-			r.Log.Error(err, "Next phase failed.")
-		}
-	} else {
-		next = step.Name
 	}
 
 	return
@@ -405,10 +253,13 @@ func (r *Migration) begin() (err error) {
 	list := []*plan.VMStatus{}
 	for _, vm := range r.Plan.Spec.VMs {
 		var status *plan.VMStatus
-		itinerary.Predicate = &Predicate{vm: &vm}
-		step, _ := itinerary.First()
+		r.itinerary().Predicate = &Predicate{vm: &vm, context: r.Context}
+		step, _ := r.itinerary().First()
 		if current, found := r.Plan.Status.Migration.FindVM(vm.Ref); !found {
 			status = &plan.VMStatus{VM: vm}
+			if r.Plan.Spec.Warm {
+				status.Warm = &plan.Warm{}
+			}
 		} else {
 			status = current
 		}
@@ -423,7 +274,9 @@ func (r *Migration) begin() (err error) {
 			status.Pipeline = pipeline
 			status.Phase = step.Name
 			status.Error = nil
-			status.Warm = nil
+			if r.Plan.Spec.Warm {
+				status.Warm = &plan.Warm{}
+			}
 			log.Info(
 				"Pipeline reset.",
 				"vm",
@@ -445,12 +298,494 @@ func (r *Migration) begin() (err error) {
 }
 
 //
+// Cancel the migration.
+// Delete resources associated with VMs that have failed or been marked canceled.
+func (r *Migration) Cancel() (err error) {
+	err = r.init()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	for _, vm := range r.Plan.Status.Migration.VMs {
+		if vm.HasAnyCondition(Canceled, Failed) {
+			err = r.kubevirt.DeleteVM(vm)
+			if err != nil {
+				return
+			}
+			err = r.kubevirt.DeleteGuestConversionPod(vm)
+			if err != nil {
+				return
+			}
+			if vm.RestorePowerState == "On" {
+				err = r.provider.PowerOn(vm.Ref)
+				if err != nil {
+					return
+				}
+			}
+			vm.MarkCompleted()
+			for _, step := range vm.Pipeline {
+				if step.MarkedStarted() {
+					step.MarkCompleted()
+				}
+			}
+		}
+	}
+
+	return
+}
+
+//
+// Best effort attempt to resolve canceled refs.
+func (r *Migration) resolveCanceledRefs() {
+	for i := range r.Context.Migration.Spec.Cancel {
+		// resolve the VM ref in place
+		ref := &r.Context.Migration.Spec.Cancel[i]
+		_, _ = r.Source.Inventory.VM(ref)
+	}
+}
+
+//
+func (r *Migration) runningVMs() (vms []*plan.VMStatus) {
+	vms = make([]*plan.VMStatus, 0)
+	for i := range r.Plan.Status.Migration.VMs {
+		vm := r.Plan.Status.Migration.VMs[i]
+		if vm.Running() {
+			vms = append(vms, vm)
+		}
+	}
+	return
+}
+
+//
+// Next step in the itinerary.
+func (r *Migration) next(phase string) (next string) {
+	step, done, err := r.itinerary().Next(phase)
+	if done || err != nil {
+		next = Completed
+		if err != nil {
+			r.Log.Error(err, "Next phase failed.")
+		}
+	} else {
+		next = step.Name
+	}
+
+	return
+}
+
+// Get the itinerary for the migration type.
+func (r *Migration) itinerary() *libitr.Itinerary {
+	if r.Plan.Spec.Warm {
+		return &warmItinerary
+	} else {
+		return &coldItinerary
+	}
+}
+
+//
+// Get the name of the pipeline step corresponding to the current VM phase.
+func (r *Migration) step(vm *plan.VMStatus) (step string) {
+	switch vm.Phase {
+	case Started, CreateInitialSnapshot, CreateDataVolumes, CreateVM, ScheduleVM:
+		step = Initialize
+	case CopyDisks, CopyingPaused, CreateSnapshot, AddCheckpoint:
+		step = DiskTransfer
+	case CreateFinalSnapshot, AddFinalCheckpoint, Finalize:
+		step = Cutover
+	case CreateGuestConversionPod, ConvertGuest:
+		step = ImageConversion
+	case PreHook, PostHook:
+		step = vm.Phase
+	case StorePowerState, PowerOffSource, WaitForPowerOff:
+		if r.Plan.Spec.Warm {
+			step = Cutover
+		} else {
+			step = Initialize
+		}
+	default:
+		step = Unknown
+	}
+	return
+}
+
+//
+// Steps a VM through the migration itinerary
+// and updates its status.
+func (r *Migration) execute(vm *plan.VMStatus) (err error) {
+	// check whether the VM has been canceled by the user
+	if r.Context.Migration.Spec.Canceled(vm.Ref) {
+		vm.SetCondition(
+			libcnd.Condition{
+				Type:     Canceled,
+				Status:   True,
+				Category: Advisory,
+				Reason:   UserRequested,
+				Message:  "The migration has been canceled.",
+				Durable:  true,
+			})
+		vm.Phase = Completed
+		r.Log.Info(
+			"Migration [CANCELED]",
+			"vm",
+			vm.String())
+		return
+	}
+	r.itinerary().Predicate = &Predicate{
+		vm:      &vm.VM,
+		context: r.Context,
+	}
+
+	r.Log.Info(
+		"Migration [RUN]",
+		"vm",
+		vm.String(),
+		"phase",
+		vm.Phase)
+	r.Log.V(2).Info(
+		"Migrating VM (definition).",
+		"vm",
+		vm)
+
+	switch vm.Phase {
+	case Started:
+		step, found := vm.FindStep(r.step(vm))
+		if !found {
+			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
+			break
+		}
+		vm.MarkStarted()
+		step.MarkStarted()
+		vm.Phase = r.next(vm.Phase)
+	case PreHook, PostHook:
+		runner := HookRunner{Context: r.Context}
+		err = runner.Run(vm)
+		if err != nil {
+			return
+		}
+		if step, found := vm.FindStep(r.step(vm)); found {
+			if step.MarkedCompleted() && step.Error == nil {
+				vm.Phase = r.next(vm.Phase)
+			}
+		} else {
+			vm.Phase = Completed
+		}
+	case CreateDataVolumes:
+		step, found := vm.FindStep(r.step(vm))
+		if !found {
+			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
+			break
+		}
+		err = r.kubevirt.EnsureDataVolumes(vm)
+		if err != nil {
+			if !errors.As(err, &web.ProviderNotReadyError{}) {
+				step.AddError(err.Error())
+				err = nil
+				break
+			} else {
+				return
+			}
+		}
+		vm.Phase = r.next(vm.Phase)
+	case CreateVM:
+		step, found := vm.FindStep(r.step(vm))
+		if !found {
+			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
+			break
+		}
+		err = r.kubevirt.EnsureVM(vm)
+		if err != nil {
+			if !errors.As(err, &web.ProviderNotReadyError{}) {
+				step.AddError(err.Error())
+				err = nil
+				break
+			} else {
+				return
+			}
+		}
+		vm.Phase = r.next(vm.Phase)
+	case ScheduleVM:
+		step, found := vm.FindStep(r.step(vm))
+		if !found {
+			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
+			break
+		}
+		waiting, rErr := r.waitingForFirstConsumer(vm)
+		if rErr != nil {
+			step.AddError(rErr.Error())
+			break
+		}
+		err = r.setRunning(vm, waiting)
+		if err != nil {
+			step.AddError(err.Error())
+			break
+		}
+		if !waiting {
+			vm.Phase = r.next(vm.Phase)
+			step.MarkCompleted()
+			step.Progress.Completed = step.Progress.Total
+		}
+	case CopyDisks:
+		step, found := vm.FindStep(r.step(vm))
+		if !found {
+			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
+			break
+		}
+		err = r.updateCopyProgress(vm, step)
+		if err != nil {
+			step.AddError(err.Error())
+			break
+		}
+		if step.MarkedCompleted() && !step.HasError() {
+			if r.Plan.Spec.Warm {
+				next := meta.NewTime(time.Now().Add(time.Duration(Settings.PrecopyInterval) * time.Minute))
+				n := len(vm.Warm.Precopies)
+				vm.Warm.Precopies[n-1].MarkCompleted()
+				vm.Warm.NextPrecopyAt = &next
+			}
+			vm.Phase = r.next(vm.Phase)
+		}
+	case CopyingPaused:
+		if r.Migration.Spec.Cutover != nil && !r.Migration.Spec.Cutover.After(time.Now()) {
+			vm.Phase = CreateFinalSnapshot
+		} else if vm.Warm.NextPrecopyAt != nil && !vm.Warm.NextPrecopyAt.After(time.Now()) {
+			vm.Phase = CreateSnapshot
+		}
+	case CreateInitialSnapshot, CreateSnapshot, CreateFinalSnapshot:
+		step, found := vm.FindStep(r.step(vm))
+		if !found {
+			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
+			break
+		}
+		var snapshot string
+		snapshot, err = r.provider.CreateSnapshot(vm.Ref)
+		if err != nil {
+			if !errors.As(err, &web.ProviderNotReadyError{}) {
+				step.AddError(err.Error())
+				err = nil
+				break
+			} else {
+				return
+			}
+		}
+		precopy := plan.Precopy{Snapshot: snapshot}
+		precopy.MarkStarted()
+		vm.Warm.Precopies = append(vm.Warm.Precopies, precopy)
+		r.resetPrecopyTasks(vm, step)
+
+		switch vm.Phase {
+		case CreateInitialSnapshot:
+			vm.Phase = CreateDataVolumes
+		case CreateSnapshot:
+			vm.Phase = AddCheckpoint
+		case CreateFinalSnapshot:
+			vm.Phase = AddFinalCheckpoint
+		}
+	case AddCheckpoint, AddFinalCheckpoint:
+		step, found := vm.FindStep(r.step(vm))
+		if !found {
+			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
+			break
+		}
+		err = r.kubevirt.SetDataVolumeCheckpoint(vm, vm.Phase == AddFinalCheckpoint)
+		if err != nil {
+			if !errors.As(err, &web.ProviderNotReadyError{}) {
+				step.AddError(err.Error())
+				err = nil
+				break
+			} else {
+				return
+			}
+		}
+		switch vm.Phase {
+		case AddCheckpoint:
+			vm.Phase = CopyDisks
+		case AddFinalCheckpoint:
+			vm.Phase = Finalize
+		}
+	case StorePowerState:
+		step, found := vm.FindStep(r.step(vm))
+		if !found {
+			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
+			break
+		}
+		var state string
+		state, err = r.provider.PowerState(vm.Ref)
+		if err != nil {
+			if !errors.As(err, &web.ProviderNotReadyError{}) {
+				step.AddError(err.Error())
+				err = nil
+				break
+			} else {
+				return
+			}
+		}
+		vm.RestorePowerState = state
+		vm.Phase = r.next(vm.Phase)
+	case PowerOffSource:
+		step, found := vm.FindStep(r.step(vm))
+		if !found {
+			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
+			break
+		}
+		err = r.provider.PowerOff(vm.Ref)
+		if err != nil {
+			if !errors.As(err, &web.ProviderNotReadyError{}) {
+				step.AddError(err.Error())
+				err = nil
+				break
+			} else {
+				return
+			}
+		}
+		vm.Phase = r.next(vm.Phase)
+	case WaitForPowerOff:
+		step, found := vm.FindStep(r.step(vm))
+		if !found {
+			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
+			break
+		}
+		var off bool
+		off, err = r.provider.PoweredOff(vm.Ref)
+		if err != nil {
+			if !errors.As(err, &web.ProviderNotReadyError{}) {
+				step.AddError(err.Error())
+				err = nil
+				break
+			} else {
+				return
+			}
+		}
+		if off {
+			vm.Phase = r.next(vm.Phase)
+		}
+	case Finalize:
+		step, found := vm.FindStep(r.step(vm))
+		if !found {
+			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
+			break
+		}
+		err = r.updateCopyProgress(vm, step)
+		if err != nil {
+			return
+		}
+		if step.MarkedCompleted() {
+			if len(vm.Warm.Precopies) > 0 {
+				snapshot := vm.Warm.Precopies[0].Snapshot
+				err = r.provider.RemoveSnapshot(vm.Ref, snapshot, true)
+				if err != nil {
+					r.Log.Info(
+						"Failed to clean up warm migration snapshots.",
+						"vm",
+						vm,
+						"snapshot",
+						snapshot)
+				}
+				err = nil
+			}
+			if !step.HasError() {
+				vm.Phase = r.next(vm.Phase)
+			}
+		}
+	case CreateGuestConversionPod:
+		step, found := vm.FindStep(r.step(vm))
+		if !found {
+			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
+			break
+		}
+		step.MarkStarted()
+		err = r.ensureGuestConversionPod(vm)
+		if err != nil {
+			step.AddError(err.Error())
+			break
+		}
+		vm.Phase = r.next(vm.Phase)
+	case ConvertGuest:
+		step, found := vm.FindStep(r.step(vm))
+		if !found {
+			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
+			break
+		}
+		err = r.updateConversionProgress(vm, step)
+		if err != nil {
+			return
+		}
+		if step.MarkedCompleted() && !step.HasError() {
+			err = r.kubevirt.DeleteGuestConversionPod(vm)
+			if err != nil {
+				return
+			}
+			vm.Phase = r.next(vm.Phase)
+		}
+	case Completed:
+		vm.MarkCompleted()
+		r.Log.Info(
+			"Migration [COMPLETED]",
+			"vm",
+			vm.String())
+	default:
+		r.Log.Info(
+			"Phase unknown.",
+			"vm",
+			vm)
+		vm.Phase = Completed
+		vm.AddError(
+			fmt.Sprintf(
+				"Phase [%s] unknown",
+				vm.Phase))
+	}
+	vm.ReflectPipeline()
+	if vm.Phase == Completed && vm.Error == nil {
+		vm.SetCondition(
+			libcnd.Condition{
+				Type:     Succeeded,
+				Status:   True,
+				Category: Advisory,
+				Message:  "The VM migration has SUCCEEDED.",
+				Durable:  true,
+			})
+	} else if vm.Error != nil {
+		vm.Phase = Completed
+		vm.SetCondition(
+			libcnd.Condition{
+				Type:     Failed,
+				Status:   True,
+				Category: Advisory,
+				Message:  "The VM migration has FAILED.",
+				Durable:  true,
+			})
+	}
+
+	return
+}
+
+//
+//
+func (r *Migration) resetPrecopyTasks(vm *plan.VMStatus, step *plan.Step) {
+	step.Completed = nil
+	for _, task := range step.Tasks {
+		task.Annotations["Precopy"] = fmt.Sprintf("%v", len(vm.Warm.Precopies))
+		task.MarkReset()
+		task.MarkStarted()
+	}
+}
+
+//
 // Build the pipeline for a VM status.
 func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error) {
-	itinerary.Predicate = &Predicate{vm: vm}
-	step, _ := itinerary.First()
+	r.itinerary().Predicate = &Predicate{vm: vm, context: r.Context}
+	step, _ := r.itinerary().First()
 	for {
 		switch step.Name {
+		case Started:
+			pipeline = append(
+				pipeline,
+				&plan.Step{
+					Task: plan.Task{
+						Name:        Initialize,
+						Description: "Initialize migration.",
+						Progress:    libitr.Progress{Total: 1},
+					},
+				})
 		case PreHook:
 			pipeline = append(
 				pipeline,
@@ -461,7 +796,7 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 						Progress:    libitr.Progress{Total: 1},
 					},
 				})
-		case CreateImport:
+		case CopyDisks:
 			tasks, pErr := r.builder.Tasks(vm.Ref)
 			if pErr != nil {
 				err = liberr.Wrap(pErr)
@@ -486,18 +821,41 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 					},
 					Tasks: tasks,
 				})
-			// only vSphere VMs require image conversion.
-			if r.Source.Provider.Type() == api.VSphere {
-				pipeline = append(
-					pipeline,
-					&plan.Step{
-						Task: plan.Task{
-							Name:        ImageConversion,
-							Description: "Convert image to kubevirt.",
-							Progress:    libitr.Progress{Total: 1},
-						},
-					})
+		case Finalize:
+			tasks, pErr := r.builder.Tasks(vm.Ref)
+			if pErr != nil {
+				err = liberr.Wrap(pErr)
+				return
 			}
+			total := int64(0)
+			for _, task := range tasks {
+				total += task.Progress.Total
+			}
+			pipeline = append(
+				pipeline,
+				&plan.Step{
+					Task: plan.Task{
+						Name:        Cutover,
+						Description: "Finalize disk transfer.",
+						Progress: libitr.Progress{
+							Total: total,
+						},
+						Annotations: map[string]string{
+							"unit": "MB",
+						},
+					},
+					Tasks: tasks,
+				})
+		case ConvertGuest:
+			pipeline = append(
+				pipeline,
+				&plan.Step{
+					Task: plan.Task{
+						Name:        ImageConversion,
+						Description: "Convert image to kubevirt.",
+						Progress:    libitr.Progress{Total: 1},
+					},
+				})
 		case PostHook:
 			pipeline = append(
 				pipeline,
@@ -509,7 +867,7 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 					},
 				})
 		}
-		next, done, _ := itinerary.Next(step.Name)
+		next, done, _ := r.itinerary().Next(step.Name)
 		if !done {
 			step = next
 		} else {
@@ -593,163 +951,163 @@ func (r *Migration) end() (completed bool, err error) {
 }
 
 //
-// Update VM migration status.
-func (r *Migration) updateVM(vm *plan.VMStatus) (err error) {
-	if r.importMap == nil {
-		r.importMap, err = r.kubevirt.ImportMap()
+// Ensure the guest conversion pod is present.
+func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (err error) {
+	if r.vmMap == nil {
+		r.vmMap, err = r.kubevirt.VirtualMachineMap()
 		if err != nil {
-			err = liberr.Wrap(err)
 			return
 		}
 	}
-	var imp VmImport
+	var vmCr VirtualMachine
 	found := false
-	if imp, found = r.importMap[vm.ID]; !found {
-		msg := "Import CR not found."
+	if vmCr, found = r.vmMap[vm.ID]; !found {
+		msg := "VirtualMachine CR not found."
 		vm.AddError(msg)
 		return
 	}
-	r.updatePipeline(vm, &imp)
-	if imp.Spec.Warm {
-		updateWarmStatus(vm, imp)
+
+	err = r.kubevirt.EnsureGuestConversionPod(vm, &vmCr)
+	return
+}
+
+//
+// Set the running state of the kubevirt VM.
+func (r *Migration) setRunning(vm *plan.VMStatus, running bool) (err error) {
+	if r.vmMap == nil {
+		r.vmMap, err = r.kubevirt.VirtualMachineMap()
+		if err != nil {
+			return
+		}
+	}
+	var vmCr VirtualMachine
+	found := false
+	if vmCr, found = r.vmMap[vm.ID]; !found {
+		msg := "VirtualMachine CR not found."
+		vm.AddError(msg)
+		return
+	}
+
+	if vmCr.Spec.Running != nil && *vmCr.Spec.Running == running {
+		return
+	}
+
+	err = r.kubevirt.SetRunning(&vmCr, running)
+	return
+}
+
+//
+// Determine whether any of the DataVolumes haven't been bound yet
+// because they are waiting for first consumer.
+func (r *Migration) waitingForFirstConsumer(vm *plan.VMStatus) (waiting bool, err error) {
+	if r.vmMap == nil {
+		r.vmMap, err = r.kubevirt.VirtualMachineMap()
+		if err != nil {
+			return
+		}
+	}
+	var vmCr VirtualMachine
+	found := false
+	if vmCr, found = r.vmMap[vm.ID]; !found {
+		msg := "VirtualMachine CR not found."
+		vm.AddError(msg)
+		return
+	}
+	for _, dv := range vmCr.DataVolumes {
+		if dv.Status.Phase == cdi.WaitForFirstConsumer {
+			waiting = true
+			return
+		}
 	}
 
 	return
 }
 
-func updateWarmStatus(vm *plan.VMStatus, imp VmImport) {
-	if vm.Warm == nil {
-		vm.Warm = &plan.Warm{
-			Precopies: make([]plan.Precopy, 0),
-		}
-	}
-	vm.Warm.Successes = imp.Status.WarmImport.Successes
-	vm.Warm.Failures = imp.Status.WarmImport.Failures
-	vm.Warm.ConsecutiveFailures = imp.Status.WarmImport.ConsecutiveFailures
-	vm.Warm.NextPrecopyAt = imp.Status.WarmImport.NextStageTime
-
-	// Use VMI Processing condition transition times to figure
-	// out the start and stop times of the precopies.
-	conditions := imp.Conditions()
-	cnd := conditions.FindCondition(string(vmio.Processing))
-	if cnd != nil {
-		switch cnd.Reason {
-		case string(vmio.CopyingStage):
-			if len(vm.Warm.Precopies) == 0 || vm.Warm.Precopies[len(vm.Warm.Precopies)-1].End != nil {
-				vm.Warm.Precopies = append(vm.Warm.Precopies, plan.Precopy{Start: &cnd.LastTransitionTime})
-			}
-		case string(vmio.CopyingPaused):
-			if len(vm.Warm.Precopies) != 0 && vm.Warm.Precopies[len(vm.Warm.Precopies)-1].End == nil {
-				vm.Warm.Precopies[len(vm.Warm.Precopies)-1].End = &cnd.LastTransitionTime
-			}
-		}
-	}
-}
-
 //
-// Update the pipeline.
-func (r *Migration) updatePipeline(vm *plan.VMStatus, imp *VmImport) {
-	for _, step := range vm.Pipeline {
-		if step.MarkedCompleted() {
+// Update the progress of the appropriate disk copy step. (DiskTransfer, Cutover)
+func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err error) {
+	if r.vmMap == nil {
+		r.vmMap, err = r.kubevirt.VirtualMachineMap()
+		if err != nil {
+			return
+		}
+	}
+
+	var imp VirtualMachine
+	found := false
+	if imp, found = r.vmMap[vm.ID]; !found {
+		msg := "VirtualMachine CR not found."
+		vm.AddError(msg)
+		return
+	}
+
+	for _, dv := range imp.DataVolumes {
+		var task *plan.Task
+		name := r.builder.ResolveDataVolumeIdentifier(dv.DataVolume)
+		found = false
+		task, found = step.FindTask(name)
+		if !found {
 			continue
 		}
-		switch step.Name {
-		case DiskTransfer:
-			var name string
-			var task *plan.Task
-			var tasksBlocked int
-			var tasksCompleted int
-			var tasksRunning int
-		nextDv:
-			for _, dv := range imp.DataVolumes {
-				name = r.builder.ResolveDataVolumeIdentifier(dv.DataVolume)
-				found := false
-				task, found = step.FindTask(name)
-				if !found {
-					continue nextDv
-				}
-				conditions := dv.Conditions()
-				cnd := conditions.FindCondition("Bound")
-				if cnd != nil && cnd.Status == False {
-					task.Phase = Blocked
-					task.Reason = cnd.Reason
-					tasksBlocked++
-					continue nextDv
-				}
-				cnd = conditions.FindCondition("Running")
-				if cnd == nil {
-					continue nextDv
-				}
-				task.MarkStarted()
-				task.Phase = Running
+
+		conditions := dv.Conditions()
+		switch dv.Status.Phase {
+		case cdi.Succeeded, cdi.Paused:
+			task.Phase = Completed
+			task.Progress.Completed = task.Progress.Total
+			task.MarkCompleted()
+		case cdi.Pending:
+			task.Phase = Pending
+			cnd := conditions.FindCondition("Bound")
+			if cnd != nil {
 				task.Reason = cnd.Reason
-				tasksRunning++
+			}
+		case cdi.ImportInProgress:
+			task.Phase = Running
+			var importer *core.Pod
+			importer, err = r.kubevirt.GetImporterPod(dv)
+			if err != nil {
+				return
+			}
+			if restartLimitExceeded(importer) {
+				task.MarkedCompleted()
+				msg, _ := terminationMessage(importer)
+				task.AddError(msg)
+			} else {
+				task.MarkStarted()
 				pct := dv.PercentComplete()
 				completed := pct * float64(task.Progress.Total)
 				task.Progress.Completed = int64(completed)
-				if conditions.HasCondition("Ready") {
-					task.Progress.Completed = task.Progress.Total
-					task.MarkCompleted()
-					tasksCompleted++
-				}
 			}
-			if tasksCompleted == len(step.Tasks) {
-				step.Phase = Completed
-			} else if tasksBlocked > 0 {
-				step.Phase = Blocked
-			} else if tasksRunning > 0 {
-				step.Phase = Running
-			}
-		case ImageConversion:
-			conditions := imp.Conditions()
-			cnd := conditions.FindCondition("Processing")
-			if cnd != nil {
-				switch cnd.Reason {
-				case string(vmio.Pending):
-					vm.SetCondition(
-						libcnd.Condition{
-							Type:     Pending,
-							Status:   True,
-							Category: Advisory,
-							Message:  "The VM migration is PENDING.",
-						})
-				case string(vmio.CopyingPaused):
-					vm.SetCondition(
-						libcnd.Condition{
-							Type:     Paused,
-							Status:   True,
-							Category: Advisory,
-							Message:  "The VM migration is PAUSED.",
-						})
-				case string(vmio.ConvertingGuest):
-					if cnd.Status == True {
-						step.MarkStarted()
-					}
-				}
-				if step.MarkedStarted() {
-					step.Phase = cnd.Reason
-				}
-			}
-			pct := imp.PercentComplete()
-			completed := pct * float64(step.Progress.Total)
-			step.Progress.Completed = int64(completed)
-			cnd = conditions.FindCondition("Succeeded")
-			if cnd != nil {
-				step.MarkCompleted()
-				step.Progress.Completed = step.Progress.Total
-				if cnd.Status != True {
-					step.AddError(cnd.Message)
-					step.Phase = cnd.Reason
-				} else {
-					step.Phase = Completed
-				}
-			}
-		}
-		step.ReflectTasks()
-		if step.Error != nil {
-			vm.AddError(step.Error.Reasons...)
 		}
 	}
+	step.ReflectTasks()
+	return
+}
+
+//
+// Wait for guest conversion to complete, and update the ImageConversion pipeline step.
+func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step) (err error) {
+	pod, err := r.kubevirt.GetGuestConversionPod(vm)
+	if err != nil {
+		return
+	}
+
+	if pod != nil {
+		switch pod.Status.Phase {
+		case core.PodSucceeded:
+			step.MarkCompleted()
+			step.Progress.Completed = step.Progress.Total
+		case core.PodFailed:
+			step.MarkCompleted()
+			msg, _ := terminationMessage(pod)
+			step.AddError(msg)
+		}
+	} else {
+		step.MarkCompleted()
+		step.AddError("Guest conversion pod not found")
+	}
+	return
 }
 
 //
@@ -757,14 +1115,13 @@ func (r *Migration) updatePipeline(vm *plan.VMStatus, imp *VmImport) {
 type Predicate struct {
 	// VM listed on the plan.
 	vm *plan.VM
+	// Plan context
+	context *plancontext.Context
 }
 
 //
 // Evaluate predicate flags.
 func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
-	if len(r.vm.Hooks) == 0 {
-		return
-	}
 	switch flag {
 	case HasPreHook:
 		_, allowed = r.vm.FindHook(PreHook)
@@ -772,5 +1129,25 @@ func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 		_, allowed = r.vm.FindHook(PostHook)
 	}
 
+	return
+}
+
+//
+// Retrieve the termination message from a pod's first container.
+func terminationMessage(pod *core.Pod) (msg string, ok bool) {
+	if pod.Status.ContainerStatuses != nil &&
+		pod.Status.ContainerStatuses[0].LastTerminationState.Terminated != nil &&
+		pod.Status.ContainerStatuses[0].LastTerminationState.Terminated.ExitCode > 0 {
+		msg = pod.Status.ContainerStatuses[0].LastTerminationState.Terminated.Message
+		ok = true
+	}
+	return
+}
+
+//
+// Return whether the pod has failed and restarted too many times.
+func restartLimitExceeded(pod *core.Pod) (exceeded bool) {
+	cs := pod.Status.ContainerStatuses[0]
+	exceeded = int(cs.RestartCount) > settings.Settings.ImporterRetry
 	return
 }

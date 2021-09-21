@@ -10,6 +10,7 @@ FROM registry.access.redhat.com/ubi8/ubi-minimal:8.4
 RUN microdnf -y install tar && microdnf clean all
 
 COPY --from=builder /opt/app-root/src/manager /usr/local/bin/manager
+ENV KUBEVIRT_CLIENT_GO_SCHEME_REGISTRATION_VERSION=v1
 ENTRYPOINT ["/usr/local/bin/manager"]
 
 LABEL name="konveyor/forklift-controller" \
