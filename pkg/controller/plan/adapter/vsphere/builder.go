@@ -24,7 +24,6 @@ import (
 	core "k8s.io/api/core/v1"
 	cnv "kubevirt.io/client-go/api/v1"
 	cdi "kubevirt.io/containerized-data-importer/pkg/apis/core/v1beta1"
-	vmio "kubevirt.io/vm-import-operator/pkg/apis/v2v/v1beta1"
 	liburl "net/url"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -173,7 +172,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 							Thumbprint:  thumbprint,
 						},
 					},
-					PVC: &core.PersistentVolumeClaimSpec{
+					Storage: &cdi.StorageSpec{
 						AccessModes: []core.PersistentVolumeAccessMode{
 							accessMode,
 						},
@@ -390,60 +389,6 @@ func (r *Builder) mapDisks(vm *model.VM, dataVolumes []cdi.DataVolume, object *c
 }
 
 //
-// Build the VMIO VM Import Spec.
-func (r *Builder) Import(vmRef ref.Ref, object *vmio.VirtualMachineImportSpec) (err error) {
-	vm := &model.VM{}
-	pErr := r.Source.Inventory.Find(vm, vmRef)
-	if pErr != nil {
-		err = liberr.New(
-			fmt.Sprintf(
-				"VM %s lookup failed: %s",
-				vmRef.String(),
-				pErr.Error()))
-		return
-	}
-	if vm.IsTemplate {
-		err = liberr.New(
-			fmt.Sprintf(
-				"VM %s is a template",
-				vmRef.String()))
-		return
-	}
-	if types.VirtualMachineConnectionState(vm.ConnectionState) != types.VirtualMachineConnectionStateConnected {
-		err = liberr.New(
-			fmt.Sprintf(
-				"VM %s is not connected",
-				vmRef.String()))
-		return
-	}
-	if r.Plan.Spec.Warm && !vm.ChangeTrackingEnabled {
-		err = liberr.New(
-			fmt.Sprintf(
-				"Changed Block Tracking (CBT) is disabled for VM %s",
-				vmRef.String()))
-		return
-	}
-	uuid := vm.UUID
-	object.TargetVMName = &vm.Name
-	if !r.Plan.Spec.Warm {
-		// object.StartVM left nil during a warm migration so that VMIO can manage it.
-		start := vm.PowerState == string(types.VirtualMachinePowerStatePoweredOn)
-		object.StartVM = &start
-	}
-	object.Source.Vmware = &vmio.VirtualMachineImportVmwareSourceSpec{
-		VM: vmio.VirtualMachineImportVmwareSourceVMSpec{
-			ID: &uuid,
-		},
-	}
-	object.Source.Vmware.Mappings, err = r.mapping(vm)
-	if err != nil {
-		return
-	}
-
-	return
-}
-
-//
 // Build tasks.
 func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 	vm := &model.VM{}
@@ -608,182 +553,6 @@ func (r *Builder) host(hostID string) (host *model.Host, err error) {
 			"Host lookup failed.",
 			"host",
 			hostID)
-	}
-
-	return
-}
-
-//
-// Build the VMIO ResourceMapping CR.
-func (r *Builder) mapping(vm *model.VM) (out *vmio.VmwareMappings, err error) {
-	netMap := []vmio.NetworkResourceMappingItem{}
-	dsMap := []vmio.StorageResourceMappingItem{}
-	netMapIn := r.Context.Map.Network.Spec.Map
-	for i := range netMapIn {
-		mapped := &netMapIn[i]
-		ref := mapped.Source
-		network := &model.Network{}
-		fErr := r.Source.Inventory.Find(network, ref)
-		if fErr != nil {
-			err = fErr
-			return
-		}
-		needed := false
-		for _, net := range vm.Networks {
-			if net.ID == network.ID {
-				needed = true
-				break
-			}
-		}
-		if !needed {
-			continue
-		}
-		id, pErr := r.networkID(vm, network)
-		if pErr != nil {
-			err = pErr
-			return
-		}
-		netMap = append(
-			netMap,
-			vmio.NetworkResourceMappingItem{
-				Source: vmio.Source{
-					ID: &id,
-				},
-				Target: vmio.ObjectIdentifier{
-					Namespace: &mapped.Destination.Namespace,
-					Name:      mapped.Destination.Name,
-				},
-				Type: &mapped.Destination.Type,
-			})
-	}
-	dsMapIn := r.Context.Map.Storage.Spec.Map
-	for i := range dsMapIn {
-		mapped := &dsMapIn[i]
-		ref := mapped.Source
-		ds := &model.Datastore{}
-		fErr := r.Source.Inventory.Find(ds, ref)
-		if fErr != nil {
-			err = fErr
-			return
-		}
-		needed := false
-		for _, disk := range vm.Disks {
-			if disk.Datastore.ID == ds.ID {
-				needed = true
-				break
-			}
-		}
-		if !needed {
-			continue
-		}
-		id, pErr := r.datastoreID(vm, ds)
-		if pErr != nil {
-			err = pErr
-			return
-		}
-		mErr := r.defaultModes(&mapped.Destination)
-		if mErr != nil {
-			err = mErr
-			return
-		}
-		item := vmio.StorageResourceMappingItem{
-			Source: vmio.Source{
-				ID: &id,
-			},
-			Target: vmio.ObjectIdentifier{
-				Name: mapped.Destination.StorageClass,
-			},
-		}
-		if mapped.Destination.VolumeMode != "" {
-			item.VolumeMode = &mapped.Destination.VolumeMode
-		}
-		/* VMIO > 0.2.5 needed.
-		if mapped.Destination.AccessMode != "" {
-			item = &mapped.Destination.AccessMode
-		}*/
-		dsMap = append(dsMap, item)
-	}
-	out = &vmio.VmwareMappings{
-		NetworkMappings: &netMap,
-		StorageMappings: &dsMap,
-	}
-
-	return
-}
-
-//
-// Network ID.
-// Translated to the ESX host oriented ID as needed.
-func (r *Builder) networkID(vm *model.VM, network *model.Network) (id string, err error) {
-	if host, found, hErr := r.esxHost(vm); found {
-		if hErr != nil {
-			err = hErr
-			return
-		}
-		hostID, hErr := host.networkID(network)
-		if hErr != nil {
-			err = hErr
-			return
-		}
-		id = hostID
-	} else {
-		id = network.ID
-	}
-
-	return
-}
-
-//
-// Datastore ID.
-// Translated to the ESX host oriented ID as needed.
-func (r *Builder) datastoreID(vm *model.VM, ds *model.Datastore) (id string, err error) {
-	if host, found, hErr := r.esxHost(vm); found {
-		if hErr != nil {
-			err = hErr
-			return
-		}
-		hostID, hErr := host.DatastoreID(ds)
-		if hErr != nil {
-			err = hErr
-			return
-		}
-		id = hostID
-	} else {
-		id = ds.ID
-	}
-
-	return
-}
-
-//
-// Get ESX host.
-// Find may matching a `Host` CR.
-func (r *Builder) esxHost(vm *model.VM) (esxHost *EsxHost, found bool, err error) {
-	url := r.Source.Provider.Spec.URL
-	hostDef, found := r.hosts[vm.Host]
-	if !found {
-		return
-	}
-	hostURL := liburl.URL{
-		Scheme: "https",
-		Host:   hostDef.Spec.IpAddress,
-		Path:   vim25.Path,
-	}
-	url = hostURL.String()
-	secret, err := r.hostSecret(hostDef)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	hostModel, nErr := r.host(vm.Host)
-	if nErr != nil {
-		err = nErr
-		return
-	}
-	secret.Data["thumbprint"] = []byte(hostModel.Thumbprint)
-	esxHost = &EsxHost{
-		Secret: secret,
-		URL:    url,
 	}
 
 	return

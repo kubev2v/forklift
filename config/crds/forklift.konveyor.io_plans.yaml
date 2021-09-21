@@ -745,12 +745,18 @@ spec:
                               items:
                                 description: Precopy durations
                                 properties:
-                                  end:
+                                  completed:
+                                    description: Completed timestamp.
                                     format: date-time
                                     type: string
-                                  start:
+                                  snapshot:
+                                    type: string
+                                  started:
+                                    description: Started timestamp.
                                     format: date-time
                                     type: string
+                                required:
+                                - snapshot
                                 type: object
                               type: array
                             successes:

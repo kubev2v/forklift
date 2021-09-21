@@ -11,8 +11,14 @@ const (
 	MaxVmInFlight   = "MAX_VM_INFLIGHT"
 	HookRetry       = "HOOK_RETRY"
 	ImporterRetry   = "IMPORTER_RETRY"
-	VirtV2vImage    = "VIRTV2V_IMAGE"
+	VirtV2vImage    = "VIRT_V2V_IMAGE"
 	PrecopyInterval = "PRECOPY_INTERVAL"
+)
+
+//
+// Default virt-v2v image.
+const (
+	DefaultVirtV2vImage = "quay.io/konveyor/forklift-virt-v2v:latest"
 )
 
 //
@@ -49,7 +55,11 @@ func (r *Migration) Load() (err error) {
 	if err != nil {
 		err = liberr.Wrap(err)
 	}
-	r.VirtV2vImage = os.Getenv(VirtV2vImage)
-
+	virtV2vImage, ok := os.LookupEnv(VirtV2vImage)
+	if ok {
+		r.VirtV2vImage = virtV2vImage
+	} else {
+		r.VirtV2vImage = DefaultVirtV2vImage
+	}
 	return
 }
