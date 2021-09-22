@@ -476,7 +476,7 @@ func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus) (err error) {
 	return
 }
 
-func (r *KubeVirt) SetDataVolumeCheckpoint(vm *plan.VMStatus, final bool) (err error) {
+func (r *KubeVirt) SetDataVolumeCheckpoint(vm *plan.VMStatus, checkpoint cdi.DataVolumeCheckpoint, final bool) (err error) {
 	list := &cdi.DataVolumeList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
@@ -493,11 +493,7 @@ func (r *KubeVirt) SetDataVolumeCheckpoint(vm *plan.VMStatus, final bool) (err e
 		if len(dv.Spec.Checkpoints) >= len(vm.Warm.Precopies) {
 			continue
 		}
-		n := len(vm.Warm.Precopies)
-		dv.Spec.Checkpoints = append(dv.Spec.Checkpoints, cdi.DataVolumeCheckpoint{
-			Current:  vm.Warm.Precopies[n-1].Snapshot,
-			Previous: vm.Warm.Precopies[n-2].Snapshot,
-		})
+		dv.Spec.Checkpoints = append(dv.Spec.Checkpoints, checkpoint)
 		dv.Spec.FinalCheckpoint = final
 		err = r.Destination.Client.Update(context.TODO(), &dv)
 		if err != nil {

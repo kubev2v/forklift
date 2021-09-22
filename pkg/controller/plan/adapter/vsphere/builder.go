@@ -259,7 +259,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 				dvSpec := cdi.DataVolumeSpec{
 					Source: cdi.DataVolumeSource{
 						VDDK: &cdi.DataVolumeSourceVDDK{
-							BackingFile: disk.File,
+							BackingFile: r.trimBackingFileName(disk.File),
 							UUID:        vm.UUID,
 							URL:         url,
 							SecretRef:   secret.Name,
