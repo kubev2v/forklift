@@ -58,8 +58,10 @@ type Client interface {
 	PoweredOff(vmRef ref.Ref) (bool, error)
 	// Create a snapshot of the source VM.
 	CreateSnapshot(vmRef ref.Ref) (string, error)
-	// Remove a snapshot of the source VM.
-	RemoveSnapshot(vmRef ref.Ref, snapshot string, all bool) error
+	// Remove all warm migration snapshots.
+	RemoveSnapshots(vmRef ref.Ref, precopies []plan.Precopy) error
+	// Create a DataVolume checkpoint out of a pair of snapshot IDs.
+	CreateCheckpoint(vmRef ref.Ref, current, previous string) (checkpoint cdi.DataVolumeCheckpoint, err error)
 	// Close connections to the provider API.
 	Close()
 }

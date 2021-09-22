@@ -4,15 +4,19 @@ import (
 	"context"
 	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
+	"github.com/konveyor/forklift-controller/pkg/settings"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/session"
 	"github.com/vmware/govmomi/vim25"
+	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
+	cdi "kubevirt.io/containerized-data-importer/pkg/apis/core/v1beta1"
 	liburl "net/url"
 )
 
@@ -37,7 +41,7 @@ type Client struct {
 
 //
 // Create a VM snapshot and return its ID.
-func (r *Client) CreateSnapshot(vmRef ref.Ref) (snapshot string, err error) {
+func (r *Client) CreateSnapshot(vmRef ref.Ref) (id string, err error) {
 	vm, err := r.getVM(vmRef)
 	if err != nil {
 		return
@@ -48,22 +52,53 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref) (snapshot string, err error) {
 		err = liberr.Wrap(err)
 		return
 	}
-	snapshot = res.Result.(types.ManagedObjectReference).Value
+	id = res.Result.(types.ManagedObjectReference).Value
+
 	return
 }
 
 //
-// Remove a VM snapshot.
-func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, all bool) (err error) {
-	vm, err := r.getVM(vmRef)
-	if err != nil {
+// Remove all warm migration snapshots.
+func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []plan.Precopy) (err error) {
+	if len(precopies) == 0 {
 		return
 	}
-	_, err = vm.RemoveSnapshot(context.TODO(), snapshot, all, nil)
-	if err != nil {
-		err = liberr.Wrap(err)
+	if settings.Settings.VsphereIncrementalBackup {
+		// only necessary to clean up the last snapshot if this feature is enabled,
+		// because all others will have already been cleaned up.
+		lastSnapshot := precopies[len(precopies)-1].Snapshot
+		err = r.removeSnapshot(vmRef, lastSnapshot, false)
+	} else {
+		rootSnapshot := precopies[0].Snapshot
+		err = r.removeSnapshot(vmRef, rootSnapshot, true)
+	}
+	return
+}
+
+//
+// Create a DataVolume checkpoint from a pair of snapshot IDs.
+func (r *Client) CreateCheckpoint(vmRef ref.Ref, current string, previous string) (checkpoint cdi.DataVolumeCheckpoint, err error) {
+	checkpoint.Current = current
+
+	if previous == "" {
 		return
 	}
+
+	if settings.Settings.VsphereIncrementalBackup {
+		var changeId string
+		changeId, err = r.getChangeId(vmRef, previous)
+		if err != nil {
+			return
+		}
+		err = r.removeSnapshot(vmRef, previous, false)
+		if err != nil {
+			return
+		}
+		previous = changeId
+	}
+
+	checkpoint.Previous = previous
+
 	return
 }
 
@@ -162,6 +197,58 @@ func (r *Client) Close() {
 }
 
 //
+// Get the changeId for a VM snapshot.
+func (r *Client) getChangeId(vmRef ref.Ref, snapshotId string) (changeId string, err error) {
+	vm, err := r.getVM(vmRef)
+	if err != nil {
+		return
+	}
+
+	var snapshot mo.VirtualMachineSnapshot
+	err = vm.Properties(
+		context.TODO(),
+		types.ManagedObjectReference{Type: "VirtualMachineSnapshot", Value: snapshotId},
+		[]string{"config.hardware.device"},
+		&snapshot)
+	if err != nil {
+		err = liberr.Wrap(err,
+			"Unable to get snapshot properties.",
+			"vm",
+			vm.Reference().Value,
+			"snapshot",
+			snapshotId)
+		return
+	}
+
+	var id *string
+	for _, device := range snapshot.Config.Hardware.Device {
+		vDevice := device.GetVirtualDevice()
+		switch dev := vDevice.Backing.(type) {
+		case *types.VirtualDiskFlatVer2BackingInfo:
+			id = &dev.ChangeId
+		case *types.VirtualDiskSparseVer2BackingInfo:
+			id = &dev.ChangeId
+		case *types.VirtualDiskRawDiskMappingVer1BackingInfo:
+			id = &dev.ChangeId
+		case *types.VirtualDiskRawDiskVer2BackingInfo:
+			id = &dev.ChangeId
+		}
+	}
+
+	if id == nil {
+		err = liberr.New("Disk backing info doesn't include changeId.",
+			"vm",
+			vm.Reference().Value,
+			"snapshot",
+			snapshotId)
+		return
+	}
+
+	changeId = *id
+	return
+}
+
+//
 // Get the VM by ref.
 func (r *Client) getVM(vmRef ref.Ref) (vsphereVm *object.VirtualMachine, err error) {
 	vm := &model.VM{}
@@ -190,6 +277,21 @@ func (r *Client) getVM(vmRef ref.Ref) (vsphereVm *object.VirtualMachine, err err
 		return
 	}
 	vsphereVm = object.NewVirtualMachine(r.client.Client, vsphereRef.Reference())
+	return
+}
+
+//
+// Remove a VM snapshot and optionally its children.
+func (r *Client) removeSnapshot(vmRef ref.Ref, snapshot string, children bool) (err error) {
+	vm, err := r.getVM(vmRef)
+	if err != nil {
+		return
+	}
+	_, err = vm.RemoveSnapshot(context.TODO(), snapshot, children, nil)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
 	return
 }
 

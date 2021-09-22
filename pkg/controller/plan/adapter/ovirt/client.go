@@ -3,10 +3,12 @@ package ovirt
 import (
 	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	ovirtsdk "github.com/ovirt/go-ovirt"
+	cdi "kubevirt.io/containerized-data-importer/pkg/apis/core/v1beta1"
 )
 
 const (
@@ -52,19 +54,31 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref) (snapshot string, err error) {
 }
 
 //
-// Remove a VM snapshot.
-func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, _ bool) (err error) {
+// Remove all warm migration snapshots.
+func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []plan.Precopy) (err error) {
+	if len(precopies) == 0 {
+		return
+	}
 	_, vmService, err := r.getVM(vmRef)
 	if err != nil {
 		return
 	}
 	snapsService := vmService.SnapshotsService()
-	snapService := snapsService.SnapshotService(snapshot)
-	_, err = snapService.Remove().Async(true).Send()
-	if err != nil {
-		err = liberr.Wrap(err)
+	for i := range precopies {
+		snapService := snapsService.SnapshotService(precopies[i].Snapshot)
+		_, err = snapService.Remove().Async(true).Send()
+		if err != nil {
+			err = liberr.Wrap(err)
+		}
 	}
+	return
+}
 
+//
+// Create a DataVolume checkpoint from a pair of snapshot IDs.
+func (r *Client) CreateCheckpoint(_ ref.Ref, current string, previous string) (checkpoint cdi.DataVolumeCheckpoint, err error) {
+	checkpoint.Current = current
+	checkpoint.Previous = previous
 	return
 }
 
