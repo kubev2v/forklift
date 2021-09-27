@@ -361,7 +361,8 @@ func (r *Builder) mapDisks(vm *model.VM, dataVolumes []cdi.DataVolume, object *c
 		return disks[i].Key < disks[j].Key
 	})
 	dvMap := make(map[string]*cdi.DataVolume)
-	for _, dv := range dataVolumes {
+	for i := range dataVolumes {
+		dv := dataVolumes[i]
 		dvMap[r.trimBackingFileName(dv.Spec.Source.VDDK.BackingFile)] = &dv
 	}
 	for i, disk := range disks {
