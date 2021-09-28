@@ -47,6 +47,9 @@ spec:
           spec:
             description: PlanSpec defines the desired state of Plan.
             properties:
+              archived:
+                description: Whether this plan should be archived.
+                type: boolean
               description:
                 description: Description
                 type: string

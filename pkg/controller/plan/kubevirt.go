@@ -239,14 +239,96 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) (err error) {
 }
 
 //
+// Delete the Secret that was created for this VM.
+func (r *KubeVirt) DeleteSecret(vm *plan.VMStatus) (err error) {
+	vmLabels := r.vmLabels(vm.Ref)
+	delete(vmLabels, kMigration)
+	list := &core.SecretList{}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: labels.SelectorFromSet(vmLabels),
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	for _, object := range list.Items {
+		err = r.Destination.Client.Delete(context.TODO(), &object)
+		if err != nil {
+			if k8serr.IsNotFound(err) {
+				err = nil
+			} else {
+				return liberr.Wrap(err)
+			}
+		} else {
+			r.Log.Info(
+				"Deleted secret.",
+				"secret",
+				path.Join(
+					object.Namespace,
+					object.Name),
+				"vm",
+				vm.String())
+		}
+	}
+	return
+}
+
+//
+// Delete the ConfigMap that was created for this VM.
+func (r *KubeVirt) DeleteConfigMap(vm *plan.VMStatus) (err error) {
+	vmLabels := r.vmLabels(vm.Ref)
+	delete(vmLabels, kMigration)
+	list := &core.ConfigMapList{}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: labels.SelectorFromSet(vmLabels),
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	for _, object := range list.Items {
+		err = r.Destination.Client.Delete(context.TODO(), &object)
+		if err != nil {
+			if k8serr.IsNotFound(err) {
+				err = nil
+			} else {
+				return liberr.Wrap(err)
+			}
+		} else {
+			r.Log.Info(
+				"Deleted configMap.",
+				"configMap",
+				path.Join(
+					object.Namespace,
+					object.Name),
+				"vm",
+				vm.String())
+		}
+	}
+	return
+}
+
+//
 // Delete the VirtualMachine CR on the destination cluster.
 func (r *KubeVirt) DeleteVM(vm *plan.VMStatus) (err error) {
+	vmLabels := r.vmLabels(vm.Ref)
+	delete(vmLabels, kMigration)
 	list := &cnv.VirtualMachineList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
 		list,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(r.vmLabels(vm.Ref)),
+			LabelSelector: labels.SelectorFromSet(vmLabels),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
@@ -453,12 +535,14 @@ func (r *KubeVirt) GetGuestConversionPod(vm *plan.VMStatus) (pod *core.Pod, err 
 //
 // Delete the guest conversion pod on the destination cluster.
 func (r *KubeVirt) DeleteGuestConversionPod(vm *plan.VMStatus) (err error) {
+	vmLabels := r.vmLabels(vm.Ref)
+	delete(vmLabels, kMigration)
 	list := &core.PodList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
 		list,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(r.vmLabels(vm.Ref)),
+			LabelSelector: labels.SelectorFromSet(vmLabels),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)

@@ -298,8 +298,27 @@ func (r *Migration) begin() (err error) {
 }
 
 //
+// Archive the plan.
+// Remove any retained migration resources.
+func (r *Migration) Archive() (err error) {
+	err = r.init()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	for _, vm := range r.Plan.Status.Migration.VMs {
+		err = r.CleanUp(vm)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
+//
 // Cancel the migration.
-// Delete resources associated with VMs that have failed or been marked canceled.
+// Delete resources associated with VMs that have been marked canceled.
 func (r *Migration) Cancel() (err error) {
 	err = r.init()
 	if err != nil {
@@ -308,12 +327,8 @@ func (r *Migration) Cancel() (err error) {
 	}
 
 	for _, vm := range r.Plan.Status.Migration.VMs {
-		if vm.HasAnyCondition(Canceled, Failed) {
-			err = r.kubevirt.DeleteVM(vm)
-			if err != nil {
-				return
-			}
-			err = r.kubevirt.DeleteGuestConversionPod(vm)
+		if vm.HasCondition(Canceled) {
+			err = r.CleanUp(vm)
 			if err != nil {
 				return
 			}
@@ -330,6 +345,31 @@ func (r *Migration) Cancel() (err error) {
 				}
 			}
 		}
+	}
+
+	return
+}
+
+//
+// Delete left over migration resources associated with a VM.
+func (r *Migration) CleanUp(vm *plan.VMStatus) (err error) {
+	if !vm.HasCondition(Succeeded) {
+		err = r.kubevirt.DeleteVM(vm)
+		if err != nil {
+			return
+		}
+	}
+	err = r.kubevirt.DeleteGuestConversionPod(vm)
+	if err != nil {
+		return
+	}
+	err = r.kubevirt.DeleteSecret(vm)
+	if err != nil {
+		return
+	}
+	err = r.kubevirt.DeleteConfigMap(vm)
+	if err != nil {
+		return
 	}
 
 	return
@@ -455,6 +495,12 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		}
 		vm.MarkStarted()
 		step.MarkStarted()
+		err = r.CleanUp(vm)
+		if err != nil {
+			step.AddError(err.Error())
+			err = nil
+			break
+		}
 		vm.Phase = r.next(vm.Phase)
 	case PreHook, PostHook:
 		runner := HookRunner{Context: r.Context}
@@ -512,11 +558,13 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		waiting, rErr := r.waitingForFirstConsumer(vm)
 		if rErr != nil {
 			step.AddError(rErr.Error())
+			err = nil
 			break
 		}
 		err = r.setRunning(vm, waiting)
 		if err != nil {
 			step.AddError(err.Error())
+			err = nil
 			break
 		}
 		if !waiting {
@@ -533,6 +581,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		err = r.updateCopyProgress(vm, step)
 		if err != nil {
 			step.AddError(err.Error())
+			err = nil
 			break
 		}
 		if step.MarkedCompleted() && !step.HasError() {
@@ -696,6 +745,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		err = r.ensureGuestConversionPod(vm)
 		if err != nil {
 			step.AddError(err.Error())
+			err = nil
 			break
 		}
 		vm.Phase = r.next(vm.Phase)
@@ -914,11 +964,6 @@ func (r *Migration) end() (completed bool, err error) {
 				Message:  "The plan execution has FAILED.",
 				Durable:  true,
 			})
-		err = r.Cancel()
-		if err != nil {
-			err = liberr.Wrap(err)
-		}
-
 	} else if succeeded > 0 {
 		// if the migration didn't fail and at least one VM succeeded,
 		// then the migration succeeded.
