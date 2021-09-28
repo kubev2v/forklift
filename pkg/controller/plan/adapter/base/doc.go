@@ -30,8 +30,6 @@ type Adapter interface {
 type Builder interface {
 	// Build secret.
 	Secret(vmRef ref.Ref, in, object *core.Secret) error
-	// Return whether DataVolume import requires a provider-specific configmap.
-	RequiresConfigMap() bool
 	// Build DataVolume config map.
 	ConfigMap(vmRef ref.Ref, secret *core.Secret, object *core.ConfigMap) error
 	// Build the Kubevirt VirtualMachine spec.

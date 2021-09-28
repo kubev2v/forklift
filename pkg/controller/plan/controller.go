@@ -303,7 +303,7 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	if snapshot.HasCondition(Canceled) {
 		r.Log.Info("migration (active) marked as canceled.")
 		for _, vm := range plan.Status.Migration.VMs {
-			if !vm.HasCondition(Succeeded) {
+			if !vm.HasAnyCondition(Succeeded, Failed) {
 				vm.SetCondition(
 					libcnd.Condition{
 						Type:     Canceled,
@@ -327,6 +327,26 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	if err != nil {
 		return
 	}
+
+	//
+	// Archive.
+	if plan.Spec.Archived && !plan.Status.HasCondition(Executing) {
+		err = runner.Archive()
+		if err != nil {
+			return
+		}
+		plan.Status.SetCondition(
+			libcnd.Condition{
+				Type:     Archived,
+				Status:   True,
+				Category: Advisory,
+				Reason:   UserRequested,
+				Message:  "The migration plan has been archived.",
+			})
+		reQ = NoReQ
+		return
+	}
+
 	//
 	// Find pending migrations.
 	pending := []*api.Migration{}
