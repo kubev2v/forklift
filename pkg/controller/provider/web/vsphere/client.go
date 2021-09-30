@@ -116,7 +116,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				&list,
 				base.Param{
 					Key:   DetailParam,
-					Value: "1",
+					Value: "all",
 				},
 				base.Param{
 					Key:   NameParam,
@@ -148,7 +148,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				&list,
 				base.Param{
 					Key:   DetailParam,
-					Value: "1",
+					Value: "all",
 				},
 				base.Param{
 					Key:   NameParam,
@@ -180,7 +180,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				&list,
 				base.Param{
 					Key:   DetailParam,
-					Value: "1",
+					Value: "all",
 				},
 				base.Param{
 					Key:   NameParam,
@@ -212,7 +212,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				&list,
 				base.Param{
 					Key:   DetailParam,
-					Value: "1",
+					Value: "all",
 				},
 				base.Param{
 					Key:   NameParam,
@@ -244,7 +244,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				&list,
 				base.Param{
 					Key:   DetailParam,
-					Value: "1",
+					Value: "all",
 				},
 				base.Param{
 					Key:   NameParam,

@@ -66,7 +66,7 @@ func (h WorkloadHandler) Get(ctx *gin.Context) {
 	if err != nil {
 		return
 	}
-	h.Detail = true
+	h.Detail = model.MaxDetail
 	r := Workload{}
 	r.With(m)
 	err = r.Expand(h.Collector.DB())
@@ -79,10 +79,146 @@ func (h WorkloadHandler) Get(ctx *gin.Context) {
 }
 
 //
+// Expanded: Disk.
+type xDisk struct {
+	Disk
+	Profile DiskProfile `json:"profile"`
+}
+
+//
+// Expand references.
+func (r *xDisk) Expand(db libmodel.DB) (err error) {
+	if r.Disk.Profile == "" {
+		return
+	}
+	p := &model.DiskProfile{
+		Base: model.Base{ID: r.Disk.Profile},
+	}
+	err = db.Get(p)
+	if err != nil {
+		return
+	}
+	r.Profile.With(p)
+	return
+}
+
+//
+// Build self link (URI).
+func (r *xDisk) Link(p *api.Provider) {
+	r.Disk.Link(p)
+	r.Profile.Link(p)
+}
+
+//
+// Expanded: DiskAttachment.
+type xDiskAttachment struct {
+	DiskAttachment
+	Disk xDisk `json:"disk"`
+}
+
+func (r *xDiskAttachment) Expand(db libmodel.DB) (err error) {
+	disk := &model.Disk{
+		Base: model.Base{ID: r.DiskAttachment.ID},
+	}
+	disk.ID = r.DiskAttachment.Disk
+	err = db.Get(disk)
+	if err != nil {
+		return
+	}
+	r.Disk.With(disk)
+	err = r.Disk.Expand(db)
+	return
+}
+
+//
+// Build self link (URI).
+func (r *xDiskAttachment) Link(p *api.Provider) {
+	r.Disk.Link(p)
+}
+
+//
+// Expanded: vNIC.
+type xNIC struct {
+	vNIC
+	Profile NICProfile `json:"profile"`
+}
+
+//
+// Expand references.
+func (r *xNIC) Expand(db libmodel.DB) (err error) {
+	if r.vNIC.Profile == "" {
+		return
+	}
+	p := &model.NICProfile{
+		Base: model.Base{ID: r.vNIC.Profile},
+	}
+	err = db.Get(p)
+	if err != nil {
+		return
+	}
+	r.Profile.With(p)
+	return
+}
+
+//
+// Build self link (URI).
+func (r *xNIC) Link(p *api.Provider) {
+	r.Profile.Link(p)
+}
+
+//
+// Expanded: VM.
+type xVM struct {
+	VM
+	DiskAttachments []xDiskAttachment `json:"diskAttachments"`
+	NICs            []xNIC            `json:"nics"`
+}
+
+//
+// Expand references.
+func (r *xVM) Expand(db libmodel.DB) (err error) {
+	for _, real := range r.VM.DiskAttachments {
+		expanded := xDiskAttachment{DiskAttachment: real}
+		err = expanded.Expand(db)
+		if err != nil {
+			return
+		}
+		r.DiskAttachments = append(
+			r.DiskAttachments,
+			expanded)
+	}
+	for _, real := range r.VM.NICs {
+		expanded := xNIC{vNIC: real}
+		err = expanded.Expand(db)
+		if err != nil {
+			return
+		}
+		r.NICs = append(
+			r.NICs,
+			expanded)
+	}
+
+	return
+}
+
+//
+// Build self link (URI).
+func (r *xVM) Link(p *api.Provider) {
+	for i := range r.DiskAttachments {
+		da := &r.DiskAttachments[i]
+		da.Link(p)
+	}
+	for i := range r.NICs {
+		n := &r.NICs[i]
+		n.Link(p)
+	}
+}
+
+//
 // Workload
 type Workload struct {
 	SelfLink string `json:"selfLink"`
-	VM
+	xVM
 	Host       *Host      `json:"host"`
 	Cluster    Cluster    `json:"cluster"`
 	DataCenter DataCenter `json:"dataCenter"`
@@ -97,6 +233,7 @@ func (r *Workload) Link(p *api.Provider) {
 			base.ProviderParam: string(p.UID),
 			VMParam:            r.ID,
 		})
+	r.xVM.Link(p)
 	r.Cluster.Link(p)
 	r.DataCenter.Link(p)
 	if r.Host != nil {
@@ -108,7 +245,7 @@ func (r *Workload) Link(p *api.Provider) {
 // Expand the workload.
 func (r *Workload) Expand(db libmodel.DB) (err error) {
 	// VM
-	err = r.VM.Expand(db)
+	err = r.xVM.Expand(db)
 	if err != nil {
 		return err
 	}

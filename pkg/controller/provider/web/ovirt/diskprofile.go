@@ -100,7 +100,7 @@ func (h DiskProfileHandler) Get(ctx *gin.Context) {
 	r := &DiskProfile{}
 	r.With(m)
 	r.Link(h.Provider)
-	content := r.Content(true)
+	content := r.Content(model.MaxDetail)
 
 	ctx.JSON(http.StatusOK, content)
 }
@@ -159,8 +159,8 @@ func (r *DiskProfile) Link(p *api.Provider) {
 
 //
 // As content.
-func (r *DiskProfile) Content(detail bool) interface{} {
-	if !detail {
+func (r *DiskProfile) Content(detail int) interface{} {
+	if detail == 0 {
 		return r.Resource
 	}
 

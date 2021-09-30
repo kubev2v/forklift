@@ -100,7 +100,7 @@ func (h StorageClassHandler) Get(ctx *gin.Context) {
 	r := &StorageClass{}
 	r.With(m)
 	r.Link(h.Provider)
-	content := r.Content(true)
+	content := r.Content(model.MaxDetail)
 
 	ctx.JSON(http.StatusOK, content)
 }
@@ -157,8 +157,8 @@ func (r *StorageClass) Link(p *api.Provider) {
 
 //
 // As content.
-func (r *StorageClass) Content(detail bool) interface{} {
-	if !detail {
+func (r *StorageClass) Content(detail int) interface{} {
+	if detail == 0 {
 		return r.Resource
 	}
 

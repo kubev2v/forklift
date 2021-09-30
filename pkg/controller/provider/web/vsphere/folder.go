@@ -106,7 +106,7 @@ func (h FolderHandler) Get(ctx *gin.Context) {
 	r.With(m)
 	r.Link(h.Provider)
 	r.Path = pb.Path(m)
-	content := r.Content(true)
+	content := r.Content(model.MaxDetail)
 
 	ctx.JSON(http.StatusOK, content)
 }
@@ -169,8 +169,8 @@ func (r *Folder) Link(p *api.Provider) {
 
 //
 // Content.
-func (r *Folder) Content(detail bool) interface{} {
-	if !detail {
+func (r *Folder) Content(detail int) interface{} {
+	if detail == 0 {
 		return r.Resource
 	}
 

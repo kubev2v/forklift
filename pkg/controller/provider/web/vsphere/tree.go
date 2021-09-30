@@ -110,7 +110,7 @@ func (h TreeHandler) VmTree(ctx *gin.Context) {
 			NodeBuilder: &NodeBuilder{
 				provider:    h.Provider,
 				pathBuilder: pb,
-				detail: map[string]bool{
+				detail: map[string]int{
 					model.VmKind: h.Detail,
 				},
 			},
@@ -176,7 +176,7 @@ func (h TreeHandler) HostTree(ctx *gin.Context) {
 			NodeBuilder: &NodeBuilder{
 				provider:    h.Provider,
 				pathBuilder: pb,
-				detail: map[string]bool{
+				detail: map[string]int{
 					model.VmKind: h.Detail,
 				},
 			},
@@ -213,7 +213,7 @@ type HostNavigator struct {
 	// DB.
 	db libmodel.DB
 	// VM detail.
-	detail bool
+	detail int
 }
 
 //
@@ -276,8 +276,8 @@ func (n *HostNavigator) Next(p libmodel.Model) (r []libmodel.Model, err error) {
 		}
 	case *model.Host:
 		detail := 0
-		if n.detail {
-			detail = 1
+		if n.detail > 0 {
+			detail = model.MaxDetail
 		}
 		list := []model.VM{}
 		err = n.db.List(
@@ -305,7 +305,7 @@ type VMNavigator struct {
 	// DB.
 	db libmodel.DB
 	// VM detail.
-	detail bool
+	detail int
 }
 
 //
@@ -338,8 +338,8 @@ func (n *VMNavigator) Next(p libmodel.Model) (r []libmodel.Model, err error) {
 		}
 		// VM
 		detail := 0
-		if n.detail {
-			detail = 1
+		if n.detail > 0 {
+			detail = model.MaxDetail
 		}
 		vm := []model.VM{}
 		err = n.db.List(
@@ -367,7 +367,7 @@ type NodeBuilder struct {
 	// Provider.
 	provider *api.Provider
 	// Resource details by kind.
-	detail map[string]bool
+	detail map[string]int
 	// Path builder.
 	pathBuilder PathBuilder
 }
@@ -462,10 +462,10 @@ func (r *NodeBuilder) Node(parent *TreeNode, m libmodel.Model) *TreeNode {
 
 //
 // Build with detail.
-func (r *NodeBuilder) withDetail(kind string) bool {
+func (r *NodeBuilder) withDetail(kind string) int {
 	if b, found := r.detail[kind]; found {
 		return b
 	}
 
-	return false
+	return 0
 }

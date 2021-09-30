@@ -78,7 +78,7 @@ func (r *Builder) Secret(_ ref.Ref, in, object *core.Secret) (err error) {
 //
 // Create DataVolume specs for the VM.
 func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap) (dvs []cdi.DataVolumeSpec, err error) {
-	vm := &model.VM{}
+	vm := &model.Workload{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
 		err = liberr.Wrap(
@@ -149,7 +149,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 //
 // Create the destination Kubevirt VM.
 func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, dataVolumes []cdi.DataVolume) (err error) {
-	vm := &model.VM{}
+	vm := &model.Workload{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
 		err = liberr.Wrap(
@@ -159,19 +159,9 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 			vmRef.String())
 		return
 	}
-	cluster := &model.Cluster{}
-	err = r.Source.Inventory.Find(cluster, ref.Ref{ID: vm.Cluster})
-	if err != nil {
-		err = liberr.Wrap(
-			err,
-			"Cluster lookup failed.",
-			"cluster",
-			vm.Cluster)
-		return
-	}
 	object.Template = &cnv.VirtualMachineInstanceTemplateSpec{}
 	r.mapDisks(vm, dataVolumes, object)
-	r.mapFirmware(vm, cluster, object)
+	r.mapFirmware(vm, &vm.Cluster, object)
 	r.mapCPU(vm, object)
 	r.mapMemory(vm, object)
 	r.mapClock(vm, object)
@@ -184,7 +174,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	return
 }
 
-func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err error) {
+func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec) (err error) {
 	var kNetworks []cnv.Network
 	var kInterfaces []cnv.Interface
 
@@ -249,7 +239,7 @@ func (r *Builder) mapInput(object *cnv.VirtualMachineSpec) {
 	object.Template.Spec.Domain.Devices.Inputs = []cnv.Input{tablet}
 }
 
-func (r *Builder) mapClock(vm *model.VM, object *cnv.VirtualMachineSpec) {
+func (r *Builder) mapClock(vm *model.Workload, object *cnv.VirtualMachineSpec) {
 	clock := cnv.Clock{
 		Timer: &cnv.Timer{},
 	}
@@ -258,7 +248,7 @@ func (r *Builder) mapClock(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	object.Template.Spec.Domain.Clock = &clock
 }
 
-func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec) {
+func (r *Builder) mapMemory(vm *model.Workload, object *cnv.VirtualMachineSpec) {
 	reservation := resource.NewQuantity(vm.Memory, resource.BinarySI)
 	object.Template.Spec.Domain.Resources = cnv.ResourceRequirements{
 		Requests: map[core.ResourceName]resource.Quantity{
@@ -266,7 +256,7 @@ func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec) {
 		},
 	}
 }
-func (r *Builder) mapCPU(vm *model.VM, object *cnv.VirtualMachineSpec) {
+func (r *Builder) mapCPU(vm *model.Workload, object *cnv.VirtualMachineSpec) {
 	object.Template.Spec.Domain.Machine = &cnv.Machine{Type: "q35"}
 	object.Template.Spec.Domain.CPU = &cnv.CPU{
 		Sockets: uint32(vm.CpuSockets),
@@ -275,7 +265,7 @@ func (r *Builder) mapCPU(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	}
 }
 
-func (r *Builder) mapFirmware(vm *model.VM, cluster *model.Cluster, object *cnv.VirtualMachineSpec) {
+func (r *Builder) mapFirmware(vm *model.Workload, cluster *model.Cluster, object *cnv.VirtualMachineSpec) {
 	biosType := vm.BIOS
 	if biosType == ClusterDefault {
 		biosType = cluster.BiosType
@@ -302,7 +292,7 @@ func (r *Builder) mapFirmware(vm *model.VM, cluster *model.Cluster, object *cnv.
 	object.Template.Spec.Domain.Firmware = firmware
 }
 
-func (r *Builder) mapDisks(vm *model.VM, dataVolumes []cdi.DataVolume, object *cnv.VirtualMachineSpec) {
+func (r *Builder) mapDisks(vm *model.Workload, dataVolumes []cdi.DataVolume, object *cnv.VirtualMachineSpec) {
 	dvMap := make(map[string]*cdi.DataVolume)
 	for _, dv := range dataVolumes {
 		dvMap[dv.Spec.Source.Imageio.DiskID] = &dv
@@ -370,7 +360,7 @@ func (r *Builder) defaultModes(dm *api.DestinationStorage) (err error) {
 //
 // Build tasks.
 func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
-	vm := &model.VM{}
+	vm := &model.Workload{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
 		err = liberr.Wrap(

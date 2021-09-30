@@ -3,7 +3,6 @@ package ovirt
 import (
 	"errors"
 	"github.com/gin-gonic/gin"
-	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
@@ -75,15 +74,6 @@ func (h VMHandler) List(ctx *gin.Context) {
 	for _, m := range list {
 		r := &VM{}
 		r.With(&m)
-		err = h.Expand(r)
-		if err != nil {
-			log.Trace(
-				err,
-				"url",
-				ctx.Request.URL)
-			ctx.Status(http.StatusInternalServerError)
-			return
-		}
 		r.Link(h.Provider)
 		r.Path = pb.Path(&m)
 		content = append(content, r.Content(h.Detail))
@@ -105,7 +95,7 @@ func (h VMHandler) Get(ctx *gin.Context) {
 			ID: ctx.Param(VMParam),
 		},
 	}
-	h.Detail = true
+	h.Detail = model.MaxDetail
 	db := h.Collector.DB()
 	err := db.Get(m)
 	if errors.Is(err, model.NotFound) {
@@ -123,30 +113,11 @@ func (h VMHandler) Get(ctx *gin.Context) {
 	pb := PathBuilder{DB: db}
 	r := &VM{}
 	r.With(m)
-	err = h.Expand(r)
-	if err != nil {
-		log.Trace(
-			err,
-			"url",
-			ctx.Request.URL)
-		ctx.Status(http.StatusInternalServerError)
-		return
-	}
 	r.Link(h.Provider)
 	r.Path = pb.Path(m)
-	content := r.Content(true)
+	content := r.Content(h.Detail)
 
 	ctx.JSON(http.StatusOK, content)
-}
-
-//
-// Expend the resource.
-func (h *VMHandler) Expand(r *VM) (err error) {
-	if !h.Detail {
-		return
-	}
-	err = r.Expand(h.Collector.DB())
-	return
 }
 
 //
@@ -207,46 +178,80 @@ func (h *VMHandler) filter(ctx *gin.Context, list *[]model.VM) (err error) {
 }
 
 //
-// REST Resource.
-type VM struct {
-	Resource
-	Cluster                     string           `json:"cluster"`
-	Host                        string           `json:"host"`
-	RevisionValidated           int64            `json:"revisionValidated"`
-	PolicyVersion               int              `json:"policyVersion"`
-	GuestName                   string           `json:"guestName"`
-	CpuSockets                  int16            `json:"cpuSockets"`
-	CpuCores                    int16            `json:"cpuCores"`
-	CpuThreads                  int16            `json:"cpuThreads"`
-	CpuShares                   int16            `json:"cpuShares"`
-	CpuAffinity                 []CpuPinning     `json:"cpuAffinity"`
-	Memory                      int64            `json:"memory"`
-	BalloonedMemory             bool             `json:"balloonedMemory"`
-	IOThreads                   int16            `json:"ioThreads"`
-	BIOS                        string           `json:"bios"`
-	Display                     string           `json:"display"`
-	HasIllegalImages            bool             `json:"hasIllegalImages"`
-	NumaNodeAffinity            []string         `json:"numaNodeAffinity"`
-	LeaseStorageDomain          string           `json:"leaseStorageDomain"`
-	StorageErrorResumeBehaviour string           `json:"storageErrorResumeBehaviour"`
-	HaEnabled                   bool             `json:"haEnabled"`
-	UsbEnabled                  bool             `json:"usbEnabled"`
-	BootMenuEnabled             bool             `json:"bootMenuEnabled"`
-	PlacementPolicyAffinity     string           `json:"placementPolicyAffinity"`
-	Timezone                    string           `json:"timezone"`
-	Status                      string           `json:"status"`
-	Stateless                   string           `json:"stateless"`
-	SerialNumber                string           `json:"serialNumber"`
-	NICs                        []vNIC           `json:"nics"`
-	DiskAttachments             []DiskAttachment `json:"diskAttachments"`
-	HostDevices                 []HostDevice     `json:"hostDevices"`
-	CDROMs                      []CDROM          `json:"cdroms"`
-	WatchDogs                   []WatchDog       `json:"watchDogs"`
-	Properties                  []Property       `json:"properties"`
-	Snapshots                   []Snapshot       `json:"snapshots"`
-	Concerns                    []Concern        `json:"concerns"`
+// VM detail=0
+type VM0 = Resource
+
+//
+// VM detail=1
+type VM1 struct {
+	VM0
+	Cluster           string           `json:"cluster"`
+	Host              string           `json:"host"`
+	RevisionValidated int64            `json:"revisionValidated"`
+	NICs              []vNIC           `json:"nics"`
+	DiskAttachments   []DiskAttachment `json:"diskAttachments"`
+	Concerns          []Concern        `json:"concerns"`
 }
 
+//
+// Build the resource using the model.
+func (r *VM1) With(m *model.VM) {
+	r.VM0.With(&m.Base)
+	r.Cluster = m.Cluster
+	r.Host = m.Host
+	r.NICs = m.NICs
+	r.DiskAttachments = m.DiskAttachments
+	r.RevisionValidated = m.RevisionValidated
+	r.Concerns = m.Concerns
+}
+
+//
+// As content.
+func (r *VM1) Content(detail int) interface{} {
+	if detail < 1 {
+		return &r.VM0
+	}
+
+	return r
+}
+
+//
+// VM resource.
+type VM struct {
+	VM1
+	PolicyVersion               int          `json:"policyVersion"`
+	GuestName                   string       `json:"guestName"`
+	CpuSockets                  int16        `json:"cpuSockets"`
+	CpuCores                    int16        `json:"cpuCores"`
+	CpuThreads                  int16        `json:"cpuThreads"`
+	CpuShares                   int16        `json:"cpuShares"`
+	CpuAffinity                 []CpuPinning `json:"cpuAffinity"`
+	Memory                      int64        `json:"memory"`
+	BalloonedMemory             bool         `json:"balloonedMemory"`
+	IOThreads                   int16        `json:"ioThreads"`
+	BIOS                        string       `json:"bios"`
+	Display                     string       `json:"display"`
+	HasIllegalImages            bool         `json:"hasIllegalImages"`
+	NumaNodeAffinity            []string     `json:"numaNodeAffinity"`
+	LeaseStorageDomain          string       `json:"leaseStorageDomain"`
+	StorageErrorResumeBehaviour string       `json:"storageErrorResumeBehaviour"`
+	HaEnabled                   bool         `json:"haEnabled"`
+	UsbEnabled                  bool         `json:"usbEnabled"`
+	BootMenuEnabled             bool         `json:"bootMenuEnabled"`
+	PlacementPolicyAffinity     string       `json:"placementPolicyAffinity"`
+	Timezone                    string       `json:"timezone"`
+	Status                      string       `json:"status"`
+	Stateless                   string       `json:"stateless"`
+	SerialNumber                string       `json:"serialNumber"`
+	HostDevices                 []HostDevice `json:"hostDevices"`
+	CDROMs                      []CDROM      `json:"cdroms"`
+	WatchDogs                   []WatchDog   `json:"watchDogs"`
+	Properties                  []Property   `json:"properties"`
+	Snapshots                   []Snapshot   `json:"snapshots"`
+}
+
+type vNIC = model.NIC
+type DiskAttachment = model.DiskAttachment
 type IpAddress = model.IpAddress
 type CpuPinning = model.CpuPinning
 type HostDevice = model.HostDevice
@@ -256,25 +261,10 @@ type Property = model.Property
 type Snapshot = model.Snapshot
 type Concern = model.Concern
 
-type vNIC struct {
-	model.NIC
-	Profile   NICProfile  `json:"profile"`
-	Plugged   bool        `json:"plugged"`
-	IpAddress []IpAddress `json:"ipAddress"`
-}
-
-type DiskAttachment struct {
-	model.DiskAttachment
-	Disk Disk `json:"disk"`
-}
-
 //
 // Build the resource using the model.
 func (r *VM) With(m *model.VM) {
-	r.Resource.With(&m.Base)
-	r.Cluster = m.Cluster
-	r.Host = m.Host
-	r.RevisionValidated = m.RevisionValidated
+	r.VM1.With(m)
 	r.PolicyVersion = m.PolicyVersion
 	r.GuestName = m.GuestName
 	r.CpuSockets = m.CpuSockets
@@ -304,9 +294,6 @@ func (r *VM) With(m *model.VM) {
 	r.WatchDogs = m.WatchDogs
 	r.Properties = m.Properties
 	r.Snapshots = m.Snapshots
-	r.Concerns = m.Concerns
-	r.addDiskAttachment(m)
-	r.addNICs(m)
 }
 
 //
@@ -318,97 +305,13 @@ func (r *VM) Link(p *api.Provider) {
 			base.ProviderParam: string(p.UID),
 			VMParam:            r.ID,
 		})
-	for i := range r.NICs {
-		n := &r.NICs[i]
-		n.Profile.Link(p)
-	}
-	for i := range r.DiskAttachments {
-		d := &r.DiskAttachments[i]
-		d.Disk.Link(p)
-	}
-}
-
-//
-// Expand the resource.
-// The vNIC profile.ID is optional.
-func (r *VM) Expand(db libmodel.DB) (err error) {
-	defer func() {
-		if err != nil {
-			err = liberr.Wrap(err, "vm", r.ID)
-		}
-	}()
-	for i := range r.NICs {
-		nic := &r.NICs[i]
-		if nic.Profile.ID == "" {
-			continue
-		}
-		profile := &model.NICProfile{
-			Base: model.Base{ID: nic.Profile.ID},
-		}
-		err = db.Get(profile)
-		if err != nil {
-			return
-		}
-		nic.Profile.With(profile)
-	}
-	for i := range r.DiskAttachments {
-		d := &r.DiskAttachments[i]
-		disk := &model.Disk{
-			Base: model.Base{ID: d.Disk.ID},
-		}
-		err = db.Get(disk)
-		if err != nil {
-			return
-		}
-		d.Disk.With(disk)
-		err = d.Disk.Expand(db)
-		if err != nil {
-			return
-		}
-	}
-
-	return
-}
-
-func (r *VM) addDiskAttachment(m *model.VM) {
-	r.DiskAttachments = []DiskAttachment{}
-	for _, d := range m.DiskAttachments {
-		r.DiskAttachments = append(
-			r.DiskAttachments,
-			DiskAttachment{
-				DiskAttachment: d,
-				Disk: Disk{
-					Resource: Resource{
-						ID: d.Disk,
-					},
-				},
-			})
-	}
-}
-
-func (r *VM) addNICs(m *model.VM) {
-	r.NICs = []vNIC{}
-	for _, n := range m.NICs {
-		r.NICs = append(
-			r.NICs,
-			vNIC{
-				NIC: n,
-				Profile: NICProfile{
-					Resource: Resource{
-						ID: n.Profile,
-					},
-				},
-				Plugged:   n.Plugged,
-				IpAddress: n.IpAddress,
-			})
-	}
 }
 
 //
 // As content.
-func (r *VM) Content(detail bool) interface{} {
-	if !detail {
-		return r.Resource
+func (r *VM) Content(detail int) interface{} {
+	if detail < 2 {
+		return r.VM1.Content(detail)
 	}
 
 	return r

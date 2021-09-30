@@ -114,7 +114,7 @@ func (h VMHandler) Get(ctx *gin.Context) {
 	r.With(m)
 	r.Link(h.Provider)
 	r.Path = pb.Path(m)
-	content := r.Content(true)
+	content := r.Content(model.MaxDetail)
 
 	ctx.JSON(http.StatusOK, content)
 }
@@ -177,53 +177,80 @@ func (h *VMHandler) filter(ctx *gin.Context, list *[]model.VM) (err error) {
 }
 
 //
-// REST Resource.
+// VM detail=0
+type VM0 = Resource
+
+//
+// VM detail=1
+type VM1 struct {
+	VM0
+	RevisionValidated int64           `json:"revisionValidated"`
+	IsTemplate        bool            `json:"isTemplate"`
+	Host              string          `json:"host"`
+	Networks          []model.Ref     `json:"networks"`
+	Disks             []model.Disk    `json:"disks"`
+	Concerns          []model.Concern `json:"concerns"`
+}
+
+//
+// Build the resource using the model.
+func (r *VM1) With(m *model.VM) {
+	r.VM0.With(&m.Base)
+	r.RevisionValidated = m.RevisionValidated
+	r.IsTemplate = m.IsTemplate
+	r.Host = m.Host
+	r.Networks = m.Networks
+	r.Disks = m.Disks
+	r.Concerns = m.Concerns
+}
+
+//
+// As content.
+func (r *VM1) Content(detail int) interface{} {
+	if detail < 1 {
+		return &r.VM0
+	}
+
+	return r
+}
+
+//
+// VM full detail.
 type VM struct {
-	Resource
-	Folder                string          `json:"folder"`
-	Host                  string          `json:"host"`
-	PolicyVersion         int             `json:"policyVersion"`
-	RevisionValidated     int64           `json:"revisionValidated"`
-	UUID                  string          `json:"uuid"`
-	Firmware              string          `json:"firmware"`
-	PowerState            string          `json:"powerState"`
-	ConnectionState       string          `json:"connectionState"`
-	Snapshot              model.Ref       `json:"snapshot"`
-	IsTemplate            bool            `json:"isTemplate"`
-	ChangeTrackingEnabled bool            `json:"changeTrackingEnabled"`
-	CpuAffinity           []int32         `json:"cpuAffinity"`
-	CpuHotAddEnabled      bool            `json:"cpuHotAddEnabled"`
-	CpuHotRemoveEnabled   bool            `json:"cpuHotRemoveEnabled"`
-	MemoryHotAddEnabled   bool            `json:"memoryHotAddEnabled"`
-	FaultToleranceEnabled bool            `json:"faultToleranceEnabled"`
-	CpuCount              int32           `json:"cpuCount"`
-	CoresPerSocket        int32           `json:"coresPerSocket"`
-	MemoryMB              int32           `json:"memoryMB"`
-	GuestName             string          `json:"guestName"`
-	BalloonedMemory       int32           `json:"balloonedMemory"`
-	IpAddress             string          `json:"ipAddress"`
-	StorageUsed           int64           `json:"storageUsed"`
-	NumaNodeAffinity      []string        `json:"numaNodeAffinity"`
-	Devices               []model.Device  `json:"devices"`
-	Networks              []model.Ref     `json:"networks"`
-	Disks                 []model.Disk    `json:"disks"`
-	Concerns              []model.Concern `json:"concerns"`
+	VM1
+	PolicyVersion         int            `json:"policyVersion"`
+	UUID                  string         `json:"uuid"`
+	Firmware              string         `json:"firmware"`
+	PowerState            string         `json:"powerState"`
+	ConnectionState       string         `json:"connectionState"`
+	Snapshot              model.Ref      `json:"snapshot"`
+	ChangeTrackingEnabled bool           `json:"changeTrackingEnabled"`
+	CpuAffinity           []int32        `json:"cpuAffinity"`
+	CpuHotAddEnabled      bool           `json:"cpuHotAddEnabled"`
+	CpuHotRemoveEnabled   bool           `json:"cpuHotRemoveEnabled"`
+	MemoryHotAddEnabled   bool           `json:"memoryHotAddEnabled"`
+	FaultToleranceEnabled bool           `json:"faultToleranceEnabled"`
+	CpuCount              int32          `json:"cpuCount"`
+	CoresPerSocket        int32          `json:"coresPerSocket"`
+	MemoryMB              int32          `json:"memoryMB"`
+	GuestName             string         `json:"guestName"`
+	BalloonedMemory       int32          `json:"balloonedMemory"`
+	IpAddress             string         `json:"ipAddress"`
+	StorageUsed           int64          `json:"storageUsed"`
+	NumaNodeAffinity      []string       `json:"numaNodeAffinity"`
+	Devices               []model.Device `json:"devices"`
 }
 
 //
 // Build the resource using the model.
 func (r *VM) With(m *model.VM) {
-	r.Resource.With(&m.Base)
-	r.Host = m.Host
-	r.Folder = m.Folder
+	r.VM1.With(m)
 	r.PolicyVersion = m.PolicyVersion
-	r.RevisionValidated = m.RevisionValidated
 	r.UUID = m.UUID
 	r.Firmware = m.Firmware
 	r.PowerState = m.PowerState
 	r.ConnectionState = m.ConnectionState
 	r.Snapshot = m.Snapshot
-	r.IsTemplate = m.IsTemplate
 	r.ChangeTrackingEnabled = m.ChangeTrackingEnabled
 	r.CpuAffinity = m.CpuAffinity
 	r.CpuHotAddEnabled = m.CpuHotAddEnabled
@@ -239,9 +266,6 @@ func (r *VM) With(m *model.VM) {
 	r.FaultToleranceEnabled = m.FaultToleranceEnabled
 	r.Devices = m.Devices
 	r.NumaNodeAffinity = m.NumaNodeAffinity
-	r.Networks = m.Networks
-	r.Disks = m.Disks
-	r.Concerns = m.Concerns
 }
 
 //
@@ -257,9 +281,9 @@ func (r *VM) Link(p *api.Provider) {
 
 //
 // As content.
-func (r *VM) Content(detail bool) interface{} {
-	if !detail {
-		return r.Resource
+func (r *VM) Content(detail int) interface{} {
+	if detail < 2 {
+		return r.VM1.Content(detail)
 	}
 
 	return r

@@ -28,7 +28,7 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 	if r.plan.Referenced.Map.Network == nil {
 		return
 	}
-	vm := &model.VM{}
+	vm := &model.Workload{}
 	err = r.inventory.Find(vm, vmRef)
 	if err != nil {
 		err = liberr.Wrap(
@@ -54,7 +54,7 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 	if r.plan.Referenced.Map.Storage == nil {
 		return
 	}
-	vm := &model.VM{}
+	vm := &model.Workload{}
 	err = r.inventory.Find(vm, vmRef)
 	if err != nil {
 		err = liberr.Wrap(

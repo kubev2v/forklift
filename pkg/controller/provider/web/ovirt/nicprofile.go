@@ -100,7 +100,7 @@ func (h NICProfileHandler) Get(ctx *gin.Context) {
 	r := &NICProfile{}
 	r.With(m)
 	r.Link(h.Provider)
-	content := r.Content(true)
+	content := r.Content(model.MaxDetail)
 
 	ctx.JSON(http.StatusOK, content)
 }
@@ -167,8 +167,8 @@ func (r *NICProfile) Link(p *api.Provider) {
 
 //
 // As content.
-func (r *NICProfile) Content(detail bool) interface{} {
-	if !detail {
+func (r *NICProfile) Content(detail int) interface{} {
+	if detail == 0 {
 		return r.Resource
 	}
 

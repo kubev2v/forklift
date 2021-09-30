@@ -69,7 +69,7 @@ func (h ProviderHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusNotFound)
 		return
 	}
-	h.Detail = true
+	h.Detail = model.MaxDetail
 	m := &model.Provider{}
 	m.With(h.Provider)
 	r := Provider{}
@@ -84,7 +84,7 @@ func (h ProviderHandler) Get(ctx *gin.Context) {
 		return
 	}
 	r.Link()
-	content := r.Content(true)
+	content := r.Content(h.Detail)
 
 	ctx.JSON(http.StatusOK, content)
 }
@@ -131,7 +131,7 @@ func (h *ProviderHandler) ListContent(ctx *gin.Context) (content []interface{}, 
 // Add derived fields.
 func (h ProviderHandler) AddDerived(r *Provider) (err error) {
 	var n int64
-	if !h.Detail {
+	if h.Detail == 0 {
 		return
 	}
 	db := h.Collector.DB()
@@ -219,8 +219,8 @@ func (r *Provider) Link() {
 
 //
 // As content.
-func (r *Provider) Content(detail bool) interface{} {
-	if !detail {
+func (r *Provider) Content(detail int) interface{} {
+	if detail == 0 {
 		return r.Resource
 	}
 

@@ -92,7 +92,7 @@ func (h TreeHandler) Tree(ctx *gin.Context) {
 			NodeBuilder: &NodeBuilder{
 				handler:     h.Handler,
 				pathBuilder: pb,
-				detail: map[string]bool{
+				detail: map[string]int{
 					model.VmKind: h.Detail,
 				},
 			},
@@ -127,7 +127,7 @@ func (h TreeHandler) Tree(ctx *gin.Context) {
 // Tree (branch) navigator.
 type BranchNavigator struct {
 	db     libmodel.DB
-	detail bool
+	detail int
 }
 
 //
@@ -192,8 +192,8 @@ func (n *BranchNavigator) listHost(p *model.Cluster) (list []model.Host, err err
 
 func (n *BranchNavigator) listVM(p *model.Cluster) (list []model.VM, err error) {
 	detail := 0
-	if n.detail {
-		detail = 1
+	if n.detail > 0 {
+		detail = model.MaxDetail
 	}
 	list = []model.VM{}
 	err = n.db.List(
@@ -211,7 +211,7 @@ type NodeBuilder struct {
 	// Handler.
 	handler Handler
 	// Resource details by kind.
-	detail map[string]bool
+	detail map[string]int
 	// Path builder.
 	pathBuilder PathBuilder
 }
@@ -296,10 +296,10 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 
 //
 // Build with detail.
-func (r *NodeBuilder) withDetail(kind string) bool {
+func (r *NodeBuilder) withDetail(kind string) int {
 	if b, found := r.detail[kind]; found {
 		return b
 	}
 
-	return false
+	return 0
 }

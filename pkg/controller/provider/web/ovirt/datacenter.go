@@ -106,7 +106,7 @@ func (h DataCenterHandler) Get(ctx *gin.Context) {
 	r.With(m)
 	r.Link(h.Provider)
 	r.Path = pb.Path(m)
-	content := r.Content(true)
+	content := r.Content(model.MaxDetail)
 
 	ctx.JSON(http.StatusOK, content)
 }
@@ -163,8 +163,8 @@ func (r *DataCenter) Link(p *api.Provider) {
 
 //
 // As content.
-func (r *DataCenter) Content(detail bool) interface{} {
-	if !detail {
+func (r *DataCenter) Content(detail int) interface{} {
+	if detail == 0 {
 		return r.Resource
 	}
 
