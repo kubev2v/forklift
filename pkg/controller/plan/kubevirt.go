@@ -28,8 +28,10 @@ import (
 
 // Annotations
 const (
-	// transfer network annotation (value=network-attachment-definition name)
-	annDefaultNetwork = "v1.multus-cni.io/default-network"
+	// Transfer network annotation (value=network-attachment-definition name)
+	AnnDefaultNetwork = "v1.multus-cni.io/default-network"
+	// Causes the importer pod to be retained after import.
+	AnnRetainAfterCompletion = "cdi.kubevirt.io/storage.pod.retainAfterCompletion"
 )
 
 // Labels
@@ -160,6 +162,35 @@ func (r *KubeVirt) GetImporterPod(dv DataVolume) (pod *core.Pod, err error) {
 	if err != nil {
 		err = liberr.Wrap(err)
 	}
+	return
+}
+
+//
+// Delete the importer pod for a DataVolume.
+func (r *KubeVirt) DeleteImporterPod(dv DataVolume) (err error) {
+	var pod *core.Pod
+	pod, err = r.GetImporterPod(dv)
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			err = nil
+			return
+		}
+		err = liberr.Wrap(err)
+		return
+	}
+	err = r.Destination.Client.Delete(context.TODO(), pod)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	r.Log.Info(
+		"Deleted importer pod.",
+		"pod",
+		path.Join(
+			pod.Namespace,
+			pod.Name),
+		"dv",
+		dv.Name)
 	return
 }
 
@@ -587,8 +618,9 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 
 	for i := range dataVolumes {
 		annotations := make(map[string]string)
+		annotations[AnnRetainAfterCompletion] = "true"
 		if r.Plan.Spec.TransferNetwork != nil {
-			annotations[annDefaultNetwork] = path.Join(
+			annotations[AnnDefaultNetwork] = path.Join(
 				r.Plan.Spec.TransferNetwork.Namespace, r.Plan.Spec.TransferNetwork.Name)
 		}
 		dv := cdi.DataVolume{
