@@ -114,7 +114,7 @@ func (h NetworkHandler) Get(ctx *gin.Context) {
 	r.With(m)
 	r.Link(h.Provider)
 	r.Path = pb.Path(m)
-	content := r.Content(true)
+	content := r.Content(model.MaxDetail)
 
 	ctx.JSON(http.StatusOK, content)
 }
@@ -214,8 +214,8 @@ func (r *Network) Link(p *api.Provider) {
 
 //
 // As content.
-func (r *Network) Content(detail bool) interface{} {
-	if !detail {
+func (r *Network) Content(detail int) interface{} {
+	if detail == 0 {
 		return r.Resource
 	}
 

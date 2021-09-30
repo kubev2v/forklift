@@ -5,6 +5,7 @@ import (
 	libcontainer "github.com/konveyor/controller/pkg/inventory/container"
 	libweb "github.com/konveyor/controller/pkg/inventory/web"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/base"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"net/http"
@@ -62,8 +63,8 @@ type Handler struct {
 	Provider *api.Provider
 	// Collector responsible for the provider.
 	Collector libcontainer.Collector
-	// Resources include details.
-	Detail bool
+	// Resources detail level.
+	Detail int
 }
 
 //
@@ -127,19 +128,26 @@ func (h *Handler) setProvider(ctx *gin.Context) (status int) {
 
 //
 // Set detail
-func (h *Handler) setDetail(ctx *gin.Context) int {
+// "all" = MaxDetail.
+func (h *Handler) setDetail(ctx *gin.Context) (status int) {
+	status = http.StatusOK
 	q := ctx.Request.URL.Query()
 	pDetail := q.Get(DetailParam)
-	if len(pDetail) > 0 {
-		b, err := strconv.ParseBool(pDetail)
-		if err == nil {
-			h.Detail = b
-		} else {
-			return http.StatusBadRequest
-		}
+	if len(pDetail) == 0 {
+		return
+	}
+	if strings.ToLower(pDetail) == "all" {
+		h.Detail = base.MaxDetail
+		return
+	}
+	n, err := strconv.Atoi(pDetail)
+	if err == nil {
+		h.Detail = n
+	} else {
+		status = http.StatusBadRequest
 	}
 
-	return http.StatusOK
+	return
 }
 
 //

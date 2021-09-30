@@ -114,7 +114,7 @@ func (h DatastoreHandler) Get(ctx *gin.Context) {
 	r.With(m)
 	r.Link(h.Provider)
 	r.Path = pb.Path(m)
-	content := r.Content(true)
+	content := r.Content(model.MaxDetail)
 
 	ctx.JSON(http.StatusOK, content)
 }
@@ -209,8 +209,8 @@ func (r *Datastore) Link(p *api.Provider) {
 
 //
 // As content.
-func (r *Datastore) Content(detail bool) interface{} {
-	if !detail {
+func (r *Datastore) Content(detail int) interface{} {
+	if detail == 0 {
 		return r.Resource
 	}
 

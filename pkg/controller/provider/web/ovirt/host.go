@@ -90,7 +90,7 @@ func (h HostHandler) Get(ctx *gin.Context) {
 		ctx.Status(status)
 		return
 	}
-	h.Detail = true
+	h.Detail = model.MaxDetail
 	m := &model.Host{
 		Base: model.Base{
 			ID: ctx.Param(HostParam),
@@ -115,7 +115,7 @@ func (h HostHandler) Get(ctx *gin.Context) {
 	r.With(m)
 	r.Link(h.Provider)
 	r.Path = pb.Path(m)
-	content := r.Content(true)
+	content := r.Content(h.Detail)
 
 	ctx.JSON(http.StatusOK, content)
 }
@@ -223,8 +223,8 @@ func (r *Host) Link(p *api.Provider) {
 
 //
 // As content.
-func (r *Host) Content(detail bool) interface{} {
-	if !detail {
+func (r *Host) Content(detail int) interface{} {
+	if detail == 0 {
 		return r.Resource
 	}
 

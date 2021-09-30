@@ -43,9 +43,9 @@ func (h Handler) Predicate(ctx *gin.Context) (p libmodel.Predicate) {
 //
 // Build list options.
 func (h Handler) ListOptions(ctx *gin.Context) libmodel.ListOptions {
-	detail := 0
-	if h.Detail {
-		detail = 1
+	detail := h.Detail
+	if detail > 0 {
+		detail = model.MaxDetail
 	}
 	return libmodel.ListOptions{
 		Predicate: h.Predicate(ctx),

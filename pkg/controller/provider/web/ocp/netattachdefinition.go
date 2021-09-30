@@ -100,7 +100,7 @@ func (h NadHandler) Get(ctx *gin.Context) {
 	r := &NetworkAttachmentDefinition{}
 	r.With(m)
 	r.Link(h.Provider)
-	content := r.Content(true)
+	content := r.Content(model.MaxDetail)
 
 	ctx.JSON(http.StatusOK, content)
 }
@@ -157,8 +157,8 @@ func (r *NetworkAttachmentDefinition) Link(p *api.Provider) {
 
 //
 // As content.
-func (r *NetworkAttachmentDefinition) Content(detail bool) interface{} {
-	if !detail {
+func (r *NetworkAttachmentDefinition) Content(detail int) interface{} {
+	if detail == 0 {
 		return r.Resource
 	}
 
