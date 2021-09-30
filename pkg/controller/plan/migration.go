@@ -353,7 +353,12 @@ func (r *Migration) Cancel() (err error) {
 //
 // Delete left over migration resources associated with a VM.
 func (r *Migration) CleanUp(vm *plan.VMStatus) (err error) {
-	if !vm.HasCondition(Succeeded) {
+	if vm.HasCondition(Succeeded) {
+		err = r.deleteImporterPods(vm)
+		if err != nil {
+			return
+		}
+	} else {
 		err = r.kubevirt.DeleteVM(vm)
 		if err != nil {
 			return
@@ -372,6 +377,26 @@ func (r *Migration) CleanUp(vm *plan.VMStatus) (err error) {
 		return
 	}
 
+	return
+}
+
+func (r *Migration) deleteImporterPods(vm *plan.VMStatus) (err error) {
+	if r.vmMap == nil {
+		r.vmMap, err = r.kubevirt.VirtualMachineMap()
+		if err != nil {
+			return
+		}
+	}
+	var vmCr VirtualMachine
+	found := false
+	if vmCr, found = r.vmMap[vm.ID]; found {
+		for _, dv := range vmCr.DataVolumes {
+			err = r.kubevirt.DeleteImporterPod(dv)
+			if err != nil {
+				return
+			}
+		}
+	}
 	return
 }
 
@@ -1078,15 +1103,15 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 		}
 	}
 
-	var imp VirtualMachine
+	var vmCr VirtualMachine
 	found := false
-	if imp, found = r.vmMap[vm.ID]; !found {
+	if vmCr, found = r.vmMap[vm.ID]; !found {
 		msg := "VirtualMachine CR not found."
 		vm.AddError(msg)
 		return
 	}
 
-	for _, dv := range imp.DataVolumes {
+	for _, dv := range vmCr.DataVolumes {
 		var task *plan.Task
 		name := r.builder.ResolveDataVolumeIdentifier(dv.DataVolume)
 		found = false
