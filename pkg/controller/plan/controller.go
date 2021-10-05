@@ -213,14 +213,22 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 	// Begin staging conditions.
 	plan.Status.BeginStagingConditions()
 
-	// Validations.
-	err = r.validate(plan)
-	if err != nil {
-		return
+	if plan.Spec.Archived {
+		// Archive the plan.
+		err = r.archive(plan)
+		if err != nil {
+			return
+		}
+	} else {
+		// Validations.
+		err = r.validate(plan)
+		if err != nil {
+			return
+		}
 	}
 
 	// Ready condition.
-	if !plan.Status.HasBlockerCondition() {
+	if !plan.Status.HasBlockerCondition() && !plan.Status.HasCondition(Archived) {
 		plan.Status.SetCondition(libcnd.Condition{
 			Type:     libcnd.Ready,
 			Status:   True,
@@ -255,6 +263,31 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 }
 
 //
+// Archive the plan.
+func (r *Reconciler) archive(plan *api.Plan) (err error) {
+	ctx, err := plancontext.New(r, plan, r.Log)
+	if err != nil {
+		return
+	}
+
+	runner := Migration{Context: ctx}
+	runner.Archive()
+
+	plan.Status.SetCondition(
+		libcnd.Condition{
+			Type:     Archived,
+			Status:   True,
+			Category: Advisory,
+			Reason:   UserRequested,
+			Message:  "The migration plan has been archived.",
+		})
+
+	r.Log.Info("Plan archived.")
+
+	return
+}
+
+//
 // Execute the plan.
 //   1. Find active (current) migration.
 //   2. If found, update the context and match the snapshot.
@@ -263,7 +296,7 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 //   5. If a new migration is being started, update the context and snapshot.
 //   6. Run the migration.
 func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
-	if plan.Status.HasBlockerCondition() {
+	if plan.Status.HasBlockerCondition() || plan.Status.HasCondition(Archived) {
 		return
 	}
 	defer func() {
@@ -325,25 +358,6 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	runner := Migration{Context: ctx}
 	err = runner.Cancel()
 	if err != nil {
-		return
-	}
-
-	//
-	// Archive.
-	if plan.Spec.Archived && !plan.Status.HasCondition(Executing) {
-		err = runner.Archive()
-		if err != nil {
-			return
-		}
-		plan.Status.SetCondition(
-			libcnd.Condition{
-				Type:     Archived,
-				Status:   True,
-				Category: Advisory,
-				Reason:   UserRequested,
-				Message:  "The migration plan has been archived.",
-			})
-		reQ = NoReQ
 		return
 	}
 

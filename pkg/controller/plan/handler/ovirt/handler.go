@@ -91,7 +91,7 @@ func (r *Handler) changed(models ...*ovirt.VM) {
 	for i := range list.Items {
 		plan := &list.Items[i]
 		ref := plan.Spec.Provider.Source
-		if !r.MatchProvider(ref) {
+		if plan.Spec.Archived || !r.MatchProvider(ref) {
 			continue
 		}
 		referenced := false

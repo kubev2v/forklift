@@ -192,9 +192,11 @@ func (r *Migration) init() (err error) {
 		return
 	}
 	r.provider, err = adapter.Client(r.Context)
+	if err != nil {
+		return
+	}
 	r.builder, err = adapter.Builder(r.Context)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	r.kubevirt = KubeVirt{
@@ -299,17 +301,21 @@ func (r *Migration) begin() (err error) {
 
 //
 // Archive the plan.
-// Remove any retained migration resources.
-func (r *Migration) Archive() (err error) {
-	err = r.init()
+// Best effort to remove any retained migration resources.
+func (r *Migration) Archive() {
+	err := r.init()
 	if err != nil {
-		err = liberr.Wrap(err)
+		r.Log.Error(err, "Archive initialization failed.")
 		return
 	}
 
 	for _, vm := range r.Plan.Status.Migration.VMs {
 		err = r.CleanUp(vm)
 		if err != nil {
+			r.Log.Error(err,
+				"Couldn't clean up VM while archiving plan.",
+				"vm",
+				vm.String())
 			return
 		}
 	}
