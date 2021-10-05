@@ -360,7 +360,6 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	if err != nil {
 		return
 	}
-
 	//
 	// Find pending migrations.
 	pending := []*api.Migration{}
