@@ -18,6 +18,7 @@ package migration
 
 import (
 	"context"
+
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	"github.com/konveyor/controller/pkg/logging"
 	libref "github.com/konveyor/controller/pkg/ref"
@@ -88,6 +89,9 @@ func Add(mgr manager.Manager) error {
 		log.Trace(err)
 		return err
 	}
+
+	// Gather migration metrics every 10 seconds
+	recordMetrics(mgr.GetClient())
 
 	return nil
 }
