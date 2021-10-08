@@ -215,10 +215,7 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 
 	if plan.Spec.Archived {
 		// Archive the plan.
-		err = r.archive(plan)
-		if err != nil {
-			return
-		}
+		r.archive(plan)
 	} else {
 		// Validations.
 		err = r.validate(plan)
@@ -264,9 +261,12 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 
 //
 // Archive the plan.
-func (r *Reconciler) archive(plan *api.Plan) (err error) {
+// Makes a best-effort attempt to clean up lingering
+// plan resources.
+func (r *Reconciler) archive(plan *api.Plan) {
 	ctx, err := plancontext.New(r, plan, r.Log)
 	if err != nil {
+		r.Log.Error(err, "Couldn't construct plan context while archiving plan.")
 		return
 	}
 
@@ -283,8 +283,6 @@ func (r *Reconciler) archive(plan *api.Plan) (err error) {
 		})
 
 	r.Log.Info("Plan archived.")
-
-	return
 }
 
 //
