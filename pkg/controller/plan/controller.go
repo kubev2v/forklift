@@ -264,15 +264,6 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 // Makes a best-effort attempt to clean up lingering
 // plan resources.
 func (r *Reconciler) archive(plan *api.Plan) {
-	ctx, err := plancontext.New(r, plan, r.Log)
-	if err != nil {
-		r.Log.Error(err, "Couldn't construct plan context while archiving plan.")
-		return
-	}
-
-	runner := Migration{Context: ctx}
-	runner.Archive()
-
 	plan.Status.SetCondition(
 		libcnd.Condition{
 			Type:     Archived,
@@ -281,6 +272,15 @@ func (r *Reconciler) archive(plan *api.Plan) {
 			Reason:   UserRequested,
 			Message:  "The migration plan has been archived.",
 		})
+
+	ctx, err := plancontext.New(r, plan, r.Log)
+	if err != nil {
+		r.Log.Error(err, "Couldn't construct plan context while archiving plan.")
+		return
+	}
+
+	runner := Migration{Context: ctx}
+	runner.Archive()
 
 	r.Log.Info("Plan archived.")
 }
