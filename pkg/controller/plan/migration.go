@@ -1192,8 +1192,7 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 			step.Progress.Completed = step.Progress.Total
 		case core.PodFailed:
 			step.MarkCompleted()
-			msg, _ := terminationMessage(pod)
-			step.AddError(msg)
+			step.AddError("Guest conversion failed. See pod logs for details.")
 		}
 	} else {
 		step.MarkCompleted()
