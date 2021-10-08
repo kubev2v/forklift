@@ -594,6 +594,10 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				if s, cast := p.Val.(string); cast {
 					v.model.GuestName = s
 				}
+			case fGuestID:
+				if s, cast := p.Val.(string); cast {
+					v.model.GuestID = s
+				}
 			case fBalloonedMemory:
 				if n, cast := p.Val.(int32); cast {
 					v.model.BalloonedMemory = n

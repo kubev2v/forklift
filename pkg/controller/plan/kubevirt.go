@@ -4,13 +4,21 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
+	template "github.com/openshift/api/template/v1"
+	"github.com/openshift/library-go/pkg/template/generator"
+	"github.com/openshift/library-go/pkg/template/templateprocessing"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	cnv "kubevirt.io/client-go/api/v1"
 	libvirtxml "libvirt.org/libvirt-go-xml"
+	"math/rand"
 	"path"
+	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
@@ -663,8 +671,81 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 		return
 	}
 
+	var ok bool
+	object, ok = r.vmTemplate(vm)
+	if !ok {
+		r.Log.Info("Building VirtualMachine without template.",
+			"vm",
+			vm.String())
+		object = r.emptyVm(vm)
+	}
 	running := false
-	object = &cnv.VirtualMachine{
+	object.Spec.Running = &running
+
+	err = r.Builder.VirtualMachine(vm.Ref, &object.Spec, list.Items)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+//
+// Attempt to find a suitable template and extract a VirtualMachine definition from it.
+func (r *KubeVirt) vmTemplate(vm *plan.VMStatus) (virtualMachine *cnv.VirtualMachine, ok bool) {
+	tmpl, err := r.findTemplate(vm)
+	if err != nil {
+		r.Log.Error(err,
+			"Could not find Template for destination VM.",
+			"vm",
+			vm.String())
+		return
+	}
+
+	err = r.processTemplate(vm, tmpl)
+	if err != nil {
+		r.Log.Error(err,
+			"Could not process Template for destination VM.",
+			"vm",
+			vm.String(),
+			"template",
+			tmpl.String())
+		return
+	}
+
+	virtualMachine, err = r.decodeTemplate(tmpl)
+	if err != nil {
+		r.Log.Error(err,
+			"Could not decode Template for destination VM.",
+			"vm",
+			vm.String(),
+			"template",
+			tmpl.String())
+		return
+	}
+
+	vmLabels := r.vmLabels(vm.Ref)
+	if virtualMachine.Labels != nil {
+		for k, v := range vmLabels {
+			virtualMachine.Labels[k] = v
+		}
+	} else {
+		virtualMachine.Labels = vmLabels
+	}
+	virtualMachine.Name = vm.Name
+	virtualMachine.Namespace = r.Plan.Spec.TargetNamespace
+	virtualMachine.Spec.Template.Spec.Volumes = []cnv.Volume{}
+	virtualMachine.Spec.Template.Spec.Networks = []cnv.Network{}
+	virtualMachine.Spec.DataVolumeTemplates = []cnv.DataVolumeTemplateSpec{}
+
+	ok = true
+	return
+}
+
+//
+// Create empty VM definition.
+func (r *KubeVirt) emptyVm(vm *plan.VMStatus) (virtualMachine *cnv.VirtualMachine) {
+	virtualMachine = &cnv.VirtualMachine{
 		TypeMeta: meta.TypeMeta{
 			APIVersion: "v1",
 			Kind:       "VirtualMachine",
@@ -674,15 +755,104 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 			Labels:    r.vmLabels(vm.Ref),
 			Name:      vm.Name,
 		},
-		Spec: cnv.VirtualMachineSpec{
-			Running: &running,
-		},
+		Spec: cnv.VirtualMachineSpec{},
 	}
-	err = r.Builder.VirtualMachine(vm.Ref, &object.Spec, list.Items)
+	return
+}
+
+//
+// Decode the VirtualMachine object embedded in the template.
+func (r *KubeVirt) decodeTemplate(tmpl *template.Template) (vm *cnv.VirtualMachine, err error) {
+	if len(tmpl.Objects) == 0 {
+		err = liberr.New("Could not find VirtualMachine in Template objects.")
+		return
+	}
+
+	// Convert the RawExtension to a unstructured object
+	var obj runtime.Object
+	var scope conversion.Scope
+	err = runtime.Convert_runtime_RawExtension_To_runtime_Object(&tmpl.Objects[0], &obj, scope)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	unstructured := obj.(runtime.Unstructured)
+
+	// Convert the unstructured object into a VirtualMachine.
+	vm = &cnv.VirtualMachine{}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructured.UnstructuredContent(), vm)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	return
+}
+
+//
+// Process the template parameters.
+func (r *KubeVirt) processTemplate(vm *plan.VMStatus, tmpl *template.Template) (err error) {
+	source := rand.NewSource(time.Now().UTC().UnixNano())
+	seed := rand.New(source)
+	expr := generator.NewExpressionValueGenerator(seed)
+	generators := map[string]generator.Generator{
+		"expression": expr,
+	}
+
+	for i, param := range tmpl.Parameters {
+		if param.Name == "NAME" {
+			tmpl.Parameters[i].Value = vm.Name
+		} else {
+			tmpl.Parameters[i].Value = "other"
+		}
+	}
+
+	processor := templateprocessing.NewProcessor(generators)
+	errs := processor.Process(tmpl)
+	if len(errs) > 0 {
+		var msg []string
+		for _, e := range errs {
+			msg = append(msg, e.Error())
+		}
+		err = liberr.New(fmt.Sprintf("Failed to process template: %s", strings.Join(msg, ", ")))
+	}
+
+	return
+}
+
+//
+// Attempt to find an OpenShift template that matches the VM's guest OS.
+func (r *KubeVirt) findTemplate(vm *plan.VMStatus) (tmpl *template.Template, err error) {
+	var templateLabels map[string]string
+	templateLabels, err = r.Builder.TemplateLabels(vm.Ref)
 	if err != nil {
 		return
 	}
 
+	templateList := &template.TemplateList{}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		templateList,
+		&client.ListOptions{
+			LabelSelector: labels.SelectorFromSet(templateLabels),
+			Namespace:     "openshift",
+		})
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	if len(templateList.Items) == 0 {
+		err = liberr.New("No matching templates found")
+		return
+	}
+
+	if len(templateList.Items) > 1 {
+		sort.Slice(templateList.Items, func(i, j int) bool {
+			return templateList.Items[j].CreationTimestamp.Before(&templateList.Items[i].CreationTimestamp)
+		})
+	}
+	tmpl = &templateList.Items[0]
 	return
 }
 

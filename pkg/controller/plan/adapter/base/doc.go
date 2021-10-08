@@ -38,6 +38,8 @@ type Builder interface {
 	DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap) (dvs []cdi.DataVolumeSpec, err error)
 	// Build tasks.
 	Tasks(vmRef ref.Ref) ([]*plan.Task, error)
+	// Build template labels.
+	TemplateLabels(vmRef ref.Ref) (labels map[string]string, err error)
 	// Return a stable identifier for a DataVolume.
 	ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string
 }

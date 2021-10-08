@@ -205,6 +205,12 @@ type VM struct {
 			Full string `json:"full_version"`
 		} `json:"version"`
 	} `json:"guest_operating_system"`
+	OS struct {
+		Type    string `json:"type"`
+		Version struct {
+			Full string `json:"full_version"`
+		} `json:"os"`
+	}
 	CPU struct {
 		Tune struct {
 			Pin struct {
@@ -337,6 +343,9 @@ func (r *VM) ApplyTo(m *model.VM) {
 	m.Cluster = r.Cluster.ID
 	m.Host = r.Host.ID
 	m.GuestName = r.Guest.Distribution + " " + r.Guest.Version.Full
+	m.Guest.Distribution = r.Guest.Distribution
+	m.Guest.FullVersion = r.Guest.Version.Full
+	m.OSType = r.OS.Type
 	m.CpuSockets = r.int16(r.CPU.Topology.Sockets)
 	m.CpuCores = r.int16(r.CPU.Topology.Cores)
 	m.CpuThreads = r.int16(r.CPU.Topology.Threads)

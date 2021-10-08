@@ -4,11 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"k8s.io/apimachinery/pkg/api/resource"
-	"path"
-	"regexp"
-	"sort"
-
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libitr "github.com/konveyor/controller/pkg/itinerary"
@@ -22,10 +17,15 @@ import (
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	cnv "kubevirt.io/client-go/api/v1"
 	cdi "kubevirt.io/containerized-data-importer/pkg/apis/core/v1beta1"
 	liburl "net/url"
+	"path"
+	"regexp"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sort"
+	"strings"
 )
 
 // BIOS types
@@ -48,6 +48,66 @@ const (
 	Pod    = "pod"
 	Multus = "multus"
 )
+
+// Template labels
+const (
+	TemplateOSLabel       = "os.template.kubevirt.io/%s"
+	TemplateWorkloadLabel = "workload.template.kubevirt.io/server"
+	TemplateFlavorLabel   = "flavor.template.kubevirt.io/medium"
+)
+
+// Operating Systems
+const (
+	DefaultWindows = "win10"
+	DefaultLinux   = "rhel8.1"
+	Unknown        = "unknown"
+)
+
+// Map of vmware guest ids to osinfo ids.
+var osMap = map[string]string{
+	"centos64Guest":         "centos5.11",
+	"centos6_64Guest":       "centos6.10",
+	"centos6Guest":          "centos6.10",
+	"centos7_64Guest":       "centos7.0",
+	"centos7Guest":          "centos7.0",
+	"centos8_64Guest":       "centos8",
+	"centos8Guest":          "centos8",
+	"debian4_64Guest":       "debian4",
+	"debian4Guest":          "debian4",
+	"debian5_64Guest":       "debian5",
+	"debian5Guest":          "debian5",
+	"debian6_64Guest":       "debian6",
+	"debian6Guest":          "debian6",
+	"debian7_64Guest":       "debian7",
+	"debian7Guest":          "debian7",
+	"debian8_64Guest":       "debian8",
+	"debian8Guest":          "debian8",
+	"debian9_64Guest":       "debian9",
+	"debian9Guest":          "debian9",
+	"debian10_64Guest":      "debian10",
+	"debian10Guest":         "debian10",
+	"fedora64Guest":         "fedora31",
+	"fedoraGuest":           "fedora31",
+	"genericLinuxGuest":     "linux",
+	"rhel6_64Guest":         "rhel6.10",
+	"rhel6Guest":            "rhel6.10",
+	"rhel7_64Guest":         "rhel7.7",
+	"rhel7Guest":            "rhel7.7",
+	"rhel8_64Guest":         "rhel8.1",
+	"ubuntu64Guest":         "ubuntu18.04",
+	"ubuntuGuest":           "ubuntu18.04",
+	"win2000AdvServGuest":   "win2k",
+	"win2000ProGuest":       "win2k",
+	"win2000ServGuest":      "win2k",
+	"windows7Guest":         "win7",
+	"windows7Server64Guest": "win2k8r2",
+	"windows8_64Guest":      "win8",
+	"windows8Guest":         "win8",
+	"windows8Server64Guest": "win2k12r2",
+	"windows9_64Guest":      "win10",
+	"windows9Guest":         "win10",
+	"windows9Server64Guest": "win2k19",
+}
 
 //
 // Regex which matches the snapshot identifier suffix of a
@@ -410,6 +470,37 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 				},
 			})
 	}
+
+	return
+}
+
+func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err error) {
+	vm := &model.VM{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(
+			err,
+			"VM lookup failed.",
+			"vm",
+			vmRef.String())
+		return
+	}
+
+	var os string
+	if vm.GuestID != "" {
+		os = osMap[vm.GuestID]
+	} else if strings.Contains(vm.GuestName, "linux") || strings.Contains(vm.GuestName, "rhel") {
+		os = DefaultLinux
+	} else if strings.Contains(vm.GuestName, "win") {
+		os = DefaultWindows
+	} else {
+		os = Unknown
+	}
+
+	labels = make(map[string]string)
+	labels[fmt.Sprintf(TemplateOSLabel, os)] = "true"
+	labels[TemplateWorkloadLabel] = "true"
+	labels[TemplateFlavorLabel] = "true"
 
 	return
 }

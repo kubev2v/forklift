@@ -254,6 +254,7 @@ type VM struct {
 	CoresPerSocket        int32     `sql:""`
 	MemoryMB              int32     `sql:""`
 	GuestName             string    `sql:""`
+	GuestID               string    `sql:""`
 	BalloonedMemory       int32     `sql:""`
 	IpAddress             string    `sql:""`
 	NumaNodeAffinity      []string  `sql:""`
