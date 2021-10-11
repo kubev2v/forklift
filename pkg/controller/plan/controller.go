@@ -202,6 +202,7 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 
 	// Don't reconcile if the plan is archived.
 	if plan.Spec.Archived && plan.Status.HasCondition(Archived) {
+		r.Log.Info("Aborting reconcile of archived plan.")
 		return
 	}
 
