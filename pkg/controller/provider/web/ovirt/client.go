@@ -59,6 +59,11 @@ func (r *Resolver) Path(resource interface{}, id string) (path string, err error
 		r.ID = id
 		r.Link(provider)
 		path = r.SelfLink
+	case *Workload:
+		r := Workload{}
+		r.ID = id
+		r.Link(provider)
+		path = r.SelfLink
 	default:
 		err = liberr.Wrap(
 			base.ResourceNotResolvedError{
@@ -253,6 +258,38 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 			}
 			*resource.(*Cluster) = list[0]
 		}
+	case *Workload:
+		id := ref.ID
+		if id != "" {
+			err = r.Get(resource, id)
+			return
+		}
+		name := ref.Name
+		if name != "" {
+			list := []Workload{}
+			err = r.List(
+				&list,
+				base.Param{
+					Key:   DetailParam,
+					Value: "all",
+				},
+				base.Param{
+					Key:   NameParam,
+					Value: name,
+				})
+			if err != nil {
+				break
+			}
+			if len(list) == 0 {
+				err = liberr.Wrap(NotFoundError{Ref: ref})
+				break
+			}
+			if len(list) > 1 {
+				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
+				break
+			}
+			*resource.(*Workload) = list[0]
+		}
 	default:
 		err = liberr.Wrap(
 			ResourceNotResolvedError{
@@ -290,6 +327,14 @@ func (r *Finder) VM(ref *base.Ref) (object interface{}, err error) {
 //   NotFoundErr
 //   RefNotUniqueErr
 func (r *Finder) Workload(ref *base.Ref) (object interface{}, err error) {
+	workload := &Workload{}
+	err = r.ByRef(workload, *ref)
+	if err == nil {
+		ref.ID = workload.ID
+		ref.Name = workload.Name
+		object = workload
+	}
+
 	return
 }
 
