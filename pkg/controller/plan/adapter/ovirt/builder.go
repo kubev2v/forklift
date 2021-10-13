@@ -295,8 +295,8 @@ func (r *Builder) mapFirmware(vm *model.Workload, cluster *model.Cluster, object
 func (r *Builder) mapDisks(vm *model.Workload, dataVolumes []cdi.DataVolume, object *cnv.VirtualMachineSpec) {
 	dvMap := make(map[string]*cdi.DataVolume)
 	for i := range dataVolumes {
-		dv := dataVolumes[i]
-		dvMap[dv.Spec.Source.Imageio.DiskID] = &dv
+		dv := &dataVolumes[i]
+		dvMap[dv.Spec.Source.Imageio.DiskID] = dv
 	}
 
 	for i, da := range vm.DiskAttachments {
