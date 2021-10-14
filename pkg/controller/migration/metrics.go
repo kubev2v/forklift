@@ -20,6 +20,8 @@ var (
 	)
 )
 
+//
+// Calculate Migrations metrics every 10 seconds
 func recordMetrics(client client.Client) {
 	go func() {
 		for {
@@ -56,7 +58,6 @@ func recordMetrics(client client.Client) {
 					canceled++
 					continue
 				}
-				// Migration object is created when the Plan has started, so there should not be any "Idle" migrations
 			}
 
 			migrationGauge.With(
