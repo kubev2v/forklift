@@ -204,6 +204,12 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 		r.Log.V(2).Info("Conditions.", "all", plan.Status.Conditions)
 	}()
 
+	// Don't reconcile if the plan is archived.
+	if plan.Spec.Archived && plan.Status.HasCondition(Archived) {
+		r.Log.Info("Aborting reconcile of archived plan.")
+		return
+	}
+
 	// Postpone as needed.
 	postpone, err := r.postpone()
 	if err != nil {
@@ -223,8 +229,13 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 		return
 	}
 
+	// Archive the plan.
+	if plan.Spec.Archived {
+		r.archive(plan)
+	}
+
 	// Ready condition.
-	if !plan.Status.HasBlockerCondition() {
+	if !plan.Status.HasBlockerCondition() && !plan.Status.HasCondition(Archived) {
 		plan.Status.SetCondition(libcnd.Condition{
 			Type:     libcnd.Ready,
 			Status:   True,
@@ -259,6 +270,30 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 }
 
 //
+// Archive the plan.
+// Makes a best-effort attempt to clean up lingering
+// plan resources.
+func (r *Reconciler) archive(plan *api.Plan) {
+	ctx, err := plancontext.New(r, plan, r.Log)
+	if err != nil {
+		r.Log.Error(err, "Couldn't construct plan context while archiving plan.")
+	} else {
+		runner := Migration{Context: ctx}
+		runner.Archive()
+	}
+	// Regardless of whether or not we can clean up, mark the plan archived.
+	plan.Status.SetCondition(
+		libcnd.Condition{
+			Type:     Archived,
+			Status:   True,
+			Category: Advisory,
+			Reason:   UserRequested,
+			Message:  "The migration plan has been archived.",
+		})
+	r.Log.Info("Plan archived.")
+}
+
+//
 // Execute the plan.
 //   1. Find active (current) migration.
 //   2. If found, update the context and match the snapshot.
@@ -267,7 +302,7 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 //   5. If a new migration is being started, update the context and snapshot.
 //   6. Run the migration.
 func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
-	if plan.Status.HasBlockerCondition() {
+	if plan.Status.HasBlockerCondition() || plan.Status.HasCondition(Archived) {
 		return
 	}
 	defer func() {
@@ -307,7 +342,7 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	if snapshot.HasCondition(Canceled) {
 		r.Log.Info("migration (active) marked as canceled.")
 		for _, vm := range plan.Status.Migration.VMs {
-			if !vm.HasCondition(Succeeded) {
+			if !vm.HasAnyCondition(Succeeded, Failed) {
 				vm.SetCondition(
 					libcnd.Condition{
 						Type:     Canceled,

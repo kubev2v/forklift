@@ -198,9 +198,11 @@ func (r *Migration) init() (err error) {
 		return
 	}
 	r.provider, err = adapter.Client(r.Context)
+	if err != nil {
+		return
+	}
 	r.builder, err = adapter.Builder(r.Context)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
 	r.kubevirt = KubeVirt{
@@ -304,8 +306,31 @@ func (r *Migration) begin() (err error) {
 }
 
 //
+// Archive the plan.
+// Best effort to remove any retained migration resources.
+func (r *Migration) Archive() {
+	err := r.init()
+	if err != nil {
+		r.Log.Error(err, "Archive initialization failed.")
+		return
+	}
+
+	for _, vm := range r.Plan.Status.Migration.VMs {
+		err = r.CleanUp(vm)
+		if err != nil {
+			r.Log.Error(err,
+				"Couldn't clean up VM while archiving plan.",
+				"vm",
+				vm.String())
+			return
+		}
+	}
+	return
+}
+
+//
 // Cancel the migration.
-// Delete resources associated with VMs that have failed or been marked canceled.
+// Delete resources associated with VMs that have been marked canceled.
 func (r *Migration) Cancel() (err error) {
 	err = r.init()
 	if err != nil {
@@ -314,12 +339,8 @@ func (r *Migration) Cancel() (err error) {
 	}
 
 	for _, vm := range r.Plan.Status.Migration.VMs {
-		if vm.HasAnyCondition(Canceled, Failed) {
-			err = r.kubevirt.DeleteVM(vm)
-			if err != nil {
-				return
-			}
-			err = r.kubevirt.DeleteGuestConversionPod(vm)
+		if vm.HasCondition(Canceled) {
+			err = r.CleanUp(vm)
 			if err != nil {
 				return
 			}
@@ -338,6 +359,56 @@ func (r *Migration) Cancel() (err error) {
 		}
 	}
 
+	return
+}
+
+//
+// Delete left over migration resources associated with a VM.
+func (r *Migration) CleanUp(vm *plan.VMStatus) (err error) {
+	if vm.HasCondition(Succeeded) {
+		err = r.deleteImporterPods(vm)
+		if err != nil {
+			return
+		}
+	} else {
+		err = r.kubevirt.DeleteVM(vm)
+		if err != nil {
+			return
+		}
+	}
+	err = r.kubevirt.DeleteGuestConversionPod(vm)
+	if err != nil {
+		return
+	}
+	err = r.kubevirt.DeleteSecret(vm)
+	if err != nil {
+		return
+	}
+	err = r.kubevirt.DeleteConfigMap(vm)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (r *Migration) deleteImporterPods(vm *plan.VMStatus) (err error) {
+	if r.vmMap == nil {
+		r.vmMap, err = r.kubevirt.VirtualMachineMap()
+		if err != nil {
+			return
+		}
+	}
+	var vmCr VirtualMachine
+	found := false
+	if vmCr, found = r.vmMap[vm.ID]; found {
+		for _, dv := range vmCr.DataVolumes {
+			err = r.kubevirt.DeleteImporterPod(dv)
+			if err != nil {
+				return
+			}
+		}
+	}
 	return
 }
 
@@ -461,6 +532,12 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		}
 		vm.MarkStarted()
 		step.MarkStarted()
+		err = r.CleanUp(vm)
+		if err != nil {
+			step.AddError(err.Error())
+			err = nil
+			break
+		}
 		vm.Phase = r.next(vm.Phase)
 	case PreHook, PostHook:
 		runner := HookRunner{Context: r.Context}
@@ -518,11 +595,13 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		waiting, rErr := r.waitingForFirstConsumer(vm)
 		if rErr != nil {
 			step.AddError(rErr.Error())
+			err = nil
 			break
 		}
 		err = r.setRunning(vm, waiting)
 		if err != nil {
 			step.AddError(err.Error())
+			err = nil
 			break
 		}
 		if !waiting {
@@ -539,6 +618,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		err = r.updateCopyProgress(vm, step)
 		if err != nil {
 			step.AddError(err.Error())
+			err = nil
 			break
 		}
 		if step.MarkedCompleted() && !step.HasError() {
@@ -703,6 +783,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		err = r.ensureGuestConversionPod(vm)
 		if err != nil {
 			step.AddError(err.Error())
+			err = nil
 			break
 		}
 		vm.Phase = r.next(vm.Phase)
@@ -927,11 +1008,6 @@ func (r *Migration) end() (completed bool, err error) {
 				Message:  "The plan execution has FAILED.",
 				Durable:  true,
 			})
-		err = r.Cancel()
-		if err != nil {
-			err = liberr.Wrap(err)
-		}
-
 	} else if succeeded > 0 {
 		// if the migration didn't fail and at least one VM succeeded,
 		// then the migration succeeded.
@@ -1046,15 +1122,15 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 		}
 	}
 
-	var imp VirtualMachine
+	var vmCr VirtualMachine
 	found := false
-	if imp, found = r.vmMap[vm.ID]; !found {
+	if vmCr, found = r.vmMap[vm.ID]; !found {
 		msg := "VirtualMachine CR not found."
 		vm.AddError(msg)
 		return
 	}
 
-	for _, dv := range imp.DataVolumes {
+	for _, dv := range vmCr.DataVolumes {
 		var task *plan.Task
 		name := r.builder.ResolveDataVolumeIdentifier(dv.DataVolume)
 		found = false

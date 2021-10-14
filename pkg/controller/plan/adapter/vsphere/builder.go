@@ -65,12 +65,6 @@ type Builder struct {
 }
 
 //
-// vSphere DataVolume imports do not require a configmap.
-func (r *Builder) RequiresConfigMap() bool {
-	return false
-}
-
-//
 // Create DataVolume certificate configmap.
 // No-op for vSphere.
 func (r *Builder) ConfigMap(_ ref.Ref, _ *core.Secret, _ *core.ConfigMap) (err error) {

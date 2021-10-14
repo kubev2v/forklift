@@ -53,12 +53,6 @@ type Builder struct {
 }
 
 //
-// oVirt DataVolume imports require a certificate configmap.
-func (r *Builder) RequiresConfigMap() bool {
-	return true
-}
-
-//
 // Create DataVolume certificate configmap.
 func (r *Builder) ConfigMap(_ ref.Ref, in *core.Secret, object *core.ConfigMap) (err error) {
 	object.BinaryData["ca.pem"] = in.Data["cacert"]
