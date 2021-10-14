@@ -552,7 +552,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		}
 	case CopyingPaused:
 		if r.Migration.Spec.Cutover != nil && !r.Migration.Spec.Cutover.After(time.Now()) {
-			vm.Phase = CreateFinalSnapshot
+			vm.Phase = StorePowerState
 		} else if vm.Warm.NextPrecopyAt != nil && !vm.Warm.NextPrecopyAt.After(time.Now()) {
 			vm.Phase = CreateSnapshot
 		}
