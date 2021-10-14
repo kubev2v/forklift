@@ -18,6 +18,10 @@ package plan
 
 import (
 	"context"
+	"path"
+	"sort"
+	"time"
+
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
@@ -29,7 +33,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/storage/names"
-	"path"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -37,8 +40,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"sort"
-	"time"
 )
 
 const (
@@ -157,6 +158,9 @@ func Add(mgr manager.Manager) error {
 		log.Trace(err)
 		return err
 	}
+
+	// Gather migration Plan metrics
+	recordMetrics(mgr.GetClient())
 
 	return nil
 }

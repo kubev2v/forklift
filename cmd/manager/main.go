@@ -17,6 +17,10 @@ limitations under the License.
 package main
 
 import (
+	"net/http"
+	"os"
+	"time"
+
 	"github.com/go-logr/logr"
 	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	"github.com/konveyor/forklift-controller/pkg/apis"
@@ -24,15 +28,14 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	"github.com/konveyor/forklift-controller/pkg/webhook"
 	"github.com/pkg/profile"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	cnv "kubevirt.io/client-go/api/v1"
 	cdi "kubevirt.io/containerized-data-importer/pkg/apis/core/v1beta1"
-	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
-	"time"
 )
 
 //
@@ -58,6 +61,11 @@ func main() {
 	if p := profiler(); p != nil {
 		defer p.Stop()
 	}
+
+	// Start prometheus metrics HTTP handler
+	log.Info("setting up prometheus endpoint :2112/metrics")
+	http.Handle("/metrics", promhttp.Handler())
+	go http.ListenAndServe(":2112", nil)
 
 	// Get a config to talk to the apiserver
 	log.Info("setting up client for manager")
