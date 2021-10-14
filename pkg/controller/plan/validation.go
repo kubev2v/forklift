@@ -48,6 +48,7 @@ const (
 	Pending             = "Pending"
 	Running             = "Running"
 	Blocked             = "Blocked"
+	Archived            = "Archived"
 )
 
 //
@@ -405,14 +406,13 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			ref.Name)
 		_, pErr = inventory.VM(&refapi.Ref{Name: id})
 		if pErr == nil {
-			if vm, found := plan.Status.Migration.FindVM(*ref); found {
-				if vm.Completed != nil && vm.Error == nil {
-					continue // migrated.
-				}
+			if _, found := plan.Status.Migration.FindVM(*ref); !found {
+				// This VM is preexisting or is being managed by a
+				// different migration plan.
+				alreadyExists.Items = append(
+					alreadyExists.Items,
+					ref.String())
 			}
-			alreadyExists.Items = append(
-				alreadyExists.Items,
-				ref.String())
 		} else {
 			if !errors.As(pErr, &web.NotFoundError{}) {
 				return liberr.Wrap(pErr)

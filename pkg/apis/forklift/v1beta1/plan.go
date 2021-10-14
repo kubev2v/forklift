@@ -42,6 +42,8 @@ type PlanSpec struct {
 	Warm bool `json:"warm,omitempty"`
 	// The network attachment definition that should be used for disk transfer.
 	TransferNetwork *core.ObjectReference `json:"transferNetwork,omitempty"`
+	// Whether this plan should be archived.
+	Archived bool `json:"archived,omitempty"`
 }
 
 //
