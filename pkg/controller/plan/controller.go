@@ -159,7 +159,7 @@ func Add(mgr manager.Manager) error {
 		return err
 	}
 
-	// Gather migration Plan metrics every 10 seconds
+	// Gather migration Plan metrics
 	recordMetrics(mgr.GetClient())
 
 	return nil
