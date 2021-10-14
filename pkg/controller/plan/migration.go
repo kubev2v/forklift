@@ -547,6 +547,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				n := len(vm.Warm.Precopies)
 				vm.Warm.Precopies[n-1].MarkCompleted()
 				vm.Warm.NextPrecopyAt = &next
+				vm.Warm.Successes++
 			}
 			vm.Phase = r.next(vm.Phase)
 		}
@@ -1080,6 +1081,9 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 			importer, err = r.kubevirt.GetImporterPod(dv)
 			if err != nil {
 				return
+			}
+			if r.Plan.Spec.Warm {
+				vm.Warm.Failures = int(importer.Status.ContainerStatuses[0].RestartCount)
 			}
 			if restartLimitExceeded(importer) {
 				task.MarkedCompleted()
