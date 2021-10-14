@@ -68,6 +68,12 @@ const (
 	Unknown         = "Unknown"
 )
 
+//
+// Power states.
+const (
+	On = "On"
+)
+
 var (
 	coldItinerary = libitr.Itinerary{
 		Name: "",
@@ -317,7 +323,7 @@ func (r *Migration) Cancel() (err error) {
 			if err != nil {
 				return
 			}
-			if vm.RestorePowerState == "On" {
+			if vm.RestorePowerState == On {
 				err = r.provider.PowerOn(vm.Ref)
 				if err != nil {
 					return
@@ -710,10 +716,6 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			return
 		}
 		if step.MarkedCompleted() && !step.HasError() {
-			err = r.kubevirt.DeleteGuestConversionPod(vm)
-			if err != nil {
-				return
-			}
 			vm.Phase = r.next(vm.Phase)
 		}
 	case Completed:
@@ -743,6 +745,16 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				Message:  "The VM migration has SUCCEEDED.",
 				Durable:  true,
 			})
+		// Power on the destination VM if this is a warm migration or if
+		// the source VM was originally powered on.
+		err = r.setRunning(vm, r.Plan.Spec.Warm || vm.RestorePowerState == On)
+		if err != nil {
+			r.Log.Error(err,
+				"Could not power on destination VM.",
+				"vm",
+				vm.String())
+			err = nil
+		}
 	} else if vm.Error != nil {
 		vm.Phase = Completed
 		vm.SetCondition(
