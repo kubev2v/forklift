@@ -249,6 +249,8 @@ type VM struct {
 	WatchDogs                   []WatchDog   `json:"watchDogs"`
 	Properties                  []Property   `json:"properties"`
 	Snapshots                   []Snapshot   `json:"snapshots"`
+	Guest                       Guest        `json:"guest"`
+	OSType                      string       `json:"osType"`
 }
 
 type vNIC = model.NIC
@@ -261,6 +263,7 @@ type WatchDog = model.WatchDog
 type Property = model.Property
 type Snapshot = model.Snapshot
 type Concern = model.Concern
+type Guest = model.Guest
 
 //
 // Build the resource using the model.
@@ -294,6 +297,8 @@ func (r *VM) With(m *model.VM) {
 	r.WatchDogs = m.WatchDogs
 	r.Properties = m.Properties
 	r.Snapshots = m.Snapshots
+	r.Guest = m.Guest
+	r.OSType = m.OSType
 }
 
 //

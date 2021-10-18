@@ -27,6 +27,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	"github.com/konveyor/forklift-controller/pkg/webhook"
+	template "github.com/openshift/api/template/v1"
 	"github.com/pkg/profile"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -104,6 +105,9 @@ func main() {
 	if err := cdi.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Error(err, "unable to add kubevirt CDI APIs to scheme")
 		os.Exit(1)
+	}
+	if err := template.Install(mgr.GetScheme()); err != nil {
+		log.Error(err, "proceeding without optional OpenShift template APIs")
 	}
 	// Setup all Controllers
 	log.Info("Setting up controller")

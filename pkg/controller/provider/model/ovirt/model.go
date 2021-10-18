@@ -157,6 +157,8 @@ type VM struct {
 	Properties                  []Property       `sql:""`
 	Snapshots                   []Snapshot       `sql:""`
 	Concerns                    []Concern        `sql:"" eq:"-"`
+	Guest                       Guest            `sql:""`
+	OSType                      string           `sql:""`
 }
 
 //
@@ -218,6 +220,11 @@ type WatchDog struct {
 type Property struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
+}
+
+type Guest struct {
+	Distribution string `json:"distribution"`
+	FullVersion  string `json:"fullVersion"`
 }
 
 type Disk struct {

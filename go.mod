@@ -10,6 +10,8 @@ require (
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.1.0
 	github.com/konveyor/controller v0.7.0
 	github.com/onsi/gomega v1.10.3
+	github.com/openshift/api v0.0.0
+	github.com/openshift/library-go v0.0.0-20200821154433-215f00df72cc
 	github.com/ovirt/go-ovirt v4.3.4+incompatible
 	github.com/pkg/profile v1.3.0
 	github.com/prometheus/client_golang v1.11.0
