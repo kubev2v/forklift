@@ -17,6 +17,7 @@ import (
 	cdi "kubevirt.io/containerized-data-importer/pkg/apis/core/v1beta1"
 	"path"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strings"
 )
 
 // BIOS types
@@ -43,6 +44,59 @@ const (
 	Pod    = "pod"
 	Multus = "multus"
 )
+
+// Template labels
+const (
+	TemplateOSLabel       = "os.template.kubevirt.io/%s"
+	TemplateWorkloadLabel = "workload.template.kubevirt.io/server"
+	TemplateFlavorLabel   = "flavor.template.kubevirt.io/medium"
+)
+
+// Operating Systems
+const (
+	DefaultWindows = "win10"
+	DefaultLinux   = "rhel8.1"
+	Unknown        = "unknown"
+)
+
+// Map of ovirt guest ids to osinfo ids.
+var osMap = map[string]string{
+	"rhel_6_10_plus_ppc64": "rhel6.10",
+	"rhel_6_ppc64":         "rhel6.10",
+	"rhel_6":               "rhel6.10",
+	"rhel_6x64":            "rhel6.10",
+	"rhel_6_9_plus_ppc64":  "rhel6.9",
+	"rhel_7_ppc64":         "rhel7.7",
+	"rhel_7_s390x":         "rhel7.7",
+	"rhel_7x64":            "rhel7.7",
+	"rhel_8x64":            "rhel8.1",
+	"sles_11_ppc64":        "opensuse15.0",
+	"sles_11":              "opensuse15.0",
+	"sles_12_s390x":        "opensuse15.0",
+	"ubuntu_12_04":         "ubuntu18.04",
+	"ubuntu_12_10":         "ubuntu18.04",
+	"ubuntu_13_04":         "ubuntu18.04",
+	"ubuntu_13_10":         "ubuntu18.04",
+	"ubuntu_14_04_ppc64":   "ubuntu18.04",
+	"ubuntu_14_04":         "ubuntu18.04",
+	"ubuntu_16_04_s390x":   "ubuntu18.04",
+	"windows_10":           "win10",
+	"windows_10x64":        "win10",
+	"windows_2003":         "win10",
+	"windows_2003x64":      "win10",
+	"windows_2008R2x64":    "win2k8",
+	"windows_2008":         "win2k8",
+	"windows_2008x64":      "win2k8",
+	"windows_2012R2x64":    "win2k12r2",
+	"windows_2012x64":      "win2k12r2",
+	"windows_2016x64":      "win2k16",
+	"windows_2019x64":      "win2k19",
+	"windows_7":            "win10",
+	"windows_7x64":         "win10",
+	"windows_8":            "win10",
+	"windows_8x64":         "win10",
+	"windows_xp":           "win10",
+}
 
 //
 // oVirt builder.
@@ -378,6 +432,39 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 				},
 			})
 	}
+
+	return
+}
+
+//
+//
+func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err error) {
+	vm := &model.Workload{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(
+			err,
+			"VM lookup failed.",
+			"vm",
+			vmRef.String())
+		return
+	}
+
+	os, ok := osMap[vm.OSType]
+	if !ok {
+		if strings.Contains(vm.OSType, "linux") || strings.Contains(vm.OSType, "rhel") {
+			os = DefaultLinux
+		} else if strings.Contains(vm.OSType, "win") {
+			os = DefaultWindows
+		} else {
+			os = Unknown
+		}
+	}
+
+	labels = make(map[string]string)
+	labels[fmt.Sprintf(TemplateOSLabel, os)] = "true"
+	labels[TemplateWorkloadLabel] = "true"
+	labels[TemplateFlavorLabel] = "true"
 
 	return
 }
