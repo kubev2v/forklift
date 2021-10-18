@@ -186,6 +186,7 @@ type VM1 struct {
 	VM0
 	RevisionValidated int64           `json:"revisionValidated"`
 	IsTemplate        bool            `json:"isTemplate"`
+	PowerState        string          `json:"powerState"`
 	Host              string          `json:"host"`
 	Networks          []model.Ref     `json:"networks"`
 	Disks             []model.Disk    `json:"disks"`
@@ -198,6 +199,7 @@ func (r *VM1) With(m *model.VM) {
 	r.VM0.With(&m.Base)
 	r.RevisionValidated = m.RevisionValidated
 	r.IsTemplate = m.IsTemplate
+	r.PowerState = m.PowerState
 	r.Host = m.Host
 	r.Networks = m.Networks
 	r.Disks = m.Disks
@@ -221,7 +223,6 @@ type VM struct {
 	PolicyVersion         int            `json:"policyVersion"`
 	UUID                  string         `json:"uuid"`
 	Firmware              string         `json:"firmware"`
-	PowerState            string         `json:"powerState"`
 	ConnectionState       string         `json:"connectionState"`
 	Snapshot              model.Ref      `json:"snapshot"`
 	ChangeTrackingEnabled bool           `json:"changeTrackingEnabled"`
@@ -248,7 +249,6 @@ func (r *VM) With(m *model.VM) {
 	r.PolicyVersion = m.PolicyVersion
 	r.UUID = m.UUID
 	r.Firmware = m.Firmware
-	r.PowerState = m.PowerState
 	r.ConnectionState = m.ConnectionState
 	r.Snapshot = m.Snapshot
 	r.ChangeTrackingEnabled = m.ChangeTrackingEnabled
