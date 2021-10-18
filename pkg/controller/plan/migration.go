@@ -827,9 +827,8 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				Message:  "The VM migration has SUCCEEDED.",
 				Durable:  true,
 			})
-		// Power on the destination VM if this is a warm migration or if
-		// the source VM was originally powered on.
-		err = r.setRunning(vm, r.Plan.Spec.Warm || vm.RestorePowerState == On)
+		// Power on the destination VM if the source VM was originally powered on.
+		err = r.setRunning(vm, vm.RestorePowerState == On)
 		if err != nil {
 			r.Log.Error(err,
 				"Could not power on destination VM.",
