@@ -186,6 +186,7 @@ type VM0 = Resource
 type VM1 struct {
 	VM0
 	Cluster           string           `json:"cluster"`
+	Status            string           `json:"status"`
 	Host              string           `json:"host"`
 	RevisionValidated int64            `json:"revisionValidated"`
 	NICs              []vNIC           `json:"nics"`
@@ -198,6 +199,7 @@ type VM1 struct {
 func (r *VM1) With(m *model.VM) {
 	r.VM0.With(&m.Base)
 	r.Cluster = m.Cluster
+	r.Status = m.Status
 	r.Host = m.Host
 	r.NICs = m.NICs
 	r.DiskAttachments = m.DiskAttachments
@@ -240,7 +242,6 @@ type VM struct {
 	BootMenuEnabled             bool         `json:"bootMenuEnabled"`
 	PlacementPolicyAffinity     string       `json:"placementPolicyAffinity"`
 	Timezone                    string       `json:"timezone"`
-	Status                      string       `json:"status"`
 	Stateless                   string       `json:"stateless"`
 	SerialNumber                string       `json:"serialNumber"`
 	HostDevices                 []HostDevice `json:"hostDevices"`
@@ -286,7 +287,6 @@ func (r *VM) With(m *model.VM) {
 	r.BootMenuEnabled = m.BootMenuEnabled
 	r.PlacementPolicyAffinity = m.PlacementPolicyAffinity
 	r.Timezone = m.Timezone
-	r.Status = m.Status
 	r.Stateless = m.Stateless
 	r.SerialNumber = m.SerialNumber
 	r.HostDevices = m.HostDevices
