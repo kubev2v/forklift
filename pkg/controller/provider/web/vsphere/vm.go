@@ -241,6 +241,7 @@ type VM struct {
 	StorageUsed           int64          `json:"storageUsed"`
 	NumaNodeAffinity      []string       `json:"numaNodeAffinity"`
 	Devices               []model.Device `json:"devices"`
+	NICs                  []model.NIC    `json:"nics"`
 }
 
 //
@@ -268,6 +269,7 @@ func (r *VM) With(m *model.VM) {
 	r.FaultToleranceEnabled = m.FaultToleranceEnabled
 	r.Devices = m.Devices
 	r.NumaNodeAffinity = m.NumaNodeAffinity
+	r.NICs = m.NICs
 }
 
 //

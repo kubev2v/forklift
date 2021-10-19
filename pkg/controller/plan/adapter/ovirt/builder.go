@@ -238,10 +238,12 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 		}
 		needed := false
 		passThrough := false
+		mac := ""
 		for _, nic := range vm.NICs {
 			if nic.Profile.Network == network.ID {
 				needed = true
 				passThrough = nic.Profile.PassThrough
+				mac = nic.Mac
 				break
 			}
 		}
@@ -253,8 +255,9 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 			Name: networkName,
 		}
 		kInterface := cnv.Interface{
-			Name:  networkName,
-			Model: Virtio,
+			Name:       networkName,
+			Model:      Virtio,
+			MacAddress: mac,
 		}
 		switch mapped.Destination.Type {
 		case Pod:
