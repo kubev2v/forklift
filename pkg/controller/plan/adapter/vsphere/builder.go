@@ -316,10 +316,13 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 			err = fErr
 			return
 		}
+
 		needed := false
-		for _, net := range vm.Networks {
-			if net.ID == network.ID {
+		mac := ""
+		for _, nic := range vm.NICs {
+			if nic.Network == network.ID {
 				needed = true
+				mac = nic.Mac
 				break
 			}
 		}
@@ -331,8 +334,9 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 			Name: networkName,
 		}
 		kInterface := cnv.Interface{
-			Name:  networkName,
-			Model: Virtio,
+			Name:       networkName,
+			Model:      Virtio,
+			MacAddress: mac,
 		}
 		switch mapped.Destination.Type {
 		case Pod:

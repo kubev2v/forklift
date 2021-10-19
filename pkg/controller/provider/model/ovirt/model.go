@@ -188,6 +188,7 @@ type NIC struct {
 	Plugged   bool        `json:"plugged"`
 	IpAddress []IpAddress `json:"ipAddress"`
 	Profile   string      `json:"profile"`
+	Mac       string      `json:"mac"`
 }
 
 type IpAddress struct {

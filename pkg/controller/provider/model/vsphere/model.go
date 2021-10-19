@@ -266,6 +266,7 @@ type VM struct {
 	Disks                 []Disk    `sql:""`
 	Networks              []Ref     `sql:""`
 	Concerns              []Concern `sql:""`
+	NICs                  []NIC     `sql:""`
 }
 
 //
@@ -289,4 +290,11 @@ type Disk struct {
 // Virtual Device.
 type Device struct {
 	Kind string `json:"kind"`
+}
+
+//
+// Virtual ethernet card.
+type NIC struct {
+	Network string `json:"network"`
+	Mac     string `json:"mac"`
 }
