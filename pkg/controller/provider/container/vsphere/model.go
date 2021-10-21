@@ -631,7 +631,7 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 					devList := []model.Device{}
 					nicList := []model.NIC{}
 					for _, dev := range devArray.VirtualDevice {
-						var virtualNetwork *types.VirtualEthernetCard
+						var nic *types.VirtualEthernetCard
 						switch device := dev.(type) {
 						case *types.VirtualSriovEthernetCard,
 							*types.VirtualPCIPassthrough,
@@ -643,18 +643,18 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 									Kind: libref.ToKind(dev),
 								})
 						case *types.VirtualE1000:
-							virtualNetwork = &device.VirtualEthernetCard
+							nic = &device.VirtualEthernetCard
 						case *types.VirtualE1000e:
-							virtualNetwork = &device.VirtualEthernetCard
+							nic = &device.VirtualEthernetCard
 						case *types.VirtualVmxnet:
-							virtualNetwork = &device.VirtualEthernetCard
+							nic = &device.VirtualEthernetCard
 						case *types.VirtualVmxnet2:
-							virtualNetwork = &device.VirtualEthernetCard
+							nic = &device.VirtualEthernetCard
 						case *types.VirtualVmxnet3:
-							virtualNetwork = &device.VirtualEthernetCard
+							nic = &device.VirtualEthernetCard
 						}
 
-						if virtualNetwork != nil && virtualNetwork.Backing != nil {
+						if nic != nil && nic.Backing != nil {
 							var network string
 							switch backing := dev.GetVirtualDevice().Backing.(type) {
 							case *types.VirtualEthernetCardNetworkBackingInfo:
@@ -674,7 +674,7 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 							nicList = append(
 								nicList,
 								model.NIC{
-									Mac:     virtualNetwork.MacAddress,
+									MAC:     nic.MacAddress,
 									Network: network,
 								})
 						}

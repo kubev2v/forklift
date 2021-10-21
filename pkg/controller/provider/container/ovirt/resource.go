@@ -289,7 +289,7 @@ type VM struct {
 			ID        string `json:"id"`
 			Name      string `json:"name"`
 			Interface string `json:"interface"`
-			Mac       struct {
+			MAC       struct {
 				Address string `json:"address"`
 			} `json:"mac"`
 			Plugged string `json:"plugged"`
@@ -411,7 +411,7 @@ func (r *VM) addNICs(m *model.VM) {
 				Name:      n.Name,
 				Profile:   n.Profile.ID,
 				Interface: n.Interface,
-				Mac:       n.Mac.Address,
+				MAC:       n.MAC.Address,
 				Plugged:   r.bool(n.Plugged),
 				IpAddress: ips,
 			})
