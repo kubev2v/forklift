@@ -23,6 +23,13 @@ func (r *Validator) Load() (err error) {
 }
 
 //
+// Validate whether warm migration is supported from this provider type.
+func (r *Validator) WarmMigration() (ok bool) {
+	ok = true
+	return
+}
+
+//
 // Validate that a VM's networks have been mapped.
 func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 	if r.plan.Referenced.Map.Network == nil {
