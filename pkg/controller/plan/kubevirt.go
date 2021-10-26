@@ -40,6 +40,9 @@ const (
 	AnnDefaultNetwork = "v1.multus-cni.io/default-network"
 	// Causes the importer pod to be retained after import.
 	AnnRetainAfterCompletion = "cdi.kubevirt.io/storage.pod.retainAfterCompletion"
+	// Contains validations for a Kubevirt VM. Needs to be removed when
+	// creating a VM from a template.
+	AnnKubevirtValidations = "vm.kubevirt.io/validations"
 )
 
 // Labels
@@ -737,6 +740,7 @@ func (r *KubeVirt) vmTemplate(vm *plan.VMStatus) (virtualMachine *cnv.VirtualMac
 	virtualMachine.Spec.Template.Spec.Volumes = []cnv.Volume{}
 	virtualMachine.Spec.Template.Spec.Networks = []cnv.Network{}
 	virtualMachine.Spec.DataVolumeTemplates = []cnv.DataVolumeTemplateSpec{}
+	delete(virtualMachine.Annotations, AnnKubevirtValidations)
 
 	ok = true
 	return
