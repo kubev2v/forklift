@@ -1129,6 +1129,8 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 		return
 	}
 
+	var pending bool
+	var reason string
 	for _, dv := range vmCr.DataVolumes {
 		var task *plan.Task
 		name := r.builder.ResolveDataVolumeIdentifier(dv.DataVolume)
@@ -1144,11 +1146,13 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 			task.Phase = Completed
 			task.Progress.Completed = task.Progress.Total
 			task.MarkCompleted()
-		case cdi.Pending:
+		case cdi.Pending, cdi.ImportScheduled:
+			pending = true
 			task.Phase = Pending
 			cnd := conditions.FindCondition("Bound")
 			if cnd != nil {
 				task.Reason = cnd.Reason
+				reason = cnd.Reason
 			}
 		case cdi.ImportInProgress:
 			task.Phase = Running
@@ -1172,7 +1176,13 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 			}
 		}
 	}
+
 	step.ReflectTasks()
+	if pending {
+		step.Phase = Pending
+		step.Reason = reason
+	}
+
 	return
 }
 
