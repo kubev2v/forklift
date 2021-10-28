@@ -628,21 +628,62 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				}
 			case fDevices:
 				if devArray, cast := p.Val.(types.ArrayOfVirtualDevice); cast {
-					list := []model.Device{}
+					devList := []model.Device{}
+					nicList := []model.NIC{}
 					for _, dev := range devArray.VirtualDevice {
-						switch dev.(type) {
+						var nic *types.VirtualEthernetCard
+						switch device := dev.(type) {
 						case *types.VirtualSriovEthernetCard,
 							*types.VirtualPCIPassthrough,
 							*types.VirtualSCSIPassthrough,
 							*types.VirtualUSBController:
-							list = append(
-								list,
+							devList = append(
+								devList,
 								model.Device{
 									Kind: libref.ToKind(dev),
 								})
+						case *types.VirtualE1000:
+							nic = &device.VirtualEthernetCard
+						case *types.VirtualE1000e:
+							nic = &device.VirtualEthernetCard
+						case *types.VirtualVmxnet:
+							nic = &device.VirtualEthernetCard
+						case *types.VirtualVmxnet2:
+							nic = &device.VirtualEthernetCard
+						case *types.VirtualVmxnet3:
+							nic = &device.VirtualEthernetCard
+						}
+
+						if nic != nil && nic.Backing != nil {
+							var network string
+							switch backing := dev.GetVirtualDevice().Backing.(type) {
+							case *types.VirtualEthernetCardNetworkBackingInfo:
+								if backing.Network != nil {
+									network = backing.Network.Value
+								}
+							case *types.VirtualEthernetCardDistributedVirtualPortBackingInfo:
+								network = backing.Port.PortgroupKey
+							}
+
+							devList = append(
+								devList,
+								model.Device{
+									Kind: libref.ToKind(dev),
+								})
+
+							nicList = append(
+								nicList,
+								model.NIC{
+									MAC: nic.MacAddress,
+									Network: model.Ref{
+										Kind: model.NetKind,
+										ID:   network,
+									},
+								})
 						}
 					}
-					v.model.Devices = list
+					v.model.Devices = devList
+					v.model.NICs = nicList
 					v.updateDisks(&devArray)
 				}
 			}

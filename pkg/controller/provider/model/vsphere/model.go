@@ -263,6 +263,7 @@ type VM struct {
 	IsTemplate            bool      `sql:""`
 	ChangeTrackingEnabled bool      `sql:""`
 	Devices               []Device  `sql:""`
+	NICs                  []NIC     `sql:""`
 	Disks                 []Disk    `sql:""`
 	Networks              []Ref     `sql:""`
 	Concerns              []Concern `sql:""`
@@ -289,4 +290,11 @@ type Disk struct {
 // Virtual Device.
 type Device struct {
 	Kind string `json:"kind"`
+}
+
+//
+// Virtual ethernet card.
+type NIC struct {
+	Network Ref    `json:"network"`
+	MAC     string `json:"mac"`
 }
