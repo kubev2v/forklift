@@ -402,9 +402,11 @@ func (r *Migration) deleteImporterPods(vm *plan.VMStatus) (err error) {
 	var vmCr VirtualMachine
 	found := false
 	if vmCr, found = r.vmMap[vm.ID]; found {
-		err = r.kubevirt.DeleteImporterPods(&vmCr)
-		if err != nil {
-			return
+		for _, dv := range vmCr.DataVolumes {
+			err = r.kubevirt.DeleteImporterPod(dv)
+			if err != nil {
+				return
+			}
 		}
 	}
 	return
