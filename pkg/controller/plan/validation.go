@@ -22,33 +22,34 @@ import (
 //
 // Types
 const (
-	NamespaceNotValid   = "NamespaceNotValid"
-	TransferNetNotValid = "TransferNetworkNotValid"
-	NetRefNotValid      = "NetworkMapRefNotValid"
-	NetMapNotReady      = "NetworkMapNotReady"
-	DsMapNotReady       = "StorageMapNotReady"
-	DsRefNotValid       = "StorageRefNotValid"
-	VMRefNotValid       = "VMRefNotValid"
-	VMNotFound          = "VMNotFound"
-	VMAlreadyExists     = "VMAlreadyExists"
-	VMNetworksNotMapped = "VMNetworksNotMapped"
-	VMStorageNotMapped  = "VMStorageNotMapped"
-	HostNotReady        = "HostNotReady"
-	DuplicateVM         = "DuplicateVM"
-	NameNotValid        = "TargetNameNotValid"
-	HookNotValid        = "HookNotValid"
-	HookNotReady        = "HookNotReady"
-	HookStepNotValid    = "HookStepNotValid"
-	Executing           = "Executing"
-	Succeeded           = "Succeeded"
-	Failed              = "Failed"
-	Canceled            = "Canceled"
-	Deleted             = "Deleted"
-	Paused              = "Paused"
-	Pending             = "Pending"
-	Running             = "Running"
-	Blocked             = "Blocked"
-	Archived            = "Archived"
+	WarmMigrationNotReady = "WarmMigrationNotReady"
+	NamespaceNotValid     = "NamespaceNotValid"
+	TransferNetNotValid   = "TransferNetworkNotValid"
+	NetRefNotValid        = "NetworkMapRefNotValid"
+	NetMapNotReady        = "NetworkMapNotReady"
+	DsMapNotReady         = "StorageMapNotReady"
+	DsRefNotValid         = "StorageRefNotValid"
+	VMRefNotValid         = "VMRefNotValid"
+	VMNotFound            = "VMNotFound"
+	VMAlreadyExists       = "VMAlreadyExists"
+	VMNetworksNotMapped   = "VMNetworksNotMapped"
+	VMStorageNotMapped    = "VMStorageNotMapped"
+	HostNotReady          = "HostNotReady"
+	DuplicateVM           = "DuplicateVM"
+	NameNotValid          = "TargetNameNotValid"
+	HookNotValid          = "HookNotValid"
+	HookNotReady          = "HookNotReady"
+	HookStepNotValid      = "HookStepNotValid"
+	Executing             = "Executing"
+	Succeeded             = "Succeeded"
+	Failed                = "Failed"
+	Canceled              = "Canceled"
+	Deleted               = "Deleted"
+	Paused                = "Paused"
+	Pending               = "Pending"
+	Running               = "Running"
+	Blocked               = "Blocked"
+	Archived              = "Archived"
 )
 
 //
@@ -67,6 +68,7 @@ const (
 	NotSet            = "NotSet"
 	NotFound          = "NotFound"
 	NotUnique         = "NotUnique"
+	NotSupported      = "NotSupported"
 	Ambiguous         = "Ambiguous"
 	NotValid          = "NotValid"
 	Modified          = "Modified"
@@ -113,6 +115,12 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 		return err
 	}
 	//
+	// Warm migration
+	err = r.validateWarmMigration(plan)
+	if err != nil {
+		return err
+	}
+	//
 	// VM list.
 	err = r.validateVM(plan)
 	if err != nil {
@@ -131,6 +139,36 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	}
 
 	return nil
+}
+
+//
+// Validate that warm migration is supported from the source provider.
+func (r *Reconciler) validateWarmMigration(plan *api.Plan) (err error) {
+	if !plan.Spec.Warm {
+		return
+	}
+	provider := plan.Referenced.Provider.Source
+	if provider == nil {
+		return nil
+	}
+	pAdapter, err := adapter.New(provider)
+	if err != nil {
+		return err
+	}
+	validator, err := pAdapter.Validator(plan)
+	if err != nil {
+		return err
+	}
+	if !validator.WarmMigration() {
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     WarmMigrationNotReady,
+			Status:   True,
+			Category: Critical,
+			Reason:   NotSupported,
+			Message:  "Warm migration from the source provider is not supported.",
+		})
+	}
+	return
 }
 
 //
