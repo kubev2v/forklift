@@ -20,6 +20,12 @@ import (
 	"strings"
 )
 
+// Labels
+const (
+	// VM step label
+	kStep = "step"
+)
+
 //
 // Hook runner.
 type HookRunner struct {
@@ -349,9 +355,9 @@ func (r *HookRunner) plan() (plan string, err error) {
 // Labels for created resources.
 func (r *HookRunner) labels() map[string]string {
 	return map[string]string{
-		"plan":      string(r.Plan.UID),
-		"migration": string(r.Plan.UID),
-		"step":      r.vm.Phase,
-		"vm":        r.vm.ID,
+		kPlan:      string(r.Plan.UID),
+		kMigration: string(r.Migration.UID),
+		kVM:        r.vm.ID,
+		kStep:      r.vm.Phase,
 	}
 }
