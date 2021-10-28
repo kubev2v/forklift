@@ -7,6 +7,7 @@ import (
 	template "github.com/openshift/api/template/v1"
 	"github.com/openshift/library-go/pkg/template/generator"
 	"github.com/openshift/library-go/pkg/template/templateprocessing"
+	batch "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -620,6 +621,46 @@ func (r *KubeVirt) DeleteGuestConversionPod(vm *plan.VMStatus) (err error) {
 			r.Log.Info(
 				"Deleted guest conversion pod.",
 				"pod",
+				path.Join(
+					object.Namespace,
+					object.Name),
+				"vm",
+				vm.String())
+		}
+	}
+	return
+}
+
+//
+// Delete any hook jobs that belong to a VM migration.
+func (r *KubeVirt) DeleteHookJobs(vm *plan.VMStatus) (err error) {
+	vmLabels := r.vmLabels(vm.Ref)
+	delete(vmLabels, kMigration)
+	list := &batch.JobList{}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: labels.SelectorFromSet(vmLabels),
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	for _, object := range list.Items {
+		err = r.Destination.Client.Delete(context.TODO(), &object)
+		if err != nil {
+			if k8serr.IsNotFound(err) {
+				err = nil
+			} else {
+				return liberr.Wrap(err)
+			}
+		} else {
+			r.Log.Info(
+				"Deleted hook job.",
+				"job",
 				path.Join(
 					object.Namespace,
 					object.Name),
