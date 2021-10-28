@@ -388,6 +388,10 @@ func (r *Migration) CleanUp(vm *plan.VMStatus) (err error) {
 	if err != nil {
 		return
 	}
+	err = r.kubevirt.DeleteHookJobs(vm)
+	if err != nil {
+		return
+	}
 
 	return
 }
