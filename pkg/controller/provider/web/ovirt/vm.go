@@ -189,7 +189,7 @@ type VM1 struct {
 	Status            string           `json:"status"`
 	Host              string           `json:"host"`
 	RevisionValidated int64            `json:"revisionValidated"`
-	NICs              []vNIC           `json:"nics"`
+	NICs              []VNIC           `json:"nics"`
 	DiskAttachments   []DiskAttachment `json:"diskAttachments"`
 	Concerns          []Concern        `json:"concerns"`
 }
@@ -253,7 +253,7 @@ type VM struct {
 	OSType                      string       `json:"osType"`
 }
 
-type vNIC = model.NIC
+type VNIC = model.NIC
 type DiskAttachment = model.DiskAttachment
 type IpAddress = model.IpAddress
 type CpuPinning = model.CpuPinning
