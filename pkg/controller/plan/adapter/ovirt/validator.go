@@ -6,6 +6,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
+	"github.com/konveyor/forklift-controller/pkg/settings"
 )
 
 //
@@ -19,6 +20,13 @@ type Validator struct {
 // Load.
 func (r *Validator) Load() (err error) {
 	r.inventory, err = web.NewClient(r.plan.Referenced.Provider.Source)
+	return
+}
+
+//
+// Validate whether warm migration is supported from this provider type.
+func (r *Validator) WarmMigration() (ok bool) {
+	ok = settings.Settings.Features.OvirtWarmMigration
 	return
 }
 

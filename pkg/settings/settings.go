@@ -27,6 +27,8 @@ type ControllerSettings struct {
 	Logging
 	// Profiler settings.
 	Profiler
+	// Feature gates.
+	Features
 }
 
 //
@@ -57,6 +59,10 @@ func (r *ControllerSettings) Load() error {
 		return err
 	}
 	err = r.Profiler.Load()
+	if err != nil {
+		return err
+	}
+	err = r.Features.Load()
 	if err != nil {
 		return err
 	}
