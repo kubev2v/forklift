@@ -674,8 +674,11 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 							nicList = append(
 								nicList,
 								model.NIC{
-									MAC:     nic.MacAddress,
-									Network: network,
+									MAC: nic.MacAddress,
+									Network: model.Ref{
+										Kind: model.NetKind,
+										ID:   network,
+									},
 								})
 						}
 					}

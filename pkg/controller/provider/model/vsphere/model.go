@@ -295,6 +295,6 @@ type Device struct {
 //
 // Virtual ethernet card.
 type NIC struct {
-	Network string `json:"network"`
+	Network Ref    `json:"network"`
 	MAC     string `json:"mac"`
 }
