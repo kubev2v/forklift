@@ -104,6 +104,42 @@ type Builder struct {
 	*plancontext.Context
 	// Provisioner CRs.
 	provisioners map[string]*api.Provisioner
+	// MAC addresses already in use on the destination cluster. k=mac, v=vmName
+	macConflictsMap map[string]string
+}
+
+//
+// Get list of destination VMs with mac addresses that would
+// conflict with this VM, if any exist.
+func (r *Builder) macConflicts(vm *model.Workload) (conflictingVMs []string, err error) {
+	if r.macConflictsMap == nil {
+		list := []ocp.VM{}
+		err = r.Destination.Inventory.List(&list)
+		if err != nil {
+			return
+		}
+
+		r.macConflictsMap = make(map[string]string)
+		for _, kVM := range list {
+			for _, iface := range kVM.Object.Spec.Template.Spec.Domain.Devices.Interfaces {
+				r.macConflictsMap[iface.MacAddress] = path.Join(kVM.Namespace, kVM.Name)
+			}
+		}
+	}
+
+	for _, nic := range vm.NICs {
+		if conflictingVm, found := r.macConflictsMap[nic.MAC]; found {
+			for i := range conflictingVMs {
+				// ignore duplicates
+				if conflictingVMs[i] == conflictingVm {
+					continue
+				}
+			}
+			conflictingVMs = append(conflictingVMs, conflictingVm)
+		}
+	}
+
+	return
 }
 
 //
@@ -207,6 +243,18 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 			vmRef.String())
 		return
 	}
+
+	var conflicts []string
+	conflicts, err = r.macConflicts(vm)
+	if err != nil {
+		return
+	}
+	if len(conflicts) > 0 {
+		err = liberr.New(
+			fmt.Sprintf("Source VM has a mac address conflict with one or more destination VMs: %s", conflicts))
+		return
+	}
+
 	object.Template = &cnv.VirtualMachineInstanceTemplateSpec{}
 	r.mapDisks(vm, dataVolumes, object)
 	r.mapFirmware(vm, &vm.Cluster, object)
@@ -238,10 +286,12 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 		}
 		needed := false
 		passThrough := false
+		mac := ""
 		for _, nic := range vm.NICs {
 			if nic.Profile.Network == network.ID {
 				needed = true
 				passThrough = nic.Profile.PassThrough
+				mac = nic.MAC
 				break
 			}
 		}
@@ -253,8 +303,9 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 			Name: networkName,
 		}
 		kInterface := cnv.Interface{
-			Name:  networkName,
-			Model: Virtio,
+			Name:       networkName,
+			Model:      Virtio,
+			MacAddress: mac,
 		}
 		switch mapped.Destination.Type {
 		case Pod:

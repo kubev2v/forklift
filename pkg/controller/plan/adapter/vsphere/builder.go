@@ -12,6 +12,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	"github.com/vmware/govmomi/vim25"
@@ -122,6 +123,45 @@ type Builder struct {
 	provisioners map[string]*api.Provisioner
 	// Host CRs.
 	hosts map[string]*api.Host
+	// MAC addresses already in use on the destination cluster. k=mac, v=vmName
+	macConflictsMap map[string]string
+}
+
+//
+// Get list of destination VMs with mac addresses that would
+// conflict with this VM, if any exist.
+func (r *Builder) macConflicts(vm *model.VM) (conflictingVMs []string, err error) {
+	if r.macConflictsMap == nil {
+		list := []ocp.VM{}
+		err = r.Destination.Inventory.List(&list, base.Param{
+			Key:   base.DetailParam,
+			Value: "all",
+		})
+		if err != nil {
+			return
+		}
+
+		r.macConflictsMap = make(map[string]string)
+		for _, kVM := range list {
+			for _, iface := range kVM.Object.Spec.Template.Spec.Domain.Devices.Interfaces {
+				r.macConflictsMap[iface.MacAddress] = path.Join(kVM.Namespace, kVM.Name)
+			}
+		}
+	}
+
+	for _, nic := range vm.NICs {
+		if conflictingVm, found := r.macConflictsMap[nic.MAC]; found {
+			for i := range conflictingVMs {
+				// ignore duplicates
+				if conflictingVMs[i] == conflictingVm {
+					continue
+				}
+			}
+			conflictingVMs = append(conflictingVMs, conflictingVm)
+		}
+	}
+
+	return
 }
 
 //
@@ -260,6 +300,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 			vmRef.String())
 		return
 	}
+
 	if vm.IsTemplate {
 		err = liberr.New(
 			fmt.Sprintf(
@@ -279,6 +320,17 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 			fmt.Sprintf(
 				"Changed Block Tracking (CBT) is disabled for VM %s",
 				vmRef.String()))
+		return
+	}
+
+	var conflicts []string
+	conflicts, err = r.macConflicts(vm)
+	if err != nil {
+		return
+	}
+	if len(conflicts) > 0 {
+		err = liberr.New(
+			fmt.Sprintf("Source VM has a mac address conflict with one or more destination VMs: %s", conflicts))
 		return
 	}
 
@@ -316,10 +368,13 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 			err = fErr
 			return
 		}
+
 		needed := false
-		for _, net := range vm.Networks {
-			if net.ID == network.ID {
+		mac := ""
+		for _, nic := range vm.NICs {
+			if nic.Network.ID == network.ID {
 				needed = true
+				mac = nic.MAC
 				break
 			}
 		}
@@ -331,8 +386,9 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 			Name: networkName,
 		}
 		kInterface := cnv.Interface{
-			Name:  networkName,
-			Model: Virtio,
+			Name:       networkName,
+			Model:      Virtio,
+			MacAddress: mac,
 		}
 		switch mapped.Destination.Type {
 		case Pod:
