@@ -372,7 +372,7 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 		needed := false
 		mac := ""
 		for _, nic := range vm.NICs {
-			if nic.Network == network.ID {
+			if nic.Network.ID == network.ID {
 				needed = true
 				mac = nic.MAC
 				break
