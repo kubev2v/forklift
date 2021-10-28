@@ -160,12 +160,8 @@ func (r *KubeVirt) EnsureNamespace() (err error) {
 //
 // Get the importer pod for a DataVolume.
 func (r *KubeVirt) GetImporterPod(dv DataVolume) (pod *core.Pod, err error) {
-	return r.getImporterPod(dv.Name)
-}
-
-func (r *KubeVirt) getImporterPod(dvName string) (pod *core.Pod, err error) {
 	pod = &core.Pod{}
-	name := fmt.Sprintf("importer-%s", dvName)
+	name := fmt.Sprintf("importer-%s", dv.Name)
 	err = r.Destination.Client.Get(
 		context.TODO(),
 		types.NamespacedName{
@@ -181,22 +177,10 @@ func (r *KubeVirt) getImporterPod(dvName string) (pod *core.Pod, err error) {
 }
 
 //
-// Delete the importer pods belonging to DataVolumes attached to a VM.
-func (r *KubeVirt) DeleteImporterPods(vmCr *VirtualMachine) (err error) {
-	for _, v := range vmCr.Spec.Template.Spec.Volumes {
-		err = r.deleteImporterPod(v.DataVolume.Name)
-		if err != nil {
-			return
-		}
-	}
-	return
-}
-
-//
 // Delete the importer pod for a DataVolume.
-func (r *KubeVirt) deleteImporterPod(dvName string) (err error) {
+func (r *KubeVirt) DeleteImporterPod(dv DataVolume) (err error) {
 	var pod *core.Pod
-	pod, err = r.getImporterPod(dvName)
+	pod, err = r.GetImporterPod(dv)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
 			err = nil
@@ -217,7 +201,7 @@ func (r *KubeVirt) deleteImporterPod(dvName string) (err error) {
 			pod.Namespace,
 			pod.Name),
 		"dv",
-		dvName)
+		dv.Name)
 	return
 }
 
