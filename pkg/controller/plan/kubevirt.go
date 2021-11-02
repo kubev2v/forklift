@@ -86,12 +86,14 @@ func (r *KubeVirt) VirtualMachineMap() (mp VirtualMachineMap, err error) {
 // List VirtualMachine CRs.
 // Each VirtualMachine represents an imported kubevirt VM with associated DataVolumes.
 func (r *KubeVirt) ListVMs() ([]VirtualMachine, error) {
+	planLabels := r.planLabels()
+	delete(planLabels, kMigration)
 	vList := &cnv.VirtualMachineList{}
 	err := r.Destination.Client.List(
 		context.TODO(),
 		vList,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(r.planLabels()),
+			LabelSelector: labels.SelectorFromSet(planLabels),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
