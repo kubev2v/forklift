@@ -21,7 +21,7 @@ require (
 	gopkg.in/yaml.v2 v2.3.0
 	k8s.io/api v0.20.2
 	k8s.io/apimachinery v0.20.2
-	k8s.io/apiserver v0.19.3
+	k8s.io/apiserver v0.20.2
 	k8s.io/client-go v12.0.0+incompatible
 	kubevirt.io/client-go v0.42.1
 	kubevirt.io/containerized-data-importer v1.34.0
@@ -62,9 +62,5 @@ replace k8s.io/kubectl => k8s.io/kubectl v0.19.3
 replace k8s.io/kubernetes => k8s.io/kubernetes v0.19.3
 
 replace sigs.k8s.io/structured-merge-diff => sigs.k8s.io/structured-merge-diff v1.0.1-0.20191108220359-b1b620dd3f06
-
-replace github.com/docker/docker => github.com/moby/moby v0.7.3-0.20190826074503-38ab9da00309
-
-replace kubevirt.io/vm-import-operator => github.com/kubevirt/vm-import-operator v0.3.0
 
 replace github.com/ovirt/go-ovirt => github.com/ovirt/go-ovirt v0.0.0-20210423075620-0fe653f1c0cd
