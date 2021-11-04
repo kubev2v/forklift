@@ -672,7 +672,9 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 
 	for i := range dataVolumes {
 		annotations := make(map[string]string)
-		annotations[AnnRetainAfterCompletion] = "true"
+		if !r.Plan.Spec.Warm || Settings.RetainPrecopyImporterPods {
+			annotations[AnnRetainAfterCompletion] = "true"
+		}
 		if r.Plan.Spec.TransferNetwork != nil {
 			annotations[AnnDefaultNetwork] = path.Join(
 				r.Plan.Spec.TransferNetwork.Namespace, r.Plan.Spec.TransferNetwork.Name)
