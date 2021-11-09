@@ -16,6 +16,10 @@ test: generate fmt vet manifests
 manager: generate fmt vet
 	go build -o bin/manager github.com/konveyor/forklift-controller/cmd/manager
 
+# Build manager binary with compiler optimizations disabled
+debug: generate fmt vet
+	go build -o bin/manager -gcflags=all="-N -l" github.com/konveyor/forklift-controller/cmd/manager
+
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate fmt vet
 	export METRICS_PORT=8888;\

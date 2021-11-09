@@ -9,6 +9,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	core "k8s.io/api/core/v1"
@@ -114,7 +115,10 @@ type Builder struct {
 func (r *Builder) macConflicts(vm *model.Workload) (conflictingVMs []string, err error) {
 	if r.macConflictsMap == nil {
 		list := []ocp.VM{}
-		err = r.Destination.Inventory.List(&list)
+		err = r.Destination.Inventory.List(&list, base.Param{
+			Key:   base.DetailParam,
+			Value: "all",
+		})
 		if err != nil {
 			return
 		}
