@@ -322,7 +322,6 @@ func (r *Migration) Archive() {
 				"Couldn't clean up VM while archiving plan.",
 				"vm",
 				vm.String())
-			return
 		}
 	}
 	return
@@ -342,12 +341,20 @@ func (r *Migration) Cancel() (err error) {
 		if vm.HasCondition(Canceled) {
 			err = r.CleanUp(vm)
 			if err != nil {
-				return
+				r.Log.Error(err,
+					"Couldn't clean up after canceled VM migration.",
+					"vm",
+					vm.String())
+				err = nil
 			}
 			if vm.RestorePowerState == On {
 				err = r.provider.PowerOn(vm.Ref)
 				if err != nil {
-					return
+					r.Log.Error(err,
+						"Couldn't restore the power state of the source VM.",
+						"vm",
+						vm.String())
+					err = nil
 				}
 			}
 			vm.MarkCompleted()
@@ -391,6 +398,9 @@ func (r *Migration) CleanUp(vm *plan.VMStatus) (err error) {
 	err = r.kubevirt.DeleteHookJobs(vm)
 	if err != nil {
 		return
+	}
+	if vm.Warm != nil {
+		_ = r.provider.RemoveSnapshots(vm.Ref, vm.Warm.Precopies)
 	}
 
 	return
