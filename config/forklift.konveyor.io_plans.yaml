@@ -772,7 +772,6 @@ spec:
                       required:
                       - phase
                       - pipeline
-                      - restorePowerState
                       type: object
                     type: array
                 type: object
