@@ -322,7 +322,6 @@ func (r *Migration) Archive() {
 				"Couldn't clean up VM while archiving plan.",
 				"vm",
 				vm.String())
-			return
 		}
 	}
 	return
@@ -342,12 +341,20 @@ func (r *Migration) Cancel() (err error) {
 		if vm.HasCondition(Canceled) {
 			err = r.CleanUp(vm)
 			if err != nil {
-				return
+				r.Log.Error(err,
+					"Couldn't clean up after canceled VM migration.",
+					"vm",
+					vm.String())
+				err = nil
 			}
 			if vm.RestorePowerState == On {
 				err = r.provider.PowerOn(vm.Ref)
 				if err != nil {
-					return
+					r.Log.Error(err,
+						"Couldn't restore the power state of the source VM.",
+						"vm",
+						vm.String())
+					err = nil
 				}
 			}
 			vm.MarkCompleted()
@@ -391,6 +398,9 @@ func (r *Migration) CleanUp(vm *plan.VMStatus) (err error) {
 	err = r.kubevirt.DeleteHookJobs(vm)
 	if err != nil {
 		return
+	}
+	if vm.Warm != nil {
+		_ = r.provider.RemoveSnapshots(vm.Ref, vm.Warm.Precopies)
 	}
 
 	return
@@ -677,7 +687,17 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
 			break
 		}
-		err = r.kubevirt.SetDataVolumeCheckpoint(vm, vm.Phase == AddFinalCheckpoint)
+		n := len(vm.Warm.Precopies)
+		current := vm.Warm.Precopies[n-1].Snapshot
+		previous := vm.Warm.Precopies[n-2].Snapshot
+		var checkpoint cdi.DataVolumeCheckpoint
+		checkpoint, err = r.provider.CreateCheckpoint(vm.Ref, current, previous)
+		if err != nil {
+			step.AddError(err.Error())
+			err = nil
+			break
+		}
+		err = r.kubevirt.SetDataVolumeCheckpoint(vm, checkpoint, vm.Phase == AddFinalCheckpoint)
 		if err != nil {
 			if !errors.As(err, &web.ProviderNotReadyError{}) {
 				step.AddError(err.Error())
@@ -760,17 +780,12 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			return
 		}
 		if step.MarkedCompleted() {
-			if len(vm.Warm.Precopies) > 0 {
-				snapshot := vm.Warm.Precopies[0].Snapshot
-				err = r.provider.RemoveSnapshot(vm.Ref, snapshot, true)
-				if err != nil {
-					r.Log.Info(
-						"Failed to clean up warm migration snapshots.",
-						"vm",
-						vm,
-						"snapshot",
-						snapshot)
-				}
+			err = r.provider.RemoveSnapshots(vm.Ref, vm.Warm.Precopies)
+			if err != nil {
+				r.Log.Info(
+					"Failed to clean up warm migration snapshots.",
+					"vm",
+					vm)
 				err = nil
 			}
 			if !step.HasError() {
