@@ -79,8 +79,9 @@ type Warm struct {
 
 // Precopy durations
 type Precopy struct {
-	Timed    `json:",inline"`
-	Snapshot string `json:"snapshot"`
+	Start    *meta.Time `json:"start,omitempty"`
+	End      *meta.Time `json:"end,omitempty"`
+	Snapshot string     `json:"snapshot,omitempty"`
 }
 
 //
