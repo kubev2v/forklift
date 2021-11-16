@@ -627,9 +627,10 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		}
 		if step.MarkedCompleted() && !step.HasError() {
 			if r.Plan.Spec.Warm {
-				next := meta.NewTime(time.Now().Add(time.Duration(Settings.PrecopyInterval) * time.Minute))
+				now := meta.Now()
+				next := meta.NewTime(now.Add(time.Duration(Settings.PrecopyInterval) * time.Minute))
 				n := len(vm.Warm.Precopies)
-				vm.Warm.Precopies[n-1].MarkCompleted()
+				vm.Warm.Precopies[n-1].End = &now
 				vm.Warm.NextPrecopyAt = &next
 				vm.Warm.Successes++
 			}
@@ -658,8 +659,8 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				return
 			}
 		}
-		precopy := plan.Precopy{Snapshot: snapshot}
-		precopy.MarkStarted()
+		now := meta.Now()
+		precopy := plan.Precopy{Snapshot: snapshot, Start: &now}
 		vm.Warm.Precopies = append(vm.Warm.Precopies, precopy)
 		r.resetPrecopyTasks(vm, step)
 
@@ -815,11 +816,11 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			"Phase unknown.",
 			"vm",
 			vm)
-		vm.Phase = Completed
 		vm.AddError(
 			fmt.Sprintf(
 				"Phase [%s] unknown",
 				vm.Phase))
+		vm.Phase = Completed
 	}
 	vm.ReflectPipeline()
 	if vm.Phase == Completed && vm.Error == nil {
