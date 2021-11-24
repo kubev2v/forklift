@@ -113,7 +113,7 @@ var osMap = map[string]string{
 //
 // Regex which matches the snapshot identifier suffix of a
 // vSphere disk backing file.
-var backingFilePattern = regexp.MustCompile("-\\d+.vmdk")
+var backingFilePattern = regexp.MustCompile("-\\d\\d\\d\\d\\d\\d.vmdk")
 
 //
 // vSphere builder.
@@ -473,7 +473,8 @@ func (r *Builder) mapDisks(vm *model.VM, dataVolumes []cdi.DataVolume, object *c
 	dvMap := make(map[string]*cdi.DataVolume)
 	for i := range dataVolumes {
 		dv := &dataVolumes[i]
-		dvMap[r.trimBackingFileName(dv.Spec.Source.VDDK.BackingFile)] = dv
+		// the DV BackingFile value has already been trimmed.
+		dvMap[dv.Spec.Source.VDDK.BackingFile] = dv
 	}
 	for i, disk := range disks {
 		dv := dvMap[r.trimBackingFileName(disk.File)]
