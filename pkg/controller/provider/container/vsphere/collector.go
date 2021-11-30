@@ -389,7 +389,6 @@ func (r *Collector) getUpdates(ctx context.Context) error {
 			tx.End()
 		}
 	}()
-next:
 	for {
 		response, err := methods.WaitForUpdatesEx(ctx, r.client, &req)
 		if err != nil {
@@ -401,16 +400,7 @@ next:
 		}
 		updateSet := response.Returnval
 		if updateSet == nil {
-			err := r.connect(ctx)
-			if err != nil {
-				r.log.Error(
-					err,
-					"failed to connect.",
-					"url",
-					r.url)
-				time.Sleep(RetryDelay)
-			}
-			continue next
+			continue
 		}
 		req.Version = updateSet.Version
 		tx, err = r.db.Begin()
