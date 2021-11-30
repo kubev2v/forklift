@@ -13,8 +13,10 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	core "k8s.io/api/core/v1"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cdi "kubevirt.io/containerized-data-importer/pkg/apis/core/v1beta1"
+	"path"
 	"time"
 )
 
@@ -1176,23 +1178,44 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 			}
 		case cdi.ImportInProgress:
 			task.Phase = Running
+			task.MarkStarted()
+			pct := dv.PercentComplete()
+			completed := pct * float64(task.Progress.Total)
+			task.Progress.Completed = int64(completed)
+
+			// The importer pod is recreated by CDI if it is removed for some
+			// reason while the import is in progress, so we can assume that if
+			// we can't find it or retrieve it for some reason that this will
+			// be a transient issue, and we should be able to find it on subsequent
+			// reconciles.
 			var importer *core.Pod
 			importer, err = r.kubevirt.GetImporterPod(dv)
 			if err != nil {
-				return
-			}
-			if r.Plan.Spec.Warm {
-				vm.Warm.Failures = int(importer.Status.ContainerStatuses[0].RestartCount)
-			}
-			if restartLimitExceeded(importer) {
-				task.MarkedCompleted()
-				msg, _ := terminationMessage(importer)
-				task.AddError(msg)
+				if k8serr.IsNotFound(err) {
+					log.Info(
+						"Did not find CDI importer pod for DataVolume.",
+						"vm",
+						vm.String(),
+						"dv",
+						path.Join(dv.Namespace, dv.Name))
+				} else {
+					log.Error(
+						err,
+						"Could not get CDI importer pod for DataVolume.",
+						"vm",
+						vm.String(),
+						"dv",
+						path.Join(dv.Namespace, dv.Name))
+				}
 			} else {
-				task.MarkStarted()
-				pct := dv.PercentComplete()
-				completed := pct * float64(task.Progress.Total)
-				task.Progress.Completed = int64(completed)
+				if r.Plan.Spec.Warm {
+					vm.Warm.Failures = int(importer.Status.ContainerStatuses[0].RestartCount)
+				}
+				if restartLimitExceeded(importer) {
+					task.MarkedCompleted()
+					msg, _ := terminationMessage(importer)
+					task.AddError(msg)
+				}
 			}
 		}
 	}
