@@ -1207,6 +1207,7 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 						"dv",
 						path.Join(dv.Namespace, dv.Name))
 				}
+				err = nil
 			} else {
 				if r.Plan.Spec.Warm {
 					vm.Warm.Failures = int(importer.Status.ContainerStatuses[0].RestartCount)
