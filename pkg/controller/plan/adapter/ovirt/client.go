@@ -127,7 +127,7 @@ func (r *Client) PowerOff(vmRef ref.Ref) (err error) {
 	}
 	// Request the VM startup if VM is not UP
 	if status, _ := vm.Status(); status != ovirtsdk.VMSTATUS_DOWN {
-		_, err = vmService.Stop().Send()
+		_, err = vmService.Shutdown().Send()
 		if err != nil {
 			err = liberr.Wrap(err)
 		}
