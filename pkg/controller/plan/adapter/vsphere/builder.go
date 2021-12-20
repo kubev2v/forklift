@@ -119,8 +119,6 @@ var backingFilePattern = regexp.MustCompile("-\\d\\d\\d\\d\\d\\d.vmdk")
 // vSphere builder.
 type Builder struct {
 	*plancontext.Context
-	// Provisioner CRs.
-	provisioners map[string]*api.Provisioner
 	// Host CRs.
 	hosts map[string]*api.Host
 	// MAC addresses already in use on the destination cluster. k=mac, v=vmName
@@ -240,22 +238,9 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 			err = fErr
 			return
 		}
-		mErr := r.defaultModes(&mapped.Destination)
-		if mErr != nil {
-			err = mErr
-			return
-		}
 		for _, disk := range vm.Disks {
 			if disk.Datastore.ID == ds.ID {
 				storageClass := mapped.Destination.StorageClass
-				volumeMode := core.PersistentVolumeFilesystem
-				if mapped.Destination.VolumeMode != "" {
-					volumeMode = mapped.Destination.VolumeMode
-				}
-				accessMode := core.ReadWriteOnce
-				if mapped.Destination.AccessMode != "" {
-					accessMode = mapped.Destination.AccessMode
-				}
 				dvSpec := cdi.DataVolumeSpec{
 					Source: cdi.DataVolumeSource{
 						VDDK: &cdi.DataVolumeSourceVDDK{
@@ -267,10 +252,6 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 						},
 					},
 					Storage: &cdi.StorageSpec{
-						AccessModes: []core.PersistentVolumeAccessMode{
-							accessMode,
-						},
-						VolumeMode: &volumeMode,
 						Resources: core.ResourceRequirements{
 							Requests: core.ResourceList{
 								core.ResourceStorage: *resource.NewQuantity(disk.Capacity, resource.BinarySI),
@@ -278,6 +259,14 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 						},
 						StorageClassName: &storageClass,
 					},
+				}
+				// set the access mode and volume mode if they were specified in the storage map.
+				// otherwise, let the storage profile decide the default values.
+				if mapped.Destination.AccessMode != "" {
+					dvSpec.Storage.AccessModes = []core.PersistentVolumeAccessMode{mapped.Destination.AccessMode}
+				}
+				if mapped.Destination.VolumeMode != "" {
+					dvSpec.Storage.VolumeMode = &mapped.Destination.VolumeMode
 				}
 				dvs = append(dvs, dvSpec)
 			}
@@ -571,10 +560,6 @@ func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
 //
 // Load
 func (r *Builder) Load() (err error) {
-	err = r.loadProvisioners()
-	if err != nil {
-		return
-	}
 	err = r.loadHosts()
 	if err != nil {
 		return
@@ -626,30 +611,6 @@ func (r *Builder) loadHosts() (err error) {
 }
 
 //
-// Load provisioner CRs.
-func (r *Builder) loadProvisioners() (err error) {
-	list := &api.ProvisionerList{}
-	err = r.List(
-		context.TODO(),
-		list,
-		&client.ListOptions{
-			Namespace: r.Source.Provider.Namespace,
-		},
-	)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	r.provisioners = map[string]*api.Provisioner{}
-	for i := range list.Items {
-		p := &list.Items[i]
-		r.provisioners[p.Spec.Name] = p
-	}
-
-	return
-}
-
-//
 // Find host ID for VM.
 func (r *Builder) hostID(vmRef ref.Ref) (hostID string, err error) {
 	vm := &model.VM{}
@@ -696,32 +657,6 @@ func (r *Builder) host(hostID string) (host *model.Host, err error) {
 			"Host lookup failed.",
 			"host",
 			hostID)
-	}
-
-	return
-}
-
-//
-// Set volume and access modes.
-func (r *Builder) defaultModes(dm *api.DestinationStorage) (err error) {
-	model := &ocp.StorageClass{}
-	ref := ref.Ref{Name: dm.StorageClass}
-	err = r.Destination.Inventory.Find(model, ref)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	if dm.VolumeMode == "" || dm.AccessMode == "" {
-		if provisioner, found := r.provisioners[model.Object.Provisioner]; found {
-			volumeMode := provisioner.VolumeMode(dm.VolumeMode)
-			accessMode := volumeMode.AccessMode(dm.AccessMode)
-			if dm.VolumeMode == "" {
-				dm.VolumeMode = volumeMode.Name
-			}
-			if dm.AccessMode == "" {
-				dm.AccessMode = accessMode.Name
-			}
-		}
 	}
 
 	return

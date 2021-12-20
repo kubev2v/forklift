@@ -1,11 +1,9 @@
 package ovirt
 
 import (
-	"context"
 	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libitr "github.com/konveyor/controller/pkg/itinerary"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
@@ -17,7 +15,6 @@ import (
 	cnv "kubevirt.io/client-go/api/v1"
 	cdi "kubevirt.io/containerized-data-importer/pkg/apis/core/v1beta1"
 	"path"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
 )
 
@@ -103,8 +100,6 @@ var osMap = map[string]string{
 // oVirt builder.
 type Builder struct {
 	*plancontext.Context
-	// Provisioner CRs.
-	provisioners map[string]*api.Provisioner
 	// MAC addresses already in use on the destination cluster. k=mac, v=vmName
 	macConflictsMap map[string]string
 }
@@ -188,22 +183,9 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 			err = fErr
 			return
 		}
-		mErr := r.defaultModes(&mapped.Destination)
-		if mErr != nil {
-			err = mErr
-			return
-		}
 		for _, da := range vm.DiskAttachments {
 			if da.Disk.StorageDomain == sd.ID {
 				storageClass := mapped.Destination.StorageClass
-				volumeMode := core.PersistentVolumeFilesystem
-				if mapped.Destination.VolumeMode != "" {
-					volumeMode = mapped.Destination.VolumeMode
-				}
-				accessMode := core.ReadWriteOnce
-				if mapped.Destination.AccessMode != "" {
-					accessMode = mapped.Destination.AccessMode
-				}
 				dvSpec := cdi.DataVolumeSpec{
 					Source: cdi.DataVolumeSource{
 						Imageio: &cdi.DataVolumeSourceImageIO{
@@ -214,10 +196,6 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 						},
 					},
 					Storage: &cdi.StorageSpec{
-						AccessModes: []core.PersistentVolumeAccessMode{
-							accessMode,
-						},
-						VolumeMode: &volumeMode,
 						Resources: core.ResourceRequirements{
 							Requests: core.ResourceList{
 								core.ResourceStorage: *resource.NewQuantity(da.Disk.ProvisionedSize, resource.BinarySI),
@@ -225,6 +203,14 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 						},
 						StorageClassName: &storageClass,
 					},
+				}
+				// set the access mode and volume mode if they were specified in the storage map.
+				// otherwise, let the storage profile decide the default values.
+				if mapped.Destination.AccessMode != "" {
+					dvSpec.Storage.AccessModes = []core.PersistentVolumeAccessMode{mapped.Destination.AccessMode}
+				}
+				if mapped.Destination.VolumeMode != "" {
+					dvSpec.Storage.VolumeMode = &mapped.Destination.VolumeMode
 				}
 				dvs = append(dvs, dvSpec)
 			}
@@ -436,32 +422,6 @@ func (r *Builder) mapDisks(vm *model.Workload, dataVolumes []cdi.DataVolume, obj
 }
 
 //
-// Set volume and access modes.
-func (r *Builder) defaultModes(dm *api.DestinationStorage) (err error) {
-	model := &ocp.StorageClass{}
-	ref := ref.Ref{Name: dm.StorageClass}
-	err = r.Destination.Inventory.Find(model, ref)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	if dm.VolumeMode == "" || dm.AccessMode == "" {
-		if provisioner, found := r.provisioners[model.Object.Provisioner]; found {
-			volumeMode := provisioner.VolumeMode(dm.VolumeMode)
-			accessMode := volumeMode.AccessMode(dm.AccessMode)
-			if dm.VolumeMode == "" {
-				dm.VolumeMode = volumeMode.Name
-			}
-			if dm.AccessMode == "" {
-				dm.AccessMode = accessMode.Name
-			}
-		}
-	}
-
-	return
-}
-
-//
 // Build tasks.
 func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 	vm := &model.Workload{}
@@ -528,32 +488,4 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 // Return a stable identifier for a DataVolume.
 func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
 	return dv.Spec.Source.Imageio.DiskID
-}
-
-func (r *Builder) Load() (err error) {
-	return r.loadProvisioners()
-}
-
-//
-// Load provisioner CRs.
-func (r *Builder) loadProvisioners() (err error) {
-	list := &api.ProvisionerList{}
-	err = r.List(
-		context.TODO(),
-		list,
-		&client.ListOptions{
-			Namespace: r.Source.Provider.Namespace,
-		},
-	)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	r.provisioners = map[string]*api.Provisioner{}
-	for i := range list.Items {
-		p := &list.Items[i]
-		r.provisioners[p.Spec.Name] = p
-	}
-
-	return
 }
