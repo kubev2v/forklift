@@ -47,6 +47,10 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref) (id string, err error) {
 		return
 	}
 	task, err := vm.CreateSnapshot(context.TODO(), snapshotName, snapshotDesc, false, true)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
 	res, err := task.WaitForResult(context.TODO(), nil)
 	if err != nil {
 		err = liberr.Wrap(err)
