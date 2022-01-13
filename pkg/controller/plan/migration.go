@@ -690,26 +690,14 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
 			break
 		}
-		n := len(vm.Warm.Precopies)
-		current := vm.Warm.Precopies[n-1].Snapshot
-		previous := vm.Warm.Precopies[n-2].Snapshot
-		var checkpoint cdi.DataVolumeCheckpoint
-		checkpoint, err = r.provider.CreateCheckpoint(vm.Ref, current, previous)
+
+		err = r.setDataVolumeCheckpoints(vm)
 		if err != nil {
 			step.AddError(err.Error())
 			err = nil
 			break
 		}
-		err = r.kubevirt.SetDataVolumeCheckpoint(vm, checkpoint, vm.Phase == AddFinalCheckpoint)
-		if err != nil {
-			if !errors.As(err, &web.ProviderNotReadyError{}) {
-				step.AddError(err.Error())
-				err = nil
-				break
-			} else {
-				return
-			}
-		}
+
 		switch vm.Phase {
 		case AddCheckpoint:
 			vm.Phase = CopyDisks
@@ -1251,6 +1239,42 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 		step.MarkCompleted()
 		step.AddError("Guest conversion pod not found")
 	}
+	return
+}
+
+//
+//
+func (r *Migration) setDataVolumeCheckpoints(vm *plan.VMStatus) (err error) {
+	if r.vmMap == nil {
+		r.vmMap, err = r.kubevirt.VirtualMachineMap()
+		if err != nil {
+			return
+		}
+	}
+	var vmCr VirtualMachine
+	found := false
+	if vmCr, found = r.vmMap[vm.ID]; !found {
+		msg := "VirtualMachine CR not found."
+		vm.AddError(msg)
+		return
+	}
+	dvs := make([]*cdi.DataVolume, 0)
+	for i := range vmCr.DataVolumes {
+		dv := vmCr.DataVolumes[i].DataVolume
+		dvs = append(dvs, dv)
+	}
+	checkpoints, err := r.provider.CreateCheckpoints(vm.Ref, vm.Warm.Precopies, dvs)
+	if err != nil {
+		return
+	}
+
+	for k, v := range checkpoints {
+		err = r.kubevirt.SetDataVolumeCheckpoint(k, v, vm.Phase == AddFinalCheckpoint)
+		if err != nil {
+			return
+		}
+	}
+
 	return
 }
 

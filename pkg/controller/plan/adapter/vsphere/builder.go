@@ -244,7 +244,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 				dvSpec := cdi.DataVolumeSpec{
 					Source: cdi.DataVolumeSource{
 						VDDK: &cdi.DataVolumeSourceVDDK{
-							BackingFile: r.trimBackingFileName(disk.File),
+							BackingFile: trimBackingFileName(disk.File),
 							UUID:        vm.UUID,
 							URL:         url,
 							SecretRef:   secret.Name,
@@ -466,7 +466,7 @@ func (r *Builder) mapDisks(vm *model.VM, dataVolumes []cdi.DataVolume, object *c
 		dvMap[dv.Spec.Source.VDDK.BackingFile] = dv
 	}
 	for i, disk := range disks {
-		dv := dvMap[r.trimBackingFileName(disk.File)]
+		dv := dvMap[trimBackingFileName(disk.File)]
 		volumeName := fmt.Sprintf("vol-%v", i)
 		volume := cnv.Volume{
 			Name: volumeName,
@@ -507,7 +507,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 		list = append(
 			list,
 			&plan.Task{
-				Name: r.trimBackingFileName(disk.File),
+				Name: trimBackingFileName(disk.File),
 				Progress: libitr.Progress{
 					Total: mB,
 				},
@@ -554,7 +554,7 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 //
 // Return a stable identifier for a VDDK DataVolume.
 func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
-	return r.trimBackingFileName(dv.Spec.Source.VDDK.BackingFile)
+	return trimBackingFileName(dv.Spec.Source.VDDK.BackingFile)
 }
 
 //
@@ -667,6 +667,6 @@ func (r *Builder) host(hostID string) (host *model.Host, err error) {
 //	Example:
 // 	Input: 	[datastore13] my-vm/disk-name-000015.vmdk
 //	Output: [datastore13] my-vm/disk-name.vmdk
-func (r *Builder) trimBackingFileName(fileName string) string {
+func trimBackingFileName(fileName string) string {
 	return backingFilePattern.ReplaceAllString(fileName, ".vmdk")
 }

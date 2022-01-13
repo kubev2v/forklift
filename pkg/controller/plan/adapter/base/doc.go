@@ -2,7 +2,7 @@ package base
 
 import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
+	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	core "k8s.io/api/core/v1"
@@ -37,7 +37,7 @@ type Builder interface {
 	// Build DataVolumes.
 	DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap) (dvs []cdi.DataVolumeSpec, err error)
 	// Build tasks.
-	Tasks(vmRef ref.Ref) ([]*plan.Task, error)
+	Tasks(vmRef ref.Ref) ([]*planapi.Task, error)
 	// Build template labels.
 	TemplateLabels(vmRef ref.Ref) (labels map[string]string, err error)
 	// Return a stable identifier for a DataVolume.
@@ -59,9 +59,9 @@ type Client interface {
 	// Create a snapshot of the source VM.
 	CreateSnapshot(vmRef ref.Ref) (string, error)
 	// Remove all warm migration snapshots.
-	RemoveSnapshots(vmRef ref.Ref, precopies []plan.Precopy) error
-	// Create a DataVolume checkpoint out of a pair of snapshot IDs.
-	CreateCheckpoint(vmRef ref.Ref, current, previous string) (checkpoint cdi.DataVolumeCheckpoint, err error)
+	RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy) error
+	// Create DataVolume checkpoints.
+	CreateCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []*cdi.DataVolume) (checkpoints map[*cdi.DataVolume]cdi.DataVolumeCheckpoint, err error)
 	// Close connections to the provider API.
 	Close()
 }
