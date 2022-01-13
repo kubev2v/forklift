@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
+	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
@@ -63,7 +63,7 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref) (id string, err error) {
 
 //
 // Remove all warm migration snapshots.
-func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []plan.Precopy) (err error) {
+func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy) (err error) {
 	if len(precopies) == 0 {
 		return
 	}
@@ -80,29 +80,39 @@ func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []plan.Precopy) (err e
 }
 
 //
-// Create a DataVolume checkpoint from a pair of snapshot IDs.
-func (r *Client) CreateCheckpoint(vmRef ref.Ref, current string, previous string) (checkpoint cdi.DataVolumeCheckpoint, err error) {
-	checkpoint.Current = current
+// Create DataVolume checkpoints.
+func (r *Client) CreateCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []*cdi.DataVolume) (checkpoints map[*cdi.DataVolume]cdi.DataVolumeCheckpoint, err error) {
+	n := len(precopies)
+	previous := precopies[n-2].Snapshot
+	current := precopies[n-1].Snapshot
 
-	if previous == "" {
-		return
-	}
-
+	checkpoints = make(map[*cdi.DataVolume]cdi.DataVolumeCheckpoint)
 	if settings.Settings.VsphereIncrementalBackup {
-		var changeId string
-		changeId, err = r.getChangeId(vmRef, previous)
+		var changeIds map[string]string
+		changeIds, err = r.getChangeIds(vmRef, previous)
 		if err != nil {
 			return
+		}
+		for i := range datavolumes {
+			dv := datavolumes[i]
+			checkpoints[dv] = cdi.DataVolumeCheckpoint{
+				Current:  current,
+				Previous: changeIds[dv.Spec.Source.VDDK.BackingFile],
+			}
 		}
 		err = r.removeSnapshot(vmRef, previous, false)
 		if err != nil {
 			return
 		}
-		previous = changeId
+	} else {
+		for i := range datavolumes {
+			dv := datavolumes[i]
+			checkpoints[dv] = cdi.DataVolumeCheckpoint{
+				Current:  current,
+				Previous: previous,
+			}
+		}
 	}
-
-	checkpoint.Previous = previous
-
 	return
 }
 
@@ -202,7 +212,7 @@ func (r *Client) Close() {
 
 //
 // Get the changeId for a VM snapshot.
-func (r *Client) getChangeId(vmRef ref.Ref, snapshotId string) (changeId string, err error) {
+func (r *Client) getChangeIds(vmRef ref.Ref, snapshotId string) (changeIdMapping map[string]string, err error) {
 	vm, err := r.getVM(vmRef)
 	if err != nil {
 		return
@@ -224,31 +234,22 @@ func (r *Client) getChangeId(vmRef ref.Ref, snapshotId string) (changeId string,
 		return
 	}
 
-	var id *string
+	changeIdMapping = make(map[string]string)
 	for _, device := range snapshot.Config.Hardware.Device {
 		vDevice := device.GetVirtualDevice()
 		switch dev := vDevice.Backing.(type) {
 		case *types.VirtualDiskFlatVer2BackingInfo:
-			id = &dev.ChangeId
+			changeIdMapping[trimBackingFileName(dev.FileName)] = dev.ChangeId
 		case *types.VirtualDiskSparseVer2BackingInfo:
-			id = &dev.ChangeId
+			changeIdMapping[trimBackingFileName(dev.FileName)] = dev.ChangeId
 		case *types.VirtualDiskRawDiskMappingVer1BackingInfo:
-			id = &dev.ChangeId
+			changeIdMapping[trimBackingFileName(dev.FileName)] = dev.ChangeId
 		case *types.VirtualDiskRawDiskVer2BackingInfo:
-			id = &dev.ChangeId
+			changeIdMapping[trimBackingFileName(dev.DescriptorFileName)] = dev.ChangeId
 		}
+
 	}
 
-	if id == nil {
-		err = liberr.New("Disk backing info doesn't include changeId.",
-			"vm",
-			vm.Reference().Value,
-			"snapshot",
-			snapshotId)
-		return
-	}
-
-	changeId = *id
 	return
 }
 
