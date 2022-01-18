@@ -8,7 +8,7 @@ require (
 	github.com/go-logr/logr v0.3.0
 	github.com/go-openapi/spec v0.19.4 // indirect
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.1.0
-	github.com/konveyor/controller v0.7.0
+	github.com/konveyor/controller v0.10.0
 	github.com/onsi/gomega v1.10.3
 	github.com/openshift/api v0.0.0
 	github.com/openshift/library-go v0.0.0-20200821154433-215f00df72cc

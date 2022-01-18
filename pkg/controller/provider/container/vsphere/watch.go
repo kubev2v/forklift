@@ -22,6 +22,7 @@ package vsphere
 
 import (
 	"context"
+	"errors"
 	"github.com/go-logr/logr"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
@@ -54,15 +55,6 @@ const (
 var Settings = &settings.Settings
 
 //
-// Reported model event.
-type ReportedEvent struct {
-	// VM id.
-	id string
-	// VM revision.
-	revision int64
-}
-
-//
 // Watch for VM changes and validate as needed.
 type VMEventHandler struct {
 	libmodel.StockEventHandler
@@ -70,10 +62,8 @@ type VMEventHandler struct {
 	Provider *api.Provider
 	// DB.
 	DB libmodel.DB
-	// Reported VM events.
-	input chan ReportedEvent
-	// Reported VM IDs.
-	reported map[string]int64
+	// Validation event latch.
+	latch chan int8
 	// Last search.
 	lastSearch time.Time
 	// Logger.
@@ -89,7 +79,6 @@ type VMEventHandler struct {
 //
 // Reset.
 func (r *VMEventHandler) reset() {
-	r.reported = map[string]int64{}
 	r.lastSearch = time.Now()
 }
 
@@ -98,7 +87,7 @@ func (r *VMEventHandler) reset() {
 func (r *VMEventHandler) Started(uint64) {
 	r.log.Info("Started.")
 	r.taskResult = make(chan *policy.Task)
-	r.input = make(chan ReportedEvent, 100)
+	r.latch = make(chan int8, 1)
 	r.context, r.cancel = context.WithCancel(context.Background())
 	go r.run()
 	go r.harvest()
@@ -115,9 +104,7 @@ func (r *VMEventHandler) Created(event libmodel.Event) {
 	}
 	if vm, cast := event.Model.(*model.VM); cast {
 		if !vm.Validated() {
-			if r.validate(vm) == nil {
-				r.report(vm)
-			}
+			r.tripLatch()
 		}
 	}
 }
@@ -136,9 +123,7 @@ func (r *VMEventHandler) Updated(event libmodel.Event) {
 	}
 	if vm, cast := event.Updated.(*model.VM); cast {
 		if !vm.Validated() {
-			if r.validate(vm) == nil {
-				r.report(vm)
-			}
+			r.tripLatch()
 		}
 	}
 }
@@ -154,19 +139,21 @@ func (r *VMEventHandler) Error(err error) {
 func (r *VMEventHandler) End() {
 	r.log.Info("Ended.")
 	r.cancel()
-	close(r.input)
+	close(r.latch)
 	close(r.taskResult)
 }
 
 //
-// Report model event.
-func (r *VMEventHandler) report(vm *model.VM) {
+// Trip the latch.
+func (r *VMEventHandler) tripLatch() {
 	defer func() {
 		_ = recover()
 	}()
-	r.input <- ReportedEvent{
-		revision: vm.Revision,
-		id:       vm.ID,
+	select {
+	case r.latch <- 1:
+		// trip.
+	default:
+		// tripped.
 	}
 }
 
@@ -183,16 +170,15 @@ func (r *VMEventHandler) run() {
 	for {
 		select {
 		case <-time.After(interval):
-		case reportedEvent, open := <-r.input:
+			r.list()
+			r.reset()
+		case _, open := <-r.latch:
 			if open {
-				r.reported[reportedEvent.id] = reportedEvent.revision
+				r.list()
+				r.reset()
 			} else {
 				return
 			}
-		}
-		if time.Since(r.lastSearch) > interval {
-			r.list()
-			r.reset()
 		}
 	}
 }
@@ -269,11 +255,6 @@ func (r *VMEventHandler) list() {
 		if !hasNext || r.canceled() {
 			break
 		}
-		if revision, found := r.reported[vm.ID]; found {
-			if vm.Revision == revision {
-				continue
-			}
-		}
 		_ = r.validate(vm)
 	}
 }
@@ -348,10 +329,13 @@ func (r *VMEventHandler) validated(batch []*policy.Task) {
 			continue
 		}
 		latest.PolicyVersion = task.Version
-		latest.RevisionValidated = latest.Revision
+		latest.RevisionValidated = task.Revision
 		latest.Concerns = task.Concerns
 		latest.Revision--
-		err = tx.Update(latest)
+		err = tx.Update(latest, libmodel.Eq("Revision", task.Revision))
+		if errors.Is(err, model.NotFound) {
+			continue
+		}
 		if err != nil {
 			r.log.Error(err, "VM update failed.")
 			continue

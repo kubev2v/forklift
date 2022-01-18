@@ -228,7 +228,7 @@ type Task struct {
 	// VM reference.
 	Ref refapi.Ref
 	// Revision number of the VM being validated.
-	Revision interface{}
+	Revision int64
 	// Context.
 	Context context.Context
 	// Workload builder.
