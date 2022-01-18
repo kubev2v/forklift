@@ -126,10 +126,20 @@ func (r *KubeVirt) ListVMs() ([]VirtualMachine, error) {
 		for i := range dvList.Items {
 			dv := &dvList.Items[i]
 			if vm.Owner(dv) {
+				pvc := &core.PersistentVolumeClaim{}
+				err = r.Destination.Client.Get(
+					context.TODO(),
+					types.NamespacedName{Namespace: r.Plan.Spec.TargetNamespace, Name: dv.Name},
+					pvc,
+				)
+				if err != nil && !k8serr.IsNotFound(err) {
+					return nil, liberr.Wrap(err)
+				}
 				vm.DataVolumes = append(
 					vm.DataVolumes,
 					DataVolume{
 						DataVolume: dv,
+						PVC:        pvc,
 					})
 			}
 		}
@@ -965,7 +975,7 @@ func (r *KubeVirt) podVolumeMounts(vmCr *VirtualMachine, configMap *core.ConfigM
 			},
 		}
 		volumes = append(volumes, vol)
-		if *dv.Spec.Storage.VolumeMode == core.PersistentVolumeBlock {
+		if dv.PVC.Spec.VolumeMode != nil && *dv.PVC.Spec.VolumeMode == core.PersistentVolumeBlock {
 			devices = append(devices, core.VolumeDevice{
 				Name:       dv.Name,
 				DevicePath: fmt.Sprintf("/dev/block%v", i),
@@ -1011,14 +1021,14 @@ func (r *KubeVirt) libvirtDomain(vmCr *VirtualMachine) (domain *libvirtxml.Domai
 		diskSource := libvirtxml.DomainDiskSource{}
 
 		dv := dvsByName[vol.DataVolume.Name]
-		if *dv.Spec.Storage.VolumeMode == core.PersistentVolumeBlock {
+		if dv.PVC.Spec.VolumeMode != nil && *dv.PVC.Spec.VolumeMode == core.PersistentVolumeBlock {
 			diskSource.Block = &libvirtxml.DomainDiskSourceBlock{
 				Dev: fmt.Sprintf("/dev/block%v", i),
 			}
 		} else {
 			diskSource.File = &libvirtxml.DomainDiskSourceFile{
 				// the location where the disk images will be found on
-				// the virt-v2v pod. See also makePodVolumeMounts.
+				// the virt-v2v pod. See also podVolumeMounts.
 				File: fmt.Sprintf("/mnt/disks/disk%v/disk.img", i),
 			}
 		}
@@ -1306,6 +1316,7 @@ func (r *KubeVirt) vmLabels(vmRef ref.Ref) (labels map[string]string) {
 // Represents a CDI DataVolume and add behavior.
 type DataVolume struct {
 	*cdi.DataVolume
+	PVC *core.PersistentVolumeClaim
 }
 
 //
