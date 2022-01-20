@@ -63,7 +63,16 @@ func (h ClusterHandler) List(ctx *gin.Context) {
 	}()
 	db := h.Collector.DB()
 	list := []model.Cluster{}
-	err = db.List(&list, h.ListOptions(ctx))
+	options := h.ListOptions(ctx)
+	realCluster := libmodel.Eq("variant", "")
+	if options.Predicate != nil {
+		options.Predicate = libmodel.And(
+			options.Predicate,
+			realCluster)
+	} else {
+		options.Predicate = realCluster
+	}
+	err = db.List(&list, options)
 	if err != nil {
 		return
 	}
@@ -196,8 +205,8 @@ type Cluster struct {
 //
 // Build the resource using the model.
 func (r *Cluster) With(m *model.Cluster) {
-	r.Folder = m.Folder
 	r.Resource.With(&m.Base)
+	r.Folder = m.Folder
 	r.DasEnabled = m.DasEnabled
 	r.DrsEnabled = m.DrsEnabled
 	r.DrsBehavior = m.DrsBehavior

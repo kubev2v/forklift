@@ -6,11 +6,14 @@ import (
 )
 
 //
-// Networks (variant).
+// Variants.
 const (
+	// Network.
 	NetStandard    = "Standard"
 	NetDvPortGroup = "DvPortGroup"
 	NetDvSwitch    = "DvSwitch"
+	// Cluster.
+	ComputeResource = "ComputeResource"
 )
 
 //
@@ -42,6 +45,8 @@ type Model interface {
 type Base struct {
 	// Managed object ID.
 	ID string `sql:"pk"`
+	// Variant
+	Variant string `sql:"d0,index(variant)"`
 	// Name
 	Name string `sql:"d0,index(name)"`
 	// Parent
@@ -216,7 +221,6 @@ type Switch struct {
 
 type Network struct {
 	Base
-	Variant  string    `sql:"d0"`
 	Tag      string    `sql:""`
 	DVSwitch Ref       `sql:""`
 	Host     []DVSHost `sql:""`

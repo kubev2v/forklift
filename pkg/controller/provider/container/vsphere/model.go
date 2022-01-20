@@ -50,7 +50,8 @@ func (b *Base) Ref(in types.AnyType) (ref model.Ref) {
 			ref.Kind = model.FolderKind
 		case Datacenter:
 			ref.Kind = model.DatacenterKind
-		case Cluster:
+		case Cluster,
+			ComputeResource:
 			ref.Kind = model.ClusterKind
 		case Network,
 			DVPortGroup,
