@@ -9,6 +9,8 @@ import (
 type Resource struct {
 	// Object ID.
 	ID string `json:"id"`
+	// Variant
+	Variant string `json:"variant,omitempty"`
 	// Parent.
 	Parent model.Ref `json:"parent"`
 	// Path
@@ -25,6 +27,7 @@ type Resource struct {
 // Build the resource using the model.
 func (r *Resource) With(m *model.Base) {
 	r.ID = m.ID
+	r.Variant = m.Variant
 	r.Parent = m.Parent
 	r.Revision = m.Revision
 	r.Name = m.Name

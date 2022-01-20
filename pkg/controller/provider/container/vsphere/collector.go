@@ -34,15 +34,16 @@ const (
 //
 // Types
 const (
-	Folder         = "Folder"
-	VirtualMachine = "VirtualMachine"
-	Datacenter     = "Datacenter"
-	Cluster        = "ClusterComputeResource"
-	Host           = "HostSystem"
-	Network        = "Network"
-	DVPortGroup    = "DistributedVirtualPortgroup"
-	DVSwitch       = "VmwareDistributedVirtualSwitch"
-	Datastore      = "Datastore"
+	Folder          = "Folder"
+	VirtualMachine  = "VirtualMachine"
+	Datacenter      = "Datacenter"
+	Cluster         = "ClusterComputeResource"
+	ComputeResource = "ComputeResource"
+	Host            = "HostSystem"
+	Network         = "Network"
+	DVPortGroup     = "DistributedVirtualPortgroup"
+	DVSwitch        = "VmwareDistributedVirtualSwitch"
+	Datastore       = "Datastore"
 )
 
 //
@@ -158,9 +159,9 @@ var TsDatacenterHost = &types.TraversalSpec{
 }
 
 //
-// Datacenter/Host traversal Spec.
-var TsClusterHostSystem = &types.TraversalSpec{
-	Type: Cluster,
+// ComputeResource/Host traversal Spec.
+var TsComputeResourceHost = &types.TraversalSpec{
+	Type: ComputeResource,
 	Path: fHost,
 	SelectSet: []types.BaseSelectionSpec{
 		&types.SelectionSpec{
@@ -205,11 +206,11 @@ var TsRootFolder = &types.TraversalSpec{
 		&types.SelectionSpec{
 			Name: TraverseFolders,
 		},
+		TsComputeResourceHost,
 		TsDatacenterVM,
 		TsDatacenterHost,
 		TsDatacenterNet,
 		TsDatacenterDatastore,
-		TsClusterHostSystem,
 	},
 }
 
@@ -611,6 +612,14 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 				fDsFolder,
 			},
 		},
+		{ // ComputeResource
+			Type: ComputeResource,
+			PathSet: []string{
+				fName,
+				fParent,
+				fHost,
+			},
+		},
 		{ // Cluster
 			Type: Cluster,
 			PathSet: []string{
@@ -761,6 +770,15 @@ func (r *Collector) selectAdapter(u types.ObjectUpdate) (Adapter, bool) {
 				},
 			},
 		}
+	case ComputeResource:
+		adapter = &ClusterAdapter{
+			model: model.Cluster{
+				Base: model.Base{
+					Variant: model.ComputeResource,
+					ID:      u.Obj.Value,
+				},
+			},
+		}
 	case Cluster:
 		adapter = &ClusterAdapter{
 			model: model.Cluster{
@@ -781,27 +799,27 @@ func (r *Collector) selectAdapter(u types.ObjectUpdate) (Adapter, bool) {
 		adapter = &NetworkAdapter{
 			model: model.Network{
 				Base: model.Base{
-					ID: u.Obj.Value,
+					Variant: model.NetStandard,
+					ID:      u.Obj.Value,
 				},
-				Variant: model.NetStandard,
 			},
 		}
 	case DVPortGroup:
 		adapter = &NetworkAdapter{
 			model: model.Network{
 				Base: model.Base{
-					ID: u.Obj.Value,
+					Variant: model.NetDvPortGroup,
+					ID:      u.Obj.Value,
 				},
-				Variant: model.NetDvPortGroup,
 			},
 		}
 	case DVSwitch:
 		adapter = &DVSwitchAdapter{
 			model: model.Network{
 				Base: model.Base{
-					ID: u.Obj.Value,
+					Variant: model.NetDvSwitch,
+					ID:      u.Obj.Value,
 				},
-				Variant: model.NetDvSwitch,
 			},
 		}
 	case Datastore:
@@ -837,9 +855,6 @@ func (r Collector) applyEnter(tx *libmodel.Tx, u types.ObjectUpdate) error {
 	}
 	adapter.Apply(u)
 	m := adapter.Model()
-	if mX, cast := m.(interface{ Created() }); cast {
-		mX.Created()
-	}
 	err := tx.Insert(m)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -861,9 +876,6 @@ func (r Collector) applyModify(tx *libmodel.Tx, u types.ObjectUpdate) error {
 		return liberr.Wrap(err)
 	}
 	adapter.Apply(u)
-	if mX, cast := m.(interface{ Updated() }); cast {
-		mX.Updated()
-	}
 	err = tx.Update(m)
 	if err != nil {
 		return liberr.Wrap(err)
