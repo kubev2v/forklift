@@ -245,7 +245,9 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 		return
 	}
 
-	object.Template = &cnv.VirtualMachineInstanceTemplateSpec{}
+	if object.Template == nil {
+		object.Template = &cnv.VirtualMachineInstanceTemplateSpec{}
+	}
 	r.mapDisks(vm, dataVolumes, object)
 	r.mapFirmware(vm, &vm.Cluster, object)
 	r.mapCPU(vm, object)
@@ -382,6 +384,9 @@ func (r *Builder) mapFirmware(vm *model.Workload, cluster *model.Cluster, object
 }
 
 func (r *Builder) mapDisks(vm *model.Workload, dataVolumes []cdi.DataVolume, object *cnv.VirtualMachineSpec) {
+	var kVolumes []cnv.Volume
+	var kDisks []cnv.Disk
+
 	dvMap := make(map[string]*cdi.DataVolume)
 	for i := range dataVolumes {
 		dv := &dataVolumes[i]
@@ -416,9 +421,11 @@ func (r *Builder) mapDisks(vm *model.Workload, dataVolumes []cdi.DataVolume, obj
 				},
 			},
 		}
-		object.Template.Spec.Volumes = append(object.Template.Spec.Volumes, volume)
-		object.Template.Spec.Domain.Devices.Disks = append(object.Template.Spec.Domain.Devices.Disks, disk)
+		kVolumes = append(kVolumes, volume)
+		kDisks = append(kDisks, disk)
 	}
+	object.Template.Spec.Volumes = kVolumes
+	object.Template.Spec.Domain.Devices.Disks = kDisks
 }
 
 //
