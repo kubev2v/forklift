@@ -597,7 +597,13 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				}
 			case fGuestID:
 				if s, cast := p.Val.(string); cast {
-					v.model.GuestID = s
+					// When the VM isn't powered on, the guest tools don't report
+					// the guest id. Only set the guest id if it's being reported,
+					// so that the stored value isn't erased when the VM
+					// is powered down.
+					if s != "" {
+						v.model.GuestID = s
+					}
 				}
 			case fBalloonedMemory:
 				if n, cast := p.Val.(int32); cast {
