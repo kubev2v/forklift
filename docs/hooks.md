@@ -5,7 +5,7 @@ Migration hooks provide a means for running custom code at points in the migrati
 The default hook image is `quay.io/konveyor/hook-runner:latest`. It is based off of the Ansible Runner image with the addition of python-openshift to provided Ansible k8s resources as well as a recent oc binary.
 
 # Hook execution
-When an Ansible playbook is provided as part of a migration hook it will be mounted into the hook container as a ConfigMap. In either case the hook container will be run as job on the desired cluster, using the default ServiceAccount in the konveyor-forklift namespace.
+When an Ansible playbook is provided as part of a migration hook it will be mounted into the hook container as a ConfigMap. In either case the hook container will be run as job in the konveyor-forklift namespace on the cluster, using either the default ServiceAccount or a ServiceAccount define on the hook resource.
 
 # Adding a hook to a Plan
 Hooks can be specified per VM and may be run as a post of pre hook. When adding a hook you must specify the namespace where the hook CR is located along with its name and specify whether it should be run as a PreHook or PostHook.
