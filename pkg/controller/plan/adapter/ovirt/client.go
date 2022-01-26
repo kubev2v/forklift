@@ -3,7 +3,7 @@ package ovirt
 import (
 	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
+	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
@@ -55,7 +55,7 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref) (snapshot string, err error) {
 
 //
 // Remove all warm migration snapshots.
-func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []plan.Precopy) (err error) {
+func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy) (err error) {
 	if len(precopies) == 0 {
 		return
 	}
@@ -75,10 +75,20 @@ func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []plan.Precopy) (err e
 }
 
 //
-// Create a DataVolume checkpoint from a pair of snapshot IDs.
-func (r *Client) CreateCheckpoint(_ ref.Ref, current string, previous string) (checkpoint cdi.DataVolumeCheckpoint, err error) {
-	checkpoint.Current = current
-	checkpoint.Previous = previous
+// Create DataVolume checkpoints.
+func (r *Client) CreateCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []*cdi.DataVolume) (checkpoints map[*cdi.DataVolume]cdi.DataVolumeCheckpoint, err error) {
+	n := len(precopies)
+	previous := precopies[n-2].Snapshot
+	current := precopies[n-1].Snapshot
+
+	checkpoints = make(map[*cdi.DataVolume]cdi.DataVolumeCheckpoint)
+	for i := range datavolumes {
+		dv := datavolumes[i]
+		checkpoints[dv] = cdi.DataVolumeCheckpoint{
+			Current:  current,
+			Previous: previous,
+		}
+	}
 	return
 }
 
