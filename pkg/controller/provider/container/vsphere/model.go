@@ -750,6 +750,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 				backing := disk.Backing.(*types.VirtualDiskRawDiskVer2BackingInfo)
 				md := model.Disk{
 					Key:      disk.Key,
+					File:     backing.DescriptorFileName,
 					Capacity: disk.CapacityInBytes,
 					Shared:   backing.Sharing != "sharingNone",
 					RDM:      true,
