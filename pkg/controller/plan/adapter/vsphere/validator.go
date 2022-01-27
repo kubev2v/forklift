@@ -56,6 +56,45 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 }
 
 //
+// Validate that no more than one of a VM's networks is mapped to the pod network.
+func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
+	if r.plan.Referenced.Map.Network == nil {
+		return
+	}
+	vm := &model.Workload{}
+	err = r.inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(
+			err,
+			"VM not found in inventory.",
+			"vm",
+			vmRef.String())
+		return
+	}
+
+	mapping := r.plan.Referenced.Map.Network.Spec.Map
+	podMapped := 0
+	for i := range mapping {
+		mapped := &mapping[i]
+		ref := mapped.Source
+		network := &model.Network{}
+		fErr := r.inventory.Find(network, ref)
+		if fErr != nil {
+			err = fErr
+			return
+		}
+		for _, nic := range vm.NICs {
+			if nic.Network.ID == network.ID && mapped.Destination.Type == Pod {
+				podMapped++
+			}
+		}
+	}
+
+	ok = podMapped <= 1
+	return
+}
+
+//
 // Validate that a VM's disk backing storage has been mapped.
 func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 	if r.plan.Referenced.Map.Storage == nil {

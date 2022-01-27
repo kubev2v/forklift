@@ -22,34 +22,35 @@ import (
 //
 // Types
 const (
-	WarmMigrationNotReady = "WarmMigrationNotReady"
-	NamespaceNotValid     = "NamespaceNotValid"
-	TransferNetNotValid   = "TransferNetworkNotValid"
-	NetRefNotValid        = "NetworkMapRefNotValid"
-	NetMapNotReady        = "NetworkMapNotReady"
-	DsMapNotReady         = "StorageMapNotReady"
-	DsRefNotValid         = "StorageRefNotValid"
-	VMRefNotValid         = "VMRefNotValid"
-	VMNotFound            = "VMNotFound"
-	VMAlreadyExists       = "VMAlreadyExists"
-	VMNetworksNotMapped   = "VMNetworksNotMapped"
-	VMStorageNotMapped    = "VMStorageNotMapped"
-	HostNotReady          = "HostNotReady"
-	DuplicateVM           = "DuplicateVM"
-	NameNotValid          = "TargetNameNotValid"
-	HookNotValid          = "HookNotValid"
-	HookNotReady          = "HookNotReady"
-	HookStepNotValid      = "HookStepNotValid"
-	Executing             = "Executing"
-	Succeeded             = "Succeeded"
-	Failed                = "Failed"
-	Canceled              = "Canceled"
-	Deleted               = "Deleted"
-	Paused                = "Paused"
-	Pending               = "Pending"
-	Running               = "Running"
-	Blocked               = "Blocked"
-	Archived              = "Archived"
+	WarmMigrationNotReady        = "WarmMigrationNotReady"
+	NamespaceNotValid            = "NamespaceNotValid"
+	TransferNetNotValid          = "TransferNetworkNotValid"
+	NetRefNotValid               = "NetworkMapRefNotValid"
+	NetMapNotReady               = "NetworkMapNotReady"
+	DsMapNotReady                = "StorageMapNotReady"
+	DsRefNotValid                = "StorageRefNotValid"
+	VMRefNotValid                = "VMRefNotValid"
+	VMNotFound                   = "VMNotFound"
+	VMAlreadyExists              = "VMAlreadyExists"
+	VMNetworksNotMapped          = "VMNetworksNotMapped"
+	VMStorageNotMapped           = "VMStorageNotMapped"
+	VMMultiplePodNetworkMappings = "VMMultiplePodNetworkMappings"
+	HostNotReady                 = "HostNotReady"
+	DuplicateVM                  = "DuplicateVM"
+	NameNotValid                 = "TargetNameNotValid"
+	HookNotValid                 = "HookNotValid"
+	HookNotReady                 = "HookNotReady"
+	HookStepNotValid             = "HookStepNotValid"
+	Executing                    = "Executing"
+	Succeeded                    = "Succeeded"
+	Failed                       = "Failed"
+	Canceled                     = "Canceled"
+	Deleted                      = "Deleted"
+	Paused                       = "Paused"
+	Pending                      = "Pending"
+	Running                      = "Running"
+	Blocked                      = "Blocked"
+	Archived                     = "Archived"
 )
 
 //
@@ -352,6 +353,14 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "VM host is in maintenance mode.",
 		Items:    []string{},
 	}
+	multiplePodNetworkMappings := libcnd.Condition{
+		Type:     VMMultiplePodNetworkMappings,
+		Status:   True,
+		Reason:   NotValid,
+		Category: Critical,
+		Message:  "VM has more than one interface mapped to the pod network.",
+		Items:    []string{},
+	}
 
 	setOf := map[string]bool{}
 	//
@@ -412,6 +421,13 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			}
 			if !ok {
 				unmappedNetwork.Items = append(unmappedNetwork.Items, ref.String())
+			}
+			ok, err = validator.PodNetwork(*ref)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				multiplePodNetworkMappings.Items = append(multiplePodNetworkMappings.Items, ref.String())
 			}
 		}
 		if plan.Referenced.Map.Storage != nil {
@@ -480,6 +496,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(maintenanceMode.Items) > 0 {
 		plan.Status.SetCondition(maintenanceMode)
+	}
+	if len(multiplePodNetworkMappings.Items) > 0 {
+		plan.Status.SetCondition(multiplePodNetworkMappings)
 	}
 
 	return nil

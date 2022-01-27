@@ -11,6 +11,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
@@ -349,6 +350,7 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 	var kNetworks []cnv.Network
 	var kInterfaces []cnv.Interface
 
+	numNetworks := 0
 	netMapIn := r.Context.Map.Network.Spec.Map
 	for i := range netMapIn {
 		mapped := &netMapIn[i]
@@ -360,39 +362,39 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 			return
 		}
 
-		needed := false
-		mac := ""
+		needed := []vsphere.NIC{}
 		for _, nic := range vm.NICs {
 			if nic.Network.ID == network.ID {
-				needed = true
-				mac = nic.MAC
-				break
+				needed = append(needed, nic)
 			}
 		}
-		if !needed {
+		if len(needed) == 0 {
 			continue
 		}
-		networkName := fmt.Sprintf("net-%v", i)
-		kNetwork := cnv.Network{
-			Name: networkName,
-		}
-		kInterface := cnv.Interface{
-			Name:       networkName,
-			Model:      Virtio,
-			MacAddress: mac,
-		}
-		switch mapped.Destination.Type {
-		case Pod:
-			kNetwork.Pod = &cnv.PodNetwork{}
-			kInterface.Masquerade = &cnv.InterfaceMasquerade{}
-		case Multus:
-			kNetwork.Multus = &cnv.MultusNetwork{
-				NetworkName: path.Join(mapped.Destination.Namespace, mapped.Destination.Name),
+		for _, nic := range needed {
+			networkName := fmt.Sprintf("net-%v", numNetworks)
+			numNetworks++
+			kNetwork := cnv.Network{
+				Name: networkName,
 			}
-			kInterface.Bridge = &cnv.InterfaceBridge{}
+			kInterface := cnv.Interface{
+				Name:       networkName,
+				Model:      Virtio,
+				MacAddress: nic.MAC,
+			}
+			switch mapped.Destination.Type {
+			case Pod:
+				kNetwork.Pod = &cnv.PodNetwork{}
+				kInterface.Masquerade = &cnv.InterfaceMasquerade{}
+			case Multus:
+				kNetwork.Multus = &cnv.MultusNetwork{
+					NetworkName: path.Join(mapped.Destination.Namespace, mapped.Destination.Name),
+				}
+				kInterface.Bridge = &cnv.InterfaceBridge{}
+			}
+			kNetworks = append(kNetworks, kNetwork)
+			kInterfaces = append(kInterfaces, kInterface)
 		}
-		kNetworks = append(kNetworks, kNetwork)
-		kInterfaces = append(kInterfaces, kInterface)
 	}
 	object.Template.Spec.Networks = kNetworks
 	object.Template.Spec.Domain.Devices.Interfaces = kInterfaces
