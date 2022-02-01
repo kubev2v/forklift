@@ -20,6 +20,7 @@ const (
 	UrlNotValid             = "UrlNotValid"
 	TypeNotSupported        = "ProviderTypeNotSupported"
 	SecretNotValid          = "SecretNotValid"
+	SettingsNotValid        = "SettingsNotValid"
 	Validated               = "Validated"
 	ConnectionTestSucceeded = "ConnectionTestSucceeded"
 	ConnectionTestFailed    = "ConnectionTestFailed"
@@ -69,6 +70,10 @@ func (r *Reconciler) validate(provider *api.Provider) error {
 		return liberr.Wrap(err)
 	}
 	secret, err := r.validateSecret(provider)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	err = r.validateSettings(provider)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -214,6 +219,33 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 	}
 	if len(newCnd.Items) > 0 {
 		newCnd.Reason = DataErr
+		provider.Status.SetCondition(newCnd)
+	}
+
+	return
+}
+
+//
+// Validate provider settings.
+func (r *Reconciler) validateSettings(provider *api.Provider) (err error) {
+	newCnd := libcnd.Condition{
+		Type:     SettingsNotValid,
+		Status:   True,
+		Reason:   DataErr,
+		Category: Critical,
+		Message:  "The `settings` are not valid.",
+	}
+	keyList := []string{}
+	switch provider.Type() {
+	case api.VSphere:
+		keyList = []string{"vddkInitImage"}
+	}
+	for _, key := range keyList {
+		if _, found := provider.Spec.Settings[key]; !found {
+			newCnd.Items = append(newCnd.Items, key)
+		}
+	}
+	if len(newCnd.Items) > 0 {
 		provider.Status.SetCondition(newCnd)
 	}
 
