@@ -20,7 +20,7 @@ import (
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	cnv "kubevirt.io/client-go/api/v1"
-	cdi "kubevirt.io/containerized-data-importer/pkg/apis/core/v1beta1"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	liburl "net/url"
 	"path"
 	"regexp"
@@ -242,13 +242,14 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 			if disk.Datastore.ID == ds.ID {
 				storageClass := mapped.Destination.StorageClass
 				dvSpec := cdi.DataVolumeSpec{
-					Source: cdi.DataVolumeSource{
+					Source: &cdi.DataVolumeSource{
 						VDDK: &cdi.DataVolumeSourceVDDK{
-							BackingFile: trimBackingFileName(disk.File),
-							UUID:        vm.UUID,
-							URL:         url,
-							SecretRef:   secret.Name,
-							Thumbprint:  thumbprint,
+							BackingFile:  trimBackingFileName(disk.File),
+							UUID:         vm.UUID,
+							URL:          url,
+							SecretRef:    secret.Name,
+							Thumbprint:   thumbprint,
+							InitImageURL: r.Source.Provider.Spec.Settings["vddkInitImage"],
 						},
 					},
 					Storage: &cdi.StorageSpec{
