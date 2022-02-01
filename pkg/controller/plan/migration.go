@@ -1139,8 +1139,10 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 		return
 	}
 
-	var pending bool
-	var reason string
+	var pendingReason string
+	var pending int
+	var completed int
+	var running int
 	for _, dv := range vmCr.DataVolumes {
 		var task *plan.Task
 		name := r.builder.ResolveDataVolumeIdentifier(dv.DataVolume)
@@ -1153,20 +1155,30 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 		conditions := dv.Conditions()
 		switch dv.Status.Phase {
 		case cdi.Succeeded, cdi.Paused:
+			completed++
 			task.Phase = Completed
+			task.Reason = "Transfer completed."
 			task.Progress.Completed = task.Progress.Total
 			task.MarkCompleted()
 		case cdi.Pending, cdi.ImportScheduled:
-			pending = true
+			pending++
 			task.Phase = Pending
 			cnd := conditions.FindCondition("Bound")
-			if cnd != nil {
-				task.Reason = cnd.Reason
-				reason = cnd.Reason
+			if cnd != nil && cnd.Status == True {
+				cnd = conditions.FindCondition("Running")
 			}
+			if cnd != nil {
+				pendingReason = fmt.Sprintf("%s; %s", cnd.Reason, cnd.Message)
+			}
+			task.Reason = pendingReason
 		case cdi.ImportInProgress:
+			running++
 			task.Phase = Running
 			task.MarkStarted()
+			cnd := conditions.FindCondition("Running")
+			if cnd != nil {
+				task.Reason = fmt.Sprintf("%s; %s", cnd.Reason, cnd.Message)
+			}
 			pct := dv.PercentComplete()
 			completed := pct * float64(task.Progress.Total)
 			task.Progress.Completed = int64(completed)
@@ -1210,11 +1222,16 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 	}
 
 	step.ReflectTasks()
-	if pending {
+	if pending > 0 {
 		step.Phase = Pending
-		step.Reason = reason
+		step.Reason = pendingReason
+	} else if running > 0 {
+		step.Phase = Running
+		step.Reason = ""
+	} else if completed == len(vmCr.DataVolumes) {
+		step.Phase = Completed
+		step.Reason = ""
 	}
-
 	return
 }
 
