@@ -2,6 +2,7 @@ package ovirt
 
 import (
 	"fmt"
+
 	liberr "github.com/konveyor/controller/pkg/error"
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
@@ -84,9 +85,18 @@ func (r *Client) CreateCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, d
 	checkpoints = make(map[*cdi.DataVolume]cdi.DataVolumeCheckpoint)
 	for i := range datavolumes {
 		dv := datavolumes[i]
+		var currentDiskSnapshot, previousDiskSnapshot string
+		currentDiskSnapshot, err = r.getDiskSnapshot(dv.Spec.Source.Imageio.DiskID, current)
+		if err != nil {
+			return
+		}
+		previousDiskSnapshot, err = r.getDiskSnapshot(dv.Spec.Source.Imageio.DiskID, previous)
+		if err != nil {
+			return
+		}
 		checkpoints[dv] = cdi.DataVolumeCheckpoint{
-			Current:  current,
-			Previous: previous,
+			Current:  currentDiskSnapshot,
+			Previous: previousDiskSnapshot,
 		}
 	}
 	return
@@ -190,6 +200,42 @@ func (r *Client) getVM(vmRef ref.Ref) (ovirtVm *ovirtsdk.Vm, vmService *ovirtsdk
 			fmt.Sprintf(
 				"VM %s source lookup failed",
 				vmRef.String()))
+	}
+	return
+}
+
+//
+// Get the disk snapshot for this disk and this snapshot ID.
+func (r *Client) getDiskSnapshot(diskID, targetSnapshotID string) (diskSnapshotID string, err error) {
+	diskService := r.connection.SystemService().DisksService().DiskService(diskID)
+	diskSnapshotsService := diskService.DiskSnapshotsService()
+	diskSnapshotsListResponse, err := diskSnapshotsService.List().Send()
+	if err != nil {
+		err = liberr.Wrap(
+			err,
+			"Error listing snapshots on disk",
+			"disk",
+			diskID)
+		return
+	}
+
+	diskSnapshotsList, success := diskSnapshotsListResponse.Snapshots()
+	if !success || len(diskSnapshotsList.Slice()) == 0 {
+		err = liberr.New(
+			"No snapshots listed on disk",
+			"disk",
+			diskID)
+		return
+	}
+
+	for _, diskSnapshot := range diskSnapshotsList.Slice() {
+		if snapshot, success := diskSnapshot.Snapshot(); success {
+			if snapshotID, success := snapshot.Id(); success && snapshotID == targetSnapshotID {
+				if diskSnapshotID, success = diskSnapshot.Id(); success {
+					return
+				}
+			}
+		}
 	}
 	return
 }
