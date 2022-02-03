@@ -19,14 +19,14 @@ require (
 	go.uber.org/zap v1.14.1 // indirect
 	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
 	gopkg.in/yaml.v2 v2.3.0
-	k8s.io/api v0.20.2
-	k8s.io/apimachinery v0.20.2
+	k8s.io/api v0.23.0
+	k8s.io/apimachinery v0.23.0
 	k8s.io/apiserver v0.20.2
 	k8s.io/client-go v12.0.0+incompatible
 	kubevirt.io/client-go v0.42.1
-	kubevirt.io/containerized-data-importer v1.34.0
+	kubevirt.io/containerized-data-importer-api v1.44.0
 	libvirt.org/libvirt-go-xml v6.6.0+incompatible
-	sigs.k8s.io/controller-runtime v0.6.4
+	sigs.k8s.io/controller-runtime v0.8.3
 )
 
 replace bitbucket.org/ww/goautoneg v0.0.0-20120707110453-75cd24fc2f2c => github.com/markusthoemmes/goautoneg v0.0.0-20190713162725-c6008fefa5b1
@@ -64,3 +64,5 @@ replace k8s.io/kubernetes => k8s.io/kubernetes v0.19.3
 replace sigs.k8s.io/structured-merge-diff => sigs.k8s.io/structured-merge-diff v1.0.1-0.20191108220359-b1b620dd3f06
 
 replace github.com/ovirt/go-ovirt => github.com/ovirt/go-ovirt v0.0.0-20210423075620-0fe653f1c0cd
+
+replace sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.6.4

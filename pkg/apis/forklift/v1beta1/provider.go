@@ -55,6 +55,8 @@ type ProviderSpec struct {
 	// References a secret containing credentials and
 	// other confidential information.
 	Secret core.ObjectReference `json:"secret" ref:"Secret"`
+	// Provider settings.
+	Settings map[string]string `json:"settings,omitempty"`
 }
 
 //
