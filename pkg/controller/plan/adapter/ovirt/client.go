@@ -9,7 +9,7 @@ import (
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	ovirtsdk "github.com/ovirt/go-ovirt"
-	cdi "kubevirt.io/containerized-data-importer/pkg/apis/core/v1beta1"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
 
 const (

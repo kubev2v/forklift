@@ -7,7 +7,7 @@ import (
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	core "k8s.io/api/core/v1"
 	cnv "kubevirt.io/client-go/api/v1"
-	cdi "kubevirt.io/containerized-data-importer/pkg/apis/core/v1beta1"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
 
 //

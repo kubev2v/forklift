@@ -13,7 +13,7 @@ import (
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	cnv "kubevirt.io/client-go/api/v1"
-	cdi "kubevirt.io/containerized-data-importer/pkg/apis/core/v1beta1"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"path"
 	"strings"
 )
@@ -187,7 +187,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 			if da.Disk.StorageDomain == sd.ID {
 				storageClass := mapped.Destination.StorageClass
 				dvSpec := cdi.DataVolumeSpec{
-					Source: cdi.DataVolumeSource{
+					Source: &cdi.DataVolumeSource{
 						Imageio: &cdi.DataVolumeSourceImageIO{
 							URL:           url,
 							DiskID:        da.Disk.ID,
