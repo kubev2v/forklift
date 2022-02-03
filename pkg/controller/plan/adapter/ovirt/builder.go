@@ -266,6 +266,7 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 	var kNetworks []cnv.Network
 	var kInterfaces []cnv.Interface
 
+	numNetworks := 0
 	netMapIn := r.Context.Map.Network.Spec.Map
 	for i := range netMapIn {
 		mapped := &netMapIn[i]
@@ -276,45 +277,43 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 			err = fErr
 			return
 		}
-		needed := false
-		passThrough := false
-		mac := ""
+		needed := []model.XNIC{}
 		for _, nic := range vm.NICs {
 			if nic.Profile.Network == network.ID {
-				needed = true
-				passThrough = nic.Profile.PassThrough
-				mac = nic.MAC
-				break
+				needed = append(needed, nic)
 			}
 		}
-		if !needed {
+		if len(needed) == 0 {
 			continue
 		}
-		networkName := fmt.Sprintf("net-%v", i)
-		kNetwork := cnv.Network{
-			Name: networkName,
-		}
-		kInterface := cnv.Interface{
-			Name:       networkName,
-			Model:      Virtio,
-			MacAddress: mac,
-		}
-		switch mapped.Destination.Type {
-		case Pod:
-			kNetwork.Pod = &cnv.PodNetwork{}
-			kInterface.Masquerade = &cnv.InterfaceMasquerade{}
-		case Multus:
-			kNetwork.Multus = &cnv.MultusNetwork{
-				NetworkName: path.Join(mapped.Destination.Namespace, mapped.Destination.Name),
+		for _, nic := range needed {
+			networkName := fmt.Sprintf("net-%v", numNetworks)
+			numNetworks++
+			kNetwork := cnv.Network{
+				Name: networkName,
 			}
-			if passThrough {
-				kInterface.SRIOV = &cnv.InterfaceSRIOV{}
-			} else {
-				kInterface.Bridge = &cnv.InterfaceBridge{}
+			kInterface := cnv.Interface{
+				Name:       networkName,
+				Model:      Virtio,
+				MacAddress: nic.MAC,
 			}
+			switch mapped.Destination.Type {
+			case Pod:
+				kNetwork.Pod = &cnv.PodNetwork{}
+				kInterface.Masquerade = &cnv.InterfaceMasquerade{}
+			case Multus:
+				kNetwork.Multus = &cnv.MultusNetwork{
+					NetworkName: path.Join(mapped.Destination.Namespace, mapped.Destination.Name),
+				}
+				if nic.Profile.PassThrough {
+					kInterface.SRIOV = &cnv.InterfaceSRIOV{}
+				} else {
+					kInterface.Bridge = &cnv.InterfaceBridge{}
+				}
+			}
+			kNetworks = append(kNetworks, kNetwork)
+			kInterfaces = append(kInterfaces, kInterface)
 		}
-		kNetworks = append(kNetworks, kNetwork)
-		kInterfaces = append(kInterfaces, kInterface)
 	}
 	object.Template.Spec.Networks = kNetworks
 	object.Template.Spec.Domain.Devices.Interfaces = kInterfaces
