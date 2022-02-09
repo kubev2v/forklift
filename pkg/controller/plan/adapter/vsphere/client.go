@@ -80,25 +80,28 @@ func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy) (er
 }
 
 //
-// Create DataVolume checkpoints.
-func (r *Client) CreateCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []*cdi.DataVolume) (checkpoints map[*cdi.DataVolume]cdi.DataVolumeCheckpoint, err error) {
+// Set DataVolume checkpoints.
+func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []cdi.DataVolume, final bool) (err error) {
 	n := len(precopies)
-	previous := precopies[n-2].Snapshot
+	previous := ""
 	current := precopies[n-1].Snapshot
+	if n >= 2 {
+		previous = precopies[n-2].Snapshot
+	}
 
-	checkpoints = make(map[*cdi.DataVolume]cdi.DataVolumeCheckpoint)
-	if settings.Settings.VsphereIncrementalBackup {
+	if settings.Settings.VsphereIncrementalBackup && previous != "" {
 		var changeIds map[string]string
 		changeIds, err = r.getChangeIds(vmRef, previous)
 		if err != nil {
 			return
 		}
 		for i := range datavolumes {
-			dv := datavolumes[i]
-			checkpoints[dv] = cdi.DataVolumeCheckpoint{
+			dv := &datavolumes[i]
+			dv.Spec.Checkpoints = append(dv.Spec.Checkpoints, cdi.DataVolumeCheckpoint{
 				Current:  current,
 				Previous: changeIds[dv.Spec.Source.VDDK.BackingFile],
-			}
+			})
+			dv.Spec.FinalCheckpoint = final
 		}
 		err = r.removeSnapshot(vmRef, previous, false)
 		if err != nil {
@@ -106,11 +109,12 @@ func (r *Client) CreateCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, d
 		}
 	} else {
 		for i := range datavolumes {
-			dv := datavolumes[i]
-			checkpoints[dv] = cdi.DataVolumeCheckpoint{
+			dv := &datavolumes[i]
+			dv.Spec.Checkpoints = append(dv.Spec.Checkpoints, cdi.DataVolumeCheckpoint{
 				Current:  current,
 				Previous: previous,
-			}
+			})
+			dv.Spec.FinalCheckpoint = final
 		}
 	}
 	return

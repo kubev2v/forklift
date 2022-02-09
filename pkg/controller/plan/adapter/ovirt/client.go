@@ -13,7 +13,6 @@ import (
 )
 
 const (
-	snapshotName = "forklift-migration-precopy"
 	snapshotDesc = "Forklift Operator warm migration precopy"
 )
 
@@ -41,7 +40,6 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref) (snapshot string, err error) {
 	snapsService := vmService.SnapshotsService()
 	snap, err := snapsService.Add().Snapshot(
 		ovirtsdk.NewSnapshotBuilder().
-			Name(snapshotName).
 			Description(snapshotDesc).
 			PersistMemorystate(false).
 			MustBuild(),
@@ -76,28 +74,34 @@ func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy) (er
 }
 
 //
-// Create DataVolume checkpoints.
-func (r *Client) CreateCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []*cdi.DataVolume) (checkpoints map[*cdi.DataVolume]cdi.DataVolumeCheckpoint, err error) {
+// Set DataVolume checkpoints.
+func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []cdi.DataVolume, final bool) (err error) {
 	n := len(precopies)
-	previous := precopies[n-2].Snapshot
+	previous := ""
 	current := precopies[n-1].Snapshot
+	if n >= 2 {
+		previous = precopies[n-2].Snapshot
+	}
 
-	checkpoints = make(map[*cdi.DataVolume]cdi.DataVolumeCheckpoint)
 	for i := range datavolumes {
-		dv := datavolumes[i]
+		dv := &datavolumes[i]
 		var currentDiskSnapshot, previousDiskSnapshot string
 		currentDiskSnapshot, err = r.getDiskSnapshot(dv.Spec.Source.Imageio.DiskID, current)
 		if err != nil {
 			return
 		}
-		previousDiskSnapshot, err = r.getDiskSnapshot(dv.Spec.Source.Imageio.DiskID, previous)
-		if err != nil {
-			return
+		if previous != "" {
+			previousDiskSnapshot, err = r.getDiskSnapshot(dv.Spec.Source.Imageio.DiskID, previous)
+			if err != nil {
+				return
+			}
 		}
-		checkpoints[dv] = cdi.DataVolumeCheckpoint{
+
+		dv.Spec.Checkpoints = append(dv.Spec.Checkpoints, cdi.DataVolumeCheckpoint{
 			Current:  currentDiskSnapshot,
 			Previous: previousDiskSnapshot,
-		}
+		})
+		dv.Spec.FinalCheckpoint = final
 	}
 	return
 }
@@ -207,36 +211,64 @@ func (r *Client) getVM(vmRef ref.Ref) (ovirtVm *ovirtsdk.Vm, vmService *ovirtsdk
 //
 // Get the disk snapshot for this disk and this snapshot ID.
 func (r *Client) getDiskSnapshot(diskID, targetSnapshotID string) (diskSnapshotID string, err error) {
-	diskService := r.connection.SystemService().DisksService().DiskService(diskID)
-	diskSnapshotsService := diskService.DiskSnapshotsService()
-	diskSnapshotsListResponse, err := diskSnapshotsService.List().Send()
+	response, rErr := r.connection.SystemService().DisksService().DiskService(diskID).Get().Send()
 	if err != nil {
-		err = liberr.Wrap(
-			err,
-			"Error listing snapshots on disk",
-			"disk",
-			diskID)
+		err = liberr.Wrap(rErr)
+		return
+	}
+	disk, ok := response.Disk()
+	if !ok {
+		err = liberr.New("Could not find disk definition in response.", "disk", diskID)
 		return
 	}
 
-	diskSnapshotsList, success := diskSnapshotsListResponse.Snapshots()
-	if !success || len(diskSnapshotsList.Slice()) == 0 {
-		err = liberr.New(
-			"No snapshots listed on disk",
-			"disk",
-			diskID)
+	storageDomains, ok := disk.StorageDomains()
+	if !ok {
+		err = liberr.New("No storage domains listed for disk.", "disk", diskID)
 		return
 	}
 
-	for _, diskSnapshot := range diskSnapshotsList.Slice() {
-		if snapshot, success := diskSnapshot.Snapshot(); success {
-			if snapshotID, success := snapshot.Id(); success && snapshotID == targetSnapshotID {
-				if diskSnapshotID, success = diskSnapshot.Id(); success {
-					return
-				}
+	for _, sd := range storageDomains.Slice() {
+		sdID, ok := sd.Id()
+		if !ok {
+			continue
+		}
+		sdService := r.connection.SystemService().StorageDomainsService().StorageDomainService(sdID)
+		if sdService == nil {
+			err = liberr.New("No service available for storage domain.", "storageDomain", sdID)
+			return
+		}
+		snapshotsResponse, rErr := sdService.DiskSnapshotsService().List().Send()
+		if err != nil {
+			err = liberr.Wrap(rErr, "Error listing snapshots in storage domain.", "storageDomain", sdID)
+			return
+		}
+		snapshots, ok := snapshotsResponse.Snapshots()
+		if !ok || len(snapshots.Slice()) == 0 {
+			err = liberr.New("No snapshots listed in storage domain.", "storageDomain", sdID)
+			return
+		}
+		for _, diskSnapshot := range snapshots.Slice() {
+			id, ok := diskSnapshot.Id()
+			if !ok {
+				continue
+			}
+			snapshot, ok := diskSnapshot.Snapshot()
+			if !ok {
+				continue
+			}
+			sid, ok := snapshot.Id()
+			if !ok {
+				continue
+			}
+			if targetSnapshotID == sid {
+				diskSnapshotID = id
+				return
 			}
 		}
 	}
+
+	err = liberr.New("Could not find disk snapshot.", "disk", diskID, "vmSnapshot", targetSnapshotID)
 	return
 }
 
