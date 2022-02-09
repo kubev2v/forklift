@@ -429,22 +429,27 @@ func (r *KubeVirt) SetRunning(vmCr *VirtualMachine, running bool) (err error) {
 }
 
 //
-// Ensure the DataVolumes exist on the destination.
-func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus) (err error) {
+//
+func (r *KubeVirt) DataVolumes(vm *plan.VMStatus) (dataVolumes []cdi.DataVolume, err error) {
 	secret, err := r.ensureSecret(vm.Ref)
 	if err != nil {
-		return err
+		return
 	}
 	configMap, err := r.ensureConfigMap(vm.Ref)
 	if err != nil {
 		return
 	}
 
-	dataVolumes, err := r.dataVolumes(vm, secret, configMap)
+	dataVolumes, err = r.dataVolumes(vm, secret, configMap)
 	if err != nil {
 		return
 	}
+	return
+}
 
+//
+// Ensure the DataVolumes exist on the destination.
+func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus, dataVolumes []cdi.DataVolume) (err error) {
 	list := &cdi.DataVolumeList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
@@ -481,18 +486,6 @@ func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus) (err error) {
 				"vm",
 				vm.String())
 		}
-	}
-
-	return
-}
-
-func (r *KubeVirt) SetDataVolumeCheckpoint(dv *cdi.DataVolume, checkpoint cdi.DataVolumeCheckpoint, final bool) (err error) {
-	dv.Spec.Checkpoints = append(dv.Spec.Checkpoints, checkpoint)
-	dv.Spec.FinalCheckpoint = final
-	err = r.Destination.Client.Update(context.TODO(), dv)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
 	}
 
 	return
@@ -681,11 +674,6 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 			Spec: dataVolumes[i],
 		}
 		dv.Labels = r.vmLabels(vm.Ref)
-		if vm.Warm != nil {
-			dv.Spec.Checkpoints = []cdi.DataVolumeCheckpoint{
-				{Previous: "", Current: vm.Warm.Precopies[0].Snapshot},
-			}
-		}
 		objects = append(objects, dv)
 	}
 
