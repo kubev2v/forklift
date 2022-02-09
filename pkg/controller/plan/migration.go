@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	libcnd "github.com/konveyor/controller/pkg/condition"
@@ -574,7 +575,8 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
 			break
 		}
-		err = r.kubevirt.EnsureDataVolumes(vm)
+		var dataVolumes []cdi.DataVolume
+		dataVolumes, err = r.kubevirt.DataVolumes(vm)
 		if err != nil {
 			if !errors.As(err, &web.ProviderNotReadyError{}) {
 				step.AddError(err.Error())
@@ -584,6 +586,25 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				return
 			}
 		}
+		if vm.Warm != nil {
+			err = r.provider.SetCheckpoints(vm.Ref, vm.Warm.Precopies, dataVolumes, false)
+			if err != nil {
+				step.AddError(err.Error())
+				err = nil
+				break
+			}
+		}
+		err = r.kubevirt.EnsureDataVolumes(vm, dataVolumes)
+		if err != nil {
+			if !errors.As(err, &web.ProviderNotReadyError{}) {
+				step.AddError(err.Error())
+				err = nil
+				break
+			} else {
+				return
+			}
+		}
+
 		vm.Phase = r.next(vm.Phase)
 	case CreateVM:
 		step, found := vm.FindStep(r.step(vm))
@@ -1275,19 +1296,19 @@ func (r *Migration) setDataVolumeCheckpoints(vm *plan.VMStatus) (err error) {
 		vm.AddError(msg)
 		return
 	}
-	dvs := make([]*cdi.DataVolume, 0)
+	dvs := make([]cdi.DataVolume, 0)
 	for i := range vmCr.DataVolumes {
 		dv := vmCr.DataVolumes[i].DataVolume
-		dvs = append(dvs, dv)
+		dvs = append(dvs, *dv)
 	}
-	checkpoints, err := r.provider.CreateCheckpoints(vm.Ref, vm.Warm.Precopies, dvs)
+	err = r.provider.SetCheckpoints(vm.Ref, vm.Warm.Precopies, dvs, vm.Phase == AddFinalCheckpoint)
 	if err != nil {
 		return
 	}
-
-	for k, v := range checkpoints {
-		err = r.kubevirt.SetDataVolumeCheckpoint(k, v, vm.Phase == AddFinalCheckpoint)
+	for i := range dvs {
+		err = r.Destination.Client.Update(context.TODO(), &dvs[i])
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 	}
