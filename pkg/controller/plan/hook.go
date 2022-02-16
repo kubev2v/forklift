@@ -216,10 +216,10 @@ func (r *HookRunner) template(mp *core.ConfigMap) (template *core.PodTemplateSpe
 		container.Command = []string{
 			"/bin/entrypoint",
 			"ansible-runner",
-			"-p",
-			"/tmp/hook/playbook.yml",
 			"run",
 			"/tmp/runner",
+			"-p",
+			"/tmp/hook/playbook.yml",
 		}
 	}
 
