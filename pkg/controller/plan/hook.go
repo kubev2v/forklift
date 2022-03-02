@@ -149,8 +149,12 @@ func (r *HookRunner) ensureJob() (job *batch.Job, err error) {
 // Build the Job.
 func (r *HookRunner) job(mp *core.ConfigMap) (job *batch.Job, err error) {
 	template := r.template(mp)
+	backOff := int32(0)
 	job = &batch.Job{
-		Spec: batch.JobSpec{Template: *template},
+		Spec: batch.JobSpec{
+			Template:     *template,
+			BackoffLimit: &backOff,
+		},
 		ObjectMeta: meta.ObjectMeta{
 			Namespace: r.Plan.Namespace,
 			GenerateName: strings.ToLower(
@@ -176,7 +180,7 @@ func (r *HookRunner) job(mp *core.ConfigMap) (job *batch.Job, err error) {
 func (r *HookRunner) template(mp *core.ConfigMap) (template *core.PodTemplateSpec) {
 	template = &core.PodTemplateSpec{
 		Spec: core.PodSpec{
-			RestartPolicy: "OnFailure",
+			RestartPolicy: core.RestartPolicyNever,
 			Containers: []core.Container{
 				{
 					Name:  "hook",
