@@ -149,7 +149,7 @@ func (r *HookRunner) ensureJob() (job *batch.Job, err error) {
 // Build the Job.
 func (r *HookRunner) job(mp *core.ConfigMap) (job *batch.Job, err error) {
 	template := r.template(mp)
-	backOff := int32(0)
+	backOff := int32(1)
 	job = &batch.Job{
 		Spec: batch.JobSpec{
 			Template:     *template,
