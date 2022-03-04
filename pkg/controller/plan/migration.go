@@ -549,6 +549,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		}
 		vm.MarkStarted()
 		step.MarkStarted()
+		step.Phase = Running
 		err = r.CleanUp(vm)
 		if err != nil {
 			step.AddError(err.Error())
@@ -563,7 +564,9 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			return
 		}
 		if step, found := vm.FindStep(r.step(vm)); found {
+			step.Phase = Running
 			if step.MarkedCompleted() && step.Error == nil {
+				step.Phase = Completed
 				vm.Phase = r.next(vm.Phase)
 			}
 		} else {
@@ -644,6 +647,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		if !waiting {
 			vm.Phase = r.next(vm.Phase)
 			step.MarkCompleted()
+			step.Phase = Completed
 			step.Progress.Completed = step.Progress.Total
 		}
 	case CopyDisks:
@@ -652,6 +656,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
 			break
 		}
+		step.Phase = Running
 		err = r.updateCopyProgress(vm, step)
 		if err != nil {
 			step.AddError(err.Error())
@@ -667,6 +672,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				vm.Warm.NextPrecopyAt = &next
 				vm.Warm.Successes++
 			}
+			step.Phase = Completed
 			vm.Phase = r.next(vm.Phase)
 		}
 	case CopyingPaused:
@@ -801,6 +807,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				err = nil
 			}
 			if !step.HasError() {
+				step.Phase = Completed
 				vm.Phase = r.next(vm.Phase)
 			}
 		}
@@ -811,6 +818,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			break
 		}
 		step.MarkStarted()
+		step.Phase = Running
 		err = r.ensureGuestConversionPod(vm)
 		if err != nil {
 			step.AddError(err.Error())
@@ -829,6 +837,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			return
 		}
 		if step.MarkedCompleted() && !step.HasError() {
+			step.Phase = Completed
 			vm.Phase = r.next(vm.Phase)
 		}
 	case Completed:
@@ -908,6 +917,7 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 						Name:        Initialize,
 						Description: "Initialize migration.",
 						Progress:    libitr.Progress{Total: 1},
+						Phase:       Pending,
 					},
 				})
 		case PreHook:
@@ -918,6 +928,7 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 						Name:        PreHook,
 						Description: "Run pre-migration hook.",
 						Progress:    libitr.Progress{Total: 1},
+						Phase:       Pending,
 					},
 				})
 		case CopyDisks:
@@ -942,6 +953,7 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 						Annotations: map[string]string{
 							"unit": "MB",
 						},
+						Phase: Pending,
 					},
 					Tasks: tasks,
 				})
@@ -978,6 +990,7 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 						Name:        ImageConversion,
 						Description: "Convert image to kubevirt.",
 						Progress:    libitr.Progress{Total: 1},
+						Phase:       Pending,
 					},
 				})
 		case PostHook:
@@ -988,6 +1001,7 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 						Name:        PostHook,
 						Description: "Run post-migration hook.",
 						Progress:    libitr.Progress{Total: 1},
+						Phase:       Pending,
 					},
 				})
 		}
