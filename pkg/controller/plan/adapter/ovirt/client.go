@@ -253,6 +253,14 @@ func (r *Client) getDiskSnapshot(diskID, targetSnapshotID string) (diskSnapshotI
 			if !ok {
 				continue
 			}
+			snapshotDisk, ok := diskSnapshot.Disk()
+			if !ok {
+				continue
+			}
+			snapshotDiskID, ok := snapshotDisk.Id()
+			if !ok {
+				continue
+			}
 			snapshot, ok := diskSnapshot.Snapshot()
 			if !ok {
 				continue
@@ -261,7 +269,7 @@ func (r *Client) getDiskSnapshot(diskID, targetSnapshotID string) (diskSnapshotI
 			if !ok {
 				continue
 			}
-			if targetSnapshotID == sid {
+			if snapshotDiskID == diskID && targetSnapshotID == sid {
 				diskSnapshotID = id
 				return
 			}
