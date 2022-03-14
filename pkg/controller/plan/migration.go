@@ -1244,7 +1244,7 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 				}
 				err = nil
 			} else {
-				if r.Plan.Spec.Warm {
+				if r.Plan.Spec.Warm && len(importer.Status.ContainerStatuses) > 0 {
 					vm.Warm.Failures = int(importer.Status.ContainerStatuses[0].RestartCount)
 				}
 				if restartLimitExceeded(importer) {
@@ -1355,7 +1355,7 @@ func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 //
 // Retrieve the termination message from a pod's first container.
 func terminationMessage(pod *core.Pod) (msg string, ok bool) {
-	if pod.Status.ContainerStatuses != nil &&
+	if len(pod.Status.ContainerStatuses) > 0 &&
 		pod.Status.ContainerStatuses[0].LastTerminationState.Terminated != nil &&
 		pod.Status.ContainerStatuses[0].LastTerminationState.Terminated.ExitCode > 0 {
 		msg = pod.Status.ContainerStatuses[0].LastTerminationState.Terminated.Message
@@ -1367,6 +1367,9 @@ func terminationMessage(pod *core.Pod) (msg string, ok bool) {
 //
 // Return whether the pod has failed and restarted too many times.
 func restartLimitExceeded(pod *core.Pod) (exceeded bool) {
+	if len(pod.Status.ContainerStatuses) == 0 {
+		return
+	}
 	cs := pod.Status.ContainerStatuses[0]
 	exceeded = int(cs.RestartCount) > settings.Settings.ImporterRetry
 	return
