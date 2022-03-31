@@ -365,8 +365,15 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 
 		needed := []vsphere.NIC{}
 		for _, nic := range vm.NICs {
-			if nic.Network.ID == network.ID {
-				needed = append(needed, nic)
+			switch network.Variant {
+			case vsphere.NetDvPortGroup:
+				if nic.Network.ID == network.Key {
+					needed = append(needed, nic)
+				}
+			default:
+				if nic.Network.ID == network.ID {
+					needed = append(needed, nic)
+				}
 			}
 		}
 		if len(needed) == 0 {

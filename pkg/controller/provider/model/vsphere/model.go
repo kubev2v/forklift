@@ -223,6 +223,7 @@ type Network struct {
 	Base
 	Tag      string    `sql:""`
 	DVSwitch Ref       `sql:""`
+	Key      string    `sql:""`
 	Host     []DVSHost `sql:""`
 }
 
