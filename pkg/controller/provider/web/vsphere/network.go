@@ -184,6 +184,7 @@ type Network struct {
 	DVSwitch *model.Ref      `json:"dvSwitch,omitempty"`
 	Host     []model.DVSHost `json:"host"`
 	Tag      string          `json:"tag,omitempty"`
+	Key      string          `json:"key,omitempty"`
 }
 
 //
@@ -196,6 +197,7 @@ func (r *Network) With(m *model.Network) {
 		r.Tag = m.Tag
 	case model.NetDvPortGroup:
 		r.DVSwitch = &m.DVSwitch
+		r.Key = m.Key
 	case model.NetDvSwitch:
 		r.Host = m.Host
 	}
