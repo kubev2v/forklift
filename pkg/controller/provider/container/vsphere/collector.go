@@ -86,6 +86,7 @@ const (
 	fTag = "tag"
 	// PortGroup
 	fDVSwitch = "config.distributedVirtualSwitch"
+	fKey      = "key"
 	// DV Switch
 	fDVSwitchHost = "config.host"
 	// Datastore
@@ -671,6 +672,7 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 				fName,
 				fDVSwitch,
 				fTag,
+				fKey,
 			},
 		},
 		{
