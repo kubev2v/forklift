@@ -8,7 +8,7 @@ The default hook image is `quay.io/konveyor/hook-runner:latest`. It is based off
 When an Ansible playbook is provided as part of a migration hook it will be mounted into the hook container as a ConfigMap. In either case the hook container will be run as job in the konveyor-forklift namespace on the cluster, using either the default ServiceAccount or a ServiceAccount define on the hook resource.
 
 # Adding a hook to a Plan
-Hooks can be specified per VM and may be run as a post of pre hook. When adding a hook you must specify the namespace where the hook CR is located along with its name and specify whether it should be run as a PreHook or PostHook.
+Hooks can be specified per VM and may be run as a post or pre hook. When adding a hook you must specify the namespace where the hook CR is located along with its name and specify whether it should be run as a PreHook or PostHook.
 
 ```
 kind: Plan
