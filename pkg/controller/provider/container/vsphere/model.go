@@ -401,6 +401,10 @@ func (v *NetworkAdapter) Apply(u types.ObjectUpdate) {
 				if s, cast := p.Val.(string); cast {
 					v.model.Tag = s
 				}
+			case fKey:
+				if s, cast := p.Val.(string); cast {
+					v.model.Key = s
+				}
 			case fDVSwitch:
 				v.model.DVSwitch = v.Ref(p.Val)
 			}
