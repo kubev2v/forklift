@@ -186,6 +186,10 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 		for _, da := range vm.DiskAttachments {
 			if da.Disk.StorageDomain == sd.ID {
 				storageClass := mapped.Destination.StorageClass
+				size := da.Disk.ProvisionedSize
+				if da.Disk.ActualSize > size {
+					size = da.Disk.ActualSize
+				}
 				dvSpec := cdi.DataVolumeSpec{
 					Source: &cdi.DataVolumeSource{
 						Imageio: &cdi.DataVolumeSourceImageIO{
@@ -198,7 +202,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 					Storage: &cdi.StorageSpec{
 						Resources: core.ResourceRequirements{
 							Requests: core.ResourceList{
-								core.ResourceStorage: *resource.NewQuantity(da.Disk.ProvisionedSize, resource.BinarySI),
+								core.ResourceStorage: *resource.NewQuantity(size, resource.BinarySI),
 							},
 						},
 						StorageClassName: &storageClass,
