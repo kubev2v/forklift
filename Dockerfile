@@ -1,12 +1,12 @@
 # Builder image
-FROM registry.access.redhat.com/ubi8/go-toolset:1.15.13 as builder
+FROM registry.access.redhat.com/ubi8/go-toolset:1.16.12 as builder
 ENV GOPATH=$APP_ROOT
 COPY . .
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o manager github.com/konveyor/forklift-controller/cmd/manager
 
 
 # Runner image
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.4
+FROM registry.access.redhat.com/ubi8/ubi-minimal
 RUN microdnf -y install tar && microdnf clean all
 
 COPY --from=builder /opt/app-root/src/manager /usr/local/bin/manager
