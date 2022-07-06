@@ -29,6 +29,9 @@ require (
 	sigs.k8s.io/controller-runtime v0.8.3
 )
 
+// CVE-2021-41190
+replace github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.2
+
 replace bitbucket.org/ww/goautoneg v0.0.0-20120707110453-75cd24fc2f2c => github.com/markusthoemmes/goautoneg v0.0.0-20190713162725-c6008fefa5b1
 
 //openshift deps pinning
