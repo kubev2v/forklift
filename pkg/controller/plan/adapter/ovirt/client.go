@@ -43,7 +43,7 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref) (snapshot string, err error) {
 			Description(snapshotDesc).
 			PersistMemorystate(false).
 			MustBuild(),
-	).Send()
+	).Query("correlation_id", r.Migration.Name).Send()
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -65,7 +65,7 @@ func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy) (er
 	snapsService := vmService.SnapshotsService()
 	for i := range precopies {
 		snapService := snapsService.SnapshotService(precopies[i].Snapshot)
-		_, err = snapService.Remove().Async(true).Send()
+		_, err = snapService.Remove().Async(true).Query("correlation_id", r.Migration.Name).Send()
 		if err != nil {
 			err = liberr.Wrap(err)
 		}
@@ -193,7 +193,7 @@ func (r *Client) getVM(vmRef ref.Ref) (ovirtVm *ovirtsdk.Vm, vmService *ovirtsdk
 		return
 	}
 	vmService = r.connection.SystemService().VmsService().VmService(vm.ID)
-	vmResponse, err := vmService.Get().Send()
+	vmResponse, err := vmService.Get().Query("correlation_id", r.Migration.Name).Send()
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -211,7 +211,7 @@ func (r *Client) getVM(vmRef ref.Ref) (ovirtVm *ovirtsdk.Vm, vmService *ovirtsdk
 //
 // Get the disk snapshot for this disk and this snapshot ID.
 func (r *Client) getDiskSnapshot(diskID, targetSnapshotID string) (diskSnapshotID string, err error) {
-	response, rErr := r.connection.SystemService().DisksService().DiskService(diskID).Get().Send()
+	response, rErr := r.connection.SystemService().DisksService().DiskService(diskID).Get().Query("correlation_id", r.Migration.Name).Send()
 	if err != nil {
 		err = liberr.Wrap(rErr)
 		return
