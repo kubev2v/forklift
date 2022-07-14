@@ -115,7 +115,7 @@ func (r *Client) PowerState(vmRef ref.Ref) (state string, err error) {
 	}
 	status, _ := vm.Status()
 	switch status {
-	case ovirtsdk.VMSTATUS_DOWN, ovirtsdk.VMSTATUS_POWERING_DOWN:
+	case ovirtsdk.VMSTATUS_DOWN:
 		state = powerOff
 	case ovirtsdk.VMSTATUS_UP, ovirtsdk.VMSTATUS_POWERING_UP:
 		state = powerOn
