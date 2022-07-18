@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path"
+	"time"
+
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libitr "github.com/konveyor/controller/pkg/itinerary"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
@@ -18,8 +20,6 @@ import (
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
-	"path"
-	"time"
 )
 
 //
@@ -1349,7 +1349,7 @@ func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 	case HasPostHook:
 		_, allowed = r.vm.FindHook(PostHook)
 	case RequiresConversion:
-		allowed = r.context.Source.Provider.Type() == api.VSphere
+		allowed = r.context.Source.Provider.RequiresConversion()
 	}
 
 	return

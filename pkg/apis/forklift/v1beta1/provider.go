@@ -149,3 +149,9 @@ func (p *Provider) IsHost() bool {
 func (p *Provider) HasReconciled() bool {
 	return p.Generation == p.Status.ObservedGeneration
 }
+
+//
+// This provider requires VM guest conversion.
+func (p *Provider) RequiresConversion() bool {
+	return p.Type() == VSphere
+}
