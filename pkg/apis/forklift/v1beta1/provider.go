@@ -27,16 +27,29 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
+type ProviderType string
+
 //
 // Provider types.
 const (
+	Undefined ProviderType = ""
 	// OpenShift
-	OpenShift = "openshift"
+	OpenShift ProviderType = "openshift"
 	// vSphere
-	VSphere = "vsphere"
+	VSphere ProviderType = "vsphere"
 	// oVirt
-	OVirt = "ovirt"
+	OVirt ProviderType = "ovirt"
 )
+
+var ProviderTypes = []ProviderType{
+	OpenShift,
+	VSphere,
+	OVirt,
+}
+
+func (t ProviderType) String() string {
+	return string(t)
+}
 
 //
 // Secret fields.
@@ -48,7 +61,7 @@ const (
 // Defines the desired state of Provider.
 type ProviderSpec struct {
 	// Provider type.
-	Type string `json:"type"`
+	Type *ProviderType `json:"type"`
 	// The provider URL.
 	// Empty may be used for the `host` provider.
 	URL string `json:"url,omitempty"`
@@ -134,8 +147,11 @@ func (p *Provider) Client(secret *core.Secret) (c client.Client, err error) {
 
 //
 // The provider type.
-func (p *Provider) Type() string {
-	return p.Spec.Type
+func (p *Provider) Type() ProviderType {
+	if p.Spec.Type != nil {
+		return *p.Spec.Type
+	}
+	return Undefined
 }
 
 //
