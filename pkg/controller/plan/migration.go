@@ -143,7 +143,7 @@ type Migration struct {
 //
 // Type of migration.
 func (r *Migration) Type() string {
-	return r.Context.Source.Provider.Type()
+	return r.Context.Source.Provider.Type().String()
 }
 
 //

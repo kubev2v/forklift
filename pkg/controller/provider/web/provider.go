@@ -104,9 +104,9 @@ func (h ProviderHandler) List(ctx *gin.Context) {
 		return
 	}
 	r := Provider{
-		api.OpenShift: ocpList,
-		api.VSphere:   vSphereList,
-		api.OVirt:     oVirtList,
+		string(api.OpenShift): ocpList,
+		string(api.VSphere):   vSphereList,
+		string(api.OVirt):     oVirtList,
 	}
 
 	content := r

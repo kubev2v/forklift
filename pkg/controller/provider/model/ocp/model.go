@@ -1,6 +1,9 @@
 package ocp
 
 import (
+	"path"
+	"strconv"
+
 	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
@@ -10,8 +13,6 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	cnv "kubevirt.io/client-go/api/v1"
-	"path"
-	"strconv"
 )
 
 //
@@ -90,7 +91,7 @@ type Provider struct {
 
 func (m *Provider) With(p *api.Provider) {
 	m.Base.With(p)
-	m.Type = p.Type()
+	m.Type = p.Type().String()
 	m.Object = *p
 }
 

@@ -10,7 +10,7 @@ import (
 //
 // Routes
 const (
-	Root = base.ProvidersRoot + "/" + api.OpenShift
+	Root = base.ProvidersRoot + "/" + string(api.OpenShift)
 )
 
 //
