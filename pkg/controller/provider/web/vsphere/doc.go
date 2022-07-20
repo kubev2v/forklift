@@ -10,7 +10,7 @@ import (
 //
 // Routes
 const (
-	Root = base.ProvidersRoot + "/" + api.VSphere
+	Root = base.ProvidersRoot + "/" + string(api.VSphere)
 )
 
 //
