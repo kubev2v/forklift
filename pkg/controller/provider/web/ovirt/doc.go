@@ -10,7 +10,7 @@ import (
 //
 // Routes
 const (
-	Root = base.ProvidersRoot + "/" + api.OVirt
+	Root = base.ProvidersRoot + "/" + string(api.OVirt)
 )
 
 //

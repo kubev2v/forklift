@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net/url"
+
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libref "github.com/konveyor/controller/pkg/ref"
@@ -10,7 +12,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"net/url"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -102,25 +103,20 @@ func (r *Reconciler) validate(provider *api.Provider) error {
 //
 // Validate types.
 func (r *Reconciler) validateType(provider *api.Provider) error {
-	switch provider.Type() {
-	case api.OpenShift,
-		api.VSphere,
-		api.OVirt:
-	default:
-		valid := []string{
-			api.OpenShift,
-			api.VSphere,
-			api.OVirt,
+	for _, p := range api.ProviderTypes {
+		if p == provider.Type() {
+			return nil
 		}
-		provider.Status.SetCondition(
-			libcnd.Condition{
-				Type:     TypeNotSupported,
-				Status:   True,
-				Reason:   NotSupported,
-				Category: Critical,
-				Message:  fmt.Sprintf("The `type` must be: %s", valid),
-			})
 	}
+
+	provider.Status.SetCondition(
+		libcnd.Condition{
+			Type:     TypeNotSupported,
+			Status:   True,
+			Reason:   NotSupported,
+			Category: Critical,
+			Message:  fmt.Sprintf("The `type` must be: %s", api.ProviderTypes),
+		})
 
 	return nil
 }
