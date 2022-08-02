@@ -23,7 +23,7 @@ debug: generate fmt vet
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate fmt vet
 	export METRICS_PORT=8888;\
-		go run ./cmd/manager/main.go
+		KUBEVIRT_CLIENT_GO_SCHEME_REGISTRATION_VERSION=v1 go run ./cmd/manager/main.go
 
 # Install CRDs into a cluster
 install: manifests
