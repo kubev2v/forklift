@@ -4,6 +4,12 @@ GOOS ?= `go env GOOS`
 GOBIN ?= ${GOPATH}/bin
 GO111MODULE = auto
 
+ifeq (, $(shell which docker))
+    CONTAINER_CMD = podman
+else
+    CONTAINER_CMD = docker
+endif
+
 ci: all
 
 all: test manager
@@ -55,13 +61,13 @@ generate: controller-gen
 # Build the docker image
 #docker-build: test
 docker-build:
-	docker build . -t ${IMG}
+	$(CONTAINER_CMD) build . -t ${IMG}
 	@echo "updating kustomize image patch file for manager resource"
 	sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
 
 # Push the docker image
 docker-push:
-	docker push ${IMG}
+	$(CONTAINER_CMD) push ${IMG}
 
 # find or download controller-gen
 # download controller-gen if necessary
