@@ -30,6 +30,7 @@ const (
 	Virtio     = "virtio"
 	Sata       = "sata"
 	Scsi       = "scsi"
+	IDE        = "ide"
 )
 
 // Input types
@@ -411,7 +412,7 @@ func (r *Builder) mapDisks(vm *model.Workload, dataVolumes []cdi.DataVolume, obj
 		switch da.Interface {
 		case VirtioScsi:
 			bus = Scsi
-		case Sata:
+		case Sata, IDE:
 			bus = Sata
 		default:
 			bus = Virtio
