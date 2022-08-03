@@ -298,7 +298,7 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 			}
 			kInterface := cnv.Interface{
 				Name:       networkName,
-				Model:      Virtio,
+				Model:      nic.Interface,
 				MacAddress: nic.MAC,
 			}
 			switch mapped.Destination.Type {
