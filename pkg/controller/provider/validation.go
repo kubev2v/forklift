@@ -10,6 +10,7 @@ import (
 	libref "github.com/konveyor/controller/pkg/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/ovirt"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -27,6 +28,7 @@ const (
 	ConnectionTestFailed    = "ConnectionTestFailed"
 	InventoryCreated        = "InventoryCreated"
 	LoadInventory           = "LoadInventory"
+	ConnectionInsecure      = "ConnectionInsecure"
 )
 
 //
@@ -42,14 +44,15 @@ const (
 //
 // Reasons
 const (
-	NotSet       = "NotSet"
-	NotFound     = "NotFound"
-	NotSupported = "NotSupported"
-	DataErr      = "DataErr"
-	Malformed    = "Malformed"
-	Completed    = "Completed"
-	Tested       = "Tested"
-	Started      = "Started"
+	NotSet              = "NotSet"
+	NotFound            = "NotFound"
+	NotSupported        = "NotSupported"
+	DataErr             = "DataErr"
+	Malformed           = "Malformed"
+	Completed           = "Completed"
+	Tested              = "Tested"
+	Started             = "Started"
+	SkipTLSVerification = "SkipTLSVerification"
 )
 
 //
@@ -202,10 +205,25 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 			"thumbprint",
 		}
 	case api.OVirt:
-		keyList = []string{
-			"user",
-			"password",
-			"cacert",
+		if ovirt.GetInsecureSkipVerifyFlag(secret) {
+			provider.Status.SetCondition(libcnd.Condition{
+				Type:     ConnectionInsecure,
+				Status:   True,
+				Reason:   SkipTLSVerification,
+				Category: Warn,
+				Message:  "TLS is susceptible to machine-in-the-middle attacks when certificate verification is skipped.",
+			})
+
+			keyList = []string{
+				"user",
+				"password",
+			}
+		} else {
+			keyList = []string{
+				"user",
+				"password",
+				"cacert",
+			}
 		}
 	}
 	for _, key := range keyList {

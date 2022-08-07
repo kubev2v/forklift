@@ -4,14 +4,16 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
-	liberr "github.com/konveyor/controller/pkg/error"
-	libweb "github.com/konveyor/controller/pkg/inventory/web"
-	core "k8s.io/api/core/v1"
 	"net"
 	"net/http"
 	liburl "net/url"
+	"strconv"
 	"strings"
 	"time"
+
+	liberr "github.com/konveyor/controller/pkg/error"
+	libweb "github.com/konveyor/controller/pkg/inventory/web"
+	core "k8s.io/api/core/v1"
 )
 
 //
@@ -37,16 +39,23 @@ type Client struct {
 //
 // Connect.
 func (r *Client) connect() (err error) {
+	var TLSClientConfig *tls.Config
+
 	if r.client != nil {
 		return
 	}
 
-	cacert := r.secret.Data["cacert"]
-	roots := x509.NewCertPool()
-	ok := roots.AppendCertsFromPEM(cacert)
-	if !ok {
-		err = liberr.New("failed to parse cacert")
-		return
+	if GetInsecureSkipVerifyFlag(r.secret) {
+		TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	} else {
+		cacert := r.secret.Data["cacert"]
+		roots := x509.NewCertPool()
+		ok := roots.AppendCertsFromPEM(cacert)
+		if !ok {
+			err = liberr.New("failed to parse cacert")
+			return
+		}
+		TLSClientConfig = &tls.Config{RootCAs: roots}
 	}
 
 	r.url = strings.TrimRight(r.url, "/")
@@ -61,7 +70,7 @@ func (r *Client) connect() (err error) {
 			IdleConnTimeout:       10 * time.Second,
 			TLSHandshakeTimeout:   10 * time.Second,
 			ExpectContinueTimeout: 1 * time.Second,
-			TLSClientConfig:       &tls.Config{RootCAs: roots},
+			TLSClientConfig:       TLSClientConfig,
 		},
 	}
 	client.Header = http.Header{
@@ -160,4 +169,21 @@ func (r *Client) system() (s *System, err error) {
 	}
 
 	return
+}
+
+//
+// GetInsecureSkipVerifyFlag gets the insecureSkipVerify boolean flag
+// value from the ovirt connection secret.
+func GetInsecureSkipVerifyFlag(secret *core.Secret) bool {
+	insecure, found := secret.Data["insecureSkipVerify"]
+	if !found {
+		return false
+	}
+
+	insecureSkipVerify, err := strconv.ParseBool(string(insecure))
+	if err != nil {
+		return false
+	}
+
+	return insecureSkipVerify
 }
