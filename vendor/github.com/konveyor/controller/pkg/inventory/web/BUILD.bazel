@@ -1,0 +1,25 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "web",
+    srcs = [
+        "client.go",
+        "doc.go",
+        "handler.go",
+        "web.go",
+    ],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/konveyor/controller/pkg/inventory/web",
+    importpath = "github.com/konveyor/controller/pkg/inventory/web",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/gin-contrib/cors",
+        "//vendor/github.com/gin-gonic/gin",
+        "//vendor/github.com/go-logr/logr",
+        "//vendor/github.com/gorilla/websocket",
+        "//vendor/github.com/konveyor/controller/pkg/error",
+        "//vendor/github.com/konveyor/controller/pkg/inventory/container",
+        "//vendor/github.com/konveyor/controller/pkg/inventory/model",
+        "//vendor/github.com/konveyor/controller/pkg/logging",
+        "//vendor/github.com/konveyor/controller/pkg/ref",
+    ],
+)

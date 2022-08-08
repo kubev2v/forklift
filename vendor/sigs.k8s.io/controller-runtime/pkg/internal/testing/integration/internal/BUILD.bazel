@@ -1,0 +1,22 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "internal",
+    srcs = [
+        "apiserver.go",
+        "arguments.go",
+        "bin_path_finder.go",
+        "etcd.go",
+        "process.go",
+        "tinyca.go",
+    ],
+    importmap = "github.com/konveyor/forklift-controller/vendor/sigs.k8s.io/controller-runtime/pkg/internal/testing/integration/internal",
+    importpath = "sigs.k8s.io/controller-runtime/pkg/internal/testing/integration/internal",
+    visibility = ["//vendor/sigs.k8s.io/controller-runtime/pkg:__subpackages__"],
+    deps = [
+        "//vendor/github.com/onsi/gomega/gbytes",
+        "//vendor/github.com/onsi/gomega/gexec",
+        "//vendor/k8s.io/client-go/util/cert",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/internal/testing/integration/addr",
+    ],
+)

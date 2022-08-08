@@ -1,0 +1,20 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "filebacked",
+    srcs = [
+        "catalog.go",
+        "doc.go",
+        "file.go",
+        "iterator.go",
+        "list.go",
+    ],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/konveyor/controller/pkg/filebacked",
+    importpath = "github.com/konveyor/controller/pkg/filebacked",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/google/uuid",
+        "//vendor/github.com/konveyor/controller/pkg/error",
+        "//vendor/github.com/konveyor/controller/pkg/logging",
+    ],
+)
