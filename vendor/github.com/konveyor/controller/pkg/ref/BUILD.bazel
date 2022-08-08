@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "ref",
+    srcs = [
+        "handler.go",
+        "labels.go",
+        "mapping.go",
+        "predicate.go",
+        "ref.go",
+    ],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/konveyor/controller/pkg/ref",
+    importpath = "github.com/konveyor/controller/pkg/ref",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/konveyor/controller/pkg/logging",
+        "//vendor/k8s.io/api/core/v1:core",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:meta",
+        "//vendor/k8s.io/apimachinery/pkg/types",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/event",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/handler",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/reconcile",
+    ],
+)

@@ -1,0 +1,22 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "compiler",
+    srcs = [
+        "context.go",
+        "error.go",
+        "extension-handler.go",
+        "helpers.go",
+        "main.go",
+        "reader.go",
+    ],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/googleapis/gnostic/compiler",
+    importpath = "github.com/googleapis/gnostic/compiler",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/golang/protobuf/proto",
+        "//vendor/github.com/golang/protobuf/ptypes/any",
+        "//vendor/github.com/googleapis/gnostic/extensions",
+        "//vendor/gopkg.in/yaml.v2:yaml_v2",
+    ],
+)

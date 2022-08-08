@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "zap",
+    srcs = [
+        "flags.go",
+        "kube_helpers.go",
+        "zap.go",
+    ],
+    importmap = "github.com/konveyor/forklift-controller/vendor/sigs.k8s.io/controller-runtime/pkg/log/zap",
+    importpath = "sigs.k8s.io/controller-runtime/pkg/log/zap",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/go-logr/logr",
+        "//vendor/github.com/go-logr/zapr",
+        "//vendor/github.com/spf13/pflag",
+        "//vendor/go.uber.org/zap",
+        "//vendor/go.uber.org/zap/buffer",
+        "//vendor/go.uber.org/zap/zapcore",
+        "//vendor/k8s.io/apimachinery/pkg/api/meta",
+        "//vendor/k8s.io/apimachinery/pkg/runtime",
+        "//vendor/k8s.io/apimachinery/pkg/types",
+    ],
+)

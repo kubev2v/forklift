@@ -1,0 +1,13 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "itinerary",
+    srcs = [
+        "doc.go",
+        "simple.go",
+    ],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/konveyor/controller/pkg/itinerary",
+    importpath = "github.com/konveyor/controller/pkg/itinerary",
+    visibility = ["//visibility:public"],
+    deps = ["//vendor/github.com/konveyor/controller/pkg/error"],
+)

@@ -1,0 +1,28 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "v1alpha1",
+    srcs = [
+        "doc.go",
+        "openapi_generated.go",
+        "register.go",
+        "types.go",
+        "types_swagger_generated.go",
+        "utils.go",
+        "zz_generated.deepcopy.go",
+    ],
+    importmap = "github.com/konveyor/forklift-controller/vendor/kubevirt.io/containerized-data-importer/pkg/apis/core/v1alpha1",
+    importpath = "kubevirt.io/containerized-data-importer/pkg/apis/core/v1alpha1",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/go-openapi/spec",
+        "//vendor/k8s.io/api/core/v1:core",
+        "//vendor/k8s.io/apimachinery/pkg/api/resource",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:meta",
+        "//vendor/k8s.io/apimachinery/pkg/runtime",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor/k8s.io/kube-openapi/pkg/common",
+        "//vendor/kubevirt.io/containerized-data-importer/pkg/apis/core",
+        "//vendor/kubevirt.io/controller-lifecycle-operator-sdk/pkg/sdk/api",
+    ],
+)

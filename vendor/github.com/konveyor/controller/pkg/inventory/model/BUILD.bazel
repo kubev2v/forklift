@@ -1,0 +1,30 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "model",
+    srcs = [
+        "client.go",
+        "doc.go",
+        "field.go",
+        "inspect.go",
+        "journal.go",
+        "label.go",
+        "model.go",
+        "predicate.go",
+        "relation.go",
+        "session.go",
+        "table.go",
+    ],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/konveyor/controller/pkg/inventory/model",
+    importpath = "github.com/konveyor/controller/pkg/inventory/model",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/go-logr/logr",
+        "//vendor/github.com/konveyor/controller/pkg/error",
+        "//vendor/github.com/konveyor/controller/pkg/filebacked",
+        "//vendor/github.com/konveyor/controller/pkg/logging",
+        "//vendor/github.com/konveyor/controller/pkg/ref",
+        "//vendor/github.com/mattn/go-sqlite3",
+        "//vendor/github.com/pkg/errors",
+    ],
+)

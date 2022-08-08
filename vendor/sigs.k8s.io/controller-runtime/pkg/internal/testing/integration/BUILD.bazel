@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "integration",
+    srcs = [
+        "apiserver.go",
+        "control_plane.go",
+        "doc.go",
+        "etcd.go",
+        "kubectl.go",
+    ],
+    importmap = "github.com/konveyor/forklift-controller/vendor/sigs.k8s.io/controller-runtime/pkg/internal/testing/integration",
+    importpath = "sigs.k8s.io/controller-runtime/pkg/internal/testing/integration",
+    visibility = ["//vendor/sigs.k8s.io/controller-runtime/pkg:__subpackages__"],
+    deps = [
+        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer",
+        "//vendor/k8s.io/apimachinery/pkg/util/errors",
+        "//vendor/k8s.io/client-go/kubernetes/scheme",
+        "//vendor/k8s.io/client-go/rest",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/internal/testing/integration/addr",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/internal/testing/integration/internal",
+    ],
+)
