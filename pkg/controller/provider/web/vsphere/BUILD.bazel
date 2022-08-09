@@ -1,0 +1,37 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "vsphere",
+    srcs = [
+        "base.go",
+        "client.go",
+        "cluster.go",
+        "datacenter.go",
+        "datastore.go",
+        "doc.go",
+        "folder.go",
+        "host.go",
+        "network.go",
+        "provider.go",
+        "resource.go",
+        "tree.go",
+        "vm.go",
+        "workload.go",
+    ],
+    importpath = "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/apis/forklift/v1beta1",
+        "//pkg/controller/provider/model/ocp",
+        "//pkg/controller/provider/model/vsphere",
+        "//pkg/controller/provider/web/base",
+        "//pkg/controller/provider/web/ocp",
+        "//vendor/github.com/gin-gonic/gin",
+        "//vendor/github.com/konveyor/controller/pkg/error",
+        "//vendor/github.com/konveyor/controller/pkg/inventory/container",
+        "//vendor/github.com/konveyor/controller/pkg/inventory/model",
+        "//vendor/github.com/konveyor/controller/pkg/inventory/web",
+        "//vendor/github.com/konveyor/controller/pkg/logging",
+        "//vendor/github.com/konveyor/controller/pkg/ref",
+    ],
+)

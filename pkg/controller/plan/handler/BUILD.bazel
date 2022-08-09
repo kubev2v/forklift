@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "handler",
+    srcs = ["doc.go"],
+    importpath = "github.com/konveyor/forklift-controller/pkg/controller/plan/handler",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/apis/forklift/v1beta1",
+        "//pkg/controller/plan/handler/ocp",
+        "//pkg/controller/plan/handler/ovirt",
+        "//pkg/controller/plan/handler/vsphere",
+        "//pkg/controller/watch/handler",
+        "//vendor/github.com/konveyor/controller/pkg/error",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/event",
+    ],
+)

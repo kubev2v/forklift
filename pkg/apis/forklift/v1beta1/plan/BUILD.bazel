@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "plan",
+    srcs = [
+        "doc.go",
+        "mapping.go",
+        "migration.go",
+        "snapshot.go",
+        "timed.go",
+        "vm.go",
+        "zz_generated.deepcopy.go",
+    ],
+    importpath = "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/apis/forklift/v1beta1/ref",
+        "//vendor/github.com/konveyor/controller/pkg/condition",
+        "//vendor/github.com/konveyor/controller/pkg/itinerary",
+        "//vendor/k8s.io/api/core/v1:core",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:meta",
+        "//vendor/k8s.io/apimachinery/pkg/types",
+    ],
+)

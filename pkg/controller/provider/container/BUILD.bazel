@@ -1,0 +1,17 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "container",
+    srcs = ["doc.go"],
+    importpath = "github.com/konveyor/forklift-controller/pkg/controller/provider/container",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/apis/forklift/v1beta1",
+        "//pkg/controller/provider/container/ocp",
+        "//pkg/controller/provider/container/ovirt",
+        "//pkg/controller/provider/container/vsphere",
+        "//vendor/github.com/konveyor/controller/pkg/inventory/container",
+        "//vendor/github.com/konveyor/controller/pkg/inventory/model",
+        "//vendor/k8s.io/api/core/v1:core",
+    ],
+)
