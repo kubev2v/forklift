@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "adapter",
+    srcs = ["doc.go"],
+    importpath = "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/apis/forklift/v1beta1",
+        "//pkg/controller/plan/adapter/base",
+        "//pkg/controller/plan/adapter/ovirt",
+        "//pkg/controller/plan/adapter/vsphere",
+        "//vendor/github.com/konveyor/controller/pkg/error",
+    ],
+)

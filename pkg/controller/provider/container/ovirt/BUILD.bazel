@@ -1,0 +1,32 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "ovirt",
+    srcs = [
+        "client.go",
+        "collector.go",
+        "doc.go",
+        "model.go",
+        "resource.go",
+        "watch.go",
+    ],
+    importpath = "github.com/konveyor/forklift-controller/pkg/controller/provider/container/ovirt",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/apis/forklift/v1beta1",
+        "//pkg/apis/forklift/v1beta1/ref",
+        "//pkg/controller/provider/model/ovirt",
+        "//pkg/controller/provider/web/ovirt",
+        "//pkg/controller/validation/policy",
+        "//pkg/settings",
+        "//vendor/github.com/go-logr/logr",
+        "//vendor/github.com/konveyor/controller/pkg/error",
+        "//vendor/github.com/konveyor/controller/pkg/filebacked",
+        "//vendor/github.com/konveyor/controller/pkg/inventory/container",
+        "//vendor/github.com/konveyor/controller/pkg/inventory/model",
+        "//vendor/github.com/konveyor/controller/pkg/inventory/web",
+        "//vendor/github.com/konveyor/controller/pkg/logging",
+        "//vendor/k8s.io/api/core/v1:core",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:meta",
+    ],
+)

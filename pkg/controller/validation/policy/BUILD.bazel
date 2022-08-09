@@ -1,0 +1,16 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "policy",
+    srcs = ["client.go"],
+    importpath = "github.com/konveyor/forklift-controller/pkg/controller/validation/policy",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/apis/forklift/v1beta1/ref",
+        "//pkg/controller/provider/model/vsphere",
+        "//pkg/settings",
+        "//vendor/github.com/konveyor/controller/pkg/error",
+        "//vendor/github.com/konveyor/controller/pkg/inventory/web",
+        "//vendor/github.com/konveyor/controller/pkg/logging",
+    ],
+)

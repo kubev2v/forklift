@@ -1,0 +1,19 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "context",
+    srcs = [
+        "doc.go",
+        "migration.go",
+    ],
+    importpath = "github.com/konveyor/forklift-controller/pkg/controller/plan/context",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/apis/forklift/v1beta1",
+        "//pkg/controller/provider/web",
+        "//vendor/github.com/go-logr/logr",
+        "//vendor/github.com/konveyor/controller/pkg/error",
+        "//vendor/k8s.io/api/core/v1:core",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
+    ],
+)
