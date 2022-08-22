@@ -2,13 +2,14 @@ package ovirt
 
 import (
 	"errors"
+	"net/http"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	"net/http"
-	"strings"
 )
 
 //
@@ -228,6 +229,7 @@ type VM struct {
 	CpuThreads                  int16        `json:"cpuThreads"`
 	CpuShares                   int16        `json:"cpuShares"`
 	CpuAffinity                 []CpuPinning `json:"cpuAffinity"`
+	CpuPinningPolicy            string       `json:"cpuPinningPolicy"`
 	Memory                      int64        `json:"memory"`
 	BalloonedMemory             bool         `json:"balloonedMemory"`
 	IOThreads                   int16        `json:"ioThreads"`
@@ -276,6 +278,7 @@ func (r *VM) With(m *model.VM) {
 	r.CpuThreads = m.CpuThreads
 	r.CpuShares = m.CpuShares
 	r.CpuAffinity = m.CpuAffinity
+	r.CpuPinningPolicy = m.CpuPinningPolicy
 	r.Memory = m.Memory
 	r.BalloonedMemory = m.BalloonedMemory
 	r.IOThreads = m.IOThreads
