@@ -2,6 +2,9 @@ package ovirt
 
 import (
 	"fmt"
+	"path"
+	"strings"
+
 	liberr "github.com/konveyor/controller/pkg/error"
 	libitr "github.com/konveyor/controller/pkg/itinerary"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
@@ -14,8 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	cnv "kubevirt.io/client-go/api/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
-	"path"
-	"strings"
 )
 
 // BIOS types
@@ -56,6 +57,15 @@ const (
 	DefaultWindows = "win10"
 	DefaultLinux   = "rhel8.1"
 	Unknown        = "unknown"
+)
+
+// CPU Pinning Policies
+const (
+	None           = "none"
+	Manual         = "manual"
+	ResizeAndPin   = "resize_and_pin_numa"
+	Dedicated      = "dedicated"
+	IsolateThreads = "isolate_threads"
 )
 
 // Map of ovirt guest ids to osinfo ids.
@@ -358,6 +368,10 @@ func (r *Builder) mapCPU(vm *model.Workload, object *cnv.VirtualMachineSpec) {
 		Cores:   uint32(vm.CpuCores),
 		Threads: uint32(vm.CpuThreads),
 	}
+	if vm.CpuPinningPolicy == Dedicated {
+		object.Template.Spec.Domain.CPU.DedicatedCPUPlacement = true
+	}
+
 }
 
 func (r *Builder) mapFirmware(vm *model.Workload, cluster *model.Cluster, object *cnv.VirtualMachineSpec) {
