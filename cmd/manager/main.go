@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 //
@@ -80,6 +81,8 @@ func main() {
 	log.Info("setting up manager")
 	mgr, err := manager.New(cfg, manager.Options{
 		MetricsBindAddress: Settings.Metrics.Address(),
+		CertDir:            "/var/run/secrets/forklift-admission-webhook-serving-cert/",
+		Port:               8444,
 	})
 	if err != nil {
 		log.Error(err, "unable to set up overall controller manager")
@@ -87,6 +90,10 @@ func main() {
 	}
 
 	log.Info("Registering Components.")
+
+	if Settings.Role.Has(settings.MainRole) {
+		mgr.GetWebhookServer().Register("/webhooks/provider", &admission.Webhook{Handler: &webhook.Handler{Client: mgr.GetClient()}})
+	}
 
 	// Setup Scheme for all resources
 	log.Info("setting up scheme")
