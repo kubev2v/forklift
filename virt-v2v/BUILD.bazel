@@ -14,11 +14,10 @@ container_image(
     name = "forklift-virt-v2v",
     base = ":virt-v2v-image",
     directory = "/usr/local/bin/",
-    files = ["bin/entrypoint"],
-    entrypoint = ["/usr/local/bin/entrypoint"],
     empty_dirs = ["/disks"],
-    env = { "LIBGUESTFS_BACKEND": "direct" },
+    entrypoint = ["/usr/local/bin/entrypoint"],
+    env = {"LIBGUESTFS_BACKEND": "direct"},
+    files = ["bin/entrypoint"],
     user = "1001",
     visibility = ["//visibility:public"],
 )
-

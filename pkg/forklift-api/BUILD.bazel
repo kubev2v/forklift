@@ -1,0 +1,9 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "forklift-api",
+    srcs = ["api.go"],
+    importpath = "github.com/konveyor/forklift-controller/pkg/forklift-api",
+    visibility = ["//visibility:public"],
+    deps = ["//pkg/forklift-api/webhooks"],
+)

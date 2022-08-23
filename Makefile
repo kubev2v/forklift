@@ -69,6 +69,9 @@ docker-build:
 docker-push:
 	$(CONTAINER_CMD) push ${IMG}
 
+bazel-generate:
+	bazel run //:gazelle
+
 # find or download controller-gen
 # download controller-gen if necessary
 controller-gen:

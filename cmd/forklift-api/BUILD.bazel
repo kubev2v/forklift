@@ -1,0 +1,20 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "forklift-api-lib",
+    srcs = ["forklift-api.go"],
+    importpath = "github.com/konveyor/forklift-controller/cmd/forklift-api",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/forklift-api",
+        "//vendor/github.com/go-logr/logr",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/runtime/log",
+    ],
+)
+
+go_binary(
+    name = "forklift-api",
+    embed = [":forklift-api-lib"],
+    static = "on",
+    visibility = ["//visibility:public"],
+)

@@ -1,0 +1,17 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "webhooks",
+    srcs = [
+        "validating-webhook.go",
+        "webhooks.go",
+    ],
+    importpath = "github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/forklift-api/webhooks/validating-webhook",
+        "//pkg/forklift-api/webhooks/validating-webhook/admitters",
+        "//vendor/github.com/konveyor/controller/pkg/logging",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/manager",
+    ],
+)
