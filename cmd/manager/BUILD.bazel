@@ -28,7 +28,26 @@ go_library(
 go_binary(
     name = "manager",
     embed = [":manager_lib"],
+    static = "on",
     visibility = ["//visibility:public"],
 )
 
+load(
+    "@io_bazel_rules_docker//container:container.bzl",
+    "container_image",
+)
+
+container_image(
+    name = "forklift-controller-image",
+    #architecture = select({
+    #    "@io_bazel_rules_go//go/platform:linux_arm64": "arm64",
+    #    "//conditions:default": "amd64",
+    #}),
+    base = "@ubi8-minimal//image",
+    directory = "/usr/local/bin/",
+    entrypoint = ["/usr/local/bin/manager"],
+    files = [":manager"],
+    user = "1001",
+    visibility = ["//visibility:public"],
+)
 
