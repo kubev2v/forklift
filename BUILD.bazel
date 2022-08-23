@@ -1,0 +1,59 @@
+load("@bazel_gazelle//:def.bzl", "gazelle")
+
+load("@bazel_tools//tools/python:toolchain.bzl", "py_runtime_pair")
+
+py_runtime(
+    name = "py2_runtime",
+    interpreter_path = "/usr/bin/python2",
+    python_version = "PY2",
+)
+
+py_runtime(
+    name = "py3_runtime",
+    interpreter_path = "/usr/bin/python3",
+    python_version = "PY3",
+)
+
+py_runtime_pair(
+    name = "py_runtime_pair",
+    py2_runtime = ":py2_runtime",
+    py3_runtime = ":py3_runtime",
+)
+
+toolchain(
+    name = "py_toolchain",
+    toolchain = "py_runtime_pair",
+    toolchain_type = "@bazel_tools//tools/python:toolchain_type",
+)
+
+# gazelle:prefix github.com/konveyor/forklift-controller
+gazelle(name = "gazelle")
+
+# gazelle:proto disable_global
+
+genrule(
+    name = "build-controller",
+    srcs = [
+        "//cmd/manager",
+    ],
+    outs = ["manager"],
+    cmd = "echo '#!/bin/sh\n\ncp -f $(SRCS) $$1' > \"$@\"",
+    executable = 1,
+)
+
+load(
+    "@io_bazel_rules_docker//container:container.bzl",
+    "container_pull",
+    "container_push",
+)
+
+container_push(
+    name = "push-forklift-controller",
+    format = "Docker",
+    image = "//cmd/manager:forklift-controller-image",
+    registry = "image-registry.openshift-image-registry.svc:5000",
+    #registry = "default-route-openshift-image-registry.apps-crc.testing:5000",
+    repository = "openshift/forklift-controller",
+    tag = "devel",
+)
+
