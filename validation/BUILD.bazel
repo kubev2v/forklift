@@ -5,16 +5,16 @@ load(
 
 container_image(
     name = "validation-policies",
+    base = "@ubi8-minimal//image",
     directory = "/usr/share/opa/",
     files = ["policies"],
-    base = "@ubi8-minimal//image",
 )
 
 container_image(
     name = "opa",
+    base = ":validation-policies",
     directory = "/usr/bin/",
     files = ["@opa//file"],
-    base = ":validation-policies",
 )
 
 container_image(
@@ -26,4 +26,3 @@ container_image(
     user = "1001",
     visibility = ["//visibility:public"],
 )
-

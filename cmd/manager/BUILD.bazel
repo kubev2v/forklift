@@ -48,10 +48,9 @@ container_image(
     base = "@ubi8-minimal//image",
     directory = "/usr/local/bin/",
     entrypoint = ["/usr/local/bin/manager"],
-    files = [":manager"],
     # workaround for github.com/bazelbuild/rules_go/issues/1706
-    env = { "GODEBUG": "netdns=go"},
+    env = {"GODEBUG": "netdns=go"},
+    files = [":manager"],
     #user = "1001",
     visibility = ["//visibility:public"],
 )
-

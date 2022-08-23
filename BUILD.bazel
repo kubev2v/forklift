@@ -1,8 +1,6 @@
 load("@bazel_gazelle//:def.bzl", "gazelle")
 load("@bazeldnf//:def.bzl", "bazeldnf")
 load("@bazel_tools//tools/python:toolchain.bzl", "py_runtime_pair")
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
-
 
 bazeldnf(name = "bazeldnf")
 
@@ -60,4 +58,3 @@ container_push(
     repository = "openshift/forklift-controller",
     tag = "devel",
 )
-
