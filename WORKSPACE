@@ -1,4 +1,4 @@
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 
 http_archive(
     name = "io_bazel_rules_go",
@@ -3386,4 +3386,12 @@ container_pull(
   repository = "ubi8/ubi-minimal",
   # 'tag' is also supported, but digest is encouraged for reproducibility.
   digest = "sha256:d1f8eff6032334a81d7cbfd73dacee680e8138db57ecbc91548b97bb45e698e5",
+)
+
+http_file(
+  name = "opa",
+  urls = [ "https://openpolicyagent.org/downloads/latest/opa_linux_amd64_static" ],
+  executable = True,
+  sha256 = "914453ebcc76781371ca27dd61086967ed5e0032e42ba85826ee77c9bca84659",
+  downloaded_file_path = "opa", 
 )
