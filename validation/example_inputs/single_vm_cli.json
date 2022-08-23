@@ -1,0 +1,7 @@
+{
+  "provider": {
+    "namespace": "openshift-migration",
+    "name": "test"
+  },
+  "vm_moref": "vm-2851a"
+}
