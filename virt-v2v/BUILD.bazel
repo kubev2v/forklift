@@ -1,0 +1,24 @@
+load(
+    "@io_bazel_rules_docker//container:container.bzl",
+    "container_image",
+)
+
+container_image(
+    name = "virt-v2v-image",
+    base = "@ubi8-minimal//image",
+    directory = "/",
+    tars = ["//rpm:virt-v2v"],
+)
+
+container_image(
+    name = "forklift-virt-v2v",
+    base = ":virt-v2v-image",
+    directory = "/usr/local/bin/",
+    files = ["bin/entrypoint"],
+    entrypoint = ["/usr/local/bin/entrypoint"],
+    empty_dirs = ["/disks"],
+    env = { "LIBGUESTFS_BACKEND": "direct" },
+    user = "1001",
+    visibility = ["//visibility:public"],
+)
+

@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+echo "Run virt-v2v with the following input:"
+cat /mnt/v2v/input.xml
+
+virt-v2v -v -x -i libvirtxml -o null --debug-overlays --no-copy --root=first /mnt/v2v/input.xml
+[ $? != 0 ] && exit 1
+
+echo "Conversion successful. Committing all overlays to local disks."
+for OVERLAY in /var/tmp/*.qcow2
+do
+	if ! qemu-img commit -p "$OVERLAY"
+	then
+		echo Failed to commit overlay "$OVERLAY"!
+		echo Unable to complete import!
+		exit 1
+	fi
+done
+
+echo "Commit successful. Cleaning up."
+find /var/tmp -name '*.qcow2' -exec rm -f {} \;
+
+exit 0
