@@ -60,6 +60,8 @@ type Client interface {
 	CreateSnapshot(vmRef ref.Ref) (string, error)
 	// Remove all warm migration snapshots.
 	RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy) error
+	// Check if a snapshot is ready to transfer.
+	CheckSnapshotReady(vmRef ref.Ref, snapshot string) (bool, error)
 	// Set DataVolume checkpoints.
 	SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []cdi.DataVolume, final bool) (err error)
 	// Close connections to the provider API.

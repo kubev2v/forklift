@@ -3,6 +3,8 @@ package vsphere
 import (
 	"context"
 	"fmt"
+	liburl "net/url"
+
 	liberr "github.com/konveyor/controller/pkg/error"
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
@@ -17,7 +19,6 @@ import (
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
-	liburl "net/url"
 )
 
 const (
@@ -59,6 +60,12 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref) (id string, err error) {
 	id = res.Result.(types.ManagedObjectReference).Value
 
 	return
+}
+
+//
+// Check if a snapshot is ready to transfer.
+func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool, err error) {
+	return true, nil
 }
 
 //
