@@ -1,6 +1,8 @@
 package ovirt
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 
 	liberr "github.com/konveyor/controller/pkg/error"
@@ -36,6 +38,12 @@ type Client struct {
 func (r *Client) CreateSnapshot(vmRef ref.Ref) (snapshot string, err error) {
 	_, vmService, err := r.getVM(vmRef)
 	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	correlationID, err := r.getSnapshotCorrelationID(vmRef, nil)
+	if err != nil {
+		err = liberr.Wrap(err)
 		return
 	}
 	snapsService := vmService.SnapshotsService()
@@ -44,7 +52,7 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref) (snapshot string, err error) {
 			Description(snapshotDesc).
 			PersistMemorystate(false).
 			MustBuild(),
-	).Query("correlation_id", r.Migration.Name).Send()
+	).Query("correlation_id", correlationID).Send()
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -69,6 +77,36 @@ func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy) (er
 		_, err = snapService.Remove().Async(true).Query("correlation_id", r.Migration.Name).Send()
 		if err != nil {
 			err = liberr.Wrap(err)
+		}
+	}
+	return
+}
+
+//
+// Check if a snapshot is ready to transfer, to avoid importer restarts.
+func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool, err error) {
+	correlationID, err := r.getSnapshotCorrelationID(vmRef, &snapshot)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	jobs, err := r.getJobs(correlationID)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	if len(jobs) < 1 {
+		err = liberr.New("No jobs found for correlation ID %", correlationID)
+		return
+	}
+	ready = true
+	for _, job := range jobs {
+		switch job.MustStatus() {
+		case ovirtsdk.JOBSTATUS_FAILED, ovirtsdk.JOBSTATUS_ABORTED:
+			err = liberr.New("Snapshot creation failed! Correlation ID is %s", correlationID)
+			ready = false
+		case ovirtsdk.JOBSTATUS_STARTED, ovirtsdk.JOBSTATUS_UNKNOWN:
+			ready = false
 		}
 	}
 	return
@@ -178,6 +216,73 @@ func (r *Client) Close() {
 		_ = r.connection.Close()
 		r.connection = nil
 	}
+}
+
+//
+// Derive a value from the plan name, the VM ID, and the index of the given
+// snapshot in the precopies list. This can be used as the correlation ID for
+// tracking the status of a snapshot creation command in the oVirt API. There
+// seems to be a limit on correlation ID lengths, so use the MD5 of this value
+// as the actual correlation ID. If there is no snapshot ID, assume the last
+// snapshot in the precopy list. This way, CreateSnapshot can set the
+// correlation ID without knowing the snapshot ID from the oVirt API, because
+// the snapshot ID hasn't been created yet.
+func (r *Client) getSnapshotCorrelationID(vmRef ref.Ref, snapshot *string) (correlationID string, err error) {
+	var vm *planapi.VMStatus
+	for _, vmstatus := range r.Migration.Status.VMs {
+		if vmstatus.ID == vmRef.ID {
+			vm = vmstatus
+			break
+		}
+	}
+	if vm == nil {
+		err = liberr.New("Could not find VM %s", vmRef.ID)
+		return
+	}
+	if vm.Warm == nil {
+		err = liberr.New("VM %s is not part of a warm migration plan", vmRef.ID)
+		return
+	}
+
+	precopyIndex := len(vm.Warm.Precopies)
+	if snapshot != nil {
+		var precopySnapshot *planapi.Precopy
+		for index, precopy := range vm.Warm.Precopies {
+			if *snapshot == precopy.Snapshot {
+				precopySnapshot = &precopy
+				precopyIndex = index
+				break
+			}
+		}
+		if precopySnapshot == nil {
+			err = liberr.New("Could not find snapshot %s in precopies list", *snapshot)
+			return
+		}
+	}
+
+	uniqueID := fmt.Sprintf("%s-%s-%d", r.Migration.Name, vmRef.ID, precopyIndex)
+	hashedID := md5.New()
+	hashedID.Write([]byte(uniqueID))
+	correlationID = hex.EncodeToString(hashedID.Sum(nil))
+	return
+}
+
+//
+// Find oVirt jobs with the given correlation ID.
+func (r *Client) getJobs(correlationID string) (ovirtJob []*ovirtsdk.Job, err error) {
+	jobService := r.connection.SystemService().JobsService().List()
+	jobResponse, err := jobService.Search(fmt.Sprintf("correlation_id=%s", correlationID)).Send()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	ovirtJobs, ok := jobResponse.Jobs()
+	if !ok {
+		err = liberr.New(fmt.Sprintf("Job %s source lookup failed", correlationID))
+		return
+	}
+	ovirtJob = ovirtJobs.Slice()
+	return
 }
 
 //

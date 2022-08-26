@@ -60,6 +60,9 @@ const (
 	ConvertGuest             = "ConvertGuest"
 	PostHook                 = "PostHook"
 	Completed                = "Completed"
+	WaitForSnapshot          = "WaitForSnapshot"
+	WaitForInitialSnapshot   = "WaitForInitialSnapshot"
+	WaitForFinalSnapshot     = "WaitForFinalSnapshot"
 )
 
 //
@@ -103,17 +106,20 @@ var (
 			{Name: Started},
 			{Name: PreHook, All: HasPreHook},
 			{Name: CreateInitialSnapshot},
+			{Name: WaitForInitialSnapshot},
 			{Name: CreateDataVolumes},
 			{Name: CreateVM},
 			{Name: ScheduleVM},
 			{Name: CopyDisks},
 			{Name: CopyingPaused},
 			{Name: CreateSnapshot},
+			{Name: WaitForSnapshot},
 			{Name: AddCheckpoint},
 			{Name: StorePowerState},
 			{Name: PowerOffSource},
 			{Name: WaitForPowerOff},
 			{Name: CreateFinalSnapshot},
+			{Name: WaitForFinalSnapshot},
 			{Name: AddFinalCheckpoint},
 			{Name: Finalize},
 			{Name: CreateGuestConversionPod, All: RequiresConversion},
@@ -481,11 +487,11 @@ func (r *Migration) itinerary() *libitr.Itinerary {
 // Get the name of the pipeline step corresponding to the current VM phase.
 func (r *Migration) step(vm *plan.VMStatus) (step string) {
 	switch vm.Phase {
-	case Started, CreateInitialSnapshot, CreateDataVolumes, CreateVM, ScheduleVM:
+	case Started, CreateInitialSnapshot, WaitForInitialSnapshot, CreateDataVolumes, CreateVM, ScheduleVM:
 		step = Initialize
-	case CopyDisks, CopyingPaused, CreateSnapshot, AddCheckpoint:
+	case CopyDisks, CopyingPaused, CreateSnapshot, WaitForSnapshot, AddCheckpoint:
 		step = DiskTransfer
-	case CreateFinalSnapshot, AddFinalCheckpoint, Finalize:
+	case CreateFinalSnapshot, WaitForFinalSnapshot, AddFinalCheckpoint, Finalize:
 		step = Cutover
 	case CreateGuestConversionPod, ConvertGuest:
 		step = ImageConversion
@@ -703,14 +709,22 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		precopy := plan.Precopy{Snapshot: snapshot, Start: &now}
 		vm.Warm.Precopies = append(vm.Warm.Precopies, precopy)
 		r.resetPrecopyTasks(vm, step)
-
-		switch vm.Phase {
-		case CreateInitialSnapshot:
-			vm.Phase = CreateDataVolumes
-		case CreateSnapshot:
-			vm.Phase = AddCheckpoint
-		case CreateFinalSnapshot:
-			vm.Phase = AddFinalCheckpoint
+		vm.Phase = r.next(vm.Phase)
+	case WaitForInitialSnapshot, WaitForSnapshot, WaitForFinalSnapshot:
+		step, found := vm.FindStep(r.step(vm))
+		if !found {
+			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
+			break
+		}
+		snapshot := vm.Warm.Precopies[len(vm.Warm.Precopies)-1].Snapshot
+		ready, err := r.provider.CheckSnapshotReady(vm.Ref, snapshot)
+		if err != nil {
+			step.AddError(err.Error())
+			err = nil
+			break
+		}
+		if ready {
+			vm.Phase = r.next(vm.Phase)
 		}
 	case AddCheckpoint, AddFinalCheckpoint:
 		step, found := vm.FindStep(r.step(vm))
