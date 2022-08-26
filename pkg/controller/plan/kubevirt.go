@@ -44,6 +44,8 @@ const (
 	// Contains validations for a Kubevirt VM. Needs to be removed when
 	// creating a VM from a template.
 	AnnKubevirtValidations = "vm.kubevirt.io/validations"
+	// PVC annotation containing the name of the importer pod.
+	AnnImporterPodName = "cdi.kubevirt.io/storage.import.importPodName"
 )
 
 // Labels
@@ -172,20 +174,30 @@ func (r *KubeVirt) EnsureNamespace() (err error) {
 
 //
 // Get the importer pod for a DataVolume.
-func (r *KubeVirt) GetImporterPod(dv DataVolume) (pod *core.Pod, err error) {
+func (r *KubeVirt) GetImporterPod(dv DataVolume) (pod *core.Pod, found bool, err error) {
 	pod = &core.Pod{}
-	name := fmt.Sprintf("importer-%s", dv.Name)
+	if dv.PVC == nil || dv.PVC.Annotations[AnnImporterPodName] == "" {
+		return
+	}
+
 	err = r.Destination.Client.Get(
 		context.TODO(),
 		types.NamespacedName{
-			Name:      name,
+			Name:      dv.PVC.Annotations[AnnImporterPodName],
 			Namespace: r.Plan.Spec.TargetNamespace,
 		},
 		pod,
 	)
 	if err != nil {
+		if k8serr.IsNotFound(err) {
+			err = nil
+			return
+		}
 		err = liberr.Wrap(err)
+		return
 	}
+
+	found = true
 	return
 }
 
@@ -193,13 +205,9 @@ func (r *KubeVirt) GetImporterPod(dv DataVolume) (pod *core.Pod, err error) {
 // Delete the importer pod for a DataVolume.
 func (r *KubeVirt) DeleteImporterPod(dv DataVolume) (err error) {
 	var pod *core.Pod
-	pod, err = r.GetImporterPod(dv)
-	if err != nil {
-		if k8serr.IsNotFound(err) {
-			err = nil
-			return
-		}
-		err = liberr.Wrap(err)
+	var found bool
+	pod, found, err = r.GetImporterPod(dv)
+	if err != nil || !found {
 		return
 	}
 	err = r.Destination.Client.Delete(context.TODO(), pod)

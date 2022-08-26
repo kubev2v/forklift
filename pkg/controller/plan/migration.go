@@ -14,7 +14,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	core "k8s.io/api/core/v1"
-	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"path"
@@ -1223,35 +1222,35 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 			// we can't find it or retrieve it for some reason that this will
 			// be a transient issue, and we should be able to find it on subsequent
 			// reconciles.
-			var importer *core.Pod
-			importer, err = r.kubevirt.GetImporterPod(dv)
-			if err != nil {
-				if k8serr.IsNotFound(err) {
-					log.Info(
-						"Did not find CDI importer pod for DataVolume.",
-						"vm",
-						vm.String(),
-						"dv",
-						path.Join(dv.Namespace, dv.Name))
-				} else {
-					log.Error(
-						err,
-						"Could not get CDI importer pod for DataVolume.",
-						"vm",
-						vm.String(),
-						"dv",
-						path.Join(dv.Namespace, dv.Name))
-				}
-				err = nil
-			} else {
-				if r.Plan.Spec.Warm && len(importer.Status.ContainerStatuses) > 0 {
-					vm.Warm.Failures = int(importer.Status.ContainerStatuses[0].RestartCount)
-				}
-				if restartLimitExceeded(importer) {
-					task.MarkedCompleted()
-					msg, _ := terminationMessage(importer)
-					task.AddError(msg)
-				}
+			importer, found, kErr := r.kubevirt.GetImporterPod(dv)
+			if kErr != nil {
+				log.Error(
+					err,
+					"Could not get CDI importer pod for DataVolume.",
+					"vm",
+					vm.String(),
+					"dv",
+					path.Join(dv.Namespace, dv.Name))
+				continue
+			}
+
+			if !found {
+				log.Info(
+					"Did not find CDI importer pod for DataVolume.",
+					"vm",
+					vm.String(),
+					"dv",
+					path.Join(dv.Namespace, dv.Name))
+				continue
+			}
+
+			if r.Plan.Spec.Warm && len(importer.Status.ContainerStatuses) > 0 {
+				vm.Warm.Failures = int(importer.Status.ContainerStatuses[0].RestartCount)
+			}
+			if restartLimitExceeded(importer) {
+				task.MarkedCompleted()
+				msg, _ := terminationMessage(importer)
+				task.AddError(msg)
 			}
 		}
 	}
