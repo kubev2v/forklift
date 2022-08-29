@@ -1057,10 +1057,6 @@ func (r *KubeVirt) ensureConfigMap(vmRef ref.Ref) (configMap *core.ConfigMap, er
 	if err != nil {
 		return
 	}
-	newConfigMap, err := r.configMap(vmRef)
-	if err != nil {
-		return
-	}
 	list := &core.ConfigMapList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
@@ -1077,7 +1073,10 @@ func (r *KubeVirt) ensureConfigMap(vmRef ref.Ref) (configMap *core.ConfigMap, er
 	if len(list.Items) > 0 {
 		configMap = &list.Items[0]
 	} else {
-		configMap = newConfigMap
+		configMap, err = r.configMap(vmRef)
+		if err != nil {
+			return
+		}
 		err = r.Destination.Client.Create(context.TODO(), configMap)
 		if err != nil {
 			err = liberr.Wrap(err)
@@ -1099,70 +1098,33 @@ func (r *KubeVirt) ensureConfigMap(vmRef ref.Ref) (configMap *core.ConfigMap, er
 //
 // Ensure the Libvirt domain config map exists on the destination.
 func (r *KubeVirt) ensureLibvirtConfigMap(vmRef ref.Ref, vmCr *VirtualMachine) (configMap *core.ConfigMap, err error) {
-	_, err = r.Source.Inventory.VM(&vmRef)
+	configMap, err = r.ensureConfigMap(vmRef)
 	if err != nil {
 		return
 	}
-	list := &core.ConfigMapList{}
-	err = r.Destination.Client.List(
-		context.TODO(),
-		list,
-		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(r.vmLabels(vmRef)),
-			Namespace:     r.Plan.Spec.TargetNamespace,
-		},
-	)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-
 	domain := r.libvirtDomain(vmCr)
 	domainXML, err := xml.Marshal(domain)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-
-	if len(list.Items) > 0 {
-		configMap = &list.Items[0]
-		if configMap.BinaryData == nil {
-			configMap.BinaryData = make(map[string][]byte)
-		}
-		configMap.BinaryData["input.xml"] = domainXML
-		err = r.Destination.Client.Update(context.TODO(), configMap)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-		r.Log.V(1).Info(
-			"ConfigMap updated.",
-			"configMap",
-			path.Join(
-				configMap.Namespace,
-				configMap.Name),
-			"vm",
-			vmRef.String())
-	} else {
-		configMap, err = r.configMap(vmRef)
-		if err != nil {
-			return
-		}
-		configMap.BinaryData["input.xml"] = domainXML
-		err = r.Destination.Client.Create(context.TODO(), configMap)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-		r.Log.V(1).Info(
-			"ConfigMap created.",
-			"configMap",
-			path.Join(
-				configMap.Namespace,
-				configMap.Name),
-			"vm",
-			vmRef.String())
+	if configMap.BinaryData == nil {
+		configMap.BinaryData = make(map[string][]byte)
 	}
+	configMap.BinaryData["input.xml"] = domainXML
+	err = r.Destination.Client.Update(context.TODO(), configMap)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	r.Log.V(1).Info(
+		"ConfigMap updated.",
+		"configMap",
+		path.Join(
+			configMap.Namespace,
+			configMap.Name),
+		"vm",
+		vmRef.String())
 
 	return
 }
