@@ -29,6 +29,7 @@ go_binary(
     name = "manager",
     embed = [":manager_lib"],
     static = "on",
+    #gotags = ["netgo"],
     visibility = ["//visibility:public"],
 )
 
@@ -43,11 +44,14 @@ container_image(
     #    "@io_bazel_rules_go//go/platform:linux_arm64": "arm64",
     #    "//conditions:default": "amd64",
     #}),
+    #base = "@centos-stream8//image",
     base = "@ubi8-minimal//image",
     directory = "/usr/local/bin/",
     entrypoint = ["/usr/local/bin/manager"],
     files = [":manager"],
-    user = "1001",
+    # workaround for github.com/bazelbuild/rules_go/issues/1706
+    env = { "GODEBUG": "netdns=go"},
+    #user = "1001",
     visibility = ["//visibility:public"],
 )
 
