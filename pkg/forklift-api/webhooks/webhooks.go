@@ -38,5 +38,5 @@ func RegisterValidatingWebhooks() {
 		Addr:    ":9876",
 		Handler: mux,
 	}
-	server.ListenAndServeTLS("/var/run/secrets/arik/tls.crt", "/var/run/secrets/arik/tls.key")
+	server.ListenAndServeTLS("/var/run/secrets/forklift-api/tls.crt", "/var/run/secrets/forklift-api/tls.key")
 }
