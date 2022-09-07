@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: forklift-api-crt
+  name: forklift-api
+  namespace: openshift-mtv
+spec:
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 9876
+  selector:
+    app: forklift-api 
