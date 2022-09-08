@@ -4,6 +4,14 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
+	"math/rand"
+	"path"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
 	template "github.com/openshift/api/template/v1"
 	"github.com/openshift/library-go/pkg/template/generator"
 	"github.com/openshift/library-go/pkg/template/templateprocessing"
@@ -12,14 +20,9 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	cnv "kubevirt.io/client-go/api/v1"
 	libvirtxml "libvirt.org/libvirt-go-xml"
-	"math/rand"
-	"path"
-	"sort"
-	"strconv"
-	"strings"
-	"time"
 
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
@@ -30,6 +33,7 @@ import (
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,6 +50,10 @@ const (
 	AnnKubevirtValidations = "vm.kubevirt.io/validations"
 	// PVC annotation containing the name of the importer pod.
 	AnnImporterPodName = "cdi.kubevirt.io/storage.import.importPodName"
+	//  Original VM name on source (value=vmOriginalName)
+	AnnOriginalName = "original-name"
+	//  Original VM name on source (value=vmOriginalID)
+	AnnOriginalID = "original-ID"
 )
 
 // Labels
@@ -704,6 +712,27 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 		return
 	}
 
+	//If the VM name is not valid according to DNS1123 labeling
+	//convention it will be automatically changed.
+	var originalName string
+
+	if errs := k8svalidation.IsDNS1123Label(vm.Name); len(errs) > 0 {
+		originalName = vm.Name
+
+		generatedName := changeVmName(vm.Name, vm.ID)
+		nameExist, errName := r.checkIfVmNameExist(generatedName)
+		if errName != nil {
+			err = liberr.Wrap(errName)
+			return
+		}
+		if nameExist {
+			generatedName = generatedName + "-" + vm.ID[:4]
+		}
+		vm.Name = generatedName
+		r.Log.Info("VM name", originalName, " was incompatible with DNS1123 RFC, changing to ",
+			vm.Name)
+	}
+
 	var ok bool
 	object, ok = r.vmTemplate(vm)
 	if !ok {
@@ -711,6 +740,13 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 			"vm",
 			vm.String())
 		object = r.emptyVm(vm)
+	}
+	//Add the original name and ID info to the VM annotations
+	if len(originalName) > 0 {
+		annotations := make(map[string]string)
+		annotations[AnnOriginalName] = originalName
+		annotations[AnnOriginalID] = vm.ID
+		object.ObjectMeta.Annotations = annotations
 	}
 	running := false
 	object.Spec.Running = &running
@@ -1254,6 +1290,39 @@ func (r *KubeVirt) vmLabels(vmRef ref.Ref) (labels map[string]string) {
 }
 
 //
+// Checks if VM with the newly generated name exists on the destination
+func (r *KubeVirt) checkIfVmNameExist(name string) (nameExist bool, err error) {
+	list := &cnv.VirtualMachineList{}
+	nameFiled := "metadata.name"
+	listOptions := &client.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector(nameFiled, name),
+	}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		list,
+		listOptions,
+	)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	if len(list.Items) > 0 {
+		nameExist = true
+		return
+	}
+	// Checks that the new name does not match a valid
+	// VM name in the same plan
+	for _, vm := range r.Migration.Status.VMs {
+		if vm.Name == name {
+			nameExist = true
+			return
+		}
+	}
+	nameExist = false
+	return
+}
+
+//
 // Represents a CDI DataVolume and add behavior.
 type DataVolume struct {
 	*cdi.DataVolume
@@ -1358,4 +1427,29 @@ func vmOwnerReference(vm *cnv.VirtualMachine) (ref meta.OwnerReference) {
 		Controller:         &isController,
 	}
 	return
+}
+
+//changes VM name to match DNS1123 RFC convention.
+func changeVmName(currName string, vmID string) string {
+
+	var nameMaxLength int = 63
+	var nameExcludeChars = regexp.MustCompile("[^a-z0-9-]")
+
+	newName := strings.ToLower(currName)
+	if len(newName) > nameMaxLength {
+		newName = newName[0:nameMaxLength]
+	}
+	if nameExcludeChars.MatchString(newName) {
+		newName = nameExcludeChars.ReplaceAllString(newName, "")
+	}
+	for strings.HasPrefix(newName, "-") {
+		newName = newName[1:]
+	}
+	for strings.HasSuffix(newName, "-") {
+		newName = newName[:len(newName)-1]
+	}
+	if len(newName) == 0 {
+		newName = "vm-" + vmID[:4]
+	}
+	return newName
 }

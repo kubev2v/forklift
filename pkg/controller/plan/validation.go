@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path"
+
 	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
@@ -15,7 +17,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/validation"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
-	"path"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -317,8 +318,8 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Type:     NameNotValid,
 		Status:   True,
 		Reason:   NotValid,
-		Category: Critical,
-		Message:  "Target VM name not valid.",
+		Category: Warn,
+		Message:  "Target VM name does not comply with DNS1123 RFC, will be automatically changed.",
 		Items:    []string{},
 	}
 	alreadyExists := libcnd.Condition{
