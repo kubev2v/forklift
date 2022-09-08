@@ -13,6 +13,7 @@ go_library(
         "//pkg/apis/forklift/v1beta1",
         "//pkg/controller/base",
         "//pkg/controller/provider/container",
+        "//pkg/controller/provider/container/ovirt",
         "//pkg/controller/provider/model",
         "//pkg/controller/provider/web",
         "//pkg/controller/validation/policy",

@@ -59,15 +59,6 @@ const (
 	Unknown        = "unknown"
 )
 
-// CPU Pinning Policies
-const (
-	None           = "none"
-	Manual         = "manual"
-	ResizeAndPin   = "resize_and_pin_numa"
-	Dedicated      = "dedicated"
-	IsolateThreads = "isolate_threads"
-)
-
 // Map of ovirt guest ids to osinfo ids.
 var osMap = map[string]string{
 	"rhel_6_10_plus_ppc64": "rhel6.10",
@@ -368,7 +359,7 @@ func (r *Builder) mapCPU(vm *model.Workload, object *cnv.VirtualMachineSpec) {
 		Cores:   uint32(vm.CpuCores),
 		Threads: uint32(vm.CpuThreads),
 	}
-	if vm.CpuPinningPolicy == Dedicated {
+	if vm.CpuPinningPolicy == model.Dedicated {
 		object.Template.Spec.Domain.CPU.DedicatedCPUPlacement = true
 	}
 
