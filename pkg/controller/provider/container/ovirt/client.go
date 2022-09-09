@@ -3,7 +3,6 @@ package ovirt
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/base64"
 	"net"
 	"net/http"
 	liburl "net/url"
@@ -11,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-logr/logr"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libweb "github.com/konveyor/controller/pkg/inventory/web"
 	core "k8s.io/api/core/v1"
@@ -33,13 +33,32 @@ type Client struct {
 	// Raw client.
 	client *libweb.Client
 	// Secret.
-	secret *core.Secret
+	secret                *core.Secret
+	clientExpiration      time.Time
+	clientTimeout         time.Duration
+	accessTokenExpiration time.Time
+	log                   logr.Logger
+}
+
+type ovirtTokenResponse struct {
+	AccessToken string `json:"access_token"`
+	Expiration  string `json:"exp"`
 }
 
 //
 // Connect.
 func (r *Client) connect() (err error) {
 	var TLSClientConfig *tls.Config
+
+	if !r.clientExpiration.IsZero() && time.Now().After(r.clientExpiration) {
+		r.log.Info("Recreating client, timeout exceeded")
+		r.client = nil
+	}
+
+	if !r.accessTokenExpiration.IsZero() && time.Now().After(r.accessTokenExpiration) {
+		r.log.Info("Recreating client, token expired")
+		r.client = nil
+	}
 
 	if r.client != nil {
 		return
@@ -73,15 +92,54 @@ func (r *Client) connect() (err error) {
 			TLSClientConfig:       TLSClientConfig,
 		},
 	}
+
+	url, err := liburl.Parse(r.url)
+	if err != nil {
+		return
+	}
+
+	url.Path = "/ovirt-engine/sso/oauth/token"
+	values := url.Query()
+	values.Add("grant_type", "password")
+	values.Add("username", string(r.secret.Data["user"]))
+	values.Add("password", string(r.secret.Data["password"]))
+	values.Add("scope", "ovirt-app-api")
+
 	client.Header = http.Header{
 		"Accept": []string{"application/json"},
-		"Authorization": []string{
-			"Basic",
-			r.auth()},
-		"Version": []string{"4"},
+	}
+
+	response := &ovirtTokenResponse{}
+	url.RawQuery = values.Encode()
+	status, err := client.Get(url.String(), response)
+	if err != nil {
+		return
+	}
+
+	// Providing bad credentials when requesting the token results
+	// in 400, and not 401. So checking for != 200 instead
+	if status != http.StatusOK {
+		err = liberr.New("Request for token failed", "status", status)
+		return
+	}
+
+	// Set the access token we received
+	client.Header = http.Header{
+		"Accept":        []string{"application/json"},
+		"Authorization": []string{"Bearer " + response.AccessToken},
+		"Version":       []string{"4"},
 	}
 
 	r.client = client
+	r.clientExpiration = time.Now().Add(r.clientTimeout)
+
+	expiration, err := strconv.ParseInt(response.Expiration, 10, 64)
+	if err != nil {
+		err = liberr.New("Failed to convert expiration time to integer", "Expiration", response.Expiration)
+		return
+	}
+
+	r.accessTokenExpiration = time.Now().Local().Add(time.Duration(expiration))
 
 	return
 }
@@ -132,21 +190,6 @@ func (r *Client) get(path string, object interface{}, param ...libweb.Param) (er
 	default:
 		err = liberr.New(http.StatusText(status))
 	}
-
-	return
-}
-
-//
-// Basic authorization user.
-func (r *Client) auth() (user string) {
-	user = strings.Join(
-		[]string{
-			string(r.secret.Data["user"]),
-			string(r.secret.Data["password"]),
-		},
-		":")
-
-	user = base64.StdEncoding.EncodeToString([]byte(user))
 
 	return
 }

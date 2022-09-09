@@ -3,6 +3,12 @@ package ovirt
 import (
 	"context"
 	"fmt"
+	liburl "net/url"
+	libpath "path"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/go-logr/logr"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
@@ -12,11 +18,6 @@ import (
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	liburl "net/url"
-	libpath "path"
-	"strconv"
-	"strings"
-	"time"
 )
 
 //
@@ -26,6 +27,9 @@ const (
 	RetryInterval = 5 * time.Second
 	// Refresh interval.
 	RefreshInterval = 10 * time.Second
+
+	// Default timeout for the HTTP client
+	DefaultClientTimeout = 30 * time.Minute
 )
 
 //
@@ -69,10 +73,27 @@ func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) (r *Collec
 		libpath.Join(
 			provider.GetNamespace(),
 			provider.GetName()))
+	clientLog := logging.WithName("client|ovirt").WithValues(
+		"provider",
+		libpath.Join(
+			provider.GetNamespace(),
+			provider.GetName()))
+
+	var err error
+	clientTimeout := DefaultClientTimeout
+	if timeout, ok := provider.Spec.Settings["ovirtClientTimeout"]; ok {
+		if clientTimeout, err = time.ParseDuration(timeout); err != nil {
+			log.Error(err, "Couldn't parse timeout, falling back to default")
+			clientTimeout = DefaultClientTimeout
+		}
+	}
+
 	r = &Collector{
 		client: &Client{
-			url:    provider.Spec.URL,
-			secret: secret,
+			url:           provider.Spec.URL,
+			secret:        secret,
+			log:           clientLog,
+			clientTimeout: clientTimeout,
 		},
 		provider: provider,
 		db:       db,
