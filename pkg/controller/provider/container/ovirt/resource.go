@@ -1,9 +1,10 @@
 package ovirt
 
 import (
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 	"sort"
 	"strconv"
+
+	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 )
 
 //
@@ -226,8 +227,9 @@ type VM struct {
 			Threads string `json:"threads"`
 		} `json:"topology"`
 	} `json:"cpu"`
-	CpuShares string `json:"cpu_shares"`
-	USB       struct {
+	CpuPinningPolicy string `json:"cpu_pinning_policy"`
+	CpuShares        string `json:"cpu_shares"`
+	USB              struct {
 		Enabled string `json:"enabled"`
 	} `json:"usb"`
 	Timezone struct {
@@ -352,6 +354,7 @@ func (r *VM) ApplyTo(m *model.VM) {
 	m.CpuSockets = r.int16(r.CPU.Topology.Sockets)
 	m.CpuCores = r.int16(r.CPU.Topology.Cores)
 	m.CpuThreads = r.int16(r.CPU.Topology.Threads)
+	m.CpuPinningPolicy = r.CpuPinningPolicy
 	m.CpuShares = r.int16(r.CpuShares)
 	m.Memory = r.int64(r.Memory)
 	m.BIOS = r.BIOS.Type

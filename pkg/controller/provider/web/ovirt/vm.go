@@ -2,13 +2,14 @@ package ovirt
 
 import (
 	"errors"
+	"net/http"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	libmodel "github.com/konveyor/controller/pkg/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	"net/http"
-	"strings"
 )
 
 //
@@ -20,6 +21,16 @@ const (
 	VMRoot       = VMsRoot + "/:" + VMParam
 )
 
+type CpuPinningPolicy string
+
+// CPU Pinning Policies
+const (
+        None           CpuPinningPolicy = "none"
+        Manual         CpuPinningPolicy = "manual"
+        ResizeAndPin   CpuPinningPolicy = "resize_and_pin_numa"
+        Dedicated      CpuPinningPolicy = "dedicated"
+        IsolateThreads CpuPinningPolicy = "isolate_threads"
+)
 //
 // Virtual Machine handler.
 type VMHandler struct {
@@ -221,13 +232,14 @@ func (r *VM1) Content(detail int) interface{} {
 // VM resource.
 type VM struct {
 	VM1
-	PolicyVersion               int          `json:"policyVersion"`
-	GuestName                   string       `json:"guestName"`
-	CpuSockets                  int16        `json:"cpuSockets"`
-	CpuCores                    int16        `json:"cpuCores"`
-	CpuThreads                  int16        `json:"cpuThreads"`
-	CpuShares                   int16        `json:"cpuShares"`
-	CpuAffinity                 []CpuPinning `json:"cpuAffinity"`
+	PolicyVersion               int              `json:"policyVersion"`
+	GuestName                   string           `json:"guestName"`
+	CpuSockets                  int16            `json:"cpuSockets"`
+	CpuCores                    int16            `json:"cpuCores"`
+	CpuThreads                  int16            `json:"cpuThreads"`
+	CpuShares                   int16            `json:"cpuShares"`
+	CpuAffinity                 []CpuPinning     `json:"cpuAffinity"`
+	CpuPinningPolicy            CpuPinningPolicy `json:"cpuPinningPolicy"`
 	Memory                      int64        `json:"memory"`
 	BalloonedMemory             bool         `json:"balloonedMemory"`
 	IOThreads                   int16        `json:"ioThreads"`
@@ -265,6 +277,8 @@ type Snapshot = model.Snapshot
 type Concern = model.Concern
 type Guest = model.Guest
 
+
+
 //
 // Build the resource using the model.
 func (r *VM) With(m *model.VM) {
@@ -276,6 +290,9 @@ func (r *VM) With(m *model.VM) {
 	r.CpuThreads = m.CpuThreads
 	r.CpuShares = m.CpuShares
 	r.CpuAffinity = m.CpuAffinity
+	if r.CpuPinningPolicy = CpuPinningPolicy(m.CpuPinningPolicy); len(r.CpuPinningPolicy) == 0 {
+		r.CpuPinningPolicy = None;
+	}
 	r.Memory = m.Memory
 	r.BalloonedMemory = m.BalloonedMemory
 	r.IOThreads = m.IOThreads
