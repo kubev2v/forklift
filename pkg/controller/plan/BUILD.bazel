@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "plan",
@@ -44,6 +44,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/api/resource",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:meta",
         "//vendor/k8s.io/apimachinery/pkg/conversion",
+        "//vendor/k8s.io/apimachinery/pkg/fields",
         "//vendor/k8s.io/apimachinery/pkg/labels",
         "//vendor/k8s.io/apimachinery/pkg/runtime",
         "//vendor/k8s.io/apimachinery/pkg/types",
@@ -63,4 +64,11 @@ go_library(
         "//vendor/sigs.k8s.io/controller-runtime/pkg/reconcile",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/source",
     ],
+)
+
+go_test(
+    name = "plan_test",
+    srcs = ["kubevirt_test.go"],
+    embed = [":plan"],
+    deps = ["//vendor/github.com/onsi/gomega"],
 )
