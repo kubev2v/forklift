@@ -729,7 +729,7 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 			generatedName = generatedName + "-" + vm.ID[:4]
 		}
 		vm.Name = generatedName
-		r.Log.Info("VM name", originalName, " was incompatible with DNS1123 RFC, changing to ",
+		r.Log.Info("VM name ", originalName, " was incompatible with DNS1123 RFC, changing to ",
 			vm.Name)
 	}
 
