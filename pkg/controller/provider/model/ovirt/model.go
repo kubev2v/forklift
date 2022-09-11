@@ -131,6 +131,7 @@ type VM struct {
 	CpuCores                    int16            `sql:""`
 	CpuThreads                  int16            `sql:""`
 	CpuAffinity                 []CpuPinning     `sql:""`
+	CpuPinningPolicy            string           `sql:""`
 	CpuShares                   int16            `sql:""`
 	Memory                      int64            `sql:""`
 	BalloonedMemory             bool             `sql:""`
