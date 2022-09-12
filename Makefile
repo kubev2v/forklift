@@ -59,12 +59,12 @@ generate: controller-gen
 	${CONTROLLER_GEN} object:headerFile="./hack/boilerplate.go.txt" paths="./..."
 
 # Build the docker image
-#docker-build: test
-docker-build:
-	$(CONTAINER_CMD) build . -t ${IMG}
+build-controller:
+	bazel run cmd/manager:forklift-controller-image
 
 # Push the docker image
-docker-push:
+push-contoller: build-controller
+	$(CONTAINER_CMD) tag cmd/manager:forklift-controller-image ${IMG}
 	$(CONTAINER_CMD) push ${IMG}
 
 bazel-generate:
