@@ -18,6 +18,10 @@ all: test manager
 test: generate fmt vet manifests
 	go test ./pkg/... ./cmd/... -coverprofile cover.out
 
+# Experimental e2e target
+e2e-sanity:
+	go test tests/base_test.go
+
 # Build manager binary
 manager: generate fmt vet
 	go build -o bin/manager github.com/konveyor/forklift-controller/cmd/manager
