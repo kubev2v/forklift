@@ -96,14 +96,14 @@ func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool,
 		return
 	}
 	if len(jobs) < 1 {
-		err = liberr.New("No jobs found for correlation ID %", correlationID)
+		err = liberr.New("No jobs found for correlation ID", "correlationID", correlationID)
 		return
 	}
 	ready = true
 	for _, job := range jobs {
 		switch job.MustStatus() {
 		case ovirtsdk.JOBSTATUS_FAILED, ovirtsdk.JOBSTATUS_ABORTED:
-			err = liberr.New("Snapshot creation failed! Correlation ID is %s", correlationID)
+			err = liberr.New("Snapshot creation failed!", "correlationID", correlationID)
 			ready = false
 		case ovirtsdk.JOBSTATUS_STARTED, ovirtsdk.JOBSTATUS_UNKNOWN:
 			ready = false
@@ -236,11 +236,11 @@ func (r *Client) getSnapshotCorrelationID(vmRef ref.Ref, snapshot *string) (corr
 		}
 	}
 	if vm == nil {
-		err = liberr.New("Could not find VM %s", vmRef.ID)
+		err = liberr.New("Could not find VM", "VM", vmRef.ID)
 		return
 	}
 	if vm.Warm == nil {
-		err = liberr.New("VM %s is not part of a warm migration plan", vmRef.ID)
+		err = liberr.New("VM is not part of a warm migration plan", "VM", vmRef.ID)
 		return
 	}
 
@@ -255,7 +255,7 @@ func (r *Client) getSnapshotCorrelationID(vmRef ref.Ref, snapshot *string) (corr
 			}
 		}
 		if precopySnapshot == nil {
-			err = liberr.New("Could not find snapshot %s in precopies list", *snapshot)
+			err = liberr.New("Could not find snapshot in precopies list", "snapshot", *snapshot)
 			return
 		}
 	}
@@ -278,7 +278,7 @@ func (r *Client) getJobs(correlationID string) (ovirtJob []*ovirtsdk.Job, err er
 	}
 	ovirtJobs, ok := jobResponse.Jobs()
 	if !ok {
-		err = liberr.New(fmt.Sprintf("Job %s source lookup failed", correlationID))
+		err = liberr.New("Job source lookup failed", "correlationID", correlationID)
 		return
 	}
 	ovirtJob = ovirtJobs.Slice()
