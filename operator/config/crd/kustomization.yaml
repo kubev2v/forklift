@@ -1,0 +1,13 @@
+# This kustomization.yaml is not intended to be run by itself,
+# since it depends on service name and namespace that are out of this kustomize package.
+# It should be run by config/default
+resources:
+- bases/forklift.konveyor.io_forkliftcontrollers.yaml
+- bases/forklift.konveyor.io_hooks.yaml
+- bases/forklift.konveyor.io_hosts.yaml
+- bases/forklift.konveyor.io_migrations.yaml
+- bases/forklift.konveyor.io_networkmaps.yaml
+- bases/forklift.konveyor.io_plans.yaml
+- bases/forklift.konveyor.io_providers.yaml
+- bases/forklift.konveyor.io_storagemaps.yaml
+#+kubebuilder:scaffold:crdkustomizeresource

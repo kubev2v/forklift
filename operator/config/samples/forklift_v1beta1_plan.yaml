@@ -1,0 +1,15 @@
+---
+apiVersion: forklift.konveyor.io/v1beta1
+kind: Plan
+metadata:
+  name: example-plan
+  namespace: ${NAMESPACE}
+spec:
+  provider:
+    source:
+      namespace: ''
+      name: ''
+    destination:
+      namespace: ''
+      name: ''
+

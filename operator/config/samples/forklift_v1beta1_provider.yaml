@@ -1,0 +1,12 @@
+---
+apiVersion: forklift.konveyor.io/v1beta1
+kind: Provider
+metadata:
+  name: example-provider
+  namespace: ${NAMESPACE}
+spec:
+  type: vmware
+  secret:
+    name: ''
+    namespace: ''
+  url: ''

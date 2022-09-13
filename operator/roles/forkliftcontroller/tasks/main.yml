@@ -1,0 +1,217 @@
+---
+- block:
+
+  - name: "Set UI feature state"
+    set_fact:
+      ui_state: "present"
+    when: feature_ui|bool
+
+  - name: "Set validation feature state"
+    set_fact:
+      validation_state: "present"
+    when: feature_validation|bool
+
+  - name: "Set must-gather-api feature state"
+    set_fact:
+      must_gather_api_state: "present"
+    when: feature_must_gather_api|bool
+
+  - name: "Load cluster API groups"
+    set_fact:
+      api_groups: "{{ lookup('k8s', cluster_info='api_groups') }}"
+
+  - when: "'route.openshift.io' not in api_groups"
+    block:
+    - name: "Enable k8s cluster environment"
+      set_fact:
+        k8s_cluster: true
+
+    - name: "Obtain k8s cluster version"
+      set_fact:
+        k8s_cluster_version: "{{ lookup('k8s', cluster_info='version').kubernetes.gitVersion }}"
+
+  - when: not k8s_cluster|bool
+    block:
+    - name: "Get cluster proxy object"
+      set_fact:
+        proxy_cluster: "{{ lookup('k8s', api_version='config.openshift.io/v1', kind='Proxy', resource_name='cluster') }}"
+
+    - when: proxy_cluster.spec.trustedCA.name|length > 0
+      block:
+      - name: "Enable trusted CA environment"
+        set_fact:
+          trusted_ca_enabled: true
+
+      - name: "Create an empty ConfigMap that will hold the trusted CA"
+        k8s:
+          state: present
+          definition: "{{ lookup('template', 'configmap-trusted-ca.yml.j2') }}"
+
+  - name: "Setup the webhook secret"
+    k8s:
+      state: present
+      definition: "{{ lookup('template', 'secret-webhook-server-secret.yml.j2') }}"
+
+  - name: "Setup controller config map"
+    k8s:
+      state : present
+      definition: "{{ lookup('template', 'configmap-controller.yml.j2') }}"
+
+  - name: "Setup inventory service"
+    k8s:
+      state: present
+      definition: "{{ lookup('template', 'service-inventory.yml.j2') }}"
+
+  - name: "Setup controller deployment"
+    k8s:
+      state : present
+      definition: "{{ lookup('template', 'deployment-controller.yml.j2') }}"
+      merge_type: "merge"
+
+  - name: "Setup inventory route"
+    k8s:
+      state: present
+      definition: "{{ lookup('template', 'route-inventory.yml.j2') }}"
+    when: not k8s_cluster|bool
+
+  - name: "Set up default provider"
+    k8s:
+      state: present
+      definition: "{{ lookup('template', 'provider-host.yml.j2') }}"
+    when: "'kubevirt.io' in api_groups"
+
+  - when: feature_validation|bool
+    block:
+    - name: "Setup validation service"
+      k8s:
+        state: "{{ validation_state }}"
+        definition: "{{ lookup('template', 'service-validation.yml.j2') }}"
+
+    - name: "Setup validation config map"
+      k8s:
+        state: "{{ validation_state }}"
+        definition: "{{ lookup('template', 'configmap-validation.yml.j2') }}"
+
+    - name: "Setup validation deployment"
+      k8s:
+        state: "{{ validation_state }}"
+        definition: "{{ lookup('template', 'deployment-validation.yml.j2') }}"
+
+  - when: feature_must_gather_api|bool
+    block:
+    - name: "Setup must-gather-api service"
+      k8s:
+        state: "{{ must_gather_api_state }}"
+        definition: "{{ lookup('template', 'service-must-gather-api.yml.j2') }}"
+
+    - name: "Setup must-gather-api deployment"
+      k8s:
+        state: "{{ must_gather_api_state }}"
+        definition: "{{ lookup('template', 'deployment-must-gather-api.yml.j2') }}"
+
+  # Non-k8s UI tasks
+  - when: feature_ui|bool and not k8s_cluster|bool
+    block:
+
+    - name: "Setup UI route"
+      k8s:
+        state: "{{ ui_state }}"
+        definition: "{{ lookup('template', 'route-ui.yml.j2') }}"
+
+    - name: "Obtain UI route"
+      k8s_info:
+        api_version: "route.openshift.io/v1"
+        kind: "Route"
+        namespace: "{{ app_namespace }}"
+        name: "{{ ui_route_name }}"
+      register: route
+      until: (route.resources|length) > 0
+      delay: 10
+      retries: 6
+
+    - name: "Extract UI FQDN from the route"
+      set_fact:
+        ui_route_fqdn: "{{ route.resources[0].spec.host }}"
+
+    - name: "Obtain OCP cluster version"
+      k8s_info:
+        kind: ClusterVersion
+        name: version
+      register: ocp_cv
+
+    - name: "Extract OCP cluster version"
+      set_fact:
+        forklift_cluster_version: "{{ ocp_cv | json_query(query) | first }}"
+      vars:
+        query: "resources[0].status.history[?state=='Completed'].version"
+      when: (ocp_cv.resources|length) > 0
+
+    - name: "Check if UI oauthclient exists already so we don't update it"
+      k8s_info:
+        api_version: v1
+        kind: OAuthClient
+        name: "{{ ui_service_name }}"
+        namespace: "{{ app_namespace }}"
+      register: ui_oauthclient_status
+
+    - when: (ui_oauthclient_status.resources | length) == 0
+      block:
+      - name: "Generate random secret value for oauth client"
+        set_fact:
+          ui_oauth_secret: "{{ 99999999 | random | to_uuid | b64encode }}"
+
+      - name: "Setup UI oauthclient"
+        k8s:
+          state: present
+          definition: "{{ lookup('template', 'oauthclient-ui.yml.j2') }}"
+
+    - name: "Use existing secret value for oauth client"
+      set_fact:
+        ui_oauth_secret: "{{ ui_oauthclient_status.resources[0].secret }}"
+      when: (ui_oauthclient_status.resources | length) > 0
+
+  - when: feature_ui|bool
+    block:
+
+    - name: "Setup UI config map"
+      k8s:
+        state: "{{ ui_state }}"
+        definition: "{{ lookup('template', 'configmap-ui.yml.j2') }}"
+
+    - name: "Setup UI service"
+      k8s:
+        state: "{{ ui_state }}"
+        definition: "{{ lookup('template', 'service-ui.yml.j2') }}"
+
+    - name: "Setup UI deployment"
+      k8s:
+        state: "{{ ui_state }}"
+        definition: "{{ lookup('template', 'deployment-ui.yml.j2') }}"
+
+  - when: not feature_ui|bool
+    name: "Cleanup {{ ui_service_name }} if disabled"
+    include_tasks: cleanup.yml
+    loop: "{{ forklift_resources }}"
+    loop_control:
+      loop_var: resource_kind
+    vars:
+      feature_label: "{{ ui_service_name }}"
+
+  - when: not feature_validation|bool
+    name: "Cleanup {{ validation_service_name }} if disabled"
+    include_tasks: cleanup.yml
+    loop: "{{ forklift_resources }}"
+    loop_control:
+      loop_var: resource_kind
+    vars:
+      feature_label: "{{ validation_service_name }}"
+
+  - when: not feature_must_gather_api|bool
+    name: "Cleanup {{ must_gather_api_service_name }} if disabled"
+    include_tasks: cleanup.yml
+    loop: "{{ forklift_resources }}"
+    loop_control:
+      loop_var: resource_kind
+    vars:
+      feature_label: "{{ must_gather_api_service_name }}"
+

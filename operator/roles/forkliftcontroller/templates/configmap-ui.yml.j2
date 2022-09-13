@@ -1,0 +1,38 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app: {{ app_name }}
+    service: {{ ui_service_name }}
+  name: "{{ ui_configmap_name }}"
+  namespace: "{{ app_namespace }}"
+data:
+  "{{ ui_meta_file_name }}": |
+    {    
+      "namespace": "{{ app_namespace }}",
+      "configNamespace": "{{ app_namespace }}",
+      "clusterApi": "https://kubernetes.default.svc.cluster.local",
+{% if inventory_tls_enabled|bool %}
+      "inventoryApi": "https://{{ inventory_service_name }}.{{ app_namespace }}.svc.cluster.local:8443",
+{% else %}
+      "inventoryApi": "http://{{ inventory_service_name }}.{{ app_namespace }}.svc.cluster.local:8080",
+{% endif %}
+{% if must_gather_api_tls_enabled|bool %}
+      "mustGatherApi": "https://{{ must_gather_api_service_name }}.{{ app_namespace }}.svc.cluster.local:8443",
+{% else %}
+      "mustGatherApi": "http://{{ must_gather_api_service_name }}.{{ app_namespace }}.svc.cluster.local:8080",
+{% endif %}
+      "oauth": {
+{% if not k8s_cluster|bool %}
+        "clientId": "{{ ui_service_name }}",
+{% if ui_tls_enabled|bool %}
+        "redirectUrl": "https://{{ ui_route_fqdn }}/login/callback",
+{% else %}
+        "redirectUrl": "http://{{ ui_route_fqdn }}/login/callback",
+{% endif %}
+        "userScope": "{{ ui_oauth_user_scope }}",
+        "clientSecret": "{{ ui_oauth_secret }}"
+{% endif %}
+      }
+    }

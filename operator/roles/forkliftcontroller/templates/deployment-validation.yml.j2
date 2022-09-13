@@ -1,0 +1,73 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ validation_deployment_name }}
+  namespace: {{ app_namespace }}
+  labels:
+    app: {{ app_name }}
+    service: {{ validation_service_name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ app_name }}
+      service: {{ validation_service_name }}
+  template:
+    metadata:
+      labels:
+        app: {{ app_name }}
+        service: {{ validation_service_name }}
+    spec:
+      containers:
+        - name: {{ validation_container_name }}
+          image: {{ validation_image_fqin }}
+          imagePullPolicy: {{ image_pull_policy }}
+          ports:
+            - name: opa
+              containerPort: 8181
+          resources:
+            limits:
+              cpu: {{ validation_container_limits_cpu }}
+              memory: {{ validation_container_limits_memory }}
+            requests:
+              cpu: {{ validation_container_requests_cpu }}
+              memory: {{ validation_container_requests_memory }}
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+            - name: INVENTORY_SERVICE
+              value: {{ inventory_service_name }}
+{% if validation_tls_enabled|bool %}
+            - name: TLS_ENABLED
+              value: 'true'
+            - name: TLS_CERT_FILE
+              value: /var/run/secrets/{{ validation_tls_secret_name }}/tls.crt
+            - name: TLS_KEY_FILE
+              value: /var/run/secrets/{{ validation_tls_secret_name }}/tls.key
+            - name: CA_TLS_CERTIFICATE
+              value: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+{% else %}
+            - name: TLS_ENABLED
+              value: 'false'
+{% endif %}
+          volumeMounts:
+            - name: {{ validation_extra_volume_name }}
+              mountPath: {{ validation_extra_volume_mountpath }}
+{% if validation_tls_enabled|bool %}
+            - name: {{ validation_tls_secret_name }}
+              mountPath: /var/run/secrets/{{ validation_tls_secret_name }}
+{% endif %}
+      volumes:
+        - name: {{ validation_extra_volume_name }}
+          configMap:
+            name: {{ validation_configmap_name }}
+{% if validation_tls_enabled|bool %}
+        - name: {{ validation_tls_secret_name }}
+          secret:
+            secretName: {{ validation_tls_secret_name }}
+            defaultMode: 420
+{% endif %}

@@ -1,0 +1,20 @@
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  annotations:
+    haproxy.router.openshift.io/timeout: 300s
+  name: "{{ ui_route_name }}"
+  namespace: "{{ app_namespace }}"
+  labels:
+    app: {{ app_name }}
+    service: {{ ui_service_name }}
+spec:
+  to:
+    kind: Service
+    name: {{ ui_service_name }}
+{% if ui_tls_enabled|bool %}
+  tls:
+    termination: reencrypt
+    insecureEdgeTerminationPolicy: Redirect
+{% endif %}
