@@ -1,0 +1,15 @@
+---
+apiVersion: forklift.konveyor.io/v1beta1
+kind: StorageMap
+metadata:
+  name: example-storagemap
+  namespace: ${NAMESPACE}
+spec:
+  provider:
+    namespace: ''
+    name: ''
+  map:
+  - source:
+      id: ''
+    destination:
+      storageClass: ''

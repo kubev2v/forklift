@@ -1,0 +1,22 @@
+---
+- block:
+
+  - name: "Get {{ resource_kind }} resources labeled {{ feature_label }}"
+    k8s_info:
+      namespace: "{{ app_namespace }}"
+      kind: "{{ resource_kind }}"
+      label_selectors:
+        - "service = {{ feature_label }}"
+    register: results
+
+  - name: "Clean up {{ resource_kind }} resources labeled {{ feature_label }}"
+    k8s:
+      namespace: "{{ app_namespace }}"
+      kind: "{{ results.resources[0].kind }}"
+      name: "{{ results.resources[0].metadata.name }}"
+      state: absent
+    when: (results.resources|length) > 0
+
+  rescue:
+  - debug:
+      msg: "Something went wrong, ignoring empty or missing resources for {{ resource_kind }} label {{ feature_label }}"

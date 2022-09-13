@@ -1,0 +1,10 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: konveyor-forklift
+  namespace: openshift-marketplace
+spec:
+  displayName: Forklift Operator
+  publisher: Konveyor
+  sourceType: grpc
+  image: quay.io/konveyor/forklift-operator-index:latest

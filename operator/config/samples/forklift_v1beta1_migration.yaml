@@ -1,0 +1,10 @@
+---
+apiVersion: forklift.konveyor.io/v1beta1
+kind: Migration
+metadata:
+  name: example-migration
+  namespace: ${NAMESPACE}
+spec:
+  plan:
+    name: example-plan
+    namespace: konveyor-forklift

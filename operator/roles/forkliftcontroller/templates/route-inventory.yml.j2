@@ -1,0 +1,20 @@
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ inventory_route_name }}
+  namespace: {{ app_namespace }}
+  labels:
+    control-plane: forklift-operator
+    controller-tools.k8s.io: "1.0"
+    app: {{ app_name }}
+    service: {{ inventory_service_name }}
+spec:
+  to:
+    kind: Service
+    name: {{ inventory_service_name }}
+{% if inventory_tls_enabled|bool %}
+  tls:
+    termination: reencrypt
+    insecureEdgeTerminationPolicy: Redirect
+{% endif %}

@@ -1,0 +1,17 @@
+---
+apiVersion: forklift.konveyor.io/v1beta1
+kind: NetworkMap
+metadata:
+  name: example-networkmap
+  namespace: ${NAMESPACE}
+spec:
+  provider:
+    namespace: ''
+    name: ''
+  map:
+  - source:
+      id: ''
+    destination:
+      type: pod
+      namespace: ''
+      name: ''

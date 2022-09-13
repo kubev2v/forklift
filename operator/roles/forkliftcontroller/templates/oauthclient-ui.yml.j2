@@ -1,0 +1,10 @@
+---
+apiVersion: oauth.openshift.io/v1
+kind: OAuthClient
+metadata:
+  name: {{ ui_service_name }}
+  namespace: "{{ app_namespace }}"
+grantMethod: auto
+redirectURIs:
+- "https://{{ ui_route_fqdn }}/login/callback"
+secret: "{{ ui_oauth_secret }}"
