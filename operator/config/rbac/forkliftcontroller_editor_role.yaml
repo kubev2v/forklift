@@ -1,0 +1,24 @@
+# permissions for end users to edit forkliftcontrollers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: forkliftcontroller-editor-role
+rules:
+- apiGroups:
+  - forklift.konveyor.io
+  resources:
+  - forkliftcontrollers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - forklift.konveyor.io
+  resources:
+  - forkliftcontrollers/status
+  verbs:
+  - get

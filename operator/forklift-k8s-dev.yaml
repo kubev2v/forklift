@@ -1,0 +1,21 @@
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: migration
+  namespace: konveyor-forklift
+spec:
+  targetNamespaces:
+    - konveyor-forklift
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: forklift-operator
+  namespace: konveyor-forklift
+spec:
+  channel: development
+  installPlanApproval: Automatic
+  name: forklift-operator
+  source: konveyor-forklift
+  sourceNamespace: konveyor-forklift

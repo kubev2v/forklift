@@ -1,0 +1,10 @@
+---
+defaultChannel: ${DEFAULT_CHANNEL}
+name: forklift-operator
+schema: olm.package
+---
+schema: olm.channel
+package: forklift-operator
+name: ${CHANNELS}
+entries:
+  - name: forklift-operator.v${VERSION}

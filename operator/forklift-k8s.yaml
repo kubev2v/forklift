@@ -1,0 +1,37 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: konveyor-forklift
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: konveyor-forklift
+  namespace: konveyor-forklift
+spec:
+  displayName: Forklift Operator
+  publisher: Konveyor
+  sourceType: grpc
+  image: quay.io/konveyor/forklift-operator-index:latest
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: migration
+  namespace: konveyor-forklift
+spec:
+  targetNamespaces:
+    - konveyor-forklift
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: forklift-operator
+  namespace: konveyor-forklift
+spec:
+  channel: development
+  installPlanApproval: Automatic
+  name: forklift-operator
+  source: konveyor-forklift
+  sourceNamespace: konveyor-forklift

@@ -1,0 +1,95 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ ui_deployment_name }}
+  namespace: "{{ app_namespace }}"
+  labels:
+    app: {{ app_name }}
+    service: {{ ui_service_name }}
+spec:
+  selector:
+     matchLabels:
+       app: {{ app_name }}
+       service: {{ ui_service_name }}
+  template:
+    metadata:
+      labels:
+        app: {{ app_name }}
+        service: {{ ui_service_name }}
+    spec:
+      containers:
+        - name: {{ ui_container_name }}
+          image: "{{ ui_image_fqin }}"
+          imagePullPolicy: "{{ image_pull_policy }}"
+          env:
+            - name: AUTH_REQUIRED
+              value: '{{ feature_auth_required|lower }}'
+            - name: META_FILE
+              value: {{ ui_configmap_path }}/{{ ui_meta_file_name }}
+            - name: NODE_EXTRA_CA_CERTS
+              value: {{ ui_node_extra_ca_certs }}
+            - name: FORKLIFT_OPERATOR_VERSION
+              value: {{ forklift_operator_version }}
+{% if k8s_cluster|bool %}
+            - name: FORKLIFT_CLUSTER_VERSION
+              value: "{{ k8s_cluster_version }}"
+{% else %}
+            - name: FORKLIFT_CLUSTER_VERSION
+              value: "{{ forklift_cluster_version }}"
+{% endif %}
+{% if ui_tls_enabled|bool %}
+            - name: UI_TLS_ENABLED
+              value: 'true'
+            - name: UI_TLS_CERTIFICATE
+              value: "/var/run/secrets/{{ ui_tls_secret_name }}/tls.crt"
+            - name: UI_TLS_KEY
+              value: "/var/run/secrets/{{ ui_tls_secret_name }}/tls.key"
+{% else %}
+            - name: UI_TLS_ENABLED
+              value: 'false'
+{% endif %}
+          ports:
+{% if ui_tls_enabled|bool %}
+            - containerPort: 8443
+{% else %}
+            - containerPort: 8080
+{% endif %}
+              protocol: TCP
+          resources:
+            limits:
+              cpu: {{ ui_container_limits_cpu }}
+              memory: {{ ui_container_limits_memory }}
+            requests:
+              cpu: {{ ui_container_requests_cpu }}
+              memory: {{ ui_container_requests_memory }}
+          volumeMounts:
+            - name: "{{ ui_configmap_name }}"
+              mountPath: "{{ ui_configmap_path }}"
+{% if ui_tls_enabled|bool %}
+            - name: "{{ ui_tls_secret_name }}"
+              mountPath: "/var/run/secrets/{{ ui_tls_secret_name }}"
+{% endif %}
+{% if trusted_ca_enabled is defined and trusted_ca_enabled|bool %}
+            - name: trusted-ca
+              mountPath: /etc/pki/ca-trust/extracted/pem
+              readOnly: true
+{% endif %}
+      volumes:
+        - name: "{{ ui_configmap_name }}"
+          configMap:
+            name: "{{ ui_configmap_name }}"
+{% if ui_tls_enabled|bool %}
+        - name: "{{ ui_tls_secret_name }}"
+          secret:
+            defaultMode: 420
+            secretName: "{{ ui_tls_secret_name }}"
+{% endif %}
+{% if trusted_ca_enabled is defined and trusted_ca_enabled|bool %}
+        - name: trusted-ca
+          configMap:
+            name: trusted-ca
+            items:
+              - key: ca-bundle.crt
+                path: tls-ca-bundle.pem
+{% endif %}

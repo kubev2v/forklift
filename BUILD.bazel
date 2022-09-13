@@ -53,8 +53,34 @@ container_push(
     name = "push-forklift-controller",
     format = "Docker",
     image = "//cmd/manager:forklift-controller-image",
-    registry = "image-registry.openshift-image-registry.svc:5000",
-    #registry = "default-route-openshift-image-registry.apps-crc.testing:5000",
-    repository = "openshift/forklift-controller",
-    tag = "devel",
+    registry = "$${REGISTRY:-quay.io}",
+    repository = "$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}forklift-controller",
+    tag = "$${REGISTRY_TAG:-devel}",
+)
+
+container_push(
+    name = "push-forklift-operator-index",
+    format = "Docker",
+    image = "//operator:forklift-operator-index-image",
+    registry = "$${REGISTRY:-quay.io}",
+    repository = "$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}forklift-operator-index",
+    tag = "$${REGISTRY_TAG:-devel}",
+)
+
+container_push(
+    name = "push-forklift-operator-bundle",
+    format = "Docker",
+    image = "//operator:forklift-operator-bundle-image",
+    registry = "$${REGISTRY:-quay.io}",
+    repository = "$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}forklift-operator-bundle",
+    tag = "$${REGISTRY_TAG:-devel}",
+)
+
+container_push(
+    name = "push-forklift-operator",
+    format = "Docker",
+    image = "//operator:forklift-operator-image",
+    registry = "$${REGISTRY:-quay.io}",
+    repository = "$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}forklift-operator",
+    tag = "$${REGISTRY_TAG:-devel}",
 )

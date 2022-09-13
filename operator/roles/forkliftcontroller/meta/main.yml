@@ -1,0 +1,31 @@
+---
+galaxy_info:
+  author: Konveyor Forklift Operator
+  description: Konveyor Forklift Operator installs a suite of migration tools that facilitate the migration of VM workloads to OpenShift Virtualization.
+  license: Apache
+
+  min_ansible_version: 2.9
+
+  # Provide a list of supported platforms, and for each platform a list of versions.
+  # If you don't wish to enumerate all versions for a particular platform, use 'all'.
+  # To view available platforms and versions (or releases), visit:
+  # https://galaxy.ansible.com/api/v1/platforms/
+  #
+  platforms:
+  - name: EL
+    versions:
+    - 8
+
+  galaxy_tags:
+  - forklift
+  - konveyor
+  - kubernetes
+  - kubevirt
+  - openshift
+  - operator
+  - vm
+
+dependencies: []
+collections:
+- operator_sdk.util
+- community.kubernetes

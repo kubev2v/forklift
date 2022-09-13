@@ -1,0 +1,11 @@
+## Append samples you want in your CSV to this file as resources ##
+resources:
+- forklift_v1beta1_forkliftcontroller.yaml
+- forklift_v1beta1_hook.yaml
+- forklift_v1beta1_host.yaml
+- forklift_v1beta1_migration.yaml
+- forklift_v1beta1_networkmap.yaml
+- forklift_v1beta1_plan.yaml
+- forklift_v1beta1_provider.yaml
+- forklift_v1beta1_storagemap.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples

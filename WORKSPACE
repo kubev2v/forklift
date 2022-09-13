@@ -3397,12 +3397,51 @@ container_pull(
     #tag = "stream8",
 )
 
+container_pull(
+    name = "ansible-operator-image",
+    digest = "sha256:0b92d03397ad85270eaaf8c4e3250944642ca7dbe659dd844914ca3da2ecaf7b",
+    registry = "quay.io",
+    repository = "operator-framework/ansible-operator",
+)
+
+container_pull(
+    name = "opm-image",
+    digest = "sha256:601c62a5e3fea961665aad2ed2834f3f165a020051d355eb24af2125da8e158e",
+    registry = "quay.io",
+    repository = "operator-framework/opm",
+)
+
 http_file(
     name = "opa",
     downloaded_file_path = "opa",
     executable = True,
     sha256 = "914453ebcc76781371ca27dd61086967ed5e0032e42ba85826ee77c9bca84659",
     urls = ["https://openpolicyagent.org/downloads/latest/opa_linux_amd64_static"],
+)
+
+http_file(
+    name = "kustomize",
+    sha256 = "4a3372d7bfdffe2eaf729e77f88bc94ce37dc84de55616bfe90aac089bf6fd02",
+    downloaded_file_path = "kustomize.tar.gz",
+    urls = [
+        "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v3.8.7/kustomize_v3.8.7_linux_amd64.tar.gz",
+    ],
+)
+
+http_file(
+    name = "operator-sdk",
+    downloaded_file_path = "operator-sdk",
+    executable = True,
+    sha256 = "2fc68a50b94b7c477e804729365baa5de6d5afcfea9b7fcac9f93dd649c29e90",
+    urls = ["https://github.com/operator-framework/operator-sdk/releases/download/v1.22.0/operator-sdk_linux_amd64"],
+)
+
+http_file(
+    name = "opm",
+    downloaded_file_path = "opm",
+    executable = True,
+    sha256 = "dc0d4d287fef23f165c837b2e6cb68e2506ff295dc57110b9bfe3b553359eb36",
+    urls = ["https://github.com/operator-framework/operator-registry/releases/download/v1.23.0/linux-amd64-opm"],
 )
 
 http_archive(

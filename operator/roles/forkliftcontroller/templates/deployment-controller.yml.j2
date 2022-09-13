@@ -1,0 +1,216 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ app_name }}
+    control-plane: forklift-operator
+    controller-tools.k8s.io: "1.0"
+  name: {{ controller_deployment_name }}
+  namespace: {{ app_namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ app_name }}
+      control-plane: forklift-operator
+      controller-tools.k8s.io: "1.0"
+  serviceName: {{ controller_service_name }}
+  template:
+    metadata:
+      labels:
+        app: {{ app_name }}
+        control-plane: forklift-operator
+        controller-tools.k8s.io: "1.0"
+      annotations:
+        configHash: "{{ (inventory_volume_path | string) }}"
+    spec:
+      serviceAccountName: {{ controller_service_name }}
+      containers:
+      - name: main
+        command:
+        - /usr/local/bin/manager
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: ROLE
+          value: main
+        - name: API_HOST
+          value: {{ inventory_service_name }}.{{ app_namespace }}.svc.cluster.local
+        - name: KUBEVIRT_CLIENT_GO_SCHEME_REGISTRATION_VERSION
+          value: "v1"
+        - name: VIRT_V2V_IMAGE
+          value: {{ virt_v2v_image_fqin }}
+{% if inventory_tls_enabled|bool %}
+        - name: API_PORT
+          value: "8443"
+        - name: API_TLS_ENABLED
+          value: "true"
+{% else %}
+        - name: API_PORT
+          value: "8080"
+        - name: API_TLS_ENABLED
+          value: "false"
+{% endif %}
+        - name: METRICS_PORT
+          value: '8081'
+        - name: SECRET_NAME
+          value: webhook-server-secret
+{% if controller_log_level is defined and controller_log_level is number %}
+        - name: LOG_LEVEL
+          value: "{{ controller_log_level }}"
+{% endif %}
+{% if controller_precopy_interval is number %}
+        - name: PRECOPY_INTERVAL
+          value: "{{ controller_precopy_interval }}"
+{% endif %}
+{% if controller_max_vm_inflight is number %}
+        - name: MAX_VM_INFLIGHT
+          value: "{{ controller_max_vm_inflight }}"
+{% endif %}
+{% if controller_vsphere_incremental_backup|bool %}
+        - name: FEATURE_VSPHERE_INCREMENTAL_BACKUP
+          value: "true"
+{% endif %}
+{% if controller_ovirt_warm_migration|bool %}
+        - name: FEATURE_OVIRT_WARM_MIGRATION
+          value: "true"
+{% endif %}
+{% if controller_profile_kind is defined and controller_profile_path is defined and controller_profile_duration is defined %}
+        - name: PROFILE_KIND
+          value: "{{ controller_profile_kind }}"
+        - name: PROFILE_PATH
+          value: "{{ controller_profile_path }}/main"
+        - name: PROFILE_DURATION
+          value: "{{ controller_profile_duration }}"
+{% endif %}
+        envFrom:
+        - configMapRef:
+            name: {{ controller_configmap_name }}
+        image: {{ controller_image_fqin }}
+        imagePullPolicy: {{ image_pull_policy }}
+        ports:
+        - containerPort: 9876
+          name: webhook-server
+          protocol: TCP
+        resources:
+          limits:
+            cpu: {{ controller_container_limits_cpu }}
+            memory: {{ controller_container_limits_memory }}
+          requests:
+            cpu: {{ controller_container_requests_cpu }}
+            memory: {{ controller_container_requests_memory }}
+        volumeMounts:
+        - mountPath: /tmp/cert
+          name: cert
+          readOnly: true
+        - mountPath: {{ profiler_volume_path }}
+          name: profiler
+      - name: inventory
+        command:
+        - /usr/local/bin/manager
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: ROLE
+          value: inventory
+        - name: KUBEVIRT_CLIENT_GO_SCHEME_REGISTRATION_VERSION
+          value: "v1"
+        - name: AUTH_REQUIRED
+          value: '{{ feature_auth_required|lower }}'
+{% if inventory_tls_enabled|bool %}
+        - name: API_PORT
+          value: "8443"
+        - name: API_TLS_ENABLED
+          value: "true"
+        - name: API_TLS_CERTIFICATE
+          value: "/var/run/secrets/{{ inventory_tls_secret_name }}/tls.crt"
+        - name: API_TLS_KEY
+          value: /var/run/secrets/{{ inventory_tls_secret_name }}/tls.key
+{% else %}
+        - name: API_PORT
+          value: "8080"
+        - name: API_TLS_ENABLED
+          value: "false"
+{% endif %}
+        - name: METRICS_PORT
+          value: '8082'
+        - name: SECRET_NAME
+          value: webhook-server-secret
+{% if feature_validation|bool and validation_tls_enabled|bool %}
+        - name: POLICY_AGENT_URL
+          value: "https://{{ validation_service_name }}.{{ app_namespace }}.svc.cluster.local:8181"
+        - name: POLICY_AGENT_CA
+          value: "/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt"
+{% else %}
+        - name: POLICY_AGENT_URL
+          value: "http://{{ validation_service_name }}.{{ app_namespace }}.svc.cluster.local:8181"
+        - name: POLICY_AGENT_CA
+          value: ""
+{% endif %}
+{% if feature_validation|bool %}
+        - name: POLICY_AGENT_SEARCH_INTERVAL
+          value: "{{ validation_policy_agent_search_interval }}"
+{% endif %}
+{% if controller_log_level is defined and controller_log_level is number %}
+        - name: LOG_LEVEL
+          value: "{{ controller_log_level }}"
+{% endif %}
+{% if controller_profile_kind is defined and controller_profile_path is defined and controller_profile_duration is defined %}
+        - name: PROFILE_KIND
+          value: "{{ controller_profile_kind }}"
+        - name: PROFILE_PATH
+          value: "{{ controller_profile_path }}/inventory"
+        - name: PROFILE_DURATION
+          value: "{{ controller_profile_duration }}"
+{% endif %}
+        envFrom:
+        - configMapRef:
+            name: {{ controller_configmap_name }}
+        image: {{ controller_image_fqin }}
+        imagePullPolicy: {{ image_pull_policy }}
+        ports:
+{% if inventory_tls_enabled|bool %}
+        - name: api
+          containerPort: 8443
+          protocol: TCP
+{% else %}
+        - name: api
+          containerPort: 8080
+          protocol: TCP
+{% endif %}
+        resources:
+          limits:
+            cpu: {{ inventory_container_limits_cpu }}
+            memory: {{ inventory_container_limits_memory }}
+          requests:
+            cpu: {{ inventory_container_requests_cpu }}
+            memory: {{ inventory_container_requests_memory }}
+        volumeMounts:
+        - mountPath: {{ inventory_volume_path }}
+          name: inventory
+        - mountPath: {{ profiler_volume_path }}
+          name: profiler
+{% if inventory_tls_enabled|bool %}
+        - mountPath: /var/run/secrets/{{ inventory_tls_secret_name }}
+          name: {{ inventory_service_name }}-serving-cert
+{% endif %}
+      terminationGracePeriodSeconds: 10
+      volumes:
+      - name: cert
+        secret:
+          defaultMode: 420
+          secretName: webhook-server-secret
+{% if inventory_tls_enabled|bool %}
+      - name: {{ inventory_tls_secret_name }}
+        secret:
+          defaultMode: 420
+          secretName: {{ inventory_tls_secret_name }}
+{% endif %}
+      - name: inventory
+        emptyDir: {}
+      - name: profiler
+        emptyDir: {}

@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    control-plane: forklift-operator
+  name: system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: forklift-operator
+  namespace: system
+  labels:
+    control-plane: forklift-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: forklift
+      name: forklift-operator
+  template:
+    metadata:
+      labels:
+        app: forklift
+        name: forklift-operator
+    spec:
+      serviceAccountName: forklift-operator
+      containers:
+      - args:
+        - --health-probe-bind-address=:6789
+        - --metrics-bind-address=127.0.0.1:8080
+        - --leader-elect
+        - --leader-election-id=forklift-operator
+        env:
+        - name: WATCH_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.annotations['olm.targetNamespaces']
+        - name: ANSIBLE_GATHERING
+          value: explicit
+        - name: CONTROLLER_IMAGE
+          value: ${CONTROLLER_IMAGE}
+        - name: MUST_GATHER_IMAGE
+          value: ${MUST_GATHER_IMAGE}
+        - name: MUST_GATHER_API_IMAGE
+          value: ${MUST_GATHER_API_IMAGE}
+        - name: UI_IMAGE
+          value: ${UI_IMAGE}
+        - name: VALIDATION_IMAGE
+          value: ${VALIDATION_IMAGE}
+        - name: VIRT_V2V_IMAGE
+          value: ${VIRT_V2V_IMAGE}
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 6789
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 6789
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        image: ${OPERATOR_IMAGE}
+        imagePullPolicy: Always
+        name: forklift-operator
+        resources: {}

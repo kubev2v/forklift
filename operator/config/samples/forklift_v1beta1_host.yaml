@@ -1,0 +1,12 @@
+---
+apiVersion: forklift.konveyor.io/v1beta1
+kind: Host
+metadata:
+  name: example-host
+  namespace: ${NAMESPACE}
+spec:
+  provider:
+    namespace: ''
+    name: ''
+  id: ''
+  ipAddress: ''
