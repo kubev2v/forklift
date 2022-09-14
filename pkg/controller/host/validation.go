@@ -86,7 +86,7 @@ func (r *Reconciler) validate(host *api.Host) error {
 			Status:   True,
 			Reason:   Completed,
 			Category: Advisory,
-			Message:  "The host has been validated.",
+			Message:  "The host inventory reference, IP address, and credentials have been validated.",
 		})
 	err = r.testConnection(host)
 	if err != nil {
@@ -343,7 +343,7 @@ func (r *Reconciler) testConnection(host *api.Host) (err error) {
 				Reason:   Tested,
 				Category: Critical,
 				Message: fmt.Sprintf(
-					"Connection test, failed: %s",
+					"Could not connect to the ESXi host, please check credentials. Error: %s",
 					testErr.Error()),
 			})
 	}
