@@ -17,6 +17,6 @@ func TestKubevirt(t *testing.T) {
 
 	//Test the case that the VM name is empty after all removals
 	emptyVM := ".__."
-	newVmNameFromId := "vm-1234-5678"
+	newVmNameFromId := "vm-1234"
 	g.Expect(changeVmName(emptyVM, id)).To(gomega.Equal(newVmNameFromId))
 }
