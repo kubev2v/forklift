@@ -51,4 +51,4 @@ jobs:
       - name: Push code coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
-          fail_ci_if_error: true
+          fail_ci_if_error: false # see https://github.com/codecov/codecov-action/issues/598
