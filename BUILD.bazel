@@ -84,3 +84,21 @@ container_push(
     repository = "$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}forklift-operator",
     tag = "$${REGISTRY_TAG:-devel}",
 )
+
+container_push(
+    name = "push-forklift-validation",
+    format = "Docker",
+    image = "//validation:forklift-validation-image",
+    registry = "$${REGISTRY:-quay.io}",
+    repository = "$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}forklift-validation",
+    tag = "$${REGISTRY_TAG:-devel}",
+)
+
+container_push(
+    name = "push-forklift-virt-v2v",
+    format = "Docker",
+    image = "//virt-v2v:forklift-virt-v2v",
+    registry = "$${REGISTRY:-quay.io}",
+    repository = "$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}forklift-virt-v2v",
+    tag = "$${REGISTRY_TAG:-devel}",
+)
