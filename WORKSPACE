@@ -3415,8 +3415,8 @@ http_file(
     name = "opa",
     downloaded_file_path = "opa",
     executable = True,
-    sha256 = "914453ebcc76781371ca27dd61086967ed5e0032e42ba85826ee77c9bca84659",
-    urls = ["https://openpolicyagent.org/downloads/latest/opa_linux_amd64_static"],
+    sha256 = "5ddb21d3fcfca130a47a42e730c05f055c68af6c1b37465879f6c59b10527eae",
+    urls = ["https://openpolicyagent.org/downloads/v0.44.0/opa_linux_amd64_static"],
 )
 
 http_file(
