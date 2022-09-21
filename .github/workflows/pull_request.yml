@@ -12,9 +12,28 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+# A workflow run is made up of one or more jobs that can run sequentially
 jobs:
-  # This workflow contains a single job called "build"
+  ci_setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out forklift repository
+        uses: actions/checkout@v3
+
+      - name: Build and setup everything with bazel
+        uses: kubev2v/forkliftci@main
+
+      - run: kubectl version
+
+      - run: kubectl get pods -n konveyor-forklift
+
+      - run: echo "CLUSTER=`kind get kubeconfig | grep server | cut -d ' ' -f6`" >> $GITHUB_ENV
+      - run: echo "TOKEN=`kubectl get secrets -n kube-system -o jsonpath='{.items[0].data.token-id}' | base64 -d`.`kubectl get secrets -n kube-system -o jsonpath='{.items[0].data.token-secret}' | base64 -d`" >> $GITHUB_ENV
+
+      - name: Test call to Forklift
+        run: |
+          curl -k "$CLUSTER/apis/forklift.konveyor.io/v1beta1/namespaces/konveyor-forklift/providers" --header "Authorization: Bearer $TOKEN"
+
   build:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
