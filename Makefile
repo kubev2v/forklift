@@ -44,7 +44,7 @@ CRD_OPTIONS ?= "crd:trivialVersions=true"
 
 # Generate manifests e.g. CRD, Webhooks
 manifests: controller-gen
-	${CONTROLLER_GEN} ${CRD_OPTIONS} crd rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crds/bases output:crd:dir=config/crds
+	${CONTROLLER_GEN} ${CRD_OPTIONS} crd rbac:roleName=manager-role webhook paths="./..." output:dir=operator/config/crd/bases
 
 # Run go fmt against code
 fmt:
