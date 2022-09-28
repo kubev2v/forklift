@@ -20,6 +20,9 @@ spec:
     - jsonPath: .spec.type
       name: TYPE
       type: string
+    - jsonPath: .status.phase
+      name: STATUS
+      type: string
     - jsonPath: .status.conditions[?(@.type=='Ready')].status
       name: READY
       type: string
@@ -152,6 +155,9 @@ spec:
                 description: The most recent generation observed by the controller.
                 format: int64
                 type: integer
+              phase:
+                description: Current life cycle phase of the provider.
+                type: string
             type: object
         type: object
     served: true
