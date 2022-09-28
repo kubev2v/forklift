@@ -18,6 +18,10 @@ package provider
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"sync"
+
 	libcnd "github.com/konveyor/controller/pkg/condition"
 	liberr "github.com/konveyor/controller/pkg/error"
 	libfb "github.com/konveyor/controller/pkg/filebacked"
@@ -36,15 +40,12 @@ import (
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/storage/names"
-	"os"
-	"path/filepath"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"sync"
 )
 
 const (
@@ -180,6 +181,7 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 	}
 
 	// Begin staging conditions.
+	provider.Status.Phase = Staging
 	provider.Status.BeginStagingConditions()
 
 	// Validations.
@@ -197,6 +199,7 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 	// Ready condition.
 	if !provider.Status.HasBlockerCondition() &&
 		provider.Status.HasCondition(ConnectionTestSucceeded, InventoryCreated) {
+		provider.Status.Phase = Ready
 		provider.Status.SetCondition(
 			libcnd.Condition{
 				Type:     libcnd.Ready,

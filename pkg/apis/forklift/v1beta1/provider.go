@@ -75,6 +75,9 @@ type ProviderSpec struct {
 //
 // ProviderStatus defines the observed state of Provider
 type ProviderStatus struct {
+	// Current life cycle phase of the provider.
+	// +optional
+	Phase string `json:"phase,omitempty"`
 	// Conditions.
 	libcnd.Conditions `json:",inline"`
 	// The most recent generation observed by the controller.
@@ -88,6 +91,7 @@ type ProviderStatus struct {
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="TYPE",type="string",JSONPath=".spec.type"
+// +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase"
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="CONNECTED",type=string,JSONPath=".status.conditions[?(@.type=='ConnectionTestSucceeded')].status"
 // +kubebuilder:printcolumn:name="INVENTORY",type=string,JSONPath=".status.conditions[?(@.type=='InventoryCreated')].status"
