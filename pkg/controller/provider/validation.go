@@ -56,6 +56,15 @@ const (
 )
 
 //
+// Phases
+const (
+	ValidationFailed = "ValidationFailed"
+	ConnectionFailed = "ConnectionFailed"
+	Ready            = "Ready"
+	Staging          = "Staging"
+)
+
+//
 // Statuses
 const (
 	True  = libcnd.True
@@ -112,6 +121,7 @@ func (r *Reconciler) validateType(provider *api.Provider) error {
 		}
 	}
 
+	provider.Status.Phase = ValidationFailed
 	provider.Status.SetCondition(
 		libcnd.Condition{
 			Type:     TypeNotSupported,
@@ -131,6 +141,7 @@ func (r *Reconciler) validateURL(provider *api.Provider) error {
 		return nil
 	}
 	if provider.Spec.URL == "" {
+		provider.Status.Phase = ValidationFailed
 		provider.Status.SetCondition(
 			libcnd.Condition{
 				Type:     UrlNotValid,
@@ -142,6 +153,7 @@ func (r *Reconciler) validateURL(provider *api.Provider) error {
 	}
 	_, err := url.Parse(provider.Spec.URL)
 	if err != nil {
+		provider.Status.Phase = ValidationFailed
 		provider.Status.SetCondition(
 			libcnd.Condition{
 				Type:     UrlNotValid,
@@ -174,6 +186,7 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 	}
 	ref := provider.Spec.Secret
 	if !libref.RefSet(&ref) {
+		provider.Status.Phase = ValidationFailed
 		provider.Status.SetCondition(newCnd)
 		return
 	}
@@ -187,6 +200,7 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 	if errors.IsNotFound(err) {
 		err = nil
 		newCnd.Reason = NotFound
+		provider.Status.Phase = ValidationFailed
 		provider.Status.SetCondition(newCnd)
 		return
 	}
@@ -233,6 +247,7 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 	}
 	if len(newCnd.Items) > 0 {
 		newCnd.Reason = DataErr
+		provider.Status.Phase = ValidationFailed
 		provider.Status.SetCondition(newCnd)
 	}
 
@@ -260,6 +275,7 @@ func (r *Reconciler) validateSettings(provider *api.Provider) (err error) {
 		}
 	}
 	if len(newCnd.Items) > 0 {
+		provider.Status.Phase = ValidationFailed
 		provider.Status.SetCondition(newCnd)
 	}
 
@@ -290,6 +306,7 @@ func (r *Reconciler) testConnection(provider *api.Provider, secret *core.Secret)
 			"Connection test failed.",
 			"reason",
 			err.Error())
+		provider.Status.Phase = ConnectionFailed
 		provider.Status.SetCondition(
 			libcnd.Condition{
 				Type:     ConnectionTestFailed,
