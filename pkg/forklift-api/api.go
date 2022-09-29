@@ -21,30 +21,30 @@ import (
 )
 
 const (
-        // Default port that virt-api listens on.
-        defaultPort = 443
+	// Default port that virt-api listens on.
+	defaultPort = 443
 
-        // Default address that virt-api listens on.
-        defaultHost = "0.0.0.0"
+	// Default address that virt-api listens on.
+	defaultHost = "0.0.0.0"
 )
 
 type ForkliftApi interface {
-        Execute()
+	Execute()
 }
 
 type forkliftAPIApp struct {
-        Name        string
-        BindAddress string
-        Port        int
+	Name        string
+	BindAddress string
+	Port        int
 }
 
 func NewForkliftApi() ForkliftApi {
 
-        app := &forkliftAPIApp{}
-        app.BindAddress = defaultHost
-        app.Port = defaultPort
+	app := &forkliftAPIApp{}
+	app.BindAddress = defaultHost
+	app.Port = defaultPort
 
-        return app
+	return app
 }
 
 func (app *forkliftAPIApp) Execute() {
