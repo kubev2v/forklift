@@ -3,8 +3,8 @@ package webhooks
 import (
 	"net/http"
 
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"github.com/konveyor/controller/pkg/logging"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 var log = logging.WithName("webhooks")
