@@ -17,19 +17,19 @@ limitations under the License.
 package main
 
 import (
-        "github.com/go-logr/logr"
-        forklift_api "github.com/konveyor/forklift-controller/pkg/forklift-api"
+	"github.com/go-logr/logr"
+	forklift_api "github.com/konveyor/forklift-controller/pkg/forklift-api"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
 var log logr.Logger
 
 func init() {
-        log = logf.Log.WithName("entrypoint")
+	log = logf.Log.WithName("entrypoint")
 }
 
 func main() {
-        log.Info("start forklift-api")
-        app := forklift_api.NewForkliftApi()
-        app.Execute()
+	log.Info("start forklift-api")
+	app := forklift_api.NewForkliftApi()
+	app.Execute()
 }
