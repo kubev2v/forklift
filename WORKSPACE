@@ -3399,7 +3399,8 @@ container_pull(
 
 container_pull(
     name = "ansible-operator-image",
-    digest = "sha256:0b92d03397ad85270eaaf8c4e3250944642ca7dbe659dd844914ca3da2ecaf7b",
+    # v1.22.0
+    digest = "sha256:e07ba82127e76f282cb61fad6cfd990ab137533e5e996686576dec088d5e7e44",
     registry = "quay.io",
     repository = "operator-framework/ansible-operator",
 )
