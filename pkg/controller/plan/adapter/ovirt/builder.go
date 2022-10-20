@@ -7,6 +7,7 @@ import (
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
+	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
@@ -164,7 +165,7 @@ func (r *Builder) Secret(_ ref.Ref, in, object *core.Secret) (err error) {
 }
 
 // Create DataVolume specs for the VM.
-func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap) (dvs []cdi.DataVolumeSpec, err error) {
+func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume) (dvs []cdi.DataVolume, err error) {
 	vm := &model.Workload{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
@@ -220,7 +221,14 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 				if mapped.Destination.VolumeMode != "" {
 					dvSpec.Storage.VolumeMode = &mapped.Destination.VolumeMode
 				}
-				dvs = append(dvs, dvSpec)
+
+				dv := dvTemplate.DeepCopy()
+				dv.Spec = dvSpec
+				if dv.ObjectMeta.Annotations == nil {
+					dv.ObjectMeta.Annotations = make(map[string]string)
+				}
+				dv.ObjectMeta.Annotations[planbase.AnnDiskSource] = da.Disk.ID
+				dvs = append(dvs, *dv)
 			}
 		}
 	}
@@ -503,7 +511,7 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 
 // Return a stable identifier for a DataVolume.
 func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
-	return dv.Spec.Source.Imageio.DiskID
+	return dv.ObjectMeta.Annotations[planbase.AnnDiskSource]
 }
 
 // Return a stable identifier for a PersistentDataVolume.
