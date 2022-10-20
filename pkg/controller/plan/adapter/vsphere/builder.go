@@ -7,6 +7,7 @@ import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
+	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
@@ -197,7 +198,7 @@ func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
 }
 
 // Create DataVolume specs for the VM.
-func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.ConfigMap) (dvs []cdi.DataVolumeSpec, err error) {
+func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.ConfigMap, dvTemplate *cdi.DataVolume) (dvs []cdi.DataVolume, err error) {
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
@@ -271,7 +272,14 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 				if mapped.Destination.VolumeMode != "" {
 					dvSpec.Storage.VolumeMode = &mapped.Destination.VolumeMode
 				}
-				dvs = append(dvs, dvSpec)
+
+				dv := dvTemplate.DeepCopy()
+				dv.Spec = dvSpec
+				if dv.ObjectMeta.Annotations == nil {
+					dv.ObjectMeta.Annotations = make(map[string]string)
+				}
+				dv.ObjectMeta.Annotations[planbase.AnnDiskSource] = trimBackingFileName(disk.File)
+				dvs = append(dvs, *dv)
 			}
 		}
 	}
@@ -574,7 +582,7 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 
 // Return a stable identifier for a VDDK DataVolume.
 func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
-	return trimBackingFileName(dv.Spec.Source.VDDK.BackingFile)
+	return trimBackingFileName(dv.ObjectMeta.Annotations[planbase.AnnDiskSource])
 }
 
 // Return a stable identifier for a PersistentDataVolume.
