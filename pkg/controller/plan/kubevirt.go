@@ -569,12 +569,17 @@ func (r *KubeVirt) getListOptionsNamespaced() (listOptions *client.ListOptions) 
 
 // Ensure the guest conversion (virt-v2v) pod exists on the destination.
 func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, vmCr *VirtualMachine, pvcs *[]core.PersistentVolumeClaim) (err error) {
+	v2vSecret, err := r.ensureSecret(vm.Ref)
+	if err != nil {
+		return
+	}
+
 	configMap, err := r.ensureLibvirtConfigMap(vm.Ref, vmCr, pvcs)
 	if err != nil {
 		return
 	}
 
-	newPod, err := r.guestConversionPod(vm, vmCr.Spec.Template.Spec.Volumes, configMap, pvcs)
+	newPod, err := r.guestConversionPod(vm, vmCr.Spec.Template.Spec.Volumes, configMap, pvcs, v2vSecret)
 	if err != nil {
 		return
 	}
@@ -976,7 +981,7 @@ func (r *KubeVirt) findTemplate(vm *plan.VMStatus) (tmpl *template.Template, err
 	return
 }
 
-func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, configMap *core.ConfigMap, pvcs *[]core.PersistentVolumeClaim) (pod *core.Pod, err error) {
+func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, configMap *core.ConfigMap, pvcs *[]core.PersistentVolumeClaim, v2vSecret *core.Secret) (pod *core.Pod, err error) {
 	volumes, volumeMounts, volumeDevices := r.podVolumeMounts(vmVolumes, configMap, pvcs)
 
 	// qemu group
@@ -992,9 +997,32 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 				FSGroup: &fsGroup,
 			},
 			RestartPolicy: core.RestartPolicyNever,
+			InitContainers: []core.Container{
+				{
+					Name:            "vddk-side-car",
+					Image:           r.Source.Provider.Spec.Settings["vddkInitImage"],
+					ImagePullPolicy: core.PullIfNotPresent,
+					VolumeMounts: []core.VolumeMount{
+						{
+							Name:      "vddk-vol-mount",
+							MountPath: "/opt",
+						},
+					},
+				},
+			},
 			Containers: []core.Container{
 				{
-					Name:            "virt-v2v",
+					Name: "virt-v2v",
+					EnvFrom: []core.EnvFromSource{
+						{
+							Prefix: "V2V_",
+							SecretRef: &core.SecretEnvSource{
+								LocalObjectReference: core.LocalObjectReference{
+									Name: v2vSecret.Name,
+								},
+							},
+						},
+					},
 					Image:           Settings.Migration.VirtV2vImage,
 					VolumeMounts:    volumeMounts,
 					VolumeDevices:   volumeDevices,
@@ -1063,9 +1091,23 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 			},
 		},
 	})
-	mounts = append(mounts, core.VolumeMount{
-		Name:      "libvirt-domain-xml",
-		MountPath: "/mnt/v2v",
+	mounts = append(mounts,
+		core.VolumeMount{
+			Name:      "libvirt-domain-xml",
+			MountPath: "/mnt/v2v",
+		},
+		core.VolumeMount{
+			Name:      "vddk-vol-mount",
+			MountPath: "/opt",
+		},
+	)
+
+	// Temporary space for VDDK library
+	volumes = append(volumes, core.Volume{
+		Name: "vddk-vol-mount",
+		VolumeSource: core.VolumeSource{
+			EmptyDir: &core.EmptyDirVolumeSource{},
+		},
 	})
 
 	return

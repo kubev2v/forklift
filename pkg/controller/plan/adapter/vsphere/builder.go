@@ -190,6 +190,7 @@ func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
 	object.StringData = map[string]string{
 		"accessKeyId": string(in.Data["user"]),
 		"secretKey":   string(in.Data["password"]),
+		"thumbprint":  string(in.Data["thumbprint"]),
 	}
 
 	return
