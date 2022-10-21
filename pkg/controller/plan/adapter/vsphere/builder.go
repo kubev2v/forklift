@@ -244,8 +244,10 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 		for _, disk := range vm.Disks {
 			if disk.Datastore.ID == ds.ID {
 				storageClass := mapped.Destination.StorageClass
-				dvSpec := cdi.DataVolumeSpec{
-					Source: &cdi.DataVolumeSource{
+				var dvSource cdi.DataVolumeSource
+				if r.Plan.Spec.Warm {
+					// Let CDI do the copying
+					dvSource = cdi.DataVolumeSource{
 						VDDK: &cdi.DataVolumeSourceVDDK{
 							BackingFile:  trimBackingFileName(disk.File),
 							UUID:         vm.UUID,
@@ -254,7 +256,15 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 							Thumbprint:   thumbprint,
 							InitImageURL: r.Source.Provider.Spec.Settings["vddkInitImage"],
 						},
-					},
+					}
+				} else {
+					// Let virt-v2v do the copying
+					dvSource = cdi.DataVolumeSource{
+						Blank: &cdi.DataVolumeBlankImage{},
+					}
+				}
+				dvSpec := cdi.DataVolumeSpec{
+					Source: &dvSource,
 					Storage: &cdi.StorageSpec{
 						Resources: core.ResourceRequirements{
 							Requests: core.ResourceList{
@@ -491,7 +501,11 @@ func (r *Builder) mapDisks(vm *model.VM, persistentVolumeClaims []core.Persisten
 	for i := range persistentVolumeClaims {
 		pvc := &persistentVolumeClaims[i]
 		// the PVC BackingFile value has already been trimmed.
-		pvcMap[pvc.Annotations[AnnImportBackingFile]] = pvc
+		if source, ok := pvc.Annotations[planbase.AnnDiskSource]; ok {
+			pvcMap[source] = pvc
+		} else {
+			pvcMap[pvc.Annotations[AnnImportBackingFile]] = pvc
+		}
 	}
 	for i, disk := range disks {
 		pvc := pvcMap[trimBackingFileName(disk.File)]
