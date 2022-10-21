@@ -155,6 +155,10 @@ func (r *Builder) ConfigMap(_ ref.Ref, in *core.Secret, object *core.ConfigMap) 
 	return
 }
 
+func (r *Builder) PodEnvironment(_ ref.Ref, _ *core.Secret) (env []core.EnvVar, err error) {
+	return
+}
+
 // Build the DataVolume credential secret.
 func (r *Builder) Secret(_ ref.Ref, in, object *core.Secret) (err error) {
 	object.StringData = map[string]string{
