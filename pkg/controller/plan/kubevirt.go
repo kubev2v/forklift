@@ -1006,6 +1006,12 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	} else {
 		virtV2vImage = Settings.Migration.VirtV2vImageCold
 	}
+	// pod environment
+	environment, err := r.Builder.PodEnvironment(vm.Ref, r.Source.Secret)
+	if err != nil {
+		return
+	}
+	// pod
 	pod = &core.Pod{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace:    r.Plan.Spec.TargetNamespace,
@@ -1033,6 +1039,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 			Containers: []core.Container{
 				{
 					Name: "virt-v2v",
+					Env: environment,
 					EnvFrom: []core.EnvFromSource{
 						{
 							Prefix: "V2V_",

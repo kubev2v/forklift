@@ -9,6 +9,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	container "github.com/konveyor/forklift-controller/pkg/controller/provider/container/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
@@ -170,6 +171,53 @@ func (r *Builder) macConflicts(vm *model.VM) (conflictingVMs []string, err error
 // Create DataVolume certificate configmap.
 // No-op for vSphere.
 func (r *Builder) ConfigMap(_ ref.Ref, _ *core.Secret, _ *core.ConfigMap) (err error) {
+	return
+}
+
+func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env []core.EnvVar, err error) {
+	vm := &model.VM{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(
+			err,
+			"VM lookup failed.",
+			"vm",
+			vmRef.String())
+		return
+	}
+
+	host, err := r.host(vm.Host)
+	if err != nil {
+		err = liberr.Wrap(
+			err,
+			"Host lookup failed.",
+			"host",
+			vm.Host)
+		return
+	}
+
+	sslVerify := ""
+	if container.GetInsecureSkipVerifyFlag(sourceSecret) {
+		sslVerify = "no_verify=1"
+	}
+	libvirtURL := &liburl.URL{
+		Scheme:   "vpx",
+		Host:     host.ManagementServerIp, // VCenter
+		User:     liburl.User(string(sourceSecret.Data["user"])),
+		Path:     host.Path, // E.g.: /Datacenter/Cluster/host.example.com
+		RawQuery: sslVerify,
+	}
+	env = append(
+		env,
+		core.EnvVar{
+			Name: "V2V_vmName",
+			Value: vm.Name,
+		},
+		core.EnvVar{
+			Name:"V2V_libvirtURL",
+			Value: libvirtURL.String(),
+		},
+	)
 	return
 }
 

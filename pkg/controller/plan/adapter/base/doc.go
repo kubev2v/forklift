@@ -49,6 +49,8 @@ type Builder interface {
 	ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string
 	// Return a stable identifier for a PersistentDataVolume
 	ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string
+	// Conversion Pod environment
+	PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env []core.EnvVar, err error)
 }
 
 // Client API.
