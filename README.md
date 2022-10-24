@@ -10,6 +10,12 @@ Konveyor Forklift controller.
 
 For the build, the forklift uses [Bazel](https://bazel.build/).
 
+Install the following system components:
+
+- bazel >= 5
+- gcc
+- glibc-static
+
 ### Configuration
 
 The environment which you can set across all projects.
