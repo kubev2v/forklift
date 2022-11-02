@@ -23,6 +23,7 @@ import (
 const (
 	ClusterDefault = "cluster_default"
 	Q35Ovmf        = "q35_ovmf"
+	Q35SecureBoot  = "q35_secure_boot"
 )
 
 // Bus types
@@ -379,12 +380,12 @@ func (r *Builder) mapFirmware(vm *model.Workload, cluster *model.Cluster, object
 		Serial: serial,
 	}
 	switch biosType {
-	case Q35Ovmf:
-		smmEnabled := true
-		features.SMM = &cnv.FeatureState{
-			Enabled: &smmEnabled,
-		}
-		firmware.Bootloader = &cnv.Bootloader{EFI: &cnv.EFI{}}
+	case Q35Ovmf, Q35SecureBoot:
+		secureBootEnabled := false
+		firmware.Bootloader = &cnv.Bootloader{
+			EFI: &cnv.EFI{
+				SecureBoot: &secureBootEnabled,
+			}}
 	default:
 		firmware.Bootloader = &cnv.Bootloader{BIOS: &cnv.BIOS{}}
 	}
