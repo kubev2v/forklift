@@ -46,6 +46,8 @@ spec:
           value: ${MUST_GATHER_API_IMAGE}
         - name: UI_IMAGE
           value: ${UI_IMAGE}
+        - name: UI_PLUGIN_IMAGE
+          value: ${UI_PLUGIN_IMAGE}
         - name: VALIDATION_IMAGE
           value: ${VALIDATION_IMAGE}
         - name: VIRT_V2V_IMAGE

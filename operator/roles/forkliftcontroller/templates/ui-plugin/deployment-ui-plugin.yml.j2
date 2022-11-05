@@ -1,0 +1,59 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ ui_plugin_deployment_name }}
+  namespace: "{{ app_namespace }}"
+  labels:
+    app: {{ app_name }}
+    service: {{ ui_plugin_service_name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ app_name }}
+      service: {{ ui_plugin_service_name }}
+  template:
+    metadata:
+      labels:
+        app: {{ app_name }}
+        service: {{ ui_plugin_service_name }}
+    spec:
+      containers:
+        - name: "{{ ui_plugin_container_name }}"
+          image: "{{ ui_plugin_image_fqin }}"
+          ports:
+            - containerPort: 9443
+              protocol: TCP
+          imagePullPolicy: "{{ image_pull_policy }}"
+          resources:
+            limits:
+              cpu: "{{ ui_plugin_container_limits_cpu }}"
+              memory: "{{ ui_plugin_container_limits_memory }}"
+            requests:
+              cpu: "{{ ui_plugin_container_requests_cpu }}"
+              memory: "{{ ui_plugin_container_requests_memory }}"
+          volumeMounts:
+            - name: plugin-serving-cert
+              readOnly: true
+              mountPath: /var/serving-cert
+            - name: nginx-conf
+              readOnly: true
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+      volumes:
+        - name: plugin-serving-cert
+          secret:
+            secretName: plugin-serving-cert
+            defaultMode: 420
+        - name: nginx-conf
+          configMap:
+            name: nginx-conf
+            defaultMode: 420
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%
