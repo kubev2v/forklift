@@ -188,6 +188,38 @@
         state: "{{ ui_state }}"
         definition: "{{ lookup('template', 'ui/deployment-ui.yml.j2') }}"
 
+  - when: feature_ui_plugin|bool and not k8s_cluster|bool
+    block:
+
+    - name: "Setup UI configmap"
+      k8s:
+        state: "{{ ui_state }}"
+        definition: "{{ lookup('template', 'ui-plugin/configmap-ui-plugin.yml.j2') }}"
+
+    - name: "Setup UI plugin service"
+      k8s:
+        state: "{{ ui_state }}"
+        definition: "{{ lookup('template', 'ui-plugin/service-ui-plugin.yml.j2') }}"
+
+    - name: "Setup UI plugin deployment"
+      k8s:
+        state: "{{ ui_state }}"
+        definition: "{{ lookup('template', 'ui-plugin/deployment-ui-plugin.yml.j2') }}"
+
+    - name: "Setup console plugin"
+      k8s:
+        state: "{{ ui_state }}"
+        definition: "{{ lookup('template', 'ui-plugin/console-plugin.yml.j2') }}"
+
+  - when: not feature_ui_plugin|bool
+    name: "Cleanup {{ ui_plugin_service_name }} if disabled"
+    include_tasks: cleanup.yml
+    loop: "{{ forklift_resources }}"
+    loop_control:
+      loop_var: resource_kind
+    vars:
+      feature_label: "{{ ui_plugin_service_name }}"
+
   - when: not feature_ui|bool
     name: "Cleanup {{ ui_service_name }} if disabled"
     include_tasks: cleanup.yml

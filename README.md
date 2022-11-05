@@ -38,6 +38,7 @@ Another option to override the default values can use `--action_env` as in the e
 | MUST_GATHER_IMAGE     | quay.io/konveyor/forklift-must-gather:latest     | The forklift must gather an image.                          |
 | MUST_GATHER_API_IMAGE | quay.io/konveyor/forklift-must-gather-api:latest | The forklift must gather image api.                         |
 | UI_IMAGE              | quay.io/konveyor/forklift-ui:latest              | The forklift UI image.                                      |
+| UI_PLUGIN_IMAGE       | quay.io/kubevirt-ui/forklift-console-plugin:latest | The forklift UI plugin image.                                      |
 | VALIDATION_IMAGE      | quay.io/konveyor/forklift-validation:latest      | The forklift validation image.                              |
 | VIRT_V2V_IMAGE        | quay.io/konveyor/forklift-virt-v2v:latest        | The forklift virt v2v image.                                |
 

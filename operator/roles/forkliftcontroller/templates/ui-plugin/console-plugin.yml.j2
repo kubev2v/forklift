@@ -1,0 +1,29 @@
+---
+apiVersion: console.openshift.io/v1alpha1
+kind: ConsolePlugin
+metadata:
+  name: {{ ui_plugin_console_name }}
+  annotations:
+    console.openshift.io/use-i18n: "true" 
+spec:
+  displayName: 'Console Plugin Template'
+  service:
+    name: {{ ui_plugin_service_name }}
+    port: 9443
+    basePath: '/'
+    namespace: {{ app_namespace }}
+  proxy:
+    - type: Service
+      alias: {{ inventory_service_name }}
+      authorize: true
+      service:
+        name: {{ inventory_service_name }}
+        namespace: {{ app_namespace }}
+        port: 8443
+    - type: Service
+      alias: {{ must_gather_api_service_name }}
+      authorize: true
+      service:
+        name: {{ must_gather_api_service_name }}
+        namespace: {{ app_namespace }}
+        port: 8443
