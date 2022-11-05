@@ -78,6 +78,16 @@ ui_meta_file_name: "meta.json"
 ui_node_extra_ca_certs: "/opt/app-root/src/ca.crt"
 ui_state: absent
 
+ui_plugin_image_fqin: "{{ lookup( 'env', 'UI_PLUGIN_IMAGE') }}"
+ui_plugin_console_name: "{{ app_name }}-console-plugin"
+ui_plugin_service_name: "{{ app_name }}-ui-plugin"
+ui_plugin_deployment_name: "{{ ui_plugin_service_name }}"
+ui_plugin_container_name: "{{ app_name }}-ui-plugin"
+ui_plugin_container_limits_cpu: "100m"
+ui_plugin_container_limits_memory: "800Mi"
+ui_plugin_container_requests_cpu: "100m"
+ui_plugin_container_requests_memory: "150Mi"
+
 must_gather_api_image_fqin: "{{ lookup( 'env', 'MUST_GATHER_API_IMAGE') or lookup( 'env', 'RELATED_IMAGE_MUST_GATHER_API') }}"
 must_gather_api_service_name: "{{ app_name }}-must-gather-api"
 must_gather_api_deployment_name: "{{ must_gather_api_service_name }}"
