@@ -49,7 +49,7 @@ export REGISTRY=quay.io
 export REGISTRY_TAG=latest
 
 CONTROLLER_IMAGE=quay.io/${REGISTRY_ACCOUNT}/forklift-controller:${REGISTRY_TAG}
-OPERATOR_IMAGE=quay.io/${REGISTRY_ACCOUNT}/forklift-controller:${REGISTRY_TAG}
+OPERATOR_IMAGE=quay.io/${REGISTRY_ACCOUNT}/forklift-operator:${REGISTRY_TAG}
 
 bazel run push-forklift-operator
 bazel run push-forklift-operator-bundle --action_env OPERATOR_IMAGE=${OPERATOR_IMAGE} --action_env CONTROLLER_IMAGE=${CONTROLLER_IMAGE}
