@@ -55,29 +55,29 @@
   - name: "Setup controller config map"
     k8s:
       state : present
-      definition: "{{ lookup('template', 'configmap-controller.yml.j2') }}"
+      definition: "{{ lookup('template', 'controller/configmap-controller.yml.j2') }}"
 
   - name: "Setup inventory service"
     k8s:
       state: present
-      definition: "{{ lookup('template', 'service-inventory.yml.j2') }}"
+      definition: "{{ lookup('template', 'controller/service-inventory.yml.j2') }}"
 
   - name: "Setup controller deployment"
     k8s:
       state : present
-      definition: "{{ lookup('template', 'deployment-controller.yml.j2') }}"
+      definition: "{{ lookup('template', 'controller/deployment-controller.yml.j2') }}"
       merge_type: "merge"
 
   - name: "Setup inventory route"
     k8s:
       state: present
-      definition: "{{ lookup('template', 'route-inventory.yml.j2') }}"
+      definition: "{{ lookup('template', 'controller/route-inventory.yml.j2') }}"
     when: not k8s_cluster|bool
 
   - name: "Set up default provider"
     k8s:
       state: present
-      definition: "{{ lookup('template', 'provider-host.yml.j2') }}"
+      definition: "{{ lookup('template', 'controller/provider-host.yml.j2') }}"
     when: "'kubevirt.io' in api_groups"
 
   - when: feature_validation|bool
@@ -85,29 +85,29 @@
     - name: "Setup validation service"
       k8s:
         state: "{{ validation_state }}"
-        definition: "{{ lookup('template', 'service-validation.yml.j2') }}"
+        definition: "{{ lookup('template', 'validation/service-validation.yml.j2') }}"
 
     - name: "Setup validation config map"
       k8s:
         state: "{{ validation_state }}"
-        definition: "{{ lookup('template', 'configmap-validation.yml.j2') }}"
+        definition: "{{ lookup('template', 'validation/configmap-validation.yml.j2') }}"
 
     - name: "Setup validation deployment"
       k8s:
         state: "{{ validation_state }}"
-        definition: "{{ lookup('template', 'deployment-validation.yml.j2') }}"
+        definition: "{{ lookup('template', 'validation/deployment-validation.yml.j2') }}"
 
   - when: feature_must_gather_api|bool
     block:
     - name: "Setup must-gather-api service"
       k8s:
         state: "{{ must_gather_api_state }}"
-        definition: "{{ lookup('template', 'service-must-gather-api.yml.j2') }}"
+        definition: "{{ lookup('template', 'must-gather-api/service-must-gather-api.yml.j2') }}"
 
     - name: "Setup must-gather-api deployment"
       k8s:
         state: "{{ must_gather_api_state }}"
-        definition: "{{ lookup('template', 'deployment-must-gather-api.yml.j2') }}"
+        definition: "{{ lookup('template', 'must-gather-api/deployment-must-gather-api.yml.j2') }}"
 
   # Non-k8s UI tasks
   - when: feature_ui|bool and not k8s_cluster|bool
@@ -116,7 +116,7 @@
     - name: "Setup UI route"
       k8s:
         state: "{{ ui_state }}"
-        definition: "{{ lookup('template', 'route-ui.yml.j2') }}"
+        definition: "{{ lookup('template', 'ui/route-ui.yml.j2') }}"
 
     - name: "Obtain UI route"
       k8s_info:
@@ -163,7 +163,7 @@
       - name: "Setup UI oauthclient"
         k8s:
           state: present
-          definition: "{{ lookup('template', 'oauthclient-ui.yml.j2') }}"
+          definition: "{{ lookup('template', 'ui/oauthclient-ui.yml.j2') }}"
 
     - name: "Use existing secret value for oauth client"
       set_fact:
@@ -176,17 +176,17 @@
     - name: "Setup UI config map"
       k8s:
         state: "{{ ui_state }}"
-        definition: "{{ lookup('template', 'configmap-ui.yml.j2') }}"
+        definition: "{{ lookup('template', 'ui/configmap-ui.yml.j2') }}"
 
     - name: "Setup UI service"
       k8s:
         state: "{{ ui_state }}"
-        definition: "{{ lookup('template', 'service-ui.yml.j2') }}"
+        definition: "{{ lookup('template', 'ui/service-ui.yml.j2') }}"
 
     - name: "Setup UI deployment"
       k8s:
         state: "{{ ui_state }}"
-        definition: "{{ lookup('template', 'deployment-ui.yml.j2') }}"
+        definition: "{{ lookup('template', 'ui/deployment-ui.yml.j2') }}"
 
   - when: not feature_ui|bool
     name: "Cleanup {{ ui_service_name }} if disabled"
@@ -214,4 +214,3 @@
       loop_var: resource_kind
     vars:
       feature_label: "{{ must_gather_api_service_name }}"
-
