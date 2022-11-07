@@ -381,6 +381,9 @@ func (r *Builder) mapFirmware(vm *model.Workload, cluster *model.Cluster, object
 	}
 	switch biosType {
 	case Q35Ovmf, Q35SecureBoot:
+		// We disable secure boot even if it was enabled on the source because the guest OS won't
+		// be able to boot without getting the NVRAM data. So we start the VM without secure boot
+		// to ease the procedure users need to do in order to make the guest OS to boot.
 		secureBootEnabled := false
 		firmware.Bootloader = &cnv.Bootloader{
 			EFI: &cnv.EFI{
