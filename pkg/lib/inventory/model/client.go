@@ -2,12 +2,12 @@ package model
 
 import (
 	"database/sql"
-	"errors"
+	"os"
+	"time"
+
 	"github.com/go-logr/logr"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	fb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
-	"os"
-	"time"
 )
 
 //
@@ -580,7 +580,7 @@ func (r *Tx) Update(model Model, predicate ...Predicate) (err error) {
 func (r *Tx) Delete(model Model) (err error) {
 	err = Table{r.real}.Get(model)
 	if err != nil {
-		if errors.As(err, &NotFound) {
+		if err == NotFound {
 			return
 		}
 		return
@@ -676,7 +676,7 @@ func (r *Tx) delete(model Model) (err error) {
 	mark := time.Now()
 	err = Table{r.real}.Delete(model)
 	if err != nil {
-		if errors.As(err, &NotFound) {
+		if err == NotFound {
 			err = nil
 		}
 		return
