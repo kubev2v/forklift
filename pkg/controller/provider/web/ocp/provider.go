@@ -2,7 +2,7 @@ package ocp
 
 import (
 	"github.com/gin-gonic/gin"
-	liberr "github.com/konveyor/controller/pkg/error"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"

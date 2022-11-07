@@ -2,8 +2,8 @@ package base
 
 import (
 	"errors"
-	libcnd "github.com/konveyor/controller/pkg/condition"
-	"github.com/konveyor/controller/pkg/logging"
+	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"

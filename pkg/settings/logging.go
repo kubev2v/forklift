@@ -1,7 +1,7 @@
 package settings
 
 import (
-	"github.com/konveyor/controller/pkg/logging"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 )
 
 //

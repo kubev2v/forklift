@@ -1,8 +1,8 @@
 package handler
 
 import (
-	libweb "github.com/konveyor/controller/pkg/inventory/web"
-	libref "github.com/konveyor/controller/pkg/ref"
+	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
+	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"k8s.io/apimachinery/pkg/types"

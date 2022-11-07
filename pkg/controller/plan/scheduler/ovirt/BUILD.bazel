@@ -9,6 +9,6 @@ go_library(
         "//pkg/apis/forklift/v1beta1",
         "//pkg/apis/forklift/v1beta1/plan",
         "//pkg/controller/plan/context",
-        "//vendor/github.com/konveyor/controller/pkg/error",
+        "//pkg/lib/error",
     ],
 )

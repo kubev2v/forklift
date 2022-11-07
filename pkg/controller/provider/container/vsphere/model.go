@@ -1,7 +1,7 @@
 package vsphere
 
 import (
-	libref "github.com/konveyor/controller/pkg/ref"
+	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	"github.com/vmware/govmomi/vim25/types"
 	"net/url"

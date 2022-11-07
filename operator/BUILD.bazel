@@ -5,10 +5,10 @@ load(
 )
 
 genrule(
-    name = 'kustomize_bin',
-    srcs = ['@kustomize//file'],
-    outs = ['kustomize'],
-    cmd = 'tar -C $(@D) -xf $(location @kustomize//file)',
+    name = "kustomize_bin",
+    srcs = ["@kustomize//file"],
+    outs = ["kustomize"],
+    cmd = "tar -C $(@D) -xf $(location @kustomize//file)",
 )
 
 # OPERATOR
@@ -17,23 +17,23 @@ genrule(
 container_image(
     name = "forklift-operator-requirements",
     base = "@ansible-operator-image//image",
-    directory = "/opt/ansible/",
     cmd = "ansible-galaxy collection install -r /opt/ansible/requirements.yml && chmod -R ug+rwx /opt/ansible/.ansible",
-    files = ['requirements.yml'],
+    directory = "/opt/ansible/",
+    files = ["requirements.yml"],
 )
 
 container_image(
     name = "forklift-operator-watches",
     base = ":forklift-operator-requirements",
     directory = "/opt/ansible/",
-    files = ['watches.yaml'],
+    files = ["watches.yaml"],
 )
 
 container_image(
     name = "forklift-operator-roles",
     base = ":forklift-operator-watches",
     directory = "/opt/ansible/",
-    files = ['roles'],
+    files = ["roles"],
 )
 
 container_image(
@@ -52,31 +52,34 @@ container_image(
 # 6. Build the image with the bundle
 
 genrule(
-    name = 'bundle',
-    srcs = [':kustomize_bin', '@operator-sdk//file'] + glob(['**/*']),
+    name = "bundle",
+    srcs = [
+        ":kustomize_bin",
+        "@operator-sdk//file",
+    ] + glob(["**/*"]),
     outs = [
         # Can be replaced with just dir 'bundle'
-        'bundle/manifests/forklift.konveyor.io_forkliftcontrollers.yaml',
-        'bundle/manifests/forklift.konveyor.io_hooks.yaml',
-        'bundle/manifests/forklift.konveyor.io_hosts.yaml',
-        'bundle/manifests/forklift.konveyor.io_migrations.yaml',
-        'bundle/manifests/forklift.konveyor.io_networkmaps.yaml',
-        'bundle/manifests/forklift.konveyor.io_plans.yaml',
-        'bundle/manifests/forklift.konveyor.io_providers.yaml',
-        'bundle/manifests/forklift.konveyor.io_storagemaps.yaml',
-        'bundle/manifests/forklift-operator.clusterserviceversion.yaml',
-        'bundle/metadata/annotations.yaml',
-        'bundle/tests/scorecard/config.yaml',
+        "bundle/manifests/forklift.konveyor.io_forkliftcontrollers.yaml",
+        "bundle/manifests/forklift.konveyor.io_hooks.yaml",
+        "bundle/manifests/forklift.konveyor.io_hosts.yaml",
+        "bundle/manifests/forklift.konveyor.io_migrations.yaml",
+        "bundle/manifests/forklift.konveyor.io_networkmaps.yaml",
+        "bundle/manifests/forklift.konveyor.io_plans.yaml",
+        "bundle/manifests/forklift.konveyor.io_providers.yaml",
+        "bundle/manifests/forklift.konveyor.io_storagemaps.yaml",
+        "bundle/manifests/forklift-operator.clusterserviceversion.yaml",
+        "bundle/metadata/annotations.yaml",
+        "bundle/tests/scorecard/config.yaml",
     ],
     # The `operator-sdk` needs to work in the operator dir
 
     # The bazel is running the build in sandbox and linkes all the sources to it.
     # The kustomize has restrictions for symlinks outside of the project scope, for this we use the ignore of LoadRestrictionsNone.
-    cmd = '''
+    cmd = """
         cd operator;
         export DATE=$$(date +%Y-%m-%dT%H:%M:%SZ);
         ../$(location :kustomize_bin) build config/manifests --load_restrictor LoadRestrictionsNone | envsubst | ../$(location @operator-sdk//file) generate bundle -q --overwrite --extra-service-accounts forklift-controller --version $${VERSION} --output-dir ../$(RULEDIR)/bundle --channels=$${CHANNELS} --default-channel=$${DEFAULT_CHANNEL}
-    ''',
+    """,
 )
 
 container_image(
@@ -84,15 +87,15 @@ container_image(
     base = "@ubi8-minimal//image",
     directory = "/manifests/",
     files = [
-        ':bundle/manifests/forklift.konveyor.io_forkliftcontrollers.yaml',
-        ':bundle/manifests/forklift.konveyor.io_hooks.yaml',
-        ':bundle/manifests/forklift.konveyor.io_hosts.yaml',
-        ':bundle/manifests/forklift.konveyor.io_migrations.yaml',
-        ':bundle/manifests/forklift.konveyor.io_networkmaps.yaml',
-        ':bundle/manifests/forklift.konveyor.io_plans.yaml',
-        ':bundle/manifests/forklift.konveyor.io_providers.yaml',
-        ':bundle/manifests/forklift.konveyor.io_storagemaps.yaml',
-        ':bundle/manifests/forklift-operator.clusterserviceversion.yaml',
+        ":bundle/manifests/forklift.konveyor.io_forkliftcontrollers.yaml",
+        ":bundle/manifests/forklift.konveyor.io_hooks.yaml",
+        ":bundle/manifests/forklift.konveyor.io_hosts.yaml",
+        ":bundle/manifests/forklift.konveyor.io_migrations.yaml",
+        ":bundle/manifests/forklift.konveyor.io_networkmaps.yaml",
+        ":bundle/manifests/forklift.konveyor.io_plans.yaml",
+        ":bundle/manifests/forklift.konveyor.io_providers.yaml",
+        ":bundle/manifests/forklift.konveyor.io_storagemaps.yaml",
+        ":bundle/manifests/forklift-operator.clusterserviceversion.yaml",
     ],
 )
 
@@ -139,31 +142,36 @@ container_image(
 # 3. Build the opm image which serves generated catalog
 
 genrule(
-    name = 'opm_render',
-    srcs = ['@opm//file', 'catalog/operator.yml'],
-    outs = ['operator.yaml'],
-    cmd = '''
+    name = "opm_render",
+    srcs = [
+        "@opm//file",
+        "catalog/operator.yml",
+    ],
+    outs = ["operator.yaml"],
+    cmd = """
         cat $(location catalog/operator.yml) | envsubst > $@
-	    $(location @opm//file) render $${REGISTRY:-quay.io}/$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}forklift-operator-bundle:$${REGISTRY_TAG:-devel} -o yaml $${OPM_OPTS:-} >> $@
-    ''',
+\t    $(location @opm//file) render $${REGISTRY:-quay.io}/$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}forklift-operator-bundle:$${REGISTRY_TAG:-devel} -o yaml $${OPM_OPTS:-} >> $@
+    """,
 )
 
 container_image(
     name = "forklift-operator-index-database",
     base = "@opm-image//image",
     directory = "/configs",
-    files = [':operator.yaml'],
+    files = [":operator.yaml"],
 )
 
 container_image(
     name = "forklift-operator-index-image",
     base = ":forklift-operator-index-database",
+    cmd = [
+        "serve",
+        "/configs",
+    ],
+    entrypoint = ["/bin/opm"],
     labels = {
         "operators.operatorframework.io.index.configs.v1": "/configs",
     },
-    entrypoint = ["/bin/opm"],
-    cmd = ["serve", "/configs"],
     user = "1001",
     visibility = ["//visibility:public"],
 )
-

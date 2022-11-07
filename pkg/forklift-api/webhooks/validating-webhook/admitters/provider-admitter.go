@@ -11,7 +11,7 @@ import (
 	//	"strings"
 
 	//webhookutils "github.com/konveyor/forklift-controller/pkg/util/webhooks"
-	"github.com/konveyor/controller/pkg/logging"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	admissionv1 "k8s.io/api/admission/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -2,7 +2,7 @@ package vsphere
 
 import (
 	"context"
-	liberr "github.com/konveyor/controller/pkg/error"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
