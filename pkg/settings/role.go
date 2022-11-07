@@ -2,7 +2,7 @@ package settings
 
 import (
 	"fmt"
-	liberr "github.com/konveyor/controller/pkg/error"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"os"
 	"strings"
 )

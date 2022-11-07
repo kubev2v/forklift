@@ -13,10 +13,10 @@ go_library(
     deps = [
         "//pkg/apis/forklift/v1beta1",
         "//pkg/controller/base",
+        "//pkg/lib/condition",
+        "//pkg/lib/logging",
+        "//pkg/lib/ref",
         "//pkg/settings",
-        "//vendor/github.com/konveyor/controller/pkg/condition",
-        "//vendor/github.com/konveyor/controller/pkg/logging",
-        "//vendor/github.com/konveyor/controller/pkg/ref",
         "//vendor/k8s.io/apimachinery/pkg/api/errors",
         "//vendor/k8s.io/apiserver/pkg/storage/names",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/controller",

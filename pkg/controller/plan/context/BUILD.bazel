@@ -11,8 +11,8 @@ go_library(
     deps = [
         "//pkg/apis/forklift/v1beta1",
         "//pkg/controller/provider/web",
+        "//pkg/lib/error",
         "//vendor/github.com/go-logr/logr",
-        "//vendor/github.com/konveyor/controller/pkg/error",
         "//vendor/k8s.io/api/core/v1:core",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
     ],

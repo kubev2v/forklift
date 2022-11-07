@@ -1,9 +1,9 @@
 package ocp
 
 import (
-	liberr "github.com/konveyor/controller/pkg/error"
-	libweb "github.com/konveyor/controller/pkg/inventory/web"
-	"github.com/konveyor/controller/pkg/logging"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/watch/handler"

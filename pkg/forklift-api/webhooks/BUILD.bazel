@@ -11,7 +11,7 @@ go_library(
     deps = [
         "//pkg/forklift-api/webhooks/validating-webhook",
         "//pkg/forklift-api/webhooks/validating-webhook/admitters",
-        "//vendor/github.com/konveyor/controller/pkg/logging",
+        "//pkg/lib/logging",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/manager",
     ],
 )

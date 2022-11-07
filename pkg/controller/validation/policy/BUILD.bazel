@@ -8,9 +8,9 @@ go_library(
     deps = [
         "//pkg/apis/forklift/v1beta1/ref",
         "//pkg/controller/provider/model/vsphere",
+        "//pkg/lib/error",
+        "//pkg/lib/inventory/web",
+        "//pkg/lib/logging",
         "//pkg/settings",
-        "//vendor/github.com/konveyor/controller/pkg/error",
-        "//vendor/github.com/konveyor/controller/pkg/inventory/web",
-        "//vendor/github.com/konveyor/controller/pkg/logging",
     ],
 )

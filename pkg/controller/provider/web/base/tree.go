@@ -1,8 +1,8 @@
 package base
 
 import (
-	libmodel "github.com/konveyor/controller/pkg/inventory/model"
-	"github.com/konveyor/controller/pkg/logging"
+	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/base"
 	"time"
 )

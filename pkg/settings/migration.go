@@ -1,7 +1,7 @@
 package settings
 
 import (
-	liberr "github.com/konveyor/controller/pkg/error"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"os"
 )
 

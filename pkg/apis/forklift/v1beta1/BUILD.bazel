@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "v1beta1",
@@ -20,8 +20,8 @@ go_library(
         "//pkg/apis/forklift/v1beta1/plan",
         "//pkg/apis/forklift/v1beta1/provider",
         "//pkg/apis/forklift/v1beta1/ref",
-        "//vendor/github.com/konveyor/controller/pkg/condition",
-        "//vendor/github.com/konveyor/controller/pkg/error",
+        "//pkg/lib/condition",
+        "//pkg/lib/error",
         "//vendor/k8s.io/api/core/v1:core",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:meta",
         "//vendor/k8s.io/apimachinery/pkg/runtime",
@@ -31,26 +31,5 @@ go_library(
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client/config",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/runtime/scheme",
-    ],
-)
-
-go_test(
-    name = "v1beta1_test",
-    srcs = [
-        "resource_test.go",
-        "suite_test.go",
-    ],
-    embed = [":v1beta1"],
-    deps = [
-        "//pkg/apis/forklift/v1beta1/plan",
-        "//pkg/apis/forklift/v1beta1/ref",
-        "//vendor/github.com/onsi/gomega",
-        "//vendor/golang.org/x/net/context",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:meta",
-        "//vendor/k8s.io/apimachinery/pkg/types",
-        "//vendor/k8s.io/client-go/kubernetes/scheme",
-        "//vendor/k8s.io/client-go/rest",
-        "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
-        "//vendor/sigs.k8s.io/controller-runtime/pkg/envtest",
     ],
 )

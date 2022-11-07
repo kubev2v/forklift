@@ -1,8 +1,8 @@
 package web
 
 import (
-	"github.com/konveyor/controller/pkg/inventory/container"
-	libweb "github.com/konveyor/controller/pkg/inventory/web"
+	"github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
+	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"

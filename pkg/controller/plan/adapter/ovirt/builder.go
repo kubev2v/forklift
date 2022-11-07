@@ -5,8 +5,8 @@ import (
 	"path"
 	"strings"
 
-	liberr "github.com/konveyor/controller/pkg/error"
-	libitr "github.com/konveyor/controller/pkg/itinerary"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"

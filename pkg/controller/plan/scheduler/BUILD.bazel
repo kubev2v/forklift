@@ -11,7 +11,7 @@ go_library(
         "//pkg/controller/plan/context",
         "//pkg/controller/plan/scheduler/ovirt",
         "//pkg/controller/plan/scheduler/vsphere",
+        "//pkg/lib/error",
         "//pkg/settings",
-        "//vendor/github.com/konveyor/controller/pkg/error",
     ],
 )

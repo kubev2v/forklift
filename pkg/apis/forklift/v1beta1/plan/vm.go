@@ -2,7 +2,7 @@ package plan
 
 import (
 	"fmt"
-	libcnd "github.com/konveyor/controller/pkg/condition"
+	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"

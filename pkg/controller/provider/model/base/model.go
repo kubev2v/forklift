@@ -2,7 +2,7 @@ package base
 
 import (
 	"fmt"
-	libmodel "github.com/konveyor/controller/pkg/inventory/model"
+	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 )
 
 type Model = libmodel.Model

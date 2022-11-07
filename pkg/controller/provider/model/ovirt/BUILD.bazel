@@ -12,7 +12,7 @@ go_library(
     deps = [
         "//pkg/controller/provider/model/base",
         "//pkg/controller/provider/model/ocp",
-        "//vendor/github.com/konveyor/controller/pkg/inventory/model",
-        "//vendor/github.com/konveyor/controller/pkg/ref",
+        "//pkg/lib/inventory/model",
+        "//pkg/lib/ref",
     ],
 )

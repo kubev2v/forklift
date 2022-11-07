@@ -1,8 +1,8 @@
 package host
 
 import (
-	libcnd "github.com/konveyor/controller/pkg/condition"
-	libref "github.com/konveyor/controller/pkg/ref"
+	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
+	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/host/handler"
 	"sigs.k8s.io/controller-runtime/pkg/client"

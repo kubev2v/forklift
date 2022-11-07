@@ -3,9 +3,9 @@ package vsphere
 import (
 	"context"
 	"github.com/go-logr/logr"
-	liberr "github.com/konveyor/controller/pkg/error"
-	libmodel "github.com/konveyor/controller/pkg/inventory/model"
-	"github.com/konveyor/controller/pkg/logging"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	"github.com/vmware/govmomi"

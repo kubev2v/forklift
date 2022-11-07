@@ -3,21 +3,30 @@ module github.com/konveyor/forklift-controller
 go 1.14
 
 require (
+	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-gonic/gin v1.7.2
 	github.com/go-kit/kit v0.10.0 // indirect
 	github.com/go-logr/logr v0.3.0
+	github.com/go-logr/zapr v0.3.0
 	github.com/go-openapi/spec v0.19.4 // indirect
+	github.com/google/uuid v1.1.2
+	github.com/gorilla/websocket v1.4.2
+	github.com/imdario/mergo v0.3.11 // indirect
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.1.0
-	github.com/konveyor/controller v0.10.0
+	github.com/mattn/go-sqlite3 v1.14.4
 	github.com/onsi/gomega v1.10.3
 	github.com/openshift/api v0.0.0
 	github.com/openshift/library-go v0.0.0-20200821154433-215f00df72cc
 	github.com/ovirt/go-ovirt v4.3.4+incompatible
+	github.com/pborman/uuid v1.2.1 // indirect
+	github.com/pkg/errors v0.9.1
 	github.com/pkg/profile v1.3.0
 	github.com/prometheus/client_golang v1.11.0
 	github.com/vmware/govmomi v0.23.1
-	go.uber.org/zap v1.14.1 // indirect
+	go.uber.org/zap v1.14.1
+	golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0 // indirect
 	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
+	golang.org/x/oauth2 v0.0.0-20200902213428-5d25da1a8d43 // indirect
 	gopkg.in/yaml.v2 v2.3.0
 	k8s.io/api v0.23.0
 	k8s.io/apimachinery v0.23.0
