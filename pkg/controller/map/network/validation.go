@@ -2,7 +2,7 @@ package network
 
 import (
 	"errors"
-	libcnd "github.com/konveyor/controller/pkg/condition"
+	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	refapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"

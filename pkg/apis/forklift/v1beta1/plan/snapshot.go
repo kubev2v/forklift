@@ -1,7 +1,7 @@
 package plan
 
 import (
-	libcnd "github.com/konveyor/controller/pkg/condition"
+	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )

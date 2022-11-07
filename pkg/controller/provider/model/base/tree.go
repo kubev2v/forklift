@@ -1,7 +1,7 @@
 package base
 
 import (
-	libref "github.com/konveyor/controller/pkg/ref"
+	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 )
 
 //

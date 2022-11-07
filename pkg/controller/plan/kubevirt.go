@@ -24,8 +24,8 @@ import (
 	cnv "kubevirt.io/client-go/api/v1"
 	libvirtxml "libvirt.org/libvirt-go-xml"
 
-	libcnd "github.com/konveyor/controller/pkg/condition"
-	liberr "github.com/konveyor/controller/pkg/error"
+	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"

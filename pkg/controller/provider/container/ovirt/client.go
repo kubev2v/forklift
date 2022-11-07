@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	liberr "github.com/konveyor/controller/pkg/error"
-	libweb "github.com/konveyor/controller/pkg/inventory/web"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
 	core "k8s.io/api/core/v1"
 )
 

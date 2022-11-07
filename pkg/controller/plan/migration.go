@@ -7,9 +7,9 @@ import (
 	"path"
 	"time"
 
-	libcnd "github.com/konveyor/controller/pkg/condition"
-	liberr "github.com/konveyor/controller/pkg/error"
-	libitr "github.com/konveyor/controller/pkg/itinerary"
+	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"

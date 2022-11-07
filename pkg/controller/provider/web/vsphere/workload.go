@@ -3,7 +3,7 @@ package vsphere
 import (
 	"errors"
 	"github.com/gin-gonic/gin"
-	libmodel "github.com/konveyor/controller/pkg/inventory/model"
+	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"

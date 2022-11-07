@@ -1,8 +1,8 @@
 package container
 
 import (
-	libcontainer "github.com/konveyor/controller/pkg/inventory/container"
-	libmodel "github.com/konveyor/controller/pkg/inventory/model"
+	libcontainer "github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
+	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/ovirt"

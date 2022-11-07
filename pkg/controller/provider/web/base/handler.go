@@ -2,8 +2,8 @@ package base
 
 import (
 	"github.com/gin-gonic/gin"
-	libcontainer "github.com/konveyor/controller/pkg/inventory/container"
-	libweb "github.com/konveyor/controller/pkg/inventory/web"
+	libcontainer "github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
+	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/base"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"

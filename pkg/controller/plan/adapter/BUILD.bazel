@@ -10,6 +10,6 @@ go_library(
         "//pkg/controller/plan/adapter/base",
         "//pkg/controller/plan/adapter/ovirt",
         "//pkg/controller/plan/adapter/vsphere",
-        "//vendor/github.com/konveyor/controller/pkg/error",
+        "//pkg/lib/error",
     ],
 )

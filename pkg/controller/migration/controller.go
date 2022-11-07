@@ -19,9 +19,9 @@ package migration
 import (
 	"context"
 
-	libcnd "github.com/konveyor/controller/pkg/condition"
-	"github.com/konveyor/controller/pkg/logging"
-	libref "github.com/konveyor/controller/pkg/ref"
+	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/base"
 	"github.com/konveyor/forklift-controller/pkg/settings"

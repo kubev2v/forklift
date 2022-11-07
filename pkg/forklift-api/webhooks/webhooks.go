@@ -3,7 +3,7 @@ package webhooks
 import (
 	"net/http"
 
-	"github.com/konveyor/controller/pkg/logging"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 

@@ -11,7 +11,7 @@ go_library(
         "//pkg/controller/map/storage/handler/ovirt",
         "//pkg/controller/map/storage/handler/vsphere",
         "//pkg/controller/watch/handler",
-        "//vendor/github.com/konveyor/controller/pkg/error",
+        "//pkg/lib/error",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/event",
     ],

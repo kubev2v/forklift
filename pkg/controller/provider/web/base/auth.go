@@ -3,7 +3,7 @@ package base
 import (
 	"context"
 	"github.com/gin-gonic/gin"
-	liberr "github.com/konveyor/controller/pkg/error"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	auth "k8s.io/api/authentication/v1"
 	auth2 "k8s.io/api/authorization/v1"

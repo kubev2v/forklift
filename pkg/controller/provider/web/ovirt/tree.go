@@ -2,8 +2,8 @@ package ovirt
 
 import (
 	"github.com/gin-gonic/gin"
-	libmodel "github.com/konveyor/controller/pkg/inventory/model"
-	libref "github.com/konveyor/controller/pkg/ref"
+	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
+	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"net/http"

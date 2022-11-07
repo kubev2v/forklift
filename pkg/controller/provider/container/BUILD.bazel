@@ -10,8 +10,8 @@ go_library(
         "//pkg/controller/provider/container/ocp",
         "//pkg/controller/provider/container/ovirt",
         "//pkg/controller/provider/container/vsphere",
-        "//vendor/github.com/konveyor/controller/pkg/inventory/container",
-        "//vendor/github.com/konveyor/controller/pkg/inventory/model",
+        "//pkg/lib/inventory/container",
+        "//pkg/lib/inventory/model",
         "//vendor/k8s.io/api/core/v1:core",
     ],
 )
