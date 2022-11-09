@@ -10,7 +10,7 @@ build --action_env=CONTROLLER_IMAGE=quay.io/konveyor/forklift-controller:latest
 build --action_env=MUST_GATHER_IMAGE=quay.io/konveyor/forklift-must-gather:latest
 build --action_env=MUST_GATHER_API_IMAGE=quay.io/konveyor/forklift-must-gather-api:latest
 build --action_env=UI_IMAGE=quay.io/konveyor/forklift-ui:latest
-build --action_env=UI_PLUGIN_IMAGE=quay.io/kubevirt-ui/forklift-console-plugin:latest
+build --action_env=UI_PLUGIN_IMAGE=quay.io/kubev2v/forklift-console-plugin:latest
 build --action_env=VALIDATION_IMAGE=quay.io/konveyor/forklift-validation:latest
 build --action_env=VIRT_V2V_IMAGE=quay.io/konveyor/forklift-virt-v2v:latest
 build --action_env=OPERATOR_IMAGE=quay.io/konveyor/forklift-operator:latest
