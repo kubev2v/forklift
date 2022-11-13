@@ -34,6 +34,25 @@ jobs:
         run: |
           curl -k "$CLUSTER/apis/forklift.konveyor.io/v1beta1/namespaces/konveyor-forklift/providers" --header "Authorization: Bearer $TOKEN"
 
+      # Run e2e sanity
+      - name: Run e2e sanity suite
+        env:
+          OVIRT_USERNAME: admin@internal
+          OVIRT_PASSWORD: 123456
+          OVIRT_URL: https://fakeovirt.konveyor-forklift:30001/ovirt-engine/api
+          OVIRT_CACERT: /home/runner/work/_actions/kubev2v/forkliftci/main/ovirt/e2e_cacert.cer
+          STORAGE_CLASS: standard
+          OVIRT_VM_ID: 31573c08-717b-43e0-825f-69a36fb0e1a1
+        run: |
+          GOPATH=${GITHUB_WORKSPACE}/go make e2e-sanity
+
+      # Push code coverage using Codecov Action
+      - name: Push code coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          fail_ci_if_error: false # see https://github.com/codecov/codecov-action/issues/598
+
+
   build:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
