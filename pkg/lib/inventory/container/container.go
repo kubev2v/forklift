@@ -1,13 +1,14 @@
 package container
 
 import (
+	"sync"
+
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	"github.com/konveyor/forklift-controller/pkg/lib/ref"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sync"
 )
 
 //
@@ -152,8 +153,9 @@ type Collector interface {
 	HasParity() bool
 	// Get the associated DB.
 	DB() model.DB
-	// Test connection with credentials.
-	Test() error
+	// Return the status code of the connection
+	// 0 = Ignore
+	Test() (int, error)
 	// Reset
 	Reset()
 }

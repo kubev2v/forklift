@@ -10,12 +10,12 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -140,8 +140,8 @@ func (r *Collector) HasParity() bool {
 
 //
 // Test connect/logout.
-func (r *Collector) Test() (err error) {
-	_, err = r.client.system()
+func (r *Collector) Test() (status int, err error) {
+	_, status, err = r.client.system()
 	return
 }
 
@@ -527,5 +527,6 @@ func (r *Collector) listEvent() (list []Event, err error) {
 //
 // Connect.
 func (r *Collector) connect() error {
-	return r.client.connect()
+	_, err := r.client.connect()
+	return err
 }
