@@ -22,6 +22,12 @@ import (
 	"path/filepath"
 	"sync"
 
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	"github.com/konveyor/forklift-controller/pkg/controller/base"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/container"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/model"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
+	"github.com/konveyor/forklift-controller/pkg/controller/validation/policy"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libfb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
@@ -30,12 +36,6 @@ import (
 	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/controller/base"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/container"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/model"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
-	"github.com/konveyor/forklift-controller/pkg/controller/validation/policy"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -170,6 +170,15 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 
 	defer func() {
 		r.Log.V(2).Info("Conditions.", "all", provider.Status.Conditions)
+	}()
+
+	defer func() {
+		// Stop reconciliation when auth fails
+		if provider.Status.HasCondition(ConnectionAuthFailed) {
+			result.RequeueAfter = 0
+			err = nil
+			return
+		}
 	}()
 
 	// Updated.

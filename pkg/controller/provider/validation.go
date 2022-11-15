@@ -3,14 +3,15 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 
-	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/ovirt"
+	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -24,6 +25,7 @@ const (
 	SecretNotValid          = "SecretNotValid"
 	SettingsNotValid        = "SettingsNotValid"
 	Validated               = "Validated"
+	ConnectionAuthFailed    = "ConnectionAuthFailed"
 	ConnectionTestSucceeded = "ConnectionTestSucceeded"
 	ConnectionTestFailed    = "ConnectionTestFailed"
 	InventoryCreated        = "InventoryCreated"
@@ -289,7 +291,7 @@ func (r *Reconciler) testConnection(provider *api.Provider, secret *core.Secret)
 		return nil
 	}
 	rl := container.Build(nil, provider, secret)
-	err := rl.Test()
+	status, err := rl.Test()
 	if err == nil {
 		log.Info(
 			"Connection test succeeded.")
@@ -302,6 +304,21 @@ func (r *Reconciler) testConnection(provider *api.Provider, secret *core.Secret)
 				Message:  "Connection test, succeeded.",
 			})
 	} else {
+		// When the status is unauthorized controller stops the reconciliation, so the user account does not get locked.
+		// Providing bad credentials when requesting the token results in 400, and not 401.
+		if status == http.StatusUnauthorized || status == http.StatusBadRequest {
+			provider.Status.SetCondition(
+				libcnd.Condition{
+					Type:     ConnectionAuthFailed,
+					Status:   True,
+					Reason:   Tested,
+					Category: Critical,
+					Message: fmt.Sprintf(
+						"Connection auth failed, error: %s",
+						err.Error()),
+				})
+			return nil
+		}
 		log.Info(
 			"Connection test failed.",
 			"reason",
