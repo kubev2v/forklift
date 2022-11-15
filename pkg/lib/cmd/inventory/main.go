@@ -5,6 +5,12 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net/http"
+	"os"
+	"runtime"
+	"strconv"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
@@ -12,11 +18,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"net/http"
-	"os"
-	"runtime"
-	"strconv"
-	"time"
 )
 
 var log = logging.WithName("TESTER")
@@ -201,8 +202,8 @@ func (r *Collector) HasParity() bool {
 	return true
 }
 
-func (r *Collector) Test() error {
-	return nil
+func (r *Collector) Test() (int, error) {
+	return 0, nil
 }
 
 func (r *Collector) Reset() {

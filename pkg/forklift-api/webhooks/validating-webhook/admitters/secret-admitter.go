@@ -88,7 +88,7 @@ func (admitter *SecretAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissio
 		}
 	}
 	log.Info("Starting provider connection test")
-	err = collector.Test()
+	_, err = collector.Test()
 	if err != nil {
 		return &admissionv1.AdmissionResponse{
 			Allowed: false,

@@ -47,7 +47,7 @@ type ovirtTokenResponse struct {
 
 //
 // Connect.
-func (r *Client) connect() (err error) {
+func (r *Client) connect() (status int, err error) {
 	var TLSClientConfig *tls.Config
 
 	if !r.clientExpiration.IsZero() && time.Now().After(r.clientExpiration) {
@@ -111,7 +111,7 @@ func (r *Client) connect() (err error) {
 
 	response := &ovirtTokenResponse{}
 	url.RawQuery = values.Encode()
-	status, err := client.Get(url.String(), response)
+	status, err = client.Get(url.String(), response)
 	if err != nil {
 		return
 	}
@@ -196,18 +196,14 @@ func (r *Client) get(path string, object interface{}, param ...libweb.Param) (er
 
 //
 // Get system.
-func (r *Client) system() (s *System, err error) {
-	err = r.connect()
+func (r *Client) system() (s *System, status int, err error) {
+	status, err = r.connect()
 	if err != nil {
 		return
 	}
 	system := &System{}
-	status, err := r.client.Get(r.url, system)
+	status, err = r.client.Get(r.url, system)
 	if err != nil {
-		return
-	}
-	if status != http.StatusOK {
-		err = liberr.New(http.StatusText(status))
 		return
 	}
 

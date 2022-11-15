@@ -2,6 +2,9 @@ package ocp
 
 import (
 	"context"
+	"path"
+	"time"
+
 	"github.com/go-logr/logr"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
@@ -11,14 +14,12 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"path"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"time"
 )
 
 const (
@@ -136,8 +137,8 @@ func (r *Collector) UpdateThreshold(m libmodel.Model) {
 }
 
 // Test connection with credentials.
-func (r *Collector) Test() error {
-	return r.buildClient()
+func (r *Collector) Test() (int, error) {
+	return 0, r.buildClient()
 }
 
 //
