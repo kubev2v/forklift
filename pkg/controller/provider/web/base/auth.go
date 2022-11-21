@@ -101,22 +101,32 @@ func (r *Auth) permit(token string, p *api.Provider) (allowed bool, err error) {
 		return
 	}
 	user := tr.Status.User
-	kind := p.GetObjectKind()
-	gvk := kind.GroupVersionKind()
 	extra := map[string]auth2.ExtraValue{}
 	for k, v := range user.Extra {
 		extra[k] = append(
 			auth2.ExtraValue{},
 			v...)
 	}
+	group, resource, err := api.GetGroupResource(p)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	var verb string
+	if p.ObjectMeta.UID != "" {
+		verb = "get"
+	} else {
+		verb = "list"
+	}
+
 	review := &auth2.SubjectAccessReview{
 		Spec: auth2.SubjectAccessReviewSpec{
 			ResourceAttributes: &auth2.ResourceAttributes{
-				Group:     gvk.Group,
-				Resource:  gvk.Kind,
+				Group:     group,
+				Resource:  resource,
 				Namespace: p.Namespace,
 				Name:      p.Name,
-				Verb:      "*",
+				Verb:      verb,
 			},
 			Extra:  extra,
 			Groups: user.Groups,

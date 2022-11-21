@@ -23,6 +23,9 @@ limitations under the License.
 package v1beta1
 
 import (
+	"fmt"
+
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/scheme"
 )
@@ -33,3 +36,19 @@ var SchemeGroupVersion = schema.GroupVersion{
 }
 
 var SchemeBuilder = &scheme.Builder{GroupVersion: SchemeGroupVersion}
+
+// TODO: find a better place for this, it would be nice to use it also to
+// determine the plural configuration of a resource for the operator
+func GetGroupResource(required runtime.Object) (group string, resource string, err error) {
+
+	switch required.(type) {
+	case *Provider:
+		group = SchemeGroupVersion.Group
+		resource = "providers"
+	default:
+		err = fmt.Errorf("resource type is not known")
+		return
+	}
+
+	return
+}
