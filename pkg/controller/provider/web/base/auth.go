@@ -2,19 +2,20 @@ package base
 
 import (
 	"context"
-	"github.com/gin-gonic/gin"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	auth "k8s.io/api/authentication/v1"
-	auth2 "k8s.io/api/authorization/v1"
-	"k8s.io/client-go/kubernetes/scheme"
 	"net/http"
 	"path"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	auth "k8s.io/api/authentication/v1"
+	auth2 "k8s.io/api/authorization/v1"
+	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 //
@@ -108,7 +109,7 @@ func (r *Auth) permit(token string, p *api.Provider) (allowed bool, err error) {
 			auth2.ExtraValue{},
 			v...)
 	}
-	ar := &auth2.SubjectAccessReview{
+	review := &auth2.SubjectAccessReview{
 		Spec: auth2.SubjectAccessReviewSpec{
 			ResourceAttributes: &auth2.ResourceAttributes{
 				Group:     gvk.Group,
@@ -123,13 +124,13 @@ func (r *Auth) permit(token string, p *api.Provider) (allowed bool, err error) {
 			UID:    user.UID,
 		},
 	}
-	err = w.Create(context.TODO(), ar)
+	err = w.Create(context.TODO(), review)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
 
-	allowed = ar.Status.Allowed
+	allowed = review.Status.Allowed
 	return
 }
 
