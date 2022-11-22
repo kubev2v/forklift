@@ -21,3 +21,15 @@ container_image(
     user = "1001",
     visibility = ["//visibility:public"],
 )
+
+container_image(
+    name = "forklift-virt-v2v-stub",
+    base = ":virt-v2v-image",
+    directory = "/usr/local/bin/",
+    empty_dirs = ["/disks"],
+    entrypoint = ["/usr/local/bin/entrypoint"],
+    env = {"LIBGUESTFS_BACKEND": "direct"},
+    files = ["stub/entrypoint"],
+    user = "1001",
+    visibility = ["//visibility:public"],
+)

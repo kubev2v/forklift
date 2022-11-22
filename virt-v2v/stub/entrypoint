@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+echo "Run virt-v2v with the following input:"
+cat /mnt/v2v/input.xml
+
+qemu-img info /mnt/disks/disk0/disk.img
+
+qemu-img convert -f raw -O qcow2 /mnt/disks/disk0/disk.img /mnt/disks/disk0/disk.qcow2
+
+exit 0
