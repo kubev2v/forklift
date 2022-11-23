@@ -2,6 +2,10 @@ package base
 
 import (
 	"context"
+	"net/http"
+	"testing"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/onsi/gomega"
@@ -9,10 +13,7 @@ import (
 	auth2 "k8s.io/api/authorization/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"net/http"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"testing"
-	"time"
 )
 
 type fakeWriter struct {
@@ -98,20 +99,20 @@ func TestAuth(t *testing.T) {
 	// token.
 	g.Expect(auth.token(ctx)).To(gomega.Equal(token))
 	// First call with no cached token.
-	status := auth.Permit(ctx, provider)
+	status, _ := auth.Permit(ctx, provider)
 	g.Expect(auth.cache[token]).ToNot(gomega.BeNil())
 	g.Expect(1).To(gomega.Equal(writer.trCount))
 	g.Expect(1).To(gomega.Equal(writer.arCount))
 	g.Expect(http.StatusOK).To(gomega.Equal(status))
 	// Second call with cached token.
-	status = auth.Permit(ctx, provider)
+	status, _ = auth.Permit(ctx, provider)
 	g.Expect(auth.cache[token]).ToNot(gomega.BeNil())
 	g.Expect(1).To(gomega.Equal(writer.trCount))
 	g.Expect(1).To(gomega.Equal(writer.arCount))
 	g.Expect(http.StatusOK).To(gomega.Equal(status))
 	// Third call after TTL.
 	time.Sleep(ttl)
-	status = auth.Permit(ctx, provider)
+	status, _ = auth.Permit(ctx, provider)
 	g.Expect(auth.cache[token]).ToNot(gomega.BeNil())
 	g.Expect(2).To(gomega.Equal(writer.trCount))
 	g.Expect(2).To(gomega.Equal(writer.arCount))

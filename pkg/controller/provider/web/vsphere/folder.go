@@ -2,15 +2,15 @@ package vsphere
 
 import (
 	"errors"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	"net/http"
+	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 )
 
-//
 // Routes.
 const (
 	FolderParam      = "folder"
@@ -19,7 +19,6 @@ const (
 	FolderRoot       = FoldersRoot + "/:" + FolderParam
 )
 
-//
 // Folder handler.
 type FolderHandler struct {
 	Handler
@@ -27,7 +26,6 @@ type FolderHandler struct {
 	folder *model.Folder
 }
 
-//
 // Add routes to the `gin` router.
 func (h *FolderHandler) AddRoutes(e *gin.Engine) {
 	e.GET(FoldersRoot, h.List)
@@ -35,15 +33,15 @@ func (h *FolderHandler) AddRoutes(e *gin.Engine) {
 	e.GET(FolderRoot, h.Get)
 }
 
-//
 // List resources in a REST collection.
 // A GET onn the collection that includes the `X-Watch`
 // header will negotiate an upgrade of the connection
 // to a websocket and push watch events.
 func (h FolderHandler) List(ctx *gin.Context) {
-	status := h.Prepare(ctx)
+	status, err := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
+		base.SetForkliftError(ctx, err)
 		return
 	}
 	if h.WatchRequest {
@@ -52,7 +50,7 @@ func (h FolderHandler) List(ctx *gin.Context) {
 	}
 	db := h.Collector.DB()
 	list := []model.Folder{}
-	err := db.List(&list, h.ListOptions(ctx))
+	err = db.List(&list, h.ListOptions(ctx))
 	if err != nil {
 		log.Trace(
 			err,
@@ -74,12 +72,12 @@ func (h FolderHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific REST resource.
 func (h FolderHandler) Get(ctx *gin.Context) {
-	status := h.Prepare(ctx)
+	status, err := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
+		base.SetForkliftError(ctx, err)
 		return
 	}
 	m := &model.Folder{
@@ -88,7 +86,7 @@ func (h FolderHandler) Get(ctx *gin.Context) {
 		},
 	}
 	db := h.Collector.DB()
-	err := db.Get(m)
+	err = db.Get(m)
 	if errors.Is(err, model.NotFound) {
 		ctx.Status(http.StatusNotFound)
 		return
@@ -111,7 +109,6 @@ func (h FolderHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Watch.
 func (h *FolderHandler) watch(ctx *gin.Context) {
 	db := h.Collector.DB()
@@ -138,7 +135,6 @@ func (h *FolderHandler) watch(ctx *gin.Context) {
 	}
 }
 
-//
 // REST Resource.
 type Folder struct {
 	Resource
@@ -147,7 +143,6 @@ type Folder struct {
 	Children   []model.Ref `json:"children"`
 }
 
-//
 // Build the resource using the model.
 func (r *Folder) With(m *model.Folder) {
 	r.Resource.With(&m.Base)
@@ -156,7 +151,6 @@ func (r *Folder) With(m *model.Folder) {
 	r.Children = m.Children
 }
 
-//
 // Build self link (URI).
 func (r *Folder) Link(p *api.Provider) {
 	r.SelfLink = base.Link(
@@ -167,7 +161,6 @@ func (r *Folder) Link(p *api.Provider) {
 		})
 }
 
-//
 // Content.
 func (r *Folder) Content(detail int) interface{} {
 	if detail == 0 {
