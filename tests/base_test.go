@@ -3,18 +3,17 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/ovirt"
 	"os"
 	"strconv"
 	"testing"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/konveyor/forklift-controller/pkg/apis"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/provider"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/ovirt"
 	ovirtsdk "github.com/ovirt/go-ovirt"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,9 +25,9 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
-func TestSanityOvirtProvider(t *testing.T) {
-	var log logr.Logger
+var namespace = "konveyor-forklift"
 
+func TestSanityOvirtProvider(t *testing.T) {
 	conf, err := config.GetConfig()
 	if err != nil {
 		fmt.Println("unable to set up client config")
@@ -37,12 +36,10 @@ func TestSanityOvirtProvider(t *testing.T) {
 
 	logf.SetLogger(
 		logf.ZapLogger(false))
-	log = logf.Log.WithName("entrypoint")
+	log := logf.Log.WithName("entrypoint")
 
-	customEnvVar := os.Getenv("OVIRT_CUSTOM_ENV")
 	customEnv := false
-	migrationTimeout := "3"
-	if customEnvVar == "true" {
+	if customEnvVar := os.Getenv("OVIRT_CUSTOM_ENV"); customEnvVar == "true" {
 		customEnv = true
 	}
 	username := os.Getenv("OVIRT_USERNAME")
@@ -79,8 +76,8 @@ func TestSanityOvirtProvider(t *testing.T) {
 	if vmId == "" {
 		t.Fatal("OVIRT_VM is not set")
 	}
-	timeoutInput := os.Getenv("MIGRATION_TIMEOUT")
-	if timeoutInput != "" {
+	migrationTimeout := "3"
+	if timeoutInput := os.Getenv("MIGRATION_TIMEOUT"); timeoutInput != "" {
 		migrationTimeout = timeoutInput
 	}
 
@@ -99,8 +96,6 @@ func TestSanityOvirtProvider(t *testing.T) {
 		t.Error(err, "Failed to create client")
 	}
 
-	localProviderNamespace := "konveyor-forklift"
-
 	log.Info("Creating secret...")
 
 	secret := &corev1.Secret{
@@ -109,7 +104,7 @@ func TestSanityOvirtProvider(t *testing.T) {
 			APIVersion: "v1",
 		},
 		ObjectMeta: v1.ObjectMeta{
-			Namespace: localProviderNamespace,
+			Namespace: namespace,
 			Name:      "ovirt-provider-test-secret",
 			Labels: map[string]string{
 				"createdForResource":     "ovirt-provider",
@@ -129,7 +124,7 @@ func TestSanityOvirtProvider(t *testing.T) {
 	}
 
 	providerName := v1.ObjectMeta{
-		Namespace: localProviderNamespace,
+		Namespace: namespace,
 		Name:      "ovirt-provider",
 	}
 
@@ -145,7 +140,7 @@ func TestSanityOvirtProvider(t *testing.T) {
 			URL:  ovirtURL,
 			Secret: corev1.ObjectReference{
 				Name:      secret.Name,
-				Namespace: localProviderNamespace,
+				Namespace: namespace,
 			},
 		},
 	}
@@ -159,7 +154,7 @@ func TestSanityOvirtProvider(t *testing.T) {
 	providerIdentifier := types.NamespacedName{Namespace: providerName.Namespace, Name: providerName.Name}
 	err = cl.Get(context.TODO(), providerIdentifier, returnedProvider)
 	if err != nil {
-		t.Fatal(err, "Failed get ovirt provider")
+		t.Fatal(err, "Failed to get ovirt provider")
 	}
 
 	done := make(chan struct{})
@@ -240,12 +235,12 @@ func TestSanityOvirtProvider(t *testing.T) {
 			}
 			sds, ok := diskResponse.MustDisk().StorageDomains()
 			if !ok {
-				t.Fatal("Failed to get sds")
+				t.Fatal("Failed to get storage domains")
 			}
 			for _, sd := range sds.Slice() {
 				sdId, ok := sd.Id()
 				if !ok {
-					t.Fatal("Failed to get sd id")
+					t.Fatal("Failed to get storage domain id")
 				}
 				pair := v1beta1.StoragePair{
 					Source: ref.Ref{ID: sdId},
@@ -298,14 +293,14 @@ func TestSanityOvirtProvider(t *testing.T) {
 		},
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "storage-map-test",
-			Namespace: localProviderNamespace,
+			Namespace: namespace,
 		},
 		Spec: v1beta1.StorageMapSpec{
 			Map: sdPairs,
 			Provider: provider.Pair{
 				Destination: corev1.ObjectReference{
 					Name:      "host",
-					Namespace: localProviderNamespace,
+					Namespace: namespace,
 				},
 				Source: corev1.ObjectReference{
 					Name:      providerIdentifier.Name,
@@ -327,14 +322,14 @@ func TestSanityOvirtProvider(t *testing.T) {
 		},
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "network-map-test",
-			Namespace: localProviderNamespace,
+			Namespace: namespace,
 		},
 		Spec: v1beta1.NetworkMapSpec{
 			Map: nicPairs,
 			Provider: provider.Pair{
 				Destination: corev1.ObjectReference{
 					Name:      "host",
-					Namespace: localProviderNamespace,
+					Namespace: namespace,
 				},
 				Source: corev1.ObjectReference{
 					Name:      providerIdentifier.Name,
@@ -356,13 +351,13 @@ func TestSanityOvirtProvider(t *testing.T) {
 		},
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "plan-test",
-			Namespace: localProviderNamespace,
+			Namespace: namespace,
 		},
 		Spec: v1beta1.PlanSpec{
 			Provider: provider.Pair{
 				Destination: corev1.ObjectReference{
 					Name:      "host",
-					Namespace: localProviderNamespace,
+					Namespace: namespace,
 				},
 				Source: corev1.ObjectReference{
 					Name:      providerIdentifier.Name,
@@ -375,11 +370,11 @@ func TestSanityOvirtProvider(t *testing.T) {
 			Map: plan.Map{
 				Storage: corev1.ObjectReference{
 					Name:      "storage-map-test",
-					Namespace: localProviderNamespace,
+					Namespace: namespace,
 				},
 				Network: corev1.ObjectReference{
 					Name:      "network-map-test",
-					Namespace: localProviderNamespace,
+					Namespace: namespace,
 				},
 			},
 			VMs: []plan.VM{
@@ -431,12 +426,12 @@ func TestSanityOvirtProvider(t *testing.T) {
 		},
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "migration-test",
-			Namespace: localProviderNamespace,
+			Namespace: namespace,
 		},
 		Spec: v1beta1.MigrationSpec{
 			Plan: corev1.ObjectReference{
 				Name:      "plan-test",
-				Namespace: localProviderNamespace,
+				Namespace: namespace,
 			},
 		},
 	}
