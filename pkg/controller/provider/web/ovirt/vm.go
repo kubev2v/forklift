@@ -6,13 +6,12 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
+	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 )
 
-//
 // Routes.
 const (
 	VMParam      = "vm"
@@ -32,13 +31,11 @@ const (
 	IsolateThreads CpuPinningPolicy = "isolate_threads"
 )
 
-//
 // Virtual Machine handler.
 type VMHandler struct {
 	Handler
 }
 
-//
 // Add routes to the `gin` router.
 func (h *VMHandler) AddRoutes(e *gin.Engine) {
 	e.GET(VMsRoot, h.List)
@@ -46,22 +43,21 @@ func (h *VMHandler) AddRoutes(e *gin.Engine) {
 	e.GET(VMRoot, h.Get)
 }
 
-//
 // List resources in a REST collection.
 // A GET onn the collection that includes the `X-Watch`
 // header will negotiate an upgrade of the connection
 // to a websocket and push watch events.
 func (h VMHandler) List(ctx *gin.Context) {
-	status := h.Prepare(ctx)
+	status, err := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
+		base.SetForkliftError(ctx, err)
 		return
 	}
 	if h.WatchRequest {
 		h.watch(ctx)
 		return
 	}
-	var err error
 	defer func() {
 		if err != nil {
 			log.Trace(
@@ -94,12 +90,12 @@ func (h VMHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific REST resource.
 func (h VMHandler) Get(ctx *gin.Context) {
-	status := h.Prepare(ctx)
+	status, err := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
+		base.SetForkliftError(ctx, err)
 		return
 	}
 	m := &model.VM{
@@ -109,7 +105,7 @@ func (h VMHandler) Get(ctx *gin.Context) {
 	}
 	h.Detail = model.MaxDetail
 	db := h.Collector.DB()
-	err := db.Get(m)
+	err = db.Get(m)
 	if errors.Is(err, model.NotFound) {
 		ctx.Status(http.StatusNotFound)
 		return
@@ -132,7 +128,6 @@ func (h VMHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Watch.
 func (h *VMHandler) watch(ctx *gin.Context) {
 	db := h.Collector.DB()
@@ -159,7 +154,6 @@ func (h *VMHandler) watch(ctx *gin.Context) {
 	}
 }
 
-//
 // Filter result set.
 // Filter by path for `name` query.
 func (h *VMHandler) filter(ctx *gin.Context, list *[]model.VM) (err error) {
@@ -189,11 +183,9 @@ func (h *VMHandler) filter(ctx *gin.Context, list *[]model.VM) (err error) {
 	return
 }
 
-//
 // VM detail=0
 type VM0 = Resource
 
-//
 // VM detail=1
 type VM1 struct {
 	VM0
@@ -206,7 +198,6 @@ type VM1 struct {
 	Concerns          []Concern        `json:"concerns"`
 }
 
-//
 // Build the resource using the model.
 func (r *VM1) With(m *model.VM) {
 	r.VM0.With(&m.Base)
@@ -219,7 +210,6 @@ func (r *VM1) With(m *model.VM) {
 	r.Concerns = m.Concerns
 }
 
-//
 // As content.
 func (r *VM1) Content(detail int) interface{} {
 	if detail < 1 {
@@ -229,7 +219,6 @@ func (r *VM1) Content(detail int) interface{} {
 	return r
 }
 
-//
 // VM resource.
 type VM struct {
 	VM1
@@ -278,7 +267,6 @@ type Snapshot = model.Snapshot
 type Concern = model.Concern
 type Guest = model.Guest
 
-//
 // Build the resource using the model.
 func (r *VM) With(m *model.VM) {
 	r.VM1.With(m)
@@ -317,7 +305,6 @@ func (r *VM) With(m *model.VM) {
 	r.OSType = m.OSType
 }
 
-//
 // Build self link (URI).
 func (r *VM) Link(p *api.Provider) {
 	r.SelfLink = base.Link(
@@ -328,7 +315,6 @@ func (r *VM) Link(p *api.Provider) {
 		})
 }
 
-//
 // As content.
 func (r *VM) Content(detail int) interface{} {
 	if detail < 2 {

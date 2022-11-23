@@ -1,17 +1,18 @@
 package base
 
 import (
-	"github.com/gin-gonic/gin"
-	libcontainer "github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
-	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/base"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/base"
+	libcontainer "github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
+	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 //
@@ -69,29 +70,29 @@ type Handler struct {
 
 //
 // Prepare to handle the request.
-func (h *Handler) Prepare(ctx *gin.Context) int {
+func (h *Handler) Prepare(ctx *gin.Context) (int, error) {
 	status := h.Paged.Prepare(ctx)
 	if status != http.StatusOK {
-		return status
+		return status, nil
 	}
 	status = h.Watched.Prepare(ctx)
 	if status != http.StatusOK {
-		return status
+		return status, nil
 	}
 	status = h.setDetail(ctx)
 	if status != http.StatusOK {
-		return status
+		return status, nil
 	}
 	status = h.setProvider(ctx)
 	if status != http.StatusOK {
-		return status
+		return status, nil
 	}
-	status = h.permit(ctx)
+	status, err := h.permit(ctx)
 	if status != http.StatusOK {
-		return status
+		return status, err
 	}
 
-	return http.StatusOK
+	return http.StatusOK, nil
 }
 
 //
@@ -152,7 +153,7 @@ func (h *Handler) setDetail(ctx *gin.Context) (status int) {
 
 //
 // Permit request - Authorization.
-func (h *Handler) permit(ctx *gin.Context) (status int) {
+func (h *Handler) permit(ctx *gin.Context) (status int, err error) {
 	status = http.StatusOK
 	if Settings.AuthRequired {
 		return DefaultAuth.Permit(ctx, h.Provider)
