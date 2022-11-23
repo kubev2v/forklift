@@ -1,16 +1,16 @@
 package ovirt
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
-	"net/http"
 )
 
-//
 // Routes.
 const (
 	ProviderParam = base.ProviderParam
@@ -18,13 +18,11 @@ const (
 	ProviderRoot  = ProvidersRoot + "/:" + ProviderParam
 )
 
-//
 // Provider handler.
 type ProviderHandler struct {
 	base.Handler
 }
 
-//
 // Add routes to the `gin` router.
 func (h *ProviderHandler) AddRoutes(e *gin.Engine) {
 	e.GET(ProvidersRoot, h.List)
@@ -32,12 +30,12 @@ func (h *ProviderHandler) AddRoutes(e *gin.Engine) {
 	e.GET(ProviderRoot, h.Get)
 }
 
-//
 // List resources in a REST collection.
 func (h ProviderHandler) List(ctx *gin.Context) {
-	status := h.Prepare(ctx)
+	status, err := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
+		base.SetForkliftError(ctx, err)
 		return
 	}
 	if h.WatchRequest {
@@ -57,12 +55,12 @@ func (h ProviderHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific REST resource.
 func (h ProviderHandler) Get(ctx *gin.Context) {
-	status := h.Prepare(ctx)
+	status, err := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
+		base.SetForkliftError(ctx, err)
 		return
 	}
 	if h.Provider.Type() != api.OVirt {
@@ -74,7 +72,7 @@ func (h ProviderHandler) Get(ctx *gin.Context) {
 	m.With(h.Provider)
 	r := Provider{}
 	r.With(m)
-	err := h.AddDerived(&r)
+	err = h.AddDerived(&r)
 	if err != nil {
 		log.Trace(
 			err,
@@ -89,7 +87,6 @@ func (h ProviderHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Build the list content.
 func (h *ProviderHandler) ListContent(ctx *gin.Context) (content []interface{}, err error) {
 	content = []interface{}{}
@@ -127,7 +124,6 @@ func (h *ProviderHandler) ListContent(ctx *gin.Context) (content []interface{}, 
 	return
 }
 
-//
 // Add derived fields.
 func (h *ProviderHandler) AddDerived(r *Provider) (err error) {
 	var n int64
@@ -175,7 +171,6 @@ func (h *ProviderHandler) AddDerived(r *Provider) (err error) {
 	return
 }
 
-//
 // REST Resource.
 type Provider struct {
 	ocp.Resource
@@ -189,7 +184,6 @@ type Provider struct {
 	StorageDomainCount int64        `json:"storageDomainCount"`
 }
 
-//
 // Set fields with the specified object.
 func (r *Provider) With(m *model.Provider) {
 	r.Resource.With(&m.Base)
@@ -197,7 +191,6 @@ func (r *Provider) With(m *model.Provider) {
 	r.Object = m.Object
 }
 
-//
 // Build self link (URI).
 func (r *Provider) Link() {
 	r.SelfLink = base.Link(
@@ -207,7 +200,6 @@ func (r *Provider) Link() {
 		})
 }
 
-//
 // As content.
 func (r *Provider) Content(detail int) interface{} {
 	if detail == 0 {

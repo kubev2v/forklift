@@ -2,16 +2,16 @@ package ovirt
 
 import (
 	"errors"
+	"net/http"
+	"strings"
+
 	"github.com/gin-gonic/gin"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	"net/http"
-	"strings"
+	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 )
 
-//
 // Routes.
 const (
 	ClusterParam      = "cluster"
@@ -20,7 +20,6 @@ const (
 	ClusterRoot       = ClustersRoot + "/:" + ClusterParam
 )
 
-//
 // Cluster handler.
 type ClusterHandler struct {
 	Handler
@@ -28,7 +27,6 @@ type ClusterHandler struct {
 	cluster *model.Cluster
 }
 
-//
 // Add routes to the `gin` router.
 func (h *ClusterHandler) AddRoutes(e *gin.Engine) {
 	e.GET(ClustersRoot, h.List)
@@ -36,22 +34,21 @@ func (h *ClusterHandler) AddRoutes(e *gin.Engine) {
 	e.GET(ClusterRoot, h.Get)
 }
 
-//
 // List resources in a REST collection.
 // A GET onn the collection that includes the `X-Watch`
 // header will negotiate an upgrade of the connection
 // to a websocket and push watch events.
 func (h ClusterHandler) List(ctx *gin.Context) {
-	status := h.Prepare(ctx)
+	status, err := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
+		base.SetForkliftError(ctx, err)
 		return
 	}
 	if h.WatchRequest {
 		h.watch(ctx)
 		return
 	}
-	var err error
 	defer func() {
 		if err != nil {
 			log.Trace(
@@ -84,12 +81,12 @@ func (h ClusterHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific REST resource.
 func (h ClusterHandler) Get(ctx *gin.Context) {
-	status := h.Prepare(ctx)
+	status, err := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
+		base.SetForkliftError(ctx, err)
 		return
 	}
 	m := &model.Cluster{
@@ -98,7 +95,7 @@ func (h ClusterHandler) Get(ctx *gin.Context) {
 		},
 	}
 	db := h.Collector.DB()
-	err := db.Get(m)
+	err = db.Get(m)
 	if errors.Is(err, model.NotFound) {
 		ctx.Status(http.StatusNotFound)
 		return
@@ -121,7 +118,6 @@ func (h ClusterHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Watch.
 func (h *ClusterHandler) watch(ctx *gin.Context) {
 	db := h.Collector.DB()
@@ -148,7 +144,6 @@ func (h *ClusterHandler) watch(ctx *gin.Context) {
 	}
 }
 
-//
 // Filter result set.
 // Filter by path for `name` query.
 func (h *ClusterHandler) filter(ctx *gin.Context, list *[]model.Cluster) (err error) {
@@ -178,7 +173,6 @@ func (h *ClusterHandler) filter(ctx *gin.Context, list *[]model.Cluster) (err er
 	return
 }
 
-//
 // REST Resource.
 type Cluster struct {
 	Resource
@@ -188,7 +182,6 @@ type Cluster struct {
 	BiosType      string `json:"biosType"`
 }
 
-//
 // Build the resource using the model.
 func (r *Cluster) With(m *model.Cluster) {
 	r.Resource.With(&m.Base)
@@ -198,7 +191,6 @@ func (r *Cluster) With(m *model.Cluster) {
 	r.BiosType = m.BiosType
 }
 
-//
 // Build self link (URI).
 func (r *Cluster) Link(p *api.Provider) {
 	r.SelfLink = base.Link(
@@ -209,7 +201,6 @@ func (r *Cluster) Link(p *api.Provider) {
 		})
 }
 
-//
 // As content.
 func (r *Cluster) Content(detail int) interface{} {
 	if detail == 0 {

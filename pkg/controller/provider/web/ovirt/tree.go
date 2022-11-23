@@ -1,27 +1,25 @@
 package ovirt
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
-	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	"net/http"
+	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
+	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 )
 
-//
 // Routes.
 const (
 	TreeRoot        = ProviderRoot + "/tree"
 	TreeClusterRoot = TreeRoot + "/cluster"
 )
 
-//
 // Types.
 type Tree = base.Tree
 type TreeNode = base.TreeNode
 
-//
 // Tree handler.
 type TreeHandler struct {
 	Handler
@@ -29,22 +27,21 @@ type TreeHandler struct {
 	datacenters []model.DataCenter
 }
 
-//
 // Add routes to the `gin` router.
 func (h *TreeHandler) AddRoutes(e *gin.Engine) {
 	e.GET(TreeClusterRoot, h.Tree)
 }
 
-//
 // Prepare to handle the request.
 func (h *TreeHandler) Prepare(ctx *gin.Context) int {
-	status := h.Handler.Prepare(ctx)
+	status, err := h.Handler.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
+		base.SetForkliftError(ctx, err)
 		return status
 	}
 	db := h.Collector.DB()
-	err := db.List(
+	err = db.List(
 		&h.datacenters,
 		model.ListOptions{
 			Detail: model.MaxDetail,
@@ -60,19 +57,16 @@ func (h *TreeHandler) Prepare(ctx *gin.Context) int {
 	return http.StatusOK
 }
 
-//
 // List not supported.
 func (h TreeHandler) List(ctx *gin.Context) {
 	ctx.Status(http.StatusMethodNotAllowed)
 }
 
-//
 // Get not supported.
 func (h TreeHandler) Get(ctx *gin.Context) {
 	ctx.Status(http.StatusMethodNotAllowed)
 }
 
-//
 // Tree.
 func (h TreeHandler) Tree(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -123,14 +117,12 @@ func (h TreeHandler) Tree(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Tree (branch) navigator.
 type BranchNavigator struct {
 	db     libmodel.DB
 	detail int
 }
 
-//
 // Next (children) on the branch.
 func (n *BranchNavigator) Next(p libmodel.Model) (r []model.Model, err error) {
 	switch p.(type) {
@@ -205,7 +197,6 @@ func (n *BranchNavigator) listVM(p *model.Cluster) (list []model.VM, err error) 
 	return
 }
 
-//
 // Tree node builder.
 type NodeBuilder struct {
 	// Handler.
@@ -216,7 +207,6 @@ type NodeBuilder struct {
 	pathBuilder PathBuilder
 }
 
-//
 // Build a node for the model.
 func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 	provider := r.handler.Provider
@@ -294,7 +284,6 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 	return node
 }
 
-//
 // Build with detail.
 func (r *NodeBuilder) withDetail(kind string) int {
 	if b, found := r.detail[kind]; found {

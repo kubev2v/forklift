@@ -2,45 +2,41 @@ package web
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 
 	"net/http"
 )
 
-//
 // Package logger.
 var log = logging.WithName("web|provider")
 
-//
 // Routes.
 const (
 	ProvidersRoot = "/providers"
 )
 
-//
 // Provider handler.
 type ProviderHandler struct {
 	base.Handler
 }
 
-//
 // Add routes to the `gin` router.
 func (h *ProviderHandler) AddRoutes(e *gin.Engine) {
 	e.GET(base.ProvidersRoot, h.List)
 	e.GET(base.ProvidersRoot+"/", h.List)
 }
 
-//
 // List resources in a REST collection.
 func (h ProviderHandler) List(ctx *gin.Context) {
-	status := h.Prepare(ctx)
+	status, err := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
+		base.SetForkliftError(ctx, err)
 		return
 	}
 	// OCP
@@ -49,9 +45,10 @@ func (h ProviderHandler) List(ctx *gin.Context) {
 			Container: h.Container,
 		},
 	}
-	status = ocpHandler.Prepare(ctx)
+	status, err = ocpHandler.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
+		base.SetForkliftError(ctx, err)
 		return
 	}
 	ocpList, err := ocpHandler.ListContent(ctx)
@@ -69,9 +66,10 @@ func (h ProviderHandler) List(ctx *gin.Context) {
 			Container: h.Container,
 		},
 	}
-	status = vSphereHandler.Prepare(ctx)
+	status, err = vSphereHandler.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
+		base.SetForkliftError(ctx, err)
 		return
 	}
 	vSphereList, err := vSphereHandler.ListContent(ctx)
@@ -89,9 +87,10 @@ func (h ProviderHandler) List(ctx *gin.Context) {
 			Container: h.Container,
 		},
 	}
-	status = oVirtHandler.Prepare(ctx)
+	status, err = oVirtHandler.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
+		base.SetForkliftError(ctx, err)
 		return
 	}
 	oVirtList, err := oVirtHandler.ListContent(ctx)
@@ -114,11 +113,9 @@ func (h ProviderHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific REST resource.
 func (h ProviderHandler) Get(ctx *gin.Context) {
 }
 
-//
 // REST resource.
 type Provider map[string]interface{}

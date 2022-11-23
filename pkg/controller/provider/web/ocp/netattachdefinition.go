@@ -2,16 +2,16 @@ package ocp
 
 import (
 	"errors"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	"net/http"
+	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 )
 
-//
 // Routes.
 const (
 	NadParam = "network"
@@ -19,13 +19,11 @@ const (
 	NadRoot  = NadsRoot + "/:" + NadParam
 )
 
-//
 // NetworkAttachmentDefinition handler.
 type NadHandler struct {
 	Handler
 }
 
-//
 // Add routes to the `gin` router.
 func (h *NadHandler) AddRoutes(e *gin.Engine) {
 	e.GET(NadsRoot, h.List)
@@ -33,15 +31,15 @@ func (h *NadHandler) AddRoutes(e *gin.Engine) {
 	e.GET(NadRoot, h.Get)
 }
 
-//
 // List resources in a REST collection.
 // A GET onn the collection that includes the `X-Watch`
 // header will negotiate an upgrade of the connection
 // to a websocket and push watch events.
 func (h NadHandler) List(ctx *gin.Context) {
-	status := h.Prepare(ctx)
+	status, err := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
+		base.SetForkliftError(ctx, err)
 		return
 	}
 	if h.WatchRequest {
@@ -50,7 +48,7 @@ func (h NadHandler) List(ctx *gin.Context) {
 	}
 	db := h.Collector.DB()
 	list := []model.NetworkAttachmentDefinition{}
-	err := db.List(&list, h.ListOptions(ctx))
+	err = db.List(&list, h.ListOptions(ctx))
 	if err != nil {
 		log.Trace(
 			err,
@@ -70,12 +68,12 @@ func (h NadHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific REST resource.
 func (h NadHandler) Get(ctx *gin.Context) {
-	status := h.Prepare(ctx)
+	status, err := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
+		base.SetForkliftError(ctx, err)
 		return
 	}
 	m := &model.NetworkAttachmentDefinition{
@@ -84,7 +82,7 @@ func (h NadHandler) Get(ctx *gin.Context) {
 		},
 	}
 	db := h.Collector.DB()
-	err := db.Get(m)
+	err = db.Get(m)
 	if errors.Is(err, model.NotFound) {
 		ctx.Status(http.StatusNotFound)
 		return
@@ -105,7 +103,6 @@ func (h NadHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Watch.
 func (h NadHandler) watch(ctx *gin.Context) {
 	db := h.Collector.DB()
@@ -130,21 +127,18 @@ func (h NadHandler) watch(ctx *gin.Context) {
 	}
 }
 
-//
 // REST Resource.
 type NetworkAttachmentDefinition struct {
 	Resource
 	Object net.NetworkAttachmentDefinition `json:"object"`
 }
 
-//
 // Set fields with the specified object.
 func (r *NetworkAttachmentDefinition) With(m *model.NetworkAttachmentDefinition) {
 	r.Resource.With(&m.Base)
 	r.Object = m.Object
 }
 
-//
 // Build self link (URI).
 func (r *NetworkAttachmentDefinition) Link(p *api.Provider) {
 	r.SelfLink = base.Link(
@@ -155,7 +149,6 @@ func (r *NetworkAttachmentDefinition) Link(p *api.Provider) {
 		})
 }
 
-//
 // As content.
 func (r *NetworkAttachmentDefinition) Content(detail int) interface{} {
 	if detail == 0 {

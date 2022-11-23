@@ -2,16 +2,16 @@ package ocp
 
 import (
 	"errors"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
+	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	storage "k8s.io/api/storage/v1"
-	"net/http"
 )
 
-//
 // Routes.
 const (
 	StorageClassParam  = "sc"
@@ -19,13 +19,11 @@ const (
 	StorageClassRoot   = StorageClassesRoot + "/:" + StorageClassParam
 )
 
-//
 // StorageClass handler.
 type StorageClassHandler struct {
 	Handler
 }
 
-//
 // Add routes to the `gin` router.
 func (h *StorageClassHandler) AddRoutes(e *gin.Engine) {
 	e.GET(StorageClassesRoot, h.List)
@@ -33,15 +31,15 @@ func (h *StorageClassHandler) AddRoutes(e *gin.Engine) {
 	e.GET(StorageClassRoot, h.Get)
 }
 
-//
 // List resources in a REST collection.
 // A GET onn the collection that includes the `X-Watch`
 // header will negotiate an upgrade of the connection
 // to a websocket and push watch events.
 func (h StorageClassHandler) List(ctx *gin.Context) {
-	status := h.Prepare(ctx)
+	status, err := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
+		base.SetForkliftError(ctx, err)
 		return
 	}
 	if h.WatchRequest {
@@ -50,7 +48,7 @@ func (h StorageClassHandler) List(ctx *gin.Context) {
 	}
 	db := h.Collector.DB()
 	list := []model.StorageClass{}
-	err := db.List(&list, h.ListOptions(ctx))
+	err = db.List(&list, h.ListOptions(ctx))
 	if err != nil {
 		log.Trace(
 			err,
@@ -70,12 +68,12 @@ func (h StorageClassHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific REST resource.
 func (h StorageClassHandler) Get(ctx *gin.Context) {
-	status := h.Prepare(ctx)
+	status, err := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
+		base.SetForkliftError(ctx, err)
 		return
 	}
 	m := &model.StorageClass{
@@ -84,7 +82,7 @@ func (h StorageClassHandler) Get(ctx *gin.Context) {
 		},
 	}
 	db := h.Collector.DB()
-	err := db.Get(m)
+	err = db.Get(m)
 	if errors.Is(err, model.NotFound) {
 		ctx.Status(http.StatusNotFound)
 		return
@@ -105,7 +103,6 @@ func (h StorageClassHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Watch.
 func (h StorageClassHandler) watch(ctx *gin.Context) {
 	db := h.Collector.DB()
@@ -130,21 +127,18 @@ func (h StorageClassHandler) watch(ctx *gin.Context) {
 	}
 }
 
-//
 // REST Resource.
 type StorageClass struct {
 	Resource
 	Object storage.StorageClass `json:"object"`
 }
 
-//
 // Set fields with the specified object.
 func (r *StorageClass) With(m *model.StorageClass) {
 	r.Resource.With(&m.Base)
 	r.Object = m.Object
 }
 
-//
 // Build self link (URI).
 func (r *StorageClass) Link(p *api.Provider) {
 	r.SelfLink = base.Link(
@@ -155,7 +149,6 @@ func (r *StorageClass) Link(p *api.Provider) {
 		})
 }
 
-//
 // As content.
 func (r *StorageClass) Content(detail int) interface{} {
 	if detail == 0 {

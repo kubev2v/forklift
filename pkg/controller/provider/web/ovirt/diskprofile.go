@@ -2,15 +2,15 @@ package ovirt
 
 import (
 	"errors"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	"net/http"
+	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 )
 
-//
 // Routes.
 const (
 	DiskProfileParam      = "profile"
@@ -19,13 +19,11 @@ const (
 	DiskProfileRoot       = DiskProfilesRoot + "/:" + DiskProfileParam
 )
 
-//
 // DiskProfile handler.
 type DiskProfileHandler struct {
 	Handler
 }
 
-//
 // Add routes to the `gin` router.
 func (h *DiskProfileHandler) AddRoutes(e *gin.Engine) {
 	e.GET(DiskProfilesRoot, h.List)
@@ -33,15 +31,15 @@ func (h *DiskProfileHandler) AddRoutes(e *gin.Engine) {
 	e.GET(DiskProfileRoot, h.Get)
 }
 
-//
 // List resources in a REST collection.
 // A GET onn the collection that includes the `X-Watch`
 // header will negotiate an upgrade of the connection
 // to a websocket and push watch events.
 func (h DiskProfileHandler) List(ctx *gin.Context) {
-	status := h.Prepare(ctx)
+	status, err := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
+		base.SetForkliftError(ctx, err)
 		return
 	}
 	if h.WatchRequest {
@@ -50,7 +48,7 @@ func (h DiskProfileHandler) List(ctx *gin.Context) {
 	}
 	db := h.Collector.DB()
 	list := []model.DiskProfile{}
-	err := db.List(&list, h.ListOptions(ctx))
+	err = db.List(&list, h.ListOptions(ctx))
 	if err != nil {
 		log.Trace(
 			err,
@@ -70,12 +68,12 @@ func (h DiskProfileHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific REST resource.
 func (h DiskProfileHandler) Get(ctx *gin.Context) {
-	status := h.Prepare(ctx)
+	status, err := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
+		base.SetForkliftError(ctx, err)
 		return
 	}
 	m := &model.DiskProfile{
@@ -84,7 +82,7 @@ func (h DiskProfileHandler) Get(ctx *gin.Context) {
 		},
 	}
 	db := h.Collector.DB()
-	err := db.Get(m)
+	err = db.Get(m)
 	if errors.Is(err, model.NotFound) {
 		ctx.Status(http.StatusNotFound)
 		return
@@ -105,7 +103,6 @@ func (h DiskProfileHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Watch.
 func (h *DiskProfileHandler) watch(ctx *gin.Context) {
 	db := h.Collector.DB()
@@ -130,7 +127,6 @@ func (h *DiskProfileHandler) watch(ctx *gin.Context) {
 	}
 }
 
-//
 // REST Resource.
 type DiskProfile struct {
 	Resource
@@ -138,7 +134,6 @@ type DiskProfile struct {
 	QoS           string `json:"qos"`
 }
 
-//
 // Build the resource using the model.
 func (r *DiskProfile) With(m *model.DiskProfile) {
 	r.Resource.With(&m.Base)
@@ -146,7 +141,6 @@ func (r *DiskProfile) With(m *model.DiskProfile) {
 	r.QoS = m.QoS
 }
 
-//
 // Build self link (URI).
 func (r *DiskProfile) Link(p *api.Provider) {
 	r.SelfLink = base.Link(
@@ -157,7 +151,6 @@ func (r *DiskProfile) Link(p *api.Provider) {
 		})
 }
 
-//
 // As content.
 func (r *DiskProfile) Content(detail int) interface{} {
 	if detail == 0 {
