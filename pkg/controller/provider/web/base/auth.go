@@ -107,6 +107,8 @@ func (r *Auth) permit(token string, p *api.Provider) (allowed bool, err error) {
 			auth2.ExtraValue{},
 			v...)
 	}
+	// Users should be able to query information on providers from the inventory
+	// only if they have permissions for list/get 'providers' in the K8s API
 	group, resource, err := api.GetGroupResource(p)
 	if err != nil {
 		err = liberr.Wrap(err)
