@@ -959,6 +959,8 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmCr *VirtualMachine, c
 					VolumeDevices:   volumeDevices,
 					ImagePullPolicy: core.PullIfNotPresent,
 					// Request access to /dev/kvm via Kubevirt's Device Manager
+					// That is to ensure the appliance virt-v2v uses would not
+					// run in emulation mode, which is significantly slower
 					Resources: core.ResourceRequirements{
 						Limits: core.ResourceList{
 							"devices.kubevirt.io/kvm": resource.MustParse("1"),
