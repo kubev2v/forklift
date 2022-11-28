@@ -28,6 +28,16 @@ http_archive(
     ],
 )
 
+http_file(
+    name = "cirros",
+    downloaded_file_path = "cirros.raw",
+    sha256 = "cc704ab14342c1c8a8d91b66a7fc611d921c8b8f1aaf4695f9d6463d913fa8d1",
+    urls = [
+        "https://github.com/cirros-dev/cirros/releases/download/0.6.1/cirros-0.6.1-x86_64-disk.img",
+        "https://download.cirros-cloud.net/0.6.1/cirros-0.6.1-x86_64-disk.img",
+    ],
+)
+
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 
