@@ -17,7 +17,19 @@ container_image(
     empty_dirs = ["/disks"],
     entrypoint = ["/usr/local/bin/entrypoint"],
     env = {"LIBGUESTFS_BACKEND": "direct"},
-    files = ["bin/entrypoint"],
+    files = ["cold/entrypoint"],
+    user = "1001",
+    visibility = ["//visibility:public"],
+)
+
+container_image(
+    name = "forklift-virt-v2v-warm",
+    base = ":virt-v2v-image",
+    directory = "/usr/local/bin/",
+    empty_dirs = ["/disks"],
+    entrypoint = ["/usr/local/bin/entrypoint"],
+    env = {"LIBGUESTFS_BACKEND": "direct"},
+    files = ["warm/entrypoint"],
     user = "1001",
     visibility = ["//visibility:public"],
 )
