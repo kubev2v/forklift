@@ -105,8 +105,15 @@ push-virt-v2v-image: build-virt-v2v-image
 	$(CONTAINER_CMD) tag virt-v2v:forklift-virt-v2v ${VIRT_V2V_IMAGE}
 	$(CONTAINER_CMD) push ${VIRT_V2V_IMAGE}
 
+build-virt-v2v-warm-image:
+	bazel run virt-v2v:forklift-virt-v2v-warm
+
+push-virt-v2v-warm-image: build-virt-v2v-warm-image
+	$(CONTAINER_CMD) tag virt-v2v:forklift-virt-v2v-warm ${VIRT_V2V_IMAGE}
+	$(CONTAINER_CMD) push ${VIRT_V2V_IMAGE}
+
 build-operator-bundle-image:
-	bazel run operator:forklift-operator-bundle-image --action_env CONTROLLER_IMAGE=${CONTROLLER_IMAGE} --action_env VALIDATION_IMAGE=${VALIDATION_IMAGE} --action_env OPERATOR_IMAGE=${OPERATOR_IMAGE} --action_env VIRT_V2V_IMAGE=${VIRT_V2V_IMAGE} --action_env API_IMAGE=${API_IMAGE}
+	bazel run operator:forklift-operator-bundle-image --action_env CONTROLLER_IMAGE=${CONTROLLER_IMAGE} --action_env VALIDATION_IMAGE=${VALIDATION_IMAGE} --action_env OPERATOR_IMAGE=${OPERATOR_IMAGE} --action_env VIRT_V2V_IMAGE=${VIRT_V2V_IMAGE_COLD} --action_env API_IMAGE=${API_IMAGE}
 
 push-operator-bundle-image: build-operator-bundle-image
 	 $(CONTAINER_CMD) tag operator:forklift-operator-bundle-image ${OPERATOR_BUNDLE_IMAGE}
@@ -119,7 +126,7 @@ push-operator-index-image: build-operator-index-image
 	$(CONTAINER_CMD) tag operator:forklift-operator-index-image ${OPERATOR_INDEX_IMAGE}
 	$(CONTAINER_CMD) push ${OPERATOR_INDEX_IMAGE}
 
-push-all-images: push-api-image push-controller-image push-validation-image push-operator-image push-virt-v2v-image push-operator-bundle-image push-operator-index-image
+push-all-images: push-api-image push-controller-image push-validation-image push-operator-image push-virt-v2v-image push-virt-v2v-warm-image push-operator-bundle-image push-operator-index-image
 
 bazel-generate:
 	bazel run //:gazelle
