@@ -3,6 +3,7 @@ package settings
 import (
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"os"
+	"strings"
 )
 
 // Environment variables.
@@ -30,8 +31,9 @@ type Migration struct {
 	ImporterRetry int
 	// Warm migration precopy interval in minutes
 	PrecopyInterval int
-	// Virt-v2v image for guest conversion
-	VirtV2vImage string
+	// Virt-v2v images for guest conversion
+	VirtV2vImageCold string
+	VirtV2vImageWarm string
 	// Virt-v2v require KVM flags for guest conversion
 	VirtV2vDontRequestKVM bool
 }
@@ -54,11 +56,17 @@ func (r *Migration) Load() (err error) {
 	if err != nil {
 		err = liberr.Wrap(err)
 	}
-	virtV2vImage, ok := os.LookupEnv(VirtV2vImage)
-	if ok {
-		r.VirtV2vImage = virtV2vImage
+	if virtV2vImage, ok := os.LookupEnv(VirtV2vImage); ok {
+		if cold, warm, found := strings.Cut(virtV2vImage, "|"); found {
+			r.VirtV2vImageCold = cold
+			r.VirtV2vImageWarm = warm
+		} else {
+			r.VirtV2vImageCold = virtV2vImage
+			r.VirtV2vImageWarm = virtV2vImage
+		}
 	} else {
-		r.VirtV2vImage = DefaultVirtV2vImage
+		r.VirtV2vImageCold = DefaultVirtV2vImage
+		r.VirtV2vImageWarm = DefaultVirtV2vImage
 	}
 	r.VirtV2vDontRequestKVM = getEnvBool(VirtV2vDontRequestKVM, false)
 	return
