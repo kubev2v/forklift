@@ -46,7 +46,9 @@ Another option to override the default values can use `--action_env` as in the e
 | UI_IMAGE              | quay.io/kubev2v/forklift-ui:latest               | The forklift UI image.                                      |
 | UI_PLUGIN_IMAGE       | quay.io/kubev2v/forklift-console-plugin:latest   | The forklift OKD/OpenShift UI plugin image.                                      |
 | VALIDATION_IMAGE      | quay.io/kubev2v/forklift-validation:latest       | The forklift validation image.                              |
-| VIRT_V2V_IMAGE        | quay.io/kubev2v/forklift-virt-v2v:latest         | The forklift virt v2v image.                                |
+| VIRT_V2V_IMAGE        | quay.io/kubev2v/forklift-virt-v2v:latest         | The forklift virt v2v image. See note below.                |
+
+Value for `VIRT_V2V_IMAGE` can be either a single image location, or it can be two different images separated `|`. The second form can be used to specify different image for cold migration and warm migration. The syntax in this case is `<cold_image>|<warm_image>`.
 
 ### Runing operator build
 
