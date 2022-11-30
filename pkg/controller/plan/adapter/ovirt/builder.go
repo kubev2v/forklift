@@ -412,20 +412,20 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 	var kVolumes []cnv.Volume
 	var kDisks []cnv.Disk
 
+	// TODO may need to drop this part
 	pvcMap := make(map[string]*core.PersistentVolumeClaim)
 	for i := range persistentVolumeClaims {
 		pvc := &persistentVolumeClaims[i]
 		pvcMap[r.ResolvePersistentVolumeClaimIdentifier(pvc)] = pvc
 	}
 
-	for i, da := range vm.DiskAttachments {
-		pvc := pvcMap[da.Disk.ID]
-		volumeName := fmt.Sprintf("vol-%v", i)
+	for _, da := range vm.DiskAttachments {
+		volumeName := da.Disk.ID
 		volume := cnv.Volume{
 			Name: volumeName,
 			VolumeSource: cnv.VolumeSource{
 				PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
-					ClaimName: pvc.Name,
+					ClaimName: volumeName,
 				},
 			},
 		}

@@ -4,21 +4,32 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"path"
+	"strconv"
 	"time"
 
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/scheduler"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 // Requeue
@@ -562,6 +573,13 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		}
 	case CreateDataVolumes:
 		step, found := vm.FindStep(r.step(vm))
+		if *r.Plan.Provider.Source.Spec.Type == v1beta1.OVirt {
+			if vm.Warm == nil {
+				err = r.createVolumes(vm.Ref)
+				vm.Phase = r.next(vm.Phase)
+				return
+			}
+		}
 		if !found {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
 			break
@@ -635,6 +653,34 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		}
 		step.MarkStarted()
 		step.Phase = Running
+
+		if *r.Plan.Provider.Source.Spec.Type == v1beta1.OVirt {
+			if vm.Warm == nil {
+				ready, err := r.getOvirtPVCs(vm.Ref, step)
+				if err != nil {
+					step.AddError(err.Error())
+					err = nil
+					break
+				}
+				err = r.updateCopyProgressForOvirt(vm, step)
+
+				if err != nil {
+					step.AddError(err.Error())
+					err = nil
+					break
+				}
+
+				if ready {
+					step.Phase = Completed
+					vm.Phase = r.next(vm.Phase)
+					break
+				} else {
+					r.Log.Info("PVCs not ready yet")
+					break
+				}
+			}
+		}
+
 		err = r.updateCopyProgress(vm, step)
 		if err != nil {
 			step.AddError(err.Error())
@@ -886,6 +932,124 @@ func (r *Migration) resetPrecopyTasks(vm *plan.VMStatus, step *plan.Step) {
 	}
 }
 
+func (r *Migration) createVolumes(vm ref.Ref) (err error) {
+	if r.vmMap == nil {
+		r.vmMap, err = r.kubevirt.VirtualMachineMap()
+		if err != nil {
+			return
+		}
+	}
+	ovirtVm := &ovirt.Workload{}
+	err = r.Source.Inventory.Find(ovirtVm, vm)
+	if err != nil {
+		return
+	}
+	url, err := url.Parse(r.Source.Provider.Spec.URL)
+	if err != nil {
+		return
+	}
+
+	storageName := &r.Context.Map.Storage.Spec.Map[0].Destination.StorageClass
+	for _, da := range ovirtVm.DiskAttachments {
+		populatorCr := v1beta1.OvirtImageIOPopulator{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      da.DiskAttachment.ID,
+				Namespace: r.Plan.Spec.TargetNamespace,
+			},
+			Spec: v1beta1.OvirtImageIOPopulatorSpec{
+				EngineURL:        fmt.Sprintf("https://%s", url.Host),
+				EngineSecretName: r.Source.Secret.Name,
+				DiskID:           da.Disk.ID,
+			},
+		}
+
+		err = r.Client.Create(context.Background(), &populatorCr, &client.CreateOptions{})
+		if err != nil {
+			return
+		}
+		apiGroup := "forklift.konveyor.io"
+
+		pvc := &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"kind":       "PersistentVolumeClaim",
+				"apiVersion": "v1",
+				"metadata": map[string]interface{}{
+					"name":      da.DiskAttachment.ID,
+					"namespace": r.Plan.Spec.TargetNamespace,
+				},
+				"spec": map[string]interface{}{
+					"storageClassName": storageName,
+					"resources": map[string]interface{}{
+						"requests": map[string]interface{}{
+							"storage": resource.NewQuantity(da.Disk.ProvisionedSize, resource.BinarySI).String(),
+						},
+					},
+					"accessModes": []string{"ReadWriteOnce"},
+					"dataSourceRef": map[string]interface{}{
+						"apiGroup": apiGroup,
+						"kind":     "OvirtImageIOPopulator",
+						"name":     populatorCr.Name,
+					},
+				},
+			},
+		}
+
+		config, configErr := config.GetConfig()
+		if configErr != nil {
+			return configErr
+		}
+
+		dynamicClient, configErr := dynamic.NewForConfig(config)
+		if configErr != nil {
+			return configErr
+		}
+
+		pvcResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "persistentvolumeclaims"}
+
+		_, err = dynamicClient.Resource(pvcResource).Namespace(r.Plan.Spec.TargetNamespace).Create(context.TODO(), pvc, meta.CreateOptions{})
+
+		if err != nil {
+			return
+		}
+	}
+
+	return
+}
+
+func (r *Migration) getOvirtPVCs(vm ref.Ref, step *plan.Step) (ready bool, err error) {
+	ovirtVm := &ovirt.Workload{}
+	err = r.Source.Inventory.Find(ovirtVm, vm)
+	if err != nil {
+		return
+	}
+	ready = true
+
+	for _, da := range ovirtVm.DiskAttachments {
+		obj := client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: da.Disk.ID}
+		pvc := core.PersistentVolumeClaim{}
+		err = r.Client.Get(context.Background(), obj, &pvc)
+		if err != nil {
+			return
+		}
+
+		if pvc.Status.Phase != core.ClaimBound {
+			ready = false
+			continue
+		}
+
+		var task *plan.Task
+		found := false
+		task, found = step.FindTask(da.Disk.ID)
+		if !found {
+			continue
+		}
+
+		task.MarkCompleted()
+	}
+
+	return
+}
+
 // Build the pipeline for a VM status.
 func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error) {
 	r.itinerary().Predicate = &Predicate{vm: vm, context: r.Context}
@@ -1123,6 +1287,50 @@ func (r *Migration) setRunning(vm *plan.VMStatus, running bool) (err error) {
 	}
 
 	err = r.kubevirt.SetRunning(&vmCr, running)
+	return
+}
+
+func (r *Migration) updateCopyProgressForOvirt(vm *plan.VMStatus, step *plan.Step) (err error) {
+	if r.vmMap == nil {
+		r.vmMap, err = r.kubevirt.VirtualMachineMap()
+		if err != nil {
+			return
+		}
+	}
+
+	var vmCr VirtualMachine
+	found := false
+	if vmCr, found = r.vmMap[vm.ID]; !found {
+		msg := "VirtualMachine CR not found."
+		vm.AddError(msg)
+		return
+	}
+
+	for _, volume := range vmCr.Spec.Template.Spec.Volumes {
+		claim := volume.PersistentVolumeClaim.ClaimName
+		var task *plan.Task
+		found = false
+		task, found = step.FindTask(claim)
+		if !found {
+			continue
+		}
+
+		populatorCr := v1beta1.OvirtImageIOPopulator{}
+		err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: claim}, &populatorCr)
+		if err != nil {
+			return
+		}
+
+		progress, parseErr := strconv.ParseInt(populatorCr.Status.Progress, 10, 64)
+		if err != nil {
+			return parseErr
+		}
+
+		percent := float64(progress/0x100000) / float64(task.Progress.Total)
+		task.Progress.Completed = int64(percent * float64(task.Progress.Total))
+	}
+
+	step.ReflectTasks()
 	return
 }
 
