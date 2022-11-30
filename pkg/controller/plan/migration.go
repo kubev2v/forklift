@@ -4,31 +4,40 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"path"
+	"strconv"
 	"time"
 
-	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/scheduler"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
+	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
-//
 // Requeue
 const (
 	NoReQ   = time.Duration(0)
 	PollReQ = time.Second * 3
 )
 
-//
 // Predicates.
 var (
 	HasPreHook         libitr.Flag = 0x01
@@ -36,7 +45,6 @@ var (
 	RequiresConversion libitr.Flag = 0x04
 )
 
-//
 // Phases.
 const (
 	Started                  = "Started"
@@ -64,7 +72,6 @@ const (
 	WaitForFinalSnapshot     = "WaitForFinalSnapshot"
 )
 
-//
 // Steps.
 const (
 	Initialize      = "Initialize"
@@ -74,7 +81,6 @@ const (
 	Unknown         = "Unknown"
 )
 
-//
 // Power states.
 const (
 	On = "On"
@@ -129,7 +135,6 @@ var (
 	}
 )
 
-//
 // Migration.
 type Migration struct {
 	*plancontext.Context
@@ -145,13 +150,11 @@ type Migration struct {
 	scheduler scheduler.Scheduler
 }
 
-//
 // Type of migration.
 func (r *Migration) Type() string {
 	return r.Context.Source.Provider.Type().String()
 }
 
-//
 // Run the migration.
 func (r *Migration) Run() (reQ time.Duration, err error) {
 	defer func() {
@@ -199,7 +202,6 @@ func (r *Migration) Run() (reQ time.Duration, err error) {
 	return
 }
 
-//
 // Get/Build resources.
 func (r *Migration) init() (err error) {
 	adapter, err := adapter.New(r.Context.Source.Provider)
@@ -226,7 +228,6 @@ func (r *Migration) init() (err error) {
 	return
 }
 
-//
 // Begin the migration.
 func (r *Migration) begin() (err error) {
 	snapshot := r.Plan.Status.Migration.ActiveSnapshot()
@@ -314,7 +315,6 @@ func (r *Migration) begin() (err error) {
 	return
 }
 
-//
 // Archive the plan.
 // Best effort to remove any retained migration resources.
 func (r *Migration) Archive() {
@@ -336,7 +336,6 @@ func (r *Migration) Archive() {
 	return
 }
 
-//
 // Cancel the migration.
 // Delete resources associated with VMs that have been marked canceled.
 func (r *Migration) Cancel() (err error) {
@@ -378,7 +377,6 @@ func (r *Migration) Cancel() (err error) {
 	return
 }
 
-//
 // Delete left over migration resources associated with a VM.
 func (r *Migration) CleanUp(vm *plan.VMStatus) (err error) {
 	if vm.HasCondition(Succeeded) {
@@ -435,7 +433,6 @@ func (r *Migration) deleteImporterPods(vm *plan.VMStatus) (err error) {
 	return
 }
 
-//
 // Best effort attempt to resolve canceled refs.
 func (r *Migration) resolveCanceledRefs() {
 	for i := range r.Context.Migration.Spec.Cancel {
@@ -445,7 +442,6 @@ func (r *Migration) resolveCanceledRefs() {
 	}
 }
 
-//
 func (r *Migration) runningVMs() (vms []*plan.VMStatus) {
 	vms = make([]*plan.VMStatus, 0)
 	for i := range r.Plan.Status.Migration.VMs {
@@ -457,7 +453,6 @@ func (r *Migration) runningVMs() (vms []*plan.VMStatus) {
 	return
 }
 
-//
 // Next step in the itinerary.
 func (r *Migration) next(phase string) (next string) {
 	step, done, err := r.itinerary().Next(phase)
@@ -482,7 +477,6 @@ func (r *Migration) itinerary() *libitr.Itinerary {
 	}
 }
 
-//
 // Get the name of the pipeline step corresponding to the current VM phase.
 func (r *Migration) step(vm *plan.VMStatus) (step string) {
 	switch vm.Phase {
@@ -508,7 +502,6 @@ func (r *Migration) step(vm *plan.VMStatus) (step string) {
 	return
 }
 
-//
 // Steps a VM through the migration itinerary
 // and updates its status.
 func (r *Migration) execute(vm *plan.VMStatus) (err error) {
@@ -580,6 +573,13 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		}
 	case CreateDataVolumes:
 		step, found := vm.FindStep(r.step(vm))
+		if *r.Plan.Provider.Source.Spec.Type == v1beta1.OVirt {
+			if vm.Warm == nil {
+				err = r.createVolumes(vm.Ref)
+				vm.Phase = r.next(vm.Phase)
+				return
+			}
+		}
 		if !found {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
 			break
@@ -634,6 +634,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		vm.Phase = r.next(vm.Phase)
 	case ScheduleVM:
 		step, found := vm.FindStep(r.step(vm))
+
 		if !found {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
 			break
@@ -663,6 +664,34 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			break
 		}
 		step.Phase = Running
+
+		if *r.Plan.Provider.Source.Spec.Type == v1beta1.OVirt {
+			if vm.Warm == nil {
+				ready, err := r.getOvirtPVCs(vm.Ref, step)
+				if err != nil {
+					step.AddError(err.Error())
+					err = nil
+					break
+				}
+				err = r.updateCopyProgressForOvirt(vm, step)
+
+				if err != nil {
+					step.AddError(err.Error())
+					err = nil
+					break
+				}
+
+				if ready {
+					step.Phase = Completed
+					vm.Phase = r.next(vm.Phase)
+					break
+				} else {
+					r.Log.Info("PVCs not ready yet")
+					break
+				}
+			}
+		}
+
 		err = r.updateCopyProgress(vm, step)
 		if err != nil {
 			step.AddError(err.Error())
@@ -905,8 +934,6 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 	return
 }
 
-//
-//
 func (r *Migration) resetPrecopyTasks(vm *plan.VMStatus, step *plan.Step) {
 	step.Completed = nil
 	for _, task := range step.Tasks {
@@ -916,7 +943,128 @@ func (r *Migration) resetPrecopyTasks(vm *plan.VMStatus, step *plan.Step) {
 	}
 }
 
-//
+func (r *Migration) createVolumes(vm ref.Ref) (err error) {
+	if r.vmMap == nil {
+		r.vmMap, err = r.kubevirt.VirtualMachineMap()
+		if err != nil {
+			return
+		}
+	}
+	ovirtVm := &ovirt.Workload{}
+	err = r.Source.Inventory.Find(ovirtVm, vm)
+	if err != nil {
+		return
+	}
+	url, err := url.Parse(r.Source.Provider.Spec.URL)
+	if err != nil {
+		return
+	}
+
+	storageName := &r.Context.Map.Storage.Spec.Map[0].Destination.StorageClass
+	for _, da := range ovirtVm.DiskAttachments {
+		populatorCr := v1beta1.OvirtImageIOPopulator{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      da.DiskAttachment.ID,
+				Namespace: r.Plan.Spec.TargetNamespace,
+			},
+			Spec: v1beta1.OvirtImageIOPopulatorSpec{
+				EngineURL:        fmt.Sprintf("https://%s", url.Host),
+				EngineSecretName: r.Source.Secret.Name,
+				DiskID:           da.Disk.ID,
+			},
+		}
+
+		err = r.Client.Create(context.Background(), &populatorCr, &client.CreateOptions{})
+		if err != nil {
+			return
+		}
+		apiGroup := "forklift.konveyor.io"
+
+		// TODO: We have to use unstructrued currently because the go-client we use doesn't have
+		// the updated struct for core.PersistentVolumeClaim that contains dataSourceRef. Once the
+		// client is updated we should switch to using the struct and use the existing typed client
+		// instead of the dynamic one
+		pvc := &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"kind":       "PersistentVolumeClaim",
+				"apiVersion": "v1",
+				"metadata": map[string]interface{}{
+					"name":      da.DiskAttachment.ID,
+					"namespace": r.Plan.Spec.TargetNamespace,
+				},
+				"spec": map[string]interface{}{
+					"storageClassName": storageName,
+					"resources": map[string]interface{}{
+						"requests": map[string]interface{}{
+							"storage": resource.NewQuantity(da.Disk.ProvisionedSize, resource.BinarySI).String(),
+						},
+					},
+					"accessModes": []string{"ReadWriteOnce"},
+					"dataSourceRef": map[string]interface{}{
+						"apiGroup": apiGroup,
+						"kind":     "OvirtImageIOPopulator",
+						"name":     populatorCr.Name,
+					},
+				},
+			},
+		}
+
+		config, configErr := config.GetConfig()
+		if configErr != nil {
+			return configErr
+		}
+
+		dynamicClient, configErr := dynamic.NewForConfig(config)
+		if configErr != nil {
+			return configErr
+		}
+
+		pvcResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "persistentvolumeclaims"}
+
+		_, err = dynamicClient.Resource(pvcResource).Namespace(r.Plan.Spec.TargetNamespace).Create(context.TODO(), pvc, meta.CreateOptions{})
+
+		if err != nil {
+			return
+		}
+	}
+
+	return
+}
+
+func (r *Migration) getOvirtPVCs(vm ref.Ref, step *plan.Step) (ready bool, err error) {
+	ovirtVm := &ovirt.Workload{}
+	err = r.Source.Inventory.Find(ovirtVm, vm)
+	if err != nil {
+		return
+	}
+	ready = true
+
+	for _, da := range ovirtVm.DiskAttachments {
+		obj := client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: da.Disk.ID}
+		pvc := core.PersistentVolumeClaim{}
+		err = r.Client.Get(context.Background(), obj, &pvc)
+		if err != nil {
+			return
+		}
+
+		if pvc.Status.Phase != core.ClaimBound {
+			ready = false
+			continue
+		}
+
+		var task *plan.Task
+		found := false
+		task, found = step.FindTask(da.Disk.ID)
+		if !found {
+			continue
+		}
+
+		task.MarkCompleted()
+	}
+
+	return
+}
+
 // Build the pipeline for a VM status.
 func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error) {
 	r.itinerary().Predicate = &Predicate{vm: vm, context: r.Context}
@@ -1035,7 +1183,6 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 	return
 }
 
-//
 // End the migration.
 func (r *Migration) end() (completed bool, err error) {
 	failed := 0
@@ -1097,7 +1244,6 @@ func (r *Migration) end() (completed bool, err error) {
 	return
 }
 
-//
 // Ensure the guest conversion pod is present.
 func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (err error) {
 	if r.vmMap == nil {
@@ -1118,7 +1264,6 @@ func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (err error) {
 	return
 }
 
-//
 // Set the running state of the kubevirt VM.
 func (r *Migration) setRunning(vm *plan.VMStatus, running bool) (err error) {
 	if r.vmMap == nil {
@@ -1143,7 +1288,6 @@ func (r *Migration) setRunning(vm *plan.VMStatus, running bool) (err error) {
 	return
 }
 
-//
 // Determine whether any of the DataVolumes haven't been bound yet
 // because they are waiting for first consumer.
 func (r *Migration) waitingForFirstConsumer(vm *plan.VMStatus) (waiting bool, err error) {
@@ -1170,7 +1314,50 @@ func (r *Migration) waitingForFirstConsumer(vm *plan.VMStatus) (waiting bool, er
 	return
 }
 
-//
+func (r *Migration) updateCopyProgressForOvirt(vm *plan.VMStatus, step *plan.Step) (err error) {
+	if r.vmMap == nil {
+		r.vmMap, err = r.kubevirt.VirtualMachineMap()
+		if err != nil {
+			return
+		}
+	}
+
+	var vmCr VirtualMachine
+	found := false
+	if vmCr, found = r.vmMap[vm.ID]; !found {
+		msg := "VirtualMachine CR not found."
+		vm.AddError(msg)
+		return
+	}
+
+	for _, volume := range vmCr.Spec.Template.Spec.Volumes {
+		claim := volume.PersistentVolumeClaim.ClaimName
+		var task *plan.Task
+		found = false
+		task, found = step.FindTask(claim)
+		if !found {
+			continue
+		}
+
+		populatorCr := v1beta1.OvirtImageIOPopulator{}
+		err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: claim}, &populatorCr)
+		if err != nil {
+			return
+		}
+
+		progress, parseErr := strconv.ParseInt(populatorCr.Status.Progress, 10, 64)
+		if err != nil {
+			return parseErr
+		}
+
+		percent := float64(progress/0x100000) / float64(task.Progress.Total)
+		task.Progress.Completed = int64(percent * float64(task.Progress.Total))
+	}
+
+	step.ReflectTasks()
+	return
+}
+
 // Update the progress of the appropriate disk copy step. (DiskTransfer, Cutover)
 func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err error) {
 	if r.vmMap == nil {
@@ -1284,7 +1471,6 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 	return
 }
 
-//
 // Wait for guest conversion to complete, and update the ImageConversion pipeline step.
 func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step) (err error) {
 	pod, err := r.kubevirt.GetGuestConversionPod(vm)
@@ -1308,8 +1494,6 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 	return
 }
 
-//
-//
 func (r *Migration) setDataVolumeCheckpoints(vm *plan.VMStatus) (err error) {
 	if r.vmMap == nil {
 		r.vmMap, err = r.kubevirt.VirtualMachineMap()
@@ -1344,7 +1528,6 @@ func (r *Migration) setDataVolumeCheckpoints(vm *plan.VMStatus) (err error) {
 	return
 }
 
-//
 // Step predicate.
 type Predicate struct {
 	// VM listed on the plan.
@@ -1353,7 +1536,6 @@ type Predicate struct {
 	context *plancontext.Context
 }
 
-//
 // Evaluate predicate flags.
 func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 	switch flag {
@@ -1368,7 +1550,6 @@ func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 	return
 }
 
-//
 // Retrieve the termination message from a pod's first container.
 func terminationMessage(pod *core.Pod) (msg string, ok bool) {
 	if len(pod.Status.ContainerStatuses) > 0 &&
@@ -1380,7 +1561,6 @@ func terminationMessage(pod *core.Pod) (msg string, ok bool) {
 	return
 }
 
-//
 // Return whether the pod has failed and restarted too many times.
 func restartLimitExceeded(pod *core.Pod) (exceeded bool) {
 	if len(pod.Status.ContainerStatuses) == 0 {

@@ -5,14 +5,14 @@ import (
 	"path"
 	"strings"
 
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	cnv "kubevirt.io/client-go/api/v1"
@@ -99,7 +99,6 @@ var osMap = map[string]string{
 	"windows_xp":           "win10",
 }
 
-//
 // oVirt builder.
 type Builder struct {
 	*plancontext.Context
@@ -107,7 +106,6 @@ type Builder struct {
 	macConflictsMap map[string]string
 }
 
-//
 // Get list of destination VMs with mac addresses that would
 // conflict with this VM, if any exist.
 func (r *Builder) macConflicts(vm *model.Workload) (conflictingVMs []string, err error) {
@@ -144,14 +142,12 @@ func (r *Builder) macConflicts(vm *model.Workload) (conflictingVMs []string, err
 	return
 }
 
-//
 // Create DataVolume certificate configmap.
 func (r *Builder) ConfigMap(_ ref.Ref, in *core.Secret, object *core.ConfigMap) (err error) {
 	object.BinaryData["ca.pem"] = in.Data["cacert"]
 	return
 }
 
-//
 // Build the DataVolume credential secret.
 func (r *Builder) Secret(_ ref.Ref, in, object *core.Secret) (err error) {
 	object.StringData = map[string]string{
@@ -161,7 +157,6 @@ func (r *Builder) Secret(_ ref.Ref, in, object *core.Secret) (err error) {
 	return
 }
 
-//
 // Create DataVolume specs for the VM.
 func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap) (dvs []cdi.DataVolumeSpec, err error) {
 	vm := &model.Workload{}
@@ -227,7 +222,6 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 	return
 }
 
-//
 // Create the destination Kubevirt VM.
 func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, dataVolumes []cdi.DataVolume) (err error) {
 	vm := &model.Workload{}
@@ -406,14 +400,13 @@ func (r *Builder) mapDisks(vm *model.Workload, dataVolumes []cdi.DataVolume, obj
 		dvMap[dv.Spec.Source.Imageio.DiskID] = dv
 	}
 
-	for i, da := range vm.DiskAttachments {
-		dv := dvMap[da.Disk.ID]
-		volumeName := fmt.Sprintf("vol-%v", i)
+	for _, da := range vm.DiskAttachments {
+		volumeName := da.Disk.ID
 		volume := cnv.Volume{
 			Name: volumeName,
 			VolumeSource: cnv.VolumeSource{
-				DataVolume: &cnv.DataVolumeSource{
-					Name: dv.Name,
+				PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
+					ClaimName: volumeName,
 				},
 			},
 		}
@@ -441,7 +434,6 @@ func (r *Builder) mapDisks(vm *model.Workload, dataVolumes []cdi.DataVolume, obj
 	object.Template.Spec.Domain.Devices.Disks = kDisks
 }
 
-//
 // Build tasks.
 func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 	vm := &model.Workload{}
@@ -471,8 +463,6 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 	return
 }
 
-//
-//
 func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err error) {
 	vm := &model.Workload{}
 	err = r.Source.Inventory.Find(vm, vmRef)
@@ -504,7 +494,6 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 	return
 }
 
-//
 // Return a stable identifier for a DataVolume.
 func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
 	return dv.Spec.Source.Imageio.DiskID
