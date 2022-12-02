@@ -1,4 +1,4 @@
-![CI](https://github.com/konveyor/forklift-controller/workflows/CI/badge.svg)&nbsp;[![Code Coverage](https://codecov.io/gh/konveyor/forklift-controller/branch/master/graph/badge.svg)](https://codecov.io/gh/konveyor/forklift-controller)
+![CI](https://github.com/kubev2v/forklift/workflows/CI/badge.svg)&nbsp;[![Code Coverage](https://codecov.io/gh/kubev2v/forklift/branch/main/graph/badge.svg)](https://codecov.io/gh/kubev2v/forklift)
 
 # forklift-controller
 
