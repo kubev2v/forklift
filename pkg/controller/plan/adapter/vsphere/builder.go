@@ -65,6 +65,12 @@ const (
 	Unknown        = "unknown"
 )
 
+// Annotations
+const (
+	// CDI import backing file annotation on PVC
+	AnnImportBackingFile = "cdi.kubevirt.io/storage.import.backingFile"
+)
+
 // Map of vmware guest ids to osinfo ids.
 var osMap = map[string]string{
 	"centos64Guest":         "centos5.11",
@@ -280,7 +286,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 
 //
 // Create the destination Kubevirt VM.
-func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, dataVolumes []cdi.DataVolume) (err error) {
+func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []core.PersistentVolumeClaim) (err error) {
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
@@ -333,7 +339,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	if object.Template == nil {
 		object.Template = &cnv.VirtualMachineInstanceTemplateSpec{}
 	}
-	r.mapDisks(vm, dataVolumes, object)
+	r.mapDisks(vm, persistentVolumeClaims, object)
 	r.mapFirmware(vm, object)
 	r.mapCPU(vm, object)
 	r.mapMemory(vm, object)
@@ -471,7 +477,7 @@ func (r *Builder) mapFirmware(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	object.Template.Spec.Domain.Firmware = firmware
 }
 
-func (r *Builder) mapDisks(vm *model.VM, dataVolumes []cdi.DataVolume, object *cnv.VirtualMachineSpec) {
+func (r *Builder) mapDisks(vm *model.VM, persistentVolumeClaims []core.PersistentVolumeClaim, object *cnv.VirtualMachineSpec) {
 	var kVolumes []cnv.Volume
 	var kDisks []cnv.Disk
 
@@ -479,20 +485,20 @@ func (r *Builder) mapDisks(vm *model.VM, dataVolumes []cdi.DataVolume, object *c
 	sort.Slice(disks, func(i, j int) bool {
 		return disks[i].Key < disks[j].Key
 	})
-	dvMap := make(map[string]*cdi.DataVolume)
-	for i := range dataVolumes {
-		dv := &dataVolumes[i]
-		// the DV BackingFile value has already been trimmed.
-		dvMap[dv.Spec.Source.VDDK.BackingFile] = dv
+	pvcMap := make(map[string]*core.PersistentVolumeClaim)
+	for i := range persistentVolumeClaims {
+		pvc := &persistentVolumeClaims[i]
+		// the PVC BackingFile value has already been trimmed.
+		pvcMap[pvc.Annotations[AnnImportBackingFile]] = pvc
 	}
 	for i, disk := range disks {
-		dv := dvMap[trimBackingFileName(disk.File)]
+		pvc := pvcMap[trimBackingFileName(disk.File)]
 		volumeName := fmt.Sprintf("vol-%v", i)
 		volume := cnv.Volume{
 			Name: volumeName,
 			VolumeSource: cnv.VolumeSource{
-				DataVolume: &cnv.DataVolumeSource{
-					Name: dv.Name,
+				PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvc.Name,
 				},
 			},
 		}
@@ -577,6 +583,12 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 // Return a stable identifier for a VDDK DataVolume.
 func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
 	return trimBackingFileName(dv.Spec.Source.VDDK.BackingFile)
+}
+
+//
+// Return a stable identifier for a PersistentDataVolume.
+func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string {
+	return trimBackingFileName(pvc.Annotations[AnnImportBackingFile])
 }
 
 //

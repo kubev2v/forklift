@@ -126,9 +126,7 @@ func (r *KubeVirt) ListVMs() ([]VirtualMachine, error) {
 	err = r.Destination.Client.List(
 		context.TODO(),
 		dvList,
-		&client.ListOptions{
-			Namespace: r.Plan.Spec.TargetNamespace,
-		},
+		r.getListOptionsNamespaced(),
 	)
 	if err != nil {
 		return nil, liberr.Wrap(err)
@@ -183,17 +181,17 @@ func (r *KubeVirt) EnsureNamespace() (err error) {
 }
 
 //
-// Get the importer pod for a DataVolume.
-func (r *KubeVirt) GetImporterPod(dv DataVolume) (pod *core.Pod, found bool, err error) {
+// Get the importer pod for a PersistentVolumeClaim.
+func (r *KubeVirt) GetImporterPod(pvc core.PersistentVolumeClaim) (pod *core.Pod, found bool, err error) {
 	pod = &core.Pod{}
-	if dv.PVC == nil || dv.PVC.Annotations[AnnImporterPodName] == "" {
+	if pvc.Annotations[AnnImporterPodName] == "" {
 		return
 	}
 
 	err = r.Destination.Client.Get(
 		context.TODO(),
 		types.NamespacedName{
-			Name:      dv.PVC.Annotations[AnnImporterPodName],
+			Name:      pvc.Annotations[AnnImporterPodName],
 			Namespace: r.Plan.Spec.TargetNamespace,
 		},
 		pod,
@@ -212,11 +210,28 @@ func (r *KubeVirt) GetImporterPod(dv DataVolume) (pod *core.Pod, found bool, err
 }
 
 //
-// Delete the importer pod for a DataVolume.
-func (r *KubeVirt) DeleteImporterPod(dv DataVolume) (err error) {
+// Delete the DataVolumes associated with the VM.
+func (r *KubeVirt) DeleteDataVolumes(vm *plan.VMStatus) (err error) {
+	dvs, err := r.getDVs(vm)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	for _, dv := range dvs {
+		err = r.Destination.Client.Delete(context.TODO(), dv.DataVolume)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
+//
+// Delete the importer pod for a PersistentVolumeClaim.
+func (r *KubeVirt) DeleteImporterPod(pvc core.PersistentVolumeClaim) (err error) {
 	var pod *core.Pod
 	var found bool
-	pod, found, err = r.GetImporterPod(dv)
+	pod, found, err = r.GetImporterPod(pvc)
 	if err != nil || !found {
 		return
 	}
@@ -231,8 +246,8 @@ func (r *KubeVirt) DeleteImporterPod(dv DataVolume) (err error) {
 		path.Join(
 			pod.Namespace,
 			pod.Name),
-		"dv",
-		dv.Name)
+		"pvc",
+		pvc.Name)
 	return
 }
 
@@ -292,16 +307,16 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
-	for _, dv := range dvs.Items {
-		ownerRefs := dv.GetOwnerReferences()
-		if ownerRefs == nil {
-			ownerRefs = []meta.OwnerReference{}
-		}
-		ownerRefs = append(ownerRefs, vmOwnerReference(virtualMachine))
-		updated := dv.DeepCopy()
-		updated.SetOwnerReferences(ownerRefs)
-		original := client.MergeFrom(&dv)
-		err = r.Destination.Client.Patch(context.TODO(), updated, original)
+	pvcs, err := r.getPVCs(vm)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	for _, pvc := range pvcs {
+		ownerRefs := []meta.OwnerReference{vmOwnerReference(virtualMachine)}
+		pvc.SetOwnerReferences(ownerRefs)
+		err = r.Destination.Client.Update(context.TODO(), &pvc)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
@@ -510,14 +525,75 @@ func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus, dataVolumes []cdi.DataVo
 }
 
 //
+// Return DataVolumes associated with a VM.
+func (r *KubeVirt) getDVs(vm *plan.VMStatus) (dvs []DataVolume, err error) {
+	dvsList := &cdi.DataVolumeList{}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		dvsList,
+		&client.ListOptions{
+			LabelSelector: labels.SelectorFromSet(r.vmLabels(vm.Ref)),
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		})
+
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	dvs = []DataVolume{}
+	for i := range dvsList.Items {
+		dv := &dvsList.Items[i]
+		dvs = append(dvs, DataVolume{
+			DataVolume: dv,
+		})
+	}
+	return
+}
+
+//
+// Return PersistentVolumeClaims associated with a VM.
+func (r *KubeVirt) getPVCs(vm *plan.VMStatus) (pvcs []core.PersistentVolumeClaim, err error) {
+	pvcsList := &core.PersistentVolumeClaimList{}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		pvcsList,
+		r.getListOptionsNamespaced(),
+	)
+
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	pvcs = []core.PersistentVolumeClaim{}
+	vmLabels := r.vmLabels(vm.Ref)
+	for i := range pvcsList.Items {
+		pvc := &pvcsList.Items[i]
+		pvcAnn := pvc.GetAnnotations()
+		if pvcAnn[kVM] == vmLabels[kVM] && pvcAnn[kPlan] == vmLabels[kPlan] {
+			pvcs = append(pvcs, *pvc)
+		}
+	}
+	return
+}
+
+// Return namespace specific ListOption.
+func (r *KubeVirt) getListOptionsNamespaced() (listOptions *client.ListOptions) {
+	return &client.ListOptions{
+		Namespace: r.Plan.Spec.TargetNamespace,
+	}
+}
+
+//
 // Ensure the guest conversion (virt-v2v) pod exists on the destination.
-func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, vmCr *VirtualMachine) (err error) {
-	configMap, err := r.ensureLibvirtConfigMap(vm.Ref, vmCr)
+func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, vmCr *VirtualMachine, pvcs *[]core.PersistentVolumeClaim) (err error) {
+	configMap, err := r.ensureLibvirtConfigMap(vm.Ref, vmCr, pvcs)
 	if err != nil {
 		return
 	}
 
-	newPod, err := r.guestConversionPod(vm, vmCr, configMap)
+	newPod, err := r.guestConversionPod(vm, vmCr.Spec.Template.Spec.Volumes, configMap, pvcs)
 	if err != nil {
 		return
 	}
@@ -671,7 +747,7 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 	}
 
 	for i := range dataVolumes {
-		annotations := make(map[string]string)
+		annotations := r.vmLabels(vm.Ref)
 		if !r.Plan.Spec.Warm || Settings.RetainPrecopyImporterPods {
 			annotations[AnnRetainAfterCompletion] = "true"
 		}
@@ -684,13 +760,9 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 		annotations[AnnDeleteAfterCompletion] = "false"
 		dv := cdi.DataVolume{
 			ObjectMeta: meta.ObjectMeta{
-				Namespace:   r.Plan.Spec.TargetNamespace,
-				Annotations: annotations,
-				GenerateName: strings.Join(
-					[]string{
-						r.Plan.Name,
-						vm.ID},
-					"-") + "-",
+				Namespace:    r.Plan.Spec.TargetNamespace,
+				Annotations:  annotations,
+				GenerateName: r.getGeneratedName(vm),
 			},
 			Spec: dataVolumes[i],
 		}
@@ -702,16 +774,19 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 }
 
 //
+// Return the generated name for a specific VM and plan.
+func (r *KubeVirt) getGeneratedName(vm *plan.VMStatus) string {
+	return strings.Join(
+		[]string{
+			r.Plan.Name,
+			vm.ID},
+		"-") + "-"
+}
+
+//
 // Build the Kubevirt VM CR.
 func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine, err error) {
-	list := &cdi.DataVolumeList{}
-	err = r.Destination.Client.List(
-		context.TODO(),
-		list,
-		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(r.vmLabels(vm.Ref)),
-			Namespace:     r.Plan.Spec.TargetNamespace,
-		})
+	pvcs, err := r.getPVCs(vm)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -756,7 +831,7 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 	running := false
 	object.Spec.Running = &running
 
-	err = r.Builder.VirtualMachine(vm.Ref, &object.Spec, list.Items)
+	err = r.Builder.VirtualMachine(vm.Ref, &object.Spec, pvcs)
 	if err != nil {
 		return
 	}
@@ -931,20 +1006,16 @@ func (r *KubeVirt) findTemplate(vm *plan.VMStatus) (tmpl *template.Template, err
 	return
 }
 
-func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmCr *VirtualMachine, configMap *core.ConfigMap) (pod *core.Pod, err error) {
-	volumes, volumeMounts, volumeDevices := r.podVolumeMounts(vmCr, configMap)
+func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, configMap *core.ConfigMap, pvcs *[]core.PersistentVolumeClaim) (pod *core.Pod, err error) {
+	volumes, volumeMounts, volumeDevices := r.podVolumeMounts(vmVolumes, configMap, pvcs)
 
 	// qemu group
 	fsGroup := int64(107)
 	pod = &core.Pod{
 		ObjectMeta: meta.ObjectMeta{
-			Namespace: r.Plan.Spec.TargetNamespace,
-			Labels:    r.vmLabels(vm.Ref),
-			GenerateName: strings.Join(
-				[]string{
-					r.Plan.Name,
-					vm.ID},
-				"-") + "-",
+			Namespace:    r.Plan.Spec.TargetNamespace,
+			Labels:       r.vmLabels(vm.Ref),
+			GenerateName: r.getGeneratedName(vm),
 		},
 		Spec: core.PodSpec{
 			SecurityContext: &core.PodSecurityContext{
@@ -979,32 +1050,32 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmCr *VirtualMachine, c
 	return
 }
 
-func (r *KubeVirt) podVolumeMounts(vmCr *VirtualMachine, configMap *core.ConfigMap) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice) {
-	dvsByName := make(map[string]DataVolume)
-	for _, dv := range vmCr.DataVolumes {
-		dvsByName[dv.Name] = dv
+func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.ConfigMap, pvcs *[]core.PersistentVolumeClaim) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice) {
+	pvcsByName := make(map[string]core.PersistentVolumeClaim)
+	for _, pvc := range *pvcs {
+		pvcsByName[pvc.Name] = pvc
 	}
 
-	for i, v := range vmCr.Spec.Template.Spec.Volumes {
-		dv, _ := dvsByName[v.DataVolume.Name]
+	for i, v := range vmVolumes {
+		pvc, _ := pvcsByName[v.PersistentVolumeClaim.ClaimName]
 		vol := core.Volume{
-			Name: dv.Name,
+			Name: pvc.Name,
 			VolumeSource: core.VolumeSource{
 				PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
-					ClaimName: dv.Name,
+					ClaimName: pvc.Name,
 					ReadOnly:  false,
 				},
 			},
 		}
 		volumes = append(volumes, vol)
-		if dv.PVC.Spec.VolumeMode != nil && *dv.PVC.Spec.VolumeMode == core.PersistentVolumeBlock {
+		if pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == core.PersistentVolumeBlock {
 			devices = append(devices, core.VolumeDevice{
-				Name:       dv.Name,
+				Name:       pvc.Name,
 				DevicePath: fmt.Sprintf("/dev/block%v", i),
 			})
 		} else {
 			mounts = append(mounts, core.VolumeMount{
-				Name:      dv.Name,
+				Name:      pvc.Name,
 				MountPath: fmt.Sprintf("/mnt/disks/disk%v", i),
 			})
 		}
@@ -1030,10 +1101,10 @@ func (r *KubeVirt) podVolumeMounts(vmCr *VirtualMachine, configMap *core.ConfigM
 	return
 }
 
-func (r *KubeVirt) libvirtDomain(vmCr *VirtualMachine) (domain *libvirtxml.Domain) {
-	dvsByName := make(map[string]DataVolume)
-	for _, dv := range vmCr.DataVolumes {
-		dvsByName[dv.Name] = dv
+func (r *KubeVirt) libvirtDomain(vmCr *VirtualMachine, pvcs *[]core.PersistentVolumeClaim) (domain *libvirtxml.Domain) {
+	pvcsByName := make(map[string]core.PersistentVolumeClaim)
+	for _, pvc := range *pvcs {
+		pvcsByName[pvc.Name] = pvc
 	}
 
 	// virt-v2v needs a very minimal libvirt domain XML file to be provided
@@ -1042,8 +1113,8 @@ func (r *KubeVirt) libvirtDomain(vmCr *VirtualMachine) (domain *libvirtxml.Domai
 	for i, vol := range vmCr.Spec.Template.Spec.Volumes {
 		diskSource := libvirtxml.DomainDiskSource{}
 
-		dv := dvsByName[vol.DataVolume.Name]
-		if dv.PVC.Spec.VolumeMode != nil && *dv.PVC.Spec.VolumeMode == core.PersistentVolumeBlock {
+		pvc := pvcsByName[vol.PersistentVolumeClaim.ClaimName]
+		if pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == core.PersistentVolumeBlock {
 			diskSource.Block = &libvirtxml.DomainDiskSourceBlock{
 				Dev: fmt.Sprintf("/dev/block%v", i),
 			}
@@ -1148,12 +1219,12 @@ func (r *KubeVirt) ensureConfigMap(vmRef ref.Ref) (configMap *core.ConfigMap, er
 
 //
 // Ensure the Libvirt domain config map exists on the destination.
-func (r *KubeVirt) ensureLibvirtConfigMap(vmRef ref.Ref, vmCr *VirtualMachine) (configMap *core.ConfigMap, err error) {
+func (r *KubeVirt) ensureLibvirtConfigMap(vmRef ref.Ref, vmCr *VirtualMachine, pvcs *[]core.PersistentVolumeClaim) (configMap *core.ConfigMap, err error) {
 	configMap, err = r.ensureConfigMap(vmRef)
 	if err != nil {
 		return
 	}
-	domain := r.libvirtDomain(vmCr)
+	domain := r.libvirtDomain(vmCr, pvcs)
 	domainXML, err := xml.Marshal(domain)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -1381,7 +1452,7 @@ type VirtualMachine struct {
 // owner of the CDI DataVolume.
 func (r *VirtualMachine) Owner(dv *cdi.DataVolume) bool {
 	for _, vol := range r.Spec.Template.Spec.Volumes {
-		if vol.DataVolume.Name == dv.Name {
+		if vol.PersistentVolumeClaim.ClaimName == dv.Name {
 			return true
 		}
 	}
