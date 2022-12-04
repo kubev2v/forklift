@@ -2580,6 +2580,13 @@ go_repository(
 )
 
 go_repository(
+    name = "com_github_xi2_xz",
+    importpath = "github.com/xi2/xz",
+    sum = "h1:nIPpBwaJSVYIxUFsDv3M8ofmx9yWTog9BfvIu0q41lo=",
+    version = "v0.0.0-20171230120015-48954b6210f8",
+)
+
+go_repository(
     name = "com_github_urfave_cli",
     importpath = "github.com/urfave/cli",
     sum = "h1:+mkCCcOFKPnCmVYVcURKps1Xe+3zP90gSYGNfRkjoIY=",
