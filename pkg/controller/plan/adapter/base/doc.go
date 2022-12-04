@@ -33,7 +33,7 @@ type Builder interface {
 	// Build DataVolume config map.
 	ConfigMap(vmRef ref.Ref, secret *core.Secret, object *core.ConfigMap) error
 	// Build the Kubevirt VirtualMachine spec.
-	VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, dataVolumes []cdi.DataVolume) error
+	VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []core.PersistentVolumeClaim) error
 	// Build DataVolumes.
 	DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap) (dvs []cdi.DataVolumeSpec, err error)
 	// Build tasks.
@@ -42,6 +42,8 @@ type Builder interface {
 	TemplateLabels(vmRef ref.Ref) (labels map[string]string, err error)
 	// Return a stable identifier for a DataVolume.
 	ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string
+	// Return a stable identifier for a PersistentDataVolume
+	ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string
 }
 
 //
