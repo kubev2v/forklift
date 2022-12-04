@@ -3,6 +3,7 @@ package base
 import (
 	"context"
 	"net/http"
+	"os"
 	"path"
 	"strings"
 	"sync"
@@ -114,11 +115,13 @@ func (r *Auth) permit(token string, p *api.Provider) (allowed bool, err error) {
 		err = liberr.Wrap(err)
 		return
 	}
-	var verb string
+	var verb, namespace string
 	if p.ObjectMeta.UID != "" {
 		verb = "get"
+		namespace = p.Namespace
 	} else {
 		verb = "list"
+		namespace = os.Getenv("POD_NAMESPACE")
 	}
 
 	review := &auth2.SubjectAccessReview{
@@ -126,7 +129,7 @@ func (r *Auth) permit(token string, p *api.Provider) (allowed bool, err error) {
 			ResourceAttributes: &auth2.ResourceAttributes{
 				Group:     group,
 				Resource:  resource,
-				Namespace: p.Namespace,
+				Namespace: namespace,
 				Name:      p.Name,
 				Verb:      verb,
 			},
