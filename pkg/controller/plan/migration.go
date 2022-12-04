@@ -46,7 +46,6 @@ const (
 	WaitForPowerOff          = "WaitForPowerOff"
 	CreateDataVolumes        = "CreateDataVolumes"
 	CreateVM                 = "CreateVM"
-	ScheduleVM               = "ScheduleVM"
 	CopyDisks                = "CopyDisks"
 	CopyingPaused            = "CopyingPaused"
 	AddCheckpoint            = "AddCheckpoint"
@@ -71,6 +70,7 @@ const (
 	Cutover         = "Cutover"
 	DiskTransfer    = "DiskTransfer"
 	ImageConversion = "ImageConversion"
+	VMCreation      = "VirtualMachineCreation"
 	Unknown         = "Unknown"
 )
 
@@ -90,11 +90,10 @@ var (
 			{Name: PowerOffSource},
 			{Name: WaitForPowerOff},
 			{Name: CreateDataVolumes},
-			{Name: CreateVM},
-			{Name: ScheduleVM},
 			{Name: CopyDisks},
 			{Name: CreateGuestConversionPod, All: RequiresConversion},
 			{Name: ConvertGuest, All: RequiresConversion},
+			{Name: CreateVM},
 			{Name: PostHook, All: HasPostHook},
 			{Name: Completed},
 		},
@@ -107,8 +106,6 @@ var (
 			{Name: CreateInitialSnapshot},
 			{Name: WaitForInitialSnapshot},
 			{Name: CreateDataVolumes},
-			{Name: CreateVM},
-			{Name: ScheduleVM},
 			{Name: CopyDisks},
 			{Name: CopyingPaused},
 			{Name: CreateSnapshot},
@@ -123,6 +120,7 @@ var (
 			{Name: Finalize},
 			{Name: CreateGuestConversionPod, All: RequiresConversion},
 			{Name: ConvertGuest, All: RequiresConversion},
+			{Name: CreateVM},
 			{Name: PostHook, All: HasPostHook},
 			{Name: Completed},
 		},
@@ -422,14 +420,14 @@ func (r *Migration) deleteImporterPods(vm *plan.VMStatus) (err error) {
 			return
 		}
 	}
-	var vmCr VirtualMachine
-	found := false
-	if vmCr, found = r.vmMap[vm.ID]; found {
-		for _, dv := range vmCr.DataVolumes {
-			err = r.kubevirt.DeleteImporterPod(dv)
-			if err != nil {
-				return
-			}
+	pvcs, err := r.kubevirt.getPVCs(vm)
+	if err != nil {
+		return
+	}
+	for _, pvc := range pvcs {
+		err = r.kubevirt.DeleteImporterPod(pvc)
+		if err != nil {
+			return
 		}
 	}
 	return
@@ -486,7 +484,7 @@ func (r *Migration) itinerary() *libitr.Itinerary {
 // Get the name of the pipeline step corresponding to the current VM phase.
 func (r *Migration) step(vm *plan.VMStatus) (step string) {
 	switch vm.Phase {
-	case Started, CreateInitialSnapshot, WaitForInitialSnapshot, CreateDataVolumes, CreateVM, ScheduleVM:
+	case Started, CreateInitialSnapshot, WaitForInitialSnapshot, CreateDataVolumes:
 		step = Initialize
 	case CopyDisks, CopyingPaused, CreateSnapshot, WaitForSnapshot, AddCheckpoint:
 		step = DiskTransfer
@@ -494,6 +492,8 @@ func (r *Migration) step(vm *plan.VMStatus) (step string) {
 		step = Cutover
 	case CreateGuestConversionPod, ConvertGuest:
 		step = ImageConversion
+	case CreateVM:
+		step = VMCreation
 	case PreHook, PostHook:
 		step = vm.Phase
 	case StorePowerState, PowerOffSource, WaitForPowerOff:
@@ -621,6 +621,8 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
 			break
 		}
+		step.MarkStarted()
+		step.Phase = Running
 		err = r.kubevirt.EnsureVM(vm)
 		if err != nil {
 			if !errors.As(err, &web.ProviderNotReadyError{}) {
@@ -631,31 +633,16 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				return
 			}
 		}
-		vm.Phase = r.next(vm.Phase)
-	case ScheduleVM:
-		step, found := vm.FindStep(r.step(vm))
-		if !found {
-			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
-			break
-		}
-		waiting, rErr := r.waitingForFirstConsumer(vm)
-		if rErr != nil {
-			step.AddError(rErr.Error())
-			err = nil
-			break
-		}
-		err = r.setRunning(vm, waiting)
+		// Removing unnecessary DataVolumes
+		err = r.kubevirt.DeleteDataVolumes(vm)
 		if err != nil {
 			step.AddError(err.Error())
 			err = nil
 			break
 		}
-		if !waiting {
-			vm.Phase = r.next(vm.Phase)
-			step.MarkCompleted()
-			step.Phase = Completed
-			step.Progress.Completed = step.Progress.Total
-		}
+		step.MarkCompleted()
+		step.Phase = Completed
+		vm.Phase = r.next(vm.Phase)
 	case CopyDisks:
 		step, found := vm.FindStep(r.step(vm))
 		if !found {
@@ -1018,6 +1005,17 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 						Phase:       Pending,
 					},
 				})
+		case CreateVM:
+			pipeline = append(
+				pipeline,
+				&plan.Step{
+					Task: plan.Task{
+						Name:        VMCreation,
+						Description: "Create VM.",
+						Phase:       Pending,
+						Progress:    libitr.Progress{Total: 1},
+					},
+				})
 		}
 		next, done, _ := r.itinerary().Next(step.Name)
 		if !done {
@@ -1107,14 +1105,20 @@ func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (err error) {
 		}
 	}
 	var vmCr VirtualMachine
+	var pvcs []core.PersistentVolumeClaim
 	found := false
 	if vmCr, found = r.vmMap[vm.ID]; !found {
-		msg := "VirtualMachine CR not found."
-		vm.AddError(msg)
-		return
+		vmCr.VirtualMachine, err = r.kubevirt.virtualMachine(vm)
+		if err != nil {
+			return
+		}
+		pvcs, err = r.kubevirt.getPVCs(vm)
+		if err != nil {
+			return
+		}
 	}
 
-	err = r.kubevirt.EnsureGuestConversionPod(vm, &vmCr)
+	err = r.kubevirt.EnsureGuestConversionPod(vm, &vmCr, &pvcs)
 	return
 }
 
@@ -1144,128 +1148,121 @@ func (r *Migration) setRunning(vm *plan.VMStatus, running bool) (err error) {
 }
 
 //
-// Determine whether any of the DataVolumes haven't been bound yet
-// because they are waiting for first consumer.
-func (r *Migration) waitingForFirstConsumer(vm *plan.VMStatus) (waiting bool, err error) {
-	if r.vmMap == nil {
-		r.vmMap, err = r.kubevirt.VirtualMachineMap()
-		if err != nil {
-			return
-		}
-	}
-	var vmCr VirtualMachine
-	found := false
-	if vmCr, found = r.vmMap[vm.ID]; !found {
-		msg := "VirtualMachine CR not found."
-		vm.AddError(msg)
-		return
-	}
-	for _, dv := range vmCr.DataVolumes {
-		if dv.Status.Phase == cdi.WaitForFirstConsumer {
-			waiting = true
-			return
-		}
-	}
-
-	return
-}
-
-//
 // Update the progress of the appropriate disk copy step. (DiskTransfer, Cutover)
 func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err error) {
-	if r.vmMap == nil {
-		r.vmMap, err = r.kubevirt.VirtualMachineMap()
-		if err != nil {
-			return
-		}
-	}
-
-	var vmCr VirtualMachine
-	found := false
-	if vmCr, found = r.vmMap[vm.ID]; !found {
-		msg := "VirtualMachine CR not found."
-		vm.AddError(msg)
-		return
-	}
-
 	var pendingReason string
 	var pending int
 	var completed int
 	var running int
-	for _, dv := range vmCr.DataVolumes {
-		var task *plan.Task
-		name := r.builder.ResolveDataVolumeIdentifier(dv.DataVolume)
-		found = false
-		task, found = step.FindTask(name)
-		if !found {
-			continue
+	var pvcs []core.PersistentVolumeClaim
+	dvs, err := r.kubevirt.getDVs(vm)
+	if err != nil {
+		return
+	}
+	if dvs == nil || len(dvs) == 0 {
+		pvcs, err = r.kubevirt.getPVCs(vm)
+		if err != nil {
+			return
 		}
-
-		conditions := dv.Conditions()
-		switch dv.Status.Phase {
-		case cdi.Succeeded, cdi.Paused:
-			completed++
-			task.Phase = Completed
-			task.Reason = "Transfer completed."
-			task.Progress.Completed = task.Progress.Total
-			task.MarkCompleted()
-		case cdi.Pending, cdi.ImportScheduled:
-			pending++
-			task.Phase = Pending
-			cnd := conditions.FindCondition("Bound")
-			if cnd != nil && cnd.Status == True {
-				cnd = conditions.FindCondition("Running")
-			}
-			if cnd != nil {
-				pendingReason = fmt.Sprintf("%s; %s", cnd.Reason, cnd.Message)
-			}
-			task.Reason = pendingReason
-		case cdi.ImportInProgress:
-			running++
-			task.Phase = Running
-			task.MarkStarted()
-			cnd := conditions.FindCondition("Running")
-			if cnd != nil {
-				task.Reason = fmt.Sprintf("%s; %s", cnd.Reason, cnd.Message)
-			}
-			pct := dv.PercentComplete()
-			completed := pct * float64(task.Progress.Total)
-			task.Progress.Completed = int64(completed)
-
-			// The importer pod is recreated by CDI if it is removed for some
-			// reason while the import is in progress, so we can assume that if
-			// we can't find it or retrieve it for some reason that this will
-			// be a transient issue, and we should be able to find it on subsequent
-			// reconciles.
-			importer, found, kErr := r.kubevirt.GetImporterPod(dv)
-			if kErr != nil {
-				log.Error(
-					kErr,
-					"Could not get CDI importer pod for DataVolume.",
-					"vm",
-					vm.String(),
-					"dv",
-					path.Join(dv.Namespace, dv.Name))
-				continue
-			}
-
+		for _, pvc := range pvcs {
+			var task *plan.Task
+			name := r.builder.ResolvePersistentVolumeClaimIdentifier(&pvc)
+			found := false
+			task, found = step.FindTask(name)
 			if !found {
-				log.Info(
-					"Did not find CDI importer pod for DataVolume.",
-					"vm",
-					vm.String(),
-					"dv",
-					path.Join(dv.Namespace, dv.Name))
+				continue
+			}
+			if pvc.Status.Phase == core.ClaimBound {
+				completed++
+				task.Phase = Completed
+				task.Reason = "Transfer completed."
+				task.Progress.Completed = task.Progress.Total
+				task.MarkCompleted()
+			}
+		}
+	} else {
+		for _, dv := range dvs {
+			var task *plan.Task
+			name := r.builder.ResolveDataVolumeIdentifier(dv.DataVolume)
+			found := false
+			task, found = step.FindTask(name)
+			if !found {
 				continue
 			}
 
-			if r.Plan.Spec.Warm && len(importer.Status.ContainerStatuses) > 0 {
-				vm.Warm.Failures = int(importer.Status.ContainerStatuses[0].RestartCount)
-			}
-			if restartLimitExceeded(importer) {
-				task.MarkedCompleted()
-				msg, _ := terminationMessage(importer)
-				task.AddError(msg)
+			conditions := dv.Conditions()
+			switch dv.Status.Phase {
+			case cdi.Succeeded, cdi.Paused:
+				completed++
+				task.Phase = Completed
+				task.Reason = "Transfer completed."
+				task.Progress.Completed = task.Progress.Total
+				task.MarkCompleted()
+			case cdi.Pending, cdi.ImportScheduled:
+				pending++
+				task.Phase = Pending
+				cnd := conditions.FindCondition("Bound")
+				if cnd != nil && cnd.Status == True {
+					cnd = conditions.FindCondition("Running")
+				}
+				if cnd != nil {
+					pendingReason = fmt.Sprintf("%s; %s", cnd.Reason, cnd.Message)
+				}
+				task.Reason = pendingReason
+			case cdi.ImportInProgress:
+				running++
+				task.Phase = Running
+				task.MarkStarted()
+				cnd := conditions.FindCondition("Running")
+				if cnd != nil {
+					task.Reason = fmt.Sprintf("%s; %s", cnd.Reason, cnd.Message)
+				}
+				pct := dv.PercentComplete()
+				transferred := pct * float64(task.Progress.Total)
+				task.Progress.Completed = int64(transferred)
+
+				// The importer pod is recreated by CDI if it is removed for some
+				// reason while the import is in progress, so we can assume that if
+				// we can't find it or retrieve it for some reason that this will
+				// be a transient issue, and we should be able to find it on subsequent
+				// reconciles.
+				var importer *core.Pod
+				var found bool
+				var kErr error
+				if dv.PVC == nil {
+					found = false
+				} else {
+					importer, found, kErr = r.kubevirt.GetImporterPod(*dv.PVC)
+				}
+				if kErr != nil {
+					log.Error(
+						kErr,
+						"Could not get CDI importer pod for DataVolume.",
+						"vm",
+						vm.String(),
+						"dv",
+						path.Join(dv.Namespace, dv.Name))
+					continue
+				}
+
+				if !found {
+					log.Info(
+						"Did not find CDI importer pod for DataVolume.",
+						"vm",
+						vm.String(),
+						"dv",
+						path.Join(dv.Namespace, dv.Name))
+					continue
+				}
+
+				if r.Plan.Spec.Warm && len(importer.Status.ContainerStatuses) > 0 {
+					vm.Warm.Failures = int(importer.Status.ContainerStatuses[0].RestartCount)
+				}
+				if restartLimitExceeded(importer) {
+					task.MarkedCompleted()
+					msg, _ := terminationMessage(importer)
+					task.AddError(msg)
+				}
 			}
 		}
 	}
@@ -1277,7 +1274,7 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 	} else if running > 0 {
 		step.Phase = Running
 		step.Reason = ""
-	} else if completed == len(vmCr.DataVolumes) {
+	} else if (len(dvs) > 0 && completed == len(dvs)) || completed == len(pvcs) {
 		step.Phase = Completed
 		step.Reason = ""
 	}
@@ -1320,8 +1317,7 @@ func (r *Migration) setDataVolumeCheckpoints(vm *plan.VMStatus) (err error) {
 	var vmCr VirtualMachine
 	found := false
 	if vmCr, found = r.vmMap[vm.ID]; !found {
-		msg := "VirtualMachine CR not found."
-		vm.AddError(msg)
+		vmCr.DataVolumes, err = r.kubevirt.getDVs(vm)
 		return
 	}
 	dvs := make([]cdi.DataVolume, 0)

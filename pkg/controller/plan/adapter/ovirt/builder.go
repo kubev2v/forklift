@@ -60,6 +60,12 @@ const (
 	Unknown        = "unknown"
 )
 
+// Annotations
+const (
+	// CDI import disk ID annotation on PVC
+	AnnImportDiskId = "cdi.kubevirt.io/storage.import.diskId"
+)
+
 // Map of ovirt guest ids to osinfo ids.
 var osMap = map[string]string{
 	"rhel_6_10_plus_ppc64": "rhel6.10",
@@ -229,7 +235,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 
 //
 // Create the destination Kubevirt VM.
-func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, dataVolumes []cdi.DataVolume) (err error) {
+func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []core.PersistentVolumeClaim) (err error) {
 	vm := &model.Workload{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
@@ -255,7 +261,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	if object.Template == nil {
 		object.Template = &cnv.VirtualMachineInstanceTemplateSpec{}
 	}
-	r.mapDisks(vm, dataVolumes, object)
+	r.mapDisks(vm, persistentVolumeClaims, object)
 	r.mapFirmware(vm, &vm.Cluster, object)
 	r.mapCPU(vm, object)
 	r.mapMemory(vm, object)
@@ -396,24 +402,24 @@ func (r *Builder) mapFirmware(vm *model.Workload, cluster *model.Cluster, object
 	object.Template.Spec.Domain.Firmware = firmware
 }
 
-func (r *Builder) mapDisks(vm *model.Workload, dataVolumes []cdi.DataVolume, object *cnv.VirtualMachineSpec) {
+func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.PersistentVolumeClaim, object *cnv.VirtualMachineSpec) {
 	var kVolumes []cnv.Volume
 	var kDisks []cnv.Disk
 
-	dvMap := make(map[string]*cdi.DataVolume)
-	for i := range dataVolumes {
-		dv := &dataVolumes[i]
-		dvMap[dv.Spec.Source.Imageio.DiskID] = dv
+	pvcMap := make(map[string]*core.PersistentVolumeClaim)
+	for i := range persistentVolumeClaims {
+		pvc := &persistentVolumeClaims[i]
+		pvcMap[r.ResolvePersistentVolumeClaimIdentifier(pvc)] = pvc
 	}
 
 	for i, da := range vm.DiskAttachments {
-		dv := dvMap[da.Disk.ID]
+		pvc := pvcMap[da.Disk.ID]
 		volumeName := fmt.Sprintf("vol-%v", i)
 		volume := cnv.Volume{
 			Name: volumeName,
 			VolumeSource: cnv.VolumeSource{
-				DataVolume: &cnv.DataVolumeSource{
-					Name: dv.Name,
+				PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvc.Name,
 				},
 			},
 		}
@@ -508,4 +514,10 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 // Return a stable identifier for a DataVolume.
 func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
 	return dv.Spec.Source.Imageio.DiskID
+}
+
+//
+// Return a stable identifier for a PersistentDataVolume.
+func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string {
+	return pvc.Annotations[AnnImportDiskId]
 }
