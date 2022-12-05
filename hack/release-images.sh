@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e 
+
 if [[ -z "${REGISTRY}" || -z "${REGISTRY_TAG}" || -z  "${REGISTRY_ACCOUNT}" ]]; then
     echo "Please set all REGISTRY, REGISTRY_TAG and REGISTRY_ACCOUNT environment variables!" 
     exit 1
