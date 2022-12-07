@@ -1,4 +1,76 @@
-# Fix and enhance the use of virt-v2v in Forklift
+# Plan for Forklift 2.4
+
+## Workflow overview
+
+![Conversion workflow in Forklfit 2.4](forklift-2.4-conversion-wokflow.svg)
+
+
+1)  *Provider CR:* The CR for VMware provider describing the source environment
+    together with a secret are created in `konveyor-forklift` namespace. This can be
+    done manually from the command line or through Forklift UI.
+
+2)  Forklift controller performs inspection of the VMware environment and lists
+    VMs, networks and storage domains.
+
+3)  *Plan CR:* The CR describing the migration plan is created in
+    `konveyor-forklift` namespace. The plan lists VMs to migrate, migration
+    hooks and is accompanied by storage map and network map. The resources can
+    be created manually from the command line or through Forklift UI.
+
+4)  *PVs:* This is the first step that is different from Forklift 2.3. Forklift
+    controller creates empty PVCs to get empty PVs in target namespace on
+    destination.
+
+5)  *Conversion Pod:* Forklift controller creates conversion pod with the PVs
+    attached as well as provider CR and secret as environment. Pod entrypoint
+    creates necessary symlinks to destination disks (both block and file).
+    Further, it will assemble necessary arguments for virt-v2v, taking
+    information about VM and source from environment variables. Finally
+    entrypoint starts virt-v2v with `-o local` output mode. Virt-v2v would
+    perform inspection of source metadata, conversion and data copying in
+    normal manner.
+
+6)  *VM:* After conversion is finished, Forklift controller creates VM in
+    target namespace attaching the populated PVs to it.
+
+## Necessary changes
+
+* Use blank DataVolume to provision PV of correct size using CDI.
+* Use virt-v2v to perform data copy.
+* Introduce insecure mode. SSL fingerprint (thumbprint) is not adequate.
+  virt-v2v/nbdkit does not accept SSL certificate which makes connection to
+  source problematic even with VDDK.
+* Add a VDDK sidecar container but also make the use of VDDK optional.
+* Forklift constructs the `vpx://` URI and passes it to the conversion pod in the environment.
+* Password and thumbprint stored in a secret, passed in the environment to the conversion pod.
+* Entrypoint in conversion pod:
+  * Prepares symlinks to target disks (for file and block PVs)
+  * Assembles virt-v2v arguments based on environment variables in the pod.
+  * Runs virt-v2v in `-o local` mode.
+
+## Further plans for the future
+
+* Add special `-o kubevirt` output to virt-v2v which would produce a YAML with
+  VM configuration that could be then used by Forklift to create the final VM.
+  Alternatively, virt-v2v could create the VM itself and Forklift would then
+  patch the VM definition as necessary. However, the possibilities of patching
+  existing VM need to be investigated first before pursuing this.
+
+* Possibly let virt-v2v also create the target PVs with k8s API. This is
+  however problematic, because PVs cannot be attached to existing pod.
+  Consequently the conversion container would need to work in two steps chained
+  together in tandem. This would duplicate (re-implement) the work that
+  Forklift already does, but the conversion pod would be less coupled with
+  Forklift and could potentially be triggered by CNV users for migration of a
+  single VM.
+
+* Add support for `esx://` connection. This requires configuration of
+  credentials for each host of the VMware environment. The change may require
+  non-trivial changes in UI, validation and controller which may rule it out
+  from the 2.4 timeframe.
+
+
+# Analysis of the use of virt-v2v in Forklift <= 2.3 and possible enhancments
 
 Forklift attempts to use virt-v2v to import from VMware, but the way
 it does it now does not generally work.  There are also many features
