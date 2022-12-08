@@ -1,12 +1,12 @@
 package vsphere
 
 import (
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/watch/handler"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	"golang.org/x/net/context"
 	"path"
 	"sigs.k8s.io/controller-runtime/pkg/event"

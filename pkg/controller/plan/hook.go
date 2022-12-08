@@ -3,11 +3,11 @@ package plan
 import (
 	"context"
 	"encoding/base64"
-	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"gopkg.in/yaml.v2"
 	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"

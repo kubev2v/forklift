@@ -1,8 +1,8 @@
 package ovirt
 
 import (
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/base"
+	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 )
 
 //

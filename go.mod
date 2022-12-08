@@ -23,7 +23,6 @@ require (
 	github.com/pkg/profile v1.3.0
 	github.com/prometheus/client_golang v1.11.0
 	github.com/vmware/govmomi v0.23.1
-	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	go.uber.org/zap v1.14.1
 	golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0 // indirect
 	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b

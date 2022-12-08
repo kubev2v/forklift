@@ -1,10 +1,10 @@
 package handler
 
 import (
-	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
-	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
+	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
+	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 	"k8s.io/apimachinery/pkg/types"
 	"sync"
 )

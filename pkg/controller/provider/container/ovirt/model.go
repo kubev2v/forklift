@@ -5,12 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"github.com/go-logr/logr"
+	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	fb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
 	libcnt "github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 	"strconv"
 	"strings"
 )
