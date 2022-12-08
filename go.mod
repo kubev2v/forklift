@@ -6,37 +6,35 @@ require (
 	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-gonic/gin v1.7.2
 	github.com/go-kit/kit v0.10.0 // indirect
-	github.com/go-logr/logr v0.3.0
-	github.com/go-logr/zapr v0.3.0
+	github.com/go-logr/logr v1.2.3
+	github.com/go-logr/zapr v1.2.0
 	github.com/go-openapi/spec v0.19.4 // indirect
-	github.com/google/uuid v1.1.2
+	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.4.2
-	github.com/imdario/mergo v0.3.11 // indirect
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.1.0
 	github.com/mattn/go-sqlite3 v1.14.4
-	github.com/onsi/gomega v1.10.3
+	github.com/onsi/ginkgo v1.16.5
+	github.com/onsi/gomega v1.19.0
 	github.com/openshift/api v0.0.0
-	github.com/openshift/library-go v0.0.0-20200821154433-215f00df72cc
+	github.com/openshift/library-go v0.0.0-20211220195323-eca2c467c492
 	github.com/ovirt/go-ovirt v4.3.4+incompatible
 	github.com/pborman/uuid v1.2.1 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/profile v1.3.0
-	github.com/prometheus/client_golang v1.11.0
+	github.com/prometheus/client_golang v1.11.1
 	github.com/vmware/govmomi v0.23.1
-	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
-	go.uber.org/zap v1.14.1
-	golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0 // indirect
-	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
-	golang.org/x/oauth2 v0.0.0-20200902213428-5d25da1a8d43 // indirect
-	gopkg.in/yaml.v2 v2.3.0
-	k8s.io/api v0.23.0
-	k8s.io/apimachinery v0.23.0
-	k8s.io/apiserver v0.20.2
+	go.uber.org/zap v1.19.1
+	golang.org/x/net v0.0.0-20220225172249-27dd8689420f
+	gopkg.in/yaml.v2 v2.4.0
+	k8s.io/api v0.23.5
+	k8s.io/apimachinery v0.23.5
+	k8s.io/apiserver v0.23.0
 	k8s.io/client-go v12.0.0+incompatible
 	kubevirt.io/client-go v0.42.1
-	kubevirt.io/containerized-data-importer-api v1.44.0
+	kubevirt.io/containerized-data-importer v1.55.1
+	kubevirt.io/containerized-data-importer-api v0.0.0
 	libvirt.org/libvirt-go-xml v6.6.0+incompatible
-	sigs.k8s.io/controller-runtime v0.8.3
+	sigs.k8s.io/controller-runtime v0.11.1
 )
 
 // CVE-2021-41190
@@ -79,3 +77,7 @@ replace sigs.k8s.io/structured-merge-diff => sigs.k8s.io/structured-merge-diff v
 replace github.com/ovirt/go-ovirt => github.com/ovirt/go-ovirt v0.0.0-20210423075620-0fe653f1c0cd
 
 replace sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.6.4
+
+replace kubevirt.io/containerized-data-importer-api => kubevirt.io/containerized-data-importer-api v1.55.1
+
+replace kubevirt.io/controller-lifecycle-operator-sdk/api => kubevirt.io/controller-lifecycle-operator-sdk/api v0.0.0-20220329064328-f3cc58c6ed90
