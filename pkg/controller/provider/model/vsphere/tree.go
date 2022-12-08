@@ -1,8 +1,8 @@
 package vsphere
 
 import (
-	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/base"
+	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 )
 
 //

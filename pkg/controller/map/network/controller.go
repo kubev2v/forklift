@@ -18,11 +18,11 @@ package network
 
 import (
 	"context"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	"github.com/konveyor/forklift-controller/pkg/controller/base"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/controller/base"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/storage/names"
