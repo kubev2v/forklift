@@ -2,8 +2,8 @@ package vsphere
 
 import (
 	"context"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/session"

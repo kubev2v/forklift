@@ -1,10 +1,10 @@
 package plan
 
 import (
-	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
-	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/handler"
+	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
+	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"

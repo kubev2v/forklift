@@ -17,9 +17,9 @@ limitations under the License.
 package v1beta1
 
 import (
-	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/provider"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
+	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

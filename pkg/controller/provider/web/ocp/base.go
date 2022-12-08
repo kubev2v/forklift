@@ -2,10 +2,10 @@ package ocp
 
 import (
 	"github.com/gin-gonic/gin"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
+	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 )
 
 //

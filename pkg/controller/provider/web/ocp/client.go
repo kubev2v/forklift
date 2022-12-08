@@ -1,9 +1,9 @@
 package ocp
 
 import (
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"path"
 	"strings"
 )
