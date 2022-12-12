@@ -18,16 +18,15 @@ type fakeBuilder struct {
 }
 
 func (b *fakeBuilder) New() logr.Logger {
-	return &fake{
+	return logr.New(&fake{
 		entry: []entry{},
-	}
+	})
 }
 
 func (b *fakeBuilder) V(level int, f logr.Logger) logr.Logger {
-	return &fake{
+	return logr.New(&fake{
 		debug: Settings.atDebug(level),
-		entry: []entry{},
-	}
+		entry: []entry{}})
 }
 
 type fake struct {
@@ -37,7 +36,7 @@ type fake struct {
 	name   string
 }
 
-func (l *fake) Info(message string, kvpair ...interface{}) {
+func (l *fake) Info(level int, message string, kvpair ...interface{}) {
 	l.entry = append(
 		l.entry,
 		entry{
@@ -56,26 +55,31 @@ func (l *fake) Error(err error, message string, kvpair ...interface{}) {
 		})
 }
 
-func (l *fake) Enabled() bool {
+func (l *fake) Enabled(level int) bool {
 	return true
 }
 
-func (l *fake) V(level int) logr.InfoLogger {
+func (l *fake) V(level int) logr.LogSink {
 	return &fake{
 		entry: []entry{},
 	}
 }
 
-func (l *fake) WithName(name string) logr.Logger {
+func (l *fake) WithName(name string) logr.LogSink {
 	l.name = name
 	return l
 }
 
 //
 // Get logger with values.
-func (l *fake) WithValues(kvpair ...interface{}) logr.Logger {
+func (l *fake) WithValues(kvpair ...interface{}) logr.LogSink {
 	l.values = kvpair
 	return l
+}
+
+// Note that Init usually takes a pointer so it can modify the receiver to save
+// runtime info.
+func (_ *fake) Init(info logr.RuntimeInfo) {
 }
 
 func TestReal(t *testing.T) {
@@ -83,7 +87,7 @@ func TestReal(t *testing.T) {
 	//
 	// Real
 	log := WithName("Test")
-	log.Info("hello")
+	log.Info(1, "hello")
 	log.Error(errors.New("A"), "thing failed")
 	log.Trace(errors.New("B"))
 	g.Expect(log.name).To(gomega.Equal("Test"))
@@ -98,7 +102,7 @@ func TestFake(t *testing.T) {
 	f := log.Real.(*fake)
 	g.Expect(f.name).To(gomega.Equal("Test"))
 	// Info
-	log.Info("hello")
+	log.Info(1, "hello")
 	g.Expect(len(f.entry)).To(gomega.Equal(1))
 	g.Expect(len(f.entry[0].kvpair)).To(gomega.Equal(0))
 	// Error

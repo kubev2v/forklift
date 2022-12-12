@@ -41,7 +41,7 @@ func init() {
 //   - Handles wrapped errors.
 type Logger struct {
 	// Real (wrapped) logger.
-	Real logr.Logger
+	Real logr.LogSink
 	// Name.
 	name string
 	// Level.
@@ -63,7 +63,7 @@ func WithName(name string, kvpair ...interface{}) *Logger {
 
 //
 // Logs at info.
-func (l *Logger) Info(message string, kvpair ...interface{}) {
+func (l *Logger) Info(level int, message string, kvpair ...interface{}) {
 	if Settings.allowed(l.level) {
 		l.Real.Info(message, kvpair...)
 	}
@@ -117,13 +117,13 @@ func (l *Logger) Trace(err error, kvpair ...interface{}) {
 
 //
 // Get whether logger is enabled.
-func (l *Logger) Enabled() bool {
+func (l *Logger) Enabled(level int) bool {
 	return l.Real.Enabled()
 }
 
 //
 // Get logger with verbosity level.
-func (l *Logger) V(level int) logr.InfoLogger {
+func (l *Logger) V(level int) logr.LogSink {
 	return &Logger{
 		Real:  Factory.V(level, l.Real),
 		name:  l.name,
@@ -133,7 +133,7 @@ func (l *Logger) V(level int) logr.InfoLogger {
 
 //
 // Get logger with name.
-func (l *Logger) WithName(name string) logr.Logger {
+func (l *Logger) WithName(name string) logr.LogSink {
 	return &Logger{
 		Real:  l.Real.WithName(name),
 		name:  name,
@@ -143,12 +143,17 @@ func (l *Logger) WithName(name string) logr.Logger {
 
 //
 // Get logger with values.
-func (l *Logger) WithValues(kvpair ...interface{}) logr.Logger {
+func (l *Logger) WithValues(kvpair ...interface{}) logr.LogSink {
 	return &Logger{
 		Real:  l.Real.WithValues(kvpair...),
 		name:  l.name,
 		level: l.level,
 	}
+}
+
+// Note that Init usually takes a pointer so it can modify the receiver to save
+// runtime info.
+func (_ *Logger) Init(info logr.RuntimeInfo) {
 }
 
 //
