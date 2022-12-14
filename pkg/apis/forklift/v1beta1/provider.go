@@ -39,12 +39,15 @@ const (
 	VSphere ProviderType = "vsphere"
 	// oVirt
 	OVirt ProviderType = "ovirt"
+	// OpenStack
+	OpenStack ProviderType = "openstack"
 )
 
 var ProviderTypes = []ProviderType{
 	OpenShift,
 	VSphere,
 	OVirt,
+	OpenStack,
 }
 
 func (t ProviderType) String() string {
