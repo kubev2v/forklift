@@ -71,6 +71,15 @@ push-contoller: build-controller
 	$(CONTAINER_CMD) tag cmd/manager:forklift-controller-image ${IMG}
 	$(CONTAINER_CMD) push ${IMG}
 
+# Build the docker image
+build-api:
+	bazel run cmd/forklift-api:forklift-api-image
+
+# Push the docker image
+push-api: build-api
+	$(CONTAINER_CMD) tag cmd/forklift-api:forklift-api-image ${API_IMAGE}
+	$(CONTAINER_CMD) push ${API_IMAGE}
+
 bazel-generate:
 	bazel run //:gazelle
 
