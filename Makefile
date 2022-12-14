@@ -80,6 +80,15 @@ push-api: build-api
 	$(CONTAINER_CMD) tag cmd/forklift-api:forklift-api-image ${API_IMAGE}
 	$(CONTAINER_CMD) push ${API_IMAGE}
 
+# Build the docker image
+build-operator:
+	bazel run operator:forklift-operator-image
+
+# Push the docker image
+push-operator: build-operator
+	$(CONTAINER_CMD) tag operator:forklift-operator-image ${OPERATOR_IMAGE}
+	$(CONTAINER_CMD) push ${OPERATOR_IMAGE}
+
 bazel-generate:
 	bazel run //:gazelle
 
