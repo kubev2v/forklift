@@ -2,10 +2,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "admitters",
-    srcs = [
-        "provider-admitter.go",
-        "secret-admitter.go",
-    ],
+    srcs = ["secret-admitter.go"],
     importpath = "github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/validating-webhook/admitters",
     visibility = ["//visibility:public"],
     deps = [
