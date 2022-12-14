@@ -3,6 +3,7 @@ package container
 import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/ocp"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/openstack"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/vsphere"
 	libcontainer "github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
@@ -24,6 +25,8 @@ func Build(
 		return vsphere.New(db, provider, secret)
 	case api.OVirt:
 		return ovirt.New(db, provider, secret)
+	case api.OpenStack:
+		return openstack.New(db, provider, secret)
 	}
 
 	return nil
