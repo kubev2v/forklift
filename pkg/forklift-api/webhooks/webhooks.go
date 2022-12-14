@@ -35,8 +35,17 @@ func RegisterValidatingWebhooks() {
 		ServeSecretCreate(w, r)
 	})
 	server := http.Server{
-		Addr:    ":9876",
+		Addr:    ":8443",
 		Handler: mux,
 	}
-	server.ListenAndServeTLS("/var/run/secrets/forklift-api/tls.crt", "/var/run/secrets/forklift-api/tls.key")
+	log.Info("start listening")
+	errors := make(chan error)
+	go func() {
+		errors <- server.ListenAndServeTLS("/var/run/secrets/forklift-api-serving-cert/tls.crt", "/var/run/secrets/forklift-api-serving-cert/tls.key")
+	}()
+	err := <-errors
+	if err != nil {
+		log.Info("got error from server")
+	}
+	log.Info("stopped listening")
 }
