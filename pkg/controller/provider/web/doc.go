@@ -3,6 +3,7 @@ package web
 import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
@@ -29,5 +30,8 @@ func All(container *container.Container) (all []libweb.RequestHandler) {
 	all = append(
 		all,
 		ovirt.Handlers(container)...)
+	all = append(
+		all,
+		openstack.Handlers(container)...)
 	return
 }
