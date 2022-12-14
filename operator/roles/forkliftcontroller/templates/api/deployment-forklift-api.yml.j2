@@ -1,0 +1,58 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ api_deployment_name }}
+  namespace: {{ app_namespace }}
+  labels:
+    app: {{ app_name }}
+    service: {{ api_service_name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ app_name }}
+      service: {{ api_service_name }}
+  template:
+    metadata:
+      labels:
+        app: {{ app_name }}
+        service: {{ api_service_name }}
+    spec:
+      containers:
+        - name: {{ api_container_name }}
+          image: {{ api_image_fqin }}
+          imagePullPolicy: {{ image_pull_policy }}
+          ports:
+          - name: api
+            containerPort: 8443
+            protocol: TCP
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+            - name: PORT
+              value: "8443"
+            - name: API_TLS_ENABLED
+              value: "true"
+            - name: API_TLS_CERTIFICATE
+              value: "/var/run/secrets/{{ api_tls_secret_name }}/tls.crt"
+            - name: API_TLS_KEY
+              value: "/var/run/secrets/{{ api_tls_secret_name }}/tls.key"
+          resources:
+            limits:
+              cpu: {{ api_container_limits_cpu }}
+              memory: {{ api_container_limits_memory }}
+            requests:
+              cpu: {{ api_container_requests_cpu }}
+              memory: {{ api_container_requests_memory }}
+          volumeMounts:
+            - name: {{ api_tls_secret_name }}
+              mountPath: /var/run/secrets/{{ api_tls_secret_name }}
+      volumes:
+        - name: {{ api_tls_secret_name }}
+          secret:
+            secretName: {{ api_tls_secret_name }}
+            defaultMode: 420

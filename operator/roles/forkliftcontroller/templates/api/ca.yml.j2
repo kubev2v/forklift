@@ -1,0 +1,36 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ api_selfsigned_issuer_name }}
+  namespace: {{ app_namespace }}
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ api_certificate_name }}
+  namespace: {{ app_namespace }}
+spec:
+  isCA: true
+  dnsNames:
+  - {{ api_service_name }}.{{ app_namespace }}.svc
+  commonName: {{ api_certificate_name }}
+  secretName: {{ api_tls_secret_name }}
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: {{ api_selfsigned_issuer_name }}
+    kind: Issuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ api_issuer_name }}
+  namespace: {{ app_namespace }}
+spec:
+  ca:
+    secretName: {{ api_tls_secret_name }}
