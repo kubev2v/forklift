@@ -17,16 +17,22 @@ limitations under the License.
 package forklift_api
 
 import (
+	"net/http"
+	"os"
+
 	webhooks "github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 )
 
 const (
-	// Default port that virt-api listens on.
+	// Default port that forklift-api listens on.
 	defaultPort = 443
 
-	// Default address that virt-api listens on.
+	// Default address that forklift-api listens on.
 	defaultHost = "0.0.0.0"
 )
+
+var log = logging.WithName("forklift-api")
 
 type ForkliftApi interface {
 	Execute()
@@ -48,5 +54,28 @@ func NewForkliftApi() ForkliftApi {
 }
 
 func (app *forkliftAPIApp) Execute() {
-	webhooks.RegisterValidatingWebhooks()
+	apiTlsCertificate, found := os.LookupEnv("API_TLS_CERTIFICATE")
+	if !found {
+		log.Info("Failed to find API_TLS_CERTIFICATE")
+		return
+	}
+	apiTlsKey, found := os.LookupEnv("API_TLS_KEY")
+	if !found {
+		log.Info("Failed to find API_TLS_KEY")
+		return
+	}
+
+	mux := http.NewServeMux()
+	webhooks.RegisterValidatingWebhooks(mux)
+	server := http.Server{
+		Addr:    ":8443",
+		Handler: mux,
+	}
+
+	log.Info("start listening")
+	err := server.ListenAndServeTLS(apiTlsCertificate, apiTlsKey)
+	if err != nil {
+		log.Info("got error from server")
+	}
+	log.Info("stopped listening")
 }

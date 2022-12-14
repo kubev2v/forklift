@@ -40,6 +40,8 @@ spec:
           value: explicit
         - name: CONTROLLER_IMAGE
           value: ${CONTROLLER_IMAGE}
+        - name: API_IMAGE
+          value: ${API_IMAGE}
         - name: MUST_GATHER_IMAGE
           value: ${MUST_GATHER_IMAGE}
         - name: MUST_GATHER_API_IMAGE
