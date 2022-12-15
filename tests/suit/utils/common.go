@@ -7,15 +7,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"net/http"
-	"net/url"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
-
-	cdiv1 "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
-	cdiClientset "kubevirt.io/containerized-data-importer/pkg/client/clientset/versioned"
 )
 
 // cdi-file-host pod/service relative values
@@ -64,7 +57,6 @@ var (
 // ClientsIface is the clients interface
 type ClientsIface interface {
 	K8s() *kubernetes.Clientset
-	Cdi() *cdiClientset.Clientset
 }
 
 // GetDefaultStorageClass return the storage class which is marked as default in the cluster
@@ -102,22 +94,6 @@ func isDefaultStorageClassCSIRespectsFsGroup() bool {
 	return DefaultStorageClassCsiDriver != nil && DefaultStorageClassCsiDriver.Spec.FSGroupPolicy != nil && *DefaultStorageClassCsiDriver.Spec.FSGroupPolicy != storagev1.NoneFSGroupPolicy
 }
 
-// IsHostpathProvisioner returns true if hostpath-provisioner is the default storage class
-func IsHostpathProvisioner() bool {
-	if DefaultStorageClass == nil {
-		return false
-	}
-	return DefaultStorageClass.Provisioner == "kubevirt.io/hostpath-provisioner"
-}
-
-// GetTestNamespaceList returns a list of namespaces that have been created by the functional tests.
-func GetTestNamespaceList(client *kubernetes.Clientset, nsPrefix string) (*corev1.NamespaceList, error) {
-	//Ensure that no namespaces with the prefix label exist
-	return client.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{
-		LabelSelector: nsPrefix,
-	})
-}
-
 // CacheTestsData fetch and cache data required for tests
 func CacheTestsData(client *kubernetes.Clientset, cdiNs string) {
 	if DefaultStorageClass == nil {
@@ -140,59 +116,6 @@ func getNfsService(client *kubernetes.Clientset, cdiNs string) *corev1.Service {
 		}
 	}
 	return nil
-}
-
-// IsNfs returns true if any type of nfs (static/dynamic-csi) is the default storage class
-func IsNfs() bool {
-	if DefaultStorageClass == nil {
-		return false
-	}
-	return strings.Contains(DefaultStorageClass.GetName(), "nfs")
-}
-
-// IsStaticNfs returns true if the default storage class is the static nfs storage class with no provisioner
-func IsStaticNfs() bool {
-	return IsNfs() && DefaultStorageClass.Provisioner == "kubernetes.io/no-provisioner"
-}
-
-// IsStaticNfsWithInternalClusterServer returns true if the default storage class is the static nfs storage class with no provisioner
-// and the NFS server is running inside the cluster (as opposed to external)
-func IsStaticNfsWithInternalClusterServer() bool {
-	return IsStaticNfs() && NfsService != nil
-}
-
-// HasInsecureRegistry checks if registry appears in CDIConfig InsecureRegistries so it is allowed to be insecure
-func HasInsecureRegistry(c client.Client, registryURL string) (bool, error) {
-	parsedURL, err := url.Parse(registryURL)
-	if err != nil {
-		return false, err
-	}
-	cfg := &cdiv1.CDIConfig{}
-	err = c.Get(context.TODO(), types.NamespacedName{Name: "config"}, cfg)
-	if err != nil {
-		return false, err
-	}
-	return hasString(cfg.Spec.InsecureRegistries, parsedURL.Host), nil
-}
-
-func removeString(strings []string, str string) []string {
-	var output []string
-	for _, s := range strings {
-		if s != str {
-			output = append(output, s)
-		}
-	}
-	return output
-}
-
-func hasString(strings []string, str string) bool {
-	for _, s := range strings {
-		if s == str {
-			return true
-		}
-	}
-
-	return false
 }
 
 //IsOpenshift checks if we are on OpenShift platform

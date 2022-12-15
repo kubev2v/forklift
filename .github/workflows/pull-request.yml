@@ -46,7 +46,8 @@ jobs:
           STORAGE_CLASS: standard
           OVIRT_VM_ID: 31573c08-717b-43e0-825f-69a36fb0e1a1
         run: |
-          GOPATH=${GITHUB_WORKSPACE}/go make e2e-sanity
+          kind get kubeconfig > /tmp/kubeconfig
+          GOPATH=${GITHUB_WORKSPACE}/go make e2e-sanity-suit
 
       # Push code coverage using Codecov Action
       - name: Push code coverage to Codecov
