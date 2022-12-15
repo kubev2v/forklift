@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/konveyor/forklift-controller/pkg/apis"
 	"github.com/konveyor/forklift-controller/tests/suit/utils"
+	"k8s.io/klog/v2"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +15,7 @@ import (
 	"strconv"
 	"time"
 
+	forkliftv1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -29,7 +32,6 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog/v2"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -85,6 +87,12 @@ func (c *Clients) K8s() *kubernetes.Clientset {
 	return c.K8sClient
 }
 
+//var log logr.Logger
+//
+//func init() {
+//	log = logf.Log.WithName("entrypoint")
+//}
+
 // Framework supports common operations used by functional/e2e tests. It holds the k8s and cdi clients,
 // a generated unique namespace, run-time flags, and more fields will be added over time as cdi e2e
 // evolves. Global BeforeEach and AfterEach are called in the Framework constructor.
@@ -100,7 +108,6 @@ type Framework struct {
 
 	// ControllerPod provides a pointer to our test controller pod
 	ControllerPod *v1.Pod
-
 	*Clients
 	reporter *KubernetesReporter
 }
@@ -250,7 +257,16 @@ func (c *Clients) GetExtClient() (*extclientset.Clientset, error) {
 // GetCrClient returns a controller runtime client
 func (c *Clients) GetCrClient() (crclient.Client, error) {
 
-	client, err := crclient.New(c.RestConfig, crclient.Options{Scheme: scheme.Scheme})
+	err := forkliftv1.SchemeBuilder.AddToScheme(scheme.Scheme)
+	if err != nil {
+		return nil, err
+	}
+	err = apis.AddToScheme(scheme.Scheme)
+	if err != nil {
+		return nil, err
+	}
+	var client crclient.Client
+	client, err = crclient.New(c.RestConfig, crclient.Options{Scheme: scheme.Scheme})
 	if err != nil {
 		return nil, err
 	}

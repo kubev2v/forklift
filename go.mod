@@ -13,6 +13,7 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.1.0
 	github.com/mattn/go-sqlite3 v1.14.4
+	github.com/onsi/ginkgo v1.14.1
 	github.com/onsi/gomega v1.10.3
 	github.com/openshift/api v0.0.0
 	github.com/openshift/library-go v0.0.0-20200821154433-215f00df72cc
@@ -25,9 +26,11 @@ require (
 	golang.org/x/net v0.0.0-20220722155237-a158d28d115b
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.23.0
+	k8s.io/apiextensions-apiserver v0.20.2
 	k8s.io/apimachinery v0.23.0
 	k8s.io/apiserver v0.20.2
 	k8s.io/client-go v12.0.0+incompatible
+	k8s.io/klog/v2 v2.2.0
 	kubevirt.io/client-go v0.42.1
 	kubevirt.io/containerized-data-importer-api v1.44.0
 	libvirt.org/libvirt-go-xml v6.6.0+incompatible
