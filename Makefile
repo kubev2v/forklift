@@ -44,11 +44,9 @@ deploy: manifests
 	kubectl apply -f config/crds
 	kustomize build config/default | kubectl apply -f -
 
-CRD_OPTIONS ?= "crd:trivialVersions=true"
-
 # Generate manifests e.g. CRD, Webhooks
 manifests: controller-gen
-	${CONTROLLER_GEN} ${CRD_OPTIONS} crd rbac:roleName=manager-role webhook paths="./..." output:dir=operator/config/crd/bases
+	${CONTROLLER_GEN} crd rbac:roleName=manager-role webhook paths="./pkg/apis/..." output:dir=operator/config/crd/bases
 
 # Run go fmt against code
 fmt:
@@ -60,7 +58,7 @@ vet:
 
 # Generate code
 generate: controller-gen
-	${CONTROLLER_GEN} object:headerFile="./hack/boilerplate.go.txt" paths="./..."
+	${CONTROLLER_GEN} object:headerFile="./hack/boilerplate.go.txt" paths="./pkg/apis/..."
 
 # Build the docker image
 build-controller:
@@ -79,7 +77,7 @@ bazel-generate:
 controller-gen:
 ifeq (, $(shell which controller-gen))
 	@{ \
-	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.6.2 ;\
+	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.10.0 ;\
 	}
 CONTROLLER_GEN=$(GOBIN)/controller-gen
 else
