@@ -21,6 +21,8 @@ test: generate fmt vet manifests
 # Experimental e2e target
 e2e-sanity:
 	go test tests/base_test.go
+	# vsphere suit
+	go test ./tests/suit -v
 
 # Build forklift-controller binary
 forklift-controller: generate fmt vet

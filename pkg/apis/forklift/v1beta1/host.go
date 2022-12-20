@@ -23,6 +23,7 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+//
 // HostSpec defines the desired state of Host
 type HostSpec struct {
 	ref.Ref `json:",inline"`
@@ -36,6 +37,7 @@ type HostSpec struct {
 	Secret core.ObjectReference `json:"secret" ref:"Secret"`
 }
 
+//
 // HostStatus defines the observed state of Host
 type HostStatus struct {
 	// Conditions.
@@ -45,6 +47,7 @@ type HostStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
+//
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:openapi-gen=true
@@ -62,6 +65,7 @@ type Host struct {
 	Referenced `json:"-"`
 }
 
+//
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type HostList struct {
 	meta.TypeMeta `json:",inline"`
