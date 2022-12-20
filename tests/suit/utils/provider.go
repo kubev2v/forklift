@@ -9,21 +9,19 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"time"
 )
 
-func NewProvider(providerName string, providerType forkliftv1.ProviderType, namespace string, url string, secret *corev1.Secret) forkliftv1.Provider {
+func NewProvider(providerName string, providerType forkliftv1.ProviderType, namespace string, providerSetting map[string]string, url string, secret *corev1.Secret) forkliftv1.Provider {
 	// nicPairs set with the default settings for kind CI.
 
 	providerMeta := v1.ObjectMeta{
-		Namespace: "konveyor-forklift",
-		//Name:      providerName,
-		Name: "ovirt-provider",
+		Namespace: namespace,
+		Name:      providerName,
 	}
 
-	ovirtProvider := forkliftv1.OVirt
-
-	//vsphere := forkliftv1.VSphere
 	p := forkliftv1.Provider{
 		TypeMeta: v1.TypeMeta{
 			Kind:       "Provider",
@@ -31,8 +29,9 @@ func NewProvider(providerName string, providerType forkliftv1.ProviderType, name
 		},
 		ObjectMeta: providerMeta,
 		Spec: forkliftv1.ProviderSpec{
-			Type: &ovirtProvider,
-			URL:  url,
+			Type:     &providerType,
+			URL:      url,
+			Settings: providerSetting,
 			Secret: corev1.ObjectReference{
 				Name:      secret.Name,
 				Namespace: namespace,
@@ -43,27 +42,31 @@ func NewProvider(providerName string, providerType forkliftv1.ProviderType, name
 	return p
 }
 
+func WaitForProviderReadyWithTimeout(cl crclient.Client, namespace string, providerName string, timeout time.Duration) error {
+	providerIdentifier := types.NamespacedName{Namespace: namespace, Name: providerName}
+
+	returnedProvider := &forkliftv1.Provider{}
+	err := wait.PollImmediate(3*time.Second, timeout, func() (bool, error) {
+		err := cl.Get(context.TODO(), providerIdentifier, returnedProvider)
+		if err != nil || !returnedProvider.Status.Conditions.IsReady() {
+			return false, err
+		}
+		return true, nil
+	})
+	if err != nil {
+		return fmt.Errorf("Provider %s not ready within %v", providerName, timeout)
+	}
+	return nil
+}
+
 // CreateProviderFromDefinition is used by tests to create a Provider
-func CreateProviderFromDefinition(cl crclient.Client, namespace string, def forkliftv1.Provider) error {
+func CreateProviderFromDefinition(cl crclient.Client, def forkliftv1.Provider) error {
 	err := cl.Create(context.TODO(), &def, &crclient.CreateOptions{})
 
 	if err == nil || apierrs.IsAlreadyExists(err) {
 		return nil
 	}
 	return err
-	//err := wait.PollImmediate(networkMapPollInterval, networkMapCreateTime, func() (bool, error) {
-	//	var err error
-	//	err = cl.Create(context.TODO(), def, &crclient.CreateOptions{})
-	//
-	//	if err == nil || apierrs.IsAlreadyExists(err) {
-	//		return true, nil
-	//	}
-	//	return false, err
-	//})
-	//if err != nil {
-	//	return err
-	//}
-	//return nil
 }
 
 // GetProvider returns provider object
