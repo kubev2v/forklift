@@ -16,6 +16,8 @@ UI_PLUGIN_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-console-plugin:${REGIST
 VALIDATION_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-validation:${REGISTRY_TAG}
 VIRT_V2V_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-virt-v2v:${REGISTRY_TAG}
 
+export USE_BAZEL_VERSION=5.4.0
+
 bazel run push-forklift-virt-v2v
 bazel run push-forklift-controller
 bazel run push-forklift-validation
