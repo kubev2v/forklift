@@ -39,8 +39,8 @@ const (
 	nsCreateTime = 60 * time.Second
 	nsDeleteTime = 5 * time.Minute
 	//NsPrefixLabel provides a cdi prefix label to identify the test namespace
-	NsPrefixLabel   = "cdi-e2e"
-	cdiPodPrefix    = "cdi-deployment"
+	NsPrefixLabel   = "forklift-e2e"
+	cdiPodPrefix    = "forklift-deployment"
 	timeout         = time.Second * 90
 	pollingInterval = time.Second
 )
@@ -187,7 +187,7 @@ func (f *Framework) CreateNamespace(prefix string, labels map[string]string) (*v
 
 	ns := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: fmt.Sprintf("cdi-e2e-tests-%s-", prefix),
+			GenerateName: fmt.Sprintf("forklift-e2e-tests-%s-", prefix),
 			Namespace:    "",
 			Labels:       labels,
 		},
