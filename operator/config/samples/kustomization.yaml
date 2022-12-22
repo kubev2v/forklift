@@ -8,4 +8,5 @@ resources:
 - forklift_v1beta1_plan.yaml
 - forklift_v1beta1_provider.yaml
 - forklift_v1beta1_storagemap.yaml
+- forklift_v1beta1_ovirtimageiopopulator.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

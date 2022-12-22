@@ -67,6 +67,7 @@ genrule(
         "bundle/manifests/forklift.konveyor.io_plans.yaml",
         "bundle/manifests/forklift.konveyor.io_providers.yaml",
         "bundle/manifests/forklift.konveyor.io_storagemaps.yaml",
+        "bundle/manifests/forklift.konveyor.io_ovirtimageiopopulators.yaml",
         "bundle/manifests/forklift-operator.clusterserviceversion.yaml",
         "bundle/metadata/annotations.yaml",
         "bundle/tests/scorecard/config.yaml",
@@ -95,6 +96,7 @@ container_image(
         ":bundle/manifests/forklift.konveyor.io_plans.yaml",
         ":bundle/manifests/forklift.konveyor.io_providers.yaml",
         ":bundle/manifests/forklift.konveyor.io_storagemaps.yaml",
+        ":bundle/manifests/forklift.konveyor.io_ovirtimageiopopulators.yaml",
         ":bundle/manifests/forklift-operator.clusterserviceversion.yaml",
     ],
 )

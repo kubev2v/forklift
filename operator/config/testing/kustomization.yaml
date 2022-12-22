@@ -18,6 +18,7 @@ resources:
 - ../crd
 - ../rbac
 - ../manager
+- ../imageio_populator
 images:
 - name: testing
   newName: testing-operator
