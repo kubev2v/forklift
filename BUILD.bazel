@@ -59,6 +59,15 @@ container_push(
 )
 
 container_push(
+    name = "push-forklift-api",
+    format = "Docker",
+    image = "//cmd/forklift-api:forklift-api-image",
+    registry = "$${REGISTRY:-quay.io}",
+    repository = "$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}forklift-api",
+    tag = "$${REGISTRY_TAG:-devel}",
+)
+
+container_push(
     name = "push-forklift-operator-index",
     format = "Docker",
     image = "//operator:forklift-operator-index-image",
