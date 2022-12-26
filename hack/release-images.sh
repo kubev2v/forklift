@@ -15,9 +15,11 @@ UI_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-ui:${REGISTRY_TAG}
 UI_PLUGIN_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-console-plugin:${REGISTRY_TAG}
 VALIDATION_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-validation:${REGISTRY_TAG}
 VIRT_V2V_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-virt-v2v:${REGISTRY_TAG}
+API_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-api:${REGISTRY_TAG}
 
 export USE_BAZEL_VERSION=5.4.0
 
+bazel run push-forklift-api
 bazel run push-forklift-virt-v2v
 bazel run push-forklift-controller
 bazel run push-forklift-validation
@@ -30,7 +32,8 @@ bazel run push-forklift-operator-bundle \
     --action_env UI_PLUGIN_IMAGE=${UI_PLUGIN_IMAGE} \
     --action_env VALIDATION_IMAGE=${VALIDATION_IMAGE} \
     --action_env VIRT_V2V_IMAGE=${VIRT_V2V_IMAGE} \
-    --action_env CONTROLLER_IMAGE=${CONTROLLER_IMAGE}
+    --action_env CONTROLLER_IMAGE=${CONTROLLER_IMAGE} \
+    --action_env API_IMAGE=${API_IMAGE}
 bazel run push-forklift-operator-index \
     --action_env REGISTRY=${REGISTRY} \
     --action_env REGISTRY_TAG=${REGISTRY_TAG} \
