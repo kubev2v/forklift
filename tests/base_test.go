@@ -109,12 +109,14 @@ func TestSanityOvirtProvider(t *testing.T) {
 			Labels: map[string]string{
 				"createdForResource":     "ovirt-provider",
 				"createdForResourceType": "providers",
+				"createdForProviderType": "ovirt",
 			},
 		},
 		Data: map[string][]byte{
 			"user":     []byte(username),
 			"password": []byte(password),
 			"cacert":   []byte(cacert),
+			"url":      []byte(ovirtURL),
 		},
 		Type: corev1.SecretTypeOpaque,
 	}
@@ -497,7 +499,6 @@ func TestSanityOvirtProvider(t *testing.T) {
 	}
 }
 
-//
 // Connect to the oVirt API.
 func (r *Client) connect(secret *corev1.Secret, url string) (err error) {
 	r.connection, err = ovirtsdk.NewConnectionBuilder().
@@ -534,7 +535,6 @@ func (r *Client) cacert(secret corev1.Secret) []byte {
 	return nil
 }
 
-//
 // Get the VM by ref.
 func (r *Client) getVMs(vmRef ref.Ref) (ovirtVm *ovirtsdk.Vm, vmService *ovirtsdk.VmService, err error) {
 	vmService = r.connection.SystemService().VmsService().VmService(vmRef.ID)
@@ -551,7 +551,6 @@ func (r *Client) getVMs(vmRef ref.Ref) (ovirtVm *ovirtsdk.Vm, vmService *ovirtsd
 	return
 }
 
-//
 // Close the connection to the oVirt API.
 func (r *Client) Close() {
 	if r.connection != nil {
@@ -560,7 +559,6 @@ func (r *Client) Close() {
 	}
 }
 
-//
 // oVirt VM Client
 type Client struct {
 	connection *ovirtsdk.Connection
