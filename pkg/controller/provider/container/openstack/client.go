@@ -192,13 +192,13 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 
 	case *[]Region:
 		switch listopts.(type) {
-		case RegionListOpts:
+		case *RegionListOpts:
 		default:
 			err = liberr.New("Wrong region list opts")
 			return
 		}
 		var allPages pagination.Page
-		allPages, err = regions.List(r.identityService, listopts.(RegionListOpts)).AllPages()
+		allPages, err = regions.List(r.identityService, listopts.(*RegionListOpts)).AllPages()
 		if err != nil {
 			return
 		}
@@ -216,13 +216,13 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 
 	case *[]Project:
 		switch listopts.(type) {
-		case ProjectListOpts:
+		case *ProjectListOpts:
 		default:
 			err = liberr.New("Wrong project list opts")
 			return
 		}
 		var allPages pagination.Page
-		allPages, err = projects.List(r.identityService, listopts.(ProjectListOpts)).AllPages()
+		allPages, err = projects.List(r.identityService, listopts.(*ProjectListOpts)).AllPages()
 		if err != nil {
 			return
 		}
@@ -240,13 +240,13 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 
 	case *[]Flavor:
 		switch listopts.(type) {
-		case FlavorListOpts:
+		case *FlavorListOpts:
 		default:
 			err = liberr.New("Wrong flavor list opts")
 			return
 		}
 		var allPages pagination.Page
-		allPages, err = flavors.ListDetail(r.computeService, listopts.(FlavorListOpts)).AllPages()
+		allPages, err = flavors.ListDetail(r.computeService, listopts.(*FlavorListOpts)).AllPages()
 		if err != nil {
 			return
 		}
@@ -264,13 +264,13 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 
 	case *[]Image:
 		switch listopts.(type) {
-		case ImageListOpts:
+		case *ImageListOpts:
 		default:
 			err = liberr.New("Wrong image list opts")
 			return
 		}
 		var allPages pagination.Page
-		allPages, err = images.List(r.imageService, listopts.(ImageListOpts)).AllPages()
+		allPages, err = images.List(r.imageService, listopts.(*ImageListOpts)).AllPages()
 		if err != nil {
 			return
 		}
@@ -288,13 +288,13 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 
 	case *[]Volume:
 		switch listopts.(type) {
-		case VolumeListOpts:
+		case *VolumeListOpts:
 		default:
 			err = liberr.New("Wrong volume list opts")
 			return
 		}
 		var allPages pagination.Page
-		allPages, err = volumes.List(r.blockStorageService, listopts.(VolumeListOpts)).AllPages()
+		allPages, err = volumes.List(r.blockStorageService, listopts.(*VolumeListOpts)).AllPages()
 		if err != nil {
 			return
 		}
@@ -312,13 +312,13 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 
 	case *[]VM:
 		switch listopts.(type) {
-		case VMListOpts:
+		case *VMListOpts:
 		default:
 			err = liberr.New("Wrong vm list opts")
 			return
 		}
 		var allPages pagination.Page
-		allPages, err = servers.List(r.computeService, listopts.(VMListOpts)).AllPages()
+		allPages, err = servers.List(r.computeService, listopts.(*VMListOpts)).AllPages()
 		if err != nil {
 			return
 		}
