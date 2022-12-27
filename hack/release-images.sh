@@ -17,8 +17,6 @@ VALIDATION_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-validation:${REGISTRY_
 VIRT_V2V_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-virt-v2v:${REGISTRY_TAG}
 API_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-api:${REGISTRY_TAG}
 
-export USE_BAZEL_VERSION=5.4.0
-
 bazel run push-forklift-api
 bazel run push-forklift-virt-v2v
 bazel run push-forklift-controller
