@@ -11,7 +11,6 @@ import (
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 )
 
-//
 // All adapters.
 var adapterList []Adapter
 
@@ -26,12 +25,10 @@ func init() {
 	}
 }
 
-//
 // Updates the DB based on
 // changes described by an Event.
 type Updater func(tx *libmodel.Tx) error
 
-//
 // Adapter context.
 type Context struct {
 	// Context.
@@ -42,7 +39,6 @@ type Context struct {
 	log logr.Logger
 }
 
-//
 // The adapter request is canceled.
 func (r *Context) canceled() (done bool) {
 	select {
@@ -54,7 +50,6 @@ func (r *Context) canceled() (done bool) {
 	return
 }
 
-//
 // Model adapter.
 // Provides integration between the REST resource
 // model and the inventory model.
@@ -69,7 +64,7 @@ type RegionAdapter struct {
 }
 
 func (r *RegionAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
-	opts := RegionListOpts{}
+	opts := &RegionListOpts{}
 	regionList := []Region{}
 	err = ctx.client.list(&regionList, opts)
 	if err != nil {
@@ -89,7 +84,7 @@ func (r *RegionAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 }
 
 func (r *RegionAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
-	opts := RegionListOpts{}
+	opts := &RegionListOpts{}
 	regionList := []Region{}
 	err = ctx.client.list(&regionList, opts)
 	for _, region := range regionList {
@@ -120,7 +115,7 @@ type ProjectAdapter struct {
 }
 
 func (r *ProjectAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
-	opts := ProjectListOpts{}
+	opts := &ProjectListOpts{}
 	projectList := []Project{}
 	err = ctx.client.list(&projectList, opts)
 	if err != nil {
@@ -140,7 +135,7 @@ func (r *ProjectAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 }
 
 func (r *ProjectAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
-	opts := ProjectListOpts{}
+	opts := &ProjectListOpts{}
 	projectList := []Project{}
 	err = ctx.client.list(&projectList, opts)
 	for _, project := range projectList {
@@ -171,7 +166,7 @@ type FlavorAdapter struct {
 }
 
 func (r *FlavorAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
-	opts := FlavorListOpts{}
+	opts := &FlavorListOpts{}
 	imageList := []Flavor{}
 	err = ctx.client.list(&imageList, opts)
 	if err != nil {
@@ -191,7 +186,7 @@ func (r *FlavorAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 }
 
 func (r *FlavorAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
-	opts := FlavorListOpts{}
+	opts := &FlavorListOpts{}
 	flavorList := []Flavor{}
 	err = ctx.client.list(&flavorList, opts)
 	for _, flavor := range flavorList {
@@ -222,7 +217,7 @@ type ImageAdapter struct {
 }
 
 func (r *ImageAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
-	opts := ImageListOpts{}
+	opts := &ImageListOpts{}
 	imageList := []Image{}
 	err = ctx.client.list(&imageList, opts)
 	if err != nil {
@@ -287,7 +282,7 @@ type VolumeAdapter struct {
 }
 
 func (r *VolumeAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
-	opts := VolumeListOpts{}
+	opts := &VolumeListOpts{}
 	volumeList := []Volume{}
 	err = ctx.client.list(&volumeList, opts)
 	if err != nil {
@@ -348,15 +343,13 @@ func (r *VolumeAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []
 	return
 }
 
-//
 // VM adapter.
 type VMAdapter struct {
 }
 
-//
 // List the collection.
 func (r *VMAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
-	opts := VMListOpts{}
+	opts := &VMListOpts{}
 	serverList := []VM{}
 	err = ctx.client.list(&serverList, opts)
 	if err != nil {
@@ -375,10 +368,9 @@ func (r *VMAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	return
 }
 
-//
 // Get updates since last sync.
 func (r *VMAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
-	opts := VMListOpts{}
+	opts := &VMListOpts{}
 	opts.ChangesSince = lastSync.Format(time.RFC3339)
 	serverList := []VM{}
 	err = ctx.client.list(&serverList, opts)
