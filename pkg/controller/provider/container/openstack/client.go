@@ -23,8 +23,7 @@ import (
 	core "k8s.io/api/core/v1"
 )
 
-//
-//NotFound error.
+// NotFound error.
 type NotFound struct {
 }
 
@@ -32,7 +31,6 @@ func (e *NotFound) Error() string {
 	return "not found."
 }
 
-//
 // Client struct
 type Client struct {
 	url                 string
@@ -44,7 +42,6 @@ type Client struct {
 	blockStorageService *gophercloud.ServiceClient
 }
 
-//
 // Connect.
 func (r *Client) connect() (err error) {
 	var TLSClientConfig *tls.Config
@@ -128,7 +125,6 @@ func (r *Client) connect() (err error) {
 	return
 }
 
-//
 // Username.
 func (r *Client) username() string {
 	if username, found := r.secret.Data["username"]; found {
@@ -137,7 +133,6 @@ func (r *Client) username() string {
 	return ""
 }
 
-//
 // Password.
 func (r *Client) password() string {
 	if password, found := r.secret.Data["password"]; found {
@@ -146,7 +141,6 @@ func (r *Client) password() string {
 	return ""
 }
 
-//
 // Project Name
 func (r *Client) projectName() string {
 	if projectName, found := r.secret.Data["projectName"]; found {
@@ -155,7 +149,6 @@ func (r *Client) projectName() string {
 	return ""
 }
 
-//
 // Domain Name
 func (r *Client) domainName() string {
 	if domainName, found := r.secret.Data["domainName"]; found {
@@ -164,7 +157,6 @@ func (r *Client) domainName() string {
 	return ""
 }
 
-//
 // Region
 func (r *Client) region() string {
 	if region, found := r.secret.Data["region"]; found {
@@ -173,7 +165,6 @@ func (r *Client) region() string {
 	return ""
 }
 
-//
 // CA Certificate
 func (r *Client) cacert() string {
 	if cacert, found := r.secret.Data["cacert"]; found {
@@ -182,7 +173,6 @@ func (r *Client) cacert() string {
 	return ""
 }
 
-//
 // Insecure
 func (r *Client) insecure() bool {
 	if insecure, found := r.secret.Data["insecure"]; found {
@@ -195,7 +185,6 @@ func (r *Client) insecure() bool {
 	return false
 }
 
-//
 // List Servers.
 func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 
@@ -209,7 +198,7 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 			return
 		}
 		var allPages pagination.Page
-		allPages, err = regions.List(r.identityService, listopts.(regions.ListOpts)).AllPages()
+		allPages, err = regions.List(r.identityService, listopts.(RegionListOpts)).AllPages()
 		if err != nil {
 			return
 		}
@@ -233,7 +222,7 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 			return
 		}
 		var allPages pagination.Page
-		allPages, err = projects.List(r.identityService, listopts.(projects.ListOpts)).AllPages()
+		allPages, err = projects.List(r.identityService, listopts.(ProjectListOpts)).AllPages()
 		if err != nil {
 			return
 		}
@@ -257,7 +246,7 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 			return
 		}
 		var allPages pagination.Page
-		allPages, err = flavors.ListDetail(r.computeService, listopts.(flavors.ListOpts)).AllPages()
+		allPages, err = flavors.ListDetail(r.computeService, listopts.(FlavorListOpts)).AllPages()
 		if err != nil {
 			return
 		}
@@ -281,7 +270,7 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 			return
 		}
 		var allPages pagination.Page
-		allPages, err = images.List(r.imageService, listopts.(images.ListOpts)).AllPages()
+		allPages, err = images.List(r.imageService, listopts.(ImageListOpts)).AllPages()
 		if err != nil {
 			return
 		}
@@ -305,7 +294,7 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 			return
 		}
 		var allPages pagination.Page
-		allPages, err = volumes.List(r.blockStorageService, listopts.(volumes.ListOpts)).AllPages()
+		allPages, err = volumes.List(r.blockStorageService, listopts.(VolumeListOpts)).AllPages()
 		if err != nil {
 			return
 		}
@@ -329,7 +318,7 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 			return
 		}
 		var allPages pagination.Page
-		allPages, err = servers.List(r.computeService, listopts.(servers.ListOpts)).AllPages()
+		allPages, err = servers.List(r.computeService, listopts.(VMListOpts)).AllPages()
 		if err != nil {
 			return
 		}
@@ -350,7 +339,6 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 	}
 }
 
-//
 // Get a resource.
 func (r *Client) get(object interface{}, ID string) (err error) {
 	switch object.(type) {
