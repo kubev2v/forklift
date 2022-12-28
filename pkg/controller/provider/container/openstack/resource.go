@@ -1,6 +1,8 @@
 package openstack
 
 import (
+	"time"
+
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
@@ -8,7 +10,6 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/regions"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/openstack"
-	"time"
 )
 
 // VM Status
@@ -216,7 +217,6 @@ func (r *VM) ApplyTo(m *model.VM) {
 	m.AdminPass = r.AdminPass
 	m.SecurityGroups = r.SecurityGroups
 	r.addAttachedVolumes(m)
-	r.addFault(m)
 	m.Tags = r.Tags
 	m.ServerGroups = r.ServerGroups
 }
