@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
@@ -31,6 +32,18 @@ func (e *NotFound) Error() string {
 	return "not found."
 }
 
+type ResourceType string
+
+// Provider types.
+const (
+	RegionResource  ResourceType = "Region"
+	ProjectResource ResourceType = "Project"
+	FlavorResource  ResourceType = "Flavor"
+	ImageResource   ResourceType = "Image"
+	VolumeResource  ResourceType = "Volume"
+	VmResource      ResourceType = "Vm"
+)
+
 // Client struct
 type Client struct {
 	url                 string
@@ -40,6 +53,7 @@ type Client struct {
 	computeService      *gophercloud.ServiceClient
 	imageService        *gophercloud.ServiceClient
 	blockStorageService *gophercloud.ServiceClient
+	log                 logr.Logger
 }
 
 // Connect.
@@ -186,17 +200,11 @@ func (r *Client) insecure() bool {
 }
 
 // List Servers.
-func (r *Client) list(object interface{}, listopts interface{}) (err error) {
+func (r *Client) list(resourceType ResourceType, listopts interface{}) (obj interface{}, err error) {
 
-	switch object.(type) {
+	switch resourceType {
 
-	case *[]Region:
-		switch listopts.(type) {
-		case *RegionListOpts:
-		default:
-			err = liberr.New("Wrong region list opts")
-			return
-		}
+	case RegionResource:
 		var allPages pagination.Page
 		allPages, err = regions.List(r.identityService, listopts.(*RegionListOpts)).AllPages()
 		if err != nil {
@@ -211,16 +219,10 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 		for _, region := range regionList {
 			instanceList = append(instanceList, Region{region})
 		}
-		object = &instanceList
+		obj = instanceList
 		return
 
-	case *[]Project:
-		switch listopts.(type) {
-		case *ProjectListOpts:
-		default:
-			err = liberr.New("Wrong project list opts")
-			return
-		}
+	case ProjectResource:
 		var allPages pagination.Page
 		allPages, err = projects.List(r.identityService, listopts.(*ProjectListOpts)).AllPages()
 		if err != nil {
@@ -235,16 +237,10 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 		for _, project := range projectList {
 			instanceList = append(instanceList, Project{project})
 		}
-		object = &instanceList
+		obj = instanceList
 		return
 
-	case *[]Flavor:
-		switch listopts.(type) {
-		case *FlavorListOpts:
-		default:
-			err = liberr.New("Wrong flavor list opts")
-			return
-		}
+	case FlavorResource:
 		var allPages pagination.Page
 		allPages, err = flavors.ListDetail(r.computeService, listopts.(*FlavorListOpts)).AllPages()
 		if err != nil {
@@ -259,18 +255,13 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 		for _, flavor := range flavorList {
 			instanceList = append(instanceList, Flavor{flavor})
 		}
-		object = &instanceList
+		obj = instanceList
 		return
 
-	case *[]Image:
-		switch listopts.(type) {
-		case *ImageListOpts:
-		default:
-			err = liberr.New("Wrong image list opts")
-			return
-		}
+	case ImageResource:
 		var allPages pagination.Page
 		allPages, err = images.List(r.imageService, listopts.(*ImageListOpts)).AllPages()
+		r.log.Info("All pages", "allPages", allPages)
 		if err != nil {
 			return
 		}
@@ -283,16 +274,11 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 		for _, image := range imageList {
 			instanceList = append(instanceList, Image{image})
 		}
-		object = &instanceList
+		obj = instanceList
+
 		return
 
-	case *[]Volume:
-		switch listopts.(type) {
-		case *VolumeListOpts:
-		default:
-			err = liberr.New("Wrong volume list opts")
-			return
-		}
+	case VolumeResource:
 		var allPages pagination.Page
 		allPages, err = volumes.List(r.blockStorageService, listopts.(*VolumeListOpts)).AllPages()
 		if err != nil {
@@ -307,16 +293,10 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 		for _, volume := range volumeList {
 			instanceList = append(instanceList, Volume{volume})
 		}
-		object = &instanceList
+		obj = instanceList
 		return
 
-	case *[]VM:
-		switch listopts.(type) {
-		case *VMListOpts:
-		default:
-			err = liberr.New("Wrong vm list opts")
-			return
-		}
+	case VmResource:
 		var allPages pagination.Page
 		allPages, err = servers.List(r.computeService, listopts.(*VMListOpts)).AllPages()
 		if err != nil {
@@ -331,11 +311,11 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 		for _, server := range serverList {
 			instanceList = append(instanceList, VM{server})
 		}
-		object = &instanceList
+		obj = instanceList
 		return
 
 	default:
-		return nil
+		return nil, nil
 	}
 }
 

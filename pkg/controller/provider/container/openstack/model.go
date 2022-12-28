@@ -65,13 +65,12 @@ type RegionAdapter struct {
 
 func (r *RegionAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	opts := &RegionListOpts{}
-	regionList := []Region{}
-	err = ctx.client.list(&regionList, opts)
+	regionList, err := ctx.client.list(RegionResource, opts)
 	if err != nil {
 		return
 	}
 	list := fb.NewList()
-	for _, region := range regionList {
+	for _, region := range regionList.([]Region) {
 		m := &model.Region{
 			Base: model.Base{ID: region.ID},
 		}
@@ -85,9 +84,8 @@ func (r *RegionAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 
 func (r *RegionAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
 	opts := &RegionListOpts{}
-	regionList := []Region{}
-	err = ctx.client.list(&regionList, opts)
-	for _, region := range regionList {
+	regionList, err := ctx.client.list(RegionResource, opts)
+	for _, region := range regionList.([]Region) {
 		updater := func(tx *libmodel.Tx) (err error) {
 			m := &model.Region{
 				Base: model.Base{ID: region.ID},
@@ -116,13 +114,12 @@ type ProjectAdapter struct {
 
 func (r *ProjectAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	opts := &ProjectListOpts{}
-	projectList := []Project{}
-	err = ctx.client.list(&projectList, opts)
+	projectList, err := ctx.client.list(ProjectResource, opts)
 	if err != nil {
 		return
 	}
 	list := fb.NewList()
-	for _, project := range projectList {
+	for _, project := range projectList.([]Project) {
 		m := &model.Project{
 			Base: model.Base{ID: project.ID},
 		}
@@ -136,9 +133,8 @@ func (r *ProjectAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 
 func (r *ProjectAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
 	opts := &ProjectListOpts{}
-	projectList := []Project{}
-	err = ctx.client.list(&projectList, opts)
-	for _, project := range projectList {
+	projectList, err := ctx.client.list(ProjectResource, opts)
+	for _, project := range projectList.([]Project) {
 		updater := func(tx *libmodel.Tx) (err error) {
 			m := &model.Project{
 				Base: model.Base{ID: project.ID},
@@ -167,17 +163,16 @@ type FlavorAdapter struct {
 
 func (r *FlavorAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	opts := &FlavorListOpts{}
-	imageList := []Flavor{}
-	err = ctx.client.list(&imageList, opts)
+	flavorList, err := ctx.client.list(FlavorResource, opts)
 	if err != nil {
 		return
 	}
 	list := fb.NewList()
-	for _, image := range imageList {
+	for _, flavor := range flavorList.([]Flavor) {
 		m := &model.Flavor{
-			Base: model.Base{ID: image.ID},
+			Base: model.Base{ID: flavor.ID},
 		}
-		image.ApplyTo(m)
+		flavor.ApplyTo(m)
 		list.Append(m)
 	}
 	itr = list.Iter()
@@ -187,9 +182,8 @@ func (r *FlavorAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 
 func (r *FlavorAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
 	opts := &FlavorListOpts{}
-	flavorList := []Flavor{}
-	err = ctx.client.list(&flavorList, opts)
-	for _, flavor := range flavorList {
+	flavorList, err := ctx.client.list(FlavorResource, opts)
+	for _, flavor := range flavorList.([]Flavor) {
 		updater := func(tx *libmodel.Tx) (err error) {
 			m := &model.Flavor{
 				Base: model.Base{ID: flavor.ID},
@@ -218,13 +212,12 @@ type ImageAdapter struct {
 
 func (r *ImageAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	opts := &ImageListOpts{}
-	imageList := []Image{}
-	err = ctx.client.list(&imageList, opts)
+	imageList, err := ctx.client.list(ImageResource, opts)
 	if err != nil {
 		return
 	}
 	list := fb.NewList()
-	for _, image := range imageList {
+	for _, image := range imageList.([]Image) {
 		m := &model.Image{
 			Base: model.Base{ID: image.ID},
 		}
@@ -237,11 +230,12 @@ func (r *ImageAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 }
 
 func (r *ImageAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
+	ctx.log.Info("Get Updates")
 	opts := &ImageListOpts{}
 	opts.setUpdateAtQueryFilterGTE(lastSync)
-	imageList := []Image{}
-	err = ctx.client.list(&imageList, opts)
-	for _, image := range imageList {
+	imageList, err := ctx.client.list(ImageResource, opts)
+
+	for _, image := range imageList.([]Image) {
 		switch image.Status {
 		case ImageStatusDeleted, ImageStatusPendingDelete:
 			updater := func(tx *libmodel.Tx) (err error) {
@@ -283,13 +277,12 @@ type VolumeAdapter struct {
 
 func (r *VolumeAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	opts := &VolumeListOpts{}
-	volumeList := []Volume{}
-	err = ctx.client.list(&volumeList, opts)
+	volumeList, err := ctx.client.list(VolumeResource, opts)
 	if err != nil {
 		return
 	}
 	list := fb.NewList()
-	for _, volume := range volumeList {
+	for _, volume := range volumeList.([]Volume) {
 		m := &model.Volume{
 			Base: model.Base{ID: volume.ID},
 		}
@@ -304,9 +297,8 @@ func (r *VolumeAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 // UpdatedAt volume list options not imlemented yet in gophercloud
 func (r *VolumeAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
 	opts := &VolumeListOpts{}
-	volumeList := []Volume{}
-	err = ctx.client.list(&volumeList, opts)
-	for _, volume := range volumeList {
+	volumeList, err := ctx.client.list(VolumeResource, opts)
+	for _, volume := range volumeList.([]Volume) {
 		switch volume.Status {
 		case VolumeStatusDeleting:
 			updater := func(tx *libmodel.Tx) (err error) {
@@ -350,13 +342,12 @@ type VMAdapter struct {
 // List the collection.
 func (r *VMAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	opts := &VMListOpts{}
-	serverList := []VM{}
-	err = ctx.client.list(&serverList, opts)
+	vmList, err := ctx.client.list(VmResource, opts)
 	if err != nil {
 		return
 	}
 	list := fb.NewList()
-	for _, server := range serverList {
+	for _, server := range vmList.([]VM) {
 		m := &model.VM{
 			Base: model.Base{ID: server.ID},
 		}
@@ -372,9 +363,8 @@ func (r *VMAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 func (r *VMAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
 	opts := &VMListOpts{}
 	opts.ChangesSince = lastSync.Format(time.RFC3339)
-	serverList := []VM{}
-	err = ctx.client.list(&serverList, opts)
-	for _, server := range serverList {
+	vmList, err := ctx.client.list(VmResource, opts)
+	for _, server := range vmList.([]VM) {
 		switch server.Status {
 		case VMStatusDeleted, VMStatusSoftDeleted:
 			updater := func(tx *libmodel.Tx) (err error) {

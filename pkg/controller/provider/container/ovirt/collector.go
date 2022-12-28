@@ -20,7 +20,6 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//
 // Settings
 const (
 	// Retry interval.
@@ -32,7 +31,6 @@ const (
 	DefaultClientTimeout = 30 * time.Minute
 )
 
-//
 // Phases
 const (
 	Started = ""
@@ -42,7 +40,6 @@ const (
 	Refresh = "refresh"
 )
 
-//
 // oVirt data collector.
 type Collector struct {
 	// Provider
@@ -65,7 +62,6 @@ type Collector struct {
 	watches []*libmodel.Watch
 }
 
-//
 // New collector.
 func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) (r *Collector) {
 	log := logging.WithName("collector|ovirt").WithValues(
@@ -87,7 +83,6 @@ func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) (r *Collec
 			clientTimeout = DefaultClientTimeout
 		}
 	}
-
 	r = &Collector{
 		client: &Client{
 			url:           provider.Spec.URL,
@@ -103,7 +98,6 @@ func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) (r *Collec
 	return
 }
 
-//
 // The name.
 func (r *Collector) Name() string {
 	url, err := liburl.Parse(r.client.url)
@@ -114,38 +108,32 @@ func (r *Collector) Name() string {
 	return r.client.url
 }
 
-//
 // The owner.
 func (r *Collector) Owner() meta.Object {
 	return r.provider
 }
 
-//
 // Get the DB.
 func (r *Collector) DB() libmodel.DB {
 	return r.db
 }
 
-//
 // Reset.
 func (r *Collector) Reset() {
 	r.parity = false
 }
 
-//
 // Reset.
 func (r *Collector) HasParity() bool {
 	return r.parity
 }
 
-//
 // Test connect/logout.
 func (r *Collector) Test() (status int, err error) {
 	_, status, err = r.client.system()
 	return
 }
 
-//
 // Start the collector.
 func (r *Collector) Start() error {
 	ctx := Context{
@@ -172,7 +160,6 @@ func (r *Collector) Start() error {
 	return nil
 }
 
-//
 // Run the current phase.
 func (r *Collector) run(ctx *Context) (err error) {
 	r.log.V(3).Info(
@@ -225,7 +212,6 @@ func (r *Collector) run(ctx *Context) (err error) {
 	return
 }
 
-//
 // Shutdown the collector.
 func (r *Collector) Shutdown() {
 	r.log.Info("Shutdown.")
@@ -234,7 +220,6 @@ func (r *Collector) Shutdown() {
 	}
 }
 
-//
 // Fetch and note that last event.
 func (r *Collector) noteLastEvent() (err error) {
 	err = r.connect()
@@ -264,7 +249,6 @@ func (r *Collector) noteLastEvent() (err error) {
 	return
 }
 
-//
 // Load the inventory.
 func (r *Collector) load(ctx *Context) (err error) {
 	err = r.connect()
@@ -290,7 +274,6 @@ func (r *Collector) load(ctx *Context) (err error) {
 	return
 }
 
-//
 // List and create resources using the adapter.
 func (r *Collector) create(ctx *Context, adapter Adapter) (err error) {
 	itr, aErr := adapter.List(ctx)
@@ -327,7 +310,6 @@ func (r *Collector) create(ctx *Context, adapter Adapter) (err error) {
 	return
 }
 
-//
 // Add model watches.
 func (r *Collector) beginWatch() (err error) {
 	defer func() {
@@ -400,7 +382,6 @@ func (r *Collector) beginWatch() (err error) {
 	return
 }
 
-//
 // End watches.
 func (r *Collector) endWatch() {
 	for _, watch := range r.watches {
@@ -408,11 +389,11 @@ func (r *Collector) endWatch() {
 	}
 }
 
-//
 // Refresh the inventory.
-//  - List events.
-//  - Build the changeSet.
-//  - Apply the changeSet.
+//   - List events.
+//   - Build the changeSet.
+//   - Apply the changeSet.
+//
 // The two-phased approach ensures we do not hold the
 // DB transaction while using the provider API which
 // can block or be slow.
@@ -450,7 +431,6 @@ func (r *Collector) refresh(ctx *Context) (err error) {
 	return
 }
 
-//
 // Build the changeSet.
 func (r *Collector) changeSet(ctx *Context, event *Event) (list []Updater, err error) {
 	for _, adapter := range adapterMap[event.code()] {
@@ -464,7 +444,6 @@ func (r *Collector) changeSet(ctx *Context, event *Event) (list []Updater, err e
 	return
 }
 
-//
 // Apply the changeSet.
 func (r *Collector) apply(changeSet []Updater) (err error) {
 	tx, err := r.db.Begin()
@@ -484,7 +463,6 @@ func (r *Collector) apply(changeSet []Updater) (err error) {
 	return
 }
 
-//
 // List Event collection.
 // Query by list of event types since lastEvent (marked).
 func (r *Collector) listEvent() (list []Event, err error) {
@@ -524,7 +502,6 @@ func (r *Collector) listEvent() (list []Event, err error) {
 	return
 }
 
-//
 // Connect.
 func (r *Collector) connect() error {
 	_, err := r.client.connect()
