@@ -2,18 +2,15 @@ package admitters
 
 import (
 	//	"encoding/base64"
+
 	"encoding/json"
 	"fmt"
 	"net/http"
 
-	//	"fmt"
-	//	"net"
-	//	"regexp"
-	//	"strings"
-
 	//webhookutils "github.com/konveyor/forklift-controller/pkg/util/webhooks"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	admissionv1 "k8s.io/api/admission/v1beta1"
 	core "k8s.io/api/core/v1"
@@ -71,7 +68,28 @@ func (admitter *SecretAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissio
 			if err != nil {
 				log.Info("Connection test failed, yet passing", "status", status, "error", err.Error())
 			} else {
-				log.Info("Test succeeded, passing")
+				// Perform validation for the provided engine CA certificate,
+				// initiate dummy image transfer to make sure the certificate is correct and that the migration will work in a later stage.
+				if createdForProviderType == "ovirt" {
+					if isCaOK, err := ovirt.TestDownloadOvfStore(secret, log); isCaOK {
+						if err != nil {
+							log.Info("CA certificate test failed, yet passing", "error", err.Error())
+						} else {
+							log.Info("Test credentials and CA certificate succeeded, passing")
+						}
+					} else {
+						log.Info("Test credentials succeeded but engine CA certificate is not valid, passing")
+						return &admissionv1.AdmissionResponse{
+							Allowed: true,
+							Result: &metav1.Status{
+								Code:    http.StatusForbidden,
+								Message: "Test credentials succeeded but engine CA certificate is not valid",
+							},
+						}
+					}
+				} else {
+					log.Info("Test credentials succeeded, passing")
+				}
 			}
 			return &admissionv1.AdmissionResponse{
 				Allowed: true,

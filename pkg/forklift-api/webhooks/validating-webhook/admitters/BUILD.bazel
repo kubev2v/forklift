@@ -8,6 +8,7 @@ go_library(
     deps = [
         "//pkg/apis/forklift/v1beta1",
         "//pkg/controller/provider/container",
+        "//pkg/controller/provider/container/ovirt",
         "//pkg/lib/logging",
         "//vendor/k8s.io/api/admission/v1beta1",
         "//vendor/k8s.io/api/core/v1:core",

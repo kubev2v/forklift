@@ -13,6 +13,7 @@ import (
 	"github.com/go-logr/logr"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
+	ovirtsdk "github.com/ovirt/go-ovirt"
 	core "k8s.io/api/core/v1"
 )
 
@@ -200,7 +201,6 @@ func (r *Client) system() (s *System, status int, err error) {
 	if err != nil {
 		return
 	}
-
 	return
 }
 
@@ -218,4 +218,153 @@ func GetInsecureSkipVerifyFlag(secret *core.Secret) bool {
 	}
 
 	return insecureSkipVerify
+}
+
+func TestDownloadOvfStore(secret *core.Secret, log logr.Logger) (validCA bool, err error) {
+	// Create the connection to the server:
+	conn, err := ovirtsdk.NewConnectionBuilder().
+		URL(string(secret.Data["url"])).
+		Username(string(secret.Data["user"])).
+		Password(string(secret.Data["password"])).
+		Insecure(true).
+		Compress(true).
+		Timeout(time.Second * 30).
+		Build()
+	if err != nil {
+		log.Error(err, "Failed establishing connection to oVirt")
+		err = liberr.Wrap(err)
+		return
+	}
+	defer conn.Close()
+
+	//Find OVF STORE ID
+	disksService := conn.SystemService().DisksService()
+	disksResponse, err := disksService.List().Send()
+	if err != nil {
+		log.Error(err, "Failed to get disks list from oVirt")
+		err = liberr.Wrap(err)
+		return
+	}
+
+	var ovfStoreId string
+	if disks, ok := disksResponse.Disks(); ok {
+		//get OVF STORE ID
+		for _, disk := range disks.Slice() {
+			if diskName, ok := disk.Name(); ok {
+				if diskName == "OVF_STORE" {
+					if diskId, ok := disk.Id(); ok {
+						ovfStoreId = diskId
+						break
+					}
+				}
+			}
+		}
+	}
+	// In case no OVF store was found in the system
+	if ovfStoreId == "" {
+		log.Error(err, "OVF Store does not exist in the system, CA certificate test can't performed")
+		return
+	}
+
+	//in case the OVF STORE is locked wait for OK status before starting the image transfer
+	conn.WaitForDisk(ovfStoreId, ovirtsdk.DISKSTATUS_OK, 20*time.Second)
+
+	// Prepare image transfer request
+	transfersService := conn.SystemService().ImageTransfersService()
+	transfer := transfersService.Add()
+	image, err := ovirtsdk.NewImageBuilder().Id(ovfStoreId).Build()
+	if err != nil {
+		log.Error(err, "Failed to build image for image transfer")
+		err = liberr.Wrap(err)
+		return
+	}
+	imageTransfer, err := ovirtsdk.NewImageTransferBuilder().Image(
+		image,
+	).Direction(
+		ovirtsdk.IMAGETRANSFERDIRECTION_DOWNLOAD,
+	).Build()
+	if err != nil {
+		log.Error(err, "Failed to build image transfer")
+		err = liberr.Wrap(err)
+		return
+	}
+
+	// Initialize image transfer and lock the disk
+	transferResponse, err := transfer.ImageTransfer(imageTransfer).Send()
+	if err != nil {
+		log.Error(err, "Failed initialize image transfer")
+		err = liberr.Wrap(err)
+		return
+	}
+	currImageTransfer, ok := transferResponse.ImageTransfer()
+
+	imageTransferId, ok := currImageTransfer.Id()
+
+	for {
+		if currImageTransfer.MustPhase() == ovirtsdk.IMAGETRANSFERPHASE_INITIALIZING {
+			time.Sleep(1 * time.Second)
+			currImagetransferResponse, errIT := conn.SystemService().ImageTransfersService().ImageTransferService(imageTransferId).Get().Send()
+			if err != nil {
+				log.Error(err, "Failed to send image transfer")
+				err = liberr.Wrap(errIT)
+				return
+			}
+			currImageTransfer, ok = currImagetransferResponse.ImageTransfer()
+		} else {
+			break
+		}
+	}
+
+	caCert := secret.Data["cacert"]
+	caCertPool := x509.NewCertPool()
+	ok = caCertPool.AppendCertsFromPEM(caCert)
+	if !ok {
+		log.Error(err, "Failed to append certificate")
+		err = liberr.Wrap(err)
+		return
+	}
+
+	// Create http client
+	tlsConfig := &tls.Config{
+		RootCAs: caCertPool,
+	}
+	transport := &http.Transport{TLSClientConfig: tlsConfig}
+	client := &http.Client{Transport: transport}
+
+	// Prepare disk GET request
+	transferURL, ok := currImageTransfer.TransferUrl()
+	req, err := http.NewRequest("GET", transferURL, nil)
+
+	// Run the request
+	resp, err := client.Do(req)
+	if err != nil {
+		// CA certificate is missing, request for image transfer url won't be sent
+		if strings.Contains(err.Error(), "x509") {
+			log.Info("Missing engine CA certificate, the request would not proceed")
+			_, _ = conn.SystemService().ImageTransfersService().ImageTransferService(imageTransferId).Finalize().Send()
+			ok = false
+			return
+		} else {
+			log.Error(err, "Failed to send request to server")
+			err = liberr.Wrap(err)
+			return
+		}
+	}
+	defer resp.Body.Close()
+
+	//close image transfer
+	_, err = conn.SystemService().ImageTransfersService().ImageTransferService(imageTransferId).Finalize().Send()
+	if err != nil {
+		log.Info("Failed to Finalize image transfer")
+		err = liberr.Wrap(err)
+		return
+	}
+
+	// Check server response
+	if resp.StatusCode == http.StatusOK {
+		log.Info("Response OK, CA certificate configured correct")
+		validCA = true
+		return
+	}
+	return
 }
