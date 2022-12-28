@@ -34,7 +34,7 @@ func (r *Resolver) Path(resource interface{}, id string) (path string, err error
 		path = r.SelfLink
 	case *Image:
 		r := Image{}
-		r.Image.ID = id
+		r.ID = id
 		r.Link(provider)
 		path = r.SelfLink
 	default:

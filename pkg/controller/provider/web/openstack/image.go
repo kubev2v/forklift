@@ -3,6 +3,7 @@ package openstack
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
@@ -27,7 +28,27 @@ type ImageHandler struct {
 
 type Image struct {
 	Resource
-	images.Image
+	Status                      images.ImageStatus     `json:"status"`
+	Tags                        []string               `json:"tags"`
+	ContainerFormat             string                 `json:"container_format"`
+	DiskFormat                  string                 `json:"disk_format"`
+	MinDiskGigabytes            int                    `json:"min_disk"`
+	MinRAMMegabytes             int                    `json:"min_ram"`
+	Owner                       string                 `json:"owner"`
+	Protected                   bool                   `json:"protected"`
+	Visibility                  images.ImageVisibility `json:"visibility"`
+	Hidden                      bool                   `json:"os_hidden"`
+	Checksum                    string                 `json:"checksum"`
+	SizeBytes                   int64                  `json:"-"`
+	Metadata                    map[string]string      `json:"metadata"`
+	CreatedAt                   time.Time              `json:"created_at"`
+	UpdatedAt                   time.Time              `json:"updated_at"`
+	File                        string                 `json:"file"`
+	Schema                      string                 `json:"schema"`
+	VirtualSize                 int64                  `json:"virtual_size"`
+	OpenStackImageImportMethods []string               `json:"-"`
+	OpenStackImageStoreIDs      []string               `json:"-"`
+	Properties                  map[string]interface{}
 }
 
 // Add routes to the `gin` router.
@@ -144,7 +165,7 @@ func (r *Image) Link(p *api.Provider) {
 		ImageRoot,
 		base.Params{
 			base.ProviderParam: string(p.UID),
-			ImageParam:         r.Image.ID,
+			ImageParam:         r.ID,
 		})
 }
 
