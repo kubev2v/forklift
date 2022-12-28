@@ -93,10 +93,10 @@ container_image(
         ":bundle/manifests/forklift.konveyor.io_hosts.yaml",
         ":bundle/manifests/forklift.konveyor.io_migrations.yaml",
         ":bundle/manifests/forklift.konveyor.io_networkmaps.yaml",
+        ":bundle/manifests/forklift.konveyor.io_ovirtimageiopopulators.yaml",
         ":bundle/manifests/forklift.konveyor.io_plans.yaml",
         ":bundle/manifests/forklift.konveyor.io_providers.yaml",
         ":bundle/manifests/forklift.konveyor.io_storagemaps.yaml",
-        ":bundle/manifests/forklift.konveyor.io_ovirtimageiopopulators.yaml",
         ":bundle/manifests/forklift-operator.clusterserviceversion.yaml",
     ],
 )

@@ -30,6 +30,6 @@ go_library(
         "//vendor/k8s.io/client-go/rest",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client/config",
-        "//vendor/sigs.k8s.io/controller-runtime/pkg/runtime/scheme",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/scheme",
     ],
 )
