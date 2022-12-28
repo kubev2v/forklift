@@ -31,6 +31,7 @@ const (
 	InventoryCreated        = "InventoryCreated"
 	LoadInventory           = "LoadInventory"
 	ConnectionInsecure      = "ConnectionInsecure"
+	CACertMissing           = "CACertMissing"
 )
 
 //
@@ -97,6 +98,10 @@ func (r *Reconciler) validate(provider *api.Provider) error {
 		return liberr.Wrap(err)
 	}
 	err = r.inventoryCreated(provider)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	err = r.validateCACert(provider, secret)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -234,6 +239,7 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 				"user",
 				"password",
 			}
+			//TODO add url check after fix
 		} else {
 			keyList = []string{
 				"user",
@@ -254,6 +260,36 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 	}
 
 	return
+}
+
+//
+// Validate CA cert not Missing
+func (r *Reconciler) validateCACert(provider *api.Provider, secret *core.Secret) error {
+	newCnd := libcnd.Condition{
+		Type:     CACertMissing,
+		Status:   True,
+		Reason:   NotSet,
+		Category: Warn,
+		Message:  "CA cert was missing, retriving the CA automaticly",
+	}
+
+	switch provider.Type() {
+	case api.OVirt:
+
+		ok, err := ovirt.DownloadOVFTestConection(secret)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if !ok {
+			newCnd.Items = append(newCnd.Items)
+		}
+
+		if len(newCnd.Items) > 0 {
+			provider.Status.SetCondition(newCnd)
+		}
+	}
+
+	return nil
 }
 
 //

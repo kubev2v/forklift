@@ -26,7 +26,10 @@ go_library(
         "//pkg/lib/logging",
         "//pkg/settings",
         "//vendor/github.com/go-logr/logr",
+        "//vendor/github.com/ovirt/go-ovirt",
         "//vendor/k8s.io/api/core/v1:core",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:meta",
+        "//vendor/k8s.io/client-go/kubernetes",
+        "//vendor/k8s.io/client-go/rest",
     ],
 )
