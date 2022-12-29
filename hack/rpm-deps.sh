@@ -20,6 +20,13 @@ virt_v2v="
   virtio-win
 "
 
+ovirt_imageio="
+  python3-devel
+  python3-ovirt-engine-sdk4
+  ovirt-imageio-common
+  qemu-img
+"
+
 bazel run \
         //:bazeldnf -- rpmtree \
         --public --nobest \
@@ -28,3 +35,10 @@ bazel run \
         ${bazeldnf_repos} \
         $virt_v2v
 
+bazel run \
+        //:bazeldnf -- rpmtree \
+        --public --nobest \
+        --name ovirt-imageio \
+        --basesystem centos-stream-release \
+        ${bazeldnf_repos} \
+        $ovirt_imageio

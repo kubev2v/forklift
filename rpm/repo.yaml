@@ -1,9 +1,12 @@
 repositories:
 - arch: x86_64
-  baseurl: http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/
-  name: centos/stream8-baseos-x86_64
+  baseurl: https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/
+  name: centos/stream9-baseos-x86_64
   gpgkey: https://www.centos.org/keys/RPM-GPG-KEY-CentOS-Official
 - arch: x86_64
-  baseurl: http://mirror.centos.org/centos/8-stream/AppStream/x86_64/os/
-  name: centos/stream8-appstream-x86_64
+  baseurl: https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/
+  name: centos/stream9-appstream-x86_64
   gpgkey: https://www.centos.org/keys/RPM-GPG-KEY-CentOS-Official
+- arch: x86_64
+  baseurl: https://mirror.stream.centos.org/SIGs/9-stream/virt/x86_64/ovirt-45
+  name: centos/stream9-virt-x86_64

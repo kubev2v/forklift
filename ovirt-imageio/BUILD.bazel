@@ -24,3 +24,17 @@ go_binary(
     embed = [":ovirt-imageio_lib"],
     visibility = ["//visibility:public"],
 )
+
+load(
+    "@io_bazel_rules_docker//container:container.bzl",
+    "container_image",
+)
+
+container_image(
+    name = "ovirt-imageio-image",
+    base = "@ubi9-go-toolset//image",
+    directory = "/usr/local/bin/",
+    entrypoint = ["/usr/local/bin/main"],
+    files = [":ovirt-imageio"],
+    tars = ["//rpm:ovirt-imageio"],
+)
