@@ -9,24 +9,20 @@ import (
 	"strings"
 )
 
-//
 // Package logger.
 var log = logging.WithName("web|vsphere")
 
-//
 // Fields.
 const (
 	DetailParam = base.DetailParam
 	NameParam   = base.NameParam
 )
 
-//
 // Base handler.
 type Handler struct {
 	base.Handler
 }
 
-//
 // Build list predicate.
 func (h Handler) Predicate(ctx *gin.Context) (p libmodel.Predicate) {
 	q := ctx.Request.URL.Query()
@@ -40,7 +36,6 @@ func (h Handler) Predicate(ctx *gin.Context) (p libmodel.Predicate) {
 	return
 }
 
-//
 // Build list options.
 func (h Handler) ListOptions(ctx *gin.Context) libmodel.ListOptions {
 	detail := h.Detail
@@ -54,7 +49,6 @@ func (h Handler) ListOptions(ctx *gin.Context) libmodel.ListOptions {
 	}
 }
 
-//
 // Path builder.
 type PathBuilder struct {
 	// Database.
@@ -63,7 +57,6 @@ type PathBuilder struct {
 	cache map[model.Ref]*model.Base
 }
 
-//
 // Determine object path.
 func (r *PathBuilder) Path(m model.Model) (path string) {
 	var err error

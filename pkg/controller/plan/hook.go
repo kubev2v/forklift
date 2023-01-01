@@ -26,7 +26,6 @@ const (
 	kStep = "step"
 )
 
-//
 // Hook runner.
 type HookRunner struct {
 	*plancontext.Context
@@ -38,7 +37,6 @@ type HookRunner struct {
 	hook *api.Hook
 }
 
-//
 // Run.
 func (r *HookRunner) Run(vm *planapi.VMStatus) (err error) {
 	r.vm = vm
@@ -87,7 +85,6 @@ func (r *HookRunner) Run(vm *planapi.VMStatus) (err error) {
 	return
 }
 
-//
 // Ensure the job.
 func (r *HookRunner) ensureJob() (job *batch.Job, err error) {
 	mp, err := r.ensureConfigMap()
@@ -145,7 +142,6 @@ func (r *HookRunner) ensureJob() (job *batch.Job, err error) {
 	return
 }
 
-//
 // Build the Job.
 func (r *HookRunner) job(mp *core.ConfigMap) (job *batch.Job, err error) {
 	template := r.template(mp)
@@ -175,7 +171,6 @@ func (r *HookRunner) job(mp *core.ConfigMap) (job *batch.Job, err error) {
 	return
 }
 
-//
 // Build pod template.
 func (r *HookRunner) template(mp *core.ConfigMap) (template *core.PodTemplateSpec) {
 	template = &core.PodTemplateSpec{
@@ -230,7 +225,6 @@ func (r *HookRunner) template(mp *core.ConfigMap) (template *core.PodTemplateSpe
 	return
 }
 
-//
 // Ensure the ConfigMap.
 func (r *HookRunner) ensureConfigMap() (mp *core.ConfigMap, err error) {
 	list := core.ConfigMapList{}
@@ -274,7 +268,6 @@ func (r *HookRunner) ensureConfigMap() (mp *core.ConfigMap, err error) {
 	return
 }
 
-//
 // Job ConfigMap for volume mounts.
 func (r *HookRunner) configMap() (mp *core.ConfigMap, err error) {
 	workload, err := r.workload()
@@ -310,7 +303,6 @@ func (r *HookRunner) configMap() (mp *core.ConfigMap, err error) {
 	return
 }
 
-//
 // Workload
 func (r *HookRunner) workload() (workload string, err error) {
 	inventory := r.Source.Inventory
@@ -327,7 +319,6 @@ func (r *HookRunner) workload() (workload string, err error) {
 	return
 }
 
-//
 // Decode playbook.
 func (r *HookRunner) playbook() (playbook string, err error) {
 	encoded := r.hook.Spec.Playbook
@@ -343,7 +334,6 @@ func (r *HookRunner) playbook() (playbook string, err error) {
 	return
 }
 
-//
 // Plan (yaml).
 func (r *HookRunner) plan() (plan string, err error) {
 	b, err := yaml.Marshal(r.Plan.Spec)
@@ -355,7 +345,6 @@ func (r *HookRunner) plan() (plan string, err error) {
 	return
 }
 
-//
 // Labels for created resources.
 func (r *HookRunner) labels() map[string]string {
 	return map[string]string{

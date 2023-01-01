@@ -25,7 +25,6 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//
 // PlanSpec defines the desired state of Plan.
 type PlanSpec struct {
 	// Description
@@ -46,7 +45,6 @@ type PlanSpec struct {
 	Archived bool `json:"archived,omitempty"`
 }
 
-//
 // Find a planned VM.
 func (r *PlanSpec) FindVM(ref ref.Ref) (v *plan.VM, found bool) {
 	for _, vm := range r.VMs {
@@ -60,7 +58,6 @@ func (r *PlanSpec) FindVM(ref ref.Ref) (v *plan.VM, found bool) {
 	return
 }
 
-//
 // PlanStatus defines the observed state of Plan.
 type PlanStatus struct {
 	// Conditions.
@@ -72,7 +69,6 @@ type PlanStatus struct {
 	Migration plan.MigrationStatus `json:"migration,omitempty"`
 }
 
-//
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:openapi-gen=true
@@ -92,7 +88,6 @@ type Plan struct {
 	Referenced `json:"-"`
 }
 
-//
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type PlanList struct {
 	meta.TypeMeta `json:",inline"`

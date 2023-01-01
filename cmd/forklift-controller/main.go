@@ -39,11 +39,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
 )
 
-//
 // Application settings.
 var Settings = &settings.Settings
 
-//
 // Logger.
 var log logr.Logger
 
@@ -128,7 +126,6 @@ func main() {
 	}
 }
 
-//
 // Build and start profiler.
 func profiler() (profiler interface{ Stop() }) {
 	var kind func(*profile.Profile)

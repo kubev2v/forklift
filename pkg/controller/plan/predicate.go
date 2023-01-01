@@ -50,7 +50,6 @@ func (r PlanPredicate) Delete(e event.DeleteEvent) bool {
 	return false
 }
 
-//
 // Provider watch predicate.
 // Also ensures an inventory watch is created and
 // associated with the channel source.
@@ -61,7 +60,6 @@ type ProviderPredicate struct {
 	client  client.Client
 }
 
-//
 // Provider created event.
 func (r *ProviderPredicate) Create(e event.CreateEvent) bool {
 	p, cast := e.Object.(*api.Provider)
@@ -73,7 +71,6 @@ func (r *ProviderPredicate) Create(e event.CreateEvent) bool {
 	return false
 }
 
-//
 // Provider updated event.
 func (r *ProviderPredicate) Update(e event.UpdateEvent) bool {
 	p, cast := e.ObjectNew.(*api.Provider)
@@ -88,7 +85,6 @@ func (r *ProviderPredicate) Update(e event.UpdateEvent) bool {
 	return false
 }
 
-//
 // Provider deleted event.
 func (r *ProviderPredicate) Delete(e event.DeleteEvent) bool {
 	p, cast := e.Object.(*api.Provider)
@@ -100,7 +96,6 @@ func (r *ProviderPredicate) Delete(e event.DeleteEvent) bool {
 	return false
 }
 
-//
 // Generic provider watch event.
 func (r *ProviderPredicate) Generic(e event.GenericEvent) bool {
 	p, cast := e.Object.(*api.Provider)
@@ -112,7 +107,6 @@ func (r *ProviderPredicate) Generic(e event.GenericEvent) bool {
 	return false
 }
 
-//
 // Ensure there is a watch for the provider
 // and inventory API kinds.
 func (r *ProviderPredicate) ensureWatch(p *api.Provider) {
@@ -281,7 +275,6 @@ func (r MigrationPredicate) Generic(e event.GenericEvent) bool {
 	return false
 }
 
-//
 // Plan request for Migration.
 func RequestForMigration(a k8shandler.MapObject) (list []reconcile.Request) {
 	if m, cast := a.Object.(*api.Migration); cast {

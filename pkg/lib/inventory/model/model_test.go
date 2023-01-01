@@ -11,7 +11,6 @@ import (
 	"time"
 )
 
-//
 // Adjust default.
 func init() {
 	DefaultDetail = 5
@@ -244,7 +243,6 @@ func (w *MutatingHandler) Error(err error) {
 func (w *MutatingHandler) End() {
 }
 
-//
 // Used for cascade delete event testing.
 type DetailHandler struct {
 	StockEventHandler
@@ -1273,7 +1271,6 @@ func TestSession(t *testing.T) {
 	}
 }
 
-//
 // Remove leading __ to enable.
 func __TestDbLocked(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
@@ -1319,7 +1316,6 @@ func __TestDbLocked(t *testing.T) {
 	}
 }
 
-//
 // Remove leading __ to enable.
 func __TestConcurrency(t *testing.T) {
 	var err error

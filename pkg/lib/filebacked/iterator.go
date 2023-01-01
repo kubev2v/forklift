@@ -1,6 +1,5 @@
 package filebacked
 
-//
 // Iterator.
 // Read-only collection with stateful iteration.
 type Iterator interface {
@@ -20,7 +19,6 @@ type Iterator interface {
 	Close()
 }
 
-//
 // Iterator.
 type FbIterator struct {
 	// Reader.
@@ -29,7 +27,6 @@ type FbIterator struct {
 	current int
 }
 
-//
 // Next object.
 func (r *FbIterator) Next() (object interface{}, hasNext bool) {
 	if r.current < r.Len() {
@@ -41,7 +38,6 @@ func (r *FbIterator) Next() (object interface{}, hasNext bool) {
 	return
 }
 
-//
 // Next object.
 func (r *FbIterator) NextWith(object interface{}) (hasNext bool) {
 	if r.current < r.Len() {
@@ -53,7 +49,6 @@ func (r *FbIterator) NextWith(object interface{}) (hasNext bool) {
 	return
 }
 
-//
 // Reverse the list.
 func (r *FbIterator) Reverse() {
 	in := r.index
@@ -70,17 +65,14 @@ func (r *FbIterator) Reverse() {
 	r.index = reversed
 }
 
-//
 // Empty.
 type EmptyIterator struct {
 }
 
-//
 // Reverse.
 func (*EmptyIterator) Reverse() {
 }
 
-//
 // Length.
 func (*EmptyIterator) Len() int {
 	return 0
@@ -96,19 +88,16 @@ func (*EmptyIterator) AtWith(int, interface{}) {
 	return
 }
 
-//
 // Next object.
 func (*EmptyIterator) Next() (interface{}, bool) {
 	return nil, false
 }
 
-//
 // Next object.
 func (*EmptyIterator) NextWith(object interface{}) bool {
 	return false
 }
 
-//
 // Close the iterator.
 func (*EmptyIterator) Close() {
 }

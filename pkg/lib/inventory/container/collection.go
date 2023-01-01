@@ -11,7 +11,6 @@ import (
 	"reflect"
 )
 
-//
 // Model shepherd.
 type Shepherd interface {
 	// Determine if model needs to be updated.
@@ -20,7 +19,6 @@ type Shepherd interface {
 	Update(stored, desired model.Model)
 }
 
-//
 // Disposition model.
 type dpnModel struct {
 	// Iterator.
@@ -29,7 +27,6 @@ type dpnModel struct {
 	index int
 }
 
-//
 // Model.
 func (r *dpnModel) model() (m model.Model) {
 	object := r.itr.At(r.index)
@@ -37,7 +34,6 @@ func (r *dpnModel) model() (m model.Model) {
 	return
 }
 
-//
 // Disposition.
 type Disposition struct {
 	// The stored models in the collection.
@@ -46,11 +42,9 @@ type Disposition struct {
 	desired *dpnModel
 }
 
-//
 // Disposition map.
 type Dispositions map[string]*Disposition
 
-//
 // Model collection.
 type Collection struct {
 	// Stored models.
@@ -67,25 +61,21 @@ type Collection struct {
 	Deleted int
 }
 
-//
 // Add models included in desired but not stored.
 func (r *Collection) Add(desired fb.Iterator) error {
 	return r.add(r.dispositions(desired))
 }
 
-//
 // Update models.
 func (r *Collection) Update(desired fb.Iterator) error {
 	return r.update(r.dispositions(desired))
 }
 
-//
 // Delete stored models not included in the desired.
 func (r *Collection) Delete(desired fb.Iterator) error {
 	return r.delete(r.dispositions(desired))
 }
 
-//
 // Reconcile the collection.
 // Ensure the stored collection is as desired.
 func (r *Collection) Reconcile(desired fb.Iterator) (err error) {
@@ -106,7 +96,6 @@ func (r *Collection) Reconcile(desired fb.Iterator) (err error) {
 	return
 }
 
-//
 // Build the dispositions.
 func (r *Collection) dispositions(desired fb.Iterator) (mp map[string]*Disposition) {
 	mp = map[string]*Disposition{}
@@ -141,7 +130,6 @@ func (r *Collection) dispositions(desired fb.Iterator) (mp map[string]*Dispositi
 	return
 }
 
-//
 // Add models included in desired but not stored.
 func (r *Collection) add(dispositions Dispositions) (err error) {
 	for _, dpn := range dispositions {
@@ -158,7 +146,6 @@ func (r *Collection) add(dispositions Dispositions) (err error) {
 	return
 }
 
-//
 // Update models.
 func (r *Collection) update(dispositions Dispositions) (err error) {
 	shepherd := r.Shepherd
@@ -186,7 +173,6 @@ func (r *Collection) update(dispositions Dispositions) (err error) {
 	return
 }
 
-//
 // Delete stored models not included in the desired.
 func (r *Collection) delete(dispositions Dispositions) (err error) {
 	for _, dpn := range dispositions {
@@ -203,7 +189,6 @@ func (r *Collection) delete(dispositions Dispositions) (err error) {
 	return
 }
 
-//
 // Default (reflect-based) shepherd.
 // Fields are ignored when:
 //   - Is the PK.
@@ -212,7 +197,6 @@ func (r *Collection) delete(dispositions Dispositions) (err error) {
 type DefaultShepherd struct {
 }
 
-//
 // Model comparison.
 func (r *DefaultShepherd) Equals(mA, mB model.Model) bool {
 	mdA, _ := model.Inspect(mA)
@@ -233,7 +217,6 @@ func (r *DefaultShepherd) Equals(mA, mB model.Model) bool {
 	return true
 }
 
-//
 // Update model A (stored) with model B (desired).
 func (r *DefaultShepherd) Update(mA, mB model.Model) {
 	mdA, _ := model.Inspect(mA)
@@ -249,7 +232,6 @@ func (r *DefaultShepherd) Update(mA, mB model.Model) {
 	}
 }
 
-//
 // The field is ignored when:
 //   - Is the PK.
 //   - Is (auto) incremented.

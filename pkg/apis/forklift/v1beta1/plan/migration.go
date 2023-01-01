@@ -6,14 +6,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-//
 // Error.
 type Error struct {
 	Phase   string   `json:"phase"`
 	Reasons []string `json:"reasons"`
 }
 
-//
 // Add.
 func (e *Error) Add(reason ...string) {
 	find := func(reason string) (found bool) {
@@ -32,7 +30,6 @@ func (e *Error) Add(reason ...string) {
 	}
 }
 
-//
 // Migration status.
 type MigrationStatus struct {
 	Timed `json:",inline,omitempty"`
@@ -42,7 +39,6 @@ type MigrationStatus struct {
 	VMs []*VMStatus `json:"vms,omitempty"`
 }
 
-//
 // The active snapshot.
 // This is the last snapshot in the history.
 func (r *MigrationStatus) ActiveSnapshot() *Snapshot {
@@ -53,7 +49,6 @@ func (r *MigrationStatus) ActiveSnapshot() *Snapshot {
 	return &Snapshot{}
 }
 
-//
 // Find snapshot for migration by UID.
 func (r *MigrationStatus) SnapshotWithMigration(uid types.UID) (found bool, snapshot *Snapshot) {
 	for i := range r.History {
@@ -67,13 +62,11 @@ func (r *MigrationStatus) SnapshotWithMigration(uid types.UID) (found bool, snap
 	return
 }
 
-//
 // Add new snapshot.
 func (r *MigrationStatus) NewSnapshot(snapshot Snapshot) {
 	r.History = append(r.History, snapshot)
 }
 
-//
 // Find a VM status.
 func (r *MigrationStatus) FindVM(ref ref.Ref) (v *VMStatus, found bool) {
 	for _, vm := range r.VMs {
@@ -87,7 +80,6 @@ func (r *MigrationStatus) FindVM(ref ref.Ref) (v *VMStatus, found bool) {
 	return
 }
 
-//
 // Pipeline step.
 type Step struct {
 	Task `json:",inline"`
@@ -95,7 +87,6 @@ type Step struct {
 	Tasks []*Task `json:"tasks,omitempty"`
 }
 
-//
 // Find task by name.
 func (r *Step) FindTask(name string) (task *Task, found bool) {
 	for _, task = range r.Tasks {
@@ -108,7 +99,6 @@ func (r *Step) FindTask(name string) (task *Task, found bool) {
 	return
 }
 
-//
 // Reflect task progress and errors.
 func (r *Step) ReflectTasks() {
 	tasksStarted := 0
@@ -138,7 +128,6 @@ func (r *Step) ReflectTasks() {
 	}
 }
 
-//
 // Migration task.
 type Task struct {
 	Timed `json:",inline"`
@@ -158,7 +147,6 @@ type Task struct {
 	Error *Error `json:"error,omitempty"`
 }
 
-//
 // Add an error.
 func (r *Task) AddError(reason ...string) {
 	if r.Error == nil {
@@ -167,7 +155,6 @@ func (r *Task) AddError(reason ...string) {
 	r.Error.Add(reason...)
 }
 
-//
 // Return whether the task has an error.
 func (r *Task) HasError() bool {
 	return r.Error != nil

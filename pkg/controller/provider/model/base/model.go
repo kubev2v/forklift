@@ -16,7 +16,6 @@ const (
 	MaxDetail = libmodel.MaxDetail
 )
 
-//
 // An object reference.
 type Ref struct {
 	// The kind (type) of the referenced.
@@ -25,7 +24,6 @@ type Ref struct {
 	ID string `json:"id"`
 }
 
-//
 // Invalid reference.
 type InvalidRefError struct {
 	Ref
@@ -35,7 +33,6 @@ func (r InvalidRefError) Error() string {
 	return fmt.Sprintf("Reference %#v not valid.", r.Ref)
 }
 
-//
 // Invalid kind.
 type InvalidKindError struct {
 	Object interface{}
@@ -45,7 +42,6 @@ func (r InvalidKindError) Error() string {
 	return fmt.Sprintf("Kind %#v not valid.", r.Object)
 }
 
-//
 // VM concerns.
 type Concern struct {
 	Label      string `json:"label"`

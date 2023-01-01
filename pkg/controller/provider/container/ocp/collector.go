@@ -10,7 +10,6 @@ import (
 	"path"
 )
 
-//
 // New collector.
 func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) libcontainer.Collector {
 	return &Collector{
@@ -49,7 +48,6 @@ func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) libcontain
 	}
 }
 
-//
 // OCP collector.
 type Collector struct {
 	*libocp.Collector

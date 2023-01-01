@@ -7,13 +7,11 @@ import (
 	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
 )
 
-//
 // Routes
 const (
 	Root = base.ProvidersRoot + "/" + string(api.OpenShift)
 )
 
-//
 // Build all handlers.
 func Handlers(container *container.Container) []libweb.RequestHandler {
 	return []libweb.RequestHandler{

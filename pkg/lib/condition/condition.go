@@ -54,7 +54,6 @@ type Condition struct {
 	staged bool `json:"-"`
 }
 
-//
 // Update this condition with another's fields.
 func (r *Condition) Update(other Condition) (updated bool) {
 	r.staged = true
@@ -73,7 +72,6 @@ func (r *Condition) Update(other Condition) (updated bool) {
 	return
 }
 
-//
 // Get whether the conditions are equal.
 func (r *Condition) Equal(other Condition) bool {
 	return r.Type == other.Type &&
@@ -85,7 +83,6 @@ func (r *Condition) Equal(other Condition) bool {
 		reflect.DeepEqual(r.Items, other.Items)
 }
 
-//
 // Managed collection of conditions.
 // Intended to be included in resource Status.
 // -------------------
@@ -97,9 +94,9 @@ func (r *Condition) Equal(other Condition) bool {
 // thing.Status.SetCondition(c)
 // thing.Status.EndStagingConditions()
 // thing.Status.SetReady(
-//     !thing.Status.HasBlockerCondition(),
-//     "Resource Ready.")
 //
+//	!thing.Status.HasBlockerCondition(),
+//	"Resource Ready.")
 type Conditions struct {
 	// List of conditions.
 	List []Condition `json:"conditions,omitempty"`
@@ -109,7 +106,6 @@ type Conditions struct {
 	explain Explain `json:"-"`
 }
 
-//
 // Begin staging conditions.
 func (r *Conditions) BeginStagingConditions() {
 	r.staging = true
@@ -122,7 +118,6 @@ func (r *Conditions) BeginStagingConditions() {
 	}
 }
 
-//
 // End staging conditions. Un-staged conditions are deleted.
 func (r *Conditions) EndStagingConditions() {
 	r.staging = false
@@ -142,7 +137,6 @@ func (r *Conditions) EndStagingConditions() {
 	r.List = kept
 }
 
-//
 // Find a condition by type.
 // Staging is ignored.
 func (r *Conditions) find(cndType string) *Condition {
@@ -159,7 +153,6 @@ func (r *Conditions) find(cndType string) *Condition {
 	return nil
 }
 
-//
 // Find a condition by type.
 func (r *Conditions) FindCondition(cndType string) *Condition {
 	if r.List == nil {
@@ -176,7 +169,6 @@ func (r *Conditions) FindCondition(cndType string) *Condition {
 	return condition
 }
 
-//
 // Set (add/update) the specified condition to the collection.
 func (r *Conditions) SetCondition(conditions ...Condition) {
 	if r.List == nil {
@@ -197,13 +189,11 @@ func (r *Conditions) SetCondition(conditions ...Condition) {
 	}
 }
 
-//
 // Update conditions.
 func (r *Conditions) UpdateConditions(other Conditions) {
 	r.SetCondition(other.List...)
 }
 
-//
 // Stage an existing condition by type.
 func (r *Conditions) StageCondition(types ...string) {
 	if r.List == nil {
@@ -221,7 +211,6 @@ func (r *Conditions) StageCondition(types ...string) {
 	}
 }
 
-//
 // Delete conditions by type.
 func (r *Conditions) DeleteCondition(types ...string) {
 	if r.List == nil {
@@ -248,7 +237,6 @@ func (r *Conditions) DeleteCondition(types ...string) {
 	r.List = kept
 }
 
-//
 // The collection has ALL of the specified conditions.
 func (r *Conditions) HasCondition(types ...string) bool {
 	if r.List == nil {
@@ -264,7 +252,6 @@ func (r *Conditions) HasCondition(types ...string) bool {
 	return len(types) > 0
 }
 
-//
 // The collection has Any of the specified conditions.
 func (r *Conditions) HasAnyCondition(types ...string) bool {
 	if r.List == nil {
@@ -281,7 +268,6 @@ func (r *Conditions) HasAnyCondition(types ...string) bool {
 	return false
 }
 
-//
 // The collection contains any conditions with category.
 func (r *Conditions) HasConditionCategory(names ...string) bool {
 	if r.List == nil {
@@ -305,32 +291,27 @@ func (r *Conditions) HasConditionCategory(names ...string) bool {
 	return false
 }
 
-//
 // The collection contains a `Critical` error condition.
 // Resource reconcile() should not continue.
 func (r *Conditions) HasCriticalCondition(category ...string) bool {
 	return r.HasConditionCategory(Critical)
 }
 
-//
 // The collection contains an `Error` condition.
 func (r *Conditions) HasErrorCondition(category ...string) bool {
 	return r.HasConditionCategory(Error)
 }
 
-//
 // The collection contains a `Warn` condition.
 func (r *Conditions) HasWarnCondition(category ...string) bool {
 	return r.HasConditionCategory(Warn)
 }
 
-//
 // The collection contains a `Ready` blocker condition.
 func (r *Conditions) HasBlockerCondition() bool {
 	return r.HasConditionCategory(Critical, Error)
 }
 
-//
 // The collection contains the `Ready` condition.
 func (r *Conditions) IsReady() bool {
 	condition := r.FindCondition(Ready)
@@ -341,14 +322,12 @@ func (r *Conditions) IsReady() bool {
 	return true
 }
 
-//
 // Get Explain report.
 func (r *Conditions) Explain() Explain {
 	r.explain.build()
 	return r.explain
 }
 
-//
 // Explain report.
 type Explain struct {
 	// conditions added.
@@ -359,21 +338,18 @@ type Explain struct {
 	Deleted map[string]Condition
 }
 
-//
 // Total number of changes.
 func (r *Explain) Len() int {
 	r.build()
 	return len(r.Updated) + len(r.Updated) + len(r.Deleted)
 }
 
-//
 // The delta is empty.
 func (r *Explain) Empty() bool {
 	r.build()
 	return r.Len() == 0
 }
 
-//
 // Ensure the collections are built.
 // Support lazy construction.
 func (r *Explain) build() {
@@ -384,7 +360,6 @@ func (r *Explain) build() {
 	}
 }
 
-//
 // Condition added.
 func (r *Explain) added(cnd Condition) {
 	r.build()
@@ -393,7 +368,6 @@ func (r *Explain) added(cnd Condition) {
 	delete(r.Deleted, cnd.Type)
 }
 
-//
 // Condition updated.
 func (r *Explain) updated(cnd Condition) {
 	r.build()
@@ -404,7 +378,6 @@ func (r *Explain) updated(cnd Condition) {
 	delete(r.Deleted, cnd.Type)
 }
 
-//
 // Condition deleted.
 func (r *Explain) deleted(cnd Condition) {
 	r.build()

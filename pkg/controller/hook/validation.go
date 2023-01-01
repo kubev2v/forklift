@@ -6,14 +6,12 @@ import (
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 )
 
-//
 // Types
 const (
 	InvalidImage    = "InvalidImage"
 	InvalidPlaybook = "InvalidPlaybook"
 )
 
-//
 // Categories
 const (
 	Required = libcnd.Required
@@ -23,7 +21,6 @@ const (
 	Warn     = libcnd.Warn
 )
 
-//
 // Reasons
 const (
 	NotSet   = "NotSet"
@@ -31,14 +28,12 @@ const (
 	DataErr  = "DataError"
 )
 
-//
 // Statuses
 const (
 	True  = libcnd.True
 	False = libcnd.False
 )
 
-//
 // Validate the hook.
 func (r *Reconciler) validate(hook *api.Hook) (err error) {
 	err = r.validateImage(hook)
@@ -52,7 +47,6 @@ func (r *Reconciler) validate(hook *api.Hook) (err error) {
 	return
 }
 
-//
 // Validate the hook.
 func (r *Reconciler) validateImage(hook *api.Hook) (err error) {
 	match := ReferenceRegexp.MatchString(hook.Spec.Image)

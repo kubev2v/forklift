@@ -11,14 +11,12 @@ type Owner v1.ObjectReference
 // The resource that is the target of an ObjectReference.
 type Target v1.ObjectReference
 
-//
 // A 1-n mapping of Target => [Owner, ...].
 type RefMap struct {
 	Content map[Target]map[Owner]bool
 	mutex   sync.RWMutex
 }
 
-//
 // Add mapping of a ref-owner to a ref-target.
 func (r *RefMap) Add(owner Owner, target Target) {
 	r.mutex.Lock()
@@ -39,7 +37,6 @@ func (r *RefMap) Add(owner Owner, target Target) {
 		target)
 }
 
-//
 // Delete mapping of a ref-owner to a ref-target.
 func (r *RefMap) Delete(owner Owner, target Target) {
 	r.mutex.Lock()
@@ -55,7 +52,6 @@ func (r *RefMap) Delete(owner Owner, target Target) {
 	r.Prune()
 }
 
-//
 // Delete all mappings to an owner.
 func (r *RefMap) DeleteOwner(owner Owner) {
 	r.mutex.Lock()
@@ -70,7 +66,6 @@ func (r *RefMap) DeleteOwner(owner Owner) {
 	r.Prune()
 }
 
-//
 // Determine if target mapped to owner.
 func (r *RefMap) Match(target Target, owner Owner) bool {
 	r.mutex.RLock()
@@ -83,7 +78,6 @@ func (r *RefMap) Match(target Target, owner Owner) bool {
 	return false
 }
 
-//
 // Find all owners mapped to the target.
 func (r *RefMap) Find(target Target) []Owner {
 	list := []Owner{}
@@ -104,7 +98,6 @@ func (r *RefMap) Find(target Target) []Owner {
 	return list
 }
 
-//
 // Prune empty mappings.
 func (r *RefMap) Prune() {
 	for key, owners := range r.Content {

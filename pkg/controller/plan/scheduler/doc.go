@@ -17,7 +17,6 @@ type Scheduler interface {
 	Next() (vm *plan.VMStatus, hasNext bool, err error)
 }
 
-//
 // Scheduler factory.
 func New(ctx *plancontext.Context) (scheduler Scheduler, err error) {
 	switch ctx.Source.Provider.Type() {

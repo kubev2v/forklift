@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-//
 // Types
 const (
 	UrlNotValid             = "UrlNotValid"
@@ -33,7 +32,6 @@ const (
 	ConnectionInsecure      = "ConnectionInsecure"
 )
 
-//
 // Categories
 const (
 	Required = libcnd.Required
@@ -43,7 +41,6 @@ const (
 	Warn     = libcnd.Warn
 )
 
-//
 // Reasons
 const (
 	NotSet              = "NotSet"
@@ -57,7 +54,6 @@ const (
 	SkipTLSVerification = "SkipTLSVerification"
 )
 
-//
 // Phases
 const (
 	ValidationFailed = "ValidationFailed"
@@ -66,14 +62,12 @@ const (
 	Staging          = "Staging"
 )
 
-//
 // Statuses
 const (
 	True  = libcnd.True
 	False = libcnd.False
 )
 
-//
 // Validate the provider resource.
 func (r *Reconciler) validate(provider *api.Provider) error {
 	err := r.validateType(provider)
@@ -114,7 +108,6 @@ func (r *Reconciler) validate(provider *api.Provider) error {
 	return nil
 }
 
-//
 // Validate types.
 func (r *Reconciler) validateType(provider *api.Provider) error {
 	for _, p := range api.ProviderTypes {
@@ -136,7 +129,6 @@ func (r *Reconciler) validateType(provider *api.Provider) error {
 	return nil
 }
 
-//
 // Validate the URL.
 func (r *Reconciler) validateURL(provider *api.Provider) error {
 	if provider.IsHost() {
@@ -169,11 +161,10 @@ func (r *Reconciler) validateURL(provider *api.Provider) error {
 	return nil
 }
 
-//
 // Validate secret (ref).
-//   1. The references is complete.
-//   2. The secret exists.
-//   3. the content of the secret is valid.
+//  1. The references is complete.
+//  2. The secret exists.
+//  3. the content of the secret is valid.
 func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret, err error) {
 	if provider.IsHost() {
 		return
@@ -256,7 +247,6 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 	return
 }
 
-//
 // Validate provider settings.
 func (r *Reconciler) validateSettings(provider *api.Provider) (err error) {
 	newCnd := libcnd.Condition{
@@ -284,7 +274,6 @@ func (r *Reconciler) validateSettings(provider *api.Provider) (err error) {
 	return
 }
 
-//
 // Test connection.
 func (r *Reconciler) testConnection(provider *api.Provider, secret *core.Secret) error {
 	if provider.Status.HasBlockerCondition() {
@@ -339,7 +328,6 @@ func (r *Reconciler) testConnection(provider *api.Provider, secret *core.Secret)
 	return nil
 }
 
-//
 // Validate inventory created.
 func (r *Reconciler) inventoryCreated(provider *api.Provider) error {
 	if provider.Status.HasBlockerCondition() {

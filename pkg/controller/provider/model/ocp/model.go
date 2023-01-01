@@ -15,7 +15,6 @@ import (
 	cnv "kubevirt.io/client-go/api/v1"
 )
 
-//
 // Errors
 var NotFound = libmodel.NotFound
 
@@ -25,20 +24,17 @@ const (
 	MaxDetail = base.MaxDetail
 )
 
-//
 // Types
 type Model = base.Model
 type ListOptions = base.ListOptions
 type Ref = base.Ref
 
-//
 // k8s Resource.
 type Resource interface {
 	meta.Object
 	runtime.Object
 }
 
-//
 // Base k8s model.
 type Base struct {
 	// Object UID.
@@ -53,7 +49,6 @@ type Base struct {
 	labels libmodel.Labels
 }
 
-//
 // Populate fields with the specified k8s resource.
 func (m *Base) With(r Resource) {
 	m.UID = string(r.GetUID())
@@ -62,7 +57,6 @@ func (m *Base) With(r Resource) {
 	m.Name = r.GetName()
 }
 
-//
 // Get kubernetes resource version.
 func (m *Base) ResourceVersion() uint64 {
 	n, _ := strconv.ParseUint(m.Version, 10, 64)
@@ -81,7 +75,6 @@ func (m *Base) Labels() libmodel.Labels {
 	return m.labels
 }
 
-//
 // Provider
 type Provider struct {
 	Base
@@ -95,7 +88,6 @@ func (m *Provider) With(p *api.Provider) {
 	m.Object = *p
 }
 
-//
 // Namespace
 type Namespace struct {
 	Base
@@ -107,7 +99,6 @@ func (m *Namespace) With(n *core.Namespace) {
 	m.Object = *n
 }
 
-//
 // StorageClass
 type StorageClass struct {
 	Base
@@ -119,7 +110,6 @@ func (m *StorageClass) With(s *storage.StorageClass) {
 	m.Object = *s
 }
 
-//
 // NetworkAttachmentDefinition
 type NetworkAttachmentDefinition struct {
 	Base
@@ -131,7 +121,6 @@ func (m *NetworkAttachmentDefinition) With(n *net.NetworkAttachmentDefinition) {
 	m.Object = *n
 }
 
-//
 // VM
 type VM struct {
 	Base

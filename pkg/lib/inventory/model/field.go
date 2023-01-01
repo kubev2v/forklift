@@ -22,32 +22,27 @@ const (
 // Applications using custom detail levels
 // must adjust to highest level used.
 // Example:
-//   func init() {
-//     model.DefaultDetail = 2
-//   }
+//
+//	func init() {
+//	  model.DefaultDetail = 2
+//	}
 var DefaultDetail = 0
 
-//
 // Regex used for `pk(fields)` tags.
 var PkRegex = regexp.MustCompile(`(pk)((\()(.+)(\)))?`)
 
-//
 // Regex used for `unique(group)` tags.
 var UniqueRegex = regexp.MustCompile(`(unique)(\()(.+)(\))`)
 
-//
 // Regex used for `index(group)` tags.
 var IndexRegex = regexp.MustCompile(`(index)(\()(.+)(\))`)
 
-//
 // Regex used for `fk(table)` tags.
 var FkRegex = regexp.MustCompile(`(fk)(\()(.+)(\))`)
 
-//
 // Regex used for detail.
 var DetailRegex = regexp.MustCompile(`(d)([0-9]+)`)
 
-//
 // Model (struct) Field
 type Field struct {
 	// reflect.Type of the field.
@@ -66,7 +61,6 @@ type Field struct {
 	isParam bool
 }
 
-//
 // Validate.
 func (f *Field) Validate() error {
 	switch f.Value.Kind() {
@@ -91,7 +85,6 @@ func (f *Field) Validate() error {
 	return nil
 }
 
-//
 // Pull from model.
 // Populate the appropriate `staging` field using the
 // model field value.
@@ -150,7 +143,6 @@ func (f *Field) Pull() interface{} {
 	return nil
 }
 
-//
 // Pointer used for Scan().
 func (f *Field) Ptr() interface{} {
 	switch f.Value.Kind() {
@@ -166,7 +158,6 @@ func (f *Field) Ptr() interface{} {
 	}
 }
 
-//
 // Push to the model.
 // Set the model field value using the `staging` field.
 func (f *Field) Push() {
@@ -212,7 +203,6 @@ func (f *Field) Push() {
 	}
 }
 
-//
 // Column DDL.
 func (f *Field) DDL() string {
 	part := []string{
@@ -240,14 +230,12 @@ func (f *Field) DDL() string {
 	return strings.Join(part, " ")
 }
 
-//
 // Get as SQL param.
 func (f *Field) Param() string {
 	f.isParam = true
 	return ":" + f.Name
 }
 
-//
 // Get whether field is the primary key.
 func (f *Field) Pk() (matched bool) {
 	for _, opt := range strings.Split(f.Tag, ",") {
@@ -260,7 +248,6 @@ func (f *Field) Pk() (matched bool) {
 	return
 }
 
-//
 // Fields used to generate the primary key.
 // Map of lower-cased field names. May be empty
 // when generation is not enabled.
@@ -284,7 +271,6 @@ func (f *Field) WithFields() (withFields map[string]bool) {
 	return
 }
 
-//
 // Get whether field is mutable.
 // Only mutable fields will be updated.
 func (f *Field) Mutable() bool {
@@ -295,13 +281,11 @@ func (f *Field) Mutable() bool {
 	return !f.hasOpt("const")
 }
 
-//
 // Get whether field is a natural key.
 func (f *Field) Key() bool {
 	return f.hasOpt("key")
 }
 
-//
 // Get whether field is virtual.
 // A `virtual` field is read-only and managed
 // internally in the DB.
@@ -309,7 +293,6 @@ func (f *Field) Virtual() bool {
 	return f.hasOpt("virtual")
 }
 
-//
 // Get whether the field is unique.
 func (f *Field) Unique() []string {
 	list := []string{}
@@ -324,7 +307,6 @@ func (f *Field) Unique() []string {
 	return list
 }
 
-//
 // Get whether the field has non-unique index.
 func (f *Field) Index() []string {
 	list := []string{}
@@ -339,12 +321,12 @@ func (f *Field) Index() []string {
 	return list
 }
 
-//
 // Get whether the field is a foreign key.
 // Format: fk(table flags..) where flags are optional.
 // Flags:
-//   +must = referenced model must exist.
-//   +cascade = cascade delete.
+//
+//	+must = referenced model must exist.
+//	+cascade = cascade delete.
 func (f *Field) Fk() (fk *FK) {
 	for _, opt := range strings.Split(f.Tag, ",") {
 		opt = strings.TrimSpace(opt)
@@ -377,7 +359,6 @@ func (f *Field) Fk() (fk *FK) {
 	return
 }
 
-//
 // Get whether field is auto-incremented.
 func (f *Field) Incremented() bool {
 	return f.hasOpt("incremented")
@@ -474,7 +455,6 @@ func (f *Field) AsValue(object interface{}) (value interface{}, err error) {
 	return
 }
 
-//
 // Get whether the field is `json` encoded.
 func (f *Field) Encoded() (encoded bool) {
 	switch f.Value.Kind() {
@@ -487,11 +467,11 @@ func (f *Field) Encoded() (encoded bool) {
 	return
 }
 
-//
 // Detail level.
 // Defaults:
-//   Key fields = 0.
-//        Other = DefaultDetail
+//
+//	Key fields = 0.
+//	     Other = DefaultDetail
 func (f *Field) Detail() (level int) {
 	level = DefaultDetail
 	for _, opt := range strings.Split(f.Tag, ",") {
@@ -510,13 +490,11 @@ func (f *Field) Detail() (level int) {
 	return
 }
 
-//
 // Match detail level.
 func (f *Field) MatchDetail(level int) bool {
 	return f.Detail() <= level
 }
 
-//
 // Get whether field has an option.
 func (f *Field) hasOpt(name string) bool {
 	for _, opt := range strings.Split(f.Tag, ",") {
@@ -529,7 +507,6 @@ func (f *Field) hasOpt(name string) bool {
 	return false
 }
 
-//
 // FK constraint.
 type FK struct {
 	// FK owner.
@@ -544,7 +521,6 @@ type FK struct {
 	Cascade bool
 }
 
-//
 // Get DDL.
 func (f *FK) DDL(field *Field) string {
 	return fmt.Sprintf(
@@ -554,7 +530,6 @@ func (f *FK) DDL(field *Field) string {
 		f.Field)
 }
 
-//
 // Get whether the FK Needs an explicit index.
 // The `must` is implemented by a constraint which is
 // implicitly indexed by the DB.

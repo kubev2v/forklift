@@ -13,14 +13,12 @@ import (
 
 type WatchManager = handler.WatchManager
 
-//
 // Inventory event handler.
 type Handler interface {
 	// Ensure watch started.
 	Watch(m *handler.WatchManager) error
 }
 
-//
 // Handler factory.
 func New(
 	client client.Client,

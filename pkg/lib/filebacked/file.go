@@ -1,10 +1,11 @@
 /*
 File backing for collections.
 File format:
-   | kind: 2 (uint16)
-   | size: 8 (uint64)
-   | object: n (gob encoded)
-   | ...
+
+	| kind: 2 (uint16)
+	| size: 8 (uint64)
+	| object: n (gob encoded)
+	| ...
 */
 package filebacked
 
@@ -23,17 +24,14 @@ import (
 
 var log = logging.WithName("filebacked")
 
-//
 // File extension.
 const (
 	Extension = ".fb"
 )
 
-//
 // Working Directory.
 var WorkingDir = "/tmp"
 
-//
 // Writer.
 type Writer struct {
 	// File path.
@@ -46,7 +44,6 @@ type Writer struct {
 	dirty bool
 }
 
-//
 // Append (write) object.
 func (w *Writer) Append(object interface{}) {
 	// Lazy open.
@@ -80,7 +77,6 @@ func (w *Writer) Append(object interface{}) {
 	return
 }
 
-//
 // Build a reader.
 func (w *Writer) Reader(shared bool) (reader *Reader) {
 	w.open()
@@ -117,7 +113,6 @@ func (w *Writer) Reader(shared bool) (reader *Reader) {
 	return
 }
 
-//
 // Close the writer.
 func (w *Writer) Close() {
 	defer func() {
@@ -133,7 +128,6 @@ func (w *Writer) Close() {
 		w.path)
 }
 
-//
 // Flush.
 func (w *Writer) flush() {
 	if !w.dirty {
@@ -147,7 +141,6 @@ func (w *Writer) flush() {
 	}
 }
 
-//
 // Open the writer.
 func (w *Writer) open() {
 	if w.file != nil {
@@ -167,7 +160,6 @@ func (w *Writer) open() {
 	return
 }
 
-//
 // Write entry.
 func (w *Writer) writeEntry(kind uint16, bfr bytes.Buffer) (offset int64) {
 	file := w.file
@@ -210,7 +202,6 @@ func (w *Writer) writeEntry(kind uint16, bfr bytes.Buffer) (offset int64) {
 	return
 }
 
-//
 // New path.
 func (w *Writer) newPath() string {
 	uid, _ := uuid.NewUUID()
@@ -218,7 +209,6 @@ func (w *Writer) newPath() string {
 	return pathlib.Join(WorkingDir, name)
 }
 
-//
 // Reader.
 type Reader struct {
 	// File path.
@@ -231,14 +221,12 @@ type Reader struct {
 	shared bool
 }
 
-//
 // Length.
 // Number of objects in the list.
 func (r *Reader) Len() (length int) {
 	return len(r.index)
 }
 
-//
 // Get the object at index.
 func (r *Reader) At(index int) (object interface{}) {
 	// Lazy open.
@@ -273,7 +261,6 @@ func (r *Reader) At(index int) (object interface{}) {
 	return
 }
 
-//
 // Get the object at index.
 func (r *Reader) AtWith(index int, object interface{}) {
 	// Lazy open.
@@ -304,7 +291,6 @@ func (r *Reader) AtWith(index int, object interface{}) {
 	return
 }
 
-//
 // Close the reader.
 func (r *Reader) Close() {
 	if r.shared {
@@ -323,7 +309,6 @@ func (r *Reader) Close() {
 		r.path)
 }
 
-//
 // Read next entry.
 func (r *Reader) readEntry() (kind uint16, bfr []byte) {
 	file := r.file
@@ -362,7 +347,6 @@ func (r *Reader) readEntry() (kind uint16, bfr []byte) {
 	return
 }
 
-//
 // Open the reader.
 func (r *Reader) open() {
 	if r.shared || r.file != nil {

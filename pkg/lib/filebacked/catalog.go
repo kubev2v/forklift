@@ -5,18 +5,15 @@ import (
 	"sync"
 )
 
-//
 // Catalog (singleton).
 var catalog = Catalog{}
 
-//
 // Type catalog.
 type Catalog struct {
 	sync.Mutex
 	content []interface{}
 }
 
-//
 // Add object (proto) to the catalog.
 func (r *Catalog) add(object interface{}) (kind uint16) {
 	if object == nil {
@@ -44,7 +41,6 @@ func (r *Catalog) add(object interface{}) (kind uint16) {
 	return
 }
 
-//
 // Build object using the catalog.
 func (r *Catalog) build(kind uint16) (object interface{}, found bool) {
 	r.Lock()

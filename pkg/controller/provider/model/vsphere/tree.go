@@ -5,7 +5,6 @@ import (
 	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 )
 
-//
 // Kinds
 var (
 	FolderKind     = libref.ToKind(Folder{})
@@ -17,7 +16,6 @@ var (
 	VmKind         = libref.ToKind(VM{})
 )
 
-//
 // Types.
 type Tree = base.Tree
 type TreeNode = base.TreeNode

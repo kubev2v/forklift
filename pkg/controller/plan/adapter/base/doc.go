@@ -10,7 +10,6 @@ import (
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
 
-//
 // Adapter API.
 // Constructs provider-specific implementations
 // of the Builder, Client, and Validator.
@@ -23,7 +22,6 @@ type Adapter interface {
 	Validator(plan *api.Plan) (Validator, error)
 }
 
-//
 // Builder API.
 // Builds/updates objects as needed with provider
 // specific constructs.
@@ -46,7 +44,6 @@ type Builder interface {
 	ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string
 }
 
-//
 // Client API.
 // Performs provider-specific actions on the source VM.
 type Client interface {
@@ -70,7 +67,6 @@ type Client interface {
 	Close()
 }
 
-//
 // Validator API.
 // Performs provider-specific validation.
 type Validator interface {

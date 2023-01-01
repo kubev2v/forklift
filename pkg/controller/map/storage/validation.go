@@ -9,14 +9,12 @@ import (
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 )
 
-//
 // Types
 const (
 	SourceStorageNotValid      = "SourceStorageNotValid"
 	DestinationStorageNotValid = "DestinationStorageNotValid"
 )
 
-//
 // Categories
 const (
 	Required = libcnd.Required
@@ -26,7 +24,6 @@ const (
 	Warn     = libcnd.Warn
 )
 
-//
 // Reasons
 const (
 	NotSet    = "NotSet"
@@ -34,14 +31,12 @@ const (
 	Ambiguous = "Ambiguous"
 )
 
-//
 // Statuses
 const (
 	True  = libcnd.True
 	False = libcnd.False
 )
 
-//
 // Validate the mp resource.
 func (r *Reconciler) validate(mp *api.StorageMap) error {
 	pv := validation.ProviderPair{Client: r}
@@ -71,7 +66,6 @@ func (r *Reconciler) validate(mp *api.StorageMap) error {
 	return nil
 }
 
-//
 // Validate source refs.
 func (r *Reconciler) validateSource(mp *api.StorageMap) (err error) {
 	provider := mp.Referenced.Provider.Source
@@ -135,7 +129,6 @@ func (r *Reconciler) validateSource(mp *api.StorageMap) (err error) {
 	return
 }
 
-//
 // Validate destination refs.
 func (r *Reconciler) validateDestination(mp *api.StorageMap) (err error) {
 	provider := mp.Referenced.Provider.Destination

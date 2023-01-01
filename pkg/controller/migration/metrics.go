@@ -20,7 +20,6 @@ var (
 	)
 )
 
-//
 // Calculate Migrations metrics every 10 seconds
 func recordMetrics(client client.Client) {
 	go func() {

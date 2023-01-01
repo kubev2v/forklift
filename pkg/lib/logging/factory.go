@@ -8,19 +8,16 @@ import (
 	"os"
 )
 
-//
 // Builder.
 type Builder interface {
 	New() logr.Logger
 	V(int, logr.Logger) logr.Logger
 }
 
-//
 // Zap builder factory.
 type ZapBuilder struct {
 }
 
-//
 // Build new logger.
 func (b *ZapBuilder) New() (logger logr.Logger) {
 	var encoder zapcore.Encoder
@@ -49,7 +46,6 @@ func (b *ZapBuilder) New() (logger logr.Logger) {
 	return
 }
 
-//
 // Debug logger.
 func (b *ZapBuilder) V(level int, in logr.Logger) (l logr.Logger) {
 	if Settings.atDebug(level) {

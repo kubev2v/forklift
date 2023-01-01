@@ -12,7 +12,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-//
 // Types
 const (
 	ProviderNotValid            = "ProviderNotValid"
@@ -23,7 +22,6 @@ const (
 	DestinationProviderNotReady = "DestinationProviderNotReady"
 )
 
-//
 // Categories
 const (
 	Advisory = libcnd.Advisory
@@ -45,7 +43,6 @@ const (
 	False = libcnd.False
 )
 
-//
 // Referenced Provider validation.
 type Provider struct {
 	client.Client
@@ -53,7 +50,6 @@ type Provider struct {
 	Referenced *api.Provider
 }
 
-//
 // Validate a provider.
 func (r *Provider) Validate(ref core.ObjectReference) (result libcnd.Conditions, err error) {
 	newCnd := libcnd.Condition{
@@ -97,7 +93,6 @@ func (r *Provider) Validate(ref core.ObjectReference) (result libcnd.Conditions,
 	return
 }
 
-//
 // ProviderPair
 type ProviderPair struct {
 	client.Client
@@ -108,7 +103,6 @@ type ProviderPair struct {
 	}
 }
 
-//
 // Validate the pair.
 func (r *ProviderPair) Validate(pair provider.Pair) (result libcnd.Conditions, err error) {
 	conditions, err := r.validateSource(pair)
@@ -125,7 +119,6 @@ func (r *ProviderPair) Validate(pair provider.Pair) (result libcnd.Conditions, e
 	return
 }
 
-//
 // Validate the source.
 func (r *ProviderPair) validateSource(pair provider.Pair) (result libcnd.Conditions, err error) {
 	pv := Provider{Client: r.Client}
@@ -164,7 +157,6 @@ func (r *ProviderPair) validateSource(pair provider.Pair) (result libcnd.Conditi
 	return
 }
 
-//
 // Validate the destination.
 func (r *ProviderPair) validateDestination(pair provider.Pair) (result libcnd.Conditions, err error) {
 	pv := Provider{Client: r.Client}

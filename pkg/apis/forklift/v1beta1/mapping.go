@@ -24,7 +24,6 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//
 // Mapped network destination.
 type DestinationNetwork struct {
 	// The network type.
@@ -36,7 +35,6 @@ type DestinationNetwork struct {
 	Name string `json:"name,omitempty"`
 }
 
-//
 // Mapped network.
 type NetworkPair struct {
 	// Source network.
@@ -45,7 +43,6 @@ type NetworkPair struct {
 	Destination DestinationNetwork `json:"destination"`
 }
 
-//
 // Mapped storage.
 type StoragePair struct {
 	// Source storage.
@@ -54,7 +51,6 @@ type StoragePair struct {
 	Destination DestinationStorage `json:"destination"`
 }
 
-//
 // Mapped storage destination.
 type DestinationStorage struct {
 	// A storage class.
@@ -67,7 +63,6 @@ type DestinationStorage struct {
 	AccessMode core.PersistentVolumeAccessMode `json:"accessMode,omitempty"`
 }
 
-//
 // Network map spec.
 type NetworkMapSpec struct {
 	// Provider
@@ -76,7 +71,6 @@ type NetworkMapSpec struct {
 	Map []NetworkPair `json:"map"`
 }
 
-//
 // Storage map spec.
 type StorageMapSpec struct {
 	// Provider
@@ -85,7 +79,6 @@ type StorageMapSpec struct {
 	Map []StoragePair `json:"map"`
 }
 
-//
 // MapStatus defines the observed state of Maps.
 type MapStatus struct {
 	// Conditions.
@@ -97,7 +90,6 @@ type MapStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
-//
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:openapi-gen=true
@@ -114,7 +106,6 @@ type NetworkMap struct {
 	Referenced `json:"-"`
 }
 
-//
 // Find network map for source ID.
 func (r *NetworkMap) FindNetwork(networkID string) (pair NetworkPair, found bool) {
 	for _, pair = range r.Spec.Map {
@@ -127,7 +118,6 @@ func (r *NetworkMap) FindNetwork(networkID string) (pair NetworkPair, found bool
 	return
 }
 
-//
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type NetworkMapList struct {
 	meta.TypeMeta `json:",inline"`
@@ -135,7 +125,6 @@ type NetworkMapList struct {
 	Items         []NetworkMap `json:"items"`
 }
 
-//
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:openapi-gen=true
@@ -152,7 +141,6 @@ type StorageMap struct {
 	Referenced `json:"-"`
 }
 
-//
 // Find storage map for source ID.
 func (r *StorageMap) FindStorage(storageID string) (pair StoragePair, found bool) {
 	for _, pair = range r.Spec.Map {
@@ -165,7 +153,6 @@ func (r *StorageMap) FindStorage(storageID string) (pair StoragePair, found bool
 	return
 }
 
-//
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type StorageMapList struct {
 	meta.TypeMeta `json:",inline"`

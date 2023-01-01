@@ -13,17 +13,14 @@ import (
 	"strings"
 )
 
-//
 // Package logger.
 var log = logging.WithName("networkMap|ovirt")
 
-//
 // Provider watch event handler.
 type Handler struct {
 	*handler.Handler
 }
 
-//
 // Ensure watch on networks.
 func (r *Handler) Watch(watch *handler.WatchManager) (err error) {
 	w, err := watch.Ensure(
@@ -46,7 +43,6 @@ func (r *Handler) Watch(watch *handler.WatchManager) (err error) {
 	return
 }
 
-//
 // Resource created.
 func (r *Handler) Created(e libweb.Event) {
 	if network, cast := e.Resource.(*ovirt.Network); cast {
@@ -54,7 +50,6 @@ func (r *Handler) Created(e libweb.Event) {
 	}
 }
 
-//
 // Resource created.
 func (r *Handler) Updated(e libweb.Event) {
 	if network, cast := e.Resource.(*ovirt.Network); cast {
@@ -65,7 +60,6 @@ func (r *Handler) Updated(e libweb.Event) {
 	}
 }
 
-//
 // Resource deleted.
 func (r *Handler) Deleted(e libweb.Event) {
 	if network, cast := e.Resource.(*ovirt.Network); cast {
@@ -73,7 +67,6 @@ func (r *Handler) Deleted(e libweb.Event) {
 	}
 }
 
-//
 // Network changed.
 // Find all of the NetworkMap CRs the reference both the
 // provider and the changed network and enqueue reconcile events.

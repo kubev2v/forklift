@@ -15,7 +15,6 @@ import (
 	"strings"
 )
 
-//
 // Event codes.
 const (
 	// DataCenter
@@ -87,11 +86,9 @@ const (
 	USER_FINISHED_REMOVE_DISK_ATTACHED_TO_VMS = 2042
 )
 
-//
 // All adapters.
 var adapterList []Adapter
 
-//
 // Event (type) mapped to adapter.
 var adapterMap = map[int][]Adapter{}
 
@@ -116,12 +113,10 @@ func init() {
 	}
 }
 
-//
 // Updates the DB based on
 // changes described by an Event.
 type Updater func(tx *libmodel.Tx) error
 
-//
 // Adapter context.
 type Context struct {
 	// Context.
@@ -132,7 +127,6 @@ type Context struct {
 	log logr.Logger
 }
 
-//
 // The adapter request is canceled.
 func (r *Context) canceled() (done bool) {
 	select {
@@ -144,7 +138,6 @@ func (r *Context) canceled() (done bool) {
 	return
 }
 
-//
 // Model adapter.
 // Provides integration between the REST resource
 // model and the inventory model.
@@ -157,12 +150,10 @@ type Adapter interface {
 	Event() []int
 }
 
-//
 // Base adapter.
 type BaseAdapter struct {
 }
 
-//
 // Build page parameter.
 func (r *BaseAdapter) page(page, max int) []libweb.Param {
 	return []libweb.Param{
@@ -177,7 +168,6 @@ func (r *BaseAdapter) page(page, max int) []libweb.Param {
 	}
 }
 
-//
 // Build follow parameter.
 func (r *BaseAdapter) follow(property ...string) libweb.Param {
 	return libweb.Param{
@@ -188,13 +178,11 @@ func (r *BaseAdapter) follow(property ...string) libweb.Param {
 	}
 }
 
-//
 // DataCenter.
 type DataCenterAdapter struct {
 	BaseAdapter
 }
 
-//
 // List the collection.
 func (r *DataCenterAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	dataCenterList := DataCenterList{}
@@ -216,7 +204,6 @@ func (r *DataCenterAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	return
 }
 
-//
 // Handled events.
 func (r *DataCenterAdapter) Event() []int {
 	return []int{
@@ -226,7 +213,6 @@ func (r *DataCenterAdapter) Event() []int {
 	}
 }
 
-//
 // Apply events to the inventory model.
 func (r *DataCenterAdapter) Apply(ctx *Context, event *Event) (updater Updater, err error) {
 	defer func() {
@@ -289,13 +275,11 @@ func (r *DataCenterAdapter) Apply(ctx *Context, event *Event) (updater Updater, 
 	return
 }
 
-//
 // Network adapter.
 type NetworkAdapter struct {
 	BaseAdapter
 }
 
-//
 // Handled events.
 func (r *NetworkAdapter) Event() []int {
 	return []int{
@@ -305,7 +289,6 @@ func (r *NetworkAdapter) Event() []int {
 	}
 }
 
-//
 // List the collection.
 func (r *NetworkAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	networkList := NetworkList{}
@@ -327,7 +310,6 @@ func (r *NetworkAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	return
 }
 
-//
 // Apply and event tot the inventory model.
 func (r *NetworkAdapter) Apply(ctx *Context, event *Event) (updater Updater, err error) {
 	var desired fb.Iterator
@@ -369,13 +351,11 @@ func (r *NetworkAdapter) follow() libweb.Param {
 		"vnic_profiles")
 }
 
-//
 // NICProfileAdapter adapter.
 type NICProfileAdapter struct {
 	BaseAdapter
 }
 
-//
 // Handled events.
 func (r *NICProfileAdapter) Event() []int {
 	return []int{
@@ -388,7 +368,6 @@ func (r *NICProfileAdapter) Event() []int {
 	}
 }
 
-//
 // List the collection.
 func (r *NICProfileAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	pList := NICProfileList{}
@@ -411,7 +390,6 @@ func (r *NICProfileAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	return
 }
 
-//
 // Apply and event tot the inventory model.
 func (r *NICProfileAdapter) Apply(ctx *Context, event *Event) (updater Updater, err error) {
 	var desired fb.Iterator
@@ -449,13 +427,11 @@ func (r *NICProfileAdapter) Apply(ctx *Context, event *Event) (updater Updater, 
 	return
 }
 
-//
 // DiskProfile adapter.
 type DiskProfileAdapter struct {
 	BaseAdapter
 }
 
-//
 // Handled events.
 func (r *DiskProfileAdapter) Event() []int {
 	return []int{
@@ -469,7 +445,6 @@ func (r *DiskProfileAdapter) Event() []int {
 	}
 }
 
-//
 // List the collection.
 func (r *DiskProfileAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	dList := DiskProfileList{}
@@ -491,7 +466,6 @@ func (r *DiskProfileAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	return
 }
 
-//
 // Apply and event tot the inventory model.
 func (r *DiskProfileAdapter) Apply(ctx *Context, event *Event) (updater Updater, err error) {
 	var desired fb.Iterator
@@ -530,13 +504,11 @@ func (r *DiskProfileAdapter) Apply(ctx *Context, event *Event) (updater Updater,
 	return
 }
 
-//
 // StorageDomain adapter.
 type StorageDomainAdapter struct {
 	BaseAdapter
 }
 
-//
 // Handled events.
 func (r *StorageDomainAdapter) Event() []int {
 	return []int{
@@ -548,7 +520,6 @@ func (r *StorageDomainAdapter) Event() []int {
 	}
 }
 
-//
 // List the collection.
 func (r *StorageDomainAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	sdList := StorageDomainList{}
@@ -570,7 +541,6 @@ func (r *StorageDomainAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	return
 }
 
-//
 // Apply and event tot the inventory model.
 func (r *StorageDomainAdapter) Apply(ctx *Context, event *Event) (updater Updater, err error) {
 	var desired fb.Iterator
@@ -609,13 +579,11 @@ func (r *StorageDomainAdapter) Apply(ctx *Context, event *Event) (updater Update
 	return
 }
 
-//
 // Cluster adapter.
 type ClusterAdapter struct {
 	BaseAdapter
 }
 
-//
 // Handled events.
 func (r *ClusterAdapter) Event() []int {
 	return []int{
@@ -625,7 +593,6 @@ func (r *ClusterAdapter) Event() []int {
 	}
 }
 
-//
 // List the collection.
 func (r *ClusterAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	clusterList := ClusterList{}
@@ -647,7 +614,6 @@ func (r *ClusterAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	return
 }
 
-//
 // Apply and event tot the inventory model.
 func (r *ClusterAdapter) Apply(ctx *Context, event *Event) (updater Updater, err error) {
 	defer func() {
@@ -710,13 +676,11 @@ func (r *ClusterAdapter) Apply(ctx *Context, event *Event) (updater Updater, err
 	return
 }
 
-//
 // Host (VDS) adapter.
 type HostAdapter struct {
 	BaseAdapter
 }
 
-//
 // Handled events.
 func (r *HostAdapter) Event() []int {
 	return []int{
@@ -730,7 +694,6 @@ func (r *HostAdapter) Event() []int {
 	}
 }
 
-//
 // List the collection.
 func (r *HostAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	hostList := HostList{}
@@ -752,7 +715,6 @@ func (r *HostAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	return
 }
 
-//
 // Apply and event tot the inventory model.
 func (r *HostAdapter) Apply(ctx *Context, event *Event) (updater Updater, err error) {
 	defer func() {
@@ -826,13 +788,11 @@ func (r *HostAdapter) follow() libweb.Param {
 	)
 }
 
-//
 // VM adapter.
 type VMAdapter struct {
 	BaseAdapter
 }
 
-//
 // Handled events.
 func (r *VMAdapter) Event() []int {
 	return []int{
@@ -873,7 +833,6 @@ func (r *VMAdapter) Event() []int {
 	}
 }
 
-//
 // List the collection.
 func (r *VMAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	vmList := VMList{}
@@ -894,7 +853,6 @@ func (r *VMAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	return
 }
 
-//
 // Apply and event tot the inventory model.
 func (r *VMAdapter) Apply(ctx *Context, event *Event) (updater Updater, err error) {
 	defer func() {
@@ -1017,13 +975,11 @@ func (r *VMAdapter) follow() libweb.Param {
 	)
 }
 
-//
 // Disk adapter.
 type DiskAdapter struct {
 	BaseAdapter
 }
 
-//
 // Handled events.
 func (r *DiskAdapter) Event() []int {
 	return []int{
@@ -1044,7 +1000,6 @@ func (r *DiskAdapter) Event() []int {
 	}
 }
 
-//
 // List the collection.
 func (r *DiskAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	diskList := DiskList{}
@@ -1066,7 +1021,6 @@ func (r *DiskAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	return
 }
 
-//
 // Apply and event tot the inventory model.
 // Disks may be added and deleted when VMs are created
 // and deleted without generating any disk events.

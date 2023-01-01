@@ -24,7 +24,6 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//
 // MigrationSpec defines the desired state of Migration
 type MigrationSpec struct {
 	// Reference to the associated Plan.
@@ -36,7 +35,6 @@ type MigrationSpec struct {
 	Cutover *meta.Time `json:"cutover,omitempty"`
 }
 
-//
 // Canceled indicates whether a VM ref is present
 // in the list of VM refs to be canceled.
 func (r *MigrationSpec) Canceled(ref ref.Ref) (found bool) {
@@ -60,7 +58,6 @@ func (r *MigrationSpec) Canceled(ref ref.Ref) (found bool) {
 	return
 }
 
-//
 // MigrationStatus defines the observed state of Migration
 type MigrationStatus struct {
 	plan.Timed `json:",inline"`
@@ -73,7 +70,6 @@ type MigrationStatus struct {
 	VMs []*plan.VMStatus `json:"vms,omitempty"`
 }
 
-//
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:openapi-gen=true
@@ -90,7 +86,6 @@ type Migration struct {
 	Status          MigrationStatus `json:"status,omitempty"`
 }
 
-//
 // Match plan.
 func (r *Migration) Match(plan *Plan) bool {
 	ref := r.Spec.Plan
@@ -98,7 +93,6 @@ func (r *Migration) Match(plan *Plan) bool {
 		ref.Name == plan.Name
 }
 
-//
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type MigrationList struct {
 	meta.TypeMeta `json:",inline"`

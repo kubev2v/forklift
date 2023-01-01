@@ -1,6 +1,5 @@
 package settings
 
-//
 // Environment Variables
 const (
 	FeatureOvirtWarmMigration        = "FEATURE_OVIRT_WARM_MIGRATION"
@@ -8,7 +7,6 @@ const (
 	FeatureVsphereIncrementalBackup  = "FEATURE_VSPHERE_INCREMENTAL_BACKUP"
 )
 
-//
 // Feature gates.
 type Features struct {
 	// Whether migration is supported from oVirt sources.
@@ -20,7 +18,6 @@ type Features struct {
 	VsphereIncrementalBackup bool
 }
 
-//
 // Load settings.
 func (r *Features) Load() (err error) {
 	r.OvirtWarmMigration = getEnvBool(FeatureOvirtWarmMigration, false)
