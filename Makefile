@@ -12,7 +12,7 @@ endif
 
 ci: all
 
-all: test manager
+all: test forklift-controller
 
 # Run tests
 test: generate fmt vet manifests
@@ -22,18 +22,18 @@ test: generate fmt vet manifests
 e2e-sanity:
 	go test tests/base_test.go
 
-# Build manager binary
-manager: generate fmt vet
-	go build -o bin/manager github.com/konveyor/forklift-controller/cmd/manager
+# Build forklift-controller binary
+forklift-controller: generate fmt vet
+	go build -o bin/forklift-controller github.com/konveyor/forklift-controller/cmd/forklift-controller
 
 # Build manager binary with compiler optimizations disabled
 debug: generate fmt vet
-	go build -o bin/manager -gcflags=all="-N -l" github.com/konveyor/forklift-controller/cmd/manager
+	go build -o bin/forklift-controller -gcflags=all="-N -l" github.com/konveyor/forklift-controller/cmd/forklift-controller
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate fmt vet
 	export METRICS_PORT=8888;\
-		KUBEVIRT_CLIENT_GO_SCHEME_REGISTRATION_VERSION=v1 go run ./cmd/manager/main.go
+		KUBEVIRT_CLIENT_GO_SCHEME_REGISTRATION_VERSION=v1 go run ./cmd/forklift-controller/main.go
 
 # Install CRDs into a cluster
 install: manifests
@@ -62,11 +62,11 @@ generate: controller-gen
 
 # Build the docker image
 build-controller:
-	bazel run cmd/manager:forklift-controller-image
+	bazel run cmd/forklift-controller:forklift-controller-image
 
 # Push the docker image
 push-contoller: build-controller
-	$(CONTAINER_CMD) tag cmd/manager:forklift-controller-image ${IMG}
+	$(CONTAINER_CMD) tag cmd/forklift-controller:forklift-controller-image ${IMG}
 	$(CONTAINER_CMD) push ${IMG}
 
 # Build the docker image
