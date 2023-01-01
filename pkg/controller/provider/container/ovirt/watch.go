@@ -1,10 +1,10 @@
-//
 // The approach for providing VM policy-based integration has the
 // following design constraints:
 //   - Validation must never block updating the data model.
 //   - Real-time validation is best effort.
 //   - A scheduled search for VMs that needs to be validated
 //     ensures that all VMs eventually get validated.
+//
 // Real-time validation is triggered by VM create/update model events.
 // If the validation service is unavailable or fails, the condition
 // is only logged with the intent that the next scheduled search will
@@ -17,7 +17,6 @@
 // Both Cluster and Host model events result in all of the VMs in their respective
 // containment trees will be updated with: revisionValidated = 0 which triggers
 // (re)validation.
-//
 package ovirt
 
 import (
@@ -42,7 +41,6 @@ const (
 	ValidationLabel = "VM-validated"
 )
 
-//
 // Endpoints.
 const (
 	BaseEndpoint       = "/v1/data/io/konveyor/forklift/ovirt/"
@@ -50,11 +48,9 @@ const (
 	ValidationEndpoint = BaseEndpoint + "validate"
 )
 
-//
 // Application settings.
 var Settings = &settings.Settings
 
-//
 // Watch for VM changes and validate as needed.
 type VMEventHandler struct {
 	libmodel.StockEventHandler
@@ -76,13 +72,11 @@ type VMEventHandler struct {
 	taskResult chan *policy.Task
 }
 
-//
 // Reset.
 func (r *VMEventHandler) reset() {
 	r.lastSearch = time.Now()
 }
 
-//
 // Watch ended.
 func (r *VMEventHandler) Started(uint64) {
 	r.log.Info("Started.")
@@ -93,7 +87,6 @@ func (r *VMEventHandler) Started(uint64) {
 	go r.harvest()
 }
 
-//
 // VM Created.
 // The VM is scheduled (and reported as scheduled).
 // This is best-effort.  If the validate() fails, it wil be
@@ -109,7 +102,6 @@ func (r *VMEventHandler) Created(event libmodel.Event) {
 	}
 }
 
-//
 // VM Updated.
 // The VM is scheduled (and reported as scheduled).
 // This is best-effort.  If the validate() fails, it wil be
@@ -128,13 +120,11 @@ func (r *VMEventHandler) Updated(event libmodel.Event) {
 	}
 }
 
-//
 // Report errors.
 func (r *VMEventHandler) Error(err error) {
 	r.log.Error(liberr.Wrap(err), err.Error())
 }
 
-//
 // Watch ended.
 func (r *VMEventHandler) End() {
 	r.log.Info("Ended.")
@@ -143,7 +133,6 @@ func (r *VMEventHandler) End() {
 	close(r.taskResult)
 }
 
-//
 // Trip the validation event latch.
 func (r *VMEventHandler) tripLatch() {
 	defer func() {
@@ -157,7 +146,6 @@ func (r *VMEventHandler) tripLatch() {
 	}
 }
 
-//
 // Run.
 // Periodically search for VMs that need to be validated.
 func (r *VMEventHandler) run() {
@@ -183,7 +171,6 @@ func (r *VMEventHandler) run() {
 	}
 }
 
-//
 // Harvest validation task results and update VMs.
 // Collect completed tasks in batches. Apply the batch
 // to VMs when one of:
@@ -218,7 +205,6 @@ func (r *VMEventHandler) harvest() {
 	}
 }
 
-//
 // List for VMs to be validated.
 // VMs that have been reported through the model event
 // watch are ignored.
@@ -259,7 +245,6 @@ func (r *VMEventHandler) list() {
 	}
 }
 
-//
 // Handler canceled.
 func (r *VMEventHandler) canceled() bool {
 	select {
@@ -270,7 +255,6 @@ func (r *VMEventHandler) canceled() bool {
 	}
 }
 
-//
 // Analyze the VM.
 func (r *VMEventHandler) validate(vm *model.VM) (err error) {
 	task := &policy.Task{
@@ -295,7 +279,6 @@ func (r *VMEventHandler) validate(vm *model.VM) (err error) {
 	return
 }
 
-//
 // VMs validated.
 func (r *VMEventHandler) validated(batch []*policy.Task) {
 	if len(batch) == 0 {
@@ -356,7 +339,6 @@ func (r *VMEventHandler) validated(batch []*policy.Task) {
 	}
 }
 
-//
 // Build the workload.
 func (r *VMEventHandler) workload(vmID string) (object interface{}, err error) {
 	vm := &model.VM{
@@ -379,7 +361,6 @@ func (r *VMEventHandler) workload(vmID string) (object interface{}, err error) {
 	return
 }
 
-//
 // Watch for cluster changes and validate as needed.
 type ClusterEventHandler struct {
 	libmodel.StockEventHandler
@@ -389,7 +370,6 @@ type ClusterEventHandler struct {
 	log logr.Logger
 }
 
-//
 // Cluster updated.
 // Analyze all related VMs.
 func (r *ClusterEventHandler) Updated(event libmodel.Event) {
@@ -399,13 +379,11 @@ func (r *ClusterEventHandler) Updated(event libmodel.Event) {
 	}
 }
 
-//
 // Report errors.
 func (r *ClusterEventHandler) Error(err error) {
 	r.log.Error(liberr.Wrap(err), err.Error())
 }
 
-//
 // Analyze all of the VMs related to the cluster.
 func (r *ClusterEventHandler) validate(cluster *model.Cluster) {
 	list := []model.Host{}
@@ -424,7 +402,6 @@ func (r *ClusterEventHandler) validate(cluster *model.Cluster) {
 	}
 }
 
-//
 // Watch for host changes and validate as needed.
 type HostEventHandler struct {
 	libmodel.StockEventHandler
@@ -434,7 +411,6 @@ type HostEventHandler struct {
 	log logr.Logger
 }
 
-//
 // Host updated.
 // Analyze all related VMs.
 func (r *HostEventHandler) Updated(event libmodel.Event) {
@@ -444,13 +420,11 @@ func (r *HostEventHandler) Updated(event libmodel.Event) {
 	}
 }
 
-//
 // Report errors.
 func (r *HostEventHandler) Error(err error) {
 	r.log.Error(liberr.Wrap(err), err.Error())
 }
 
-//
 // Analyze all of the VMs related to the host.
 func (r *HostEventHandler) validate(host *model.Host) {
 	tx, err := r.DB.Begin()
@@ -486,7 +460,6 @@ func (r *HostEventHandler) validate(host *model.Host) {
 	}
 }
 
-//
 // Watch for NICProfile changes and validate VMs as needed.
 type NICProfileHandler struct {
 	libmodel.StockEventHandler
@@ -496,7 +469,6 @@ type NICProfileHandler struct {
 	log logr.Logger
 }
 
-//
 // Profile updated.
 // Analyze all referencing VMs.
 func (r *NICProfileHandler) Updated(event libmodel.Event) {
@@ -506,13 +478,11 @@ func (r *NICProfileHandler) Updated(event libmodel.Event) {
 	}
 }
 
-//
 // Report errors.
 func (r *NICProfileHandler) Error(err error) {
 	r.log.Error(liberr.Wrap(err), err.Error())
 }
 
-//
 // Analyze all of the VMs with NICs referencing the profile.
 func (r *NICProfileHandler) validate(profile *model.NICProfile) {
 	tx, err := r.DB.Begin()
@@ -557,7 +527,6 @@ func (r *NICProfileHandler) validate(profile *model.NICProfile) {
 	}
 }
 
-//
 // Watch for DiskProfile changes and validate VMs as needed.
 type DiskProfileHandler struct {
 	libmodel.StockEventHandler
@@ -567,7 +536,6 @@ type DiskProfileHandler struct {
 	log logr.Logger
 }
 
-//
 // Profile updated.
 // Analyze all referencing VMs.
 func (r *DiskProfileHandler) Updated(event libmodel.Event) {
@@ -577,13 +545,11 @@ func (r *DiskProfileHandler) Updated(event libmodel.Event) {
 	}
 }
 
-//
 // Report errors.
 func (r *DiskProfileHandler) Error(err error) {
 	r.log.Error(liberr.Wrap(err), err.Error())
 }
 
-//
 // Analyze all of the VMs with disks referencing the profile.
 func (r *DiskProfileHandler) validate(profile *model.DiskProfile) {
 	tx, err := r.DB.Begin()

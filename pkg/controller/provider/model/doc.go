@@ -8,7 +8,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 )
 
-//
 // All models.
 func Models(provider *api.Provider) (all []interface{}) {
 	switch provider.Type() {

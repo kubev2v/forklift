@@ -53,15 +53,12 @@ const (
 	Name = "provider"
 )
 
-//
 // Package logger.
 var log = logging.WithName(Name)
 
-//
 // Application settings.
 var Settings = &settings.Settings
 
-//
 // Creates a new Inventory Controller and adds it to the Manager.
 func Add(mgr manager.Manager) error {
 	libfb.WorkingDir = Settings.WorkingDir
@@ -123,7 +120,6 @@ func Add(mgr manager.Manager) error {
 
 var _ reconcile.Reconciler = &Reconciler{}
 
-//
 // Reconciles an provider object.
 type Reconciler struct {
 	base.Reconciler
@@ -132,7 +128,6 @@ type Reconciler struct {
 	web       *libweb.WebServer
 }
 
-//
 // Reconcile a Inventory CR.
 // Note: Must not a pointer receiver to ensure that the
 // logger and other state is not shared.
@@ -248,7 +243,6 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 	return
 }
 
-//
 // Update the provider.
 func (r *Reconciler) updateProvider(provider *api.Provider) (err error) {
 	collector, found := r.container.Get(provider)
@@ -259,7 +253,6 @@ func (r *Reconciler) updateProvider(provider *api.Provider) (err error) {
 	return
 }
 
-//
 // Update the container.
 func (r *Reconciler) updateContainer(provider *api.Provider) (err error) {
 	if _, found := r.container.Get(provider); found {
@@ -303,7 +296,6 @@ func (r *Reconciler) updateContainer(provider *api.Provider) (err error) {
 	return
 }
 
-//
 // Build DB for provider.
 func (r *Reconciler) getDB(provider *api.Provider) (db libmodel.DB) {
 	dir := Settings.Inventory.WorkingDir
@@ -323,7 +315,6 @@ func (r *Reconciler) getDB(provider *api.Provider) (db libmodel.DB) {
 	return
 }
 
-//
 // Get the secret referenced by the provider.
 func (r *Reconciler) getSecret(provider *api.Provider) (*core.Secret, error) {
 	secret := &core.Secret{}
@@ -343,14 +334,12 @@ func (r *Reconciler) getSecret(provider *api.Provider) (*core.Secret, error) {
 	return secret, nil
 }
 
-//
 // Provider catalog.
 type Catalog struct {
 	mutex   sync.Mutex
 	content map[reconcile.Request]*api.Provider
 }
 
-//
 // Add a provider to the catalog.
 func (r *Catalog) add(request reconcile.Request, p *api.Provider) {
 	r.mutex.Lock()
@@ -361,7 +350,6 @@ func (r *Catalog) add(request reconcile.Request, p *api.Provider) {
 	r.content[request] = p
 }
 
-//
 // Get a provider from the catalog.
 func (r *Catalog) get(request reconcile.Request) (p *api.Provider, found bool) {
 	r.mutex.Lock()

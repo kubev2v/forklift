@@ -24,7 +24,6 @@ func Inspect(model interface{}) (md *Definition, err error) {
 	return
 }
 
-//
 // Model definition.
 type Definition struct {
 	Kind   string
@@ -32,7 +31,6 @@ type Definition struct {
 	model  interface{}
 }
 
-//
 // Get the mutable `Fields` for the model.
 func (r *Definition) MutableFields() []*Field {
 	list := []*Field{}
@@ -45,7 +43,6 @@ func (r *Definition) MutableFields() []*Field {
 	return list
 }
 
-//
 // Get the natural key `Fields` for the model.
 func (r *Definition) KeyFields() []*Field {
 	list := []*Field{}
@@ -58,7 +55,6 @@ func (r *Definition) KeyFields() []*Field {
 	return list
 }
 
-//
 // Get foreign keys for the model.
 func (r *Definition) Fks() []*FK {
 	list := []*FK{}
@@ -72,7 +68,6 @@ func (r *Definition) Fks() []*FK {
 	return list
 }
 
-//
 // Get the non-virtual `Fields` for the model.
 func (r *Definition) RealFields(fields []*Field) []*Field {
 	list := []*Field{}
@@ -85,7 +80,6 @@ func (r *Definition) RealFields(fields []*Field) []*Field {
 	return list
 }
 
-//
 // Get the PK field.
 func (r *Definition) PkField() *Field {
 	for _, f := range r.Fields {
@@ -97,7 +91,6 @@ func (r *Definition) PkField() *Field {
 	return nil
 }
 
-//
 // Field by name.
 func (r *Definition) Field(name string) *Field {
 	name = strings.ToLower(name)
@@ -110,13 +103,11 @@ func (r *Definition) Field(name string) *Field {
 	return nil
 }
 
-//
 // Match (case-insensitive) by kind.
 func (r *Definition) IsKind(kind string) bool {
 	return strings.ToLower(kind) == strings.ToLower(r.Kind)
 }
 
-//
 // Get the table name for the model.
 func (r Definition) kind(model interface{}) string {
 	mt := reflect.TypeOf(model)
@@ -127,7 +118,6 @@ func (r Definition) kind(model interface{}) string {
 	return mt.Name()
 }
 
-//
 // Validate the model.
 func (r *Definition) validate() (err error) {
 	for _, f := range r.Fields {
@@ -144,7 +134,6 @@ func (r *Definition) validate() (err error) {
 	return
 }
 
-//
 // Get the `Fields` for the model.
 func (r *Definition) fields(model interface{}) (fields []*Field, err error) {
 	mt := reflect.TypeOf(model)
@@ -215,7 +204,6 @@ func (r *Definition) fields(model interface{}) (fields []*Field, err error) {
 	return
 }
 
-//
 // New model for kind.
 func (r *Definition) NewModel() (m interface{}) {
 	mt := reflect.TypeOf(r.model)
@@ -226,7 +214,6 @@ func (r *Definition) NewModel() (m interface{}) {
 	return
 }
 
-//
 // New data Model.
 func NewModel(models []interface{}) (dm *DataModel, err error) {
 	dm = &DataModel{
@@ -244,21 +231,18 @@ func NewModel(models []interface{}) (dm *DataModel, err error) {
 	return
 }
 
-//
 // DataModel.
 // Map of definitions.
 type DataModel struct {
 	content map[string]*Definition
 }
 
-//
 // Add definition.
 func (r *DataModel) Add(md *Definition) {
 	key := strings.ToLower(md.Kind)
 	r.content[key] = md
 }
 
-//
 // Definitions.
 func (r *DataModel) Definitions() (list Definitions) {
 	list = Definitions{}
@@ -269,7 +253,6 @@ func (r *DataModel) Definitions() (list Definitions) {
 	return
 }
 
-//
 // Build the DDL.
 func (r *DataModel) DDL() (list []string, err error) {
 	fkRelation := FkRelation{dm: r}
@@ -285,7 +268,6 @@ func (r *DataModel) DDL() (list []string, err error) {
 	return
 }
 
-//
 // Find by kind.
 func (r *DataModel) Find(kind string) (md *Definition, found bool) {
 	key := strings.ToLower(kind)
@@ -293,7 +275,6 @@ func (r *DataModel) Find(kind string) (md *Definition, found bool) {
 	return
 }
 
-//
 // Find with model.
 func (r *DataModel) FindWith(model interface{}) (md *Definition, found bool) {
 	kind := Definition{}.kind(model)
@@ -301,7 +282,6 @@ func (r *DataModel) FindWith(model interface{}) (md *Definition, found bool) {
 	return
 }
 
-//
 // Find models to be (cascade) deleted.
 func (r *DataModel) Deleted(tx *Tx, model interface{}) (cascaded fb.Iterator, err error) {
 	md, err := Inspect(model)
@@ -317,7 +297,6 @@ func (r *DataModel) Deleted(tx *Tx, model interface{}) (cascaded fb.Iterator, er
 	return
 }
 
-//
 // Find models to be (cascade) deleted.
 func (r *DataModel) cascade(tx *Tx, relation *FkRelation, md *Definition) (cascaded fb.Iterator, err error) {
 	list := fb.NewList()
@@ -366,23 +345,19 @@ func (r *DataModel) cascade(tx *Tx, relation *FkRelation, md *Definition) (casca
 	return
 }
 
-//
 // Model definitions.
 type Definitions []*Definition
 
-//
 // Append model definition.
 func (r *Definitions) Append(md *Definition) {
 	*r = append(*r, md)
 }
 
-//
 // Push model definition.
 func (r *Definitions) Push(md *Definition) {
 	r.Append(md)
 }
 
-//
 // Head (first) model definition.
 // Returns: nil when empty.
 func (r *Definitions) Head(delete bool) (md *Definition) {
@@ -395,7 +370,6 @@ func (r *Definitions) Head(delete bool) (md *Definition) {
 	return
 }
 
-//
 // Top (last) model definition.
 // Returns: nil when empty.
 func (r *Definitions) Top() (md *Definition) {
@@ -407,7 +381,6 @@ func (r *Definitions) Top() (md *Definition) {
 	return
 }
 
-//
 // Pop model definition.
 // Returns: nil when empty.
 func (r *Definitions) Pop() (md *Definition) {
@@ -420,7 +393,6 @@ func (r *Definitions) Pop() (md *Definition) {
 	return
 }
 
-//
 // Delete model definition.
 func (r *Definitions) Delete(index int) {
 	_ = (*r)[index]
@@ -431,7 +403,6 @@ func (r *Definitions) Delete(index int) {
 	*r = s
 }
 
-//
 // Reverse.
 func (r *Definitions) Reverse() {
 	if len(*r) == 0 {

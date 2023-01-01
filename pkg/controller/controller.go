@@ -28,16 +28,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
-//
 // Application settings.
 var Settings = &settings.Settings
 
-//
 // Function provided by controller packages to add
 // them self to the manager.
 type AddFunction func(manager.Manager) error
 
-//
 // List of main controllers
 var MainControllers = []AddFunction{
 	migration.Add,
@@ -48,13 +45,11 @@ var MainControllers = []AddFunction{
 	hook.Add,
 }
 
-//
 // List of Inventory controllers
 var InventoryControllers = []AddFunction{
 	provider.Add,
 }
 
-//
 // Add controllers to the manager based on role.
 func AddToManager(m manager.Manager) error {
 	load := func(functions []AddFunction) error {

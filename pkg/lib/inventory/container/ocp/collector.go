@@ -26,7 +26,6 @@ const (
 	RetryDelay = time.Second * 5
 )
 
-//
 // Cluster.
 type Cluster interface {
 	meta.Object
@@ -35,7 +34,6 @@ type Cluster interface {
 	RestCfg(*core.Secret) *rest.Config
 }
 
-//
 // An OpenShift collector.
 type Collector struct {
 	// The cluster CR.
@@ -67,7 +65,6 @@ type Collector struct {
 	cancel func()
 }
 
-//
 // New collector.
 func New(
 	db libmodel.DB,
@@ -89,43 +86,36 @@ func New(
 	}
 }
 
-//
 // The name.
 func (r *Collector) Name() string {
 	return r.cluster.GetName()
 }
 
-//
 // The owner.
 func (r *Collector) Owner() meta.Object {
 	return r.cluster
 }
 
-//
 // Get the DB.
 func (r *Collector) DB() libmodel.DB {
 	return r.db
 }
 
-//
 // Get the Client.
 func (r *Collector) Client() client.Client {
 	return r.client
 }
 
-//
 // Reset.
 func (r *Collector) Reset() {
 	r.parity = false
 }
 
-//
 // Collector has achieved parity.
 func (r *Collector) HasParity() bool {
 	return r.parity
 }
 
-//
 // Update the versionThreshold
 func (r *Collector) UpdateThreshold(m libmodel.Model) {
 	if m, cast := m.(interface{ ResourceVersion() uint64 }); cast {
@@ -141,7 +131,6 @@ func (r *Collector) Test() (int, error) {
 	return 0, r.buildClient()
 }
 
-//
 // Start the collector.
 func (r *Collector) Start() error {
 	ctx := context.Background()
@@ -176,12 +165,11 @@ func (r *Collector) Start() error {
 	return nil
 }
 
-//
 // Start details.
-//   1. Build and start the manager.
-//   2. Reconcile all of the collections.
-//   3. Mark parity.
-//   4. Start apply events (coroutine).
+//  1. Build and start the manager.
+//  2. Reconcile all of the collections.
+//  3. Mark parity.
+//  4. Start apply events (coroutine).
 func (r *Collector) start(ctx context.Context) (err error) {
 	r.versionThreshold = 0
 	r.eventChannel = make(chan ModelEvent, 100)
@@ -216,7 +204,6 @@ func (r *Collector) start(ctx context.Context) (err error) {
 	return
 }
 
-//
 // Reconcile collections.
 func (r *Collector) reconcileCollections(ctx context.Context) (err error) {
 	mark := time.Now()
@@ -242,11 +229,10 @@ func (r *Collector) reconcileCollections(ctx context.Context) (err error) {
 	return
 }
 
-//
 // Shutdown the collector.
-//   1. Close manager stop channel.
-//   2. Close watch event coroutine channel.
-//   3. Cancel the context.
+//  1. Close manager stop channel.
+//  2. Close watch event coroutine channel.
+//  3. Cancel the context.
 func (r *Collector) Shutdown() {
 	r.log.V(3).Info("shutdown.")
 	r.terminate()
@@ -255,7 +241,6 @@ func (r *Collector) Shutdown() {
 	}
 }
 
-//
 // Terminate coroutines.
 func (r *Collector) terminate() {
 	defer func() {
@@ -265,7 +250,6 @@ func (r *Collector) terminate() {
 	close(r.eventChannel)
 }
 
-//
 // Enqueue create model event.
 // Used by watch predicates.
 // Swallow panic: send on closed channel.
@@ -278,7 +262,6 @@ func (r *Collector) Create(m libmodel.Model) {
 	r.eventChannel <- ModelEvent{}.Create(m)
 }
 
-//
 // Enqueue update model event.
 // Used by watch predicates.
 // Swallow panic: send on closed channel.
@@ -291,7 +274,6 @@ func (r *Collector) Update(m libmodel.Model) {
 	r.eventChannel <- ModelEvent{}.Update(m)
 }
 
-//
 // Enqueue delete model event.
 // Used by watch predicates.
 // Swallow panic: send on closed channel.
@@ -304,7 +286,6 @@ func (r *Collector) Delete(m libmodel.Model) {
 	r.eventChannel <- ModelEvent{}.Delete(m)
 }
 
-//
 // Build the k8s manager.
 func (r *Collector) buildManager() (err error) {
 	r.manager, err = manager.New(
@@ -342,7 +323,6 @@ func (r *Collector) buildManager() (err error) {
 	return
 }
 
-//
 // Build non-cached client.
 func (r *Collector) buildClient() (err error) {
 	r.client, err = client.New(
@@ -354,7 +334,6 @@ func (r *Collector) buildClient() (err error) {
 	return
 }
 
-//
 // Apply model events.
 func (r *Collector) applyEvents() {
 	r.log.V(3).Info("apply started.")
@@ -368,13 +347,11 @@ func (r *Collector) applyEvents() {
 	}
 }
 
-//
 // Never called.
 func (r *Collector) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	return reconcile.Result{}, nil
 }
 
-//
 // Model event.
 // Used with `eventChannel`.
 type ModelEvent struct {
@@ -387,7 +364,6 @@ type ModelEvent struct {
 	action byte
 }
 
-//
 // Apply the change to the DB.
 func (r *ModelEvent) Apply(rl *Collector) (err error) {
 	tx, err := rl.db.Begin()
@@ -449,7 +425,6 @@ func (r *ModelEvent) Apply(rl *Collector) (err error) {
 	return
 }
 
-//
 // Set the event model and action.
 func (r ModelEvent) Create(m libmodel.Model) ModelEvent {
 	r.model = m
@@ -457,7 +432,6 @@ func (r ModelEvent) Create(m libmodel.Model) ModelEvent {
 	return r
 }
 
-//
 // Set the event model and action.
 func (r ModelEvent) Update(m libmodel.Model) ModelEvent {
 	r.model = m
@@ -465,7 +439,6 @@ func (r ModelEvent) Update(m libmodel.Model) ModelEvent {
 	return r
 }
 
-//
 // Set the event model and action.
 func (r ModelEvent) Delete(m libmodel.Model) ModelEvent {
 	r.model = m

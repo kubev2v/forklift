@@ -10,7 +10,6 @@ import (
 	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
 )
 
-//
 // All handlers.
 func All(container *container.Container) (all []libweb.RequestHandler) {
 	all = []libweb.RequestHandler{

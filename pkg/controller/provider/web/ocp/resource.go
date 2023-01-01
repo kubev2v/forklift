@@ -4,7 +4,6 @@ import (
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 )
 
-//
 // REST Resource.
 type Resource struct {
 	// k8s UID.
@@ -19,7 +18,6 @@ type Resource struct {
 	SelfLink string `json:"selfLink"`
 }
 
-//
 // Populate the fields with the specified object.
 func (r *Resource) With(m *model.Base) {
 	r.UID = m.UID

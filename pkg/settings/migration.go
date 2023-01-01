@@ -5,7 +5,6 @@ import (
 	"os"
 )
 
-//
 // Environment variables.
 const (
 	MaxVmInFlight   = "MAX_VM_INFLIGHT"
@@ -15,13 +14,11 @@ const (
 	PrecopyInterval = "PRECOPY_INTERVAL"
 )
 
-//
 // Default virt-v2v image.
 const (
 	DefaultVirtV2vImage = "quay.io/konveyor/forklift-virt-v2v:latest"
 )
 
-//
 // Migration settings
 type Migration struct {
 	// Max VMs in-flight.
@@ -36,7 +33,6 @@ type Migration struct {
 	VirtV2vImage string
 }
 
-//
 // Load settings.
 func (r *Migration) Load() (err error) {
 	r.MaxInFlight, err = getEnvLimit(MaxVmInFlight, 20)

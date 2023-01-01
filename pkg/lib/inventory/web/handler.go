@@ -15,21 +15,18 @@ import (
 	"time"
 )
 
-//
 // Web request handler.
 type RequestHandler interface {
 	// Add routes to the `gin` router.
 	AddRoutes(*gin.Engine)
 }
 
-//
 // Paged handler.
 type Paged struct {
 	// The `page` parameter passed in the request.
 	Page model.Page
 }
 
-//
 // Prepare the handler to fulfil the request.
 // Set the `page` field using passed parameters.
 func (h *Paged) Prepare(ctx *gin.Context) int {
@@ -41,7 +38,6 @@ func (h *Paged) Prepare(ctx *gin.Context) int {
 	return http.StatusOK
 }
 
-//
 // Set the `page` field.
 func (h *Paged) setPage(ctx *gin.Context) int {
 	q := ctx.Request.URL.Query()
@@ -70,12 +66,10 @@ func (h *Paged) setPage(ctx *gin.Context) int {
 	return http.StatusOK
 }
 
-//
 // Parity (not-partial) request handler.
 type Parity struct {
 }
 
-//
 // Ensure collector has achieved parity.
 func (c *Parity) EnsureParity(r container.Collector, w time.Duration) int {
 	wait := w
@@ -96,11 +90,9 @@ func (c *Parity) EnsureParity(r container.Collector, w time.Duration) int {
 	return http.StatusPartialContent
 }
 
-//
 // Watched resource builder.
 type ResourceBuilder func(model.Model) interface{}
 
-//
 // Event
 type Event struct {
 	// ID
@@ -115,7 +107,6 @@ type Event struct {
 	Updated interface{}
 }
 
-//
 // String representation.
 func (r *Event) String() string {
 	action := "unknown"
@@ -146,7 +137,6 @@ func (r *Event) String() string {
 		kind)
 }
 
-//
 // Watch (event) writer.
 // The writer is model event handler. Each event
 // is send (forwarded) to the watch client.  This
@@ -164,13 +154,11 @@ type WatchWriter struct {
 	done bool
 }
 
-//
 // Watch options.
 func (r *WatchWriter) Options() model.WatchOptions {
 	return r.options
 }
 
-//
 // Start the writer.
 // Detect connection closed by peer or broken
 // and end the watch.
@@ -201,7 +189,6 @@ func (r *WatchWriter) Start(watch *model.Watch) {
 	}()
 }
 
-//
 // Watch has started.
 func (r *WatchWriter) Started(watchID uint64) {
 	r.log.V(3).Info("event: started.")
@@ -211,7 +198,6 @@ func (r *WatchWriter) Started(watchID uint64) {
 	})
 }
 
-//
 // Watch has parity.
 func (r *WatchWriter) Parity() {
 	r.log.V(3).Info("event: parity.")
@@ -220,7 +206,6 @@ func (r *WatchWriter) Parity() {
 	})
 }
 
-//
 // A model has been created.
 func (r *WatchWriter) Created(event model.Event) {
 	r.log.V(5).Info(
@@ -230,7 +215,6 @@ func (r *WatchWriter) Created(event model.Event) {
 	r.send(event)
 }
 
-//
 // A model has been updated.
 func (r *WatchWriter) Updated(event model.Event) {
 	r.log.V(5).Info(
@@ -240,7 +224,6 @@ func (r *WatchWriter) Updated(event model.Event) {
 	r.send(event)
 }
 
-//
 // A model has been deleted.
 func (r *WatchWriter) Deleted(event model.Event) {
 	r.log.V(5).Info(
@@ -250,7 +233,6 @@ func (r *WatchWriter) Deleted(event model.Event) {
 	r.send(event)
 }
 
-//
 // An error has occurred delivering an event.
 func (r *WatchWriter) Error(err error) {
 	r.log.V(3).Info(
@@ -262,7 +244,6 @@ func (r *WatchWriter) Error(err error) {
 	})
 }
 
-//
 // An event watch has ended.
 func (r *WatchWriter) End() {
 	r.log.V(3).Info("event: ended.")
@@ -274,7 +255,6 @@ func (r *WatchWriter) End() {
 	_ = r.webSocket.Close()
 }
 
-//
 // Write event to the socket.
 func (r *WatchWriter) send(e model.Event) {
 	if r.done {
@@ -302,7 +282,6 @@ func (r *WatchWriter) send(e model.Event) {
 		event)
 }
 
-//
 // Watched (handler).
 type Watched struct {
 	// Watch requested.
@@ -311,7 +290,6 @@ type Watched struct {
 	options model.WatchOptions
 }
 
-//
 // Prepare the handler to fulfil the request.
 // Set the `WatchRequest` and `snapshot` fields based on passed headers.
 // The header value is a list of options.
@@ -328,7 +306,6 @@ func (h *Watched) Prepare(ctx *gin.Context) int {
 	return http.StatusOK
 }
 
-//
 // Watch model.
 func (r *Watched) Watch(
 	ctx *gin.Context,
@@ -381,7 +358,6 @@ func (r *Watched) Watch(
 	return
 }
 
-//
 // Schema (route) handler.
 type SchemaHandler struct {
 	// The `gin` router.
@@ -392,14 +368,12 @@ type SchemaHandler struct {
 	Release int
 }
 
-//
 // Add routes.
 func (h *SchemaHandler) AddRoutes(r *gin.Engine) {
 	r.GET("/schema", h.List)
 	h.router = r
 }
 
-//
 // List schema.
 func (h *SchemaHandler) List(ctx *gin.Context) {
 	type Schema struct {
@@ -419,7 +393,6 @@ func (h *SchemaHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, schema)
 }
 
-//
 // Not supported.
 func (h SchemaHandler) Get(ctx *gin.Context) {
 	ctx.Status(http.StatusMethodNotAllowed)

@@ -20,19 +20,15 @@ import (
 
 var log = logging.WithName("validation|policy")
 
-//
 // Lib.
 type LibClient = libweb.Client
 
-//
 // Application settings.
 var Settings = &settings.Settings
 
-//
 // Pool (singleton).
 var Agent Pool
 
-//
 // Error reported by the service.
 type ValidationError struct {
 	Errors []string
@@ -42,19 +38,16 @@ func (r *ValidationError) Error() string {
 	return fmt.Sprintf("%v", r.Errors)
 }
 
-//
 // Client.
 type Client struct {
 	LibClient
 }
 
-//
 // Enabled.
 func (r *Client) Enabled() bool {
 	return Settings.PolicyAgent.Enabled()
 }
 
-//
 // Policy version.
 func (r *Client) Version(path string) (version int, err error) {
 	if !r.Enabled() {
@@ -82,7 +75,6 @@ func (r *Client) Version(path string) (version int, err error) {
 	return
 }
 
-//
 // Validate the VM.
 func (r *Client) Validate(
 	path string,
@@ -121,7 +113,6 @@ func (r *Client) Validate(
 	return
 }
 
-//
 // Get request.
 func (r *Client) get(path string, out interface{}) (err error) {
 	parsedURL, err := liburl.Parse(Settings.PolicyAgent.URL)
@@ -150,7 +141,6 @@ func (r *Client) get(path string, out interface{}) (err error) {
 	return
 }
 
-//
 // Post request.
 func (r *Client) post(path string, in interface{}, out interface{}) (err error) {
 	parsedURL, err := liburl.Parse(Settings.PolicyAgent.URL)
@@ -181,7 +171,6 @@ func (r *Client) post(path string, in interface{}, out interface{}) (err error) 
 	return
 }
 
-//
 // Build and set the transport as needed.
 func (c *Client) buildTransport() (err error) {
 	if c.Transport != nil || !Settings.PolicyAgent.Enabled() {
@@ -220,7 +209,6 @@ func (c *Client) buildTransport() (err error) {
 	return
 }
 
-//
 // Policy agent task.
 type Task struct {
 	// Path (endpoint).
@@ -249,19 +237,16 @@ type Task struct {
 	completed time.Time
 }
 
-//
 // Worker ID.
 func (r *Task) Worker() int {
 	return r.worker
 }
 
-//
 // Duration.
 func (r *Task) Duration() time.Duration {
 	return r.completed.Sub(r.started)
 }
 
-//
 // Description.
 func (r *Task) String() string {
 	err := ""
@@ -277,7 +262,6 @@ func (r *Task) String() string {
 		r.Concerns)
 }
 
-//
 // Notify result handler the task has completed.
 func (r *Task) notify() {
 	func() {
@@ -288,7 +272,6 @@ func (r *Task) notify() {
 	}
 }
 
-//
 // Task canceled.
 func (r *Task) canceled() bool {
 	select {
@@ -299,7 +282,6 @@ func (r *Task) canceled() bool {
 	}
 }
 
-//
 // Task worker.
 type Worker struct {
 	id int
@@ -311,7 +293,6 @@ type Worker struct {
 	output chan *Task
 }
 
-//
 // Main worker run.
 // Process input queue. Validation delegated to the
 // policy agent.
@@ -348,7 +329,6 @@ func (r *Worker) run() {
 	}()
 }
 
-//
 // Policy agent task pool.
 type Pool struct {
 	Client
@@ -360,7 +340,6 @@ type Pool struct {
 	started bool
 }
 
-//
 // Main.
 // Start workers and process output queue.
 func (r *Pool) Start() {
@@ -402,7 +381,6 @@ func (r *Pool) Start() {
 	r.started = true
 }
 
-//
 // Shutdown the pool.
 // Terminate workers and stop processing result queue.
 func (r *Pool) Shutdown() {
@@ -414,13 +392,11 @@ func (r *Pool) Shutdown() {
 	close(r.output)
 }
 
-//
 // Policy version.
 func (r *Pool) Version(path string) (version int, err error) {
 	return r.Client.Version(path)
 }
 
-//
 // Submit validation task.
 // Queue validation request.
 func (r *Pool) Submit(task *Task) (err error) {
@@ -434,13 +410,11 @@ func (r *Pool) Submit(task *Task) (err error) {
 	return
 }
 
-//
 // The pool backlog.
 func (r *Pool) Backlog() int {
 	return len(r.input)
 }
 
-//
 // Number of workers.
 func (r *Pool) parallel() (limit int) {
 	limit = Settings.PolicyAgent.Limit.Worker

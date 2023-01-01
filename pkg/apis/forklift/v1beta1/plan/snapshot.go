@@ -6,7 +6,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-//
 // Snapshot object reference.
 type SnapshotRef struct {
 	Namespace  string    `json:"namespace"`
@@ -15,21 +14,18 @@ type SnapshotRef struct {
 	Generation int64     `json:"generation"`
 }
 
-//
 // Source and destination pair.
 type SnapshotRefPair struct {
 	Source      SnapshotRef `json:"source"`
 	Destination SnapshotRef `json:"destination"`
 }
 
-//
 // Mapping.
 type SnapshotMap struct {
 	Network SnapshotRef `json:"network"`
 	Storage SnapshotRef `json:"storage"`
 }
 
-//
 // Snapshot
 type Snapshot struct {
 	// Conditions.
@@ -44,7 +40,6 @@ type Snapshot struct {
 	Migration SnapshotRef `json:"migration"`
 }
 
-//
 // Populate the ref using the specified (meta) object.
 func (r *SnapshotRef) With(object meta.Object) {
 	r.Namespace = object.GetNamespace()
@@ -53,7 +48,6 @@ func (r *SnapshotRef) With(object meta.Object) {
 	r.UID = object.GetUID()
 }
 
-//
 // Match the object and ref by UID/Generation.
 func (r *SnapshotRef) Match(object meta.Object) bool {
 	return r.UID == object.GetUID() && r.Generation == object.GetGeneration()

@@ -19,7 +19,6 @@ const (
 	LongReQ = time.Second * 30
 )
 
-//
 // Base reconciler.
 type Reconciler struct {
 	record.EventRecorder
@@ -27,13 +26,11 @@ type Reconciler struct {
 	Log *logging.Logger
 }
 
-//
 // Reconcile started.
 func (r *Reconciler) Started() {
 	r.Log.Info("Reconcile started.")
 }
 
-//
 // Reconcile ended.
 func (r *Reconciler) Ended(reQin time.Duration, err error) (reQ time.Duration) {
 	defer func() {
@@ -63,7 +60,6 @@ func (r *Reconciler) Ended(reQin time.Duration, err error) (reQ time.Duration) {
 	return
 }
 
-//
 // Record for changes in conditions.
 // Logged and recorded as `Event`.
 func (r *Reconciler) Record(object runtime.Object, cnd libcnd.Conditions) {

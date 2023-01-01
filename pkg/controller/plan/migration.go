@@ -21,14 +21,12 @@ import (
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
 
-//
 // Requeue
 const (
 	NoReQ   = time.Duration(0)
 	PollReQ = time.Second * 3
 )
 
-//
 // Predicates.
 var (
 	HasPreHook         libitr.Flag = 0x01
@@ -36,7 +34,6 @@ var (
 	RequiresConversion libitr.Flag = 0x04
 )
 
-//
 // Phases.
 const (
 	Started                  = "Started"
@@ -63,7 +60,6 @@ const (
 	WaitForFinalSnapshot     = "WaitForFinalSnapshot"
 )
 
-//
 // Steps.
 const (
 	Initialize      = "Initialize"
@@ -74,7 +70,6 @@ const (
 	Unknown         = "Unknown"
 )
 
-//
 // Power states.
 const (
 	On = "On"
@@ -127,7 +122,6 @@ var (
 	}
 )
 
-//
 // Migration.
 type Migration struct {
 	*plancontext.Context
@@ -143,13 +137,11 @@ type Migration struct {
 	scheduler scheduler.Scheduler
 }
 
-//
 // Type of migration.
 func (r *Migration) Type() string {
 	return r.Context.Source.Provider.Type().String()
 }
 
-//
 // Run the migration.
 func (r *Migration) Run() (reQ time.Duration, err error) {
 	defer func() {
@@ -197,7 +189,6 @@ func (r *Migration) Run() (reQ time.Duration, err error) {
 	return
 }
 
-//
 // Get/Build resources.
 func (r *Migration) init() (err error) {
 	adapter, err := adapter.New(r.Context.Source.Provider)
@@ -224,7 +215,6 @@ func (r *Migration) init() (err error) {
 	return
 }
 
-//
 // Begin the migration.
 func (r *Migration) begin() (err error) {
 	snapshot := r.Plan.Status.Migration.ActiveSnapshot()
@@ -312,7 +302,6 @@ func (r *Migration) begin() (err error) {
 	return
 }
 
-//
 // Archive the plan.
 // Best effort to remove any retained migration resources.
 func (r *Migration) Archive() {
@@ -334,7 +323,6 @@ func (r *Migration) Archive() {
 	return
 }
 
-//
 // Cancel the migration.
 // Delete resources associated with VMs that have been marked canceled.
 func (r *Migration) Cancel() (err error) {
@@ -376,7 +364,6 @@ func (r *Migration) Cancel() (err error) {
 	return
 }
 
-//
 // Delete left over migration resources associated with a VM.
 func (r *Migration) CleanUp(vm *plan.VMStatus) (err error) {
 	if vm.HasCondition(Succeeded) {
@@ -433,7 +420,6 @@ func (r *Migration) deleteImporterPods(vm *plan.VMStatus) (err error) {
 	return
 }
 
-//
 // Best effort attempt to resolve canceled refs.
 func (r *Migration) resolveCanceledRefs() {
 	for i := range r.Context.Migration.Spec.Cancel {
@@ -443,7 +429,6 @@ func (r *Migration) resolveCanceledRefs() {
 	}
 }
 
-//
 func (r *Migration) runningVMs() (vms []*plan.VMStatus) {
 	vms = make([]*plan.VMStatus, 0)
 	for i := range r.Plan.Status.Migration.VMs {
@@ -455,7 +440,6 @@ func (r *Migration) runningVMs() (vms []*plan.VMStatus) {
 	return
 }
 
-//
 // Next step in the itinerary.
 func (r *Migration) next(phase string) (next string) {
 	step, done, err := r.itinerary().Next(phase)
@@ -480,7 +464,6 @@ func (r *Migration) itinerary() *libitr.Itinerary {
 	}
 }
 
-//
 // Get the name of the pipeline step corresponding to the current VM phase.
 func (r *Migration) step(vm *plan.VMStatus) (step string) {
 	switch vm.Phase {
@@ -508,7 +491,6 @@ func (r *Migration) step(vm *plan.VMStatus) (step string) {
 	return
 }
 
-//
 // Steps a VM through the migration itinerary
 // and updates its status.
 func (r *Migration) execute(vm *plan.VMStatus) (err error) {
@@ -892,8 +874,6 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 	return
 }
 
-//
-//
 func (r *Migration) resetPrecopyTasks(vm *plan.VMStatus, step *plan.Step) {
 	step.Completed = nil
 	for _, task := range step.Tasks {
@@ -903,7 +883,6 @@ func (r *Migration) resetPrecopyTasks(vm *plan.VMStatus, step *plan.Step) {
 	}
 }
 
-//
 // Build the pipeline for a VM status.
 func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error) {
 	r.itinerary().Predicate = &Predicate{vm: vm, context: r.Context}
@@ -1033,7 +1012,6 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 	return
 }
 
-//
 // End the migration.
 func (r *Migration) end() (completed bool, err error) {
 	failed := 0
@@ -1095,7 +1073,6 @@ func (r *Migration) end() (completed bool, err error) {
 	return
 }
 
-//
 // Ensure the guest conversion pod is present.
 func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (err error) {
 	if r.vmMap == nil {
@@ -1122,7 +1099,6 @@ func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (err error) {
 	return
 }
 
-//
 // Set the running state of the kubevirt VM.
 func (r *Migration) setRunning(vm *plan.VMStatus, running bool) (err error) {
 	if r.vmMap == nil {
@@ -1147,7 +1123,6 @@ func (r *Migration) setRunning(vm *plan.VMStatus, running bool) (err error) {
 	return
 }
 
-//
 // Update the progress of the appropriate disk copy step. (DiskTransfer, Cutover)
 func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err error) {
 	var pendingReason string
@@ -1281,7 +1256,6 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 	return
 }
 
-//
 // Wait for guest conversion to complete, and update the ImageConversion pipeline step.
 func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step) (err error) {
 	pod, err := r.kubevirt.GetGuestConversionPod(vm)
@@ -1305,8 +1279,6 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 	return
 }
 
-//
-//
 func (r *Migration) setDataVolumeCheckpoints(vm *plan.VMStatus) (err error) {
 	if r.vmMap == nil {
 		r.vmMap, err = r.kubevirt.VirtualMachineMap()
@@ -1340,7 +1312,6 @@ func (r *Migration) setDataVolumeCheckpoints(vm *plan.VMStatus) (err error) {
 	return
 }
 
-//
 // Step predicate.
 type Predicate struct {
 	// VM listed on the plan.
@@ -1349,7 +1320,6 @@ type Predicate struct {
 	context *plancontext.Context
 }
 
-//
 // Evaluate predicate flags.
 func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 	switch flag {
@@ -1364,7 +1334,6 @@ func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 	return
 }
 
-//
 // Retrieve the termination message from a pod's first container.
 func terminationMessage(pod *core.Pod) (msg string, ok bool) {
 	if len(pod.Status.ContainerStatuses) > 0 &&
@@ -1376,7 +1345,6 @@ func terminationMessage(pod *core.Pod) (msg string, ok bool) {
 	return
 }
 
-//
 // Return whether the pod has failed and restarted too many times.
 func restartLimitExceeded(pod *core.Pod) (exceeded bool) {
 	if len(pod.Status.ContainerStatuses) == 0 {

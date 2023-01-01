@@ -16,7 +16,6 @@ import (
 	"text/template"
 )
 
-//
 // DDL templates.
 var TableDDL = `
 CREATE TABLE IF NOT EXISTS {{.Table}} (
@@ -41,7 +40,6 @@ ON {{.Table}}
 );
 `
 
-//
 // SQL templates.
 var InsertSQL = `
 INSERT INTO {{.Table}} (
@@ -121,7 +119,6 @@ LIMIT {{.Page.Limit}} OFFSET {{.Page.Offset}}
 ;
 `
 
-//
 // Errors
 var (
 	// Must have PK.
@@ -148,28 +145,26 @@ var (
 	DetailErr = errors.New("detail level must be <= MaxDetail")
 )
 
-//
 // Represents a table in the DB.
 // Using reflect, the model is inspected to determine the
 // table name and columns. The column definition is specified
 // using field tags:
-//   pk - Primary key.
-//   key - Natural key.
-//   fk:<table>(field) - Foreign key.
-//   unique(<group>) - Unique constraint collated by <group>.
-//   const - Not updated.
+//
+//	pk - Primary key.
+//	key - Natural key.
+//	fk:<table>(field) - Foreign key.
+//	unique(<group>) - Unique constraint collated by <group>.
+//	const - Not updated.
 type Table struct {
 	// Database connection.
 	DB DBTX
 }
 
-//
 // Get the table name for the model.
 func (t Table) Name(model interface{}) string {
 	return Definition{}.kind(model)
 }
 
-//
 // Get table and index create DDL.
 func (t Table) DDL(model interface{}, dm *DataModel) (list []string, err error) {
 	md, found := dm.FindWith(model)
@@ -202,7 +197,6 @@ func (t Table) DDL(model interface{}, dm *DataModel) (list []string, err error) 
 	return
 }
 
-//
 // Build table DDL.
 func (t Table) TableDDL(md *Definition, dm *DataModel) (list []string, err error) {
 	tpl := template.New("")
@@ -231,7 +225,6 @@ func (t Table) TableDDL(md *Definition, dm *DataModel) (list []string, err error
 	return
 }
 
-//
 // Build natural key index DDL.
 func (t Table) KeyIndexDDL(md *Definition) (list []string, err error) {
 	tpl := template.New("")
@@ -260,7 +253,6 @@ func (t Table) KeyIndexDDL(md *Definition) (list []string, err error) {
 	return
 }
 
-//
 // Build non-unique index DDL.
 func (t Table) IndexDDL(md *Definition) (list []string, err error) {
 	tpl := template.New("")
@@ -311,7 +303,6 @@ func (t Table) IndexDDL(md *Definition) (list []string, err error) {
 	return
 }
 
-//
 // Insert the model in the DB.
 // Expects the primary key (PK) to be set.
 func (t Table) Insert(model interface{}) (err error) {
@@ -358,7 +349,6 @@ func (t Table) Insert(model interface{}) (err error) {
 	return
 }
 
-//
 // Update the model in the DB.
 // Expects the primary key (PK) to be set.
 func (t Table) Update(model interface{}, predicate ...Predicate) (err error) {
@@ -408,7 +398,6 @@ func (t Table) Update(model interface{}, predicate ...Predicate) (err error) {
 	return
 }
 
-//
 // Delete the model in the DB.
 // Expects the primary key (PK) to be set.
 func (t Table) Delete(model interface{}) (err error) {
@@ -452,7 +441,6 @@ func (t Table) Delete(model interface{}) (err error) {
 	return
 }
 
-//
 // Get the model in the DB.
 // Expects the primary key (PK) to be set.
 // Fetch the row and populate the fields in the model.
@@ -489,7 +477,6 @@ func (t Table) Get(model interface{}) (err error) {
 	return
 }
 
-//
 // List the model in the DB.
 // Qualified by the list options.
 func (t Table) List(list interface{}, options ListOptions) (err error) {
@@ -562,7 +549,6 @@ func (t Table) List(list interface{}, options ListOptions) (err error) {
 	return
 }
 
-//
 // Find models in the DB.
 // Qualified by the list options.
 func (t Table) Find(model interface{}, options ListOptions) (itr fb.Iterator, err error) {
@@ -612,7 +598,6 @@ func (t Table) Find(model interface{}, options ListOptions) (itr fb.Iterator, er
 	return
 }
 
-//
 // Count the models in the DB.
 // Qualified by the model field values and list options.
 // Else, ALL models are counted.
@@ -650,7 +635,6 @@ func (t Table) Count(model interface{}, predicate Predicate) (count int64, err e
 	return
 }
 
-//
 // Get the `Fields` referenced as param in SQL.
 func (t Table) Params(md *Definition) (list []interface{}) {
 	list = []interface{}{}
@@ -664,7 +648,6 @@ func (t Table) Params(md *Definition) (list []interface{}) {
 	return
 }
 
-//
 // Ensure PK is generated as specified/needed.
 func (t Table) EnsurePk(md *Definition) {
 	pk := md.PkField()
@@ -708,7 +691,6 @@ func (t Table) EnsurePk(md *Definition) {
 	pk.Push()
 }
 
-//
 // Get constraint DDL.
 func (t Table) Constraints(md *Definition, dm *DataModel) (constraints []string, err error) {
 	constraints = []string{}
@@ -742,7 +724,6 @@ func (t Table) Constraints(md *Definition, dm *DataModel) (constraints []string,
 	return
 }
 
-//
 // Reflect auto-incremented fields.
 // Field.int is incremented by Field.Push() called when the
 // SQL statement is built. This needs to be propagated to the model.
@@ -754,7 +735,6 @@ func (t *Table) reflectIncremented(md *Definition) {
 	}
 }
 
-//
 // Build model insert SQL.
 func (t Table) insertSQL(md *Definition) (sql string, err error) {
 	tpl := template.New("")
@@ -780,7 +760,6 @@ func (t Table) insertSQL(md *Definition) (sql string, err error) {
 	return
 }
 
-//
 // Build model update SQL.
 func (t Table) updateSQL(md *Definition, options *FilterOptions) (sql string, err error) {
 	tpl := template.New("")
@@ -812,7 +791,6 @@ func (t Table) updateSQL(md *Definition, options *FilterOptions) (sql string, er
 	return
 }
 
-//
 // Build model delete SQL.
 func (t Table) deleteSQL(md *Definition) (sql string, err error) {
 	tpl := template.New("")
@@ -838,7 +816,6 @@ func (t Table) deleteSQL(md *Definition) (sql string, err error) {
 	return
 }
 
-//
 // Build model get SQL.
 func (t Table) getSQL(md *Definition) (sql string, err error) {
 	tpl := template.New("")
@@ -865,7 +842,6 @@ func (t Table) getSQL(md *Definition) (sql string, err error) {
 	return
 }
 
-//
 // Build model list SQL.
 func (t Table) listSQL(md *Definition, options *ListOptions) (sql string, err error) {
 	tpl := template.New("")
@@ -897,7 +873,6 @@ func (t Table) listSQL(md *Definition, options *ListOptions) (sql string, err er
 	return
 }
 
-//
 // Build model count SQL.
 func (t Table) countSQL(md *Definition, options *FilterOptions) (sql string, err error) {
 	tpl := template.New("")
@@ -930,7 +905,6 @@ func (t Table) countSQL(md *Definition, options *FilterOptions) (sql string, err
 	return
 }
 
-//
 // Scan the fetch row into the model.
 // The model fields are updated.
 func (t Table) scan(row Row, fields []*Field) (err error) {
@@ -951,7 +925,6 @@ func (t Table) scan(row Row, fields []*Field) (err error) {
 	return
 }
 
-//
 // Template data.
 type TmplData struct {
 	// Table name.
@@ -972,25 +945,21 @@ type TmplData struct {
 	Count bool
 }
 
-//
 // Predicate
 func (t TmplData) Predicate() Predicate {
 	return t.Options.Predicate
 }
 
-//
 // Pagination.
 func (t TmplData) Page() *Page {
 	return t.Options.Page
 }
 
-//
 // Sort criteria
 func (t TmplData) Sort() []int {
 	return t.Options.Sort
 }
 
-//
 // FilterOptions options.
 type FilterOptions struct {
 	// Pagination.
@@ -1012,7 +981,6 @@ type FilterOptions struct {
 	params []interface{}
 }
 
-//
 // Validate options.
 func (l *FilterOptions) Build(md *Definition) (err error) {
 	l.table = md.Kind
@@ -1024,7 +992,6 @@ func (l *FilterOptions) Build(md *Definition) (err error) {
 	return
 }
 
-//
 // Get an appropriate parameter name.
 // Builds a parameter and adds it to the options.param list.
 func (l *FilterOptions) Param(name string, value interface{}) (p string) {
@@ -1034,7 +1001,6 @@ func (l *FilterOptions) Param(name string, value interface{}) (p string) {
 	return
 }
 
-//
 // Fields filtered by detail level.
 func (l *FilterOptions) Fields() (filtered []*Field) {
 	for _, f := range l.fields {
@@ -1046,12 +1012,10 @@ func (l *FilterOptions) Fields() (filtered []*Field) {
 	return
 }
 
-//
 // Get params referenced by the predicate.
 func (l *FilterOptions) Params() []interface{} {
 	return l.params
 }
 
-//
 // List options
 type ListOptions = FilterOptions

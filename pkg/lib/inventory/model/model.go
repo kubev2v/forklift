@@ -7,15 +7,12 @@ import (
 	"reflect"
 )
 
-//
 // Package logger.
 var log = logging.WithName("model")
 
-//
 // Errors.
 var NotFound = sql.ErrNoRows
 
-//
 // Database client interface.
 // Support model methods taking either sql.DB or sql.Tx.
 type DBTX interface {
@@ -24,14 +21,12 @@ type DBTX interface {
 	QueryRow(string, ...interface{}) *sql.Row
 }
 
-//
 // Database interface.
 // Support model `Scan` taking either sql.Row or sql.Rows.
 type Row interface {
 	Scan(...interface{}) error
 }
 
-//
 // Page.
 // Support pagination.
 type Page struct {
@@ -41,7 +36,6 @@ type Page struct {
 	Limit int
 }
 
-//
 // Slice the collection according to the page definition.
 // The `collection` must be a pointer to a `Slice` which is
 // modified as needed.
@@ -69,7 +63,6 @@ func (p *Page) Slice(collection interface{}) {
 	}
 }
 
-//
 // Model
 // Each model represents a table in the DB.
 type Model interface {
@@ -77,7 +70,6 @@ type Model interface {
 	Pk() string
 }
 
-//
 // Labeled model.
 type Labeled interface {
 	// Get labels.
@@ -91,13 +83,11 @@ type Base struct {
 	Object string `sql:""`
 }
 
-//
 // Get the primary key.
 func (m *Base) Pk() string {
 	return m.PK
 }
 
-//
 // Create new the model.
 func Clone(model Model) Model {
 	mt := reflect.TypeOf(model)
@@ -112,7 +102,6 @@ func Clone(model Model) Model {
 	return new.Addr().Interface().(Model)
 }
 
-//
 // Model description.
 func Describe(model Model) (s string) {
 	s = ref.ToKind(model) + ": "

@@ -8,19 +8,16 @@ import (
 	"strings"
 )
 
-//
 // Errors.
 type ResourceNotResolvedError = base.ResourceNotResolvedError
 type RefNotUniqueError = base.RefNotUniqueError
 type NotFoundError = base.NotFoundError
 
-//
 // API path resolver.
 type Resolver struct {
 	*api.Provider
 }
 
-//
 // Resolve the URL path.
 func (r *Resolver) Path(object interface{}, id string) (path string, err error) {
 	provider := r.Provider
@@ -62,26 +59,24 @@ func (r *Resolver) Path(object interface{}, id string) (path string, err error) 
 	return
 }
 
-//
 // Resource finder.
 type Finder struct {
 	base.Client
 }
 
-//
 // With client.
 func (r *Finder) With(client base.Client) base.Finder {
 	r.Client = client
 	return r
 }
 
-//
 // Find a resource by ref.
 // Returns:
-//   ProviderNotSupportedErr
-//   ProviderNotReadyErr
-//   NotFoundErr
-//   RefNotUniqueErr
+//
+//	ProviderNotSupportedErr
+//	ProviderNotReadyErr
+//	NotFoundErr
+//	RefNotUniqueErr
 func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 	switch resource.(type) {
 	case *NetworkAttachmentDefinition:
@@ -197,13 +192,13 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 	return
 }
 
-//
 // Find a VM by ref.
 // Returns the matching resource and:
-//   ProviderNotSupportedErr
-//   ProviderNotReadyErr
-//   NotFoundErr
-//   RefNotUniqueErr
+//
+//	ProviderNotSupportedErr
+//	ProviderNotReadyErr
+//	NotFoundErr
+//	RefNotUniqueErr
 func (r *Finder) VM(ref *base.Ref) (object interface{}, err error) {
 	vm := &VM{}
 	err = r.ByRef(vm, *ref)
@@ -216,13 +211,13 @@ func (r *Finder) VM(ref *base.Ref) (object interface{}, err error) {
 	return
 }
 
-//
 // Find workload by ref.
 // Returns the matching resource and:
-//   ProviderNotSupportedErr
-//   ProviderNotReadyErr
-//   NotFoundErr
-//   RefNotUniqueErr
+//
+//	ProviderNotSupportedErr
+//	ProviderNotReadyErr
+//	NotFoundErr
+//	RefNotUniqueErr
 func (r *Finder) Workload(ref *base.Ref) (object interface{}, err error) {
 	vm := &VM{}
 	err = r.ByRef(vm, *ref)
@@ -235,13 +230,13 @@ func (r *Finder) Workload(ref *base.Ref) (object interface{}, err error) {
 	return
 }
 
-//
 // Find a Network by ref.
-//Returns the matching resource and:
-//   ProviderNotSupportedErr
-//   ProviderNotReadyErr
-//   NotFoundErr
-//   RefNotUniqueErr
+// Returns the matching resource and:
+//
+//	ProviderNotSupportedErr
+//	ProviderNotReadyErr
+//	NotFoundErr
+//	RefNotUniqueErr
 func (r *Finder) Network(ref *base.Ref) (object interface{}, err error) {
 	nad := &NetworkAttachmentDefinition{}
 	err = r.ByRef(nad, *ref)
@@ -254,13 +249,13 @@ func (r *Finder) Network(ref *base.Ref) (object interface{}, err error) {
 	return
 }
 
-//
 // Find storage by ref.
 // Returns the matching resource and:
-//   ProviderNotSupportedErr
-//   ProviderNotReadyErr
-//   NotFoundErr
-//   RefNotUniqueErr
+//
+//	ProviderNotSupportedErr
+//	ProviderNotReadyErr
+//	NotFoundErr
+//	RefNotUniqueErr
 func (r *Finder) Storage(ref *base.Ref) (object interface{}, err error) {
 	sc := &StorageClass{}
 	err = r.ByRef(sc, *ref)
@@ -273,13 +268,13 @@ func (r *Finder) Storage(ref *base.Ref) (object interface{}, err error) {
 	return
 }
 
-//
 // Find host by ref.
 // Returns the matching resource and:
-//   ProviderNotSupportedErr
-//   ProviderNotReadyErr
-//   NotFoundErr
-//   RefNotUniqueErr
+//
+//	ProviderNotSupportedErr
+//	ProviderNotReadyErr
+//	NotFoundErr
+//	RefNotUniqueErr
 func (r *Finder) Host(ref *base.Ref) (object interface{}, err error) {
 	err = liberr.Wrap(&NotFoundError{
 		Ref: *ref,

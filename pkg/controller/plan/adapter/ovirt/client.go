@@ -26,14 +26,12 @@ const (
 	powerUnknown = "Unknown"
 )
 
-//
 // oVirt VM Client
 type Client struct {
 	*plancontext.Context
 	connection *ovirtsdk.Connection
 }
 
-//
 // Create a VM snapshot and return its ID.
 func (r *Client) CreateSnapshot(vmRef ref.Ref) (snapshot string, err error) {
 	_, vmService, err := r.getVM(vmRef)
@@ -61,7 +59,6 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref) (snapshot string, err error) {
 	return
 }
 
-//
 // Remove all warm migration snapshots.
 func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy) (err error) {
 	if len(precopies) == 0 {
@@ -82,7 +79,6 @@ func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy) (er
 	return
 }
 
-//
 // Check if a snapshot is ready to transfer, to avoid importer restarts.
 func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool, err error) {
 	correlationID, err := r.getSnapshotCorrelationID(vmRef, &snapshot)
@@ -112,7 +108,6 @@ func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool,
 	return
 }
 
-//
 // Set DataVolume checkpoints.
 func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []cdi.DataVolume, final bool) (err error) {
 	n := len(precopies)
@@ -145,7 +140,6 @@ func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, data
 	return
 }
 
-//
 // Get the power state of the VM.
 func (r *Client) PowerState(vmRef ref.Ref) (state string, err error) {
 	vm, _, err := r.getVM(vmRef)
@@ -164,7 +158,6 @@ func (r *Client) PowerState(vmRef ref.Ref) (state string, err error) {
 	return
 }
 
-//
 // Power on the VM.
 func (r *Client) PowerOn(vmRef ref.Ref) (err error) {
 	vm, vmService, err := r.getVM(vmRef)
@@ -181,7 +174,6 @@ func (r *Client) PowerOn(vmRef ref.Ref) (err error) {
 	return
 }
 
-//
 // Power off the VM.
 func (r *Client) PowerOff(vmRef ref.Ref) (err error) {
 	vm, vmService, err := r.getVM(vmRef)
@@ -198,7 +190,6 @@ func (r *Client) PowerOff(vmRef ref.Ref) (err error) {
 	return
 }
 
-//
 // Determine whether the VM has been powered off.
 func (r *Client) PoweredOff(vmRef ref.Ref) (poweredOff bool, err error) {
 	powerState, err := r.PowerState(vmRef)
@@ -209,7 +200,6 @@ func (r *Client) PoweredOff(vmRef ref.Ref) (poweredOff bool, err error) {
 	return
 }
 
-//
 // Close the connection to the oVirt API.
 func (r *Client) Close() {
 	if r.connection != nil {
@@ -218,7 +208,6 @@ func (r *Client) Close() {
 	}
 }
 
-//
 // Derive a value from the plan name, the VM ID, and the index of the given
 // snapshot in the precopies list. This can be used as the correlation ID for
 // tracking the status of a snapshot creation command in the oVirt API. There
@@ -267,7 +256,6 @@ func (r *Client) getSnapshotCorrelationID(vmRef ref.Ref, snapshot *string) (corr
 	return
 }
 
-//
 // Find oVirt jobs with the given correlation ID.
 func (r *Client) getJobs(correlationID string) (ovirtJob []*ovirtsdk.Job, err error) {
 	jobService := r.connection.SystemService().JobsService().List()
@@ -285,7 +273,6 @@ func (r *Client) getJobs(correlationID string) (ovirtJob []*ovirtsdk.Job, err er
 	return
 }
 
-//
 // Get the VM by ref.
 func (r *Client) getVM(vmRef ref.Ref) (ovirtVm *ovirtsdk.Vm, vmService *ovirtsdk.VmService, err error) {
 	vm := &model.VM{}
@@ -314,7 +301,6 @@ func (r *Client) getVM(vmRef ref.Ref) (ovirtVm *ovirtsdk.Vm, vmService *ovirtsdk
 	return
 }
 
-//
 // Get the disk snapshot for this disk and this snapshot ID.
 func (r *Client) getDiskSnapshot(diskID, targetSnapshotID string) (diskSnapshotID string, err error) {
 	response, rErr := r.connection.SystemService().DisksService().DiskService(diskID).Get().Query("correlation_id", r.Migration.Name).Send()
@@ -386,7 +372,6 @@ func (r *Client) getDiskSnapshot(diskID, targetSnapshotID string) (diskSnapshotI
 	return
 }
 
-//
 // Connect to the oVirt API.
 func (r *Client) connect() (err error) {
 	URL := r.Source.Provider.Spec.URL

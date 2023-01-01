@@ -2,7 +2,6 @@ package ref
 
 import "fmt"
 
-//
 // Source reference.
 // Either the ID or Name must be specified.
 type Ref struct {
@@ -18,13 +17,11 @@ type Ref struct {
 	Type string `json:"type,omitempty"`
 }
 
-//
 // Determine if the ref either the ID or Name is set.
 func (r Ref) NotSet() bool {
 	return r.ID == "" && r.Name == ""
 }
 
-//
 // String representation.
 func (r *Ref) String() (s string) {
 	if r.Type != "" {
@@ -41,13 +38,11 @@ func (r *Ref) String() (s string) {
 	return
 }
 
-//
 // Collection of Refs.
 type Refs struct {
 	List []Ref `json:"references,omitempty"`
 }
 
-//
 // Determine whether the list of refs contains a given ref.
 func (r *Refs) Find(ref Ref) (found bool) {
 	for _, r := range r.List {

@@ -14,7 +14,6 @@ import (
 	"time"
 )
 
-//
 // ESX Host.
 type EsxHost struct {
 	// Host url.
@@ -27,7 +26,6 @@ type EsxHost struct {
 	finder *find.Finder
 }
 
-//
 // Test the connection.
 func (r *EsxHost) TestConnection() (err error) {
 	ctx := context.Background()
@@ -40,7 +38,6 @@ func (r *EsxHost) TestConnection() (err error) {
 	return
 }
 
-//
 // Translate network ID.
 func (r *EsxHost) networkID(network *model.Network) (id string, err error) {
 	ctx := context.Background()
@@ -62,7 +59,6 @@ func (r *EsxHost) networkID(network *model.Network) (id string, err error) {
 	return
 }
 
-//
 // Translate datastore ID.
 func (r *EsxHost) DatastoreID(ds *model.Datastore) (id string, err error) {
 	ctx := context.Background()
@@ -84,7 +80,6 @@ func (r *EsxHost) DatastoreID(ds *model.Datastore) (id string, err error) {
 	return
 }
 
-//
 // Build the client and finder.
 func (r *EsxHost) connect(ctx context.Context) (err error) {
 	if r.client != nil {
@@ -117,7 +112,6 @@ func (r *EsxHost) connect(ctx context.Context) (err error) {
 	return nil
 }
 
-//
 // Close connections.
 func (r *EsxHost) close() {
 	if r.client != nil {
@@ -127,7 +121,6 @@ func (r *EsxHost) close() {
 	}
 }
 
-//
 // User.
 func (r *EsxHost) user() string {
 	if user, found := r.Secret.Data["user"]; found {
@@ -137,7 +130,6 @@ func (r *EsxHost) user() string {
 	return ""
 }
 
-//
 // Password.
 func (r *EsxHost) password() string {
 	if password, found := r.Secret.Data["password"]; found {
@@ -147,7 +139,6 @@ func (r *EsxHost) password() string {
 	return ""
 }
 
-//
 // Thumbprint.
 func (r *EsxHost) thumbprint() string {
 	if password, found := r.Secret.Data["thumbprint"]; found {

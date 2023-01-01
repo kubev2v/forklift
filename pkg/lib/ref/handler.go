@@ -9,14 +9,14 @@ import (
 	"strings"
 )
 
-//
 // Build an event handler.
 // Example:
-//   err = cnt.Watch(
-//      &source.Kind{
-//         Type: &api.Referenced{},
-//      },
-//      libref.Handler(&api.Owner{}))
+//
+//	err = cnt.Watch(
+//	   &source.Kind{
+//	      Type: &api.Referenced{},
+//	   },
+//	   libref.Handler(&api.Owner{}))
 func Handler(owner interface{}) handler.EventHandler {
 	log := logging.WithName("ref|handler")
 	ownerKind := ToKind(owner)
@@ -40,7 +40,6 @@ func Handler(owner interface{}) handler.EventHandler {
 	}
 }
 
-//
 // Impl the handler interface.
 func GetRequests(kind string, a handler.MapObject) []reconcile.Request {
 	target := Target{
@@ -66,7 +65,6 @@ func GetRequests(kind string, a handler.MapObject) []reconcile.Request {
 	return list
 }
 
-//
 // Determine the resource Kind.
 func ToKind(resource interface{}) string {
 	t := reflect.TypeOf(resource).String()

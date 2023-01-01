@@ -6,11 +6,9 @@ import (
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 )
 
-//
 // vSphere adapter.
 type Adapter struct{}
 
-//
 // Constructs a vSphere builder.
 func (r *Adapter) Builder(ctx *plancontext.Context) (builder base.Builder, err error) {
 	b := &Builder{Context: ctx}
@@ -22,7 +20,6 @@ func (r *Adapter) Builder(ctx *plancontext.Context) (builder base.Builder, err e
 	return
 }
 
-//
 // Constructs a vSphere validator.
 func (r *Adapter) Validator(plan *api.Plan) (validator base.Validator, err error) {
 	v := &Validator{plan: plan}
@@ -34,7 +31,6 @@ func (r *Adapter) Validator(plan *api.Plan) (validator base.Validator, err error
 	return
 }
 
-//
 // Constructs a vSphere client.
 func (r *Adapter) Client(ctx *plancontext.Context) (client base.Client, err error) {
 	c := &Client{Context: ctx}

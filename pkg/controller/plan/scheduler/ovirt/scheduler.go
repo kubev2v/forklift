@@ -9,7 +9,6 @@ import (
 	"sync"
 )
 
-//
 // Package level mutex to ensure that
 // multiple concurrent reconciles don't
 // attempt to schedule VMs into the same

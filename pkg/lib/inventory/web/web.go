@@ -10,11 +10,9 @@ import (
 	"time"
 )
 
-//
 // Package logger.
 var log = logging.WithName("web")
 
-//
 // Web server
 type WebServer struct {
 	// The optional port.  Default: 8080
@@ -38,7 +36,6 @@ type WebServer struct {
 	}
 }
 
-//
 // Start the web-server.
 // Initializes `gin` with routes and CORS origins.
 // Creates an http server to handle TLS
@@ -68,7 +65,6 @@ func (w *WebServer) Start(middleware ...gin.HandlerFunc) {
 		w.address())
 }
 
-//
 // Determine the address.
 func (w *WebServer) address() string {
 	if w.Port == 0 {
@@ -82,7 +78,6 @@ func (w *WebServer) address() string {
 	return fmt.Sprintf(":%d", w.Port)
 }
 
-//
 // Build a REGEX for each CORS origin.
 func (w *WebServer) buildOrigins() {
 	w.allowedOrigins = []*regexp.Regexp{}
@@ -95,7 +90,6 @@ func (w *WebServer) buildOrigins() {
 	}
 }
 
-//
 // Add the routes.
 func (w *WebServer) addRoutes(r *gin.Engine) {
 	for _, h := range w.Handlers {
@@ -103,7 +97,6 @@ func (w *WebServer) addRoutes(r *gin.Engine) {
 	}
 }
 
-//
 // Called by `gin` to perform CORS authorization.
 func (w *WebServer) allow(origin string) bool {
 	for _, expr := range w.allowedOrigins {

@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-//
 // Types
 const (
 	Validated               = "Validated"
@@ -31,7 +30,6 @@ const (
 	NotHealthy              = "NotHealthy"
 )
 
-//
 // Categories
 const (
 	Required = libcnd.Required
@@ -41,7 +39,6 @@ const (
 	Warn     = libcnd.Warn
 )
 
-//
 // Reasons
 const (
 	NotSet         = "NotSet"
@@ -54,14 +51,12 @@ const (
 	StateEvaluated = "StateEvaluated"
 )
 
-//
 // Statuses
 const (
 	True  = libcnd.True
 	False = libcnd.False
 )
 
-//
 // Validate the Host resource.
 func (r *Reconciler) validate(host *api.Host) error {
 	err := r.validateProvider(host)
@@ -96,7 +91,6 @@ func (r *Reconciler) validate(host *api.Host) error {
 	return nil
 }
 
-//
 // Validate provider field.
 func (r *Reconciler) validateProvider(host *api.Host) error {
 	pVal := validation.Provider{
@@ -127,7 +121,6 @@ func (r *Reconciler) validateProvider(host *api.Host) error {
 	return nil
 }
 
-//
 // Validate host ref.
 func (r *Reconciler) validateRef(host *api.Host) error {
 	ref := host.Spec.Ref
@@ -180,7 +173,6 @@ func (r *Reconciler) validateRef(host *api.Host) error {
 	return nil
 }
 
-//
 // Validate host ID field.
 func (r *Reconciler) validateIp(host *api.Host) error {
 	if host.Spec.IpAddress == "" {
@@ -197,11 +189,10 @@ func (r *Reconciler) validateIp(host *api.Host) error {
 	return nil
 }
 
-//
 // Validate secret (ref).
-//   1. The references is complete.
-//   2. The secret exists.
-//   3. the content of the secret is valid.
+//  1. The references is complete.
+//  2. The secret exists.
+//  3. the content of the secret is valid.
 func (r *Reconciler) validateSecret(host *api.Host) (err error) {
 	ref := host.Spec.Secret
 	cnd := libcnd.Condition{
@@ -260,7 +251,6 @@ func (r *Reconciler) validateSecret(host *api.Host) (err error) {
 	return
 }
 
-//
 // Test connection.
 func (r *Reconciler) testConnection(host *api.Host) (err error) {
 	if host.Status.HasBlockerCondition() {

@@ -13,7 +13,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-//
 // Types
 const (
 	PlanNotValid = "PlanNotValid"
@@ -27,7 +26,6 @@ const (
 	Canceled     = plancnt.Canceled
 )
 
-//
 // Categories
 const (
 	Required = libcnd.Required
@@ -50,7 +48,6 @@ const (
 	False = libcnd.False
 )
 
-//
 // Validate the migration resource.
 func (r *Reconciler) validate(migration *api.Migration) (plan *api.Plan, err error) {
 	newCnd := libcnd.Condition{

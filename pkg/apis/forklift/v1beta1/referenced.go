@@ -2,7 +2,6 @@ package v1beta1
 
 import core "k8s.io/api/core/v1"
 
-//
 // Referenced resources.
 // Holds resources fetched during validation.
 // +k8s:deepcopy-gen=false
@@ -27,7 +26,6 @@ type Referenced struct {
 	Hooks []*Hook
 }
 
-//
 // Find hook by ref.
 func (in *Referenced) FindHook(ref core.ObjectReference) (found bool, hook *Hook) {
 	for _, hook = range in.Hooks {

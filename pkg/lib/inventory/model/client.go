@@ -10,7 +10,6 @@ import (
 	fb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
 )
 
-//
 // Database client.
 type DB interface {
 	// Open and build the schema.
@@ -43,7 +42,6 @@ type DB interface {
 	EndWatch(watch *Watch)
 }
 
-//
 // Database client.
 type Client struct {
 	// file path.
@@ -60,7 +58,6 @@ type Client struct {
 	log logr.Logger
 }
 
-//
 // Create the database.
 // Build the schema to support the specified models.
 // See: Pool.Open().
@@ -90,7 +87,6 @@ func (r *Client) Open(delete bool) (err error) {
 	return
 }
 
-//
 // Close the database.
 // The session pool and journal are closed.
 func (r *Client) Close(delete bool) (err error) {
@@ -116,7 +112,6 @@ func (r *Client) Close(delete bool) (err error) {
 	return
 }
 
-//
 // Execute SQL.
 // Delegated to Tx.Execute().
 func (r *Client) Execute(sql string) (result sql.Result, err error) {
@@ -128,7 +123,6 @@ func (r *Client) Execute(sql string) (result sql.Result, err error) {
 	return
 }
 
-//
 // Get the model.
 func (r *Client) Get(model Model) (err error) {
 	session := r.pool.Reader()
@@ -147,7 +141,6 @@ func (r *Client) Get(model Model) (err error) {
 	return
 }
 
-//
 // List models.
 // The `list` must be: *[]Model.
 func (r *Client) List(list interface{}, options ListOptions) (err error) {
@@ -167,7 +160,6 @@ func (r *Client) List(list interface{}, options ListOptions) (err error) {
 	return
 }
 
-//
 // Find models.
 func (r *Client) Find(model interface{}, options ListOptions) (itr fb.Iterator, err error) {
 	session := r.pool.Reader()
@@ -186,7 +178,6 @@ func (r *Client) Find(model interface{}, options ListOptions) (itr fb.Iterator, 
 	return
 }
 
-//
 // Count models.
 func (r *Client) Count(model Model, predicate Predicate) (n int64, err error) {
 	session := r.pool.Reader()
@@ -205,7 +196,6 @@ func (r *Client) Count(model Model, predicate Predicate) (n int64, err error) {
 	return
 }
 
-//
 // Begin a transaction.
 func (r *Client) Begin(labels ...string) (tx *Tx, error error) {
 	mark := time.Now()
@@ -238,7 +228,6 @@ func (r *Client) Begin(labels ...string) (tx *Tx, error error) {
 	return
 }
 
-//
 // With transaction.
 func (r *Client) With(fn func(*Tx) error, labels ...string) (err error) {
 	tx, err := r.Begin(labels...)
@@ -256,7 +245,6 @@ func (r *Client) With(fn func(*Tx) error, labels ...string) (err error) {
 	return
 }
 
-//
 // Insert the model.
 // Delegated to Tx.Insert().
 func (r *Client) Insert(model Model) (err error) {
@@ -276,7 +264,6 @@ func (r *Client) Insert(model Model) (err error) {
 	return
 }
 
-//
 // Update the model.
 // Delegated to Tx.Update().
 func (r *Client) Update(model Model, predicate ...Predicate) (err error) {
@@ -296,7 +283,6 @@ func (r *Client) Update(model Model, predicate ...Predicate) (err error) {
 	return
 }
 
-//
 // Delete the model.
 // Delegated to Tx.Delete().
 func (r *Client) Delete(model Model) (err error) {
@@ -316,7 +302,6 @@ func (r *Client) Delete(model Model) (err error) {
 	return
 }
 
-//
 // Watch model events.
 func (r *Client) Watch(model Model, handler EventHandler) (w *Watch, err error) {
 	mark := time.Now()
@@ -355,7 +340,6 @@ func (r *Client) Watch(model Model, handler EventHandler) (w *Watch, err error) 
 	return
 }
 
-//
 // End watch.
 func (r *Client) EndWatch(watch *Watch) {
 	r.journal.End(watch)
@@ -365,7 +349,6 @@ func (r *Client) EndWatch(watch *Watch) {
 		Describe(watch.Model))
 }
 
-//
 // Build the data model.
 func (r *Client) build() (err error) {
 	r.models = append(r.models, &Label{})
@@ -398,7 +381,6 @@ func (r *Client) build() (err error) {
 	return nil
 }
 
-//
 // Database transaction.
 type Tx struct {
 	// DB session.
@@ -423,7 +405,6 @@ type Tx struct {
 	ended bool
 }
 
-//
 // Execute SQL.
 func (r *Tx) Execute(sql string) (result sql.Result, err error) {
 	mark := time.Now()
@@ -440,7 +421,6 @@ func (r *Tx) Execute(sql string) (result sql.Result, err error) {
 	return
 }
 
-//
 // Get the model.
 func (r *Tx) Get(model Model) (err error) {
 	mark := time.Now()
@@ -457,7 +437,6 @@ func (r *Tx) Get(model Model) (err error) {
 	return
 }
 
-//
 // List models.
 // The `list` must be: *[]Model.
 func (r *Tx) List(list interface{}, options ListOptions) (err error) {
@@ -475,7 +454,6 @@ func (r *Tx) List(list interface{}, options ListOptions) (err error) {
 	return
 }
 
-//
 // List models.
 func (r *Tx) Find(model interface{}, options ListOptions) (itr fb.Iterator, err error) {
 	mark := time.Now()
@@ -492,7 +470,6 @@ func (r *Tx) Find(model interface{}, options ListOptions) (itr fb.Iterator, err 
 	return
 }
 
-//
 // Count models.
 func (r *Tx) Count(model Model, predicate Predicate) (n int64, err error) {
 	mark := time.Now()
@@ -508,7 +485,6 @@ func (r *Tx) Count(model Model, predicate Predicate) (n int64, err error) {
 	return
 }
 
-//
 // Insert the model.
 func (r *Tx) Insert(model Model) (err error) {
 	mark := time.Now()
@@ -538,7 +514,6 @@ func (r *Tx) Insert(model Model) (err error) {
 	return
 }
 
-//
 // Update the model.
 func (r *Tx) Update(model Model, predicate ...Predicate) (err error) {
 	mark := time.Now()
@@ -575,7 +550,6 @@ func (r *Tx) Update(model Model, predicate ...Predicate) (err error) {
 	return
 }
 
-//
 // Delete (cascading) of the model.
 func (r *Tx) Delete(model Model) (err error) {
 	err = Table{r.real}.Get(model)
@@ -608,7 +582,6 @@ func (r *Tx) Delete(model Model) (err error) {
 	return
 }
 
-//
 // Commit a transaction.
 // Staged changes are committed in the DB.
 // The transaction is ended and the session returned.
@@ -639,7 +612,6 @@ func (r *Tx) Commit() (err error) {
 	return
 }
 
-//
 // End a transaction.
 // Staged changes are discarded.
 // The session is returned.
@@ -668,7 +640,6 @@ func (r *Tx) End() (err error) {
 	return
 }
 
-//
 // Raw Delete.
 // Non-cascading delete of the model.
 // The model must be complete (fetched from the DB).
@@ -703,7 +674,6 @@ func (r *Tx) delete(model Model) (err error) {
 	return
 }
 
-//
 // Report staged events to the journal.
 func (r *Tx) report() {
 	if r.staged.Len() == 0 {
@@ -713,7 +683,6 @@ func (r *Tx) report() {
 	r.staged = fb.NewList()
 }
 
-//
 // Labeler.
 type Labeler struct {
 	// DB transaction.
@@ -722,7 +691,6 @@ type Labeler struct {
 	log logr.Logger
 }
 
-//
 // Insert labels for the model into the DB.
 func (r *Labeler) Insert(model Model) (err error) {
 	table := Table{r.tx}
@@ -755,7 +723,6 @@ func (r *Labeler) Insert(model Model) (err error) {
 	return
 }
 
-//
 // Delete labels for a model in the DB.
 func (r *Labeler) Delete(model Model) (err error) {
 	if _, cast := model.(Labeled); !cast {
@@ -793,7 +760,6 @@ func (r *Labeler) Delete(model Model) (err error) {
 	return
 }
 
-//
 // Replace labels.
 func (r *Labeler) Replace(model Model) (err error) {
 	if _, cast := model.(Labeled); !cast {

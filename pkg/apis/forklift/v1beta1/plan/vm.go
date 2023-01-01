@@ -9,7 +9,6 @@ import (
 	"path"
 )
 
-//
 // Plan hook.
 type HookRef struct {
 	// Pipeline step.
@@ -25,7 +24,6 @@ func (r *HookRef) String() string {
 		r.Step)
 }
 
-//
 // A VM listed on the plan.
 type VM struct {
 	ref.Ref `json:",inline"`
@@ -33,7 +31,6 @@ type VM struct {
 	Hooks []HookRef `json:"hooks,omitempty"`
 }
 
-//
 // Find a Hook for the specified step.
 func (r *VM) FindHook(step string) (ref HookRef, found bool) {
 	for _, h := range r.Hooks {
@@ -47,7 +44,6 @@ func (r *VM) FindHook(step string) (ref HookRef, found bool) {
 	return
 }
 
-//
 // VM Status
 type VMStatus struct {
 	Timed `json:",inline"`
@@ -67,7 +63,6 @@ type VMStatus struct {
 	libcnd.Conditions `json:",inline"`
 }
 
-//
 // Warm Migration status
 type Warm struct {
 	Successes           int        `json:"successes"`
@@ -84,7 +79,6 @@ type Precopy struct {
 	Snapshot string     `json:"snapshot,omitempty"`
 }
 
-//
 // Find a step by name.
 func (r *VMStatus) FindStep(name string) (step *Step, found bool) {
 	for _, s := range r.Pipeline {
@@ -98,7 +92,6 @@ func (r *VMStatus) FindStep(name string) (step *Step, found bool) {
 	return
 }
 
-//
 // Add an error.
 func (r *VMStatus) AddError(reason ...string) {
 	if r.Error == nil {
@@ -107,7 +100,6 @@ func (r *VMStatus) AddError(reason ...string) {
 	r.Error.Add(reason...)
 }
 
-//
 // Reflect pipeline.
 func (r *VMStatus) ReflectPipeline() {
 	nStarted := 0

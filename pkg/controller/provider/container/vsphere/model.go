@@ -9,7 +9,6 @@ import (
 	"strings"
 )
 
-//
 // Model adapter.
 // Each adapter provides provider-specific management of a model.
 type Adapter interface {
@@ -19,12 +18,10 @@ type Adapter interface {
 	Apply(types.ObjectUpdate)
 }
 
-//
 // Base adapter.
 type Base struct {
 }
 
-//
 // Apply the update to the model `Base`.
 func (b *Base) Apply(m *model.Base, u types.ObjectUpdate) {
 	for _, p := range u.ChangeSet {
@@ -40,7 +37,6 @@ func (b *Base) Apply(m *model.Base, u types.ObjectUpdate) {
 	}
 }
 
-//
 // Build ref.
 func (b *Base) Ref(in types.AnyType) (ref model.Ref) {
 	if r, cast := in.(types.ManagedObjectReference); cast {
@@ -71,7 +67,6 @@ func (b *Base) Ref(in types.AnyType) (ref model.Ref) {
 	return
 }
 
-//
 // Build a []Ref.
 func (b *Base) RefList(in types.AnyType) (list []model.Ref) {
 	if a, cast := in.(types.ArrayOfManagedObjectReference); cast {
@@ -83,7 +78,6 @@ func (b *Base) RefList(in types.AnyType) (list []model.Ref) {
 	return
 }
 
-//
 // URL decoded string.
 // Some property values returned by the property
 // collector are URL-encoded.
@@ -99,7 +93,6 @@ func (b *Base) Decoded(in types.AnyType) (s string) {
 	return
 }
 
-//
 // Folder model adapter.
 type FolderAdapter struct {
 	Base
@@ -107,7 +100,6 @@ type FolderAdapter struct {
 	model model.Folder
 }
 
-//
 // Apply the update to the model.
 func (v *FolderAdapter) Apply(u types.ObjectUpdate) {
 	v.Base.Apply(&v.model.Base, u)
@@ -130,13 +122,11 @@ func (v *FolderAdapter) Apply(u types.ObjectUpdate) {
 	}
 }
 
-//
 // The new model.
 func (v *FolderAdapter) Model() model.Model {
 	return &v.model
 }
 
-//
 // Datacenter model adapter.
 type DatacenterAdapter struct {
 	Base
@@ -144,13 +134,11 @@ type DatacenterAdapter struct {
 	model model.Datacenter
 }
 
-//
 // The adapter model.
 func (v *DatacenterAdapter) Model() model.Model {
 	return &v.model
 }
 
-//
 // Apply the update to the model.
 func (v *DatacenterAdapter) Apply(u types.ObjectUpdate) {
 	v.Base.Apply(&v.model.Base, u)
@@ -171,7 +159,6 @@ func (v *DatacenterAdapter) Apply(u types.ObjectUpdate) {
 	}
 }
 
-//
 // Cluster model adapter.
 type ClusterAdapter struct {
 	Base
@@ -179,7 +166,6 @@ type ClusterAdapter struct {
 	model model.Cluster
 }
 
-//
 // The adapter model.
 func (v *ClusterAdapter) Model() model.Model {
 	return &v.model
@@ -232,7 +218,6 @@ func (v *ClusterAdapter) Apply(u types.ObjectUpdate) {
 	}
 }
 
-//
 // Host model adapter.
 type HostAdapter struct {
 	Base
@@ -240,7 +225,6 @@ type HostAdapter struct {
 	model model.Host
 }
 
-//
 // The adapter model.
 func (v *HostAdapter) Model() model.Model {
 	return &v.model
@@ -375,7 +359,6 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 	}
 }
 
-//
 // Network model adapter.
 type NetworkAdapter struct {
 	Base
@@ -383,13 +366,11 @@ type NetworkAdapter struct {
 	model model.Network
 }
 
-//
 // The adapter model.
 func (v *NetworkAdapter) Model() model.Model {
 	return &v.model
 }
 
-//
 // Apply the update to the model.
 func (v *NetworkAdapter) Apply(u types.ObjectUpdate) {
 	v.Base.Apply(&v.model.Base, u)
@@ -412,7 +393,6 @@ func (v *NetworkAdapter) Apply(u types.ObjectUpdate) {
 	}
 }
 
-//
 // DVSwitch model adapter.
 type DVSwitchAdapter struct {
 	Base
@@ -420,13 +400,11 @@ type DVSwitchAdapter struct {
 	model model.Network
 }
 
-//
 // The adapter model.
 func (v *DVSwitchAdapter) Model() model.Model {
 	return &v.model
 }
 
-//
 // Apply the update to the model.
 func (v *DVSwitchAdapter) Apply(u types.ObjectUpdate) {
 	v.Base.Apply(&v.model.Base, u)
@@ -443,7 +421,6 @@ func (v *DVSwitchAdapter) Apply(u types.ObjectUpdate) {
 	}
 }
 
-//
 // Add hosts.
 func (v *DVSwitchAdapter) addHost(array types.ArrayOfDistributedVirtualSwitchHostMember) {
 	list := []model.DVSHost{}
@@ -465,7 +442,6 @@ func (v *DVSwitchAdapter) addHost(array types.ArrayOfDistributedVirtualSwitchHos
 	v.model.Host = list
 }
 
-//
 // Datastore model adapter.
 type DatastoreAdapter struct {
 	Base
@@ -473,13 +449,11 @@ type DatastoreAdapter struct {
 	model model.Datastore
 }
 
-//
 // The adapter model.
 func (v *DatastoreAdapter) Model() model.Model {
 	return &v.model
 }
 
-//
 // Apply the update to the model.
 func (v *DatastoreAdapter) Apply(u types.ObjectUpdate) {
 	v.Base.Apply(&v.model.Base, u)
@@ -508,7 +482,6 @@ func (v *DatastoreAdapter) Apply(u types.ObjectUpdate) {
 	}
 }
 
-//
 // VM model adapter.
 type VmAdapter struct {
 	Base
@@ -516,13 +489,11 @@ type VmAdapter struct {
 	model model.VM
 }
 
-//
 // The adapter model.
 func (v *VmAdapter) Model() model.Model {
 	return &v.model
 }
 
-//
 // Apply the update to the model.
 func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 	v.Base.Apply(&v.model.Base, u)
@@ -702,7 +673,6 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 	}
 }
 
-//
 // Update virtual disk devices.
 func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 	disks := []model.Disk{}

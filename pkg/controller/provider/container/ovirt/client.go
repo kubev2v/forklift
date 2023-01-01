@@ -16,7 +16,6 @@ import (
 	core "k8s.io/api/core/v1"
 )
 
-//
 // Not found error.
 type NotFound struct {
 }
@@ -25,7 +24,6 @@ func (e *NotFound) Error() string {
 	return "not found."
 }
 
-//
 // Client.
 type Client struct {
 	// Base URL.
@@ -45,7 +43,6 @@ type ovirtTokenResponse struct {
 	Expiration  string `json:"exp"`
 }
 
-//
 // Connect.
 func (r *Client) connect() (status int, err error) {
 	var TLSClientConfig *tls.Config
@@ -144,7 +141,6 @@ func (r *Client) connect() (status int, err error) {
 	return
 }
 
-//
 // List collection.
 func (r *Client) list(path string, list interface{}, param ...libweb.Param) (err error) {
 	url, err := liburl.Parse(r.url)
@@ -165,7 +161,6 @@ func (r *Client) list(path string, list interface{}, param ...libweb.Param) (err
 	return
 }
 
-//
 // Get a resource.
 func (r *Client) get(path string, object interface{}, param ...libweb.Param) (err error) {
 	url, err := liburl.Parse(r.url)
@@ -194,7 +189,6 @@ func (r *Client) get(path string, object interface{}, param ...libweb.Param) (er
 	return
 }
 
-//
 // Get system.
 func (r *Client) system() (s *System, status int, err error) {
 	status, err = r.connect()
@@ -210,7 +204,6 @@ func (r *Client) system() (s *System, status int, err error) {
 	return
 }
 
-//
 // GetInsecureSkipVerifyFlag gets the insecureSkipVerify boolean flag
 // value from the ovirt connection secret.
 func GetInsecureSkipVerifyFlag(secret *core.Secret) bool {

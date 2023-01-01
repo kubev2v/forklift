@@ -10,24 +10,20 @@ import (
 	"strings"
 )
 
-//
 // Package logger.
 var log = logging.WithName("web|ovirt")
 
-//
 // Fields.
 const (
 	DetailParam = base.DetailParam
 	NameParam   = base.NameParam
 )
 
-//
 // Base handler.
 type Handler struct {
 	base.Handler
 }
 
-//
 // Build list predicate.
 func (h Handler) Predicate(ctx *gin.Context) (p libmodel.Predicate) {
 	q := ctx.Request.URL.Query()
@@ -41,7 +37,6 @@ func (h Handler) Predicate(ctx *gin.Context) (p libmodel.Predicate) {
 	return
 }
 
-//
 // Build list options.
 func (h Handler) ListOptions(ctx *gin.Context) libmodel.ListOptions {
 	detail := h.Detail
@@ -55,7 +50,6 @@ func (h Handler) ListOptions(ctx *gin.Context) libmodel.ListOptions {
 	}
 }
 
-//
 // Path builder.
 type PathBuilder struct {
 	// Database.
@@ -64,7 +58,6 @@ type PathBuilder struct {
 	cache map[string]string
 }
 
-//
 // Build.
 func (r *PathBuilder) Path(m model.Model) (path string) {
 	var err error
@@ -102,7 +95,6 @@ func (r *PathBuilder) Path(m model.Model) (path string) {
 	return
 }
 
-//
 // Path based on DataCenter.
 func (r *PathBuilder) forDataCenter(id, leaf string) (path string, err error) {
 	name, cached := r.cache[id]
@@ -123,7 +115,6 @@ func (r *PathBuilder) forDataCenter(id, leaf string) (path string, err error) {
 	return
 }
 
-//
 // Path based on Cluster.
 func (r *PathBuilder) forCluster(id, leaf string) (path string, err error) {
 	name, cached := r.cache[id]

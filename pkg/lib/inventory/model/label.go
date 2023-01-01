@@ -1,10 +1,8 @@
 package model
 
-//
 // Labels collection.
 type Labels map[string]string
 
-//
 // Label model
 type Label struct {
 	PK     string `sql:"pk(parent;kind;name)"`

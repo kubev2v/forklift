@@ -71,7 +71,6 @@ func (l *fake) WithName(name string) logr.Logger {
 	return l
 }
 
-//
 // Get logger with values.
 func (l *fake) WithValues(kvpair ...interface{}) logr.Logger {
 	l.values = kvpair

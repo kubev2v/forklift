@@ -6,11 +6,9 @@ import (
 	"strconv"
 )
 
-//
 // Global
 var Settings = ControllerSettings{}
 
-//
 // Settings
 type ControllerSettings struct {
 	// Roles.
@@ -31,7 +29,6 @@ type ControllerSettings struct {
 	Features
 }
 
-//
 // Load settings.
 func (r *ControllerSettings) Load() error {
 	err := r.Role.Load()
@@ -70,7 +67,6 @@ func (r *ControllerSettings) Load() error {
 	return nil
 }
 
-//
 // Get positive integer limit from the environment
 // using the specified variable name and default.
 func getEnvLimit(name string, def int) (int, error) {
@@ -91,7 +87,6 @@ func getEnvLimit(name string, def int) (int, error) {
 	return limit, nil
 }
 
-//
 // Get boolean.
 func getEnvBool(name string, def bool) bool {
 	boolean := def

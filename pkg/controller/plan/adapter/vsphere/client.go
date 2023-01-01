@@ -33,14 +33,12 @@ const (
 	powerUnknown = "Unknown"
 )
 
-//
 // vSphere VM Client
 type Client struct {
 	*plancontext.Context
 	client *govmomi.Client
 }
 
-//
 // Create a VM snapshot and return its ID.
 func (r *Client) CreateSnapshot(vmRef ref.Ref) (id string, err error) {
 	vm, err := r.getVM(vmRef)
@@ -62,13 +60,11 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref) (id string, err error) {
 	return
 }
 
-//
 // Check if a snapshot is ready to transfer.
 func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool, err error) {
 	return true, nil
 }
 
-//
 // Remove all warm migration snapshots.
 func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy) (err error) {
 	if len(precopies) == 0 {
@@ -86,7 +82,6 @@ func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy) (er
 	return
 }
 
-//
 // Set DataVolume checkpoints.
 func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []cdi.DataVolume, final bool) (err error) {
 	n := len(precopies)
@@ -127,7 +122,6 @@ func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, data
 	return
 }
 
-//
 // Get the power state of the VM.
 func (r *Client) PowerState(vmRef ref.Ref) (state string, err error) {
 	vm, err := r.getVM(vmRef)
@@ -150,7 +144,6 @@ func (r *Client) PowerState(vmRef ref.Ref) (state string, err error) {
 	return
 }
 
-//
 // Power on the VM.
 func (r *Client) PowerOn(vmRef ref.Ref) (err error) {
 	vm, err := r.getVM(vmRef)
@@ -172,7 +165,6 @@ func (r *Client) PowerOn(vmRef ref.Ref) (err error) {
 	return
 }
 
-//
 // Power off the VM. Requires guest tools to be installed.
 func (r *Client) PowerOff(vmRef ref.Ref) (err error) {
 	vm, err := r.getVM(vmRef)
@@ -195,7 +187,6 @@ func (r *Client) PowerOff(vmRef ref.Ref) (err error) {
 	return
 }
 
-//
 // Determine whether the VM has been powered off.
 func (r *Client) PoweredOff(vmRef ref.Ref) (poweredOff bool, err error) {
 	vm, err := r.getVM(vmRef)
@@ -211,7 +202,6 @@ func (r *Client) PoweredOff(vmRef ref.Ref) (poweredOff bool, err error) {
 	return
 }
 
-//
 // Close the connection to the vSphere API.
 func (r *Client) Close() {
 	if r.client != nil {
@@ -221,7 +211,6 @@ func (r *Client) Close() {
 	}
 }
 
-//
 // Get the changeId for a VM snapshot.
 func (r *Client) getChangeIds(vmRef ref.Ref, snapshotId string) (changeIdMapping map[string]string, err error) {
 	vm, err := r.getVM(vmRef)
@@ -264,7 +253,6 @@ func (r *Client) getChangeIds(vmRef ref.Ref, snapshotId string) (changeIdMapping
 	return
 }
 
-//
 // Get the VM by ref.
 func (r *Client) getVM(vmRef ref.Ref) (vsphereVm *object.VirtualMachine, err error) {
 	vm := &model.VM{}
@@ -296,7 +284,6 @@ func (r *Client) getVM(vmRef ref.Ref) (vsphereVm *object.VirtualMachine, err err
 	return
 }
 
-//
 // Remove a VM snapshot and optionally its children.
 func (r *Client) removeSnapshot(vmRef ref.Ref, snapshot string, children bool) (err error) {
 	vm, err := r.getVM(vmRef)
@@ -311,7 +298,6 @@ func (r *Client) removeSnapshot(vmRef ref.Ref, snapshot string, children bool) (
 	return
 }
 
-//
 // Connect to the vSphere API.
 func (r *Client) connect() error {
 	r.Close()

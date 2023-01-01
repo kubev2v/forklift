@@ -8,28 +8,24 @@ import (
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 )
 
-//
 // vSphere validator.
 type Validator struct {
 	plan      *api.Plan
 	inventory web.Client
 }
 
-//
 // Load.
 func (r *Validator) Load() (err error) {
 	r.inventory, err = web.NewClient(r.plan.Referenced.Provider.Source)
 	return
 }
 
-//
 // Validate whether warm migration is supported from this provider type.
 func (r *Validator) WarmMigration() (ok bool) {
 	ok = true
 	return
 }
 
-//
 // Validate that a VM's networks have been mapped.
 func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 	if r.plan.Referenced.Map.Network == nil {
@@ -55,7 +51,6 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 	return
 }
 
-//
 // Validate that no more than one of a VM's networks is mapped to the pod network.
 func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
 	if r.plan.Referenced.Map.Network == nil {
@@ -94,7 +89,6 @@ func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
 	return
 }
 
-//
 // Validate that a VM's disk backing storage has been mapped.
 func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 	if r.plan.Referenced.Map.Storage == nil {
@@ -120,7 +114,6 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 	return
 }
 
-//
 // Validate that a VM's Host isn't in maintenance mode.
 func (r *Validator) MaintenanceMode(vmRef ref.Ref) (ok bool, err error) {
 	vm := &model.VM{}

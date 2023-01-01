@@ -8,7 +8,6 @@ import (
 	"text/template"
 )
 
-//
 // Label SQL.
 var LabelSQL = `
 {{ $kind := .Kind -}}
@@ -29,7 +28,6 @@ value = {{ $l.Value }}
 {{ end -}}
 `
 
-//
 // New Eq (=) predicate.
 func Eq(field string, value interface{}) *EqPredicate {
 	return &EqPredicate{
@@ -40,7 +38,6 @@ func Eq(field string, value interface{}) *EqPredicate {
 	}
 }
 
-//
 // New Neq (!=) predicate.
 func Neq(field string, value interface{}) *NeqPredicate {
 	return &NeqPredicate{
@@ -51,7 +48,6 @@ func Neq(field string, value interface{}) *NeqPredicate {
 	}
 }
 
-//
 // New Gt (>) predicate.
 func Gt(field string, value interface{}) *GtPredicate {
 	return &GtPredicate{
@@ -62,7 +58,6 @@ func Gt(field string, value interface{}) *GtPredicate {
 	}
 }
 
-//
 // New Lt (<) predicate.
 func Lt(field string, value interface{}) *LtPredicate {
 	return &LtPredicate{
@@ -73,7 +68,6 @@ func Lt(field string, value interface{}) *LtPredicate {
 	}
 }
 
-//
 // AND predicate.
 func And(predicates ...Predicate) *AndPredicate {
 	return &AndPredicate{
@@ -83,7 +77,6 @@ func And(predicates ...Predicate) *AndPredicate {
 	}
 }
 
-//
 // OR predicate.
 func Or(predicates ...Predicate) *OrPredicate {
 	return &OrPredicate{
@@ -93,7 +86,6 @@ func Or(predicates ...Predicate) *OrPredicate {
 	}
 }
 
-//
 // Label predicate.
 func Match(labels Labels) *LabelPredicate {
 	return &LabelPredicate{
@@ -101,7 +93,6 @@ func Match(labels Labels) *LabelPredicate {
 	}
 }
 
-//
 // List predicate.
 type Predicate interface {
 	// Build the predicate.
@@ -110,7 +101,6 @@ type Predicate interface {
 	Expr() string
 }
 
-//
 // Simple predicate.
 type SimplePredicate struct {
 	// Field name.
@@ -121,13 +111,11 @@ type SimplePredicate struct {
 	expr string
 }
 
-//
 // Find referenced field.
 func (p *SimplePredicate) match(fields []*Field) (*Field, bool) {
 	return p.field(p.Field, fields)
 }
 
-//
 // Find field.
 func (p *SimplePredicate) field(name string, fields []*Field) (*Field, bool) {
 	name = strings.ToLower(name)
@@ -140,7 +128,6 @@ func (p *SimplePredicate) field(name string, fields []*Field) (*Field, bool) {
 	return nil, false
 }
 
-//
 // Build.
 func (p *SimplePredicate) build(operator string, options *FilterOptions) error {
 	f, found := p.match(options.fields)
@@ -176,13 +163,11 @@ func (p *SimplePredicate) build(operator string, options *FilterOptions) error {
 	return nil
 }
 
-//
 // Equals (=) predicate.
 type EqPredicate struct {
 	SimplePredicate
 }
 
-//
 // Build.
 func (p *EqPredicate) Build(options *FilterOptions) error {
 	f, found := p.match(options.fields)
@@ -217,37 +202,31 @@ func (p *EqPredicate) Build(options *FilterOptions) error {
 	return nil
 }
 
-//
 // Render the expression.
 func (p *EqPredicate) Expr() string {
 	return p.expr
 }
 
-//
 // NotEqual (!=) predicate.
 type NeqPredicate struct {
 	SimplePredicate
 }
 
-//
 // Build.
 func (p *NeqPredicate) Build(options *FilterOptions) error {
 	return p.build("!=", options)
 }
 
-//
 // Render the expression.
 func (p *NeqPredicate) Expr() string {
 	return p.expr
 }
 
-//
 // Greater than (>) predicate.
 type GtPredicate struct {
 	SimplePredicate
 }
 
-//
 // Build.
 func (p *GtPredicate) Build(options *FilterOptions) error {
 	f, found := p.match(options.fields)
@@ -269,19 +248,16 @@ func (p *GtPredicate) Build(options *FilterOptions) error {
 	}
 }
 
-//
 // Render the expression.
 func (p *GtPredicate) Expr() string {
 	return p.expr
 }
 
-//
 // Less than (<) predicate.
 type LtPredicate struct {
 	SimplePredicate
 }
 
-//
 // Build.
 func (p *LtPredicate) Build(options *FilterOptions) error {
 	f, found := p.match(options.fields)
@@ -303,26 +279,22 @@ func (p *LtPredicate) Build(options *FilterOptions) error {
 	}
 }
 
-//
 // Render the expression.
 func (p *LtPredicate) Expr() string {
 	return p.expr
 }
 
-//
 // Compound predicate.
 type CompoundPredicate struct {
 	// List of predicates.
 	Predicates []Predicate
 }
 
-//
 // And predicate.
 type AndPredicate struct {
 	CompoundPredicate
 }
 
-//
 // Build.
 func (p *AndPredicate) Build(options *FilterOptions) error {
 	for _, p := range p.Predicates {
@@ -335,7 +307,6 @@ func (p *AndPredicate) Build(options *FilterOptions) error {
 	return nil
 }
 
-//
 // Render the expression.
 func (p *AndPredicate) Expr() string {
 	predicates := []string{}
@@ -348,13 +319,11 @@ func (p *AndPredicate) Expr() string {
 	return expr
 }
 
-//
 // OR predicate.
 type OrPredicate struct {
 	CompoundPredicate
 }
 
-//
 // Build.
 func (p *OrPredicate) Build(options *FilterOptions) error {
 	for _, p := range p.Predicates {
@@ -367,7 +336,6 @@ func (p *OrPredicate) Build(options *FilterOptions) error {
 	return nil
 }
 
-//
 // Render the expression.
 func (p *OrPredicate) Expr() string {
 	predicates := []string{}
@@ -380,7 +348,6 @@ func (p *OrPredicate) Expr() string {
 	return expr
 }
 
-//
 // Label predicate.
 type LabelPredicate struct {
 	// Labels
@@ -393,7 +360,6 @@ type LabelPredicate struct {
 	expr string
 }
 
-//
 // Build.
 func (p *LabelPredicate) Build(options *FilterOptions) error {
 	p.options = options
@@ -419,19 +385,16 @@ func (p *LabelPredicate) Build(options *FilterOptions) error {
 	return nil
 }
 
-//
 // Label (parent) kind.
 func (p *LabelPredicate) Kind() string {
 	return p.options.table
 }
 
-//
 // PK field name.
 func (p *LabelPredicate) Pk() *Field {
 	return p.pk
 }
 
-//
 // List of labels.
 func (p *LabelPredicate) List() []Label {
 	list := []Label{}
@@ -449,13 +412,11 @@ func (p *LabelPredicate) List() []Label {
 	return list
 }
 
-//
 // Get the number of labels.
 func (p *LabelPredicate) Len() int {
 	return len(p.Labels)
 }
 
-//
 // Render the expression.
 func (p *LabelPredicate) Expr() string {
 	return p.expr

@@ -2,7 +2,6 @@ package model
 
 import liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 
-//
 // FK relation.
 type FkRelation struct {
 	// Data model.
@@ -11,7 +10,6 @@ type FkRelation struct {
 	sorted Definitions
 }
 
-//
 // Build constraint DDL.
 func (r *FkRelation) DDL(md *Definition) (ddl []string, err error) {
 	for _, field := range md.Fields {
@@ -37,7 +35,6 @@ func (r *FkRelation) DDL(md *Definition) (ddl []string, err error) {
 	return
 }
 
-//
 // Find model definitions that
 // reference the specified definition.
 func (r *FkRelation) Referencing(md *Definition) (list []*FkRef) {
@@ -64,7 +61,6 @@ func (r *FkRelation) Referencing(md *Definition) (list []*FkRef) {
 	return
 }
 
-//
 // Model definitions dependency-sorted as needed to be created.
 func (r *FkRelation) Definitions() (list Definitions) {
 	r.sort()
@@ -72,7 +68,6 @@ func (r *FkRelation) Definitions() (list Definitions) {
 	return
 }
 
-//
 // Sort definitions as needed for creation.
 func (r *FkRelation) sort() {
 	if r.sorted != nil {
@@ -103,7 +98,6 @@ func (r *FkRelation) sort() {
 	return
 }
 
-//
 // Find next model definition that references the
 // specified definition. The found definition is removed
 // from the candidate (in) list.
@@ -124,7 +118,6 @@ func (r *FkRelation) nextRef(in *Definitions, md *Definition) (ref *Definition, 
 	return
 }
 
-//
 // FK reference.
 type FkRef struct {
 	// Field name.

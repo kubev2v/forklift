@@ -12,7 +12,6 @@ import (
 	"strings"
 )
 
-//
 // Resource kind cannot be resolved.
 type ProviderNotSupportedError struct {
 	*api.Provider
@@ -22,7 +21,6 @@ func (r ProviderNotSupportedError) Error() string {
 	return fmt.Sprintf("Provider (type) not supported: %#v", r.Provider)
 }
 
-//
 // Resource kind cannot be resolved.
 type ProviderNotReadyError struct {
 	*api.Provider
@@ -35,7 +33,6 @@ func (r ProviderNotReadyError) Error() string {
 type RefNotUniqueError = base.RefNotUniqueError
 type NotFoundError = base.NotFoundError
 
-//
 // Interfaces.
 type EventHandler = base.EventHandler
 type Client = base.Client
@@ -43,7 +40,6 @@ type Finder = base.Finder
 type Param = base.Param
 type Watch = base.Watch
 
-//
 // Build an appropriate client.
 func NewClient(provider *api.Provider) (client Client, err error) {
 	switch provider.Type() {
@@ -81,7 +77,6 @@ func NewClient(provider *api.Provider) (client Client, err error) {
 	return
 }
 
-//
 // Provider API client.
 type ProviderClient struct {
 	restClient base.RestClient
@@ -91,18 +86,17 @@ type ProviderClient struct {
 	finder Finder
 }
 
-//
 // Finder.
 func (r *ProviderClient) Finder() Finder {
 	return r.finder.With(r)
 }
 
-//
 // Get a resource.
 // Returns:
-//   ProviderNotSupportedErr
-//   ProviderNotReadyErr
-//   NotFoundErr
+//
+//	ProviderNotSupportedErr
+//	ProviderNotReadyErr
+//	NotFoundErr
 func (r *ProviderClient) Get(resource interface{}, id string) (err error) {
 	status, err := r.restClient.Get(resource, id)
 	if err == nil {
@@ -112,12 +106,12 @@ func (r *ProviderClient) Get(resource interface{}, id string) (err error) {
 	return
 }
 
-//
 // List a resource collection.
 // Returns:
-//   ProviderNotSupportedErr
-//   ProviderNotReadyErr
-//   NotFoundErr
+//
+//	ProviderNotSupportedErr
+//	ProviderNotReadyErr
+//	NotFoundErr
 func (r *ProviderClient) List(resource interface{}, param ...Param) (err error) {
 	status, err := r.restClient.List(resource, param...)
 	if err == nil {
@@ -127,12 +121,12 @@ func (r *ProviderClient) List(resource interface{}, param ...Param) (err error) 
 	return
 }
 
-//
 // Watch a resource.
 // Returns:
-//   ProviderNotSupportedErr
-//   ProviderNotReadyErr
-//   NotFoundErr
+//
+//	ProviderNotSupportedErr
+//	ProviderNotReadyErr
+//	NotFoundErr
 func (r *ProviderClient) Watch(resource interface{}, h EventHandler) (w *Watch, err error) {
 	status, w, err := r.restClient.Watch(resource, h)
 	if err == nil {
@@ -142,78 +136,78 @@ func (r *ProviderClient) Watch(resource interface{}, h EventHandler) (w *Watch, 
 	return
 }
 
-//
 // Find an object by ref.
 // Returns:
-//   ProviderNotSupportedErr
-//   ProviderNotReadyErr
-//   NotFoundErr
-//   RefNotUniqueErr
+//
+//	ProviderNotSupportedErr
+//	ProviderNotReadyErr
+//	NotFoundErr
+//	RefNotUniqueErr
 func (r *ProviderClient) Find(resource interface{}, ref base.Ref) (err error) {
 	err = r.Finder().ByRef(resource, ref)
 	return
 }
 
-//
 // Find a VM by ref.
 // Returns the matching resource and:
-//   ProviderNotSupportedErr
-//   ProviderNotReadyErr
-//   NotFoundErr
-//   RefNotUniqueErr
+//
+//	ProviderNotSupportedErr
+//	ProviderNotReadyErr
+//	NotFoundErr
+//	RefNotUniqueErr
 func (r *ProviderClient) VM(ref *base.Ref) (object interface{}, err error) {
 	return r.Finder().VM(ref)
 }
 
-//
 // Find a workload by ref.
 // Returns the matching resource and:
-//   ProviderNotSupportedErr
-//   ProviderNotReadyErr
-//   NotFoundErr
-//   RefNotUniqueErr
+//
+//	ProviderNotSupportedErr
+//	ProviderNotReadyErr
+//	NotFoundErr
+//	RefNotUniqueErr
 func (r *ProviderClient) Workload(ref *base.Ref) (object interface{}, err error) {
 	return r.Finder().Workload(ref)
 }
 
-//
 // Find a network by ref.
 // Returns the matching resource and:
-//   ProviderNotSupportedErr
-//   ProviderNotReadyErr
-//   NotFoundErr
-//   RefNotUniqueErr
+//
+//	ProviderNotSupportedErr
+//	ProviderNotReadyErr
+//	NotFoundErr
+//	RefNotUniqueErr
 func (r *ProviderClient) Network(ref *base.Ref) (object interface{}, err error) {
 	return r.Finder().Network(ref)
 }
 
-//
 // Find a storage object by ref.
 // Returns the matching resource and:
-//   ProviderNotSupportedErr
-//   ProviderNotReadyErr
-//   NotFoundErr
-//   RefNotUniqueErr
+//
+//	ProviderNotSupportedErr
+//	ProviderNotReadyErr
+//	NotFoundErr
+//	RefNotUniqueErr
 func (r *ProviderClient) Storage(ref *base.Ref) (object interface{}, err error) {
 	return r.Finder().Storage(ref)
 }
 
-//
 // Find a Host by ref.
 // Returns the matching resource and:
-//   ProviderNotSupportedErr
-//   ProviderNotReadyErr
-//   NotFoundErr
-//   RefNotUniqueErr
+//
+//	ProviderNotSupportedErr
+//	ProviderNotReadyErr
+//	NotFoundErr
+//	RefNotUniqueErr
 func (r *ProviderClient) Host(ref *base.Ref) (object interface{}, err error) {
 	return r.Finder().Host(ref)
 }
 
-//
 // Evaluate the status.
 // Returns:
-//  ProviderNotReady
-//  NotFound
+//
+//	ProviderNotReady
+//	NotFound
 func (r *ProviderClient) asError(status int, id string) (err error) {
 	switch status {
 	case http.StatusOK:
@@ -241,7 +235,6 @@ func (r *ProviderClient) asError(status int, id string) (err error) {
 	return
 }
 
-//
 // Match X-Reason reply header.
 func (r *ProviderClient) HasReason(reason string) bool {
 	reason = strings.ToLower(reason)

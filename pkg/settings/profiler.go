@@ -5,7 +5,6 @@ import (
 	"time"
 )
 
-//
 // Environment variables.
 const (
 	ProfilePath     = "PROFILE_PATH"
@@ -16,7 +15,6 @@ const (
 	ProfileMutex    = "mutex"
 )
 
-//
 // Profiler settings
 type Profiler struct {
 	// Profiler output directory.
@@ -27,7 +25,6 @@ type Profiler struct {
 	Kind string
 }
 
-//
 // Load settings.
 func (r *Profiler) Load() error {
 	minutes, _ := getEnvLimit(ProfileDuration, 0)

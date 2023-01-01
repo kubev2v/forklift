@@ -15,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-//
 // Root - all routes.
 const (
 	ProvidersRoot = "providers"
@@ -25,7 +24,6 @@ const (
 	NameParam     = "name"
 )
 
-//
 // Reply Header.
 const (
 	// Explains reason behind status code.
@@ -36,11 +34,9 @@ const (
 	UnknownProvider = "ProviderNotFound"
 )
 
-//
 // Params
 type Params = map[string]string
 
-//
 // Build link.
 func Link(path string, params Params) string {
 	for k, v := range params {
@@ -52,7 +48,6 @@ func Link(path string, params Params) string {
 	return path
 }
 
-//
 // Base handler.
 type Handler struct {
 	libweb.Parity
@@ -68,7 +63,6 @@ type Handler struct {
 	Detail int
 }
 
-//
 // Prepare to handle the request.
 func (h *Handler) Prepare(ctx *gin.Context) (int, error) {
 	status := h.Paged.Prepare(ctx)
@@ -95,13 +89,11 @@ func (h *Handler) Prepare(ctx *gin.Context) (int, error) {
 	return http.StatusOK, nil
 }
 
-//
 // Build link.
 func (h *Handler) Link(path string, params Params) string {
 	return Link(path, params)
 }
 
-//
 // Set the provider.
 // Set the Provider field and the X-Provider header.
 func (h *Handler) setProvider(ctx *gin.Context) (status int) {
@@ -127,7 +119,6 @@ func (h *Handler) setProvider(ctx *gin.Context) (status int) {
 	return
 }
 
-//
 // Set detail
 // "all" = MaxDetail.
 func (h *Handler) setDetail(ctx *gin.Context) (status int) {
@@ -151,7 +142,6 @@ func (h *Handler) setDetail(ctx *gin.Context) (status int) {
 	return
 }
 
-//
 // Permit request - Authorization.
 func (h *Handler) permit(ctx *gin.Context) (status int, err error) {
 	status = http.StatusOK
@@ -162,7 +152,6 @@ func (h *Handler) permit(ctx *gin.Context) (status int, err error) {
 	return
 }
 
-//
 // Match (compare) paths.
 // Determine if the relative path is contained
 // in the absolute path.
@@ -190,7 +179,6 @@ func (h *Handler) PathMatch(absolute, relative string) (matched bool) {
 	return
 }
 
-//
 // Match (compare) paths.
 // Determine if the paths have the same root.
 func (h *Handler) PathMatchRoot(absolute, path string) (matched bool) {

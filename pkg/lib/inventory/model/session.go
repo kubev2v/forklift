@@ -6,7 +6,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-//
 // DB session.
 // Encapsulates the sql.DB.
 type Session struct {
@@ -22,7 +21,6 @@ type Session struct {
 	closed bool
 }
 
-//
 // Return the session to the pool.
 // After is has been returned, it MUST no longer be used.
 func (s *Session) Return() {
@@ -31,7 +29,6 @@ func (s *Session) Return() {
 	s.returner = nil
 }
 
-//
 // Begin a transaction.
 func (s *Session) Begin() (tx *sql.Tx, err error) {
 	s.assertReserved()
@@ -44,7 +41,6 @@ func (s *Session) Begin() (tx *sql.Tx, err error) {
 	return
 }
 
-//
 // Assert reserved.
 // Ensure the session has been reserved and not
 // yet returned.
@@ -56,7 +52,6 @@ func (s *Session) assertReserved() {
 	}
 }
 
-//
 // Reset.
 // Ensure all transactions have been ended.
 func (s *Session) reset() {
@@ -67,7 +62,6 @@ func (s *Session) reset() {
 	s.tx = nil
 }
 
-//
 // Session pool.
 type Pool struct {
 	// Journal.
@@ -81,12 +75,12 @@ type Pool struct {
 	}
 }
 
-//
 // Open the pool.
 // Create sessions with DB connections.
 // For sqlite3:
-//   Even with journal=WAL, nWriter must be (1) to
-//   prevent SQLITE_LOCKED error.
+//
+//	Even with journal=WAL, nWriter must be (1) to
+//	prevent SQLITE_LOCKED error.
 func (p *Pool) Open(nWriter, nReader int, path string, journal *Journal) (err error) {
 	defer func() {
 		if err != nil {
@@ -126,7 +120,6 @@ func (p *Pool) Open(nWriter, nReader int, path string, journal *Journal) (err er
 	return
 }
 
-//
 // Close the pool.
 // Close DB connections.
 func (p *Pool) Close() (err error) {
@@ -138,21 +131,18 @@ func (p *Pool) Close() (err error) {
 	return
 }
 
-//
 // Get the next writer.
 // This may block until available.
 func (p *Pool) Writer() *Session {
 	return p.nextSession(p.next.writer)
 }
 
-//
 // Get the next reader.
 // This may block until available.
 func (p *Pool) Reader() *Session {
 	return p.nextSession(p.next.reader)
 }
 
-//
 // Get the next session.
 // This may block until available.
 func (p *Pool) nextSession(ch chan *Session) (session *Session) {
