@@ -28,7 +28,7 @@ spec:
       containers:
       - name: main
         command:
-        - /usr/local/bin/manager
+        - /usr/local/bin/forklift-controller
         env:
         - name: POD_NAMESPACE
           valueFrom:
@@ -109,7 +109,7 @@ spec:
           name: profiler
       - name: inventory
         command:
-        - /usr/local/bin/manager
+        - /usr/local/bin/forklift-controller
         env:
         - name: POD_NAMESPACE
           valueFrom:

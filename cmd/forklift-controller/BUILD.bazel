@@ -1,0 +1,56 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_binary(
+    name = "forklift-controller",
+    embed = [":forklift-controller_lib"],
+    static = "on",
+    #gotags = ["netgo"],
+    visibility = ["//visibility:public"],
+)
+
+load(
+    "@io_bazel_rules_docker//container:container.bzl",
+    "container_image",
+)
+
+container_image(
+    name = "forklift-controller-image",
+    #architecture = select({
+    #    "@io_bazel_rules_go//go/platform:linux_arm64": "arm64",
+    #    "//conditions:default": "amd64",
+    #}),
+    #base = "@centos-stream8//image",
+    base = "@ubi8-minimal//image",
+    directory = "/usr/local/bin/",
+    entrypoint = ["/usr/local/bin/forklift-controller"],
+    # workaround for github.com/bazelbuild/rules_go/issues/1706
+    env = {"GODEBUG": "netdns=go"},
+    files = [":forklift-controller"],
+    #user = "1001",
+    visibility = ["//visibility:public"],
+)
+
+go_library(
+    name = "forklift-controller_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/konveyor/forklift-controller/cmd/forklift-controller",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//pkg/apis",
+        "//pkg/controller",
+        "//pkg/settings",
+        "//pkg/webhook",
+        "//vendor/github.com/go-logr/logr",
+        "//vendor/github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1:k8s_cni_cncf_io",
+        "//vendor/github.com/openshift/api/template/v1:template",
+        "//vendor/github.com/pkg/profile",
+        "//vendor/github.com/prometheus/client_golang/prometheus/promhttp",
+        "//vendor/k8s.io/client-go/plugin/pkg/client/auth/gcp",
+        "//vendor/kubevirt.io/client-go/api/v1:api",
+        "//vendor/kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/client/config",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/manager",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/runtime/log",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/runtime/signals",
+    ],
+)

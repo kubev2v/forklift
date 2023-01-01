@@ -36,9 +36,9 @@ gazelle(name = "gazelle")
 genrule(
     name = "build-controller",
     srcs = [
-        "//cmd/manager",
+        "//cmd/forklift-controller",
     ],
-    outs = ["manager"],
+    outs = ["forklift-controller"],
     cmd = "echo '#!/bin/sh\n\ncp -f $(SRCS) $$1' > \"$@\"",
     executable = 1,
 )
@@ -52,7 +52,7 @@ load(
 container_push(
     name = "push-forklift-controller",
     format = "Docker",
-    image = "//cmd/manager:forklift-controller-image",
+    image = "//cmd/forklift-controller:forklift-controller-image",
     registry = "$${REGISTRY:-quay.io}",
     repository = "$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}forklift-controller",
     tag = "$${REGISTRY_TAG:-devel}",
