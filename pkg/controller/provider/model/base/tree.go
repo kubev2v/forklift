@@ -4,14 +4,12 @@ import (
 	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 )
 
-//
 // Tree.
 type Tree struct {
 	// Depth limit (0=unlimited).
 	Depth int
 }
 
-//
 // Build the tree.
 func (r *Tree) Build(root Model, navigator BranchNavigator) (treeRoot *TreeNode, err error) {
 	node := &TreeNode{
@@ -63,7 +61,6 @@ func (r *Tree) Build(root Model, navigator BranchNavigator) (treeRoot *TreeNode,
 	return
 }
 
-//
 // Build the (ancestry) tree.
 func (r *Tree) Ancestry(leaf Model, navigator ParentNavigator) (treeRoot *TreeNode, err error) {
 	node := &TreeNode{
@@ -92,7 +89,6 @@ func (r *Tree) Ancestry(leaf Model, navigator ParentNavigator) (treeRoot *TreeNo
 	return
 }
 
-//
 // Tree node.
 type TreeNode struct {
 	// Parent node.
@@ -105,14 +101,12 @@ type TreeNode struct {
 	Children []*TreeNode
 }
 
-//
 // Tree navigator.
 // Navigate up the parent tree.
 type ParentNavigator interface {
 	Next(Model) (Model, error)
 }
 
-//
 // Tree navigator.
 // Navigate down the children.
 type BranchNavigator interface {

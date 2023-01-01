@@ -29,7 +29,6 @@ import (
 
 type ProviderType string
 
-//
 // Provider types.
 const (
 	Undefined ProviderType = ""
@@ -54,13 +53,11 @@ func (t ProviderType) String() string {
 	return string(t)
 }
 
-//
 // Secret fields.
 const (
 	Token = "token"
 )
 
-//
 // Defines the desired state of Provider.
 type ProviderSpec struct {
 	// Provider type.
@@ -75,7 +72,6 @@ type ProviderSpec struct {
 	Settings map[string]string `json:"settings,omitempty"`
 }
 
-//
 // ProviderStatus defines the observed state of Provider
 type ProviderStatus struct {
 	// Current life cycle phase of the provider.
@@ -88,7 +84,6 @@ type ProviderStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
-//
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:openapi-gen=true
@@ -107,7 +102,6 @@ type Provider struct {
 	Status          ProviderStatus `json:"status,omitempty"`
 }
 
-//
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ProviderList struct {
 	meta.TypeMeta `json:",inline"`
@@ -119,7 +113,6 @@ func init() {
 	SchemeBuilder.Register(&Provider{}, &ProviderList{})
 }
 
-//
 // Build k8s REST configuration.
 func (p *Provider) RestCfg(secret *core.Secret) (cfg *rest.Config) {
 	if p.IsHost() {
@@ -137,7 +130,6 @@ func (p *Provider) RestCfg(secret *core.Secret) (cfg *rest.Config) {
 	return
 }
 
-//
 // Build a k8s client.
 func (p *Provider) Client(secret *core.Secret) (c client.Client, err error) {
 	c, err = client.New(
@@ -152,7 +144,6 @@ func (p *Provider) Client(secret *core.Secret) (c client.Client, err error) {
 	return
 }
 
-//
 // The provider type.
 func (p *Provider) Type() ProviderType {
 	if p.Spec.Type != nil {
@@ -161,19 +152,16 @@ func (p *Provider) Type() ProviderType {
 	return Undefined
 }
 
-//
 // This provider is the `host` cluster.
 func (p *Provider) IsHost() bool {
 	return p.Type() == OpenShift && p.Spec.URL == ""
 }
 
-//
 // Current generation has been reconciled.
 func (p *Provider) HasReconciled() bool {
 	return p.Generation == p.Status.ObservedGeneration
 }
 
-//
 // This provider requires VM guest conversion.
 func (p *Provider) RequiresConversion() bool {
 	return p.Type() == VSphere

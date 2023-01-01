@@ -11,7 +11,6 @@ import (
 	core "k8s.io/api/core/v1"
 )
 
-//
 // Build
 func Build(
 	db libmodel.DB,

@@ -6,20 +6,17 @@ import (
 	"strconv"
 )
 
-//
 // Environment variables.
 const (
 	MetricsPort = "METRICS_PORT"
 )
 
-//
 // Metrics settings
 type Metrics struct {
 	// Metrics port. 0 = disabled.
 	Port int
 }
 
-//
 // Load settings.
 func (r *Metrics) Load() error {
 	// Port
@@ -32,7 +29,6 @@ func (r *Metrics) Load() error {
 	return nil
 }
 
-//
 // Metrics address.
 // Port = 0 will disable metrics.
 func (r *Metrics) Address() string {

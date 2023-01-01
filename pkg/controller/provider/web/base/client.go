@@ -18,17 +18,14 @@ import (
 	"time"
 )
 
-//
 // Application settings.
 var Settings = &settings.Settings
 
-//
 // Lib.
 type EventHandler = libweb.EventHandler
 type LibClient = libweb.Client
 type Watch = libweb.Watch
 
-//
 // Resource kind cannot be resolved.
 type ResourceNotResolvedError struct {
 	Object interface{}
@@ -38,7 +35,6 @@ func (r ResourceNotResolvedError) Error() string {
 	return fmt.Sprintf("Resource %#v cannot be resolved.", r.Object)
 }
 
-//
 // Reference matches multiple resources.
 type RefNotUniqueError struct {
 	Ref
@@ -48,7 +44,6 @@ func (r RefNotUniqueError) Error() string {
 	return fmt.Sprintf("Reference %#v matched multiple resources.", r.Ref)
 }
 
-//
 // Resource not found.
 type NotFoundError struct {
 	Ref
@@ -58,18 +53,15 @@ func (r NotFoundError) Error() string {
 	return fmt.Sprintf("Resource %#v not found.", r.Ref)
 }
 
-//
 // Reference.
 type Ref = ref.Ref
 
-//
 // Resolves resources to API paths.
 type Resolver interface {
 	// Find the API path for the specified resource.
 	Path(resource interface{}, id string) (string, error)
 }
 
-//
 // Resource Finder.
 type Finder interface {
 	// Finder with client.
@@ -118,7 +110,6 @@ type Finder interface {
 	Host(ref *Ref) (interface{}, error)
 }
 
-//
 // REST Client.
 type Client interface {
 	// Finder
@@ -187,14 +178,12 @@ type Client interface {
 	Host(ref *Ref) (interface{}, error)
 }
 
-//
 // Web parameter.
 type Param struct {
 	Key   string
 	Value string
 }
 
-//
 // REST API client.
 type RestClient struct {
 	LibClient
@@ -205,7 +194,6 @@ type RestClient struct {
 	Params Params
 }
 
-//
 // Get a resource.
 func (c *RestClient) Get(resource interface{}, id string) (status int, err error) {
 	if c.Resolver == nil {
@@ -228,7 +216,6 @@ func (c *RestClient) Get(resource interface{}, id string) (status int, err error
 	return
 }
 
-//
 // List resources in a collection.
 func (c *RestClient) List(list interface{}, param ...Param) (status int, err error) {
 	var resource interface{}
@@ -264,7 +251,6 @@ func (c *RestClient) List(list interface{}, param ...Param) (status int, err err
 	return
 }
 
-//
 // Watch a resource.
 func (c *RestClient) Watch(resource interface{}, h EventHandler) (status int, w *Watch, err error) {
 	if c.Resolver == nil {
@@ -293,7 +279,6 @@ func (c *RestClient) Watch(resource interface{}, h EventHandler) (status int, w 
 	return
 }
 
-//
 // Build and set the transport as needed.
 func (c *RestClient) buildTransport() (err error) {
 	if c.Transport != nil {
@@ -328,7 +313,6 @@ func (c *RestClient) buildTransport() (err error) {
 	return
 }
 
-//
 // Build header.
 func (c *RestClient) buildHeader() {
 	cfg, _ := config.GetConfig()
@@ -339,7 +323,6 @@ func (c *RestClient) buildHeader() {
 	}
 }
 
-//
 // Build the URL.
 func (c *RestClient) url(path string) string {
 	if c.Host == "" {
@@ -362,7 +345,6 @@ func (c *RestClient) url(path string) string {
 	return url.String()
 }
 
-//
 // Http GET
 func (c *RestClient) get(path string, resource interface{}) (status int, err error) {
 	err = c.buildTransport()

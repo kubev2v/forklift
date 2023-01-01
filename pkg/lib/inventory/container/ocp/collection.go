@@ -6,7 +6,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-//
 // Resource collection.
 type Collection interface {
 	predicate.Predicate
@@ -18,14 +17,12 @@ type Collection interface {
 	Reconcile(context.Context) error
 }
 
-//
 // Base collection.
 type BaseCollection struct {
 	// Associated data collector.
 	Collector *Collector
 }
 
-//
 // Associate with a collector.
 func (r *BaseCollection) Bind(collector *Collector) {
 	r.Collector = collector

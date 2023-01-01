@@ -2,7 +2,6 @@ package plan
 
 import core "k8s.io/api/core/v1"
 
-//
 // Maps.
 type Map struct {
 	// Network.

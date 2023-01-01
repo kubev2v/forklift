@@ -47,15 +47,12 @@ const (
 	Name = "plan"
 )
 
-//
 // Package logger.
 var log = logging.WithName(Name)
 
-//
 // Application settings.
 var Settings = &settings.Settings
 
-//
 // Creates a new Plan Controller and adds it to the Manager.
 func Add(mgr manager.Manager) error {
 	reconciler := &Reconciler{
@@ -167,13 +164,11 @@ func Add(mgr manager.Manager) error {
 
 var _ reconcile.Reconciler = &Reconciler{}
 
-//
 // Reconciles a Plan object.
 type Reconciler struct {
 	base.Reconciler
 }
 
-//
 // Reconcile a Plan CR.
 // Note: Must not a pointer receiver to ensure that the
 // logger and other state is not shared.
@@ -269,7 +264,6 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 	return
 }
 
-//
 // Archive the plan.
 // Makes a best-effort attempt to clean up lingering
 // plan resources.
@@ -293,14 +287,13 @@ func (r *Reconciler) archive(plan *api.Plan) {
 	r.Log.Info("Plan archived.")
 }
 
-//
 // Execute the plan.
-//   1. Find active (current) migration.
-//   2. If found, update the context and match the snapshot.
-//   3. Cancel as needed.
-//   4. If not, find the next pending migration.
-//   5. If a new migration is being started, update the context and snapshot.
-//   6. Run the migration.
+//  1. Find active (current) migration.
+//  2. If found, update the context and match the snapshot.
+//  3. Cancel as needed.
+//  4. If not, find the next pending migration.
+//  5. If a new migration is being started, update the context and snapshot.
+//  6. Run the migration.
 func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	if plan.Status.HasBlockerCondition() || plan.Status.HasCondition(Archived) {
 		return
@@ -435,7 +428,6 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	return
 }
 
-//
 // Create a new snapshot.
 // Return: The new active snapshot.
 func (r *Reconciler) newSnapshot(ctx *plancontext.Context) *planapi.Snapshot {
@@ -456,7 +448,6 @@ func (r *Reconciler) newSnapshot(ctx *plancontext.Context) *planapi.Snapshot {
 	return plan.Status.Migration.ActiveSnapshot()
 }
 
-//
 // Match the snapshot and detect mutation.
 // When detected, the (active) snapshot will get marked as canceled.
 func (r *Reconciler) matchSnapshot(ctx *plancontext.Context) (matched bool) {
@@ -503,7 +494,6 @@ func (r *Reconciler) matchSnapshot(ctx *plancontext.Context) (matched bool) {
 	return true
 }
 
-//
 // Get the current (active) migration referenced in the snapshot.
 // The active snapshot will be marked canceled.
 // Returns: nil when not-found.
@@ -555,7 +545,6 @@ func (r *Reconciler) activeMigration(plan *api.Plan) (migration *api.Migration, 
 	return
 }
 
-//
 // Sorted list of pending migrations.
 func (r *Reconciler) pendingMigrations(plan *api.Plan) (list []*api.Migration, err error) {
 	all := &api.MigrationList{}
@@ -610,7 +599,6 @@ func (r *Reconciler) pendingMigrations(plan *api.Plan) (list []*api.Migration, e
 	return
 }
 
-//
 // Postpone reconciliation.
 // Ensure that dependencies (CRs) have been reconciled.
 func (r *Reconciler) postpone() (postpone bool, err error) {

@@ -68,11 +68,9 @@ const (
 	kVM = "vmID"
 )
 
-//
 // Map of VirtualMachines keyed by vmID.
 type VirtualMachineMap map[string]VirtualMachine
 
-//
 // Represents kubevirt.
 type KubeVirt struct {
 	*plancontext.Context
@@ -80,7 +78,6 @@ type KubeVirt struct {
 	Builder adapter.Builder
 }
 
-//
 // Build a VirtualMachineMap.
 func (r *KubeVirt) VirtualMachineMap() (mp VirtualMachineMap, err error) {
 	list, err := r.ListVMs()
@@ -95,7 +92,6 @@ func (r *KubeVirt) VirtualMachineMap() (mp VirtualMachineMap, err error) {
 	return
 }
 
-//
 // List VirtualMachine CRs.
 // Each VirtualMachine represents an imported kubevirt VM with associated DataVolumes.
 func (r *KubeVirt) ListVMs() ([]VirtualMachine, error) {
@@ -158,7 +154,6 @@ func (r *KubeVirt) ListVMs() ([]VirtualMachine, error) {
 	return list, nil
 }
 
-//
 // Ensure the namespace exists on the destination.
 func (r *KubeVirt) EnsureNamespace() (err error) {
 	ns := &core.Namespace{
@@ -180,7 +175,6 @@ func (r *KubeVirt) EnsureNamespace() (err error) {
 	return
 }
 
-//
 // Get the importer pod for a PersistentVolumeClaim.
 func (r *KubeVirt) GetImporterPod(pvc core.PersistentVolumeClaim) (pod *core.Pod, found bool, err error) {
 	pod = &core.Pod{}
@@ -209,7 +203,6 @@ func (r *KubeVirt) GetImporterPod(pvc core.PersistentVolumeClaim) (pod *core.Pod
 	return
 }
 
-//
 // Delete the DataVolumes associated with the VM.
 func (r *KubeVirt) DeleteDataVolumes(vm *plan.VMStatus) (err error) {
 	dvs, err := r.getDVs(vm)
@@ -226,7 +219,6 @@ func (r *KubeVirt) DeleteDataVolumes(vm *plan.VMStatus) (err error) {
 	return
 }
 
-//
 // Delete the importer pod for a PersistentVolumeClaim.
 func (r *KubeVirt) DeleteImporterPod(pvc core.PersistentVolumeClaim) (err error) {
 	var pod *core.Pod
@@ -251,7 +243,6 @@ func (r *KubeVirt) DeleteImporterPod(pvc core.PersistentVolumeClaim) (err error)
 	return
 }
 
-//
 // Ensure the kubevirt VirtualMachine exists on the destination.
 func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) (err error) {
 	newVM, err := r.virtualMachine(vm)
@@ -326,7 +317,6 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) (err error) {
 	return
 }
 
-//
 // Delete the Secret that was created for this VM.
 func (r *KubeVirt) DeleteSecret(vm *plan.VMStatus) (err error) {
 	vmLabels := r.vmLabels(vm.Ref)
@@ -366,7 +356,6 @@ func (r *KubeVirt) DeleteSecret(vm *plan.VMStatus) (err error) {
 	return
 }
 
-//
 // Delete the ConfigMap that was created for this VM.
 func (r *KubeVirt) DeleteConfigMap(vm *plan.VMStatus) (err error) {
 	vmLabels := r.vmLabels(vm.Ref)
@@ -406,7 +395,6 @@ func (r *KubeVirt) DeleteConfigMap(vm *plan.VMStatus) (err error) {
 	return
 }
 
-//
 // Delete the VirtualMachine CR on the destination cluster.
 func (r *KubeVirt) DeleteVM(vm *plan.VMStatus) (err error) {
 	vmLabels := r.vmLabels(vm.Ref)
@@ -448,7 +436,6 @@ func (r *KubeVirt) DeleteVM(vm *plan.VMStatus) (err error) {
 	return
 }
 
-//
 // Set the Running state on a Kubevirt VirtualMachine.
 func (r *KubeVirt) SetRunning(vmCr *VirtualMachine, running bool) (err error) {
 	vmCopy := vmCr.VirtualMachine.DeepCopy()
@@ -461,8 +448,6 @@ func (r *KubeVirt) SetRunning(vmCr *VirtualMachine, running bool) (err error) {
 	return
 }
 
-//
-//
 func (r *KubeVirt) DataVolumes(vm *plan.VMStatus) (dataVolumes []cdi.DataVolume, err error) {
 	secret, err := r.ensureSecret(vm.Ref)
 	if err != nil {
@@ -480,7 +465,6 @@ func (r *KubeVirt) DataVolumes(vm *plan.VMStatus) (dataVolumes []cdi.DataVolume,
 	return
 }
 
-//
 // Ensure the DataVolumes exist on the destination.
 func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus, dataVolumes []cdi.DataVolume) (err error) {
 	list := &cdi.DataVolumeList{}
@@ -524,7 +508,6 @@ func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus, dataVolumes []cdi.DataVo
 	return
 }
 
-//
 // Return DataVolumes associated with a VM.
 func (r *KubeVirt) getDVs(vm *plan.VMStatus) (dvs []DataVolume, err error) {
 	dvsList := &cdi.DataVolumeList{}
@@ -551,7 +534,6 @@ func (r *KubeVirt) getDVs(vm *plan.VMStatus) (dvs []DataVolume, err error) {
 	return
 }
 
-//
 // Return PersistentVolumeClaims associated with a VM.
 func (r *KubeVirt) getPVCs(vm *plan.VMStatus) (pvcs []core.PersistentVolumeClaim, err error) {
 	pvcsList := &core.PersistentVolumeClaimList{}
@@ -585,7 +567,6 @@ func (r *KubeVirt) getListOptionsNamespaced() (listOptions *client.ListOptions) 
 	}
 }
 
-//
 // Ensure the guest conversion (virt-v2v) pod exists on the destination.
 func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, vmCr *VirtualMachine, pvcs *[]core.PersistentVolumeClaim) (err error) {
 	configMap, err := r.ensureLibvirtConfigMap(vm.Ref, vmCr, pvcs)
@@ -632,7 +613,6 @@ func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, vmCr *VirtualMach
 	return
 }
 
-//
 // Get the guest conversion pod for the VM.
 func (r *KubeVirt) GetGuestConversionPod(vm *plan.VMStatus) (pod *core.Pod, err error) {
 	list := &core.PodList{}
@@ -653,7 +633,6 @@ func (r *KubeVirt) GetGuestConversionPod(vm *plan.VMStatus) (pod *core.Pod, err 
 	return
 }
 
-//
 // Delete the guest conversion pod on the destination cluster.
 func (r *KubeVirt) DeleteGuestConversionPod(vm *plan.VMStatus) (err error) {
 	vmLabels := r.vmLabels(vm.Ref)
@@ -693,7 +672,6 @@ func (r *KubeVirt) DeleteGuestConversionPod(vm *plan.VMStatus) (err error) {
 	return
 }
 
-//
 // Delete any hook jobs that belong to a VM migration.
 func (r *KubeVirt) DeleteHookJobs(vm *plan.VMStatus) (err error) {
 	vmLabels := r.vmLabels(vm.Ref)
@@ -733,7 +711,6 @@ func (r *KubeVirt) DeleteHookJobs(vm *plan.VMStatus) (err error) {
 	return
 }
 
-//
 // Build the DataVolume CRs.
 func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap *core.ConfigMap) (objects []cdi.DataVolume, err error) {
 	_, err = r.Source.Inventory.VM(&vm.Ref)
@@ -773,7 +750,6 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 	return
 }
 
-//
 // Return the generated name for a specific VM and plan.
 func (r *KubeVirt) getGeneratedName(vm *plan.VMStatus) string {
 	return strings.Join(
@@ -783,7 +759,6 @@ func (r *KubeVirt) getGeneratedName(vm *plan.VMStatus) string {
 		"-") + "-"
 }
 
-//
 // Build the Kubevirt VM CR.
 func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine, err error) {
 	pvcs, err := r.getPVCs(vm)
@@ -839,7 +814,6 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 	return
 }
 
-//
 // Attempt to find a suitable template and extract a VirtualMachine definition from it.
 func (r *KubeVirt) vmTemplate(vm *plan.VMStatus) (virtualMachine *cnv.VirtualMachine, ok bool) {
 	tmpl, err := r.findTemplate(vm)
@@ -892,7 +866,6 @@ func (r *KubeVirt) vmTemplate(vm *plan.VMStatus) (virtualMachine *cnv.VirtualMac
 	return
 }
 
-//
 // Create empty VM definition.
 func (r *KubeVirt) emptyVm(vm *plan.VMStatus) (virtualMachine *cnv.VirtualMachine) {
 	virtualMachine = &cnv.VirtualMachine{
@@ -910,7 +883,6 @@ func (r *KubeVirt) emptyVm(vm *plan.VMStatus) (virtualMachine *cnv.VirtualMachin
 	return
 }
 
-//
 // Decode the VirtualMachine object embedded in the template.
 func (r *KubeVirt) decodeTemplate(tmpl *template.Template) (vm *cnv.VirtualMachine, err error) {
 	if len(tmpl.Objects) == 0 {
@@ -939,7 +911,6 @@ func (r *KubeVirt) decodeTemplate(tmpl *template.Template) (vm *cnv.VirtualMachi
 	return
 }
 
-//
 // Process the template parameters.
 func (r *KubeVirt) processTemplate(vm *plan.VMStatus, tmpl *template.Template) (err error) {
 	source := rand.NewSource(time.Now().UTC().UnixNano())
@@ -970,7 +941,6 @@ func (r *KubeVirt) processTemplate(vm *plan.VMStatus, tmpl *template.Template) (
 	return
 }
 
-//
 // Attempt to find an OpenShift template that matches the VM's guest OS.
 func (r *KubeVirt) findTemplate(vm *plan.VMStatus) (tmpl *template.Template, err error) {
 	var templateLabels map[string]string
@@ -1172,7 +1142,6 @@ func (r *KubeVirt) libvirtDomain(vmCr *VirtualMachine, pvcs *[]core.PersistentVo
 	return
 }
 
-//
 // Ensure the config map exists on the destination.
 func (r *KubeVirt) ensureConfigMap(vmRef ref.Ref) (configMap *core.ConfigMap, err error) {
 	_, err = r.Source.Inventory.VM(&vmRef)
@@ -1217,7 +1186,6 @@ func (r *KubeVirt) ensureConfigMap(vmRef ref.Ref) (configMap *core.ConfigMap, er
 	return
 }
 
-//
 // Ensure the Libvirt domain config map exists on the destination.
 func (r *KubeVirt) ensureLibvirtConfigMap(vmRef ref.Ref, vmCr *VirtualMachine, pvcs *[]core.PersistentVolumeClaim) (configMap *core.ConfigMap, err error) {
 	configMap, err = r.ensureConfigMap(vmRef)
@@ -1251,7 +1219,6 @@ func (r *KubeVirt) ensureLibvirtConfigMap(vmRef ref.Ref, vmCr *VirtualMachine, p
 	return
 }
 
-//
 // Build the config map.
 func (r *KubeVirt) configMap(vmRef ref.Ref) (object *core.ConfigMap, err error) {
 	object = &core.ConfigMap{
@@ -1271,7 +1238,6 @@ func (r *KubeVirt) configMap(vmRef ref.Ref) (object *core.ConfigMap, err error) 
 	return
 }
 
-//
 // Ensure the DatVolume credential secret exists on the destination.
 func (r *KubeVirt) ensureSecret(vmRef ref.Ref) (secret *core.Secret, err error) {
 	_, err = r.Source.Inventory.VM(&vmRef)
@@ -1331,7 +1297,6 @@ func (r *KubeVirt) ensureSecret(vmRef ref.Ref) (secret *core.Secret, err error) 
 	return
 }
 
-//
 // Build the DataVolume credential secret.
 func (r *KubeVirt) secret(vmRef ref.Ref) (object *core.Secret, err error) {
 	object = &core.Secret{
@@ -1350,7 +1315,6 @@ func (r *KubeVirt) secret(vmRef ref.Ref) (object *core.Secret, err error) {
 	return
 }
 
-//
 // Labels for plan and migration.
 func (r *KubeVirt) planLabels() map[string]string {
 	return map[string]string{
@@ -1359,7 +1323,6 @@ func (r *KubeVirt) planLabels() map[string]string {
 	}
 }
 
-//
 // Labels for a VM on a plan.
 func (r *KubeVirt) vmLabels(vmRef ref.Ref) (labels map[string]string) {
 	labels = r.planLabels()
@@ -1367,7 +1330,6 @@ func (r *KubeVirt) vmLabels(vmRef ref.Ref) (labels map[string]string) {
 	return
 }
 
-//
 // Checks if VM with the newly generated name exists on the destination
 func (r *KubeVirt) checkIfVmNameExist(name string) (nameExist bool, err error) {
 	list := &cnv.VirtualMachineList{}
@@ -1400,14 +1362,12 @@ func (r *KubeVirt) checkIfVmNameExist(name string) (nameExist bool, err error) {
 	return
 }
 
-//
 // Represents a CDI DataVolume and add behavior.
 type DataVolume struct {
 	*cdi.DataVolume
 	PVC *core.PersistentVolumeClaim
 }
 
-//
 // Get conditions.
 func (r *DataVolume) Conditions() (cnd *libcnd.Conditions) {
 	cnd = &libcnd.Conditions{}
@@ -1424,7 +1384,6 @@ func (r *DataVolume) Conditions() (cnd *libcnd.Conditions) {
 	return
 }
 
-//
 // Convert the Status.Progress into a
 // percentage (float).
 func (r *DataVolume) PercentComplete() (pct float64) {
@@ -1440,14 +1399,12 @@ func (r *DataVolume) PercentComplete() (pct float64) {
 	return
 }
 
-//
 // Represents Kubevirt VirtualMachine with associated DataVolumes.
 type VirtualMachine struct {
 	*cnv.VirtualMachine
 	DataVolumes []DataVolume
 }
 
-//
 // Determine if `this` VirtualMachine is the
 // owner of the CDI DataVolume.
 func (r *VirtualMachine) Owner(dv *cdi.DataVolume) bool {
@@ -1460,7 +1417,6 @@ func (r *VirtualMachine) Owner(dv *cdi.DataVolume) bool {
 	return false
 }
 
-//
 // Get conditions.
 func (r *VirtualMachine) Conditions() (cnd *libcnd.Conditions) {
 	cnd = &libcnd.Conditions{}
@@ -1478,7 +1434,6 @@ func (r *VirtualMachine) Conditions() (cnd *libcnd.Conditions) {
 	return
 }
 
-//
 // Convert the combined progress of all DataVolumes
 // into a percentage (float).
 func (r *VirtualMachine) PercentComplete() (pct float64) {
@@ -1491,7 +1446,6 @@ func (r *VirtualMachine) PercentComplete() (pct float64) {
 	return
 }
 
-//
 // Create an OwnerReference from a VM.
 func vmOwnerReference(vm *cnv.VirtualMachine) (ref meta.OwnerReference) {
 	blockOwnerDeletion := true
@@ -1507,7 +1461,7 @@ func vmOwnerReference(vm *cnv.VirtualMachine) (ref meta.OwnerReference) {
 	return
 }
 
-//changes VM name to match DNS1123 RFC convention.
+// changes VM name to match DNS1123 RFC convention.
 func changeVmName(currName string, vmID string) string {
 
 	var nameMaxLength int = 63

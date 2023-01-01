@@ -180,7 +180,6 @@ func TestCollection(t *testing.T) {
 	g.Expect(collection.Deleted).To(gomega.Equal(2))
 }
 
-//
 // Iterator of models.
 func asIter(models []TestObject2) fb.Iterator {
 	list := fb.NewList()

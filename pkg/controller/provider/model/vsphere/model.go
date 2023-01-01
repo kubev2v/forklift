@@ -5,7 +5,6 @@ import (
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 )
 
-//
 // Variants.
 const (
 	// Network.
@@ -16,7 +15,6 @@ const (
 	ComputeResource = "ComputeResource"
 )
 
-//
 // Errors
 var NotFound = libmodel.NotFound
 
@@ -26,13 +24,11 @@ const (
 	MaxDetail = base.MaxDetail
 )
 
-//
 // Types
 type ListOptions = base.ListOptions
 type Concern = base.Concern
 type Ref = base.Ref
 
-//
 // Model.
 type Model interface {
 	base.Model
@@ -40,7 +36,6 @@ type Model interface {
 	GetName() string
 }
 
-//
 // Base VMWare model.
 type Base struct {
 	// Managed object ID.
@@ -55,19 +50,16 @@ type Base struct {
 	Revision int64 `sql:"incremented,d0,index(revision)"`
 }
 
-//
 // Get the PK.
 func (m *Base) Pk() string {
 	return m.ID
 }
 
-//
 // String representation.
 func (m *Base) String() string {
 	return m.ID
 }
 
-//
 // Get labels.
 func (m *Base) Labels() libmodel.Labels {
 	return nil
@@ -81,19 +73,16 @@ func (m *Base) Equals(other libmodel.Model) bool {
 	return false
 }
 
-//
 // Populate PK using the ref.
 func (m *Base) WithRef(ref Ref) {
 	m.ID = ref.ID
 }
 
-//
 // Parent.
 func (m *Base) GetParent() Ref {
 	return m.Parent
 }
 
-//
 // Name.
 func (m *Base) GetName() string {
 	return m.Name
@@ -274,13 +263,11 @@ type VM struct {
 	Concerns              []Concern `sql:""`
 }
 
-//
 // Determine if current revision has been validated.
 func (m *VM) Validated() bool {
 	return m.RevisionValidated == m.Revision
 }
 
-//
 // Virtual Disk.
 type Disk struct {
 	Key       int32  `json:"key"`
@@ -291,13 +278,11 @@ type Disk struct {
 	RDM       bool   `json:"rdm"`
 }
 
-//
 // Virtual Device.
 type Device struct {
 	Kind string `json:"kind"`
 }
 
-//
 // Virtual ethernet card.
 type NIC struct {
 	Network Ref    `json:"network"`

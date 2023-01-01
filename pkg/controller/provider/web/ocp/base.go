@@ -8,11 +8,9 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 )
 
-//
 // Package logger.
 var log = logging.WithName("web|ocp")
 
-//
 // Params.
 const (
 	NsParam     = base.NsParam
@@ -20,13 +18,11 @@ const (
 	DetailParam = base.DetailParam
 )
 
-//
 // Base handler.
 type Handler struct {
 	base.Handler
 }
 
-//
 // Build list predicate.
 func (h Handler) Predicate(ctx *gin.Context) (p libmodel.Predicate) {
 	q := ctx.Request.URL.Query()
@@ -54,7 +50,6 @@ func (h Handler) Predicate(ctx *gin.Context) (p libmodel.Predicate) {
 	return
 }
 
-//
 // Build list options.
 func (h Handler) ListOptions(ctx *gin.Context) libmodel.ListOptions {
 	detail := h.Detail

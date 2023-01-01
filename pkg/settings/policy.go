@@ -4,7 +4,6 @@ import (
 	"os"
 )
 
-//
 // Environment variables.
 const (
 	PolicyAgentURL            = "POLICY_AGENT_URL"
@@ -13,7 +12,6 @@ const (
 	PolicyAgentSearchInterval = "POLICY_AGENT_SEARCH_INTERVAL"
 )
 
-//
 // Policy agent settings.
 type PolicyAgent struct {
 	// URL.
@@ -32,7 +30,6 @@ type PolicyAgent struct {
 	}
 }
 
-//
 // Load settings.
 func (r *PolicyAgent) Load() (err error) {
 	if s, found := os.LookupEnv(PolicyAgentURL); found {
@@ -56,7 +53,6 @@ func (r *PolicyAgent) Load() (err error) {
 	return
 }
 
-//
 // Enabled.
 func (r *PolicyAgent) Enabled() bool {
 	return r.URL != ""

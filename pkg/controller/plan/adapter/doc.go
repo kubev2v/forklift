@@ -13,7 +13,6 @@ type Builder = base.Builder
 type Client = base.Client
 type Validator = base.Validator
 
-//
 // Adapter factory.
 func New(provider *api.Provider) (adapter Adapter, err error) {
 	//

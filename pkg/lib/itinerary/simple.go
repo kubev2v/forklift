@@ -5,15 +5,12 @@ import (
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 )
 
-//
 // List of steps.
 type Pipeline []Step
 
-//
 // Predicate flag.
 type Flag = int16
 
-//
 // Predicate.
 // Flags delegated to the predicate.
 type Predicate interface {
@@ -22,7 +19,6 @@ type Predicate interface {
 	Evaluate(Flag) (bool, error)
 }
 
-//
 // Itinerary step.
 type Step struct {
 	// Name.
@@ -35,7 +31,6 @@ type Step struct {
 	Any Flag
 }
 
-//
 // An itinerary.
 // List of conditional steps.
 type Itinerary struct {
@@ -47,13 +42,11 @@ type Itinerary struct {
 	Name string
 }
 
-//
 // Errors.
 var (
 	StepNotFound = errors.New("step not found")
 )
 
-//
 // Get a step by name.
 func (r *Itinerary) Get(name string) (step Step, err error) {
 	for _, step = range r.Pipeline {
@@ -66,7 +59,6 @@ func (r *Itinerary) Get(name string) (step Step, err error) {
 	return
 }
 
-//
 // Get the first step filtered by predicate.
 func (r *Itinerary) First() (step Step, err error) {
 	list, pErr := r.List()
@@ -109,7 +101,6 @@ func (r *Itinerary) List() (pipeline Pipeline, err error) {
 	return
 }
 
-//
 // Get the next step in the itinerary.
 func (r *Itinerary) Next(name string) (next Step, done bool, err error) {
 	current, pErr := r.Get(name)
@@ -155,7 +146,6 @@ func (r *Itinerary) Progress(step string) (report Progress, err error) {
 	return
 }
 
-//
 // The step has satisfied ANY of the predicates.
 func (r *Itinerary) hasAny(step Step) (pTrue bool, err error) {
 	for i := 0; i < 16; i++ {
@@ -176,7 +166,6 @@ func (r *Itinerary) hasAny(step Step) (pTrue bool, err error) {
 	return
 }
 
-//
 // The step has satisfied ALL of the predicates.
 func (r *Itinerary) hasAll(step Step) (pTrue bool, err error) {
 	for i := 0; i < 16; i++ {
@@ -197,7 +186,6 @@ func (r *Itinerary) hasAll(step Step) (pTrue bool, err error) {
 	return
 }
 
-//
 // Progress report.
 type Progress struct {
 	// Completed units.

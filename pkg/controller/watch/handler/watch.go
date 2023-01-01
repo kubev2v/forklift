@@ -9,15 +9,12 @@ import (
 	"sync"
 )
 
-//
 // Watch map keyed by resource kind.
 type watchMap map[string]*libweb.Watch
 
-//
 // Provider map keyed by provider.UID.
 type ProviderMap map[types.UID]watchMap
 
-//
 // Watch manager.
 type WatchManager struct {
 	mutex sync.Mutex
@@ -25,7 +22,6 @@ type WatchManager struct {
 	providerMap ProviderMap
 }
 
-//
 // Ensure watch has been created.
 // An existing watch that is not `alive` will be replaced.
 func (m *WatchManager) Ensure(
@@ -64,7 +60,6 @@ func (m *WatchManager) Ensure(
 	return
 }
 
-//
 // A provider has been deleted.
 // Delete associated watches.
 func (m *WatchManager) Deleted(provider *api.Provider) {

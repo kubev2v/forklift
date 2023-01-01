@@ -12,7 +12,6 @@ var Mapper *EventMapper
 
 var log = logging.WithName("ref")
 
-//
 // Build globals.
 func init() {
 	Map = &RefMap{
@@ -23,7 +22,6 @@ func init() {
 	}
 }
 
-//
 // Determine if the ref is `set`.
 // Must not be `nil` with Namespace and Name not "".
 func RefSet(ref *v1.ObjectReference) bool {
@@ -32,7 +30,6 @@ func RefSet(ref *v1.ObjectReference) bool {
 		ref.Name != ""
 }
 
-//
 // Equals comparison.
 // May be used with `nil` pointers.
 func Equals(refA, refB *v1.ObjectReference) bool {

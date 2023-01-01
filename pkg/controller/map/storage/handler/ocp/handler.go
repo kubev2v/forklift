@@ -12,17 +12,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
-//
 // Package logger.
 var log = logging.WithName("storageMap|ocp")
 
-//
 // Provider watch event handler.
 type Handler struct {
 	*handler.Handler
 }
 
-//
 // Ensure watch on storageClass.
 func (r *Handler) Watch(watch *handler.WatchManager) (err error) {
 	w, err := watch.Ensure(
@@ -45,7 +42,6 @@ func (r *Handler) Watch(watch *handler.WatchManager) (err error) {
 	return
 }
 
-//
 // Resource created.
 func (r *Handler) Created(e libweb.Event) {
 	if storageClass, cast := e.Resource.(*ocp.StorageClass); cast {
@@ -53,7 +49,6 @@ func (r *Handler) Created(e libweb.Event) {
 	}
 }
 
-//
 // Resource deleted.
 func (r *Handler) Deleted(e libweb.Event) {
 	if storageClass, cast := e.Resource.(*ocp.StorageClass); cast {
@@ -61,7 +56,6 @@ func (r *Handler) Deleted(e libweb.Event) {
 	}
 }
 
-//
 // Storage changed.
 // Find all of the StorageMap CRs the reference both the
 // provider and the changed storageClass and enqueue reconcile events.

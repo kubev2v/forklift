@@ -7,7 +7,6 @@ import (
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 )
 
-//
 // System.
 type System struct {
 	Product struct {
@@ -22,7 +21,6 @@ type System struct {
 	} `json:"product_info"`
 }
 
-//
 // Ref.
 type Ref struct {
 	Ref string `json:"href"`
@@ -57,26 +55,22 @@ func (b *Base) int64(s string) (v int64) {
 	return
 }
 
-//
 // DataCenter.
 type DataCenter struct {
 	Base
 }
 
-//
 // Apply to (update) the model.
 func (r *DataCenter) ApplyTo(m *model.DataCenter) {
 	m.Name = r.Name
 	m.Description = r.Description
 }
 
-//
 // DataCenter (list).
 type DataCenterList struct {
 	Items []DataCenter `json:"data_center"`
 }
 
-//
 // Cluster.
 type Cluster struct {
 	Base
@@ -88,7 +82,6 @@ type Cluster struct {
 	BiosType string `json:"bios_type"`
 }
 
-//
 // Apply to (update) the model.
 func (r *Cluster) ApplyTo(m *model.Cluster) {
 	m.Name = r.Name
@@ -99,13 +92,11 @@ func (r *Cluster) ApplyTo(m *model.Cluster) {
 	m.BiosType = r.BiosType
 }
 
-//
 // Cluster (list).
 type ClusterList struct {
 	Items []Cluster `json:"cluster"`
 }
 
-//
 // Host.
 type Host struct {
 	Base
@@ -145,7 +136,6 @@ type Host struct {
 	} `json:"network_attachments"`
 }
 
-//
 // Apply to (update) the model.
 func (r *Host) ApplyTo(m *model.Host) {
 	m.Name = r.Name
@@ -188,13 +178,11 @@ func (r *Host) addNICs(m *model.Host) {
 	}
 }
 
-//
 // Host (list).
 type HostList struct {
 	Items []Host `json:"host"`
 }
 
-//
 // VM.
 type VM struct {
 	Base
@@ -340,7 +328,6 @@ type VM struct {
 	} `json:"snapshots"`
 }
 
-//
 // Apply to (update) the model.
 func (r *VM) ApplyTo(m *model.VM) {
 	m.Name = r.Name
@@ -499,13 +486,11 @@ func (r *VM) addSnapshot(m *model.VM) {
 	}
 }
 
-//
 // VM (list).
 type VMList struct {
 	Items []VM `json:"vm"`
 }
 
-//
 // Network.
 type Network struct {
 	Base
@@ -522,7 +507,6 @@ type Network struct {
 	} `json:"vnic_profiles"`
 }
 
-//
 // Apply to (update) the model.
 func (r *Network) ApplyTo(m *model.Network) {
 	m.Name = r.Name
@@ -540,13 +524,11 @@ func (r *Network) setProfiles(m *model.Network) {
 	}
 }
 
-//
 // Network (list).
 type NetworkList struct {
 	Items []Network `json:"network"`
 }
 
-//
 // StorageDomain.
 type StorageDomain struct {
 	Base
@@ -561,7 +543,6 @@ type StorageDomain struct {
 	} `json:"data_centers"`
 }
 
-//
 // Apply to (update) the model.
 func (r *StorageDomain) ApplyTo(m *model.StorageDomain) {
 	m.Name = r.Name
@@ -580,13 +561,11 @@ func (r *StorageDomain) setDataCenter(m *model.StorageDomain) {
 	}
 }
 
-//
 // StorageDomain (list).
 type StorageDomainList struct {
 	Items []StorageDomain `json:"storage_domain"`
 }
 
-//
 // vNIC profile.
 type NICProfile struct {
 	Base
@@ -605,7 +584,6 @@ type NICProfile struct {
 	} `json:"pass_through"`
 }
 
-//
 // Apply to (update) the model.
 func (r *NICProfile) ApplyTo(m *model.NICProfile) {
 	m.Name = r.Name
@@ -631,13 +609,11 @@ func (r *NICProfile) addProperties(m *model.NICProfile) {
 	m.Properties = properties
 }
 
-//
 // NICProfile (list).
 type NICProfileList struct {
 	Items []NICProfile `json:"vnic_profile"`
 }
 
-//
 // Disk profile.
 type DiskProfile struct {
 	Base
@@ -645,7 +621,6 @@ type DiskProfile struct {
 	QoS           Ref `json:"qos"`
 }
 
-//
 // Apply to (update) the model.
 func (r *DiskProfile) ApplyTo(m *model.DiskProfile) {
 	m.Name = r.Name
@@ -654,13 +629,11 @@ func (r *DiskProfile) ApplyTo(m *model.DiskProfile) {
 	m.QoS = r.QoS.ID
 }
 
-//
 // NICProfile (list).
 type DiskProfileList struct {
 	Items []DiskProfile `json:"disk_profile"`
 }
 
-//
 // Disk.
 type Disk struct {
 	Base
@@ -676,7 +649,6 @@ type Disk struct {
 	StorageType string `json:"storage_type"`
 }
 
-//
 // Apply to (update) the model.
 func (r *Disk) ApplyTo(m *model.Disk) {
 	m.Name = r.Name
@@ -698,13 +670,11 @@ func (r *Disk) setStorageDomain(m *model.Disk) {
 	}
 }
 
-//
 // Disk (list).
 type DiskList struct {
 	Items []Disk `json:"disk"`
 }
 
-//
 // Event.
 type Event struct {
 	ID          string `json:"id"`
@@ -738,13 +708,11 @@ func (r *Event) code() (n int) {
 	return
 }
 
-//
 // EVent (list).
 type EventList struct {
 	Items []Event `json:"event"`
 }
 
-//
 // Sort by ID ascending.
 func (r *EventList) sort() {
 	sort.Slice(

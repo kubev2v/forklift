@@ -105,7 +105,6 @@ var osMap = map[string]string{
 	"windows_xp":           "win10",
 }
 
-//
 // oVirt builder.
 type Builder struct {
 	*plancontext.Context
@@ -113,7 +112,6 @@ type Builder struct {
 	macConflictsMap map[string]string
 }
 
-//
 // Get list of destination VMs with mac addresses that would
 // conflict with this VM, if any exist.
 func (r *Builder) macConflicts(vm *model.Workload) (conflictingVMs []string, err error) {
@@ -150,14 +148,12 @@ func (r *Builder) macConflicts(vm *model.Workload) (conflictingVMs []string, err
 	return
 }
 
-//
 // Create DataVolume certificate configmap.
 func (r *Builder) ConfigMap(_ ref.Ref, in *core.Secret, object *core.ConfigMap) (err error) {
 	object.BinaryData["ca.pem"] = in.Data["cacert"]
 	return
 }
 
-//
 // Build the DataVolume credential secret.
 func (r *Builder) Secret(_ ref.Ref, in, object *core.Secret) (err error) {
 	object.StringData = map[string]string{
@@ -167,7 +163,6 @@ func (r *Builder) Secret(_ ref.Ref, in, object *core.Secret) (err error) {
 	return
 }
 
-//
 // Create DataVolume specs for the VM.
 func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap) (dvs []cdi.DataVolumeSpec, err error) {
 	vm := &model.Workload{}
@@ -233,7 +228,6 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 	return
 }
 
-//
 // Create the destination Kubevirt VM.
 func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []core.PersistentVolumeClaim) (err error) {
 	vm := &model.Workload{}
@@ -447,7 +441,6 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 	object.Template.Spec.Domain.Devices.Disks = kDisks
 }
 
-//
 // Build tasks.
 func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 	vm := &model.Workload{}
@@ -477,8 +470,6 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 	return
 }
 
-//
-//
 func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err error) {
 	vm := &model.Workload{}
 	err = r.Source.Inventory.Find(vm, vmRef)
@@ -510,13 +501,11 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 	return
 }
 
-//
 // Return a stable identifier for a DataVolume.
 func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
 	return dv.Spec.Source.Imageio.DiskID
 }
 
-//
 // Return a stable identifier for a PersistentDataVolume.
 func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string {
 	return pvc.Annotations[AnnImportDiskId]

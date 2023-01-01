@@ -39,15 +39,12 @@ const (
 	Name = "networkMap"
 )
 
-//
 // Package logger.
 var log = logging.WithName(Name)
 
-//
 // Application settings.
 var Settings = &settings.Settings
 
-//
 // Creates a new Map Controller and adds it to the Manager.
 func Add(mgr manager.Manager) error {
 	reconciler := &Reconciler{
@@ -107,13 +104,11 @@ func Add(mgr manager.Manager) error {
 
 var _ reconcile.Reconciler = &Reconciler{}
 
-//
 // Reconciles a Map object.
 type Reconciler struct {
 	base.Reconciler
 }
 
-//
 // Reconcile a Map CR.
 // Note: Must not a pointer receiver to ensure that the
 // logger and other state is not shared.

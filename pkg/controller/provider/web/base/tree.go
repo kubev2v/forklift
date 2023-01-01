@@ -9,13 +9,11 @@ import (
 
 var log = logging.WithName("web|tree")
 
-//
 // Node builder.
 type NodeBuilder interface {
 	Node(p *TreeNode, m libmodel.Model) *TreeNode
 }
 
-//
 // Tree.
 type Tree struct {
 	NodeBuilder
@@ -23,7 +21,6 @@ type Tree struct {
 	Depth int
 }
 
-//
 // Build the tree
 func (r *Tree) Build(m model.Model, navigator model.BranchNavigator) (*TreeNode, error) {
 	root := r.Node(nil, m)
@@ -57,7 +54,6 @@ func (r *Tree) Build(m model.Model, navigator model.BranchNavigator) (*TreeNode,
 	return root, nil
 }
 
-//
 // Ancestry (Tree).
 func (r *Tree) Ancestry(leaf model.Model, navigator model.ParentNavigator) (*TreeNode, error) {
 	root := &TreeNode{}
@@ -90,7 +86,6 @@ func (r *Tree) Ancestry(leaf model.Model, navigator model.ParentNavigator) (*Tre
 	return root, nil
 }
 
-//
 // Tree node resource.
 type TreeNode struct {
 	// Parent node.

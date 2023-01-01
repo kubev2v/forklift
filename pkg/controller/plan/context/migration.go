@@ -11,7 +11,6 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-//
 // Not enough data to build the context.
 type NotEnoughDataError struct {
 }
@@ -20,7 +19,6 @@ func (e NotEnoughDataError) Error() string {
 	return "Not enough data to build plan context."
 }
 
-//
 // Factory.
 func New(
 	client k8sclient.Client, plan *api.Plan, log logr.Logger) (ctx *Context, err error) {
@@ -39,7 +37,6 @@ func New(
 	return
 }
 
-//
 // Plan execution context.
 type Context struct {
 	// Host client.
@@ -65,7 +62,6 @@ type Context struct {
 	Log logr.Logger
 }
 
-//
 // Build.
 func (r *Context) build() (err error) {
 	r.Map.Network = r.Plan.Referenced.Map.Network
@@ -93,7 +89,6 @@ func (r *Context) build() (err error) {
 	return
 }
 
-//
 // Set the migration.
 // This will update the logger context.
 func (r *Context) SetMigration(migration *api.Migration) {
@@ -108,7 +103,6 @@ func (r *Context) SetMigration(migration *api.Migration) {
 			migration.Name))
 }
 
-//
 // Source.
 type Source struct {
 	// Provider
@@ -119,10 +113,10 @@ type Source struct {
 	Secret *core.Secret
 }
 
-//
 // Build.
 // Returns: NotEnoughDataError when:
-//   Plan.Referenced.Source is not complete.
+//
+//	Plan.Referenced.Source is not complete.
 func (r *Source) build(ctx *Context) (err error) {
 	r.Provider = ctx.Plan.Referenced.Provider.Source
 	if r.Provider == nil {
@@ -161,10 +155,10 @@ type Destination struct {
 	Inventory web.Client
 }
 
-//
 // Build.
 // Returns: NotEnoughDataError when:
-//   Plan.Referenced.Destination is not complete.
+//
+//	Plan.Referenced.Destination is not complete.
 func (r *Destination) build(ctx *Context) (err error) {
 	r.Provider = ctx.Plan.Referenced.Provider.Destination
 	if r.Provider == nil {
@@ -206,7 +200,6 @@ func (r *Destination) build(ctx *Context) (err error) {
 	return
 }
 
-//
 // Find a Hook by ref.
 func (r *Context) FindHook(ref core.ObjectReference) (hook *api.Hook, found bool) {
 	for _, h := range r.Hooks {

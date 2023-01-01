@@ -13,14 +13,12 @@ import (
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 )
 
-//
 // Package level mutex to ensure that
 // multiple concurrent reconciles don't
 // attempt to schedule VMs into the same
 // slots.
 var mutex sync.Mutex
 
-//
 // Scheduler for migrations from ESX hosts.
 type Scheduler struct {
 	*plancontext.Context
@@ -35,7 +33,6 @@ type Scheduler struct {
 	pending map[string][]*pendingVM
 }
 
-//
 // Convenience struct to package a
 // VMStatus with a cost that is calculated
 // from the inventory VM object.
@@ -44,7 +41,6 @@ type pendingVM struct {
 	cost   int
 }
 
-//
 // Return the next VM to migrate.
 func (r *Scheduler) Next() (vm *plan.VMStatus, hasNext bool, err error) {
 	mutex.Lock()
@@ -70,7 +66,6 @@ func (r *Scheduler) Next() (vm *plan.VMStatus, hasNext bool, err error) {
 	return
 }
 
-//
 // Determine how much host capacity is occupied
 // by running migrations across all plans for
 // the same provider, and determine which
@@ -96,7 +91,6 @@ func (r *Scheduler) buildSchedule() (err error) {
 	return
 }
 
-//
 // Build the map of the number of disks that
 // are currently in flight for each host.
 func (r *Scheduler) buildInFlight() (err error) {
@@ -160,7 +154,6 @@ func (r *Scheduler) buildInFlight() (err error) {
 	return
 }
 
-//
 // Build the map of pending VMs belonging to each host.
 func (r *Scheduler) buildPending() (err error) {
 	r.pending = make(map[string][]*pendingVM)
@@ -183,7 +176,6 @@ func (r *Scheduler) buildPending() (err error) {
 	return
 }
 
-//
 // Return a map of all the VMs that could be scheduled
 // based on the available host capacities.
 func (r *Scheduler) schedulable() (schedulable map[string][]*pendingVM) {

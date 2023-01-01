@@ -5,7 +5,6 @@ import (
 	"strings"
 )
 
-//
 // Labels
 const (
 	// = Application
@@ -18,7 +17,6 @@ var (
 	Application = ""
 )
 
-//
 // Build unique reference label for an object.
 // Format: <kind> = <uid>
 func Label(object v1.Object) (label, uid string) {
@@ -27,7 +25,6 @@ func Label(object v1.Object) (label, uid string) {
 	return
 }
 
-//
 // Build reference labels for an object.
 // Includes both `Application` and unique labels.
 func Labels(object v1.Object) map[string]string {

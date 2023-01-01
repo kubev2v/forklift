@@ -1,4 +1,3 @@
-//
 // Web stack integration test.
 package main
 
@@ -22,7 +21,6 @@ import (
 
 var log = logging.WithName("TESTER")
 
-//
 // Model object.
 type Model struct {
 	ID   int    `sql:"pk"`
@@ -49,7 +47,6 @@ func (m *Model) Labels() model.Labels {
 	return nil
 }
 
-//
 // Watch (event) handler.
 type EventHandler struct {
 	options web.WatchOptions
@@ -171,7 +168,6 @@ func (h *Endpoint) AddRoutes(e *gin.Engine) {
 	e.GET("/models/:id", h.Get)
 }
 
-//
 // Data collector.
 type Collector struct {
 	db model.DB
@@ -309,7 +305,6 @@ func wait(d time.Duration) {
 	time.Sleep(d * time.Millisecond)
 }
 
-//
 // Basic test.
 func testA(client *web.Client) {
 	w := watch(client, true)
@@ -319,7 +314,6 @@ func testA(client *web.Client) {
 	wait(500)
 }
 
-//
 // Test client watch normal lifecycle.
 func testB(client *web.Client, n int) {
 	for i := 0; i < n; i++ {
@@ -329,7 +323,6 @@ func testB(client *web.Client, n int) {
 	}
 }
 
-//
 // Test watch client finalizer.
 func testC(client *web.Client, n int) {
 	for i := 0; i < n; i++ {
@@ -342,7 +335,6 @@ func testC(client *web.Client, n int) {
 	}
 }
 
-//
 // Watch no snapshot
 func testD(db model.DB, client *web.Client) {
 	w := watch(client, false)
@@ -362,7 +354,6 @@ func testD(db model.DB, client *web.Client) {
 	wait(500)
 }
 
-//
 // Test close Db.
 func testE(db model.DB, client *web.Client) {
 	w := watch(client, true)
@@ -371,7 +362,6 @@ func testE(db model.DB, client *web.Client) {
 	_ = db.Close(false)
 }
 
-//
 // Main.
 func main() {
 	db, _ := setup()

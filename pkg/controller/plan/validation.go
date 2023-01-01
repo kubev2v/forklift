@@ -20,7 +20,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-//
 // Types
 const (
 	WarmMigrationNotReady        = "WarmMigrationNotReady"
@@ -54,7 +53,6 @@ const (
 	Archived                     = "Archived"
 )
 
-//
 // Categories
 const (
 	Required = libcnd.Required
@@ -64,7 +62,6 @@ const (
 	Warn     = libcnd.Warn
 )
 
-//
 // Reasons
 const (
 	NotSet            = "NotSet"
@@ -78,14 +75,12 @@ const (
 	InMaintenanceMode = "InMaintenanceMode"
 )
 
-//
 // Statuses
 const (
 	True  = libcnd.True
 	False = libcnd.False
 )
 
-//
 // Validate the plan resource.
 func (r *Reconciler) validate(plan *api.Plan) error {
 	// Provider.
@@ -143,7 +138,6 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	return nil
 }
 
-//
 // Validate that warm migration is supported from the source provider.
 func (r *Reconciler) validateWarmMigration(plan *api.Plan) (err error) {
 	if !plan.Spec.Warm {
@@ -173,7 +167,6 @@ func (r *Reconciler) validateWarmMigration(plan *api.Plan) (err error) {
 	return
 }
 
-//
 // Validate the target namespace.
 func (r *Reconciler) validateTargetNamespace(plan *api.Plan) (err error) {
 	newCnd := libcnd.Condition{
@@ -194,7 +187,6 @@ func (r *Reconciler) validateTargetNamespace(plan *api.Plan) (err error) {
 	return
 }
 
-//
 // Validate network mapping ref.
 func (r *Reconciler) validateNetworkMap(plan *api.Plan) (err error) {
 	ref := plan.Spec.Map.Network
@@ -239,7 +231,6 @@ func (r *Reconciler) validateNetworkMap(plan *api.Plan) (err error) {
 	return
 }
 
-//
 // Validate storage mapping ref.
 func (r *Reconciler) validateStorageMap(plan *api.Plan) (err error) {
 	ref := plan.Spec.Map.Storage
@@ -284,7 +275,6 @@ func (r *Reconciler) validateStorageMap(plan *api.Plan) (err error) {
 	return
 }
 
-//
 // Validate listed VMs.
 func (r *Reconciler) validateVM(plan *api.Plan) error {
 	if plan.Status.HasCondition(Executing) {
@@ -505,7 +495,6 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	return nil
 }
 
-//
 // Validate transfer network selection.
 func (r *Reconciler) validateTransferNetwork(plan *api.Plan) (err error) {
 	if plan.Spec.TransferNetwork == nil {

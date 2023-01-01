@@ -106,7 +106,6 @@ func literal(s string) *regexp.Regexp {
 	return re
 }
 
-//
 // expression defines a full expression, where each regular expression must
 // follow the previous.
 func expression(res ...*regexp.Regexp) *regexp.Regexp {
@@ -118,33 +117,28 @@ func expression(res ...*regexp.Regexp) *regexp.Regexp {
 	return match(s)
 }
 
-//
 // optional wraps the expression in a non-capturing group and makes the
 // production optional.
 func optional(res ...*regexp.Regexp) *regexp.Regexp {
 	return match(group(expression(res...)).String() + `?`)
 }
 
-//
 // repeated wraps the regexp in a non-capturing group to get one or more
 // matches.
 func repeated(res ...*regexp.Regexp) *regexp.Regexp {
 	return match(group(expression(res...)).String() + `+`)
 }
 
-//
 // group wraps the regexp in a non-capturing group.
 func group(res ...*regexp.Regexp) *regexp.Regexp {
 	return match(`(?:` + expression(res...).String() + `)`)
 }
 
-//
 // capture wraps the expression in a capturing group.
 func capture(res ...*regexp.Regexp) *regexp.Regexp {
 	return match(`(` + expression(res...).String() + `)`)
 }
 
-//
 // anchored anchors the regular expression by adding start and end delimiters.
 func anchored(res ...*regexp.Regexp) *regexp.Regexp {
 	return match(`^` + expression(res...).String() + `$`)

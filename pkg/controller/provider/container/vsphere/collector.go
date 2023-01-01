@@ -25,7 +25,6 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//
 // Settings
 const (
 	// Connect retry delay.
@@ -34,7 +33,6 @@ const (
 	MaxObjectUpdates = 10000
 )
 
-//
 // Types
 const (
 	Folder          = "Folder"
@@ -49,7 +47,6 @@ const (
 	Datastore       = "Datastore"
 )
 
-//
 // Fields
 const (
 	// Common
@@ -123,13 +120,11 @@ const (
 	fIsTemplate          = "config.template"
 )
 
-//
 // Selections
 const (
 	TraverseFolders = "traverseFolders"
 )
 
-//
 // Actions
 const (
 	Enter  = "enter"
@@ -138,7 +133,6 @@ const (
 	Assign = "assign"
 )
 
-//
 // Datacenter/VM traversal Spec.
 var TsDatacenterVM = &types.TraversalSpec{
 	Type: Datacenter,
@@ -150,7 +144,6 @@ var TsDatacenterVM = &types.TraversalSpec{
 	},
 }
 
-//
 // Datacenter/Host traversal Spec.
 var TsDatacenterHost = &types.TraversalSpec{
 	Type: Datacenter,
@@ -162,7 +155,6 @@ var TsDatacenterHost = &types.TraversalSpec{
 	},
 }
 
-//
 // ComputeResource/Host traversal Spec.
 var TsComputeResourceHost = &types.TraversalSpec{
 	Type: ComputeResource,
@@ -174,7 +166,6 @@ var TsComputeResourceHost = &types.TraversalSpec{
 	},
 }
 
-//
 // Datacenter/Host traversal Spec.
 var TsDatacenterNet = &types.TraversalSpec{
 	Type: Datacenter,
@@ -186,7 +177,6 @@ var TsDatacenterNet = &types.TraversalSpec{
 	},
 }
 
-//
 // Datacenter/Datastore traversal Spec.
 var TsDatacenterDatastore = &types.TraversalSpec{
 	Type: Datacenter,
@@ -198,7 +188,6 @@ var TsDatacenterDatastore = &types.TraversalSpec{
 	},
 }
 
-//
 // Root Folder traversal Spec
 var TsRootFolder = &types.TraversalSpec{
 	SelectionSpec: types.SelectionSpec{
@@ -218,7 +207,6 @@ var TsRootFolder = &types.TraversalSpec{
 	},
 }
 
-//
 // A VMWare collector.
 type Collector struct {
 	// The vsphere url.
@@ -239,7 +227,6 @@ type Collector struct {
 	parity bool
 }
 
-//
 // New collector.
 func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) *Collector {
 	nlog := logging.WithName("collector|vsphere").WithValues(
@@ -256,7 +243,6 @@ func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) *Collector
 	}
 }
 
-//
 // The name.
 func (r *Collector) Name() string {
 	url, err := liburl.Parse(r.url)
@@ -267,31 +253,26 @@ func (r *Collector) Name() string {
 	return r.url
 }
 
-//
 // The owner.
 func (r *Collector) Owner() meta.Object {
 	return r.provider
 }
 
-//
 // Get the DB.
 func (r *Collector) DB() libmodel.DB {
 	return r.db
 }
 
-//
 // Reset.
 func (r *Collector) Reset() {
 	r.parity = false
 }
 
-//
 // Reset.
 func (r *Collector) HasParity() bool {
 	return r.parity
 }
 
-//
 // Test connect/logout.
 func (r *Collector) Test() (status int, err error) {
 	ctx := context.Background()
@@ -305,7 +286,6 @@ func (r *Collector) Test() (status int, err error) {
 	return
 }
 
-//
 // Start the collector.
 func (r *Collector) Start() error {
 	ctx := context.Background()
@@ -337,7 +317,6 @@ func (r *Collector) Start() error {
 	return nil
 }
 
-//
 // Shutdown the collector.
 func (r *Collector) Shutdown() {
 	r.log.Info("Shutdown.")
@@ -346,10 +325,10 @@ func (r *Collector) Shutdown() {
 	}
 }
 
-//
 // Get object updates.
 //  1. connect.
 //  2. apply updates.
+//
 // Blocks waiting on updates until canceled.
 func (r *Collector) getUpdates(ctx context.Context) error {
 	_, err := r.connect(ctx)
@@ -446,7 +425,6 @@ func (r *Collector) getUpdates(ctx context.Context) error {
 	return nil
 }
 
-//
 // Add model watches.
 func (r *Collector) watch() (list []*libmodel.Watch) {
 	// Cluster
@@ -496,7 +474,6 @@ func (r *Collector) watch() (list []*libmodel.Watch) {
 	return
 }
 
-//
 // Build the client.
 func (r *Collector) connect(ctx context.Context) (status int, err error) {
 	r.close()
@@ -531,7 +508,6 @@ func (r *Collector) connect(ctx context.Context) (status int, err error) {
 	return http.StatusOK, nil
 }
 
-//
 // Close connections.
 func (r *Collector) close() {
 	if r.client != nil {
@@ -541,7 +517,6 @@ func (r *Collector) close() {
 	}
 }
 
-//
 // User.
 func (r *Collector) user() string {
 	if user, found := r.secret.Data["user"]; found {
@@ -551,7 +526,6 @@ func (r *Collector) user() string {
 	return ""
 }
 
-//
 // Password.
 func (r *Collector) password() string {
 	if password, found := r.secret.Data["password"]; found {
@@ -561,7 +535,6 @@ func (r *Collector) password() string {
 	return ""
 }
 
-//
 // Thumbprint.
 func (r *Collector) thumbprint() string {
 	if password, found := r.secret.Data["thumbprint"]; found {
@@ -571,7 +544,6 @@ func (r *Collector) thumbprint() string {
 	return ""
 }
 
-//
 // Build the object Spec filter.
 func (r *Collector) filter(pc *property.Collector) *property.WaitFilter {
 	return &property.WaitFilter{
@@ -588,7 +560,6 @@ func (r *Collector) filter(pc *property.Collector) *property.WaitFilter {
 	}
 }
 
-//
 // Build the object Spec.
 func (r *Collector) objectSpec() types.ObjectSpec {
 	return types.ObjectSpec{
@@ -599,7 +570,6 @@ func (r *Collector) objectSpec() types.ObjectSpec {
 	}
 }
 
-//
 // Build the property Spec.
 func (r *Collector) propertySpec() []types.PropertySpec {
 	return []types.PropertySpec{
@@ -739,7 +709,6 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 	}
 }
 
-//
 // Apply updates.
 func (r *Collector) apply(ctx context.Context, tx *libmodel.Tx, updates []types.ObjectUpdate) (err error) {
 	for _, u := range updates {
@@ -760,7 +729,6 @@ func (r *Collector) apply(ctx context.Context, tx *libmodel.Tx, updates []types.
 	return
 }
 
-//
 // Select the appropriate adapter.
 func (r *Collector) selectAdapter(u types.ObjectUpdate) (Adapter, bool) {
 	var adapter Adapter
@@ -857,7 +825,6 @@ func (r *Collector) selectAdapter(u types.ObjectUpdate) (Adapter, bool) {
 	return adapter, true
 }
 
-//
 // Object created.
 func (r Collector) applyEnter(tx *libmodel.Tx, u types.ObjectUpdate) error {
 	adapter, selected := r.selectAdapter(u)
@@ -874,7 +841,6 @@ func (r Collector) applyEnter(tx *libmodel.Tx, u types.ObjectUpdate) error {
 	return nil
 }
 
-//
 // Object modified.
 func (r Collector) applyModify(tx *libmodel.Tx, u types.ObjectUpdate) error {
 	adapter, selected := r.selectAdapter(u)
@@ -895,7 +861,6 @@ func (r Collector) applyModify(tx *libmodel.Tx, u types.ObjectUpdate) error {
 	return nil
 }
 
-//
 // Object deleted.
 func (r Collector) applyLeave(tx *libmodel.Tx, u types.ObjectUpdate) error {
 	var deleted model.Model

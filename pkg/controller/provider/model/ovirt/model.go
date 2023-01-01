@@ -5,7 +5,6 @@ import (
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 )
 
-//
 // Errors
 var NotFound = libmodel.NotFound
 
@@ -15,14 +14,12 @@ const (
 	MaxDetail = base.MaxDetail
 )
 
-//
 // Types
 type Model = base.Model
 type ListOptions = base.ListOptions
 type Concern = base.Concern
 type Ref = base.Ref
 
-//
 // Base oVirt model.
 type Base struct {
 	// Managed object ID.
@@ -35,13 +32,11 @@ type Base struct {
 	Revision int64 `sql:"incremented,d0,index(revision)"`
 }
 
-//
 // Get the PK.
 func (m *Base) Pk() string {
 	return m.ID
 }
 
-//
 // String representation.
 func (m *Base) String() string {
 	return m.ID
@@ -162,7 +157,6 @@ type VM struct {
 	OSType                      string           `sql:""`
 }
 
-//
 // Determine if current revision has been validated.
 func (m *VM) Validated() bool {
 	return m.RevisionValidated == m.Revision

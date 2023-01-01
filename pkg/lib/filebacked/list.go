@@ -12,49 +12,54 @@ list.Append(object)
 //
 // Iterate the list.
 itr := list.Iter()
-for i := 0; i < itr.Len(); i++ {
-    person := itr.At(i)
-    ...
-}
+
+	for i := 0; i < itr.Len(); i++ {
+	    person := itr.At(i)
+	    ...
+	}
 
 //
 // Iterate the list.
 itr := list.Iter()
-for i := 0; i < itr.Len(); i++ {
-    person := Person{}
-    itr.AtWith(i, &person))
-    ...
-}
+
+	for i := 0; i < itr.Len(); i++ {
+	    person := Person{}
+	    itr.AtWith(i, &person))
+	    ...
+	}
 
 //
 // Iterate the list.
 itr := list.Iter()
-for {
-    object, hasNext := itr.Next()
-    if !hasNext {
-        break
-    }
-    ...
-}
+
+	for {
+	    object, hasNext := itr.Next()
+	    if !hasNext {
+	        break
+	    }
+	    ...
+	}
 
 //
 // Iterate the list.
 itr := list.Iter()
-for object, hasNext := itr.Next(); hasNext; object, hasNext = itr.Next() {
-    ...
-}
+
+	for object, hasNext := itr.Next(); hasNext; object, hasNext = itr.Next() {
+	    ...
+	}
 
 //
 // Iterate the list.
 itr := list.Iter()
-for {
-    person := Person{}
-    hasNext := itr.NextWith(&person))
-    if !hasNext {
-        break
-    }
-    ...
-}
+
+	for {
+	    person := Person{}
+	    hasNext := itr.NextWith(&person))
+	    if !hasNext {
+	        break
+	    }
+	    ...
+	}
 */
 package filebacked
 
@@ -62,7 +67,6 @@ import (
 	"runtime"
 )
 
-//
 // List factory.
 func NewList() (list *List) {
 	list = &List{}
@@ -74,14 +78,12 @@ func NewList() (list *List) {
 	return
 }
 
-//
 // File-backed list.
 type List struct {
 	// File writer.
 	writer Writer
 }
 
-//
 // Append an object.
 func (l *List) Append(object interface{}) {
 	switch object.(type) {
@@ -100,7 +102,6 @@ func (l *List) Append(object interface{}) {
 	}
 }
 
-//
 // Length.
 // Number of objects.
 func (l *List) Len() int {
@@ -121,7 +122,6 @@ func (l *List) AtWith(index int, object interface{}) {
 	return
 }
 
-//
 // Get an iterator.
 func (l *List) Iter() (itr Iterator) {
 	if l.Len() > 0 {
@@ -135,7 +135,6 @@ func (l *List) Iter() (itr Iterator) {
 	return
 }
 
-//
 // Close (delete) the list.
 func (l *List) Close() {
 	l.writer.Close()

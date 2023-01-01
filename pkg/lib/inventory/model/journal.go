@@ -10,11 +10,9 @@ import (
 	"sync"
 )
 
-//
 // Serial number pool.
 var serial Serial
 
-//
 // Event Actions.
 var (
 	Started uint8 = 0x00
@@ -26,7 +24,6 @@ var (
 	Deleted uint8 = 0x40
 )
 
-//
 // Model event.
 type Event struct {
 	// ID.
@@ -41,7 +38,6 @@ type Event struct {
 	Updated Model
 }
 
-//
 // Get whether the event has the specified label.
 func (r *Event) HasLabel(label string) bool {
 	for _, l := range r.Labels {
@@ -53,7 +49,6 @@ func (r *Event) HasLabel(label string) bool {
 	return false
 }
 
-//
 // String representation.
 func (r *Event) String() string {
 	action := "unknown"
@@ -82,12 +77,12 @@ func (r *Event) String() string {
 		model)
 }
 
-//
 // Append self to the list.
 // The protocol is to write:
-//   Event (self)
-//   Event.Model
-//   Event.Updated (optional)
+//
+//	Event (self)
+//	Event.Model
+//	Event.Updated (optional)
 func (r *Event) append(list *fb.List) {
 	list.Append(Event{
 		ID:     r.ID,
@@ -100,12 +95,12 @@ func (r *Event) append(list *fb.List) {
 	}
 }
 
-//
 // Read self from the iterator.
 // The protocol is to read:
-//   Event (self)
-//   Event.Model
-//   Event.Updated (optional)
+//
+//	Event (self)
+//	Event.Model
+//	Event.Updated (optional)
 func (r *Event) next(itr fb.Iterator) (hasNext bool) {
 	hasNext = itr.NextWith(r)
 	if !hasNext {
@@ -131,7 +126,6 @@ func (r *Event) next(itr fb.Iterator) (hasNext bool) {
 	return
 }
 
-//
 // Watch options.
 type WatchOptions struct {
 	// Initial snapshot.
@@ -139,7 +133,6 @@ type WatchOptions struct {
 	Snapshot bool
 }
 
-//
 // Event handler.
 type EventHandler interface {
 	// Watch options.
@@ -162,7 +155,6 @@ type EventHandler interface {
 	End()
 }
 
-//
 // Model event watch.
 type Watch struct {
 	// Model to be watched.
@@ -183,7 +175,6 @@ type Watch struct {
 	done bool
 }
 
-//
 // String representation.
 func (w *Watch) String() string {
 	kind := ref.ToKind(w.Model)
@@ -193,25 +184,21 @@ func (w *Watch) String() string {
 		kind)
 }
 
-//
 // End the watch.
 func (w *Watch) End() {
 	w.journal.End(w)
 }
 
-//
 // The watch has not ended.
 func (w *Watch) Alive() bool {
 	return !w.done
 }
 
-//
 // Match by model `kind`.
 func (w *Watch) Match(model Model) bool {
 	return ref.ToKind(w.Model) == ref.ToKind(model)
 }
 
-//
 // Queue event.
 func (w *Watch) notify(itr fb.Iterator) {
 	defer func() {
@@ -226,7 +213,6 @@ func (w *Watch) notify(itr fb.Iterator) {
 	}
 }
 
-//
 // Run the watch.
 // Forward events to the `handler`.
 func (w *Watch) Start(snapshot fb.Iterator) {
@@ -291,7 +277,6 @@ func (w *Watch) Start(snapshot fb.Iterator) {
 	go run()
 }
 
-//
 // Terminate.
 func (w *Watch) terminate() {
 	if w.started {
@@ -299,7 +284,6 @@ func (w *Watch) terminate() {
 	}
 }
 
-//
 // DB journal.
 // Provides model watch events.
 type Journal struct {
@@ -310,7 +294,6 @@ type Journal struct {
 	watches []*Watch
 }
 
-//
 // Watch a `watch` of the specified model.
 // The returned watch has not been started.
 // See: Watch.Start().
@@ -341,7 +324,6 @@ func (r *Journal) Watch(model Model, handler EventHandler) (*Watch, error) {
 	return watch, nil
 }
 
-//
 // End watch.
 func (r *Journal) End(watch *Watch) {
 	r.mutex.Lock()
@@ -362,7 +344,6 @@ func (r *Journal) End(watch *Watch) {
 	r.watches = kept
 }
 
-//
 // Transaction committed.
 // Recorded (staged) events are forwarded to watches.
 func (r *Journal) Report(staged *fb.List) {
@@ -373,7 +354,6 @@ func (r *Journal) Report(staged *fb.List) {
 	}
 }
 
-//
 // Close the journal.
 // End all watches.
 func (r *Journal) Close() (err error) {
@@ -386,7 +366,6 @@ func (r *Journal) Close() (err error) {
 	return
 }
 
-//
 // Model is being watched.
 // Determine if there a watch interested in the model.
 func (r *Journal) hasWatch(model Model) bool {
@@ -399,7 +378,6 @@ func (r *Journal) hasWatch(model Model) bool {
 	return false
 }
 
-//
 // Stock event handler.
 // Provides default event methods.
 type StockEventHandler struct{}
@@ -409,42 +387,33 @@ func (r *StockEventHandler) Options() WatchOptions {
 	return WatchOptions{}
 }
 
-//
 // Watch has started.
 func (r *StockEventHandler) Started(uint64) {}
 
-//
 // Watch has parity.
 func (r *StockEventHandler) Parity() {}
 
-//
 // A model has been created.
 func (r *StockEventHandler) Created(Event) {}
 
-//
 // A model has been updated.
 func (r *StockEventHandler) Updated(Event) {}
 
-//
 // A model has been deleted.
 func (r *StockEventHandler) Deleted(Event) {}
 
-//
 // An error has occurred delivering an event.
 func (r *StockEventHandler) Error(error) {}
 
-//
 // An event watch has ended.
 func (r *StockEventHandler) End() {}
 
-//
 // Serial number pool.
 type Serial struct {
 	mutex sync.Mutex
 	pool  map[int]uint64
 }
 
-//
 // Next serial number.
 func (r *Serial) next(key int) (sn uint64) {
 	r.mutex.Lock()

@@ -17,7 +17,6 @@ const (
 	EnvLevel       = "LOG_LEVEL"
 )
 
-//
 // Settings.
 var Settings _Settings
 
@@ -25,7 +24,6 @@ func init() {
 	Settings.Load()
 }
 
-//
 // Logger factory.
 var Factory Builder
 
@@ -33,7 +31,6 @@ func init() {
 	Factory = &ZapBuilder{}
 }
 
-//
 // Logger
 // Delegates functionality to the wrapped `Real` logger.
 // Provides:
@@ -48,7 +45,6 @@ type Logger struct {
 	level int
 }
 
-//
 // Get a named logger.
 func WithName(name string, kvpair ...interface{}) *Logger {
 	l := &Logger{
@@ -61,7 +57,6 @@ func WithName(name string, kvpair ...interface{}) *Logger {
 	return l
 }
 
-//
 // Logs at info.
 func (l *Logger) Info(message string, kvpair ...interface{}) {
 	if Settings.allowed(l.level) {
@@ -69,7 +64,6 @@ func (l *Logger) Info(message string, kvpair ...interface{}) {
 	}
 }
 
-//
 // Logs an error.
 func (l *Logger) Error(err error, message string, kvpair ...interface{}) {
 	if err == nil {
@@ -109,19 +103,16 @@ func (l *Logger) Error(err error, message string, kvpair ...interface{}) {
 	l.Real.Error(err, message, kvpair...)
 }
 
-//
 // Logs an error without a description.
 func (l *Logger) Trace(err error, kvpair ...interface{}) {
 	l.Error(err, None, kvpair...)
 }
 
-//
 // Get whether logger is enabled.
 func (l *Logger) Enabled() bool {
 	return l.Real.Enabled()
 }
 
-//
 // Get logger with verbosity level.
 func (l *Logger) V(level int) logr.InfoLogger {
 	return &Logger{
@@ -131,7 +122,6 @@ func (l *Logger) V(level int) logr.InfoLogger {
 	}
 }
 
-//
 // Get logger with name.
 func (l *Logger) WithName(name string) logr.Logger {
 	return &Logger{
@@ -141,7 +131,6 @@ func (l *Logger) WithName(name string) logr.Logger {
 	}
 }
 
-//
 // Get logger with values.
 func (l *Logger) WithValues(kvpair ...interface{}) logr.Logger {
 	return &Logger{
@@ -151,7 +140,6 @@ func (l *Logger) WithValues(kvpair ...interface{}) logr.Logger {
 	}
 }
 
-//
 // Package settings.
 type _Settings struct {
 	// Debug threshold.
@@ -165,7 +153,6 @@ type _Settings struct {
 	Level int
 }
 
-//
 // Determine development logger.
 func (r *_Settings) Load() {
 	r.DebugThreshold = 4
@@ -183,13 +170,11 @@ func (r *_Settings) Load() {
 	}
 }
 
-//
 // The level is at (or above) the level setting.
 func (r *_Settings) allowed(level int) bool {
 	return r.Level >= level
 }
 
-//
 // The level is at or above the debug threshold.
 func (r *_Settings) atDebug(level int) bool {
 	return level >= r.DebugThreshold

@@ -7,7 +7,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
-//
 // Handler factory.
 func New(
 	client client.Client,

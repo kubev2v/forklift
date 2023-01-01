@@ -15,20 +15,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
-//
 // StorageClass
 type StorageClass struct {
 	libocp.BaseCollection
 	log logr.Logger
 }
 
-//
 // Get the kubernetes object being collected.
 func (r *StorageClass) Object() runtime.Object {
 	return &storage.StorageClass{}
 }
 
-//
 // Reconcile.
 // Achieve initial consistency.
 func (r *StorageClass) Reconcile(ctx context.Context) (err error) {
@@ -71,7 +68,6 @@ func (r *StorageClass) Reconcile(ctx context.Context) (err error) {
 	return
 }
 
-//
 // Resource created watch event.
 func (r *StorageClass) Create(e event.CreateEvent) bool {
 	object, cast := e.Object.(*storage.StorageClass)
@@ -85,7 +81,6 @@ func (r *StorageClass) Create(e event.CreateEvent) bool {
 	return false
 }
 
-//
 // Resource updated watch event.
 func (r *StorageClass) Update(e event.UpdateEvent) bool {
 	object, cast := e.ObjectNew.(*storage.StorageClass)
@@ -99,7 +94,6 @@ func (r *StorageClass) Update(e event.UpdateEvent) bool {
 	return false
 }
 
-//
 // Resource deleted watch event.
 func (r *StorageClass) Delete(e event.DeleteEvent) bool {
 	object, cast := e.Object.(*storage.StorageClass)
@@ -113,26 +107,22 @@ func (r *StorageClass) Delete(e event.DeleteEvent) bool {
 	return false
 }
 
-//
 // Ignored.
 func (r *StorageClass) Generic(e event.GenericEvent) bool {
 	return false
 }
 
-//
 // NetworkAttachmentDefinition
 type NetworkAttachmentDefinition struct {
 	libocp.BaseCollection
 	log logr.Logger
 }
 
-//
 // Get the kubernetes object being collected.
 func (r *NetworkAttachmentDefinition) Object() runtime.Object {
 	return &net.NetworkAttachmentDefinition{}
 }
 
-//
 // Reconcile.
 // Achieve initial consistency.
 func (r *NetworkAttachmentDefinition) Reconcile(ctx context.Context) (err error) {
@@ -175,7 +165,6 @@ func (r *NetworkAttachmentDefinition) Reconcile(ctx context.Context) (err error)
 	return
 }
 
-//
 // Resource created watch event.
 func (r *NetworkAttachmentDefinition) Create(e event.CreateEvent) bool {
 	object, cast := e.Object.(*net.NetworkAttachmentDefinition)
@@ -189,7 +178,6 @@ func (r *NetworkAttachmentDefinition) Create(e event.CreateEvent) bool {
 	return false
 }
 
-//
 // Resource updated watch event.
 func (r *NetworkAttachmentDefinition) Update(e event.UpdateEvent) bool {
 	object, cast := e.ObjectNew.(*net.NetworkAttachmentDefinition)
@@ -203,7 +191,6 @@ func (r *NetworkAttachmentDefinition) Update(e event.UpdateEvent) bool {
 	return false
 }
 
-//
 // Resource deleted watch event.
 func (r *NetworkAttachmentDefinition) Delete(e event.DeleteEvent) bool {
 	object, cast := e.Object.(*net.NetworkAttachmentDefinition)
@@ -217,26 +204,22 @@ func (r *NetworkAttachmentDefinition) Delete(e event.DeleteEvent) bool {
 	return false
 }
 
-//
 // Ignored.
 func (r *NetworkAttachmentDefinition) Generic(e event.GenericEvent) bool {
 	return false
 }
 
-//
 // Namespace
 type Namespace struct {
 	libocp.BaseCollection
 	log logr.Logger
 }
 
-//
 // Get the kubernetes object being collected.
 func (r *Namespace) Object() runtime.Object {
 	return &core.Namespace{}
 }
 
-//
 // Reconcile.
 // Achieve initial consistency.
 func (r *Namespace) Reconcile(ctx context.Context) (err error) {
@@ -279,7 +262,6 @@ func (r *Namespace) Reconcile(ctx context.Context) (err error) {
 	return
 }
 
-//
 // Resource created watch event.
 func (r *Namespace) Create(e event.CreateEvent) bool {
 	object, cast := e.Object.(*core.Namespace)
@@ -293,7 +275,6 @@ func (r *Namespace) Create(e event.CreateEvent) bool {
 	return false
 }
 
-//
 // Resource updated watch event.
 func (r *Namespace) Update(e event.UpdateEvent) bool {
 	object, cast := e.ObjectNew.(*core.Namespace)
@@ -307,7 +288,6 @@ func (r *Namespace) Update(e event.UpdateEvent) bool {
 	return false
 }
 
-//
 // Resource deleted watch event.
 func (r *Namespace) Delete(e event.DeleteEvent) bool {
 	object, cast := e.Object.(*core.Namespace)
@@ -321,26 +301,22 @@ func (r *Namespace) Delete(e event.DeleteEvent) bool {
 	return false
 }
 
-//
 // Ignored.
 func (r *Namespace) Generic(e event.GenericEvent) bool {
 	return false
 }
 
-//
 // VM
 type VM struct {
 	libocp.BaseCollection
 	log logr.Logger
 }
 
-//
 // Get the kubernetes object being collected.
 func (r *VM) Object() runtime.Object {
 	return &cnv.VirtualMachine{}
 }
 
-//
 // Reconcile.
 // Achieve initial consistency.
 func (r *VM) Reconcile(ctx context.Context) (err error) {
@@ -383,7 +359,6 @@ func (r *VM) Reconcile(ctx context.Context) (err error) {
 	return
 }
 
-//
 // Resource created watch event.
 func (r *VM) Create(e event.CreateEvent) bool {
 	object, cast := e.Object.(*cnv.VirtualMachine)
@@ -397,7 +372,6 @@ func (r *VM) Create(e event.CreateEvent) bool {
 	return false
 }
 
-//
 // Resource updated watch event.
 func (r *VM) Update(e event.UpdateEvent) bool {
 	object, cast := e.ObjectNew.(*cnv.VirtualMachine)
@@ -411,7 +385,6 @@ func (r *VM) Update(e event.UpdateEvent) bool {
 	return false
 }
 
-//
 // Resource deleted watch event.
 func (r *VM) Delete(e event.DeleteEvent) bool {
 	object, cast := e.Object.(*cnv.VirtualMachine)
@@ -425,7 +398,6 @@ func (r *VM) Delete(e event.DeleteEvent) bool {
 	return false
 }
 
-//
 // Ignored.
 func (r *VM) Generic(e event.GenericEvent) bool {
 	return false

@@ -6,13 +6,11 @@ import (
 	"strings"
 )
 
-//
 // k8s pod default.
 const (
 	ServiceCAFile = "/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt"
 )
 
-//
 // Environment variables.
 const (
 	AllowedOrigins = "CORS_ALLOWED_ORIGINS"
@@ -26,14 +24,12 @@ const (
 	TLSCa          = "API_TLS_CA"
 )
 
-//
 // CORS
 type CORS struct {
 	// Allowed origins.
 	AllowedOrigins []string
 }
 
-//
 // Inventory settings.
 type Inventory struct {
 	// CORS settings.
@@ -59,7 +55,6 @@ type Inventory struct {
 	}
 }
 
-//
 // Load settings.
 func (r *Inventory) Load() error {
 	r.CORS = CORS{

@@ -11,7 +11,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
 )
 
-//
 // Routes.
 const (
 	ProviderParam = base.ProviderParam
@@ -19,13 +18,11 @@ const (
 	ProviderRoot  = ProvidersRoot + "/:" + ProviderParam
 )
 
-//
 // Provider handler.
 type ProviderHandler struct {
 	base.Handler
 }
 
-//
 // Add routes to the `gin` router.
 func (h *ProviderHandler) AddRoutes(e *gin.Engine) {
 	e.GET(ProvidersRoot, h.List)
@@ -33,7 +30,6 @@ func (h *ProviderHandler) AddRoutes(e *gin.Engine) {
 	e.GET(ProviderRoot, h.Get)
 }
 
-//
 // List resources in a REST collection.
 func (h ProviderHandler) List(ctx *gin.Context) {
 	status, err := h.Prepare(ctx)
@@ -61,7 +57,6 @@ func (h ProviderHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific REST resource.
 func (h ProviderHandler) Get(ctx *gin.Context) {
 	status, err := h.Prepare(ctx)
@@ -96,7 +91,6 @@ func (h ProviderHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Build the list content.
 func (h *ProviderHandler) ListContent(ctx *gin.Context) (content []interface{}, err error) {
 	content = []interface{}{}
@@ -134,7 +128,6 @@ func (h *ProviderHandler) ListContent(ctx *gin.Context) (content []interface{}, 
 	return
 }
 
-//
 // Add derived fields.
 func (h *ProviderHandler) AddDerived(r *Provider) (err error) {
 	var n int64
@@ -152,7 +145,6 @@ func (h *ProviderHandler) AddDerived(r *Provider) (err error) {
 	return
 }
 
-//
 // REST Resource.
 type Provider struct {
 	ocp.Resource
@@ -164,7 +156,6 @@ type Provider struct {
 	NetworkCount int64        `json:"networkCount"`
 }
 
-//
 // Set fields with the specified object.
 func (r *Provider) With(m *model.Provider) {
 	r.Resource.With(&m.Base)
@@ -172,7 +163,6 @@ func (r *Provider) With(m *model.Provider) {
 	r.Object = m.Object
 }
 
-//
 // Build self link (URI).
 func (r *Provider) Link() {
 	r.SelfLink = base.Link(
@@ -182,7 +172,6 @@ func (r *Provider) Link() {
 		})
 }
 
-//
 // As content.
 func (r *Provider) Content(detail int) interface{} {
 	if detail == 0 {

@@ -7,7 +7,6 @@ import (
 	"strings"
 )
 
-//
 // Environment variables & roles.
 const (
 	Roles         = "ROLE"
@@ -15,14 +14,12 @@ const (
 	MainRole      = "main"
 )
 
-//
 // Role settings
 type Role struct {
 	// Enabled roles.
 	Roles map[string]bool
 }
 
-//
 // Load settings.
 func (r *Role) Load() error {
 	r.Roles = map[string]bool{}
@@ -52,7 +49,6 @@ func (r *Role) Load() error {
 	return nil
 }
 
-//
 // Test has-role.
 func (r *Role) Has(name string) bool {
 	_, found := r.Roles[name]

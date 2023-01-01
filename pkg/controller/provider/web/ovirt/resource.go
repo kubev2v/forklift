@@ -4,7 +4,6 @@ import (
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 )
 
-//
 // REST Resource.
 type Resource struct {
 	// Object ID.
@@ -21,7 +20,6 @@ type Resource struct {
 	SelfLink string `json:"selfLink"`
 }
 
-//
 // Build the resource using the model.
 func (r *Resource) With(m *model.Base) {
 	r.ID = m.ID

@@ -13,11 +13,9 @@ import (
 
 var log = logging.WithName("watch")
 
-//
 // Generic event.
 type EventChannel chan event.GenericEvent
 
-//
 // Provider watch event handler.
 type Handler struct {
 	libweb.StockEventHandler
@@ -35,19 +33,16 @@ type Handler struct {
 	ended bool
 }
 
-//
 // The associated provider.
 func (r *Handler) Provider() *api.Provider {
 	return r.provider
 }
 
-//
 // Get an inventory client.
 func (r *Handler) Inventory() web.Client {
 	return r.inventory
 }
 
-//
 // Enqueue reconcile request.
 func (r *Handler) Enqueue(event event.GenericEvent) {
 	defer func() {
@@ -56,20 +51,17 @@ func (r *Handler) Enqueue(event event.GenericEvent) {
 	r.channel <- event
 }
 
-//
 // Match provider.
 func (r *Handler) MatchProvider(ref core.ObjectReference) bool {
 	return r.Match(r.provider, ref)
 }
 
-//
 // Ref matches object.
 func (r *Handler) Match(object meta.Object, ref core.ObjectReference) bool {
 	return ref.Namespace == object.GetNamespace() &&
 		ref.Name == object.GetName()
 }
 
-//
 // Inventory watch has parity.
 func (r *Handler) Started(id uint64) {
 	r.id = id
@@ -79,7 +71,6 @@ func (r *Handler) Started(id uint64) {
 		r.id)
 }
 
-//
 // Watch ended by peer.
 // The database has been closed.
 func (r *Handler) End() {
@@ -90,7 +81,6 @@ func (r *Handler) End() {
 		r.id)
 }
 
-//
 // Watch error.
 // Repair the watch.
 func (r *Handler) Error(w *libweb.Watch, err error) {

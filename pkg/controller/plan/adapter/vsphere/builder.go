@@ -117,12 +117,10 @@ var osMap = map[string]string{
 	"windows9Server64Guest": "win2k19",
 }
 
-//
 // Regex which matches the snapshot identifier suffix of a
 // vSphere disk backing file.
 var backingFilePattern = regexp.MustCompile("-\\d\\d\\d\\d\\d\\d.vmdk")
 
-//
 // vSphere builder.
 type Builder struct {
 	*plancontext.Context
@@ -132,7 +130,6 @@ type Builder struct {
 	macConflictsMap map[string]string
 }
 
-//
 // Get list of destination VMs with mac addresses that would
 // conflict with this VM, if any exist.
 func (r *Builder) macConflicts(vm *model.VM) (conflictingVMs []string, err error) {
@@ -169,14 +166,12 @@ func (r *Builder) macConflicts(vm *model.VM) (conflictingVMs []string, err error
 	return
 }
 
-//
 // Create DataVolume certificate configmap.
 // No-op for vSphere.
 func (r *Builder) ConfigMap(_ ref.Ref, _ *core.Secret, _ *core.ConfigMap) (err error) {
 	return
 }
 
-//
 // Build the DataVolume credential secret.
 func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
 	hostID, err := r.hostID(vmRef)
@@ -200,7 +195,6 @@ func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
 	return
 }
 
-//
 // Create DataVolume specs for the VM.
 func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.ConfigMap) (dvs []cdi.DataVolumeSpec, err error) {
 	vm := &model.VM{}
@@ -284,7 +278,6 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 	return
 }
 
-//
 // Create the destination Kubevirt VM.
 func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []core.PersistentVolumeClaim) (err error) {
 	vm := &model.VM{}
@@ -517,7 +510,6 @@ func (r *Builder) mapDisks(vm *model.VM, persistentVolumeClaims []core.Persisten
 	object.Template.Spec.Domain.Devices.Disks = kDisks
 }
 
-//
 // Build tasks.
 func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 	vm := &model.VM{}
@@ -579,19 +571,16 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 	return
 }
 
-//
 // Return a stable identifier for a VDDK DataVolume.
 func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
 	return trimBackingFileName(dv.Spec.Source.VDDK.BackingFile)
 }
 
-//
 // Return a stable identifier for a PersistentDataVolume.
 func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string {
 	return trimBackingFileName(pvc.Annotations[AnnImportBackingFile])
 }
 
-//
 // Load
 func (r *Builder) Load() (err error) {
 	err = r.loadHosts()
@@ -602,7 +591,6 @@ func (r *Builder) Load() (err error) {
 	return
 }
 
-//
 // Load host CRs.
 func (r *Builder) loadHosts() (err error) {
 	list := &api.HostList{}
@@ -644,7 +632,6 @@ func (r *Builder) loadHosts() (err error) {
 	return
 }
 
-//
 // Find host ID for VM.
 func (r *Builder) hostID(vmRef ref.Ref) (hostID string, err error) {
 	vm := &model.VM{}
@@ -663,7 +650,6 @@ func (r *Builder) hostID(vmRef ref.Ref) (hostID string, err error) {
 	return
 }
 
-//
 // Find host CR secret.
 func (r *Builder) hostSecret(host *api.Host) (secret *core.Secret, err error) {
 	ref := host.Spec.Secret
@@ -680,7 +666,6 @@ func (r *Builder) hostSecret(host *api.Host) (secret *core.Secret, err error) {
 	return
 }
 
-//
 // Find host in the inventory.
 func (r *Builder) host(hostID string) (host *model.Host, err error) {
 	host = &model.Host{}
@@ -696,10 +681,10 @@ func (r *Builder) host(hostID string) (host *model.Host, err error) {
 	return
 }
 
-//
 // Trims the snapshot suffix from a disk backing file name if there is one.
+//
 //	Example:
-// 	Input: 	[datastore13] my-vm/disk-name-000015.vmdk
+//	Input: 	[datastore13] my-vm/disk-name-000015.vmdk
 //	Output: [datastore13] my-vm/disk-name.vmdk
 func trimBackingFileName(fileName string) string {
 	return backingFilePattern.ReplaceAllString(fileName, ".vmdk")
