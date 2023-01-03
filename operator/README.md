@@ -1,6 +1,6 @@
 # Forklift Operator
 
-[![Operator Repository on Quay](https://quay.io/repository/konveyor/forklift-operator/status "Operator Repository on Quay")](https://quay.io/repository/konveyor/forklift-operator) [![License](http://img.shields.io/:license-apache-blue.svg)](http://www.apache.org/licenses/LICENSE-2.0.html) [![contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/konveyor/forklift-operator/pulls)
+[![Operator Repository on Quay](https://quay.io/repository/kubev2v/forklift-operator/status "Operator Repository on Quay")](https://quay.io/repository/kubev2v/forklift-operator) [![License](http://img.shields.io/:license-apache-blue.svg)](http://www.apache.org/licenses/LICENSE-2.0.html) [![contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/kubev2v/forklift/pulls)
 
 Forklift Operator installs a suite of migration tools that facilitate the migration of VM workloads to [OpenShift Virtualization](https://cloud.redhat.com/learn/topics/virtualization/) or [KubeVirt](https://kubevirt.io/).
 
@@ -25,10 +25,10 @@ v2.3 | v4.10+ | 6.5+ | 4.4.9+
 
 The operator will install all the necessary components which Forklift needs to operate. The projects and a description of each are detailed below:
 
-* [Forklift UI](https://github.com/konveyor/forklift-ui), The Forklift UI is based on [Patternfly 4](https://www.patternfly.org/v4).
-* [Forklift Controller](https://github.com/konveyor/forklift-controller), The Forklift Controller orchestrates the migration.
-* [Forklift Validation](https://github.com/konveyor/forklift-validation), The Forklift Validation service checks the VMs for possible issues before migration. This service is based on [Open Policy Agent](https://www.openpolicyagent.org).
-* [Forklift Must Gather](https://github.com/konveyor/forklift-must-gather), Support tool for gathering information about the Forklift environment.
+* [Forklift UI](https://github.com/kubev2v/forklift-ui), The Forklift UI is based on [Patternfly 4](https://www.patternfly.org/v4).
+* [Forklift Controller](https://github.com/kubev2v/forklift), The Forklift Controller orchestrates the migration.
+* [Forklift Validation](https://github.com/kubev2v/forklift), The Forklift Validation service checks the VMs for possible issues before migration. This service is based on [Open Policy Agent](https://www.openpolicyagent.org).
+* [Forklift Must Gather](https://github.com/kubev2v/forklift-must-gather), Support tool for gathering information about the Forklift environment.
 
 ## Development
 

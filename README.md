@@ -39,14 +39,14 @@ Another option to override the default values can use `--action_env` as in the e
 | NAMESPACE             | konveyor-forklift                                | The namespace in which the operator should be installed.    |
 | CHANNELS              | development                                      | The olm channels.                                           |
 | DEFAULT_CHANNEL       | development                                      | The default olm channel.                                    |
-| OPERATOR_IMAGE        | quay.io/konveyor/forklift-operator:latest        | The forklift operator image with the ansible-operator role. |
-| CONTROLLER_IMAGE      | quay.io/konveyor/forklift-controller:latest      | The forklift controller image.                              |
-| MUST_GATHER_IMAGE     | quay.io/konveyor/forklift-must-gather:latest     | The forklift must gather an image.                          |
-| MUST_GATHER_API_IMAGE | quay.io/konveyor/forklift-must-gather-api:latest | The forklift must gather image api.                         |
-| UI_IMAGE              | quay.io/konveyor/forklift-ui:latest              | The forklift UI image.                                      |
+| OPERATOR_IMAGE        | quay.io/kubev2v/forklift-operator:latest         | The forklift operator image with the ansible-operator role. |
+| CONTROLLER_IMAGE      | quay.io/kubev2v/forklift-controller:latest       | The forklift controller image.                              |
+| MUST_GATHER_IMAGE     | quay.io/kubev2v/forklift-must-gather:latest      | The forklift must gather an image.                          |
+| MUST_GATHER_API_IMAGE | quay.io/kubev2v/forklift-must-gather-api:latest  | The forklift must gather image api.                         |
+| UI_IMAGE              | quay.io/kubev2v/forklift-ui:latest               | The forklift UI image.                                      |
 | UI_PLUGIN_IMAGE       | quay.io/kubev2v/forklift-console-plugin:latest   | The forklift OKD/OpenShift UI plugin image.                                      |
-| VALIDATION_IMAGE      | quay.io/konveyor/forklift-validation:latest      | The forklift validation image.                              |
-| VIRT_V2V_IMAGE        | quay.io/konveyor/forklift-virt-v2v:latest        | The forklift virt v2v image.                                |
+| VALIDATION_IMAGE      | quay.io/kubev2v/forklift-validation:latest       | The forklift validation image.                              |
+| VIRT_V2V_IMAGE        | quay.io/kubev2v/forklift-virt-v2v:latest         | The forklift virt v2v image.                                |
 
 ### Runing operator build
 

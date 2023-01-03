@@ -16,7 +16,7 @@ const (
 
 // Default virt-v2v image.
 const (
-	DefaultVirtV2vImage = "quay.io/konveyor/forklift-virt-v2v:latest"
+	DefaultVirtV2vImage = "quay.io/kubev2v/forklift-virt-v2v:latest"
 )
 
 // Migration settings
