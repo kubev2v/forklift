@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/openstack"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
@@ -28,26 +27,26 @@ type ImageHandler struct {
 
 type Image struct {
 	Resource
-	Status                      images.ImageStatus     `json:"status"`
-	Tags                        []string               `json:"tags"`
-	ContainerFormat             string                 `json:"container_format"`
-	DiskFormat                  string                 `json:"disk_format"`
-	MinDiskGigabytes            int                    `json:"min_disk"`
-	MinRAMMegabytes             int                    `json:"min_ram"`
-	Owner                       string                 `json:"owner"`
-	Protected                   bool                   `json:"protected"`
-	Visibility                  images.ImageVisibility `json:"visibility"`
-	Hidden                      bool                   `json:"os_hidden"`
-	Checksum                    string                 `json:"checksum"`
-	SizeBytes                   int64                  `json:"-"`
-	Metadata                    map[string]string      `json:"metadata"`
-	CreatedAt                   time.Time              `json:"created_at"`
-	UpdatedAt                   time.Time              `json:"updated_at"`
-	File                        string                 `json:"file"`
-	Schema                      string                 `json:"schema"`
-	VirtualSize                 int64                  `json:"virtual_size"`
-	OpenStackImageImportMethods []string               `json:"-"`
-	OpenStackImageStoreIDs      []string               `json:"-"`
+	Status                      string            `json:"status"`
+	Tags                        []string          `json:"tags"`
+	ContainerFormat             string            `json:"container_format"`
+	DiskFormat                  string            `json:"disk_format"`
+	MinDiskGigabytes            int               `json:"min_disk"`
+	MinRAMMegabytes             int               `json:"min_ram"`
+	Owner                       string            `json:"owner"`
+	Protected                   bool              `json:"protected"`
+	Visibility                  string            `json:"visibility"`
+	Hidden                      bool              `json:"os_hidden"`
+	Checksum                    string            `json:"checksum"`
+	SizeBytes                   int64             `json:"-"`
+	Metadata                    map[string]string `json:"metadata"`
+	CreatedAt                   time.Time         `json:"created_at"`
+	UpdatedAt                   time.Time         `json:"updated_at"`
+	File                        string            `json:"file"`
+	Schema                      string            `json:"schema"`
+	VirtualSize                 int64             `json:"virtual_size"`
+	OpenStackImageImportMethods []string          `json:"-"`
+	OpenStackImageStoreIDs      []string          `json:"-"`
 	Properties                  map[string]interface{}
 }
 
@@ -60,6 +59,30 @@ func (h *ImageHandler) AddRoutes(e *gin.Engine) {
 
 // Build the resource using the model.
 func (r *Image) With(m *model.Image) {
+	r.Resource.ID = m.ID
+	r.Resource.Revision = m.Revision
+	r.Resource.Name = m.Name
+	r.Status = string(m.Status)
+	r.Tags = m.Tags
+	r.ContainerFormat = m.ContainerFormat
+	r.DiskFormat = m.DiskFormat
+	r.MinDiskGigabytes = m.MinDiskGigabytes
+	r.MinRAMMegabytes = m.MinRAMMegabytes
+	r.Owner = m.Owner
+	r.Protected = m.Protected
+	r.Visibility = string(m.Visibility)
+	r.Hidden = m.Hidden
+	r.Checksum = m.Checksum
+	r.SizeBytes = m.SizeBytes
+	r.Metadata = m.Metadata
+	r.Properties = m.Properties
+	r.CreatedAt = m.CreatedAt
+	r.UpdatedAt = m.UpdatedAt
+	r.File = m.File
+	r.Schema = m.Schema
+	r.VirtualSize = m.VirtualSize
+	r.OpenStackImageImportMethods = m.OpenStackImageImportMethods
+	r.OpenStackImageStoreIDs = m.OpenStackImageStoreIDs
 }
 
 // List resources in a REST collection.
