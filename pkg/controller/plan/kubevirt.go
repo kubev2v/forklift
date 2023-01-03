@@ -981,6 +981,13 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 
 	// qemu group
 	fsGroup := int64(107)
+        // virt-v2v image
+        var virtV2vImage string
+        if r.Plan.Spec.Warm {
+            virtV2vImage = Settings.Migration.VirtV2vImageWarm
+        } else {
+            virtV2vImage = Settings.Migration.VirtV2vImageCold
+        }
 	pod = &core.Pod{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace:    r.Plan.Spec.TargetNamespace,
@@ -995,7 +1002,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 			Containers: []core.Container{
 				{
 					Name:            "virt-v2v",
-					Image:           Settings.Migration.VirtV2vImage,
+					Image:           virtV2vImage,
 					VolumeMounts:    volumeMounts,
 					VolumeDevices:   volumeDevices,
 					ImagePullPolicy: core.PullIfNotPresent,
