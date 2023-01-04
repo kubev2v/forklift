@@ -26,6 +26,5 @@ go_library(
         "//pkg/lib/inventory/web",
         "//pkg/lib/logging",
         "//vendor/github.com/gin-gonic/gin",
-        "//vendor/github.com/gophercloud/gophercloud/openstack/imageservice/v2/images",
     ],
 )
