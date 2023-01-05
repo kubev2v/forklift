@@ -5,7 +5,9 @@ import (
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	cnv "kubevirt.io/client-go/api/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
@@ -51,6 +53,8 @@ type Builder interface {
 	ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string
 	// Conversion Pod environment
 	PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env []core.EnvVar, err error)
+	// Build a PersistentVolumeClaim with SourceRef for VolumePopulator
+	PersistentVolumeClaimWithSourceRef(da ovirt.XDiskAttachment, storageName *string, populatorName string, accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode) *unstructured.Unstructured
 }
 
 // Client API.

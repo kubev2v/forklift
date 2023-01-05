@@ -2,6 +2,8 @@ package ovirt
 
 import (
 	"fmt"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"path"
 	"strings"
 
@@ -521,4 +523,34 @@ func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
 // Return a stable identifier for a PersistentDataVolume.
 func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string {
 	return pvc.Annotations[AnnImportDiskId]
+}
+
+// Build a PersistentVolumeClaim with SourceRef for VolumePopulator
+func (r *Builder) PersistentVolumeClaimWithSourceRef(da model.XDiskAttachment, storageName *string, populatorName string,
+	accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "PersistentVolumeClaim",
+			"apiVersion": "v1",
+			"metadata": map[string]interface{}{
+				"name":      da.DiskAttachment.ID,
+				"namespace": r.Plan.Spec.TargetNamespace,
+			},
+			"spec": map[string]interface{}{
+				"storageClassName": storageName,
+				"resources": map[string]interface{}{
+					"requests": map[string]interface{}{
+						"storage": resource.NewQuantity(int64(float64(da.Disk.ProvisionedSize)*1.1), resource.BinarySI).String(),
+					},
+				},
+				"accessModes": accessModes,
+				"volumeMode":  volumeMode,
+				"dataSourceRef": map[string]interface{}{
+					"apiGroup": api.SchemeGroupVersion.Group,
+					"kind":     "OvirtImageIOPopulator",
+					"name":     populatorName,
+				},
+			},
+		},
+	}
 }
