@@ -261,7 +261,6 @@ func (r *Client) list(resourceType ResourceType, listopts interface{}) (obj inte
 	case ImageResource:
 		var allPages pagination.Page
 		allPages, err = images.List(r.imageService, listopts.(*ImageListOpts)).AllPages()
-		r.log.Info("All pages", "allPages", allPages)
 		if err != nil {
 			return
 		}
