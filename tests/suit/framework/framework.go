@@ -38,9 +38,8 @@ import (
 const (
 	nsCreateTime = 60 * time.Second
 	nsDeleteTime = 5 * time.Minute
-	//NsPrefixLabel provides a cdi prefix label to identify the test namespace
+	//NsPrefixLabel provides a prefix label to identify the test namespace
 	NsPrefixLabel   = "forklift-e2e"
-	cdiPodPrefix    = "forklift-deployment"
 	timeout         = time.Second * 90
 	pollingInterval = time.Second
 )
@@ -60,16 +59,14 @@ type Config struct {
 
 // Clients is the struct containing the client-go kubernetes clients
 type Clients struct {
-	KubectlPath    string
-	OcPath         string
-	CdiInstallNs   string
-	KubeConfig     string
-	KubeURL        string
-	GoCLIPath      string
-	SnapshotSCName string
-	BlockSCName    string
-	DockerPrefix   string
-	DockerTag      string
+	KubectlPath       string
+	OcPath            string
+	ForkliftInstallNs string
+	KubeConfig        string
+	KubeURL           string
+	GoCLIPath         string
+	DockerPrefix      string
+	DockerTag         string
 
 	//  k8sClient provides our k8s client pointer
 	K8sClient *kubernetes.Clientset
@@ -87,14 +84,8 @@ func (c *Clients) K8s() *kubernetes.Clientset {
 	return c.K8sClient
 }
 
-//var log logr.Logger
-//
-//func init() {
-//	log = logf.Log.WithName("entrypoint")
-//}
-
-// Framework supports common operations used by functional/e2e tests. It holds the k8s and cdi clients,
-// a generated unique namespace, run-time flags, and more fields will be added over time as cdi e2e
+// Framework supports common operations used by functional/e2e tests. It holds the k8s,
+// a generated unique namespace, run-time flags, and more fields will be added over time as forklift e2e
 // evolves. Global BeforeEach and AfterEach are called in the Framework constructor.
 type Framework struct {
 	Config
@@ -168,7 +159,6 @@ func (f *Framework) AfterEach() {
 
 	if ginkgo.CurrentGinkgoTestDescription().Failed {
 		f.reporter.FailureCount++
-		//	f.reporter.Dump(f.K8sClient, f.CdiClient, ginkgo.CurrentGinkgoTestDescription().Duration)
 	}
 
 	return
