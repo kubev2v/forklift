@@ -31,3 +31,7 @@ type OvirtVolumePopulatorList struct {
 	meta.ListMeta `json:"metadata,omitempty"`
 	Items         []OvirtVolumePopulator `json:"items"`
 }
+
+func init() {
+	SchemeBuilder.Register(&OvirtVolumePopulator{}, &OvirtVolumePopulatorList{})
+}

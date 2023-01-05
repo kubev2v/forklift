@@ -4,15 +4,10 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/klog/v2"
 	"math/rand"
 	"net/url"
 	"path"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -27,13 +22,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/klog/v2"
 	cnv "kubevirt.io/client-go/api/v1"
 	libvirtxml "libvirt.org/libvirt-go-xml"
 
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	core "k8s.io/api/core/v1"
@@ -319,8 +317,8 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) (err error) {
 			err = liberr.Wrap(err)
 			return
 		}
-		if r.useOvirtPopulator(vm) && pvc.Spec.DataSource.Kind == "OvirtImageIOPopulator" {
-			populatorCr := v1beta1.OvirtImageIOPopulator{}
+		if r.useOvirtPopulator(vm) && pvc.Spec.DataSource.Kind == reflect.TypeOf(v1beta1.OvirtVolumePopulator{}).Name() {
+			populatorCr := v1beta1.OvirtVolumePopulator{}
 			err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: pvc.Spec.DataSource.Name}, &populatorCr)
 			if err != nil {
 				err = liberr.Wrap(err)
@@ -608,7 +606,7 @@ func (r *KubeVirt) createVolumesForOvirt(vm ref.Ref) (err error) {
 
 	storageName := &r.Context.Map.Storage.Spec.Map[0].Destination.StorageClass
 	for _, da := range ovirtVm.DiskAttachments {
-		populatorCr := r.OvirtImageIOPopulator(da, sourceUrl)
+		populatorCr := r.OvirtVolumePopulator(da, sourceUrl)
 		err = r.Client.Create(context.Background(), populatorCr, &client.CreateOptions{})
 		if err != nil {
 			return
@@ -619,27 +617,12 @@ func (r *KubeVirt) createVolumesForOvirt(vm ref.Ref) (err error) {
 			return
 		}
 
-		// TODO once version bump happens to core get rid of the unstructured and dynamic client
 		pvc := r.Builder.PersistentVolumeClaimWithSourceRef(da, storageName, populatorCr.Name, accessModes, volumeMode)
 		if pvc == nil {
 			klog.Errorf("Couldn't build the PVC %v", da.DiskAttachment.ID)
 			return
 		}
-
-		config, configErr := config.GetConfig()
-		if configErr != nil {
-			return configErr
-		}
-
-		dynamicClient, configErr := dynamic.NewForConfig(config)
-		if configErr != nil {
-			return configErr
-		}
-
-		pvcResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "persistentvolumeclaims"}
-
-		_, err = dynamicClient.Resource(pvcResource).Namespace(r.Plan.Spec.TargetNamespace).Create(context.TODO(), pvc, meta.CreateOptions{})
-
+		err = r.Client.Create(context.TODO(), pvc, &client.CreateOptions{})
 		if err != nil {
 			return
 		}
@@ -648,14 +631,14 @@ func (r *KubeVirt) createVolumesForOvirt(vm ref.Ref) (err error) {
 	return
 }
 
-// Build an OvirtImageIOPopulator for XDiskAttachment and source URL
-func (r *KubeVirt) OvirtImageIOPopulator(da ovirt.XDiskAttachment, sourceUrl *url.URL) *v1beta1.OvirtImageIOPopulator {
-	return &v1beta1.OvirtImageIOPopulator{
+// Build an OvirtVolumePopulator for XDiskAttachment and source URL
+func (r *KubeVirt) OvirtVolumePopulator(da ovirt.XDiskAttachment, sourceUrl *url.URL) *v1beta1.OvirtVolumePopulator {
+	return &v1beta1.OvirtVolumePopulator{
 		ObjectMeta: meta.ObjectMeta{
 			Name:      da.DiskAttachment.ID,
 			Namespace: r.Plan.Spec.TargetNamespace,
 		},
-		Spec: v1beta1.OvirtImageIOPopulatorSpec{
+		Spec: v1beta1.OvirtVolumePopulatorSpec{
 			EngineURL:        fmt.Sprintf("https://%s", sourceUrl.Host),
 			EngineSecretName: r.Source.Secret.Name,
 			DiskID:           da.Disk.ID,
@@ -663,7 +646,7 @@ func (r *KubeVirt) OvirtImageIOPopulator(da ovirt.XDiskAttachment, sourceUrl *ur
 	}
 }
 
-func (r *KubeVirt) getOvirtPVCs(vm ref.Ref, step *plan.Step) (ready bool, err error) {
+func (r *KubeVirt) areOvirtPVCsReady(vm ref.Ref, step *plan.Step) (ready bool, err error) {
 	ovirtVm := &ovirt.Workload{}
 	err = r.Source.Inventory.Find(ovirtVm, vm)
 	if err != nil {
@@ -681,12 +664,10 @@ func (r *KubeVirt) getOvirtPVCs(vm ref.Ref, step *plan.Step) (ready bool, err er
 
 		if pvc.Status.Phase != core.ClaimBound {
 			ready = false
-			continue
+			break
 		}
 
-		var task *plan.Task
-		found := false
-		task, found = step.FindTask(da.Disk.ID)
+		task, found := step.FindTask(da.Disk.ID)
 		if !found {
 			continue
 		}
@@ -717,12 +698,9 @@ func (r *KubeVirt) getStorageProfileModes(storageName string) (accessModes []cor
 	return
 }
 
-// Return if the import done with OvirtVolumePopulator
+// Return true when the import is done with OvirtVolumePopulator
 func (r *KubeVirt) useOvirtPopulator(vm *plan.VMStatus) bool {
-	if *r.Plan.Provider.Source.Spec.Type == v1beta1.OVirt && vm.Warm == nil && r.Destination.Provider.IsHost() {
-		return true
-	}
-	return false
+	return *r.Plan.Provider.Source.Spec.Type == v1beta1.OVirt && vm.Warm == nil && r.Destination.Provider.IsHost()
 }
 
 // Return namespace specific ListOption.
