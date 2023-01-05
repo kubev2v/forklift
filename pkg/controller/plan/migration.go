@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/populator"
 	"path"
 	"strconv"
 	"time"
 
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
@@ -1171,7 +1171,7 @@ func (r *Migration) updateCopyProgressForOvirt(vm *plan.VMStatus, step *plan.Ste
 			continue
 		}
 
-		populatorCr := v1beta1.OvirtImageIOPopulator{}
+		populatorCr := populator.OvirtImageIOPopulator{}
 		err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: claim}, &populatorCr)
 		if err != nil {
 			return

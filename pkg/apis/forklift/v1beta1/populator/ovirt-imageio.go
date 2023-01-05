@@ -1,6 +1,7 @@
-package v1beta1
+package populator
 
 import (
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -33,5 +34,5 @@ type OvirtImageIOPopulatorList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&OvirtImageIOPopulator{}, &OvirtImageIOPopulatorList{})
+	v1beta1.SchemeBuilder.Register(&OvirtImageIOPopulator{}, &OvirtImageIOPopulatorList{})
 }

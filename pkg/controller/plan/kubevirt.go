@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/populator"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -319,7 +320,7 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) (err error) {
 			return
 		}
 		if r.isOvirtImageIO(vm) && pvc.Spec.DataSource.Kind == "OvirtImageIOPopulator" {
-			populatorCr := v1beta1.OvirtImageIOPopulator{}
+			populatorCr := populator.OvirtImageIOPopulator{}
 			err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: pvc.Spec.DataSource.Name}, &populatorCr)
 			if err != nil {
 				err = liberr.Wrap(err)

@@ -3,6 +3,7 @@ package ovirt
 import (
 	"fmt"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/populator"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"net/url"
@@ -516,13 +517,13 @@ func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVol
 }
 
 // Build an OvirtImageIOPopulator for XDiskAttachment and source URL
-func (r *Builder) OvirtImageIOPopulator(da model.XDiskAttachment, sourceUrl *url.URL) *api.OvirtImageIOPopulator {
-	return &api.OvirtImageIOPopulator{
+func (r *Builder) OvirtImageIOPopulator(da model.XDiskAttachment, sourceUrl *url.URL) *populator.OvirtImageIOPopulator {
+	return &populator.OvirtImageIOPopulator{
 		ObjectMeta: meta.ObjectMeta{
 			Name:      da.DiskAttachment.ID,
 			Namespace: r.Plan.Spec.TargetNamespace,
 		},
-		Spec: api.OvirtImageIOPopulatorSpec{
+		Spec: populator.OvirtImageIOPopulatorSpec{
 			EngineURL:        fmt.Sprintf("https://%s", sourceUrl.Host),
 			EngineSecretName: r.Source.Secret.Name,
 			DiskID:           da.Disk.ID,

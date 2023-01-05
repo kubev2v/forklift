@@ -3,6 +3,7 @@ package base
 import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/populator"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
@@ -46,7 +47,7 @@ type Builder interface {
 	// Return a stable identifier for a PersistentDataVolume
 	ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string
 	// Build an OvirtImageIOPopulator for XDiskAttachment and source URL
-	OvirtImageIOPopulator(da ovirt.XDiskAttachment, sourceUrl *url.URL) *api.OvirtImageIOPopulator
+	OvirtImageIOPopulator(da ovirt.XDiskAttachment, sourceUrl *url.URL) *populator.OvirtImageIOPopulator
 	// Build a PersistentVolumeClaim with SourceRef for VolumePopulator
 	PersistentVolumeClaimWithSourceRef(da ovirt.XDiskAttachment, storageName *string, populatorName string, accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode) *unstructured.Unstructured
 }

@@ -14,6 +14,7 @@ go_library(
     deps = [
         "//pkg/apis/forklift/v1beta1",
         "//pkg/apis/forklift/v1beta1/plan",
+        "//pkg/apis/forklift/v1beta1/populator",
         "//pkg/apis/forklift/v1beta1/ref",
         "//pkg/controller/plan/adapter/base",
         "//pkg/controller/plan/context",

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/populator"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
@@ -695,7 +696,7 @@ func trimBackingFileName(fileName string) string {
 }
 
 // Build an OvirtImageIOPopulator for XDiskAttachment and source URL, not supported for vSphere
-func (r *Builder) OvirtImageIOPopulator(da ovirt.XDiskAttachment, sourceUrl *url.URL) *api.OvirtImageIOPopulator {
+func (r *Builder) OvirtImageIOPopulator(da ovirt.XDiskAttachment, sourceUrl *url.URL) *populator.OvirtImageIOPopulator {
 	// Not supported for vSphere
 	return nil
 }
