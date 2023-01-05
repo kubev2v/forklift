@@ -19,21 +19,18 @@ const (
 )
 
 var (
-	kubectlPath    = flag.String("kubectl-path", "/home/eslutsky/bin/kubectl", "The path to the kubectl binary")
-	ocPath         = flag.String("oc-path", "oc", "The path to the oc binary")
-	cdiInstallNs   = flag.String("cdi-namespace", "cdi", "The namespace of the CDI controller")
-	kubeConfig     = flag.String("kubeconfig2", "/tmp/kubeconfig", "The absolute path to the kubeconfig file")
-	kubeURL        = flag.String("kubeurl", "", "kube URL url:port")
-	goCLIPath      = flag.String("gocli-path", "cli.sh", "The path to cli script")
-	snapshotSCName = flag.String("snapshot-sc", "", "The Storage Class supporting snapshots")
-	blockSCName    = flag.String("block-sc", "", "The Storage Class supporting block mode volumes")
-	csiCloneSCName = flag.String("csiclone-sc", "", "The Storage Class supporting CSI Volume Cloning")
-	dockerPrefix   = flag.String("docker-prefix", "", "The docker host:port")
-	dockerTag      = flag.String("docker-tag", "", "The docker tag")
+	kubectlPath       = flag.String("kubectl-path", "/home/eslutsky/bin/kubectl", "The path to the kubectl binary")
+	ocPath            = flag.String("oc-path", "oc", "The path to the oc binary")
+	forkliftInstallNs = flag.String("forklift-namespace", "konveyor-forklift", "The namespace of the CDI controller")
+	kubeConfig        = flag.String("kubeconfig2", "/tmp/kubeconfig", "The absolute path to the kubeconfig file")
+	kubeURL           = flag.String("kubeurl", "", "kube URL url:port")
+	goCLIPath         = flag.String("gocli-path", "cli.sh", "The path to cli script")
+	dockerPrefix      = flag.String("docker-prefix", "", "The docker host:port")
+	dockerTag         = flag.String("docker-tag", "", "The docker tag")
 )
 
-// cdiFailHandler call ginkgo.Fail with printing the additional information
-func cdiFailHandler(message string, callerSkip ...int) {
+// forkliftFailHandler call ginkgo.Fail with printing the additional information
+func forkliftFailHandler(message string, callerSkip ...int) {
 	if len(callerSkip) > 0 {
 		callerSkip[0]++
 	}
@@ -42,7 +39,7 @@ func cdiFailHandler(message string, callerSkip ...int) {
 
 func TestTests(t *testing.T) {
 	defer GinkgoRecover()
-	RegisterFailHandler(cdiFailHandler)
+	RegisterFailHandler(forkliftFailHandler)
 	BuildTestSuite()
 	RunSpecsWithDefaultAndCustomReporters(t, "Tests Suite", reporters.NewReporters())
 }
@@ -56,22 +53,19 @@ func BuildTestSuite() {
 		// Read flags, and configure client instances
 		framework.ClientsInstance.KubectlPath = *kubectlPath
 		framework.ClientsInstance.OcPath = *ocPath
-		framework.ClientsInstance.CdiInstallNs = *cdiInstallNs
+		framework.ClientsInstance.ForkliftInstallNs = *forkliftInstallNs
 		framework.ClientsInstance.KubeConfig = *kubeConfig
 		framework.ClientsInstance.KubeURL = *kubeURL
 		framework.ClientsInstance.GoCLIPath = *goCLIPath
-		framework.ClientsInstance.SnapshotSCName = *snapshotSCName
-		framework.ClientsInstance.BlockSCName = *blockSCName
 		framework.ClientsInstance.DockerPrefix = *dockerPrefix
 		framework.ClientsInstance.DockerTag = *dockerTag
 
 		fmt.Fprintf(ginkgo.GinkgoWriter, "Kubectl path: %s\n", framework.ClientsInstance.KubectlPath)
 		fmt.Fprintf(ginkgo.GinkgoWriter, "OC path: %s\n", framework.ClientsInstance.OcPath)
-		fmt.Fprintf(ginkgo.GinkgoWriter, "CDI install NS: %s\n", framework.ClientsInstance.CdiInstallNs)
+		fmt.Fprintf(ginkgo.GinkgoWriter, "Forklift install NS: %s\n", framework.ClientsInstance.ForkliftInstallNs)
 		fmt.Fprintf(ginkgo.GinkgoWriter, "Kubeconfig: %s\n", framework.ClientsInstance.KubeConfig)
 		fmt.Fprintf(ginkgo.GinkgoWriter, "KubeURL: %s\n", framework.ClientsInstance.KubeURL)
 		fmt.Fprintf(ginkgo.GinkgoWriter, "GO CLI path: %s\n", framework.ClientsInstance.GoCLIPath)
-		fmt.Fprintf(ginkgo.GinkgoWriter, "Snapshot SC: %s\n", framework.ClientsInstance.SnapshotSCName)
 		fmt.Fprintf(ginkgo.GinkgoWriter, "DockerPrefix: %s\n", framework.ClientsInstance.DockerPrefix)
 		fmt.Fprintf(ginkgo.GinkgoWriter, "DockerTag: %s\n", framework.ClientsInstance.DockerTag)
 
@@ -101,15 +95,7 @@ func BuildTestSuite() {
 		}
 		framework.ClientsInstance.DynamicClient = dyn
 
-		utils.CacheTestsData(framework.ClientsInstance.K8sClient, framework.ClientsInstance.CdiInstallNs)
+		utils.CacheTestsData(framework.ClientsInstance.K8sClient, framework.ClientsInstance.ForkliftInstallNs)
 	})
 
-	//
-	//AfterSuite(func() {
-	//	Eventually(func() []corev1.Namespace {
-	//		nsList, _ := utils.GetTestNamespaceList(framework.ClientsInstance.K8sClient, framework.NsPrefixLabel)
-	//		fmt.Fprintf(ginkgo.GinkgoWriter, "DEBUG: AfterSuite nsList: %v\n", nsList.Items)
-	//		return nsList.Items
-	//	}, nsDeletedTimeout, pollInterval).Should(BeEmpty())
-	//})
 }
