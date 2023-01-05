@@ -566,6 +566,9 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 	case CreateDataVolumes:
 		if r.kubevirt.useOvirtPopulator(vm) {
 			err = r.kubevirt.createVolumesForOvirt(vm.Ref)
+			if err != nil {
+				return err
+			}
 			vm.Phase = r.next(vm.Phase)
 			return
 		}
@@ -645,7 +648,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		step.Phase = Running
 
 		if r.kubevirt.useOvirtPopulator(vm) {
-			ready, err := r.kubevirt.getOvirtPVCs(vm.Ref, step)
+			ready, err := r.kubevirt.areOvirtPVCsReady(vm.Ref, step)
 			if err != nil {
 				step.AddError(err.Error())
 				err = nil
@@ -1167,14 +1170,12 @@ func (r *Migration) updateCopyProgressForOvirt(vm *plan.VMStatus, step *plan.Ste
 	}
 	for _, pvc := range pvcs {
 		claim := pvc.Spec.DataSource.Name
-		var task *plan.Task
-		found := false
-		task, found = step.FindTask(claim)
+		task, found := step.FindTask(claim)
 		if !found {
 			continue
 		}
 
-		populatorCr := v1beta1.OvirtImageIOPopulator{}
+		populatorCr := v1beta1.OvirtVolumePopulator{}
 		err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: claim}, &populatorCr)
 		if err != nil {
 			return

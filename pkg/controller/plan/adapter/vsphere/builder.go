@@ -23,7 +23,6 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	cnv "kubevirt.io/client-go/api/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	liburl "net/url"
@@ -765,7 +764,7 @@ func trimBackingFileName(fileName string) string {
 
 // Build a PersistentVolumeClaim with SourceRef for VolumePopulator, not supported for vSphere
 func (r *Builder) PersistentVolumeClaimWithSourceRef(da ovirt.XDiskAttachment, storageName *string, populatorName string,
-	accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode) *unstructured.Unstructured {
+	accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode) *core.PersistentVolumeClaim {
 	// Not supported for vSphere
 	return nil
 }
