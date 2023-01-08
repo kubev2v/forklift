@@ -36,7 +36,6 @@ var _ = Describe("[level:component]Migration tests for vSphere provider", func()
 		err = utils.WaitForProviderReadyWithTimeout(f.CrClient, f.Namespace.Name, providerName, 30*time.Second)
 		Expect(err).ToNot(HaveOccurred())
 		provider, err := utils.GetProvider(f.CrClient, providerName, f.Namespace.Name)
-
 		Expect(err).ToNot(HaveOccurred())
 		By("Create Network Map")
 		networkMapDef := utils.NewNetworkMap(namespace, *provider, networkMapName, "dvportgroup-13")

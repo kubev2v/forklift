@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/konveyor/forklift-controller/pkg/apis"
-	"github.com/konveyor/forklift-controller/tests/suit/utils"
 	"k8s.io/klog/v2"
 	"os"
 	"os/exec"
@@ -94,7 +93,6 @@ type Framework struct {
 	// Namespace provides a namespace for each test generated/unique ns per test
 	Namespace *v1.Namespace
 	// Namespace2 provides an additional generated/unique secondary ns for testing across namespaces (eg. clone tests)
-	Namespace2         *v1.Namespace // note: not instantiated in NewFramework
 	namespacesToDelete []*v1.Namespace
 
 	// ControllerPod provides a pointer to our test controller pod
@@ -171,10 +169,6 @@ func (f *Framework) CreateNamespace(prefix string, labels map[string]string) (*v
 	}
 	// pod-security.kubernetes.io/<MODE>: <LEVEL>
 	labels["pod-security.kubernetes.io/enforce"] = "restricted"
-	if utils.IsOpenshift(f.K8sClient) {
-		labels["security.openshift.io/scc.podSecurityLabelSync"] = "false"
-	}
-
 	ns := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: fmt.Sprintf("forklift-e2e-tests-%s-", prefix),
