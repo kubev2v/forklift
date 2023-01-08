@@ -85,6 +85,9 @@ func (r *RegionAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 func (r *RegionAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
 	opts := &RegionListOpts{}
 	regionList, err := ctx.client.list(RegionResource, opts)
+	if err != nil {
+		return
+	}
 	for _, region := range regionList.([]Region) {
 		updater := func(tx *libmodel.Tx) (err error) {
 			m := &model.Region{
@@ -134,6 +137,9 @@ func (r *ProjectAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 func (r *ProjectAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
 	opts := &ProjectListOpts{}
 	projectList, err := ctx.client.list(ProjectResource, opts)
+	if err != nil {
+		return
+	}
 	for _, project := range projectList.([]Project) {
 		updater := func(tx *libmodel.Tx) (err error) {
 			m := &model.Project{
@@ -183,6 +189,9 @@ func (r *FlavorAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 func (r *FlavorAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
 	opts := &FlavorListOpts{}
 	flavorList, err := ctx.client.list(FlavorResource, opts)
+	if err != nil {
+		return
+	}
 	for _, flavor := range flavorList.([]Flavor) {
 		updater := func(tx *libmodel.Tx) (err error) {
 			m := &model.Flavor{
@@ -230,11 +239,12 @@ func (r *ImageAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 }
 
 func (r *ImageAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
-	ctx.log.Info("Get Updates")
 	opts := &ImageListOpts{}
 	opts.setUpdateAtQueryFilterGTE(lastSync)
 	imageList, err := ctx.client.list(ImageResource, opts)
-
+	if err != nil {
+		return
+	}
 	for _, image := range imageList.([]Image) {
 		switch image.Status {
 		case ImageStatusDeleted, ImageStatusPendingDelete:
@@ -298,6 +308,9 @@ func (r *VolumeAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 func (r *VolumeAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
 	opts := &VolumeListOpts{}
 	volumeList, err := ctx.client.list(VolumeResource, opts)
+	if err != nil {
+		return
+	}
 	for _, volume := range volumeList.([]Volume) {
 		switch volume.Status {
 		case VolumeStatusDeleting:
@@ -364,6 +377,9 @@ func (r *VMAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Upda
 	opts := &VMListOpts{}
 	opts.ChangesSince = lastSync.Format(time.RFC3339)
 	vmList, err := ctx.client.list(VmResource, opts)
+	if err != nil {
+		return
+	}
 	for _, server := range vmList.([]VM) {
 		switch server.Status {
 		case VMStatusDeleted, VMStatusSoftDeleted:
