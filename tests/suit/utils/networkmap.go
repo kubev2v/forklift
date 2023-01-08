@@ -15,13 +15,6 @@ import (
 	"time"
 )
 
-const (
-	networkMapPollInterval = 3 * time.Second
-	networkMapCreateTime   = 270 * time.Second
-	dataVolumeDeleteTime   = 270 * time.Second
-	dataVolumePhaseTime    = 270 * time.Second
-)
-
 // CreateNetworkMapFromDefinition is used by tests to create a NetworkMap
 func CreateNetworkMapFromDefinition(cl crclient.Client, def *forkliftv1.NetworkMap) error {
 	var err error

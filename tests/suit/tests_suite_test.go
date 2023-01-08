@@ -10,12 +10,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"testing"
-	"time"
-)
-
-const (
-	pollInterval     = 2 * time.Second
-	nsDeletedTimeout = 270 * time.Second
 )
 
 var (
