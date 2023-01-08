@@ -84,6 +84,7 @@ func (r *Client) connect() (err error) {
 			Password:    r.password(),
 			ProjectName: r.projectName(),
 			DomainName:  r.domainName(),
+			AllowReauth: true,
 		},
 		HTTPClient: &http.Client{
 			Transport: &http.Transport{
