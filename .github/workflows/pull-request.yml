@@ -24,6 +24,8 @@ jobs:
 
       - name: Build and setup everything with bazel
         uses: kubev2v/forkliftci@main
+        with:
+          gh_access_token: ${{ secrets.GITHUB_TOKEN }}
 
       - run: kubectl version
 
