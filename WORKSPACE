@@ -9,6 +9,54 @@ http_archive(
     ],
 )
 
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+http_archive(
+    name = "rules_python",
+    sha256 = "497ca47374f48c8b067d786b512ac10a276211810f4a580178ee9b9ad139323a",
+    strip_prefix = "rules_python-0.16.1",
+    url = "https://github.com/bazelbuild/rules_python/archive/refs/tags/0.16.1.tar.gz",
+)
+
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+http_archive(
+    name = "bazel_skylib",
+    sha256 = "74d544d96f4a5bb630d465ca8bbcfe231e3594e5aae57e1edbf17a6eb3ca2506",
+    urls = [
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.3.0/bazel-skylib-1.3.0.tar.gz",
+        "https://github.com/bazelbuild/bazel-skylib/releases/download/1.3.0/bazel-skylib-1.3.0.tar.gz",
+    ],
+)
+
+load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
+
+bazel_skylib_workspace()
+
+load("@rules_python//python:repositories.bzl", "python_register_toolchains")
+
+python_register_toolchains(
+    name = "python3_9",
+    # Available versions are listed in @rules_python//python:versions.bzl.
+    # We recommend using the same version your team is already standardized on.
+    python_version = "3.9",
+)
+
+load("@python3_9//:defs.bzl", "interpreter")
+load("@rules_python//python:pip.bzl", "pip_parse")
+
+pip_parse(
+    name = "my_deps",
+    python_interpreter_target = interpreter,
+    requirements_lock = "//:requirements.txt",
+)
+
+# Load the starlark macro which will define your dependencies.
+load("@my_deps//:requirements.bzl", "install_deps")
+
+# Call it to define repos for your requirements.
+install_deps()
+
 http_archive(
     name = "bazel_gazelle",
     sha256 = "448e37e0dbf61d6fa8f00aaa12d191745e14f07c31cabfa731f0c8e8a4f41b97",
@@ -3616,6 +3664,18 @@ rpm(
 )
 
 rpm(
+    name = "coreutils-0__8.32-33.el9.x86_64",
+    sha256 = "04e7c56f1f980a7e78bae39786ffd56a6cc762b21779df076c9addda54a5e126",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/coreutils-8.32-33.el9.x86_64.rpm"],
+)
+
+rpm(
+    name = "coreutils-common-0__8.32-33.el9.x86_64",
+    sha256 = "9964fb4e2afc30696d12d7f0e135a05ae448077c5ca5689f173acb44cedfd803",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/coreutils-common-8.32-33.el9.x86_64.rpm"],
+)
+
+rpm(
     name = "coreutils-single-0__8.32-33.el9.x86_64",
     sha256 = "ada0b3dfc46e2944206ca4af18a87067cc2a3d2f802ac7b49c627e3a46f1dd16",
     urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/coreutils-single-8.32-33.el9.x86_64.rpm"],
@@ -3646,9 +3706,9 @@ rpm(
 )
 
 rpm(
-    name = "curl-0__7.76.1-21.el9.x86_64",
-    sha256 = "47129405ce7bdde445079794b228bc51a6e9609fa9d68f6f812682fbe0bb962b",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/curl-7.76.1-21.el9.x86_64.rpm"],
+    name = "curl-minimal-0__7.76.1-21.el9.x86_64",
+    sha256 = "a6fb3685ef60b3f194f71ce63c37277719ac30f8c1df89ed3b70f7cd665c0cd7",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/curl-minimal-7.76.1-21.el9.x86_64.rpm"],
 )
 
 rpm(
@@ -3880,15 +3940,15 @@ rpm(
 )
 
 rpm(
-    name = "glibc-langpack-cy-0__2.34-54.el9.x86_64",
-    sha256 = "04cb3da82c9e3348c7e2977ce2409399ccdc019272f33682921e920f6e81e454",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/glibc-langpack-cy-2.34-54.el9.x86_64.rpm"],
+    name = "glibc-langpack-tg-0__2.34-54.el9.x86_64",
+    sha256 = "c1924de63cd7e85594010fe081935e1a3322d5f6bb9fe3410f82ee1e8ade7c46",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/glibc-langpack-tg-2.34-54.el9.x86_64.rpm"],
 )
 
 rpm(
-    name = "glibc-langpack-fr-0__2.34-54.el9.x86_64",
-    sha256 = "f05670df408197cc44f34d1ca395cf2a947221449ef5f8a3c7b122a0fb085b47",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/glibc-langpack-fr-2.34-54.el9.x86_64.rpm"],
+    name = "glibc-langpack-to-0__2.34-54.el9.x86_64",
+    sha256 = "d407b58c752deba7577460c0f5d935fa35fa5ffab4d18ffce57d1f1967c5caa2",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/glibc-langpack-to-2.34-54.el9.x86_64.rpm"],
 )
 
 rpm(
@@ -5029,12 +5089,6 @@ rpm(
     name = "osinfo-db-tools-0__1.10.0-1.el9.x86_64",
     sha256 = "2681f49bf19314e44e7189852d6fbfc22fc3ed428240df9f3936a5200c14ddd0",
     urls = ["https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/osinfo-db-tools-1.10.0-1.el9.x86_64.rpm"],
-)
-
-rpm(
-    name = "ovirt-imageio-common-0__2.4.7-1.el9.x86_64",
-    sha256 = "a50c13b4734da8472a646a0811a8aa11bb38ce19b2a206f5403e8d3798597be5",
-    urls = ["https://mirror.stream.centos.org/SIGs/9-stream/virt/x86_64/ovirt-45/Packages/o/ovirt-imageio-common-2.4.7-1.el9.x86_64.rpm"],
 )
 
 rpm(

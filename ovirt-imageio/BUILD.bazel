@@ -1,4 +1,6 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load("@rules_python//python:defs.bzl", "py_library")
+load("@my_deps//:requirements.bzl", "requirement")
 
 go_library(
     name = "ovirt-imageio_lib",
@@ -19,8 +21,17 @@ go_library(
     ],
 )
 
+py_library(
+    name = "py_test",
+    srcs = ["main.py"],
+    deps = [
+        requirement("ovirt-imageio"),
+    ],
+)
+
 go_binary(
     name = "ovirt-imageio",
+    data = [":py_test"],
     embed = [":ovirt-imageio_lib"],
     visibility = ["//visibility:public"],
 )

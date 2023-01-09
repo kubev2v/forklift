@@ -21,4 +21,9 @@ go_test(
     name = "logging_test",
     srcs = ["logger_test.go"],
     embed = [":logging"],
+    deps = [
+        "//pkg/lib/error",
+        "//vendor/github.com/go-logr/logr",
+        "//vendor/github.com/onsi/gomega",
+    ],
 )

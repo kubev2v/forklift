@@ -23,7 +23,6 @@ virt_v2v="
 ovirt_imageio="
   python3-devel
   python3-ovirt-engine-sdk4
-  ovirt-imageio-common
   qemu-img
 "
 
