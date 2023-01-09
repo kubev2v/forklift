@@ -7,7 +7,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"testing"
 )
 
@@ -93,7 +92,6 @@ func TestMapperCreate(t *testing.T) {
 	mapper := EventMapper{Map: m}
 	mapper.Create(
 		event.CreateEvent{
-			Meta:   thing,
 			Object: thing,
 		})
 
@@ -162,14 +160,11 @@ func TestMapperUpdate(t *testing.T) {
 	mapper := EventMapper{Map: m}
 	mapper.Create(
 		event.CreateEvent{
-			Meta:   old,
 			Object: old,
 		})
 	mapper.Update(
 		event.UpdateEvent{
-			MetaOld:   old,
 			ObjectOld: old,
-			MetaNew:   new,
 			ObjectNew: new,
 		})
 
@@ -229,7 +224,6 @@ func TestMapperDelete(t *testing.T) {
 	mapper := EventMapper{Map: m}
 	mapper.Create(
 		event.CreateEvent{
-			Meta:   thing,
 			Object: thing,
 		})
 	owner := Owner{
@@ -254,7 +248,6 @@ func TestMapperDelete(t *testing.T) {
 	// Test
 	mapper.Delete(
 		event.DeleteEvent{
-			Meta:   thing,
 			Object: thing,
 		})
 
@@ -302,16 +295,13 @@ func TestHandler(t *testing.T) {
 	mapper := EventMapper{Map}
 	mapper.Create(
 		event.CreateEvent{
-			Meta:   owner,
 			Object: owner,
 		})
 
 	list := GetRequests(
 		ToKind(&_Thing{}),
-		handler.MapObject{
-			Meta:   target,
-			Object: target,
-		})
+		target,
+	)
 
 	g.Expect(len(list)).To(gomega.Equal(1))
 }
