@@ -14,6 +14,7 @@ go_library(
         "//pkg/controller/base",
         "//pkg/controller/provider/container",
         "//pkg/controller/provider/container/ovirt",
+        "//pkg/controller/provider/container/vsphere",
         "//pkg/controller/provider/model",
         "//pkg/controller/provider/web",
         "//pkg/controller/validation/policy",

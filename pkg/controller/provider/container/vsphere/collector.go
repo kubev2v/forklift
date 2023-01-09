@@ -5,6 +5,7 @@ import (
 	"net/http"
 	liburl "net/url"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -917,4 +918,21 @@ func (r Collector) applyLeave(tx *libmodel.Tx, u types.ObjectUpdate) error {
 	}
 
 	return nil
+}
+
+
+// GetInsecureSkipVerifyFlag gets the insecureSkipVerify boolean flag
+// value from the VSphere connection secret.
+func GetInsecureSkipVerifyFlag(secret *core.Secret) bool {
+	insecure, found := secret.Data["insecureSkipVerify"]
+	if !found {
+		return false
+	}
+
+	insecureSkipVerify, err := strconv.ParseBool(string(insecure))
+	if err != nil {
+		return false
+	}
+
+	return insecureSkipVerify
 }
