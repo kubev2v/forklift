@@ -9,6 +9,7 @@ import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/ovirt"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/vsphere"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
@@ -206,6 +207,16 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 	case api.OpenShift:
 		keyList = []string{"token"}
 	case api.VSphere:
+		if vsphere.GetInsecureSkipVerifyFlag(secret) {
+			provider.Status.SetCondition(libcnd.Condition{
+				Type:     ConnectionInsecure,
+				Status:   True,
+				Reason:   SkipTLSVerification,
+				Category: Warn,
+				Message:  "TLS is susceptible to machine-in-the-middle attacks when certificate verification is skipped.",
+			})
+                }
+
 		keyList = []string{
 			"user",
 			"password",
