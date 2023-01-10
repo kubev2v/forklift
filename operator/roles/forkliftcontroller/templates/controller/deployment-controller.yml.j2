@@ -167,6 +167,11 @@ spec:
         - name: PROFILE_DURATION
           value: "{{ controller_profile_duration }}"
 {% endif %}
+{% if virt_v2v_dont_request_kvm|bool %}
+        - name: VIRT_V2V_DONT_REQUEST_KVM
+          value: "true"
+{% endif %}
+
         envFrom:
         - configMapRef:
             name: {{ controller_configmap_name }}
