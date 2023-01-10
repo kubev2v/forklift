@@ -7,11 +7,12 @@ import (
 
 // Environment variables.
 const (
-	MaxVmInFlight   = "MAX_VM_INFLIGHT"
-	HookRetry       = "HOOK_RETRY"
-	ImporterRetry   = "IMPORTER_RETRY"
-	VirtV2vImage    = "VIRT_V2V_IMAGE"
-	PrecopyInterval = "PRECOPY_INTERVAL"
+	MaxVmInFlight         = "MAX_VM_INFLIGHT"
+	HookRetry             = "HOOK_RETRY"
+	ImporterRetry         = "IMPORTER_RETRY"
+	VirtV2vImage          = "VIRT_V2V_IMAGE"
+	PrecopyInterval       = "PRECOPY_INTERVAL"
+	VirtV2vDontRequestKVM = "VIRT_V2V_DONT_REQUEST_KVM"
 )
 
 // Default virt-v2v image.
@@ -31,6 +32,8 @@ type Migration struct {
 	PrecopyInterval int
 	// Virt-v2v image for guest conversion
 	VirtV2vImage string
+	// Virt-v2v require KVM flags for guest conversion
+	VirtV2vDontRequestKVM bool
 }
 
 // Load settings.
@@ -57,5 +60,6 @@ func (r *Migration) Load() (err error) {
 	} else {
 		r.VirtV2vImage = DefaultVirtV2vImage
 	}
+	r.VirtV2vDontRequestKVM = getEnvBool(VirtV2vDontRequestKVM, false)
 	return
 }
