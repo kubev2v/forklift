@@ -102,7 +102,6 @@ func (r *Handler) changed(models ...*vsphere.Host) {
 					h.Namespace,
 					h.Name))
 			r.Enqueue(event.GenericEvent{
-				Meta:   &h.ObjectMeta,
 				Object: h,
 			})
 		}

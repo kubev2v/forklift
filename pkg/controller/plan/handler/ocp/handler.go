@@ -86,7 +86,6 @@ func (r *Handler) changed(vm *ocp.VM) {
 					plan.Namespace,
 					plan.Name))
 			r.Enqueue(event.GenericEvent{
-				Meta:   &plan.ObjectMeta,
 				Object: plan,
 			})
 		}

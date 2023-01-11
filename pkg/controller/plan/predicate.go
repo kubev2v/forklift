@@ -8,7 +8,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
-	k8shandler "sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -276,8 +275,8 @@ func (r MigrationPredicate) Generic(e event.GenericEvent) bool {
 }
 
 // Plan request for Migration.
-func RequestForMigration(a k8shandler.MapObject) (list []reconcile.Request) {
-	if m, cast := a.Object.(*api.Migration); cast {
+func RequestForMigration(a client.Object) (list []reconcile.Request) {
+	if m, cast := a.(*api.Migration); cast {
 		ref := &m.Spec.Plan
 		if !libref.RefSet(ref) {
 			return

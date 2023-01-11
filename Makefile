@@ -89,6 +89,15 @@ push-operator: build-operator
 	$(CONTAINER_CMD) tag operator:forklift-operator-image ${OPERATOR_IMAGE}
 	$(CONTAINER_CMD) push ${OPERATOR_IMAGE}
 
+# Build the docker image
+build-imageio:
+	bazel run ovirt-imageio/ovirt-imageio-image
+
+# Push the docker image
+push-imageio: build-operator
+	$(CONTAINER_CMD) tag operator:forklift-operator-image ${IMAGEIO_IMAGE}
+	$(CONTAINER_CMD) push ${IMAGEIO_IMAGE}
+
 bazel-generate:
 	bazel run //:gazelle
 

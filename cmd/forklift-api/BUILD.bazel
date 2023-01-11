@@ -8,7 +8,7 @@ go_library(
     deps = [
         "//pkg/forklift-api",
         "//vendor/github.com/go-logr/logr",
-        "//vendor/sigs.k8s.io/controller-runtime/pkg/runtime/log",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/log",
     ],
 )
 

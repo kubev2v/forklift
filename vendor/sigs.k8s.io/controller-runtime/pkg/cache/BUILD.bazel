@@ -24,5 +24,6 @@ go_library(
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client/apiutil",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/internal/log",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/internal/objectutil",
     ],
 )

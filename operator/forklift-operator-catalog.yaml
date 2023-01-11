@@ -4,7 +4,10 @@ metadata:
   name: konveyor-forklift
   namespace: openshift-marketplace
 spec:
-  displayName: Forklift Operator
+  displayName: Liran Rotenberg
   publisher: Konveyor
   sourceType: grpc
-  image: quay.io/kubev2v/forklift-operator-index:latest
+  image: quay.io/lrotenbe/forklift-operator-index:latest
+  updateStrategy:
+    registryPoll:
+      interval: 10m0s

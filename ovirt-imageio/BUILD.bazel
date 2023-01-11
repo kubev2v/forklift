@@ -1,0 +1,51 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load("@rules_python//python:defs.bzl", "py_library")
+load("@my_deps//:requirements.bzl", "requirement")
+
+go_library(
+    name = "ovirt-imageio_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/konveyor/forklift-controller/ovirt-imageio",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//ovirt-imageio/pkg/v1beta1",
+        "//vendor/github.com/kubernetes-csi/lib-volume-populator/populator-machinery",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:meta",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured",
+        "//vendor/k8s.io/apimachinery/pkg/runtime",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor/k8s.io/client-go/dynamic",
+        "//vendor/k8s.io/client-go/kubernetes",
+        "//vendor/k8s.io/client-go/rest",
+        "//vendor/k8s.io/klog/v2:klog",
+    ],
+)
+
+py_library(
+    name = "py_test",
+    srcs = ["main.py"],
+    deps = [
+        requirement("ovirt-imageio"),
+    ],
+)
+
+go_binary(
+    name = "ovirt-imageio",
+    data = [":py_test"],
+    embed = [":ovirt-imageio_lib"],
+    visibility = ["//visibility:public"],
+)
+
+load(
+    "@io_bazel_rules_docker//container:container.bzl",
+    "container_image",
+)
+
+container_image(
+    name = "ovirt-imageio-image",
+    base = "@ubi9-go-toolset//image",
+    directory = "/usr/local/bin/",
+    entrypoint = ["/usr/local/bin/main"],
+    files = [":ovirt-imageio"],
+    tars = ["//rpm:ovirt-imageio"],
+)

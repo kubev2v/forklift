@@ -11,13 +11,14 @@ go_library(
     importpath = "sigs.k8s.io/controller-runtime/pkg/webhook",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/prometheus/client_golang/prometheus",
-        "//vendor/github.com/prometheus/client_golang/prometheus/promhttp",
         "//vendor/gomodules.xyz/jsonpatch/v2:jsonpatch",
+        "//vendor/k8s.io/apimachinery/pkg/runtime",
+        "//vendor/k8s.io/client-go/kubernetes/scheme",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/certwatcher",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/healthz",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/internal/log",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/runtime/inject",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/webhook/admission",
-        "//vendor/sigs.k8s.io/controller-runtime/pkg/webhook/internal/certwatcher",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/webhook/internal/metrics",
     ],
 )

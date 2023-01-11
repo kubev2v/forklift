@@ -4,6 +4,7 @@ go_library(
     name = "intstr",
     srcs = [
         "generated.pb.go",
+        "instr_fuzz.go",
         "intstr.go",
     ],
     importmap = "github.com/konveyor/forklift-controller/vendor/k8s.io/apimachinery/pkg/util/intstr",

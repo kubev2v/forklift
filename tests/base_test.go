@@ -22,7 +22,8 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 var namespace = "konveyor-forklift"
@@ -35,7 +36,7 @@ func TestSanityOvirtProvider(t *testing.T) {
 	}
 
 	logf.SetLogger(
-		logf.ZapLogger(false))
+		zap.New(zap.UseDevMode(false)))
 	log := logf.Log.WithName("entrypoint")
 
 	customEnv := false

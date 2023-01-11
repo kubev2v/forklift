@@ -12,7 +12,6 @@ import (
 	auth "k8s.io/api/authentication/v1"
 	auth2 "k8s.io/api/authorization/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -24,7 +23,7 @@ type fakeWriter struct {
 
 func (r *fakeWriter) Create(
 	ctx context.Context,
-	object runtime.Object,
+	object client.Object,
 	option ...client.CreateOption) (err error) {
 	//
 	if tr, cast := object.(*auth.TokenReview); cast {
@@ -43,7 +42,7 @@ func (r *fakeWriter) Create(
 
 func (r *fakeWriter) Delete(
 	context.Context,
-	runtime.Object,
+	client.Object,
 	...client.DeleteOption) error {
 	//
 	return nil
@@ -51,7 +50,7 @@ func (r *fakeWriter) Delete(
 
 func (r *fakeWriter) Update(
 	context.Context,
-	runtime.Object,
+	client.Object,
 	...client.UpdateOption) error {
 	//
 	return nil
@@ -59,7 +58,7 @@ func (r *fakeWriter) Update(
 
 func (r *fakeWriter) Patch(
 	context.Context,
-	runtime.Object,
+	client.Object,
 	client.Patch,
 	...client.PatchOption) error {
 	//
@@ -68,7 +67,7 @@ func (r *fakeWriter) Patch(
 
 func (r *fakeWriter) DeleteAllOf(
 	context.Context,
-	runtime.Object,
+	client.Object,
 	...client.DeleteAllOfOption) error {
 	//
 	return nil

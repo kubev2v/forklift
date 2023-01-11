@@ -1,0 +1,16 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "v1beta1",
+    srcs = [
+        "doc.go",
+        "ovirtimageiopopulator.go",
+        "zz_generated.deepcopy.go",
+    ],
+    importpath = "github.com/konveyor/forklift-controller/ovirt-imageio/pkg/v1beta1",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:meta",
+        "//vendor/k8s.io/apimachinery/pkg/runtime",
+    ],
+)

@@ -95,6 +95,7 @@ spec:
                         description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
                         type: string
                     type: object
+                    x-kubernetes-map-type: atomic
                   storage:
                     description: Storage.
                     properties:
@@ -131,6 +132,7 @@ spec:
                         description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
                         type: string
                     type: object
+                    x-kubernetes-map-type: atomic
                 required:
                 - network
                 - storage
@@ -174,6 +176,7 @@ spec:
                         description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
                         type: string
                     type: object
+                    x-kubernetes-map-type: atomic
                   source:
                     description: Source.
                     properties:
@@ -210,6 +213,7 @@ spec:
                         description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
                         type: string
                     type: object
+                    x-kubernetes-map-type: atomic
                 required:
                 - destination
                 - source
@@ -254,6 +258,7 @@ spec:
                     description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
                     type: string
                 type: object
+                x-kubernetes-map-type: atomic
               vms:
                 description: List of VMs.
                 items:
@@ -303,6 +308,7 @@ spec:
                                 description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
                                 type: string
                             type: object
+                            x-kubernetes-map-type: atomic
                           step:
                             description: Pipeline step.
                             type: string
@@ -699,6 +705,7 @@ spec:
                                       https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
                                     type: string
                                 type: object
+                                x-kubernetes-map-type: atomic
                               step:
                                 description: Pipeline step.
                                 type: string

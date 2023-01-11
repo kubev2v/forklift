@@ -5,7 +5,7 @@ go_library(
     srcs = [
         "context.go",
         "error.go",
-        "extension-handler.go",
+        "extensions.go",
         "helpers.go",
         "main.go",
         "reader.go",
@@ -17,6 +17,7 @@ go_library(
         "//vendor/github.com/golang/protobuf/proto",
         "//vendor/github.com/golang/protobuf/ptypes/any",
         "//vendor/github.com/googleapis/gnostic/extensions",
-        "//vendor/gopkg.in/yaml.v2:yaml_v2",
+        "//vendor/github.com/googleapis/gnostic/jsonschema",
+        "//vendor/gopkg.in/yaml.v3:yaml_v3",
     ],
 )

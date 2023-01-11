@@ -18,6 +18,7 @@ go_test(
         "//vendor/k8s.io/client-go/kubernetes/scheme",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client/config",
-        "//vendor/sigs.k8s.io/controller-runtime/pkg/runtime/log",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/log",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/log/zap",
     ],
 )

@@ -49,8 +49,9 @@ go_library(
         "//vendor/kubevirt.io/client-go/api/v1:api",
         "//vendor/kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client/config",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/log",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/log/zap",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/manager",
-        "//vendor/sigs.k8s.io/controller-runtime/pkg/runtime/log",
-        "//vendor/sigs.k8s.io/controller-runtime/pkg/runtime/signals",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/manager/signals",
     ],
 )

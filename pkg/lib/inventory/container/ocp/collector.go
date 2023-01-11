@@ -50,8 +50,6 @@ type Collector struct {
 	manager manager.Manager
 	// A k8s non-cached client.
 	client client.Client
-	// The k8s manager/controller `stop` channel.
-	stopChannel chan struct{}
 	// Model event channel.
 	eventChannel chan ModelEvent
 	// The model version threshold used to determine if a
@@ -173,7 +171,6 @@ func (r *Collector) Start() error {
 func (r *Collector) start(ctx context.Context) (err error) {
 	r.versionThreshold = 0
 	r.eventChannel = make(chan ModelEvent, 100)
-	r.stopChannel = make(chan struct{})
 	defer func() {
 		if err != nil {
 			r.terminate()
@@ -189,7 +186,7 @@ func (r *Collector) start(ctx context.Context) (err error) {
 	if err != nil {
 		return
 	}
-	go r.manager.Start(r.stopChannel)
+	go r.manager.Start(ctx)
 	err = r.reconcileCollections(ctx)
 	if err != nil {
 		return
@@ -246,7 +243,6 @@ func (r *Collector) terminate() {
 	defer func() {
 		recover()
 	}()
-	close(r.stopChannel)
 	close(r.eventChannel)
 }
 
@@ -348,7 +344,7 @@ func (r *Collector) applyEvents() {
 }
 
 // Never called.
-func (r *Collector) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *Collector) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	return reconcile.Result{}, nil
 }
 

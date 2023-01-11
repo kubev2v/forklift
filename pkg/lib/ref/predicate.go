@@ -38,8 +38,8 @@ func (r *EventMapper) Create(event event.CreateEvent) {
 		kind)
 	refOwner := Owner{
 		Kind:      kind,
-		Namespace: event.Meta.GetNamespace(),
-		Name:      event.Meta.GetName(),
+		Namespace: event.Object.GetNamespace(),
+		Name:      event.Object.GetName(),
 	}
 	for _, ref := range r.findRefs(event.Object) {
 		r.Map.Add(refOwner, ref)
@@ -55,13 +55,13 @@ func (r *EventMapper) Update(event event.UpdateEvent) {
 		kind)
 	r.Map.DeleteOwner(Owner{
 		Kind:      kind,
-		Namespace: event.MetaOld.GetNamespace(),
-		Name:      event.MetaOld.GetName(),
+		Namespace: event.ObjectOld.GetNamespace(),
+		Name:      event.ObjectOld.GetName(),
 	})
 	refOwner := Owner{
 		Kind:      kind,
-		Namespace: event.MetaNew.GetNamespace(),
-		Name:      event.MetaNew.GetName(),
+		Namespace: event.ObjectNew.GetNamespace(),
+		Name:      event.ObjectNew.GetName(),
 	}
 	for _, ref := range r.findRefs(event.ObjectNew) {
 		r.Map.Add(refOwner, ref)
@@ -77,8 +77,8 @@ func (r *EventMapper) Delete(event event.DeleteEvent) {
 		kind)
 	r.Map.DeleteOwner(Owner{
 		Kind:      kind,
-		Namespace: event.Meta.GetNamespace(),
-		Name:      event.Meta.GetName(),
+		Namespace: event.Object.GetNamespace(),
+		Name:      event.Object.GetName(),
 	})
 }
 
