@@ -88,7 +88,6 @@ func (r *Handler) changed(network *ocp.NetworkAttachmentDefinition) {
 						mp.Namespace,
 						mp.Name))
 				r.Enqueue(event.GenericEvent{
-					Meta:   &mp.ObjectMeta,
 					Object: mp,
 				})
 			}

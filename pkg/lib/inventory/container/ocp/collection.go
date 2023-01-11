@@ -2,7 +2,7 @@ package ocp
 
 import (
 	"context"
-	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
@@ -12,7 +12,7 @@ type Collection interface {
 	// Bind to a collector.
 	Bind(*Collector)
 	// Get kubernetes resource object.
-	Object() runtime.Object
+	Object() client.Object
 	// Initial reconcile.
 	Reconcile(context.Context) error
 }
