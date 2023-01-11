@@ -10,8 +10,8 @@ import (
 	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 	core "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	cnv "kubevirt.io/client-go/api/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
@@ -22,7 +22,7 @@ type StorageClass struct {
 }
 
 // Get the kubernetes object being collected.
-func (r *StorageClass) Object() runtime.Object {
+func (r *StorageClass) Object() client.Object {
 	return &storage.StorageClass{}
 }
 
@@ -119,7 +119,7 @@ type NetworkAttachmentDefinition struct {
 }
 
 // Get the kubernetes object being collected.
-func (r *NetworkAttachmentDefinition) Object() runtime.Object {
+func (r *NetworkAttachmentDefinition) Object() client.Object {
 	return &net.NetworkAttachmentDefinition{}
 }
 
@@ -216,7 +216,7 @@ type Namespace struct {
 }
 
 // Get the kubernetes object being collected.
-func (r *Namespace) Object() runtime.Object {
+func (r *Namespace) Object() client.Object {
 	return &core.Namespace{}
 }
 
@@ -313,7 +313,7 @@ type VM struct {
 }
 
 // Get the kubernetes object being collected.
-func (r *VM) Object() runtime.Object {
+func (r *VM) Object() client.Object {
 	return &cnv.VirtualMachine{}
 }
 

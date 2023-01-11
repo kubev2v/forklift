@@ -86,7 +86,6 @@ func (r *Handler) changed(storageClass *ocp.StorageClass) {
 						mp.Namespace,
 						mp.Name))
 				r.Enqueue(event.GenericEvent{
-					Meta:   &mp.ObjectMeta,
 					Object: mp,
 				})
 			}

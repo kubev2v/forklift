@@ -19,7 +19,7 @@ package main
 import (
 	"github.com/go-logr/logr"
 	forklift_api "github.com/konveyor/forklift-controller/pkg/forklift-api"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var log logr.Logger

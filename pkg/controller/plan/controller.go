@@ -134,9 +134,7 @@ func Add(mgr manager.Manager) error {
 		&source.Kind{
 			Type: &api.Hook{},
 		},
-		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(RequestForMigration),
-		},
+		handler.EnqueueRequestsFromMapFunc(RequestForMigration),
 		&HookPredicate{})
 	if err != nil {
 		log.Trace(err)
@@ -147,9 +145,7 @@ func Add(mgr manager.Manager) error {
 		&source.Kind{
 			Type: &api.Migration{},
 		},
-		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(RequestForMigration),
-		},
+		handler.EnqueueRequestsFromMapFunc(RequestForMigration),
 		&MigrationPredicate{})
 	if err != nil {
 		log.Trace(err)
@@ -172,7 +168,7 @@ type Reconciler struct {
 // Reconcile a Plan CR.
 // Note: Must not a pointer receiver to ensure that the
 // logger and other state is not shared.
-func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Result, err error) {
+func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (result reconcile.Result, err error) {
 	r.Log = logging.WithName(
 		names.SimpleNameGenerator.GenerateName(Name+"|"),
 		"plan",
@@ -247,6 +243,8 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 
 	// Apply changes.
 	plan.Status.ObservedGeneration = plan.Generation
+	// The update removes plan.Referenced data
+	copyPlan := plan.DeepCopy()
 	err = r.Status().Update(context.TODO(), plan)
 	if err != nil {
 		return
@@ -255,7 +253,7 @@ func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Resul
 	//
 	// Execute.
 	// The plan is updated as needed to reflect status.
-	result.RequeueAfter, err = r.execute(plan)
+	result.RequeueAfter, err = r.execute(copyPlan)
 	if err != nil {
 		return
 	}

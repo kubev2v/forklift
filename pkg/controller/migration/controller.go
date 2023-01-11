@@ -103,7 +103,7 @@ type Reconciler struct {
 // Reconcile a Migration CR.
 // Note: Must not a pointer receiver to ensure that the
 // logger and other state is not shared.
-func (r Reconciler) Reconcile(request reconcile.Request) (result reconcile.Result, err error) {
+func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (result reconcile.Result, err error) {
 	r.Log = logging.WithName(
 		names.SimpleNameGenerator.GenerateName(Name+"|"),
 		"migration",

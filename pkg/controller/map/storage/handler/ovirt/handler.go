@@ -108,7 +108,6 @@ func (r *Handler) changed(models ...*ovirt.StorageDomain) {
 					mp.Namespace,
 					mp.Name))
 			r.Enqueue(event.GenericEvent{
-				Meta:   &mp.ObjectMeta,
 				Object: mp,
 			})
 		}
