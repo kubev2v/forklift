@@ -101,6 +101,11 @@
       state: present
       definition: "{{ lookup('template', 'api/validatingwebhookconfiguration-forklift-api.yml.j2') }}"
 
+  - name: "Setup api mutating webhook configuration"
+    k8s:
+      state: present
+      definition: "{{ lookup('template', 'api/mutatingwebhookconfiguration-forklift-api.yml.j2') }}"
+      
   - when: feature_validation|bool
     block:
     - name: "Setup validation service"

@@ -10,6 +10,7 @@ import (
 var log = logging.WithName("webhooks")
 
 const SecretValidatePath = "/secret-validate"
+const OvirtCaMutatorPath = "/secret-mutate"
 
 // AddToManagerFuncs is a list of functions to add all Controllers to the Manager
 var AddToManagerFuncs []func(manager.Manager) error
@@ -25,8 +26,16 @@ func AddToManager(m manager.Manager) error {
 }
 
 func RegisterValidatingWebhooks(mux *http.ServeMux) {
-	log.Info("register validation webhooks\n")
+	log.Info("register validation webhooks")
 	mux.HandleFunc(SecretValidatePath, func(w http.ResponseWriter, r *http.Request) {
 		ServeSecretCreate(w, r)
+	})
+
+}
+
+func RegisterMutetingWebhooks(mux *http.ServeMux) {
+	log.Info("register mutation webhook")
+	mux.HandleFunc(OvirtCaMutatorPath, func(w http.ResponseWriter, r *http.Request) {
+		ServeOvirtCa(w, r)
 	})
 }

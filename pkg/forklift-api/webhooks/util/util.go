@@ -11,6 +11,12 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type PatchOperation struct {
+	Op    string      `json:"op"`
+	Path  string      `json:"path"`
+	Value interface{} `json:"value"`
+}
+
 func GetAdmissionReview(r *http.Request) (*admissionv1.AdmissionReview, error) {
 	var body []byte
 	if r.Body != nil {
@@ -67,4 +73,17 @@ func ToAdmissionResponseError(err error) *admissionv1.AdmissionResponse {
 			Code:    http.StatusBadRequest,
 		},
 	}
+}
+
+func GeneratePatchPayload(patches ...PatchOperation) ([]byte, error) {
+	if len(patches) == 0 {
+		return nil, fmt.Errorf("list of patches is empty")
+	}
+
+	payloadBytes, err := json.Marshal(patches)
+	if err != nil {
+		return nil, err
+	}
+
+	return payloadBytes, nil
 }
