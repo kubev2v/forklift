@@ -2,14 +2,16 @@ package web
 
 import (
 	"fmt"
+	"net/http"
+	"strings"
+
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	"net/http"
-	"strings"
 )
 
 // Resource kind cannot be resolved.
@@ -65,6 +67,14 @@ func NewClient(provider *api.Provider) (client Client, err error) {
 			finder:   &ovirt.Finder{},
 			restClient: base.RestClient{
 				Resolver: &ovirt.Resolver{Provider: provider},
+			},
+		}
+	case api.OpenStack:
+		client = &ProviderClient{
+			provider: provider,
+			finder:   &openstack.Finder{},
+			restClient: base.RestClient{
+				Resolver: &openstack.Resolver{Provider: provider},
 			},
 		}
 	default:
