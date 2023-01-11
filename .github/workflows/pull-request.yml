@@ -51,13 +51,6 @@ jobs:
           kind get kubeconfig > /tmp/kubeconfig
           GOPATH=${GITHUB_WORKSPACE}/go make e2e-sanity
 
-      # Push code coverage using Codecov Action
-      - name: Push code coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          fail_ci_if_error: false # see https://github.com/codecov/codecov-action/issues/598
-
-
   build:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
