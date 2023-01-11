@@ -108,3 +108,44 @@ func (r *Finder) Workload(ref *base.Ref) (object interface{}, err error) {
 
 	return
 }
+
+// REST Resource.
+type Network struct {
+	Resource
+}
+
+func (r *Finder) Network(ref *base.Ref) (object interface{}, err error) {
+	network := &Network{}
+	err = r.ByRef(network, *ref)
+	if err == nil {
+		ref.ID = network.ID
+		ref.Name = network.Name
+		object = network
+	}
+
+	return
+}
+
+// REST Resource.
+type Storage struct {
+	Resource
+}
+
+// Find storage by ref.
+// Returns the matching resource and:
+//
+//	ProviderNotSupportedErr
+//	ProviderNotReadyErr
+//	NotFoundErr
+//	RefNotUniqueErr
+func (r *Finder) Storage(ref *base.Ref) (object interface{}, err error) {
+	s := &Storage{}
+	err = r.ByRef(s, *ref)
+	if err == nil {
+		ref.ID = s.ID
+		ref.Name = s.Name
+		object = s
+	}
+
+	return
+}
