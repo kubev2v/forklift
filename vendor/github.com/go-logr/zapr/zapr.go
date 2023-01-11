@@ -151,6 +151,10 @@ func (zl *zapLogger) WithName(name string) logr.Logger {
 	return newLoggerWithExtraSkip(newLogger, 0)
 }
 
+func (zl *zapLogger) WithCallDepth(depth int) logr.Logger {
+	return newLoggerWithExtraSkip(zl.l, depth)
+}
+
 // Underlier exposes access to the underlying logging implementation.  Since
 // callers only have a logr.Logger, they have to know which implementation is
 // in use, so this interface is less of an abstraction and more of way to test
@@ -177,3 +181,6 @@ func NewLogger(l *zap.Logger) logr.Logger {
 	// creates a new logger skipping one level of callstack
 	return newLoggerWithExtraSkip(l, 1)
 }
+
+var _ logr.Logger = &zapLogger{}
+var _ logr.CallDepthLogger = &zapLogger{}

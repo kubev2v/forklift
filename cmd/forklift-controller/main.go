@@ -34,9 +34,10 @@ import (
 	cnv "kubevirt.io/client-go/api/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
+	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
 
 // Application settings.
@@ -51,7 +52,7 @@ func init() {
 		panic(err)
 	}
 	logf.SetLogger(
-		logf.ZapLogger(Settings.Logging.Development))
+		zap.New(zap.UseDevMode(Settings.Logging.Development)))
 	log = logf.Log.WithName("entrypoint")
 }
 

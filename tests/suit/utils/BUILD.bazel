@@ -6,6 +6,7 @@ go_library(
         "common.go",
         "migration.go",
         "networkmap.go",
+        "plan.go",
         "pod.go",
         "provider.go",
         "secrets.go",
@@ -15,6 +16,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/apis/forklift/v1beta1",
+        "//pkg/apis/forklift/v1beta1/plan",
         "//pkg/apis/forklift/v1beta1/provider",
         "//pkg/apis/forklift/v1beta1/ref",
         "//vendor/github.com/onsi/ginkgo",

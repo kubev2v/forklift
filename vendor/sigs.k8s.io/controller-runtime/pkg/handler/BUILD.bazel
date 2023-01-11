@@ -19,6 +19,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor/k8s.io/apimachinery/pkg/types",
         "//vendor/k8s.io/client-go/util/workqueue",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/event",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/internal/log",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/reconcile",
