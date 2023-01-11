@@ -51,7 +51,7 @@ func (r *Handler) Created(e libweb.Event) {
 	}
 }
 
-// Resource created.
+// Resource updated.
 func (r *Handler) Updated(e libweb.Event) {
 	if ds, cast := e.Resource.(*openstack.Storage); cast {
 		updated := e.Updated.(*openstack.Storage)
