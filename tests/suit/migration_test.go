@@ -10,9 +10,12 @@ import (
 )
 
 const (
-	providerName   = "vsphere-provider"
-	networkMapName = "network-map-test"
-	namespace      = "konveyor-forklift"
+	providerName          = "vsphere-provider"
+	networkMapName        = "network-map-test"
+	namespace             = "konveyor-forklift"
+	test_migration_name   = "migration-test"
+	test_plan_name        = "plan-test"
+	test_storage_map_name = "test-storage-map-v"
 )
 
 var _ = Describe("[level:component]Migration tests for vSphere provider", func() {
@@ -44,17 +47,24 @@ var _ = Describe("[level:component]Migration tests for vSphere provider", func()
 		err = utils.WaitForNetworkMapReadyWithTimeout(f.CrClient, f.Namespace.Name, networkMapName, 10*time.Second)
 		Expect(err).ToNot(HaveOccurred())
 		By("Create Storage Map")
-		storageMapDef := utils.NewStorageMap(namespace, *provider, "test-storage-map-v", []string{"datastore-52"})
+		storageMapDef := utils.NewStorageMap(namespace, *provider, test_storage_map_name, []string{"datastore-52"})
 		err = utils.CreateStorageMapFromDefinition(f.CrClient, storageMapDef)
 		Expect(err).ToNot(HaveOccurred())
-		err = utils.WaitForStorageMapReadyWithTimeout(f.CrClient, f.Namespace.Name, "test-storage-map-v", 10*time.Second)
+		err = utils.WaitForStorageMapReadyWithTimeout(f.CrClient, f.Namespace.Name, test_storage_map_name, 10*time.Second)
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Creating plan")
-		planDenf := utils.NewPlan(namespace, *provider, "plan-test", "test-storage-map-v", networkMapName, []string{"DC0_H0_VM0"})
+		planDenf := utils.NewPlan(namespace, *provider, test_plan_name, test_storage_map_name, networkMapName, []string{"DC0_H0_VM0"})
 		err = utils.CreatePlanFromDefinition(f.CrClient, planDenf)
 		Expect(err).ToNot(HaveOccurred())
-		err = utils.WaitForPlanReadyWithTimeout(f.CrClient, f.Namespace.Name, "plan-test", 15*time.Second)
+		err = utils.WaitForPlanReadyWithTimeout(f.CrClient, f.Namespace.Name, test_plan_name, 15*time.Second)
+		Expect(err).ToNot(HaveOccurred())
+
+		By("Creating migration")
+		migrationDef := utils.NewMigration(provider.Namespace, test_migration_name, test_plan_name)
+		err = utils.CreateMigrationFromDefinition(f.CrClient, migrationDef)
+		Expect(err).ToNot(HaveOccurred())
+		err = utils.WaitForMigrationSucceededWithTimeout(f.CrClient, provider.Namespace, test_migration_name, 300*time.Second)
 		Expect(err).ToNot(HaveOccurred())
 
 	})
