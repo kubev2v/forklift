@@ -2,6 +2,11 @@ package ovirt
 
 import (
 	"fmt"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/populator"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"net/url"
 	"path"
 	"strings"
 
@@ -400,20 +405,20 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 	var kVolumes []cnv.Volume
 	var kDisks []cnv.Disk
 
+	// TODO may need to drop this part
 	pvcMap := make(map[string]*core.PersistentVolumeClaim)
 	for i := range persistentVolumeClaims {
 		pvc := &persistentVolumeClaims[i]
 		pvcMap[r.ResolvePersistentVolumeClaimIdentifier(pvc)] = pvc
 	}
 
-	for i, da := range vm.DiskAttachments {
-		pvc := pvcMap[da.Disk.ID]
-		volumeName := fmt.Sprintf("vol-%v", i)
+	for _, da := range vm.DiskAttachments {
+		volumeName := da.Disk.ID
 		volume := cnv.Volume{
 			Name: volumeName,
 			VolumeSource: cnv.VolumeSource{
 				PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
-					ClaimName: pvc.Name,
+					ClaimName: volumeName,
 				},
 			},
 		}
@@ -509,4 +514,49 @@ func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
 // Return a stable identifier for a PersistentDataVolume.
 func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string {
 	return pvc.Annotations[AnnImportDiskId]
+}
+
+// Build an OvirtImageIOPopulator for XDiskAttachment and source URL
+func (r *Builder) OvirtImageIOPopulator(da model.XDiskAttachment, sourceUrl *url.URL) *populator.OvirtImageIOPopulator {
+	return &populator.OvirtImageIOPopulator{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      da.DiskAttachment.ID,
+			Namespace: r.Plan.Spec.TargetNamespace,
+		},
+		Spec: populator.OvirtImageIOPopulatorSpec{
+			EngineURL:        fmt.Sprintf("https://%s", sourceUrl.Host),
+			EngineSecretName: r.Source.Secret.Name,
+			DiskID:           da.Disk.ID,
+		},
+	}
+}
+
+// Build a PersistentVolumeClaim with SourceRef for VolumePopulator
+func (r *Builder) PersistentVolumeClaimWithSourceRef(da model.XDiskAttachment, storageName *string, populatorName string,
+	accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "PersistentVolumeClaim",
+			"apiVersion": "v1",
+			"metadata": map[string]interface{}{
+				"name":      da.DiskAttachment.ID,
+				"namespace": r.Plan.Spec.TargetNamespace,
+			},
+			"spec": map[string]interface{}{
+				"storageClassName": storageName,
+				"resources": map[string]interface{}{
+					"requests": map[string]interface{}{
+						"storage": resource.NewQuantity(int64(float64(da.Disk.ProvisionedSize)*1.1), resource.BinarySI).String(),
+					},
+				},
+				"accessModes": accessModes,
+				"volumeMode":  volumeMode,
+				"dataSourceRef": map[string]interface{}{
+					"apiGroup": api.SchemeGroupVersion.Group,
+					"kind":     "OvirtImageIOPopulator",
+					"name":     populatorName,
+				},
+			},
+		},
+	}
 }

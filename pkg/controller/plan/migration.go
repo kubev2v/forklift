@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/populator"
 	"path"
+	"strconv"
 	"time"
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
@@ -19,6 +21,7 @@ import (
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Requeue
@@ -561,6 +564,11 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			vm.Phase = Completed
 		}
 	case CreateDataVolumes:
+		if r.kubevirt.isOvirtImageIO(vm) {
+			err = r.kubevirt.createVolumes(vm.Ref)
+			vm.Phase = r.next(vm.Phase)
+			return
+		}
 		step, found := vm.FindStep(r.step(vm))
 		if !found {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
@@ -632,6 +640,32 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			break
 		}
 		step.Phase = Running
+
+		if r.kubevirt.isOvirtImageIO(vm) {
+			ready, err := r.kubevirt.getOvirtPVCs(vm.Ref, step)
+			if err != nil {
+				step.AddError(err.Error())
+				err = nil
+				break
+			}
+			err = r.updateCopyProgressForOvirt(vm, step)
+
+			if err != nil {
+				step.AddError(err.Error())
+				err = nil
+				break
+			}
+
+			if ready {
+				step.Phase = Completed
+				vm.Phase = r.next(vm.Phase)
+				break
+			} else {
+				r.Log.Info("PVCs not ready yet")
+				break
+			}
+		}
+
 		err = r.updateCopyProgress(vm, step)
 		if err != nil {
 			step.AddError(err.Error())
@@ -1120,6 +1154,39 @@ func (r *Migration) setRunning(vm *plan.VMStatus, running bool) (err error) {
 	}
 
 	err = r.kubevirt.SetRunning(&vmCr, running)
+	return
+}
+
+func (r *Migration) updateCopyProgressForOvirt(vm *plan.VMStatus, step *plan.Step) (err error) {
+	pvcs, err := r.kubevirt.getPVCs(vm)
+	if err != nil {
+		return
+	}
+	for _, pvc := range pvcs {
+		claim := pvc.Spec.DataSource.Name
+		var task *plan.Task
+		found := false
+		task, found = step.FindTask(claim)
+		if !found {
+			continue
+		}
+
+		populatorCr := populator.OvirtImageIOPopulator{}
+		err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: claim}, &populatorCr)
+		if err != nil {
+			return
+		}
+
+		progress, parseErr := strconv.ParseInt(populatorCr.Status.Progress, 10, 64)
+		if err != nil {
+			return parseErr
+		}
+
+		percent := float64(progress/0x100000) / float64(task.Progress.Total)
+		task.Progress.Completed = int64(percent * float64(task.Progress.Total))
+	}
+
+	step.ReflectTasks()
 	return
 }
 
