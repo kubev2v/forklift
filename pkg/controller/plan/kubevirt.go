@@ -988,7 +988,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	// Request access to /dev/kvm via Kubevirt's Device Manager
 	// That is to ensure the appliance virt-v2v uses would not
 	// run in emulation mode, which is significantly slower
-	if !Settings.VirtV2vDontRequestKVM {
+	if Settings.VirtV2vDontRequestKVM != true {
 		resourceReq.Limits = core.ResourceList{
 			"devices.kubevirt.io/kvm": resource.MustParse("1"),
 		}
