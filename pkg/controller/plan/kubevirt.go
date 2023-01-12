@@ -717,39 +717,35 @@ func (r *KubeVirt) DeleteHookJobs(vm *plan.VMStatus) (err error) {
 }
 
 // Build the DataVolume CRs.
-func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap *core.ConfigMap) (objects []cdi.DataVolume, err error) {
+func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap *core.ConfigMap) (dataVolumes []cdi.DataVolume, err error) {
 	_, err = r.Source.Inventory.VM(&vm.Ref)
 	if err != nil {
 		return
 	}
 
-	dataVolumes, err := r.Builder.DataVolumes(vm.Ref, secret, configMap)
+        annotations := make(map[string]string)
+        if !r.Plan.Spec.Warm || Settings.RetainPrecopyImporterPods {
+            annotations[AnnRetainAfterCompletion] = "true"
+        }
+        if r.Plan.Spec.TransferNetwork != nil {
+            annotations[AnnDefaultNetwork] = path.Join(
+                r.Plan.Spec.TransferNetwork.Namespace, r.Plan.Spec.TransferNetwork.Name)
+        }
+        // Do not delete the DV when the import completes as we check the DV to get the current
+        // disk transfer status.
+        annotations[AnnDeleteAfterCompletion] = "false"
+        dvTemplate := cdi.DataVolume{
+            ObjectMeta: meta.ObjectMeta{
+                Namespace:   r.Plan.Spec.TargetNamespace,
+                Annotations: annotations,
+                GenerateName: r.getGeneratedName(vm),
+            },
+        }
+	dvTemplate.Labels = r.vmLabels(vm.Ref)
+
+	dataVolumes, err = r.Builder.DataVolumes(vm.Ref, secret, configMap, &dvTemplate)
 	if err != nil {
 		return
-	}
-
-	for i := range dataVolumes {
-		annotations := r.vmLabels(vm.Ref)
-		if !r.Plan.Spec.Warm || Settings.RetainPrecopyImporterPods {
-			annotations[AnnRetainAfterCompletion] = "true"
-		}
-		if r.Plan.Spec.TransferNetwork != nil {
-			annotations[AnnDefaultNetwork] = path.Join(
-				r.Plan.Spec.TransferNetwork.Namespace, r.Plan.Spec.TransferNetwork.Name)
-		}
-		// Do not delete the DV when the import completes as we check the DV to get the current
-		// disk transfer status.
-		annotations[AnnDeleteAfterCompletion] = "false"
-		dv := cdi.DataVolume{
-			ObjectMeta: meta.ObjectMeta{
-				Namespace:    r.Plan.Spec.TargetNamespace,
-				Annotations:  annotations,
-				GenerateName: r.getGeneratedName(vm),
-			},
-			Spec: dataVolumes[i],
-		}
-		dv.Labels = r.vmLabels(vm.Ref)
-		objects = append(objects, dv)
 	}
 
 	return

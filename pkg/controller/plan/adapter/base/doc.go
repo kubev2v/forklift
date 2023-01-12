@@ -10,6 +10,13 @@ import (
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
 
+// Annotations
+const (
+	// Used on DataVolume, contains disk source -- e.g. backing file in
+	// VMware or disk ID in oVirt.
+	AnnDiskSource = "forklift.konveyor.io/disk-source"
+)
+
 // Adapter API.
 // Constructs provider-specific implementations
 // of the Builder, Client, and Validator.
@@ -33,7 +40,7 @@ type Builder interface {
 	// Build the Kubevirt VirtualMachine spec.
 	VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []core.PersistentVolumeClaim) error
 	// Build DataVolumes.
-	DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap) (dvs []cdi.DataVolumeSpec, err error)
+	DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume) (dvs []cdi.DataVolume, err error)
 	// Build tasks.
 	Tasks(vmRef ref.Ref) ([]*planapi.Task, error)
 	// Build template labels.
