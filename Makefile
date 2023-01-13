@@ -62,32 +62,56 @@ vet:
 generate: controller-gen
 	${CONTROLLER_GEN} object:headerFile="./hack/boilerplate.go.txt" paths="./pkg/apis/..."
 
-# Build the docker image
-build-controller:
+build-controller-image:
 	bazel run cmd/forklift-controller:forklift-controller-image
 
-# Push the docker image
-push-contoller: build-controller
+push-controller-image: build-controller-image
 	$(CONTAINER_CMD) tag cmd/forklift-controller:forklift-controller-image ${IMG}
 	$(CONTAINER_CMD) push ${IMG}
 
-# Build the docker image
-build-api:
+build-api-image:
 	bazel run cmd/forklift-api:forklift-api-image
 
-# Push the docker image
-push-api: build-api
+push-api-image: build-api-image
 	$(CONTAINER_CMD) tag cmd/forklift-api:forklift-api-image ${API_IMAGE}
 	$(CONTAINER_CMD) push ${API_IMAGE}
 
-# Build the docker image
-build-operator:
+build-validation-image:
+	bazel run validation:forklift-validation-image
+
+push-validation-image: build-validation-image
+	$(CONTAINER_CMD) tag validation:forklift-validation-image ${VALIDATION_IMAGE}
+	$(CONTAINER_CMD) push ${VALIDATION_IMAGE}
+
+build-operator-image:
 	bazel run operator:forklift-operator-image
 
-# Push the docker image
-push-operator: build-operator
+push-operator-image: build-operator-image
 	$(CONTAINER_CMD) tag operator:forklift-operator-image ${OPERATOR_IMAGE}
 	$(CONTAINER_CMD) push ${OPERATOR_IMAGE}
+
+build-virt-v2v-image:
+	bazel run virt-v2v:virt-v2v-image
+
+push-virt-v2v-image: build-virt-v2v-image
+	$(CONTAINER_CMD) tag virt-v2v:virt-v2v-image ${VIRT_V2V_IMAGE}
+	$(CONTAINER_CMD) push ${VIRT_V2V_IMAGE}
+
+build-operator-bundle-image:
+	bazel run operator:forklift-operator-bundle-image --action_env CONTROLLER_IMAGE=${CONTROLLER_IMAGE} --action_env VALIDATION_IMAGE=${VALIDATION_IMAGE} --action_env OPERATOR_IMAGE=${OPERATOR_IMAGE} --action_env VIRT_V2V_IMAGE=${VIRT_V2v_IMAGE} --action_env API_IMAGE=${API_IMAGE}
+
+push-operator-bundle-image: build-operator-bundle-image
+	 $(CONTAINER_CMD) tag operator:forklift-operator-bundle-image ${OPERATOR_BUNDLE_IMAGE}
+	 $(CONTAINER_CMD) push ${OPERATOR_BUNDLE_IMAGE}
+
+build-operator-index-image:
+	bazel run operator:forklift-operator-index-image --action_env REGISTRY=${REGISTRY} --action_env REGISTRY_ACCOUNT=${REGISTRY_ACCOUNT} --action_env REGISTRY_TAG=${REGISTRY_TAG}
+
+push-operator-index-image: build-operator-index-image
+	$(CONTAINER_CMD) tag operator:forklift-operator-index-image ${OPERATOR_INDEX_IMAGE}
+	$(CONTAINER_CMD) push ${OPERATOR_INDEX_IMAGE}
+
+push-all-images: push-api-image push-controller-image push-validation-image push-operator-image push-virt-v2v-image push-operator-bundle-image push-operator-index-image
 
 bazel-generate:
 	bazel run //:gazelle
