@@ -1,5 +1,13 @@
-# Image URL to use all building/pushing image targets
-IMG ?= quay.io/ocpmigrate/forklift-controller:latest
+REGISTRY ?= quay.io
+REGISTRY_ACCOUNT ?= kubev2v
+REGISTRY_TAG ?= devel
+CONTROLLER_IMAGE ?= ${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-controller:${REGISTRY_TAG}
+API_IMAGE ?= ${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-api:${REGISTRY_TAG}
+VALIDATION_IMAGE ?= ${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-validation:${REGISTRY_TAG}
+VIRT_V2V_IMAGE ?= ${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-virt-v2v:${REGISTRY_TAG}
+OPERATOR_IMAGE ?= ${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-operator:${REGISTRY_TAG}
+OPERATOR_BUNDLE_IMAGE ?= ${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-operator-bundle:${REGISTRY_TAG}
+OPERATOR_INDEX_IMAGE ?= ${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-operator-index:${REGISTRY_TAG}
 GOOS ?= `go env GOOS`
 GOBIN ?= ${GOPATH}/bin
 GO111MODULE = auto
@@ -66,8 +74,8 @@ build-controller-image:
 	bazel run cmd/forklift-controller:forklift-controller-image
 
 push-controller-image: build-controller-image
-	$(CONTAINER_CMD) tag cmd/forklift-controller:forklift-controller-image ${IMG}
-	$(CONTAINER_CMD) push ${IMG}
+	$(CONTAINER_CMD) tag cmd/forklift-controller:forklift-controller-image ${CONTROLLER_IMAGE}
+	$(CONTAINER_CMD) push ${CONTROLLER_IMAGE}
 
 build-api-image:
 	bazel run cmd/forklift-api:forklift-api-image
