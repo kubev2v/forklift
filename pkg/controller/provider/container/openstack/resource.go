@@ -200,6 +200,8 @@ type VMListOpts struct {
 }
 
 func (r *VM) ApplyTo(m *model.VM) {
+	m.Name = r.Name
+	m.ID = r.ID
 	m.TenantID = r.TenantID
 	m.UserID = r.UserID
 	m.Updated = r.Updated
