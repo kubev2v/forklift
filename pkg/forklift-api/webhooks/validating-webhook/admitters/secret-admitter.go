@@ -64,7 +64,7 @@ func (admitter *SecretAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissio
 				Allowed: false,
 				Result: &metav1.Status{
 					Code:    http.StatusForbidden,
-					Message: err.Error(),
+					Message: "Invalid credentials",
 				},
 			}
 		} else {
