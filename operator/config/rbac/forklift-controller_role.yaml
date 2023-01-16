@@ -18,6 +18,8 @@ rules:
   - namespaces
   - events
   - configmaps
+  # PVs added for the populator(s) that uses the same role as forklift-controller
+  - persistentvolumes
   - persistentvolumeclaims
   verbs:
   - get
