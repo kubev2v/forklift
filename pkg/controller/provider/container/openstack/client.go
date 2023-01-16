@@ -46,8 +46,8 @@ const (
 
 // Client struct
 type Client struct {
-	url                 string
-	secret              *core.Secret
+	URL                 string
+	Secret              *core.Secret
 	provider            *gophercloud.ProviderClient
 	identityService     *gophercloud.ServiceClient
 	computeService      *gophercloud.ServiceClient
@@ -57,7 +57,7 @@ type Client struct {
 }
 
 // Connect.
-func (r *Client) connect() (err error) {
+func (r *Client) Connect() (err error) {
 	var TLSClientConfig *tls.Config
 
 	if r.provider != nil {
@@ -79,7 +79,7 @@ func (r *Client) connect() (err error) {
 
 	clientOpts := &clientconfig.ClientOpts{
 		AuthInfo: &clientconfig.AuthInfo{
-			AuthURL:     r.url,
+			AuthURL:     r.URL,
 			Username:    r.username(),
 			Password:    r.password(),
 			ProjectName: r.projectName(),
@@ -142,7 +142,7 @@ func (r *Client) connect() (err error) {
 
 // Username.
 func (r *Client) username() string {
-	if username, found := r.secret.Data["username"]; found {
+	if username, found := r.Secret.Data["username"]; found {
 		return string(username)
 	}
 	return ""
@@ -150,7 +150,7 @@ func (r *Client) username() string {
 
 // Password.
 func (r *Client) password() string {
-	if password, found := r.secret.Data["password"]; found {
+	if password, found := r.Secret.Data["password"]; found {
 		return string(password)
 	}
 	return ""
@@ -158,7 +158,7 @@ func (r *Client) password() string {
 
 // Project Name
 func (r *Client) projectName() string {
-	if projectName, found := r.secret.Data["projectName"]; found {
+	if projectName, found := r.Secret.Data["projectName"]; found {
 		return string(projectName)
 	}
 	return ""
@@ -166,7 +166,7 @@ func (r *Client) projectName() string {
 
 // Domain Name
 func (r *Client) domainName() string {
-	if domainName, found := r.secret.Data["domainName"]; found {
+	if domainName, found := r.Secret.Data["domainName"]; found {
 		return string(domainName)
 	}
 	return ""
@@ -174,7 +174,7 @@ func (r *Client) domainName() string {
 
 // Region
 func (r *Client) region() string {
-	if region, found := r.secret.Data["region"]; found {
+	if region, found := r.Secret.Data["region"]; found {
 		return string(region)
 	}
 	return ""
@@ -182,7 +182,7 @@ func (r *Client) region() string {
 
 // CA Certificate
 func (r *Client) cacert() string {
-	if cacert, found := r.secret.Data["cacert"]; found {
+	if cacert, found := r.Secret.Data["cacert"]; found {
 		return string(cacert)
 	}
 	return ""
@@ -190,7 +190,7 @@ func (r *Client) cacert() string {
 
 // Insecure
 func (r *Client) insecure() bool {
-	if insecure, found := r.secret.Data["insecure"]; found {
+	if insecure, found := r.Secret.Data["insecure"]; found {
 		insecure, err := strconv.ParseBool(string(insecure))
 		if err != nil {
 			return false
