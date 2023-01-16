@@ -362,7 +362,9 @@ func (r *VMAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	list := fb.NewList()
 	for _, server := range vmList.([]VM) {
 		m := &model.VM{
-			Base: model.Base{ID: server.ID},
+			Base: model.Base{
+				ID:   server.ID,
+				Name: server.Name},
 		}
 		server.ApplyTo(m)
 		list.Append(m)
