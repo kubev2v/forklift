@@ -1,0 +1,27 @@
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: {{ populator_controller_deployment_name }}
+  namespace: {{ app_namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ app_name }}
+  template:
+    metadata:
+      labels:
+        app: {{ app_name }}
+    spec:
+      serviceAccountName: forklift-controller
+      containers:
+        - name: {{ populator_controller_container_name }}
+          image: {{ populator_controller_image_fqin }}
+          imagePullPolicy: {{ image_pull_policy }}
+          args:
+            - --image-name={{ populator_ovirt_image_fqin }}
+            - --http-endpoint=:8080
+          ports:
+            - containerPort: 8080
+              name: http-endpoint
+              protocol: TCP
