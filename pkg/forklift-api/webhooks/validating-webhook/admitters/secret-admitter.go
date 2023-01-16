@@ -59,7 +59,7 @@ func (admitter *SecretAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissio
 		log.Info("Starting provider connection test")
 		status, err := collector.Test()
 		if err != nil && (status == http.StatusUnauthorized || status == http.StatusBadRequest) {
-			log.Info("Connection test failed, failing")
+			log.Info("Connection test failed, failing", "status", status)
 			return &admissionv1.AdmissionResponse{
 				Allowed: false,
 				Result: &metav1.Status{
@@ -69,7 +69,7 @@ func (admitter *SecretAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissio
 			}
 		} else {
 			if err != nil {
-				log.Info("Connection test failed, yet passing")
+				log.Info("Connection test failed, yet passing", "status", status, "error", err.Error())
 			} else {
 				log.Info("Test succeeded, passing")
 			}
