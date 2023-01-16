@@ -8,6 +8,7 @@ go_library(
     deps = [
         "//pkg/apis/forklift/v1beta1",
         "//pkg/controller/host/handler/ocp",
+        "//pkg/controller/host/handler/openstack",
         "//pkg/controller/host/handler/ovirt",
         "//pkg/controller/host/handler/vsphere",
         "//pkg/controller/watch/handler",

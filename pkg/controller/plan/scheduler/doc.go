@@ -4,6 +4,7 @@ import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	"github.com/konveyor/forklift-controller/pkg/controller/plan/scheduler/openstack"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/scheduler/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/scheduler/vsphere"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
@@ -27,6 +28,11 @@ func New(ctx *plancontext.Context) (scheduler Scheduler, err error) {
 		}
 	case api.OVirt:
 		scheduler = &ovirt.Scheduler{
+			Context:     ctx,
+			MaxInFlight: settings.Settings.MaxInFlight,
+		}
+	case api.OpenStack:
+		scheduler = &openstack.Scheduler{
 			Context:     ctx,
 			MaxInFlight: settings.Settings.MaxInFlight,
 		}
