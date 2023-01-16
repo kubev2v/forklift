@@ -1,18 +1,21 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
-    name = "handler",
-    srcs = ["doc.go"],
-    importpath = "github.com/konveyor/forklift-controller/pkg/controller/map/network/handler",
+    name = "openstack",
+    srcs = [
+        "doc.go",
+        "handler.go",
+    ],
+    importpath = "github.com/konveyor/forklift-controller/pkg/controller/map/network/handler/openstack",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/apis/forklift/v1beta1",
-        "//pkg/controller/map/network/handler/ocp",
-        "//pkg/controller/map/network/handler/openstack",
-        "//pkg/controller/map/network/handler/ovirt",
-        "//pkg/controller/map/network/handler/vsphere",
+        "//pkg/controller/provider/web/openstack",
         "//pkg/controller/watch/handler",
         "//pkg/lib/error",
+        "//pkg/lib/inventory/web",
+        "//pkg/lib/logging",
+        "//vendor/golang.org/x/net/context",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/event",
     ],
