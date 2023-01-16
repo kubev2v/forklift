@@ -3,6 +3,7 @@ package handler
 import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/map/network/handler/ocp"
+	"github.com/konveyor/forklift-controller/pkg/controller/map/network/handler/openstack"
 	"github.com/konveyor/forklift-controller/pkg/controller/map/network/handler/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/map/network/handler/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/watch/handler"
@@ -38,6 +39,11 @@ func New(
 			provider)
 	case api.OVirt:
 		h, err = ovirt.New(
+			client,
+			channel,
+			provider)
+	case api.OpenStack:
+		h, err = openstack.New(
 			client,
 			channel,
 			provider)
