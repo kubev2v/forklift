@@ -67,8 +67,8 @@ func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) (r *Collec
 
 	r = &Collector{
 		client: &Client{
-			url:    provider.Spec.URL,
-			secret: secret,
+			URL:    provider.Spec.URL,
+			Secret: secret,
 			log:    log,
 		},
 		provider: provider,
@@ -81,12 +81,12 @@ func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) (r *Collec
 
 // The name.
 func (r *Collector) Name() string {
-	url, err := liburl.Parse(r.client.url)
+	url, err := liburl.Parse(r.client.URL)
 	if err == nil {
 		return url.Host
 	}
 
-	return r.client.url
+	return r.client.URL
 }
 
 // The owner.
@@ -111,7 +111,7 @@ func (r *Collector) HasParity() bool {
 
 // Test connect/logout.
 func (r *Collector) Test() (_ int, err error) {
-	err = r.client.connect()
+	err = r.client.Connect()
 	return
 }
 
@@ -350,5 +350,5 @@ func (r *Collector) apply(changeSet []Updater) (err error) {
 
 // Connect.
 func (r *Collector) connect() error {
-	return r.client.connect()
+	return r.client.Connect()
 }
