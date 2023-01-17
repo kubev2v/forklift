@@ -135,12 +135,37 @@ func (h *ProviderHandler) AddDerived(r *Provider) (err error) {
 		return
 	}
 	db := h.Collector.DB()
-	// DataCenter
+	// Regions
+	n, err = db.Count(&openstack.Region{}, nil)
+	if err != nil {
+		return
+	}
+	r.RegionCount = n
+	// Project
+	n, err = db.Count(&openstack.Project{}, nil)
+	if err != nil {
+		return
+	}
+	r.ProjectCount = n
+	// VMs
 	n, err = db.Count(&openstack.VM{}, nil)
 	if err != nil {
 		return
 	}
-	r.ServerCount = n
+	r.VMCount = n
+	// Images
+	n, err = db.Count(&openstack.Image{}, nil)
+	if err != nil {
+		return
+	}
+	r.ImageCount = n
+	// Volumes
+	n, err = db.Count(&openstack.Volume{}, nil)
+	if err != nil {
+		return
+	}
+	r.VolumeCount = n
+	// TODO Networks
 
 	return
 }
@@ -151,9 +176,10 @@ type Provider struct {
 	Type         string       `json:"type"`
 	Object       api.Provider `json:"object"`
 	RegionCount  int64        `json:"regionCount"`
-	TenantCount  int64        `json:"tenantCount"`
-	ServerCount  int64        `json:"serverCount"`
-	NetworkCount int64        `json:"networkCount"`
+	ProjectCount int64        `json:"projectCount"`
+	VMCount      int64        `json:"vmCount"`
+	ImageCount   int64        `json:"imageCount"`
+	VolumeCount  int64        `json:"volumeCount"`
 }
 
 // Set fields with the specified object.
