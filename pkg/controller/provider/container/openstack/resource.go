@@ -55,7 +55,7 @@ type Project struct {
 }
 
 func (r *Project) ApplyTo(m *model.Project) {
-	m.Name = r.ID
+	m.Name = r.Name
 	m.Description = r.Description
 	m.Enabled = r.Enabled
 	m.IsDomain = r.IsDomain
@@ -204,6 +204,7 @@ func (r *VM) ApplyTo(m *model.VM) {
 	m.ID = r.ID
 	m.TenantID = r.TenantID
 	m.UserID = r.UserID
+	m.Name = r.Name
 	m.Updated = r.Updated
 	m.Created = r.Created
 	m.HostID = r.HostID
