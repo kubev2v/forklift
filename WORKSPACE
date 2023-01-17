@@ -36,6 +36,18 @@ http_file(
     ],
 )
 
+load("@io_bazel_rules_docker//toolchains/docker:toolchain.bzl",
+    docker_toolchain_configure="toolchain_configure"
+)
+
+docker_toolchain_configure(
+  name = "docker_config",
+  docker_path="${CONTAINER_CMD:-$(command -v podman||command -v docker)}",
+  docker_flags = [
+    "--log-level=info",
+  ],
+)
+
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 
