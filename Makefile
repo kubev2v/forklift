@@ -99,14 +99,14 @@ push-operator-image: build-operator-image
 	$(CONTAINER_CMD) push ${OPERATOR_IMAGE}
 
 build-virt-v2v-image:
-	bazel run virt-v2v:virt-v2v-image
+	bazel run virt-v2v:forklift-virt-v2v
 
 push-virt-v2v-image: build-virt-v2v-image
-	$(CONTAINER_CMD) tag virt-v2v:virt-v2v-image ${VIRT_V2V_IMAGE}
+	$(CONTAINER_CMD) tag virt-v2v:forklift-virt-v2v ${VIRT_V2V_IMAGE}
 	$(CONTAINER_CMD) push ${VIRT_V2V_IMAGE}
 
 build-operator-bundle-image:
-	bazel run operator:forklift-operator-bundle-image --action_env CONTROLLER_IMAGE=${CONTROLLER_IMAGE} --action_env VALIDATION_IMAGE=${VALIDATION_IMAGE} --action_env OPERATOR_IMAGE=${OPERATOR_IMAGE} --action_env VIRT_V2V_IMAGE=${VIRT_V2v_IMAGE} --action_env API_IMAGE=${API_IMAGE}
+	bazel run operator:forklift-operator-bundle-image --action_env CONTROLLER_IMAGE=${CONTROLLER_IMAGE} --action_env VALIDATION_IMAGE=${VALIDATION_IMAGE} --action_env OPERATOR_IMAGE=${OPERATOR_IMAGE} --action_env VIRT_V2V_IMAGE=${VIRT_V2V_IMAGE} --action_env API_IMAGE=${API_IMAGE}
 
 push-operator-bundle-image: build-operator-bundle-image
 	 $(CONTAINER_CMD) tag operator:forklift-operator-bundle-image ${OPERATOR_BUNDLE_IMAGE}
