@@ -5,6 +5,7 @@ import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
@@ -102,10 +103,32 @@ func (h ProviderHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
+	// OpenStack
+	openStackHandler := &openstack.ProviderHandler{
+		Handler: base.Handler{
+			Container: h.Container,
+		},
+	}
+	status, err = openStackHandler.Prepare(ctx)
+	if status != http.StatusOK {
+		ctx.Status(status)
+		base.SetForkliftError(ctx, err)
+		return
+	}
+	openStackList, err := openStackHandler.ListContent(ctx)
+	if err != nil {
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
 	r := Provider{
 		string(api.OpenShift): ocpList,
 		string(api.VSphere):   vSphereList,
 		string(api.OVirt):     oVirtList,
+		string(api.OpenStack): openStackList,
 	}
 
 	content := r
