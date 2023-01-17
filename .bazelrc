@@ -1,3 +1,6 @@
+# Container Runtime
+build --action_env=CONTAINER_CMD
+build --action_env=XDG_RUNTIME_DIR
 # Operator
 ## Default operator config
 build --action_env=VERSION=99.0.0
