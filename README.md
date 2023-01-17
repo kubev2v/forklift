@@ -57,13 +57,19 @@ export REGISTRY_TAG=latest
 
 CONTROLLER_IMAGE=quay.io/${REGISTRY_ACCOUNT}/forklift-controller:${REGISTRY_TAG}
 OPERATOR_IMAGE=quay.io/${REGISTRY_ACCOUNT}/forklift-operator:${REGISTRY_TAG}
-
+# If YAML files are added/modified `bazel clean` needs to be performed before building the image for the change to take effect
 bazel run push-forklift-operator
 bazel run push-forklift-operator-bundle --action_env OPERATOR_IMAGE=${OPERATOR_IMAGE} --action_env CONTROLLER_IMAGE=${CONTROLLER_IMAGE}
 # The build of the catalog requires already pushed bundle
 # For http registry add --action_env OPM_OPTS="--use-http"
 bazel run push-forklift-operator-index --action_env REGISTRY=${REGISTRY} --action_env REGISTRY_ACCOUNT=${REGISTRY_ACCOUNT} --action_env REGISTRY_TAG=${REGISTRY_TAG}
 ```
+
+### Instaling custom operator
+
+1. Modify the _image_ value under `oprator/forklift-operator-catalog.yaml` to point to the desired forklift-operator-index image.
+2. Run `oc create -f operator/forklift-operator-catalog.yaml`
+3. A new _Forklift operator_ should be availble now in the _OperatorHub_ (without community tag).
 
 ---
 
