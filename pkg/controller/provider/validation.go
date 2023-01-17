@@ -215,7 +215,7 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 				Category: Warn,
 				Message:  "TLS is susceptible to machine-in-the-middle attacks when certificate verification is skipped.",
 			})
-                }
+		}
 
 		keyList = []string{
 			"user",
