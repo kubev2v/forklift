@@ -69,7 +69,7 @@ bazel run push-forklift-operator-index --action_env REGISTRY=${REGISTRY} --actio
 
 1. Modify the _image_ value under `oprator/forklift-operator-catalog.yaml` to point to the desired forklift-operator-index image.
 2. Run `oc create -f operator/forklift-operator-catalog.yaml`
-3. A new _Forklift operator_ should be availble now in the _OperatorHub_ (without community tag).
+3. A new _Forklift operator_ should be available now in the _OperatorHub_ (without community tag).
 
 ---
 
