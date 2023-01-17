@@ -149,8 +149,26 @@ genrule(
     ],
     outs = ["operator.yaml"],
     cmd = """
+        CONTAINER_RUNTIME="$$(basename $${CONTAINER_CMD:-$$(command -v podman || command -v docker)})"
+        if [ ! -z "$${XDG_RUNTIME_DIR}" ]; then
+          PODMAN_AUTH_FILE="$${XDG_RUNTIME_DIR}/containers/auth.json"
+          if [ "$${CONTAINER_RUNTIME}" == "podman" ]; then
+            if [ -e "$${PODMAN_AUTH_FILE}" ]; then 
+              DOCKER_CONFIG="$$(mktemp -d)"
+              DOCKER_AUTH_FILE="$${DOCKER_CONFIG}/config.json"
+              cp "$${PODMAN_AUTH_FILE}" "$${DOCKER_AUTH_FILE}"
+              export DOCKER_CONFIG
+            else
+              unset DOCKER_CONFIG
+            fi
+          fi
+        fi
+        OPERATOR_BUNDLE_IMAGE="$${REGISTRY:-quay.io}/$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}forklift-operator-bundle:$${REGISTRY_TAG:-devel}"
         cat $(location catalog/operator.yml) | envsubst > $@
-\t    $(location @opm//file) render $${REGISTRY:-quay.io}/$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}forklift-operator-bundle:$${REGISTRY_TAG:-devel} -o yaml $${OPM_OPTS:-} >> $@
+        $(location @opm//file) render "$${OPERATOR_BUNDLE_IMAGE}" -o yaml $${OPM_OPTS:-} >> $@
+        if [ "$${CONTAINER_RUNTIME}" == "podman" && ! -z "$${DOCKER_CONFIG}" ]; then
+          rm -rf "$${DOCKER_CONFIG}"
+        fi
     """,
 )
 

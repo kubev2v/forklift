@@ -15,6 +15,7 @@ Install the following system components:
 - bazel >= 5
 - gcc
 - glibc-static
+- podman (or docker)
 
 ### Configuration
 
@@ -35,6 +36,7 @@ Another option to override the default values can use `--action_env` as in the e
 
 | Name                  | Default value                                    | Description                                                 |
 |-----------------------|--------------------------------------------------|-------------------------------------------------------------|
+| CONTAINER_CMD         | autodetected                                     | The container runtime command (e.g.: /usr/bin/podman)
 | VERSION               | 99.0.0                                           | The version with which the forklift should be built.        |
 | NAMESPACE             | konveyor-forklift                                | The namespace in which the operator should be installed.    |
 | CHANNELS              | development                                      | The olm channels.                                           |
