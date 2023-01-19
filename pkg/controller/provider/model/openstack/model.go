@@ -124,11 +124,11 @@ type VM struct {
 	Metadata          map[string]string        `sql:""`
 	KeyName           string                   `sql:""`
 	AdminPass         string                   `sql:""`
-	SecurityGroups    []map[string]interface{} `sql:"" `
-	AttachedVolumes   []AttachedVolume         `sql:"" `
-	Fault             Fault                    `sql:"" `
-	Tags              *[]string                `sql:"" `
-	ServerGroups      *[]string                `sql:"" `
+	SecurityGroups    []map[string]interface{} `sql:""`
+	AttachedVolumes   []AttachedVolume         `sql:""`
+	Fault             Fault                    `sql:""`
+	Tags              *[]string                `sql:""`
+	ServerGroups      *[]string                `sql:""`
 	Concerns          []Concern                `sql:"" eq:"-"`
 }
 
@@ -157,12 +157,13 @@ type VolumeType struct {
 
 type Snapshot struct {
 	Base
-	CreatedAt time.Time         `sql:""`
-	UpdatedAt time.Time         `sql:""`
-	VolumeID  string            `sql:""`
-	Status    string            `sql:""`
-	Size      int               `sql:""`
-	Metadata  map[string]string `sql:""`
+	CreatedAt   time.Time         `sql:""`
+	UpdatedAt   time.Time         `sql:""`
+	Description string            `sql:""`
+	VolumeID    string            `sql:""`
+	Status      string            `sql:""`
+	Size        int               `sql:""`
+	Metadata    map[string]string `sql:""`
 }
 
 type Volume struct {

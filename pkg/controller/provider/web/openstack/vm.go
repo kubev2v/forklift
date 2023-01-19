@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
@@ -186,9 +187,10 @@ type VM1 struct {
 	Status            string                 `json:"status"`
 	HostID            string                 `json:"hostID"`
 	RevisionValidated int64                  `json:"revisionValidated"`
-	Image             string                 `json:"image"`
+	ImageID           string                 `json:"imageID"`
+	FlavorID          string                 `json:"flavorID"`
 	Addresses         map[string]interface{} `json:"addresses"`
-	AttachedVolumes   []AttachedVolumes      `json:"attachedVolumes"`
+	AttachedVolumes   []AttachedVolume       `json:"attachedVolumes"`
 	Concerns          []Concern              `json:"concerns"`
 }
 
@@ -198,8 +200,11 @@ func (r *VM1) With(m *model.VM) {
 	r.TenantID = m.TenantID
 	r.Status = m.Status
 	r.HostID = m.HostID
-	r.AttachedVolumes = m.AttachedVolumes
 	r.RevisionValidated = m.RevisionValidated
+	r.ImageID = m.ImageID
+	r.FlavorID = m.FlavorID
+	r.Addresses = m.Addresses
+	r.AttachedVolumes = m.AttachedVolumes
 	r.Concerns = m.Concerns
 }
 
@@ -215,18 +220,41 @@ func (r *VM1) Content(detail int) interface{} {
 // VM resource.
 type VM struct {
 	VM1
-	AccessIPv4 string `json:"accessIPv4"`
-	AccessIPv6 string `json:"accessIPv6"`
+	UserID         string                   `json:"user_id"`
+	Updated        time.Time                `json:"updated"`
+	Created        time.Time                `json:"created"`
+	Progress       int                      `json:"progress"`
+	AccessIPv4     string                   `json:"accessIPv4"`
+	AccessIPv6     string                   `json:"accessIPv6"`
+	Metadata       map[string]string        `json:"metadata"`
+	KeyName        string                   `json:"key_name"`
+	AdminPass      string                   `json:"adminPass"`
+	SecurityGroups []map[string]interface{} `json:"security_groups"`
+	Fault          Fault                    `json:"fault"`
+	Tags           *[]string                `json:"tags"`
+	ServerGroups   *[]string                `json:"server_groups"`
 }
 
-type AttachedVolumes = model.AttachedVolume
+type AttachedVolume = model.AttachedVolume
 type Concern = model.Concern
+type Fault = model.Fault
 
 // Build the resource using the model.
 func (r *VM) With(m *model.VM) {
 	r.VM1.With(m)
+	r.UserID = m.UserID
+	r.Updated = m.Updated
+	r.Created = m.Created
+	r.Progress = m.Progress
 	r.AccessIPv4 = m.AccessIPv4
 	r.AccessIPv6 = m.AccessIPv6
+	r.Metadata = m.Metadata
+	r.KeyName = m.KeyName
+	r.AdminPass = m.AdminPass
+	r.SecurityGroups = m.SecurityGroups
+	r.Fault = m.Fault
+	r.Tags = m.Tags
+	r.ServerGroups = m.ServerGroups
 }
 
 // Build self link (URI).

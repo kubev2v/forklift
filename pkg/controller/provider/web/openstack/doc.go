@@ -20,12 +20,37 @@ func Handlers(container *container.Container) []libweb.RequestHandler {
 				Container: container,
 			},
 		},
-		&VMHandler{
+		&RegionHandler{
+			Handler{
+				base.Handler{Container: container},
+			},
+		},
+		&ProjectHandler{
 			Handler{
 				base.Handler{Container: container},
 			},
 		},
 		&ImageHandler{
+			Handler{
+				base.Handler{Container: container},
+			},
+		},
+		&FlavorHandler{
+			Handler{
+				base.Handler{Container: container},
+			},
+		},
+		&VMHandler{
+			Handler{
+				base.Handler{Container: container},
+			},
+		},
+		&SnapshotHandler{
+			Handler{
+				base.Handler{Container: container},
+			},
+		},
+		&VolumeHandler{
 			Handler{
 				base.Handler{Container: container},
 			},

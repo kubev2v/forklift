@@ -7,12 +7,13 @@ import (
 
 // Kinds
 var (
-	VMKind       = libref.ToKind(VM{})
+	RegionKind   = libref.ToKind(Region{})
 	ProjectKind  = libref.ToKind(Project{})
 	ImageKind    = libref.ToKind(Image{})
 	FlavorKind   = libref.ToKind(Flavor{})
-	VolumeKind   = libref.ToKind(Volume{})
+	VMKind       = libref.ToKind(VM{})
 	SnapshotKind = libref.ToKind(Snapshot{})
+	VolumeKind   = libref.ToKind(Volume{})
 )
 
 // Types.
