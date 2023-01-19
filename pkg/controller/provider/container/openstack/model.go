@@ -23,6 +23,7 @@ func init() {
 		&VMAdapter{},
 		&SnapshotAdapter{},
 		&VolumeAdapter{},
+		&NetworkAdapter{},
 	}
 }
 
@@ -481,5 +482,57 @@ func (r *VolumeAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []
 			updates = append(updates, updater)
 		}
 	}
+	return
+}
+
+type NetworkAdapter struct {
+}
+
+func (r *NetworkAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
+	networkList := []Network{}
+	err = ctx.client.list(&networkList, nil)
+	if err != nil {
+		return
+	}
+	list := fb.NewList()
+	for _, network := range networkList {
+		m := &model.Network{
+			Base: model.Base{ID: network.ID},
+		}
+		network.ApplyTo(m)
+		list.Append(m)
+	}
+	itr = list.Iter()
+
+	return
+}
+
+func (r *NetworkAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
+	networkList := []Network{}
+	err = ctx.client.list(&networkList, nil)
+	if err != nil {
+		return
+	}
+	for _, network := range networkList {
+		updater := func(tx *libmodel.Tx) (err error) {
+			m := &model.Network{
+				Base: model.Base{ID: network.ID},
+			}
+			err = tx.Get(m)
+			if err != nil {
+				if errors.Is(err, &NotFound{}) {
+					network.ApplyTo(m)
+					err = tx.Insert(m)
+					return
+				}
+				return
+			}
+			network.ApplyTo(m)
+			err = tx.Update(m)
+			return
+		}
+		updates = append(updates, updater)
+	}
+	// TODO: delete unexisting networks
 	return
 }

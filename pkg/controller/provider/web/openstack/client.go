@@ -60,6 +60,12 @@ func (r *Resolver) Path(resource interface{}, id string) (path string, err error
 		r.ID = id
 		r.Link(provider)
 		path = r.SelfLink
+	case *Network:
+		r := Network{}
+		r.ID = id
+		r.Link(provider)
+		path = r.SelfLink
+
 	default:
 		err = liberr.Wrap(
 			base.ResourceNotResolvedError{
@@ -130,11 +136,6 @@ func (r *Finder) Workload(ref *base.Ref) (object interface{}, err error) {
 	}
 
 	return
-}
-
-// REST Resource.
-type Network struct {
-	Resource
 }
 
 func (r *Finder) Network(ref *base.Ref) (object interface{}, err error) {
