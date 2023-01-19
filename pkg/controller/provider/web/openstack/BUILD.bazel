@@ -8,6 +8,7 @@ go_library(
         "doc.go",
         "flavor.go",
         "image.go",
+        "network.go",
         "project.go",
         "provider.go",
         "region.go",

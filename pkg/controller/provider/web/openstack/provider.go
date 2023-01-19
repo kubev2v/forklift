@@ -165,7 +165,12 @@ func (h *ProviderHandler) AddDerived(r *Provider) (err error) {
 		return
 	}
 	r.VolumeCount = n
-	// TODO Networks
+	// Networks
+	n, err = db.Count(&openstack.Network{}, nil)
+	if err != nil {
+		return
+	}
+	r.NetworkCount = n
 
 	return
 }
@@ -180,6 +185,7 @@ type Provider struct {
 	VMCount      int64        `json:"vmCount"`
 	ImageCount   int64        `json:"imageCount"`
 	VolumeCount  int64        `json:"volumeCount"`
+	NetworkCount int64        `json:"networkCount"`
 }
 
 // Set fields with the specified object.

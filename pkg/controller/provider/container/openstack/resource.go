@@ -5,6 +5,7 @@ import (
 
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/snapshots"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/networks"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
@@ -274,4 +275,39 @@ type AttachedVolume struct {
 
 func (r *AttachedVolume) ApplyTo(m *model.AttachedVolume) {
 	m.ID = r.ID
+}
+
+type Network struct {
+	networks.Network
+}
+
+func (r *Network) ApplyTo(m *model.Network) {
+	m.Name = r.Label
+	m.Bridge = r.Bridge
+	m.BridgeInterface = r.BridgeInterface
+	m.Broadcast = r.Broadcast
+	m.CIDR = r.CIDR
+	m.CIDRv6 = r.CIDRv6
+	m.CreatedAt = time.Time(r.CreatedAt)
+	m.Deleted = r.Deleted
+	m.DeletedAt = time.Time(r.DeletedAt)
+	m.DHCPStart = r.DHCPStart
+	m.DNS1 = r.DNS1
+	m.DNS2 = r.DNS2
+	m.Gateway = r.Gateway
+	m.Gatewayv6 = r.Gatewayv6
+	m.Host = r.Host
+	m.Injected = r.Injected
+	m.Label = r.Label
+	m.MultiHost = r.MultiHost
+	m.Netmask = r.Netmask
+	m.Netmaskv6 = r.Netmaskv6
+	m.Priority = r.Priority
+	m.ProjectID = r.ProjectID
+	m.RXTXBase = r.RXTXBase
+	m.UpdatedAt = time.Time(r.UpdatedAt)
+	m.VLAN = r.VLAN
+	m.VPNPrivateAddress = r.VPNPrivateAddress
+	m.VPNPublicAddress = r.VPNPublicAddress
+	m.VPNPublicPort = r.VPNPublicPort
 }

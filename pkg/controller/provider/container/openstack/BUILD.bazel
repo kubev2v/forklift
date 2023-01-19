@@ -28,6 +28,7 @@ go_library(
         "//vendor/github.com/gophercloud/gophercloud/openstack",
         "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/v3/snapshots",
         "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes",
+        "//vendor/github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/networks",
         "//vendor/github.com/gophercloud/gophercloud/openstack/compute/v2/flavors",
         "//vendor/github.com/gophercloud/gophercloud/openstack/compute/v2/servers",
         "//vendor/github.com/gophercloud/gophercloud/openstack/identity/v3/projects",
