@@ -14,6 +14,7 @@ var (
 	VMKind       = libref.ToKind(VM{})
 	SnapshotKind = libref.ToKind(Snapshot{})
 	VolumeKind   = libref.ToKind(Volume{})
+	NetworkKind  = libref.ToKind(Network{})
 )
 
 // Types.

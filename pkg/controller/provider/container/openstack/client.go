@@ -14,6 +14,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/snapshots"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/networks"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
@@ -324,6 +325,24 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 		*object = instanceList
 		return
 
+	case *[]Network:
+		object := object.(*[]Network)
+		allPages, err = networks.List(r.computeService).AllPages()
+		if err != nil {
+			return
+		}
+		var networkList []networks.Network
+		networkList, err = networks.ExtractNetworks(allPages)
+		if err != nil {
+			return
+		}
+		var instanceList []Network
+		for _, network := range networkList {
+			instanceList = append(instanceList, Network{network})
+		}
+		*object = instanceList
+		return
+
 	default:
 		err = liberr.New(fmt.Sprintf("unsupported type %+v", object))
 		return
@@ -367,6 +386,11 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 		var server *servers.Server
 		server, err = servers.Get(r.computeService, ID).Extract()
 		object = &VM{*server}
+		return
+	case *Network:
+		var network *networks.Network
+		network, err = networks.Get(r.computeService, ID).Extract()
+		object = &Network{*network}
 		return
 	default:
 		err = liberr.New(fmt.Sprintf("unsupported type %+v", object))
