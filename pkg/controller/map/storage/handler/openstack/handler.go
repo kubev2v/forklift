@@ -22,18 +22,49 @@ type Handler struct {
 	*handler.Handler
 }
 
-// Ensure watch on StorageDomain.
+// Ensure watch on Images, Snapshots and Volumes.
 func (r *Handler) Watch(watch *handler.WatchManager) (err error) {
 	w, err := watch.Ensure(
 		r.Provider(),
-		&openstack.Storage{},
+		&openstack.Image{},
 		r)
 	if err != nil {
 		return
 	}
-
 	log.Info(
-		"Inventory watch ensured.",
+		"Image watch ensured.",
+		"provider",
+		path.Join(
+			r.Provider().Namespace,
+			r.Provider().Name),
+		"watch",
+		w.ID())
+
+	w, err = watch.Ensure(
+		r.Provider(),
+		&openstack.Snapshot{},
+		r)
+	if err != nil {
+		return
+	}
+	log.Info(
+		"Snapshot watch ensured.",
+		"provider",
+		path.Join(
+			r.Provider().Namespace,
+			r.Provider().Name),
+		"watch",
+		w.ID())
+
+	w, err = watch.Ensure(
+		r.Provider(),
+		&openstack.Volume{},
+		r)
+	if err != nil {
+		return
+	}
+	log.Info(
+		"Volume watch ensured.",
 		"provider",
 		path.Join(
 			r.Provider().Namespace,
@@ -46,36 +77,43 @@ func (r *Handler) Watch(watch *handler.WatchManager) (err error) {
 
 // Resource created.
 func (r *Handler) Created(e libweb.Event) {
-	if ds, cast := e.Resource.(*openstack.Storage); cast {
-		r.changed(ds)
-	}
+	r.changed(e.Resource)
 }
 
 // Resource updated.
 func (r *Handler) Updated(e libweb.Event) {
-	if ds, cast := e.Resource.(*openstack.Storage); cast {
-		updated := e.Updated.(*openstack.Storage)
-		if updated.Path != ds.Path {
-			r.changed(ds, updated)
+	switch e.Resource.(type) {
+	case *openstack.Image:
+		image := e.Resource.(*openstack.Image)
+		updated := e.Updated.(*openstack.Image)
+		if updated.Path != image.Path {
+			r.changed(image, updated)
+		}
+	case *openstack.Snapshot:
+		snapshot := e.Resource.(*openstack.Snapshot)
+		updated := e.Updated.(*openstack.Snapshot)
+		if updated.Path != snapshot.Path {
+			r.changed(snapshot, updated)
+		}
+	case *openstack.Volume:
+		volume := e.Resource.(*openstack.Volume)
+		updated := e.Updated.(*openstack.Volume)
+		if updated.Path != volume.Path {
+			r.changed(volume, updated)
 		}
 	}
 }
 
 // Resource deleted.
 func (r *Handler) Deleted(e libweb.Event) {
-	if ds, cast := e.Resource.(*openstack.Storage); cast {
-		r.changed(ds)
-	}
+	r.changed(e.Resource)
 }
 
 // Storage changed.
-// Find all of the StorageMap CRs the reference both the
-// provider and the changed storage domain and enqueue reconcile events.
-func (r *Handler) changed(models ...*openstack.Storage) {
-	log.V(3).Info(
-		"Storage domain changed.",
-		"id",
-		models[0].ID)
+// Find all of the StorageMap CRs referencing both the
+// provider and the changed storage and enqueue reconcile events.
+func (r *Handler) changed(models ...interface{}) {
+
 	list := api.StorageMapList{}
 	err := r.List(context.TODO(), &list)
 	if err != nil {
@@ -83,18 +121,51 @@ func (r *Handler) changed(models ...*openstack.Storage) {
 		return
 	}
 	for i := range list.Items {
-		mp := &list.Items[i]
-		ref := mp.Spec.Provider.Source
+		storageMap := &list.Items[i]
+		ref := storageMap.Spec.Provider.Source
 		if !r.MatchProvider(ref) {
 			continue
 		}
 		referenced := false
-		for _, pair := range mp.Spec.Map {
+		for _, pair := range storageMap.Spec.Map {
 			ref := pair.Source
-			for _, ds := range models {
-				if ref.ID == ds.ID || strings.HasSuffix(ds.Path, ref.Name) {
-					referenced = true
-					break
+			for _, model := range models {
+				switch model.(type) {
+				case *openstack.Image:
+					image := model.(*openstack.Image)
+					if ref.ID == image.ID || strings.HasSuffix(image.Path, ref.Name) {
+						referenced = true
+						log.V(3).Info(
+							"Image changed.",
+							"id",
+							image.ID)
+						break
+					}
+					return
+
+				case *openstack.Snapshot:
+					snapshot := model.(*openstack.Snapshot)
+					if ref.ID == snapshot.ID || strings.HasSuffix(snapshot.Path, ref.Name) {
+						referenced = true
+						log.V(3).Info(
+							"Snapshot changed.",
+							"id",
+							snapshot.ID)
+						break
+					}
+					return
+
+				case *openstack.Volume:
+					volume := model.(*openstack.Volume)
+					if ref.ID == volume.ID || strings.HasSuffix(volume.Path, ref.Name) {
+						referenced = true
+						log.V(3).Info(
+							"Volume changed.",
+							"id",
+							volume.ID)
+						break
+					}
+					return
 				}
 			}
 			if referenced {
@@ -106,10 +177,10 @@ func (r *Handler) changed(models ...*openstack.Storage) {
 				"Queue reconcile event.",
 				"map",
 				path.Join(
-					mp.Namespace,
-					mp.Name))
+					storageMap.Namespace,
+					storageMap.Name))
 			r.Enqueue(event.GenericEvent{
-				Object: mp,
+				Object: storageMap,
 			})
 		}
 	}
