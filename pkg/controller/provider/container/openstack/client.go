@@ -12,7 +12,6 @@ import (
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
-	"github.com/gophercloud/gophercloud/openstack/compute/apiversions"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
@@ -355,13 +354,4 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 	default:
 		return
 	}
-}
-
-// Get API Versions
-func (r *Client) listApiVersions() ([]apiversions.APIVersion, error) {
-	allPages, err := apiversions.List(r.computeService).AllPages()
-	if err != nil {
-		return []apiversions.APIVersion{}, err
-	}
-	return apiversions.ExtractAPIVersions(allPages)
 }
