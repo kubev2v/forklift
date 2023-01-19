@@ -60,8 +60,11 @@ func (r *Client) Connect() (err error) {
 		roots := x509.NewCertPool()
 		ok := roots.AppendCertsFromPEM(cacert)
 		if !ok {
-			err = liberr.New("failed to parse cacert")
-			return
+			roots, err = x509.SystemCertPool()
+			if err != nil {
+				err = liberr.New("failed to configure the system's cert pool")
+				return
+			}
 		}
 		TLSClientConfig = &tls.Config{RootCAs: roots}
 	}
