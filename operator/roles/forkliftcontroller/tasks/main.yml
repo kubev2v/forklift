@@ -232,6 +232,28 @@
         state: "{{ ui_state }}"
         definition: "{{ lookup('template', 'ui-plugin/console-plugin.yml.j2') }}"
 
+    - name: "Get cluster console information"
+      k8s_info:
+        api_version: operator.openshift.io/v1
+        kind: console
+        name: cluster
+      register: console_operator
+
+    - name: "Set console_plugins variable"
+      set_fact:
+        console_plugins: "{{ console_operator['resources'][0]['spec']['plugins'] }}"
+
+    - name: "Enable console plugin"
+      k8s:
+        api_version: operator.openshift.io/v1
+        kind: console
+        name: cluster
+        state: present
+        definition:
+          spec:
+            plugins: "{{ console_plugins + [ui_plugin_console_name] }}"
+      when: ui_plugin_console_name not in console_plugins
+
   - when: not feature_ui_plugin|bool
     name: "Cleanup {{ ui_plugin_service_name }} if disabled"
     include_tasks: cleanup.yml
