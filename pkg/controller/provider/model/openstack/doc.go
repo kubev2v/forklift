@@ -10,10 +10,10 @@ func All() []interface{} {
 		&ocp.Provider{},
 		&Region{},
 		&Project{},
-		&Flavor{},
 		&Image{},
+		&Flavor{},
 		&VM{},
-		&Volume{},
 		&Snapshot{},
+		&Volume{},
 	}
 }

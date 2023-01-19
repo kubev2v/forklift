@@ -3,6 +3,7 @@ package openstack
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"net"
 	"net/http"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
+	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/snapshots"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
@@ -30,18 +32,6 @@ type NotFound struct {
 func (e *NotFound) Error() string {
 	return "not found."
 }
-
-type ResourceType string
-
-// Provider types.
-const (
-	RegionResource  ResourceType = "Region"
-	ProjectResource ResourceType = "Project"
-	FlavorResource  ResourceType = "Flavor"
-	ImageResource   ResourceType = "Image"
-	VolumeResource  ResourceType = "Volume"
-	VmResource      ResourceType = "Vm"
-)
 
 // Client struct
 type Client struct {
@@ -200,12 +190,13 @@ func (r *Client) insecure() bool {
 }
 
 // List Servers.
-func (r *Client) list(resourceType ResourceType, listopts interface{}) (obj interface{}, err error) {
+func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 
-	switch resourceType {
+	var allPages pagination.Page
 
-	case RegionResource:
-		var allPages pagination.Page
+	switch object.(type) {
+	case *[]Region:
+		object := object.(*[]Region)
 		allPages, err = regions.List(r.identityService, listopts.(*RegionListOpts)).AllPages()
 		if err != nil {
 			return
@@ -219,11 +210,11 @@ func (r *Client) list(resourceType ResourceType, listopts interface{}) (obj inte
 		for _, region := range regionList {
 			instanceList = append(instanceList, Region{region})
 		}
-		obj = instanceList
+		*object = instanceList
 		return
 
-	case ProjectResource:
-		var allPages pagination.Page
+	case *[]Project:
+		object := object.(*[]Project)
 		allPages, err = projects.List(r.identityService, listopts.(*ProjectListOpts)).AllPages()
 		if err != nil {
 			return
@@ -237,11 +228,11 @@ func (r *Client) list(resourceType ResourceType, listopts interface{}) (obj inte
 		for _, project := range projectList {
 			instanceList = append(instanceList, Project{project})
 		}
-		obj = instanceList
+		*object = instanceList
 		return
 
-	case FlavorResource:
-		var allPages pagination.Page
+	case *[]Flavor:
+		object := object.(*[]Flavor)
 		allPages, err = flavors.ListDetail(r.computeService, listopts.(*FlavorListOpts)).AllPages()
 		if err != nil {
 			return
@@ -255,11 +246,11 @@ func (r *Client) list(resourceType ResourceType, listopts interface{}) (obj inte
 		for _, flavor := range flavorList {
 			instanceList = append(instanceList, Flavor{flavor})
 		}
-		obj = instanceList
+		*object = instanceList
 		return
 
-	case ImageResource:
-		var allPages pagination.Page
+	case *[]Image:
+		object := object.(*[]Image)
 		allPages, err = images.List(r.imageService, listopts.(*ImageListOpts)).AllPages()
 		if err != nil {
 			return
@@ -273,30 +264,11 @@ func (r *Client) list(resourceType ResourceType, listopts interface{}) (obj inte
 		for _, image := range imageList {
 			instanceList = append(instanceList, Image{image})
 		}
-		obj = instanceList
-
+		*object = instanceList
 		return
 
-	case VolumeResource:
-		var allPages pagination.Page
-		allPages, err = volumes.List(r.blockStorageService, listopts.(*VolumeListOpts)).AllPages()
-		if err != nil {
-			return
-		}
-		var volumeList []volumes.Volume
-		volumeList, err = volumes.ExtractVolumes(allPages)
-		if err != nil {
-			return
-		}
-		var instanceList []Volume
-		for _, volume := range volumeList {
-			instanceList = append(instanceList, Volume{volume})
-		}
-		obj = instanceList
-		return
-
-	case VmResource:
-		var allPages pagination.Page
+	case *[]VM:
+		object := object.(*[]VM)
 		allPages, err = servers.List(r.computeService, listopts.(*VMListOpts)).AllPages()
 		if err != nil {
 			return
@@ -310,11 +282,48 @@ func (r *Client) list(resourceType ResourceType, listopts interface{}) (obj inte
 		for _, server := range serverList {
 			instanceList = append(instanceList, VM{server})
 		}
-		obj = instanceList
+		*object = instanceList
+		return
+
+	case *[]Snapshot:
+		object := object.(*[]Snapshot)
+		allPages, err = snapshots.List(r.blockStorageService, nil).AllPages()
+		if err != nil {
+			return
+		}
+		var snapshotList []snapshots.Snapshot
+		snapshotList, err = snapshots.ExtractSnapshots(allPages)
+		if err != nil {
+			return
+		}
+		var instanceList []Snapshot
+		for _, snapshot := range snapshotList {
+			instanceList = append(instanceList, Snapshot{snapshot})
+		}
+		*object = instanceList
+		return
+
+	case *[]Volume:
+		object := object.(*[]Volume)
+		allPages, err = volumes.List(r.blockStorageService, listopts.(*VolumeListOpts)).AllPages()
+		if err != nil {
+			return
+		}
+		var volumeList []volumes.Volume
+		volumeList, err = volumes.ExtractVolumes(allPages)
+		if err != nil {
+			return
+		}
+		var instanceList []Volume
+		for _, volume := range volumeList {
+			instanceList = append(instanceList, Volume{volume})
+		}
+		*object = instanceList
 		return
 
 	default:
-		return nil, nil
+		err = liberr.New(fmt.Sprintf("unsupported type %+v", object))
+		return
 	}
 }
 
@@ -341,6 +350,11 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 		image, err = images.Get(r.imageService, ID).Extract()
 		object = &Image{*image}
 		return
+	case *Snapshot:
+		var snapshot *snapshots.Snapshot
+		snapshot, err = snapshots.Get(r.blockStorageService, ID).Extract()
+		object = &Snapshot{*snapshot}
+		return
 	case *Volume:
 		var volume *volumes.Volume
 		volume, err = volumes.Get(r.blockStorageService, ID).Extract()
@@ -352,6 +366,7 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 		object = &VM{*server}
 		return
 	default:
+		err = liberr.New(fmt.Sprintf("unsupported type %+v", object))
 		return
 	}
 }

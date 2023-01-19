@@ -3,6 +3,7 @@ package openstack
 import (
 	"time"
 
+	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/snapshots"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
@@ -67,26 +68,6 @@ type ProjectListOpts struct {
 	projects.ListOpts
 }
 
-type Flavor struct {
-	flavors.Flavor
-}
-
-type FlavorListOpts struct {
-	flavors.ListOpts
-}
-
-func (r *Flavor) ApplyTo(m *model.Flavor) {
-	m.Disk = r.Disk
-	m.RAM = r.RAM
-	m.Name = r.Name
-	m.RxTxFactor = r.RxTxFactor
-	m.Swap = r.Swap
-	m.VCPUs = r.VCPUs
-	m.IsPublic = r.IsPublic
-	m.Ephemeral = r.Ephemeral
-	m.Description = r.Description
-}
-
 type Image struct {
 	images.Image
 }
@@ -132,6 +113,45 @@ type ImageListOpts struct {
 
 func (r *ImageListOpts) setUpdateAtQueryFilterGTE(lastSync time.Time) {
 	r.UpdatedAtQuery = &images.ImageDateQuery{Date: lastSync, Filter: images.FilterGTE}
+}
+
+type Flavor struct {
+	flavors.Flavor
+}
+
+type FlavorListOpts struct {
+	flavors.ListOpts
+}
+
+func (r *Flavor) ApplyTo(m *model.Flavor) {
+	m.Disk = r.Disk
+	m.RAM = r.RAM
+	m.Name = r.Name
+	m.RxTxFactor = r.RxTxFactor
+	m.Swap = r.Swap
+	m.VCPUs = r.VCPUs
+	m.IsPublic = r.IsPublic
+	m.Ephemeral = r.Ephemeral
+	m.Description = r.Description
+}
+
+type SnapshotListOpts struct {
+	snapshots.ListOpts
+}
+
+type Snapshot struct {
+	snapshots.Snapshot
+}
+
+func (r *Snapshot) ApplyTo(m *model.Snapshot) {
+	m.CreatedAt = r.CreatedAt
+	m.UpdatedAt = r.UpdatedAt
+	m.Name = r.Name
+	m.Description = r.Description
+	m.VolumeID = r.VolumeID
+	m.Status = r.Status
+	m.Size = r.Size
+	m.Metadata = r.Metadata
 }
 
 const (
