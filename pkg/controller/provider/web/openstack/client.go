@@ -27,13 +27,36 @@ func (r *Resolver) Path(resource interface{}, id string) (path string, err error
 		r.UID = id
 		r.Link()
 		path = r.SelfLink
+	case *Region:
+		r := Region{}
+		r.ID = id
+		r.Link(provider)
+		path = r.SelfLink
+	case *Project:
+		r := Project{}
+		r.ID = id
+		r.Link(provider)
+	case *Image:
+		r := Image{}
+		r.ID = id
+		r.Link(provider)
+		path = r.SelfLink
+	case *Flavor:
+		r := Flavor{}
+		r.ID = id
+		r.Link(provider)
 	case *VM:
 		r := VM{}
 		r.ID = id
 		r.Link(provider)
 		path = r.SelfLink
-	case *Image:
-		r := Image{}
+	case *Snapshot:
+		r := Snapshot{}
+		r.ID = id
+		r.Link(provider)
+		path = r.SelfLink
+	case *Volume:
+		r := Volume{}
 		r.ID = id
 		r.Link(provider)
 		path = r.SelfLink
