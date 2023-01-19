@@ -12,7 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       REGISTRY: quay.io
-      REGISTRY_TAG: ${{ github.head_ref || github.ref_name }}
+      # Set tag 'latest' on main branch
+      REGISTRY_TAG: ${{ (github.head_ref||github.ref_name)=='main' && 'latest' || (github.head_ref||github.ref_name) }}
       REGISTRY_ACCOUNT: kubev2v
       USE_BAZEL_VERSION: 5.4.0
     steps:
