@@ -38,7 +38,6 @@ go_library(
         "//vendor/github.com/vmware/govmomi/vim25/types",
         "//vendor/k8s.io/api/core/v1:core",
         "//vendor/k8s.io/apimachinery/pkg/api/resource",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured",
         "//vendor/kubevirt.io/client-go/api/v1:api",
         "//vendor/kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
