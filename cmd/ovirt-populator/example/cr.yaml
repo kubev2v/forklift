@@ -1,0 +1,11 @@
+apiVersion: forklift.konveyor.io/v1beta1
+kind: OvirtVolumePopulator
+metadata:
+  name: nfs-vol-pop
+  namespace: default
+spec:
+  engineUrl: http://engine.fqdn
+  engineSecretName: vm-11-59-fjxx7
+  diskId: 9512498e-84ab-45d6-8131-3e12feb800ad
+status:
+  progress: "0"

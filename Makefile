@@ -34,6 +34,7 @@ VIRT_V2V_IMAGE_WARM ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-virt-v2v-warm:$(
 OPERATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-operator:$(REGISTRY_TAG)
 OPERATOR_BUNDLE_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-operator-bundle:$(REGISTRY_TAG)
 OPERATOR_INDEX_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-operator-index:$(REGISTRY_TAG)
+OVIRT_POPULATOR_IMAGE ?= ${REGISTRY}/${REGISTRY_ACCOUNT}/ovirt-populator:${REGISTRY_TAG}
 
 ### External images
 MUST_GATHER_IMAGE ?= quay.io/kubev2v/forklift-must-gather:latest
@@ -197,7 +198,15 @@ push-operator-index-image: build-operator-index-image
 
 build-all-images: build-api-image build-controller-image build-validation-image build-operator-image build-virt-v2v-image build-virt-v2v-warm-image build-operator-bundle-image build-operator-index-image
 
-push-all-images: push-api-image push-controller-image push-validation-image push-operator-image push-virt-v2v-image push-virt-v2v-warm-image push-operator-bundle-image push-operator-index-image
+# Build the docker image
+build-ovirt-populator-image:
+	$(CONTAINER_CMD) build cmd/ovirt-populator/ -t ${OVIRT_POPULATOR_IMAGE}
+
+# Push the docker image
+push-ovirt-populator-image: build-ovirt-populator-image
+	$(CONTAINER_CMD) push  ${OVIRT_POPULATOR_IMAGE}
+
+push-all-images: push-api-image push-controller-image push-validation-image push-operator-image push-virt-v2v-image push-virt-v2v-warm-image push-operator-bundle-image push-operator-index-image push-ovirt-populator-image
 
 .PHONY: check_container_runtmime
 check_container_runtmime:

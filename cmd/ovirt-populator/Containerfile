@@ -1,0 +1,20 @@
+FROM golang:1.19.3-alpine3.16 as builder
+WORKDIR /app
+
+COPY go.mod ./
+COPY go.sum ./
+COPY ./pkg ./pkg
+COPY ovirt-populator.go ./
+
+# When debugging by replacing the lib-volume-populator with a local modified copy
+# COPY . ./
+
+RUN go mod download
+RUN CGO_ENABLED=0 go build -o /ovirt-populator
+
+FROM quay.io/centos/centos:stream9-minimal
+COPY --from=builder /ovirt-populator /
+RUN microdnf install -y gcc python3-pip python3-devel libxml2-devel openssl-devel libcurl-devel qemu-img
+RUN pip install ovirt-engine-sdk-python ovirt-imageio
+
+ENTRYPOINT ["/ovirt-populator"]
