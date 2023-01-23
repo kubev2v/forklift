@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nfs-vol-pop
+  namespace: default
+spec:
+  storageClassName: nfs-csi
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  dataSourceRef:
+    apiGroup: forklift.konveyor.io
+    kind: OvirtVolumePopulator
+    name: nfs-vol-pop
