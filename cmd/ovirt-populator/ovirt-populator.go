@@ -10,7 +10,7 @@ import (
 	"os/exec"
 
 	"forklift.konveyor.io/ovirt-populator/pkg/v1beta1"
-	populator_machinery "github.com/kubernetes-csi/lib-volume-populator/populator-machinery"
+	populator_machinery "github.com/kubev2v/lib-volume-populator/populator-machinery"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
