@@ -1,6 +1,6 @@
 # Operator
 ## Default operator config
-build --action_env=VERSION=99.0.0
+build --action_env=VERSION=2.3.99
 build --action_env=NAMESPACE=konveyor-forklift
 build --action_env=CHANNELS=development
 build --action_env=DEFAULT_CHANNEL=development
