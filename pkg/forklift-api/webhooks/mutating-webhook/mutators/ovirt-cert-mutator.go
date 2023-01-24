@@ -13,6 +13,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	admissionv1 "k8s.io/api/admission/v1beta1"
 	core "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var log = logging.WithName("mutator")
@@ -57,31 +58,39 @@ func (mutator *OvirtCertMutator) Mutate(ar *admissionv1.AdmissionReview) *admiss
 			secret.Data["cacert"] = append(secret.Data["cacert"], b...)
 			secret.Labels["ca-cert-updated"] = "true"
 		}
+
+		patchBytes, err := util.GeneratePatchPayload(
+			util.PatchOperation{
+				Op:    "replace",
+				Path:  "/data",
+				Value: secret.Data,
+			},
+			util.PatchOperation{
+				Op:    "replace",
+				Path:  "/metadata/labels",
+				Value: secret.Labels,
+			},
+		)
+
+		if err != nil {
+			log.Error(err, "mutating webhook error")
+			util.ToAdmissionResponseError(err)
+		}
+
+		jsonPatchType := admissionv1.PatchTypeJSONPatch
+		return &admissionv1.AdmissionResponse{
+			Allowed:   true,
+			Patch:     patchBytes,
+			PatchType: &jsonPatchType,
+		}
 	}
 
-	patchBytes, err := util.GeneratePatchPayload(
-		util.PatchOperation{
-			Op:    "replace",
-			Path:  "/data",
-			Value: secret.Data,
-		},
-		util.PatchOperation{
-			Op:    "replace",
-			Path:  "/metadata/labels",
-			Value: secret.Labels,
-		},
-	)
-
-	if err != nil {
-		log.Error(err, "mutating webhook error")
-		util.ToAdmissionResponseError(err)
-	}
-
-	jsonPatchType := admissionv1.PatchTypeJSONPatch
+	// Response for other providers type
 	return &admissionv1.AdmissionResponse{
-		Allowed:   true,
-		Patch:     patchBytes,
-		PatchType: &jsonPatchType,
+		Allowed: true,
+		Result: &metav1.Status{
+			Message: "Provider type diffretn from oVirt, no changes required",
+			Code:    http.StatusOK,
+		},
 	}
-
 }
