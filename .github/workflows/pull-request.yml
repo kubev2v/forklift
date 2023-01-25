@@ -23,6 +23,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Build and setup everything with bazel
+        id: forkliftci
         uses: kubev2v/forkliftci@main
         with:
           gh_access_token: ${{ secrets.GITHUB_TOKEN }}
@@ -31,12 +32,9 @@ jobs:
 
       - run: kubectl get pods -n konveyor-forklift
 
-      - run: echo "CLUSTER=`kind get kubeconfig | grep server | cut -d ' ' -f6`" >> $GITHUB_ENV
-      - run: echo "TOKEN=`kubectl get secrets -n kube-system -o jsonpath='{.items[0].data.token-id}' | base64 -d`.`kubectl get secrets -n kube-system -o jsonpath='{.items[0].data.token-secret}' | base64 -d`" >> $GITHUB_ENV
-
       - name: Test call to Forklift
         run: |
-          curl -k "$CLUSTER/apis/forklift.konveyor.io/v1beta1/namespaces/konveyor-forklift/providers" --header "Authorization: Bearer $TOKEN"
+          curl -k "${{ steps.forkliftci.outputs.cluster }}/apis/forklift.konveyor.io/v1beta1/namespaces/konveyor-forklift/providers" --header "Authorization: Bearer ${{ steps.forkliftci.outputs.token }}"
 
       # Run e2e sanity
       - name: Run e2e sanity suite
