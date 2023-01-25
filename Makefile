@@ -4,7 +4,8 @@ REGISTRY_TAG ?= devel
 CONTROLLER_IMAGE ?= ${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-controller:${REGISTRY_TAG}
 API_IMAGE ?= ${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-api:${REGISTRY_TAG}
 VALIDATION_IMAGE ?= ${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-validation:${REGISTRY_TAG}
-VIRT_V2V_IMAGE ?= ${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-virt-v2v:${REGISTRY_TAG}
+VIRT_V2V_IMAGE_COLD ?= ${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-virt-v2v:${REGISTRY_TAG}
+VIRT_V2V_IMAGE_WARM ?= ${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-virt-v2v-warm:${REGISTRY_TAG}
 OPERATOR_IMAGE ?= ${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-operator:${REGISTRY_TAG}
 OPERATOR_BUNDLE_IMAGE ?= ${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-operator-bundle:${REGISTRY_TAG}
 OPERATOR_INDEX_IMAGE ?= ${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-operator-index:${REGISTRY_TAG}
@@ -102,15 +103,15 @@ build-virt-v2v-image:
 	bazel run virt-v2v:forklift-virt-v2v
 
 push-virt-v2v-image: build-virt-v2v-image
-	$(CONTAINER_CMD) tag virt-v2v:forklift-virt-v2v ${VIRT_V2V_IMAGE}
-	$(CONTAINER_CMD) push ${VIRT_V2V_IMAGE}
+	$(CONTAINER_CMD) tag virt-v2v:forklift-virt-v2v ${VIRT_V2V_IMAGE_COLD}
+	$(CONTAINER_CMD) push ${VIRT_V2V_IMAGE_COLD}
 
 build-virt-v2v-warm-image:
 	bazel run virt-v2v:forklift-virt-v2v-warm
 
 push-virt-v2v-warm-image: build-virt-v2v-warm-image
-	$(CONTAINER_CMD) tag virt-v2v:forklift-virt-v2v-warm ${VIRT_V2V_IMAGE}
-	$(CONTAINER_CMD) push ${VIRT_V2V_IMAGE}
+	$(CONTAINER_CMD) tag virt-v2v:forklift-virt-v2v-warm ${VIRT_V2V_IMAGE_WARM}
+	$(CONTAINER_CMD) push ${VIRT_V2V_IMAGE_WARM}
 
 build-operator-bundle-image:
 	bazel run operator:forklift-operator-bundle-image --action_env CONTROLLER_IMAGE=${CONTROLLER_IMAGE} --action_env VALIDATION_IMAGE=${VALIDATION_IMAGE} --action_env OPERATOR_IMAGE=${OPERATOR_IMAGE} --action_env VIRT_V2V_IMAGE=${VIRT_V2V_IMAGE_COLD} --action_env API_IMAGE=${API_IMAGE}
