@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	kubectlPath       = flag.String("kubectl-path", "/home/eslutsky/bin/kubectl", "The path to the kubectl binary")
+	kubectlPath       = flag.String("kubectl-path", "kubectl", "The path to the kubectl binary")
 	ocPath            = flag.String("oc-path", "oc", "The path to the oc binary")
 	forkliftInstallNs = flag.String("forklift-namespace", "konveyor-forklift", "The namespace of the CDI controller")
 	kubeConfig        = flag.String("kubeconfig2", "/tmp/kubeconfig", "The absolute path to the kubeconfig file")
