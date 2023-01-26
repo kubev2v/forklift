@@ -200,11 +200,11 @@ build-all-images: build-api-image build-controller-image build-validation-image 
 
 # Build the docker image
 build-ovirt-populator-image:
-	$(CONTAINER_CMD) build cmd/ovirt-populator/ -t ${OVIRT_POPULATOR_IMAGE}
+	$(CONTAINER_CMD) build -f hack/ovirt-populator/Containerfile -t ${OVIRT_POPULATOR_IMAGE} .
 
 # Push the docker image
 push-ovirt-populator-image: build-ovirt-populator-image
-	$(CONTAINER_CMD) push  ${OVIRT_POPULATOR_IMAGE}
+	$(CONTAINER_CMD) push ${OVIRT_POPULATOR_IMAGE}
 
 push-all-images: push-api-image push-controller-image push-validation-image push-operator-image push-virt-v2v-image push-virt-v2v-warm-image push-operator-bundle-image push-operator-index-image push-ovirt-populator-image
 

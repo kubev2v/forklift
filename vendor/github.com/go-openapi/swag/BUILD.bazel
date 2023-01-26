@@ -6,6 +6,7 @@ go_library(
         "convert.go",
         "convert_types.go",
         "doc.go",
+        "file.go",
         "json.go",
         "loading.go",
         "name_lexem.go",
@@ -25,6 +26,6 @@ go_library(
     deps = [
         "//vendor/github.com/mailru/easyjson/jlexer",
         "//vendor/github.com/mailru/easyjson/jwriter",
-        "//vendor/gopkg.in/yaml.v2:yaml_v2",
+        "//vendor/gopkg.in/yaml.v3:yaml_v3",
     ],
 )
