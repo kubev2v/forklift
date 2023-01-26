@@ -7,14 +7,15 @@ import (
 
 // Kinds
 var (
-	RegionKind   = libref.ToKind(Region{})
-	ProjectKind  = libref.ToKind(Project{})
-	ImageKind    = libref.ToKind(Image{})
-	FlavorKind   = libref.ToKind(Flavor{})
-	VMKind       = libref.ToKind(VM{})
-	SnapshotKind = libref.ToKind(Snapshot{})
-	VolumeKind   = libref.ToKind(Volume{})
-	NetworkKind  = libref.ToKind(Network{})
+	RegionKind     = libref.ToKind(Region{})
+	ProjectKind    = libref.ToKind(Project{})
+	ImageKind      = libref.ToKind(Image{})
+	FlavorKind     = libref.ToKind(Flavor{})
+	VMKind         = libref.ToKind(VM{})
+	SnapshotKind   = libref.ToKind(Snapshot{})
+	VolumeKind     = libref.ToKind(Volume{})
+	VolumeTypeKind = libref.ToKind(VolumeType{})
+	NetworkKind    = libref.ToKind(Network{})
 )
 
 // Types.

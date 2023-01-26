@@ -149,10 +149,11 @@ type Attachment struct {
 
 type VolumeType struct {
 	Base
-	ExtraSpecs   map[string]interface{} `sql:""`
-	IsPublic     bool                   `sql:""`
-	QosSpecID    string                 `sql:""`
-	PublicAccess bool                   `sql:""`
+	Description  string            `sql:""`
+	ExtraSpecs   map[string]string `sql:""`
+	IsPublic     bool              `sql:""`
+	QosSpecID    string            `sql:""`
+	PublicAccess bool              `sql:""`
 }
 
 type Snapshot struct {

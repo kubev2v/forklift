@@ -14,6 +14,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/snapshots"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
+	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumetypes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/networks"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
@@ -325,6 +326,24 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 		*object = instanceList
 		return
 
+	case *[]VolumeType:
+		object := object.(*[]VolumeType)
+		allPages, err = volumetypes.List(r.blockStorageService, listopts.(*VolumeTypeListOpts)).AllPages()
+		if err != nil {
+			return
+		}
+		var volumeTypeList []volumetypes.VolumeType
+		volumeTypeList, err = volumetypes.ExtractVolumeTypes(allPages)
+		if err != nil {
+			return
+		}
+		var instanceList []VolumeType
+		for _, volume := range volumeTypeList {
+			instanceList = append(instanceList, VolumeType{volume})
+		}
+		*object = instanceList
+		return
+
 	case *[]Network:
 		object := object.(*[]Network)
 		allPages, err = networks.List(r.computeService).AllPages()
@@ -381,6 +400,11 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 		var volume *volumes.Volume
 		volume, err = volumes.Get(r.blockStorageService, ID).Extract()
 		object = &Volume{*volume}
+		return
+	case *VolumeType:
+		var volumeType *volumetypes.VolumeType
+		volumeType, err = volumetypes.Get(r.blockStorageService, ID).Extract()
+		object = &VolumeType{*volumeType}
 		return
 	case *VM:
 		var server *servers.Server
