@@ -256,28 +256,6 @@ func (r *VMEventHandler) canceled() bool {
 	}
 }
 
-// Build the workload.
-func (r *VMEventHandler) workload(vmID string) (object interface{}, err error) {
-	vm := &model.VM{
-		Base: model.Base{ID: vmID},
-	}
-	err = r.DB.Get(vm)
-	if err != nil {
-		return
-	}
-	workload := web.Workload{}
-	workload.With(vm)
-	err = workload.Expand(r.DB)
-	if err != nil {
-		return
-	}
-
-	workload.Link(r.Provider)
-	object = workload
-
-	return
-}
-
 // Analyze the VM.
 func (r *VMEventHandler) validate(VM *model.VM) (err error) {
 	task := &policy.Task{
@@ -363,25 +341,24 @@ func (r *VMEventHandler) validated(batch []*policy.Task) {
 	}
 }
 
-//
 // Build the workload.
-// func (r *VMEventHandler) workload(vmID string) (object interface{}, err error) {
-// 	vm := &model.VM{
-// 		Base: model.Base{ID: vmID},
-// 	}
-// 	err = r.DB.Get(vm)
-// 	if err != nil {
-// 		return
-// 	}
-// 	workload := web.Workload{}
-// 	workload.With(vm)
-// 	err = workload.Expand(r.DB)
-// 	if err != nil {
-// 		return
-// 	}
+func (r *VMEventHandler) workload(vmID string) (object interface{}, err error) {
+	vm := &model.VM{
+		Base: model.Base{ID: vmID},
+	}
+	err = r.DB.Get(vm)
+	if err != nil {
+		return
+	}
+	workload := web.Workload{}
+	workload.With(vm)
+	err = workload.Expand(r.DB)
+	if err != nil {
+		return
+	}
 
-// 	workload.Link(r.Provider)
-// 	object = workload
+	workload.Link(r.Provider)
+	object = workload
 
-// 	return
-// }
+	return
+}
