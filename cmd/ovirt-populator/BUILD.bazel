@@ -1,0 +1,26 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "ovirt-populator_lib",
+    srcs = ["ovirt-populator.go"],
+    importpath = "github.com/konveyor/forklift-controller/cmd/ovirt-populator",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//pkg/apis/forklift/v1beta1",
+        "//vendor/github.com/kubev2v/lib-volume-populator/populator-machinery",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:meta",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured",
+        "//vendor/k8s.io/apimachinery/pkg/runtime",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor/k8s.io/client-go/dynamic",
+        "//vendor/k8s.io/client-go/kubernetes",
+        "//vendor/k8s.io/client-go/rest",
+        "//vendor/k8s.io/klog/v2:klog",
+    ],
+)
+
+go_binary(
+    name = "ovirt-populator",
+    embed = [":ovirt-populator_lib"],
+    visibility = ["//visibility:public"],
+)
