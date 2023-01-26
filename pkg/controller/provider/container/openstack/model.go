@@ -23,6 +23,7 @@ func init() {
 		&VMAdapter{},
 		&SnapshotAdapter{},
 		&VolumeAdapter{},
+		&VolumeTypeAdapter{},
 		&NetworkAdapter{},
 	}
 }
@@ -482,6 +483,61 @@ func (r *VolumeAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []
 			updates = append(updates, updater)
 		}
 	}
+	return
+}
+
+type VolumeTypeAdapter struct {
+}
+
+func (r *VolumeTypeAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
+	opts := &VolumeTypeListOpts{}
+	volumeTypeList := []VolumeType{}
+	err = ctx.client.list(&volumeTypeList, opts)
+	if err != nil {
+		return
+	}
+	list := fb.NewList()
+	for _, volumeType := range volumeTypeList {
+		m := &model.VolumeType{
+			Base: model.Base{ID: volumeType.ID},
+		}
+		volumeType.ApplyTo(m)
+		list.Append(m)
+	}
+	itr = list.Iter()
+
+	return
+}
+
+// UpdatedAt volume list options not imlemented yet in gophercloud
+func (r *VolumeTypeAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
+	opts := &VolumeTypeListOpts{}
+	volumeTypeList := []VolumeType{}
+	err = ctx.client.list(&volumeTypeList, opts)
+	if err != nil {
+		return
+	}
+	for _, volumeType := range volumeTypeList {
+		updater := func(tx *libmodel.Tx) (err error) {
+			m := &model.VolumeType{
+				Base: model.Base{ID: volumeType.ID},
+			}
+			err = tx.Get(m)
+			if err != nil {
+				if errors.Is(err, &NotFound{}) {
+					volumeType.ApplyTo(m)
+					err = tx.Insert(m)
+					return
+				}
+				return
+			}
+			volumeType.ApplyTo(m)
+			err = tx.Update(m)
+			return
+		}
+		updates = append(updates, updater)
+	}
+	// TODO: delete unexisting volumetypes
 	return
 }
 
