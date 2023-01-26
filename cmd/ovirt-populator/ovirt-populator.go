@@ -1,4 +1,4 @@
-package ovirt_populator
+package main
 
 import (
 	"bufio"
@@ -9,7 +9,7 @@ import (
 	"os"
 	"os/exec"
 
-	"forklift.konveyor.io/ovirt-populator/pkg/v1beta1"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	populator_machinery "github.com/kubev2v/lib-volume-populator/populator-machinery"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -48,7 +48,11 @@ func main() {
 	flag.StringVar(&crNamespace, "cr-namespace", "", "Custom Resource instance namespace")
 
 	// Controller args
-	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
+	if f := flag.Lookup("kubeconfig"); f != nil {
+		kubeconfig = f.Value.String()
+	} else {
+		flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
+	}
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 	flag.StringVar(&imageName, "image-name", "", "Image to use for populating")
 	// Metrics args
