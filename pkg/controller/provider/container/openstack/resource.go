@@ -5,6 +5,7 @@ import (
 
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/snapshots"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
+	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumetypes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/networks"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
@@ -199,6 +200,24 @@ func (r *Volume) addAttachMents(m *model.Volume) {
 				ID: n.ID,
 			})
 	}
+}
+
+type VolumeTypeListOpts struct {
+	volumetypes.ListOpts
+}
+
+type VolumeType struct {
+	volumetypes.VolumeType
+}
+
+func (r *VolumeType) ApplyTo(m *model.VolumeType) {
+	m.ID = r.ID
+	m.Name = r.Name
+	m.Description = r.Description
+	m.ExtraSpecs = r.ExtraSpecs
+	m.IsPublic = r.IsPublic
+	m.QosSpecID = r.QosSpecID
+	m.PublicAccess = r.PublicAccess
 }
 
 type Fault struct {

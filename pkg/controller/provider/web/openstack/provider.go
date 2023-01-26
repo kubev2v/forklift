@@ -165,6 +165,12 @@ func (h *ProviderHandler) AddDerived(r *Provider) (err error) {
 		return
 	}
 	r.VolumeCount = n
+	// VolumeTypes
+	n, err = db.Count(&openstack.VolumeType{}, nil)
+	if err != nil {
+		return
+	}
+	r.VolumeTypeCount = n
 	// Networks
 	n, err = db.Count(&openstack.Network{}, nil)
 	if err != nil {
@@ -178,14 +184,15 @@ func (h *ProviderHandler) AddDerived(r *Provider) (err error) {
 // REST Resource.
 type Provider struct {
 	ocp.Resource
-	Type         string       `json:"type"`
-	Object       api.Provider `json:"object"`
-	RegionCount  int64        `json:"regionCount"`
-	ProjectCount int64        `json:"projectCount"`
-	VMCount      int64        `json:"vmCount"`
-	ImageCount   int64        `json:"imageCount"`
-	VolumeCount  int64        `json:"volumeCount"`
-	NetworkCount int64        `json:"networkCount"`
+	Type            string       `json:"type"`
+	Object          api.Provider `json:"object"`
+	RegionCount     int64        `json:"regionCount"`
+	ProjectCount    int64        `json:"projectCount"`
+	VMCount         int64        `json:"vmCount"`
+	ImageCount      int64        `json:"imageCount"`
+	VolumeCount     int64        `json:"volumeCount"`
+	VolumeTypeCount int64        `json:"volumeTypeCount"`
+	NetworkCount    int64        `json:"networkCount"`
 }
 
 // Set fields with the specified object.

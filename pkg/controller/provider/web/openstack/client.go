@@ -60,6 +60,11 @@ func (r *Resolver) Path(resource interface{}, id string) (path string, err error
 		r.ID = id
 		r.Link(provider)
 		path = r.SelfLink
+	case *VolumeType:
+		r := VolumeType{}
+		r.ID = id
+		r.Link(provider)
+		path = r.SelfLink
 	case *Network:
 		r := Network{}
 		r.ID = id
