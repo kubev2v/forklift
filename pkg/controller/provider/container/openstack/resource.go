@@ -241,6 +241,7 @@ func (r *VM) ApplyTo(m *model.VM) {
 	m.AdminPass = r.AdminPass
 	m.SecurityGroups = r.SecurityGroups
 	r.addAttachedVolumes(m)
+	r.addFault(m)
 	m.Tags = r.Tags
 	m.ServerGroups = r.ServerGroups
 }
@@ -255,7 +256,8 @@ func (r *VM) addFlavorID(m *model.VM) {
 
 func (r *VM) addFault(m *model.VM) {
 	m.Fault = model.Fault{}
-	r.ApplyTo(m)
+	f := &Fault{r.Fault}
+	f.ApplyTo(&m.Fault)
 }
 
 func (r *VM) addAttachedVolumes(m *model.VM) {
