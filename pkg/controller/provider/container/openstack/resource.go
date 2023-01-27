@@ -2,6 +2,7 @@ package openstack
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/snapshots"
@@ -50,6 +51,12 @@ func (r *Region) ApplyTo(m *model.Region) {
 	m.ParentRegionID = r.ParentRegionID
 }
 
+func (r *Region) equalsTo(m *model.Region) bool {
+	return m.Name == r.ID &&
+		m.Description == r.Description &&
+		m.ParentRegionID == r.ParentRegionID
+}
+
 type RegionListOpts struct {
 	regions.ListOpts
 }
@@ -65,6 +72,15 @@ func (r *Project) ApplyTo(m *model.Project) {
 	m.IsDomain = r.IsDomain
 	m.DomainID = r.DomainID
 	m.ParentID = r.ParentID
+}
+
+func (r *Project) equalsTo(m *model.Project) bool {
+	return m.Name == r.Name &&
+		m.Description == r.Description &&
+		m.Enabled == r.Enabled &&
+		m.IsDomain == r.IsDomain &&
+		m.DomainID == r.DomainID &&
+		m.ParentID == r.ParentID
 }
 
 type ProjectListOpts struct {
@@ -98,6 +114,10 @@ func (r *Image) ApplyTo(m *model.Image) {
 	m.VirtualSize = r.VirtualSize
 	m.OpenStackImageImportMethods = r.OpenStackImageImportMethods
 	m.OpenStackImageStoreIDs = r.OpenStackImageStoreIDs
+}
+
+func (r *Image) updatedAfter(m *model.Image) bool {
+	return r.UpdatedAt.After(m.UpdatedAt)
 }
 
 const (
@@ -138,6 +158,18 @@ func (r *Flavor) ApplyTo(m *model.Flavor) {
 	m.Description = r.Description
 }
 
+func (r *Flavor) equalsTo(m *model.Flavor) bool {
+	return m.Disk == r.Disk &&
+		m.RAM == r.RAM &&
+		m.Name == r.Name &&
+		m.RxTxFactor == fmt.Sprintf("%f", r.RxTxFactor) &&
+		m.Swap == r.Swap &&
+		m.VCPUs == r.VCPUs &&
+		m.IsPublic == r.IsPublic &&
+		m.Ephemeral == r.Ephemeral &&
+		m.Description == r.Description
+}
+
 type SnapshotListOpts struct {
 	snapshots.ListOpts
 }
@@ -155,6 +187,10 @@ func (r *Snapshot) ApplyTo(m *model.Snapshot) {
 	m.Status = r.Status
 	m.Size = r.Size
 	m.Metadata = r.Metadata
+}
+
+func (r *Snapshot) updatedAfter(m *model.Snapshot) bool {
+	return r.UpdatedAt.After(m.UpdatedAt)
 }
 
 const (
@@ -203,6 +239,10 @@ func (r *Volume) addAttachMents(m *model.Volume) {
 	}
 }
 
+func (r *Volume) updatedAfter(m *model.Volume) bool {
+	return r.UpdatedAt.After(m.UpdatedAt)
+}
+
 type VolumeTypeListOpts struct {
 	volumetypes.ListOpts
 }
@@ -219,6 +259,18 @@ func (r *VolumeType) ApplyTo(m *model.VolumeType) {
 	m.IsPublic = r.IsPublic
 	m.QosSpecID = r.QosSpecID
 	m.PublicAccess = r.PublicAccess
+}
+
+func (r *VolumeType) equalsTo(m *model.VolumeType) bool {
+	if !reflect.DeepEqual(r.ExtraSpecs, m.ExtraSpecs) {
+		return false
+	}
+	return m.ID == r.ID &&
+		m.Name == r.Name &&
+		m.Description == r.Description &&
+		m.IsPublic == r.IsPublic &&
+		m.QosSpecID == r.QosSpecID &&
+		m.PublicAccess == r.PublicAccess
 }
 
 type Fault struct {
@@ -291,6 +343,10 @@ func (r *VM) addAttachedVolumes(m *model.VM) {
 	}
 }
 
+func (r *VM) updatedAfter(m *model.VM) bool {
+	return r.Updated.After(m.Updated)
+}
+
 type AttachedVolume struct {
 	servers.AttachedVolume
 }
@@ -332,4 +388,8 @@ func (r *Network) ApplyTo(m *model.Network) {
 	m.VPNPrivateAddress = r.VPNPrivateAddress
 	m.VPNPublicAddress = r.VPNPublicAddress
 	m.VPNPublicPort = r.VPNPublicPort
+}
+
+func (r *Network) updatedAfter(m *model.Network) bool {
+	return time.Time(r.UpdatedAt).After(m.UpdatedAt)
 }
