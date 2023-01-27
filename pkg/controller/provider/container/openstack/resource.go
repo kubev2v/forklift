@@ -1,6 +1,7 @@
 package openstack
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/snapshots"
@@ -129,7 +130,7 @@ func (r *Flavor) ApplyTo(m *model.Flavor) {
 	m.Disk = r.Disk
 	m.RAM = r.RAM
 	m.Name = r.Name
-	m.RxTxFactor = r.RxTxFactor
+	m.RxTxFactor = fmt.Sprintf("%f", r.RxTxFactor)
 	m.Swap = r.Swap
 	m.VCPUs = r.VCPUs
 	m.IsPublic = r.IsPublic
