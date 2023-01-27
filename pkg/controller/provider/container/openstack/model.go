@@ -107,6 +107,9 @@ func (r *RegionAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []
 				}
 				return
 			}
+			if region.equalsTo(m) {
+				return
+			}
 			region.ApplyTo(m)
 			err = tx.Update(m)
 			return
@@ -159,6 +162,9 @@ func (r *ProjectAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates [
 					err = tx.Insert(m)
 					return
 				}
+				return
+			}
+			if project.equalsTo(m) {
 				return
 			}
 			project.ApplyTo(m)
@@ -229,6 +235,9 @@ func (r *ImageAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []U
 					}
 					return
 				}
+				if !image.updatedAfter(m) {
+					return
+				}
 				image.ApplyTo(m)
 				err = tx.Update(m)
 				return
@@ -281,6 +290,9 @@ func (r *FlavorAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []
 					err = tx.Insert(m)
 					return
 				}
+				return
+			}
+			if flavor.equalsTo(m) {
 				return
 			}
 			flavor.ApplyTo(m)
@@ -356,6 +368,9 @@ func (r *VMAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Upda
 					}
 					return
 				}
+				if !server.updatedAfter(m) {
+					return
+				}
 				server.ApplyTo(m)
 				err = tx.Update(m)
 				return
@@ -406,6 +421,9 @@ func (r *SnapshotAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates 
 					err = tx.Insert(m)
 					return
 				}
+				return
+			}
+			if !snapshot.updatedAfter(m) {
 				return
 			}
 			snapshot.ApplyTo(m)
@@ -476,6 +494,9 @@ func (r *VolumeAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []
 					}
 					return
 				}
+				if !volume.updatedAfter(m) {
+					return
+				}
 				volume.ApplyTo(m)
 				err = tx.Update(m)
 				return
@@ -531,6 +552,9 @@ func (r *VolumeTypeAdapter) GetUpdates(ctx *Context, lastSync time.Time) (update
 				}
 				return
 			}
+			if volumeType.equalsTo(m) {
+				return
+			}
 			volumeType.ApplyTo(m)
 			err = tx.Update(m)
 			return
@@ -581,6 +605,9 @@ func (r *NetworkAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates [
 					err = tx.Insert(m)
 					return
 				}
+				return
+			}
+			if !network.updatedAfter(m) {
 				return
 			}
 			network.ApplyTo(m)
