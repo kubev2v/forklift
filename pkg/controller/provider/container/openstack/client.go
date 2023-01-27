@@ -374,46 +374,73 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 	case *Region:
 		var region *regions.Region
 		region, err = regions.Get(r.identityService, ID).Extract()
+		if err != nil {
+			return
+		}
 		object = &Region{*region}
 		return
 	case *Project:
 		var project *projects.Project
 		project, err = projects.Get(r.identityService, ID).Extract()
+		if err != nil {
+			return
+		}
 		object = &Project{*project}
 		return
 	case *Flavor:
 		var flavor *flavors.Flavor
 		flavor, err = flavors.Get(r.computeService, ID).Extract()
+		if err != nil {
+			return
+		}
 		object = &Flavor{*flavor}
 		return
 	case *Image:
 		var image *images.Image
 		image, err = images.Get(r.imageService, ID).Extract()
+		if err != nil {
+			return
+		}
 		object = &Image{*image}
 		return
 	case *Snapshot:
 		var snapshot *snapshots.Snapshot
 		snapshot, err = snapshots.Get(r.blockStorageService, ID).Extract()
+		if err != nil {
+			return
+		}
 		object = &Snapshot{*snapshot}
 		return
 	case *Volume:
 		var volume *volumes.Volume
 		volume, err = volumes.Get(r.blockStorageService, ID).Extract()
+		if err != nil {
+			return
+		}
 		object = &Volume{*volume}
 		return
 	case *VolumeType:
 		var volumeType *volumetypes.VolumeType
 		volumeType, err = volumetypes.Get(r.blockStorageService, ID).Extract()
+		if err != nil {
+			return
+		}
 		object = &VolumeType{*volumeType}
 		return
 	case *VM:
 		var server *servers.Server
 		server, err = servers.Get(r.computeService, ID).Extract()
+		if err != nil {
+			return
+		}
 		object = &VM{*server}
 		return
 	case *Network:
 		var network *networks.Network
 		network, err = networks.Get(r.computeService, ID).Extract()
+		if err != nil {
+			return
+		}
 		object = &Network{*network}
 		return
 	default:
