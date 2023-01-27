@@ -273,6 +273,7 @@ func (r *FlavorAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 
 func (r *FlavorAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
 	opts := &FlavorListOpts{}
+	opts.ChangesSince = lastSync.Format(time.RFC3339)
 	flavorList := []Flavor{}
 	err = ctx.client.list(&flavorList, opts)
 	if err != nil {
