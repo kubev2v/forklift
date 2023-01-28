@@ -3420,12 +3420,10 @@ container_pull(
 )
 
 container_pull(
-    name = "centos-stream8",
-    # 'tag' is also supported, but digest is encouraged for reproducibility.
-    digest = "sha256:925b59f6a8f93b4cea34ca7e4d8cacb40784cc12161e0c41081792a71d91221c",
+    name = "libguestfs-appliance",
     registry = "quay.io",
-    repository = "centos/centos",
-    #tag = "stream8",
+    repository = "kubev2v/libguestfs-appliance",
+    tag = "latest",
 )
 
 container_pull(

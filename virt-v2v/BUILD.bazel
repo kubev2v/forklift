@@ -5,7 +5,7 @@ load(
 
 container_image(
     name = "virt-v2v-image",
-    base = "@ubi8-minimal//image",
+    base = "@libguestfs-appliance//image",
     directory = "/",
     tars = ["//rpm:virt-v2v"],
 )
