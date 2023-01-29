@@ -2,7 +2,7 @@
 
 set -e 
 
-bazeldnf_repos="--repofile rpm/repo.yaml"
+bazeldnf_repos="--repofile rpm/stream8-repo.yaml"
 if [ "${CUSTOM_REPO}" ]; then
     bazeldnf_repos="--repofile ${CUSTOM_REPO} ${bazeldnf_repos}"
 fi
