@@ -98,7 +98,6 @@ build-controller-image: check_container_runtmime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
 	bazel run cmd/forklift-controller:forklift-controller-image \
 		--verbose_failures \
-		--sandbox_writable_path=$${HOME}/.ccache \
 		--sandbox_writable_path=$${XDG_RUNTIME_DIR} \
 		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
 
@@ -110,7 +109,6 @@ build-api-image: check_container_runtmime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
 	bazel run cmd/forklift-api:forklift-api-image \
 		--verbose_failures \
-		--sandbox_writable_path=$${HOME}/.ccache \
 		--sandbox_writable_path=$${XDG_RUNTIME_DIR} \
 		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
 
@@ -145,7 +143,7 @@ build-virt-v2v-image: check_container_runtmime
 		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
 
 push-virt-v2v-image: build-virt-v2v-image
-	$(CONTAINER_CMD) tag bazel/virt-v2v:virt-v2v-image $(VIRT_V2V_IMAGE_COLD)
+	$(CONTAINER_CMD) tag bazel/virt-v2v:forklift-virt-v2v $(VIRT_V2V_IMAGE_COLD)
 	$(CONTAINER_CMD) push $(VIRT_V2V_IMAGE_COLD)
 
 build-virt-v2v-warm-image:
