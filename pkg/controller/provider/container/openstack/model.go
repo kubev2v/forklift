@@ -617,6 +617,11 @@ func (r *NetworkAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates [
 				}
 				return
 			}
+			if network.Deleted {
+				network.ApplyTo(m)
+				err = tx.Delete(m)
+				return
+			}
 			if !network.updatedAfter(m) {
 				return
 			}
