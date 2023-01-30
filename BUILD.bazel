@@ -104,24 +104,6 @@ container_push(
 )
 
 container_push(
-    name = "push-forklift-virt-v2v",
-    format = "Docker",
-    image = "//virt-v2v:forklift-virt-v2v",
-    registry = "$${REGISTRY:-quay.io}",
-    repository = "$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}forklift-virt-v2v",
-    tag = "$${REGISTRY_TAG:-devel}",
-)
-
-container_push(
-    name = "push-forklift-virt-v2v-warm",
-    format = "Docker",
-    image = "//virt-v2v:forklift-virt-v2v-warm",
-    registry = "$${REGISTRY:-quay.io}",
-    repository = "$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}forklift-virt-v2v-warm",
-    tag = "$${REGISTRY_TAG:-devel}",
-)
-
-container_push(
     name = "push-populator-controller",
     format = "Docker",
     image = "//cmd/populator-controller:populator-controller-image",
