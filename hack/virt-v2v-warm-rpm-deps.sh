@@ -43,6 +43,8 @@ alternative_picks="
 bazel run \
         //:bazeldnf -- rpmtree \
         --public \
+        --workspace virt-v2v/warm/WORKSPACE \
+        --buildfile virt-v2v/warm/BUILD.bazel \
         --name virt-v2v \
         --basesystem centos-stream-release \
         ${bazeldnf_repos} \
