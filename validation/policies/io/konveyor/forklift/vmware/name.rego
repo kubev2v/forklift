@@ -14,7 +14,7 @@ valid_vm = true {
 
 valid_vm_name = true {
     regex.match("^[a-z0-9][a-z0-9-]*[a-z0-9]$", input.name)
-    count(input.name) <= 64
+    count(input.name) < 64
 }
 
 concerns[flag] {
