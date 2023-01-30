@@ -100,7 +100,7 @@ func (r *RegionAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []
 			}
 			err = tx.Get(m)
 			if err != nil {
-				if errors.Is(err, &NotFound{}) {
+				if errors.Is(err, libmodel.NotFound) {
 					region.ApplyTo(m)
 					err = tx.Insert(m)
 					return
@@ -157,7 +157,7 @@ func (r *ProjectAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates [
 			}
 			err = tx.Get(m)
 			if err != nil {
-				if errors.Is(err, &NotFound{}) {
+				if errors.Is(err, libmodel.NotFound) {
 					project.ApplyTo(m)
 					err = tx.Insert(m)
 					return
@@ -228,7 +228,7 @@ func (r *ImageAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []U
 				}
 				err = tx.Get(m)
 				if err != nil {
-					if errors.Is(err, &NotFound{}) {
+					if errors.Is(err, libmodel.NotFound) {
 						image.ApplyTo(m)
 						err = tx.Insert(m)
 						return
@@ -286,7 +286,7 @@ func (r *FlavorAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []
 			}
 			err = tx.Get(m)
 			if err != nil {
-				if errors.Is(err, &NotFound{}) {
+				if errors.Is(err, libmodel.NotFound) {
 					flavor.ApplyTo(m)
 					err = tx.Insert(m)
 					return
@@ -362,7 +362,7 @@ func (r *VMAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Upda
 				}
 				err = tx.Get(m)
 				if err != nil {
-					if errors.Is(err, &NotFound{}) {
+					if errors.Is(err, libmodel.NotFound) {
 						server.ApplyTo(m)
 						err = tx.Insert(m)
 						return
@@ -417,7 +417,7 @@ func (r *SnapshotAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates 
 			}
 			err = tx.Get(m)
 			if err != nil {
-				if errors.Is(err, &NotFound{}) {
+				if errors.Is(err, libmodel.NotFound) {
 					snapshot.ApplyTo(m)
 					err = tx.Insert(m)
 					return
@@ -488,7 +488,7 @@ func (r *VolumeAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []
 				}
 				err = tx.Get(m)
 				if err != nil {
-					if errors.Is(err, &NotFound{}) {
+					if errors.Is(err, libmodel.NotFound) {
 						volume.ApplyTo(m)
 						err = tx.Insert(m)
 						return
@@ -546,7 +546,7 @@ func (r *VolumeTypeAdapter) GetUpdates(ctx *Context, lastSync time.Time) (update
 			}
 			err = tx.Get(m)
 			if err != nil {
-				if errors.Is(err, &NotFound{}) {
+				if errors.Is(err, libmodel.NotFound) {
 					volumeType.ApplyTo(m)
 					err = tx.Insert(m)
 					return
@@ -601,7 +601,7 @@ func (r *NetworkAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates [
 			}
 			err = tx.Get(m)
 			if err != nil {
-				if errors.Is(err, &NotFound{}) {
+				if errors.Is(err, libmodel.NotFound) {
 					network.ApplyTo(m)
 					err = tx.Insert(m)
 					return

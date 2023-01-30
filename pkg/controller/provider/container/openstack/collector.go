@@ -33,7 +33,7 @@ const (
 	Refresh = "refresh"
 )
 
-// oVirt data collector.
+// Openstack data collector.
 type Collector struct {
 	// Provider
 	provider *api.Provider

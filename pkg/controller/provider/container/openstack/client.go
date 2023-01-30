@@ -27,14 +27,6 @@ import (
 	core "k8s.io/api/core/v1"
 )
 
-// NotFound error.
-type NotFound struct {
-}
-
-func (e *NotFound) Error() string {
-	return "not found."
-}
-
 // Client struct
 type Client struct {
 	URL                 string
