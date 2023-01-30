@@ -12,7 +12,7 @@ func TestKubevirt(t *testing.T) {
 
 	//Test all cases in name adjustments
 	originalVmName := "----------------Vm!@#$%^&*()_+-Name/.,';[]-CorREct-<>123----------------------"
-	newVmName := "vm-name-correct-123"
+	newVmName := "vm--name-correct-123"
 	g.Expect(changeVmName(originalVmName, id)).To(gomega.Equal(newVmName))
 
 	//Test the case that the VM name is empty after all removals

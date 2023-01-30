@@ -56,6 +56,8 @@ const (
 	AnnOriginalID = "original-ID"
 	// DV deletion on completion
 	AnnDeleteAfterCompletion = "cdi.kubevirt.io/storage.deleteAfterCompletion"
+	// Max Length for vm name
+	NameMaxLength = 63
 )
 
 // Labels
@@ -776,12 +778,17 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 		originalName = vm.Name
 
 		generatedName := changeVmName(vm.Name, vm.ID)
-		nameExist, errName := r.checkIfVmNameExist(generatedName)
+		nameExist, errName := r.checkIfVmNameExistsInNamespace(generatedName, r.Plan.Spec.TargetNamespace)
 		if errName != nil {
 			err = liberr.Wrap(errName)
 			return
 		}
 		if nameExist {
+			// If the name exists and it's at max allowed length, remove 5 chars from the end
+			// so we won't reach the limit after appending vmId
+			if len(generatedName) == NameMaxLength {
+				generatedName = generatedName[0 : NameMaxLength-5]
+			}
 			generatedName = generatedName + "-" + vm.ID[:4]
 		}
 		vm.Name = generatedName
@@ -1025,7 +1032,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 			},
 			Containers: []core.Container{
 				{
-					Name:            "virt-v2v",
+					Name: "virt-v2v",
 					EnvFrom: []core.EnvFromSource{
 						{
 							Prefix: "V2V_",
@@ -1378,11 +1385,15 @@ func (r *KubeVirt) vmLabels(vmRef ref.Ref) (labels map[string]string) {
 }
 
 // Checks if VM with the newly generated name exists on the destination
-func (r *KubeVirt) checkIfVmNameExist(name string) (nameExist bool, err error) {
+func (r *KubeVirt) checkIfVmNameExistsInNamespace(name string, namespace string) (nameExist bool, err error) {
 	list := &cnv.VirtualMachineList{}
-	nameFiled := "metadata.name"
+	nameField := "metadata.name"
+	namespaceField := "metadata.namespace"
 	listOptions := &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector(nameFiled, name),
+		FieldSelector: fields.SelectorFromSet(map[string]string{
+			nameField:      name,
+			namespaceField: namespace,
+		}),
 	}
 	err = r.Destination.Client.List(
 		context.TODO(),
@@ -1511,12 +1522,15 @@ func vmOwnerReference(vm *cnv.VirtualMachine) (ref meta.OwnerReference) {
 // changes VM name to match DNS1123 RFC convention.
 func changeVmName(currName string, vmID string) string {
 
-	var nameMaxLength int = 63
+	var underscoreExcluded = regexp.MustCompile("[_]")
 	var nameExcludeChars = regexp.MustCompile("[^a-z0-9-]")
 
 	newName := strings.ToLower(currName)
-	if len(newName) > nameMaxLength {
-		newName = newName[0:nameMaxLength]
+	if len(newName) > NameMaxLength {
+		newName = newName[0:NameMaxLength]
+	}
+	if underscoreExcluded.MatchString(newName) {
+		newName = underscoreExcluded.ReplaceAllString(newName, "-")
 	}
 	if nameExcludeChars.MatchString(newName) {
 		newName = nameExcludeChars.ReplaceAllString(newName, "")
