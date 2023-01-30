@@ -90,6 +90,13 @@ func BuildTestSuite() {
 		framework.ClientsInstance.DynamicClient = dyn
 
 		utils.CacheTestsData(framework.ClientsInstance.K8sClient, framework.ClientsInstance.ForkliftInstallNs)
+
+		ovirtClient, err := framework.ClientsInstance.GetOvirtClient()
+		if err != nil {
+			ginkgo.Fail(fmt.Sprintf("ERROR, unable to create OvirtClient: %v", err))
+		}
+		framework.ClientsInstance.OvirtClient = *ovirtClient
+
 	})
 
 }
