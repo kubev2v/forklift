@@ -93,7 +93,8 @@ func (r *RegionAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []
 	if err != nil {
 		return
 	}
-	for _, region := range regionList {
+	for i := range regionList {
+		region := &regionList[i]
 		updater := func(tx *libmodel.Tx) (err error) {
 			m := &model.Region{
 				Base: model.Base{ID: region.ID},
@@ -150,7 +151,8 @@ func (r *ProjectAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates [
 	if err != nil {
 		return
 	}
-	for _, project := range projectList {
+	for i := range projectList {
+		project := &projectList[i]
 		updater := func(tx *libmodel.Tx) (err error) {
 			m := &model.Project{
 				Base: model.Base{ID: project.ID},
@@ -208,7 +210,8 @@ func (r *ImageAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []U
 	if err != nil {
 		return
 	}
-	for _, image := range imageList {
+	for i := range imageList {
+		image := &imageList[i]
 		switch image.Status {
 		case ImageStatusDeleted, ImageStatusPendingDelete:
 			updater := func(tx *libmodel.Tx) (err error) {
@@ -279,7 +282,8 @@ func (r *FlavorAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []
 	if err != nil {
 		return
 	}
-	for _, flavor := range flavorList {
+	for i := range flavorList {
+		flavor := &flavorList[i]
 		updater := func(tx *libmodel.Tx) (err error) {
 			m := &model.Flavor{
 				Base: model.Base{ID: flavor.ID},
@@ -342,14 +346,15 @@ func (r *VMAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Upda
 	if err != nil {
 		return
 	}
-	for _, server := range vmList {
-		switch server.Status {
+	for i := range vmList {
+		vm := &vmList[i]
+		switch vm.Status {
 		case VMStatusDeleted, VMStatusSoftDeleted:
 			updater := func(tx *libmodel.Tx) (err error) {
 				m := &model.VM{
-					Base: model.Base{ID: server.ID},
+					Base: model.Base{ID: vm.ID},
 				}
-				server.ApplyTo(m)
+				vm.ApplyTo(m)
 				err = tx.Delete(m)
 				return
 			}
@@ -358,21 +363,21 @@ func (r *VMAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Upda
 		default:
 			updater := func(tx *libmodel.Tx) (err error) {
 				m := &model.VM{
-					Base: model.Base{ID: server.ID},
+					Base: model.Base{ID: vm.ID},
 				}
 				err = tx.Get(m)
 				if err != nil {
 					if errors.Is(err, libmodel.NotFound) {
-						server.ApplyTo(m)
+						vm.ApplyTo(m)
 						err = tx.Insert(m)
 						return
 					}
 					return
 				}
-				if !server.updatedAfter(m) {
+				if !vm.updatedAfter(m) {
 					return
 				}
-				server.ApplyTo(m)
+				vm.ApplyTo(m)
 				err = tx.Update(m)
 				return
 			}
@@ -410,7 +415,8 @@ func (r *SnapshotAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates 
 	if err != nil {
 		return
 	}
-	for _, snapshot := range snapshotList {
+	for i := range snapshotList {
+		snapshot := &snapshotList[i]
 		updater := func(tx *libmodel.Tx) (err error) {
 			m := &model.Snapshot{
 				Base: model.Base{ID: snapshot.ID},
@@ -468,7 +474,8 @@ func (r *VolumeAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []
 	if err != nil {
 		return
 	}
-	for _, volume := range volumeList {
+	for i := range volumeList {
+		volume := &volumeList[i]
 		switch volume.Status {
 		case VolumeStatusDeleting:
 			updater := func(tx *libmodel.Tx) (err error) {
@@ -539,7 +546,8 @@ func (r *VolumeTypeAdapter) GetUpdates(ctx *Context, lastSync time.Time) (update
 	if err != nil {
 		return
 	}
-	for _, volumeType := range volumeTypeList {
+	for i := range volumeTypeList {
+		volumeType := &volumeTypeList[i]
 		updater := func(tx *libmodel.Tx) (err error) {
 			m := &model.VolumeType{
 				Base: model.Base{ID: volumeType.ID},
@@ -594,7 +602,8 @@ func (r *NetworkAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates [
 	if err != nil {
 		return
 	}
-	for _, network := range networkList {
+	for i := range networkList {
+		network := &networkList[i]
 		updater := func(tx *libmodel.Tx) (err error) {
 			m := &model.Network{
 				Base: model.Base{ID: network.ID},
