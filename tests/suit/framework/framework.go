@@ -76,6 +76,8 @@ type Clients struct {
 	RestConfig *rest.Config
 	// DynamicClient performs generic operations on arbitrary k8s API objects.
 	DynamicClient dynamic.Interface
+	// OvirtClient provides a pointer to ovirt client.
+	OvirtClient OvirtClient
 }
 
 // K8s returns Kubernetes Clientset
@@ -256,6 +258,12 @@ func (c *Clients) GetCrClient() (crclient.Client, error) {
 	}
 
 	return client, nil
+}
+
+// GetOvirtClient instantiates and returns an ovirtClient
+func (c *Clients) GetOvirtClient() (*OvirtClient, error) {
+	oc := OvirtClient{}
+	return &oc, nil
 }
 
 // GetRESTConfigForServiceAccount returns a RESTConfig for SA

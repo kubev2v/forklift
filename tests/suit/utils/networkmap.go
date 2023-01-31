@@ -30,7 +30,6 @@ func NewNetworkMap(namespace string, providerIdentifier forkliftv1.Provider, net
 	// nicPairs set with the default settings for kind CI.
 	nicPairs := []forkliftv1.NetworkPair{
 		{
-			//TODO: externalize nicPairs
 			Source: ref.Ref{ID: sourceNicID},
 			Destination: forkliftv1.DestinationNetwork{
 				Type: "pod",
