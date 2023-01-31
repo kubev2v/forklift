@@ -2,7 +2,7 @@
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
-  name: secret-mutate
+  name: {{ api_deployment_name }}
   namespace: ""
   annotations:
 {% if k8s_cluster|bool %}
