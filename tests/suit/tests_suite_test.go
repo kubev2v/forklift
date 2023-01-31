@@ -12,6 +12,14 @@ import (
 	"testing"
 )
 
+const (
+	networkMapName        = "network-map-test"
+	namespace             = "konveyor-forklift"
+	test_migration_name   = "migration-test"
+	test_plan_name        = "plan-test"
+	test_storage_map_name = "test-storage-map-v"
+)
+
 var (
 	kubectlPath       = flag.String("kubectl-path", "kubectl", "The path to the kubectl binary")
 	ocPath            = flag.String("oc-path", "oc", "The path to the oc binary")
@@ -90,6 +98,13 @@ func BuildTestSuite() {
 		framework.ClientsInstance.DynamicClient = dyn
 
 		utils.CacheTestsData(framework.ClientsInstance.K8sClient, framework.ClientsInstance.ForkliftInstallNs)
+
+		ovirtClient, err := framework.ClientsInstance.GetOvirtClient()
+		if err != nil {
+			ginkgo.Fail(fmt.Sprintf("ERROR, unable to create OvirtClient: %v", err))
+		}
+		framework.ClientsInstance.OvirtClient = *ovirtClient
+
 	})
 
 }
