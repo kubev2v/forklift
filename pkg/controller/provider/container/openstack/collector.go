@@ -119,6 +119,7 @@ func (r *Collector) Test() (_ int, err error) {
 func (r *Collector) Start() error {
 	ctx := Context{
 		client: r.client,
+		db:     r.db,
 		log:    r.log,
 	}
 	ctx.ctx, r.cancel = context.WithCancel(context.Background())
@@ -303,7 +304,7 @@ func (r *Collector) endWatch() {
 // DB transaction while using the provider API which
 // can block or be slow.
 func (r *Collector) refresh(ctx *Context) (err error) {
-	var updates []Updater
+	var deletes, updates []Updater
 	err = r.connect()
 	if err != nil {
 		return
@@ -311,6 +312,14 @@ func (r *Collector) refresh(ctx *Context) (err error) {
 	mark := time.Now()
 	for _, adapter := range adapterList {
 		if ctx.canceled() {
+			return
+		}
+		deletes, err = adapter.DeleteUnexisting(ctx)
+		if err != nil {
+			return
+		}
+		err = r.apply(deletes)
+		if err != nil {
 			return
 		}
 		updates, err = adapter.GetUpdates(ctx, r.lastSync)
