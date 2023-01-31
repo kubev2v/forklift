@@ -5,7 +5,7 @@ load(
 
 container_image(
     name = "validation-policies",
-    base = "@ubi8-minimal//image",
+    base = "@ubi9-minimal//image",
     directory = "/usr/share/opa/",
     files = ["policies"],
 )
