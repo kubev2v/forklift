@@ -20,7 +20,7 @@ container_image(
     #    "//conditions:default": "amd64",
     #}),
     #base = "@centos-stream8//image",
-    base = "@ubi8-minimal//image",
+    base = "@ubi9-minimal//image",
     directory = "/usr/local/bin/",
     entrypoint = ["/usr/local/bin/forklift-controller"],
     # workaround for github.com/bazelbuild/rules_go/issues/1706
