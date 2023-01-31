@@ -34,21 +34,22 @@ The environment which you can set across all projects.
 The environment variables that you can set in .bazelrc, these variables are used during Bazel build process and used inside the bazel sandbox.
 Another option to override the default values can use `--action_env` as in the example.
 
-| Name                  | Default value                                    | Description                                                 |
-|-----------------------|--------------------------------------------------|-------------------------------------------------------------|
-| CONTAINER_CMD         | autodetected                                     | The container runtime command (e.g.: /usr/bin/podman)       |
-| VERSION               | 2.4.0                                            | The version with which the forklift should be built.        |
-| NAMESPACE             | konveyor-forklift                                | The namespace in which the operator should be installed.    |
-| CHANNELS              | development                                      | The olm channels.                                           |
-| DEFAULT_CHANNEL       | development                                      | The default olm channel.                                    |
-| OPERATOR_IMAGE        | quay.io/kubev2v/forklift-operator:latest         | The forklift operator image with the ansible-operator role. |
-| CONTROLLER_IMAGE      | quay.io/kubev2v/forklift-controller:latest       | The forklift controller image.                              |
-| MUST_GATHER_IMAGE     | quay.io/kubev2v/forklift-must-gather:latest      | The forklift must gather an image.                          |
-| MUST_GATHER_API_IMAGE | quay.io/kubev2v/forklift-must-gather-api:latest  | The forklift must gather image api.                         |
-| UI_IMAGE              | quay.io/kubev2v/forklift-ui:latest               | The forklift UI image.                                      |
-| UI_PLUGIN_IMAGE       | quay.io/kubev2v/forklift-console-plugin:latest   | The forklift OKD/OpenShift UI plugin image.                 |
-| VALIDATION_IMAGE      | quay.io/kubev2v/forklift-validation:latest       | The forklift validation image.                              |
-| VIRT_V2V_IMAGE        | *see below*                                      | The forklift virt v2v image. See note below.                |
+| Name                       | Default value                                   | Description                                                 |
+|----------------------------|-------------------------------------------------|-------------------------------------------------------------|
+| CONTAINER_CMD              | autodetected                                    | The container runtime command (e.g.: /usr/bin/podman)       |
+| VERSION                    | 2.4.0                                           | The version with which the forklift should be built.        |
+| NAMESPACE                  | konveyor-forklift                               | The namespace in which the operator should be installed.    |
+| CHANNELS                   | development                                     | The olm channels.                                           |
+| DEFAULT_CHANNEL            | development                                     | The default olm channel.                                    |
+| OPERATOR_IMAGE             | quay.io/kubev2v/forklift-operator:latest        | The forklift operator image with the ansible-operator role. |
+| CONTROLLER_IMAGE           | quay.io/kubev2v/forklift-controller:latest      | The forklift controller image.                              |
+| MUST_GATHER_IMAGE          | quay.io/kubev2v/forklift-must-gather:latest     | The forklift must gather an image.                          |
+| MUST_GATHER_API_IMAGE      | quay.io/kubev2v/forklift-must-gather-api:latest | The forklift must gather image api.                         |
+| UI_IMAGE                   | quay.io/kubev2v/forklift-ui:latest              | The forklift UI image.                                      |
+| UI_PLUGIN_IMAGE            | quay.io/kubev2v/forklift-console-plugin:latest  | The forklift OKD/OpenShift UI plugin image.                 |
+| VALIDATION_IMAGE           | quay.io/kubev2v/forklift-validation:latest      | The forklift validation image.                              |
+| VIRT_V2V_IMAGE             | *see below*                                     | The forklift virt v2v image. See note below.                |
+| POPULATOR_CONTROLLER_IMAGE | quay.io/kubev2v/populator-controller:latest     | The populator controller image.                             |
 
 Value for `VIRT_V2V_IMAGE` can be either a single image location, or it can be two different images separated by `|`. The second form can be used to specify different image for cold migration and warm migration. The syntax in this case is `<cold_image>|<warm_image>`. Currently the default value is: `quay.io/kubev2v/forklift-virt-v2v:latest|quay.io/kubev2v/forklift-virt-v2v-warm:latest`.
 
