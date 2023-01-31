@@ -9,6 +9,10 @@ import (
 	"time"
 )
 
+const (
+	ovirtProviderName = "ovirt-provider"
+)
+
 var _ = Describe("[level:component]Migration tests for oVirt provider", func() {
 	f := framework.NewFramework("migration-func-test")
 
@@ -34,9 +38,6 @@ var _ = Describe("[level:component]Migration tests for oVirt provider", func() {
 				"user":     []byte(f.OvirtClient.Username),
 				"url":      []byte(f.OvirtClient.OvirtURL),
 			}, f.Namespace.Name, "provider-test-secret"))
-		Expect(err).ToNot(HaveOccurred())
-
-		err = f.OvirtClient.ConnectUsingSecret(s)
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Create oVirt provider")

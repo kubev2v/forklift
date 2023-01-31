@@ -3,9 +3,7 @@ package framework
 import (
 	"fmt"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/ovirt"
 	ovirtsdk "github.com/ovirt/go-ovirt"
-	corev1 "k8s.io/api/core/v1"
 	"os"
 )
 
@@ -53,6 +51,7 @@ func (r *OvirtClient) LoadSourceDetails() (err error) {
 
 	// if a real custom ovirt environment is used.
 	if r.CustomEnv {
+		defer r.Close()
 		// connect to ovirt instance
 		err = r.Connect()
 
@@ -75,7 +74,7 @@ func (r *OvirtClient) LoadSourceDetails() (err error) {
 	return
 }
 
-// Connect - Connect to the oVirt API using secret.
+// Connect - Connect to the oVirt API.
 func (r *OvirtClient) Connect() (err error) {
 	r.connection, err = ovirtsdk.NewConnectionBuilder().
 		URL(r.OvirtURL).
@@ -88,42 +87,6 @@ func (r *OvirtClient) Connect() (err error) {
 		return err
 	}
 	return
-}
-
-// ConnectUsingSecret - Connect to the oVirt API using secret.
-func (r *OvirtClient) ConnectUsingSecret(secret *corev1.Secret) (err error) {
-	r.connection, err = ovirtsdk.NewConnectionBuilder().
-		URL(r.OvirtURL).
-		Username(r.GetUserFromSecret(*secret)).
-		Password(r.GetPasswordFromSecret(*secret)).
-		CACert(r.getCAcertFromSecret(*secret)).
-		Insecure(ovirt.GetInsecureSkipVerifyFlag(secret)).
-		Build()
-	if err != nil {
-		return err
-	}
-	return
-}
-
-func (r *OvirtClient) GetUserFromSecret(secret corev1.Secret) string {
-	if user, found := secret.Data["user"]; found {
-		return string(user)
-	}
-	return ""
-}
-
-func (r *OvirtClient) GetPasswordFromSecret(secret corev1.Secret) string {
-	if password, found := secret.Data["password"]; found {
-		return string(password)
-	}
-	return ""
-}
-
-func (r *OvirtClient) getCAcertFromSecret(secret corev1.Secret) []byte {
-	if cacert, found := secret.Data["cacert"]; found {
-		return cacert
-	}
-	return nil
 }
 
 // Get the VM by ref.
@@ -218,14 +181,17 @@ func (r *OvirtClient) getSDFromVM(vmRef ref.Ref) (storageDomains []string, err e
 	return
 }
 
+// GetVMNics - return the network interface for the VM
 func (r *OvirtClient) GetVMNics() []string {
 	return r.vmData.nicPairs
 }
 
+// GetVMSDs - return storage domain IDs
 func (r *OvirtClient) GetVMSDs() []string {
 	return r.vmData.sdPairs
 }
 
+// GetTestVMId - return the test VM ID
 func (r *OvirtClient) GetTestVMId() string {
 	return r.testVMId
 }

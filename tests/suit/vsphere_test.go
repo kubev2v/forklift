@@ -10,13 +10,7 @@ import (
 )
 
 const (
-	vsphereProviderName   = "vsphere-provider"
-	ovirtProviderName     = "ovirt-provider"
-	networkMapName        = "network-map-test"
-	namespace             = "konveyor-forklift"
-	test_migration_name   = "migration-test"
-	test_plan_name        = "plan-test"
-	test_storage_map_name = "test-storage-map-v"
+	vsphereProviderName = "vsphere-provider"
 )
 
 var _ = Describe("[level:component]Migration tests for vSphere provider", func() {

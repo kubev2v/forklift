@@ -12,6 +12,14 @@ import (
 	"testing"
 )
 
+const (
+	networkMapName        = "network-map-test"
+	namespace             = "konveyor-forklift"
+	test_migration_name   = "migration-test"
+	test_plan_name        = "plan-test"
+	test_storage_map_name = "test-storage-map-v"
+)
+
 var (
 	kubectlPath       = flag.String("kubectl-path", "kubectl", "The path to the kubectl binary")
 	ocPath            = flag.String("oc-path", "oc", "The path to the oc binary")
