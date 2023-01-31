@@ -2,8 +2,6 @@ package suit_test
 
 import (
 	forkliftv1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/tests/suit/framework"
 	"github.com/konveyor/forklift-controller/tests/suit/utils"
 	. "github.com/onsi/ginkgo"
@@ -58,7 +56,6 @@ var _ = Describe("[level:component]Migration tests for vSphere provider", func()
 
 		By("Creating plan")
 		planDef := utils.NewPlanWithName(namespace, *provider, test_plan_name, test_storage_map_name, networkMapName, []string{"DC0_H0_VM0"})
-		planDef.Spec.VMs = []plan.VM{{Ref: ref.Ref{}}}
 
 		err = utils.CreatePlanFromDefinition(f.CrClient, planDef)
 		Expect(err).ToNot(HaveOccurred())
