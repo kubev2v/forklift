@@ -26,7 +26,7 @@ func CreatePlanFromDefinition(cl crclient.Client, def *forkliftv1.Plan) error {
 	}
 	return err
 }
-func NewPlanWithName(namespace string, providerIdentifier forkliftv1.Provider, planName string, storageMap string, networkMap string, vmName []string) *forkliftv1.Plan {
+func NewPlanWithVmName(namespace string, providerIdentifier forkliftv1.Provider, planName string, storageMap string, networkMap string, vmName []string) *forkliftv1.Plan {
 	planDef := newPlan(namespace, providerIdentifier, planName, storageMap, networkMap)
 	planDef.Spec.VMs = []plan.VM{
 		{
@@ -36,7 +36,7 @@ func NewPlanWithName(namespace string, providerIdentifier forkliftv1.Provider, p
 	return planDef
 }
 
-func NewPlanWithID(namespace string, providerIdentifier forkliftv1.Provider, planName string, storageMap string, networkMap string, vmIds []string) *forkliftv1.Plan {
+func NewPlanWithVmId(namespace string, providerIdentifier forkliftv1.Provider, planName string, storageMap string, networkMap string, vmIds []string) *forkliftv1.Plan {
 	planDef := newPlan(namespace, providerIdentifier, planName, storageMap, networkMap)
 	planDef.Spec.VMs = []plan.VM{
 		{

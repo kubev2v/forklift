@@ -49,7 +49,7 @@ var _ = Describe("[level:component]Migration tests for vSphere provider", func()
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Creating plan")
-		planDef := utils.NewPlanWithName(namespace, *provider, test_plan_name, test_storage_map_name, networkMapName, []string{"DC0_H0_VM0"})
+		planDef := utils.NewPlanWithVmName(namespace, *provider, test_plan_name, test_storage_map_name, networkMapName, []string{"DC0_H0_VM0"})
 
 		err = utils.CreatePlanFromDefinition(f.CrClient, planDef)
 		Expect(err).ToNot(HaveOccurred())

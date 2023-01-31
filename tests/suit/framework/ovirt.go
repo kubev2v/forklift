@@ -36,14 +36,14 @@ func (r *OvirtClient) SetupClient() (err error) {
 	r.Username = os.Getenv("OVIRT_USERNAME")
 	r.Password = os.Getenv("OVIRT_PASSWORD")
 	r.OvirtURL = os.Getenv("OVIRT_URL")
-	r.testVMId = os.Getenv("OVIRT_VM_ID")
+	r.vmData.testVMId = os.Getenv("OVIRT_VM_ID")
 	r.Cacert = fileinput
 
 	return
 }
 
 // LoadSourceDetails - Load Source VM details from oVirt
-func (r *OvirtClient) LoadSourceDetails() (err error) {
+func (r *OvirtClient) LoadSourceDetails() (vm *OvirtVM, err error) {
 
 	// default test values
 	sdomains := []string{"95ef6fee-5773-46a2-9340-a636958a96b8"}
@@ -56,22 +56,22 @@ func (r *OvirtClient) LoadSourceDetails() (err error) {
 		err = r.Connect()
 
 		// get storage domain from the test VM
-		sdomains, err = r.getSDFromVM(ref.Ref{ID: r.testVMId})
+		sdomains, err = r.vmData.getSDFromVM(r.connection, ref.Ref{ID: r.vmData.testVMId})
 		if err != nil {
-			return fmt.Errorf("error getting storage domains from VM - %v", err)
+			return nil, fmt.Errorf("error getting storage domains from VM - %v", err)
 		}
 
 		// get network interface from the test VM
-		nics, err = r.getNicsFromVM(ref.Ref{ID: r.testVMId})
+		nics, err = r.vmData.getNicsFromVM(r.connection, ref.Ref{ID: r.vmData.testVMId})
 		if err != nil {
-			return fmt.Errorf("error getting network interfaces from VM - %v", err)
+			return nil, fmt.Errorf("error getting network interfaces from VM - %v", err)
 		}
 
 	}
 	r.vmData.sdPairs = sdomains
 	r.vmData.nicPairs = nics
 
-	return
+	return &r.vmData, nil
 }
 
 // Connect - Connect to the oVirt API.
@@ -89,14 +89,22 @@ func (r *OvirtClient) Connect() (err error) {
 	return
 }
 
+// Close the connection to the oVirt API.
+func (r *OvirtClient) Close() {
+	if r.connection != nil {
+		_ = r.connection.Close()
+		r.connection = nil
+	}
+}
+
 // Get the VM by ref.
-func (r *OvirtClient) getVM(vmRef ref.Ref) (ovirtVm *ovirtsdk.Vm, vmService *ovirtsdk.VmService, err error) {
-	vmService = r.connection.SystemService().VmsService().VmService(vmRef.ID)
+func (r *OvirtVM) getVM(ovirtConn *ovirtsdk.Connection, vmRef ref.Ref) (vmService *ovirtsdk.VmService, err error) {
+	vmService = ovirtConn.SystemService().VmsService().VmService(vmRef.ID)
 	vmResponse, err := vmService.Get().Send()
 	if err != nil {
 		return
 	}
-	ovirtVm, ok := vmResponse.Vm()
+	_, ok := vmResponse.Vm()
 	if !ok {
 		err = fmt.Errorf(
 			"VM %s source lookup failed",
@@ -106,35 +114,35 @@ func (r *OvirtClient) getVM(vmRef ref.Ref) (ovirtVm *ovirtsdk.Vm, vmService *ovi
 }
 
 // getNicsFromVM - get network interfaces from specific VM
-func (r *OvirtClient) getNicsFromVM(vmRef ref.Ref) (nicIds []string, err error) {
-	_, vmService, err := r.getVM(vmRef)
+func (r *OvirtVM) getNicsFromVM(ovirtConn *ovirtsdk.Connection, vmRef ref.Ref) (nicIds []string, err error) {
+	vmService, err := r.getVM(ovirtConn, vmRef)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get VM - %v", err)
+		return nil, fmt.Errorf("failed to get VM - %v", err)
 	}
 
 	nicsResponse, err := vmService.NicsService().List().Send()
 	nics, ok := nicsResponse.Nics()
 	if !ok {
-		return nil, fmt.Errorf("Failed to get nics")
+		return nil, fmt.Errorf("failed to get nics")
 	}
 
 	for _, nic := range nics.Slice() {
-		vnicService := r.connection.SystemService().VnicProfilesService().ProfileService(nic.MustVnicProfile().MustId())
+		vnicService := ovirtConn.SystemService().VnicProfilesService().ProfileService(nic.MustVnicProfile().MustId())
 		vnicResponse, err := vnicService.Get().Send()
 		if err != nil {
-			return nil, fmt.Errorf("Failed to get vnic service = %v", err)
+			return nil, fmt.Errorf("failed to get vnic service = %v", err)
 		}
 		profile, ok := vnicResponse.Profile()
 		if !ok {
-			return nil, fmt.Errorf("Failed to get nic profile")
+			return nil, fmt.Errorf("failed to get nic profile")
 		}
 		network, ok := profile.Network()
 		if !ok {
-			return nil, fmt.Errorf("Failed to get network")
+			return nil, fmt.Errorf("failed to get network")
 		}
 		networkId, ok := network.Id()
 		if !ok {
-			return nil, fmt.Errorf("Failed to get network id")
+			return nil, fmt.Errorf("failed to get network id")
 		}
 		nicIds = append(nicIds, networkId)
 	}
@@ -142,38 +150,38 @@ func (r *OvirtClient) getNicsFromVM(vmRef ref.Ref) (nicIds []string, err error) 
 }
 
 // getSDFromVM - get storage domains from specific VM
-func (r *OvirtClient) getSDFromVM(vmRef ref.Ref) (storageDomains []string, err error) {
-	_, vmService, err := r.getVM(vmRef)
+func (r *OvirtVM) getSDFromVM(ovirtConn *ovirtsdk.Connection, vmRef ref.Ref) (storageDomains []string, err error) {
+	vmService, err := r.getVM(ovirtConn, vmRef)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get VM - %v", err)
+		return nil, fmt.Errorf("failed to get VM - %v", err)
 	}
 
 	diskAttachementResponse, err := vmService.DiskAttachmentsService().List().Send()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get disk attachment service  %v", err)
+		return nil, fmt.Errorf("failed to get disk attachment service  %v", err)
 	}
 	disks, ok := diskAttachementResponse.Attachments()
 	if !ok {
-		return nil, fmt.Errorf("Failed to get disks")
+		return nil, fmt.Errorf("failed to get disks")
 	}
 	for _, da := range disks.Slice() {
 		disk, ok := da.Disk()
 		if !ok {
-			return nil, fmt.Errorf("Failed to get disks")
+			return nil, fmt.Errorf("failed to get disks")
 		}
-		diskService := r.connection.SystemService().DisksService().DiskService(disk.MustId())
+		diskService := ovirtConn.SystemService().DisksService().DiskService(disk.MustId())
 		diskResponse, err := diskService.Get().Send()
 		if err != nil {
-			return nil, fmt.Errorf("Failed to get disks - %v", err)
+			return nil, fmt.Errorf("failed to get disks - %v", err)
 		}
 		sds, ok := diskResponse.MustDisk().StorageDomains()
 		if !ok {
-			return nil, fmt.Errorf("Failed to get storage domains")
+			return nil, fmt.Errorf("failed to get storage domains")
 		}
 		for _, sd := range sds.Slice() {
 			sdId, ok := sd.Id()
 			if !ok {
-				return nil, fmt.Errorf("Failed to get storage domain id")
+				return nil, fmt.Errorf("failed to get storage domain id")
 			}
 			storageDomains = append(storageDomains, sdId)
 		}
@@ -182,26 +190,18 @@ func (r *OvirtClient) getSDFromVM(vmRef ref.Ref) (storageDomains []string, err e
 }
 
 // GetVMNics - return the network interface for the VM
-func (r *OvirtClient) GetVMNics() []string {
-	return r.vmData.nicPairs
+func (r *OvirtVM) GetVMNics() []string {
+	return r.nicPairs
 }
 
 // GetVMSDs - return storage domain IDs
-func (r *OvirtClient) GetVMSDs() []string {
-	return r.vmData.sdPairs
+func (r *OvirtVM) GetVMSDs() []string {
+	return r.sdPairs
 }
 
 // GetTestVMId - return the test VM ID
-func (r *OvirtClient) GetTestVMId() string {
+func (r *OvirtVM) GetTestVMId() string {
 	return r.testVMId
-}
-
-// Close the connection to the oVirt API.
-func (r *OvirtClient) Close() {
-	if r.connection != nil {
-		_ = r.connection.Close()
-		r.connection = nil
-	}
 }
 
 // OvirtClient - oVirt VM Client
@@ -211,7 +211,6 @@ type OvirtClient struct {
 	Username     string
 	OvirtURL     string
 	Password     string
-	testVMId     string
 	storageClass string
 	vmData       OvirtVM
 	CustomEnv    bool
@@ -220,4 +219,5 @@ type OvirtClient struct {
 type OvirtVM struct {
 	nicPairs []string
 	sdPairs  []string
+	testVMId string
 }
