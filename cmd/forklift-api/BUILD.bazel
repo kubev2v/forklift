@@ -30,7 +30,7 @@ container_image(
     #    "@io_bazel_rules_go//go/platform:linux_arm64": "arm64",
     #    "//conditions:default": "amd64",
     #}),
-    base = "@ubi8-minimal//image",
+    base = "@ubi9-minimal//image",
     directory = "/usr/local/bin/",
     entrypoint = ["/usr/local/bin/forklift-api"],
     files = [":forklift-api"],

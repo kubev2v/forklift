@@ -84,7 +84,7 @@ genrule(
 
 container_image(
     name = "forklift-operator-bundle-manifests",
-    base = "@ubi8-minimal//image",
+    base = "@ubi9-minimal//image",
     directory = "/manifests/",
     files = [
         ":bundle/manifests/forklift.konveyor.io_forkliftcontrollers.yaml",
