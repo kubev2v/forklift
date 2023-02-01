@@ -596,6 +596,8 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 		}
 
+		step.MarkCompleted()
+		step.Phase = Completed
 		vm.Phase = r.next(vm.Phase)
 	case CreateVM:
 		step, found := vm.FindStep(r.step(vm))
@@ -631,6 +633,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
 			break
 		}
+		step.MarkStarted()
 		step.Phase = Running
 		err = r.updateCopyProgress(vm, step)
 		if err != nil {
