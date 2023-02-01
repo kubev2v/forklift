@@ -124,9 +124,9 @@ func getPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured) ([]string,
 	}
 
 	if rawBlock {
-		args = append(args, "--file-name="+devicePath)
+		args = append(args, "--volume-path="+devicePath)
 	} else {
-		args = append(args, "--file-name="+mountPath+"disk.img")
+		args = append(args, "--volume-path="+mountPath+"disk.img")
 	}
 
 	args = append(args, "--secret-name="+ovirtVolumePopulator.Spec.EngineSecretName)
