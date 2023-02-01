@@ -8,7 +8,7 @@ require (
 	github.com/go-logr/logr v1.2.3
 	github.com/go-logr/zapr v0.4.0
 	github.com/google/uuid v1.1.2
-	github.com/gophercloud/gophercloud v1.1.1
+	github.com/gophercloud/gophercloud v1.2.0
 	github.com/gophercloud/utils v0.0.0-20221207145018-e8fba78967ca
 	github.com/gorilla/websocket v1.4.2
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.1.0
