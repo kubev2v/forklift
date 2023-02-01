@@ -15,7 +15,16 @@ on:
 # A workflow run is made up of one or more jobs that can run sequentially
 jobs:
   ci_setup:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            source_provider: ovirt
+
+          - os: ubuntu-latest
+            source_provider: vsphere
+
+    runs-on: ${{ matrix.os }}
     env:
       USE_BAZEL_VERSION: 5.4.0
     steps:
@@ -46,7 +55,7 @@ jobs:
           STORAGE_CLASS: standard
           OVIRT_VM_ID: 31573c08-717b-43e0-825f-69a36fb0e1a1
         run: |
-          GOPATH=${GITHUB_WORKSPACE}/go make e2e-sanity
+          GOPATH=${GITHUB_WORKSPACE}/go make e2e-sanity-${{ matrix.source_provider }}
 
       - name: show abnormal events and all objects in konveyor-forklift
         if: always()

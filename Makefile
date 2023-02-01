@@ -51,13 +51,15 @@ test: generate fmt vet manifests
 	go test ./pkg/... ./cmd/... -coverprofile cover.out
 
 # Experimental e2e target
-e2e-sanity:
+e2e-sanity: e2e-sanity-ovirt e2e-sanity-vsphere
+
+e2e-sanity-ovirt:
 	# ovirt suite
 	go test ./tests/suit -v -ginkgo.focus ".*oVirt.*"
 
+e2e-sanity-vsphere:
 	# vsphere suit
 	go test ./tests/suit -v -ginkgo.focus ".*vSphere.*"
-
 
 # Build forklift-controller binary
 forklift-controller: generate fmt vet
