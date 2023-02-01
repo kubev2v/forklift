@@ -18,6 +18,7 @@ virt_v2v="
   qemu-kvm
   virt-v2v
   virtio-win
+  file
 "
 
 bazel run \

@@ -36,16 +36,17 @@ http_file(
     ],
 )
 
-load("@io_bazel_rules_docker//toolchains/docker:toolchain.bzl",
-    docker_toolchain_configure="toolchain_configure"
+load(
+    "@io_bazel_rules_docker//toolchains/docker:toolchain.bzl",
+    docker_toolchain_configure = "toolchain_configure",
 )
 
 docker_toolchain_configure(
-  name = "docker_config",
-  docker_path="${CONTAINER_CMD:-$(command -v podman||command -v docker)}",
-  docker_flags = [
-    "--log-level=info",
-  ],
+    name = "docker_config",
+    docker_flags = [
+        "--log-level=info",
+    ],
+    docker_path = "${CONTAINER_CMD:-$(command -v podman||command -v docker)}",
 )
 
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
@@ -3870,6 +3871,18 @@ rpm(
 )
 
 rpm(
+    name = "file-0__5.33-21.el8.x86_64",
+    sha256 = "202e8164df8a6110d58692fa25eaf1d1078a988372943ae73536333237dc3818",
+    urls = ["http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/file-5.33-21.el8.x86_64.rpm"],
+)
+
+rpm(
+    name = "file-libs-0__5.33-21.el8.x86_64",
+    sha256 = "9a51006d0e557e456eb9fc03ff7ed236633d32823dbd46984aca96f379e09f21",
+    urls = ["http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/file-libs-5.33-21.el8.x86_64.rpm"],
+)
+
+rpm(
     name = "filesystem-0__3.8-6.el8.x86_64",
     sha256 = "50bdb81d578914e0e88fe6b13550b4c30aac4d72f064fdcd78523df7dd2f64da",
     urls = ["http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/filesystem-3.8-6.el8.x86_64.rpm"],
@@ -3966,21 +3979,21 @@ rpm(
 )
 
 rpm(
-    name = "glibc-0__2.28-224.el8.x86_64",
-    sha256 = "d435b2974794c7acd6b263676ae5f80fdf9ffaee30ba92f86eb0f0dbc07740db",
-    urls = ["http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/glibc-2.28-224.el8.x86_64.rpm"],
+    name = "glibc-0__2.28-220.el8.x86_64",
+    sha256 = "428ebe30a0880e39cba427528220b0a758ebdb2212b753a0a1ccab8eee94242f",
+    urls = ["http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/glibc-2.28-220.el8.x86_64.rpm"],
 )
 
 rpm(
-    name = "glibc-common-0__2.28-224.el8.x86_64",
-    sha256 = "21c3069e5de0ffa8800b2e03112079582025c121a6da2fe66c63595db1f4e63b",
-    urls = ["http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/glibc-common-2.28-224.el8.x86_64.rpm"],
+    name = "glibc-common-0__2.28-220.el8.x86_64",
+    sha256 = "35f9bb3c2c61317facee6e9cee753683503f2ec4161c9da187974b93eddfcf21",
+    urls = ["http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/glibc-common-2.28-220.el8.x86_64.rpm"],
 )
 
 rpm(
-    name = "glibc-langpack-hne-0__2.28-224.el8.x86_64",
-    sha256 = "98c972340079074a0c083c487ee32c90305ebd12dd1df4f0a27a026d6d9520f3",
-    urls = ["http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/glibc-langpack-hne-2.28-224.el8.x86_64.rpm"],
+    name = "glibc-langpack-ne-0__2.28-220.el8.x86_64",
+    sha256 = "90e8a8f189550a5f20dca9b549ade97ee5c14d2575ee80342afeda0e34a62da0",
+    urls = ["http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/glibc-langpack-ne-2.28-220.el8.x86_64.rpm"],
 )
 
 rpm(
@@ -4200,15 +4213,9 @@ rpm(
 )
 
 rpm(
-    name = "kernel-core-0__4.18.0-448.el8.x86_64",
-    sha256 = "ae367028decb901507137eb8d056fbd96348fd32226eb2d1128ce716bfb6e761",
-    urls = ["http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/kernel-core-4.18.0-448.el8.x86_64.rpm"],
-)
-
-rpm(
-    name = "kernel-modules-0__4.18.0-448.el8.x86_64",
-    sha256 = "d73eb46d794d66e8791f2e5fdb089443e585e6ad09df653875fc1818394307de",
-    urls = ["http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/kernel-modules-4.18.0-448.el8.x86_64.rpm"],
+    name = "kernel-rt-core-0__4.18.0-348.rt7.130.el8.x86_64",
+    sha256 = "99f525c37edaaf3ea7fe19ca906a63167eddbd110d5c16c2ed7c1d27f521f6d1",
+    urls = ["http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/kernel-rt-core-4.18.0-348.rt7.130.el8.x86_64.rpm"],
 )
 
 rpm(
@@ -5334,12 +5341,6 @@ rpm(
 )
 
 rpm(
-    name = "overpass-mono-fonts-0__3.0.2-3.el8.x86_64",
-    sha256 = "032006d2a85649ee9513a08454dfadde0c7c7522d6065774a45b673b5e058161",
-    urls = ["http://mirror.centos.org/centos/8-stream/AppStream/x86_64/os/Packages/overpass-mono-fonts-3.0.2-3.el8.noarch.rpm"],
-)
-
-rpm(
     name = "p11-kit-0__0.23.22-1.el8.x86_64",
     sha256 = "6a67c8721fe24af25ec56c6aae956a190d8463e46efed45adfbbd800086550c7",
     urls = ["http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/p11-kit-0.23.22-1.el8.x86_64.rpm"],
@@ -5652,15 +5653,15 @@ rpm(
 )
 
 rpm(
-    name = "selinux-policy-0__3.14.3-111.el8.x86_64",
-    sha256 = "ab5368b466ee9cf34d8a4ed859e368d6f6693f9f47de81ca470a58776d346952",
-    urls = ["http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/selinux-policy-3.14.3-111.el8.noarch.rpm"],
+    name = "selinux-policy-0__3.14.3-108.el8.x86_64",
+    sha256 = "84b49fd4b40c26b7dcfd05fcfe9b249af48798c45749e6b25dd6e2017eb1547b",
+    urls = ["http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/selinux-policy-3.14.3-108.el8.noarch.rpm"],
 )
 
 rpm(
-    name = "selinux-policy-targeted-0__3.14.3-111.el8.x86_64",
-    sha256 = "d115b76e68c215ea4030ff595aa9b3b55fdcb6f7e1ad276ff48bbd1e8ab93b8c",
-    urls = ["http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/selinux-policy-targeted-3.14.3-111.el8.noarch.rpm"],
+    name = "selinux-policy-targeted-0__3.14.3-108.el8.x86_64",
+    sha256 = "f41687f7f44a1f7bb0bfa60325e9cf9036970dc74cf650f94c8fb6b3baf3036a",
+    urls = ["http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/selinux-policy-targeted-3.14.3-108.el8.noarch.rpm"],
 )
 
 rpm(
@@ -5805,6 +5806,12 @@ rpm(
     name = "which-0__2.21-18.el8.x86_64",
     sha256 = "0e4d5ee4cbea952903ee4febb1450caf92bf3c2d6ecac9d0dd8ac8611e9ff4db",
     urls = ["http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/which-2.21-18.el8.x86_64.rpm"],
+)
+
+rpm(
+    name = "wqy-microhei-fonts-0__0.2.0-0.22.beta.el8.x86_64",
+    sha256 = "2104b702e6abdf9a59a363acf6f00816679d41d539251ec9a47894b147f38a52",
+    urls = ["http://mirror.centos.org/centos/8-stream/AppStream/x86_64/os/Packages/wqy-microhei-fonts-0.2.0-0.22.beta.el8.noarch.rpm"],
 )
 
 rpm(
