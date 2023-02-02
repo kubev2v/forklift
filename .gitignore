@@ -33,3 +33,4 @@ tools/tilt/tilt-settings.json
 
 # bazel build artifacts
 bazel-*
+.bazeldnf
