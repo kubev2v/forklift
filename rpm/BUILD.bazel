@@ -374,6 +374,7 @@ rpmtree(
         "@systemd-libs-0__239-70.el8.x86_64//rpm",
         "@systemd-pam-0__239-70.el8.x86_64//rpm",
         "@systemd-udev-0__239-70.el8.x86_64//rpm",
+        "@tar-2__1.30-8.el8.x86_64//rpm",
         "@tzdata-0__2022g-2.el8.x86_64//rpm",
         "@unbound-libs-0__1.16.2-5.el8.x86_64//rpm",
         "@unzip-0__6.0-46.el8.x86_64//rpm",

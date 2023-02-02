@@ -1,4 +1,15 @@
 #!/usr/bin/env bash
+shopt -s nullglob
+
+export LIBGUESTFS_PATH=/usr/lib64/guestfs
+set -- "$LIBGUESTFS_PATH"/appliance-*.tar.xz
+if [ -f "$1" ] ; then
+    echo "Extracting libguestfs appliance..."
+    APPLIANCE="/var/tmp/libguestfs-appliance"
+    mkdir -p "$APPLIANCE"
+    tar -xvJf "$1" -C "$APPLIANCE"
+    LIBGUESTFS_PATH="$APPLIANCE/appliance"
+fi
 
 echo "Run virt-v2v with the following input:"
 cat /mnt/v2v/input.xml
