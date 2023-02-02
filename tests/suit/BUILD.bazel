@@ -57,8 +57,9 @@ go_library(
 go_test(
     name = "suit_test",
     srcs = [
-        "migration_test.go",
+        "ovirt_test.go",
         "tests_suite_test.go",
+        "vsphere_test.go",
     ],
     deps = [
         "//pkg/apis/forklift/v1beta1",

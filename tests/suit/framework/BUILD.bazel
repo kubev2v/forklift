@@ -2,14 +2,19 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "framework",
-    srcs = ["framework.go"],
+    srcs = [
+        "framework.go",
+        "ovirt.go",
+    ],
     importpath = "github.com/konveyor/forklift-controller/tests/suit/framework",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/apis",
         "//pkg/apis/forklift/v1beta1",
+        "//pkg/apis/forklift/v1beta1/ref",
         "//vendor/github.com/onsi/ginkgo",
         "//vendor/github.com/onsi/gomega",
+        "//vendor/github.com/ovirt/go-ovirt",
         "//vendor/k8s.io/api/authentication/v1:authentication",
         "//vendor/k8s.io/api/core/v1:core",
         "//vendor/k8s.io/api/storage/v1:storage",
