@@ -14,8 +14,6 @@ bazel run \
 
 # These are the packages we really depend on.
 virt_v2v="
-  qemu-img
-  qemu-kvm
   virt-v2v
   virtio-win
 "
