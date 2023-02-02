@@ -34,13 +34,13 @@ VIRT_V2V_IMAGE_WARM ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-virt-v2v-warm:$(
 OPERATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-operator:$(REGISTRY_TAG)
 OPERATOR_BUNDLE_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-operator-bundle:$(REGISTRY_TAG)
 OPERATOR_INDEX_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-operator-index:$(REGISTRY_TAG)
-OVIRT_POPULATOR_IMAGE ?= ${REGISTRY}/${REGISTRY_ACCOUNT}/ovirt-populator:${REGISTRY_TAG}
 
 ### External images
 MUST_GATHER_IMAGE ?= quay.io/kubev2v/forklift-must-gather:latest
 MUST_GATHER_API_IMAGE ?= quay.io/kubev2v/forklift-must-gather-api:latest
 UI_IMAGE ?= quay.io/kubev2v/forklift-ui:latest
 UI_PLUGIN_IMAGE ?= quay.io/kubev2v/forklift-console-plugin:latest
+POPULATOR_CONTROLLER_IMAGE ?= quay.io/kubev2v/populator-controller:latest
 
 ci: all
 
@@ -199,17 +199,17 @@ push-operator-index-image: build-operator-index-image
 	$(CONTAINER_CMD) tag bazel/operator:forklift-operator-index-image $(OPERATOR_INDEX_IMAGE)
 	$(CONTAINER_CMD) push $(OPERATOR_INDEX_IMAGE)
 
-build-all-images: build-api-image build-controller-image build-validation-image build-operator-image build-virt-v2v-image build-virt-v2v-warm-image build-operator-bundle-image build-operator-index-image
-
 # Build the docker image
-build-ovirt-populator-image:
-	$(CONTAINER_CMD) build -f hack/ovirt-populator/Containerfile -t ${OVIRT_POPULATOR_IMAGE} .
+build-populator-image:
+	$(CONTAINER_CMD) build -f hack/ovirt-populator/Containerfile -t $(POPULATOR_CONTROLLER_IMAGE) .
 
 # Push the docker image
-push-ovirt-populator-image: build-ovirt-populator-image
-	$(CONTAINER_CMD) push ${OVIRT_POPULATOR_IMAGE}
+push-populator-image: build-populator-image
+	$(CONTAINER_CMD) push $(POPULATOR_CONTROLLER_IMAGE)
 
-push-all-images: push-api-image push-controller-image push-validation-image push-operator-image push-virt-v2v-image push-virt-v2v-warm-image push-operator-bundle-image push-operator-index-image push-ovirt-populator-image
+build-all-images: build-api-image build-controller-image build-validation-image build-operator-image build-virt-v2v-image build-virt-v2v-warm-image build-operator-bundle-image build-operator-index-image build-populator-image
+
+push-all-images: push-api-image push-controller-image push-validation-image push-operator-image push-virt-v2v-image push-virt-v2v-warm-image push-operator-bundle-image push-operator-index-image push-populator-image
 
 .PHONY: check_container_runtmime
 check_container_runtmime:
