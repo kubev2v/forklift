@@ -144,12 +144,12 @@ push-operator-image: build-operator-image
 
 build-virt-v2v-image: check_container_runtmime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
-	bazel run virt-v2v:forklift-virt-v2v \
+	bazel run --package_path=virt-v2v/cold forklift-virt-v2v \
 		--verbose_failures \
 		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
 
 push-virt-v2v-image: build-virt-v2v-image
-	$(CONTAINER_CMD) tag bazel/virt-v2v:forklift-virt-v2v $(VIRT_V2V_IMAGE_COLD)
+	$(CONTAINER_CMD) tag bazel:forklift-virt-v2v $(VIRT_V2V_IMAGE_COLD)
 	$(CONTAINER_CMD) push $(VIRT_V2V_IMAGE_COLD)
 
 build-virt-v2v-warm-image: check_container_runtmime
