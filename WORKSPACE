@@ -5503,12 +5503,6 @@ rpm(
 )
 
 rpm(
-    name = "qemu-guest-agent-15__6.2.0-20.module_el8.7.0__plus__1218__plus__f626c2ff.1.x86_64",
-    sha256 = "9ea98288d0991f3fa2af26d0ec18d9a839f05c5682252e70b781989d6eb27e6f",
-    urls = ["http://mirror.centos.org/centos/8-stream/AppStream/x86_64/os/Packages/qemu-guest-agent-6.2.0-20.module_el8.7.0+1218+f626c2ff.1.x86_64.rpm"],
-)
-
-rpm(
     name = "qemu-img-15__6.2.0-20.module_el8.7.0__plus__1218__plus__f626c2ff.1.x86_64",
     sha256 = "9bbb3b752390de1d16924ccbc9b124b4582fa91ecfeaf0b8fd143b2e4f434cdb",
     urls = ["http://mirror.centos.org/centos/8-stream/AppStream/x86_64/os/Packages/qemu-img-6.2.0-20.module_el8.7.0+1218+f626c2ff.1.x86_64.rpm"],
@@ -5800,12 +5794,6 @@ rpm(
     name = "which-0__2.21-18.el8.x86_64",
     sha256 = "0e4d5ee4cbea952903ee4febb1450caf92bf3c2d6ecac9d0dd8ac8611e9ff4db",
     urls = ["http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/which-2.21-18.el8.x86_64.rpm"],
-)
-
-rpm(
-    name = "wqy-microhei-fonts-0__0.2.0-0.22.beta.el8.x86_64",
-    sha256 = "2104b702e6abdf9a59a363acf6f00816679d41d539251ec9a47894b147f38a52",
-    urls = ["http://mirror.centos.org/centos/8-stream/AppStream/x86_64/os/Packages/wqy-microhei-fonts-0.2.0-0.22.beta.el8.noarch.rpm"],
 )
 
 rpm(
