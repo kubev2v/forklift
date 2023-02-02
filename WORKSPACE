@@ -3422,7 +3422,7 @@ container_pull(
 
 container_pull(
     name = "libguestfs-appliance",
-    digest = "sha256:1c40f82eac823fc417dc69453685bb0cf79391e1306a2b576f88217d61abd644",
+    digest = "sha256:6416ecadf57ea1d558f1c6a64b740180f21ae330ed945552eab387ff5e4434b0",
     registry = "quay.io",
     repository = "kubev2v/libguestfs-appliance",
 )
@@ -5734,6 +5734,12 @@ rpm(
     name = "systemd-udev-0__239-70.el8.x86_64",
     sha256 = "bebff1d796265dccbc9e83875b99559ed4b4c547f912ee7604aa0cca7e702f71",
     urls = ["http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/systemd-udev-239-70.el8.x86_64.rpm"],
+)
+
+rpm(
+    name = "tar-2__1.30-8.el8.x86_64",
+    sha256 = "55056b8b60c9382f41e97004ed64fb300c930b29f15b70394d6a5aeffe23010e",
+    urls = ["http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/tar-1.30-8.el8.x86_64.rpm"],
 )
 
 rpm(
