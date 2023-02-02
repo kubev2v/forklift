@@ -3422,7 +3422,7 @@ container_pull(
 
 container_pull(
     name = "libguestfs-appliance",
-    digest = "sha256:1c40f82eac823fc417dc69453685bb0cf79391e1306a2b576f88217d61abd644",
+    digest = "sha256:6416ecadf57ea1d558f1c6a64b740180f21ae330ed945552eab387ff5e4434b0",
     registry = "quay.io",
     repository = "kubev2v/libguestfs-appliance",
 )
