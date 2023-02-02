@@ -38,4 +38,4 @@ jobs:
         run: |
           cd ${GITHUB_WORKSPACE}
           ./hack/release-images.sh
-          make push-populator-image
+          make push-ovirt-populator-image
