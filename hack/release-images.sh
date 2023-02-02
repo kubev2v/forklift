@@ -20,7 +20,7 @@ API_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-api:${REGISTRY_TAG}
 POPULATOR_CONTROLLER_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/populator-controller:${REGISTRY_TAG}
 
 bazel run push-forklift-api
-bazel run push-forklift-virt-v2v
+bazel run --package_path=virt-v2v/cold push-forklift-virt-v2v
 bazel run --package_path=virt-v2v/warm push-forklift-virt-v2v-warm
 bazel run push-populator-controller
 bazel run push-forklift-controller
