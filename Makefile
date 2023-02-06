@@ -173,7 +173,7 @@ build-operator-bundle-image: check_container_runtmime
 		--action_env UI_IMAGE=$(UI_IMAGE) \
 		--action_env UI_PLUGIN_IMAGE=$(UI_PLUGIN_IMAGE) \
 		--action_env VALIDATION_IMAGE=$(VALIDATION_IMAGE) \
-		--action_env VIRT_V2V_IMAGE=$(VIRT_V2V_IMAGE_COLD) \
+		--action_env VIRT_V2V_IMAGE="$(VIRT_V2V_IMAGE_COLD)|$(VIRT_V2V_IMAGE_WARM)" \
 		--action_env CONTROLLER_IMAGE=$(CONTROLLER_IMAGE) \
 		--action_env API_IMAGE=$(API_IMAGE) \
 
