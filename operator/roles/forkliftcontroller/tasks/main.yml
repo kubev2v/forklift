@@ -16,6 +16,11 @@
       must_gather_api_state: "present"
     when: feature_must_gather_api|bool
 
+  - name: "Set volume populator feature state"
+    set_fact:
+      volume_populator_state: "present"
+    when: feature_volume_populator|bool
+
   - name: "Load cluster API groups"
     set_fact:
       api_groups: "{{ lookup('k8s', cluster_info='api_groups') }}"
@@ -80,10 +85,12 @@
       definition: "{{ lookup('template', 'controller/provider-host.yml.j2') }}"
     when: "'kubevirt.io' in api_groups"
 
-  - name: "Setup populator controller deployment"
-    k8s:
-      state: present
-      definition: "{{ lookup('template', 'populator/deployment-populator-controller.yml.j2') }}"
+  - when: feature_volume_populator|bool
+    block:
+    - name: "Setup populator controller deployment"
+      k8s:
+        state: "{{ volume_populator_state }}"
+        definition: "{{ lookup('template', 'populator/deployment-populator-controller.yml.j2') }}"
 
   - name: "Configure webhook certificate on K8s"
     k8s:
