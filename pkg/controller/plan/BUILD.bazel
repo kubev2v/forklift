@@ -11,6 +11,7 @@ go_library(
         "migration.go",
         "predicate.go",
         "validation.go",
+        "vm_name_handler.go",
     ],
     importpath = "github.com/konveyor/forklift-controller/pkg/controller/plan",
     visibility = ["//visibility:public"],
@@ -68,7 +69,7 @@ go_library(
 
 go_test(
     name = "plan_test",
-    srcs = ["kubevirt_test.go"],
+    srcs = ["vm_name_handler_test.go"],
     embed = [":plan"],
     deps = ["//vendor/github.com/onsi/gomega"],
 )
