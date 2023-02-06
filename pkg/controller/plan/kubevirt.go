@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/rand"
 	"path"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -33,7 +32,6 @@ import (
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -776,22 +774,11 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 
 	if errs := k8svalidation.IsDNS1123Label(vm.Name); len(errs) > 0 {
 		originalName = vm.Name
-
-		generatedName := changeVmName(vm.Name, vm.ID)
-		nameExist, errName := r.checkIfVmNameExistsInNamespace(generatedName, r.Plan.Spec.TargetNamespace)
-		if errName != nil {
-			err = liberr.Wrap(errName)
+		vm.Name, err = r.changeVmNameDNS1123(vm.Name, r.Plan.Spec.TargetNamespace)
+		if err != nil {
+			r.Log.Error(err, "Failed to update the VM name to meet DNS1123 protocol requirements.")
 			return
 		}
-		if nameExist {
-			// If the name exists and it's at max allowed length, remove 5 chars from the end
-			// so we won't reach the limit after appending vmId
-			if len(generatedName) == NameMaxLength {
-				generatedName = generatedName[0 : NameMaxLength-5]
-			}
-			generatedName = generatedName + "-" + vm.ID[:4]
-		}
-		vm.Name = generatedName
 		r.Log.Info("VM name ", originalName, " was incompatible with DNS1123 RFC, changing to ",
 			vm.Name)
 	}
@@ -1039,7 +1026,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 			Containers: []core.Container{
 				{
 					Name: "virt-v2v",
-					Env: environment,
+					Env:  environment,
 					EnvFrom: []core.EnvFromSource{
 						{
 							Prefix: "V2V_",
@@ -1050,10 +1037,10 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 							},
 						},
 					},
-					Image:           virtV2vImage,
-					VolumeMounts:    volumeMounts,
-					VolumeDevices:   volumeDevices,
-					Resources:       resourceReq,
+					Image:         virtV2vImage,
+					VolumeMounts:  volumeMounts,
+					VolumeDevices: volumeDevices,
+					Resources:     resourceReq,
 				},
 			},
 			Volumes: volumes,
@@ -1391,42 +1378,6 @@ func (r *KubeVirt) vmLabels(vmRef ref.Ref) (labels map[string]string) {
 	return
 }
 
-// Checks if VM with the newly generated name exists on the destination
-func (r *KubeVirt) checkIfVmNameExistsInNamespace(name string, namespace string) (nameExist bool, err error) {
-	list := &cnv.VirtualMachineList{}
-	nameField := "metadata.name"
-	namespaceField := "metadata.namespace"
-	listOptions := &client.ListOptions{
-		FieldSelector: fields.SelectorFromSet(map[string]string{
-			nameField:      name,
-			namespaceField: namespace,
-		}),
-	}
-	err = r.Destination.Client.List(
-		context.TODO(),
-		list,
-		listOptions,
-	)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	if len(list.Items) > 0 {
-		nameExist = true
-		return
-	}
-	// Checks that the new name does not match a valid
-	// VM name in the same plan
-	for _, vm := range r.Migration.Status.VMs {
-		if vm.Name == name {
-			nameExist = true
-			return
-		}
-	}
-	nameExist = false
-	return
-}
-
 // Represents a CDI DataVolume and add behavior.
 type DataVolume struct {
 	*cdi.DataVolume
@@ -1524,32 +1475,4 @@ func vmOwnerReference(vm *cnv.VirtualMachine) (ref meta.OwnerReference) {
 		Controller:         &isController,
 	}
 	return
-}
-
-// changes VM name to match DNS1123 RFC convention.
-func changeVmName(currName string, vmID string) string {
-
-	var underscoreExcluded = regexp.MustCompile("[_]")
-	var nameExcludeChars = regexp.MustCompile("[^a-z0-9-]")
-
-	newName := strings.ToLower(currName)
-	if len(newName) > NameMaxLength {
-		newName = newName[0:NameMaxLength]
-	}
-	if underscoreExcluded.MatchString(newName) {
-		newName = underscoreExcluded.ReplaceAllString(newName, "-")
-	}
-	if nameExcludeChars.MatchString(newName) {
-		newName = nameExcludeChars.ReplaceAllString(newName, "")
-	}
-	for strings.HasPrefix(newName, "-") {
-		newName = newName[1:]
-	}
-	for strings.HasSuffix(newName, "-") {
-		newName = newName[:len(newName)-1]
-	}
-	if len(newName) == 0 {
-		newName = "vm-" + vmID[:4]
-	}
-	return newName
 }
