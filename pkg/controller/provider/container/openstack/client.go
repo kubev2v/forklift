@@ -343,8 +343,11 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 			return
 		}
 		var instanceList []VolumeType
-		for _, volume := range volumeTypeList {
-			instanceList = append(instanceList, VolumeType{volume})
+		for _, volumeType := range volumeTypeList {
+			if volumeType.ExtraSpecs == nil {
+				volumeType.ExtraSpecs = map[string]string{}
+			}
+			instanceList = append(instanceList, VolumeType{volumeType})
 		}
 		*object = instanceList
 		return
