@@ -34,6 +34,8 @@ go_library(
         "//vendor/github.com/gophercloud/gophercloud/openstack/compute/v2/servers",
         "//vendor/github.com/gophercloud/gophercloud/openstack/identity/v3/projects",
         "//vendor/github.com/gophercloud/gophercloud/openstack/identity/v3/regions",
+        "//vendor/github.com/gophercloud/gophercloud/openstack/identity/v3/tokens",
+        "//vendor/github.com/gophercloud/gophercloud/openstack/identity/v3/users",
         "//vendor/github.com/gophercloud/gophercloud/openstack/imageservice/v2/images",
         "//vendor/github.com/gophercloud/gophercloud/pagination",
         "//vendor/github.com/gophercloud/utils/openstack/clientconfig",
