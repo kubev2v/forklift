@@ -20,6 +20,8 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/regions"
+	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
+	"github.com/gophercloud/gophercloud/openstack/identity/v3/users"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
 	"github.com/gophercloud/gophercloud/pagination"
 	"github.com/gophercloud/utils/openstack/clientconfig"
@@ -214,7 +216,18 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 		object := object.(*[]Project)
 		allPages, err = projects.List(r.identityService, listopts.(*ProjectListOpts)).AllPages()
 		if err != nil {
-			return
+			if !r.isForbidden(err) {
+				return
+			}
+			var userID string
+			userID, err = r.getAuthenticatedUserID()
+			if err != nil {
+				return
+			}
+			allPages, err = users.ListProjects(r.identityService, userID).AllPages()
+			if err != nil {
+				return
+			}
 		}
 		var projectList []projects.Project
 		projectList, err = projects.ExtractProjects(allPages)
@@ -447,5 +460,34 @@ func (r *Client) isNotFound(err error) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func (r *Client) isForbidden(err error) bool {
+	switch liberr.Unwrap(err).(type) {
+	case gophercloud.ErrDefault403:
+		return true
+	default:
+		return false
+	}
+}
+
+func (r *Client) getAuthenticatedUserID() (string, error) {
+	authResult := r.provider.GetAuthResult()
+	if authResult == nil {
+		//ProviderClient did not use openstack.Authenticate(), e.g. because token
+		//was set manually with ProviderClient.SetToken()
+		return "", liberr.New("no AuthResult available")
+	}
+	switch a := authResult.(type) {
+	case tokens.CreateResult:
+		u, err := a.ExtractUser()
+		if err != nil {
+			return "", err
+		}
+		return u.ID, nil
+	default:
+		return "", liberr.New(fmt.Sprintf("got unexpected AuthResult type: %T", a))
+
 	}
 }
