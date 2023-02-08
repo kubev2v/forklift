@@ -440,3 +440,12 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 		return
 	}
 }
+
+func (r *Client) isNotFound(err error) bool {
+	switch liberr.Unwrap(err).(type) {
+	case gophercloud.ErrResourceNotFound, gophercloud.ErrDefault404:
+		return true
+	default:
+		return false
+	}
+}
