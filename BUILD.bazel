@@ -120,3 +120,12 @@ container_push(
     repository = "$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}forklift-virt-v2v-warm",
     tag = "$${REGISTRY_TAG:-devel}",
 )
+
+container_push(
+    name = "push-populator-controller",
+    format = "Docker",
+    image = "//cmd/populator-controller:populator-controller-image",
+    registry = "$${REGISTRY:-quay.io}",
+    repository = "$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}populator-controller",
+    tag = "$${REGISTRY_TAG:-devel}",
+)
