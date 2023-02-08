@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/gophercloud/gophercloud"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/openstack"
 	fb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
@@ -109,7 +108,6 @@ func (r *RegionAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []
 				if errors.Is(err, libmodel.NotFound) {
 					region.ApplyTo(m)
 					err = tx.Insert(m)
-					return
 				}
 				return
 			}
@@ -138,22 +136,20 @@ func (r *RegionAdapter) DeleteUnexisting(ctx *Context) (updates []Updater, err e
 		region := &regionList[i]
 		s := &Region{}
 		err = ctx.client.get(s, region.ID)
-		if err != nil {
-			switch err.(type) {
-			case gophercloud.ErrDefault404:
-				updater := func(tx *libmodel.Tx) (err error) {
-					m := &model.Region{
-						Base: model.Base{ID: region.ID},
-					}
-					return tx.Delete(m)
+		if err != nil && !ctx.client.isNotFound(err) {
+			return
+		}
+		if ctx.client.isNotFound(err) {
+			updater := func(tx *libmodel.Tx) (err error) {
+				m := &model.Region{
+					Base: model.Base{ID: region.ID},
 				}
-				updates = append(updates, updater)
-			default:
-				return
+				return tx.Delete(m)
 			}
+			updates = append(updates, updater)
+			err = nil
 		}
 	}
-	err = nil
 	return
 }
 
@@ -198,7 +194,6 @@ func (r *ProjectAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates [
 				if errors.Is(err, libmodel.NotFound) {
 					project.ApplyTo(m)
 					err = tx.Insert(m)
-					return
 				}
 				return
 			}
@@ -227,22 +222,20 @@ func (r *ProjectAdapter) DeleteUnexisting(ctx *Context) (updates []Updater, err 
 		project := &projectList[i]
 		s := &Project{}
 		err = ctx.client.get(s, project.ID)
-		if err != nil {
-			switch err.(type) {
-			case gophercloud.ErrResourceNotFound, gophercloud.ErrDefault404:
-				updater := func(tx *libmodel.Tx) (err error) {
-					m := &model.Project{
-						Base: model.Base{ID: project.ID},
-					}
-					return tx.Delete(m)
+		if err != nil && !ctx.client.isNotFound(err) {
+			return
+		}
+		if ctx.client.isNotFound(err) {
+			updater := func(tx *libmodel.Tx) (err error) {
+				m := &model.Project{
+					Base: model.Base{ID: project.ID},
 				}
-				updates = append(updates, updater)
-			default:
-				return
+				return tx.Delete(m)
 			}
+			updates = append(updates, updater)
+			err = nil
 		}
 	}
-	err = nil
 	return
 }
 
@@ -301,7 +294,6 @@ func (r *ImageAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []U
 					if errors.Is(err, libmodel.NotFound) {
 						image.ApplyTo(m)
 						err = tx.Insert(m)
-						return
 					}
 					return
 				}
@@ -331,22 +323,20 @@ func (r *ImageAdapter) DeleteUnexisting(ctx *Context) (updates []Updater, err er
 		image := &imageList[i]
 		s := &Image{}
 		err = ctx.client.get(s, image.ID)
-		if err != nil {
-			switch err.(type) {
-			case gophercloud.ErrResourceNotFound, gophercloud.ErrDefault404:
-				updater := func(tx *libmodel.Tx) (err error) {
-					m := &model.Image{
-						Base: model.Base{ID: image.ID},
-					}
-					return tx.Delete(m)
+		if err != nil && !ctx.client.isNotFound(err) {
+			return
+		}
+		if ctx.client.isNotFound(err) {
+			updater := func(tx *libmodel.Tx) (err error) {
+				m := &model.Image{
+					Base: model.Base{ID: image.ID},
 				}
-				updates = append(updates, updater)
-			default:
-				return
+				return tx.Delete(m)
 			}
+			updates = append(updates, updater)
+			err = nil
 		}
 	}
-	err = nil
 	return
 }
 
@@ -392,7 +382,6 @@ func (r *FlavorAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []
 				if errors.Is(err, libmodel.NotFound) {
 					flavor.ApplyTo(m)
 					err = tx.Insert(m)
-					return
 				}
 				return
 			}
@@ -421,22 +410,20 @@ func (r *FlavorAdapter) DeleteUnexisting(ctx *Context) (updates []Updater, err e
 		flavor := &flavorList[i]
 		s := &Flavor{}
 		err = ctx.client.get(s, flavor.ID)
-		if err != nil {
-			switch err.(type) {
-			case gophercloud.ErrResourceNotFound, gophercloud.ErrDefault404:
-				updater := func(tx *libmodel.Tx) (err error) {
-					m := &model.Flavor{
-						Base: model.Base{ID: flavor.ID},
-					}
-					return tx.Delete(m)
+		if err != nil && !ctx.client.isNotFound(err) {
+			return
+		}
+		if ctx.client.isNotFound(err) {
+			updater := func(tx *libmodel.Tx) (err error) {
+				m := &model.Flavor{
+					Base: model.Base{ID: flavor.ID},
 				}
-				updates = append(updates, updater)
-			default:
-				return
+				return tx.Delete(m)
 			}
+			updates = append(updates, updater)
+			err = nil
 		}
 	}
-	err = nil
 	return
 }
 
@@ -503,7 +490,6 @@ func (r *VMAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Upda
 					if errors.Is(err, libmodel.NotFound) {
 						vm.ApplyTo(m)
 						err = tx.Insert(m)
-						return
 					}
 					return
 				}
@@ -533,22 +519,20 @@ func (r *VMAdapter) DeleteUnexisting(ctx *Context) (updates []Updater, err error
 		vm := &vmList[i]
 		s := &VM{}
 		err = ctx.client.get(s, vm.ID)
-		if err != nil {
-			switch err.(type) {
-			case gophercloud.ErrResourceNotFound, gophercloud.ErrDefault404:
-				updater := func(tx *libmodel.Tx) (err error) {
-					m := &model.VM{
-						Base: model.Base{ID: vm.ID},
-					}
-					return tx.Delete(m)
+		if err != nil && !ctx.client.isNotFound(err) {
+			return
+		}
+		if ctx.client.isNotFound(err) {
+			updater := func(tx *libmodel.Tx) (err error) {
+				m := &model.VM{
+					Base: model.Base{ID: vm.ID},
 				}
-				updates = append(updates, updater)
-			default:
-				return
+				return tx.Delete(m)
 			}
+			updates = append(updates, updater)
+			err = nil
 		}
 	}
-	err = nil
 	return
 }
 
@@ -591,7 +575,6 @@ func (r *SnapshotAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates 
 				if errors.Is(err, libmodel.NotFound) {
 					snapshot.ApplyTo(m)
 					err = tx.Insert(m)
-					return
 				}
 				return
 			}
@@ -621,22 +604,20 @@ func (r *SnapshotAdapter) DeleteUnexisting(ctx *Context) (updates []Updater, err
 		snapshot := &snapshotList[i]
 		s := &Snapshot{}
 		err = ctx.client.get(s, snapshot.ID)
-		if err != nil {
-			switch err.(type) {
-			case gophercloud.ErrResourceNotFound, gophercloud.ErrDefault404:
-				updater := func(tx *libmodel.Tx) (err error) {
-					m := &model.Snapshot{
-						Base: model.Base{ID: snapshot.ID},
-					}
-					return tx.Delete(m)
+		if err != nil && !ctx.client.isNotFound(err) {
+			return
+		}
+		if ctx.client.isNotFound(err) {
+			updater := func(tx *libmodel.Tx) (err error) {
+				m := &model.Snapshot{
+					Base: model.Base{ID: snapshot.ID},
 				}
-				updates = append(updates, updater)
-			default:
-				return
+				return tx.Delete(m)
 			}
+			updates = append(updates, updater)
+			err = nil
 		}
 	}
-	err = nil
 	return
 }
 
@@ -698,7 +679,6 @@ func (r *VolumeAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []
 					if errors.Is(err, libmodel.NotFound) {
 						volume.ApplyTo(m)
 						err = tx.Insert(m)
-						return
 					}
 					return
 				}
@@ -728,22 +708,20 @@ func (r *VolumeAdapter) DeleteUnexisting(ctx *Context) (updates []Updater, err e
 		volume := &volumeList[i]
 		s := &Volume{}
 		err = ctx.client.get(s, volume.ID)
-		if err != nil {
-			switch err.(type) {
-			case gophercloud.ErrResourceNotFound, gophercloud.ErrDefault404:
-				updater := func(tx *libmodel.Tx) (err error) {
-					m := &model.Volume{
-						Base: model.Base{ID: volume.ID},
-					}
-					return tx.Delete(m)
+		if err != nil && !ctx.client.isNotFound(err) {
+			return
+		}
+		if ctx.client.isNotFound(err) {
+			updater := func(tx *libmodel.Tx) (err error) {
+				m := &model.Volume{
+					Base: model.Base{ID: volume.ID},
 				}
-				updates = append(updates, updater)
-			default:
-				return
+				return tx.Delete(m)
 			}
+			updates = append(updates, updater)
+			err = nil
 		}
 	}
-	err = nil
 	return
 }
 
@@ -789,7 +767,6 @@ func (r *VolumeTypeAdapter) GetUpdates(ctx *Context, lastSync time.Time) (update
 				if errors.Is(err, libmodel.NotFound) {
 					volumeType.ApplyTo(m)
 					err = tx.Insert(m)
-					return
 				}
 				return
 			}
@@ -818,22 +795,20 @@ func (r *VolumeTypeAdapter) DeleteUnexisting(ctx *Context) (updates []Updater, e
 		volumeType := &volumeTypeList[i]
 		s := &VolumeType{}
 		err = ctx.client.get(s, volumeType.ID)
-		if err != nil {
-			switch err.(type) {
-			case gophercloud.ErrResourceNotFound, gophercloud.ErrDefault404:
-				updater := func(tx *libmodel.Tx) (err error) {
-					m := &model.VolumeType{
-						Base: model.Base{ID: volumeType.ID},
-					}
-					return tx.Delete(m)
+		if err != nil && !ctx.client.isNotFound(err) {
+			return
+		}
+		if ctx.client.isNotFound(err) {
+			updater := func(tx *libmodel.Tx) (err error) {
+				m := &model.VolumeType{
+					Base: model.Base{ID: volumeType.ID},
 				}
-				updates = append(updates, updater)
-			default:
-				return
+				return tx.Delete(m)
 			}
+			updates = append(updates, updater)
+			err = nil
 		}
 	}
-	err = nil
 	return
 }
 
@@ -876,7 +851,6 @@ func (r *NetworkAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates [
 				if errors.Is(err, libmodel.NotFound) {
 					network.ApplyTo(m)
 					err = tx.Insert(m)
-					return
 				}
 				return
 			}
@@ -913,21 +887,19 @@ func (r *NetworkAdapter) DeleteUnexisting(ctx *Context) (updates []Updater, err 
 		network := &networkList[i]
 		s := &Network{}
 		err = ctx.client.get(s, network.ID)
-		if err != nil {
-			switch err.(type) {
-			case gophercloud.ErrResourceNotFound, gophercloud.ErrDefault404:
-				updater := func(tx *libmodel.Tx) (err error) {
-					m := &model.Network{
-						Base: model.Base{ID: network.ID},
-					}
-					return tx.Delete(m)
+		if err != nil && !ctx.client.isNotFound(err) {
+			return
+		}
+		if ctx.client.isNotFound(err) {
+			updater := func(tx *libmodel.Tx) (err error) {
+				m := &model.Network{
+					Base: model.Base{ID: network.ID},
 				}
-				updates = append(updates, updater)
-			default:
-				return
+				return tx.Delete(m)
 			}
+			updates = append(updates, updater)
+			err = nil
 		}
 	}
-	err = nil
 	return
 }
