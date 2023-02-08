@@ -45,9 +45,9 @@ type Client struct {
 func (r *Client) Connect() (err error) {
 	var TLSClientConfig *tls.Config
 
-	if r.provider != nil {
-		return
-	}
+	// if r.provider != nil {
+	// 	return
+	// }
 
 	if r.insecure() {
 		TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
