@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"math/rand"
+	"net/url"
 	"path"
 	"sort"
 	"strconv"
@@ -15,6 +16,7 @@ import (
 	"github.com/openshift/library-go/pkg/template/generator"
 	"github.com/openshift/library-go/pkg/template/templateprocessing"
 	batch "k8s.io/api/batch/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -23,10 +25,12 @@ import (
 	cnv "kubevirt.io/client-go/api/v1"
 	libvirtxml "libvirt.org/libvirt-go-xml"
 
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	core "k8s.io/api/core/v1"
@@ -1474,5 +1478,108 @@ func vmOwnerReference(vm *cnv.VirtualMachine) (ref meta.OwnerReference) {
 		BlockOwnerDeletion: &blockOwnerDeletion,
 		Controller:         &isController,
 	}
+	return
+}
+
+// TODO move elsewhere
+func (r *KubeVirt) createVolumes(vm ref.Ref) (err error) {
+	openstackVm := &openstack.Workload{}
+	err = r.Source.Inventory.Find(openstackVm, vm)
+	if err != nil {
+		return
+	}
+	sourceUrl, err := url.Parse(r.Source.Provider.Spec.URL)
+	if err != nil {
+		return
+	}
+
+	storageName := r.Context.Map.Storage.Spec.Map[0].Destination.StorageClass
+	image := openstackVm.Image
+	accessModes := []core.PersistentVolumeAccessMode{core.ReadWriteOnce}
+	volumeMode := core.PersistentVolumeFilesystem
+	if openstackVm.ImageID != "" {
+		populatorCr := openstackutil.OpenstackVolumePopulator(&image, sourceUrl, r.Plan.Spec.TargetNamespace, r.Source.Secret.Name)
+		err = r.Client.Create(context.TODO(), populatorCr, &client.CreateOptions{})
+		if err != nil {
+			return
+		}
+		pvc := r.Builder.PersistentVolumeClaimWithSourceRef(image, &storageName, populatorCr.Name, accessModes, &volumeMode)
+		err = r.Client.Create(context.TODO(), pvc, &client.CreateOptions{})
+
+		if err != nil {
+			return
+		}
+	}
+
+	if len(openstackVm.AttachedVolumes) > 0 {
+		for _, vol := range openstackVm.AttachedVolumes {
+			image := &openstack.Image{}
+			err = r.Source.Inventory.Find(image, ref.Ref{Name: vol.ID})
+			if err != nil {
+				return
+			}
+
+			// TODO deduplicate with above
+			populatorCr := openstackutil.OpenstackVolumePopulator(image, sourceUrl, r.Plan.Spec.TargetNamespace, r.Source.Secret.Name)
+			err = r.Client.Create(context.TODO(), populatorCr, &client.CreateOptions{})
+			if errors.IsAlreadyExists(err) {
+				err = nil
+				continue
+			} else if err != nil {
+				return
+			}
+
+			pvc := r.Builder.PersistentVolumeClaimWithSourceRef(image, &storageName, populatorCr.Name, accessModes, &volumeMode)
+			err = r.Client.Create(context.TODO(), pvc, &client.CreateOptions{})
+			if errors.IsAlreadyExists(err) {
+				err = nil
+				continue
+			} else if err != nil {
+				return
+			}
+		}
+	}
+
+	return
+}
+
+// Return if the import done with Openstack
+func (r *KubeVirt) isOpenstack(vm *plan.VMStatus) bool {
+	if *r.Plan.Provider.Source.Spec.Type == v1beta1.OpenStack && vm.Warm == nil && r.Destination.Provider.IsHost() {
+		return true
+	}
+	return false
+}
+
+func (r *KubeVirt) getOpenstackPVCs(vm ref.Ref, step *plan.Step) (ready bool, err error) {
+	openstackVm := &openstack.Workload{}
+	err = r.Source.Inventory.Find(openstackVm, vm)
+	if err != nil {
+		return
+	}
+	ready = true
+
+	// TODO check image
+	for _, vol := range openstackVm.AttachedVolumes {
+		obj := client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: vol.ID}
+		pvc := core.PersistentVolumeClaim{}
+		err = r.Client.Get(context.Background(), obj, &pvc)
+		if err != nil {
+			return
+		}
+
+		if pvc.Status.Phase != core.ClaimBound {
+			ready = false
+			return
+		}
+		var task *plan.Task
+		found := false
+		task, found = step.FindTask(vol.ID)
+		if !found {
+			return
+		}
+		task.MarkCompleted()
+	}
+
 	return
 }
