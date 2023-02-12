@@ -99,13 +99,26 @@ func (r *Builder) mapCPU(vm *model.Workload, object *cnv.VirtualMachineSpec) {
 	}
 }
 
-func (r *Builder) mapMemory(vm *model.Workload, object *cnv.VirtualMachineSpec) {
-	reservation := resource.NewQuantity(int64(2*1024*1024*1024), resource.BinarySI)
+func (r *Builder) mapMemory(vm *model.Workload, object *cnv.VirtualMachineSpec) (err error) {
+	flavor := &model.Flavor{}
+	err = r.Source.Inventory.Find(flavor, ref.Ref{ID: vm.FlavorID})
+	if err != nil {
+		err = liberr.Wrap(
+			err,
+			"Flavor lookup failed.",
+			"flavor",
+			vm.FlavorID)
+		return
+	}
+
+	reservation := resource.NewQuantity(int64(flavor.RAM*1024*1024), resource.BinarySI)
 	object.Template.Spec.Domain.Resources = cnv.ResourceRequirements{
 		Requests: map[core.ResourceName]resource.Quantity{
 			core.ResourceMemory: *reservation,
 		},
 	}
+
+	return nil
 }
 
 func (r *Builder) mapFirmware(vm *model.Workload, object *cnv.VirtualMachineSpec) {
