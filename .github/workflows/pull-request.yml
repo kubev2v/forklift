@@ -16,6 +16,7 @@ on:
 jobs:
   ci_setup:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -23,6 +24,9 @@ jobs:
 
           - os: ubuntu-latest
             source_provider: vsphere
+
+          - os: ubuntu-latest
+            source_provider: openstack
 
     runs-on: ${{ matrix.os }}
     env:
@@ -36,6 +40,7 @@ jobs:
         uses: kubev2v/forkliftci@main
         with:
           gh_access_token: ${{ secrets.GITHUB_TOKEN }}
+          provider_name: ${{ matrix.source_provider }}
 
       - run: kubectl version
 

@@ -62,6 +62,10 @@ e2e-sanity-vsphere:
 	# vsphere suit
 	go test ./tests/suit -v -ginkgo.focus ".*vSphere.*"
 
+e2e-sanity-openstack:
+	# openstack suit
+	go test ./tests/suit -v -ginkgo.focus ".*Openstack.*"
+
 # Build forklift-controller binary
 forklift-controller: generate fmt vet
 	go build -o bin/forklift-controller github.com/konveyor/forklift-controller/cmd/forklift-controller
