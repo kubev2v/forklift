@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"strconv"
 	"time"
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
@@ -19,6 +20,7 @@ import (
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Requeue
@@ -565,6 +567,21 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		if !found {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
 			break
+		}
+		var ready bool
+		ready, err = r.builder.BeforeTransferHook(r.provider, vm.Ref)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+		if !ready {
+			r.Log.Info("Images not ready yet")
+			return
+		}
+		if r.kubevirt.isOpenstack(vm) {
+			err = r.kubevirt.createVolumes(vm.Ref)
+			vm.Phase = r.next(vm.Phase)
+			return
 		}
 		var dataVolumes []cdi.DataVolume
 		dataVolumes, err = r.kubevirt.DataVolumes(vm)
@@ -1312,6 +1329,41 @@ func (r *Migration) setDataVolumeCheckpoints(vm *plan.VMStatus) (err error) {
 		}
 	}
 
+	return
+}
+
+func (r *Migration) updateCopyProgressForOpenstack(vm *plan.VMStatus, step *plan.Step) (err error) {
+	pvcs, err := r.kubevirt.getPVCs(vm)
+	if err != nil {
+		return
+	}
+
+	for _, pvc := range pvcs {
+		claim := pvc.Name
+		var task *plan.Task
+		found := false
+		task, found = step.FindTask(claim)
+
+		if !found {
+			continue
+		}
+
+		populatorCr := v1beta1.OpenstackVolumePopulator{}
+		err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: claim}, &populatorCr)
+		if err != nil {
+			return
+		}
+
+		progress, parseErr := strconv.ParseInt(populatorCr.Status.Transferred, 10, 64)
+		if err != nil {
+			return parseErr
+		}
+
+		percent := float64(progress/0x100000) / float64(task.Progress.Total)
+		task.Progress.Completed = int64(percent * float64(task.Progress.Total))
+	}
+
+	step.ReflectTasks()
 	return
 }
 

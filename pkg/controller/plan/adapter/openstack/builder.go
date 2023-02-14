@@ -162,30 +162,14 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 			vmRef.String())
 	}
 
-	if vm.ImageID != "" {
-		mB := int64(vm.Image.SizeBytes)
-		list = append(
-			list,
-			&plan.Task{
-				Name: vm.ImageID,
-				Progress: libitr.Progress{
-					Total: mB,
-				},
-				Annotations: map[string]string{
-					"unit": "MB",
-				},
-			})
-
-	}
 	for _, va := range vm.AttachedVolumes {
-		volume := &model.Volume{}
-		mB := int64(volume.Size)
+		gb := int64(va.Size)
 		list = append(
 			list,
 			&plan.Task{
 				Name: va.ID,
 				Progress: libitr.Progress{
-					Total: mB,
+					Total: gb * 1024,
 				},
 				Annotations: map[string]string{
 					"unit": "MB",

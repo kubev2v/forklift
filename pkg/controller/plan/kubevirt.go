@@ -559,6 +559,8 @@ func (r *KubeVirt) getPVCs(vm *plan.VMStatus) (pvcs []core.PersistentVolumeClaim
 		pvcAnn := pvc.GetAnnotations()
 		if pvcAnn[kVM] == vmLabels[kVM] && pvcAnn[kPlan] == vmLabels[kPlan] {
 			pvcs = append(pvcs, *pvc)
+		} else if r.isOpenstack(vm) {
+			pvcs = append(pvcs, *pvc)
 		}
 	}
 	return
@@ -1490,32 +1492,20 @@ func (r *KubeVirt) createVolumes(vm ref.Ref) (err error) {
 	}
 	sourceUrl, err := url.Parse(r.Source.Provider.Spec.URL)
 	if err != nil {
+		err = liberr.Wrap(err)
 		return
 	}
 
 	storageName := r.Context.Map.Storage.Spec.Map[0].Destination.StorageClass
-	image := openstackVm.Image
 	accessModes := []core.PersistentVolumeAccessMode{core.ReadWriteOnce}
 	volumeMode := core.PersistentVolumeFilesystem
-	if openstackVm.ImageID != "" {
-		populatorCr := openstackutil.OpenstackVolumePopulator(&image, sourceUrl, r.Plan.Spec.TargetNamespace, r.Source.Secret.Name)
-		err = r.Client.Create(context.TODO(), populatorCr, &client.CreateOptions{})
-		if err != nil {
-			return
-		}
-		pvc := r.Builder.PersistentVolumeClaimWithSourceRef(image, &storageName, populatorCr.Name, accessModes, &volumeMode)
-		err = r.Client.Create(context.TODO(), pvc, &client.CreateOptions{})
-
-		if err != nil {
-			return
-		}
-	}
 
 	if len(openstackVm.AttachedVolumes) > 0 {
 		for _, vol := range openstackVm.AttachedVolumes {
 			image := &openstack.Image{}
 			err = r.Source.Inventory.Find(image, ref.Ref{Name: vol.ID})
 			if err != nil {
+				err = liberr.Wrap(err)
 				return
 			}
 
@@ -1524,8 +1514,8 @@ func (r *KubeVirt) createVolumes(vm ref.Ref) (err error) {
 			err = r.Client.Create(context.TODO(), populatorCr, &client.CreateOptions{})
 			if errors.IsAlreadyExists(err) {
 				err = nil
-				continue
 			} else if err != nil {
+				err = liberr.Wrap(err)
 				return
 			}
 
@@ -1535,6 +1525,7 @@ func (r *KubeVirt) createVolumes(vm ref.Ref) (err error) {
 				err = nil
 				continue
 			} else if err != nil {
+				err = liberr.Wrap(err)
 				return
 			}
 		}
