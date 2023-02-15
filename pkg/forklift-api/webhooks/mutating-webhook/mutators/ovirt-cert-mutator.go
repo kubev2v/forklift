@@ -2,6 +2,7 @@ package mutators
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -39,8 +40,10 @@ func (mutator *OvirtCertMutator) Mutate(ar *admissionv1.AdmissionReview) *admiss
 			util.ToAdmissionResponseError(err)
 		}
 
+		certPool := x509.NewCertPool()
+		certPool.AppendCertsFromPEM(secret.Data["cacert"])
 		certUrl := fmt.Sprint(url.Scheme, "://", url.Host, "/ovirt-engine/services/pki-resource?resource=ca-certificate&format=X509-PEM-CA")
-		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{RootCAs: certPool}
 		response, err := http.Get(certUrl)
 		if err != nil {
 			log.Error(err, "mutating webhook error")
@@ -57,6 +60,7 @@ func (mutator *OvirtCertMutator) Mutate(ar *admissionv1.AdmissionReview) *admiss
 		if !strings.Contains(string(secret.Data["cacert"]), string(b)) {
 			secret.Data["cacert"] = append(secret.Data["cacert"], b...)
 			secret.Labels["ca-cert-updated"] = "true"
+			log.Info("Engine CA certificate was missing, updating the secret")
 		}
 
 		patchBytes, err := util.GeneratePatchPayload(
