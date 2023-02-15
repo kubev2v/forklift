@@ -19,6 +19,11 @@ spec:
           image: {{ populator_controller_image_fqin }}
           imagePullPolicy: {{ image_pull_policy }}
           env:
+          - name: POD_NAMESPACE
+            valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
           - name: OVIRT_POPULATOR_IMAGE
             value: {{ populator_ovirt_image_fqin }}
           args:

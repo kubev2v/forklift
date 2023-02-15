@@ -26,7 +26,7 @@ const (
 )
 
 func main() {
-	var httpEndpoint, metricsPath, masterURL, kubeconfig, namespace string
+	var httpEndpoint, metricsPath, masterURL, kubeconfig string
 
 	// Controller args
 	if f := flag.Lookup("kubeconfig"); f != nil {
@@ -38,9 +38,10 @@ func main() {
 	// Metrics args
 	flag.StringVar(&httpEndpoint, "http-endpoint", "", "The TCP network address where the HTTP server for diagnostics, including metrics and leader election health check, will listen (example: `:8080`). The default is empty string, which means the server is disabled.")
 	flag.StringVar(&metricsPath, "metrics-path", "/metrics", "The HTTP path where prometheus metrics will be exposed. Default is `/metrics`.")
-	// Other args
-	flag.StringVar(&namespace, "namespace", "konveyor-forklift", "Namespace to deploy controller")
+
 	flag.Parse()
+
+	namespace := os.Getenv("POD_NAMESPACE")
 
 	if ovirtImage, ok := os.LookupEnv("OVIRT_POPULATOR_IMAGE"); ok {
 		klog.Info("Tracking ovirt populators")
