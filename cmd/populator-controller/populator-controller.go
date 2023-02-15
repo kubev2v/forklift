@@ -51,11 +51,11 @@ func main() {
 func getPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured) ([]string, error) {
 	var ovirtVolumePopulator v1beta1.OvirtVolumePopulator
 	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &ovirtVolumePopulator)
-	var args []string
-	if nil != err {
+	if err != nil {
 		return nil, err
 	}
 
+	var args []string
 	if rawBlock {
 		args = append(args, "--volume-path="+devicePath)
 	} else {
