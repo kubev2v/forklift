@@ -45,7 +45,7 @@ container_image(
     empty_dirs = ["/disks"],
     entrypoint = ["/usr/local/bin/entrypoint"],
     env = {"LIBGUESTFS_BACKEND": "direct"},
-    files = ["entrypoint"],
+    files = ["entrypoint", "@forklift//cmd/virt-v2v-monitor:virt-v2v-monitor"],
     user = "1001",
     visibility = ["//visibility:public"],
 )

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -o pipefail
 shopt -s nullglob
 
 if [ -z "$V2V_libvirtURL" ] || \
@@ -74,4 +75,4 @@ exec virt-v2v -v -x \
     -i libvirt \
     -ic "$V2V_libvirtURL" \
     "${args[@]}" \
-    "$V2V_vmName"
+    "$V2V_vmName" |& /usr/local/bin/virt-v2v-monitor
