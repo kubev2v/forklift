@@ -18,8 +18,10 @@ spec:
         - name: {{ populator_controller_container_name }}
           image: {{ populator_controller_image_fqin }}
           imagePullPolicy: {{ image_pull_policy }}
+          env:
+          - name: OVIRT_POPULATOR_IMAGE
+            value: {{ populator_ovirt_image_fqin }}
           args:
-            - --image-name={{ populator_ovirt_image_fqin }}
             - --http-endpoint=:8080
           ports:
             - containerPort: 8080
