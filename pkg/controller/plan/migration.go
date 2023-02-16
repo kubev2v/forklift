@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
@@ -612,7 +613,6 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				return
 			}
 		}
-
 		step.MarkCompleted()
 		step.Phase = Completed
 		vm.Phase = r.next(vm.Phase)
@@ -652,6 +652,31 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		}
 		step.MarkStarted()
 		step.Phase = Running
+		if r.kubevirt.isOpenstack(vm) {
+			ready, err := r.kubevirt.getOpenstackPVCs(vm.Ref, step)
+			if err != nil {
+				step.AddError(err.Error())
+				err = nil
+				break
+			}
+			err = r.updateCopyProgressForOpenstack(vm, step)
+
+			if err != nil {
+				step.AddError(err.Error())
+				err = nil
+				break
+			}
+
+			if ready {
+				step.Phase = Completed
+				vm.Phase = r.next(vm.Phase)
+				break
+			} else {
+				r.Log.Info("PVCs not ready yet")
+				break
+			}
+		}
+
 		err = r.updateCopyProgress(vm, step)
 		if err != nil {
 			step.AddError(err.Error())

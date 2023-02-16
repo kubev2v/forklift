@@ -522,3 +522,11 @@ func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
 func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string {
 	return pvc.Annotations[AnnImportDiskId]
 }
+
+func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName *string, populatorName string, accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode) *core.PersistentVolumeClaim {
+	return nil
+}
+
+func (r *Builder) BeforeTransferHook(c planbase.Client, vmRef ref.Ref) (ready bool, err error) {
+	return true, nil
+}

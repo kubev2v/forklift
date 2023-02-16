@@ -51,6 +51,9 @@ type Builder interface {
 	ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string
 	// Conversion Pod environment
 	PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env []core.EnvVar, err error)
+	PersistentVolumeClaimWithSourceRef(da interface{}, storageName *string, populatorName string, accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode) *core.PersistentVolumeClaim
+	// Add custom steps before creating PVC/DataVolume
+	BeforeTransferHook(c Client, vmRef ref.Ref) (ready bool, err error)
 }
 
 // Client API.

@@ -35,9 +35,9 @@ type Client struct {
 	Secret              *core.Secret
 	provider            *gophercloud.ProviderClient
 	identityService     *gophercloud.ServiceClient
-	computeService      *gophercloud.ServiceClient
-	imageService        *gophercloud.ServiceClient
-	blockStorageService *gophercloud.ServiceClient
+	ComputeService      *gophercloud.ServiceClient
+	ImageService        *gophercloud.ServiceClient
+	BlockStorageService *gophercloud.ServiceClient
 	log                 logr.Logger
 }
 
@@ -109,21 +109,21 @@ func (r *Client) Connect() (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
-	r.computeService = computeService
+	r.ComputeService = computeService
 
 	imageService, err := openstack.NewImageServiceV2(r.provider, gophercloud.EndpointOpts{Region: r.region()})
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	r.imageService = imageService
+	r.ImageService = imageService
 
 	blockStorageService, err := openstack.NewBlockStorageV3(r.provider, gophercloud.EndpointOpts{Region: r.region()})
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	r.blockStorageService = blockStorageService
+	r.BlockStorageService = blockStorageService
 
 	return
 }
@@ -243,7 +243,7 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 
 	case *[]Flavor:
 		object := object.(*[]Flavor)
-		allPages, err = flavors.ListDetail(r.computeService, listopts.(*FlavorListOpts)).AllPages()
+		allPages, err = flavors.ListDetail(r.ComputeService, listopts.(*FlavorListOpts)).AllPages()
 		if err != nil {
 			return
 		}
@@ -261,7 +261,7 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 
 	case *[]Image:
 		object := object.(*[]Image)
-		allPages, err = images.List(r.imageService, listopts.(*ImageListOpts)).AllPages()
+		allPages, err = images.List(r.ImageService, listopts.(*ImageListOpts)).AllPages()
 		if err != nil {
 			return
 		}
@@ -279,7 +279,7 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 
 	case *[]VM:
 		object := object.(*[]VM)
-		allPages, err = servers.List(r.computeService, listopts.(*VMListOpts)).AllPages()
+		allPages, err = servers.List(r.ComputeService, listopts.(*VMListOpts)).AllPages()
 		if err != nil {
 			return
 		}
@@ -297,7 +297,7 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 
 	case *[]Snapshot:
 		object := object.(*[]Snapshot)
-		allPages, err = snapshots.List(r.blockStorageService, nil).AllPages()
+		allPages, err = snapshots.List(r.BlockStorageService, nil).AllPages()
 		if err != nil {
 			return
 		}
@@ -315,7 +315,7 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 
 	case *[]Volume:
 		object := object.(*[]Volume)
-		allPages, err = volumes.List(r.blockStorageService, listopts.(*VolumeListOpts)).AllPages()
+		allPages, err = volumes.List(r.BlockStorageService, listopts.(*VolumeListOpts)).AllPages()
 		if err != nil {
 			return
 		}
@@ -333,7 +333,7 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 
 	case *[]VolumeType:
 		object := object.(*[]VolumeType)
-		allPages, err = volumetypes.List(r.blockStorageService, listopts.(*VolumeTypeListOpts)).AllPages()
+		allPages, err = volumetypes.List(r.BlockStorageService, listopts.(*VolumeTypeListOpts)).AllPages()
 		if err != nil {
 			return
 		}
@@ -354,7 +354,7 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 
 	case *[]Network:
 		object := object.(*[]Network)
-		allPages, err = networks.List(r.computeService).AllPages()
+		allPages, err = networks.List(r.ComputeService).AllPages()
 		if err != nil {
 			return
 		}
@@ -397,7 +397,7 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 		return
 	case *Flavor:
 		var flavor *flavors.Flavor
-		flavor, err = flavors.Get(r.computeService, ID).Extract()
+		flavor, err = flavors.Get(r.ComputeService, ID).Extract()
 		if err != nil {
 			return
 		}
@@ -405,7 +405,7 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 		return
 	case *Image:
 		var image *images.Image
-		image, err = images.Get(r.imageService, ID).Extract()
+		image, err = images.Get(r.ImageService, ID).Extract()
 		if err != nil {
 			return
 		}
@@ -413,7 +413,7 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 		return
 	case *Snapshot:
 		var snapshot *snapshots.Snapshot
-		snapshot, err = snapshots.Get(r.blockStorageService, ID).Extract()
+		snapshot, err = snapshots.Get(r.BlockStorageService, ID).Extract()
 		if err != nil {
 			return
 		}
@@ -421,7 +421,7 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 		return
 	case *Volume:
 		var volume *volumes.Volume
-		volume, err = volumes.Get(r.blockStorageService, ID).Extract()
+		volume, err = volumes.Get(r.BlockStorageService, ID).Extract()
 		if err != nil {
 			return
 		}
@@ -429,7 +429,7 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 		return
 	case *VolumeType:
 		var volumeType *volumetypes.VolumeType
-		volumeType, err = volumetypes.Get(r.blockStorageService, ID).Extract()
+		volumeType, err = volumetypes.Get(r.BlockStorageService, ID).Extract()
 		if err != nil {
 			return
 		}
@@ -437,7 +437,7 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 		return
 	case *VM:
 		var server *servers.Server
-		server, err = servers.Get(r.computeService, ID).Extract()
+		server, err = servers.Get(r.ComputeService, ID).Extract()
 		if err != nil {
 			return
 		}
@@ -445,7 +445,7 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 		return
 	case *Network:
 		var network *networks.Network
-		network, err = networks.Get(r.computeService, ID).Extract()
+		network, err = networks.Get(r.ComputeService, ID).Extract()
 		if err != nil {
 			return
 		}

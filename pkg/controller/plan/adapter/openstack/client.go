@@ -11,14 +11,14 @@ import (
 // Client
 type Client struct {
 	*plancontext.Context
-	openstack.Client
+	OpenstackClient openstack.Client
 }
 
 // Connect to the openstack API.
 func (r *Client) connect() (err error) {
-	r.Client.Secret = r.Source.Secret
-	r.URL = r.Source.Provider.Spec.URL
-	err = r.Connect()
+	r.OpenstackClient.Secret = r.Source.Secret
+	r.OpenstackClient.URL = r.Source.Provider.Spec.URL
+	err = r.OpenstackClient.Connect()
 	return
 }
 
@@ -34,7 +34,7 @@ func (c *Client) PowerOff(vmRef ref.Ref) error {
 
 // Return the source VM's power state.
 func (c *Client) PowerState(vmRef ref.Ref) (string, error) {
-	return "", nil
+	return "SHUTOFF", nil
 }
 
 // Return whether the source VM is powered off.
