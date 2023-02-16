@@ -268,8 +268,14 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 			Name:  fmt.Sprintf("snap-%s", vol.ID),
 			Limit: 1,
 		})
-		pages, _ := pager.AllPages()
-		isEmpty, _ := pages.IsEmpty()
+		pages, err := pager.AllPages()
+		if err != nil {
+			return true, err
+		}
+		isEmpty, err := pages.IsEmpty()
+		if err != nil {
+			return true, err
+		}
 		if !isEmpty {
 			snaps, _ := snapshots.ExtractSnapshots(pages)
 			snaplist = append(snaplist, snaps...)
@@ -294,7 +300,10 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 	}
 
 	for _, snap := range snaplist {
-		snapshot, _ := snapshots.Get(osClient.BlockStorageService, snap.ID).Extract()
+		snapshot, err := snapshots.Get(osClient.BlockStorageService, snap.ID).Extract()
+		if err != nil {
+			return true, err
+		}
 		if snapshot.Status != "available" {
 			r.Log.Info("Snapshot not ready yet, recheking...", "snapshot", snap.Name)
 			return false, nil
@@ -307,8 +316,14 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 			Name:  snap.VolumeID,
 			Limit: 1,
 		})
-		pages, _ := pager.AllPages()
-		isEmpty, _ := pages.IsEmpty()
+		pages, err := pager.AllPages()
+		if err != nil {
+			return true, err
+		}
+		isEmpty, err := pages.IsEmpty()
+		if err != nil {
+			return true, err
+		}
 		if !isEmpty {
 			vols, _ := volumes.ExtractVolumes(pages)
 			vollist = append(vollist, vols...)
@@ -345,8 +360,14 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 			Name:  vol.Name,
 			Limit: 1,
 		})
-		pages, _ := pager.AllPages()
-		isEmpty, _ := pages.IsEmpty()
+		pages, err := pager.AllPages()
+		if err != nil {
+			return true, err
+		}
+		isEmpty, err := pages.IsEmpty()
+		if err != nil {
+			return true, err
+		}
 		if !isEmpty {
 			imgs, _ := images.ExtractImages(pages)
 			for _, i := range imgs {
