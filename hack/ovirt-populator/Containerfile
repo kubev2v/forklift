@@ -1,16 +1,14 @@
-FROM golang:1.19.5-alpine3.17 as builder
-WORKDIR /app
-
-COPY . ./
-WORKDIR /app/cmd/ovirt-populator
+FROM registry.access.redhat.com/ubi8/go-toolset:1.18.9-8 as builder
+ENV GOPATH=$APP_ROOT
+COPY . .
 
 # When debugging by replacing the lib-volume-populator with a local modified copy
 # COPY . ./
-RUN CGO_ENABLED=0 go build -o /ovirt-populator
+RUN CGO_ENABLED=0 go build -o ovirt-populator github.com/konveyor/forklift-controller/cmd/ovirt-populator
 
 FROM quay.io/centos/centos:stream9-minimal
-COPY --from=builder /ovirt-populator /
-RUN microdnf install -y gcc python3-pip python3-devel libxml2-devel openssl-devel libcurl-devel qemu-img
+COPY --from=builder /opt/app-root/src/ovirt-populator /usr/local/bin
+RUN microdnf install -y gcc python3-pip python3-devel libxml2-devel openssl-devel libcurl-devel qemu-img && microdnf clean all
 RUN pip install ovirt-engine-sdk-python ovirt-imageio
 
-ENTRYPOINT ["/ovirt-populator"]
+ENTRYPOINT ["/usr/local/bin/ovirt-populator"]
