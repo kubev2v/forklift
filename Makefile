@@ -34,14 +34,14 @@ VIRT_V2V_IMAGE_WARM ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-virt-v2v-warm:$(
 OPERATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-operator:$(REGISTRY_TAG)
 OPERATOR_BUNDLE_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-operator-bundle:$(REGISTRY_TAG)
 OPERATOR_INDEX_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-operator-index:$(REGISTRY_TAG)
+POPULATOR_CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/populator-controller:$(REGISTRY_TAG)
+OVIRT_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/ovirt-populator:$(REGISTRY_TAG)
 
 ### External images
 MUST_GATHER_IMAGE ?= quay.io/kubev2v/forklift-must-gather:latest
 MUST_GATHER_API_IMAGE ?= quay.io/kubev2v/forklift-must-gather-api:latest
 UI_IMAGE ?= quay.io/kubev2v/forklift-ui:latest
 UI_PLUGIN_IMAGE ?= quay.io/kubev2v/forklift-console-plugin:latest
-POPULATOR_CONTROLLER_IMAGE ?= quay.io/kubev2v/populator-controller:latest
-OVIRT_POPULATOR_IMAGE ?= quay.io/kubev2v/ovirt-populator:latest
 
 ci: all
 
@@ -184,6 +184,8 @@ build-operator-bundle-image: check_container_runtmime
 		--action_env VIRT_V2V_IMAGE="$(VIRT_V2V_IMAGE_COLD)|$(VIRT_V2V_IMAGE_WARM)" \
 		--action_env CONTROLLER_IMAGE=$(CONTROLLER_IMAGE) \
 		--action_env API_IMAGE=$(API_IMAGE) \
+		--action_env POPULATOR_CONTROLLER_IMAGE=$(POPULATOR_CONTROLLER_IMAGE) \
+		--action_env OVIRT_POPULATOR_IMAGE=$(OVIRT_POPULATOR_IMAGE)
 
 push-operator-bundle-image: build-operator-bundle-image
 	 $(CONTAINER_CMD) tag bazel/operator:forklift-operator-bundle-image $(OPERATOR_BUNDLE_IMAGE)
