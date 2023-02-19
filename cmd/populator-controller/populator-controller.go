@@ -16,14 +16,31 @@ const (
 	prefix     = "forklift.konveyor.io"
 	mountPath  = "/mnt/"
 	devicePath = "/dev/block"
-)
-
-const (
 	groupName  = "forklift.konveyor.io"
 	apiVersion = "v1beta1"
-	kind       = "OvirtVolumePopulator"
-	resource   = "ovirtvolumepopulators"
 )
+
+type populator struct {
+	kind           string
+	resource       string
+	controllerFunc func(bool, *unstructured.Unstructured) ([]string, error)
+	imageVar       string
+}
+
+var populators = map[string]populator{
+	"ovirt": {
+		kind:           "OvirtVolumePopulator",
+		resource:       "ovirtvolumepopulators",
+		controllerFunc: getOvirtPopulatorPodArgs,
+		imageVar:       "OVIRT_POPULATOR_IMAGE",
+	},
+	"openstack": {
+		kind:           "OpenstackVolumePopulator",
+		resource:       "openstackvolumepopulators",
+		controllerFunc: getOpenstackPopulatorPodArgs,
+		imageVar:       "OPENSTACK_POPULATOR_IMAGE",
+	},
+}
 
 func main() {
 	var httpEndpoint, metricsPath, masterURL, kubeconfig string
@@ -43,18 +60,21 @@ func main() {
 
 	namespace := os.Getenv("POD_NAMESPACE")
 
-	if ovirtImage, ok := os.LookupEnv("OVIRT_POPULATOR_IMAGE"); ok {
-		klog.Info("Tracking ovirt populators")
-		gk := schema.GroupKind{Group: groupName, Kind: kind}
-		gvr := schema.GroupVersionResource{Group: groupName, Version: apiVersion, Resource: resource}
-		populator_machinery.RunController(masterURL, kubeconfig, ovirtImage, httpEndpoint, metricsPath,
-			namespace, prefix, gk, gvr, mountPath, devicePath, getPopulatorPodArgs)
-	} else {
-		klog.Warning("Couldn't find OVIRT_POPULATOR_IMAGE, don't track ovirt populators")
+	for _, populator := range populators {
+		imageName, ok := os.LookupEnv(populator.imageVar)
+		if !ok {
+			klog.Warning("Couldn't find", "imageVar", populator.imageVar)
+			continue
+		}
+		gk := schema.GroupKind{Group: groupName, Kind: populator.kind}
+		gvr := schema.GroupVersionResource{Group: groupName, Version: apiVersion, Resource: populator.resource}
+		populator_machinery.RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath,
+			namespace, prefix, gk, gvr, mountPath, devicePath, populator.controllerFunc)
 	}
+
 }
 
-func getPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured) ([]string, error) {
+func getOvirtPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured) ([]string, error) {
 	var ovirtVolumePopulator v1beta1.OvirtVolumePopulator
 	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &ovirtVolumePopulator)
 	if err != nil {
@@ -73,6 +93,28 @@ func getPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured) ([]string,
 	args = append(args, "--engine-url="+ovirtVolumePopulator.Spec.EngineURL)
 	args = append(args, "--cr-name="+ovirtVolumePopulator.Name)
 	args = append(args, "--cr-namespace="+ovirtVolumePopulator.Namespace)
+
+	return args, nil
+}
+
+func getOpenstackPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured) ([]string, error) {
+	var openstackPopulator v1beta1.OpenstackVolumePopulator
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &openstackPopulator)
+	if nil != err {
+		return nil, err
+	}
+	args := []string{"--mode=populate"}
+	if rawBlock {
+		args = append(args, "--file-name="+devicePath)
+	} else {
+		args = append(args, "--file-name="+mountPath+"disk.img")
+	}
+
+	args = append(args, "--endpoint="+openstackPopulator.Spec.IdentityURL)
+	args = append(args, "--secret-name="+openstackPopulator.Spec.SecretName)
+	args = append(args, "--image-id="+openstackPopulator.Spec.ImageID)
+	args = append(args, "--cr-name="+openstackPopulator.Name)
+	args = append(args, "--cr-namespace="+openstackPopulator.Namespace)
 
 	return args, nil
 }
