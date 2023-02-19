@@ -18,7 +18,6 @@ import (
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/clientcmd/api"
 	cnv "kubevirt.io/client-go/api/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
@@ -61,12 +60,18 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 	var kDisks []cnv.Disk
 
 	pvcMap := make(map[string]*core.PersistentVolumeClaim)
+
 	for i := range persistentVolumeClaims {
 		pvc := &persistentVolumeClaims[i]
 		pvcMap[pvc.Name] = pvc
 	}
 	for i, av := range vm.AttachedVolumes {
-		pvc := pvcMap[av.ID]
+		image := &model.Image{}
+		err := r.Source.Inventory.Find(image, ref.Ref{Name: fmt.Sprintf("%s-%s", r.Plan.Name, av.ID)})
+		if err != nil {
+			return
+		}
+		pvc := pvcMap[image.ID]
 		volumeName := fmt.Sprintf("vol-%v", i)
 		volume := cnv.Volume{
 			Name: volumeName,
@@ -215,11 +220,16 @@ func (r *Builder) Secret(_ ref.Ref, in, object *core.Secret) (err error) {
 	return
 }
 
+func (r *Builder) PodEnvironment(_ ref.Ref, _ *core.Secret) (env []core.EnvVar, err error) {
+	return
+}
+
 func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName *string, populatorName string, accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode) *core.PersistentVolumeClaim {
 	image := da.(*openstack.Image)
+	apiGroup := "forklift.konveyor.io"
 	return &core.PersistentVolumeClaim{
 		ObjectMeta: meta.ObjectMeta{
-			Name:      image.Name,
+			Name:      image.ID,
 			Namespace: r.Plan.Spec.TargetNamespace,
 		},
 		Spec: core.PersistentVolumeClaimSpec{
@@ -231,7 +241,7 @@ func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName
 			StorageClassName: storageName,
 			VolumeMode:       volumeMode,
 			DataSourceRef: &core.TypedLocalObjectReference{
-				APIGroup: &api.SchemeGroupVersion.Group,
+				APIGroup: &apiGroup,
 				Kind:     "OpenstackVolumePopulator",
 				Name:     populatorName,
 			},
@@ -264,9 +274,14 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 	}
 
 	var snaplist []snapshots.Snapshot
-	for _, vol := range vm.AttachedVolumes {
+	for _, av := range vm.AttachedVolumes {
+		// Skip if image already exists
+		if r.imageExists(fmt.Sprintf("%s-%s", r.Plan.Name, av.ID)) {
+			continue
+		}
+
 		pager := snapshots.List(osClient.BlockStorageService, snapshots.ListOpts{
-			Name:  fmt.Sprintf("snap-%s", vol.ID),
+			Name:  fmt.Sprintf("%s-%s", r.Plan.Name, av.ID),
 			Limit: 1,
 		})
 		pages, err := pager.AllPages()
@@ -278,14 +293,18 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 			return true, err
 		}
 		if !isEmpty {
-			snaps, _ := snapshots.ExtractSnapshots(pages)
+			snaps, err := snapshots.ExtractSnapshots(pages)
+			if err != nil {
+				return true, err
+			}
+
 			snaplist = append(snaplist, snaps...)
 			continue
 		}
 
 		snapshot, err := snapshots.Create(osClient.BlockStorageService, snapshots.CreateOpts{
-			Name:     fmt.Sprintf("snap-%s", vol.ID),
-			VolumeID: vol.ID,
+			Name:     fmt.Sprintf("%s-%s", r.Plan.Name, av.ID),
+			VolumeID: av.ID,
 			Force:    true,
 		}).Extract()
 		if err != nil {
@@ -293,7 +312,7 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 				err,
 				"Failed to create snapshot.",
 				"volume",
-				vol.ID)
+				av.ID)
 			return true, err
 		}
 
@@ -301,6 +320,9 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 	}
 
 	for _, snap := range snaplist {
+		if r.imageExists(fmt.Sprintf("%s-%s", r.Plan.Name, snap.VolumeID)) {
+			continue
+		}
 		snapshot, err := snapshots.Get(osClient.BlockStorageService, snap.ID).Extract()
 		if err != nil {
 			return true, err
@@ -313,8 +335,11 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 
 	var vollist []volumes.Volume
 	for _, snap := range snaplist {
+		if r.imageExists(fmt.Sprintf("%s-%s", r.Plan.Name, snap.VolumeID)) {
+			continue
+		}
 		pager := volumes.List(osClient.BlockStorageService, volumes.ListOpts{
-			Name:  snap.VolumeID,
+			Name:  fmt.Sprintf("%s-%s", r.Plan.Name, snap.VolumeID),
 			Limit: 1,
 		})
 		pages, err := pager.AllPages()
@@ -326,15 +351,19 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 			return true, err
 		}
 		if !isEmpty {
-			vols, _ := volumes.ExtractVolumes(pages)
+			vols, err := volumes.ExtractVolumes(pages)
+			if err != nil {
+				return true, err
+			}
 			vollist = append(vollist, vols...)
 
 			continue
 		}
 		volume, err := volumes.Create(osClient.BlockStorageService, volumes.CreateOpts{
-			Name:       snap.VolumeID,
-			SnapshotID: snap.ID,
-			Size:       snap.Size,
+			Name:        fmt.Sprintf("%s-%s", r.Plan.Name, snap.VolumeID),
+			SnapshotID:  snap.ID,
+			Size:        snap.Size,
+			Description: fmt.Sprintf("%s-%s", r.Plan.Name, snap.VolumeID),
 		}).Extract()
 		if err != nil {
 			err = liberr.Wrap(
@@ -348,15 +377,25 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 	}
 
 	for _, vol := range vollist {
-		volume, _ := volumes.Get(osClient.BlockStorageService, vol.ID).Extract()
+		if r.imageExists(vol.Description) {
+			continue
+		}
+		volume, err := volumes.Get(osClient.BlockStorageService, vol.ID).Extract()
+		if err != nil {
+			return true, err
+		}
+
 		if volume.Status != "available" {
-			r.Log.Info("Volume not ready yet, recheking...", "volume", volume)
+			r.Log.Info("Volume not ready yet, recheking...", "volume", vol.Name)
 			return false, nil
 		}
 	}
 
 	var imagelist []string
 	for _, vol := range vollist {
+		if r.imageReady(vol.Description) {
+			continue
+		}
 		pager := images.List(osClient.ImageService, images.ListOpts{
 			Name:  vol.Name,
 			Limit: 1,
@@ -370,13 +409,17 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 			return true, err
 		}
 		if !isEmpty {
-			imgs, _ := images.ExtractImages(pages)
+			imgs, err := images.ExtractImages(pages)
+			if err != nil {
+				return true, err
+			}
 			for _, i := range imgs {
 				imagelist = append(imagelist, i.ID)
 			}
 
 			continue
 		}
+
 		image, err := volumeactions.UploadImage(osClient.BlockStorageService, vol.ID, volumeactions.UploadImageOpts{
 			ImageName:  vol.Name,
 			DiskFormat: "raw",
@@ -394,12 +437,49 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 	}
 
 	for _, image := range imagelist {
-		i, _ := images.Get(osClient.ImageService, image).Extract()
+		i, err := images.Get(osClient.ImageService, image).Extract()
+		if err != nil {
+			return true, err
+		}
 		if i.Status != "active" {
 			r.Log.Info("Image not ready yet, recheking...", "image", i)
 			return false, nil
 		}
 	}
 
+	//r.cleanup(client, vollist, snaplist)
 	return true, nil
+}
+
+func (r *Builder) imageExists(imageName string) bool {
+	image := &model.Image{}
+	err := r.Source.Inventory.Find(image, ref.Ref{Name: imageName})
+	return err == nil
+}
+
+func (r *Builder) imageReady(imageName string) bool {
+	image := &model.Image{}
+	err := r.Source.Inventory.Find(image, ref.Ref{Name: imageName})
+	if err == nil {
+		return image.Status == "active"
+	}
+
+	return false
+}
+
+func (r *Builder) cleanup(c base.Client, volumesIDs []volumes.Volume, snapshotIDs []snapshots.Snapshot) {
+	client, ok := c.(*Client)
+	osClient := client.OpenstackClient
+	if !ok {
+		r.Log.Info("Couldn't cast client (should never happen)")
+		return
+	}
+
+	for _, vol := range volumesIDs {
+		volumes.Delete(osClient.BlockStorageService, vol.ID, volumes.DeleteOpts{Cascade: true})
+	}
+
+	for _, snap := range snapshotIDs {
+		snapshots.Delete(osClient.BlockStorageService, snap.ID)
+	}
 }

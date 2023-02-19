@@ -19,6 +19,7 @@ func (r *Client) connect() (err error) {
 	r.OpenstackClient.Secret = r.Source.Secret
 	r.OpenstackClient.URL = r.Source.Provider.Spec.URL
 	err = r.OpenstackClient.Connect()
+
 	return
 }
 

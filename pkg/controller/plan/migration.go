@@ -198,6 +198,7 @@ func (r *Migration) init() (err error) {
 	if err != nil {
 		return
 	}
+
 	r.provider, err = adapter.Client(r.Context)
 	if err != nil {
 		return
@@ -766,6 +767,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			break
 		}
 		var state string
+		r.Log.Info("Benny", "vm", r.provider)
 		state, err = r.provider.PowerState(vm.Ref)
 		if err != nil {
 			if !errors.As(err, &web.ProviderNotReadyError{}) {

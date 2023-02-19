@@ -1504,7 +1504,7 @@ func (r *KubeVirt) createVolumes(vm ref.Ref) (err error) {
 	if len(openstackVm.AttachedVolumes) > 0 {
 		for _, vol := range openstackVm.AttachedVolumes {
 			image := &openstack.Image{}
-			err = r.Source.Inventory.Find(image, ref.Ref{Name: vol.ID})
+			err = r.Source.Inventory.Find(image, ref.Ref{Name: fmt.Sprintf("%s-%s", r.Plan.Name, vol.ID)})
 			if err != nil {
 				err = liberr.Wrap(err)
 				return
@@ -1553,7 +1553,13 @@ func (r *KubeVirt) getOpenstackPVCs(vm ref.Ref, step *plan.Step) (ready bool, er
 
 	// TODO check image
 	for _, vol := range openstackVm.AttachedVolumes {
-		obj := client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: vol.ID}
+		image := &openstack.Image{}
+		err = r.Source.Inventory.Find(image, ref.Ref{Name: fmt.Sprintf("%s-%s", r.Plan.Name, vol.ID)})
+		if err != nil {
+			return
+		}
+
+		obj := client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: image.ID}
 		pvc := core.PersistentVolumeClaim{}
 		err = r.Client.Get(context.Background(), obj, &pvc)
 		if err != nil {
