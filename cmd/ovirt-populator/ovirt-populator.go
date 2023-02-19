@@ -148,7 +148,7 @@ func populate(crName, engineURL, secretName, diskID, volPath, namespace, crNames
 	<-done
 	err = cmd.Wait()
 	if err != nil {
-		klog.Error(err)
+		klog.Fatal(err)
 	}
 }
 
