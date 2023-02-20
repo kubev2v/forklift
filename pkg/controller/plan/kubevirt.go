@@ -1510,7 +1510,6 @@ func (r *KubeVirt) createVolumes(vm ref.Ref) (err error) {
 				return
 			}
 
-			// TODO deduplicate with above
 			populatorCr := openstackutil.OpenstackVolumePopulator(image, sourceUrl, r.Plan.Spec.TargetNamespace, r.Source.Secret.Name)
 			err = r.Client.Create(context.TODO(), populatorCr, &client.CreateOptions{})
 			if errors.IsAlreadyExists(err) {

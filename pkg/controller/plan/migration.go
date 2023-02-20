@@ -767,7 +767,6 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			break
 		}
 		var state string
-		r.Log.Info("Benny", "vm", r.provider)
 		state, err = r.provider.PowerState(vm.Ref)
 		if err != nil {
 			if !errors.As(err, &web.ProviderNotReadyError{}) {

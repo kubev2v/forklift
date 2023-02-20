@@ -416,7 +416,7 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 			for _, i := range imgs {
 				imagelist = append(imagelist, i.ID)
 			}
-
+			r.Log.Info("Image already exists", "id", imgs[0].ID)
 			continue
 		}
 
@@ -436,18 +436,28 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 		imagelist = append(imagelist, image.ImageID)
 	}
 
-	for _, image := range imagelist {
-		i, err := images.Get(osClient.ImageService, image).Extract()
+	for _, imageID := range imagelist {
+		img, err := images.Get(osClient.ImageService, imageID).Extract()
 		if err != nil {
 			return true, err
 		}
-		if i.Status != "active" {
-			r.Log.Info("Image not ready yet, recheking...", "image", i)
+
+		// TODO also check for "saving" and "error"
+		if img.Status != "active" {
+			r.Log.Info("Image not ready yet, recheking...", "image", img)
+			return false, nil
+		} else if img.Status == "active" {
+			r.cleanup(c, img.Name)
+		}
+
+		// TODO figure out a better way, since when the image in the inventory may be out of sync
+		// with openstack, and be ready in openstack, but not in the inventory
+		if !r.imageReady(img.Name) {
+			r.Log.Info("Image not ready yet in inventory, recheking...", "image", img)
 			return false, nil
 		}
 	}
 
-	//r.cleanup(client, vollist, snaplist)
 	return true, nil
 }
 
@@ -463,11 +473,10 @@ func (r *Builder) imageReady(imageName string) bool {
 	if err == nil {
 		return image.Status == "active"
 	}
-
 	return false
 }
 
-func (r *Builder) cleanup(c base.Client, volumesIDs []volumes.Volume, snapshotIDs []snapshots.Snapshot) {
+func (r *Builder) cleanup(c base.Client, imageName string) {
 	client, ok := c.(*Client)
 	osClient := client.OpenstackClient
 	if !ok {
@@ -475,11 +484,19 @@ func (r *Builder) cleanup(c base.Client, volumesIDs []volumes.Volume, snapshotID
 		return
 	}
 
-	for _, vol := range volumesIDs {
-		volumes.Delete(osClient.BlockStorageService, vol.ID, volumes.DeleteOpts{Cascade: true})
+	volume := &model.Volume{}
+	err := r.Source.Inventory.Find(volume, ref.Ref{Name: imageName})
+	if err != nil {
+		r.Log.Error(err, "Couldn't find volume", "name", imageName)
 	}
 
-	for _, snap := range snapshotIDs {
-		snapshots.Delete(osClient.BlockStorageService, snap.ID)
+	volumes.Delete(osClient.BlockStorageService, volume.ID, volumes.DeleteOpts{Cascade: true})
+
+	snapshot := &model.Snapshot{}
+	err = r.Source.Inventory.Find(snapshot, ref.Ref{Name: imageName})
+	if err != nil {
+		r.Log.Error(err, "Couldn't find snapshot", "name", imageName)
 	}
+
+	snapshots.Delete(osClient.BlockStorageService, snapshot.ID)
 }
