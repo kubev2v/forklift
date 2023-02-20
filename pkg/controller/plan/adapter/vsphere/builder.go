@@ -210,11 +210,11 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 	env = append(
 		env,
 		core.EnvVar{
-			Name: "V2V_vmName",
+			Name:  "V2V_vmName",
 			Value: vm.Name,
 		},
 		core.EnvVar{
-			Name:"V2V_libvirtURL",
+			Name:  "V2V_libvirtURL",
 			Value: libvirtURL.String(),
 		},
 	)

@@ -3,6 +3,7 @@ package base
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"testing"
 	"time"
 
@@ -87,6 +88,7 @@ func TestAuth(t *testing.T) {
 			Header: map[string][]string{
 				"Authorization": {"Bearer " + token},
 			},
+			URL: &url.URL{},
 		},
 	}
 	provider := &api.Provider{

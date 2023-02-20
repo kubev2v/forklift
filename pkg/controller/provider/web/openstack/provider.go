@@ -95,7 +95,8 @@ func (h ProviderHandler) Get(ctx *gin.Context) {
 func (h *ProviderHandler) ListContent(ctx *gin.Context) (content []interface{}, err error) {
 	content = []interface{}{}
 	list := h.Container.List()
-	ns := ctx.Param(base.NsParam)
+	q := ctx.Request.URL.Query()
+	ns := q.Get(base.NsParam)
 	for _, collector := range list {
 		if p, cast := collector.Owner().(*api.Provider); cast {
 			if p.Type() != api.OpenStack {
