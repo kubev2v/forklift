@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-const DefaultStorageClass = "standard"
+const DefaultStorageClass = "nfs-csi"
 
 func (r *OvirtClient) SetupClient() (err error) {
 	r.CustomEnv = false
