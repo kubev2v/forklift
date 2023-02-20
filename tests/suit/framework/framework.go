@@ -78,6 +78,8 @@ type Clients struct {
 	DynamicClient dynamic.Interface
 	// OvirtClient provides a pointer to ovirt client.
 	OvirtClient OvirtClient
+	// OpenStackClient provides a pointer to Openstack client.
+	OpenStackClient OpenStackClient
 }
 
 // K8s returns Kubernetes Clientset
@@ -264,6 +266,12 @@ func (c *Clients) GetCrClient() (crclient.Client, error) {
 // GetOvirtClient instantiates and returns an ovirtClient
 func (c *Clients) GetOvirtClient() (*OvirtClient, error) {
 	oc := OvirtClient{}
+	return &oc, nil
+}
+
+// GetOpenStackClient instantiates and returns an OpenStackClient
+func (c *Clients) GetOpenStackClient() (*OpenStackClient, error) {
+	oc := OpenStackClient{}
 	return &oc, nil
 }
 

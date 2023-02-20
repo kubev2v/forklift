@@ -104,6 +104,12 @@ func BuildTestSuite() {
 		}
 		framework.ClientsInstance.OvirtClient = *ovirtClient
 
+		openStackClient, err := framework.ClientsInstance.GetOpenStackClient()
+		if err != nil {
+			ginkgo.Fail(fmt.Sprintf("ERROR, unable to create OpenStackClient: %v", err))
+		}
+		framework.ClientsInstance.OpenStackClient = *openStackClient
+
 	})
 
 }
