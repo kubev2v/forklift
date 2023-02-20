@@ -12,6 +12,7 @@ import (
 
 const (
 	ovirtProviderName = "ovirt-provider"
+	ovirtStorageClass = "nfs-csi"
 )
 
 var _ = Describe("[level:component]Migration tests for oVirt provider", func() {
@@ -56,7 +57,7 @@ var _ = Describe("[level:component]Migration tests for oVirt provider", func() {
 		err = utils.WaitForNetworkMapReadyWithTimeout(f.CrClient, f.Namespace.Name, networkMapName, 10*time.Second)
 		Expect(err).ToNot(HaveOccurred())
 		By("Create Storage Map")
-		storageMapDef := utils.NewStorageMap(namespace, *provider, test_storage_map_name, vmData.GetVMSDs())
+		storageMapDef := utils.NewStorageMap(namespace, *provider, test_storage_map_name, vmData.GetVMSDs(), ovirtStorageClass)
 		err = utils.CreateStorageMapFromDefinition(f.CrClient, storageMapDef)
 		Expect(err).ToNot(HaveOccurred())
 		err = utils.WaitForStorageMapReadyWithTimeout(f.CrClient, f.Namespace.Name, test_storage_map_name, 10*time.Second)
