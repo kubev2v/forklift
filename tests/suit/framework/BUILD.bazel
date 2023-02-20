@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "framework",
     srcs = [
+        "exec_util.go",
         "framework.go",
         "ovirt.go",
     ],
@@ -29,6 +30,7 @@ go_library(
         "//vendor/k8s.io/client-go/kubernetes/scheme",
         "//vendor/k8s.io/client-go/rest",
         "//vendor/k8s.io/client-go/tools/clientcmd",
+        "//vendor/k8s.io/client-go/tools/remotecommand",
         "//vendor/k8s.io/klog/v2:klog",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
     ],

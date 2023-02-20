@@ -83,6 +83,7 @@ jobs:
             kubectl logs -n kube-system $(kubectl get po -n kube-system  -o=name | grep csi-nfs-controller)  nfs >> /tmp/artifacts/k8s-csi-nfs.log
             kubectl get openstackvolumepopulator -A >> /tmp/artifacts/k8s-openstackvolumepopulator.log
             kubectl get pvc -A >> /tmp/artifacts/k8s-pvc.log
+            kubectl cp konveyor-forklift/$(kubectl get po -n konveyor-forklift  -o=name | grep packstack|cut -d/ -f2):/var/log/cinder/volume.log /tmp/artifacts/k8s-packstack-cinder-volume.log
           fi
 
       - uses: actions/upload-artifact@master

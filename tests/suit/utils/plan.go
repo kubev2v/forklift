@@ -70,7 +70,7 @@ func newPlan(namespace string, providerIdentifier forkliftv1.Provider, planName 
 				}},
 			Archived:        false,
 			Warm:            false,
-			TargetNamespace: namespace,
+			TargetNamespace: "default",
 			Map: plan.Map{
 				Storage: corev1.ObjectReference{
 					Name:      storageMap,

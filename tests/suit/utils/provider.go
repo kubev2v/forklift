@@ -54,7 +54,9 @@ func WaitForProviderReadyWithTimeout(cl crclient.Client, namespace string, provi
 		return true, nil
 	})
 	if err != nil {
-		return fmt.Errorf("Provider %s not ready within %v", providerName, timeout)
+		conditions := returnedProvider.Status.Conditions.List
+		return fmt.Errorf("Provider %s not ready within %v - Phase/condition: %v/%v",
+			providerName, timeout, returnedProvider.Status.Phase, conditions[len(conditions)-1].Message)
 	}
 	return nil
 }
