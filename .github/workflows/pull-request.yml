@@ -62,11 +62,23 @@ jobs:
         run: |
           GOPATH=${GITHUB_WORKSPACE}/go make e2e-sanity-${{ matrix.source_provider }}
 
-      - name: show abnormal events and all objects in konveyor-forklift
+      # TODO: execute this step only on failures
+      - name: save k8s logs
         if: always()
         run: |
-          kubectl get events --field-selector type!=Normal -A --sort-by='.lastTimestamp'
-          kubectl get all -n konveyor-forklift -o yaml
+          mkdir /tmp/artifacts/
+          kubectl get pods -n konveyor-forklift >> /tmp/artifacts/k8s-pods.log
+          kubectl get events --field-selector type!=Normal -A --sort-by='.lastTimestamp' >> /tmp/artifacts/k8s_abnormal_events.log
+          kubectl get all -n konveyor-forklift -o yaml >> /tmp/artifacts/k8s-all-forklift-objects.log
+          kubectl logs -n konveyor-forklift $(kubectl get po -n konveyor-forklift  -o=name | grep forklift-controller) >> /tmp/artifacts/forklift-controller-inventory.log
+
+      - uses: actions/upload-artifact@master
+        if: always()
+        with:
+          name: k8s-forklift-logs
+          path: /tmp/artifacts
+
+
 
   build:
     # The type of runner that the job will run on
