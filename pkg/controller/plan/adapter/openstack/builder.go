@@ -393,13 +393,11 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 
 	var imagelist []string
 	for _, vol := range vollist {
-		if r.imageReady(vol.Description) {
-			continue
-		}
 		pager := images.List(osClient.ImageService, images.ListOpts{
-			Name:  vol.Name,
+			Name:  vol.Description,
 			Limit: 1,
 		})
+		r.Log.Info("Benny list images", "name", vol.Description)
 		pages, err := pager.AllPages()
 		if err != nil {
 			return true, err
@@ -421,7 +419,7 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 		}
 
 		image, err := volumeactions.UploadImage(osClient.BlockStorageService, vol.ID, volumeactions.UploadImageOpts{
-			ImageName:  vol.Name,
+			ImageName:  vol.Description,
 			DiskFormat: "raw",
 		}).Extract()
 		if err != nil {
@@ -447,17 +445,18 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 			r.Log.Info("Image not ready yet, recheking...", "image", img)
 			return false, nil
 		} else if img.Status == "active" {
-			r.cleanup(c, img.Name)
-		}
-
-		// TODO figure out a better way, since when the image in the inventory may be out of sync
-		// with openstack, and be ready in openstack, but not in the inventory
-		if !r.imageReady(img.Name) {
-			r.Log.Info("Image not ready yet in inventory, recheking...", "image", img)
-			return false, nil
+			// TODO figure out a better way, since when the image in the inventory may be out of sync
+			// with openstack, and be ready in openstack, but not in the inventory
+			if !r.imageReady(img.Name) {
+				r.Log.Info("Image not ready yet in inventory, recheking...", "image")
+				return false, nil
+			} else {
+				r.cleanup(c, img.Name)
+			}
 		}
 	}
 
+	r.Log.Info("Benny images ready", "images", imagelist)
 	return true, nil
 }
 
@@ -471,6 +470,7 @@ func (r *Builder) imageReady(imageName string) bool {
 	image := &model.Image{}
 	err := r.Source.Inventory.Find(image, ref.Ref{Name: imageName})
 	if err == nil {
+		r.Log.Info("Benny imageReady", "image", image)
 		return image.Status == "active"
 	}
 	return false

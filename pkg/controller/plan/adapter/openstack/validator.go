@@ -6,6 +6,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 )
 
 // Validator
@@ -21,6 +22,8 @@ func (r *Validator) Load() (err error) {
 }
 
 func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
+	var log = logging.WithName("DEBUG_CI")
+
 	if r.plan.Referenced.Map.Storage == nil {
 		return
 	}
@@ -35,17 +38,21 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 		return
 	}
 	for _, av := range vm.AttachedVolumes {
+		log.Info("Attached Volume", "av", av)
 		volType := &model.VolumeType{}
 		err = r.inventory.Find(volType, ref.Ref{Name: av.VolumeType})
+		log.Info("VolumeType", "vt", volType)
 		if err != nil {
+			log.Info("Failed looking for VolumeType", "vt", volType)
 			err = liberr.Wrap(
 				err,
-				"VM not found in inventory.",
-				"vm",
-				vmRef.String())
+				"VolumeType not found in inventory.",
+				"VolumeType",
+				volType)
 			return
 		}
 		if !r.plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{ID: volType.ID}) {
+			log.Info("Found voltype")
 			return
 		}
 	}
