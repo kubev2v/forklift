@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 shopt -s nullglob
 
+if [ -z "$V2V_libvirtURL" ] || \
+    [ -z "$V2V_secretKey" ] || \
+    [ -z "$V2V_vmName" ] ; then
+    echo "Following environment needs to be defined:"
+    echo
+    echo "    V2V_libvirtURL, V2V_secretKey, V2V_vmName"
+    exit 1
+fi
+
 export LIBGUESTFS_PATH=/usr/lib64/guestfs/appliance
 
 echo "Preparing virt-v2v"
