@@ -275,13 +275,9 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 
 	var snaplist []snapshots.Snapshot
 	for _, av := range vm.AttachedVolumes {
-		// Skip if image already exists
-		if r.imageExists(fmt.Sprintf("%s-%s", r.Plan.Name, av.ID)) {
-			continue
-		}
-
+		imageName := fmt.Sprintf("%s-%s", r.Plan.Name, av.ID)
 		pager := snapshots.List(osClient.BlockStorageService, snapshots.ListOpts{
-			Name:  fmt.Sprintf("%s-%s", r.Plan.Name, av.ID),
+			Name:  imageName,
 			Limit: 1,
 		})
 		pages, err := pager.AllPages()
@@ -303,9 +299,10 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 		}
 
 		snapshot, err := snapshots.Create(osClient.BlockStorageService, snapshots.CreateOpts{
-			Name:     fmt.Sprintf("%s-%s", r.Plan.Name, av.ID),
-			VolumeID: av.ID,
-			Force:    true,
+			Name:        imageName,
+			VolumeID:    av.ID,
+			Force:       true,
+			Description: imageName,
 		}).Extract()
 		if err != nil {
 			err = liberr.Wrap(
@@ -320,9 +317,6 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 	}
 
 	for _, snap := range snaplist {
-		if r.imageExists(fmt.Sprintf("%s-%s", r.Plan.Name, snap.VolumeID)) {
-			continue
-		}
 		snapshot, err := snapshots.Get(osClient.BlockStorageService, snap.ID).Extract()
 		if err != nil {
 			return true, err
@@ -335,11 +329,9 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 
 	var vollist []volumes.Volume
 	for _, snap := range snaplist {
-		if r.imageExists(fmt.Sprintf("%s-%s", r.Plan.Name, snap.VolumeID)) {
-			continue
-		}
+		imageName := fmt.Sprintf("%s-%s", r.Plan.Name, snap.VolumeID)
 		pager := volumes.List(osClient.BlockStorageService, volumes.ListOpts{
-			Name:  fmt.Sprintf("%s-%s", r.Plan.Name, snap.VolumeID),
+			Name:  imageName,
 			Limit: 1,
 		})
 		pages, err := pager.AllPages()
@@ -360,10 +352,10 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 			continue
 		}
 		volume, err := volumes.Create(osClient.BlockStorageService, volumes.CreateOpts{
-			Name:        fmt.Sprintf("%s-%s", r.Plan.Name, snap.VolumeID),
+			Name:        imageName,
 			SnapshotID:  snap.ID,
 			Size:        snap.Size,
-			Description: fmt.Sprintf("%s-%s", r.Plan.Name, snap.VolumeID),
+			Description: imageName,
 		}).Extract()
 		if err != nil {
 			err = liberr.Wrap(
@@ -377,9 +369,6 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 	}
 
 	for _, vol := range vollist {
-		if r.imageExists(vol.Description) {
-			continue
-		}
 		volume, err := volumes.Get(osClient.BlockStorageService, vol.ID).Extract()
 		if err != nil {
 			return true, err
@@ -392,12 +381,12 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 	}
 
 	var imagelist []string
+
 	for _, vol := range vollist {
 		pager := images.List(osClient.ImageService, images.ListOpts{
 			Name:  vol.Description,
 			Limit: 1,
 		})
-		r.Log.Info("Benny list images", "name", vol.Description)
 		pages, err := pager.AllPages()
 		if err != nil {
 			return true, err
@@ -414,7 +403,7 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 			for _, i := range imgs {
 				imagelist = append(imagelist, i.ID)
 			}
-			r.Log.Info("Image already exists", "id", imgs[0].ID)
+			r.Log.Info("Image already exists", "id", imagelist)
 			continue
 		}
 
@@ -448,15 +437,15 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 			// TODO figure out a better way, since when the image in the inventory may be out of sync
 			// with openstack, and be ready in openstack, but not in the inventory
 			if !r.imageReady(img.Name) {
-				r.Log.Info("Image not ready yet in inventory, recheking...", "image")
+				r.Log.Info("Image not ready yet in inventory, recheking...", "image", img.Name)
 				return false, nil
 			} else {
+				r.Log.Info("Image is ready, cleaning up...", "image", img.Name)
 				r.cleanup(c, img.Name)
 			}
 		}
 	}
 
-	r.Log.Info("Benny images ready", "images", imagelist)
 	return true, nil
 }
 
@@ -470,7 +459,6 @@ func (r *Builder) imageReady(imageName string) bool {
 	image := &model.Image{}
 	err := r.Source.Inventory.Find(image, ref.Ref{Name: imageName})
 	if err == nil {
-		r.Log.Info("Benny imageReady", "image", image)
 		return image.Status == "active"
 	}
 	return false
