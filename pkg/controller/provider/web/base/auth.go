@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"path"
 	"strings"
 	"sync"
@@ -42,6 +41,7 @@ type Auth struct {
 // Authenticate token.
 func (r *Auth) Permit(ctx *gin.Context, p *api.Provider) (status int, err error) {
 	r.mutex.Lock()
+	ns := ""
 	defer r.mutex.Unlock()
 	status = http.StatusOK
 	if r.cache == nil {
@@ -59,7 +59,11 @@ func (r *Auth) Permit(ctx *gin.Context, p *api.Provider) (status int, err error)
 			return
 		}
 	}
-	allowed, err := r.permit(token, p)
+	if p.ObjectMeta.UID == "" {
+		q := ctx.Request.URL.Query()
+		ns = q.Get(NsParam)
+	}
+	allowed, err := r.permit(token, ns, p)
 	if allowed && err != nil {
 		log.Error(err, "Authorization failed.")
 		status = http.StatusInternalServerError
@@ -80,7 +84,7 @@ func (r *Auth) Permit(ctx *gin.Context, p *api.Provider) (status int, err error)
 }
 
 // Authenticate token.
-func (r *Auth) permit(token string, p *api.Provider) (allowed bool, err error) {
+func (r *Auth) permit(token string, ns string, p *api.Provider) (allowed bool, err error) {
 	allowed = true
 	tr := &auth.TokenReview{
 		Spec: auth.TokenReviewSpec{
@@ -120,9 +124,8 @@ func (r *Auth) permit(token string, p *api.Provider) (allowed bool, err error) {
 		namespace = p.Namespace
 	} else {
 		verb = "list"
-		namespace = os.Getenv("POD_NAMESPACE")
+		namespace = ns
 	}
-
 	review := &auth2.SubjectAccessReview{
 		Spec: auth2.SubjectAccessReviewSpec{
 			ResourceAttributes: &auth2.ResourceAttributes{
