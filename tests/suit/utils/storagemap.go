@@ -77,7 +77,10 @@ func WaitForStorageMapReadyWithTimeout(cl crclient.Client, namespace string, sto
 		return true, nil
 	})
 	if err != nil {
-		return fmt.Errorf("StorageMap %s not ready within %v", storageMapName, timeout)
+		//return fmt.Errorf("StorageMap %s not ready within %v", storageMapName, timeout)
+		conditions := returnedStorageMap.Status.Conditions.List
+		return fmt.Errorf("StorageMap %s not ready within %v - condition: %v",
+			storageMapName, timeout, conditions[len(conditions)-1].Message)
 	}
 	return nil
 }

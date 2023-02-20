@@ -1,6 +1,9 @@
 package suit_test
 
 import (
+	"time"
+
+	forkliftv1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/tests/suit/framework"
 	"github.com/konveyor/forklift-controller/tests/suit/utils"
 	. "github.com/onsi/ginkgo"
@@ -8,23 +11,76 @@ import (
 )
 
 const (
-	openstackProviderName = "openstack-provider"
+	openstackProviderName = "os-provider"
+	openstackStorageClass = "nfs-csi"
 )
 
-var _ = Describe("[level:component]Migration tests for Openstack provider", func() {
+var _ = Describe("[level:component]Migration tests for OpenStack provider", func() {
 	f := framework.NewFramework("migration-func-test")
 
 	It("[test] should create provider with NetworkMap", func() {
 		namespace := f.Namespace.Name
-
-		By("Create Secret from Definition")
-		_, err := utils.CreateSecretFromDefinition(f.K8sClient, utils.NewSecretDefinition(nil, nil,
-			map[string][]byte{
-				"thumbprint": []byte("52:6C:4E:88:1D:78:AE:12:1C:F3:BB:6C:5B:F4:E2:82:86:A7:08:AF"),
-				"password":   []byte("MTIzNDU2Cg=="),
-				"user":       []byte("YWRtaW5pc3RyYXRvckB2c3BoZXJlLmxvY2Fs"),
-			}, namespace, "provider-test-secret"))
+		err := f.Clients.OpenStackClient.SetupClient("cirros-volume", "net-int", "nfs")
 		Expect(err).ToNot(HaveOccurred())
 
+		By("Load Source VM Details from OpenStack")
+		vmData, err := f.Clients.OpenStackClient.LoadSourceDetails(f, namespace, "packstack")
+		Expect(err).ToNot(HaveOccurred())
+
+		By("Create Secret from Definition")
+		s, err := utils.CreateSecretFromDefinition(f.K8sClient, utils.NewSecretDefinition(nil,
+			map[string]string{
+				"username":    "admin",
+				"password":    "12e2f14739194a6c",
+				"domainName":  "default",
+				"projectName": "admin",
+				"region":      "RegionOne",
+				"insecure":    "true",
+			}, nil, namespace, "os-test-secret"))
+		Expect(err).ToNot(HaveOccurred())
+
+		By("Create osp provider")
+		pr := utils.NewProvider(openstackProviderName, forkliftv1.OpenStack, namespace, map[string]string{},
+			"http://packstack.konveyor-forklift:5000/v3", s)
+		err = utils.CreateProviderFromDefinition(f.CrClient, pr)
+		Expect(err).ToNot(HaveOccurred())
+		err = utils.WaitForProviderReadyWithTimeout(f.CrClient, namespace, openstackProviderName, 30*time.Second)
+		Expect(err).ToNot(HaveOccurred())
+
+		provider, err := utils.GetProvider(f.CrClient, openstackProviderName, namespace)
+		Expect(err).ToNot(HaveOccurred())
+
+		networkMapDef := utils.NewNetworkMap(namespace, *provider, networkMapName, vmData.GetNetworkId())
+		err = utils.CreateNetworkMapFromDefinition(f.CrClient, networkMapDef)
+		Expect(err).ToNot(HaveOccurred())
+		err = utils.WaitForNetworkMapReadyWithTimeout(f.CrClient, namespace, networkMapName, 10*time.Second)
+		Expect(err).ToNot(HaveOccurred())
+		By("Create Storage Map")
+
+		//TODO: Add storage-class  pass here
+		storageMapDef := utils.NewStorageMap(namespace, *provider, test_storage_map_name, []string{vmData.GetVolumeId()}, openstackStorageClass)
+
+		err = utils.CreateStorageMapFromDefinition(f.CrClient, storageMapDef)
+		Expect(err).ToNot(HaveOccurred())
+		err = utils.WaitForStorageMapReadyWithTimeout(f.CrClient, namespace, test_storage_map_name, 10*time.Second)
+		Expect(err).ToNot(HaveOccurred())
+
+		By("Creating plan")
+		planDenf := utils.NewPlanWithVmId(namespace, *provider, test_plan_name, test_storage_map_name, networkMapName, []string{vmData.GetTestVMId()})
+		err = utils.CreatePlanFromDefinition(f.CrClient, planDenf)
+		Expect(err).ToNot(HaveOccurred())
+		err = utils.WaitForPlanReadyWithTimeout(f.CrClient, namespace, test_plan_name, 15*time.Second)
+		Expect(err).ToNot(HaveOccurred())
+		By("Creating migration")
+		migrationDef := utils.NewMigration(provider.Namespace, test_migration_name, test_plan_name)
+		err = utils.CreateMigrationFromDefinition(f.CrClient, migrationDef)
+		Expect(err).ToNot(HaveOccurred())
+		err = utils.WaitForMigrationSucceededWithTimeout(f.CrClient, provider.Namespace, test_migration_name, 400*time.Second)
+		Expect(err).ToNot(HaveOccurred())
+
+		//err = utils.WaitForNetworkMapReadyWithTimeout(f.CrClient, f.Namespace.Name, networkMapName, 10*time.Second)
+		//Expect(err).ToNot(HaveOccurred())
+
 	})
+
 })
