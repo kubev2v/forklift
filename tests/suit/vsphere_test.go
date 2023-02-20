@@ -12,6 +12,7 @@ import (
 
 const (
 	vsphereProviderName = "vsphere-provider"
+	vsphereStorageClass = "standard"
 )
 
 var _ = Describe("[level:component]Migration tests for vSphere provider", func() {
@@ -43,7 +44,7 @@ var _ = Describe("[level:component]Migration tests for vSphere provider", func()
 		err = utils.WaitForNetworkMapReadyWithTimeout(f.CrClient, namespace, networkMapName, 10*time.Second)
 		Expect(err).ToNot(HaveOccurred())
 		By("Create Storage Map")
-		storageMapDef := utils.NewStorageMap(namespace, *provider, test_storage_map_name, []string{"datastore-52"})
+		storageMapDef := utils.NewStorageMap(namespace, *provider, test_storage_map_name, []string{"datastore-52"}, vsphereStorageClass)
 		err = utils.CreateStorageMapFromDefinition(f.CrClient, storageMapDef)
 		Expect(err).ToNot(HaveOccurred())
 		err = utils.WaitForStorageMapReadyWithTimeout(f.CrClient, namespace, test_storage_map_name, 10*time.Second)

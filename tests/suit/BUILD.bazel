@@ -65,7 +65,6 @@ go_test(
     deps = [
         "//pkg/apis/forklift/v1beta1",
         "//tests/suit/framework",
-        "//tests/suit/reporters",
         "//tests/suit/utils",
         "//vendor/github.com/onsi/ginkgo",
         "//vendor/github.com/onsi/gomega",
