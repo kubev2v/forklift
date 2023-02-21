@@ -67,15 +67,28 @@ jobs:
         if: always()
         run: |
           mkdir /tmp/artifacts/
+          set +e
           kubectl get pods -n konveyor-forklift >> /tmp/artifacts/k8s-pods.log
           kubectl get events --field-selector type!=Normal -A --sort-by='.lastTimestamp' >> /tmp/artifacts/k8s_abnormal_events.log
           kubectl get all -n konveyor-forklift -o yaml >> /tmp/artifacts/k8s-all-forklift-objects.log
-          kubectl logs -n konveyor-forklift $(kubectl get po -n konveyor-forklift  -o=name | grep forklift-controller) >> /tmp/artifacts/forklift-controller-inventory.log
+          kubectl get migrations -A -o yaml >> /tmp/artifacts/k8s-all-migrations.log
+          kubectl get plans -A -o yaml >> /tmp/artifacts/k8s-all-plans.log
+          kubectl get Virtualmachines -A -o yaml >> /tmp/artifacts/k8s-all-Virtualmachines.log
+          kubectl logs -n konveyor-forklift $(kubectl get po -n konveyor-forklift  -o=name | grep forklift-controller) >> /tmp/artifacts/k8s-forklift-controller-inventory.log
+          kubectl get Storageclasses -A -o yaml >> /tmp/artifacts/k8s-storage-classes.log
+          
+          if [ "${{ matrix.source_provider }}" == 'openstack' ] ; then
+            kubectl logs -n konveyor-forklift $(kubectl get po -n konveyor-forklift  -o=name | grep openstack-populator) >> /tmp/artifacts/k8s-forklift-openstack-populator.log
+            kubectl logs -n kube-system $(kubectl get po -n kube-system  -o=name | grep csi-nfs-controller)  csi-provisioner >> /tmp/artifacts/k8s-csi-nfs-provisioner.log
+            kubectl logs -n kube-system $(kubectl get po -n kube-system  -o=name | grep csi-nfs-controller)  nfs >> /tmp/artifacts/k8s-csi-nfs.log
+            kubectl get openstackvolumepopulator -A >> /tmp/artifacts/k8s-openstackvolumepopulator.log
+            kubectl get pvc -A >> /tmp/artifacts/k8s-pvc.log
+          fi
 
       - uses: actions/upload-artifact@master
         if: always()
         with:
-          name: k8s-forklift-logs
+          name: ${{ matrix.source_provider }}-k8s-forklift-logs
           path: /tmp/artifacts
 
 
