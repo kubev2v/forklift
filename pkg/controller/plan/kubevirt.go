@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	k8sutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // Annotations
@@ -1525,6 +1526,18 @@ func (r *KubeVirt) createVolumes(vm ref.Ref) (err error) {
 				err = nil
 				continue
 			} else if err != nil {
+				err = liberr.Wrap(err)
+				return
+			}
+
+			err = k8sutil.SetOwnerReference(pvc, populatorCr, r.Scheme())
+			if err != nil {
+				err = liberr.Wrap(err)
+				return
+			}
+
+			err = r.Client.Update(context.TODO(), populatorCr, &client.UpdateOptions{})
+			if err != nil {
 				err = liberr.Wrap(err)
 				return
 			}

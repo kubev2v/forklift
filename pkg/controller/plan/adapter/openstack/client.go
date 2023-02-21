@@ -1,10 +1,16 @@
 package openstack
 
 import (
+	"fmt"
+
+	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/snapshots"
+	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
+	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/openstack"
+	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
 
@@ -65,4 +71,48 @@ func (c *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, data
 
 // Close connections to the provider API.
 func (c *Client) Close() {
+}
+
+func (c *Client) Finalize(vms []*planapi.VMStatus, planName string) {
+	for _, vm := range vms {
+		vmModel := &model.VM{}
+		err := c.Source.Inventory.Find(vmModel, ref.Ref{ID: vm.Ref.ID})
+		if err != nil {
+			c.Log.Error(err, "Failed to find vm", "vm", vm.Name)
+			return
+		}
+
+		for _, av := range vmModel.AttachedVolumes {
+			lookupName := fmt.Sprintf("%s-%s", planName, av.ID)
+			// In a normal operation the snapshot and volume should already have been removed
+			// but they may remain in case of failure or cancellation of the migration
+
+			// Delete snapshot
+			snapshot := &model.Snapshot{}
+			err := c.Source.Inventory.Find(snapshot, ref.Ref{Name: lookupName})
+			if err != nil {
+				c.Log.Info("Failed to find snapshot", "snapshot", snapshot.Name)
+			} else {
+				snapshots.Delete(c.OpenstackClient.BlockStorageService, snapshot.ID)
+			}
+
+			// Delete cloned volume
+			volume := &model.Volume{}
+			err = c.Source.Inventory.Find(volume, ref.Ref{Name: lookupName})
+			if err != nil {
+				c.Log.Info("Failed to find volume", "volume", volume.Name)
+			} else {
+				volumes.Delete(c.OpenstackClient.BlockStorageService, volume.ID, volumes.DeleteOpts{Cascade: true})
+			}
+
+			// Delete Image
+			image := &model.Image{}
+			err = c.Source.Inventory.Find(image, ref.Ref{Name: lookupName})
+			if err != nil {
+				c.Log.Info("Failed to find image", "image", image.Name)
+			}
+
+			images.Delete(c.OpenstackClient.ImageService, image.ID)
+		}
+	}
 }

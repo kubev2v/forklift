@@ -1073,6 +1073,7 @@ func (r *Migration) end() (completed bool, err error) {
 			succeeded++
 		}
 	}
+	go r.provider.Finalize(r.Plan.Status.Migration.VMs, r.Plan.Name)
 	r.Plan.Status.Migration.MarkCompleted()
 	snapshot := r.Plan.Status.Migration.ActiveSnapshot()
 	snapshot.DeleteCondition(Executing)

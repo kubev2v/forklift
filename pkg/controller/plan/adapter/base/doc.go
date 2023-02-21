@@ -77,6 +77,8 @@ type Client interface {
 	SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []cdi.DataVolume, final bool) (err error)
 	// Close connections to the provider API.
 	Close()
+	// Finalize migrations
+	Finalize(vms []*planapi.VMStatus, planName string)
 }
 
 // Validator API.
