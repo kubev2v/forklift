@@ -374,7 +374,7 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 			return true, err
 		}
 
-		if volume.Status != "available" {
+		if volume.Status != "available" && volume.Status != "uploading" {
 			r.Log.Info("Volume not ready yet, recheking...", "volume", vol.Name)
 			return false, nil
 		}
