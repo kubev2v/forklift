@@ -36,6 +36,7 @@ OPERATOR_BUNDLE_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-operator-bundl
 OPERATOR_INDEX_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-operator-index:$(REGISTRY_TAG)
 POPULATOR_CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/populator-controller:$(REGISTRY_TAG)
 OVIRT_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/ovirt-populator:$(REGISTRY_TAG)
+OPENSTACK_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/openstack-populator:$(REGISTRY_TAG)
 
 ### External images
 MUST_GATHER_IMAGE ?= quay.io/kubev2v/forklift-must-gather:latest
@@ -185,7 +186,8 @@ build-operator-bundle-image: check_container_runtmime
 		--action_env CONTROLLER_IMAGE=$(CONTROLLER_IMAGE) \
 		--action_env API_IMAGE=$(API_IMAGE) \
 		--action_env POPULATOR_CONTROLLER_IMAGE=$(POPULATOR_CONTROLLER_IMAGE) \
-		--action_env OVIRT_POPULATOR_IMAGE=$(OVIRT_POPULATOR_IMAGE)
+		--action_env OVIRT_POPULATOR_IMAGE=$(OVIRT_POPULATOR_IMAGE) \
+		--action_env OPENSTACK_POPULATOR_IMAGE=$(OPENSTACK_POPULATOR_IMAGE)
 
 push-operator-bundle-image: build-operator-bundle-image
 	 $(CONTAINER_CMD) tag bazel/operator:forklift-operator-bundle-image $(OPERATOR_BUNDLE_IMAGE)
@@ -227,9 +229,15 @@ build-ovirt-populator-image:
 push-ovirt-populator-image: build-ovirt-populator-image
 	$(CONTAINER_CMD) push $(OVIRT_POPULATOR_IMAGE)
 
-build-all-images: build-api-image build-controller-image build-validation-image build-operator-image build-virt-v2v-image build-virt-v2v-warm-image build-operator-bundle-image build-operator-index-image build-populator-controller-image build-ovirt-populator-image
+build-openstack-populator-image:
+	$(CONTAINER_CMD) build -f hack/openstack-populator/Containerfile -t $(OPENSTACK_POPULATOR_IMAGE) .
 
-push-all-images: push-api-image push-controller-image push-validation-image push-operator-image push-virt-v2v-image push-virt-v2v-warm-image push-operator-bundle-image push-operator-index-image push-populator-controller-image push-ovirt-populator-image
+push-openstack-populator-image: build-openstack-populator-image
+	$(CONTAINER_CMD) push $(OPENSTACK_POPULATOR_IMAGE)
+
+build-all-images: build-api-image build-controller-image build-validation-image build-operator-image build-virt-v2v-image build-virt-v2v-warm-image build-operator-bundle-image build-operator-index-image build-populator-controller-image build-ovirt-populator-image build-openstack-populator-image
+
+push-all-images: push-api-image push-controller-image push-validation-image push-operator-image push-virt-v2v-image push-virt-v2v-warm-image push-operator-bundle-image push-operator-index-image push-populator-controller-image push-ovirt-populator-image push-openstack-populator-image
 
 .PHONY: check_container_runtmime
 check_container_runtmime:

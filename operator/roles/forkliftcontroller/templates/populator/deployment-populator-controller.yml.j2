@@ -26,6 +26,8 @@ spec:
                   fieldPath: metadata.namespace
           - name: OVIRT_POPULATOR_IMAGE
             value: {{ populator_ovirt_image_fqin }}
+          - name: OPENSTACK_POPULATOR_IMAGE
+            value: {{ populator_openstack_image_fqin }}
           args:
             - --http-endpoint=:8080
           ports:

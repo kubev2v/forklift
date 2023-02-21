@@ -1,0 +1,11 @@
+apiVersion: forklift.konveyor.io/v1beta1
+kind: OpenstackVolumePopulator
+metadata:
+  name: example-openstack
+  namespace: ${NAMESPACE}
+spec:
+  identityUrl: ''
+  secretName: ''
+  imageId: ''
+status:
+  transferred: '0'
