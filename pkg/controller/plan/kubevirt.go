@@ -614,7 +614,7 @@ func (r *KubeVirt) createVolumesForOvirt(vm ref.Ref) (err error) {
 
 		accessModes, volumeMode, failure := r.getStorageProfileModes(*storageName)
 		if failure != nil {
-			return
+			return failure
 		}
 
 		pvc := r.Builder.PersistentVolumeClaimWithSourceRef(da, storageName, populatorCr.Name, accessModes, volumeMode)
