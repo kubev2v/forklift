@@ -607,9 +607,9 @@ func (r *KubeVirt) createVolumesForOvirt(vm ref.Ref) (err error) {
 	storageName := &r.Context.Map.Storage.Spec.Map[0].Destination.StorageClass
 	for _, da := range ovirtVm.DiskAttachments {
 		populatorCr := r.OvirtVolumePopulator(da, sourceUrl)
-		err = r.Client.Create(context.Background(), populatorCr, &client.CreateOptions{})
-		if err != nil {
-			return
+		failure := r.Client.Create(context.Background(), populatorCr, &client.CreateOptions{})
+		if failure != nil && !k8serr.IsAlreadyExists(failure) {
+			return failure
 		}
 
 		accessModes, volumeMode, failure := r.getStorageProfileModes(*storageName)
