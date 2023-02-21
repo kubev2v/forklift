@@ -173,7 +173,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 		list = append(
 			list,
 			&plan.Task{
-				Name: va.ID,
+				Name: fmt.Sprintf("%s-%s", r.Plan.Name, va.ID),
 				Progress: libitr.Progress{
 					Total: gb * 1024,
 				},

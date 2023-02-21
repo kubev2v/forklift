@@ -10,10 +10,12 @@ import (
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/scheduler"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
@@ -1366,17 +1368,22 @@ func (r *Migration) updateCopyProgressForOpenstack(vm *plan.VMStatus, step *plan
 	}
 
 	for _, pvc := range pvcs {
-		claim := pvc.Name
+		image := &openstack.Image{}
+		err = r.Source.Inventory.Find(image, ref.Ref{ID: pvc.Name})
+		if err != nil {
+			return
+		}
+
 		var task *plan.Task
 		found := false
-		task, found = step.FindTask(claim)
+		task, found = step.FindTask(image.Name)
 
 		if !found {
 			continue
 		}
 
 		populatorCr := v1beta1.OpenstackVolumePopulator{}
-		err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: claim}, &populatorCr)
+		err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: image.Name}, &populatorCr)
 		if err != nil {
 			return
 		}
