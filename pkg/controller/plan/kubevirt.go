@@ -1505,13 +1505,13 @@ func (r *KubeVirt) createVolumes(vm ref.Ref) (err error) {
 	if len(openstackVm.AttachedVolumes) > 0 {
 		for _, vol := range openstackVm.AttachedVolumes {
 			image := &openstack.Image{}
-			err = r.Source.Inventory.Find(image, ref.Ref{Name: fmt.Sprintf("%s-%s", r.Plan.Name, vol.ID)})
+			err = r.Source.Inventory.Find(image, ref.Ref{Name: fmt.Sprintf("%s-%s", r.Migration.Name, vol.ID)})
 			if err != nil {
 				err = liberr.Wrap(err)
 				return
 			}
 
-			populatorCr := openstackutil.OpenstackVolumePopulator(image, sourceUrl, r.Plan.Spec.TargetNamespace, r.Source.Secret.Name)
+			populatorCr := openstackutil.OpenstackVolumePopulator(image, sourceUrl, r.Plan.Spec.TargetNamespace, r.Source.Secret.Name, r.Migration.Name)
 			err = r.Client.Create(context.TODO(), populatorCr, &client.CreateOptions{})
 			if errors.IsAlreadyExists(err) {
 				err = nil
@@ -1565,8 +1565,9 @@ func (r *KubeVirt) getOpenstackPVCs(vm ref.Ref, step *plan.Step) (ready bool, er
 
 	// TODO check image
 	for _, vol := range openstackVm.AttachedVolumes {
+		lookupName := fmt.Sprintf("%s-%s", r.Migration.Name, vol.ID)
 		image := &openstack.Image{}
-		err = r.Source.Inventory.Find(image, ref.Ref{Name: fmt.Sprintf("%s-%s", r.Plan.Name, vol.ID)})
+		err = r.Source.Inventory.Find(image, ref.Ref{Name: lookupName})
 		if err != nil {
 			return
 		}
@@ -1584,7 +1585,7 @@ func (r *KubeVirt) getOpenstackPVCs(vm ref.Ref, step *plan.Step) (ready bool, er
 		}
 		var task *plan.Task
 		found := false
-		task, found = step.FindTask(vol.ID)
+		task, found = step.FindTask(lookupName)
 		if !found {
 			return
 		}

@@ -1,6 +1,7 @@
 package openstack
 
 import (
+	"fmt"
 	"net/url"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
@@ -10,10 +11,10 @@ import (
 )
 
 // Build the DataVolume credential secret.
-func OpenstackVolumePopulator(image *openstack.Image, sourceUrl *url.URL, targetNamespace, secretName string) *api.OpenstackVolumePopulator {
+func OpenstackVolumePopulator(image *openstack.Image, sourceUrl *url.URL, targetNamespace, secretName, migrationName string) *api.OpenstackVolumePopulator {
 	return &api.OpenstackVolumePopulator{
 		ObjectMeta: meta.ObjectMeta{
-			Name:      image.Name,
+			Name:      fmt.Sprintf("%s-%s", migrationName, image.ID),
 			Namespace: targetNamespace,
 		},
 		Spec: api.OpenstackVolumePopulatorSpec{

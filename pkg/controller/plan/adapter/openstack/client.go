@@ -73,7 +73,7 @@ func (c *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, data
 func (c *Client) Close() {
 }
 
-func (c *Client) Finalize(vms []*planapi.VMStatus, planName string) {
+func (c *Client) Finalize(vms []*planapi.VMStatus, migrationName string) {
 	for _, vm := range vms {
 		vmModel := &model.VM{}
 		err := c.Source.Inventory.Find(vmModel, ref.Ref{ID: vm.Ref.ID})
@@ -83,7 +83,7 @@ func (c *Client) Finalize(vms []*planapi.VMStatus, planName string) {
 		}
 
 		for _, av := range vmModel.AttachedVolumes {
-			lookupName := fmt.Sprintf("%s-%s", planName, av.ID)
+			lookupName := fmt.Sprintf("%s-%s", migrationName, av.ID)
 			// In a normal operation the snapshot and volume should already have been removed
 			// but they may remain in case of failure or cancellation of the migration
 

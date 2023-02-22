@@ -67,7 +67,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 	}
 	for i, av := range vm.AttachedVolumes {
 		image := &model.Image{}
-		err := r.Source.Inventory.Find(image, ref.Ref{Name: fmt.Sprintf("%s-%s", r.Plan.Name, av.ID)})
+		err := r.Source.Inventory.Find(image, ref.Ref{Name: fmt.Sprintf("%s-%s", r.Migration.Name, av.ID)})
 		if err != nil {
 			return
 		}
@@ -173,7 +173,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 		list = append(
 			list,
 			&plan.Task{
-				Name: fmt.Sprintf("%s-%s", r.Plan.Name, va.ID),
+				Name: fmt.Sprintf("%s-%s", r.Migration.Name, va.ID),
 				Progress: libitr.Progress{
 					Total: gb * 1024,
 				},
@@ -275,7 +275,7 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 
 	var snaplist []snapshots.Snapshot
 	for _, av := range vm.AttachedVolumes {
-		imageName := fmt.Sprintf("%s-%s", r.Plan.Name, av.ID)
+		imageName := fmt.Sprintf("%s-%s", r.Migration.Name, av.ID)
 		pager := snapshots.List(osClient.BlockStorageService, snapshots.ListOpts{
 			Name:  imageName,
 			Limit: 1,
@@ -329,7 +329,7 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 
 	var vollist []volumes.Volume
 	for _, snap := range snaplist {
-		imageName := fmt.Sprintf("%s-%s", r.Plan.Name, snap.VolumeID)
+		imageName := fmt.Sprintf("%s-%s", r.Migration.Name, snap.VolumeID)
 		pager := volumes.List(osClient.BlockStorageService, volumes.ListOpts{
 			Name:  imageName,
 			Limit: 1,

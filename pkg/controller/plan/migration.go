@@ -1075,7 +1075,7 @@ func (r *Migration) end() (completed bool, err error) {
 			succeeded++
 		}
 	}
-	go r.provider.Finalize(r.Plan.Status.Migration.VMs, r.Plan.Name)
+	go r.provider.Finalize(r.Plan.Status.Migration.VMs, r.Migration.Name)
 	r.Plan.Status.Migration.MarkCompleted()
 	snapshot := r.Plan.Status.Migration.ActiveSnapshot()
 	snapshot.DeleteCondition(Executing)
@@ -1371,19 +1371,22 @@ func (r *Migration) updateCopyProgressForOpenstack(vm *plan.VMStatus, step *plan
 		image := &openstack.Image{}
 		err = r.Source.Inventory.Find(image, ref.Ref{ID: pvc.Name})
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 
+		crName := fmt.Sprintf("%s-%s", r.Migration.Name, image.ID)
+
 		var task *plan.Task
 		found := false
-		task, found = step.FindTask(image.Name)
+		task, found = step.FindTask(crName)
 
 		if !found {
 			continue
 		}
 
 		populatorCr := v1beta1.OpenstackVolumePopulator{}
-		err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: image.Name}, &populatorCr)
+		err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: crName}, &populatorCr)
 		if err != nil {
 			return
 		}
