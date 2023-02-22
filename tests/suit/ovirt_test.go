@@ -1,12 +1,13 @@
 package suit_test
 
 import (
+	"time"
+
 	forkliftv1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/tests/suit/framework"
 	"github.com/konveyor/forklift-controller/tests/suit/utils"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"time"
 )
 
 const (
@@ -15,6 +16,7 @@ const (
 
 var _ = Describe("[level:component]Migration tests for oVirt provider", func() {
 	f := framework.NewFramework("migration-func-test")
+	namespace := f.Namespace.Name
 
 	FIt("[oVirt MTV] should create provider with NetworkMap", func() {
 
@@ -37,7 +39,7 @@ var _ = Describe("[level:component]Migration tests for oVirt provider", func() {
 				"password": []byte(f.OvirtClient.Password),
 				"user":     []byte(f.OvirtClient.Username),
 				"url":      []byte(f.OvirtClient.OvirtURL),
-			}, f.Namespace.Name, "provider-test-secret"))
+			}, namespace, "provider-test-secret"))
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Create oVirt provider")
