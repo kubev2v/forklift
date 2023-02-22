@@ -1,12 +1,13 @@
 package suit_test
 
 import (
+	"time"
+
 	forkliftv1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/tests/suit/framework"
 	"github.com/konveyor/forklift-controller/tests/suit/utils"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"time"
 )
 
 const (
@@ -15,6 +16,7 @@ const (
 
 var _ = Describe("[level:component]Migration tests for vSphere provider", func() {
 	f := framework.NewFramework("migration-func-test")
+	namespace := f.Namespace.Name
 
 	It("[test] should create provider with NetworkMap", func() {
 
@@ -24,7 +26,7 @@ var _ = Describe("[level:component]Migration tests for vSphere provider", func()
 				"thumbprint": []byte("52:6C:4E:88:1D:78:AE:12:1C:F3:BB:6C:5B:F4:E2:82:86:A7:08:AF"),
 				"password":   []byte("MTIzNDU2Cg=="),
 				"user":       []byte("YWRtaW5pc3RyYXRvckB2c3BoZXJlLmxvY2Fs"),
-			}, f.Namespace.Name, "provider-test-secret"))
+			}, namespace, "provider-test-secret"))
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Create vSphere provider")
