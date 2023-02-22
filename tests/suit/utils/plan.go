@@ -61,7 +61,7 @@ func newPlan(namespace string, providerIdentifier forkliftv1.Provider, planName 
 			Provider: provider.Pair{
 				Destination: corev1.ObjectReference{
 					Name:      "host",
-					Namespace: namespace,
+					Namespace: forklift_namespace,
 				},
 				Source: corev1.ObjectReference{
 					Name:      providerIdentifier.Name,

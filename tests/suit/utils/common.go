@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"fmt"
+
 	"github.com/onsi/ginkgo"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,6 +13,7 @@ import (
 var (
 	// DefaultStorageClass the default storage class used in tests
 	DefaultStorageClass *storagev1.StorageClass
+	forklift_namespace  = "konveyor-forklift"
 )
 
 // ClientsIface is the clients interface
