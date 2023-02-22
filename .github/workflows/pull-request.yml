@@ -31,7 +31,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       USE_BAZEL_VERSION: 5.4.0
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Check out forklift repository
         uses: actions/checkout@v3
