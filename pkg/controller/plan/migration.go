@@ -1375,18 +1375,16 @@ func (r *Migration) updateCopyProgressForOpenstack(vm *plan.VMStatus, step *plan
 			return
 		}
 
-		crName := fmt.Sprintf("%s-%s", r.Migration.Name, image.ID)
-
 		var task *plan.Task
 		found := false
-		task, found = step.FindTask(crName)
+		task, found = step.FindTask(image.Name)
 
 		if !found {
 			continue
 		}
 
 		populatorCr := v1beta1.OpenstackVolumePopulator{}
-		err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: crName}, &populatorCr)
+		err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: image.Name}, &populatorCr)
 		if err != nil {
 			return
 		}

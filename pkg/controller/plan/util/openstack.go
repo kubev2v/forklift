@@ -1,7 +1,6 @@
 package openstack
 
 import (
-	"fmt"
 	"net/url"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
@@ -14,7 +13,7 @@ import (
 func OpenstackVolumePopulator(image *openstack.Image, sourceUrl *url.URL, targetNamespace, secretName, migrationName string) *api.OpenstackVolumePopulator {
 	return &api.OpenstackVolumePopulator{
 		ObjectMeta: meta.ObjectMeta{
-			Name:      fmt.Sprintf("%s-%s", migrationName, image.ID),
+			Name:      image.Name,
 			Namespace: targetNamespace,
 		},
 		Spec: api.OpenstackVolumePopulatorSpec{
