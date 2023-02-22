@@ -3,6 +3,8 @@ package utils
 import (
 	"context"
 	"fmt"
+	"time"
+
 	forkliftv1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/provider"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
@@ -12,14 +14,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
 )
 
 // CreateStorageMapFromDefinition is used by tests to create a StorageMap
 func CreateStorageMapFromDefinition(cl crclient.Client, def *forkliftv1.StorageMap) error {
-	var err error
-	err = cl.Create(context.TODO(), def, &crclient.CreateOptions{})
-
+	err := cl.Create(context.TODO(), def, &crclient.CreateOptions{})
 	if err == nil || apierrs.IsAlreadyExists(err) {
 		return nil
 	}

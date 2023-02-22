@@ -23,7 +23,7 @@ var _ = Describe("[level:component]Migration tests for Openstack provider", func
 				"thumbprint": []byte("52:6C:4E:88:1D:78:AE:12:1C:F3:BB:6C:5B:F4:E2:82:86:A7:08:AF"),
 				"password":   []byte("MTIzNDU2Cg=="),
 				"user":       []byte("YWRtaW5pc3RyYXRvckB2c3BoZXJlLmxvY2Fs"),
-			}, f.Namespace.Name, "provider-test-secret"))
+			}, namespace, "provider-test-secret"))
 		Expect(err).ToNot(HaveOccurred())
 
 	})
