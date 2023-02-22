@@ -41,6 +41,7 @@ func (c *Client) PowerOff(vmRef ref.Ref) error {
 
 // Return the source VM's power state.
 func (c *Client) PowerState(vmRef ref.Ref) (string, error) {
+	// TODO change once we implement warm migration
 	return "SHUTOFF", nil
 }
 
