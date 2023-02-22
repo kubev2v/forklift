@@ -17,10 +17,10 @@ const (
 
 var _ = Describe("[level:component]Migration tests for OpenStack provider", func() {
 	f := framework.NewFramework("migration-func-test")
-	namespace := f.Namespace.Name
 
 	It("[test] should create provider with NetworkMap", func() {
-		namespace := f.Namespace.Name
+		// TODO: use a different (the generated) namespace
+		namespace := "konveyor-forklift"
 		err := f.Clients.OpenStackClient.SetupClient("cirros-volume", "net-int", "nfs")
 		Expect(err).ToNot(HaveOccurred())
 

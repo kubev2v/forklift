@@ -19,7 +19,8 @@ var _ = Describe("[level:component]Migration tests for oVirt provider", func() {
 	f := framework.NewFramework("migration-func-test")
 
 	FIt("[oVirt MTV] should create provider with NetworkMap", func() {
-		namespace := f.Namespace.Name
+		// TODO: use a different (the generated) namespace
+		namespace := "konveyor-forklift"
 		err := f.Clients.OvirtClient.SetupClient()
 		Expect(err).ToNot(HaveOccurred())
 
@@ -43,30 +44,30 @@ var _ = Describe("[level:component]Migration tests for oVirt provider", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Create oVirt provider")
-		pr := utils.NewProvider(ovirtProviderName, forkliftv1.OVirt, f.Namespace.Name, map[string]string{}, f.OvirtClient.OvirtURL, s)
+		pr := utils.NewProvider(ovirtProviderName, forkliftv1.OVirt, namespace, map[string]string{}, f.OvirtClient.OvirtURL, s)
 		err = utils.CreateProviderFromDefinition(f.CrClient, pr)
 		Expect(err).ToNot(HaveOccurred())
-		err = utils.WaitForProviderReadyWithTimeout(f.CrClient, f.Namespace.Name, ovirtProviderName, 30*time.Second)
+		err = utils.WaitForProviderReadyWithTimeout(f.CrClient, namespace, ovirtProviderName, 30*time.Second)
 		Expect(err).ToNot(HaveOccurred())
-		provider, err := utils.GetProvider(f.CrClient, ovirtProviderName, f.Namespace.Name)
+		provider, err := utils.GetProvider(f.CrClient, ovirtProviderName, namespace)
 		Expect(err).ToNot(HaveOccurred())
 		By("Create Network Map")
 		networkMapDef := utils.NewNetworkMap(namespace, *provider, networkMapName, vmData.GetVMNics()[0])
 		err = utils.CreateNetworkMapFromDefinition(f.CrClient, networkMapDef)
 		Expect(err).ToNot(HaveOccurred())
-		err = utils.WaitForNetworkMapReadyWithTimeout(f.CrClient, f.Namespace.Name, networkMapName, 10*time.Second)
+		err = utils.WaitForNetworkMapReadyWithTimeout(f.CrClient, namespace, networkMapName, 10*time.Second)
 		Expect(err).ToNot(HaveOccurred())
 		By("Create Storage Map")
 		storageMapDef := utils.NewStorageMap(namespace, *provider, test_storage_map_name, vmData.GetVMSDs(), ovirtStorageClass)
 		err = utils.CreateStorageMapFromDefinition(f.CrClient, storageMapDef)
 		Expect(err).ToNot(HaveOccurred())
-		err = utils.WaitForStorageMapReadyWithTimeout(f.CrClient, f.Namespace.Name, test_storage_map_name, 10*time.Second)
+		err = utils.WaitForStorageMapReadyWithTimeout(f.CrClient, namespace, test_storage_map_name, 10*time.Second)
 		Expect(err).ToNot(HaveOccurred())
 		By("Creating plan")
 		planDenf := utils.NewPlanWithVmId(namespace, *provider, test_plan_name, test_storage_map_name, networkMapName, []string{vmData.GetTestVMId()}, "default")
 		err = utils.CreatePlanFromDefinition(f.CrClient, planDenf)
 		Expect(err).ToNot(HaveOccurred())
-		err = utils.WaitForPlanReadyWithTimeout(f.CrClient, f.Namespace.Name, test_plan_name, 15*time.Second)
+		err = utils.WaitForPlanReadyWithTimeout(f.CrClient, namespace, test_plan_name, 15*time.Second)
 		Expect(err).ToNot(HaveOccurred())
 		By("Creating migration")
 		migrationDef := utils.NewMigration(provider.Namespace, test_migration_name, test_plan_name)
