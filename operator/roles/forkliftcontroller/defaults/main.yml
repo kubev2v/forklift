@@ -103,7 +103,7 @@ api_issuer_name: "{{ api_service_name }}-issuer"
 api_certificate_name: "{{ api_service_name }}-selfsigned-ca"
 
 populator_controller_image_fqin: "{{ lookup( 'env', 'POPULATOR_CONTROLLER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_POPULATOR_CONTROLLER') }}"
-populator_ovirt_image_fqin: "{{ lookup( 'env', 'OVIRT_POPULATOR_IMAGE') or lookup( 'env', 'RELATED_IMAGE_OVIRT_POPULATOR') }}"
+populator_ovirt_image_fqin: "{{ lookup( 'env', 'OVIRT_POPULATOR_IMAGE') or lookup( 'env', 'RELATED_IMAGE_RHV_POPULATOR') }}"
 populator_controller_deployment_name: "{{ app_name }}-volume-populator-controller"
 populator_controller_container_name: "{{ app_name }}-populator-controller"
 
