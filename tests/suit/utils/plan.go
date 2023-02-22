@@ -27,8 +27,8 @@ func CreatePlanFromDefinition(cl crclient.Client, def *forkliftv1.Plan) error {
 	}
 	return err
 }
-func NewPlanWithVmName(namespace string, providerIdentifier forkliftv1.Provider, planName string, storageMap string, networkMap string, vmName []string) *forkliftv1.Plan {
-	planDef := newPlan(namespace, providerIdentifier, planName, storageMap, networkMap)
+func NewPlanWithVmName(namespace string, providerIdentifier forkliftv1.Provider, planName string, storageMap string, networkMap string, vmName []string, targetNameSpace string) *forkliftv1.Plan {
+	planDef := newPlan(namespace, providerIdentifier, planName, storageMap, networkMap, targetNameSpace)
 	planDef.Spec.VMs = []plan.VM{
 		{
 			Ref: ref.Ref{Name: vmName[0]},
@@ -37,8 +37,8 @@ func NewPlanWithVmName(namespace string, providerIdentifier forkliftv1.Provider,
 	return planDef
 }
 
-func NewPlanWithVmId(namespace string, providerIdentifier forkliftv1.Provider, planName string, storageMap string, networkMap string, vmIds []string) *forkliftv1.Plan {
-	planDef := newPlan(namespace, providerIdentifier, planName, storageMap, networkMap)
+func NewPlanWithVmId(namespace string, providerIdentifier forkliftv1.Provider, planName string, storageMap string, networkMap string, vmIds []string, targetNameSpace string) *forkliftv1.Plan {
+	planDef := newPlan(namespace, providerIdentifier, planName, storageMap, networkMap, targetNameSpace)
 	planDef.Spec.VMs = []plan.VM{
 		{
 			Ref: ref.Ref{ID: vmIds[0]},
@@ -47,7 +47,7 @@ func NewPlanWithVmId(namespace string, providerIdentifier forkliftv1.Provider, p
 	return planDef
 }
 
-func newPlan(namespace string, providerIdentifier forkliftv1.Provider, planName string, storageMap string, networkMap string) *forkliftv1.Plan {
+func newPlan(namespace string, providerIdentifier forkliftv1.Provider, planName string, storageMap string, networkMap string, targetNameSpace string) *forkliftv1.Plan {
 
 	plan := &forkliftv1.Plan{
 		TypeMeta: v1.TypeMeta{
@@ -70,7 +70,7 @@ func newPlan(namespace string, providerIdentifier forkliftv1.Provider, planName 
 				}},
 			Archived:        false,
 			Warm:            false,
-			TargetNamespace: "default",
+			TargetNamespace: targetNameSpace,
 			Map: plan.Map{
 				Storage: corev1.ObjectReference{
 					Name:      storageMap,
