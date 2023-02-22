@@ -16,10 +16,9 @@ const (
 
 var _ = Describe("[level:component]Migration tests for oVirt provider", func() {
 	f := framework.NewFramework("migration-func-test")
-	namespace := f.Namespace.Name
 
 	FIt("[oVirt MTV] should create provider with NetworkMap", func() {
-
+		namespace := f.Namespace.Name
 		err := f.Clients.OvirtClient.SetupClient()
 		Expect(err).ToNot(HaveOccurred())
 
