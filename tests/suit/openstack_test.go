@@ -17,6 +17,7 @@ const (
 
 var _ = Describe("[level:component]Migration tests for OpenStack provider", func() {
 	f := framework.NewFramework("migration-func-test")
+	namespace := f.Namespace.Name
 
 	It("[test] should create provider with NetworkMap", func() {
 		namespace := f.Namespace.Name
@@ -66,7 +67,7 @@ var _ = Describe("[level:component]Migration tests for OpenStack provider", func
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Creating plan")
-		planDenf := utils.NewPlanWithVmId(namespace, *provider, test_plan_name, test_storage_map_name, networkMapName, []string{vmData.GetTestVMId()})
+		planDenf := utils.NewPlanWithVmId(namespace, *provider, test_plan_name, test_storage_map_name, networkMapName, []string{vmData.GetTestVMId()}, "default")
 		err = utils.CreatePlanFromDefinition(f.CrClient, planDenf)
 		Expect(err).ToNot(HaveOccurred())
 		err = utils.WaitForPlanReadyWithTimeout(f.CrClient, namespace, test_plan_name, 15*time.Second)
