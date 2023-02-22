@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	populator_machinery "github.com/kubev2v/lib-volume-populator/populator-machinery"
@@ -21,29 +23,32 @@ const (
 )
 
 type populator struct {
-	kind           string
-	resource       string
-	controllerFunc func(bool, *unstructured.Unstructured) ([]string, error)
-	imageVar       string
+	kind            string
+	resource        string
+	controllerFunc  func(bool, *unstructured.Unstructured) ([]string, error)
+	imageVar        string
+	metricsEndpoint string
 }
 
 var populators = map[string]populator{
 	"ovirt": {
-		kind:           "OvirtVolumePopulator",
-		resource:       "ovirtvolumepopulators",
-		controllerFunc: getOvirtPopulatorPodArgs,
-		imageVar:       "OVIRT_POPULATOR_IMAGE",
+		kind:            "OvirtVolumePopulator",
+		resource:        "ovirtvolumepopulators",
+		controllerFunc:  getOvirtPopulatorPodArgs,
+		imageVar:        "OVIRT_POPULATOR_IMAGE",
+		metricsEndpoint: ":8080",
 	},
 	"openstack": {
-		kind:           "OpenstackVolumePopulator",
-		resource:       "openstackvolumepopulators",
-		controllerFunc: getOpenstackPopulatorPodArgs,
-		imageVar:       "OPENSTACK_POPULATOR_IMAGE",
+		kind:            "OpenstackVolumePopulator",
+		resource:        "openstackvolumepopulators",
+		controllerFunc:  getOpenstackPopulatorPodArgs,
+		imageVar:        "OPENSTACK_POPULATOR_IMAGE",
+		metricsEndpoint: ":8081",
 	},
 }
 
 func main() {
-	var httpEndpoint, metricsPath, masterURL, kubeconfig string
+	var metricsPath, masterURL, kubeconfig string
 
 	// Controller args
 	if f := flag.Lookup("kubeconfig"); f != nil {
@@ -53,12 +58,19 @@ func main() {
 	}
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 	// Metrics args
-	flag.StringVar(&httpEndpoint, "http-endpoint", "", "The TCP network address where the HTTP server for diagnostics, including metrics and leader election health check, will listen (example: `:8080`). The default is empty string, which means the server is disabled.")
 	flag.StringVar(&metricsPath, "metrics-path", "/metrics", "The HTTP path where prometheus metrics will be exposed. Default is `/metrics`.")
 
 	flag.Parse()
 
 	namespace := os.Getenv("POD_NAMESPACE")
+
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	stop := make(chan bool)
+	go func() {
+		<-sigs
+		stop <- true
+	}()
 
 	for _, populator := range populators {
 		imageName, ok := os.LookupEnv(populator.imageVar)
@@ -68,10 +80,15 @@ func main() {
 		}
 		gk := schema.GroupKind{Group: groupName, Kind: populator.kind}
 		gvr := schema.GroupVersionResource{Group: groupName, Version: apiVersion, Resource: populator.resource}
-		populator_machinery.RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath,
-			namespace, prefix, gk, gvr, mountPath, devicePath, populator.controllerFunc)
+		controllerFunc := populator.controllerFunc
+		metricsEndpoint := populator.metricsEndpoint
+		go func() {
+			populator_machinery.RunController(masterURL, kubeconfig, imageName, metricsEndpoint, metricsPath,
+				namespace, prefix, gk, gvr, mountPath, devicePath, controllerFunc)
+			<-stop
+		}()
 	}
-
+	<-stop
 }
 
 func getOvirtPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured) ([]string, error) {
