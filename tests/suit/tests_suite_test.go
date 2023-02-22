@@ -3,18 +3,18 @@ package suit_test
 import (
 	"flag"
 	"fmt"
+	"testing"
+
 	"github.com/konveyor/forklift-controller/tests/suit/framework"
 	"github.com/konveyor/forklift-controller/tests/suit/reporters"
 	"github.com/konveyor/forklift-controller/tests/suit/utils"
 	"github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"testing"
 )
 
 const (
 	networkMapName        = "network-map-test"
-	namespace             = "konveyor-forklift"
 	test_migration_name   = "migration-test"
 	test_plan_name        = "plan-test"
 	test_storage_map_name = "test-storage-map-v"
