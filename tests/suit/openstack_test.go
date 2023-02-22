@@ -15,6 +15,7 @@ var _ = Describe("[level:component]Migration tests for Openstack provider", func
 	f := framework.NewFramework("migration-func-test")
 
 	It("[test] should create provider with NetworkMap", func() {
+		namespace := f.Namespace.Name
 
 		By("Create Secret from Definition")
 		_, err := utils.CreateSecretFromDefinition(f.K8sClient, utils.NewSecretDefinition(nil, nil,
