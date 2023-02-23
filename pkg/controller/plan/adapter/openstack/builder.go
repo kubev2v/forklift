@@ -27,6 +27,11 @@ type Builder struct {
 	*plancontext.Context
 }
 
+// Annotations
+const (
+	AnnImportDiskId = "cdi.kubevirt.io/storage.import.volumeId"
+)
+
 // Create the destination Kubevirt VM.
 func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []core.PersistentVolumeClaim) (err error) {
 	vm := &model.Workload{}
@@ -63,7 +68,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 
 	for i := range persistentVolumeClaims {
 		pvc := &persistentVolumeClaims[i]
-		pvcMap[pvc.Name] = pvc
+		pvcMap[pvc.Annotations[AnnImportDiskId]] = pvc
 	}
 	for i, av := range vm.AttachedVolumes {
 		image := &model.Image{}
@@ -71,7 +76,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 		if err != nil {
 			return
 		}
-		pvc := pvcMap[image.ID]
+		pvc := pvcMap[av.ID]
 		volumeName := fmt.Sprintf("vol-%v", i)
 		volume := cnv.Volume{
 			Name: volumeName,
@@ -231,6 +236,9 @@ func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName
 		ObjectMeta: meta.ObjectMeta{
 			Name:      image.ID,
 			Namespace: r.Plan.Spec.TargetNamespace,
+			Annotations: map[string]string{
+				AnnImportDiskId: image.Name[len(r.Migration.Name)+1:],
+			},
 		},
 		Spec: core.PersistentVolumeClaimSpec{
 			AccessModes: accessModes,
@@ -246,7 +254,6 @@ func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName
 				Name:     populatorName,
 			},
 		},
-		Status: core.PersistentVolumeClaimStatus{},
 	}
 }
 
@@ -430,10 +437,10 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 		}
 
 		// TODO also check for "saving" and "error"
-		if img.Status != "active" {
+		if img.Status != images.ImageStatusActive {
 			r.Log.Info("Image not ready yet, recheking...", "image", img)
 			return false, nil
-		} else if img.Status == "active" {
+		} else if img.Status == images.ImageStatusActive {
 			// TODO figure out a better way, since when the image in the inventory may be out of sync
 			// with openstack, and be ready in openstack, but not in the inventory
 			if !r.imageReady(img.Name) {

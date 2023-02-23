@@ -660,7 +660,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		step.MarkStarted()
 		step.Phase = Running
 		if r.kubevirt.isOpenstack(vm) {
-			ready, err := r.kubevirt.getOpenstackPVCs(vm.Ref, step)
+			ready, err := r.kubevirt.openstackPVCsReady(vm.Ref, step)
 			if err != nil {
 				step.AddError(err.Error())
 				err = nil

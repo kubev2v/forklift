@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/gophercloud/gophercloud"
@@ -36,34 +35,32 @@ const (
 
 func main() {
 	var (
-		mode             string
 		identityEndpoint string
 		imageID          string
 		crNamespace      string
 		crName           string
 		secretName       string
 
-		fileName  string
-		namespace string
+		volumePath string
+		namespace  string
 	)
 
 	klog.InitFlags(nil)
 
 	// Main arg
-	flag.StringVar(&mode, "mode", "", "Mode to run in (controller, populate)")
 	flag.StringVar(&identityEndpoint, "endpoint", "", "endpoint URL (https://openstack.example.com:5000/v2.0)")
 	flag.StringVar(&secretName, "secret-name", "", "secret containing OpenStack credentials")
 
 	flag.StringVar(&imageID, "image-id", "", "Openstack image ID")
-	flag.StringVar(&fileName, "file-name", "", "Filename to populate")
+	flag.StringVar(&volumePath, "volume-path", "", "Path to populate")
 	flag.StringVar(&crName, "cr-name", "", "Custom Resource instance name")
 	flag.StringVar(&crNamespace, "cr-namespace", "", "Custom Resource instance namespace")
 
 	// Other args
-	flag.StringVar(&namespace, "namespace", "konveyor-forklift", "Namespace to deploy controller")
+	flag.StringVar(&namespace, "namespace", "", "Namespace to deploy controller")
 	flag.Parse()
 
-	populate(crName, crNamespace, namespace, fileName, identityEndpoint, secretName, imageID)
+	populate(crName, crNamespace, namespace, volumePath, identityEndpoint, secretName, imageID)
 }
 
 type openstackConfig struct {
@@ -132,28 +129,15 @@ func populate(crName, crNamespace, namespace, fileName, endpoint, secretName, im
 	if err != nil {
 		klog.Fatal(err)
 	}
-	if strings.HasSuffix(fileName, "disk.img") {
-		f, err := os.Create(fileName)
-		if err != nil {
-			klog.Fatal(err)
-		}
-		defer f.Close()
+	f, err := os.OpenFile(fileName, os.O_RDWR, 0777)
+	if err != nil {
+		klog.Fatal(err)
+	}
+	defer f.Close()
 
-		err = writeData(image, f, crName, crNamespace)
-		if err != nil {
-			klog.Fatal(err)
-		}
-	} else {
-		f, err := os.OpenFile(fileName, os.O_RDWR, 0777)
-		if err != nil {
-			klog.Fatal(err)
-		}
-		defer f.Close()
-
-		err = writeData(image, f, crName, crNamespace)
-		if err != nil {
-			klog.Fatal(err)
-		}
+	err = writeData(image, f, crName, crNamespace)
+	if err != nil {
+		klog.Fatal(err)
 	}
 }
 
@@ -170,7 +154,6 @@ func (cr *CountingReader) Read(p []byte) (int, error) {
 }
 
 func writeData(reader io.ReadCloser, file *os.File, crName, crNamespace string) error {
-	var err error
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		klog.Fatal(err.Error())

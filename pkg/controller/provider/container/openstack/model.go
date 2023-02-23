@@ -264,7 +264,11 @@ func (r *ImageAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 
 func (r *ImageAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
 	opts := &ImageListOpts{}
-	opts.setUpdateAtQueryFilterGTE(lastSync)
+
+	// TODO We currently have a race condition and we might miss updates
+	// that happen after we fetch the list
+	//	opts.setUpdateAtQueryFilterGTE(lastSync)
+
 	imageList := []Image{}
 	err = ctx.client.list(&imageList, opts)
 	if err != nil {

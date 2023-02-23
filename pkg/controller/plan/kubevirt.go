@@ -1551,13 +1551,10 @@ func (r *KubeVirt) createVolumes(vm ref.Ref) (err error) {
 
 // Return if the import done with Openstack
 func (r *KubeVirt) isOpenstack(vm *plan.VMStatus) bool {
-	if *r.Plan.Provider.Source.Spec.Type == v1beta1.OpenStack && vm.Warm == nil && r.Destination.Provider.IsHost() {
-		return true
-	}
-	return false
+	return *r.Plan.Provider.Source.Spec.Type == v1beta1.OpenStack && vm.Warm == nil && r.Destination.Provider.IsHost()
 }
 
-func (r *KubeVirt) getOpenstackPVCs(vm ref.Ref, step *plan.Step) (ready bool, err error) {
+func (r *KubeVirt) openstackPVCsReady(vm ref.Ref, step *plan.Step) (ready bool, err error) {
 	openstackVm := &openstack.Workload{}
 	err = r.Source.Inventory.Find(openstackVm, vm)
 	if err != nil {
@@ -1565,7 +1562,6 @@ func (r *KubeVirt) getOpenstackPVCs(vm ref.Ref, step *plan.Step) (ready bool, er
 	}
 	ready = true
 
-	// TODO check image
 	for _, vol := range openstackVm.AttachedVolumes {
 		lookupName := fmt.Sprintf("%s-%s", r.Migration.Name, vol.ID)
 		image := &openstack.Image{}

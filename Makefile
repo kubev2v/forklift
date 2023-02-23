@@ -229,7 +229,7 @@ build-ovirt-populator-image:
 push-ovirt-populator-image: build-ovirt-populator-image
 	$(CONTAINER_CMD) push $(OVIRT_POPULATOR_IMAGE)
 
-build-openstack-populator-image:
+build-openstack-populator-image: check_container_runtmime
 	$(CONTAINER_CMD) build -f hack/openstack-populator/Containerfile -t $(OPENSTACK_POPULATOR_IMAGE) .
 
 push-openstack-populator-image: build-openstack-populator-image

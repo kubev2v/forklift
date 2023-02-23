@@ -34,5 +34,5 @@ func (r *Adapter) Client(ctx *plancontext.Context) (client base.Client, err erro
 		return
 	}
 	client = c
-	return client, nil
+	return
 }

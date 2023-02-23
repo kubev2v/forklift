@@ -9,7 +9,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
 )
 
-// Build the DataVolume credential secret.
 func OpenstackVolumePopulator(image *openstack.Image, sourceUrl *url.URL, targetNamespace, secretName, migrationName string) *api.OpenstackVolumePopulator {
 	return &api.OpenstackVolumePopulator{
 		ObjectMeta: meta.ObjectMeta{

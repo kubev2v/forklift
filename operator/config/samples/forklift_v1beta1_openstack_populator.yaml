@@ -7,5 +7,3 @@ spec:
   identityUrl: ''
   secretName: ''
   imageId: ''
-status:
-  transferred: '0'
