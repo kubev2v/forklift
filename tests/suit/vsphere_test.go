@@ -16,10 +16,10 @@ const (
 
 var _ = Describe("[level:component]Migration tests for vSphere provider", func() {
 	f := framework.NewFramework("migration-func-test")
-	namespace := f.Namespace.Name
 
 	It("[test] should create provider with NetworkMap", func() {
-
+		// TODO: use a different (the generated) namespace
+		namespace := "konveyor-forklift"
 		By("Create Secret from Definition")
 		s, err := utils.CreateSecretFromDefinition(f.K8sClient, utils.NewSecretDefinition(nil, nil,
 			map[string][]byte{
@@ -30,24 +30,24 @@ var _ = Describe("[level:component]Migration tests for vSphere provider", func()
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Create vSphere provider")
-		pr := utils.NewProvider(vsphereProviderName, forkliftv1.VSphere, f.Namespace.Name, map[string]string{"vddkInitImage": "quay.io/kubev2v/vddk-test-vmdk"}, "https://vcsim.konveyor-forklift:8989/sdk", s)
+		pr := utils.NewProvider(vsphereProviderName, forkliftv1.VSphere, namespace, map[string]string{"vddkInitImage": "quay.io/kubev2v/vddk-test-vmdk"}, "https://vcsim.konveyor-forklift:8989/sdk", s)
 		err = utils.CreateProviderFromDefinition(f.CrClient, pr)
 		Expect(err).ToNot(HaveOccurred())
-		err = utils.WaitForProviderReadyWithTimeout(f.CrClient, f.Namespace.Name, vsphereProviderName, 30*time.Second)
+		err = utils.WaitForProviderReadyWithTimeout(f.CrClient, namespace, vsphereProviderName, 30*time.Second)
 		Expect(err).ToNot(HaveOccurred())
-		provider, err := utils.GetProvider(f.CrClient, vsphereProviderName, f.Namespace.Name)
+		provider, err := utils.GetProvider(f.CrClient, vsphereProviderName, namespace)
 		Expect(err).ToNot(HaveOccurred())
 		By("Create Network Map")
 		networkMapDef := utils.NewNetworkMap(namespace, *provider, networkMapName, "dvportgroup-13")
 		err = utils.CreateNetworkMapFromDefinition(f.CrClient, networkMapDef)
 		Expect(err).ToNot(HaveOccurred())
-		err = utils.WaitForNetworkMapReadyWithTimeout(f.CrClient, f.Namespace.Name, networkMapName, 10*time.Second)
+		err = utils.WaitForNetworkMapReadyWithTimeout(f.CrClient, namespace, networkMapName, 10*time.Second)
 		Expect(err).ToNot(HaveOccurred())
 		By("Create Storage Map")
 		storageMapDef := utils.NewStorageMap(namespace, *provider, test_storage_map_name, []string{"datastore-52"})
 		err = utils.CreateStorageMapFromDefinition(f.CrClient, storageMapDef)
 		Expect(err).ToNot(HaveOccurred())
-		err = utils.WaitForStorageMapReadyWithTimeout(f.CrClient, f.Namespace.Name, test_storage_map_name, 10*time.Second)
+		err = utils.WaitForStorageMapReadyWithTimeout(f.CrClient, namespace, test_storage_map_name, 10*time.Second)
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Creating plan")
@@ -55,7 +55,7 @@ var _ = Describe("[level:component]Migration tests for vSphere provider", func()
 
 		err = utils.CreatePlanFromDefinition(f.CrClient, planDef)
 		Expect(err).ToNot(HaveOccurred())
-		err = utils.WaitForPlanReadyWithTimeout(f.CrClient, f.Namespace.Name, test_plan_name, 15*time.Second)
+		err = utils.WaitForPlanReadyWithTimeout(f.CrClient, namespace, test_plan_name, 15*time.Second)
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Creating migration")
