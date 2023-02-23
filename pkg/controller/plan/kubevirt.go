@@ -16,7 +16,6 @@ import (
 	"github.com/openshift/library-go/pkg/template/generator"
 	"github.com/openshift/library-go/pkg/template/templateprocessing"
 	batch "k8s.io/api/batch/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1515,7 +1514,7 @@ func (r *KubeVirt) createVolumes(vm ref.Ref) (err error) {
 
 			populatorCr := openstackutil.OpenstackVolumePopulator(image, sourceUrl, r.Plan.Spec.TargetNamespace, r.Source.Secret.Name, r.Migration.Name)
 			err = r.Client.Create(context.TODO(), populatorCr, &client.CreateOptions{})
-			if errors.IsAlreadyExists(err) {
+			if k8serr.IsAlreadyExists(err) {
 				err = nil
 			} else if err != nil {
 				err = liberr.Wrap(err)
@@ -1524,7 +1523,7 @@ func (r *KubeVirt) createVolumes(vm ref.Ref) (err error) {
 
 			pvc := r.Builder.PersistentVolumeClaimWithSourceRef(image, &storageName, populatorCr.Name, accessModes, &volumeMode)
 			err = r.Client.Create(context.TODO(), pvc, &client.CreateOptions{})
-			if errors.IsAlreadyExists(err) {
+			if k8serr.IsAlreadyExists(err) {
 				err = nil
 				continue
 			} else if err != nil {
