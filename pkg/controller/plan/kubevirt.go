@@ -1499,6 +1499,8 @@ func (r *KubeVirt) createVolumes(vm ref.Ref) (err error) {
 	}
 
 	storageName := r.Context.Map.Storage.Spec.Map[0].Destination.StorageClass
+
+	// TODO use storageprofile
 	accessModes := []core.PersistentVolumeAccessMode{core.ReadWriteOnce}
 	volumeMode := core.PersistentVolumeFilesystem
 
@@ -1530,6 +1532,7 @@ func (r *KubeVirt) createVolumes(vm ref.Ref) (err error) {
 				return
 			}
 
+			// TODO change once we decide how to cleanup the CR
 			err = k8sutil.SetOwnerReference(pvc, populatorCr, r.Scheme())
 			if err != nil {
 				err = liberr.Wrap(err)

@@ -449,16 +449,11 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 	return true, nil
 }
 
-func (r *Builder) imageExists(imageName string) bool {
-	image := &model.Image{}
-	err := r.Source.Inventory.Find(image, ref.Ref{Name: imageName})
-	return err == nil
-}
-
 func (r *Builder) imageReady(imageName string) bool {
 	image := &model.Image{}
 	err := r.Source.Inventory.Find(image, ref.Ref{Name: imageName})
 	if err == nil {
+		r.Log.Info("Image status in inventory", "image", image.Status)
 		return image.Status == "active"
 	}
 	return false
