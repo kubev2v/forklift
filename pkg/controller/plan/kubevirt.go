@@ -1631,18 +1631,6 @@ func (r *VirtualMachine) Conditions() (cnd *libcnd.Conditions) {
 	return
 }
 
-// Convert the combined progress of all DataVolumes
-// into a percentage (float).
-func (r *VirtualMachine) PercentComplete() (pct float64) {
-	for _, dv := range r.DataVolumes {
-		pct += dv.PercentComplete()
-	}
-
-	pct = pct / float64(len(r.DataVolumes))
-
-	return
-}
-
 // Create an OwnerReference from a VM.
 func vmOwnerReference(vm *cnv.VirtualMachine) (ref meta.OwnerReference) {
 	blockOwnerDeletion := true
