@@ -12,7 +12,7 @@ require (
 	github.com/gophercloud/utils v0.0.0-20221207145018-e8fba78967ca
 	github.com/gorilla/websocket v1.4.2
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.1.0
-	github.com/kubev2v/lib-volume-populator v0.0.0-20230123163556-dbd0a2e6b1bf
+	github.com/kubev2v/lib-volume-populator v0.0.0-20230302083332-2e9205dab199
 	github.com/mattn/go-sqlite3 v1.14.4
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.19.0

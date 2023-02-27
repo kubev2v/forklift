@@ -582,7 +582,7 @@ func (r *KubeVirt) getPVCs(vm *plan.VMStatus) (pvcs []core.PersistentVolumeClaim
 					return
 				}
 				for _, da := range ovirtVm.DiskAttachments {
-					if da.Disk.ID == pvc.Spec.DataSource.Name {
+					if pvc.Spec.DataSource != nil && da.Disk.ID == pvc.Spec.DataSource.Name {
 						pvcs = append(pvcs, *pvc)
 						break
 					}
@@ -594,6 +594,10 @@ func (r *KubeVirt) getPVCs(vm *plan.VMStatus) (pvcs []core.PersistentVolumeClaim
 }
 
 func (r *KubeVirt) createVolumesForOvirt(vm ref.Ref) (err error) {
+	_, err = r.ensureSecret(vm)
+	if err != nil {
+		return
+	}
 	ovirtVm := &ovirt.Workload{}
 	err = r.Source.Inventory.Find(ovirtVm, vm)
 	if err != nil {

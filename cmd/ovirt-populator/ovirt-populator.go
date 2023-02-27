@@ -2,19 +2,11 @@ package main
 
 import (
 	"bufio"
-	"context"
 	"encoding/json"
 	"flag"
-	"fmt"
 	"os"
 	"os/exec"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 )
 
@@ -92,7 +84,7 @@ func populate(crName, engineURL, secretName, diskID, volPath, namespace, crNames
 		diskID,
 		volPath,
 	}
-	config, err := rest.InClusterConfig()
+	/*config, err := rest.InClusterConfig()
 	if err != nil {
 		klog.Fatal(err.Error())
 	}
@@ -103,6 +95,7 @@ func populate(crName, engineURL, secretName, diskID, volPath, namespace, crNames
 	}
 
 	gvr := schema.GroupVersionResource{Group: groupName, Version: apiVersion, Resource: resource}
+	*/
 	cmd := exec.Command("ovirt-img", args...)
 	r, _ := cmd.StdoutPipe()
 	cmd.Stderr = cmd.Stdout
@@ -119,7 +112,7 @@ func populate(crName, engineURL, secretName, diskID, volPath, namespace, crNames
 				klog.Error(err)
 			}
 
-			if progressOutput.Size != nil {
+			/*if progressOutput.Size != nil {
 				// We have to get it in the loop to avoid a conflict error
 				populatorCr, err := client.Resource(gvr).Namespace(crNamespace).Get(context.TODO(), crName, metav1.GetOptions{})
 				if err != nil {
@@ -134,7 +127,7 @@ func populate(crName, engineURL, secretName, diskID, volPath, namespace, crNames
 				if err != nil {
 					klog.Error(err)
 				}
-			}
+			}*/
 		}
 
 		done <- struct{}{}
@@ -153,7 +146,7 @@ func populate(crName, engineURL, secretName, diskID, volPath, namespace, crNames
 }
 
 func loadEngineConfig(secretName, engineURL, namespace string) engineConfig {
-	config, err := rest.InClusterConfig()
+	/*config, err := rest.InClusterConfig()
 	if err != nil {
 		klog.Fatal(err.Error())
 	}
@@ -166,12 +159,24 @@ func loadEngineConfig(secretName, engineURL, namespace string) engineConfig {
 	secret, err := clientset.CoreV1().Secrets(namespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {
 		klog.Fatal(err.Error())
+	}*/
+	user, err := os.ReadFile("/etc/secret-volume/user")
+	if err != nil {
+		klog.Fatal(err.Error())
+	}
+	pass, err := os.ReadFile("/etc/secret-volume/password")
+	if err != nil {
+		klog.Fatal(err.Error())
+	}
+	ca, err := os.ReadFile("/etc/secret-volume/cacert")
+	if err != nil {
+		klog.Fatal(err.Error())
 	}
 
 	return engineConfig{
 		URL:      engineURL,
-		username: string(secret.Data["user"]),
-		password: string(secret.Data["password"]),
-		ca:       string(secret.Data["cacert"]),
+		username: string(user),
+		password: string(pass),
+		ca:       string(ca),
 	}
 }
