@@ -62,7 +62,7 @@ type Adapter interface {
 	// List REST collections.
 	List(ctx *Context) (itr fb.Iterator, err error)
 	// Get object updates
-	GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error)
+	GetUpdates(ctx *Context) (updates []Updater, err error)
 	// Clean unexisting objects within the database
 	DeleteUnexisting(ctx *Context) (updates []Updater, err error)
 }
@@ -90,7 +90,7 @@ func (r *RegionAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	return
 }
 
-func (r *RegionAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
+func (r *RegionAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 	opts := &RegionListOpts{}
 	regionList := []Region{}
 	err = ctx.client.list(&regionList, opts)
@@ -176,7 +176,7 @@ func (r *ProjectAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	return
 }
 
-func (r *ProjectAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
+func (r *ProjectAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 	opts := &ProjectListOpts{}
 	projectList := []Project{}
 	err = ctx.client.list(&projectList, opts)
@@ -240,11 +240,13 @@ func (r *ProjectAdapter) DeleteUnexisting(ctx *Context) (updates []Updater, err 
 }
 
 type ImageAdapter struct {
+	lastSync time.Time
 }
 
 func (r *ImageAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	opts := &ImageListOpts{}
 	imageList := []Image{}
+	now := time.Now()
 	err = ctx.client.list(&imageList, opts)
 	if err != nil {
 		return
@@ -258,14 +260,15 @@ func (r *ImageAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 		list.Append(m)
 	}
 	itr = list.Iter()
-
+	r.lastSync = now
 	return
 }
 
-func (r *ImageAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
+func (r *ImageAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 	opts := &ImageListOpts{}
-	opts.setUpdateAtQueryFilterGTE(lastSync)
+	opts.setUpdateAtQueryFilterGTE(r.lastSync)
 	imageList := []Image{}
+	now := time.Now()
 	err = ctx.client.list(&imageList, opts)
 	if err != nil {
 		return
@@ -307,6 +310,7 @@ func (r *ImageAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []U
 			updates = append(updates, updater)
 		}
 	}
+	r.lastSync = now
 	return
 }
 
@@ -341,11 +345,13 @@ func (r *ImageAdapter) DeleteUnexisting(ctx *Context) (updates []Updater, err er
 }
 
 type FlavorAdapter struct {
+	lastSync time.Time
 }
 
 func (r *FlavorAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	opts := &FlavorListOpts{}
 	flavorList := []Flavor{}
+	now := time.Now()
 	err = ctx.client.list(&flavorList, opts)
 	if err != nil {
 		return
@@ -359,14 +365,15 @@ func (r *FlavorAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 		list.Append(m)
 	}
 	itr = list.Iter()
-
+	r.lastSync = now
 	return
 }
 
-func (r *FlavorAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
+func (r *FlavorAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 	opts := &FlavorListOpts{}
-	opts.ChangesSince = lastSync.Format(time.RFC3339)
+	opts.ChangesSince = r.lastSync.Format(time.RFC3339)
 	flavorList := []Flavor{}
+	now := time.Now()
 	err = ctx.client.list(&flavorList, opts)
 	if err != nil {
 		return
@@ -394,6 +401,7 @@ func (r *FlavorAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []
 		}
 		updates = append(updates, updater)
 	}
+	r.lastSync = now
 	return
 }
 
@@ -429,12 +437,14 @@ func (r *FlavorAdapter) DeleteUnexisting(ctx *Context) (updates []Updater, err e
 
 // VM adapter.
 type VMAdapter struct {
+	lastSync time.Time
 }
 
 // List the collection.
 func (r *VMAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	opts := &VMListOpts{}
 	vmList := []VM{}
+	now := time.Now()
 	err = ctx.client.list(&vmList, opts)
 	if err != nil {
 		return
@@ -450,15 +460,16 @@ func (r *VMAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 		list.Append(m)
 	}
 	itr = list.Iter()
-
+	r.lastSync = now
 	return
 }
 
 // Get updates since last sync.
-func (r *VMAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
+func (r *VMAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 	opts := &VMListOpts{}
-	opts.ChangesSince = lastSync.Format(time.RFC3339)
+	opts.ChangesSince = r.lastSync.Format(time.RFC3339)
 	vmList := []VM{}
+	now := time.Now()
 	err = ctx.client.list(&vmList, opts)
 	if err != nil {
 		return
@@ -503,6 +514,7 @@ func (r *VMAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Upda
 			updates = append(updates, updater)
 		}
 	}
+	r.lastSync = now
 	return
 }
 
@@ -558,7 +570,7 @@ func (r *SnapshotAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	return
 }
 
-func (r *SnapshotAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
+func (r *SnapshotAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 	snapshotList := []Snapshot{}
 	err = ctx.client.list(&snapshotList, nil)
 	if err != nil {
@@ -645,7 +657,7 @@ func (r *VolumeAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 }
 
 // UpdatedAt volume list options not imlemented yet in gophercloud
-func (r *VolumeAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
+func (r *VolumeAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 	opts := &VolumeListOpts{}
 	volumeList := []Volume{}
 	err = ctx.client.list(&volumeList, opts)
@@ -749,7 +761,7 @@ func (r *VolumeTypeAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 }
 
 // UpdatedAt volume list options not imlemented yet in gophercloud
-func (r *VolumeTypeAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
+func (r *VolumeTypeAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 	opts := &VolumeTypeListOpts{}
 	volumeTypeList := []VolumeType{}
 	err = ctx.client.list(&volumeTypeList, opts)
@@ -834,7 +846,7 @@ func (r *NetworkAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	return
 }
 
-func (r *NetworkAdapter) GetUpdates(ctx *Context, lastSync time.Time) (updates []Updater, err error) {
+func (r *NetworkAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 	networkList := []Network{}
 	err = ctx.client.list(&networkList, nil)
 	if err != nil {
