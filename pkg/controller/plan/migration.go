@@ -1182,7 +1182,13 @@ func (r *Migration) updateCopyProgressForOvirt(vm *plan.VMStatus, step *plan.Ste
 		populatorCr := v1beta1.OvirtVolumePopulator{}
 		err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: claim}, &populatorCr)
 		if err != nil {
-			return
+			if pvc.Status.Phase == core.ClaimBound {
+				// the populator CR is deleted and the PVC is bound - it most likely finished transferring the disk
+				task.Progress.Completed = int64(100 * float64(task.Progress.Total))
+				break
+			} else {
+				return
+			}
 		}
 
 		progress, parseErr := strconv.ParseInt(populatorCr.Status.Progress, 10, 64)
