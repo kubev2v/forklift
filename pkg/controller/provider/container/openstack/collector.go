@@ -49,8 +49,6 @@ type Collector struct {
 	cancel func()
 	// Start Time
 	startTime time.Time
-	// Last sync.
-	lastSync time.Time
 	// Phase
 	phase string
 	// List of watches.
@@ -156,13 +154,11 @@ func (r *Collector) run(ctx *Context) (err error) {
 		err = r.load(ctx)
 		if err == nil {
 			r.phase = Loaded
-			r.lastSync = time.Now()
 		}
 	case Loaded:
 		err = r.refresh(ctx)
 		if err == nil {
 			r.phase = Parity
-			r.lastSync = time.Now()
 		}
 	case Parity:
 		r.endWatch()
@@ -175,7 +171,6 @@ func (r *Collector) run(ctx *Context) (err error) {
 		err = r.refresh(ctx)
 		if err == nil {
 			r.parity = true
-			r.lastSync = time.Now()
 			time.Sleep(RefreshInterval)
 		} else {
 			r.parity = false
@@ -322,7 +317,7 @@ func (r *Collector) refresh(ctx *Context) (err error) {
 		if err != nil {
 			return
 		}
-		updates, err = adapter.GetUpdates(ctx, r.lastSync)
+		updates, err = adapter.GetUpdates(ctx)
 		if err != nil {
 			return
 		}
