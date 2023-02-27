@@ -18,8 +18,7 @@ var _ = Describe("[level:component]Migration tests for vSphere provider", func()
 	f := framework.NewFramework("migration-func-test")
 
 	It("[test] should create provider with NetworkMap", func() {
-		// TODO: use a different (the generated) namespace
-		namespace := "konveyor-forklift"
+		namespace := f.Namespace.Name
 		By("Create Secret from Definition")
 		s, err := utils.CreateSecretFromDefinition(f.K8sClient, utils.NewSecretDefinition(nil, nil,
 			map[string][]byte{
