@@ -129,7 +129,7 @@ func populate(crName, crNamespace, namespace, fileName, endpoint, secretName, im
 	if err != nil {
 		klog.Fatal(err)
 	}
-	f, err := os.OpenFile(fileName, os.O_RDWR, 0777)
+	f, err := os.OpenFile(fileName, os.O_RDWR, 0650)
 	if err != nil {
 		klog.Fatal(err)
 	}
