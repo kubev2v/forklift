@@ -7,6 +7,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/snapshots"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
@@ -250,7 +251,7 @@ func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName
 			VolumeMode:       volumeMode,
 			DataSourceRef: &core.TypedLocalObjectReference{
 				APIGroup: &apiGroup,
-				Kind:     "OpenstackVolumePopulator",
+				Kind:     v1beta1.OpenstackVolumePopulatorKind,
 				Name:     populatorName,
 			},
 		},
