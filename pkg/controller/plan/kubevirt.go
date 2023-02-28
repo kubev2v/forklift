@@ -1485,7 +1485,7 @@ func vmOwnerReference(vm *cnv.VirtualMachine) (ref meta.OwnerReference) {
 }
 
 // TODO move elsewhere
-func (r *KubeVirt) createVolumes(vm ref.Ref) (err error) {
+func (r *KubeVirt) createOpenStackVolumes(vm ref.Ref) (err error) {
 	openstackVm := &openstack.Workload{}
 	err = r.Source.Inventory.Find(openstackVm, vm)
 	if err != nil {

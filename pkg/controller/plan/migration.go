@@ -583,7 +583,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			return
 		}
 		if r.kubevirt.isOpenstack(vm) {
-			err = r.kubevirt.createVolumes(vm.Ref)
+			err = r.kubevirt.createOpenStackVolumes(vm.Ref)
 			if err != nil {
 				err = liberr.Wrap(err)
 				return
