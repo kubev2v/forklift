@@ -22,98 +22,58 @@ type Handler struct {
 	*handler.Handler
 }
 
-// Ensure watch on Images, Snapshots and Volumes.
+// Ensure watch on VolumeType.
 func (r *Handler) Watch(watch *handler.WatchManager) (err error) {
 	w, err := watch.Ensure(
 		r.Provider(),
-		&openstack.Image{},
+		&openstack.VolumeType{},
 		r)
 	if err != nil {
 		return
 	}
 	log.Info(
-		"Image watch ensured.",
+		"VolumeType watch ensured.",
 		"provider",
 		path.Join(
 			r.Provider().Namespace,
 			r.Provider().Name),
 		"watch",
 		w.ID())
-
-	w, err = watch.Ensure(
-		r.Provider(),
-		&openstack.Snapshot{},
-		r)
-	if err != nil {
-		return
-	}
-	log.Info(
-		"Snapshot watch ensured.",
-		"provider",
-		path.Join(
-			r.Provider().Namespace,
-			r.Provider().Name),
-		"watch",
-		w.ID())
-
-	w, err = watch.Ensure(
-		r.Provider(),
-		&openstack.Volume{},
-		r)
-	if err != nil {
-		return
-	}
-	log.Info(
-		"Volume watch ensured.",
-		"provider",
-		path.Join(
-			r.Provider().Namespace,
-			r.Provider().Name),
-		"watch",
-		w.ID())
-
 	return
 }
 
 // Resource created.
 func (r *Handler) Created(e libweb.Event) {
-	r.changed(e.Resource)
+	if model, cast := e.Resource.(*openstack.VolumeType); cast {
+		r.changed(model)
+	}
 }
 
 // Resource updated.
 func (r *Handler) Updated(e libweb.Event) {
-	switch e.Resource.(type) {
-	case *openstack.Image:
-		image := e.Resource.(*openstack.Image)
-		updated := e.Updated.(*openstack.Image)
-		if updated.Path != image.Path {
-			r.changed(image, updated)
-		}
-	case *openstack.Snapshot:
-		snapshot := e.Resource.(*openstack.Snapshot)
-		updated := e.Updated.(*openstack.Snapshot)
-		if updated.Path != snapshot.Path {
-			r.changed(snapshot, updated)
-		}
-	case *openstack.Volume:
-		volume := e.Resource.(*openstack.Volume)
-		updated := e.Updated.(*openstack.Volume)
-		if updated.Path != volume.Path {
-			r.changed(volume, updated)
+	if model, cast := e.Resource.(*openstack.VolumeType); cast {
+		updated := e.Updated.(*openstack.VolumeType)
+		if updated.Path != model.Path {
+			r.changed(model, updated)
 		}
 	}
 }
 
 // Resource deleted.
 func (r *Handler) Deleted(e libweb.Event) {
-	r.changed(e.Resource)
+	if model, cast := e.Resource.(*openstack.VolumeType); cast {
+		r.changed(model)
+	}
 }
 
 // Storage changed.
-// Find all of the StorageMap CRs referencing both the
-// provider and the changed storage and enqueue reconcile events.
-func (r *Handler) changed(models ...interface{}) {
-
+// Find all of the StorageMap CRs the reference both the
+// provider and the changed volume type and enqueue reconcile events.
+func (r *Handler) changed(models ...*openstack.VolumeType) {
+	log.V(3).Info(
+		"Volume type changed.",
+		"id",
+		models[0].ID)
 	list := api.StorageMapList{}
 	err := r.List(context.TODO(), &list)
 	if err != nil {
@@ -130,42 +90,9 @@ func (r *Handler) changed(models ...interface{}) {
 		for _, pair := range storageMap.Spec.Map {
 			ref := pair.Source
 			for _, model := range models {
-				switch model.(type) {
-				case *openstack.Image:
-					image := model.(*openstack.Image)
-					if ref.ID == image.ID || strings.HasSuffix(image.Path, ref.Name) {
-						referenced = true
-						log.V(3).Info(
-							"Image changed.",
-							"id",
-							image.ID)
-						break
-					}
-					return
-
-				case *openstack.Snapshot:
-					snapshot := model.(*openstack.Snapshot)
-					if ref.ID == snapshot.ID || strings.HasSuffix(snapshot.Path, ref.Name) {
-						referenced = true
-						log.V(3).Info(
-							"Snapshot changed.",
-							"id",
-							snapshot.ID)
-						break
-					}
-					return
-
-				case *openstack.Volume:
-					volume := model.(*openstack.Volume)
-					if ref.ID == volume.ID || strings.HasSuffix(volume.Path, ref.Name) {
-						referenced = true
-						log.V(3).Info(
-							"Volume changed.",
-							"id",
-							volume.ID)
-						break
-					}
-					return
+				if ref.ID == model.ID || strings.HasSuffix(model.Path, ref.Name) {
+					referenced = true
+					break
 				}
 			}
 			if referenced {
