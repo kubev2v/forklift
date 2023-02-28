@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/konveyor/forklift-controller/tests/suit/framework"
-	"github.com/konveyor/forklift-controller/tests/suit/reporters"
 	"github.com/konveyor/forklift-controller/tests/suit/utils"
 	"github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo"
@@ -43,7 +42,7 @@ func TestTests(t *testing.T) {
 	defer GinkgoRecover()
 	RegisterFailHandler(forkliftFailHandler)
 	BuildTestSuite()
-	RunSpecsWithDefaultAndCustomReporters(t, "Tests Suite", reporters.NewReporters())
+	RunSpecs(t, "Tests Suite")
 }
 
 // To understand the order in which things are run, read http://onsi.github.io/ginkgo/#understanding-ginkgos-lifecycle
