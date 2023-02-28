@@ -29,8 +29,8 @@ CONTROLLER_GEN ?= $(DEFAULT_CONTROLLER_GEN)
 CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-controller:$(REGISTRY_TAG)
 API_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-api:$(REGISTRY_TAG)
 VALIDATION_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-validation:$(REGISTRY_TAG)
-VIRT_V2V_IMAGE_COLD ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-virt-v2v:$(REGISTRY_TAG)
-VIRT_V2V_IMAGE_WARM ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-virt-v2v-warm:$(REGISTRY_TAG)
+VIRT_V2V_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-virt-v2v:$(REGISTRY_TAG)
+VIRT_V2V_WARM_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-virt-v2v-warm:$(REGISTRY_TAG)
 OPERATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-operator:$(REGISTRY_TAG)
 OPERATOR_BUNDLE_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-operator-bundle:$(REGISTRY_TAG)
 OPERATOR_INDEX_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-operator-index:$(REGISTRY_TAG)
@@ -153,8 +153,8 @@ build-virt-v2v-image: check_container_runtmime
 		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
 
 push-virt-v2v-image: build-virt-v2v-image
-	$(CONTAINER_CMD) tag bazel:forklift-virt-v2v $(VIRT_V2V_IMAGE_COLD)
-	$(CONTAINER_CMD) push $(VIRT_V2V_IMAGE_COLD)
+	$(CONTAINER_CMD) tag bazel:forklift-virt-v2v $(VIRT_V2V_IMAGE)
+	$(CONTAINER_CMD) push $(VIRT_V2V_IMAGE)
 
 build-virt-v2v-warm-image: check_container_runtmime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
@@ -163,8 +163,8 @@ build-virt-v2v-warm-image: check_container_runtmime
                 --action_env CONTAINER_CMD=$(CONTAINER_CMD)
 
 push-virt-v2v-warm-image: build-virt-v2v-warm-image
-	$(CONTAINER_CMD) tag bazel:forklift-virt-v2v-warm ${VIRT_V2V_IMAGE_WARM}
-	$(CONTAINER_CMD) push ${VIRT_V2V_IMAGE_WARM}
+	$(CONTAINER_CMD) tag bazel:forklift-virt-v2v-warm ${VIRT_V2V_WARM_IMAGE}
+	$(CONTAINER_CMD) push ${VIRT_V2V_WARM_IMAGE}
 
 build-operator-bundle-image: check_container_runtmime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
@@ -181,7 +181,8 @@ build-operator-bundle-image: check_container_runtmime
 		--action_env UI_IMAGE=$(UI_IMAGE) \
 		--action_env UI_PLUGIN_IMAGE=$(UI_PLUGIN_IMAGE) \
 		--action_env VALIDATION_IMAGE=$(VALIDATION_IMAGE) \
-		--action_env VIRT_V2V_IMAGE="$(VIRT_V2V_IMAGE_COLD)|$(VIRT_V2V_IMAGE_WARM)" \
+		--action_env VIRT_V2V_IMAGE=$(VIRT_V2V_IMAGE) \
+		--action_env VIRT_V2V_WARM_IMAGE=$(VIRT_V2V_WARM_IMAGE) \
 		--action_env CONTROLLER_IMAGE=$(CONTROLLER_IMAGE) \
 		--action_env API_IMAGE=$(API_IMAGE) \
 		--action_env POPULATOR_CONTROLLER_IMAGE=$(POPULATOR_CONTROLLER_IMAGE) \
