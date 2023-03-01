@@ -14,6 +14,7 @@ go_library(
         "region.go",
         "resource.go",
         "snapshot.go",
+        "tree.go",
         "vm.go",
         "volume.go",
         "volumetype.go",
@@ -32,6 +33,7 @@ go_library(
         "//pkg/lib/inventory/model",
         "//pkg/lib/inventory/web",
         "//pkg/lib/logging",
+        "//pkg/lib/ref",
         "//vendor/github.com/gin-gonic/gin",
     ],
 )
