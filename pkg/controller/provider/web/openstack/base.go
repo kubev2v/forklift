@@ -8,6 +8,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	pathlib "path"
 )
 
 // Package logger.
@@ -65,8 +66,11 @@ func (r *PathBuilder) Path(m model.Model) (path string) {
 		r.cache = map[string]string{}
 	}
 	switch m.(type) {
+	case *model.Project:
+		path = m.(*model.Project).Name
 	case *model.VM:
-		path = m.(*model.VM).Name
+		object := m.(*model.VM)
+		path, err = r.forProject(object.TenantID, object.Name)
 	}
 
 	if err != nil {
@@ -76,6 +80,26 @@ func (r *PathBuilder) Path(m model.Model) (path string) {
 			"model",
 			libmodel.Describe(m))
 	}
+
+	return
+}
+
+// Path based on Project.
+func (r *PathBuilder) forProject(id, leaf string) (path string, err error) {
+	name, cached := r.cache[id]
+	if !cached {
+		m := &model.Project{
+			Base: model.Base{ID: id},
+		}
+		err = r.DB.Get(m)
+		if err != nil {
+			return
+		}
+		name = m.Name
+		r.cache[id] = name
+	}
+
+	path = pathlib.Join(name, leaf)
 
 	return
 }
