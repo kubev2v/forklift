@@ -43,6 +43,20 @@ MUST_GATHER_API_IMAGE ?= quay.io/kubev2v/forklift-must-gather-api:latest
 UI_IMAGE ?= quay.io/kubev2v/forklift-ui:latest
 UI_PLUGIN_IMAGE ?= quay.io/kubev2v/forklift-console-plugin:latest
 
+BAZEL_OPTS ?= --verbose_failures
+
+ifneq (,$(findstring /usr/lib64/ccache,$(PATH)))
+CCACHE_DIR ?= $${HOME}/.ccache
+BAZEL_OPTS +=	--sandbox_writable_path=$(CCACHE_DIR)
+$(shell [ -d $(CCACHE_DIR)] || mkdir -p $(CCACHE_DIR))
+endif
+
+XDG_RUNTIME_DIR ?=
+ifneq (,$(XDG_RUNTIME_DIR))
+BAZEL_OPTS +=	--sandbox_writable_path=$${XDG_RUNTIME_DIR}
+$(shell [ -d $(XDG_RUNTIME_DIR) ] || mkdir -p $(XDG_RUNTIME_DIR))
+endif
+
 ci: all
 
 all: test forklift-controller
@@ -107,8 +121,7 @@ generate: controller-gen
 build-controller-image: check_container_runtmime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
 	bazel run cmd/forklift-controller:forklift-controller-image \
-		--verbose_failures \
-		--sandbox_writable_path=$${XDG_RUNTIME_DIR} \
+		$(BAZEL_OPTS) \
 		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
 
 push-controller-image: build-controller-image
@@ -118,8 +131,7 @@ push-controller-image: build-controller-image
 build-api-image: check_container_runtmime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
 	bazel run cmd/forklift-api:forklift-api-image \
-		--verbose_failures \
-		--sandbox_writable_path=$${XDG_RUNTIME_DIR} \
+		$(BAZEL_OPTS) \
 		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
 
 push-api-image: build-api-image
@@ -129,7 +141,7 @@ push-api-image: build-api-image
 build-validation-image: check_container_runtmime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
 	bazel run validation:forklift-validation-image \
-		--verbose_failures \
+		$(BAZEL_OPTS) \
 		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
 
 push-validation-image: build-validation-image
@@ -139,7 +151,7 @@ push-validation-image: build-validation-image
 build-operator-image: check_container_runtmime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
 	bazel run operator:forklift-operator-image \
-		--verbose_failures \
+		$(BAZEL_OPTS) \
 		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
 
 push-operator-image: build-operator-image
@@ -149,7 +161,7 @@ push-operator-image: build-operator-image
 build-virt-v2v-image: check_container_runtmime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
 	bazel run --package_path=virt-v2v/cold forklift-virt-v2v \
-		--verbose_failures \
+		$(BAZEL_OPTS) \
 		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
 
 push-virt-v2v-image: build-virt-v2v-image
@@ -159,8 +171,8 @@ push-virt-v2v-image: build-virt-v2v-image
 build-virt-v2v-warm-image: check_container_runtmime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
 	bazel run --package_path=virt-v2v/warm forklift-virt-v2v-warm \
-		--verbose_failures \
-                --action_env CONTAINER_CMD=$(CONTAINER_CMD)
+		$(BAZEL_OPTS) \
+		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
 
 push-virt-v2v-warm-image: build-virt-v2v-warm-image
 	$(CONTAINER_CMD) tag bazel:forklift-virt-v2v-warm ${VIRT_V2V_WARM_IMAGE}
@@ -169,7 +181,7 @@ push-virt-v2v-warm-image: build-virt-v2v-warm-image
 build-operator-bundle-image: check_container_runtmime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
 	bazel run operator:forklift-operator-bundle-image \
-		--verbose_failures \
+		$(BAZEL_OPTS) \
 		--action_env CONTAINER_CMD=$(CONTAINER_CMD) \
 		--action_env VERSION=$(VERSION) \
 		--action_env NAMESPACE=$(NAMESPACE) \
@@ -195,8 +207,7 @@ push-operator-bundle-image: build-operator-bundle-image
 build-operator-index-image: check_container_runtmime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
 	bazel run operator:forklift-operator-index-image \
-		--verbose_failures \
-		--sandbox_writable_path=$${XDG_RUNTIME_DIR} \
+		$(BAZEL_OPTS) \
 		--action_env CONTAINER_CMD=$(CONTAINER_CMD) \
 		--action_env VERSION=$(VERSION) \
 		--action_env CHANNELS=$(CHANNELS) \
@@ -213,7 +224,7 @@ push-operator-index-image: build-operator-index-image
 build-populator-controller-image: check_container_runtmime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
 	bazel run cmd/populator-controller:populator-controller-image \
-		--verbose_failures \
+		$(BAZEL_OPTS) \
 		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
 
 push-populator-controller-image: build-populator-controller-image
