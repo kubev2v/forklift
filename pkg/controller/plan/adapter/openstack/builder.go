@@ -218,10 +218,13 @@ func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVol
 
 // Build the DataVolume credential secret.
 func (r *Builder) Secret(_ ref.Ref, in, object *core.Secret) (err error) {
-	// TODO: complete
 	object.StringData = map[string]string{
-		"accessKeyId": string(in.Data["user"]),
-		"secretKey":   string(in.Data["password"]),
+		"username":    string(in.Data["username"]),
+		"password":    string(in.Data["password"]),
+		"domainName":  string(in.Data["domainName"]),
+		"projectName": string(in.Data["projectName"]),
+		"region":      string(in.Data["region"]),
+		"insecure":    string(in.Data["insecure"]),
 	}
 	return
 }
@@ -240,6 +243,7 @@ func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName
 			Annotations: map[string]string{
 				AnnImportDiskId: image.Name[len(r.Migration.Name)+1:],
 			},
+			Labels: map[string]string{"migration": r.Migration.Name},
 		},
 		Spec: core.PersistentVolumeClaimSpec{
 			AccessModes: accessModes,

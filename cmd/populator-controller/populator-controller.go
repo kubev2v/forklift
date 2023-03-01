@@ -120,11 +120,11 @@ func getOpenstackPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured) (
 	if nil != err {
 		return nil, err
 	}
-	args := []string{"--mode=populate"}
+	args := []string{}
 	if rawBlock {
-		args = append(args, "--file-name="+devicePath)
+		args = append(args, "--volume-path="+devicePath)
 	} else {
-		args = append(args, "--file-name="+mountPath+"disk.img")
+		args = append(args, "--volume-path="+mountPath+"disk.img")
 	}
 
 	args = append(args, "--endpoint="+openstackPopulator.Spec.IdentityURL)

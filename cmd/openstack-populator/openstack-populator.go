@@ -3,18 +3,14 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"io"
 	"os"
-	"time"
+	"strings"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/imagedata"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
@@ -56,11 +52,9 @@ func main() {
 	flag.StringVar(&crName, "cr-name", "", "Custom Resource instance name")
 	flag.StringVar(&crNamespace, "cr-namespace", "", "Custom Resource instance namespace")
 
-	// Other args
-	flag.StringVar(&namespace, "namespace", "", "Namespace to deploy controller")
 	flag.Parse()
 
-	populate(crName, crNamespace, namespace, volumePath, identityEndpoint, secretName, imageID)
+	populate(crName, crNamespace, volumePath, identityEndpoint, secretName, imageID)
 }
 
 type openstackConfig struct {
@@ -99,8 +93,8 @@ func loadConfig(secretName, endpoint, namespace string) openstackConfig {
 	}
 }
 
-func populate(crName, crNamespace, namespace, fileName, endpoint, secretName, imageID string) {
-	config := loadConfig(secretName, endpoint, namespace)
+func populate(crName, crNamespace, fileName, endpoint, secretName, imageID string) {
+	config := loadConfig(secretName, endpoint, crNamespace)
 
 	authOpts := gophercloud.AuthOptions{
 		IdentityEndpoint: endpoint,
@@ -129,7 +123,11 @@ func populate(crName, crNamespace, namespace, fileName, endpoint, secretName, im
 	if err != nil {
 		klog.Fatal(err)
 	}
-	f, err := os.OpenFile(fileName, os.O_RDWR, 0650)
+	flags := os.O_RDWR
+	if strings.HasSuffix(fileName, "disk.img") {
+		flags |= os.O_CREATE
+	}
+	f, err := os.OpenFile(fileName, flags, 0650)
 	if err != nil {
 		klog.Fatal(err)
 	}
@@ -154,59 +152,59 @@ func (cr *CountingReader) Read(p []byte) (int, error) {
 }
 
 func writeData(reader io.ReadCloser, file *os.File, crName, crNamespace string) error {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		klog.Fatal(err.Error())
-	}
+	// 	config, err := rest.InClusterConfig()
+	// 	if err != nil {
+	// 		klog.Fatal(err.Error())
+	// 	}
 
-	client, err := dynamic.NewForConfig(config)
-	if err != nil {
-		klog.Fatal(err.Error())
-	}
-	gvr := schema.GroupVersionResource{Group: groupName, Version: apiVersion, Resource: resource}
+	// 	client, err := dynamic.NewForConfig(config)
+	// 	if err != nil {
+	// 		klog.Fatal(err.Error())
+	// 	}
+	// 	gvr := schema.GroupVersionResource{Group: groupName, Version: apiVersion, Resource: resource}
 
 	total := new(int64)
 	countingReader := CountingReader{reader, total}
 
-	done := make(chan bool)
-	go func() {
-		for {
-			select {
-			case <-done:
-				return
-			default:
-				populatorCr, err := client.Resource(gvr).Namespace(crNamespace).Get(context.TODO(), crName, metav1.GetOptions{})
-				if err != nil {
-					klog.Fatal(err.Error())
-				}
-				status := map[string]interface{}{"transferred": fmt.Sprintf("%d", *total)}
-				unstructured.SetNestedField(populatorCr.Object, status, "status")
+	//done := make(chan bool)
+	// go func() {
+	// 	for {
+	// 		select {
+	// 		case <-done:
+	// 			return
+	// 		default:
+	// 			populatorCr, err := client.Resource(gvr).Namespace(crNamespace).Get(context.TODO(), crName, metav1.GetOptions{})
+	// 			if err != nil {
+	// 				klog.Fatal(err.Error())
+	// 			}
+	// 			status := map[string]interface{}{"transferred": fmt.Sprintf("%d", *total)}
+	// 			unstructured.SetNestedField(populatorCr.Object, status, "status")
 
-				_, err = client.Resource(gvr).Namespace(crNamespace).Update(context.TODO(), populatorCr, metav1.UpdateOptions{})
-				if err != nil {
-					klog.Fatal(err.Error())
-				}
-			}
+	// 			_, err = client.Resource(gvr).Namespace(crNamespace).Update(context.TODO(), populatorCr, metav1.UpdateOptions{})
+	// 			if err != nil {
+	// 				klog.Fatal(err.Error())
+	// 			}
+	// 		}
 
-			time.Sleep(3 * time.Second)
-		}
-	}()
+	// 		time.Sleep(3 * time.Second)
+	// 	}
+	// }()
 
 	if _, err := io.Copy(file, &countingReader); err != nil {
 		klog.Fatal(err)
 	}
-	done <- true
-	populatorCr, err := client.Resource(gvr).Namespace(crNamespace).Get(context.TODO(), crName, metav1.GetOptions{})
-	if err != nil {
-		klog.Fatal(err.Error())
-	}
-	status := map[string]interface{}{"transferred": *countingReader.total}
-	unstructured.SetNestedField(populatorCr.Object, status, "status")
+	//done <- true
+	// populatorCr, err := client.Resource(gvr).Namespace(crNamespace).Get(context.TODO(), crName, metav1.GetOptions{})
+	// if err != nil {
+	// 	klog.Fatal(err.Error())
+	// }
+	// status := map[string]interface{}{"transferred": *countingReader.total}
+	// unstructured.SetNestedField(populatorCr.Object, status, "status")
 
-	_, err = client.Resource(gvr).Namespace(crNamespace).Update(context.TODO(), populatorCr, metav1.UpdateOptions{})
-	if err != nil {
-		klog.Error(err)
-	}
+	// _, err = client.Resource(gvr).Namespace(crNamespace).Update(context.TODO(), populatorCr, metav1.UpdateOptions{})
+	// if err != nil {
+	// 	klog.Error(err)
+	// }
 
 	return nil
 }

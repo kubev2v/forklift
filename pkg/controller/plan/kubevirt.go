@@ -561,7 +561,9 @@ func (r *KubeVirt) getPVCs(vm *plan.VMStatus) (pvcs []core.PersistentVolumeClaim
 		if pvcAnn[kVM] == vmLabels[kVM] && pvcAnn[kPlan] == vmLabels[kPlan] {
 			pvcs = append(pvcs, *pvc)
 		} else if r.isOpenstack(vm) {
-			pvcs = append(pvcs, *pvc)
+			if _, ok := pvc.Labels["migration"]; ok {
+				pvcs = append(pvcs, *pvc)
+			}
 		}
 	}
 	return
@@ -1486,9 +1488,16 @@ func vmOwnerReference(vm *cnv.VirtualMachine) (ref meta.OwnerReference) {
 
 // TODO move elsewhere
 func (r *KubeVirt) createOpenStackVolumes(vm ref.Ref) (err error) {
+	secret, err := r.ensureSecret(vm)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
 	openstackVm := &openstack.Workload{}
 	err = r.Source.Inventory.Find(openstackVm, vm)
 	if err != nil {
+		err = liberr.Wrap(err)
 		return
 	}
 	sourceUrl, err := url.Parse(r.Source.Provider.Spec.URL)
@@ -1512,7 +1521,7 @@ func (r *KubeVirt) createOpenStackVolumes(vm ref.Ref) (err error) {
 				return
 			}
 
-			populatorCr := openstackutil.OpenstackVolumePopulator(image, sourceUrl, r.Plan.Spec.TargetNamespace, r.Source.Secret.Name, r.Migration.Name)
+			populatorCr := openstackutil.OpenstackVolumePopulator(image, sourceUrl, r.Plan.Spec.TargetNamespace, secret.Name, r.Migration.Name)
 			err = r.Client.Create(context.TODO(), populatorCr, &client.CreateOptions{})
 			if k8serr.IsAlreadyExists(err) {
 				err = nil
