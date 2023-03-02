@@ -56,21 +56,33 @@ type PathBuilder struct {
 	// Database.
 	DB libmodel.DB
 	// Cached resources.
-	cache map[string]string
+	cache map[string]interface{}
 }
 
 // Build.
 func (r *PathBuilder) Path(m model.Model) (path string) {
 	var err error
 	if r.cache == nil {
-		r.cache = map[string]string{}
+		r.cache = map[string]interface{}{}
 	}
 	switch m.(type) {
 	case *model.Project:
-		path = m.(*model.Project).Name
+		project := m.(*model.Project)
+		path = project.Name
+		if project.IsDomain {
+			return
+		}
+		if project.ParentID != project.DomainID {
+			var parentProject *model.Project
+			parentProject, err = r.getProject(project.ParentID)
+			path = pathlib.Join(r.Path(parentProject), path)
+		}
+
 	case *model.VM:
-		object := m.(*model.VM)
-		path, err = r.forProject(object.TenantID, object.Name)
+		vm := m.(*model.VM)
+		var project *model.Project
+		project, err = r.getProject(vm.TenantID)
+		path = pathlib.Join(r.Path(project), vm.Name)
 	}
 
 	if err != nil {
@@ -84,22 +96,18 @@ func (r *PathBuilder) Path(m model.Model) (path string) {
 	return
 }
 
-// Path based on Project.
-func (r *PathBuilder) forProject(id, leaf string) (path string, err error) {
-	name, cached := r.cache[id]
+func (r *PathBuilder) getProject(projectID string) (project *model.Project, err error) {
+	project, cached := r.cache[projectID].(*model.Project)
 	if !cached {
-		m := &model.Project{
-			Base: model.Base{ID: id},
+		project = &model.Project{
+			Base: model.Base{ID: projectID},
 		}
-		err = r.DB.Get(m)
+		err = r.DB.Get(project)
 		if err != nil {
 			return
 		}
-		name = m.Name
-		r.cache[id] = name
+		r.cache[projectID] = project
 	}
-
-	path = pathlib.Join(name, leaf)
 
 	return
 }
