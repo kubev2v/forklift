@@ -62,8 +62,6 @@ func main() {
 
 	flag.Parse()
 
-	namespace := os.Getenv("POD_NAMESPACE")
-
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	stop := make(chan bool)
@@ -84,7 +82,7 @@ func main() {
 		metricsEndpoint := populator.metricsEndpoint
 		go func() {
 			populator_machinery.RunController(masterURL, kubeconfig, imageName, metricsEndpoint, metricsPath,
-				namespace, prefix, gk, gvr, mountPath, devicePath, controllerFunc)
+				prefix, gk, gvr, mountPath, devicePath, controllerFunc)
 			<-stop
 		}()
 	}

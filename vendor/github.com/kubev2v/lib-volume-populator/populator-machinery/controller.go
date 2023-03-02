@@ -77,34 +77,33 @@ type stringSet struct {
 }
 
 type controller struct {
-	populatorNamespace string
-	populatedFromAnno  string
-	pvcFinalizer       string
-	kubeClient         kubernetes.Interface
-	imageName          string
-	devicePath         string
-	mountPath          string
-	pvcLister          corelisters.PersistentVolumeClaimLister
-	pvcSynced          cache.InformerSynced
-	pvLister           corelisters.PersistentVolumeLister
-	pvSynced           cache.InformerSynced
-	podLister          corelisters.PodLister
-	podSynced          cache.InformerSynced
-	scLister           storagelisters.StorageClassLister
-	scSynced           cache.InformerSynced
-	unstLister         dynamiclister.Lister
-	unstSynced         cache.InformerSynced
-	mu                 sync.Mutex
-	notifyMap          map[string]*stringSet
-	cleanupMap         map[string]*stringSet
-	workqueue          workqueue.RateLimitingInterface
-	populatorArgs      func(bool, *unstructured.Unstructured) ([]string, error)
-	gk                 schema.GroupKind
-	metrics            *metricsManager
-	recorder           record.EventRecorder
+	populatedFromAnno string
+	pvcFinalizer      string
+	kubeClient        kubernetes.Interface
+	imageName         string
+	devicePath        string
+	mountPath         string
+	pvcLister         corelisters.PersistentVolumeClaimLister
+	pvcSynced         cache.InformerSynced
+	pvLister          corelisters.PersistentVolumeLister
+	pvSynced          cache.InformerSynced
+	podLister         corelisters.PodLister
+	podSynced         cache.InformerSynced
+	scLister          storagelisters.StorageClassLister
+	scSynced          cache.InformerSynced
+	unstLister        dynamiclister.Lister
+	unstSynced        cache.InformerSynced
+	mu                sync.Mutex
+	notifyMap         map[string]*stringSet
+	cleanupMap        map[string]*stringSet
+	workqueue         workqueue.RateLimitingInterface
+	populatorArgs     func(bool, *unstructured.Unstructured) ([]string, error)
+	gk                schema.GroupKind
+	metrics           *metricsManager
+	recorder          record.EventRecorder
 }
 
-func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, namespace, prefix string,
+func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, prefix string,
 	gk schema.GroupKind, gvr schema.GroupVersionResource, mountPath, devicePath string,
 	populatorArgs func(bool, *unstructured.Unstructured) ([]string, error),
 ) {
@@ -145,30 +144,29 @@ func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, 
 	unstInformer := dynInformerFactory.ForResource(gvr).Informer()
 
 	c := &controller{
-		kubeClient:         kubeClient,
-		imageName:          imageName,
-		populatorNamespace: namespace,
-		devicePath:         devicePath,
-		mountPath:          mountPath,
-		populatedFromAnno:  prefix + "/" + populatedFromAnnoSuffix,
-		pvcFinalizer:       prefix + "/" + pvcFinalizerSuffix,
-		pvcLister:          pvcInformer.Lister(),
-		pvcSynced:          pvcInformer.Informer().HasSynced,
-		pvLister:           pvInformer.Lister(),
-		pvSynced:           pvInformer.Informer().HasSynced,
-		podLister:          podInformer.Lister(),
-		podSynced:          podInformer.Informer().HasSynced,
-		scLister:           scInformer.Lister(),
-		scSynced:           scInformer.Informer().HasSynced,
-		unstLister:         dynamiclister.New(unstInformer.GetIndexer(), gvr),
-		unstSynced:         unstInformer.HasSynced,
-		notifyMap:          make(map[string]*stringSet),
-		cleanupMap:         make(map[string]*stringSet),
-		workqueue:          workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
-		populatorArgs:      populatorArgs,
-		gk:                 gk,
-		metrics:            initMetrics(),
-		recorder:           getRecorder(kubeClient, prefix+"-"+controllerNameSuffix),
+		kubeClient:        kubeClient,
+		imageName:         imageName,
+		devicePath:        devicePath,
+		mountPath:         mountPath,
+		populatedFromAnno: prefix + "/" + populatedFromAnnoSuffix,
+		pvcFinalizer:      prefix + "/" + pvcFinalizerSuffix,
+		pvcLister:         pvcInformer.Lister(),
+		pvcSynced:         pvcInformer.Informer().HasSynced,
+		pvLister:          pvInformer.Lister(),
+		pvSynced:          pvInformer.Informer().HasSynced,
+		podLister:         podInformer.Lister(),
+		podSynced:         podInformer.Informer().HasSynced,
+		scLister:          scInformer.Lister(),
+		scSynced:          scInformer.Informer().HasSynced,
+		unstLister:        dynamiclister.New(unstInformer.GetIndexer(), gvr),
+		unstSynced:        unstInformer.HasSynced,
+		notifyMap:         make(map[string]*stringSet),
+		cleanupMap:        make(map[string]*stringSet),
+		workqueue:         workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		populatorArgs:     populatorArgs,
+		gk:                gk,
+		metrics:           initMetrics(),
+		recorder:          getRecorder(kubeClient, prefix+"-"+controllerNameSuffix),
 	}
 
 	c.metrics.startListener(httpEndpoint, metricsPath)
@@ -341,9 +339,8 @@ func (c *controller) handlePVC(obj interface{}) {
 	if object == nil {
 		return
 	}
-	if c.populatorNamespace != object.GetNamespace() {
-		c.workqueue.Add("pvc/" + object.GetNamespace() + "/" + object.GetName())
-	}
+
+	c.workqueue.Add("pvc/" + object.GetNamespace() + "/" + object.GetName())
 }
 
 func (c *controller) handlePV(obj interface{}) {
@@ -466,11 +463,11 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 		return err
 	}
 
-	// Overriding the namespace to our target namespace
 	var secretName string
+	var populatorNamespace string
 	for _, val := range args {
 		if strings.HasPrefix(val, "--cr-namespace=") {
-			c.populatorNamespace = strings.Split(val, "--cr-namespace=")[1]
+			populatorNamespace = strings.Split(val, "--cr-namespace=")[1]
 		} else if strings.HasPrefix(val, "--secret-name=") {
 			secretName = strings.Split(val, "--secret-name=")[1]
 		}
@@ -509,9 +506,9 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 
 	// Look for the populator pod
 	podName := fmt.Sprintf("%s-%s", populatorPodPrefix, pvc.UID)
-	c.addNotification(key, "pod", c.populatorNamespace, podName)
+	c.addNotification(key, "pod", populatorNamespace, podName)
 	var pod *corev1.Pod
-	pod, err = c.podLister.Pods(c.populatorNamespace).Get(podName)
+	pod, err = c.podLister.Pods(populatorNamespace).Get(podName)
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return err
@@ -520,9 +517,9 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 
 	// Look for PVC'
 	pvcPrimeName := fmt.Sprintf("%s-%s", populatorPvcPrefix, pvc.UID)
-	c.addNotification(key, "pvc", c.populatorNamespace, pvcPrimeName)
+	c.addNotification(key, "pvc", populatorNamespace, pvcPrimeName)
 	var pvcPrime *corev1.PersistentVolumeClaim
-	pvcPrime, err = c.pvcLister.PersistentVolumeClaims(c.populatorNamespace).Get(pvcPrimeName)
+	pvcPrime, err = c.pvcLister.PersistentVolumeClaims(populatorNamespace).Get(pvcPrimeName)
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return err
@@ -549,7 +546,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 			pod = &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      podName,
-					Namespace: c.populatorNamespace,
+					Namespace: populatorNamespace,
 				},
 				Spec: makePopulatePodSpec(pvcPrimeName, secretName),
 			}
@@ -580,7 +577,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 			if waitForFirstConsumer {
 				pod.Spec.NodeName = nodeName
 			}
-			_, err = c.kubeClient.CoreV1().Pods(c.populatorNamespace).Create(ctx, pod, metav1.CreateOptions{})
+			_, err = c.kubeClient.CoreV1().Pods(populatorNamespace).Create(ctx, pod, metav1.CreateOptions{})
 			if err != nil {
 				c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPodCreationError, "Failed to create populator pod: %s", err)
 				return err
@@ -592,7 +589,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 				pvcPrime = &corev1.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      pvcPrimeName,
-						Namespace: c.populatorNamespace,
+						Namespace: populatorNamespace,
 					},
 					Spec: corev1.PersistentVolumeClaimSpec{
 						AccessModes:      pvc.Spec.AccessModes,
@@ -606,7 +603,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 						annSelectedNode: nodeName,
 					}
 				}
-				_, err = c.kubeClient.CoreV1().PersistentVolumeClaims(c.populatorNamespace).Create(ctx, pvcPrime, metav1.CreateOptions{})
+				_, err = c.kubeClient.CoreV1().PersistentVolumeClaims(populatorNamespace).Create(ctx, pvcPrime, metav1.CreateOptions{})
 				if err != nil {
 					c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPVCCreationError, "Failed to create populator PVC: %s", err)
 					return err
@@ -621,7 +618,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 			if corev1.PodFailed == pod.Status.Phase {
 				c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPodFailed, "Populator failed: %s", pod.Status.Message)
 				// Delete failed pods so we can try again
-				err = c.kubeClient.CoreV1().Pods(c.populatorNamespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+				err = c.kubeClient.CoreV1().Pods(populatorNamespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
 				if err != nil {
 					return err
 				}
@@ -698,7 +695,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 
 	// If the pod still exists, delete it
 	if pod != nil {
-		err = c.kubeClient.CoreV1().Pods(c.populatorNamespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+		err = c.kubeClient.CoreV1().Pods(populatorNamespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
 		if err != nil {
 			return err
 		}
@@ -706,7 +703,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 
 	// If PVC' still exists, delete it
 	if pvcPrime != nil {
-		err = c.kubeClient.CoreV1().PersistentVolumeClaims(c.populatorNamespace).Delete(ctx, pvcPrime.Name, metav1.DeleteOptions{})
+		err = c.kubeClient.CoreV1().PersistentVolumeClaims(populatorNamespace).Delete(ctx, pvcPrime.Name, metav1.DeleteOptions{})
 		if err != nil {
 			return err
 		}
@@ -728,7 +725,7 @@ func makePopulatePodSpec(pvcPrimeName, secretName string) corev1.PodSpec {
 	return corev1.PodSpec{
 		Containers: []corev1.Container{
 			{
-				Name:            populatorContainerName,
+				Name: populatorContainerName,
 			},
 		},
 		RestartPolicy: corev1.RestartPolicyNever,

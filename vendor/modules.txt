@@ -145,7 +145,7 @@ github.com/json-iterator/go
 ## explicit; go 1.12
 github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io
 github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1
-# github.com/kubev2v/lib-volume-populator v0.0.0-20230302125601-6a8f7b8cb4dd
+# github.com/kubev2v/lib-volume-populator v0.0.0-20230302175623-d862c6573c29
 ## explicit; go 1.19
 github.com/kubev2v/lib-volume-populator/populator-machinery
 # github.com/leodido/go-urn v1.2.0
