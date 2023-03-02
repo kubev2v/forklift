@@ -12,12 +12,11 @@ require (
 	github.com/gophercloud/utils v0.0.0-20221207145018-e8fba78967ca
 	github.com/gorilla/websocket v1.4.2
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.1.0
-	github.com/kubev2v/lib-volume-populator v0.0.0-20230228162913-9a68ab82a014
+	github.com/kubev2v/lib-volume-populator v0.0.0-20230302083332-2e9205dab199
 	github.com/mattn/go-sqlite3 v1.14.4
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.19.0
 	github.com/openshift/api v0.0.0
-	github.com/openshift/library-go v0.0.0-20200821154433-215f00df72cc
 	github.com/ovirt/go-ovirt v4.3.4+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/profile v1.3.0
@@ -35,7 +34,6 @@ require (
 	k8s.io/klog/v2 v2.80.1
 	kubevirt.io/client-go v0.42.1
 	kubevirt.io/containerized-data-importer-api v1.44.0
-	libvirt.org/libvirt-go-xml v6.6.0+incompatible
 	sigs.k8s.io/controller-runtime v0.8.3
 )
 

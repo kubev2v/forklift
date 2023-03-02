@@ -5,6 +5,9 @@ import (
 	"path"
 	"strings"
 
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
@@ -267,7 +270,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	if object.Template == nil {
 		object.Template = &cnv.VirtualMachineInstanceTemplateSpec{}
 	}
-	r.mapDisks(vm, persistentVolumeClaims, object)
+	r.mapDisks(vm, object)
 	r.mapFirmware(vm, &vm.Cluster, object)
 	r.mapCPU(vm, object)
 	r.mapMemory(vm, object)
@@ -408,24 +411,17 @@ func (r *Builder) mapFirmware(vm *model.Workload, cluster *model.Cluster, object
 	object.Template.Spec.Domain.Firmware = firmware
 }
 
-func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.PersistentVolumeClaim, object *cnv.VirtualMachineSpec) {
+func (r *Builder) mapDisks(vm *model.Workload, object *cnv.VirtualMachineSpec) {
 	var kVolumes []cnv.Volume
 	var kDisks []cnv.Disk
 
-	pvcMap := make(map[string]*core.PersistentVolumeClaim)
-	for i := range persistentVolumeClaims {
-		pvc := &persistentVolumeClaims[i]
-		pvcMap[r.ResolvePersistentVolumeClaimIdentifier(pvc)] = pvc
-	}
-
-	for i, da := range vm.DiskAttachments {
-		pvc := pvcMap[da.Disk.ID]
-		volumeName := fmt.Sprintf("vol-%v", i)
+	for _, da := range vm.DiskAttachments {
+		volumeName := da.Disk.ID
 		volume := cnv.Volume{
 			Name: volumeName,
 			VolumeSource: cnv.VolumeSource{
 				PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
-					ClaimName: pvc.Name,
+					ClaimName: volumeName,
 				},
 			},
 		}
@@ -523,10 +519,35 @@ func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVol
 	return pvc.Annotations[AnnImportDiskId]
 }
 
-func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName *string, populatorName string, accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode) *core.PersistentVolumeClaim {
-	return nil
+// Build a PersistentVolumeClaim with DataSourceRef for VolumePopulator
+func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName *string, populatorName string,
+	accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode) *core.PersistentVolumeClaim {
+	diskAttachment := da.(*model.XDiskAttachment)
+
+	// We add 10% overhead because of the fsOverhead in CDI, around 5% to ext4 and 5% for root partition.
+	diskSize := int64(float64(diskAttachment.Disk.ProvisionedSize) * 1.1)
+	return &core.PersistentVolumeClaim{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      diskAttachment.DiskAttachment.ID,
+			Namespace: r.Plan.Spec.TargetNamespace,
+		},
+		Spec: core.PersistentVolumeClaimSpec{
+			AccessModes: accessModes,
+			Resources: core.ResourceRequirements{
+				Requests: map[core.ResourceName]resource.Quantity{
+					core.ResourceStorage: *resource.NewQuantity(diskSize, resource.BinarySI)},
+			},
+			StorageClassName: storageName,
+			VolumeMode:       volumeMode,
+			DataSourceRef: &core.TypedLocalObjectReference{
+				APIGroup: &api.SchemeGroupVersion.Group,
+				Kind:     "OvirtVolumePopulator",
+				Name:     populatorName,
+			},
+		},
+	}
 }
 
-func (r *Builder) BeforeTransferHook(c planbase.Client, vmRef ref.Ref) (ready bool, err error) {
+func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, err error) {
 	return true, nil
 }

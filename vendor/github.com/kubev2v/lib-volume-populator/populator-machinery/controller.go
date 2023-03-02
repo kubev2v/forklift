@@ -460,15 +460,23 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 		rawBlock = true
 	}
 
+<<<<<<< HEAD
 	// Calculate the args for the populator pod
 	var args []string
 	args, err = c.populatorArgs(rawBlock, unstructured)
+=======
+	// Set the args for the populator pod
+	args, err := c.populatorArgs(rawBlock, unstructured)
+>>>>>>> origin/main
 	if err != nil {
 		return err
 	}
 
 	// Overriding the namespace to our target namespace
+<<<<<<< HEAD
 	// Taking the secret name from the args
+=======
+>>>>>>> origin/main
 	var secretName string
 	for _, val := range args {
 		if strings.HasPrefix(val, "--cr-namespace=") {
@@ -727,9 +735,12 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 }
 
 func makePopulatePodSpec(pvcPrimeName, secretName string) corev1.PodSpec {
+<<<<<<< HEAD
 	nonRoot := true
 	allowPrivilageEscalation := false
 	user := int64(1000)
+=======
+>>>>>>> origin/main
 	return corev1.PodSpec{
 		Containers: []corev1.Container{
 			{

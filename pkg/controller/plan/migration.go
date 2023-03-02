@@ -579,7 +579,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			return
 		}
 		if !ready {
-			r.Log.Info("Images not ready yet")
+			r.Log.Info("BeforeTransfer hook isn't ready yet")
 			return
 		}
 		if r.kubevirt.isOpenstack(vm) {
@@ -588,6 +588,16 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				err = liberr.Wrap(err)
 				return
 			}
+		}
+		if r.kubevirt.useOvirtPopulator(vm) {
+			err = r.kubevirt.createVolumesForOvirt(vm.Ref)
+			if err != nil {
+				step.AddError(err.Error())
+				err = nil
+				break
+			}
+			step.MarkCompleted()
+			step.Phase = Completed
 			vm.Phase = r.next(vm.Phase)
 			return
 		}
@@ -659,6 +669,8 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		}
 		step.MarkStarted()
 		step.Phase = Running
+
+		// TODO we can probably clean up these 2 if's nicely
 		if r.kubevirt.isOpenstack(vm) {
 			ready, err := r.kubevirt.openstackPVCsReady(vm.Ref, step)
 			if err != nil {
@@ -667,6 +679,30 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				break
 			}
 			err = r.updateCopyProgressForOpenstack(vm, step)
+			if err != nil {
+				step.AddError(err.Error())
+				err = nil
+				break
+			}
+
+			if ready {
+				step.Phase = Completed
+				vm.Phase = r.next(vm.Phase)
+				break
+			} else {
+				r.Log.Info("PVCs not ready yet")
+				break
+			}
+		}
+
+		if r.kubevirt.useOvirtPopulator(vm) {
+			ready, err := r.kubevirt.areOvirtPVCsReady(vm.Ref, step)
+			if err != nil {
+				step.AddError(err.Error())
+				err = nil
+				break
+			}
+			err = r.updateCopyProgressForOvirt(vm, step)
 
 			if err != nil {
 				step.AddError(err.Error())
@@ -1173,6 +1209,43 @@ func (r *Migration) setRunning(vm *plan.VMStatus, running bool) (err error) {
 	}
 
 	err = r.kubevirt.SetRunning(&vmCr, running)
+	return
+}
+
+func (r *Migration) updateCopyProgressForOvirt(vm *plan.VMStatus, step *plan.Step) (err error) {
+	pvcs, err := r.kubevirt.getPVCs(vm)
+	if err != nil {
+		return
+	}
+	for _, pvc := range pvcs {
+		claim := pvc.Spec.DataSource.Name
+		task, found := step.FindTask(claim)
+		if !found {
+			continue
+		}
+
+		populatorCr := v1beta1.OvirtVolumePopulator{}
+		err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: claim}, &populatorCr)
+		if err != nil {
+			if pvc.Status.Phase == core.ClaimBound {
+				// the populator CR is deleted and the PVC is bound - it most likely finished transferring the disk
+				task.Progress.Completed = int64(100 * float64(task.Progress.Total))
+				break
+			} else {
+				return
+			}
+		}
+
+		progress, parseErr := strconv.ParseInt(populatorCr.Status.Progress, 10, 64)
+		if err != nil {
+			return parseErr
+		}
+
+		percent := float64(progress/0x100000) / float64(task.Progress.Total)
+		task.Progress.Completed = int64(percent * float64(task.Progress.Total))
+	}
+
+	step.ReflectTasks()
 	return
 }
 

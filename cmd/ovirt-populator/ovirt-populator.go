@@ -2,19 +2,12 @@ package main
 
 import (
 	"bufio"
-	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 )
 
@@ -32,12 +25,6 @@ type TransferProgress struct {
 	Elapsed     float64 `json:"elapsed"`
 }
 
-const (
-	groupName  = "forklift.konveyor.io"
-	apiVersion = "v1beta1"
-	resource   = "ovirtvolumepopulators"
-)
-
 func main() {
 	var engineUrl, secretName, diskID, volPath, crName, crNamespace, namespace string
 	// Populate args
@@ -52,11 +39,11 @@ func main() {
 	flag.StringVar(&namespace, "namespace", "konveyor-forklift", "Namespace to deploy controller")
 	flag.Parse()
 
-	populate(crName, engineUrl, secretName, diskID, volPath, namespace, crNamespace)
+	populate(engineUrl, diskID, volPath)
 }
 
-func populate(crName, engineURL, secretName, diskID, volPath, namespace, crNamespace string) {
-	engineConfig := loadEngineConfig(secretName, engineURL, namespace)
+func populate(engineURL, diskID, volPath string) {
+	engineConfig := loadEngineConfig(engineURL)
 
 	// Write credentials to files
 	ovirtPass, err := os.Create("/tmp/ovirt.pass")
@@ -92,22 +79,12 @@ func populate(crName, engineURL, secretName, diskID, volPath, namespace, crNames
 		diskID,
 		volPath,
 	}
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		klog.Fatal(err.Error())
-	}
-
-	client, err := dynamic.NewForConfig(config)
-	if err != nil {
-		klog.Fatal(err.Error())
-	}
-
-	gvr := schema.GroupVersionResource{Group: groupName, Version: apiVersion, Resource: resource}
 	cmd := exec.Command("ovirt-img", args...)
 	r, _ := cmd.StdoutPipe()
 	cmd.Stderr = cmd.Stdout
 	done := make(chan struct{})
 	scanner := bufio.NewScanner(r)
+	klog.Info(fmt.Sprintf("Running command: %s", cmd.String()))
 
 	go func() {
 		for scanner.Scan() {
@@ -119,7 +96,8 @@ func populate(crName, engineURL, secretName, diskID, volPath, namespace, crNames
 				klog.Error(err)
 			}
 
-			if progressOutput.Size != nil {
+			//TODO add progress mechanism to the disk transfer
+			/*if progressOutput.Size != nil {
 				// We have to get it in the loop to avoid a conflict error
 				populatorCr, err := client.Resource(gvr).Namespace(crNamespace).Get(context.TODO(), crName, metav1.GetOptions{})
 				if err != nil {
@@ -134,7 +112,7 @@ func populate(crName, engineURL, secretName, diskID, volPath, namespace, crNames
 				if err != nil {
 					klog.Error(err)
 				}
-			}
+			}*/
 		}
 
 		done <- struct{}{}
@@ -152,26 +130,24 @@ func populate(crName, engineURL, secretName, diskID, volPath, namespace, crNames
 	}
 }
 
-func loadEngineConfig(secretName, engineURL, namespace string) engineConfig {
-	config, err := rest.InClusterConfig()
+func loadEngineConfig(engineURL string) engineConfig {
+	user, err := os.ReadFile("/etc/secret-volume/user")
 	if err != nil {
 		klog.Fatal(err.Error())
 	}
-	// creates the clientset
-	clientset, err := kubernetes.NewForConfig(config)
+	pass, err := os.ReadFile("/etc/secret-volume/password")
 	if err != nil {
 		klog.Fatal(err.Error())
 	}
-
-	secret, err := clientset.CoreV1().Secrets(namespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+	ca, err := os.ReadFile("/etc/secret-volume/cacert")
 	if err != nil {
 		klog.Fatal(err.Error())
 	}
 
 	return engineConfig{
 		URL:      engineURL,
-		username: string(secret.Data["user"]),
-		password: string(secret.Data["password"]),
-		ca:       string(secret.Data["cacert"]),
+		username: string(user),
+		password: string(pass),
+		ca:       string(ca),
 	}
 }

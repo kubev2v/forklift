@@ -11,7 +11,8 @@ type OvirtVolumePopulator struct {
 	meta.TypeMeta   `json:",inline"`
 	meta.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   OvirtVolumePopulatorSpec   `json:"spec"`
+	Spec OvirtVolumePopulatorSpec `json:"spec"`
+	// +optional
 	Status OvirtVolumePopulatorStatus `json:"status"`
 }
 
@@ -22,6 +23,7 @@ type OvirtVolumePopulatorSpec struct {
 }
 
 type OvirtVolumePopulatorStatus struct {
+	// +optional
 	Progress string `json:"progress"`
 }
 
@@ -30,4 +32,8 @@ type OvirtVolumePopulatorList struct {
 	meta.TypeMeta `json:",inline"`
 	meta.ListMeta `json:"metadata,omitempty"`
 	Items         []OvirtVolumePopulator `json:"items"`
+}
+
+func init() {
+	SchemeBuilder.Register(&OvirtVolumePopulator{}, &OvirtVolumePopulatorList{})
 }
