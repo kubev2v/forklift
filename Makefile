@@ -49,7 +49,7 @@ BAZEL_OPTS ?= --verbose_failures
 ifneq (,$(findstring /usr/lib64/ccache,$(PATH)))
 CCACHE_DIR ?= $${HOME}/.ccache
 BAZEL_OPTS +=	--sandbox_writable_path=$(CCACHE_DIR)
-$(shell [ -d $(CCACHE_DIR)] || mkdir -p $(CCACHE_DIR))
+$(shell [ -d $(CCACHE_DIR) ] || mkdir -p $(CCACHE_DIR))
 endif
 
 XDG_RUNTIME_DIR ?=
