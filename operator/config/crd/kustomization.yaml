@@ -11,4 +11,5 @@ resources:
 - bases/forklift.konveyor.io_providers.yaml
 - bases/forklift.konveyor.io_storagemaps.yaml
 - bases/forklift.konveyor.io_ovirtvolumepopulators.yaml
+- bases/forklift.konveyor.io_openstackvolumepopulators.yaml
 #+kubebuilder:scaffold:crdkustomizeresource

@@ -103,6 +103,7 @@ github.com/googleapis/gnostic/openapiv2
 ## explicit; go 1.14
 github.com/gophercloud/gophercloud
 github.com/gophercloud/gophercloud/openstack
+github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions
 github.com/gophercloud/gophercloud/openstack/blockstorage/v3/snapshots
 github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes
 github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumetypes
@@ -118,6 +119,7 @@ github.com/gophercloud/gophercloud/openstack/identity/v3/projects
 github.com/gophercloud/gophercloud/openstack/identity/v3/regions
 github.com/gophercloud/gophercloud/openstack/identity/v3/tokens
 github.com/gophercloud/gophercloud/openstack/identity/v3/users
+github.com/gophercloud/gophercloud/openstack/imageservice/v2/imagedata
 github.com/gophercloud/gophercloud/openstack/imageservice/v2/images
 github.com/gophercloud/gophercloud/openstack/utils
 github.com/gophercloud/gophercloud/pagination
@@ -143,7 +145,7 @@ github.com/json-iterator/go
 ## explicit; go 1.12
 github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io
 github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1
-# github.com/kubev2v/lib-volume-populator v0.0.0-20230302083332-2e9205dab199
+# github.com/kubev2v/lib-volume-populator v0.0.0-20230302125601-6a8f7b8cb4dd
 ## explicit; go 1.19
 github.com/kubev2v/lib-volume-populator/populator-machinery
 # github.com/leodido/go-urn v1.2.0

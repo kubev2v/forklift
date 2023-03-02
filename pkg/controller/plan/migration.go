@@ -10,10 +10,12 @@ import (
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/scheduler"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
@@ -198,6 +200,7 @@ func (r *Migration) init() (err error) {
 	if err != nil {
 		return
 	}
+
 	r.provider, err = adapter.Client(r.Context)
 	if err != nil {
 		return
@@ -569,6 +572,23 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
 			break
 		}
+		var ready bool
+		ready, err = r.builder.BeforeTransferHook(r.provider, vm.Ref)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+		if !ready {
+			r.Log.Info("BeforeTransfer hook isn't ready yet")
+			return
+		}
+		if r.kubevirt.isOpenstack(vm) {
+			err = r.kubevirt.createOpenStackVolumes(vm.Ref)
+			if err != nil {
+				err = liberr.Wrap(err)
+				return
+			}
+		}
 		if r.kubevirt.useOvirtPopulator(vm) {
 			err = r.kubevirt.createVolumesForOvirt(vm.Ref)
 			if err != nil {
@@ -610,7 +630,6 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				return
 			}
 		}
-
 		step.MarkCompleted()
 		step.Phase = Completed
 		vm.Phase = r.next(vm.Phase)
@@ -650,6 +669,31 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		}
 		step.MarkStarted()
 		step.Phase = Running
+
+		// TODO we can probably clean up these 2 if's nicely
+		if r.kubevirt.isOpenstack(vm) {
+			ready, err := r.kubevirt.openstackPVCsReady(vm.Ref, step)
+			if err != nil {
+				step.AddError(err.Error())
+				err = nil
+				break
+			}
+			err = r.updateCopyProgressForOpenstack(vm, step)
+			if err != nil {
+				step.AddError(err.Error())
+				err = nil
+				break
+			}
+
+			if ready {
+				step.Phase = Completed
+				vm.Phase = r.next(vm.Phase)
+				break
+			} else {
+				r.Log.Info("PVCs not ready yet")
+				break
+			}
+		}
 
 		if r.kubevirt.useOvirtPopulator(vm) {
 			ready, err := r.kubevirt.areOvirtPVCsReady(vm.Ref, step)
@@ -1071,6 +1115,7 @@ func (r *Migration) end() (completed bool, err error) {
 			succeeded++
 		}
 	}
+	go r.provider.Finalize(r.Plan.Status.Migration.VMs, r.Migration.Name)
 	r.Plan.Status.Migration.MarkCompleted()
 	snapshot := r.Plan.Status.Migration.ActiveSnapshot()
 	snapshot.DeleteCondition(Executing)
@@ -1390,6 +1435,47 @@ func (r *Migration) setDataVolumeCheckpoints(vm *plan.VMStatus) (err error) {
 		}
 	}
 
+	return
+}
+
+func (r *Migration) updateCopyProgressForOpenstack(vm *plan.VMStatus, step *plan.Step) (err error) {
+	pvcs, err := r.kubevirt.getPVCs(vm)
+	if err != nil {
+		return
+	}
+
+	for _, pvc := range pvcs {
+		image := &openstack.Image{}
+		err = r.Source.Inventory.Find(image, ref.Ref{ID: pvc.Name})
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+
+		var task *plan.Task
+		found := false
+		task, found = step.FindTask(image.Name)
+
+		if !found {
+			continue
+		}
+
+		populatorCr := v1beta1.OpenstackVolumePopulator{}
+		err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: image.Name}, &populatorCr)
+		if err != nil {
+			return
+		}
+
+		progress, parseErr := strconv.ParseInt(populatorCr.Status.Transferred, 10, 64)
+		if err != nil {
+			return parseErr
+		}
+
+		percent := float64(progress/0x100000) / float64(task.Progress.Total)
+		task.Progress.Completed = int64(percent * float64(task.Progress.Total))
+	}
+
+	step.ReflectTasks()
 	return
 }
 

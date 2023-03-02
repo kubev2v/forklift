@@ -408,3 +408,7 @@ func (r *Client) cacert() []byte {
 	}
 	return nil
 }
+
+func (c *Client) Finalize(vms []*planapi.VMStatus, planName string) {
+
+}

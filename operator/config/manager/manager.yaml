@@ -60,6 +60,8 @@ spec:
           value: ${POPULATOR_CONTROLLER_IMAGE}
         - name: OVIRT_POPULATOR_IMAGE
           value: ${OVIRT_POPULATOR_IMAGE}
+        - name: OPENSTACK_POPULATOR_IMAGE
+          value: ${OPENSTACK_POPULATOR_IMAGE}
         livenessProbe:
           httpGet:
             path: /healthz

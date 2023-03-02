@@ -1,0 +1,20 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "openstack-populator_lib",
+    srcs = ["openstack-populator.go"],
+    importpath = "github.com/konveyor/forklift-controller/cmd/openstack-populator",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//vendor/github.com/gophercloud/gophercloud",
+        "//vendor/github.com/gophercloud/gophercloud/openstack",
+        "//vendor/github.com/gophercloud/gophercloud/openstack/imageservice/v2/imagedata",
+        "//vendor/k8s.io/klog/v2:klog",
+    ],
+)
+
+go_binary(
+    name = "openstack-populator",
+    embed = [":openstack-populator_lib"],
+    visibility = ["//visibility:public"],
+)

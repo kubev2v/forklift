@@ -11,7 +11,7 @@ type Adapter struct{}
 
 // Constructs a openstack builder.
 func (r *Adapter) Builder(ctx *plancontext.Context) (builder base.Builder, err error) {
-	//builder = &Builder{Context: ctx}
+	builder = &Builder{Context: ctx}
 	return
 }
 
@@ -34,5 +34,5 @@ func (r *Adapter) Client(ctx *plancontext.Context) (client base.Client, err erro
 		return
 	}
 	client = c
-	return nil, nil
+	return
 }

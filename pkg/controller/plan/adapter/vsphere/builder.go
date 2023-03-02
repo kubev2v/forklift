@@ -4,6 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	liburl "net/url"
+	"path"
+	"regexp"
+	"sort"
+	"strings"
+
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
@@ -14,7 +20,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
@@ -25,12 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	cnv "kubevirt.io/client-go/api/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
-	liburl "net/url"
-	"path"
-	"regexp"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sort"
-	"strings"
 )
 
 // BIOS types
@@ -762,9 +762,10 @@ func trimBackingFileName(fileName string) string {
 	return backingFilePattern.ReplaceAllString(fileName, ".vmdk")
 }
 
-// Build a PersistentVolumeClaim with SourceRef for VolumePopulator, not supported for vSphere
-func (r *Builder) PersistentVolumeClaimWithSourceRef(da ovirt.XDiskAttachment, storageName *string, populatorName string,
-	accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode) *core.PersistentVolumeClaim {
-	// Not supported for vSphere
+func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName *string, populatorName string, accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode) *core.PersistentVolumeClaim {
 	return nil
+}
+
+func (r *Builder) BeforeTransferHook(c planbase.Client, vmRef ref.Ref) (ready bool, err error) {
+	return true, nil
 }
