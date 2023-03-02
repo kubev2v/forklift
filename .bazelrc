@@ -16,7 +16,8 @@ build --action_env=MUST_GATHER_API_IMAGE=quay.io/kubev2v/forklift-must-gather-ap
 build --action_env=UI_IMAGE=quay.io/kubev2v/forklift-ui:latest
 build --action_env=UI_PLUGIN_IMAGE=quay.io/kubev2v/forklift-console-plugin:latest
 build --action_env=VALIDATION_IMAGE=quay.io/kubev2v/forklift-validation:latest
-build --action_env=VIRT_V2V_IMAGE="quay.io/kubev2v/forklift-virt-v2v:latest|quay.io/kubev2v/forklift-virt-v2v-warm:latest"
+build --action_env=VIRT_V2V_IMAGE=quay.io/kubev2v/forklift-virt-v2v:latest
+build --action_env=VIRT_V2V_WARM_IMAGE=quay.io/kubev2v/forklift-virt-v2v-warm:latest
 build --action_env=POPULATOR_CONTROLLER_IMAGE=quay.io/kubev2v/populator-controller:latest
 build --action_env=OPENSTACK_POPULATOR_IMAGE=quay.io/kubev2v/openstack-populator:latest
 build --action_env=OVIRT_POPULATOR_IMAGE=quay.io/kubev2v/ovirt-populator:latest

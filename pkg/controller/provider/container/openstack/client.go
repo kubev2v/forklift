@@ -162,7 +162,7 @@ func (r *Client) domainName() string {
 
 // Region
 func (r *Client) region() string {
-	if region, found := r.Secret.Data["region"]; found {
+	if region, found := r.Secret.Data["regionName"]; found {
 		return string(region)
 	}
 	return ""

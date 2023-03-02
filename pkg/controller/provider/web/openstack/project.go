@@ -125,11 +125,11 @@ func (h *ProjectHandler) watch(ctx *gin.Context) {
 		func(in libmodel.Model) (r interface{}) {
 			pb := PathBuilder{DB: db}
 			m := in.(*model.Project)
-			network := &Project{}
-			network.With(m)
-			network.Link(h.Provider)
-			network.Path = pb.Path(m)
-			r = network
+			project := &Project{}
+			project.With(m)
+			project.Link(h.Provider)
+			project.Path = pb.Path(m)
+			r = project
 			return
 		})
 	if err != nil {
