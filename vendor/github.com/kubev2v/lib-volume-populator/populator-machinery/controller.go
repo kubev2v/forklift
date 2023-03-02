@@ -463,7 +463,6 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 		return err
 	}
 
-	// Overriding the namespace to our target namespace
 	var secretName string
 	var populatorNamespace string
 	for _, val := range args {
