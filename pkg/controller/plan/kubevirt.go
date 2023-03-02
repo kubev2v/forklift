@@ -1652,10 +1652,6 @@ func (r *KubeVirt) createOpenStackVolumes(vm ref.Ref) (err error) {
 
 	storageName := r.Context.Map.Storage.Spec.Map[0].Destination.StorageClass
 
-	// TODO use storageprofile
-	accessModes := []core.PersistentVolumeAccessMode{core.ReadWriteOnce}
-	volumeMode := core.PersistentVolumeFilesystem
-
 	if len(openstackVm.AttachedVolumes) > 0 {
 		for _, vol := range openstackVm.AttachedVolumes {
 			image := &openstack.Image{}
@@ -1673,8 +1669,12 @@ func (r *KubeVirt) createOpenStackVolumes(vm ref.Ref) (err error) {
 				err = liberr.Wrap(err)
 				return
 			}
+			accessModes, volumeMode, failure := r.getStorageProfileModes(storageName)
+			if failure != nil {
+				return failure
+			}
 
-			pvc := r.Builder.PersistentVolumeClaimWithSourceRef(image, &storageName, populatorCr.Name, accessModes, &volumeMode)
+			pvc := r.Builder.PersistentVolumeClaimWithSourceRef(image, &storageName, populatorCr.Name, accessModes, volumeMode)
 			err = r.Client.Create(context.TODO(), pvc, &client.CreateOptions{})
 			if k8serr.IsAlreadyExists(err) {
 				err = nil

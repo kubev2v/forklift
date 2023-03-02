@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"io"
 	"os"
@@ -10,9 +9,6 @@ import (
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/imagedata"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 )
 
@@ -66,29 +62,38 @@ type openstackConfig struct {
 }
 
 func loadConfig(secretName, endpoint, namespace string) openstackConfig {
-	config, err := rest.InClusterConfig()
+	username, err := os.ReadFile("/etc/secret-volume/username")
 	if err != nil {
 		klog.Fatal(err.Error())
 	}
-	// creates the clientset
-	clientset, err := kubernetes.NewForConfig(config)
+	password, err := os.ReadFile("/etc/secret-volume/password")
 	if err != nil {
 		klog.Fatal(err.Error())
 	}
-
-	klog.Info("Looking for secret", "secret", secretName, "namespace", namespace)
-	secret, err := clientset.CoreV1().Secrets(namespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+	projectName, err := os.ReadFile("/etc/secret-volume/projectName")
+	if err != nil {
+		klog.Fatal(err.Error())
+	}
+	region, err := os.ReadFile("/etc/secret-volume/region")
+	if err != nil {
+		klog.Fatal(err.Error())
+	}
+	domainName, err := os.ReadFile("/etc/secret-volume/domainName")
+	if err != nil {
+		klog.Fatal(err.Error())
+	}
+	insecure, err := os.ReadFile("/etc/secret-volume/insecure")
 	if err != nil {
 		klog.Fatal(err.Error())
 	}
 
 	return openstackConfig{
-		username:    string(secret.Data["username"]),
-		password:    string(secret.Data["password"]),
-		insecure:    string(secret.Data["insecure"]),
-		projectName: string(secret.Data["projectName"]),
-		region:      string(secret.Data["region"]),
-		domainName:  string(secret.Data["domainName"]),
+		username:    string(username),
+		password:    string(password),
+		insecure:    string(insecure),
+		projectName: string(projectName),
+		region:      string(region),
+		domainName:  string(domainName),
 	}
 }
 
@@ -165,7 +170,8 @@ func writeData(reader io.ReadCloser, file *os.File, crName, crNamespace string) 
 	total := new(int64)
 	countingReader := CountingReader{reader, total}
 
-	//done := make(chan bool)
+	// TODO introduce /metrics endpoint to report progress
+	// done := make(chan bool)
 	// go func() {
 	// 	for {
 	// 		select {

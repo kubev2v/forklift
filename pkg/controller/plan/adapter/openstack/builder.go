@@ -216,9 +216,9 @@ func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVol
 	return ""
 }
 
-// Build the DataVolume credential secret.
-func (r *Builder) Secret(_ ref.Ref, in, object *core.Secret) (err error) {
-	object.StringData = map[string]string{
+// Build credential secret.
+func (r *Builder) Secret(_ ref.Ref, in, secret *core.Secret) (err error) {
+	secret.StringData = map[string]string{
 		"username":    string(in.Data["username"]),
 		"password":    string(in.Data["password"]),
 		"domainName":  string(in.Data["domainName"]),
