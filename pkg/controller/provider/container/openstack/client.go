@@ -207,27 +207,26 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 		}
 		var instanceList []Region
 		for _, region := range regionList {
-			instanceList = append(instanceList, Region{region})
+			// TODO implement support multiple regions/projects sync per user
+			if region.ID == r.region() {
+				instanceList = append(instanceList, Region{region})
+			}
 		}
 		*object = instanceList
 		return
 
 	case *[]Project:
 		object := object.(*[]Project)
-		allPages, err = projects.List(r.identityService, listopts.(*ProjectListOpts)).AllPages()
+		// TODO implement support multiple regions/projects sync per user
+		opts := listopts.(*ProjectListOpts)
+		opts.Name = r.projectName()
+		allPages, err = projects.List(r.identityService, opts).AllPages()
 		if err != nil {
 			if !r.isForbidden(err) {
 				return
 			}
-			var userID string
-			userID, err = r.getAuthenticatedUserID()
-			if err != nil {
-				return
-			}
-			allPages, err = users.ListProjects(r.identityService, userID).AllPages()
-			if err != nil {
-				return
-			}
+			*object, err = r.getUserProjects()
+			return
 		}
 		var projectList []projects.Project
 		projectList, err = projects.ExtractProjects(allPages)
@@ -391,6 +390,10 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 		var project *projects.Project
 		project, err = projects.Get(r.identityService, ID).Extract()
 		if err != nil {
+			if !r.isForbidden(err) {
+				return
+			}
+			object, err = r.getUserProject(ID)
 			return
 		}
 		object = &Project{*project}
@@ -493,4 +496,50 @@ func (r *Client) getAuthenticatedUserID() (string, error) {
 		return "", liberr.New(fmt.Sprintf("got unexpected AuthResult type: %T", a))
 
 	}
+}
+
+func (r *Client) getUserProject(projectID string) (project *Project, err error) {
+	var userProjects []Project
+	var found bool
+	userProjects, err = r.getUserProjects()
+	if err != nil {
+		return
+	}
+	for _, p := range userProjects {
+		if p.ID == projectID {
+			found = true
+			project = &p
+			break
+		}
+	}
+	if !found {
+		err = gophercloud.ErrDefault404{}
+		return
+	}
+	return
+}
+
+func (r *Client) getUserProjects() (userProjects []Project, err error) {
+	var userID string
+	var allPages pagination.Page
+	userID, err = r.getAuthenticatedUserID()
+	if err != nil {
+		return
+	}
+	allPages, err = users.ListProjects(r.identityService, userID).AllPages()
+	if err != nil {
+		return
+	}
+	var projectList []projects.Project
+	projectList, err = projects.ExtractProjects(allPages)
+	if err != nil {
+		return
+	}
+	for _, project := range projectList {
+		// TODO implement support multiple regions/projects sync per user
+		if project.Name == r.projectName() {
+			userProjects = append(userProjects, Project{project})
+		}
+	}
+	return
 }
