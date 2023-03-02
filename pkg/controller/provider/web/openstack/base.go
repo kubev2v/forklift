@@ -8,6 +8,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	pathlib "path"
 )
 
 // Package logger.
@@ -55,18 +56,33 @@ type PathBuilder struct {
 	// Database.
 	DB libmodel.DB
 	// Cached resources.
-	cache map[string]string
+	cache map[string]interface{}
 }
 
 // Build.
 func (r *PathBuilder) Path(m model.Model) (path string) {
 	var err error
 	if r.cache == nil {
-		r.cache = map[string]string{}
+		r.cache = map[string]interface{}{}
 	}
 	switch m.(type) {
+	case *model.Project:
+		project := m.(*model.Project)
+		path = project.Name
+		if project.IsDomain {
+			return
+		}
+		if project.ParentID != project.DomainID {
+			var parentProject *model.Project
+			parentProject, err = r.getProject(project.ParentID)
+			path = pathlib.Join(r.Path(parentProject), path)
+		}
+
 	case *model.VM:
-		path = m.(*model.VM).Name
+		vm := m.(*model.VM)
+		var project *model.Project
+		project, err = r.getProject(vm.TenantID)
+		path = pathlib.Join(r.Path(project), vm.Name)
 	}
 
 	if err != nil {
@@ -75,6 +91,22 @@ func (r *PathBuilder) Path(m model.Model) (path string) {
 			"path builder failed.",
 			"model",
 			libmodel.Describe(m))
+	}
+
+	return
+}
+
+func (r *PathBuilder) getProject(projectID string) (project *model.Project, err error) {
+	project, cached := r.cache[projectID].(*model.Project)
+	if !cached {
+		project = &model.Project{
+			Base: model.Base{ID: projectID},
+		}
+		err = r.DB.Get(project)
+		if err != nil {
+			return
+		}
+		r.cache[projectID] = project
 	}
 
 	return
