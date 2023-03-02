@@ -699,8 +699,16 @@ func (r *KubeVirt) getStorageProfileModes(storageName string) (accessModes []cor
 		storageProfile := &storageProfileList.Items[i]
 		if storageProfile.Name == storageName {
 			for _, claimProperty := range storageProfile.Status.ClaimPropertySets {
-				accessModes = append(accessModes, claimProperty.AccessModes...)
 				volumeMode = claimProperty.VolumeMode
+				if *volumeMode == core.PersistentVolumeBlock {
+					// Preferring Block volume mode
+					break
+				}
+			}
+			for _, claimProperty := range storageProfile.Status.ClaimPropertySets {
+				if *claimProperty.VolumeMode == *volumeMode {
+					accessModes = append(accessModes, claimProperty.AccessModes...)
+				}
 			}
 			break
 		}

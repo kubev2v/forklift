@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 
 	"k8s.io/klog/v2"
 )
@@ -16,6 +17,7 @@ type engineConfig struct {
 	username string
 	password string
 	ca       string
+	insecure bool
 }
 
 type TransferProgress struct {
@@ -57,27 +59,43 @@ func populate(engineURL, diskID, volPath string) {
 		klog.Fatalf("Failed to write password to file: %v", err)
 	}
 
-	cert, err := os.Create("/tmp/ca.pem")
-	if err != nil {
-		klog.Fatalf("Failed to create ca.pem %v", err)
-	}
+	var args []string
+	//for secure connection use the ca cert
+	if !engineConfig.insecure {
+		cert, err := os.Create("/tmp/ca.pem")
+		if err != nil {
+			klog.Fatalf("Failed to create ca.pem %v", err)
+		}
 
-	defer cert.Close()
-	_, err = cert.Write([]byte(engineConfig.ca))
-	if err != nil {
-		klog.Fatalf("Failed to write CA to file: %v", err)
-	}
+		defer cert.Close()
+		_, err = cert.Write([]byte(engineConfig.ca))
+		if err != nil {
+			klog.Fatalf("Failed to write CA to file: %v", err)
+		}
 
-	args := []string{
-		"download-disk",
-		"--output", "json",
-		"--engine-url=" + engineConfig.URL,
-		"--username=" + engineConfig.username,
-		"--password-file=/tmp/ovirt.pass",
-		"--cafile=" + "/tmp/ca.pem",
-		"-f", "raw",
-		diskID,
-		volPath,
+		args = []string{
+			"download-disk",
+			"--output", "json",
+			"--engine-url=" + engineConfig.URL,
+			"--username=" + engineConfig.username,
+			"--password-file=/tmp/ovirt.pass",
+			"--cafile=" + "/tmp/ca.pem",
+			"-f", "raw",
+			diskID,
+			volPath,
+		}
+	} else {
+		args = []string{
+			"download-disk",
+			"--output", "json",
+			"--engine-url=" + engineConfig.URL,
+			"--username=" + engineConfig.username,
+			"--password-file=/tmp/ovirt.pass",
+			"--insecure",
+			"-f", "raw",
+			diskID,
+			volPath,
+		}
 	}
 	cmd := exec.Command("ovirt-img", args...)
 	r, _ := cmd.StdoutPipe()
@@ -144,10 +162,20 @@ func loadEngineConfig(engineURL string) engineConfig {
 		klog.Fatal(err.Error())
 	}
 
+	insecureSkipVerify, err := os.ReadFile("/etc/secret-volume/insecureSkipVerify")
+	if err != nil {
+		klog.Fatal(err.Error())
+	}
+	insecure, err := strconv.ParseBool(string(insecureSkipVerify))
+	if err != nil {
+		klog.Fatal(err.Error())
+	}
+
 	return engineConfig{
 		URL:      engineURL,
 		username: string(user),
 		password: string(pass),
 		ca:       string(ca),
+		insecure: insecure,
 	}
 }
