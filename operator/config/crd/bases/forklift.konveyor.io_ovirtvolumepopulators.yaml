@@ -48,12 +48,9 @@ spec:
             properties:
               progress:
                 type: string
-            required:
-            - progress
             type: object
         required:
         - spec
-        - status
         type: object
     served: true
     storage: true
