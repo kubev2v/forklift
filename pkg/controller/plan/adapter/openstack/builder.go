@@ -236,6 +236,10 @@ func (r *Builder) PodEnvironment(_ ref.Ref, _ *core.Secret) (env []core.EnvVar, 
 func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName *string, populatorName string, accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode) *core.PersistentVolumeClaim {
 	image := da.(*openstack.Image)
 	apiGroup := "forklift.konveyor.io"
+	size := image.VirtualSize
+	if *volumeMode == core.PersistentVolumeFilesystem {
+		size = int64(float64(image.VirtualSize) * 1.1)
+	}
 	return &core.PersistentVolumeClaim{
 		ObjectMeta: meta.ObjectMeta{
 			Name:      image.ID,
@@ -249,7 +253,7 @@ func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName
 			AccessModes: accessModes,
 			Resources: core.ResourceRequirements{
 				Requests: map[core.ResourceName]resource.Quantity{
-					core.ResourceStorage: *resource.NewQuantity(int64(float64(image.VirtualSize)*1.1), resource.BinarySI)},
+					core.ResourceStorage: *resource.NewQuantity(size, resource.BinarySI)},
 			},
 			StorageClassName: storageName,
 			VolumeMode:       volumeMode,
