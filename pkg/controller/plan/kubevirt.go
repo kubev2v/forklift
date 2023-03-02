@@ -580,21 +580,22 @@ func (r *KubeVirt) getPVCs(vm *plan.VMStatus) (pvcs []core.PersistentVolumeClaim
 		} else if r.isOpenstack(vm) {
 			if _, ok := pvc.Labels["migration"]; ok {
 				pvcs = append(pvcs, *pvc)
-			} else if r.useOvirtPopulator(vm) {
-				ovirtVm := &ovirt.Workload{}
-				err = r.Source.Inventory.Find(ovirtVm, vm.Ref)
-				if err != nil {
-					return
-				}
-				for _, da := range ovirtVm.DiskAttachments {
-					if pvc.Spec.DataSource != nil && da.Disk.ID == pvc.Spec.DataSource.Name {
-						pvcs = append(pvcs, *pvc)
-						break
-					}
+			}
+		} else if r.useOvirtPopulator(vm) {
+			ovirtVm := &ovirt.Workload{}
+			err = r.Source.Inventory.Find(ovirtVm, vm.Ref)
+			if err != nil {
+				return
+			}
+			for _, da := range ovirtVm.DiskAttachments {
+				if pvc.Spec.DataSource != nil && da.Disk.ID == pvc.Spec.DataSource.Name {
+					pvcs = append(pvcs, *pvc)
+					break
 				}
 			}
 		}
 	}
+
 	return
 }
 
