@@ -17,6 +17,7 @@ require (
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.19.0
 	github.com/openshift/api v0.0.0
+	github.com/openshift/library-go v0.0.0-20200821154433-215f00df72cc
 	github.com/ovirt/go-ovirt v4.3.4+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/profile v1.3.0
@@ -30,10 +31,10 @@ require (
 	k8s.io/apimachinery v0.26.0
 	k8s.io/apiserver v0.20.2
 	k8s.io/client-go v12.0.0+incompatible
-	k8s.io/component-base v0.26.0
 	k8s.io/klog/v2 v2.80.1
 	kubevirt.io/client-go v0.42.1
 	kubevirt.io/containerized-data-importer-api v1.44.0
+	libvirt.org/libvirt-go-xml v6.6.0+incompatible
 	sigs.k8s.io/controller-runtime v0.8.3
 )
 
@@ -92,6 +93,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	k8s.io/component-base v0.26.0 // indirect
 	k8s.io/component-helpers v0.26.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280 // indirect
 	k8s.io/utils v0.0.0-20221107191617-1a15be271d1d // indirect
