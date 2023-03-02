@@ -38,7 +38,6 @@ func main() {
 		secretName       string
 
 		volumePath string
-		namespace  string
 	)
 
 	klog.InitFlags(nil)
