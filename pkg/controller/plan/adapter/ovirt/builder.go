@@ -522,7 +522,7 @@ func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVol
 // Build a PersistentVolumeClaim with DataSourceRef for VolumePopulator
 func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName *string, populatorName string,
 	accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode) *core.PersistentVolumeClaim {
-	diskAttachment := da.(*model.XDiskAttachment)
+	diskAttachment := da.(model.XDiskAttachment)
 
 	// We add 10% overhead because of the fsOverhead in CDI, around 5% to ext4 and 5% for root partition.
 	diskSize := int64(float64(diskAttachment.Disk.ProvisionedSize) * 1.1)
