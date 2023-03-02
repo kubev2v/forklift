@@ -31,6 +31,8 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	openstackutil "github.com/konveyor/forklift-controller/pkg/controller/plan/util"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
@@ -40,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	k8sutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // Annotations
@@ -574,22 +577,25 @@ func (r *KubeVirt) getPVCs(vm *plan.VMStatus) (pvcs []core.PersistentVolumeClaim
 		pvcAnn := pvc.GetAnnotations()
 		if pvcAnn[kVM] == vmLabels[kVM] && pvcAnn[kPlan] == vmLabels[kPlan] {
 			pvcs = append(pvcs, *pvc)
-		} else {
-			if r.useOvirtPopulator(vm) {
-				ovirtVm := &ovirt.Workload{}
-				err = r.Source.Inventory.Find(ovirtVm, vm.Ref)
-				if err != nil {
-					return
-				}
-				for _, da := range ovirtVm.DiskAttachments {
-					if pvc.Spec.DataSource != nil && da.Disk.ID == pvc.Spec.DataSource.Name {
-						pvcs = append(pvcs, *pvc)
-						break
-					}
+		} else if r.isOpenstack(vm) {
+			if _, ok := pvc.Labels["migration"]; ok {
+				pvcs = append(pvcs, *pvc)
+			}
+		} else if r.useOvirtPopulator(vm) {
+			ovirtVm := &ovirt.Workload{}
+			err = r.Source.Inventory.Find(ovirtVm, vm.Ref)
+			if err != nil {
+				return
+			}
+			for _, da := range ovirtVm.DiskAttachments {
+				if pvc.Spec.DataSource != nil && da.Disk.ID == pvc.Spec.DataSource.Name {
+					pvcs = append(pvcs, *pvc)
+					break
 				}
 			}
 		}
 	}
+
 	return
 }
 
@@ -1629,5 +1635,121 @@ func vmOwnerReference(vm *cnv.VirtualMachine) (ref meta.OwnerReference) {
 		BlockOwnerDeletion: &blockOwnerDeletion,
 		Controller:         &isController,
 	}
+	return
+}
+
+// TODO move elsewhere
+func (r *KubeVirt) createOpenStackVolumes(vm ref.Ref) (err error) {
+	secret, err := r.ensureSecret(vm)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	openstackVm := &openstack.Workload{}
+	err = r.Source.Inventory.Find(openstackVm, vm)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	sourceUrl, err := url.Parse(r.Source.Provider.Spec.URL)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	storageName := r.Context.Map.Storage.Spec.Map[0].Destination.StorageClass
+
+	if len(openstackVm.AttachedVolumes) > 0 {
+		for _, vol := range openstackVm.AttachedVolumes {
+			image := &openstack.Image{}
+			err = r.Source.Inventory.Find(image, ref.Ref{Name: fmt.Sprintf("%s-%s", r.Migration.Name, vol.ID)})
+			if err != nil {
+				err = liberr.Wrap(err)
+				return
+			}
+
+			populatorCr := openstackutil.OpenstackVolumePopulator(image, sourceUrl, r.Plan.Spec.TargetNamespace, secret.Name, r.Migration.Name)
+			err = r.Client.Create(context.TODO(), populatorCr, &client.CreateOptions{})
+			if k8serr.IsAlreadyExists(err) {
+				err = nil
+			} else if err != nil {
+				err = liberr.Wrap(err)
+				return
+			}
+			accessModes, volumeMode, failure := r.getStorageProfileModes(storageName)
+			if failure != nil {
+				return failure
+			}
+
+			pvc := r.Builder.PersistentVolumeClaimWithSourceRef(image, &storageName, populatorCr.Name, accessModes, volumeMode)
+			err = r.Client.Create(context.TODO(), pvc, &client.CreateOptions{})
+			if k8serr.IsAlreadyExists(err) {
+				err = nil
+				continue
+			} else if err != nil {
+				err = liberr.Wrap(err)
+				return
+			}
+
+			// TODO change once we decide how to cleanup the CR
+			err = k8sutil.SetOwnerReference(pvc, populatorCr, r.Scheme())
+			if err != nil {
+				err = liberr.Wrap(err)
+				return
+			}
+
+			err = r.Client.Update(context.TODO(), populatorCr, &client.UpdateOptions{})
+			if err != nil {
+				err = liberr.Wrap(err)
+				return
+			}
+		}
+	}
+
+	return
+}
+
+// Return if the import done with Openstack
+func (r *KubeVirt) isOpenstack(vm *plan.VMStatus) bool {
+	return *r.Plan.Provider.Source.Spec.Type == v1beta1.OpenStack && vm.Warm == nil && r.Destination.Provider.IsHost()
+}
+
+func (r *KubeVirt) openstackPVCsReady(vm ref.Ref, step *plan.Step) (ready bool, err error) {
+	openstackVm := &openstack.Workload{}
+	err = r.Source.Inventory.Find(openstackVm, vm)
+	if err != nil {
+		return
+	}
+	ready = true
+
+	for _, vol := range openstackVm.AttachedVolumes {
+		lookupName := fmt.Sprintf("%s-%s", r.Migration.Name, vol.ID)
+		image := &openstack.Image{}
+		err = r.Source.Inventory.Find(image, ref.Ref{Name: lookupName})
+		if err != nil {
+			return
+		}
+
+		obj := client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: image.ID}
+		pvc := core.PersistentVolumeClaim{}
+		err = r.Client.Get(context.Background(), obj, &pvc)
+		if err != nil {
+			return
+		}
+
+		if pvc.Status.Phase != core.ClaimBound {
+			ready = false
+			return
+		}
+		var task *plan.Task
+		found := false
+		task, found = step.FindTask(lookupName)
+		if !found {
+			return
+		}
+		task.MarkCompleted()
+	}
+
 	return
 }

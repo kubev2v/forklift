@@ -729,7 +729,6 @@ func makePopulatePodSpec(pvcPrimeName, secretName string) corev1.PodSpec {
 		Containers: []corev1.Container{
 			{
 				Name:            populatorContainerName,
-				ImagePullPolicy: corev1.PullIfNotPresent,
 			},
 		},
 		RestartPolicy: corev1.RestartPolicyNever,

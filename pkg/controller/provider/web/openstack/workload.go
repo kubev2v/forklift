@@ -65,7 +65,7 @@ func (h WorkloadHandler) Get(ctx *gin.Context) {
 	}
 	h.Detail = model.MaxDetail
 	r := Workload{}
-	r.With(m)
+	r.VM.With(m)
 	err = r.Expand(h.Collector.DB())
 	if err != nil {
 		return
@@ -81,11 +81,6 @@ type Workload struct {
 	XVM
 }
 
-// Expanded: VM.
-type XVM struct {
-	VM
-}
-
 // Build self link (URI).
 func (r *Workload) Link(p *api.Provider) {
 	r.SelfLink = base.Link(
@@ -97,7 +92,48 @@ func (r *Workload) Link(p *api.Provider) {
 	r.XVM.Link(p)
 }
 
+// Expanded: VM.
+type XVM struct {
+	VM
+	Image           Image    `json:"image"`
+	AttachedVolumes []Volume `json:"attached_volumes"`
+}
+
 // Expand references.
 func (r *XVM) Expand(db libmodel.DB) (err error) {
-	return nil
+	image := model.Image{Base: model.Base{
+		ID: r.ImageID,
+	}}
+	db.Get(&image)
+	r.Image.With(&image)
+
+	var volumes []Volume
+	for _, av := range r.VM.AttachedVolumes {
+		volumeModel := model.Volume{
+			Base: model.Base{ID: av.ID},
+		}
+		db.Get(&volumeModel)
+		volume := &Volume{}
+		volume.With(&volumeModel)
+		volumes = append(volumes, *volume)
+	}
+	r.AttachedVolumes = volumes
+
+	return
+}
+
+// Build self link (URI).
+func (r *XVM) Link(p *api.Provider) {
+	r.VM.Link(p)
+}
+
+// Expand the workload.
+func (r *Workload) Expand(db libmodel.DB) (err error) {
+	// VM
+	err = r.XVM.Expand(db)
+	if err != nil {
+		return err
+	}
+
+	return
 }

@@ -106,6 +106,7 @@ populator_controller_image_fqin: "{{ lookup( 'env', 'POPULATOR_CONTROLLER_IMAGE'
 populator_ovirt_image_fqin: "{{ lookup( 'env', 'OVIRT_POPULATOR_IMAGE') or lookup( 'env', 'RELATED_IMAGE_RHV_POPULATOR') }}"
 populator_controller_deployment_name: "{{ app_name }}-volume-populator-controller"
 populator_controller_container_name: "{{ app_name }}-populator-controller"
+populator_openstack_image_fqin: "{{ lookup( 'env', 'OPENSTACK_POPULATOR_IMAGE') or lookup( 'env', 'RELATED_IMAGE_OPENSTACK_POPULATOR') }}"
 
 must_gather_api_image_fqin: "{{ lookup( 'env', 'MUST_GATHER_API_IMAGE') or lookup( 'env', 'RELATED_IMAGE_MUST_GATHER_API') }}"
 must_gather_api_service_name: "{{ app_name }}-must-gather-api"

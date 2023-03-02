@@ -35,7 +35,17 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 		return
 	}
 	for _, av := range vm.AttachedVolumes {
-		if !r.plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{ID: av.ID}) {
+		volType := &model.VolumeType{}
+		err = r.inventory.Find(volType, ref.Ref{Name: av.VolumeType})
+		if err != nil {
+			err = liberr.Wrap(
+				err,
+				"VolumeType not found in inventory.",
+				"VolumeType",
+				volType)
+			return
+		}
+		if !r.plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{ID: volType.ID}) {
 			return
 		}
 	}
