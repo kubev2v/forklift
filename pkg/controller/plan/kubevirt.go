@@ -1162,10 +1162,10 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	fsGroup := int64(107)
 	// virt-v2v image
 	var virtV2vImage string
-	if r.Plan.Spec.Warm {
-		virtV2vImage = Settings.Migration.VirtV2vImageWarm
-	} else {
+	if r.Context.UseEl9VirtV2v() {
 		virtV2vImage = Settings.Migration.VirtV2vImageCold
+	} else {
+		virtV2vImage = Settings.Migration.VirtV2vImageWarm
 	}
 	// pod environment
 	environment, err := r.Builder.PodEnvironment(vm.Ref, r.Source.Secret)

@@ -103,6 +103,10 @@ func (r *Context) SetMigration(migration *api.Migration) {
 			migration.Name))
 }
 
+func (r *Context) UseEl9VirtV2v() bool {
+	return !r.Plan.Spec.Warm
+}
+
 // Source.
 type Source struct {
 	// Provider
