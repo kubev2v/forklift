@@ -4,8 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"path"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
@@ -37,6 +41,8 @@ var (
 	HasPreHook         libitr.Flag = 0x01
 	HasPostHook        libitr.Flag = 0x02
 	RequiresConversion libitr.Flag = 0x04
+	CDIDiskCopy        libitr.Flag = 0x08
+	VirtV2vDiskCopy    libitr.Flag = 0x10
 )
 
 // Phases.
@@ -49,6 +55,7 @@ const (
 	CreateDataVolumes        = "CreateDataVolumes"
 	CreateVM                 = "CreateVM"
 	CopyDisks                = "CopyDisks"
+	AllocateDisks            = "AllocateDisks"
 	CopyingPaused            = "CopyingPaused"
 	AddCheckpoint            = "AddCheckpoint"
 	AddFinalCheckpoint       = "AddFinalCheckpoint"
@@ -58,6 +65,7 @@ const (
 	Finalize                 = "Finalize"
 	CreateGuestConversionPod = "CreateGuestConversionPod"
 	ConvertGuest             = "ConvertGuest"
+	CopyDisksVirtV2V         = "CopyDisksVirtV2V"
 	PostHook                 = "PostHook"
 	Completed                = "Completed"
 	WaitForSnapshot          = "WaitForSnapshot"
@@ -69,8 +77,10 @@ const (
 const (
 	Initialize      = "Initialize"
 	Cutover         = "Cutover"
+	DiskAllocation  = "DiskAllocation"
 	DiskTransfer    = "DiskTransfer"
 	ImageConversion = "ImageConversion"
+	DiskTransferV2v = "DiskTransferV2v"
 	VMCreation      = "VirtualMachineCreation"
 	Unknown         = "Unknown"
 )
@@ -90,9 +100,11 @@ var (
 			{Name: PowerOffSource},
 			{Name: WaitForPowerOff},
 			{Name: CreateDataVolumes},
-			{Name: CopyDisks},
+			{Name: CopyDisks, All: CDIDiskCopy},
+			{Name: AllocateDisks, All: VirtV2vDiskCopy},
 			{Name: CreateGuestConversionPod, All: RequiresConversion},
 			{Name: ConvertGuest, All: RequiresConversion},
+			{Name: CopyDisksVirtV2V, All: RequiresConversion},
 			{Name: CreateVM},
 			{Name: PostHook, All: HasPostHook},
 			{Name: Completed},
@@ -457,6 +469,7 @@ func (r *Migration) next(phase string) (next string) {
 	} else {
 		next = step.Name
 	}
+	r.Log.Info("Itinerary transition", "current phase", phase, "next phase", next)
 
 	return
 }
@@ -475,12 +488,16 @@ func (r *Migration) step(vm *plan.VMStatus) (step string) {
 	switch vm.Phase {
 	case Started, CreateInitialSnapshot, WaitForInitialSnapshot, CreateDataVolumes:
 		step = Initialize
+	case AllocateDisks:
+		step = DiskAllocation
 	case CopyDisks, CopyingPaused, CreateSnapshot, WaitForSnapshot, AddCheckpoint:
 		step = DiskTransfer
 	case CreateFinalSnapshot, WaitForFinalSnapshot, AddFinalCheckpoint, Finalize:
 		step = Cutover
 	case CreateGuestConversionPod, ConvertGuest:
 		step = ImageConversion
+	case CopyDisksVirtV2V:
+		step = DiskTransferV2v
 	case CreateVM:
 		step = VMCreation
 	case PreHook, PostHook:
@@ -661,7 +678,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		step.MarkCompleted()
 		step.Phase = Completed
 		vm.Phase = r.next(vm.Phase)
-	case CopyDisks:
+	case AllocateDisks, CopyDisks:
 		step, found := vm.FindStep(r.step(vm))
 		if !found {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
@@ -897,12 +914,14 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			break
 		}
 		vm.Phase = r.next(vm.Phase)
-	case ConvertGuest:
+	case ConvertGuest, CopyDisksVirtV2V:
 		step, found := vm.FindStep(r.step(vm))
 		if !found {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
 			break
 		}
+		step.MarkStarted()
+		step.Phase = Running
 		err = r.updateConversionProgress(vm, step)
 		if err != nil {
 			return
@@ -999,7 +1018,7 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 						Phase:       Pending,
 					},
 				})
-		case CopyDisks:
+		case AllocateDisks, CopyDisks, CopyDisksVirtV2V:
 			tasks, pErr := r.builder.Tasks(vm.Ref)
 			if pErr != nil {
 				err = liberr.Wrap(pErr)
@@ -1009,12 +1028,27 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 			for _, task := range tasks {
 				total += task.Progress.Total
 			}
+			var task_description, task_name string
+			switch step.Name {
+			case CopyDisks:
+				task_name = DiskTransfer
+				task_description = "Transfer disks."
+			case AllocateDisks:
+				task_name = DiskAllocation
+				task_description = "Allocate disks."
+			case CopyDisksVirtV2V:
+				task_name = DiskTransferV2v
+				task_description = "Copy disks."
+			default:
+				err = liberr.New(fmt.Sprintf("Unknown step '%s'. Not implemented.", step.Name))
+				return
+			}
 			pipeline = append(
 				pipeline,
 				&plan.Step{
 					Task: plan.Task{
-						Name:        DiskTransfer,
-						Description: "Transfer disks.",
+						Name:        task_name,
+						Description: task_description,
 						Progress: libitr.Progress{
 							Total: total,
 						},
@@ -1397,10 +1431,76 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 		case core.PodFailed:
 			step.MarkCompleted()
 			step.AddError("Guest conversion failed. See pod logs for details.")
+		default:
+			if r.Context.UseEl9VirtV2v() {
+				err = r.updateConversionProgressEl9(pod, step)
+				if err != nil {
+					// Just log it. Missing progress is not fatal.
+					log.Error(err, "Failed to update conversion progress")
+					err = nil
+					return
+				}
+			}
 		}
 	} else {
 		step.MarkCompleted()
 		step.AddError("Guest conversion pod not found")
+	}
+	return
+}
+
+func (r *Migration) updateConversionProgressEl9(pod *core.Pod, step *plan.Step) (err error) {
+	if pod.Status.PodIP == "" {
+		return
+	}
+
+	var disk_re = regexp.MustCompile(`v2v_disk_transfers\{disk_id="(\d+)"\} (\d{1,3}\.?\d*)`)
+	url := fmt.Sprintf("http://%s:2112/metrics", pod.Status.PodIP)
+	resp, err := http.Get(url)
+	if err != nil {
+		if strings.Contains(err.Error(), "connection refused") {
+			return nil
+		}
+		return
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+	matches := disk_re.FindAllStringSubmatch(string(body), -1)
+	if matches == nil {
+		return
+	}
+	some_progress := false
+	for _, match := range matches {
+		disk_nr, _ := strconv.ParseUint(string(match[1]), 10, 0)
+		progress, _ := strconv.ParseFloat(string(match[2]), 64)
+		r.Log.Info("Progress update", "disk", disk_nr, "progress", progress, "tasks", step.Tasks)
+		if progress > 100 {
+			r.Log.Info("Progress seems out of range", "progress", progress)
+			progress = 100
+		}
+		if progress > 0 {
+			some_progress = true
+		}
+		if disk_nr > uint64(len(step.Tasks)) {
+			r.Log.Info("Ignoring progress update", "disk", disk_nr, "disks count", len(step.Tasks), "step", step.Name)
+			continue
+		}
+		task := step.Tasks[disk_nr-1]
+		if step.Name == DiskTransferV2v {
+			// Update copy progress if we're in CopyDisksVirtV2V step.
+			task.Progress.Completed = int64(float64(task.Progress.Total) * progress / 100)
+		}
+	}
+	step.ReflectTasks()
+	if step.Name == ImageConversion && some_progress {
+		// Disk copying has already started. Transition from
+		// ConvertGuest to CopyDisksVirtV2V .
+		step.MarkCompleted()
+		step.Progress.Completed = step.Progress.Total
+		return
 	}
 	return
 }
@@ -1496,6 +1596,10 @@ func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 		_, allowed = r.vm.FindHook(PostHook)
 	case RequiresConversion:
 		allowed = r.context.Source.Provider.RequiresConversion()
+	case CDIDiskCopy:
+		allowed = !r.context.UseEl9VirtV2v()
+	case VirtV2vDiskCopy:
+		allowed = r.context.UseEl9VirtV2v()
 	}
 
 	return

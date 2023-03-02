@@ -1215,6 +1215,13 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 					VolumeMounts:  volumeMounts,
 					VolumeDevices: volumeDevices,
 					Resources:     resourceReq,
+					Ports: []core.ContainerPort{
+						{
+							Name:          "metrics",
+							ContainerPort: 2112,
+							Protocol:      core.ProtocolTCP,
+						},
+					},
 				},
 			},
 			Volumes:      volumes,
