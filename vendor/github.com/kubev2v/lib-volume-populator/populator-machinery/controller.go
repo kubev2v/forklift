@@ -68,6 +68,8 @@ const (
 	reasonPodFailed          = "PopulatorFailed"
 	reasonPodFinished        = "PopulatorFinished"
 	reasonPVCCreationError   = "PopulatorPVCCreationError"
+
+	qemuGroup = 107
 )
 
 type empty struct{}
@@ -722,11 +724,28 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 }
 
 func makePopulatePodSpec(pvcPrimeName, secretName string) corev1.PodSpec {
+	nonRoot := true
+	allowPrivilageEscalation := false
+	user := int64(qemuGroup)
 	return corev1.PodSpec{
 		Containers: []corev1.Container{
 			{
 				Name: populatorContainerName,
+				SecurityContext: &corev1.SecurityContext{
+					AllowPrivilegeEscalation: &allowPrivilageEscalation,
+					RunAsNonRoot:             &nonRoot,
+					RunAsUser:                &user,
+					SeccompProfile: &corev1.SeccompProfile{
+						Type: corev1.SeccompProfileTypeRuntimeDefault,
+					},
+					Capabilities: &corev1.Capabilities{
+						Drop: []corev1.Capability{"ALL"},
+					},
+				},
 			},
+		},
+		SecurityContext: &corev1.PodSecurityContext{
+			FSGroup: &user,
 		},
 		RestartPolicy: corev1.RestartPolicyNever,
 		Volumes: []corev1.Volume{
