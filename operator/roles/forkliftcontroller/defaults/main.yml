@@ -4,6 +4,7 @@ app_namespace: "{{ lookup( 'env', 'WATCH_NAMESPACE') or 'konveyor-forklift' }}"
 
 # Feature defaults
 feature_ui: true
+feature_ui_plugin: true
 feature_validation: true
 feature_must_gather_api: true
 feature_volume_populator: true
