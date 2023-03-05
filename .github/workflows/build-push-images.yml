@@ -39,3 +39,4 @@ jobs:
           cd ${GITHUB_WORKSPACE}
           ./hack/release-images.sh
           make push-ovirt-populator-image
+          make push-openstack-populator-image
