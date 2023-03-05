@@ -13,6 +13,9 @@ spec:
     listKind: OvirtVolumePopulatorList
     plural: ovirtvolumepopulators
     singular: ovirtvolumepopulator
+    shortNames:
+    - ovvp
+    - ovvps
   scope: Namespaced
   versions:
   - name: v1beta1
