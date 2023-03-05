@@ -74,16 +74,15 @@ func (mutator *OvirtCertMutator) Mutate(ar *admissionv1.AdmissionReview) *admiss
 			return util.ToAdmissionResponseError(err)
 		}
 
-		b, err := io.ReadAll(response.Body)
+		cert, err := io.ReadAll(response.Body)
 		if err != nil {
 			log.Error(err, "mutating webhook error, failed to read certificate retrieval response")
 			return util.ToAdmissionResponseError(err)
 		}
 
-		secretCa, retrivedCa := removeAllNewLines(secret, b)
 		//check if the CA included in the secrete provided by the user and update it if needed
-		if !bytes.Contains(secretCa, retrivedCa) {
-			secret.Data["cacert"] = appendMissingCa(secret, b)
+		if !contains(secret.Data["cacert"], cert) {
+			secret.Data["cacert"] = appendCerts(secret.Data["cacert"], cert)
 			secret.Labels["ca-cert-updated"] = "true"
 			log.Info("Engine CA certificate was missing, updating the secret")
 		}
@@ -124,18 +123,15 @@ func (mutator *OvirtCertMutator) Mutate(ar *admissionv1.AdmissionReview) *admiss
 	}
 }
 
-func removeAllNewLines(secret *core.Secret, b []byte) (secretCa []byte, retrivedCa []byte) {
-	secretCa = bytes.ReplaceAll(secret.Data["cacert"], []byte{0x0a}, []byte{})
-	retrivedCa = bytes.ReplaceAll(b, []byte{0x0a}, []byte{})
-	return
+func contains(secretCert, cert []byte) bool {
+	flatSecretCa := bytes.ReplaceAll(secretCert, []byte{0x0a}, []byte{})
+	flatCert := bytes.ReplaceAll(cert, []byte{0x0a}, []byte{})
+	return bytes.Contains(flatSecretCa, flatCert)
 }
 
-func appendMissingCa(secret *core.Secret, b []byte) (newCa []byte) {
-	if bytes.HasSuffix(secret.Data["cacert"], []byte{0x0a}) {
-		newCa = append(secret.Data["cacert"], b...)
-	} else {
-		newCa = append(secret.Data["cacert"], 0x0a)
-		newCa = append(newCa, b...)
+func appendCerts(secretCert, cert []byte) []byte {
+	if !bytes.HasSuffix(secretCert, []byte{0x0a}) {
+		secretCert = append(secretCert, 0x0a)
 	}
-	return
+	return append(secretCert, cert...)
 }
