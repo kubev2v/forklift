@@ -688,6 +688,8 @@ func (r *KubeVirt) areOvirtPVCsReady(vm ref.Ref, step *plan.Step) (ready bool, e
 	return
 }
 
+var filesystemMode = core.PersistentVolumeFilesystem
+
 // Return storage profile access mode based on storage class
 func (r *KubeVirt) getStorageProfileModes(storageName string) (accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode, err error) {
 	storageProfileList := &cdi.StorageProfileList{}
@@ -700,13 +702,21 @@ func (r *KubeVirt) getStorageProfileModes(storageName string) (accessModes []cor
 		if storageProfile.Name == storageName {
 			for _, claimProperty := range storageProfile.Status.ClaimPropertySets {
 				volumeMode = claimProperty.VolumeMode
-				if *volumeMode == core.PersistentVolumeBlock {
+				if volumeMode != nil && *volumeMode == core.PersistentVolumeBlock {
 					// Preferring Block volume mode
 					break
 				}
 			}
+			if volumeMode == nil {
+				// volumeMode is an optional API parameter. Filesystem is the default mode used when volumeMode parameter is omitted.
+				volumeMode = &filesystemMode
+			}
 			for _, claimProperty := range storageProfile.Status.ClaimPropertySets {
-				if *claimProperty.VolumeMode == *volumeMode {
+				claimPropertyVolumeMode := claimProperty.VolumeMode
+				if claimPropertyVolumeMode == nil {
+					claimPropertyVolumeMode = &filesystemMode
+				}
+				if *claimPropertyVolumeMode == *volumeMode {
 					accessModes = append(accessModes, claimProperty.AccessModes...)
 				}
 			}
