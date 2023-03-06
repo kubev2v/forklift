@@ -471,7 +471,7 @@ func (r *KubeVirt) SetRunning(vmCr *VirtualMachine, running bool) (err error) {
 }
 
 func (r *KubeVirt) DataVolumes(vm *plan.VMStatus) (dataVolumes []cdi.DataVolume, err error) {
-	secret, err := r.ensureSecret(vm.Ref)
+	secret, err := r.ensureSecret(vm.Ref, false)
 	if err != nil {
 		return
 	}
@@ -600,7 +600,7 @@ func (r *KubeVirt) getPVCs(vm *plan.VMStatus) (pvcs []core.PersistentVolumeClaim
 }
 
 func (r *KubeVirt) createVolumesForOvirt(vm ref.Ref) (err error) {
-	_, err = r.ensureSecret(vm)
+	secret, err := r.ensureSecret(vm, true)
 	if err != nil {
 		return
 	}
@@ -616,7 +616,7 @@ func (r *KubeVirt) createVolumesForOvirt(vm ref.Ref) (err error) {
 
 	storageName := &r.Context.Map.Storage.Spec.Map[0].Destination.StorageClass
 	for _, da := range ovirtVm.DiskAttachments {
-		populatorCr := r.OvirtVolumePopulator(da, sourceUrl)
+		populatorCr := r.OvirtVolumePopulator(da, sourceUrl, secret.Name)
 		failure := r.Client.Create(context.Background(), populatorCr, &client.CreateOptions{})
 		if failure != nil && !k8serr.IsAlreadyExists(failure) {
 			return failure
@@ -642,7 +642,7 @@ func (r *KubeVirt) createVolumesForOvirt(vm ref.Ref) (err error) {
 }
 
 // Build an OvirtVolumePopulator for XDiskAttachment and source URL
-func (r *KubeVirt) OvirtVolumePopulator(da ovirt.XDiskAttachment, sourceUrl *url.URL) *v1beta1.OvirtVolumePopulator {
+func (r *KubeVirt) OvirtVolumePopulator(da ovirt.XDiskAttachment, sourceUrl *url.URL, secretName string) *v1beta1.OvirtVolumePopulator {
 	return &v1beta1.OvirtVolumePopulator{
 		ObjectMeta: meta.ObjectMeta{
 			Name:      da.DiskAttachment.ID,
@@ -650,7 +650,7 @@ func (r *KubeVirt) OvirtVolumePopulator(da ovirt.XDiskAttachment, sourceUrl *url
 		},
 		Spec: v1beta1.OvirtVolumePopulatorSpec{
 			EngineURL:        fmt.Sprintf("https://%s", sourceUrl.Host),
-			EngineSecretName: r.Source.Secret.Name,
+			EngineSecretName: secretName,
 			DiskID:           da.Disk.ID,
 		},
 	}
@@ -730,7 +730,7 @@ func (r *KubeVirt) getListOptionsNamespaced() (listOptions *client.ListOptions) 
 
 // Ensure the guest conversion (virt-v2v) pod exists on the destination.
 func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, vmCr *VirtualMachine, pvcs *[]core.PersistentVolumeClaim) (err error) {
-	v2vSecret, err := r.ensureSecret(vm.Ref)
+	v2vSecret, err := r.ensureSecret(vm.Ref, false)
 	if err != nil {
 		return
 	}
@@ -1448,12 +1448,12 @@ func (r *KubeVirt) configMap(vmRef ref.Ref) (object *core.ConfigMap, err error) 
 }
 
 // Ensure the DatVolume credential secret exists on the destination.
-func (r *KubeVirt) ensureSecret(vmRef ref.Ref) (secret *core.Secret, err error) {
+func (r *KubeVirt) ensureSecret(vmRef ref.Ref, cloneProviderSecret bool) (secret *core.Secret, err error) {
 	_, err = r.Source.Inventory.VM(&vmRef)
 	if err != nil {
 		return
 	}
-	newSecret, err := r.secret(vmRef)
+	newSecret, err := r.secret(vmRef, cloneProviderSecret)
 	if err != nil {
 		return
 	}
@@ -1507,7 +1507,7 @@ func (r *KubeVirt) ensureSecret(vmRef ref.Ref) (secret *core.Secret, err error) 
 }
 
 // Build the DataVolume credential secret.
-func (r *KubeVirt) secret(vmRef ref.Ref) (object *core.Secret, err error) {
+func (r *KubeVirt) secret(vmRef ref.Ref, cloneProviderSecret bool) (object *core.Secret, err error) {
 	object = &core.Secret{
 		ObjectMeta: meta.ObjectMeta{
 			Labels:    r.vmLabels(vmRef),
@@ -1518,6 +1518,10 @@ func (r *KubeVirt) secret(vmRef ref.Ref) (object *core.Secret, err error) {
 					vmRef.ID},
 				"-") + "-",
 		},
+	}
+	if cloneProviderSecret {
+		object.Data = r.Source.Secret.Data
+		return
 	}
 	err = r.Builder.Secret(vmRef, r.Source.Secret, object)
 
@@ -1640,7 +1644,7 @@ func vmOwnerReference(vm *cnv.VirtualMachine) (ref meta.OwnerReference) {
 
 // TODO move elsewhere
 func (r *KubeVirt) createOpenStackVolumes(vm ref.Ref) (err error) {
-	secret, err := r.ensureSecret(vm)
+	secret, err := r.ensureSecret(vm, false)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
