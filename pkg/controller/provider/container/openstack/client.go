@@ -49,7 +49,7 @@ func (r *Client) Connect() (err error) {
 	// 	return
 	// }
 
-	if r.insecure() {
+	if r.insecureSkipVerify() {
 		TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	} else {
 		cacert := []byte(r.cacert())
@@ -176,14 +176,14 @@ func (r *Client) cacert() string {
 	return ""
 }
 
-// Insecure
-func (r *Client) insecure() bool {
-	if insecure, found := r.Secret.Data["insecure"]; found {
-		insecure, err := strconv.ParseBool(string(insecure))
+// insecureSkipVerify
+func (r *Client) insecureSkipVerify() bool {
+	if insecureSkipVerifyStr, found := r.Secret.Data["insecureSkipVerify"]; found {
+		insecureSkipVerify, err := strconv.ParseBool(string(insecureSkipVerifyStr))
 		if err != nil {
 			return false
 		}
-		return insecure
+		return insecureSkipVerify
 	}
 	return false
 }
