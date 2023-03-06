@@ -20,7 +20,8 @@ var _ = Describe("[level:component]Migration tests for oVirt provider", func() {
 
 	FIt("[oVirt MTV] should create provider with NetworkMap", func() {
 		// TODO: use a different (the generated) namespace
-		namespace := "konveyor-forklift"
+		//namespace := "konveyor-forklift"
+		namespace := f.Namespace.Name
 		err := f.Clients.OvirtClient.SetupClient()
 		Expect(err).ToNot(HaveOccurred())
 
