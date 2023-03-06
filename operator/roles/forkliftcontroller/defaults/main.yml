@@ -3,7 +3,7 @@ app_name: "{{ lookup('env', 'APP_NAME') or 'forklift' }}"
 app_namespace: "{{ lookup( 'env', 'WATCH_NAMESPACE') or 'konveyor-forklift' }}"
 
 # Feature defaults
-feature_ui: true
+feature_ui: false
 feature_ui_plugin: true
 feature_validation: true
 feature_must_gather_api: true
