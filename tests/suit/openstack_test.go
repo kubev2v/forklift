@@ -13,19 +13,19 @@ import (
 const (
 	openstackProviderName = "os-provider"
 	openstackStorageClass = "nfs-csi"
+	packstackNameSpace    = "konveyor-forklift"
 )
 
 var _ = Describe("[level:component]Migration tests for OpenStack provider", func() {
 	f := framework.NewFramework("migration-func-test")
 
 	It("[test] should create provider with NetworkMap", func() {
-		// TODO: use a different (the generated) namespace
-		namespace := "konveyor-forklift"
+		namespace := f.Namespace.Name
 		err := f.Clients.OpenStackClient.SetupClient("cirros-volume", "net-int", "nfs")
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Load Source VM Details from OpenStack")
-		vmData, err := f.Clients.OpenStackClient.LoadSourceDetails(f, namespace, "packstack")
+		vmData, err := f.Clients.OpenStackClient.LoadSourceDetails(f, packstackNameSpace, "packstack")
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Create Secret from Definition")
@@ -67,7 +67,7 @@ var _ = Describe("[level:component]Migration tests for OpenStack provider", func
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Creating plan")
-		planDenf := utils.NewPlanWithVmId(namespace, *provider, test_plan_name, test_storage_map_name, networkMapName, []string{vmData.GetTestVMId()}, "default")
+		planDenf := utils.NewPlanWithVmId(namespace, *provider, test_plan_name, test_storage_map_name, networkMapName, []string{vmData.GetTestVMId()}, namespace)
 		err = utils.CreatePlanFromDefinition(f.CrClient, planDenf)
 		Expect(err).ToNot(HaveOccurred())
 		err = utils.WaitForPlanReadyWithTimeout(f.CrClient, namespace, test_plan_name, 15*time.Second)
@@ -78,10 +78,6 @@ var _ = Describe("[level:component]Migration tests for OpenStack provider", func
 		Expect(err).ToNot(HaveOccurred())
 		err = utils.WaitForMigrationSucceededWithTimeout(f.CrClient, provider.Namespace, test_migration_name, 400*time.Second)
 		Expect(err).ToNot(HaveOccurred())
-
-		//err = utils.WaitForNetworkMapReadyWithTimeout(f.CrClient, f.Namespace.Name, networkMapName, 10*time.Second)
-		//Expect(err).ToNot(HaveOccurred())
-
 	})
 
 })

@@ -12,7 +12,7 @@ func (r *OpenStackClient) SetupClient(vmName string, networkName string, volumeT
 	return nil
 }
 
-// LoadSourceDetails - Load Source VM details from oVirt
+// LoadSourceDetails - Load Source VM details from openstack
 func (r *OpenStackClient) LoadSourceDetails(f *Framework, namespace string, contName string) (vm *OpenStackVM, err error) {
 
 	pod, err := utils.FindPodByPrefix(f.K8sClient, namespace, contName, fmt.Sprintf("app=%s", contName))
