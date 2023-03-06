@@ -53,12 +53,12 @@ func main() {
 }
 
 type openstackConfig struct {
-	username    string
-	password    string
-	domainName  string
-	projectName string
-	insecure    string
-	region      string
+	username           string
+	password           string
+	domainName         string
+	projectName        string
+	insecureSkipVerify string
+	region             string
 }
 
 func loadConfig(secretName, endpoint, namespace string) openstackConfig {
@@ -82,18 +82,18 @@ func loadConfig(secretName, endpoint, namespace string) openstackConfig {
 	if err != nil {
 		klog.Fatal(err.Error())
 	}
-	insecure, err := os.ReadFile("/etc/secret-volume/insecure")
+	insecureSkipVerify, err := os.ReadFile("/etc/secret-volume/insecureSkipVerify")
 	if err != nil {
 		klog.Fatal(err.Error())
 	}
 
 	return openstackConfig{
-		username:    string(username),
-		password:    string(password),
-		insecure:    string(insecure),
-		projectName: string(projectName),
-		region:      string(region),
-		domainName:  string(domainName),
+		username:           string(username),
+		password:           string(password),
+		insecureSkipVerify: string(insecureSkipVerify),
+		projectName:        string(projectName),
+		region:             string(region),
+		domainName:         string(domainName),
 	}
 }
 
