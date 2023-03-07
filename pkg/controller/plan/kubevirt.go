@@ -471,7 +471,7 @@ func (r *KubeVirt) SetRunning(vmCr *VirtualMachine, running bool) (err error) {
 }
 
 func (r *KubeVirt) DataVolumes(vm *plan.VMStatus) (dataVolumes []cdi.DataVolume, err error) {
-	secret, err := r.ensureSecret(vm.Ref, false)
+	secret, err := r.ensureSecret(vm.Ref, r.secretDataSetterForCDI(vm.Ref))
 	if err != nil {
 		return
 	}
@@ -600,7 +600,7 @@ func (r *KubeVirt) getPVCs(vm *plan.VMStatus) (pvcs []core.PersistentVolumeClaim
 }
 
 func (r *KubeVirt) createVolumesForOvirt(vm ref.Ref) (err error) {
-	secret, err := r.ensureSecret(vm, true)
+	secret, err := r.ensureSecret(vm, r.copyDataFromProviderSecret)
 	if err != nil {
 		return
 	}
@@ -730,7 +730,7 @@ func (r *KubeVirt) getListOptionsNamespaced() (listOptions *client.ListOptions) 
 
 // Ensure the guest conversion (virt-v2v) pod exists on the destination.
 func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, vmCr *VirtualMachine, pvcs *[]core.PersistentVolumeClaim) (err error) {
-	v2vSecret, err := r.ensureSecret(vm.Ref, false)
+	v2vSecret, err := r.ensureSecret(vm.Ref, r.secretDataSetterForCDI(vm.Ref))
 	if err != nil {
 		return
 	}
@@ -1447,13 +1447,24 @@ func (r *KubeVirt) configMap(vmRef ref.Ref) (object *core.ConfigMap, err error) 
 	return
 }
 
-// Ensure the DatVolume credential secret exists on the destination.
-func (r *KubeVirt) ensureSecret(vmRef ref.Ref, cloneProviderSecret bool) (secret *core.Secret, err error) {
+func (r *KubeVirt) copyDataFromProviderSecret(secret *core.Secret) error {
+	secret.Data = r.Source.Secret.Data
+	return nil
+}
+
+func (r *KubeVirt) secretDataSetterForCDI(vmRef ref.Ref) func(*core.Secret) error {
+	return func(secret *core.Secret) error {
+		return r.Builder.Secret(vmRef, r.Source.Secret, secret)
+	}
+}
+
+// Ensure the credential secret for the data transfer exists on the destination.
+func (r *KubeVirt) ensureSecret(vmRef ref.Ref, setSecretData func(*core.Secret) error) (secret *core.Secret, err error) {
 	_, err = r.Source.Inventory.VM(&vmRef)
 	if err != nil {
 		return
 	}
-	newSecret, err := r.secret(vmRef, cloneProviderSecret)
+	newSecret, err := r.secret(vmRef, setSecretData)
 	if err != nil {
 		return
 	}
@@ -1506,9 +1517,9 @@ func (r *KubeVirt) ensureSecret(vmRef ref.Ref, cloneProviderSecret bool) (secret
 	return
 }
 
-// Build the DataVolume credential secret.
-func (r *KubeVirt) secret(vmRef ref.Ref, cloneProviderSecret bool) (object *core.Secret, err error) {
-	object = &core.Secret{
+// Build the credential secret for the data transfer (CDI importer / popoulator pod).
+func (r *KubeVirt) secret(vmRef ref.Ref, setSecretData func(*core.Secret) error) (secret *core.Secret, err error) {
+	secret = &core.Secret{
 		ObjectMeta: meta.ObjectMeta{
 			Labels:    r.vmLabels(vmRef),
 			Namespace: r.Plan.Spec.TargetNamespace,
@@ -1519,12 +1530,7 @@ func (r *KubeVirt) secret(vmRef ref.Ref, cloneProviderSecret bool) (object *core
 				"-") + "-",
 		},
 	}
-	if cloneProviderSecret {
-		object.Data = r.Source.Secret.Data
-		return
-	}
-	err = r.Builder.Secret(vmRef, r.Source.Secret, object)
-
+	err = setSecretData(secret)
 	return
 }
 
@@ -1644,7 +1650,7 @@ func vmOwnerReference(vm *cnv.VirtualMachine) (ref meta.OwnerReference) {
 
 // TODO move elsewhere
 func (r *KubeVirt) createOpenStackVolumes(vm ref.Ref) (err error) {
-	secret, err := r.ensureSecret(vm, false)
+	secret, err := r.ensureSecret(vm, r.secretDataSetterForCDI(vm))
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
