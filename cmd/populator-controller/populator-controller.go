@@ -7,7 +7,7 @@ import (
 	"syscall"
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	populator_machinery "github.com/kubev2v/lib-volume-populator/populator-machinery"
+	populator_machinery "github.com/konveyor/forklift-controller/pkg/lib-volume-populator/populator-machinery"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
