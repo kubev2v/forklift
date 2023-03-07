@@ -19,18 +19,24 @@ package populator_machinery
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"os/signal"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -68,6 +74,7 @@ const (
 	reasonPodFailed          = "PopulatorFailed"
 	reasonPodFinished        = "PopulatorFinished"
 	reasonPVCCreationError   = "PopulatorPVCCreationError"
+	reasonPopulatorProgress  = "PopulatorProgress"
 
 	qemuGroup = 107
 )
@@ -82,6 +89,7 @@ type controller struct {
 	populatedFromAnno string
 	pvcFinalizer      string
 	kubeClient        kubernetes.Interface
+	dynamicClient     dynamic.Interface
 	imageName         string
 	devicePath        string
 	mountPath         string
@@ -147,6 +155,7 @@ func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, 
 
 	c := &controller{
 		kubeClient:        kubeClient,
+		dynamicClient:     dynClient,
 		imageName:         imageName,
 		devicePath:        devicePath,
 		mountPath:         mountPath,
@@ -614,6 +623,8 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 
 			// We'll get called again later when the pod exists
 			return nil
+		} else {
+			c.updateProgress(pvc, pod, "openstack_volume_populator", unstructured)
 		}
 
 		if corev1.PodSucceeded != pod.Status.Phase {
@@ -723,6 +734,53 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 	return nil
 }
 
+func (c *controller) updateProgress(pvc *corev1.PersistentVolumeClaim, pod *corev1.Pod, populatorName string, cr *unstructured.Unstructured) error {
+	var disk_re = regexp.MustCompile(fmt.Sprintf(`volume_populators_%s\{image_id=\"([a-z]|\d|\-)+"\} (\d{1,3}\.?(\d+e\+\d+)*)`, populatorName))
+	url := fmt.Sprintf("http://%s:2112/metrics", pod.Status.PodIP)
+	resp, err := http.Get(url)
+	if err != nil {
+		if strings.Contains(err.Error(), "connection refused") {
+			return nil
+		}
+		c.recorder.Eventf(pod, corev1.EventTypeWarning, reasonPopulatorProgress, "Failed to get url: %s, err: %w", url, err)
+
+		return nil
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+
+	if err != nil {
+		c.recorder.Eventf(pod, corev1.EventTypeWarning, reasonPopulatorProgress, "Failed to read bosy: %s, err: %w", url, err)
+		return nil
+	}
+
+	matches := disk_re.FindAllStringSubmatch(string(body), -1)
+	if matches == nil {
+		c.recorder.Eventf(pod, corev1.EventTypeWarning, reasonPopulatorProgress, "Failed to find matchs: %s", matches)
+		return nil
+	}
+
+	for _, match := range matches {
+		imageID := match[1]
+		progress, _ := strconv.ParseFloat(string(match[2]), 64)
+		c.recorder.Eventf(pod, corev1.EventTypeNormal, reasonPopulatorProgress, "disk_nr: %s, progress %d", imageID, int64(progress))
+		gvr := schema.GroupVersionResource{Group: *pvc.Spec.DataSourceRef.APIGroup, Version: "v1beta1", Resource: "openstackvolumepopulators"}
+		openstackPopulator := &v1beta1.OpenstackVolumePopulator{}
+		runtime.DefaultUnstructuredConverter.FromUnstructured(cr.UnstructuredContent(), openstackPopulator)
+		openstackPopulator.Status.Transferred = fmt.Sprintf("%d", int64(progress))
+		unstructuredPopulator, _ := runtime.DefaultUnstructuredConverter.ToUnstructured(openstackPopulator)
+		cr, err := c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Update(context.TODO(), &unstructured.Unstructured{Object: unstructuredPopulator}, metav1.UpdateOptions{})
+		if err != nil {
+			c.recorder.Eventf(pod, corev1.EventTypeWarning, reasonPopulatorProgress, "failed to find cr: %w", err)
+			return nil
+		}
+		c.recorder.Eventf(pod, corev1.EventTypeWarning, reasonPopulatorProgress, "CR: %v", cr)
+
+	}
+
+	return nil
+}
+
 func makePopulatePodSpec(pvcPrimeName, secretName string) corev1.PodSpec {
 	nonRoot := true
 	allowPrivilageEscalation := false
@@ -730,7 +788,8 @@ func makePopulatePodSpec(pvcPrimeName, secretName string) corev1.PodSpec {
 	return corev1.PodSpec{
 		Containers: []corev1.Container{
 			{
-				Name: populatorContainerName,
+				Name:  populatorContainerName,
+				Ports: []corev1.ContainerPort{{Name: "metrics", ContainerPort: 2112}},
 				SecurityContext: &corev1.SecurityContext{
 					AllowPrivilegeEscalation: &allowPrivilageEscalation,
 					RunAsNonRoot:             &nonRoot,
