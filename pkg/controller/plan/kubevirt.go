@@ -1650,7 +1650,7 @@ func vmOwnerReference(vm *cnv.VirtualMachine) (ref meta.OwnerReference) {
 
 // TODO move elsewhere
 func (r *KubeVirt) createOpenStackVolumes(vm ref.Ref) (err error) {
-	secret, err := r.ensureSecret(vm, r.secretDataSetterForCDI(vm))
+	secret, err := r.ensureSecret(vm, r.copyDataFromProviderSecret)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
