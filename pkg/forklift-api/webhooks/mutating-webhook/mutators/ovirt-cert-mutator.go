@@ -22,6 +22,8 @@ import (
 
 var log = logging.WithName("mutator")
 
+const NewLine = 0x0a
+
 type OvirtCertMutator struct {
 }
 
@@ -124,14 +126,14 @@ func (mutator *OvirtCertMutator) Mutate(ar *admissionv1.AdmissionReview) *admiss
 }
 
 func contains(secretCert, cert []byte) bool {
-	flatSecretCa := bytes.ReplaceAll(secretCert, []byte{0x0a}, []byte{})
-	flatCert := bytes.ReplaceAll(cert, []byte{0x0a}, []byte{})
+	flatSecretCa := bytes.ReplaceAll(secretCert, []byte{NewLine}, []byte{})
+	flatCert := bytes.ReplaceAll(cert, []byte{NewLine}, []byte{})
 	return bytes.Contains(flatSecretCa, flatCert)
 }
 
 func appendCerts(secretCert, cert []byte) []byte {
-	if !bytes.HasSuffix(secretCert, []byte{0x0a}) {
-		secretCert = append(secretCert, 0x0a)
+	if !bytes.HasSuffix(secretCert, []byte{NewLine}) {
+		secretCert = append(secretCert, NewLine)
 	}
 	return append(secretCert, cert...)
 }
