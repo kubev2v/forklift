@@ -79,6 +79,7 @@ ui_route_name: "virt"
 ui_meta_file_name: "meta.json"
 ui_node_extra_ca_certs: "/opt/app-root/src/ca.crt"
 ui_state: absent
+ui_plugin_state: absent
 
 ui_plugin_image_fqin: "{{ lookup( 'env', 'UI_PLUGIN_IMAGE') or lookup( 'env', 'RELATED_IMAGE_UI_PLUGIN') }}"
 ui_plugin_console_name: "{{ app_name }}-console-plugin"
