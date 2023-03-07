@@ -12,7 +12,6 @@ require (
 	github.com/gophercloud/utils v0.0.0-20221207145018-e8fba78967ca
 	github.com/gorilla/websocket v1.4.2
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.1.0
-	github.com/kubev2v/lib-volume-populator v0.0.0-20230305164042-fa4b97bd58e8
 	github.com/mattn/go-sqlite3 v1.14.4
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.19.0
@@ -31,6 +30,8 @@ require (
 	k8s.io/apimachinery v0.26.0
 	k8s.io/apiserver v0.20.2
 	k8s.io/client-go v12.0.0+incompatible
+	k8s.io/component-base v0.26.0
+	k8s.io/component-helpers v0.26.0
 	k8s.io/klog/v2 v2.80.1
 	kubevirt.io/client-go v0.42.1
 	kubevirt.io/containerized-data-importer-api v1.44.0
@@ -93,8 +94,6 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/component-base v0.26.0 // indirect
-	k8s.io/component-helpers v0.26.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280 // indirect
 	k8s.io/utils v0.0.0-20221107191617-1a15be271d1d // indirect
 	kubevirt.io/containerized-data-importer v1.34.0 // indirect
