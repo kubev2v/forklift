@@ -307,6 +307,7 @@ func (r *Reconciler) testConnection(provider *api.Provider, secret *core.Secret)
 		// When the status is unauthorized controller stops the reconciliation, so the user account does not get locked.
 		// Providing bad credentials when requesting the token results in 400, and not 401.
 		if status == http.StatusUnauthorized || status == http.StatusBadRequest {
+			provider.Status.Phase = ConnectionFailed
 			provider.Status.SetCondition(
 				libcnd.Condition{
 					Type:     ConnectionAuthFailed,
