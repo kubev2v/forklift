@@ -3,12 +3,17 @@ package main
 import (
 	"flag"
 	"io"
+	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/imagedata"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"k8s.io/klog/v2"
 )
 
@@ -32,6 +37,7 @@ func main() {
 		crNamespace      string
 		crName           string
 		secretName       string
+		controllerIp     string
 
 		volumePath string
 	)
@@ -46,10 +52,11 @@ func main() {
 	flag.StringVar(&volumePath, "volume-path", "", "Path to populate")
 	flag.StringVar(&crName, "cr-name", "", "Custom Resource instance name")
 	flag.StringVar(&crNamespace, "cr-namespace", "", "Custom Resource instance namespace")
+	flag.StringVar(&controllerIp, "controller-ip", "", "controller-ip")
 
 	flag.Parse()
 
-	populate(crName, crNamespace, volumePath, identityEndpoint, secretName, imageID)
+	populate(volumePath, identityEndpoint, secretName, imageID, controllerIp)
 }
 
 type openstackConfig struct {
@@ -61,7 +68,7 @@ type openstackConfig struct {
 	region             string
 }
 
-func loadConfig(secretName, endpoint, namespace string) openstackConfig {
+func loadConfig(secretName, endpoint string) openstackConfig {
 	username, err := os.ReadFile("/etc/secret-volume/username")
 	if err != nil {
 		klog.Fatal(err.Error())
@@ -97,8 +104,25 @@ func loadConfig(secretName, endpoint, namespace string) openstackConfig {
 	}
 }
 
-func populate(crName, crNamespace, fileName, endpoint, secretName, imageID string) {
-	config := loadConfig(secretName, endpoint, crNamespace)
+func populate(fileName, endpoint, secretName, imageID, controllerIp string) {
+	http.Handle("/metrics", promhttp.Handler())
+	go http.ListenAndServe(":2112", nil)
+	progressGague := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Subsystem: "volume_populators",
+			Name:      "openstack_volume_populator",
+			Help:      "Amount of data transferred",
+		},
+		[]string{"image_id"},
+	)
+
+	if err := prometheus.Register(progressGague); err != nil {
+		klog.Error("Prometheus progress counter not registered:", err)
+	} else {
+		klog.Info("Prometheus progress counter registered.")
+	}
+
+	config := loadConfig(secretName, endpoint)
 
 	authOpts := gophercloud.AuthOptions{
 		IdentityEndpoint: endpoint,
@@ -137,7 +161,7 @@ func populate(crName, crNamespace, fileName, endpoint, secretName, imageID strin
 	}
 	defer f.Close()
 
-	err = writeData(image, f, crName, crNamespace)
+	err = writeData(image, f, imageID, controllerIp, progressGague)
 	if err != nil {
 		klog.Fatal(err)
 	}
@@ -155,61 +179,28 @@ func (cr *CountingReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
-func writeData(reader io.ReadCloser, file *os.File, crName, crNamespace string) error {
-	// 	config, err := rest.InClusterConfig()
-	// 	if err != nil {
-	// 		klog.Fatal(err.Error())
-	// 	}
-
-	// 	client, err := dynamic.NewForConfig(config)
-	// 	if err != nil {
-	// 		klog.Fatal(err.Error())
-	// 	}
-	// 	gvr := schema.GroupVersionResource{Group: groupName, Version: apiVersion, Resource: resource}
-
+func writeData(reader io.ReadCloser, file *os.File, imageID, controllerIp string, progress *prometheus.GaugeVec) error {
 	total := new(int64)
 	countingReader := CountingReader{reader, total}
 
-	// TODO introduce /metrics endpoint to report progress
-	// done := make(chan bool)
-	// go func() {
-	// 	for {
-	// 		select {
-	// 		case <-done:
-	// 			return
-	// 		default:
-	// 			populatorCr, err := client.Resource(gvr).Namespace(crNamespace).Get(context.TODO(), crName, metav1.GetOptions{})
-	// 			if err != nil {
-	// 				klog.Fatal(err.Error())
-	// 			}
-	// 			status := map[string]interface{}{"transferred": fmt.Sprintf("%d", *total)}
-	// 			unstructured.SetNestedField(populatorCr.Object, status, "status")
-
-	// 			_, err = client.Resource(gvr).Namespace(crNamespace).Update(context.TODO(), populatorCr, metav1.UpdateOptions{})
-	// 			if err != nil {
-	// 				klog.Fatal(err.Error())
-	// 			}
-	// 		}
-
-	// 		time.Sleep(3 * time.Second)
-	// 	}
-	// }()
+	done := make(chan bool)
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			default:
+				progress.WithLabelValues(imageID).Set(float64(*total))
+			}
+		}
+	}()
 
 	if _, err := io.Copy(file, &countingReader); err != nil {
 		klog.Fatal(err)
 	}
-	//done <- true
-	// populatorCr, err := client.Resource(gvr).Namespace(crNamespace).Get(context.TODO(), crName, metav1.GetOptions{})
-	// if err != nil {
-	// 	klog.Fatal(err.Error())
-	// }
-	// status := map[string]interface{}{"transferred": *countingReader.total}
-	// unstructured.SetNestedField(populatorCr.Object, status, "status")
+	done <- true
+	progress.WithLabelValues(imageID).Set(float64(*total))
 
-	// _, err = client.Resource(gvr).Namespace(crNamespace).Update(context.TODO(), populatorCr, metav1.UpdateOptions{})
-	// if err != nil {
-	// 	klog.Error(err)
-	// }
-
+	time.Sleep(2 * time.Minute)
 	return nil
 }
