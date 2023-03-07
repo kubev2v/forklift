@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	openstackProviderName = "os-provider"
+	openstackProviderName = "osp-provider"
 	openstackStorageClass = "nfs-csi"
 	packstackNameSpace    = "konveyor-forklift"
 )
@@ -31,12 +31,12 @@ var _ = Describe("[level:component]Migration tests for OpenStack provider", func
 		By("Create Secret from Definition")
 		s, err := utils.CreateSecretFromDefinition(f.K8sClient, utils.NewSecretDefinition(nil,
 			map[string]string{
-				"username":    "admin",
-				"password":    "12e2f14739194a6c",
-				"domainName":  "default",
-				"projectName": "admin",
-				"region":      "RegionOne",
-				"insecure":    "true",
+				"username":           "admin",
+				"password":           "12e2f14739194a6c",
+				"domainName":         "default",
+				"projectName":        "admin",
+				"regionName":         "RegionOne",
+				"insecureSkipVerify": "true",
 			}, nil, namespace, "os-test-secret"))
 		Expect(err).ToNot(HaveOccurred())
 

@@ -74,7 +74,7 @@ func loadConfig(secretName, endpoint, namespace string) openstackConfig {
 	if err != nil {
 		klog.Fatal(err.Error())
 	}
-	region, err := os.ReadFile("/etc/secret-volume/region")
+	region, err := os.ReadFile("/etc/secret-volume/regionName")
 	if err != nil {
 		klog.Fatal(err.Error())
 	}
