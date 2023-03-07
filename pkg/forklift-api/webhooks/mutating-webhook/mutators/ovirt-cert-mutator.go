@@ -1,6 +1,7 @@
 package mutators
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -10,7 +11,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 
 	"github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/util"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
@@ -74,15 +74,15 @@ func (mutator *OvirtCertMutator) Mutate(ar *admissionv1.AdmissionReview) *admiss
 			return util.ToAdmissionResponseError(err)
 		}
 
-		b, err := io.ReadAll(response.Body)
+		cert, err := io.ReadAll(response.Body)
 		if err != nil {
 			log.Error(err, "mutating webhook error, failed to read certificate retrieval response")
 			return util.ToAdmissionResponseError(err)
 		}
 
 		//check if the CA included in the secrete provided by the user and update it if needed
-		if !strings.Contains(string(secret.Data["cacert"]), string(b)) {
-			secret.Data["cacert"] = append(secret.Data["cacert"], b...)
+		if !contains(secret.Data["cacert"], cert) {
+			secret.Data["cacert"] = appendCerts(secret.Data["cacert"], cert)
 			secret.Labels["ca-cert-updated"] = "true"
 			log.Info("Engine CA certificate was missing, updating the secret")
 		}
@@ -121,4 +121,17 @@ func (mutator *OvirtCertMutator) Mutate(ar *admissionv1.AdmissionReview) *admiss
 			Code:    http.StatusOK,
 		},
 	}
+}
+
+func contains(secretCert, cert []byte) bool {
+	flatSecretCa := bytes.ReplaceAll(secretCert, []byte{0x0a}, []byte{})
+	flatCert := bytes.ReplaceAll(cert, []byte{0x0a}, []byte{})
+	return bytes.Contains(flatSecretCa, flatCert)
+}
+
+func appendCerts(secretCert, cert []byte) []byte {
+	if !bytes.HasSuffix(secretCert, []byte{0x0a}) {
+		secretCert = append(secretCert, 0x0a)
+	}
+	return append(secretCert, cert...)
 }

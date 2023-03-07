@@ -6,6 +6,11 @@
       ui_state: "present"
     when: feature_ui|bool
 
+  - name: "Set UI plugin feature state"
+    set_fact:
+      ui_plugin_state: "present"
+    when: feature_ui_plugin|bool
+
   - name: "Set validation feature state"
     set_fact:
       validation_state: "present"
@@ -231,22 +236,22 @@
 
     - name: "Setup UI configmap"
       k8s:
-        state: "{{ ui_state }}"
+        state: "{{ ui_plugin_state }}"
         definition: "{{ lookup('template', 'ui-plugin/configmap-ui-plugin.yml.j2') }}"
 
     - name: "Setup UI plugin service"
       k8s:
-        state: "{{ ui_state }}"
+        state: "{{ ui_plugin_state }}"
         definition: "{{ lookup('template', 'ui-plugin/service-ui-plugin.yml.j2') }}"
 
     - name: "Setup UI plugin deployment"
       k8s:
-        state: "{{ ui_state }}"
+        state: "{{ ui_plugin_state }}"
         definition: "{{ lookup('template', 'ui-plugin/deployment-ui-plugin.yml.j2') }}"
 
     - name: "Setup console plugin"
       k8s:
-        state: "{{ ui_state }}"
+        state: "{{ ui_plugin_state }}"
         definition: "{{ lookup('template', 'ui-plugin/console-plugin.yml.j2') }}"
 
     - name: "Get cluster console information"
