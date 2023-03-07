@@ -218,14 +218,7 @@ func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVol
 
 // Build credential secret.
 func (r *Builder) Secret(_ ref.Ref, in, secret *core.Secret) (err error) {
-	secret.StringData = map[string]string{
-		"username":           string(in.Data["username"]),
-		"password":           string(in.Data["password"]),
-		"domainName":         string(in.Data["domainName"]),
-		"projectName":        string(in.Data["projectName"]),
-		"region":             string(in.Data["region"]),
-		"insecureSkipVerify": string(in.Data["insecureSkipVerify"]),
-	}
+	// no-op, we just need to clone the provider secret so there's no action to be made here
 	return
 }
 
