@@ -12,7 +12,7 @@ import (
 
 const (
 	vsphereProviderName = "vsphere-provider"
-	vsphereStorageClass = "standard"
+	vsphereStorageClass = "nfs-csi"
 )
 
 var _ = Describe("[level:component]Migration tests for vSphere provider", func() {
