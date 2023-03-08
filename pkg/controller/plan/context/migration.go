@@ -2,12 +2,14 @@ package context
 
 import (
 	"context"
+	"path"
+
 	"github.com/go-logr/logr"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	core "k8s.io/api/core/v1"
-	"path"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -104,7 +106,7 @@ func (r *Context) SetMigration(migration *api.Migration) {
 }
 
 func (r *Context) UseEl9VirtV2v() bool {
-	return !r.Plan.Spec.Warm
+	return r.Source.Provider.Type() == v1beta1.VSphere && r.Destination.Provider.IsHost() && !r.Plan.Spec.Warm
 }
 
 // Source.
