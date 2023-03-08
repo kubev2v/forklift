@@ -50,14 +50,3 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/types",
     ],
 )
-
-go_test(
-    name = "populator-machinery_test",
-    srcs = ["metrics_test.go"],
-    embed = [":populator-machinery"],
-    deps = [
-        "//vendor/github.com/prometheus/client_model/go",
-        "//vendor/github.com/prometheus/common/expfmt",
-        "//vendor/k8s.io/apimachinery/pkg/types",
-    ],
-)
