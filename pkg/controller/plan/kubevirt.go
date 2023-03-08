@@ -357,22 +357,9 @@ func (r *KubeVirt) DeleteSecret(vm *plan.VMStatus) (err error) {
 		return
 	}
 	for _, object := range list.Items {
-		err = r.Destination.Client.Delete(context.TODO(), &object)
+		err = r.DeleteObject(&object, vm, "Deleted secret.", "secret")
 		if err != nil {
-			if k8serr.IsNotFound(err) {
-				err = nil
-			} else {
-				return liberr.Wrap(err)
-			}
-		} else {
-			r.Log.Info(
-				"Deleted secret.",
-				"secret",
-				path.Join(
-					object.Namespace,
-					object.Name),
-				"vm",
-				vm.String())
+			return err
 		}
 	}
 	return
@@ -396,22 +383,9 @@ func (r *KubeVirt) DeleteConfigMap(vm *plan.VMStatus) (err error) {
 		return
 	}
 	for _, object := range list.Items {
-		err = r.Destination.Client.Delete(context.TODO(), &object)
+		err = r.DeleteObject(&object, vm, "Deleted configMap.", "configMap")
 		if err != nil {
-			if k8serr.IsNotFound(err) {
-				err = nil
-			} else {
-				return liberr.Wrap(err)
-			}
-		} else {
-			r.Log.Info(
-				"Deleted configMap.",
-				"configMap",
-				path.Join(
-					object.Namespace,
-					object.Name),
-				"vm",
-				vm.String())
+			return err
 		}
 	}
 	return
@@ -599,7 +573,7 @@ func (r *KubeVirt) getPVCs(vm *plan.VMStatus) (pvcs []core.PersistentVolumeClaim
 	return
 }
 
-func (r *KubeVirt) createVolumesForOvirt(vm ref.Ref) (err error) {
+func (r *KubeVirt) createVolumesForOvirt(vm ref.Ref) (pvcNames []string, err error) {
 	secret, err := r.ensureSecret(vm, r.copyDataFromProviderSecret)
 	if err != nil {
 		return
@@ -619,12 +593,12 @@ func (r *KubeVirt) createVolumesForOvirt(vm ref.Ref) (err error) {
 		populatorCr := r.OvirtVolumePopulator(da, sourceUrl, secret.Name)
 		failure := r.Client.Create(context.Background(), populatorCr, &client.CreateOptions{})
 		if failure != nil && !k8serr.IsAlreadyExists(failure) {
-			return failure
+			return nil, failure
 		}
 
 		accessModes, volumeMode, failure := r.getStorageProfileModes(*storageName)
 		if failure != nil {
-			return failure
+			return nil, failure
 		}
 
 		pvc := r.Builder.PersistentVolumeClaimWithSourceRef(da, storageName, populatorCr.Name, accessModes, volumeMode)
@@ -636,9 +610,51 @@ func (r *KubeVirt) createVolumesForOvirt(vm ref.Ref) (err error) {
 		if err != nil {
 			return
 		}
+		pvcNames = append(pvcNames, pvc.Name)
 	}
 
 	return
+}
+
+// Creates a pod associated with PVCs to create node bind (wait for consumer)
+func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) error {
+	name := "init"
+	volumes := []core.Volume{}
+	for _, pvcName := range pvcNames {
+		volumes = append(volumes, core.Volume{
+			Name: name,
+			VolumeSource: core.VolumeSource{
+				PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvcName,
+				},
+			},
+		})
+	}
+	pod := &core.Pod{
+		ObjectMeta: meta.ObjectMeta{
+			Namespace:    r.Plan.Spec.TargetNamespace,
+			Labels:       r.vmLabels(vm.Ref),
+			GenerateName: r.getGeneratedName(vm) + "pvcinit",
+		},
+		Spec: core.PodSpec{
+			RestartPolicy: core.RestartPolicyNever,
+			Containers: []core.Container{
+				{
+					Name:    name,
+					Image:   "ubi9-minimal",
+					Command: []string{"/bin/sh"},
+				},
+			},
+			Volumes: volumes,
+		},
+	}
+
+	err := r.Client.Create(context.TODO(), pod, &client.CreateOptions{})
+	if err != nil {
+		return err
+	}
+	r.Log.Info(fmt.Sprintf("Created pod '%s' to init the PVC node", pod.Name))
+	return nil
 }
 
 // Build an OvirtVolumePopulator for XDiskAttachment and source URL
@@ -809,14 +825,46 @@ func (r *KubeVirt) GetGuestConversionPod(vm *plan.VMStatus) (pod *core.Pod, err 
 	return
 }
 
+// Delete the PVC consumer pod on the destination cluster.
+func (r *KubeVirt) DeletePVCConsumerPod(vm *plan.VMStatus) (err error) {
+	list, err := r.GetPods(vm)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	for _, object := range list.Items {
+		if strings.Contains(object.GenerateName, "pvcinit") {
+			err = r.DeleteObject(&object, vm, "Deleted PVC consumer pod.", "pod")
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return
+}
+
 // Delete the guest conversion pod on the destination cluster.
 func (r *KubeVirt) DeleteGuestConversionPod(vm *plan.VMStatus) (err error) {
+	list, err := r.GetPods(vm)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	for _, object := range list.Items {
+		err := r.DeleteObject(&object, vm, "Deleted guest conversion pod.", "pod")
+		if err != nil {
+			return err
+		}
+	}
+	return
+}
+
+// Gets pods associated with the VM.
+func (r *KubeVirt) GetPods(vm *plan.VMStatus) (pods *core.PodList, err error) {
 	vmLabels := r.vmLabels(vm.Ref)
 	delete(vmLabels, kMigration)
-	list := &core.PodList{}
+	pods = &core.PodList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
-		list,
+		pods,
 		&client.ListOptions{
 			LabelSelector: labels.SelectorFromSet(vmLabels),
 			Namespace:     r.Plan.Spec.TargetNamespace,
@@ -824,26 +872,29 @@ func (r *KubeVirt) DeleteGuestConversionPod(vm *plan.VMStatus) (err error) {
 	)
 	if err != nil {
 		err = liberr.Wrap(err)
-		return
+		return nil, err
 	}
-	for _, object := range list.Items {
-		err = r.Destination.Client.Delete(context.TODO(), &object)
-		if err != nil {
-			if k8serr.IsNotFound(err) {
-				err = nil
-			} else {
-				return liberr.Wrap(err)
-			}
+	return
+}
+
+// Deletes an object from destination cluster associated with the VM.
+func (r *KubeVirt) DeleteObject(object client.Object, vm *plan.VMStatus, message, objType string) (err error) {
+	err = r.Destination.Client.Delete(context.TODO(), object)
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			err = nil
 		} else {
-			r.Log.Info(
-				"Deleted guest conversion pod.",
-				"pod",
-				path.Join(
-					object.Namespace,
-					object.Name),
-				"vm",
-				vm.String())
+			return liberr.Wrap(err)
 		}
+	} else {
+		r.Log.Info(
+			message,
+			objType,
+			path.Join(
+				object.GetNamespace(),
+				object.GetName()),
+			"vm",
+			vm.String())
 	}
 	return
 }
@@ -866,22 +917,9 @@ func (r *KubeVirt) DeleteHookJobs(vm *plan.VMStatus) (err error) {
 		return
 	}
 	for _, object := range list.Items {
-		err = r.Destination.Client.Delete(context.TODO(), &object)
+		err = r.DeleteObject(&object, vm, "Deleted hook job.", "job")
 		if err != nil {
-			if k8serr.IsNotFound(err) {
-				err = nil
-			} else {
-				return liberr.Wrap(err)
-			}
-		} else {
-			r.Log.Info(
-				"Deleted hook job.",
-				"job",
-				path.Join(
-					object.Namespace,
-					object.Name),
-				"vm",
-				vm.String())
+			return err
 		}
 	}
 	return
@@ -1654,7 +1692,7 @@ func vmOwnerReference(vm *cnv.VirtualMachine) (ref meta.OwnerReference) {
 }
 
 // TODO move elsewhere
-func (r *KubeVirt) createOpenStackVolumes(vm ref.Ref) (err error) {
+func (r *KubeVirt) createOpenStackVolumes(vm ref.Ref) (pvcNames []string, err error) {
 	secret, err := r.ensureSecret(vm, r.copyDataFromProviderSecret)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -1694,7 +1732,7 @@ func (r *KubeVirt) createOpenStackVolumes(vm ref.Ref) (err error) {
 			}
 			accessModes, volumeMode, failure := r.getStorageProfileModes(storageName)
 			if failure != nil {
-				return failure
+				return nil, failure
 			}
 
 			pvc := r.Builder.PersistentVolumeClaimWithSourceRef(image, &storageName, populatorCr.Name, accessModes, volumeMode)
@@ -1719,6 +1757,8 @@ func (r *KubeVirt) createOpenStackVolumes(vm ref.Ref) (err error) {
 				err = liberr.Wrap(err)
 				return
 			}
+
+			pvcNames = append(pvcNames, pvc.Name)
 		}
 	}
 
