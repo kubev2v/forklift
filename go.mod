@@ -25,14 +25,14 @@ require (
 	github.com/prometheus/common v0.39.0
 	github.com/vmware/govmomi v0.23.1
 	go.uber.org/zap v1.19.0
-	golang.org/x/net v0.4.0
+	golang.org/x/net v0.7.0
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.26.0
+	k8s.io/api v0.26.2
 	k8s.io/apiextensions-apiserver v0.22.1
-	k8s.io/apimachinery v0.26.0
-	k8s.io/apiserver v0.20.2
+	k8s.io/apimachinery v0.26.2
+	k8s.io/apiserver v0.26.2
 	k8s.io/client-go v12.0.0+incompatible
-	k8s.io/component-base v0.26.0
+	k8s.io/component-base v0.26.2
 	k8s.io/component-helpers v0.26.0
 	k8s.io/klog/v2 v2.80.1
 	kubevirt.io/client-go v0.42.1
@@ -49,7 +49,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emicklei/go-restful v2.10.0+incompatible // indirect
 	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
-	github.com/fsnotify/fsnotify v1.4.9 // indirect
+	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.20.0 // indirect
@@ -83,11 +83,11 @@ require (
 	github.com/ugorji/go/codec v1.1.7 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
-	golang.org/x/crypto v0.0.0-20220829220503-c86fa9a7ed90 // indirect
+	golang.org/x/crypto v0.1.0 // indirect
 	golang.org/x/oauth2 v0.3.0 // indirect
-	golang.org/x/sys v0.3.0 // indirect
-	golang.org/x/term v0.3.0 // indirect
-	golang.org/x/text v0.5.0 // indirect
+	golang.org/x/sys v0.5.0 // indirect
+	golang.org/x/term v0.5.0 // indirect
+	golang.org/x/text v0.7.0 // indirect
 	golang.org/x/time v0.1.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
@@ -118,7 +118,7 @@ replace k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.16.4
 
 replace k8s.io/api => k8s.io/api v0.22.0
 
-replace k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.19.3
+replace k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.22.0
 
 replace k8s.io/apimachinery => k8s.io/apimachinery v0.22.0
 

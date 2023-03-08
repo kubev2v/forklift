@@ -204,7 +204,7 @@ func (f *Framework) CreateNamespace(prefix string, labels map[string]string) (*v
 
 // AddNamespaceToDelete provides a wrapper around the go append function
 func (f *Framework) AddNamespaceToDelete(ns *v1.Namespace) {
-	f.namespacesToDelete = append(f.namespacesToDelete, ns)
+	//f.namespacesToDelete = append(f.namespacesToDelete, ns)
 }
 
 // DeleteNS provides a function to delete the specified namespace from the test cluster
