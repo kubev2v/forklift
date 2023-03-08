@@ -85,6 +85,29 @@ type stringSet struct {
 	set map[string]empty
 }
 
+var (
+	populatorToResource = map[string]*populatorResource{
+		"OvirtVolumePopulator": {
+			storageResourceKey: "disk_id",
+			resource:           "ovirtvolumepopulators",
+			regexKey:           "ovirt_volume_populator",
+		},
+		"OpenstackVolumePopulator": {
+			storageResourceKey: "image_id",
+			resource:           "openstackvolumepopulators",
+			regexKey:           "openstack_volume_populator",
+		},
+	}
+
+	monitoredPVCs = map[string]interface{}{}
+)
+
+type populatorResource struct {
+	storageResourceKey string
+	resource           string
+	regexKey           string
+}
+
 type controller struct {
 	populatedFromAnno string
 	pvcFinalizer      string
@@ -431,6 +454,7 @@ func (c *controller) runWorker() {
 
 func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName string) error {
 	var err error
+	done := make(chan bool)
 
 	var pvc *corev1.PersistentVolumeClaim
 	pvc, err = c.pvcLister.PersistentVolumeClaims(pvcNamespace).Get(pvcName)
@@ -624,7 +648,27 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 			// We'll get called again later when the pod exists
 			return nil
 		} else {
-			c.updateProgress(pvc, pod, "openstack_volume_populator", unstructured)
+			if pod.Status.PodIP != "" {
+				if _, ok := monitoredPVCs[string(pvc.UID)]; !ok {
+					monitoredPVCs[string(pvc.UID)] = true
+					go func() {
+						c.recorder.Eventf(pod, corev1.EventTypeWarning, reasonPopulatorProgress, "Starting to monitor progress for PVC %s", pvc.Name)
+						for {
+							c.updateProgress(pvc, pod.Status.PodIP, unstructured)
+							pod, err = c.podLister.Pods(populatorNamespace).Get(pod.Name)
+							if err != nil {
+								break
+							}
+							if pod.Status.Phase != corev1.PodRunning {
+								break
+							}
+
+							// TODO make configurable?
+							time.Sleep(5 * time.Second)
+						}
+					}()
+				}
+			}
 		}
 
 		if corev1.PodSucceeded != pod.Status.Phase {
@@ -731,54 +775,114 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 	// Clean up our internal callback maps
 	c.cleanupNotifications(key)
 
+	// Stop progress monitoring
+	close(done)
+	delete(monitoredPVCs, string(pvc.UID))
+
 	return nil
 }
 
-func (c *controller) updateProgress(pvc *corev1.PersistentVolumeClaim, pod *corev1.Pod, populatorName string, cr *unstructured.Unstructured) error {
-	var disk_re = regexp.MustCompile(fmt.Sprintf(`volume_populators_%s\{image_id=\"([a-z]|\d|\-)+"\} (\d{1,3}\.?(\d+e\+\d+)*)`, populatorName))
-	url := fmt.Sprintf("http://%s:2112/metrics", pod.Status.PodIP)
+func (c *controller) updateProgress(pvc *corev1.PersistentVolumeClaim, podIP string, cr *unstructured.Unstructured) error {
+	populatorKind := pvc.Spec.DataSourceRef.Kind
+	var diskRegex = regexp.MustCompile(fmt.Sprintf(`volume_populators_%s\{%s=\"([0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12})"\} (\d{1,3}.*)`,
+		populatorToResource[populatorKind].regexKey,
+		populatorToResource[populatorKind].storageResourceKey))
+	url := fmt.Sprintf("http://%s:2112/metrics", podIP)
 	resp, err := http.Get(url)
 	if err != nil {
 		if strings.Contains(err.Error(), "connection refused") {
 			return nil
 		}
-		c.recorder.Eventf(pod, corev1.EventTypeWarning, reasonPopulatorProgress, "Failed to get url: %s, err: %w", url, err)
-
+		c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPopulatorProgress, "Failed to get url: %s, err: %w", url, err)
 		return nil
 	}
+
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 
 	if err != nil {
-		c.recorder.Eventf(pod, corev1.EventTypeWarning, reasonPopulatorProgress, "Failed to read bosy: %s, err: %w", url, err)
-		return nil
+		c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPopulatorProgress, "Failed to read response, error: %w", url, err)
 	}
 
-	matches := disk_re.FindAllStringSubmatch(string(body), -1)
+	matches := diskRegex.FindAllStringSubmatch(string(body), -1)
 	if matches == nil {
-		c.recorder.Eventf(pod, corev1.EventTypeWarning, reasonPopulatorProgress, "Failed to find matchs: %s", matches)
+		c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPopulatorProgress, "Failed to find matches, regex: %s", diskRegex)
 		return nil
 	}
 
 	for _, match := range matches {
 		imageID := match[1]
-		progress, _ := strconv.ParseFloat(string(match[2]), 64)
-		c.recorder.Eventf(pod, corev1.EventTypeNormal, reasonPopulatorProgress, "disk_nr: %s, progress %d", imageID, int64(progress))
-		gvr := schema.GroupVersionResource{Group: *pvc.Spec.DataSourceRef.APIGroup, Version: "v1beta1", Resource: "openstackvolumepopulators"}
-		openstackPopulator := &v1beta1.OpenstackVolumePopulator{}
-		runtime.DefaultUnstructuredConverter.FromUnstructured(cr.UnstructuredContent(), openstackPopulator)
-		openstackPopulator.Status.Transferred = fmt.Sprintf("%d", int64(progress))
-		unstructuredPopulator, _ := runtime.DefaultUnstructuredConverter.ToUnstructured(openstackPopulator)
-		cr, err := c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Update(context.TODO(), &unstructured.Unstructured{Object: unstructuredPopulator}, metav1.UpdateOptions{})
+		progress, err := strconv.ParseFloat(string(match[2]), 64)
 		if err != nil {
-			c.recorder.Eventf(pod, corev1.EventTypeWarning, reasonPopulatorProgress, "failed to find cr: %w", err)
-			return nil
+			c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPopulatorProgress, "Could not convert progress: %w", err)
+			break
 		}
-		c.recorder.Eventf(pod, corev1.EventTypeWarning, reasonPopulatorProgress, "CR: %v", cr)
 
+		gvr := schema.GroupVersionResource{
+			Group:    *pvc.Spec.DataSourceRef.APIGroup,
+			Version:  "v1beta1",
+			Resource: populatorToResource[populatorKind].resource,
+		}
+
+		latestPopulator, err := c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Get(context.TODO(), cr.GetName(), metav1.GetOptions{})
+		if err != nil {
+			c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPopulatorProgress, "Failed to get CR for kind: %s error: %w", populatorKind, err)
+			break
+		}
+
+		var updatedPopulator *unstructured.Unstructured
+		switch populatorKind {
+		case v1beta1.OpenstackVolumePopulatorKind:
+			updatedPopulator, err = createUpdatedOpenstackPopulatorProgress(int64(progress), latestPopulator)
+		// TODO add const
+		case "OvirtVolumePopulator":
+			updatedPopulator, err = updateOvirtPopulatorProgress(int64(progress), latestPopulator)
+		default:
+			c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPopulatorProgress, "Unsupported populator kind: %s", populatorKind)
+		}
+		if err != nil {
+			c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPopulatorProgress, "Failed to updated CR for kind: %s error: %w", populatorKind, err)
+			break
+		}
+
+		_, err = c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Update(context.TODO(), updatedPopulator, metav1.UpdateOptions{})
+		if err != nil {
+			c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPopulatorProgress, "Failed to update CR: %w", err)
+			break
+		}
+
+		if err != nil {
+			c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPopulatorProgress, "Failed to update CR: %w", err)
+			break
+		}
+
+		c.recorder.Eventf(pvc, corev1.EventTypeNormal, reasonPopulatorProgress, "Updated progress for %s, disk: %s, progress: %d", populatorKind, imageID, int64(progress))
+	}
+	return nil
+}
+
+func createUpdatedOpenstackPopulatorProgress(progress int64, cr *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	openstackPopulator := &v1beta1.OpenstackVolumePopulator{}
+	runtime.DefaultUnstructuredConverter.FromUnstructured(cr.UnstructuredContent(), openstackPopulator)
+	openstackPopulator.Status.Transferred = fmt.Sprintf("%d", progress)
+	unstructuredPopulator, err := runtime.DefaultUnstructuredConverter.ToUnstructured(openstackPopulator)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil
+	return &unstructured.Unstructured{Object: unstructuredPopulator}, nil
+}
+
+func updateOvirtPopulatorProgress(progress int64, cr *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	ovirtPopulator := &v1beta1.OvirtVolumePopulator{}
+	runtime.DefaultUnstructuredConverter.FromUnstructured(cr.UnstructuredContent(), ovirtPopulator)
+	ovirtPopulator.Status.Progress = fmt.Sprintf("%d", progress)
+	unstructuredPopulator, err := runtime.DefaultUnstructuredConverter.ToUnstructured(ovirtPopulator)
+	if err != nil {
+		return nil, err
+	}
+
+	return &unstructured.Unstructured{Object: unstructuredPopulator}, nil
 }
 
 func makePopulatePodSpec(pvcPrimeName, secretName string) corev1.PodSpec {
