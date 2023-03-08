@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
@@ -17,19 +16,6 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const (
-	prefix     = "forklift.konveyor.io"
-	mountPath  = "/mnt/"
-	devicePath = "/dev/block"
-)
-
-const (
-	groupName  = "forklift.konveyor.io"
-	apiVersion = "v1beta1"
-	kind       = "OpenstackVolumePopulator"
-	resource   = "openstackvolumepopulators"
-)
-
 func main() {
 	var (
 		identityEndpoint string
@@ -37,7 +23,6 @@ func main() {
 		crNamespace      string
 		crName           string
 		secretName       string
-		controllerIp     string
 
 		volumePath string
 	)
@@ -52,11 +37,10 @@ func main() {
 	flag.StringVar(&volumePath, "volume-path", "", "Path to populate")
 	flag.StringVar(&crName, "cr-name", "", "Custom Resource instance name")
 	flag.StringVar(&crNamespace, "cr-namespace", "", "Custom Resource instance namespace")
-	flag.StringVar(&controllerIp, "controller-ip", "", "controller-ip")
 
 	flag.Parse()
 
-	populate(volumePath, identityEndpoint, secretName, imageID, controllerIp)
+	populate(volumePath, identityEndpoint, secretName, imageID)
 }
 
 type openstackConfig struct {
@@ -104,7 +88,7 @@ func loadConfig(secretName, endpoint string) openstackConfig {
 	}
 }
 
-func populate(fileName, endpoint, secretName, imageID, controllerIp string) {
+func populate(fileName, endpoint, secretName, imageID string) {
 	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(":2112", nil)
 	progressGague := prometheus.NewGaugeVec(
@@ -161,7 +145,7 @@ func populate(fileName, endpoint, secretName, imageID, controllerIp string) {
 	}
 	defer f.Close()
 
-	err = writeData(image, f, imageID, controllerIp, progressGague)
+	err = writeData(image, f, imageID, progressGague)
 	if err != nil {
 		klog.Fatal(err)
 	}
@@ -179,7 +163,7 @@ func (cr *CountingReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
-func writeData(reader io.ReadCloser, file *os.File, imageID, controllerIp string, progress *prometheus.GaugeVec) error {
+func writeData(reader io.ReadCloser, file *os.File, imageID string, progress *prometheus.GaugeVec) error {
 	total := new(int64)
 	countingReader := CountingReader{reader, total}
 
@@ -201,6 +185,5 @@ func writeData(reader io.ReadCloser, file *os.File, imageID, controllerIp string
 	done <- true
 	progress.WithLabelValues(imageID).Set(float64(*total))
 
-	time.Sleep(2 * time.Minute)
 	return nil
 }
