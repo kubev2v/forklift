@@ -395,6 +395,10 @@ func (r *Migration) CleanUp(vm *plan.VMStatus) (err error) {
 			return
 		}
 	}
+	err = r.kubevirt.DeletePVCConsumerPod(vm)
+	if err != nil {
+		return
+	}
 	err = r.kubevirt.DeleteGuestConversionPod(vm)
 	if err != nil {
 		return
@@ -599,15 +603,29 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			r.Log.Info("BeforeTransfer hook isn't ready yet")
 			return
 		}
+		var pvcNames []string
 		if r.kubevirt.isOpenstack(vm) {
-			err = r.kubevirt.createOpenStackVolumes(vm.Ref)
+			pvcNames, err = r.kubevirt.createOpenStackVolumes(vm.Ref)
 			if err != nil {
-				err = liberr.Wrap(err)
+				step.AddError(err.Error())
+				err = nil
 				return
+			}
+			err = r.kubevirt.createPodToBindPVCs(vm, pvcNames)
+			if err != nil {
+				step.AddError(err.Error())
+				err = nil
+				break
 			}
 		}
 		if r.kubevirt.useOvirtPopulator(vm) {
-			err = r.kubevirt.createVolumesForOvirt(vm.Ref)
+			pvcNames, err = r.kubevirt.createVolumesForOvirt(vm.Ref)
+			if err != nil {
+				step.AddError(err.Error())
+				err = nil
+				break
+			}
+			err = r.kubevirt.createPodToBindPVCs(vm, pvcNames)
 			if err != nil {
 				step.AddError(err.Error())
 				err = nil
@@ -674,6 +692,11 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			step.AddError(err.Error())
 			err = nil
 			break
+		}
+		err = r.kubevirt.DeletePVCConsumerPod(vm)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
 		}
 		step.MarkCompleted()
 		step.Phase = Completed
