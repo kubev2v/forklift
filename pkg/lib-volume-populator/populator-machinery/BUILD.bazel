@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "populator-machinery",
@@ -73,5 +73,16 @@ go_library(
         "//vendor/k8s.io/component-base/metrics",
         "//vendor/k8s.io/component-helpers/storage/volume",
         "//vendor/k8s.io/klog/v2:klog",
+    ],
+)
+
+go_test(
+    name = "populator-machinery_test",
+    srcs = ["metrics_test.go"],
+    embed = [":populator-machinery"],
+    deps = [
+        "//vendor/github.com/prometheus/client_model/go",
+        "//vendor/github.com/prometheus/common/expfmt",
+        "//vendor/k8s.io/apimachinery/pkg/types",
     ],
 )
