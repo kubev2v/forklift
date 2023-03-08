@@ -3325,13 +3325,6 @@ go_repository(
 )
 
 go_repository(
-    name = "org_mongodb_go_mongo_driver",
-    importpath = "go.mongodb.org/mongo-driver",
-    sum = "h1:jxcFYjlkl8xaERsgLo+RNquI0epW6zuy/ZRQs6jnrFA=",
-    version = "v1.1.2",
-)
-
-go_repository(
     name = "org_uber_go_atomic",
     importpath = "go.uber.org/atomic",
     sum = "h1:Ezj3JGmsOnG1MoRWQkPBsKLe9DwWD9QeXzTRzzldNVk=",
