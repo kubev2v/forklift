@@ -77,15 +77,42 @@ jobs:
           kubectl get Virtualmachines -A -o yaml >> /tmp/artifacts/k8s-all-Virtualmachines.log
           kubectl logs -n konveyor-forklift $(kubectl get po -n konveyor-forklift  -o=name | grep forklift-controller) >> /tmp/artifacts/k8s-forklift-controller-inventory.log
           kubectl get Storageclasses -A -o yaml >> /tmp/artifacts/k8s-storage-classes.log
+
+          # CRDs in e2e-tests generated Namespace
+          kubectl get secrets -n $(kubectl get ns -o=name | grep forklift-e2e-tests | cut -d/ -f2) -o yaml >> /tmp/artifacts/k8s-secrets.log
+          kubectl describe pods -n $(kubectl get ns -o=name |grep forklift-e2e-tests | cut -d/ -f2) >> /tmp/artifacts/k8s-pods-describe-forklift-tests.log
+          kubectl get events -n $(kubectl get ns -o=name |grep forklift-e2e-tests | cut -d/ -f2)  --sort-by='.lastTimestamp' >> /tmp/artifacts/k8s-events-forklift-tests.log
           
-          if [ "${{ matrix.source_provider }}" == 'openstack' ] ; then
-            kubectl logs -n konveyor-forklift $(kubectl get po -n konveyor-forklift  -o=name | grep openstack-populator) >> /tmp/artifacts/k8s-forklift-openstack-populator.log
-            kubectl logs -n kube-system $(kubectl get po -n kube-system  -o=name | grep csi-nfs-controller)  csi-provisioner >> /tmp/artifacts/k8s-csi-nfs-provisioner.log
-            kubectl logs -n kube-system $(kubectl get po -n kube-system  -o=name | grep csi-nfs-controller)  nfs >> /tmp/artifacts/k8s-csi-nfs.log
-            kubectl get openstackvolumepopulator -A >> /tmp/artifacts/k8s-openstackvolumepopulator.log
-            kubectl get pvc -A >> /tmp/artifacts/k8s-pvc.log
-            kubectl cp konveyor-forklift/$(kubectl get po -n konveyor-forklift  -o=name | grep packstack|cut -d/ -f2):/var/log/cinder/volume.log /tmp/artifacts/k8s-packstack-cinder-volume.log
+          kubectl describe pods -n konveyor-forklift >> /tmp/artifacts/k8s-pods-describe-konveyor-forklift.log
+
+          # CSI controller
+          kubectl logs -n kube-system $(kubectl get po -n kube-system  -o=name | grep csi-nfs-controller)  csi-provisioner >> /tmp/artifacts/k8s-csi-nfs-provisioner.log
+          kubectl logs -n kube-system $(kubectl get po -n kube-system  -o=name | grep csi-nfs-controller)  nfs >> /tmp/artifacts/k8s-csi-nfs.log
+          
+          # PVCs
+          kubectl get pvc -A >> /tmp/artifacts/k8s-pvc.log
+          
+          # ovirt logs
+          if [ "${{ matrix.source_provider }}" == 'ovirt' ] ; then
+            kubectl get ovirtvolumepopulator -A >> /tmp/artifacts/k8s-ovirtvolumepopulator.log
+            kubectl logs -n konveyor-forklift $(kubectl get po -n konveyor-forklift  -o=name | grep fakeovirt)  >> /tmp/artifacts/k8s-fakeovirt.log
+            kubectl logs -n konveyor-forklift $(kubectl get po -n konveyor-forklift  -o=name | grep ovirt-imageio)  >> /tmp/artifacts/k8s-ovirt-imageio.log
+            kubectl logs -n konveyor-forklift $(kubectl get po -n konveyor-forklift  -o=name | grep ovirt-populator) >> /tmp/artifacts/k8s-forklift-ovirt-populator.log
+            kubectl logs -n konveyor-forklift $(kubectl get po -n konveyor-forklift  -o=name | grep forklift-volume-populator) >> /tmp/artifacts/k8s-forklift-volume-populator.log
           fi
+          
+          # openstack logs
+          if [ "${{ matrix.source_provider }}" == 'openstack' ] ; then
+            kubectl cp konveyor-forklift/$(kubectl get po -n konveyor-forklift  -o=name | grep packstack|cut -d/ -f2):/var/log/cinder/volume.log /tmp/artifacts/k8s-packstack-cinder-volume.log
+            kubectl cp konveyor-forklift/$(kubectl get po -n konveyor-forklift  -o=name | grep packstack|cut -d/ -f2):/var/log/nova/nova-compute.log /tmp/artifacts/k8s-packstack-nova-compute.log
+            kubectl cp konveyor-forklift/$(kubectl get po -n konveyor-forklift  -o=name | grep packstack|cut -d/ -f2):/var/log/glance/api.log /tmp/artifacts/k8s-packstack-glance-api.log
+            kubectl get openstackvolumepopulator -A >> /tmp/artifacts/k8s-openstackvolumepopulator.log
+            kubectl logs -n konveyor-forklift $(kubectl get po -n konveyor-forklift  -o=name | grep openstack-populator) >> /tmp/artifacts/k8s-forklift-openstack-populator.log
+            kubectl logs -n konveyor-forklift $(kubectl get po -n konveyor-forklift  -o=name | grep forklift-volume-populator) >> /tmp/artifacts/k8s-forklift-volume-populator.log
+          fi
+          
+          # export kind cluster full logs
+          kind export logs /tmp/artifacts/kind-logs
 
       - uses: actions/upload-artifact@master
         if: always()
