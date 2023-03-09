@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"strconv"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/klog/v2"
 )
 
@@ -45,6 +48,22 @@ func main() {
 }
 
 func populate(engineURL, diskID, volPath string) {
+	http.Handle("/metrics", promhttp.Handler())
+	go http.ListenAndServe(":2112", nil)
+	progressGague := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Subsystem: "volume_populators",
+			Name:      "ovirt_volume_populator",
+			Help:      "Amount of data transferred",
+		},
+		[]string{"disk_id"},
+	)
+	if err := prometheus.Register(progressGague); err != nil {
+		klog.Error("Prometheus progress gauge not registered:", err)
+	} else {
+		klog.Info("Prometheus progress gauge registered.")
+	}
+
 	engineConfig := loadEngineConfig(engineURL)
 
 	// Write credentials to files
@@ -114,23 +133,7 @@ func populate(engineURL, diskID, volPath string) {
 				klog.Error(err)
 			}
 
-			//TODO add progress mechanism to the disk transfer
-			/*if progressOutput.Size != nil {
-				// We have to get it in the loop to avoid a conflict error
-				populatorCr, err := client.Resource(gvr).Namespace(crNamespace).Get(context.TODO(), crName, metav1.GetOptions{})
-				if err != nil {
-					klog.Error(err.Error())
-				}
-
-				status := map[string]interface{}{"progress": fmt.Sprintf("%d", progressOutput.Transferred)}
-				unstructured.SetNestedField(populatorCr.Object, status, "status")
-
-				_, err = client.Resource(gvr).Namespace(crNamespace).Update(context.TODO(), populatorCr, metav1.UpdateOptions{})
-
-				if err != nil {
-					klog.Error(err)
-				}
-			}*/
+			progressGague.WithLabelValues(diskID).Set(float64(progressOutput.Transferred))
 		}
 
 		done <- struct{}{}
