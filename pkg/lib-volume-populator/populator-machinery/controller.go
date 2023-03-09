@@ -832,8 +832,7 @@ func (c *controller) updateProgress(pvc *corev1.PersistentVolumeClaim, podIP str
 		switch populatorKind {
 		case v1beta1.OpenstackVolumePopulatorKind:
 			updatedPopulator, err = createUpdatedOpenstackPopulatorProgress(int64(progress), latestPopulator)
-		// TODO add const
-		case "OvirtVolumePopulator":
+		case v1beta1.OvirtVolumePopulatorKind:
 			updatedPopulator, err = updateOvirtPopulatorProgress(int64(progress), latestPopulator)
 		default:
 			c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPopulatorProgress, "Unsupported populator kind: %s", populatorKind)
