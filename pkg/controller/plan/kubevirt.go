@@ -1145,7 +1145,7 @@ func (r *KubeVirt) findTemplate(vm *plan.VMStatus) (tmpl *template.Template, err
 func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, configMap *core.ConfigMap, pvcs *[]core.PersistentVolumeClaim, v2vSecret *core.Secret) (pod *core.Pod, err error) {
 	volumes, volumeMounts, volumeDevices := r.podVolumeMounts(vmVolumes, configMap, pvcs)
 	resourceReq := core.ResourceRequirements{}
-	var nodeSelector map[string]string
+	nodeSelector := make(map[string]string)
 
 	// Request access to /dev/kvm via Kubevirt's Device Manager
 	// That is to ensure the appliance virt-v2v uses would not
