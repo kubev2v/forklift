@@ -5,6 +5,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -541,7 +542,7 @@ func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName
 			VolumeMode:       volumeMode,
 			DataSourceRef: &core.TypedLocalObjectReference{
 				APIGroup: &api.SchemeGroupVersion.Group,
-				Kind:     "OvirtVolumePopulator",
+				Kind:     v1beta1.OvirtVolumePopulatorKind,
 				Name:     populatorName,
 			},
 		},
