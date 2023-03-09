@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "exec_util.go",
         "framework.go",
+        "openstack.go",
         "ovirt.go",
     ],
     importpath = "github.com/konveyor/forklift-controller/tests/suit/framework",
@@ -13,6 +14,7 @@ go_library(
         "//pkg/apis",
         "//pkg/apis/forklift/v1beta1",
         "//pkg/apis/forklift/v1beta1/ref",
+        "//tests/suit/utils",
         "//vendor/github.com/onsi/ginkgo",
         "//vendor/github.com/onsi/gomega",
         "//vendor/github.com/ovirt/go-ovirt",
