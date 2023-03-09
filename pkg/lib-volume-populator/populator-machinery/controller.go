@@ -454,7 +454,6 @@ func (c *controller) runWorker() {
 
 func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName string) error {
 	var err error
-	done := make(chan bool)
 
 	var pvc *corev1.PersistentVolumeClaim
 	pvc, err = c.pvcLister.PersistentVolumeClaims(pvcNamespace).Get(pvcName)
@@ -776,7 +775,6 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 	c.cleanupNotifications(key)
 
 	// Stop progress monitoring
-	close(done)
 	delete(monitoredPVCs, string(pvc.UID))
 
 	return nil
