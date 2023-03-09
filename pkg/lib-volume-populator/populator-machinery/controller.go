@@ -735,9 +735,6 @@ func makePopulatePodSpec(pvcPrimeName, secretName string) corev1.PodSpec {
 					AllowPrivilegeEscalation: &allowPrivilageEscalation,
 					RunAsNonRoot:             &nonRoot,
 					RunAsUser:                &user,
-					SeccompProfile: &corev1.SeccompProfile{
-						Type: corev1.SeccompProfileTypeRuntimeDefault,
-					},
 					Capabilities: &corev1.Capabilities{
 						Drop: []corev1.Capability{"ALL"},
 					},
