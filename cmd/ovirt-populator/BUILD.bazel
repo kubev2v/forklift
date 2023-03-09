@@ -21,5 +21,9 @@ go_library(
     srcs = ["ovirt-populator.go"],
     importpath = "github.com/konveyor/forklift-controller/cmd/ovirt-populator",
     visibility = ["//visibility:private"],
-    deps = ["//vendor/k8s.io/klog/v2:klog"],
+    deps = [
+        "//vendor/github.com/prometheus/client_golang/prometheus",
+        "//vendor/github.com/prometheus/client_golang/prometheus/promhttp",
+        "//vendor/k8s.io/klog/v2:klog",
+    ],
 )
