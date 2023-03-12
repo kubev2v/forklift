@@ -28,6 +28,7 @@ var (
 	goCLIPath         = flag.String("gocli-path", "cli.sh", "The path to cli script")
 	dockerPrefix      = flag.String("docker-prefix", "", "The docker host:port")
 	dockerTag         = flag.String("docker-tag", "", "The docker tag")
+	deleteNameSpace   = flag.Bool("delete-namespace", false, "Delete namespace after completion")
 )
 
 // forkliftFailHandler call ginkgo.Fail with printing the additional information
@@ -60,6 +61,7 @@ func BuildTestSuite() {
 		framework.ClientsInstance.GoCLIPath = *goCLIPath
 		framework.ClientsInstance.DockerPrefix = *dockerPrefix
 		framework.ClientsInstance.DockerTag = *dockerTag
+		framework.ClientsInstance.AutoDeleteNs = *deleteNameSpace
 
 		fmt.Fprintf(ginkgo.GinkgoWriter, "Kubectl path: %s\n", framework.ClientsInstance.KubectlPath)
 		fmt.Fprintf(ginkgo.GinkgoWriter, "OC path: %s\n", framework.ClientsInstance.OcPath)
