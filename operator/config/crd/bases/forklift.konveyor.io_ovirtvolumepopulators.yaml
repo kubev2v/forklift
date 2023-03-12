@@ -12,10 +12,10 @@ spec:
     kind: OvirtVolumePopulator
     listKind: OvirtVolumePopulatorList
     plural: ovirtvolumepopulators
-    singular: ovirtvolumepopulator
     shortNames:
     - ovvp
     - ovvps
+    singular: ovirtvolumepopulator
   scope: Namespaced
   versions:
   - name: v1beta1
