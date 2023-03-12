@@ -9,6 +9,7 @@ var OvirtVolumePopulatorKind = "OvirtVolumePopulator"
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:openapi-gen=true
+// +kubebuilder:resource:shortName={ovvp,ovvps}
 type OvirtVolumePopulator struct {
 	meta.TypeMeta   `json:",inline"`
 	meta.ObjectMeta `json:"metadata,omitempty"`

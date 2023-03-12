@@ -9,11 +9,13 @@ var OpenstackVolumePopulatorKind = "OpenstackVolumePopulator"
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:openapi-gen=true
+// +kubebuilder:resource:shortName={osvp,osvps}
 type OpenstackVolumePopulator struct {
 	meta.TypeMeta   `json:",inline"`
 	meta.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec   OpenstackVolumePopulatorSpec   `json:"spec"`
+	// +optional
 	Status OpenstackVolumePopulatorStatus `json:"status"`
 }
 
@@ -24,6 +26,7 @@ type OpenstackVolumePopulatorSpec struct {
 }
 
 type OpenstackVolumePopulatorStatus struct {
+	// +optional
 	Transferred string `json:"transferred"`
 }
 
