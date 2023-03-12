@@ -12,10 +12,10 @@ spec:
     kind: OpenstackVolumePopulator
     listKind: OpenstackVolumePopulatorList
     plural: openstackvolumepopulators
-    singular: openstackvolumepopulator
     shortNames:
     - osvp
     - osvps
+    singular: openstackvolumepopulator
   scope: Namespaced
   versions:
   - name: v1beta1
