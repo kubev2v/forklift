@@ -66,6 +66,7 @@ type Clients struct {
 	GoCLIPath         string
 	DockerPrefix      string
 	DockerTag         string
+	AutoDeleteNs      bool
 
 	//  k8sClient provides our k8s client pointer
 	K8sClient *kubernetes.Clientset
@@ -137,7 +138,11 @@ func (f *Framework) BeforeEach() {
 		})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		f.Namespace = ns
-		f.AddNamespaceToDelete(ns)
+
+		if f.Clients.AutoDeleteNs {
+			f.AddNamespaceToDelete(ns)
+		}
+
 	}
 
 }
