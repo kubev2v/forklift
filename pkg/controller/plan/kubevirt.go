@@ -74,6 +74,8 @@ const (
 	kPlan = "plan"
 	// VM label (value=vmID)
 	kVM = "vmID"
+	// App label
+	kApp = "forklift.app"
 )
 
 // Map of VirtualMachines keyed by vmID.
@@ -476,6 +478,7 @@ func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus, dataVolumes []cdi.DataVo
 		return
 	}
 
+	var pvcNames []string
 	for _, dv := range dataVolumes {
 		exists := false
 		for _, item := range list.Items {
@@ -498,6 +501,14 @@ func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus, dataVolumes []cdi.DataVo
 					dv.Name),
 				"vm",
 				vm.String())
+		}
+		// DataVolume and PVC names are the same
+		pvcNames = append(pvcNames, dv.Name)
+	}
+	if r.UseEl9VirtV2v() {
+		err = r.createPodToBindPVCs(vm, pvcNames)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -633,15 +644,15 @@ func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) err
 	pod := &core.Pod{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace:    r.Plan.Spec.TargetNamespace,
-			Labels:       r.vmLabels(vm.Ref),
-			GenerateName: r.getGeneratedName(vm) + "pvcinit",
+			Labels:       r.consumerLabels(vm.Ref),
+			GenerateName: r.getGeneratedName(vm) + "pvcinit-",
 		},
 		Spec: core.PodSpec{
 			RestartPolicy: core.RestartPolicyNever,
 			Containers: []core.Container{
 				{
 					Name:    name,
-					Image:   "ubi9-minimal",
+					Image:   Settings.Migration.VirtV2vImageCold,
 					Command: []string{"/bin/sh"},
 				},
 			},
@@ -771,19 +782,11 @@ func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, vmCr *VirtualMach
 		return
 	}
 
-	list := &core.PodList{}
-	err = r.Destination.Client.List(
-		context.TODO(),
-		list,
-		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(r.vmLabels(vm.Ref)),
-			Namespace:     r.Plan.Spec.TargetNamespace,
-		},
-	)
+	list, err := r.GetPodsWithLabels(r.conversionLabels(vm.Ref))
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
+
 	pod := &core.Pod{}
 	if len(list.Items) == 0 {
 		pod = newPod
@@ -812,7 +815,7 @@ func (r *KubeVirt) GetGuestConversionPod(vm *plan.VMStatus) (pod *core.Pod, err 
 		context.TODO(),
 		list,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(r.vmLabels(vm.Ref)),
+			LabelSelector: labels.SelectorFromSet(r.conversionLabels(vm.Ref)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		})
 	if err != nil {
@@ -827,16 +830,14 @@ func (r *KubeVirt) GetGuestConversionPod(vm *plan.VMStatus) (pod *core.Pod, err 
 
 // Delete the PVC consumer pod on the destination cluster.
 func (r *KubeVirt) DeletePVCConsumerPod(vm *plan.VMStatus) (err error) {
-	list, err := r.GetPods(vm)
+	list, err := r.GetPodsWithLabels(r.consumerLabels(vm.Ref))
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 	for _, object := range list.Items {
-		if strings.Contains(object.GenerateName, "pvcinit") {
-			err = r.DeleteObject(&object, vm, "Deleted PVC consumer pod.", "pod")
-			if err != nil {
-				return err
-			}
+		err = r.DeleteObject(&object, vm, "Deleted PVC consumer pod.", "pod")
+		if err != nil {
+			return err
 		}
 	}
 	return
@@ -844,7 +845,7 @@ func (r *KubeVirt) DeletePVCConsumerPod(vm *plan.VMStatus) (err error) {
 
 // Delete the guest conversion pod on the destination cluster.
 func (r *KubeVirt) DeleteGuestConversionPod(vm *plan.VMStatus) (err error) {
-	list, err := r.GetPods(vm)
+	list, err := r.GetPodsWithLabels(r.conversionLabels(vm.Ref))
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -859,14 +860,18 @@ func (r *KubeVirt) DeleteGuestConversionPod(vm *plan.VMStatus) (err error) {
 
 // Gets pods associated with the VM.
 func (r *KubeVirt) GetPods(vm *plan.VMStatus) (pods *core.PodList, err error) {
-	vmLabels := r.vmLabels(vm.Ref)
-	delete(vmLabels, kMigration)
+	return r.GetPodsWithLabels(r.vmLabels(vm.Ref))
+}
+
+// Gets pods associated with the VM.
+func (r *KubeVirt) GetPodsWithLabels(podLabels map[string]string) (pods *core.PodList, err error) {
+	delete(podLabels, kMigration)
 	pods = &core.PodList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
 		pods,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(vmLabels),
+			LabelSelector: labels.SelectorFromSet(podLabels),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
@@ -1214,7 +1219,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	pod = &core.Pod{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace:    r.Plan.Spec.TargetNamespace,
-			Labels:       r.vmLabels(vm.Ref),
+			Labels:       r.conversionLabels(vm.Ref),
 			GenerateName: r.getGeneratedName(vm),
 		},
 		Spec: core.PodSpec{
@@ -1595,6 +1600,20 @@ func (r *KubeVirt) planLabels() map[string]string {
 		kMigration: string(r.Migration.UID),
 		kPlan:      string(r.Plan.GetUID()),
 	}
+}
+
+// Label for a PVC consumer pod.
+func (r *KubeVirt) consumerLabels(vmRef ref.Ref) (labels map[string]string) {
+	labels = r.vmLabels(vmRef)
+	labels[kApp] = "consumer"
+	return
+}
+
+// Label for a conversion pod.
+func (r *KubeVirt) conversionLabels(vmRef ref.Ref) (labels map[string]string) {
+	labels = r.vmLabels(vmRef)
+	labels[kApp] = "virt-v2v"
+	return
 }
 
 // Labels for a VM on a plan.
