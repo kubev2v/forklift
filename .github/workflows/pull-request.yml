@@ -79,9 +79,12 @@ jobs:
           kubectl get Storageclasses -A -o yaml >> /tmp/artifacts/k8s-storage-classes.log
 
           # CRDs in e2e-tests generated Namespace
-          kubectl get secrets -n $(kubectl get ns -o=name | grep forklift-e2e-tests | cut -d/ -f2) -o yaml >> /tmp/artifacts/k8s-secrets.log
-          kubectl describe pods -n $(kubectl get ns -o=name |grep forklift-e2e-tests | cut -d/ -f2) >> /tmp/artifacts/k8s-pods-describe-forklift-tests.log
-          kubectl get events -n $(kubectl get ns -o=name |grep forklift-e2e-tests | cut -d/ -f2)  --sort-by='.lastTimestamp' >> /tmp/artifacts/k8s-events-forklift-tests.log
+          generatedNS=$(kubectl get ns -o=name |grep forklift-e2e-tests | cut -d/ -f2)
+          kubectl get secrets -n ${generatedNS} -o yaml >> /tmp/artifacts/k8s-secrets.log
+          kubectl describe pods -n ${generatedNS} >> /tmp/artifacts/k8s-pods-describe-forklift-tests.log
+          kubectl get events -n ${generatedNS} --sort-by='.lastTimestamp' >> /tmp/artifacts/k8s-events-forklift-tests.log
+          kubectl api-resources --verbs=list --namespaced -o name | grep forklift.konveyor.io | xargs -n 1 kubectl get -oyaml  --show-kind --ignore-not-found -n ${generatedNS}  >> /tmp/artifacts/k8s-objects-forklift-tests.log
+          
           
           kubectl describe pods -n konveyor-forklift >> /tmp/artifacts/k8s-pods-describe-konveyor-forklift.log
 
