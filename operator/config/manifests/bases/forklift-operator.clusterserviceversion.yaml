@@ -153,7 +153,7 @@ spec:
   - email: forklift-dev@googlegroups.com
     name: Forklift by Konveyor Community
   maturity: stable
-  minKubeVersion: 1.23.0
+  minKubeVersion: 1.24.0
   provider:
     name: Konveyor
     url: https://www.konveyor.io
