@@ -45,6 +45,8 @@ import (
 const (
 	// Name.
 	Name = "plan"
+	// Annotation for populator Labels set
+	AnnPopulatorLabels = "populatorLabels"
 )
 
 // Package logger.
@@ -220,6 +222,11 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		return
 	}
 
+	// Set PopulatorDataSource with labels when needed
+	if _, ok := plan.Annotations[AnnPopulatorLabels]; !ok {
+		r.setPopulatorDataSourceLabels(plan)
+	}
+
 	// Archive the plan.
 	if plan.Spec.Archived {
 		r.archive(plan)
@@ -260,6 +267,25 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 
 	// Done.
 	return
+}
+
+func (r *Reconciler) setPopulatorDataSourceLabels(plan *api.Plan) {
+	if plan.Status.HasAnyCondition(Succeeded, Failed, Canceled) {
+		ctx, err := plancontext.New(r, plan, r.Log)
+		if err != nil {
+			r.Log.Error(err, "Couldn't construct plan context when trying to set populator labels.")
+		} else {
+			runner := Migration{Context: ctx}
+			runner.SetPopulatorDataSourceLabels()
+			planCopy := plan.DeepCopy()
+			if plan.Annotations == nil {
+				plan.Annotations = make(map[string]string)
+			}
+			plan.Annotations[AnnPopulatorLabels] = "True"
+			patch := client.MergeFrom(planCopy)
+			err = r.Client.Patch(context.TODO(), plan, patch)
+		}
+	}
 }
 
 // Archive the plan.

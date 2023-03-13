@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
@@ -20,6 +19,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/scheduler"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
@@ -27,7 +27,6 @@ import (
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Requeue
@@ -152,6 +151,8 @@ type Migration struct {
 	vmMap VirtualMachineMap
 	// VM scheduler
 	scheduler scheduler.Scheduler
+	// destination client.
+	destinationClient adapter.DestinationClient
 }
 
 // Type of migration.
@@ -218,6 +219,10 @@ func (r *Migration) init() (err error) {
 		return
 	}
 	r.builder, err = adapter.Builder(r.Context)
+	if err != nil {
+		return
+	}
+	r.destinationClient, err = adapter.DestinationClient(r.Context)
 	if err != nil {
 		return
 	}
@@ -341,6 +346,35 @@ func (r *Migration) Archive() {
 	return
 }
 
+func (r *Migration) SetPopulatorDataSourceLabels() {
+	err := r.init()
+	if err != nil {
+		r.Log.Error(err, "Setting Populator Data Source labels failed.")
+		return
+	}
+
+	for _, vm := range r.Plan.Status.Migration.VMs {
+		pvcs, err := r.kubevirt.getPVCs(vm)
+		if err != nil {
+			r.Log.Error(err,
+				"Couldn't get VM's PVCs.",
+				"vm",
+				vm.String())
+		}
+		if r.Plan.IsSourceProviderOpenstack() {
+			err = r.setOpenStackPopulatorLabels(vm, pvcs)
+			if err != nil {
+				r.Log.Error(err, "Couldn't set the labels.", "vm", vm.String())
+			}
+		} else if r.kubevirt.useOvirtPopulator(vm) {
+			err = r.setOvirtPopulatorLabels(vm, pvcs)
+			if err != nil {
+				r.Log.Error(err, "Couldn't set the labels.", "vm", vm.String())
+			}
+		}
+	}
+}
+
 // Cancel the migration.
 // Delete resources associated with VMs that have been marked canceled.
 func (r *Migration) Cancel() (err error) {
@@ -384,16 +418,15 @@ func (r *Migration) Cancel() (err error) {
 
 // Delete left over migration resources associated with a VM.
 func (r *Migration) CleanUp(vm *plan.VMStatus) (err error) {
-	if vm.HasCondition(Succeeded) {
-		err = r.deleteImporterPods(vm)
-		if err != nil {
-			return
-		}
-	} else {
+	if !vm.HasCondition(Succeeded) {
 		err = r.kubevirt.DeleteVM(vm)
 		if err != nil {
 			return
 		}
+	}
+	err = r.deleteImporterPods(vm)
+	if err != nil {
+		return
 	}
 	err = r.kubevirt.DeletePVCConsumerPod(vm)
 	if err != nil {
@@ -412,6 +445,14 @@ func (r *Migration) CleanUp(vm *plan.VMStatus) (err error) {
 		return
 	}
 	err = r.kubevirt.DeleteHookJobs(vm)
+	if err != nil {
+		return
+	}
+	err = r.destinationClient.DeletePopulatorDataSource(vm)
+	if err != nil {
+		return
+	}
+	err = r.kubevirt.DeletePopulatorPods(vm)
 	if err != nil {
 		return
 	}
@@ -696,6 +737,18 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			} else {
 				return
 			}
+		}
+		// set ownership to populator Crs
+		err = r.destinationClient.SetPopulatorCrOwnership()
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+		// set ownership to populator pods
+		err = r.kubevirt.SetPopulatorPodOwnership(vm)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
 		}
 		// Removing unnecessary DataVolumes
 		err = r.kubevirt.DeleteDataVolumes(vm)
@@ -1279,15 +1332,14 @@ func (r *Migration) updateCopyProgressForOvirt(vm *plan.VMStatus, step *plan.Ste
 			continue
 		}
 
-		populatorCr := v1beta1.OvirtVolumePopulator{}
-		err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: claim}, &populatorCr)
+		populatorCr, err := r.kubevirt.getOvirtPopulatorCr(claim)
 		if err != nil {
 			if pvc.Status.Phase == core.ClaimBound {
 				// the populator CR is deleted and the PVC is bound - it most likely finished transferring the disk
 				task.Progress.Completed = int64(100 * float64(task.Progress.Total))
 				break
 			} else {
-				return
+				return err
 			}
 		}
 
@@ -1414,7 +1466,7 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 				if r.Plan.Spec.Warm && len(importer.Status.ContainerStatuses) > 0 {
 					vm.Warm.Failures = int(importer.Status.ContainerStatuses[0].RestartCount)
 				}
-				if restartLimitExceeded(importer) {
+				if RestartLimitExceeded(importer) {
 					task.MarkedCompleted()
 					msg, _ := terminationMessage(importer)
 					task.AddError(msg)
@@ -1562,11 +1614,9 @@ func (r *Migration) updateCopyProgressForOpenstack(vm *plan.VMStatus, step *plan
 	}
 
 	for _, pvc := range pvcs {
-		image := &openstack.Image{}
-		err = r.Source.Inventory.Find(image, ref.Ref{ID: pvc.Name})
+		image, err := r.GetOpenstackImage(pvc)
 		if err != nil {
-			err = liberr.Wrap(err)
-			return
+			return err
 		}
 
 		var task *plan.Task
@@ -1577,10 +1627,9 @@ func (r *Migration) updateCopyProgressForOpenstack(vm *plan.VMStatus, step *plan
 			continue
 		}
 
-		populatorCr := v1beta1.OpenstackVolumePopulator{}
-		err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: image.Name}, &populatorCr)
+		populatorCr, err := r.kubevirt.getOpenstackPopulatorCr(image.Name)
 		if err != nil {
-			return
+			return err
 		}
 
 		progress, parseErr := strconv.ParseInt(populatorCr.Status.Transferred, 10, 64)
@@ -1593,6 +1642,128 @@ func (r *Migration) updateCopyProgressForOpenstack(vm *plan.VMStatus, step *plan
 	}
 
 	step.ReflectTasks()
+	return
+}
+
+// Sets the OpenStackVolumePopulator CRs with VM ID and migration ID into the labels.
+func (r *Migration) setOpenStackPopulatorLabels(vm *plan.VMStatus, pvcs []core.PersistentVolumeClaim) (err error) {
+	openstackVm := &openstack.Workload{}
+	err = r.Source.Inventory.Find(openstackVm, vm.Ref)
+	if err != nil {
+		return
+	}
+	var images []*openstack.Image
+	for _, vol := range openstackVm.Volumes {
+		lookupName := fmt.Sprintf("%s-%s", r.Migration.Name, vol.ID)
+		image, err := r.getOpenstackImageByName(lookupName)
+		if err != nil {
+			continue
+		}
+		images = append(images, image)
+	}
+	if len(images) != len(pvcs) {
+		// To be sure we have every disk based on what already migrated and what's not.
+		// e.g when initializing the plan and the PVC has not been created yet (but the populator CR is) or when the disks that are attached to the source VM change.
+		for _, pvc := range pvcs {
+			image, err := r.GetOpenstackImage(pvc)
+			if err != nil {
+				continue
+			}
+			images = append(images, image)
+		}
+	}
+	migrationID := string(r.Plan.Status.Migration.ActiveSnapshot().Migration.UID)
+	for _, image := range images {
+		populatorCr, err := r.kubevirt.getOpenstackPopulatorCr(image.Name)
+		if err != nil {
+			continue
+		}
+		err = r.kubevirt.setOpenStackPopulatorLabels(populatorCr, vm.ID, migrationID)
+		if err != nil {
+			r.Log.Error(err, "Couldn't update the Populator Custom Resource labels.", "vm", vm.String(), "migration", migrationID, "OpenStackVolumePopulator", populatorCr.Name)
+			continue
+		}
+	}
+	// populator pods
+	r.setPopulatorPodsWithLabels(vm, migrationID)
+	return
+}
+
+//
+func (r *Migration) setPopulatorPodsWithLabels(vm *plan.VMStatus, migrationID string) {
+	podList, err := r.kubevirt.GetPodsWithLabels(map[string]string{})
+	if err != nil {
+		return
+	}
+	for _, pod := range podList.Items {
+		if strings.HasPrefix(pod.Name, "populate-") {
+			// it's populator pod
+			if _, ok := pod.Labels["migration"]; !ok {
+				// un-labeled pod, we need to set it
+				err = r.kubevirt.setPopulatorPodLabels(pod, migrationID)
+				if err != nil {
+					r.Log.Error(err, "Couldn't update the Populator pod labels.", "vm", vm.String(), "migration", migrationID, "pod", pod.Name)
+					continue
+				}
+			}
+		}
+	}
+}
+
+// Sets the OvirtVolumePopulator CRs with VM ID and migration ID into the labels.
+func (r *Migration) setOvirtPopulatorLabels(vm *plan.VMStatus, pvcs []core.PersistentVolumeClaim) (err error) {
+	ovirtVm := &ovirt.Workload{}
+	err = r.Source.Inventory.Find(ovirtVm, vm.Ref)
+	if err != nil {
+		return
+	}
+	var diskIds []string
+	for _, da := range ovirtVm.DiskAttachments {
+		diskIds = append(diskIds, da.Disk.ID)
+	}
+	if len(diskIds) != len(pvcs) {
+		// To be sure we have every disk based on what already migrated and what's not.
+		// e.g when initializing the plan and the PVC has not been created yet (but the populator CR is) or when the disks that are attached to the source VM change.
+		for _, pvc := range pvcs {
+			diskIds = append(diskIds, pvc.Spec.DataSource.Name)
+		}
+	}
+	migrationID := string(r.Plan.Status.Migration.ActiveSnapshot().Migration.UID)
+	for _, id := range diskIds {
+		populatorCr, err := r.kubevirt.getOvirtPopulatorCr(id)
+		if err != nil {
+			continue
+		}
+		err = r.kubevirt.setOvirtPopulatorLabels(populatorCr, vm.ID, migrationID)
+		if err != nil {
+			r.Log.Error(err, "Couldn't update the Populator Custom Resource labels.", "vm", vm.String(), "migration", migrationID, "OvirtVolumePopulator", populatorCr.Name)
+			continue
+		}
+	}
+	// populator pods
+	r.setPopulatorPodsWithLabels(vm, migrationID)
+	return
+}
+
+// Get the Openstack image from the inventory based on the PVC.
+func (r *Migration) GetOpenstackImage(pvc core.PersistentVolumeClaim) (image *openstack.Image, err error) {
+	image = &openstack.Image{}
+	err = r.Source.Inventory.Find(image, ref.Ref{ID: pvc.Name})
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	return
+}
+
+// Get the Openstack image from the inventory based on the name.
+func (r *Migration) getOpenstackImageByName(name string) (image *openstack.Image, err error) {
+	image = &openstack.Image{}
+	err = r.Source.Inventory.Find(image, ref.Ref{Name: name})
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
 	return
 }
 
@@ -1639,7 +1810,7 @@ func terminationMessage(pod *core.Pod) (msg string, ok bool) {
 }
 
 // Return whether the pod has failed and restarted too many times.
-func restartLimitExceeded(pod *core.Pod) (exceeded bool) {
+func RestartLimitExceeded(pod *core.Pod) (exceeded bool) {
 	if len(pod.Status.ContainerStatuses) == 0 {
 		return
 	}
