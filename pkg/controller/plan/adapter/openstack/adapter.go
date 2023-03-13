@@ -36,3 +36,9 @@ func (r *Adapter) Client(ctx *plancontext.Context) (client base.Client, err erro
 	client = c
 	return
 }
+
+// Constucts a destination client.
+func (r *Adapter) DestinationClient(ctx *plancontext.Context) (destinationClient base.DestinationClient, err error) {
+	destinationClient = &DestinationClient{Context: ctx}
+	return
+}
