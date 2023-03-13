@@ -27,6 +27,8 @@ type Adapter interface {
 	Client(ctx *plancontext.Context) (Client, error)
 	// Construct validator.
 	Validator(plan *api.Plan) (Validator, error)
+	// Construct DestinationClient.
+	DestinationClient(ctx *plancontext.Context) (DestinationClient, error)
 }
 
 // Builder API.
@@ -96,4 +98,13 @@ type Validator interface {
 	WarmMigration() bool
 	// Validate that no more than one of a VM's networks is mapped to the pod network.
 	PodNetwork(vmRef ref.Ref) (bool, error)
+}
+
+// DestinationClient API.
+// Performs provider-specific actions on the Destination cluster
+type DestinationClient interface {
+	// Deletes Populator Data Source
+	DeletePopulatorDataSource(vm *planapi.VMStatus) error
+	// Set the VolumePopulator CustomResource Ownership.
+	SetPopulatorCrOwnership() error
 }

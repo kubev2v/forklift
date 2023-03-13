@@ -6,6 +6,7 @@ go_library(
         "adapter.go",
         "builder.go",
         "client.go",
+        "destinationclient.go",
         "host.go",
         "validator.go",
     ],

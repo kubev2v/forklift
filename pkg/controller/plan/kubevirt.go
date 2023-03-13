@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"net/url"
 	"path"
-	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -31,7 +30,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	openstackutil "github.com/konveyor/forklift-controller/pkg/controller/plan/util"
+	"github.com/konveyor/forklift-controller/pkg/controller/plan/util"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
@@ -335,22 +334,6 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) (err error) {
 			err = liberr.Wrap(err)
 			return
 		}
-		if r.useOvirtPopulator(vm) && pvc.Spec.DataSource.Kind == reflect.TypeOf(v1beta1.OvirtVolumePopulator{}).Name() {
-			populatorCr := v1beta1.OvirtVolumePopulator{}
-			err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: pvc.Spec.DataSource.Name}, &populatorCr)
-			if err != nil {
-				err = liberr.Wrap(err)
-				return
-			}
-			crCopy := populatorCr.DeepCopy()
-			populatorCr.OwnerReferences = ownerRefs
-			patch = client.MergeFrom(crCopy)
-			err = r.Destination.Client.Patch(context.TODO(), &populatorCr, patch)
-			if err != nil {
-				err = liberr.Wrap(err)
-				return
-			}
-		}
 	}
 
 	return
@@ -358,8 +341,7 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) (err error) {
 
 // Delete the Secret that was created for this VM.
 func (r *KubeVirt) DeleteSecret(vm *plan.VMStatus) (err error) {
-	vmLabels := r.vmLabels(vm.Ref)
-	delete(vmLabels, kMigration)
+	vmLabels := r.vmAllButMigrationLabels(vm.Ref)
 	list := &core.SecretList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
@@ -384,8 +366,7 @@ func (r *KubeVirt) DeleteSecret(vm *plan.VMStatus) (err error) {
 
 // Delete the ConfigMap that was created for this VM.
 func (r *KubeVirt) DeleteConfigMap(vm *plan.VMStatus) (err error) {
-	vmLabels := r.vmLabels(vm.Ref)
-	delete(vmLabels, kMigration)
+	vmLabels := r.vmAllButMigrationLabels(vm.Ref)
 	list := &core.ConfigMapList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
@@ -410,8 +391,7 @@ func (r *KubeVirt) DeleteConfigMap(vm *plan.VMStatus) (err error) {
 
 // Delete the VirtualMachine CR on the destination cluster.
 func (r *KubeVirt) DeleteVM(vm *plan.VMStatus) (err error) {
-	vmLabels := r.vmLabels(vm.Ref)
-	delete(vmLabels, kMigration)
+	vmLabels := r.vmAllButMigrationLabels(vm.Ref)
 	list := &cnv.VirtualMachineList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
@@ -623,7 +603,7 @@ func (r *KubeVirt) createVolumesForOvirt(vm ref.Ref) (pvcNames []string, err err
 
 	storageName := &r.Context.Map.Storage.Spec.Map[0].Destination.StorageClass
 	for _, da := range ovirtVm.DiskAttachments {
-		populatorCr := r.OvirtVolumePopulator(da, sourceUrl, r.Plan.Spec.TransferNetwork, secret.Name)
+		populatorCr := util.OvirtVolumePopulator(da, sourceUrl, r.Plan.Spec.TransferNetwork, r.Plan.Spec.TargetNamespace, secret.Name, vm.ID, string(r.Migration.UID))
 		failure := r.Client.Create(context.Background(), populatorCr, &client.CreateOptions{})
 		if failure != nil && !k8serr.IsAlreadyExists(failure) {
 			return nil, failure
@@ -668,7 +648,7 @@ func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) err
 	pod := &core.Pod{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace:    r.Plan.Spec.TargetNamespace,
-			Labels:       r.consumerLabels(vm.Ref),
+			Labels:       r.consumerLabels(vm.Ref, false),
 			GenerateName: r.getGeneratedName(vm) + "pvcinit-",
 		},
 		Spec: core.PodSpec{
@@ -721,22 +701,6 @@ func (r *KubeVirt) setKvmOnPodSpec(podSpec *core.PodSpec) {
 		}
 		// Ensure that the pod is deployed on a node where /dev/kvm is present.
 		container.Resources.Requests["devices.kubevirt.io/kvm"] = resource.MustParse("1")
-	}
-}
-
-// Build an OvirtVolumePopulator for XDiskAttachment and source URL
-func (r *KubeVirt) OvirtVolumePopulator(da ovirt.XDiskAttachment, sourceUrl *url.URL, transferNetwork *core.ObjectReference, secretName string) *v1beta1.OvirtVolumePopulator {
-	return &v1beta1.OvirtVolumePopulator{
-		ObjectMeta: meta.ObjectMeta{
-			Name:      da.DiskAttachment.ID,
-			Namespace: r.Plan.Spec.TargetNamespace,
-		},
-		Spec: v1beta1.OvirtVolumePopulatorSpec{
-			EngineURL:        fmt.Sprintf("https://%s", sourceUrl.Host),
-			EngineSecretName: secretName,
-			DiskID:           da.Disk.ID,
-			TransferNetwork:  transferNetwork,
-		},
 	}
 }
 
@@ -826,7 +790,7 @@ func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, vmCr *VirtualMach
 		return
 	}
 
-	list, err := r.GetPodsWithLabels(r.conversionLabels(vm.Ref))
+	list, err := r.GetPodsWithLabels(r.conversionLabels(vm.Ref, true))
 	if err != nil {
 		return
 	}
@@ -859,7 +823,7 @@ func (r *KubeVirt) GetGuestConversionPod(vm *plan.VMStatus) (pod *core.Pod, err 
 		context.TODO(),
 		list,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(r.conversionLabels(vm.Ref)),
+			LabelSelector: labels.SelectorFromSet(r.conversionLabels(vm.Ref, false)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		})
 	if err != nil {
@@ -874,7 +838,7 @@ func (r *KubeVirt) GetGuestConversionPod(vm *plan.VMStatus) (pod *core.Pod, err 
 
 // Delete the PVC consumer pod on the destination cluster.
 func (r *KubeVirt) DeletePVCConsumerPod(vm *plan.VMStatus) (err error) {
-	list, err := r.GetPodsWithLabels(r.consumerLabels(vm.Ref))
+	list, err := r.GetPodsWithLabels(r.consumerLabels(vm.Ref, true))
 	if err != nil {
 		return err
 	}
@@ -889,7 +853,7 @@ func (r *KubeVirt) DeletePVCConsumerPod(vm *plan.VMStatus) (err error) {
 
 // Delete the guest conversion pod on the destination cluster.
 func (r *KubeVirt) DeleteGuestConversionPod(vm *plan.VMStatus) (err error) {
-	list, err := r.GetPodsWithLabels(r.conversionLabels(vm.Ref))
+	list, err := r.GetPodsWithLabels(r.conversionLabels(vm.Ref, true))
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -904,12 +868,11 @@ func (r *KubeVirt) DeleteGuestConversionPod(vm *plan.VMStatus) (err error) {
 
 // Gets pods associated with the VM.
 func (r *KubeVirt) GetPods(vm *plan.VMStatus) (pods *core.PodList, err error) {
-	return r.GetPodsWithLabels(r.vmLabels(vm.Ref))
+	return r.GetPodsWithLabels(r.vmAllButMigrationLabels(vm.Ref))
 }
 
 // Gets pods associated with the VM.
 func (r *KubeVirt) GetPodsWithLabels(podLabels map[string]string) (pods *core.PodList, err error) {
-	delete(podLabels, kMigration)
 	pods = &core.PodList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
@@ -950,8 +913,7 @@ func (r *KubeVirt) DeleteObject(object client.Object, vm *plan.VMStatus, message
 
 // Delete any hook jobs that belong to a VM migration.
 func (r *KubeVirt) DeleteHookJobs(vm *plan.VMStatus) (err error) {
-	vmLabels := r.vmLabels(vm.Ref)
-	delete(vmLabels, kMigration)
+	vmLabels := r.vmAllButMigrationLabels(vm.Ref)
 	list := &batch.JobList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
@@ -969,6 +931,73 @@ func (r *KubeVirt) DeleteHookJobs(vm *plan.VMStatus) (err error) {
 		err = r.DeleteObject(&object, vm, "Deleted hook job.", "job")
 		if err != nil {
 			return err
+		}
+	}
+	return
+}
+
+// Get the OpenstackVolumePopulator CustomResource based on the image name.
+func (r *KubeVirt) getOpenstackPopulatorCr(name string) (populatorCr v1beta1.OpenstackVolumePopulator, err error) {
+	populatorCr = v1beta1.OpenstackVolumePopulator{}
+	err = r.Destination.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: name}, &populatorCr)
+	return
+}
+
+// Get the OvirtVolumePopulator CustomResource based on the PVC name.
+func (r *KubeVirt) getOvirtPopulatorCr(name string) (populatorCr v1beta1.OvirtVolumePopulator, err error) {
+	populatorCr = v1beta1.OvirtVolumePopulator{}
+	err = r.Destination.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: name}, &populatorCr)
+	return
+}
+
+// Set the Populator Pod Ownership.
+func (r *KubeVirt) SetPopulatorPodOwnership(vm *plan.VMStatus) (err error) {
+	pvcs, err := r.getPVCs(vm)
+	if err != nil {
+		return
+	}
+	pods, err := r.getPopulatorPods()
+	if err != nil {
+		return
+	}
+	for _, pod := range pods {
+		pvcId := strings.Split(pod.Name, "populate-")[1]
+		for _, pvc := range pvcs {
+			if string(pvc.UID) == pvcId {
+				podCopy := pod.DeepCopy()
+				err = k8sutil.SetOwnerReference(&pvc, &pod, r.Scheme())
+				if err != nil {
+					continue
+				}
+				patch := client.MergeFrom(podCopy)
+				err = r.Destination.Client.Patch(context.TODO(), &pod, patch)
+				if err != nil {
+					break
+				}
+			}
+		}
+	}
+	return
+}
+
+// Delete any populator pods that belong to a VM's migration.
+func (r *KubeVirt) DeletePopulatorPods(vm *plan.VMStatus) (err error) {
+	list, err := r.getPopulatorPods()
+	for _, object := range list {
+		err = r.DeleteObject(&object, vm, "Deleted populator pod.", "pod")
+	}
+	return
+}
+
+// Get populator pods that belong to a VM's migration.
+func (r *KubeVirt) getPopulatorPods() (pods []core.Pod, err error) {
+	migrationPods, err := r.GetPodsWithLabels(map[string]string{kMigration: string(r.Plan.Status.Migration.ActiveSnapshot().Migration.UID)})
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	for _, pod := range migrationPods.Items {
+		if strings.HasPrefix(pod.Name, "populate-") {
+			pods = append(pods, pod)
 		}
 	}
 	return
@@ -1256,22 +1285,22 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	var initContainers []core.Container
 	if vddkImage, found := r.Source.Provider.Spec.Settings["vddkInitImage"]; found {
 		initContainers = append(initContainers, core.Container{
-					Name:            "vddk-side-car",
-					Image:           vddkImage,
-					ImagePullPolicy: core.PullIfNotPresent,
-					VolumeMounts: []core.VolumeMount{
-						{
-							Name:      "vddk-vol-mount",
-							MountPath: "/opt",
-						},
-					},
-					SecurityContext: &core.SecurityContext{
-						AllowPrivilegeEscalation: &allowPrivilageEscalation,
-						Capabilities: &core.Capabilities{
-							Drop: []core.Capability{"ALL"},
-						},
-					},
-				})
+			Name:            "vddk-side-car",
+			Image:           vddkImage,
+			ImagePullPolicy: core.PullIfNotPresent,
+			VolumeMounts: []core.VolumeMount{
+				{
+					Name:      "vddk-vol-mount",
+					MountPath: "/opt",
+				},
+			},
+			SecurityContext: &core.SecurityContext{
+				AllowPrivilegeEscalation: &allowPrivilageEscalation,
+				Capabilities: &core.Capabilities{
+					Drop: []core.Capability{"ALL"},
+				},
+			},
+		})
 	}
 	// pod environment
 	environment, err := r.Builder.PodEnvironment(vm.Ref, r.Source.Secret)
@@ -1282,7 +1311,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	pod = &core.Pod{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace:    r.Plan.Spec.TargetNamespace,
-			Labels:       r.conversionLabels(vm.Ref),
+			Labels:       r.conversionLabels(vm.Ref, false),
 			GenerateName: r.getGeneratedName(vm),
 		},
 		Spec: core.PodSpec{
@@ -1291,7 +1320,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 				RunAsUser:    &user,
 				RunAsNonRoot: &nonRoot,
 			},
-			RestartPolicy: core.RestartPolicyNever,
+			RestartPolicy:  core.RestartPolicyNever,
 			InitContainers: initContainers,
 			Containers: []core.Container{
 				{
@@ -1664,15 +1693,23 @@ func (r *KubeVirt) planLabels() map[string]string {
 }
 
 // Label for a PVC consumer pod.
-func (r *KubeVirt) consumerLabels(vmRef ref.Ref) (labels map[string]string) {
-	labels = r.vmLabels(vmRef)
+func (r *KubeVirt) consumerLabels(vmRef ref.Ref, filterOutMigrationLabel bool) (labels map[string]string) {
+	if filterOutMigrationLabel {
+		labels = r.vmAllButMigrationLabels(vmRef)
+	} else {
+		labels = r.vmLabels(vmRef)
+	}
 	labels[kApp] = "consumer"
 	return
 }
 
 // Label for a conversion pod.
-func (r *KubeVirt) conversionLabels(vmRef ref.Ref) (labels map[string]string) {
-	labels = r.vmLabels(vmRef)
+func (r *KubeVirt) conversionLabels(vmRef ref.Ref, filterOutMigrationLabel bool) (labels map[string]string) {
+	if filterOutMigrationLabel {
+		labels = r.vmAllButMigrationLabels(vmRef)
+	} else {
+		labels = r.vmLabels(vmRef)
+	}
 	labels[kApp] = "virt-v2v"
 	return
 }
@@ -1681,6 +1718,13 @@ func (r *KubeVirt) conversionLabels(vmRef ref.Ref) (labels map[string]string) {
 func (r *KubeVirt) vmLabels(vmRef ref.Ref) (labels map[string]string) {
 	labels = r.planLabels()
 	labels[kVM] = vmRef.ID
+	return
+}
+
+// Labels for a VM on a plan without migration label.
+func (r *KubeVirt) vmAllButMigrationLabels(vmRef ref.Ref) (labels map[string]string) {
+	labels = r.vmLabels(vmRef)
+	delete(labels, kMigration)
 	return
 }
 
@@ -1811,8 +1855,7 @@ func (r *KubeVirt) ensureOpenStackVolumes(vm ref.Ref, ready bool) (pvcNames []st
 				r.Log.Info("Image is not active yet", "image", image.Name)
 				continue
 			}
-
-			populatorCr := openstackutil.OpenstackVolumePopulator(image, sourceUrl, r.Plan.Spec.TransferNetwork, r.Plan.Spec.TargetNamespace, secret.Name, r.Migration.Name)
+			populatorCr := util.OpenstackVolumePopulator(image, sourceUrl, r.Plan.Spec.TransferNetwork, r.Plan.Spec.TargetNamespace, secret.Name, vm.ID, string(r.Migration.UID))
 			err = r.Client.Create(context.TODO(), populatorCr, &client.CreateOptions{})
 			if k8serr.IsAlreadyExists(err) {
 				err = nil
@@ -1834,20 +1877,6 @@ func (r *KubeVirt) ensureOpenStackVolumes(vm ref.Ref, ready bool) (pvcNames []st
 				err = liberr.Wrap(err)
 				return
 			}
-
-			// TODO change once we decide how to cleanup the CR
-			err = k8sutil.SetOwnerReference(pvc, populatorCr, r.Scheme())
-			if err != nil {
-				err = liberr.Wrap(err)
-				return
-			}
-
-			err = r.Client.Update(context.TODO(), populatorCr, &client.UpdateOptions{})
-			if err != nil {
-				err = liberr.Wrap(err)
-				return
-			}
-
 			pvcNames = append(pvcNames, pvc.Name)
 		}
 	}
@@ -1891,5 +1920,40 @@ func (r *KubeVirt) openstackPVCsReady(vm ref.Ref, step *plan.Step) (ready bool, 
 		task.MarkCompleted()
 	}
 
+	return
+}
+
+func (r *KubeVirt) setOpenStackPopulatorLabels(populatorCr v1beta1.OpenstackVolumePopulator, vmId, migrationId string) (err error) {
+	populatorCrCopy := populatorCr.DeepCopy()
+	if populatorCr.Labels == nil {
+		populatorCr.Labels = make(map[string]string)
+	}
+	populatorCr.Labels["vmID"] = vmId
+	populatorCr.Labels["migration"] = migrationId
+	patch := client.MergeFrom(populatorCrCopy)
+	err = r.Destination.Client.Patch(context.TODO(), &populatorCr, patch)
+	return
+}
+
+func (r *KubeVirt) setOvirtPopulatorLabels(populatorCr v1beta1.OvirtVolumePopulator, vmId, migrationId string) (err error) {
+	populatorCrCopy := populatorCr.DeepCopy()
+	if populatorCr.Labels == nil {
+		populatorCr.Labels = make(map[string]string)
+	}
+	populatorCr.Labels["vmID"] = vmId
+	populatorCr.Labels["migration"] = migrationId
+	patch := client.MergeFrom(populatorCrCopy)
+	err = r.Destination.Client.Patch(context.TODO(), &populatorCr, patch)
+	return
+}
+
+func (r *KubeVirt) setPopulatorPodLabels(pod core.Pod, migrationId string) (err error) {
+	podCopy := pod.DeepCopy()
+	if pod.Labels == nil {
+		pod.Labels = make(map[string]string)
+	}
+	pod.Labels[kMigration] = migrationId
+	patch := client.MergeFrom(podCopy)
+	err = r.Destination.Client.Patch(context.TODO(), &pod, patch)
 	return
 }
