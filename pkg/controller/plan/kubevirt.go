@@ -78,6 +78,14 @@ const (
 	kApp = "forklift.app"
 )
 
+// User
+const (
+	// Qemu user
+	qemuUser = int64(107)
+	// Qemu group
+	qemuGroup = int64(107)
+)
+
 // Map of VirtualMachines keyed by vmID.
 type VirtualMachineMap map[string]VirtualMachine
 
@@ -641,6 +649,8 @@ func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) err
 			},
 		})
 	}
+	nonRoot := true
+	allowPrivilageEscalation := false
 	pod := &core.Pod{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace:    r.Plan.Spec.TargetNamespace,
@@ -654,6 +664,16 @@ func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) err
 					Name:    name,
 					Image:   Settings.Migration.VirtV2vImageCold,
 					Command: []string{"/bin/sh"},
+					SecurityContext: &core.SecurityContext{
+						AllowPrivilegeEscalation: &allowPrivilageEscalation,
+						RunAsNonRoot:             &nonRoot,
+						Capabilities: &core.Capabilities{
+							Drop: []core.Capability{"ALL"},
+						},
+						SeccompProfile: &core.SeccompProfile{
+							Type: core.SeccompProfileTypeRuntimeDefault,
+						},
+					},
 				},
 			},
 			Volumes: volumes,
@@ -1202,7 +1222,8 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	}
 
 	// qemu group
-	qemuUser := int64(107)
+	fsGroup := qemuGroup
+	user := qemuUser
 	nonRoot := true
 	allowPrivilageEscalation := false
 	// virt-v2v image
@@ -1226,8 +1247,8 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 		},
 		Spec: core.PodSpec{
 			SecurityContext: &core.PodSecurityContext{
-				FSGroup:      &qemuUser,
-				RunAsUser:    &qemuUser,
+				FSGroup:      &fsGroup,
+				RunAsUser:    &user,
 				RunAsNonRoot: &nonRoot,
 			},
 			RestartPolicy: core.RestartPolicyNever,
