@@ -27,17 +27,18 @@ type ImageHandler struct {
 
 type Image struct {
 	Resource
-	Status                      string            `json:"status"`
-	Tags                        []string          `json:"tags"`
-	ContainerFormat             string            `json:"container_format"`
-	DiskFormat                  string            `json:"disk_format"`
-	MinDiskGigabytes            int               `json:"min_disk"`
-	MinRAMMegabytes             int               `json:"min_ram"`
-	Owner                       string            `json:"owner"`
-	Protected                   bool              `json:"protected"`
-	Visibility                  string            `json:"visibility"`
-	Hidden                      bool              `json:"os_hidden"`
-	Checksum                    string            `json:"checksum"`
+	Status           string   `json:"status"`
+	Tags             []string `json:"tags"`
+	ContainerFormat  string   `json:"container_format"`
+	DiskFormat       string   `json:"disk_format"`
+	MinDiskGigabytes int      `json:"min_disk"`
+	MinRAMMegabytes  int      `json:"min_ram"`
+	Owner            string   `json:"owner"`
+	Protected        bool     `json:"protected"`
+	Visibility       string   `json:"visibility"`
+	Hidden           bool     `json:"os_hidden"`
+	Checksum         string   `json:"checksum"`
+	// Size may represent the actual size or size set for the volume by the user
 	SizeBytes                   int64             `json:"size"`
 	Metadata                    map[string]string `json:"metadata"`
 	CreatedAt                   time.Time         `json:"created_at"`
