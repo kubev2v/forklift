@@ -1202,7 +1202,9 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	}
 
 	// qemu group
-	fsGroup := int64(107)
+	qemuUser := int64(107)
+	nonRoot := true
+	allowPrivilageEscalation := false
 	// virt-v2v image
 	var virtV2vImage string
 	if r.Context.UseEl9VirtV2v() {
@@ -1224,7 +1226,9 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 		},
 		Spec: core.PodSpec{
 			SecurityContext: &core.PodSecurityContext{
-				FSGroup: &fsGroup,
+				FSGroup:      &qemuUser,
+				RunAsUser:    &qemuUser,
+				RunAsNonRoot: &nonRoot,
 			},
 			RestartPolicy: core.RestartPolicyNever,
 			InitContainers: []core.Container{
@@ -1236,6 +1240,12 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 						{
 							Name:      "vddk-vol-mount",
 							MountPath: "/opt",
+						},
+					},
+					SecurityContext: &core.SecurityContext{
+						AllowPrivilegeEscalation: &allowPrivilageEscalation,
+						Capabilities: &core.Capabilities{
+							Drop: []core.Capability{"ALL"},
 						},
 					},
 				},
@@ -1263,6 +1273,12 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 							Name:          "metrics",
 							ContainerPort: 2112,
 							Protocol:      core.ProtocolTCP,
+						},
+					},
+					SecurityContext: &core.SecurityContext{
+						AllowPrivilegeEscalation: &allowPrivilageEscalation,
+						Capabilities: &core.Capabilities{
+							Drop: []core.Capability{"ALL"},
 						},
 					},
 				},
