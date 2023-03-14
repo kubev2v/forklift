@@ -38,7 +38,7 @@ type Image struct {
 	Visibility                  string            `json:"visibility"`
 	Hidden                      bool              `json:"os_hidden"`
 	Checksum                    string            `json:"checksum"`
-	SizeBytes                   int64             `json:"-"`
+	SizeBytes                   int64             `json:"size"`
 	Metadata                    map[string]string `json:"metadata"`
 	CreatedAt                   time.Time         `json:"created_at"`
 	UpdatedAt                   time.Time         `json:"updated_at"`
