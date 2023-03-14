@@ -235,7 +235,7 @@ func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName
 		virtualSize = image.SizeBytes
 	}
 	if *volumeMode == core.PersistentVolumeFilesystem {
-		virtualSize = int64(float64(image.VirtualSize) * 1.1)
+		virtualSize = int64(float64(virtualSize) * 1.1)
 	}
 	return &core.PersistentVolumeClaim{
 		ObjectMeta: meta.ObjectMeta{
