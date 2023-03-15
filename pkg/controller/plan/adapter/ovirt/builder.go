@@ -526,7 +526,12 @@ func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName
 	diskAttachment := da.(model.XDiskAttachment)
 
 	// We add 10% overhead because of the fsOverhead in CDI, around 5% to ext4 and 5% for root partition.
-	diskSize := int64(float64(diskAttachment.Disk.ProvisionedSize) * 1.1)
+	diskSize := diskAttachment.Disk.ProvisionedSize
+	// Accounting for fsOverhead is only required for `volumeMode: Filesystem`
+	if *volumeMode == core.PersistentVolumeFilesystem {
+		diskSize = int64(float64(diskSize) * 1.1)
+	}
+
 	return &core.PersistentVolumeClaim{
 		ObjectMeta: meta.ObjectMeta{
 			Name:      diskAttachment.DiskAttachment.ID,
