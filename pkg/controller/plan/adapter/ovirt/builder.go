@@ -527,7 +527,8 @@ func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName
 
 	// We add 10% overhead because of the fsOverhead in CDI, around 5% to ext4 and 5% for root partition.
 	diskSize := diskAttachment.Disk.ProvisionedSize
-	// Accounting for fsOverhead is only required for `volumeMode: Filesystem`
+	// Accounting for fsOverhead is only required for `volumeMode: Filesystem`, as we may not have enough space
+	// after creating a filesystem on an underlying block device
 	if *volumeMode == core.PersistentVolumeFilesystem {
 		diskSize = int64(float64(diskSize) * 1.1)
 	}
