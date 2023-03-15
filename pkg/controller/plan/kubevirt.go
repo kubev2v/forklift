@@ -649,6 +649,7 @@ func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) err
 		})
 	}
 	nonRoot := true
+	user := qemuUser
 	allowPrivilageEscalation := false
 	pod := &core.Pod{
 		ObjectMeta: meta.ObjectMeta{
@@ -666,11 +667,9 @@ func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) err
 					SecurityContext: &core.SecurityContext{
 						AllowPrivilegeEscalation: &allowPrivilageEscalation,
 						RunAsNonRoot:             &nonRoot,
+						RunAsUser:                &user,
 						Capabilities: &core.Capabilities{
 							Drop: []core.Capability{"ALL"},
-						},
-						SeccompProfile: &core.SeccompProfile{
-							Type: core.SeccompProfileTypeRuntimeDefault,
 						},
 					},
 				},
