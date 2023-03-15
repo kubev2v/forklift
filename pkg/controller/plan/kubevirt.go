@@ -637,11 +637,10 @@ func (r *KubeVirt) createVolumesForOvirt(vm ref.Ref) (pvcNames []string, err err
 
 // Creates a pod associated with PVCs to create node bind (wait for consumer)
 func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) error {
-	name := "init"
 	volumes := []core.Volume{}
 	for _, pvcName := range pvcNames {
 		volumes = append(volumes, core.Volume{
-			Name: name,
+			Name: pvcName,
 			VolumeSource: core.VolumeSource{
 				PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
 					ClaimName: pvcName,
@@ -661,7 +660,7 @@ func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) err
 			RestartPolicy: core.RestartPolicyNever,
 			Containers: []core.Container{
 				{
-					Name:    name,
+					Name:    "main",
 					Image:   Settings.Migration.VirtV2vImageCold,
 					Command: []string{"/bin/sh"},
 					SecurityContext: &core.SecurityContext{
