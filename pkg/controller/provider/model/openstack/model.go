@@ -84,14 +84,15 @@ type Image struct {
 
 type Flavor struct {
 	Base
-	Disk        int    `sql:""`
-	RAM         int    `sql:""`
-	RxTxFactor  string `sql:""`
-	Swap        int    `sql:""`
-	VCPUs       int    `sql:""`
-	IsPublic    bool   `sql:""`
-	Ephemeral   int    `sql:""`
-	Description string `sql:""`
+	Disk        int               `sql:""`
+	RAM         int               `sql:""`
+	RxTxFactor  string            `sql:""`
+	Swap        int               `sql:""`
+	VCPUs       int               `sql:""`
+	IsPublic    bool              `sql:""`
+	Ephemeral   int               `sql:""`
+	Description string            `sql:""`
+	ExtraSpecs  map[string]string `sql:""`
 }
 
 type AttachedVolume struct {
