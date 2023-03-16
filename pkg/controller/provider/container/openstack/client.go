@@ -15,7 +15,6 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/snapshots"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumetypes"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/networks"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
@@ -23,6 +22,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/users"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	"github.com/gophercloud/gophercloud/pagination"
 	"github.com/gophercloud/utils/openstack/clientconfig"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
@@ -37,6 +37,7 @@ type Client struct {
 	identityService     *gophercloud.ServiceClient
 	ComputeService      *gophercloud.ServiceClient
 	ImageService        *gophercloud.ServiceClient
+	NetworkService      *gophercloud.ServiceClient
 	BlockStorageService *gophercloud.ServiceClient
 	log                 logr.Logger
 }
@@ -117,6 +118,13 @@ func (r *Client) Connect() (err error) {
 		return
 	}
 	r.ImageService = imageService
+
+	networkService, err := openstack.NewNetworkV2(r.provider, gophercloud.EndpointOpts{Region: r.region()})
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	r.NetworkService = networkService
 
 	blockStorageService, err := openstack.NewBlockStorageV3(r.provider, gophercloud.EndpointOpts{Region: r.region()})
 	if err != nil {
@@ -358,7 +366,7 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 
 	case *[]Network:
 		object := object.(*[]Network)
-		allPages, err = networks.List(r.ComputeService).AllPages()
+		allPages, err = networks.List(r.NetworkService, listopts.(*NetworkListOpts)).AllPages()
 		if err != nil {
 			return
 		}
@@ -459,7 +467,7 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 		return
 	case *Network:
 		var network *networks.Network
-		network, err = networks.Get(r.ComputeService, ID).Extract()
+		network, err = networks.Get(r.NetworkService, ID).Extract()
 		if err != nil {
 			return
 		}

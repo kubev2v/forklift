@@ -829,7 +829,8 @@ type NetworkAdapter struct {
 
 func (r *NetworkAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	networkList := []Network{}
-	err = ctx.client.list(&networkList, nil)
+	opts := &NetworkListOpts{}
+	err = ctx.client.list(&networkList, opts)
 	if err != nil {
 		return
 	}
@@ -848,7 +849,8 @@ func (r *NetworkAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 
 func (r *NetworkAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 	networkList := []Network{}
-	err = ctx.client.list(&networkList, nil)
+	opts := &NetworkListOpts{}
+	err = ctx.client.list(&networkList, opts)
 	if err != nil {
 		return
 	}
@@ -863,14 +865,6 @@ func (r *NetworkAdapter) GetUpdates(ctx *Context) (updates []Updater, err error)
 				if errors.Is(err, libmodel.NotFound) {
 					network.ApplyTo(m)
 					err = tx.Insert(m)
-				}
-				return
-			}
-			if network.Deleted {
-				network.ApplyTo(m)
-				err = tx.Delete(m)
-				if errors.Is(err, libmodel.NotFound) {
-					err = nil
 				}
 				return
 			}
