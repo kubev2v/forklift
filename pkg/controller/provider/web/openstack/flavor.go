@@ -174,14 +174,15 @@ func (h *FlavorHandler) filter(ctx *gin.Context, list *[]model.Flavor) (err erro
 // REST Resource.
 type Flavor struct {
 	Resource
-	Description string  `json:"description"`
-	Disk        int     `json:"disk"`
-	RAM         int     `json:"ram"`
-	RxTxFactor  float64 `json:"rxtx_factor"`
-	Swap        int     `json:"-"`
-	VCPUs       int     `json:"vcpus"`
-	IsPublic    bool    `json:"os-flavor-access:is_public"`
-	Ephemeral   int     `json:"OS-FLV-EXT-DATA:ephemeral"`
+	Description string            `json:"description"`
+	Disk        int               `json:"disk"`
+	RAM         int               `json:"ram"`
+	RxTxFactor  float64           `json:"rxtx_factor"`
+	Swap        int               `json:"-"`
+	VCPUs       int               `json:"vcpus"`
+	IsPublic    bool              `json:"os-flavor-access:is_public"`
+	Ephemeral   int               `json:"OS-FLV-EXT-DATA:ephemeral"`
+	ExtraSpecs  map[string]string `json:"extra_specs,omitempty"`
 }
 
 // Build the resource using the model.
@@ -195,6 +196,7 @@ func (r *Flavor) With(m *model.Flavor) {
 	r.VCPUs = m.VCPUs
 	r.IsPublic = m.IsPublic
 	r.Ephemeral = m.Ephemeral
+	r.ExtraSpecs = m.ExtraSpecs
 }
 
 // Build self link (URI).
