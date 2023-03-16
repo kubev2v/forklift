@@ -16,6 +16,7 @@ var (
 	VolumeKind     = libref.ToKind(Volume{})
 	VolumeTypeKind = libref.ToKind(VolumeType{})
 	NetworkKind    = libref.ToKind(Network{})
+	SubnetKind     = libref.ToKind(Subnet{})
 )
 
 // Types.

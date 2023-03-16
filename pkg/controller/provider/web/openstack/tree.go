@@ -272,6 +272,17 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 			Kind:   kind,
 			Object: object,
 		}
+	case model.SubnetKind:
+		resource := &Subnet{}
+		resource.With(m.(*model.Subnet))
+		resource.Link(provider)
+		resource.Path = r.pathBuilder.Path(m)
+		object := resource.Content(r.withDetail(kind))
+		node = &TreeNode{
+			Parent: parent,
+			Kind:   kind,
+			Object: object,
+		}
 	}
 
 	return node
