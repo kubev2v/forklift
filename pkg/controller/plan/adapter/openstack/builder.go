@@ -12,7 +12,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
@@ -227,7 +226,7 @@ func (r *Builder) PodEnvironment(_ ref.Ref, _ *core.Secret) (env []core.EnvVar, 
 }
 
 func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName *string, populatorName string, accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode) *core.PersistentVolumeClaim {
-	image := da.(*openstack.Image)
+	image := da.(*model.Image)
 	apiGroup := "forklift.konveyor.io"
 	virtualSize := image.VirtualSize
 	// virtual_size may not always be available
