@@ -25,6 +25,7 @@ func init() {
 		&VolumeAdapter{},
 		&VolumeTypeAdapter{},
 		&NetworkAdapter{},
+		&SubnetAdapter{},
 	}
 }
 
@@ -900,6 +901,92 @@ func (r *NetworkAdapter) DeleteUnexisting(ctx *Context) (updates []Updater, err 
 			updater := func(tx *libmodel.Tx) (err error) {
 				m := &model.Network{
 					Base: model.Base{ID: network.ID},
+				}
+				return tx.Delete(m)
+			}
+			updates = append(updates, updater)
+			err = nil
+		}
+	}
+	return
+}
+
+type SubnetAdapter struct {
+}
+
+func (r *SubnetAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
+	subnetList := []Subnet{}
+	opts := &SubnetListOpts{}
+	err = ctx.client.list(&subnetList, opts)
+	if err != nil {
+		return
+	}
+	list := fb.NewList()
+	for _, subnet := range subnetList {
+		m := &model.Subnet{
+			Base: model.Base{ID: subnet.ID},
+		}
+		subnet.ApplyTo(m)
+		list.Append(m)
+	}
+	itr = list.Iter()
+
+	return
+}
+
+func (r *SubnetAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
+	subnetList := []Subnet{}
+	opts := &SubnetListOpts{}
+	err = ctx.client.list(&subnetList, opts)
+	if err != nil {
+		return
+	}
+	for i := range subnetList {
+		subnet := &subnetList[i]
+		updater := func(tx *libmodel.Tx) (err error) {
+			m := &model.Subnet{
+				Base: model.Base{ID: subnet.ID},
+			}
+			err = tx.Get(m)
+			if err != nil {
+				if errors.Is(err, libmodel.NotFound) {
+					subnet.ApplyTo(m)
+					err = tx.Insert(m)
+				}
+				return
+			}
+			if subnet.equalsTo(m) {
+				return
+			}
+			subnet.ApplyTo(m)
+			err = tx.Update(m)
+			return
+		}
+		updates = append(updates, updater)
+	}
+	return
+}
+
+func (r *SubnetAdapter) DeleteUnexisting(ctx *Context) (updates []Updater, err error) {
+	subnetList := []model.Subnet{}
+	err = ctx.db.List(&subnetList, libmodel.FilterOptions{})
+	if err != nil {
+		if errors.Is(err, libmodel.NotFound) {
+			err = nil
+		}
+		return
+	}
+	for i := range subnetList {
+		subnet := &subnetList[i]
+		s := &Subnet{}
+		err = ctx.client.get(s, subnet.ID)
+		if err != nil && !ctx.client.isNotFound(err) {
+			return
+		}
+		if ctx.client.isNotFound(err) {
+			updater := func(tx *libmodel.Tx) (err error) {
+				m := &model.Subnet{
+					Base: model.Base{ID: subnet.ID},
 				}
 				return tx.Delete(m)
 			}
