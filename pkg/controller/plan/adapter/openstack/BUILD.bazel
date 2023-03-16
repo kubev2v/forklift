@@ -18,6 +18,8 @@ go_library(
         "//pkg/controller/plan/context",
         "//pkg/controller/provider/container/openstack",
         "//pkg/controller/provider/web",
+        "//pkg/controller/provider/web/base",
+        "//pkg/controller/provider/web/ocp",
         "//pkg/controller/provider/web/openstack",
         "//pkg/lib/error",
         "//pkg/lib/itinerary",
