@@ -185,12 +185,12 @@ type VM1 struct {
 	VM0
 	TenantID          string                 `json:"tenantID"`
 	Status            string                 `json:"status"`
-	HostID            string                 `json:"hostID"`
+	HostID            string                 `json:"hostID,omitempty"`
 	RevisionValidated int64                  `json:"revisionValidated"`
-	ImageID           string                 `json:"imageID"`
+	ImageID           string                 `json:"imageID,omitempty"`
 	FlavorID          string                 `json:"flavorID"`
 	Addresses         map[string]interface{} `json:"addresses"`
-	AttachedVolumes   []AttachedVolume       `json:"attachedVolumes"`
+	AttachedVolumes   []AttachedVolume       `json:"attachedVolumes,omitempty"`
 	Concerns          []Concern              `json:"concerns"`
 }
 
@@ -220,19 +220,19 @@ func (r *VM1) Content(detail int) interface{} {
 // VM resource.
 type VM struct {
 	VM1
-	UserID         string                   `json:"user_id"`
+	UserID         string                   `json:"userID"`
 	Updated        time.Time                `json:"updated"`
 	Created        time.Time                `json:"created"`
 	Progress       int                      `json:"progress"`
-	AccessIPv4     string                   `json:"accessIPv4"`
-	AccessIPv6     string                   `json:"accessIPv6"`
-	Metadata       map[string]string        `json:"metadata"`
-	KeyName        string                   `json:"key_name"`
-	AdminPass      string                   `json:"adminPass"`
-	SecurityGroups []map[string]interface{} `json:"security_groups"`
+	AccessIPv4     string                   `json:"accessIPv4,omitempty"`
+	AccessIPv6     string                   `json:"accessIPv6,omitempty"`
+	Metadata       map[string]string        `json:"metadata,omitempty"`
+	KeyName        string                   `json:"keyName,omitempty"`
+	AdminPass      string                   `json:"adminPass,omitempty"`
+	SecurityGroups []map[string]interface{} `json:"securityGroups,omitempty"`
 	Fault          Fault                    `json:"fault"`
-	Tags           *[]string                `json:"tags"`
-	ServerGroups   *[]string                `json:"server_groups"`
+	Tags           *[]string                `json:"tags,omitempty"`
+	ServerGroups   *[]string                `json:"serverGroups,omitempty"`
 }
 
 type AttachedVolume = model.AttachedVolume

@@ -173,23 +173,23 @@ func (h *SubnetHandler) filter(ctx *gin.Context, list *[]model.Subnet) (err erro
 // REST Resource.
 type Subnet struct {
 	Resource
-	NetworkID       string           `json:"network_id"`
+	NetworkID       string           `json:"networkID"`
 	Description     string           `json:"description,omitempty"`
-	IPVersion       int              `json:"ip_version"`
+	IPVersion       int              `json:"ipVersion"`
 	CIDR            string           `json:"cidr"`
-	GatewayIP       string           `json:"gateway_ip,omitempty"`
-	DNSNameservers  []string         `json:"dns_nameservers,omitempty"`
-	ServiceTypes    []string         `json:"service_types,omitempty"`
-	AllocationPools []AllocationPool `json:"allocation_pools,omitempty"`
-	HostRoutes      []HostRoute      `json:"host_routes,omitempty"`
-	EnableDHCP      bool             `json:"enable_dhcp"`
-	TenantID        string           `json:"tenant_id"`
-	ProjectID       string           `json:"project_id"`
-	IPv6AddressMode string           `json:"ipv6_address_mode,omitempty"`
-	IPv6RAMode      string           `json:"ipv6_ra_mode,omitempty"`
-	SubnetPoolID    string           `json:"subnetpool_id,omitempty"`
+	GatewayIP       string           `json:"gatewayIP,omitempty"`
+	DNSNameservers  []string         `json:"dnsNameservers,omitempty"`
+	ServiceTypes    []string         `json:"serviceTypes,omitempty"`
+	AllocationPools []AllocationPool `json:"allocationPools,omitempty"`
+	HostRoutes      []HostRoute      `json:"hostRoutes,omitempty"`
+	EnableDHCP      bool             `json:"enableDHCP"`
+	TenantID        string           `json:"tenantID"`
+	ProjectID       string           `json:"projectID"`
+	IPv6AddressMode string           `json:"ipv6AddressMode,omitempty"`
+	IPv6RAMode      string           `json:"ipv6RAMode,omitempty"`
+	SubnetPoolID    string           `json:"subnetpoolID,omitempty"`
 	Tags            []string         `json:"tags,omitempty"`
-	RevisionNumber  int              `json:"revision_number"`
+	RevisionNumber  int              `json:"revisionNumber"`
 }
 
 type AllocationPool = model.AllocationPool

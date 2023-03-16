@@ -174,7 +174,7 @@ func (h *RegionHandler) filter(ctx *gin.Context, list *[]model.Region) (err erro
 type Region struct {
 	Resource
 	Description    string `json:"description"`
-	ParentRegionID string `json:"parent_region_id"`
+	ParentRegionID string `json:"parentRegionID,omitempty"`
 }
 
 // Build the resource using the model.
