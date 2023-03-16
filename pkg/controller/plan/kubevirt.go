@@ -1776,7 +1776,7 @@ func vmOwnerReference(vm *cnv.VirtualMachine) (ref meta.OwnerReference) {
 }
 
 // TODO move elsewhere
-func (r *KubeVirt) createOpenStackVolumes(vm ref.Ref) (pvcNames []string, err error) {
+func (r *KubeVirt) ensureOpenStackVolumes(vm ref.Ref, ready bool) (pvcNames []string, err error) {
 	secret, err := r.ensureSecret(vm, r.copyDataFromProviderSecret)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -1802,8 +1802,18 @@ func (r *KubeVirt) createOpenStackVolumes(vm ref.Ref) (pvcNames []string, err er
 			image := &openstack.Image{}
 			err = r.Source.Inventory.Find(image, ref.Ref{Name: fmt.Sprintf("%s-%s", r.Migration.Name, vol.ID)})
 			if err != nil {
+				if !ready {
+					err = nil
+					r.Log.Info("Image is not found yet")
+					continue
+				}
 				err = liberr.Wrap(err)
 				return
+			}
+
+			if image.Status != "active" {
+				r.Log.Info("Image is not active yet", "image", image.Name)
+				continue
 			}
 
 			populatorCr := openstackutil.OpenstackVolumePopulator(image, sourceUrl, r.Plan.Spec.TargetNamespace, secret.Name, r.Migration.Name)
