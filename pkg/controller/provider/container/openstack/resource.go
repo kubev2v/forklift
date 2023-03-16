@@ -140,6 +140,7 @@ func (r *ImageListOpts) setUpdateAtQueryFilterGTE(lastSync time.Time) {
 
 type Flavor struct {
 	flavors.Flavor
+	ExtraSpecs map[string]string
 }
 
 type FlavorListOpts struct {
@@ -156,9 +157,13 @@ func (r *Flavor) ApplyTo(m *model.Flavor) {
 	m.IsPublic = r.IsPublic
 	m.Ephemeral = r.Ephemeral
 	m.Description = r.Description
+	m.ExtraSpecs = r.ExtraSpecs
 }
 
 func (r *Flavor) equalsTo(m *model.Flavor) bool {
+	if !reflect.DeepEqual(r.ExtraSpecs, m.ExtraSpecs) {
+		return false
+	}
 	return m.Disk == r.Disk &&
 		m.RAM == r.RAM &&
 		m.Name == r.Name &&

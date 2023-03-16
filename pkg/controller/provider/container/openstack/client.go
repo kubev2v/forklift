@@ -252,8 +252,13 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 			return
 		}
 		var instanceList []Flavor
+		var extraSpecs map[string]string
 		for _, flavor := range flavorList {
-			instanceList = append(instanceList, Flavor{flavor})
+			extraSpecs, err = flavors.ListExtraSpecs(r.ComputeService, flavor.ID).Extract()
+			if err != nil {
+				return
+			}
+			instanceList = append(instanceList, Flavor{Flavor: flavor, ExtraSpecs: extraSpecs})
 		}
 		*object = instanceList
 		return
@@ -404,7 +409,13 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 		if err != nil {
 			return
 		}
-		object = &Flavor{*flavor}
+		var extraSpecs map[string]string
+		extraSpecs, err = flavors.ListExtraSpecs(r.ComputeService, ID).Extract()
+		if err != nil {
+			return
+		}
+		object = &Flavor{Flavor: *flavor, ExtraSpecs: extraSpecs}
+
 		return
 	case *Image:
 		var image *images.Image
