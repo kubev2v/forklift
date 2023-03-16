@@ -478,7 +478,7 @@ func (r *VMAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 	for i := range vmList {
 		vm := &vmList[i]
 		switch vm.Status {
-		case VMStatusDeleted, VMStatusSoftDeleted:
+		case model.VMStatusDeleted, model.VMStatusSoftDeleted:
 			updater := func(tx *libmodel.Tx) (err error) {
 				m := &model.VM{
 					Base: model.Base{ID: vm.ID},
