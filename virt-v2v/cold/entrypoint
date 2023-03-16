@@ -11,6 +11,10 @@ if [ -z "$V2V_libvirtURL" ] || \
     exit 1
 fi
 
+for f in /usr/lib64/guestfs/appliance-*.tar.xz ; do
+    tar xvJf "$f" -C /usr/lib64/guestfs
+    break  # Idealy there should be just one such file.
+done
 export LIBGUESTFS_PATH=/usr/lib64/guestfs/appliance
 
 echo "Preparing virt-v2v"
