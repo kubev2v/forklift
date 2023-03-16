@@ -95,29 +95,146 @@ func (r *Workload) Link(p *api.Provider) {
 // Expanded: VM.
 type XVM struct {
 	VM
-	Image           Image    `json:"image"`
-	AttachedVolumes []Volume `json:"attached_volumes"`
+	Image       Image        `json:"image"`
+	Flavor      Flavor       `json:"flavor"`
+	Networks    []Network    `json:"networks"`
+	Subnets     []Subnet     `json:"subnets"`
+	Volumes     []Volume     `json:"volumes,omitempty"`
+	VolumeTypes []VolumeType `json:"volumeTypes,omitempty"`
+	Snapshots   []Snapshot   `json:"snapshots,omitempty"`
 }
 
 // Expand references.
 func (r *XVM) Expand(db libmodel.DB) (err error) {
-	image := model.Image{Base: model.Base{
-		ID: r.ImageID,
+	var imageID string
+	if r.ImageID != "" {
+		imageID = r.ImageID
+	}
+	flavor := model.Flavor{Base: model.Base{
+		ID: r.FlavorID,
 	}}
-	db.Get(&image)
-	r.Image.With(&image)
+	err = db.Get(&flavor)
+	if err != nil {
+		return
+	}
+	r.Flavor.With(&flavor)
+
+	var networks []Network
+	var subnets []Subnet
+
+	for name := range r.Addresses {
+		networkList := []model.Network{}
+		err = db.List(&networkList, model.ListOptions{
+			Predicate: libmodel.Eq("Name", name),
+			Detail:    model.MaxDetail,
+		})
+		if err != nil {
+			return
+		}
+		for _, networkModel := range networkList {
+			network := &Network{}
+			network.With(&networkModel)
+			networks = append(networks, *network)
+			for _, subnetID := range network.Subnets {
+				subnetModel := model.Subnet{Base: model.Base{
+					ID: subnetID,
+				}}
+				err = db.Get(&subnetModel)
+				if err != nil {
+					return
+				}
+				subnet := &Subnet{}
+				subnet.With(&subnetModel)
+				subnets = append(subnets, *subnet)
+				if err != nil {
+					return
+				}
+			}
+		}
+	}
+	r.Networks = networks
+	r.Subnets = subnets
 
 	var volumes []Volume
-	for _, av := range r.VM.AttachedVolumes {
-		volumeModel := model.Volume{
-			Base: model.Base{ID: av.ID},
-		}
-		db.Get(&volumeModel)
+	var volumeTypes []VolumeType
+	var snapshots []Snapshot
+
+	volumeTypeCache := map[string]VolumeType{}
+
+	for _, attachedVolume := range r.AttachedVolumes {
 		volume := &Volume{}
+		volumeModel := model.Volume{
+			Base: model.Base{ID: attachedVolume.ID},
+		}
+		err = db.Get(&volumeModel)
+		if err != nil {
+			return
+		}
 		volume.With(&volumeModel)
 		volumes = append(volumes, *volume)
+
+		if _, ok := volumeTypeCache[volume.VolumeType]; !ok {
+			volumeTypes := []model.VolumeType{}
+			err = db.List(&volumeTypes, model.ListOptions{
+				Predicate: libmodel.Eq("Name", volume.VolumeType),
+				Detail:    model.MaxDetail,
+			})
+			if err != nil {
+				return
+			}
+			volumeType := &VolumeType{}
+			volumeType.With(&volumeTypes[0])
+			volumeTypeCache[volume.VolumeType] = *volumeType
+		}
+
+		volumeType := volumeTypeCache[volume.VolumeType]
+		found := false
+		for i := range volumeTypes {
+			if volumeTypes[i].ID == volumeType.ID {
+				found = true
+			}
+		}
+		if !found {
+			volumeTypes = append(volumeTypes, volumeType)
+		}
+
+		snapshotsList := []model.Snapshot{}
+		err = db.List(&snapshotsList, model.ListOptions{
+			Predicate: libmodel.Eq("volumeID", attachedVolume.ID),
+			Detail:    model.MaxDetail,
+		})
+		if err != nil {
+			return
+		}
+		for _, snapshotModel := range snapshotsList {
+			snapshot := &Snapshot{}
+			snapshot.With(&snapshotModel)
+			snapshots = append(snapshots, *snapshot)
+		}
+
+		if imageID == "" && volume.Bootable == "true" {
+			if volumeImageID, ok := volume.VolumeImageMetadata["image_id"]; ok {
+				imageID = volumeImageID
+			}
+		}
+
 	}
-	r.AttachedVolumes = volumes
+
+	r.Volumes = volumes
+	r.VolumeTypes = volumeTypes
+	r.Snapshots = snapshots
+
+	if imageID != "" {
+		image := model.Image{Base: model.Base{
+			ID: imageID,
+		}}
+
+		err = db.Get(&image)
+		if err != nil {
+			return
+		}
+		r.Image.With(&image)
+	}
 
 	return
 }
@@ -125,6 +242,28 @@ func (r *XVM) Expand(db libmodel.DB) (err error) {
 // Build self link (URI).
 func (r *XVM) Link(p *api.Provider) {
 	r.VM.Link(p)
+	r.Image.Link(p)
+	r.Flavor.Link(p)
+	for i := range r.Networks {
+		network := &r.Networks[i]
+		network.Link(p)
+	}
+	for i := range r.Subnets {
+		subnet := &r.Subnets[i]
+		subnet.Link(p)
+	}
+	for i := range r.VolumeTypes {
+		volumeType := &r.VolumeTypes[i]
+		volumeType.Link(p)
+	}
+	for i := range r.Volumes {
+		volume := &r.Volumes[i]
+		volume.Link(p)
+	}
+	for i := range r.Snapshots {
+		snapshot := &r.Snapshots[i]
+		snapshot.Link(p)
+	}
 }
 
 // Expand the workload.

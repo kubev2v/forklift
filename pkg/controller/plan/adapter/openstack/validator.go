@@ -34,7 +34,7 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 			vmRef.String())
 		return
 	}
-	for _, av := range vm.AttachedVolumes {
+	for _, av := range vm.Volumes {
 		volType := &model.VolumeType{}
 		err = r.inventory.Find(volType, ref.Ref{Name: av.VolumeType})
 		if err != nil {
