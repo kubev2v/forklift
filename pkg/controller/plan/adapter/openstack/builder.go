@@ -71,7 +71,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 		pvc := &persistentVolumeClaims[i]
 		pvcMap[pvc.Annotations[AnnImportDiskId]] = pvc
 	}
-	for i, av := range vm.AttachedVolumes {
+	for i, av := range vm.Volumes {
 		image := &model.Image{}
 		err := r.Source.Inventory.Find(image, ref.Ref{Name: fmt.Sprintf("%s-%s", r.Migration.Name, av.ID)})
 		if err != nil {
@@ -174,7 +174,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 			vmRef.String())
 	}
 
-	for _, va := range vm.AttachedVolumes {
+	for _, va := range vm.Volumes {
 		gb := int64(va.Size)
 		list = append(
 			list,
@@ -287,7 +287,7 @@ func (r *Builder) BeforeTransferHook(c base.Client, vmRef ref.Ref) (ready bool, 
 	}
 
 	var snaplist []snapshots.Snapshot
-	for _, av := range vm.AttachedVolumes {
+	for _, av := range vm.Volumes {
 		imageName := fmt.Sprintf("%s-%s", r.Migration.Name, av.ID)
 		pager := snapshots.List(osClient.BlockStorageService, snapshots.ListOpts{
 			Name:  imageName,
