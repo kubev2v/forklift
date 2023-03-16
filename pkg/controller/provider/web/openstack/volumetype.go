@@ -174,10 +174,10 @@ func (h *VolumeTypeHandler) filter(ctx *gin.Context, list *[]model.VolumeType) (
 type VolumeType struct {
 	Resource
 	Description  string            `json:"description"`
-	ExtraSpecs   map[string]string `json:"extra_specs"`
-	IsPublic     bool              `json:"is_public"`
-	QosSpecID    string            `json:"qos_specs_id"`
-	PublicAccess bool              `json:"os-volume-type-access:is_public"`
+	ExtraSpecs   map[string]string `json:"extraSpecs,omitempty"`
+	IsPublic     bool              `json:"isPublic"`
+	QosSpecID    string            `json:"qosSpecsID"`
+	PublicAccess bool              `json:"publicAccess"`
 }
 
 // Build the resource using the model.
