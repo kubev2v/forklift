@@ -175,17 +175,17 @@ func (h *NetworkHandler) filter(ctx *gin.Context, list *[]model.Network) (err er
 type Network struct {
 	Resource
 	Description           string    `json:"description"`
-	AdminStateUp          bool      `json:"admin_state_up"`
+	AdminStateUp          bool      `json:"adminStateUp"`
 	Status                string    `json:"status"`
 	Subnets               []string  `json:"subnets,omitempty"`
-	TenantID              string    `json:"tenant_id"`
-	UpdatedAt             time.Time `json:"updated_at"`
-	CreatedAt             time.Time `json:"created_at"`
-	ProjectID             string    `json:"project_id"`
+	TenantID              string    `json:"tenantID"`
+	UpdatedAt             time.Time `json:"updatedAt"`
+	CreatedAt             time.Time `json:"createdAt"`
+	ProjectID             string    `json:"projectID"`
 	Shared                bool      `json:"shared"`
-	AvailabilityZoneHints []string  `json:"availability_zone_hints,omitempty"`
+	AvailabilityZoneHints []string  `json:"availabilityZoneHints,omitempty"`
 	Tags                  []string  `json:"tags,omitEmpty"`
-	RevisionNumber        int       `json:"revision_number"`
+	RevisionNumber        int       `json:"revisionNumber"`
 }
 
 // Build the resource using the model.

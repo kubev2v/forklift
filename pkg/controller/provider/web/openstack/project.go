@@ -173,11 +173,11 @@ func (h *ProjectHandler) filter(ctx *gin.Context, list *[]model.Project) (err er
 // REST Resource.
 type Project struct {
 	Resource
-	IsDomain    bool   `json:"is_domain"`
+	IsDomain    bool   `json:"isDomain"`
 	Description string `json:"description"`
-	DomainID    string `json:"domain_id"`
+	DomainID    string `json:"domainID"`
 	Enabled     bool   `json:"enabled"`
-	ParentID    string `json:"parent_id"`
+	ParentID    string `json:"parentID,omitempty"`
 }
 
 // Build the resource using the model.
