@@ -1776,8 +1776,8 @@ func (r *KubeVirt) createOpenStackVolumes(vm ref.Ref) (pvcNames []string, err er
 
 	storageName := r.Context.Map.Storage.Spec.Map[0].Destination.StorageClass
 
-	if len(openstackVm.AttachedVolumes) > 0 {
-		for _, vol := range openstackVm.AttachedVolumes {
+	if len(openstackVm.Volumes) > 0 {
+		for _, vol := range openstackVm.Volumes {
 			image := &openstack.Image{}
 			err = r.Source.Inventory.Find(image, ref.Ref{Name: fmt.Sprintf("%s-%s", r.Migration.Name, vol.ID)})
 			if err != nil {
@@ -1841,7 +1841,7 @@ func (r *KubeVirt) openstackPVCsReady(vm ref.Ref, step *plan.Step) (ready bool, 
 	}
 	ready = true
 
-	for _, vol := range openstackVm.AttachedVolumes {
+	for _, vol := range openstackVm.Volumes {
 		lookupName := fmt.Sprintf("%s-%s", r.Migration.Name, vol.ID)
 		image := &openstack.Image{}
 		err = r.Source.Inventory.Find(image, ref.Ref{Name: lookupName})
