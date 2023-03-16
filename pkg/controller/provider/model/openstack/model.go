@@ -193,31 +193,16 @@ type Volume struct {
 
 type Network struct {
 	Base
-	Bridge            string    `sql:""`
-	BridgeInterface   string    `sql:""`
-	Broadcast         string    `sql:""`
-	CIDR              string    `sql:""`
-	CIDRv6            string    `sql:""`
-	CreatedAt         time.Time `sql:""`
-	Deleted           bool      `sql:""`
-	DeletedAt         time.Time `sql:""`
-	DHCPStart         string    `sql:""`
-	DNS1              string    `sql:""`
-	DNS2              string    `sql:""`
-	Gateway           string    `sql:""`
-	Gatewayv6         string    `sql:""`
-	Host              string    `sql:""`
-	Injected          bool      `sql:""`
-	Label             string    `sql:""`
-	MultiHost         bool      `sql:""`
-	Netmask           string    `sql:""`
-	Netmaskv6         string    `sql:""`
-	Priority          int       `sql:""`
-	ProjectID         string    `sql:"d0,fk(project +cascade)"`
-	RXTXBase          int       `sql:""`
-	UpdatedAt         time.Time `sql:""`
-	VLAN              int       `sql:""`
-	VPNPrivateAddress string    `sql:""`
-	VPNPublicAddress  string    `sql:""`
-	VPNPublicPort     int       `sql:""`
+	Description           string    `sql:""`
+	AdminStateUp          bool      `sql:""`
+	Status                string    `sql:""`
+	Subnets               []string  `sql:""`
+	TenantID              string    `sql:"d0,fk(project +cascade)"`
+	UpdatedAt             time.Time `sql:""`
+	CreatedAt             time.Time `sql:""`
+	ProjectID             string    `sql:"d0,fk(project +cascade)"`
+	Shared                bool      `sql:""`
+	AvailabilityZoneHints []string  `sql:""`
+	Tags                  []string  `sql:""`
+	RevisionNumber        int       `sql:""`
 }
