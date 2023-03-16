@@ -174,65 +174,35 @@ func (h *NetworkHandler) filter(ctx *gin.Context, list *[]model.Network) (err er
 // REST Resource.
 type Network struct {
 	Resource
-	Bridge            string    `json:"bridge"`
-	BridgeInterface   string    `json:"bridge_interface"`
-	Broadcast         string    `json:"broadcast"`
-	CIDR              string    `json:"cidr"`
-	CIDRv6            string    `json:"cidr_v6"`
-	CreatedAt         time.Time `json:"created_at,omitempty"`
-	Deleted           bool      `json:"deleted"`
-	DeletedAt         time.Time `json:"deleted_at,omitempty"`
-	DHCPStart         string    `json:"dhcp_start"`
-	DNS1              string    `json:"dns_1"`
-	DNS2              string    `json:"dns_2"`
-	Gateway           string    `json:"gateway"`
-	Gatewayv6         string    `json:"gateway_v6"`
-	Host              string    `json:"host"`
-	Injected          bool      `json:"injected"`
-	Label             string    `json:"label"`
-	MultiHost         bool      `json:"multi_host"`
-	Netmask           string    `json:"netmask"`
-	Netmaskv6         string    `json:"netmask_v6"`
-	Priority          int       `json:"priority"`
-	ProjectID         string    `json:"project_id"`
-	RXTXBase          int       `json:"rxtx_base"`
-	UpdatedAt         time.Time `json:"updated_at,omitempty"`
-	VLAN              int       `json:"vlan"`
-	VPNPrivateAddress string    `json:"vpn_private_address"`
-	VPNPublicAddress  string    `json:"vpn_public_address"`
-	VPNPublicPort     int       `json:"vpn_public_port"`
+	Description           string    `json:"description"`
+	AdminStateUp          bool      `json:"admin_state_up"`
+	Status                string    `json:"status"`
+	Subnets               []string  `json:"subnets,omitempty"`
+	TenantID              string    `json:"tenant_id"`
+	UpdatedAt             time.Time `json:"updated_at"`
+	CreatedAt             time.Time `json:"created_at"`
+	ProjectID             string    `json:"project_id"`
+	Shared                bool      `json:"shared"`
+	AvailabilityZoneHints []string  `json:"availability_zone_hints,omitempty"`
+	Tags                  []string  `json:"tags,omitEmpty"`
+	RevisionNumber        int       `json:"revision_number"`
 }
 
 // Build the resource using the model.
 func (r *Network) With(m *model.Network) {
 	r.Resource.With(&m.Base)
-	r.Bridge = m.Bridge
-	r.BridgeInterface = m.BridgeInterface
-	r.Broadcast = m.Broadcast
-	r.CIDR = m.CIDR
-	r.CIDRv6 = m.CIDRv6
-	r.CreatedAt = m.CreatedAt
-	r.Deleted = m.Deleted
-	r.DeletedAt = m.DeletedAt
-	r.DHCPStart = m.DHCPStart
-	r.DNS1 = m.DNS1
-	r.DNS2 = m.DNS2
-	r.Gateway = m.Gateway
-	r.Gatewayv6 = m.Gatewayv6
-	r.Host = m.Host
-	r.Injected = m.Injected
-	r.Label = m.Label
-	r.MultiHost = m.MultiHost
-	r.Netmask = m.Netmask
-	r.Netmaskv6 = m.Netmaskv6
-	r.Priority = m.Priority
-	r.ProjectID = m.ProjectID
-	r.RXTXBase = m.RXTXBase
+	r.Description = m.Description
+	r.AdminStateUp = m.AdminStateUp
+	r.Subnets = m.Subnets
+	r.Status = m.Status
+	r.TenantID = m.TenantID
 	r.UpdatedAt = m.UpdatedAt
-	r.VLAN = m.VLAN
-	r.VPNPrivateAddress = m.VPNPrivateAddress
-	r.VPNPublicAddress = m.VPNPublicAddress
-	r.VPNPublicPort = m.VPNPublicPort
+	r.CreatedAt = m.CreatedAt
+	r.ProjectID = m.ProjectID
+	r.Shared = m.Shared
+	r.AvailabilityZoneHints = m.AvailabilityZoneHints
+	r.Tags = m.Tags
+	r.RevisionNumber = m.RevisionNumber
 }
 
 // Build self link (URI).
