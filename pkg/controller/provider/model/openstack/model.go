@@ -206,3 +206,34 @@ type Network struct {
 	Tags                  []string  `sql:""`
 	RevisionNumber        int       `sql:""`
 }
+
+type Subnet struct {
+	Base
+	NetworkID       string           `sql:"d0,fk(network +cascade)"`
+	Description     string           `sql:""`
+	IPVersion       int              `sql:""`
+	CIDR            string           `sql:""`
+	GatewayIP       string           `sql:""`
+	DNSNameservers  []string         `sql:""`
+	ServiceTypes    []string         `sql:""`
+	AllocationPools []AllocationPool `sql:""`
+	HostRoutes      []HostRoute      `sql:""`
+	EnableDHCP      bool             `sql:""`
+	TenantID        string           `sql:""`
+	ProjectID       string           `sql:""`
+	IPv6AddressMode string           `sql:""`
+	IPv6RAMode      string           `sql:""`
+	SubnetPoolID    string           `sql:""`
+	Tags            []string         `sql:""`
+	RevisionNumber  int              `sql:""`
+}
+
+type AllocationPool struct {
+	Start string `sql:""`
+	End   string `sql:""`
+}
+
+type HostRoute struct {
+	DestinationCIDR string `sql:""`
+	NextHop         string `sql:""`
+}

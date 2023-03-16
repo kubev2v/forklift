@@ -14,6 +14,7 @@ go_library(
         "region.go",
         "resource.go",
         "snapshot.go",
+        "subnet.go",
         "tree.go",
         "vm.go",
         "volume.go",
