@@ -23,6 +23,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/users"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	"github.com/gophercloud/gophercloud/pagination"
 	"github.com/gophercloud/utils/openstack/clientconfig"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
@@ -382,6 +383,24 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 		*object = instanceList
 		return
 
+	case *[]Subnet:
+		object := object.(*[]Subnet)
+		allPages, err = subnets.List(r.NetworkService, listopts.(*SubnetListOpts)).AllPages()
+		if err != nil {
+			return
+		}
+		var subnetList []subnets.Subnet
+		subnetList, err = subnets.ExtractSubnets(allPages)
+		if err != nil {
+			return
+		}
+		var instanceList []Subnet
+		for _, subnet := range subnetList {
+			instanceList = append(instanceList, Subnet{subnet})
+		}
+		*object = instanceList
+		return
+
 	default:
 		err = liberr.New(fmt.Sprintf("unsupported type %+v", object))
 		return
@@ -472,6 +491,14 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 			return
 		}
 		object = &Network{*network}
+		return
+	case *Subnet:
+		var subnet *subnets.Subnet
+		subnet, err = subnets.Get(r.NetworkService, ID).Extract()
+		if err != nil {
+			return
+		}
+		object = &Subnet{*subnet}
 		return
 	default:
 		err = liberr.New(fmt.Sprintf("unsupported type %+v", object))

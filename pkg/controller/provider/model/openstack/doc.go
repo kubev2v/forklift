@@ -17,5 +17,6 @@ func All() []interface{} {
 		&Volume{},
 		&VolumeType{},
 		&Network{},
+		&Subnet{},
 	}
 }
