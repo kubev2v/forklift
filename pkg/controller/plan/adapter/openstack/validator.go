@@ -34,17 +34,7 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 			vmRef.String())
 		return
 	}
-	for _, av := range vm.Volumes {
-		volType := &model.VolumeType{}
-		err = r.inventory.Find(volType, ref.Ref{Name: av.VolumeType})
-		if err != nil {
-			err = liberr.Wrap(
-				err,
-				"VolumeType not found in inventory.",
-				"VolumeType",
-				volType)
-			return
-		}
+	for _, volType := range vm.VolumeTypes {
 		if !r.plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{ID: volType.ID}) {
 			return
 		}
@@ -68,22 +58,55 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 			vmRef.String())
 		return
 	}
-
+	for _, network := range vm.Networks {
+		if !r.plan.Referenced.Map.Network.Status.Refs.Find(ref.Ref{ID: network.ID}) {
+			return
+		}
+	}
 	ok = true
 	return
 }
 
 // Validate that a VM's Host isn't in maintenance mode.
-func (r *Validator) MaintenanceMode(vmRef ref.Ref) (bool, error) {
-	return true, nil
+func (r *Validator) MaintenanceMode(vmRef ref.Ref) (ok bool, err error) {
+	ok = true
+	return
 }
 
 // Validate whether warm migration is supported from this provider type.
-func (r *Validator) WarmMigration() bool {
-	return true
+func (r *Validator) WarmMigration() (ok bool) {
+	ok = false
+	return
 }
 
 // Validate that no more than one of a VM's networks is mapped to the pod network.
-func (r *Validator) PodNetwork(vmRef ref.Ref) (bool, error) {
-	return true, nil
+func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
+	if r.plan.Referenced.Map.Network == nil {
+		return
+	}
+	vm := &model.Workload{}
+	err = r.inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(
+			err,
+			"VM not found in inventory.",
+			"vm",
+			vmRef.String())
+		return
+	}
+
+	mapping := r.plan.Referenced.Map.Network.Spec.Map
+	podMapped := 0
+	for i := range mapping {
+		mapped := &mapping[i]
+		ref := mapped.Source
+		for _, network := range vm.Networks {
+			if ref.ID == network.ID && mapped.Destination.Type == "Pod" {
+				podMapped++
+			}
+		}
+	}
+
+	ok = podMapped <= 1
+	return
 }
