@@ -177,12 +177,12 @@ type Flavor struct {
 	Description string            `json:"description"`
 	Disk        int               `json:"disk"`
 	RAM         int               `json:"ram"`
-	RxTxFactor  float64           `json:"rxtx_factor"`
-	Swap        int               `json:"-"`
+	RxTxFactor  float64           `json:"rxtxFactor"`
+	Swap        int               `json:"swap"`
 	VCPUs       int               `json:"vcpus"`
-	IsPublic    bool              `json:"os-flavor-access:is_public"`
-	Ephemeral   int               `json:"OS-FLV-EXT-DATA:ephemeral"`
-	ExtraSpecs  map[string]string `json:"extra_specs,omitempty"`
+	IsPublic    bool              `json:"isPublic"`
+	Ephemeral   int               `json:"ephemeral"`
+	ExtraSpecs  map[string]string `json:"extraSpecs,omitempty"`
 }
 
 // Build the resource using the model.

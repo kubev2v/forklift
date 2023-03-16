@@ -174,13 +174,13 @@ func (h *SnapshotHandler) filter(ctx *gin.Context, list *[]model.Snapshot) (err 
 // REST Resource.
 type Snapshot struct {
 	Resource
-	CreatedAt   time.Time         `json:"-"`
-	UpdatedAt   time.Time         `json:"-"`
+	CreatedAt   time.Time         `json:"createdAt"`
+	UpdatedAt   time.Time         `json:"updatedAt"`
 	Description string            `json:"description"`
-	VolumeID    string            `json:"volume_id"`
+	VolumeID    string            `json:"volumeID"`
 	Status      string            `json:"status"`
 	Size        int               `json:"size"`
-	Metadata    map[string]string `json:"metadata"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
 }
 
 // Build the resource using the model.

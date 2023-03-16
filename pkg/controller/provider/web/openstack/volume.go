@@ -178,23 +178,23 @@ type Volume struct {
 	Resource                              // Unique identifier for the volume.
 	Status              string            `json:"status"`
 	Size                int               `json:"size"`
-	AvailabilityZone    string            `json:"availability_zone"`
-	CreatedAt           time.Time         `json:"-"`
-	UpdatedAt           time.Time         `json:"-"`
+	AvailabilityZone    string            `json:"availabilityZone"`
+	CreatedAt           time.Time         `json:"createdAt"`
+	UpdatedAt           time.Time         `json:"updatedAt"`
 	Attachments         []Attachment      `json:"attachments"`
-	Description         string            `json:"description"`
-	VolumeType          string            `json:"volume_type"`
-	SnapshotID          string            `json:"snapshot_id"`
-	SourceVolID         string            `json:"source_volid"`
-	BackupID            *string           `json:"backup_id"`
-	Metadata            map[string]string `json:"metadata"`
-	UserID              string            `json:"user_id"`
+	Description         string            `json:"description,omitempty"`
+	VolumeType          string            `json:"volumeType"`
+	SnapshotID          string            `json:"snapshotID,omitempty"`
+	SourceVolID         string            `json:"sourceVolID,omitempty"`
+	BackupID            *string           `json:"backupID,omitempty"`
+	Metadata            map[string]string `json:"metadata,omitempty"`
+	UserID              string            `json:"userID"`
 	Bootable            string            `json:"bootable"`
 	Encrypted           bool              `json:"encrypted"`
-	ReplicationStatus   string            `json:"replication_status"`
-	ConsistencyGroupID  string            `json:"consistencygroup_id"`
+	ReplicationStatus   string            `json:"replicationStatus"`
+	ConsistencyGroupID  string            `json:"consistencygroupID,omitempty"`
 	Multiattach         bool              `json:"multiattach"`
-	VolumeImageMetadata map[string]string `json:"volume_image_metadata"`
+	VolumeImageMetadata map[string]string `json:"volumeImageMetadata,omitempty"`
 }
 
 // Build the resource using the model.
