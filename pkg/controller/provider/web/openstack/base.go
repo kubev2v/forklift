@@ -82,6 +82,9 @@ func (r *PathBuilder) Path(m model.Model) (path string) {
 		vm := m.(*model.VM)
 		var project *model.Project
 		project, err = r.getProject(vm.TenantID)
+		if err != nil {
+			return
+		}
 		path = pathlib.Join(r.Path(project), vm.Name)
 	}
 
