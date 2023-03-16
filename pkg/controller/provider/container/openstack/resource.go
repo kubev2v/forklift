@@ -14,6 +14,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/regions"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/openstack"
 )
 
@@ -386,4 +387,117 @@ func (r *Network) ApplyTo(m *model.Network) {
 
 func (r *Network) updatedAfter(m *model.Network) bool {
 	return time.Time(r.UpdatedAt).After(m.UpdatedAt)
+}
+
+type Subnet struct {
+	subnets.Subnet
+}
+
+type SubnetListOpts struct {
+	subnets.ListOpts
+}
+
+func (r *Subnet) ApplyTo(m *model.Subnet) {
+	m.ID = r.ID
+	m.NetworkID = r.NetworkID
+	m.Name = r.Name
+	m.Description = r.Description
+	m.IPVersion = r.IPVersion
+	m.CIDR = r.CIDR
+	m.GatewayIP = r.GatewayIP
+	m.DNSNameservers = r.DNSNameservers
+	m.ServiceTypes = r.ServiceTypes
+	r.addAllocationPools(m)
+	r.addHostRoutes(m)
+	m.EnableDHCP = r.EnableDHCP
+	m.TenantID = r.TenantID
+	m.ProjectID = r.ProjectID
+	m.IPv6AddressMode = r.IPv6AddressMode
+	m.IPv6RAMode = r.IPv6RAMode
+	m.SubnetPoolID = r.SubnetPoolID
+	m.Tags = r.Tags
+	m.RevisionNumber = r.RevisionNumber
+}
+
+func (r *Subnet) addAllocationPools(m *model.Subnet) {
+	m.AllocationPools = []model.AllocationPool{}
+	for i := range r.AllocationPools {
+		allocationPool := AllocationPool{r.AllocationPools[i]}
+		ap := &model.AllocationPool{}
+		allocationPool.ApplyTo(ap)
+		m.AllocationPools = append(m.AllocationPools, *ap)
+	}
+}
+func (r *Subnet) addHostRoutes(m *model.Subnet) {
+	m.HostRoutes = []model.HostRoute{}
+	for i := range r.HostRoutes {
+		hostRoute := HostRoute{r.HostRoutes[i]}
+		hr := &model.HostRoute{}
+		hostRoute.ApplyTo(hr)
+		m.HostRoutes = append(m.HostRoutes, *hr)
+	}
+}
+
+func (r *Subnet) equalsTo(m *model.Subnet) bool {
+	if !reflect.DeepEqual(r.DNSNameservers, m.DNSNameservers) {
+		return false
+	}
+	if !reflect.DeepEqual(r.ServiceTypes, m.ServiceTypes) {
+		return false
+	}
+	if !reflect.DeepEqual(r.Tags, m.Tags) {
+		return false
+	}
+	for i := range r.HostRoutes {
+		hostRoute := HostRoute{r.HostRoutes[i]}
+		if !hostRoute.equalsTo(&m.HostRoutes[i]) {
+			return false
+		}
+	}
+	for i := range r.AllocationPools {
+		allocationPool := AllocationPool{r.AllocationPools[i]}
+		if !allocationPool.equalsTo(&m.AllocationPools[i]) {
+			return false
+		}
+	}
+	return m.ID == r.ID &&
+		m.NetworkID == r.NetworkID &&
+		m.Name == r.Name &&
+		m.Description == r.Description &&
+		m.IPVersion == r.IPVersion &&
+		m.CIDR == r.CIDR &&
+		m.GatewayIP == r.GatewayIP &&
+		m.EnableDHCP == r.EnableDHCP &&
+		m.TenantID == r.TenantID &&
+		m.ProjectID == r.ProjectID &&
+		m.IPv6AddressMode == r.IPv6AddressMode &&
+		m.IPv6RAMode == r.IPv6RAMode &&
+		m.SubnetPoolID == r.SubnetPoolID &&
+		m.RevisionNumber == r.RevisionNumber
+}
+
+type AllocationPool struct {
+	subnets.AllocationPool
+}
+
+func (r *AllocationPool) ApplyTo(m *model.AllocationPool) {
+	m.Start = r.Start
+	m.End = r.End
+}
+
+func (r *AllocationPool) equalsTo(m *model.AllocationPool) bool {
+	return m.Start == r.Start && m.End == r.End
+}
+
+type HostRoute struct {
+	subnets.HostRoute
+}
+
+func (r *HostRoute) ApplyTo(m *model.HostRoute) {
+	m.DestinationCIDR = r.DestinationCIDR
+	m.NextHop = r.NextHop
+}
+
+func (r *HostRoute) equalsTo(m *model.HostRoute) bool {
+	return m.DestinationCIDR == r.DestinationCIDR && m.NextHop == r.NextHop
 }
