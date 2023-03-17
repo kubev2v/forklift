@@ -196,6 +196,25 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 			vm.Host)
 		return
 	}
+	path := host.Path
+	// Check parent resource
+	if host.Parent.Kind == "Cluster" {
+		parent := &model.Cluster{}
+		err = r.Source.Inventory.Get(parent, host.Parent.ID)
+		if err != nil {
+			err = liberr.Wrap(
+				err,
+				"Cluster lookup failed.",
+				"cluster",
+				host.Parent.ID)
+			return
+		}
+		if parent.Variant == "ComputeResource" {
+			// This is a stand-alone host without a cluster. We
+			// need to use path to the partent resource instead.
+			path = parent.Path
+		}
+	}
 
 	sslVerify := ""
 	if container.GetInsecureSkipVerifyFlag(sourceSecret) {
@@ -205,7 +224,7 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		Scheme:   "vpx",
 		Host:     host.ManagementServerIp, // VCenter
 		User:     liburl.User(string(sourceSecret.Data["user"])),
-		Path:     host.Path, // E.g.: /Datacenter/Cluster/host.example.com
+		Path:     path, // E.g.: /Datacenter/Cluster/host.example.com
 		RawQuery: sslVerify,
 	}
 	env = append(
