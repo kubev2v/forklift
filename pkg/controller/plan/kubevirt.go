@@ -679,6 +679,8 @@ func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) err
 			Volumes: volumes,
 		},
 	}
+	// Align with the conversion pod request, to prevent breakage
+	r.setKvmOnPodSpec(&pod.Spec)
 
 	err := r.Client.Create(context.TODO(), pod, &client.CreateOptions{})
 	if err != nil {
@@ -686,6 +688,22 @@ func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) err
 	}
 	r.Log.Info(fmt.Sprintf("Created pod '%s' to init the PVC node", pod.Name))
 	return nil
+}
+
+// Sets KVM requirement to the pod and container.
+func (r *KubeVirt) setKvmOnPodSpec(podSpec *core.PodSpec) {
+	if *r.Plan.Provider.Source.Spec.Type == v1beta1.VSphere && !Settings.VirtV2vDontRequestKVM {
+		if podSpec.NodeSelector == nil {
+			podSpec.NodeSelector = make(map[string]string)
+		}
+		podSpec.NodeSelector["kubevirt.io/schedulable"] = "true"
+		container := &podSpec.Containers[0]
+		if container.Resources.Requests == nil {
+			container.Resources.Requests = make(map[core.ResourceName]resource.Quantity)
+		}
+		// Ensure that the pod is deployed on a node where /dev/kvm is present.
+		container.Resources.Requests["devices.kubevirt.io/kvm"] = resource.MustParse("1")
+	}
 }
 
 // Build an OvirtVolumePopulator for XDiskAttachment and source URL
@@ -1207,19 +1225,6 @@ func (r *KubeVirt) findTemplate(vm *plan.VMStatus) (tmpl *template.Template, err
 
 func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, configMap *core.ConfigMap, pvcs *[]core.PersistentVolumeClaim, v2vSecret *core.Secret) (pod *core.Pod, err error) {
 	volumes, volumeMounts, volumeDevices := r.podVolumeMounts(vmVolumes, configMap, pvcs)
-	resourceReq := core.ResourceRequirements{}
-	nodeSelector := make(map[string]string)
-
-	// Request access to /dev/kvm via Kubevirt's Device Manager
-	// That is to ensure the appliance virt-v2v uses would not
-	// run in emulation mode, which is significantly slower
-	if !Settings.VirtV2vDontRequestKVM {
-		resourceReq.Limits = core.ResourceList{
-			"devices.kubevirt.io/kvm": resource.MustParse("1"),
-		}
-		// Ensure that the pod is deployed on a node where /dev/kvm is present.
-		nodeSelector["kubevirt.io/schedulable"] = "true"
-	}
 
 	// qemu group
 	fsGroup := qemuGroup
@@ -1288,7 +1293,6 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 					Image:         virtV2vImage,
 					VolumeMounts:  volumeMounts,
 					VolumeDevices: volumeDevices,
-					Resources:     resourceReq,
 					Ports: []core.ContainerPort{
 						{
 							Name:          "metrics",
@@ -1304,10 +1308,13 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 					},
 				},
 			},
-			Volumes:      volumes,
-			NodeSelector: nodeSelector,
+			Volumes: volumes,
 		},
 	}
+	// Request access to /dev/kvm via Kubevirt's Device Manager
+	// That is to ensure the appliance virt-v2v uses would not
+	// run in emulation mode, which is significantly slower
+	r.setKvmOnPodSpec(&pod.Spec)
 
 	return
 }
