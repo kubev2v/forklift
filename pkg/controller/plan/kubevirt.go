@@ -661,7 +661,9 @@ func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) err
 			RestartPolicy: core.RestartPolicyNever,
 			Containers: []core.Container{
 				{
-					Name:    "main",
+					Name: "main",
+					// For v2v the consumer pod is used only when we execute cold migration with el9.
+					// In that case, we could benefit from pulling the image of the conversion pod, so it will be present on the node.
 					Image:   Settings.Migration.VirtV2vImageCold,
 					Command: []string{"/bin/sh"},
 					SecurityContext: &core.SecurityContext{
