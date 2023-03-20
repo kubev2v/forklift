@@ -2,14 +2,15 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
-	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/imagedata"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
@@ -125,16 +126,25 @@ func populate(fileName, endpoint, secretName, imageID string) {
 	if err != nil {
 		klog.Fatal(err)
 	}
-
-	image, err := imagedata.Download(imageService, imageID).Extract()
+	url := fmt.Sprintf("%sv2/images/%s/file", imageService.Endpoint, imageID)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		klog.Fatal(err)
 	}
-	defer image.Close()
-
+	client := http.Client{}
+	req.Header.Set("X-Auth-Token", provider.Token())
+	resp, err := client.Do(req)
 	if err != nil {
 		klog.Fatal(err)
 	}
+	fileSize := resp.ContentLength
+	klog.Info("Downloading image ", imageID, " size ", fileSize)
+	resp.Body.Close()
+
+	workers := 4
+	var wg sync.WaitGroup
+	wg.Add(workers)
+
 	flags := os.O_RDWR
 	if strings.HasSuffix(fileName, "disk.img") {
 		flags |= os.O_CREATE
@@ -145,45 +155,60 @@ func populate(fileName, endpoint, secretName, imageID string) {
 	}
 	defer f.Close()
 
-	err = writeData(image, f, imageID, progressGague)
-	if err != nil {
-		klog.Fatal(err)
+	chunkSize := fileSize / int64(workers)
+	for i := 0; i < workers; i++ {
+		klog.Infof("Starting worker %d/%d", i+1, workers)
+		start := int64(i) * chunkSize
+		end := start + chunkSize
+		if i == workers-1 {
+			end = fileSize - 1
+		}
+		go writeData(start, end, f, url, imageID, provider.Token(), fmt.Sprintf("worker/%d", i), &wg)
 	}
+	wg.Wait()
+
 }
 
 type CountingReader struct {
 	reader io.ReadCloser
 	total  *int64
+	name   string
 }
 
 func (cr *CountingReader) Read(p []byte) (int, error) {
 	n, err := cr.reader.Read(p)
-	*cr.total += int64(n)
-	klog.Info("Transferred: ", *cr.total)
+	//*cr.total += int64(n)
 	return n, err
 }
 
-func writeData(reader io.ReadCloser, file *os.File, imageID string, progress *prometheus.GaugeVec) error {
-	total := new(int64)
-	countingReader := CountingReader{reader, total}
+func writeData(start, end int64, file *os.File, url, imageID, token, name string, wg *sync.WaitGroup) error {
+	defer wg.Done()
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		klog.Fatal(err)
+	}
+	rangeHeader := fmt.Sprintf("bytes=%d-%d", start, end)
+	req.Header.Set("Range", rangeHeader)
+	req.Header.Set("X-Auth-Token", token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		klog.Fatal(err)
+	}
 
-	done := make(chan bool)
-	go func() {
-		for {
-			select {
-			case <-done:
-				return
-			default:
-				progress.WithLabelValues(imageID).Set(float64(*total))
-			}
-		}
-	}()
+	defer resp.Body.Close()
+
+	_, err = file.Seek(start, 0)
+	if err != nil {
+		klog.Fatal(err)
+	}
+
+	total := new(int64)
+	countingReader := CountingReader{resp.Body, total, name}
 
 	if _, err := io.Copy(file, &countingReader); err != nil {
 		klog.Fatal(err)
 	}
-	done <- true
-	progress.WithLabelValues(imageID).Set(float64(*total))
 
+	klog.Infof("Worker %s finished", name)
 	return nil
 }
