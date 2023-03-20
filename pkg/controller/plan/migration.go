@@ -593,7 +593,6 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
 			break
 		}
-		var pvcNames []string
 		var ready bool
 		ready, err = r.builder.BeforeTransferHook(r.provider, vm.Ref)
 		if err != nil {
@@ -601,11 +600,18 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			return
 		}
 
+		var pvcNames []string
 		if r.kubevirt.isOpenstack(vm) {
 			pvcNames, err = r.kubevirt.ensureOpenStackVolumes(vm.Ref, ready)
 			if !ready {
 				return
 			}
+			if err != nil {
+				step.AddError(err.Error())
+				err = nil
+				break
+			}
+			err = r.kubevirt.createPodToBindPVCs(vm, pvcNames)
 			if err != nil {
 				step.AddError(err.Error())
 				err = nil
@@ -618,12 +624,6 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			return
 		}
 
-		err = r.kubevirt.createPodToBindPVCs(vm, pvcNames)
-		if err != nil {
-			step.AddError(err.Error())
-			err = nil
-			break
-		}
 		if r.kubevirt.useOvirtPopulator(vm) {
 			pvcNames, err = r.kubevirt.createVolumesForOvirt(vm.Ref)
 			if err != nil {
