@@ -30,8 +30,6 @@ var _ = Describe("[level:component]Migration tests for oVirt provider", func() {
 		By("Create Secret from Definition")
 		s, err := utils.CreateSecretFromDefinition(f.K8sClient, utils.NewSecretDefinition(
 			map[string]string{
-				"createdForResource":     "ovirt-provider",
-				"createdForResourceType": "providers",
 				"createdForProviderType": "ovirt",
 			}, nil,
 			map[string][]byte{
