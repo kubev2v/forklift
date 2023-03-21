@@ -159,7 +159,6 @@ type CountingReader struct {
 func (cr *CountingReader) Read(p []byte) (int, error) {
 	n, err := cr.reader.Read(p)
 	*cr.total += int64(n)
-	klog.Info("Transferred: ", *cr.total)
 	return n, err
 }
 
