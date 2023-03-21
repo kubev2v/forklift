@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"net/http"
@@ -165,9 +166,19 @@ func loadEngineConfig(engineURL string) engineConfig {
 		klog.Fatal(err.Error())
 	}
 
-	insecureSkipVerify, err := os.ReadFile("/etc/secret-volume/insecureSkipVerify")
+	var insecureSkipVerify []byte
+	_, err = os.Stat("/etc/secret-volume/insecureSkipVerify")
 	if err != nil {
-		klog.Fatal(err.Error())
+		if errors.Is(err, os.ErrNotExist) {
+			insecureSkipVerify = []byte("false")
+		} else {
+			klog.Fatal(err.Error())
+		}
+	} else {
+		insecureSkipVerify, err = os.ReadFile("/etc/secret-volume/insecureSkipVerify")
+		if err != nil {
+			klog.Fatal(err.Error())
+		}
 	}
 	insecure, err := strconv.ParseBool(string(insecureSkipVerify))
 	if err != nil {
