@@ -832,7 +832,6 @@ func (r *Builder) BeforeTransferHook(c planbase.Client, vmRef ref.Ref) (ready bo
 	// 2. Improve concurrency, as soon as the image is ready we can create the PVC, no need to wait
 	// for everything to finish
 	client, ok := c.(*Client)
-	osClient := client.OpenstackClient
 	if !ok {
 		return false, nil
 	}
@@ -852,7 +851,7 @@ func (r *Builder) BeforeTransferHook(c planbase.Client, vmRef ref.Ref) (ready bo
 	var snaplist []snapshots.Snapshot
 	for _, av := range vm.Volumes {
 		imageName := fmt.Sprintf("%s-%s", r.Migration.Name, av.ID)
-		pager := snapshots.List(osClient.BlockStorageService, snapshots.ListOpts{
+		pager := snapshots.List(client.blockStorageService, snapshots.ListOpts{
 			Name:  imageName,
 			Limit: 1,
 		})
@@ -874,7 +873,7 @@ func (r *Builder) BeforeTransferHook(c planbase.Client, vmRef ref.Ref) (ready bo
 			continue
 		}
 
-		snapshot, err := snapshots.Create(osClient.BlockStorageService, snapshots.CreateOpts{
+		snapshot, err := snapshots.Create(client.blockStorageService, snapshots.CreateOpts{
 			Name:        imageName,
 			VolumeID:    av.ID,
 			Force:       true,
@@ -893,7 +892,7 @@ func (r *Builder) BeforeTransferHook(c planbase.Client, vmRef ref.Ref) (ready bo
 	}
 
 	for _, snap := range snaplist {
-		snapshot, err := snapshots.Get(osClient.BlockStorageService, snap.ID).Extract()
+		snapshot, err := snapshots.Get(client.blockStorageService, snap.ID).Extract()
 		if err != nil {
 			return true, err
 		}
@@ -906,7 +905,7 @@ func (r *Builder) BeforeTransferHook(c planbase.Client, vmRef ref.Ref) (ready bo
 	var vollist []volumes.Volume
 	for _, snap := range snaplist {
 		imageName := fmt.Sprintf("%s-%s", r.Migration.Name, snap.VolumeID)
-		pager := volumes.List(osClient.BlockStorageService, volumes.ListOpts{
+		pager := volumes.List(client.blockStorageService, volumes.ListOpts{
 			Name:  imageName,
 			Limit: 1,
 		})
@@ -927,7 +926,7 @@ func (r *Builder) BeforeTransferHook(c planbase.Client, vmRef ref.Ref) (ready bo
 
 			continue
 		}
-		volume, err := volumes.Create(osClient.BlockStorageService, volumes.CreateOpts{
+		volume, err := volumes.Create(client.blockStorageService, volumes.CreateOpts{
 			Name:        imageName,
 			SnapshotID:  snap.ID,
 			Size:        snap.Size,
@@ -945,7 +944,7 @@ func (r *Builder) BeforeTransferHook(c planbase.Client, vmRef ref.Ref) (ready bo
 	}
 
 	for _, vol := range vollist {
-		volume, err := volumes.Get(osClient.BlockStorageService, vol.ID).Extract()
+		volume, err := volumes.Get(client.blockStorageService, vol.ID).Extract()
 		if err != nil {
 			return true, err
 		}
@@ -959,7 +958,7 @@ func (r *Builder) BeforeTransferHook(c planbase.Client, vmRef ref.Ref) (ready bo
 	var imagelist []string
 
 	for _, vol := range vollist {
-		pager := images.List(osClient.ImageService, images.ListOpts{
+		pager := images.List(client.imageService, images.ListOpts{
 			Name:  vol.Description,
 			Limit: 1,
 		})
@@ -983,7 +982,7 @@ func (r *Builder) BeforeTransferHook(c planbase.Client, vmRef ref.Ref) (ready bo
 			continue
 		}
 
-		image, err := volumeactions.UploadImage(osClient.BlockStorageService, vol.ID, volumeactions.UploadImageOpts{
+		image, err := volumeactions.UploadImage(client.blockStorageService, vol.ID, volumeactions.UploadImageOpts{
 			ImageName:  vol.Description,
 			DiskFormat: "raw",
 		}).Extract()
@@ -1000,7 +999,7 @@ func (r *Builder) BeforeTransferHook(c planbase.Client, vmRef ref.Ref) (ready bo
 	}
 
 	for _, imageID := range imagelist {
-		img, err := images.Get(osClient.ImageService, imageID).Extract()
+		img, err := images.Get(client.imageService, imageID).Extract()
 		if err != nil {
 			return true, err
 		}
@@ -1037,7 +1036,6 @@ func (r *Builder) imageReady(imageName string) bool {
 
 func (r *Builder) cleanup(c planbase.Client, imageName string) {
 	client, ok := c.(*Client)
-	osClient := client.OpenstackClient
 	if !ok {
 		r.Log.Info("Couldn't cast client (should never happen)")
 		return
@@ -1048,7 +1046,7 @@ func (r *Builder) cleanup(c planbase.Client, imageName string) {
 	if err != nil {
 		r.Log.Info("couldn't find volume for deletion, skipping...", "name", imageName)
 	} else {
-		err = volumes.Delete(osClient.BlockStorageService, volume.ID, volumes.DeleteOpts{Cascade: true}).ExtractErr()
+		err = volumes.Delete(client.blockStorageService, volume.ID, volumes.DeleteOpts{Cascade: true}).ExtractErr()
 		if err != nil {
 			r.Log.Error(err, "error removing volume", "name", imageName)
 		}
@@ -1059,7 +1057,7 @@ func (r *Builder) cleanup(c planbase.Client, imageName string) {
 	if err != nil {
 		r.Log.Info("couldn't find snapshot for deletion, skipping...", "name", imageName)
 	} else {
-		err = snapshots.Delete(osClient.BlockStorageService, snapshot.ID).ExtractErr()
+		err = snapshots.Delete(client.blockStorageService, snapshot.ID).ExtractErr()
 		if err != nil {
 			r.Log.Error(err, "error removing snapshot", "name", imageName)
 		}
