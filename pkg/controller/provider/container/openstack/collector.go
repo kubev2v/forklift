@@ -67,7 +67,7 @@ func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) (r *Collec
 		client: &Client{
 			URL:    provider.Spec.URL,
 			Secret: secret,
-			log:    log,
+			Log:    log,
 		},
 		provider: provider,
 		db:       db,
