@@ -14,7 +14,7 @@ type OpenstackVolumePopulator struct {
 	meta.TypeMeta   `json:",inline"`
 	meta.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   OpenstackVolumePopulatorSpec   `json:"spec"`
+	Spec OpenstackVolumePopulatorSpec `json:"spec"`
 	// +optional
 	Status OpenstackVolumePopulatorStatus `json:"status"`
 }
