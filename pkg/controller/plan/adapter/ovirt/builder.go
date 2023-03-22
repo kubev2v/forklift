@@ -271,7 +271,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	if object.Template == nil {
 		object.Template = &cnv.VirtualMachineInstanceTemplateSpec{}
 	}
-	r.mapDisks(vm, object)
+	r.mapDisks(vm, persistentVolumeClaims, object)
 	r.mapFirmware(vm, &vm.Cluster, object)
 	r.mapCPU(vm, object)
 	r.mapMemory(vm, object)
@@ -412,17 +412,24 @@ func (r *Builder) mapFirmware(vm *model.Workload, cluster *model.Cluster, object
 	object.Template.Spec.Domain.Firmware = firmware
 }
 
-func (r *Builder) mapDisks(vm *model.Workload, object *cnv.VirtualMachineSpec) {
+func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.PersistentVolumeClaim, object *cnv.VirtualMachineSpec) {
 	var kVolumes []cnv.Volume
 	var kDisks []cnv.Disk
 
+	pvcMap := make(map[string]*core.PersistentVolumeClaim)
+	for i := range persistentVolumeClaims {
+		pvc := &persistentVolumeClaims[i]
+		pvcMap[r.ResolvePersistentVolumeClaimIdentifier(pvc)] = pvc
+	}
+
 	for _, da := range vm.DiskAttachments {
+		claimName := pvcMap[da.Disk.ID].Name
 		volumeName := da.Disk.ID
 		volume := cnv.Volume{
 			Name: volumeName,
 			VolumeSource: cnv.VolumeSource{
 				PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
-					ClaimName: volumeName,
+					ClaimName: claimName,
 				},
 			},
 		}
@@ -531,6 +538,10 @@ func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName
 		ObjectMeta: meta.ObjectMeta{
 			Name:      diskAttachment.DiskAttachment.ID,
 			Namespace: r.Plan.Spec.TargetNamespace,
+			Annotations: map[string]string{
+				AnnImportDiskId: diskAttachment.Disk.ID,
+			},
+			Labels: map[string]string{"migration": r.Migration.Name},
 		},
 		Spec: core.PersistentVolumeClaimSpec{
 			AccessModes: accessModes,
