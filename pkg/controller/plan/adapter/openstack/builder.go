@@ -1046,16 +1046,22 @@ func (r *Builder) cleanup(c planbase.Client, imageName string) {
 	volume := &model.Volume{}
 	err := r.Source.Inventory.Find(volume, ref.Ref{Name: imageName})
 	if err != nil {
-		r.Log.Error(err, "Couldn't find volume", "name", imageName)
+		r.Log.Info("couldn't find volume for deletion, skipping...", "name", imageName)
+	} else {
+		err = volumes.Delete(osClient.BlockStorageService, volume.ID, volumes.DeleteOpts{Cascade: true}).ExtractErr()
+		if err != nil {
+			r.Log.Error(err, "error removing volume", "name", imageName)
+		}
 	}
-
-	volumes.Delete(osClient.BlockStorageService, volume.ID, volumes.DeleteOpts{Cascade: true})
 
 	snapshot := &model.Snapshot{}
 	err = r.Source.Inventory.Find(snapshot, ref.Ref{Name: imageName})
 	if err != nil {
-		r.Log.Error(err, "Couldn't find snapshot", "name", imageName)
+		r.Log.Info("couldn't find snapshot for deletion, skipping...", "name", imageName)
+	} else {
+		err = snapshots.Delete(osClient.BlockStorageService, snapshot.ID).ExtractErr()
+		if err != nil {
+			r.Log.Error(err, "error removing snapshot", "name", imageName)
+		}
 	}
-
-	snapshots.Delete(osClient.BlockStorageService, snapshot.ID)
 }
