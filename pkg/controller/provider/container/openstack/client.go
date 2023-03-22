@@ -40,7 +40,7 @@ type Client struct {
 	ImageService        *gophercloud.ServiceClient
 	NetworkService      *gophercloud.ServiceClient
 	BlockStorageService *gophercloud.ServiceClient
-	log                 logr.Logger
+	Log                 logr.Logger
 }
 
 // Connect.
@@ -58,6 +58,7 @@ func (r *Client) Connect() (err error) {
 		roots := x509.NewCertPool()
 		ok := roots.AppendCertsFromPEM(cacert)
 		if !ok {
+			r.Log.Info("the CA certificate is malformed or was not provided, falling back to system CA cert pool")
 			roots, err = x509.SystemCertPool()
 			if err != nil {
 				err = liberr.New("failed to configure the system's cert pool")
