@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
@@ -174,6 +175,8 @@ func writeData(reader io.ReadCloser, file *os.File, imageID string, progress *pr
 				return
 			default:
 				progress.WithLabelValues(imageID).Set(float64(*total))
+				klog.Info("Transferred: ", *total)
+				time.Sleep(3 * time.Second)
 			}
 		}
 	}()
