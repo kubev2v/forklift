@@ -263,7 +263,7 @@
 
     - name: "Set console_plugins variable"
       set_fact:
-        console_plugins: "{{ console_operator['resources'][0]['spec']['plugins'] }}"
+        console_plugins: "{{ console_operator['resources'][0]['spec']['plugins'] | default([]) }}"
 
     - name: "Enable console plugin"
       k8s:
