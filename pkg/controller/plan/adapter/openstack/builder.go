@@ -913,6 +913,12 @@ func (r *Builder) BeforeTransferHook(c planbase.Client, vmRef ref.Ref) (ready bo
 		if err != nil {
 			return true, err
 		}
+
+		if snapshot.Status == "error" {
+			r.Log.Error(err, "Failed to create snapshot")
+			return true, err
+		}
+
 		if snapshot.Status != "available" {
 			r.Log.Info("Snapshot not ready yet, recheking...", "snapshot", snap.Name)
 			return false, nil
@@ -963,6 +969,11 @@ func (r *Builder) BeforeTransferHook(c planbase.Client, vmRef ref.Ref) (ready bo
 	for _, vol := range vollist {
 		volume, err := volumes.Get(client.blockStorageService, vol.ID).Extract()
 		if err != nil {
+			return true, err
+		}
+
+		if volume.Status == "error" {
+			r.Log.Error(err, "Failed to create snapshot")
 			return true, err
 		}
 
