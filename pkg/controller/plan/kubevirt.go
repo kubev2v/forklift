@@ -696,6 +696,10 @@ func (r *KubeVirt) setKvmOnPodSpec(podSpec *core.PodSpec) {
 		}
 		podSpec.NodeSelector["kubevirt.io/schedulable"] = "true"
 		container := &podSpec.Containers[0]
+		if container.Resources.Limits == nil {
+			container.Resources.Limits = make(map[core.ResourceName]resource.Quantity)
+		}
+		container.Resources.Limits["devices.kubevirt.io/kvm"] = resource.MustParse("1")
 		if container.Resources.Requests == nil {
 			container.Resources.Requests = make(map[core.ResourceName]resource.Quantity)
 		}
