@@ -186,18 +186,18 @@ load("@bazeldnf//:deps.bzl", "bazeldnf_dependencies", "rpm")
 
 bazeldnf_dependencies()
 
-http_archive(
-    name = "libguestfs-appliance",
-    sha256 = "124d6325a799e958843be4818ef2c32661755be1c56e519665779948861b04f6",
-    urls = [
-        "https://storage.googleapis.com/kubevirt-prow/devel/release/kubevirt/libguestfs-appliance/libguestfs-appliance-1.48.4-qcow2-linux-5.14.0-183-centos9.tar.xz",
-    ],
+container_pull(
+    name = "centos9",
+    # 'tag' is also supported, but digest is encouraged for reproducibility.
+    digest = "sha256:66d2ee16970b1c15b26bfad256e5fbf2d57e72510974da0f0ebac4b49a166e94",  # built on 2023-04-25
+    registry = "quay.io",
+    repository = "centos/centos",
 )
 
 container_pull(
     name = "ubi9-minimal",
     # 'tag' is also supported, but digest is encouraged for reproducibility.
-    digest = "sha256:e9ea62ea2017705205ba7bc55d20827e06abe4fe071f0793c6cae46edd5855cf",
+    digest = "sha256:e9ea62ea2017705205ba7bc55d20827e06abe4fe071f0793c6cae46edd5855cf",  # 9.1.0-1760
     registry = "registry.access.redhat.com",
     repository = "ubi9/ubi-minimal",
 )

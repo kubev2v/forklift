@@ -22,3 +22,9 @@ build --action_env=POPULATOR_CONTROLLER_IMAGE=quay.io/kubev2v/populator-controll
 build --action_env=OPENSTACK_POPULATOR_IMAGE=quay.io/kubev2v/openstack-populator:latest
 build --action_env=OVIRT_POPULATOR_IMAGE=quay.io/kubev2v/ovirt-populator:latest
 build --action_env=OPERATOR_IMAGE=quay.io/kubev2v/forklift-operator:latest
+
+# Appliance build
+# container_run_and_extract() does not work inside Podman and Docker
+# sandboxes. Use slightly less secure but working processwrapper sandbox.
+# NOTE: Same configuration is in virt-v2v/cold/.bazelrc.
+build --strategy_regexp="Action appliance/libguestfs-appliance.tar"=processwrapper-sandbox
