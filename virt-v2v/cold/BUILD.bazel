@@ -3,6 +3,10 @@ load(
     "container_image",
     "container_push",
 )
+load(
+    "@io_bazel_rules_docker//docker/util:run.bzl",
+    "container_run_and_extract",
+)
 load("@bazeldnf//:deps.bzl", "rpmtree")
 load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 
@@ -15,17 +19,30 @@ container_push(
     tag = "$${REGISTRY_TAG:-devel}",
 )
 
-pkg_tar(
-    name = "appliance_layer",
-    srcs = [
-        "@libguestfs-appliance//appliance:README.fixed",
-        "@libguestfs-appliance//appliance:initrd",
-        "@libguestfs-appliance//appliance:kernel",
-        "@libguestfs-appliance//appliance:root",
+# Appliance build
+# NOTE: We deliberately do not use (and cannot use) rpmtree to build a base
+# layer with packages. Supermin queries the RPM database to track package files
+# and dependencies. Tar constructed by rpmtree is just a bunch of files and it
+# does not preserve the RPM database info. Therefore we imitate a Dockerfile
+# build here.
+container_run_and_extract(
+    name = "appliance",
+    commands = [
+        "set -x",
+        "dnf -y update",
+        "dnf -y install libguestfs libguestfs-appliance libguestfs-xfs libguestfs-winsupport qemu-img supermin",
+        "depmod \\$(ls /lib/modules/ |tail -n1)",
+        "export LIBGUESTFS_BACKEND=direct",
+        "export LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1",
+        "mkdir -p /usr/lib64/guestfs/appliance",
+        "cd /usr/lib64/guestfs/appliance",
+        "libguestfs-make-fixed-appliance .",
+        "qemu-img convert -c -O qcow2 root root.qcow2",
+        "mv -vf root.qcow2 root",
+        "tar -cvf /libguestfs-appliance.tar /usr/lib64/guestfs/appliance",
     ],
-    mode = "0444",
-    package_dir = "/usr/lib64/guestfs/appliance",
-    visibility = ["//visibility:public"],
+    extract_file = "/libguestfs-appliance.tar",
+    image = "@centos9//image",
 )
 
 container_image(
@@ -34,7 +51,7 @@ container_image(
     directory = "/",
     tars = [
         ":virt-v2v",
-        ":appliance_layer",
+        "appliance/libguestfs-appliance.tar",
     ],
 )
 
