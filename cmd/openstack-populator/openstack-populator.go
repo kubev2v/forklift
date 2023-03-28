@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"flag"
 	"io"
 	"net/http"
@@ -11,6 +13,7 @@ import (
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/imagedata"
+	"github.com/gophercloud/utils/openstack/clientconfig"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
@@ -51,6 +54,7 @@ type openstackConfig struct {
 	projectName        string
 	insecureSkipVerify string
 	region             string
+	cacert             string
 }
 
 func loadConfig(secretName, endpoint string) openstackConfig {
@@ -78,6 +82,10 @@ func loadConfig(secretName, endpoint string) openstackConfig {
 	if err != nil {
 		klog.Fatal(err.Error())
 	}
+	cacert, err := os.ReadFile("/etc/secret-volume/cacert")
+	if err != nil {
+		klog.Error(err.Error())
+	}
 
 	return openstackConfig{
 		username:           string(username),
@@ -86,6 +94,7 @@ func loadConfig(secretName, endpoint string) openstackConfig {
 		projectName:        string(projectName),
 		region:             string(region),
 		domainName:         string(domainName),
+		cacert:             string(cacert),
 	}
 }
 
@@ -108,16 +117,42 @@ func populate(fileName, endpoint, secretName, imageID string) {
 	}
 
 	config := loadConfig(secretName, endpoint)
+	var tlsConfig *tls.Config
+	var err error
 
-	authOpts := gophercloud.AuthOptions{
-		IdentityEndpoint: endpoint,
-		DomainName:       config.domainName,
-		Username:         config.username,
-		Password:         config.password,
-		TenantName:       config.projectName,
+	if config.insecureSkipVerify == "true" {
+		tlsConfig = &tls.Config{InsecureSkipVerify: true}
+	} else {
+		cacert := []byte(config.cacert)
+		roots := x509.NewCertPool()
+		ok := roots.AppendCertsFromPEM(cacert)
+		if !ok {
+			roots, err = x509.SystemCertPool()
+			if err != nil {
+				klog.Fatal("failed to configure the system's cert pool")
+				return
+			}
+		}
+		tlsConfig = &tls.Config{RootCAs: roots}
 	}
 
-	provider, err := openstack.AuthenticatedClient(authOpts)
+	clientOpts := &clientconfig.ClientOpts{
+		AuthInfo: &clientconfig.AuthInfo{
+			AuthURL:     endpoint,
+			DomainName:  config.domainName,
+			Username:    config.username,
+			Password:    config.password,
+			ProjectName: config.projectName,
+			AllowReauth: true,
+		},
+		HTTPClient: &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: tlsConfig,
+			},
+		},
+	}
+
+	provider, err := clientconfig.AuthenticatedClient(clientOpts)
 	if err != nil {
 		klog.Fatal(err)
 	}
