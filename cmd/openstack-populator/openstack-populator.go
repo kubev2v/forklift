@@ -122,16 +122,12 @@ func populate(fileName, endpoint, secretName, imageID string) {
 
 	if config.insecureSkipVerify == "true" {
 		tlsConfig = &tls.Config{InsecureSkipVerify: true}
-	} else {
+	} else if config.cacert != "" {
 		cacert := []byte(config.cacert)
 		roots := x509.NewCertPool()
 		ok := roots.AppendCertsFromPEM(cacert)
 		if !ok {
-			roots, err = x509.SystemCertPool()
-			if err != nil {
-				klog.Fatal("failed to configure the system's cert pool")
-				return
-			}
+			klog.Fatal("Failed to parse certificate")
 		}
 		tlsConfig = &tls.Config{RootCAs: roots}
 	}
