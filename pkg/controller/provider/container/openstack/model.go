@@ -259,6 +259,9 @@ func (r *ImageAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 		}
 		image.ApplyTo(m)
 		list.Append(m)
+		if image.UpdatedAt.After(now) {
+			now = image.UpdatedAt
+		}
 	}
 	itr = list.Iter()
 	r.lastSync = now
@@ -267,7 +270,7 @@ func (r *ImageAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 
 func (r *ImageAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 	opts := &ImageListOpts{}
-	opts.setUpdateAtQueryFilterGTE(r.lastSync)
+	opts.setUpdateAtQueryFilterGT(r.lastSync)
 	imageList := []Image{}
 	now := time.Now()
 	err = ctx.client.list(&imageList, opts)
@@ -309,6 +312,10 @@ func (r *ImageAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 				return
 			}
 			updates = append(updates, updater)
+		}
+
+		if image.UpdatedAt.After(now) {
+			now = image.UpdatedAt
 		}
 	}
 	r.lastSync = now
@@ -513,6 +520,9 @@ func (r *VMAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 				return
 			}
 			updates = append(updates, updater)
+		}
+		if vm.Updated.After(now) {
+			now = vm.Updated
 		}
 	}
 	r.lastSync = now
