@@ -2,7 +2,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "mutators",
-    srcs = ["ovirt-cert-mutator.go"],
+    srcs = ["secret-mutator.go"],
     importpath = "github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/mutating-webhook/mutators",
     visibility = ["//visibility:public"],
     deps = [
@@ -17,7 +17,7 @@ go_library(
 
 go_test(
     name = "mutators_test",
-    srcs = ["ovirt-cert-mutator_test.go"],
+    srcs = ["secret-mutator_test.go"],
     embed = [":mutators"],
     deps = ["//vendor/github.com/onsi/gomega"],
 )
