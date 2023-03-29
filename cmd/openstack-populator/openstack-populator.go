@@ -84,7 +84,7 @@ func loadConfig(secretName, endpoint string) openstackConfig {
 	}
 	cacert, err := os.ReadFile("/etc/secret-volume/cacert")
 	if err != nil {
-		klog.Error(err.Error())
+		klog.Fatal(err.Error())
 	}
 
 	return openstackConfig{
