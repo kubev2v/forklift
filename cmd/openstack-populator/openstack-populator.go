@@ -80,11 +80,12 @@ func loadConfig(secretName, endpoint string) openstackConfig {
 	}
 	insecureSkipVerify, err := os.ReadFile("/etc/secret-volume/insecureSkipVerify")
 	if err != nil {
-		klog.Fatal(err.Error())
+		klog.Error(err.Error())
+		insecureSkipVerify = []byte("false")
 	}
 	cacert, err := os.ReadFile("/etc/secret-volume/cacert")
 	if err != nil {
-		klog.Fatal(err.Error())
+		klog.Error(err.Error())
 	}
 
 	return openstackConfig{
