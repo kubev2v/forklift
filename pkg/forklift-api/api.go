@@ -66,7 +66,7 @@ func (app *forkliftAPIApp) Execute() {
 	}
 
 	mux := http.NewServeMux()
-	webhooks.RegisterMutetingWebhooks(mux)
+	webhooks.RegisterMutatingWebhooks(mux)
 	webhooks.RegisterValidatingWebhooks(mux)
 	server := http.Server{
 		Addr:    ":8443",

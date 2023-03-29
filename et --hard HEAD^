@@ -1,0 +1,2137 @@
+[33mcommit 13455e8dbc74e1b12a21aa968a7b6fe93810c59a[m[33m ([m[1;36mHEAD[m[33m, [m[1;31morigin/webhook[m[33m, [m[1;32mwebhook[m[33m)[m
+Author: Bella Khizgiyaev <bkhizgiy@redhat.com>
+Date:   Wed Mar 29 13:21:59 2023 +0300
+
+    Refactor mutating webhook to support all providers
+    
+    Signed-off-by: Bella Khizgiyaev <bkhizgiy@redhat.com>
+
+[33mcommit b950af5cae9af836d449f6566fc7686253712cea[m
+Author: Benny Zlotnik <bzlotnik@redhat.com>
+Date:   Sun Mar 12 12:56:22 2023 +0200
+
+    openstack: use size if virtual_size is not available
+    
+    Signed-off-by: Benny Zlotnik <bzlotnik@redhat.com>
+
+[33mcommit 7ce9dcc3aef3985513757975c77bc30bb3011c78[m[33m ([m[1;31mforklift/main[m[33m)[m
+Author: Benny Zlotnik <bzlotnik@redhat.com>
+Date:   Wed Mar 29 13:16:34 2023 +0300
+
+    change to klog.Fatal
+    
+    Signed-off-by: Benny Zlotnik <bzlotnik@redhat.com>
+
+[33mcommit 15a027e38296ed04e1b1fb1f14c0902532c38a99[m
+Author: Benny Zlotnik <bzlotnik@redhat.com>
+Date:   Tue Mar 28 18:33:58 2023 +0300
+
+    openstack: do not use system cert pool
+    
+    Signed-off-by: Benny Zlotnik <bzlotnik@redhat.com>
+
+[33mcommit 0d10aa61604f006f8a5c6b1f2c2c79f24418bf8d[m
+Author: Benny Zlotnik <bzlotnik@redhat.com>
+Date:   Tue Mar 28 15:05:06 2023 +0300
+
+    openstack: use certificate in populator
+    
+    Signed-off-by: Benny Zlotnik <bzlotnik@redhat.com>
+
+[33mcommit 71eb520bbafa338bbc9f1ea89e6cd2c5a77bdf62[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Wed Mar 22 14:31:10 2023 +0100
+
+    Implement openstack power management for vms
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit af3ff322a136032a815f8b76a5fe46b6aa7f43e4[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Sun Mar 26 16:54:55 2023 +0300
+
+    Switch the KVM resource to limits
+    
+    Having the consumer container and the v2v conversion container with the
+    KVM device as required caused:
+    `spec.containers[0].resources.limits: Required value: Limit must be set
+    for non overcommitable resources`. This patch switch it to be as Limit
+    and Request of the container.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit 55119d5062f88e479b31cd8058b154b987c2f6a6[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Wed Mar 22 07:43:13 2023 +0100
+
+    Do not try to remove non-existing entities
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 381aaafce13d170bbdb19ba81e73bb5ce11b4f7d[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Wed Mar 22 07:38:30 2023 +0100
+
+    Include changes after 'make test'
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit d33378b2548a4d4a15f98d3b248c9f0e63c5c298[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Thu Mar 16 18:54:44 2023 +0100
+
+    Map openstack vm configuration
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit bbfef1fe2bb9491b366c5479546318a30d1ba5e2[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Thu Mar 16 18:51:12 2023 +0100
+
+    Remove duplicated import
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 2f35cb01dba6c8f2e0095a593597615cc30004a1[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Thu Mar 16 14:53:09 2023 +0100
+
+    Add openstack plan validations
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit d7554109c6497f225782a6c72b4414ec30476d9c[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Thu Mar 16 14:48:27 2023 +0100
+
+    Workload enhancements
+    
+    - Rename ambiguous 'AttachedVolumes' to 'Volumes'
+    - Add 'Flavor', 'Networks', 'Subnets', 'VolumeTypes' and
+    'Snapshots' information to the workload.
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 10ff03c25035c296a1898ca833e7bfa51e4f037f[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Thu Mar 16 14:02:02 2023 +0100
+
+    Check error when retrieving the project
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 72e3936360762dc332bd42146ccf562de2dc7f08[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Thu Mar 16 13:59:57 2023 +0100
+
+    Make use of coherent field names and omit some fields when empty
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 04a4d3e3800645f770fe9017dbc7bc12fe55cfc7[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Thu Mar 16 13:58:07 2023 +0100
+
+    Move vm status definition to the model
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 7663ed359e2cdbb78be13ad3839beb19b13b76b5[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Thu Mar 16 13:40:57 2023 +0100
+
+    Add Subnet type
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit efed59fa1938dbd592678b3ef8c8efdb2b5aa1e7[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Thu Mar 16 13:33:48 2023 +0100
+
+    Use Neutron API instead of Compute for networks
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 92bff582e87fce6f35768ba261e2187ad23f4b1d[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Thu Mar 16 13:17:49 2023 +0100
+
+    Retrieve Flavor ExtraSpecs
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 504fdc5b94f39f9d4e2941846f61e19111e367c2[m
+Author: Benny Zlotnik <bzlotnik@redhat.com>
+Date:   Thu Mar 23 11:19:39 2023 +0200
+
+    openstack: move log to goroutine
+    
+    Signed-off-by: Benny Zlotnik <bzlotnik@redhat.com>
+
+[33mcommit 46e2f92ebf936ce1cc9f3e815b4f47fa3b71dcb8[m
+Author: Benny Zlotnik <bzlotnik@redhat.com>
+Date:   Tue Mar 21 22:35:24 2023 +0200
+
+    openstack: remove log
+    
+    Signed-off-by: Benny Zlotnik <bzlotnik@redhat.com>
+
+[33mcommit 6b86889dcfe6f1c511a55027b42c71db62c5866d[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Sun Mar 19 12:04:29 2023 +0200
+
+    Require KVM to the PVC consumer pod
+    
+    In order to have the PVC bind with a host with KVM, which is required by
+    the conversion pod. The consumer need to run on a node that has KVM
+    enabled as well.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit 7e03a890e6dc1bcb7362014eeecf92a5d655c268[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Wed Mar 22 12:01:18 2023 +0200
+
+    Attach the right PVC on different flows
+    
+    When running an import with CDI, the PVC is not named based on the
+    source input. In that case we need to use the generated name of the PVC
+    to be claimed by the VM. This relevant for non volume populator imports
+    such as warm imports and imports to remote clusters.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit 00ee2b8e067cf53cd7faa286468b5bebbf08526b[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Mon Mar 20 16:40:28 2023 +0200
+
+    Drop unused createdForResource and createdForResourceType labels
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 5067f85ec03c8f24da1720a9f8e3842a91e1be68[m
+Author: Martin Nečas <necas.marty@gmail.com>
+Date:   Tue Mar 21 16:11:50 2023 +0100
+
+    operator: Fix console_plugins list in case there are no other plugins
+    
+    Signed-off-by: Martin Nečas <necas.marty@gmail.com>
+
+[33mcommit 33e78966d5804f374eb4b76e4b9cb0bb4689a87d[m
+Author: Bella Khizgiyaev <bkhizgiy@redhat.com>
+Date:   Sun Mar 19 11:51:31 2023 +0200
+
+    Fix defult setting for insecureSkipVerify
+    
+    Signed-off-by: Bella Khizgiyaev <bkhizgiy@redhat.com>
+
+[33mcommit 40446ce8d18f077ab7f2a9513ace010dd3315885[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Mon Mar 20 10:33:21 2023 +0200
+
+    Add a comment about the consumer image
+    
+    We may benefit from the image we chose for the consumer pod. This patch
+    adds a comment about it.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit e2b3d2d4b51f5d18ef3170c06a7f7815194519c3[m
+Author: Tomáš Golembiovský <tgolembi@redhat.com>
+Date:   Fri Mar 17 16:36:11 2023 +0100
+
+    controller: vsphere: Use parent path for hosts without cluster
+    
+    When there is only a stand-alone host without cluster in the VMware
+    environment VSphere creates a special Cluster resource with the same
+    name in the hierarchy. This leads to duplicated last component in the
+    path to the host resource e.g.:
+    `/DC/my-host.example.com/my-host.example.com`. This confuses libvirt
+    and/or VMware API. To get a proper path and avoid the duplicated last
+    component we need to look at the path of the (artificial) cluster
+    resource instead.
+    
+    Signed-off-by: Tomáš Golembiovský <tgolembi@redhat.com>
+
+[33mcommit 5e3447a65532511b2d619ad104b81c45704ae48b[m
+Author: Tomáš Golembiovský <tgolembi@redhat.com>
+Date:   Fri Mar 17 10:39:54 2023 +0100
+
+    Revert "virt-v2v: cold: extract the appliance if it is stored in compressed tar"
+    
+    This reverts commit 279e1eca012c493a2a8ee625f60f5fa11b49306b.
+    
+    The change was wrong. Downstream can use qcow2 image too and what will
+    happen with upstream remains to be seen.
+    
+    Signed-off-by: Tomáš Golembiovský <tgolembi@redhat.com>
+
+[33mcommit 279e1eca012c493a2a8ee625f60f5fa11b49306b[m
+Author: Tomáš Golembiovský <tgolembi@redhat.com>
+Date:   Thu Mar 16 14:10:51 2023 +0100
+
+    virt-v2v: cold: extract the appliance if it is stored in compressed tar
+    
+    This is useful for downstream builds and may become also necessary for
+    upstream soon since we plan to abandon the pre-built Kubevirt appliance.
+    
+    Signed-off-by: Tomáš Golembiovský <tgolembi@redhat.com>
+
+[33mcommit e515d3d6ef29387309872456b3be18738e1810ac[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Thu Mar 16 13:34:34 2023 +0200
+
+    Bump v2v RPM dependencies
+    
+    The OS repository updated their RPMs. We need to update accordingly in
+    order to build the images.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit 8fb3e866ee6e49448bd625f9f2155307e26eeafe[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Wed Mar 15 09:35:26 2023 +0200
+
+    Fix PVC consumer pod security
+    
+    Having `RunAsNonRoot` requires to specify the user the container is
+    intended to run with.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit 390e00180c25e86c09ba10b42a8363ac186ff710[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Wed Mar 15 17:28:59 2023 +0200
+
+    Fix import of multi-volume VMs from vSphere
+    
+    We previously named all volumes within the pod we start for binding the
+    PVCs with the same name, "init". Now, each volume is named after the PVC
+    it is expected to bind. The container is now named "main" rather than
+    "init" - init is a bit misleading as it might suggest we refer to an
+    init-container.
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit ba0bab5eff6bc7de269e7dcdcd2b105669a230fe[m
+Author: Benny Zlotnik <bzlotnik@redhat.com>
+Date:   Wed Mar 15 16:09:18 2023 +0200
+
+    update comment
+    
+    Signed-off-by: Benny Zlotnik <bzlotnik@redhat.com>
+
+[33mcommit 88554cab141a591e7a3806933f495c8541b22fc1[m
+Author: Benny Zlotnik <bzlotnik@redhat.com>
+Date:   Wed Mar 15 14:12:30 2023 +0200
+
+    ovirt: only add 10% to PVC if volumeMode == Filesystem
+    
+    Signed-off-by: Benny Zlotnik <bzlotnik@redhat.com>
+
+[33mcommit 1d7dca08edef0a42c4b85b024d2ce5b87d9cbac8[m
+Author: Martin Nečas <necas.marty@gmail.com>
+Date:   Mon Mar 13 21:04:56 2023 +0100
+
+    operator: Add information about 4.12 ocp support
+    
+    Signed-off-by: Martin Nečas <necas.marty@gmail.com>
+
+[33mcommit dd4e1fb86b6c9483d97d134ca099b9ee031cee5e[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Tue Mar 14 10:53:29 2023 +0200
+
+    Set the pvc consumer with security context
+    
+    The container needs security context in order to run in restricted
+    namespaces.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit 08759a2f06de2730607e16dccb745b5b5ecb6c56[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Tue Mar 14 10:13:04 2023 +0200
+
+    Set security context to v2v
+    
+    The v2v container needs security context in order to run in restricted
+    namespaces.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit 24403c4af382677fb20e403be0cde53d4d720486[m
+Author: Benny Zlotnik <2139890+bennyz@users.noreply.github.com>
+Date:   Tue Mar 14 18:13:39 2023 +0200
+
+    Update pkg/controller/plan/adapter/openstack/builder.go
+    
+    Co-authored-by: Arik Hadas <ahadas@redhat.com>
+    Signed-off-by: Benny Zlotnik <bzlotnik@redhat.com>
+
+[33mcommit bd7ed78515cf0047e2f5587109a55131ec3e2c92[m
+Author: Benny Zlotnik <bzlotnik@redhat.com>
+Date:   Tue Mar 14 17:51:39 2023 +0200
+
+    openstack: add comment about SizeBytes field
+    
+    Signed-off-by: Benny Zlotnik <bzlotnik@redhat.com>
+
+[33mcommit 83efe30b5c41cbe65eb185dbd081f36d6a6e229b[m
+Author: Benny Zlotnik <bzlotnik@redhat.com>
+Date:   Sun Mar 12 12:56:22 2023 +0200
+
+    openstack: use size if virtual_size is not available
+    
+    Signed-off-by: Benny Zlotnik <bzlotnik@redhat.com>
+
+[33mcommit f558031b158eeb3a27b3c08dd24c742e3a7affb9[m
+Author: Benny Zlotnik <bzlotnik@redhat.com>
+Date:   Tue Mar 14 10:47:58 2023 +0200
+
+    openstack populate SizeBytes
+    
+    Signed-off-by: Benny Zlotnik <bzlotnik@redhat.com>
+
+[33mcommit 1bf7c49c0120f01ffe7a3d185eb8a396fb59d7fd[m
+Author: Martin Nečas <necas.marty@gmail.com>
+Date:   Mon Mar 13 11:20:10 2023 +0100
+
+    Bump minKubeVersion to 1.24.0 which corresponds to 4.11 ocp
+    
+    Signed-off-by: Martin Nečas <necas.marty@gmail.com>
+
+[33mcommit af7bcc75407107ccae0c161b928cc31565850fcd[m
+Author: Martin Nečas <necas.marty@gmail.com>
+Date:   Mon Mar 13 10:50:54 2023 +0100
+
+    operator: Add 2.4 support infomation
+    
+    Signed-off-by: Martin Nečas <necas.marty@gmail.com>
+
+[33mcommit 6edebae4a439890ff4f7839578093de3e414fe5a[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Sun Mar 12 12:12:43 2023 +0200
+
+    Create a consumer for PVCs for vsphere
+    
+    When importing a VM from vSphere and the storage class is "wait for
+    consumer" the migration will stuck, as the PVC and DV will wait for
+    consumer.
+    
+    This patch solves it by creating a dummy pod to initiate the PVC.
+    It continues PR #209.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit 26c602f8ee38582c5f659a47d3970e21a90f34a5[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Sun Mar 12 17:23:32 2023 +0200
+
+    Fix generation of manifests for populator CRDs
+    
+    1. Add 'optional' comments to the status properties of
+       OpenstackVolumePopulator
+    2. Add 'shortNames' as comments for OpenstackVolumePopulator and
+       OvirtVolumePopulator
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit e0747a86d51220b706c3d1e45a9d2e66c831be4c[m
+Author: Evgeny Slutsky <eslutsky@redhat.com>
+Date:   Sun Mar 12 15:35:21 2023 +0200
+
+    add more logs to CI (#212)
+
+[33mcommit f76f5db70ebf6c897cf95538317f78df7c595efb[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Thu Mar 9 17:21:23 2023 +0200
+
+    refresh bazel
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit 504acbcaf32f58ce011a005fdfde9433c310d786[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Wed Mar 8 17:00:19 2023 +0200
+
+    Create a consumer to PVC
+    
+    When having a storage class with `WaitForConsumer` the disk transfer
+    won't start until the PVC had a consumer and it has the annotation
+    `volume.kubernetes.io/selected-node`. For that, we will create a simple
+    pod associated with the PVC to let kubernetes schedule it - making a
+    consumer to the PVC.
+    
+    When executed by the volume populator, the PV won't create, letting the
+    volume populator to be executed.
+    
+    This relates only to ovirt and openstack imports.
+    
+    The pod will remain on destination namespace until the migration ends
+    successfully or once the plan is archived.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit 299ff9877e888cedd267848bf4c7fd74f2e6e245[m
+Author: Bella Khizgiyaev <bkhizgiy@redhat.com>
+Date:   Tue Mar 7 16:34:34 2023 +0200
+
+    Adding unit testing
+    
+    Signed-off-by: Bella Khizgiyaev <bkhizgiy@redhat.com>
+
+[33mcommit af9db98119b5cb9561191d09f09471d845597d31[m
+Author: Benny Zlotnik <bzlotnik@redhat.com>
+Date:   Thu Mar 9 13:08:59 2023 +0200
+
+    add progress to ovirt
+    
+    Signed-off-by: Benny Zlotnik <bzlotnik@redhat.com>
+
+[33mcommit 77af8e7fb89f0fb7357e97c896ca0821d6cb5a71[m
+Author: Benny Zlotnik <bzlotnik@redhat.com>
+Date:   Thu Mar 9 10:36:52 2023 +0200
+
+    add const for OvirtVolumePopulator
+    
+    Signed-off-by: Benny Zlotnik <bzlotnik@redhat.com>
+
+[33mcommit ad9ec71fb4865c1a7f03d172b71c69369e4f29c2[m
+Author: Benny Zlotnik <bzlotnik@redhat.com>
+Date:   Thu Mar 9 10:28:02 2023 +0200
+
+    remove done channel
+    
+    Signed-off-by: Benny Zlotnik <bzlotnik@redhat.com>
+
+[33mcommit 39d23d976627ab1453738ee194ec49facf3fd950[m
+Author: Benny Zlotnik <bzlotnik@redhat.com>
+Date:   Wed Mar 8 22:36:38 2023 +0200
+
+    fix BUILD.bazel
+    
+    Signed-off-by: Benny Zlotnik <bzlotnik@redhat.com>
+
+[33mcommit 728c2e2c5174285eda5bb1a57d095ec0371d7327[m
+Author: Benny Zlotnik <bzlotnik@redhat.com>
+Date:   Wed Mar 8 22:09:39 2023 +0200
+
+    cleanup openstack populator and add support for ovirt in controller
+    
+    Signed-off-by: Benny Zlotnik <bzlotnik@redhat.com>
+
+[33mcommit 5534be2da1455d24158ee37732ec029e8a069319[m
+Author: Benny Zlotnik <bzlotnik@redhat.com>
+Date:   Tue Mar 7 19:04:16 2023 +0200
+
+    Add progress reporting for openstack
+    
+    Signed-off-by: Benny Zlotnik <bzlotnik@redhat.com>
+
+[33mcommit 945ec71aad20cb9273b571448a3a95fa880fd5fd[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Thu Mar 9 14:35:17 2023 +0200
+
+    Add missing VIRT_V2V_WARM_IMAGE env var to CSV
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit dda7d2d34e7c51714c91cb1e2b9823e40d964080[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Thu Mar 9 14:34:31 2023 +0200
+
+    Fix guestConversionPod
+    
+    Initialize the nodeSelector map properly.
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 7da3e6838646dd2c8be8898f8bcfe3cddcda7018[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Wed Mar 8 18:25:56 2023 +0200
+
+    Fix UseEl9VirtV2v
+    
+    We should use virt-v2v on el9 only on cold-migration from vsphere to the
+    same cluster that forklift runs on.
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 51e16866a22fb7d502c34483a72c5827a37d5613[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Thu Mar 9 11:33:45 2023 +0200
+
+    Drop SeccompProfile from populator pod
+    
+    Having the SeccompProfile set to runtime caused an issue starting the
+    pod.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit 5d0cd74fe669a56a6e8d5d79100fc7aac5cd3f95[m
+Author: Tomáš Golembiovský <tgolembi@redhat.com>
+Date:   Thu Mar 2 09:02:37 2023 +0100
+
+    controller: consume progress in metrics from virt-v2v EL9 image
+    
+    Signed-off-by: Tomáš Golembiovský <tgolembi@redhat.com>
+
+[33mcommit 37e34ff5c397522ee9e0f051a4fad120a129ab51[m
+Author: Tomáš Golembiovský <tgolembi@redhat.com>
+Date:   Wed Feb 15 15:35:08 2023 +0100
+
+    virt-v2v: Run virt-v2v-monitor in image for cold migration
+    
+    Signed-off-by: Tomáš Golembiovský <tgolembi@redhat.com>
+
+[33mcommit 6637679eeb98e272927a569dbb7d478135766f9f[m
+Author: Tomáš Golembiovský <tgolembi@redhat.com>
+Date:   Wed Feb 15 11:20:58 2023 +0100
+
+    virt-v2v-monitor: a tool for monitoring virt-v2v progress
+    
+    Here is a tool that monitors virt-v2v progress and contains a Prometheus
+    metrics endpoint that Forklift controller can talk to.
+    
+    Signed-off-by: Tomáš Golembiovský <tgolembi@redhat.com>
+
+[33mcommit 6c8d624178bed27da324366345d88985a523cee7[m
+Author: Tomáš Golembiovský <tgolembi@redhat.com>
+Date:   Thu Mar 2 09:07:07 2023 +0100
+
+    controller: move decision on EL8/EL9 to plan context
+    
+    That way it can be used in other parts of code.
+    
+    Signed-off-by: Tomáš Golembiovský <tgolembi@redhat.com>
+
+[33mcommit f0b46d207202428d13a357264958eceb146adbee[m
+Author: Tomáš Golembiovský <tgolembi@redhat.com>
+Date:   Fri Feb 24 07:38:02 2023 +0100
+
+    kubevirt: remove unused function
+    
+    Signed-off-by: Tomáš Golembiovský <tgolembi@redhat.com>
+
+[33mcommit 0f3f452abe33882ed5e7cecde92c8054bdf27115[m
+Author: Tomáš Golembiovský <tgolembi@redhat.com>
+Date:   Mon Feb 20 16:04:07 2023 +0100
+
+    virt-v2v: make sure environment variables are defined
+    
+    Signed-off-by: Tomáš Golembiovský <tgolembi@redhat.com>
+
+[33mcommit 7a5cad691e8668ab55a69a2db86c806219b89cc0[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Wed Mar 8 09:03:58 2023 +0000
+
+    drop mongo-driver
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit f1e383c5d767f89b0d01c3197cb99c7b77504b02[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Wed Mar 8 10:42:20 2023 +0000
+
+    update bazel configuration for lib-volume-populator
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 965af360cf01423925786d99874987b1f25d6fe1[m
+Author: Benny Zlotnik <bzlotnik@redhat.com>
+Date:   Tue Mar 7 19:16:46 2023 +0200
+
+    Openstack changes
+    
+    Adjust secret fields and remove comments
+    
+    Signed-off-by: Benny Zlotnik <bzlotnik@redhat.com>
+
+[33mcommit ec91d8f4f567b0fa9133810c470a667338036ab0[m
+Author: Evgeny Slutsky <eslutsky@redhat.com>
+Date:   Mon Mar 6 10:28:46 2023 +0200
+
+    cleanup and move to generated NS
+    
+    Signed-off-by: Evgeny Slutsky <eslutsky@redhat.com>
+
+[33mcommit 6c1a5f88c1bba279ed176b8bd9330e58ee25fa66[m
+Author: Evgeny Slutsky <eslutsky@redhat.com>
+Date:   Wed Feb 22 18:17:18 2023 +0200
+
+    dont use auto-generated NS in the test.
+    
+    Signed-off-by: Evgeny Slutsky <eslutsky@redhat.com>
+
+[33mcommit 5a5a4850118b77a6fea14fee4127ab8818782267[m
+Author: Evgeny Slutsky <eslutsky@redhat.com>
+Date:   Wed Feb 22 17:28:27 2023 +0200
+
+    add timeout to the CI job executime time
+    
+    set it  as "default".
+    
+    Signed-off-by: Evgeny Slutsky <eslutsky@redhat.com>
+
+[33mcommit a87451fae15518d204f317edf23b27c0d7e486e2[m
+Author: Evgeny Slutsky <eslutsky@redhat.com>
+Date:   Wed Feb 22 17:10:17 2023 +0200
+
+    add targetNameSpace to the plan
+    
+    set it  as "default".
+    
+    Signed-off-by: Evgeny Slutsky <eslutsky@redhat.com>
+
+[33mcommit 263978a9c0cdf5071ebe763e6b4d7acb3e50cfdc[m
+Author: Evgeny Slutsky <eslutsky@redhat.com>
+Date:   Mon Feb 20 10:51:04 2023 +0200
+
+    adding gingo osp migration test
+    
+    Signed-off-by: Evgeny Slutsky <eslutsky@redhat.com>
+
+[33mcommit 48afe3f9e9d05827ef82c0c49794d102364761c5[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Tue Mar 7 14:46:53 2023 +0000
+
+    Use nfs-csi in vSphere test
+    
+    With CDI 1.56.0, the vSphere test fails with the 'standard' storage
+    class. While we need to investigate this, it seems like the right time
+    to align with ovirt's and openstack's tests, and use nfs-csi also in
+    the vsphere test.
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 2b0427ffb3de256599fbc28e5221010efc4d08f2[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Sun Mar 5 18:49:38 2023 +0200
+
+    Do not set 'kubevirt.io/schedulable' when VirtV2vDontRequestKVM is set
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 32266241226ebe9ad224da3ecbd9fbca8df85d7b[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Mon Mar 6 10:34:23 2023 +0200
+
+    Handle the case volumeMode is omitted from StorageProfile
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 0918dc5c6bc3b2afa7a393b17702fe6d213b6985[m
+Author: yzamir <yzamir@redhat.com>
+Date:   Tue Mar 7 16:01:17 2023 +0200
+
+    Add missing connection fail phase
+    
+    Signed-off-by: yzamir <yzamir@redhat.com>
+
+[33mcommit 77b3d77135441a6e82b588b0d59b8abbde04a71f[m
+Author: Benny Zlotnik <2139890+bennyz@users.noreply.github.com>
+Date:   Tue Mar 7 18:29:06 2023 +0200
+
+    move lib-volume-populator into forklift (#203)
+
+[33mcommit d0da4a95c473999ecf9af0b825fb5cfcc662e4f0[m[33m ([m[1;32mtest[m[33m)[m
+Author: Martin Nečas <necas.marty@gmail.com>
+Date:   Tue Mar 7 15:21:14 2023 +0100
+
+    operator: Add ui_plugin_state
+    
+    Signed-off-by: Martin Nečas <necas.marty@gmail.com>
+
+[33mcommit 8ecce0f272e476a1434a5052fef8724d7e02869d[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Tue Mar 7 12:41:43 2023 +0200
+
+    Replace Openstack's secret builder with copyDataFromProviderSecret
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 781316a5be5defbbebe77b78683a0b97a70151cb[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Tue Mar 7 12:28:23 2023 +0200
+
+    Cleanup in creation of secret for data transfers
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit cf70249468f228570250a66521345b63bd887a38[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Mon Mar 6 14:14:58 2023 +0200
+
+    Create the relevant secret for populator
+    
+    When migrating using the populator, a secret is required. It differs in
+    the data and name compared to DataVolumes. The secret is required in the
+    target namespace. This patch ensure the secret will be there with the
+    relevant data and name.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit 4c7f3c3282fc43933306a004d1d5c1b998b3c728[m
+Author: yzamir <yzamir@redhat.com>
+Date:   Tue Mar 7 09:19:39 2023 +0200
+
+    Update console plugin display name
+    
+    Signed-off-by: yzamir <yzamir@redhat.com>
+
+[33mcommit bfdce55cbc4cb1eee5b00a305d37d0c43db3a53e[m
+Author: yzamir <yzamir@redhat.com>
+Date:   Mon Mar 6 18:17:59 2023 +0200
+
+    Rename insecure secret key to insecureSkipVerify in openstack
+    to macth the secret key in vmware and ovirt
+    
+    Signed-off-by: yzamir <yzamir@redhat.com>
+
+[33mcommit 85edea6de9751d934cb76082b04053ddf1c5b5a5[m
+Author: Martin Nečas <necas.marty@gmail.com>
+Date:   Mon Mar 6 14:08:44 2023 +0100
+
+    operator: Disable old ui by default
+    
+    Signed-off-by: Martin Nečas <necas.marty@gmail.com>
+
+[33mcommit 7d0d35b6ded8c7bc9be39d77a2b877b8ec594f4b[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Sun Mar 5 10:44:16 2023 +0200
+
+    Adding security context to volume populator
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit fb322b628fa912d480f4eeeee9b08c83e8cd195c[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Sun Mar 5 17:23:43 2023 +0200
+
+    refactor ovirt-cert-mutator
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit c6f79e5433d8bca2f193a86216c0a8d5b6ef7e93[m
+Author: Bella Khizgiyaev <bkhizgiy@redhat.com>
+Date:   Wed Mar 1 21:52:25 2023 +0200
+
+    Fixing redundant CA cert retrival when both CA have different line counts
+    
+    Signed-off-by: Bella Khizgiyaev <bkhizgiy@redhat.com>
+
+[33mcommit 8cf5519609389cca9690153b7a82a4512a5944cd[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Sun Mar 5 16:32:14 2023 +0200
+
+    Enable feature_ui_plugin by default
+    
+    Previously the 'feature_ui_plugin' var wasn't set with a default value
+    and thus triggered the following error when it wasn't define in
+    ForkliftController:
+    
+    The conditional check 'feature_ui_plugin|bool and not k8s_cluster|bool'
+    failed. The error was: error while evaluating conditional
+    (feature_ui_plugin|bool and not k8s_cluster|bool): 'feature_ui_plugin'
+    is undefined
+    
+    Now this variable is defined and set to 'true' in order to deploy the
+    console plugin by default.
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 02ced02e8c2c097e871cd5963bacd3425b557cb8[m
+Author: Benny Zlotnik <bzlotnik@redhat.com>
+Date:   Sun Mar 5 16:14:06 2023 +0200
+
+    push openstack populator image
+    
+    Signed-off-by: Benny Zlotnik <bzlotnik@redhat.com>
+
+[33mcommit 38bad0e549d8d5c409c35af9a5f25181cb66aa4f[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Sun Mar 5 10:35:54 2023 +0200
+
+    Short names for OpenStack/oVirt volume populators
+    
+    For OpenStack the names are: osvp, osvps.
+    For oVirt the bames are: ovvp, ovvps.
+    The ease querying the populator CRs from the CLI a bit.
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 48acbfd9a48be508d6aad10c48c0fc086f4a2e22[m
+Author: Benny Zlotnik <2139890+bennyz@users.noreply.github.com>
+Date:   Thu Mar 2 20:13:54 2023 +0200
+
+    vol-pop: Always use CR namespace (#186)
+
+[33mcommit 1d2ef32d65b6552f8c724287f4522be1062e1c67[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Thu Mar 2 17:26:07 2023 +0100
+
+    Implement the tree endpoint
+    
+    Implement the "tree/project" endpoint showing
+    the list of projects with their associated VMs
+    in a tree like view
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit a88dec717f292cfad23b733bae71dd8685ccc5b5[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Thu Mar 2 17:18:18 2023 +0100
+
+    Limit Region/Project sync to token scope
+    
+    The current implementation uses a single
+    OpenStack client so the scope is limited
+    to the region/project contained in the secret.
+    
+    Therefore, it makes no sense to synchronize objects
+    out of that scope as they will be unusable.
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit c6ab5428baa77c4c5326b940ab5bfe0eb7200483[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Wed Mar 1 11:49:08 2023 +0100
+
+    Implement the tree endpoint
+    
+    Implement the "tree/project" endpoint showing
+    the list of projects with their associated VMs
+    in a tree like view
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 51103dfb52fdeb7921d2760ff37f5b35127a00a5[m
+Author: Benny Zlotnik <2139890+bennyz@users.noreply.github.com>
+Date:   Thu Mar 2 17:23:04 2023 +0200
+
+    openstack: vol pop integration (#139)
+    
+    Integrate the openstack volume populator
+
+[33mcommit aa9513b860fb21e1bd8ecfa25316bac59b487ad4[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Thu Mar 2 16:00:59 2023 +0200
+
+    Fix the access modes to the PVC
+    
+    When passing on the storage profile it can have multiple accessmodes and
+    multiple volume modes. We prefer the block volume mode and set the
+    access modes accordingly.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit 99820b01431d50272460ad3c96410b7f24a5d99b[m
+Author: Bella Khizgiyaev <bkhizgiy@redhat.com>
+Date:   Sun Feb 19 14:38:47 2023 +0200
+
+    Adding insecure migration from RHV
+    
+    Signed-off-by: Bella Khizgiyaev <bkhizgiy@redhat.com>
+
+[33mcommit 0abe6cd6460bc970ba58fe538eceea7110f79d26[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Thu Mar 2 10:45:04 2023 +0200
+
+    Make the status and progress optional
+    
+    Change the CRD of OvirtVolumePopulator field: status and progress to be
+    optional.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit 47c8514d4b30eb821560f3a52516c1f22363794a[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Tue Feb 28 12:58:38 2023 +0200
+
+    Cleanup from ovirt-populator image
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit 0341856a10674b5f31f57b26a8f027838e742da4[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Mon Feb 27 20:16:05 2023 +0200
+
+    Change the populator pod namespace
+    
+    Change the populator pod into the destination namespace. That includes
+    changes in the lib-volume-populator. The controller will ensure the
+    secret exist on destination namespace, also the progress is now dropped
+    to let the populator pod run without the specific `forklift-controller`
+    service account.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit f7f3193956873fbda7c551f486c75ac1b53fc31e[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Tue Feb 21 21:56:47 2023 +0200
+
+    proceed if populator CR already exists
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 34e43aadca76fa6dc8c6e7e7600a5d0491b6c07f[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Tue Feb 21 14:05:03 2023 +0200
+
+    propagate errors in getting storage profile modes
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 0395bbecc7a623afdb9d15bf11b853ef5f0047e5[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Mon Feb 20 14:51:44 2023 +0200
+
+    support storageclasses in tests
+    
+    This patch will allow to select the storageClass per provider test as
+    the destination in the storage mapping.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit ad8185ad3888b42dbb9b9541c563c6e41b03ecb0[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Wed Feb 1 20:22:27 2023 +0200
+
+    fix the step and phasing
+    
+    This patch starts and completes the step and phases of the execution
+    when needed.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit c177624c9005018ee2c75e9c051781efac88ec1f[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Mon Jan 23 18:04:37 2023 +0200
+
+    bazel update
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit 1c91156dddce9ca7844983c3f34d9eb86a516770[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Thu Jan 5 18:59:11 2023 +0200
+
+    switch ovirt image populator placement
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit 6e043e9e218ae13a3696d4fd947f72958bd13de8[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Thu Jan 5 18:14:56 2023 +0200
+
+    change integration to current code
+    
+    Some changes to fit the current rebased version. Also some refactoring
+    of the code.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit d0770c66afdf026a803087676903fdc468d90018[m
+Author: Benny Zlotnik <bzlotnik@redhat.com>
+Date:   Wed Nov 30 19:16:21 2022 +0200
+
+    ovirt: Use volume populator for cold migration
+    
+    Use the ovirt-imageio-populator to transfer disks from oVirt/RHV to
+    KubeVirt.
+    This patch assumes the presence of the volume populator controller.
+    
+    The changes to the transfer process are as follows:
+    1. Do not create datavolumes when cold migration for oVirt is started.
+    2. Instead, create an OvirtImageIOPopulator CustomResource.
+    3. Create a PVC with DataSourceRef pointing to the name of the
+       CustomResource above
+    4. Track the PVC until it is in bound status, which indicates the
+       populators have finished successfully.
+    
+    Signed-off-by: Benny Zlotnik <bzlotnik@redhat.com>
+
+[33mcommit 4f7e0dbf3c6da4d4cbeb93077aa7e42eadcdc92c[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Thu Mar 2 10:32:27 2023 +0100
+
+    Fix makefile syntax error
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit d52eb3559bae775849b7aadcb0b6ab7fcbaef4aa[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Wed Mar 1 12:12:44 2023 +0100
+
+    Fix Makefile when using ccache
+    
+    When "ccache" is installed the PATH variable contains
+    "/usr/lib64/ccache" directory and the CCACHE_DIR
+    (default $HOME/.ccache) is used by the compiler.
+    
+    However CCACHE_DIR is not writable within the bazel sandbox
+    and the build fails.
+    
+    The proposed changes try to fix this and make sure
+    the CCACHE_DIR is created if it doesn't exist before
+    starting the build (that would make the build to fail).
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 8f64ee6fec435d1aa9343cb06de89a280101d5e1[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Wed Mar 1 12:33:59 2023 +0100
+
+    Use correct variable name.
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 2c484ef0fe48e47bf789b1fcb99ebad0a7e59f12[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Wed Mar 1 12:33:08 2023 +0100
+
+    Fix region method for the openstack client
+    
+    Read the correct variable from the secret.
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 499377a625e21400bf988aad244e69918343946e[m
+Author: Martin Nečas <necas.marty@gmail.com>
+Date:   Tue Feb 28 13:17:02 2023 +0100
+
+    operator: virtv2v - split image to warm and cold
+    
+    Signed-off-by: Martin Nečas <necas.marty@gmail.com>
+
+[33mcommit 510b60334aff8b5fbc476a9afd93093eb242f191[m
+Author: Evgeny Slutsky <eslutsky@redhat.com>
+Date:   Tue Feb 28 10:57:08 2023 +0200
+
+    CI remove ginkgo custom reporter from tests
+    
+    Signed-off-by: Evgeny Slutsky <eslutsky@redhat.com>
+
+[33mcommit 8e363b0beb7e307b6f10108299bd403e51d6949b[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Mon Feb 27 16:25:02 2023 +0200
+
+    Run vSphere test in a generated namespace
+    
+    Our testing framework creates namespaces to run the tests on with a
+    label pod-security.kubernetes.io/enforce=restricted. This makes sense
+    but currently we can't start the conversion pod in such namespaces and
+    therefore the vSphere test fails when we create the plan in a generated
+    namespace.
+    
+    This PR removes the pod-security.kubernetes.io label from namespaces
+    that are generated by the testing framework and creates the resources
+    for the vSphere test in a generated namespace. The label should be
+    restored when https://github.com/kubev2v/forklift/issues/173 is fixed.
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit df4a846bbd752ed881f0dbb0f36fc5e55018f8c1[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Mon Feb 27 11:44:20 2023 +0100
+
+    Fix OpenStack StorageMap watch
+    
+    The storage map for OpenStack maps VolumeType objects to
+    StorageClass so no need to watch for Image, Volume or
+    Snapshot. We just need to watch for VolumeType instead, just
+    as oVirt watches for StorageDomains or vSphere for Datastores.
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 2226cce06ea8d126d322398d763497b4dbc0a9e4[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Mon Feb 27 09:07:04 2023 +0100
+
+    Fix race condition on inventory synchronization
+    
+    Currently we save the time where the last sync has been
+    successful for all the objects.
+    
+    If any object is updated in that sync interval it's possible
+    to loose updates.
+    
+    The proposed changes try to fix this issue.
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 9460fcc8708b1e1f09e926939c7e3ff291d4e635[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mpop[m[33m)[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Wed Feb 22 19:02:57 2023 +0200
+
+    change vsphere test to use 'konveyor-forklift' namespace
+    
+    there's an issue with using the generated namespace so let's temporary
+    use the 'konveyor-forklift' namespace until we figure this out.
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 53bfccc0cd8dfdcf6492eec0aae223d69f89d39d[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Wed Feb 22 18:58:21 2023 +0200
+
+    fix for ginko suite
+    
+    set it  as "default".
+    
+    Signed-off-by: Evgeny Slutsky <eslutsky@redhat.com>
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 0684790f8be5662ee6cd513e0993bf27d777dada[m
+Author: Martin Nečas <necas.marty@gmail.com>
+Date:   Wed Feb 22 17:18:51 2023 +0100
+
+    operator: Change RELATED_IMAGE_OVIRT_POPULATOR to RELATED_IMAGE_RHV_POPULATOR
+    
+    Signed-off-by: Martin Nečas <necas.marty@gmail.com>
+
+[33mcommit 92493f68b19a7462bdc17ac360196f26d845fbe1[m
+Author: Martin Nečas <necas.marty@gmail.com>
+Date:   Wed Feb 22 12:10:39 2023 +0100
+
+    operator: Fix CSV example format
+    
+    Signed-off-by: Martin Nečas <necas.marty@gmail.com>
+
+[33mcommit ea1f9a017768294d319ad6bc7088e40c2438524b[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Wed Feb 22 10:53:41 2023 +0200
+
+    Use right namespaces in tests
+    
+    The 'host' provider is defined in the 'konveyor-forklift' namespace but
+    other entities should be defined in the generated namespace (otherwise,
+    there will be an issue with volume-populators that expect the PVC to be
+    defined on a namespace that is different than the one the
+    populator-controller runs on)
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 72ed7b86bfdeca509f193f75836eaca1a700b243[m
+Author: Evgeny Slutsky <eslutsky@redhat.com>
+Date:   Tue Feb 21 10:18:12 2023 +0200
+
+    CI - add more logs and seperate artifcats per provider
+    
+    Signed-off-by: Evgeny Slutsky <eslutsky@redhat.com>
+
+[33mcommit bdd5147659d3aaaa585f402b6ac8aa9ac907d871[m
+Author: Bella Khizgiyaev <bkhizgiy@redhat.com>
+Date:   Sun Feb 19 17:27:12 2023 +0200
+
+    Adding a check that the certificate provided is valid
+    
+    Signed-off-by: Bella Khizgiyaev <bkhizgiy@redhat.com>
+
+[33mcommit c573c565690fd0d56fc961ecf0f2c2fd98d5764c[m
+Author: Evgeny Slutsky <eslutsky@redhat.com>
+Date:   Mon Feb 20 10:21:00 2023 +0200
+
+    CI - save k8s logs in gh-action workflow artifacts
+    
+    Signed-off-by: Evgeny Slutsky <eslutsky@redhat.com>
+
+[33mcommit 2c40436909c8a667eed31afdcf716b6e6761a2e5[m
+Author: yzamir <yzamir@redhat.com>
+Date:   Mon Feb 20 11:06:26 2023 +0200
+
+    Authenticate requests for the currect namespace
+    
+    Signed-off-by: yzamir <yzamir@redhat.com>
+
+[33mcommit e6d4e20549e357e34ae66e2c01cfb2ceb6e97e7f[m
+Author: Martin Nečas <necas.marty@gmail.com>
+Date:   Sun Feb 19 10:13:32 2023 +0100
+
+    operator: Add RELATED_IMAGE_UI_PLUGIN env var
+    
+    Signed-off-by: Martin Nečas <necas.marty@gmail.com>
+
+[33mcommit 0ad008b80ed43d9bc1e16c2e948f3cef5a02c9b0[m
+Author: Evgeny Slutsky <eslutsky@redhat.com>
+Date:   Sun Feb 19 17:23:30 2023 +0200
+
+    fix for ovirt CI migration test e2e_cacert.cer changed path
+    
+    Signed-off-by: Evgeny Slutsky <eslutsky@redhat.com>
+
+[33mcommit a722b2399b0df3174c93ef57b265d6e478d5be40[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Sun Feb 19 15:20:06 2023 +0200
+
+    ovirt-populator: change an error to fatal
+    
+    In case we are exiting from ovirt-imgio with an error - we should end
+    the pod with fatal error, indicating a failure in the transfer.
+    Until now, it just printed the error and could finish as completed even
+    when it didn't.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit 83439b2e5039660bf87a6950d52cc60a5556c1d3[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Thu Feb 16 16:13:28 2023 +0200
+
+    Add missing properties for deploying populator related pods
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 36b4e0d0f02d7f1efa4e49756629aff80c57a24f[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Thu Feb 16 16:12:47 2023 +0200
+
+    Replace go-toolset image
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 67883ce23970472fb8163d8c57db37451a8e79cf[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Wed Feb 15 18:33:58 2023 +0200
+
+    Set namespace for populator controller using envvar
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit bd2e44b7120f2e239a71f9d8e16cf5a2a2c5ba0a[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Wed Feb 15 18:29:40 2023 +0200
+
+    Set oVirt populator image using envvar
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 5d55c7d28af6543e5608e7c193415298ab4da652[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Wed Feb 15 18:39:40 2023 +0200
+
+    Minor cleanup
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 1af23691f330d7f23d62c963409b532e3f912cbf[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Mon Feb 6 11:25:50 2023 +0200
+
+    make the populator deployment optional
+    
+    This patch will make the volume-populator to be optional deployed.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit ad0d868c75d3f855cc300682c9f311e3d09bdf4c[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Mon Jan 16 16:31:34 2023 +0200
+
+    Add ovirt popoulator deployment
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit de38ece340a72e0802ca5116be16afc9fce2c6b2[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Wed Feb 8 17:06:14 2023 +0100
+
+    Fix VolumeType comparison for unprivileged users
+    
+    'ExtraSpecs' field is not populated for unprivileged users.
+    This makes the 'equalsTo' method to return false as the retrieved
+    value from the API is 'nil' and the value obtained from the
+    DB is the empty map, causing continuous updates of all
+    volume types.
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 0f90ae685d051a0796fedc4136719c7d4cd82da5[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Wed Feb 8 13:52:24 2023 +0100
+
+    Fix project sync when the user has no list permissions
+    
+    Sync user's personal projects when the user has
+    no project list permissions in the identity API.
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit c744b377b95b0dd03d1b341bf865db73f76081bd[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Wed Feb 8 13:51:26 2023 +0100
+
+    Better 'NotFound' error handling
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit fde06cb0307244d64b22e8b735daa7ad9f8358fa[m
+Author: Bella Khizgiyaev <bkhizgiy@redhat.com>
+Date:   Wed Feb 15 14:44:06 2023 +0200
+
+    Fix retrival of engine ca cert request to be secure
+    
+    Signed-off-by: Bella Khizgiyaev <bkhizgiy@redhat.com>
+
+[33mcommit d70fa2bbdfdaad39509b153d7f75773bb43c60d2[m
+Author: Tomáš Golembiovský <tgolembi@redhat.com>
+Date:   Wed Feb 15 14:12:33 2023 +0100
+
+    build: Use packaging rules from external repository
+    
+    The rules have been extracted from Bazel and are in external repository
+    now. Use of the original rules is deprecated.
+    
+    Also, container build fails on Bazel 6.0 withe the original rules
+    reporting error:
+    
+        no such attribute 'mode' in '_real_pkg_tar' rule
+    
+    Signed-off-by: Tomáš Golembiovský <tgolembi@redhat.com>
+
+[33mcommit 7fc70cf3f32b19f25ff97bb5d0c7bd69d8b5208d[m
+Author: Bella Khizgiyaev <bkhizgiy@redhat.com>
+Date:   Mon Feb 6 19:03:36 2023 +0200
+
+    Fixing auto-generated name suffix in case of already used name
+    
+    Signed-off-by: Bella Khizgiyaev <bkhizgiy@redhat.com>
+
+[33mcommit e32819aca753567e87306131292ad82a0b53e128[m
+Author: Evgeny Slutsky <eslutsky@redhat.com>
+Date:   Sun Feb 12 10:45:48 2023 +0200
+
+    introduce openstack tesing suite to the CI
+    
+    Signed-off-by: Evgeny Slutsky <eslutsky@redhat.com>
+
+[33mcommit 342e3d61c076f8a53385e5079350053fb553868a[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Fri Feb 3 00:27:53 2023 +0200
+
+    Upgrade virt-v2v-cold to ubi9
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 6a130f2fd2173703643801cf16d0ef7d6a24062f[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Mon Jan 30 23:45:07 2023 +0200
+
+    Nested workspace for virt-v2v-warm
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 63e78b5f3c6d30c38c5b94b98ee412d03da7dbae[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Wed Feb 8 10:08:31 2023 +0200
+
+    Fix the populator controller image push
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit 84c46ae5e074df8f1ec4f8e5c8fb7c3cabdbd8d7[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Thu Feb 2 19:22:47 2023 +0200
+
+    Push the new images
+    
+    Triggers the push for the split images.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit c8fec0037d1f466bc054a7d26d01f7e0efb066c9[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Tue Jan 31 10:55:16 2023 +0200
+
+    Split the populator image
+    
+    This patch will split the populator image.
+    One image acts as a controller to the populator - 'populator-controller'
+    and the actual populator action will be executed by the
+    'ovirt-populator' image.
+    
+    This will allow a separation in logic, allowing to add more source
+    providers images and use the same controller for all.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit bc83af66884bdeb2d648846a88b8d5687ca60edb[m
+Author: Tomáš Golembiovský <tgolembi@redhat.com>
+Date:   Mon Feb 6 17:39:54 2023 +0100
+
+    Change default for VIRT_V2V_IMAGE
+    
+    Signed-off-by: Tomáš Golembiovský <tgolembi@redhat.com>
+
+[33mcommit fb15fd817af99c424d918199318a93184bf1558d[m
+Author: Tomáš Golembiovský <tgolembi@redhat.com>
+Date:   Wed Aug 17 13:10:09 2022 +0200
+
+    virt-v2v: Let virt-v2v do the copying and conversion
+    
+    Modify container entrypoint to let virt-v2v do the data copying as well
+    as conversion instead of the sort of in-place conversion we used to do
+    before.
+    
+    To achieve that we use the `-o local` output mode. For that output mode
+    to work as we need we have to prepare some symlinks for disks. Our disks
+    are expected to be either in `/mnt/disks/disk*/disk.img` files on
+    filesystem PVs or on `/dev/block*` devices for block based PVs. On the
+    other hand virt-v2v expects the disks to be in `<vm_name>-sd<X>` files.
+    
+    Signed-off-by: Tomáš Golembiovský <tgolembi@redhat.com>
+
+[33mcommit 5cc79f87f45257b3fea7b23652b5840a156a9c28[m
+Author: Tomáš Golembiovský <tgolembi@redhat.com>
+Date:   Fri Oct 21 09:36:31 2022 +0200
+
+    vsphere: Store info for virt-v2v in environment
+    
+    To be able to use virt-v2v for data copying as well as conversion we
+    need to provide it with more information. Notably the VM name and
+    libvirt URI that contains VCenter and path to ESXi.
+    
+    Signed-off-by: Tomáš Golembiovský <tgolembi@redhat.com>
+
+[33mcommit 403f3a288e5eb4a67f851d3d67ce296ffe2a34f1[m
+Author: Tomáš Golembiovský <tgolembi@redhat.com>
+Date:   Fri Oct 21 13:58:19 2022 +0200
+
+    vsphere: Create empty DataVolume for cold migration
+    
+    We plan to use virt-v2v for copying data from source instead of CDI.
+    
+    Signed-off-by: Tomáš Golembiovský <tgolembi@redhat.com>
+
+[33mcommit da0a6f8877fb7c78c105a2cfb374e29322aa9bde[m[33m ([m[1;32mnames[m[33m)[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Sun Feb 5 19:11:59 2023 +0200
+
+    Update libguestfs-appliance
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit f17b73b290d2f8adb3d85acfe1167bf6a75918b0[m
+Author: Tomáš Golembiovský <tgolembi@redhat.com>
+Date:   Thu Feb 2 09:36:29 2023 +0100
+
+    virt-v2v: Extract compressed tar with libguestfs appliance
+    
+    Signed-off-by: Tomáš Golembiovský <tgolembi@redhat.com>
+
+[33mcommit fe05b75945027a309c6f8d8f13e8d4915a54aaf5[m
+Author: Tomáš Golembiovský <tgolembi@redhat.com>
+Date:   Thu Feb 2 11:17:46 2023 +0100
+
+    virt-v2v: Remove qemu-* dependencies
+    
+    virt-v2v package depends on these and we don't need to specify them
+    explicitly.
+    
+    Signed-off-by: Tomáš Golembiovský <tgolembi@redhat.com>
+
+[33mcommit bffc6776a9c30e9ee4c5b586c628de43bbe09197[m
+Author: Tomáš Golembiovský <tgolembi@redhat.com>
+Date:   Thu Feb 2 10:59:28 2023 +0100
+
+    virt-v2v: Drop qemu-guest-agent dependency
+    
+    The package is meaningless inside the container. It is not used by
+    virt-v2v in any way.
+    
+    Signed-off-by: Tomáš Golembiovský <tgolembi@redhat.com>
+
+[33mcommit 15a5d7136fe575717812ed894e554ae0a382a93c[m
+Author: Tomáš Golembiovský <tgolembi@redhat.com>
+Date:   Tue Jan 24 13:04:31 2023 +0100
+
+    virt-v2v: make bazeldnf output stable
+    
+    bazeldnf cannot handle properly alternative packages and keeps swapping
+    e.g. libcurl and libcurl-minimal, language alternatives or kernel core
+    on each run. To make the list of packages stable we pick our preferred
+    alternatives here. We don't really have a strong preference for either
+    of those and the choice is mostly arbitrary with package size taken into
+    consideration. This will make tracking changes in dependencies easier.
+    
+    Argument `--nobest` is also removed because at the moment we don't have
+    any justifiable reason to use it.
+    
+    Signed-off-by: Tomáš Golembiovský <tgolembi@redhat.com>
+
+[33mcommit d4ab9a3515c1410842457fbd430d7ccf5ed0394f[m
+Author: Tomáš Golembiovský <tgolembi@redhat.com>
+Date:   Thu Feb 2 10:47:32 2023 +0100
+
+    gitignore: Ignore .bazeldnf directory
+    
+    Signed-off-by: Tomáš Golembiovský <tgolembi@redhat.com>
+
+[33mcommit 695e84c68673f6e8da970ca2d2eafc9e84dd2179[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Thu Feb 2 14:32:32 2023 +0200
+
+    Update bazel files
+    
+    Just ran 'make bazel-generate'
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 33db7e09eef64e441d392f5fa684c843a47aef66[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Thu Feb 2 11:42:12 2023 +0200
+
+    Push the populator image
+    
+    This patch will push the populator image that contains both populator
+    controller and the populator itself to quay. Later on we will split the
+    images.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit a376de4e42d58aab086a602872c0665ad8fff21e[m
+Author: Martin Nečas <necas.marty@gmail.com>
+Date:   Thu Feb 2 09:52:06 2023 +0100
+
+    Bazel: Fix libguestfs-appliance digest
+    
+    Signed-off-by: Martin Nečas <necas.marty@gmail.com>
+
+[33mcommit 960eefe94e1c60fda9171c654039c3ec37480e40[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Wed Feb 1 20:31:22 2023 +0200
+
+    Fix the step and phasing for initalization
+    
+    When changing the phasing of the disk transfer before the VM creation,
+    the scheduling of the VM removed. Doing so, we didn't end up with the
+    Initialization phase, and signal the step as completed. It caused the
+    the phase to keep running and harmed the time counter for the upcoming
+    phases.
+    
+    This patch ends the step and fix the issue above.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit dfb1d2a4942c8d8500dbc085d1a0f62b3af77eb2[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Wed Feb 1 18:16:58 2023 +0200
+
+    Fix the file-name to vol-name
+    
+    When calling the populator we add args, it expected to get `volume-path`
+    but we sent `file-name`. This cause a failure to the populator
+    container.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit 952e8eb14fcc9246296ede030952055bc6847b83[m
+Author: Bella <bkhizgiy@redhat.com>
+Date:   Mon Jan 30 23:22:18 2023 +0200
+
+    Improving automated vm name renaming handling
+    
+    Signed-off-by: Bella <bkhizgiy@redhat.com>
+
+[33mcommit 0b7b480d6b121a5b4523b9b705c7f77081e930fe[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Wed Feb 1 10:27:25 2023 +0100
+
+    Upgrade gophercloud to v1.2.0
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 2dd424b0599f0eff4e11fdecedd0e49bf9f4b906[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Tue Jan 31 11:54:56 2023 +0100
+
+    Delete unexisting objects from the DB
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 1382aa3ee48ed988a790799f51a3befdf39dfb1d[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Mon Jan 30 12:28:12 2023 +0100
+
+    Remove deleted networks from the db
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 2d9dc6d0a3c4be849b9403b04fd748d6a7354f1d[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Mon Jan 30 12:22:48 2023 +0100
+
+    Make sure all objects are updated.
+    
+    Using the variable declared in the 'for' statement
+    made the 'updater' to check the same object (the first
+    one in the array) all the time.
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit f111ab5585832b6b8dc4b17a1933be2bd4a7d29f[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Mon Jan 30 12:20:37 2023 +0100
+
+    Use libmodel.NotFound instead of custom type
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 34315cbb428d5c07b929176f3d5c624e714566da[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Fri Jan 27 13:07:40 2023 +0100
+
+    Implement missing Finder methods
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit b5ef52bb6b70371572972657ee5b1b64838eba56[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Fri Jan 27 12:59:19 2023 +0100
+
+    Use the ChangesSince filter for Flavor updates
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 1178c0d3645fb686b7c83ca61e8a6218c84bdeed[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Fri Jan 27 12:53:00 2023 +0100
+
+    Do not update the model if objects are equal.
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit e0de4549461878177c8ac13fe2e90e5cd490fe0a[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Fri Jan 27 12:33:26 2023 +0100
+
+    Change RxTXFactor type in database model
+    
+    Currently the database abstraction used
+    by forklift does not support "float64" type.
+    
+    Implementing "float64" support is way more
+    complicated, so using this workaround instead.
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit ab94ae5dae1e397512653e9be23f80cf0fecfaf9[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Fri Jan 27 12:13:38 2023 +0100
+
+    Fix missing check in client Get method
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit a5b20b09b54aaef2090a527074825015a0a8930f[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Thu Jan 26 12:47:16 2023 +0100
+
+    Implement workload REST API
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 51f5040839c6211b58b2fef2ec7339731c93d89e[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Thu Jan 26 11:41:57 2023 +0100
+
+    Retrieve volumetypes inventory and implement REST API
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 81b2d251729c114a20c510c5374b61ea1247f627[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Thu Jan 26 09:47:45 2023 +0100
+
+    Apply missing 'Fault' field to 'VM' model
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit bd66a6d8f218753bf7d072da706757ac44cd4641[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Thu Jan 19 16:15:22 2023 +0100
+
+    Monitor Image, Volume and Snapshot changes
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit d63c1a9c471fdba310d00c0763545563994f4525[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Thu Jan 19 16:12:20 2023 +0100
+
+    Retrieve network inventory and implement REST API
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 3c85f52f683953752d83b8abde6d1d28bcf44468[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Thu Jan 19 16:02:38 2023 +0100
+
+    Use System CA certs when "cacert" is missing
+    
+    Do not fail in secure connections when the `cacert` is missing within
+    the secret, use system CA certs instead.
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 2320dc6e2aeba2099bd2d5315868a672ea50015c[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Thu Jan 19 15:43:34 2023 +0100
+
+    Implement missing REST API endpoints
+    
+    Implement missing `regions`, `projects`, `flavors` and
+    `snapshots` REST API endpoint.
+    
+    Reorder and add some missing fields in the existing
+    model.
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 65d97e9100949008fd4ccdd886c28deea5dc1de7[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Thu Jan 19 14:14:33 2023 +0100
+
+    Remove unused code
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit d14342e1ddd72b3b271ea56953a11e306e5718f3[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Tue Jan 17 13:52:55 2023 +0100
+
+    Fix source code format
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 1d4d640983b214451550e4d3d2a07ff311cb7792[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Tue Jan 17 13:33:43 2023 +0100
+
+    Fix incorrect field mapping and add missing fields
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 0246974375cc2527eedab6ddaa33e22738b4e83d[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Tue Jan 17 13:23:38 2023 +0100
+
+    Add missing derived fields to the openstack provider
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 68e44dda3fb785a45b315a50a89931e7b4f0c576[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Tue Jan 17 13:22:13 2023 +0100
+
+    Add OpenStack to the provider list
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit bde5cec93b1d497ec65c75bb1d94e39950c7dd47[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Wed Feb 1 12:56:50 2023 +0200
+
+    Install 'file' in forklift-virt-v2v image
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit ba926ca4192f7152c4e72934a4ad769fe92999cf[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Wed Feb 1 11:50:55 2023 +0200
+
+    Fix using non-up-to-date image of forklift-virt-v2v
+    
+    Drop the settings of ImagePullPolicy for forklift-virt-v2v's image so
+    the default policy will be set and the image would always be pulled for
+    the 'latest' tag.
+    
+    Also, refer to the libguestfs-appliance image by digest rather than by
+    tag.
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit b4b66c3c979dc57623c6ad64728e1b091c396fa2[m
+Author: Evgeny Slutsky <eslutsky@redhat.com>
+Date:   Wed Feb 1 09:50:23 2023 +0200
+
+    add gh-action providers matrix to ci_setup
+    
+    Signed-off-by: Evgeny Slutsky <eslutsky@redhat.com>
+
+[33mcommit 1156288cf25dc8d0bf7ecb62da420b944898cbe9[m
+Author: eslutsky <eslutsky@redhat.com>
+Date:   Tue Jan 31 18:08:55 2023 +0200
+
+    refactor ovirt E2E tests to use ginkgo framework (#129)
+    
+    this is  refactor PR to https://github.com/kubev2v/forklift/pull/6
+    all the  E2E provider tests will use ginkgo framework.
+    
+    ---------
+    
+    Signed-off-by: Evgeny Slutsky <eslutsky@redhat.com>
+
+[33mcommit 4b4dba26ef6c8a3921d155f135cfcccbf2268adb[m
+Author: Bella <bkhizgiy@redhat.com>
+Date:   Tue Jan 31 17:04:06 2023 +0200
+
+    Fix mutating configuration name
+    
+    Signed-off-by: Bella <bkhizgiy@redhat.com>
+
+[33mcommit 7f5c8d40470f30f446a0068b43b06650f4dac3d9[m
+Author: Martin Nečas <necas.marty@gmail.com>
+Date:   Tue Jan 31 15:25:06 2023 +0100
+
+    Change ubi8 to ubi9 for validation, controller, operator, api
+    
+    Signed-off-by: Martin Nečas <necas.marty@gmail.com>
+
+[33mcommit 34d88c9637196df2ebd9cee9573c007fa1aaff52[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Sun Jan 29 16:27:08 2023 +0200
+
+    Fix deployment using deploy-to-crc.sh
+    
+    1. Drop '--sandbox_writable_path=$${HOME}/.ccache' that assumes the
+       '.ccache' folder exists
+    2. Fix reference to virt-v2v's image
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 63b2145e76516e62eb2b4a9a69e61bce15546efa[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Sun Jan 29 16:26:05 2023 +0200
+
+    Set version to 2.4.0
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit ab03b186b6db6aec60f472eacfdfbff9b83772e1[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Thu Jan 26 18:01:00 2023 +0200
+
+    refactoring the image
+    
+    Switch the placement of the code, in order to align with the project.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit d5468fb0311fcc5f6611a497c0dd6961f1ebcc6e[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Mon Jan 23 18:40:38 2023 +0200
+
+    change the lib-volume-populator
+    
+    Change from kubernetes-csi to kubev2v fork of the lib-volume-populator.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit 82291c447f56f2b9431938c5897701f7450b448f[m
+Author: Liran Rotenberg <lrotenbe@redhat.com>
+Date:   Mon Jan 23 17:09:59 2023 +0200
+
+    Introduce ovirt volume populator image
+    
+    Current, the image is built using the dockerfile. Later it should
+    migrate to bazel.
+    
+    Signed-off-by: Liran Rotenberg <lrotenbe@redhat.com>
+
+[33mcommit 698835292cbc8695d1b0b85830d258fe008972ed[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Sat Jan 28 11:50:04 2023 +0200
+
+    Upgrade virt-v2v on centos-stream 8
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 3f3d024c58c3c6d5e1c234c3ee4ea264dd3db288[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Sun Jan 29 11:30:56 2023 +0200
+
+    minor cleanup in virt-v2v deps resources
+    
+    Renaming repo.yaml to stream8-repo.yaml and rpm-deps.sh to
+    virt-v2v-stream8-rpm-deps.sh as we expect stream9 stuff to be added soon
+    and we may introduce similar scripts to the populator images.
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 3d4c5a41abac9a3494b7c5df31eab20df35b41d9[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Sat Jan 28 11:49:08 2023 +0200
+
+    Use libguestfs-appliance as base image
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 8d2ccbadb34cd3d43d01356bf78a4af2bb46c59a[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Mon Jan 30 10:25:26 2023 +0200
+
+    add code owners for 'tests/'
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 7a8142ea921704093c53f44ea78924207f1967a6[m
+Author: Miguel Martín <mmartinv@redhat.com>
+Date:   Tue Jan 17 13:02:17 2023 +0100
+
+    Make the Makefile build fully customizable
+    
+    Prefer `podman` over `docker`.
+    
+    Make the build fully customizable through environment
+    variables.
+    
+    Use `CONTROLLER_GEN` var to specify which `controller-gen`
+    binary must be used and make sure the correct version is
+    installed when using the default one.
+    
+    Make consistent use of parentheses instead of curly braces
+    for variable delimitation.
+    
+    Add sandbox writeable paths, needed after `bazel clean`.
+    
+    Signed-off-by: Miguel Martín <mmartinv@redhat.com>
+
+[33mcommit 5d78636ccf0e716e3946e64d50cbd9e08d6c0b74[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Tue Jan 17 13:19:11 2023 +0200
+
+    Add opinionated script for pushing to CRC
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit a8e53f9cd6f3f2cba4ada65a58d3f6d928ccefe0[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Wed Jan 25 18:01:34 2023 +0200
+
+    Do not store kubeconfig
+    
+    Previously, kubeconfig was stored in /tmp but that's not needed anymore
+    since forkliftci does it now.
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit b6f03fc2c5bd391377e2728c8ccfc4f2f1c8771a[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Wed Jan 25 15:25:19 2023 +0200
+
+    tests: change default value of kubectl-path
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit cf3bd977b5596f0b0fd6a1b9459b3ff0450deec2[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Wed Jan 25 20:16:32 2023 +0200
+
+    Consume forkliftci outputs (cluster and token)
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit ff7bd883d1c065b37eff3e5847ad507841ff531c[m
+Author: Tomáš Golembiovský <tgolembi@redhat.com>
+Date:   Wed Jan 25 09:26:56 2023 +0100
+
+    build: fix virt-v2v image builds
+    
+    The build targets for virt-v2v warm image and operator bundle were
+    broken after commit a9043160.
+    
+    Signed-off-by: Tomáš Golembiovský <tgolembi@redhat.com>
+
+[33mcommit 12d351f18bdaf27288089d13b926e6057b9823af[m
+Author: Bella <bkhizgiy@redhat.com>
+Date:   Tue Jan 24 15:56:24 2023 +0200
+
+    Returning empy replay for providers diffrent then oVirt as part of the
+    mutating webhook
+    
+    Signed-off-by: Bella <bkhizgiy@redhat.com>
+
+[33mcommit a7938da38fac656bed5dbcf40b7737d52715d84c[m
+Author: Tomáš Golembiovský <tgolembi@redhat.com>
+Date:   Tue Nov 29 07:50:12 2022 +0100
+
+    controller: Use different image for cold and warm migration
+    
+    Signed-off-by: Tomáš Golembiovský <tgolembi@redhat.com>
+
+[33mcommit a9043160d88d523826d4439adab885164486b039[m
+Author: Tomáš Golembiovský <tgolembi@redhat.com>
+Date:   Mon Nov 28 10:30:39 2022 +0100
+
+    build: Build separate images for cold and warm migration
+    
+    Later we plan to use CentoOS Stream 9 as a base image for our
+    containers. However, virt-v2v in C9S does not have the features needed
+    for warm migration. Therefore we will need to have one image for warm
+    migration with C8S and another image for cold migration with C9S.
+    
+    For now both images will be based on C8S. The switch to C9S for cold
+    migration image will be done later when the controller and the container
+    entrypoint are prepared for the change.
+    
+    Signed-off-by: Tomáš Golembiovský <tgolembi@redhat.com>
+
+[33mcommit 2fb2cda4b3941273ca0ca191e61114e721df341e[m
+Author: Tomáš Golembiovský <tgolembi@redhat.com>
+Date:   Thu Oct 20 14:35:51 2022 +0200
+
+    plan: store disk source in annotation
+    
+    Instead of relying on disk source being part of DataVolume.Spec we store
+    the source also in the annotation. This is a preliminary change that
+    will ease our transition from CDI.
+    
+    Signed-off-by: Tomáš Golembiovský <tgolembi@redhat.com>
+
+[33mcommit 1ec73ea49df98b65425c51ccef62731e3761221d[m
+Author: Bella <bkhizgiy@redhat.com>
+Date:   Wed Jan 11 15:54:20 2023 +0200
+
+    Add mutating webhook to modify missing ovirt CA
+    
+    Signed-off-by: Bella <bkhizgiy@redhat.com>
+
+[33mcommit f3f0920c084b7fc46ebb5e8f1b929db525b7d3f7[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Sun Jan 22 15:22:47 2023 +0200
+
+    update pattern of openstack owners
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit f371637e531332d4fa28bd34069781cfe98b2776[m
+Author: Martin Nečas <necas.marty@gmail.com>
+Date:   Thu Jan 19 19:30:53 2023 +0100
+
+    Autoenable console plugin
+    
+    Signed-off-by: Martin Nečas <necas.marty@gmail.com>
+
+[33mcommit 58a2d025820733e2d4a68a8dc251355bf6591442[m
+Author: Martin Nečas <necas.marty@gmail.com>
+Date:   Thu Jan 19 21:04:46 2023 +0100
+
+    GitHub Action: Set REGISTRY_TAG 'latest' on main branch
+    
+    Signed-off-by: Martin Nečas <necas.marty@gmail.com>
+
+[33mcommit 6a67e0dba77b45a5668148b2f17407f8d2d7ce69[m
+Author: Arik Hadas <ahadas@redhat.com>
+Date:   Tue Jan 17 23:33:35 2023 +0200
+
+    fix typo
+    
+    Signed-off-by: Arik Hadas <ahadas@redhat.com>
+
+[33mcommit 0a9cf3b4263532dd8df1190a2d9937ac8f86332c[m
+Author: Bella <bkhizgiy@redhat.com>
+Date:   Tue Jan 17 13:18:32 2023 +0200
+
+    Adding forklift-operator builds info to the documentation
+    
+    Signed-off-by: Bella <bkhizgiy@redhat.com>

@@ -7,6 +7,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/mutating-webhook/mutators"
 )
 
-func ServeOvirtCa(resp http.ResponseWriter, req *http.Request) {
-	mutating_webhooks.Serve(resp, req, &mutators.OvirtCertMutator{})
+func ServeSecretMutator(resp http.ResponseWriter, req *http.Request) {
+	mutating_webhooks.Serve(resp, req, &mutators.SecretMutator{})
 }
