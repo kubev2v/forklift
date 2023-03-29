@@ -111,8 +111,8 @@ type ImageListOpts struct {
 	images.ListOpts
 }
 
-func (r *ImageListOpts) setUpdateAtQueryFilterGTE(lastSync time.Time) {
-	r.UpdatedAtQuery = &images.ImageDateQuery{Date: lastSync, Filter: images.FilterGTE}
+func (r *ImageListOpts) setUpdateAtQueryFilterGT(lastSync time.Time) {
+	r.UpdatedAtQuery = &images.ImageDateQuery{Date: lastSync, Filter: images.FilterGT}
 }
 
 type Flavor struct {
