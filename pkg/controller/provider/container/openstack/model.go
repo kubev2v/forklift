@@ -247,7 +247,8 @@ type ImageAdapter struct {
 func (r *ImageAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	opts := &ImageListOpts{}
 	imageList := []Image{}
-	now := time.Now()
+	// Set time to epoch start
+	updateTime := time.Unix(0, 0)
 	err = ctx.client.list(&imageList, opts)
 	if err != nil {
 		return
@@ -259,12 +260,12 @@ func (r *ImageAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 		}
 		image.ApplyTo(m)
 		list.Append(m)
-		if image.UpdatedAt.After(now) {
-			now = image.UpdatedAt
+		if image.UpdatedAt.After(updateTime) {
+			updateTime = image.UpdatedAt
 		}
 	}
 	itr = list.Iter()
-	r.lastSync = now
+	r.lastSync = updateTime
 	return
 }
 
@@ -272,7 +273,8 @@ func (r *ImageAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 	opts := &ImageListOpts{}
 	opts.setUpdateAtQueryFilterGT(r.lastSync)
 	imageList := []Image{}
-	now := time.Now()
+	// Set time to epoch start
+	updateTime := time.Unix(0, 0)
 	err = ctx.client.list(&imageList, opts)
 	if err != nil {
 		return
@@ -314,11 +316,11 @@ func (r *ImageAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 			updates = append(updates, updater)
 		}
 
-		if image.UpdatedAt.After(now) {
-			now = image.UpdatedAt
+		if image.UpdatedAt.After(updateTime) {
+			updateTime = image.UpdatedAt
 		}
 	}
-	r.lastSync = now
+	r.lastSync = updateTime
 	return
 }
 
@@ -452,7 +454,8 @@ type VMAdapter struct {
 func (r *VMAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	opts := &VMListOpts{}
 	vmList := []VM{}
-	now := time.Now()
+	// Set time to epoch start
+	updateTime := time.Unix(0, 0)
 	err = ctx.client.list(&vmList, opts)
 	if err != nil {
 		return
@@ -468,7 +471,7 @@ func (r *VMAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 		list.Append(m)
 	}
 	itr = list.Iter()
-	r.lastSync = now
+	r.lastSync = updateTime
 	return
 }
 
@@ -477,7 +480,8 @@ func (r *VMAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 	opts := &VMListOpts{}
 	opts.ChangesSince = r.lastSync.Format(time.RFC3339)
 	vmList := []VM{}
-	now := time.Now()
+	// Set time to epoch start
+	updateTime := time.Unix(0, 0)
 	err = ctx.client.list(&vmList, opts)
 	if err != nil {
 		return
@@ -521,11 +525,11 @@ func (r *VMAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 			}
 			updates = append(updates, updater)
 		}
-		if vm.Updated.After(now) {
-			now = vm.Updated
+		if vm.Updated.After(updateTime) {
+			updateTime = vm.Updated
 		}
 	}
-	r.lastSync = now
+	r.lastSync = updateTime
 	return
 }
 
