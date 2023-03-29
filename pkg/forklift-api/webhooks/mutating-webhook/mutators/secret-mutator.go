@@ -24,10 +24,10 @@ var log = logging.WithName("mutator")
 
 const NewLine = 0x0a
 
-type OvirtCertMutator struct {
+type SecretMutator struct {
 }
 
-func (mutator *OvirtCertMutator) Mutate(ar *admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
+func (mutator *SecretMutator) Mutate(ar *admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
 	log.Info("secret mutator was called")
 	raw := ar.Request.Object.Raw
 	secret := &core.Secret{}
@@ -38,6 +38,8 @@ func (mutator *OvirtCertMutator) Mutate(ar *admissionv1.AdmissionReview) *admiss
 	}
 
 	var insecure = false
+	var secretChanged = false
+	// Applies to all secrets with 'createdForProviderType' label.
 	if insecureSkipVerify, ok := secret.Data["insecureSkipVerify"]; ok {
 		insecure, err = strconv.ParseBool(string(insecureSkipVerify))
 		if err != nil {
@@ -46,9 +48,10 @@ func (mutator *OvirtCertMutator) Mutate(ar *admissionv1.AdmissionReview) *admiss
 		}
 	} else {
 		secret.Data["insecureSkipVerify"] = []byte("false")
+		secretChanged = true
 	}
 
-	if providerType, ok := secret.GetLabels()["createdForProviderType"]; ok && providerType == "ovirt" && !insecure {
+	if providerType := secret.GetLabels()["createdForProviderType"]; providerType == "ovirt" && !insecure {
 		url, err := url.Parse(string(secret.Data["url"]))
 		if err != nil {
 			log.Error(err, "mutating webhook URL parsing error")
@@ -86,9 +89,13 @@ func (mutator *OvirtCertMutator) Mutate(ar *admissionv1.AdmissionReview) *admiss
 		if !contains(secret.Data["cacert"], cert) {
 			secret.Data["cacert"] = appendCerts(secret.Data["cacert"], cert)
 			secret.Labels["ca-cert-updated"] = "true"
+			secretChanged = true
 			log.Info("Engine CA certificate was missing, updating the secret")
 		}
+	}
 
+	//In case the data in the secret changed patch the secret.
+	if secretChanged {
 		patchBytes, err := util.GeneratePatchPayload(
 			util.PatchOperation{
 				Op:    "replace",
