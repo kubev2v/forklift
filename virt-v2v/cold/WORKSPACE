@@ -323,9 +323,9 @@ rpm(
 )
 
 rpm(
-    name = "curl-0__7.76.1-23.el9.x86_64",
-    sha256 = "e08f95656a19787d18b52f96a2329fc63758253d96297434cb5fb51b857482b7",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/curl-7.76.1-23.el9.x86_64.rpm"],
+    name = "curl-minimal-0__7.76.1-23.el9.x86_64",
+    sha256 = "3d2ed0db2e85e18edd897ae63b463255536e597abc6ca4b8f189bf08c263ed65",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/curl-minimal-7.76.1-23.el9.x86_64.rpm"],
 )
 
 rpm(

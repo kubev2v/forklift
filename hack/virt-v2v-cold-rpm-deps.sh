@@ -31,6 +31,7 @@ v2v_missing="
 # choice is mostly arbitrary with package size taken into consideration.
 alternative_picks="
   coreutils-single
+  curl-minimal
   glibc-langpack-en
   kernel-core
   libcurl-minimal
