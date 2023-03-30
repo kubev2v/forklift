@@ -21,6 +21,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/openstack"
+	resource "github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
@@ -281,20 +282,20 @@ func (r *Client) Close() {
 
 func (r *Client) Finalize(vms []*planapi.VMStatus, migrationName string) {
 	for _, vm := range vms {
-		vmModel := &model.VM{}
-		err := r.Source.Inventory.Find(vmModel, ref.Ref{ID: vm.Ref.ID})
+		vmResource := &resource.VM{}
+		err := r.Source.Inventory.Find(vmResource, ref.Ref{ID: vm.Ref.ID})
 		if err != nil {
 			r.Log.Error(err, "Failed to find vm", "vm", vm.Name)
 			return
 		}
 
-		for _, av := range vmModel.AttachedVolumes {
+		for _, av := range vmResource.AttachedVolumes {
 			lookupName := fmt.Sprintf("%s-%s", migrationName, av.ID)
 			// In a normal operation the snapshot and volume should already have been removed
 			// but they may remain in case of failure or cancellation of the migration
 
 			// Delete snapshot
-			snapshot := &model.Snapshot{}
+			snapshot := &resource.Snapshot{}
 			err := r.Source.Inventory.Find(snapshot, ref.Ref{Name: lookupName})
 			if err != nil {
 				r.Log.Info("Failed to find snapshot", "snapshot", lookupName)
@@ -306,7 +307,7 @@ func (r *Client) Finalize(vms []*planapi.VMStatus, migrationName string) {
 			}
 
 			// Delete cloned volume
-			volume := &model.Volume{}
+			volume := &resource.Volume{}
 			err = r.Source.Inventory.Find(volume, ref.Ref{Name: lookupName})
 			if err != nil {
 				r.Log.Info("Failed to find volume", "volume", lookupName)
@@ -318,7 +319,7 @@ func (r *Client) Finalize(vms []*planapi.VMStatus, migrationName string) {
 			}
 
 			// Delete Image
-			image := &model.Image{}
+			image := &resource.Image{}
 			err = r.Source.Inventory.Find(image, ref.Ref{Name: lookupName})
 			if err != nil {
 				r.Log.Info("Failed to find image", "image", lookupName)
