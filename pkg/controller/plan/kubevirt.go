@@ -62,6 +62,8 @@ const (
 	AnnOriginalID = "original-ID"
 	// DV deletion on completion
 	AnnDeleteAfterCompletion = "cdi.kubevirt.io/storage.deleteAfterCompletion"
+	// DV immediate bind to WaitForFirstConsumer storage class
+	AnnBindImmediate = "cdi.kubevirt.io/storage.bind.immediate.requested"
 	// Max Length for vm name
 	NameMaxLength = 63
 )
@@ -989,6 +991,9 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 		annotations[AnnDefaultNetwork] = path.Join(
 			r.Plan.Spec.TransferNetwork.Namespace, r.Plan.Spec.TransferNetwork.Name)
 	}
+	if r.Plan.Spec.Warm || !r.Destination.Provider.IsHost() {
+		annotations[AnnBindImmediate] = "true"
+	}
 	// Do not delete the DV when the import completes as we check the DV to get the current
 	// disk transfer status.
 	annotations[AnnDeleteAfterCompletion] = "false"
@@ -1836,7 +1841,7 @@ func (r *KubeVirt) createOpenStackVolumes(vm ref.Ref) (pvcNames []string, err er
 
 // Return if the import done with Openstack
 func (r *KubeVirt) isOpenstack(vm *plan.VMStatus) bool {
-	return *r.Plan.Provider.Source.Spec.Type == v1beta1.OpenStack && vm.Warm == nil && r.Destination.Provider.IsHost()
+	return *r.Plan.Provider.Source.Spec.Type == v1beta1.OpenStack
 }
 
 func (r *KubeVirt) openstackPVCsReady(vm ref.Ref, step *plan.Step) (ready bool, err error) {
