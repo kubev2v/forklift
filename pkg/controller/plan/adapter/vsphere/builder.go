@@ -313,7 +313,12 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 			if disk.Datastore.ID == ds.ID {
 				storageClass := mapped.Destination.StorageClass
 				var dvSource cdi.DataVolumeSource
-				if r.Plan.Spec.Warm {
+				if r.Context.UseEl9VirtV2v() {
+					// Let virt-v2v do the copying
+					dvSource = cdi.DataVolumeSource{
+						Blank: &cdi.DataVolumeBlankImage{},
+					}
+				} else {
 					// Let CDI do the copying
 					dvSource = cdi.DataVolumeSource{
 						VDDK: &cdi.DataVolumeSourceVDDK{
@@ -324,11 +329,6 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 							Thumbprint:   thumbprint,
 							InitImageURL: r.Source.Provider.Spec.Settings["vddkInitImage"],
 						},
-					}
-				} else {
-					// Let virt-v2v do the copying
-					dvSource = cdi.DataVolumeSource{
-						Blank: &cdi.DataVolumeBlankImage{},
 					}
 				}
 				dvSpec := cdi.DataVolumeSpec{
