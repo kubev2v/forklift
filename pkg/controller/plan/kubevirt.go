@@ -572,7 +572,9 @@ func (r *KubeVirt) getPVCs(vm *plan.VMStatus) (pvcs []core.PersistentVolumeClaim
 			pvcs = append(pvcs, *pvc)
 		} else if r.isOpenstack(vm) {
 			if _, ok := pvc.Labels["migration"]; ok {
-				pvcs = append(pvcs, *pvc)
+				if pvc.Labels["migration"] == r.Migration.Name {
+					pvcs = append(pvcs, *pvc)
+				}
 			}
 		} else if r.useOvirtPopulator(vm) {
 			ovirtVm := &ovirt.Workload{}
