@@ -76,7 +76,7 @@ rpmtree(
         "@cracklib-dicts-0__2.9.6-27.el9.x86_64//rpm",
         "@crypto-policies-0__20221215-1.git9a18988.el9.x86_64//rpm",
         "@cryptsetup-libs-0__2.6.0-2.el9.x86_64//rpm",
-        "@curl-0__7.76.1-23.el9.x86_64//rpm",
+        "@curl-minimal-0__7.76.1-23.el9.x86_64//rpm",
         "@cyrus-sasl-0__2.1.27-21.el9.x86_64//rpm",
         "@cyrus-sasl-gssapi-0__2.1.27-21.el9.x86_64//rpm",
         "@cyrus-sasl-lib-0__2.1.27-21.el9.x86_64//rpm",
