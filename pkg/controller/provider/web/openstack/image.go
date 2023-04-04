@@ -27,27 +27,27 @@ type ImageHandler struct {
 
 type Image struct {
 	Resource
-	Status                      string            `json:"status"`
-	Tags                        []string          `json:"tags"`
-	ContainerFormat             string            `json:"containerFormat"`
-	DiskFormat                  string            `json:"diskFormat"`
-	MinDiskGigabytes            int               `json:"minDisk"`
-	MinRAMMegabytes             int               `json:"minRam"`
-	Owner                       string            `json:"owner"`
-	Protected                   bool              `json:"protected"`
-	Visibility                  string            `json:"visibility"`
-	Hidden                      bool              `json:"osHidden"`
-	Checksum                    string            `json:"checksum"`
-	SizeBytes                   int64             `json:"sizeBytes"`
-	Metadata                    map[string]string `json:"metadata"`
-	CreatedAt                   time.Time         `json:"createdAt"`
-	UpdatedAt                   time.Time         `json:"updatedAt"`
-	File                        string            `json:"file"`
-	Schema                      string            `json:"schema"`
-	VirtualSize                 int64             `json:"virtualSize"`
-	OpenStackImageImportMethods []string          `json:"imageImportMethods"`
-	OpenStackImageStoreIDs      []string          `json:"imageStoreIDs"`
-	Properties                  map[string]interface{}
+	Status                      string                 `json:"status"`
+	Tags                        []string               `json:"tags"`
+	ContainerFormat             string                 `json:"containerFormat"`
+	DiskFormat                  string                 `json:"diskFormat"`
+	MinDiskGigabytes            int                    `json:"minDisk"`
+	MinRAMMegabytes             int                    `json:"minRam"`
+	Owner                       string                 `json:"owner"`
+	Protected                   bool                   `json:"protected"`
+	Visibility                  string                 `json:"visibility"`
+	Hidden                      bool                   `json:"osHidden"`
+	Checksum                    string                 `json:"checksum"`
+	SizeBytes                   int64                  `json:"sizeBytes"`
+	Metadata                    map[string]string      `json:"metadata"`
+	CreatedAt                   time.Time              `json:"createdAt"`
+	UpdatedAt                   time.Time              `json:"updatedAt"`
+	File                        string                 `json:"file"`
+	Schema                      string                 `json:"schema"`
+	VirtualSize                 int64                  `json:"virtualSize"`
+	OpenStackImageImportMethods []string               `json:"imageImportMethods"`
+	OpenStackImageStoreIDs      []string               `json:"imageStoreIDs"`
+	Properties                  map[string]interface{} `json:"properties"`
 }
 
 // Add routes to the `gin` router.
