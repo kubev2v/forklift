@@ -17,11 +17,11 @@ docker-push:
 
 # Find or download opa
 opa-bin:
-ifeq (, $(shell which opa))
+ifeq (, $(shell command -v opa))
 	@{ \
 	set -e ;\
 	mkdir -p ${HOME}/.local/bin ; \
-	curl -sL -o ${HOME}/.local/bin/opa https://openpolicyagent.org/downloads/latest/opa_linux_amd64 ; \
+	curl -sL -o ${HOME}/.local/bin/opa https://openpolicyagent.org/downloads/v0.52.0/opa_linux_amd64 ; \
 	chmod 755 ${HOME}/.local/bin/opa ;\
 	}
 OPA=${HOME}/.local/bin/opa
