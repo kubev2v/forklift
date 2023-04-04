@@ -75,4 +75,4 @@ exec virt-v2v -v -x \
     -i libvirt \
     -ic "$V2V_libvirtURL" \
     "${args[@]}" \
-    "$V2V_vmName" |& /usr/local/bin/virt-v2v-monitor
+    -- "$V2V_vmName" |& /usr/local/bin/virt-v2v-monitor
