@@ -582,6 +582,10 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 				if imageVIFModel, ok := vm.Image.Properties[VifModel]; ok {
 					interfaceModel = imageVIFModel.(string)
 				}
+				// vmxnet3 is unsupported in OpenShift Virtualization
+				if interfaceModel == VifModelVmxnet3 {
+					interfaceModel = DefaultProperties[VifModel]
+				}
 				kInterface.Model = interfaceModel
 				if m := nic.(map[string]interface{}); ok {
 					if macAddress, ok := m["OS-EXT-IPS-MAC:mac_addr"]; ok {
