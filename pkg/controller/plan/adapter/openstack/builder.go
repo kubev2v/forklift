@@ -142,6 +142,7 @@ const (
 // Video models
 const (
 	VideoVga    = "vga"
+	VideoVirtio = "virtio"
 	VideoCirrus = "cirrus"
 	VideoVmVga  = "vmvga"
 	VideoXen    = "xen"
@@ -149,6 +150,22 @@ const (
 	VideoGop    = "gop"
 	VideoNONE   = "none"
 	VideoBochs  = "bochs"
+)
+
+// Vif models
+const (
+	VifModelE1000   = "e1000"
+	VifModelE1000e  = "e1000e"
+	VifModelNe2kpci = "ne2k_pci"
+	VifModelPcnet   = "pcnet"
+	VifModelRtl8139 = "rtl8139"
+	VifModelVirtio  = "virtio"
+	VifModelVmxnet3 = "vmxnet3"
+)
+
+// HW RNG models
+const (
+	HwRngModelVirtio = "virtio"
 )
 
 // Disk Formats
@@ -222,12 +239,12 @@ var DefaultProperties = map[string]string{
 	MachineType:     PC,
 	CdromBus:        IdeBus,
 	PointerModel:    UsbTablet,
-	VideoModel:      VirtioBus,
+	VideoModel:      VideoVirtio,
 	DiskBus:         VirtioBus,
-	VifModel:        VirtioBus,
+	VifModel:        VifModelVirtio,
 	OsType:          Linux,
 	OsSecureBoot:    SecureBootDisabled,
-	HwRngModel:      VirtioBus,
+	HwRngModel:      HwRngModelVirtio,
 }
 
 // Create the destination Kubevirt VM.
