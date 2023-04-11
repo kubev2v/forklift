@@ -373,12 +373,8 @@ func (r *Builder) mapVideo(vm *model.Workload, object *cnv.VirtualMachineSpec) {
 	if imageVideoModel, ok := vm.Image.Properties[VideoModel]; ok {
 		videoModel = imageVideoModel.(string)
 	}
-	switch videoModel {
-	case VideoNONE:
-	default:
-		autoAttachGraphicsDevice := false
-		object.Template.Spec.Domain.Devices.AutoattachGraphicsDevice = &autoAttachGraphicsDevice
-	}
+	autoAttachGraphicsDevice := videoModel != VideoNONE
+	object.Template.Spec.Domain.Devices.AutoattachGraphicsDevice = &autoAttachGraphicsDevice
 }
 
 func (r *Builder) mapInput(vm *model.Workload, object *cnv.VirtualMachineSpec) {
