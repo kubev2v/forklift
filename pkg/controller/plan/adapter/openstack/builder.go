@@ -443,51 +443,52 @@ func (r *Builder) mapResources(vm *model.Workload, object *cnv.VirtualMachineSpe
 
 	// Set CPU Sockets/Cores/Threads and Memory requests
 	// TODO support NUMA, CPU pinning
-	var cpuSockets, cpuCores, cpuThreads int
-
-	cpuSockets = vm.Flavor.VCPUs
-	cpuCores = 1
-	cpuThreads = 1
-
-	if flavorCPUSockets, ok := vm.Flavor.ExtraSpecs[FlavorCpuSockets]; ok {
-		if sockets, err := strconv.Atoi(flavorCPUSockets); err == nil {
-			cpuSockets = sockets
-		}
-	} else if imageCPUSockets, ok := vm.Image.Properties[CpuSockets]; ok {
-		if sockets, ok := imageCPUSockets.(int); ok {
-			cpuSockets = sockets
-		}
-	}
-	if flavorCPUCores, ok := vm.Flavor.ExtraSpecs[FlavorCpuCores]; ok {
-		if cores, err := strconv.Atoi(flavorCPUCores); err == nil {
-			cpuCores = cores
-		}
-	} else if imageCPUCores, ok := vm.Image.Properties[CpuCores]; ok {
-		if cores, ok := imageCPUCores.(int); ok {
-			cpuCores = cores
-		}
-	}
-	if flavorCPUThreads, ok := vm.Flavor.ExtraSpecs[FlavorCpuThreads]; ok {
-		if threads, err := strconv.Atoi(flavorCPUThreads); err == nil {
-			cpuThreads = threads
-		}
-	} else if imageCPUThreads, ok := vm.Image.Properties[CpuThreads]; ok {
-		if threads, ok := imageCPUThreads.(int); ok {
-			cpuThreads = threads
-		}
-	}
-
-	resourceRequests := map[core.ResourceName]resource.Quantity{}
-
-	object.Template.Spec.Domain.CPU.Sockets = uint32(cpuSockets)
-	object.Template.Spec.Domain.CPU.Cores = uint32(cpuCores)
-	object.Template.Spec.Domain.CPU.Threads = uint32(cpuThreads)
+	object.Template.Spec.Domain.CPU.Sockets = r.getCpuCount(vm, CpuSockets)
+	object.Template.Spec.Domain.CPU.Cores = r.getCpuCount(vm, CpuCores)
+	object.Template.Spec.Domain.CPU.Threads = r.getCpuCount(vm, CpuThreads)
 
 	// TODO Support HugePages
 	memory := resource.NewQuantity(int64(vm.Flavor.RAM)*1024*1024, resource.BinarySI)
+	resourceRequests := map[core.ResourceName]resource.Quantity{}
 	resourceRequests[core.ResourceMemory] = *memory
 
 	object.Template.Spec.Domain.Resources.Requests = resourceRequests
+}
+
+func (r *Builder) getCpuCount(vm *model.Workload, imageCpuProperty string) (count uint32) {
+	var flavorCpuProperty string
+	switch imageCpuProperty {
+	case CpuSockets:
+		count = uint32(vm.Flavor.VCPUs)
+		flavorCpuProperty = FlavorCpuSockets
+	case CpuCores:
+		count = 1
+		flavorCpuProperty = FlavorCpuCores
+	case CpuThreads:
+		count = 1
+		flavorCpuProperty = FlavorCpuThreads
+	default:
+		count = 0
+		return
+	}
+	if imageCountIface, ok := vm.Image.Properties[imageCpuProperty]; ok {
+		if imageCountStr, ok := imageCountIface.(string); ok {
+			if imageCount, err := strconv.Atoi(imageCountStr); err == nil {
+				count = uint32(imageCount)
+			} else {
+				r.Log.Error(err, "unable to parse image property",
+					"property", imageCpuProperty, "value", imageCountStr)
+			}
+		}
+	} else if flavorCountStr, ok := vm.Flavor.ExtraSpecs[flavorCpuProperty]; ok {
+		if flavorCount, err := strconv.Atoi(flavorCountStr); err == nil {
+			count = uint32(flavorCount)
+		} else {
+			r.Log.Error(err, "unable to parse flavor extra spec",
+				"extraSpec", flavorCpuProperty, "value", flavorCountStr)
+		}
+	}
+	return
 }
 
 func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.PersistentVolumeClaim, object *cnv.VirtualMachineSpec) {
@@ -655,13 +656,21 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 	object.Template.Spec.Domain.Devices.Interfaces = kInterfaces
 
 	var vifMultiQueueEnabled *bool
-	if flavorVifMultiQueueEnabled, ok := vm.Flavor.ExtraSpecs[FlavorVifMultiQueueEnabled]; ok {
+	if imageVifMultiQueueEnabled, ok := vm.Image.Properties[VifMultiQueueEnabled]; ok {
+		if enabledStr, ok := imageVifMultiQueueEnabled.(string); ok {
+			if enabled, err := strconv.ParseBool(enabledStr); err == nil && enabled {
+				vifMultiQueueEnabled = &enabled
+			} else if err != nil {
+				r.Log.Error(err, "unable to parse image property",
+					"property", VifMultiQueueEnabled, "value", enabledStr)
+			}
+		}
+	} else if flavorVifMultiQueueEnabled, ok := vm.Flavor.ExtraSpecs[FlavorVifMultiQueueEnabled]; ok {
 		if enabled, err := strconv.ParseBool(flavorVifMultiQueueEnabled); err == nil && enabled {
 			vifMultiQueueEnabled = &enabled
-		}
-	} else if imageVifMultiQueueEnabled, ok := vm.Image.Properties[VifMultiQueueEnabled]; ok {
-		if enabled, ok := imageVifMultiQueueEnabled.(bool); ok {
-			vifMultiQueueEnabled = &enabled
+		} else if err != nil {
+			r.Log.Error(err, "unable to parse flavor extra spec",
+				"extraSpec", FlavorVifMultiQueueEnabled, "value", flavorVifMultiQueueEnabled)
 		}
 	}
 	if vifMultiQueueEnabled != nil {
