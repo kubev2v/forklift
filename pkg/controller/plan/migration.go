@@ -603,13 +603,13 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		var pvcNames []string
 		if r.kubevirt.isOpenstack(vm) {
 			pvcNames, err = r.kubevirt.ensureOpenStackVolumes(vm.Ref, ready)
-			if !ready {
-				return
-			}
 			if err != nil {
 				step.AddError(err.Error())
 				err = nil
 				break
+			}
+			if !ready {
+				return
 			}
 			err = r.kubevirt.createPodToBindPVCs(vm, pvcNames)
 			if err != nil {
