@@ -870,7 +870,7 @@ func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName
 	}
 }
 
-func (r *Builder) BeforeTransferHook(c planbase.Client, vmRef ref.Ref) (ready bool, err error) {
+func (r *Builder) PreTransferActions(c planbase.Client, vmRef ref.Ref) (ready bool, err error) {
 	// TODO:
 	// 1. Dedup
 	// 2. Improve concurrency, as soon as the image is ready we can create the PVC, no need to wait

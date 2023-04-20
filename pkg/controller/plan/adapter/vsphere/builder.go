@@ -785,6 +785,6 @@ func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName
 	return nil
 }
 
-func (r *Builder) BeforeTransferHook(c planbase.Client, vmRef ref.Ref) (ready bool, err error) {
+func (r *Builder) PreTransferActions(c planbase.Client, vmRef ref.Ref) (ready bool, err error) {
 	return true, nil
 }
