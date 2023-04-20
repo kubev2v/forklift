@@ -594,7 +594,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			break
 		}
 		var ready bool
-		ready, err = r.builder.BeforeTransferHook(r.provider, vm.Ref)
+		ready, err = r.builder.PreTransferActions(r.provider, vm.Ref)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
@@ -620,7 +620,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		}
 
 		if !ready {
-			r.Log.Info("BeforeTransfer hook isn't ready yet")
+			r.Log.Info("PreTransferActions hook isn't ready yet")
 			return
 		}
 

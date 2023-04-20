@@ -55,7 +55,7 @@ type Builder interface {
 	// Create PersistentVolumeClaim with a DataSourceRef
 	PersistentVolumeClaimWithSourceRef(da interface{}, storageName *string, populatorName string, accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode) *core.PersistentVolumeClaim
 	// Add custom steps before creating PVC/DataVolume
-	BeforeTransferHook(c Client, vmRef ref.Ref) (ready bool, err error)
+	PreTransferActions(c Client, vmRef ref.Ref) (ready bool, err error)
 }
 
 // Client API.
