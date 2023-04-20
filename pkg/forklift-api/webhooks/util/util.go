@@ -87,3 +87,10 @@ func GeneratePatchPayload(patches ...PatchOperation) ([]byte, error) {
 
 	return payloadBytes, nil
 }
+
+// ToAdmissionResponseAllow returns allowed response
+func ToAdmissionResponseAllow() *admissionv1.AdmissionResponse {
+	return &admissionv1.AdmissionResponse{
+		Allowed: true,
+	}
+}

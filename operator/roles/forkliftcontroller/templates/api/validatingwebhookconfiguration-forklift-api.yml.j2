@@ -39,3 +39,27 @@ webhooks:
     - secrets
     scope: Namespaced
   sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ api_service_name }}
+      namespace: {{ app_namespace }}
+      path: /plan-validate
+      port: 443
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: plans.forklift.konveyor
+  namespaceSelector: {}
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - forklift.konveyor.io
+    resources:
+    - plans
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+  sideEffects: None
