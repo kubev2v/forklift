@@ -19,6 +19,7 @@ spec:
         app: {{ app_name }}
         service: {{ api_service_name }}
     spec:
+      serviceAccountName: forklift-controller
       containers:
         - name: {{ api_container_name }}
           image: {{ api_image_fqin }}
