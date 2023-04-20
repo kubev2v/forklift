@@ -154,13 +154,25 @@ const (
 
 // Vif models
 const (
-	VifModelE1000   = "e1000"
-	VifModelE1000e  = "e1000e"
+	// KVM/Xen/VMWare
+	VifModelE1000 = "e1000"
+	// KVM/VMWare
+	VifModelE1000e = "e1000e"
+	// KVM/Xen
 	VifModelNe2kpci = "ne2k_pci"
 	VifModelPcnet   = "pcnet"
 	VifModelRtl8139 = "rtl8139"
-	VifModelVirtio  = "virtio"
+	// KVM
 	VifModelVmxnet3 = "vmxnet3"
+	VifModelVirtio  = "virtio"
+	// VMWare
+	VifModelVirtualE1000   = "VirtualE1000"
+	VifModelVirtualE1000e  = "VirtualE1000e"
+	VifModelVirtualPcnet32 = "VirtualPCNet32"
+	VifModelVirtualVmxNet  = "VirtualVmxNet"
+	VifModelVirtualVmxNet3 = "VirtualVmxNet3"
+	//Xen
+	VifModelNetfront = "netfront"
 )
 
 // HW RNG models
@@ -582,8 +594,14 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 				if imageVIFModel, ok := vm.Image.Properties[VifModel]; ok {
 					interfaceModel = imageVIFModel.(string)
 				}
-				// vmxnet3 is unsupported in OpenShift Virtualization
-				if interfaceModel == VifModelVmxnet3 {
+				switch interfaceModel {
+				case VifModelVirtualE1000:
+					interfaceModel = VifModelE1000
+				case VifModelVirtualE1000e:
+					interfaceModel = VifModelVirtualE1000e
+				case VifModelVirtualPcnet32:
+					interfaceModel = VifModelPcnet
+				case VifModelVirtualVmxNet, VifModelVirtualVmxNet3, VifModelVmxnet3, VifModelNetfront:
 					interfaceModel = DefaultProperties[VifModel]
 				}
 				kInterface.Model = interfaceModel
