@@ -710,17 +710,19 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		step.MarkStarted()
 		step.Phase = Running
 
-		if r.kubevirt.useOvirtPopulator(vm) || r.kubevirt.isOpenstack(vm) {
-			var progressFn func(*plan.VMStatus, *plan.Step) error
-			var readyFn func(ref.Ref, *plan.Step) (bool, error)
-			if r.kubevirt.useOvirtPopulator(vm) {
-				progressFn = r.updateCopyProgressForOvirt
-				readyFn = r.kubevirt.areOvirtPVCsReady
-			} else if r.kubevirt.isOpenstack(vm) {
-				progressFn = r.updateCopyProgressForOpenstack
-				readyFn = r.kubevirt.openstackPVCsReady
-			}
+		var progressFn func(*plan.VMStatus, *plan.Step) error
+		var readyFn func(ref.Ref, *plan.Step) (bool, error)
 
+		switch {
+		case r.kubevirt.useOvirtPopulator(vm):
+			progressFn = r.updateCopyProgressForOvirt
+			readyFn = r.kubevirt.areOvirtPVCsReady
+		case r.kubevirt.isOpenstack(vm):
+			progressFn = r.updateCopyProgressForOpenstack
+			readyFn = r.kubevirt.openstackPVCsReady
+		}
+
+		if readyFn != nil {
 			ready, err := readyFn(vm.Ref, step)
 			if err != nil {
 				step.AddError(err.Error())
@@ -739,11 +741,12 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				vm.Phase = r.next(vm.Phase)
 				break
 			} else {
-				r.Log.Info("PVCs not ready yet")
+				r.Log.Info("PVCs are not ready yet")
 				break
 			}
 		}
 
+		// Fallback to non-volume populator path
 		err = r.updateCopyProgress(vm, step)
 		if err != nil {
 			step.AddError(err.Error())
