@@ -710,40 +710,24 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		step.MarkStarted()
 		step.Phase = Running
 
-		// TODO we can probably clean up these 2 if's nicely
-		if r.kubevirt.isOpenstack(vm) {
-			ready, err := r.kubevirt.openstackPVCsReady(vm.Ref, step)
+		if r.kubevirt.useOvirtPopulator(vm) || r.kubevirt.isOpenstack(vm) {
+			var progressFn func(*plan.VMStatus, *plan.Step) error
+			var readyFn func(ref.Ref, *plan.Step) (bool, error)
+			if r.kubevirt.useOvirtPopulator(vm) {
+				progressFn = r.updateCopyProgressForOvirt
+				readyFn = r.kubevirt.areOvirtPVCsReady
+			} else if r.kubevirt.isOpenstack(vm) {
+				progressFn = r.updateCopyProgressForOpenstack
+				readyFn = r.kubevirt.openstackPVCsReady
+			}
+
+			ready, err := readyFn(vm.Ref, step)
 			if err != nil {
 				step.AddError(err.Error())
 				err = nil
 				break
 			}
-			err = r.updateCopyProgressForOpenstack(vm, step)
-			if err != nil {
-				step.AddError(err.Error())
-				err = nil
-				break
-			}
-
-			if ready {
-				step.Phase = Completed
-				vm.Phase = r.next(vm.Phase)
-				break
-			} else {
-				r.Log.Info("PVCs not ready yet")
-				break
-			}
-		}
-
-		if r.kubevirt.useOvirtPopulator(vm) {
-			ready, err := r.kubevirt.areOvirtPVCsReady(vm.Ref, step)
-			if err != nil {
-				step.AddError(err.Error())
-				err = nil
-				break
-			}
-			err = r.updateCopyProgressForOvirt(vm, step)
-
+			err = progressFn(vm, step)
 			if err != nil {
 				step.AddError(err.Error())
 				err = nil
