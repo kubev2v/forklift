@@ -30,6 +30,37 @@ import (
 	core "k8s.io/api/core/v1"
 )
 
+const (
+	RegionName                  = "regionName"
+	AuthType                    = "authType"
+	Username                    = "username"
+	UserID                      = "userID"
+	Password                    = "password"
+	ApplicationCredentialID     = "applicationCredentialID"
+	ApplicationCredentialName   = "applicationCredentialName"
+	ApplicationCredentialSecret = "applicationCredentialSecret"
+	Token                       = "token"
+	SystemScope                 = "systemScope"
+	ProjectName                 = "projectName"
+	ProjectID                   = "projectID"
+	UserDomainName              = "userDomainName"
+	UserDomainID                = "userDomainID"
+	ProjectDomainName           = "projectDomainName"
+	ProjectDomainID             = "projectDomainID"
+	DomainName                  = "domainName"
+	DefaultDomain               = "defaultDomain"
+	InsecureSkipVerify          = "insecureSkipVerify"
+	CACert                      = "cacert"
+)
+
+var supportedAuthTypes = map[string]clientconfig.AuthType{
+	"password":                clientconfig.AuthPassword,
+	"v3password":              clientconfig.AuthV3Password,
+	"token":                   clientconfig.AuthToken,
+	"v3token":                 clientconfig.AuthV3Token,
+	"v3applicationcredential": clientconfig.AuthV3ApplicationCredential,
+}
+
 // Client struct
 type Client struct {
 	URL                 string
@@ -45,16 +76,45 @@ type Client struct {
 
 // Connect.
 func (r *Client) Connect() (err error) {
+
+	authInfo := &clientconfig.AuthInfo{
+		AuthURL:           r.URL,
+		ProjectName:       r.getSecretString(ProjectName),
+		ProjectID:         r.getSecretString(ProjectID),
+		UserDomainName:    r.getSecretString(UserDomainName),
+		UserDomainID:      r.getSecretString(UserDomainID),
+		ProjectDomainName: r.getSecretString(ProjectDomainName),
+		ProjectDomainID:   r.getSecretString(ProjectDomainID),
+		DomainName:        r.getSecretString(DomainName),
+		DefaultDomain:     r.getSecretString(DefaultDomain),
+		AllowReauth:       true,
+	}
+
+	var authType clientconfig.AuthType
+	authType, err = r.authType()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	switch authType {
+	case clientconfig.AuthPassword, clientconfig.AuthV3Password:
+		authInfo.Username = r.getSecretString(Username)
+		authInfo.UserID = r.getSecretString(UserID)
+		authInfo.Password = r.getSecretString(Password)
+	case clientconfig.AuthToken, clientconfig.AuthV3Token:
+		authInfo.Token = r.getSecretString(Token)
+	case clientconfig.AuthV3ApplicationCredential:
+		authInfo.ApplicationCredentialID = r.getSecretString(ApplicationCredentialID)
+		authInfo.ApplicationCredentialName = r.getSecretString(ApplicationCredentialName)
+		authInfo.ApplicationCredentialSecret = r.getSecretString(ApplicationCredentialSecret)
+	}
+
 	var TLSClientConfig *tls.Config
-
-	// if r.provider != nil {
-	// 	return
-	// }
-
 	if r.insecureSkipVerify() {
 		TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	} else {
-		cacert := []byte(r.cacert())
+		cacert := []byte(r.getSecretString(CACert))
 		roots := x509.NewCertPool()
 		ok := roots.AppendCertsFromPEM(cacert)
 		if !ok {
@@ -69,14 +129,8 @@ func (r *Client) Connect() (err error) {
 	}
 
 	clientOpts := &clientconfig.ClientOpts{
-		AuthInfo: &clientconfig.AuthInfo{
-			AuthURL:     r.URL,
-			Username:    r.username(),
-			Password:    r.password(),
-			ProjectName: r.projectName(),
-			DomainName:  r.domainName(),
-			AllowReauth: true,
-		},
+		AuthType: authType,
+		AuthInfo: authInfo,
 		HTTPClient: &http.Client{
 			Transport: &http.Transport{
 				Proxy: http.ProxyFromEnvironment,
@@ -100,35 +154,37 @@ func (r *Client) Connect() (err error) {
 	}
 	r.provider = provider
 
-	identityService, err := openstack.NewIdentityV3(r.provider, gophercloud.EndpointOpts{Region: r.region()})
+	regionName := r.getSecretString(RegionName)
+
+	identityService, err := openstack.NewIdentityV3(r.provider, gophercloud.EndpointOpts{Region: regionName})
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
 	r.identityService = identityService
 
-	computeService, err := openstack.NewComputeV2(r.provider, gophercloud.EndpointOpts{Region: r.region()})
+	computeService, err := openstack.NewComputeV2(r.provider, gophercloud.EndpointOpts{Region: regionName})
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
 	r.ComputeService = computeService
 
-	imageService, err := openstack.NewImageServiceV2(r.provider, gophercloud.EndpointOpts{Region: r.region()})
+	imageService, err := openstack.NewImageServiceV2(r.provider, gophercloud.EndpointOpts{Region: regionName})
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
 	r.ImageService = imageService
 
-	networkService, err := openstack.NewNetworkV2(r.provider, gophercloud.EndpointOpts{Region: r.region()})
+	networkService, err := openstack.NewNetworkV2(r.provider, gophercloud.EndpointOpts{Region: regionName})
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
 	r.NetworkService = networkService
 
-	blockStorageService, err := openstack.NewBlockStorageV3(r.provider, gophercloud.EndpointOpts{Region: r.region()})
+	blockStorageService, err := openstack.NewBlockStorageV3(r.provider, gophercloud.EndpointOpts{Region: regionName})
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -138,64 +194,35 @@ func (r *Client) Connect() (err error) {
 	return
 }
 
-// Username.
-func (r *Client) username() string {
-	if username, found := r.Secret.Data["username"]; found {
-		return string(username)
-	}
-	return ""
-}
-
-// Password.
-func (r *Client) password() string {
-	if password, found := r.Secret.Data["password"]; found {
-		return string(password)
-	}
-	return ""
-}
-
-// Project Name
-func (r *Client) projectName() string {
-	if projectName, found := r.Secret.Data["projectName"]; found {
-		return string(projectName)
-	}
-	return ""
-}
-
-// Domain Name
-func (r *Client) domainName() string {
-	if domainName, found := r.Secret.Data["domainName"]; found {
-		return string(domainName)
-	}
-	return ""
-}
-
-// Region
-func (r *Client) region() string {
-	if region, found := r.Secret.Data["regionName"]; found {
-		return string(region)
-	}
-	return ""
-}
-
-// CA Certificate
-func (r *Client) cacert() string {
-	if cacert, found := r.Secret.Data["cacert"]; found {
-		return string(cacert)
-	}
-	return ""
-}
-
 // insecureSkipVerify
 func (r *Client) insecureSkipVerify() bool {
-	if insecureSkipVerifyStr, found := r.Secret.Data["insecureSkipVerify"]; found {
-		insecureSkipVerify, err := strconv.ParseBool(string(insecureSkipVerifyStr))
+	if configuredInsecureSkipVerify := r.getSecretString(InsecureSkipVerify); configuredInsecureSkipVerify != "" {
+		insecureSkipVerify, err := strconv.ParseBool(configuredInsecureSkipVerify)
 		if err != nil {
 			return false
 		}
 		return insecureSkipVerify
 	}
 	return false
+}
+
+// AuthType.
+func (r *Client) authType() (authType clientconfig.AuthType, err error) {
+	if configuredAuthType := r.getSecretString(AuthType); configuredAuthType == "" {
+		authType = clientconfig.AuthPassword
+	} else if supportedAuthType, found := supportedAuthTypes[configuredAuthType]; found {
+		authType = supportedAuthType
+	} else {
+		err = liberr.New("unsupported authentication type", "authType", configuredAuthType)
+	}
+	return
+}
+
+func (r *Client) getSecretString(key string) string {
+	if value, found := r.Secret.Data[key]; found {
+		return string(value)
+	}
+	return ""
 }
 
 // List Servers.
@@ -218,7 +245,7 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 		var instanceList []Region
 		for _, region := range regionList {
 			// TODO implement support multiple regions/projects sync per user
-			if region.ID == r.region() {
+			if region.ID == r.getSecretString(RegionName) {
 				instanceList = append(instanceList, Region{region})
 			}
 		}
@@ -229,7 +256,7 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 		object := object.(*[]Project)
 		// TODO implement support multiple regions/projects sync per user
 		opts := listopts.(*ProjectListOpts)
-		opts.Name = r.projectName()
+		opts.Name = r.getSecretString(ProjectName)
 		allPages, err = projects.List(r.identityService, opts).AllPages()
 		if err != nil {
 			if !r.isForbidden(err) {
@@ -584,7 +611,7 @@ func (r *Client) getUserProjects() (userProjects []Project, err error) {
 	}
 	for _, project := range projectList {
 		// TODO implement support multiple regions/projects sync per user
-		if project.Name == r.projectName() {
+		if project.Name == r.getSecretString(ProjectName) {
 			userProjects = append(userProjects, Project{project})
 		}
 	}
