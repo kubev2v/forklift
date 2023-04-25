@@ -1,6 +1,7 @@
 package v1beta1
 
 import (
+	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -23,6 +24,8 @@ type OpenstackVolumePopulatorSpec struct {
 	IdentityURL string `json:"identityUrl"`
 	SecretName  string `json:"secretName"`
 	ImageID     string `json:"imageId"`
+	// The network attachment definition that should be used for disk transfer.
+	TransferNetwork *core.ObjectReference `json:"transferNetwork,omitempty"`
 }
 
 type OpenstackVolumePopulatorStatus struct {
