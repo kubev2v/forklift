@@ -266,6 +266,13 @@ func (r *Fault) ApplyTo(m *model.Fault) {
 	m.Message = r.Message
 }
 
+func (r *Fault) equalsTo(m *model.Fault) bool {
+	return m.Code == r.Code &&
+		m.Created == r.Created &&
+		m.Details == r.Details &&
+		m.Message == r.Message
+}
+
 type VM struct {
 	servers.Server
 }
@@ -325,8 +332,60 @@ func (r *VM) addAttachedVolumes(m *model.VM) {
 	}
 }
 
-func (r *VM) updatedAfter(m *model.VM) bool {
-	return r.Updated.After(m.Updated)
+func (r *VM) equalAttachedVolumes(m *model.VM) bool {
+	if len(r.AttachedVolumes) != len(m.AttachedVolumes) {
+		return false
+	}
+	for _, rAttachedVolume := range r.AttachedVolumes {
+		found := false
+		attachedVolume := &AttachedVolume{rAttachedVolume}
+		for _, mAttachedVolume := range m.AttachedVolumes {
+			if attachedVolume.equalsTo(&mAttachedVolume) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+func (r *VM) equalsTo(m *model.VM) bool {
+	imageID, _ := r.Image["id"].(string)
+	if m.ImageID != imageID {
+		return false
+	}
+	flavorID, _ := r.Flavor["id"].(string)
+	if m.FlavorID != flavorID {
+		return false
+	}
+	f := &Fault{r.Fault}
+	if !f.equalsTo(&m.Fault) {
+		return false
+	}
+	if !r.equalAttachedVolumes(m) {
+		return false
+	}
+	return m.Name == r.Name &&
+		m.ID == r.ID &&
+		m.TenantID == r.TenantID &&
+		m.UserID == r.UserID &&
+		m.Updated.Equal(r.Updated) &&
+		m.Created.Equal(r.Created) &&
+		m.HostID == r.HostID &&
+		m.Status == r.Status &&
+		m.Progress == r.Progress &&
+		m.AccessIPv4 == r.AccessIPv4 &&
+		m.AccessIPv6 == r.AccessIPv6 &&
+		reflect.DeepEqual(m.Addresses, r.Addresses) &&
+		reflect.DeepEqual(m.Metadata, r.Metadata) &&
+		m.KeyName == r.KeyName &&
+		m.AdminPass == r.AdminPass &&
+		reflect.DeepEqual(m.SecurityGroups, r.SecurityGroups) &&
+		reflect.DeepEqual(m.Tags, r.Tags) &&
+		reflect.DeepEqual(m.ServerGroups, r.ServerGroups)
 }
 
 type AttachedVolume struct {
@@ -335,6 +394,10 @@ type AttachedVolume struct {
 
 func (r *AttachedVolume) ApplyTo(m *model.AttachedVolume) {
 	m.ID = r.ID
+}
+
+func (r *AttachedVolume) equalsTo(m *model.AttachedVolume) bool {
+	return m.ID == r.ID
 }
 
 type Network struct {
