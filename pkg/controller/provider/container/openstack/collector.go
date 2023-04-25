@@ -327,7 +327,7 @@ func (r *Collector) refresh(ctx *Context) (err error) {
 		}
 	}
 	r.log.Info(
-		"Initial Parity.",
+		"Refresh finished.",
 		"duration",
 		time.Since(mark))
 	return
