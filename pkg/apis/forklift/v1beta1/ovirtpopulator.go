@@ -1,6 +1,7 @@
 package v1beta1
 
 import (
+	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -20,9 +21,10 @@ type OvirtVolumePopulator struct {
 }
 
 type OvirtVolumePopulatorSpec struct {
-	EngineURL        string `json:"engineUrl"`
-	EngineSecretName string `json:"engineSecretName"`
-	DiskID           string `json:"diskId"`
+	EngineURL        string                `json:"engineUrl"`
+	EngineSecretName string                `json:"engineSecretName"`
+	DiskID           string                `json:"diskId"`
+	TransferNetwork  *core.ObjectReference `json:"transferNetwork,omitempty"`
 }
 
 type OvirtVolumePopulatorStatus struct {
