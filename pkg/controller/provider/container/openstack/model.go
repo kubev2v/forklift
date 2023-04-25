@@ -516,7 +516,7 @@ func (r *VMAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 					}
 					return
 				}
-				if !vm.updatedAfter(m) {
+				if vm.equalsTo(m) {
 					return
 				}
 				vm.ApplyTo(m)
