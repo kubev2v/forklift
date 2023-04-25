@@ -613,7 +613,7 @@ func (r *KubeVirt) createVolumesForOvirt(vm ref.Ref) (pvcNames []string, err err
 
 	storageName := &r.Context.Map.Storage.Spec.Map[0].Destination.StorageClass
 	for _, da := range ovirtVm.DiskAttachments {
-		populatorCr := r.OvirtVolumePopulator(da, sourceUrl, secret.Name)
+		populatorCr := r.OvirtVolumePopulator(da, sourceUrl, r.Plan.Spec.TransferNetwork, secret.Name)
 		failure := r.Client.Create(context.Background(), populatorCr, &client.CreateOptions{})
 		if failure != nil && !k8serr.IsAlreadyExists(failure) {
 			return nil, failure
@@ -713,7 +713,7 @@ func (r *KubeVirt) setKvmOnPodSpec(podSpec *core.PodSpec) {
 }
 
 // Build an OvirtVolumePopulator for XDiskAttachment and source URL
-func (r *KubeVirt) OvirtVolumePopulator(da ovirt.XDiskAttachment, sourceUrl *url.URL, secretName string) *v1beta1.OvirtVolumePopulator {
+func (r *KubeVirt) OvirtVolumePopulator(da ovirt.XDiskAttachment, sourceUrl *url.URL, transferNetwork *core.ObjectReference, secretName string) *v1beta1.OvirtVolumePopulator {
 	return &v1beta1.OvirtVolumePopulator{
 		ObjectMeta: meta.ObjectMeta{
 			Name:      da.DiskAttachment.ID,
@@ -723,6 +723,7 @@ func (r *KubeVirt) OvirtVolumePopulator(da ovirt.XDiskAttachment, sourceUrl *url
 			EngineURL:        fmt.Sprintf("https://%s", sourceUrl.Host),
 			EngineSecretName: secretName,
 			DiskID:           da.Disk.ID,
+			TransferNetwork:  transferNetwork,
 		},
 	}
 }
@@ -1794,7 +1795,12 @@ func (r *KubeVirt) createOpenStackVolumes(vm ref.Ref) (pvcNames []string, err er
 				return
 			}
 
-			populatorCr := openstackutil.OpenstackVolumePopulator(image, sourceUrl, r.Plan.Spec.TargetNamespace, secret.Name, r.Migration.Name)
+			if image.Status != "active" {
+				r.Log.Info("Image is not active yet", "image", image.Name)
+				continue
+			}
+
+			populatorCr := openstackutil.OpenstackVolumePopulator(image, sourceUrl, r.Plan.Spec.TransferNetwork, r.Plan.Spec.TargetNamespace, secret.Name, r.Migration.Name)
 			err = r.Client.Create(context.TODO(), populatorCr, &client.CreateOptions{})
 			if k8serr.IsAlreadyExists(err) {
 				err = nil

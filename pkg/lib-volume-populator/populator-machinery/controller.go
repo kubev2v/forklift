@@ -75,6 +75,7 @@ const (
 	reasonPodFinished        = "PopulatorFinished"
 	reasonPVCCreationError   = "PopulatorPVCCreationError"
 	reasonPopulatorProgress  = "PopulatorProgress"
+	AnnDefaultNetwork        = "v1.multus-cni.io/default-network"
 
 	qemuGroup = 107
 )
@@ -476,8 +477,8 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 		return nil
 	}
 
-	var unstructured *unstructured.Unstructured
-	unstructured, err = c.unstLister.Namespace(pvc.Namespace).Get(dataSourceRef.Name)
+	var crInstance *unstructured.Unstructured
+	crInstance, err = c.unstLister.Namespace(pvc.Namespace).Get(dataSourceRef.Name)
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return err
@@ -492,7 +493,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 	}
 
 	// Set the args for the populator pod
-	args, err := c.populatorArgs(rawBlock, unstructured)
+	args, err := c.populatorArgs(rawBlock, crInstance)
 	if err != nil {
 		return err
 	}
@@ -576,11 +577,22 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 
 		// If the pod doesn't exist yet, create it
 		if pod == nil {
+			transferNetwork, found, err := unstructured.NestedStringMap(crInstance.Object, "spec", "transferNetwork")
+			if err != nil {
+				return err
+			}
+			annotations := make(map[string]string)
+			if found {
+				// Join the transfer network namespace and name
+				annotations[AnnDefaultNetwork] = fmt.Sprintf("%s/%s", transferNetwork["namespace"], transferNetwork["name"])
+			}
+
 			// Make the pod
 			pod = &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      podName,
-					Namespace: populatorNamespace,
+					Name:        podName,
+					Namespace:   populatorNamespace,
+					Annotations: annotations,
 				},
 				Spec: makePopulatePodSpec(pvcPrimeName, secretName),
 			}
@@ -653,7 +665,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 					go func() {
 						c.recorder.Eventf(pod, corev1.EventTypeWarning, reasonPopulatorProgress, "Starting to monitor progress for PVC %s", pvc.Name)
 						for {
-							c.updateProgress(pvc, pod.Status.PodIP, unstructured)
+							c.updateProgress(pvc, pod.Status.PodIP, crInstance)
 							pod, err = c.podLister.Pods(populatorNamespace).Get(pod.Name)
 							if err != nil {
 								break

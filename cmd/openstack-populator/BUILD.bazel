@@ -9,6 +9,7 @@ go_library(
         "//vendor/github.com/gophercloud/gophercloud",
         "//vendor/github.com/gophercloud/gophercloud/openstack",
         "//vendor/github.com/gophercloud/gophercloud/openstack/imageservice/v2/imagedata",
+        "//vendor/github.com/gophercloud/utils/openstack/clientconfig",
         "//vendor/github.com/prometheus/client_golang/prometheus",
         "//vendor/github.com/prometheus/client_golang/prometheus/promhttp",
         "//vendor/k8s.io/klog/v2:klog",
