@@ -508,19 +508,15 @@ func (r *VMAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 				m := &model.VM{
 					Base: model.Base{ID: vm.ID},
 				}
-				err = tx.Get(m)
-				if err != nil {
+				if err = tx.Get(m); err != nil {
 					if errors.Is(err, libmodel.NotFound) {
 						vm.ApplyTo(m)
 						err = tx.Insert(m)
 					}
-					return
+				} else if !vm.equalsTo(m) {
+					vm.ApplyTo(m)
+					err = tx.Update(m)
 				}
-				if vm.equalsTo(m) {
-					return
-				}
-				vm.ApplyTo(m)
-				err = tx.Update(m)
 				return
 			}
 			updates = append(updates, updater)
