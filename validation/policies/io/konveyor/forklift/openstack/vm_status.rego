@@ -1,16 +1,14 @@
 package io.konveyor.forklift.openstack
 
+import future.keywords.if
+
 default valid_status_string = false
 
 default legal_vm_status = false
 
-valid_status_string {
-	is_string(input.status)
-}
+valid_status_string if is_string(input.status)
 
-legal_vm_status {
-	regex.match(`ACTIVE|SHUTOFF`, input.status)
-}
+legal_vm_status if regex.match(`ACTIVE|SHUTOFF`, input.status)
 
 concerns[flag] {
 	valid_status_string

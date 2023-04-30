@@ -1,11 +1,10 @@
 package io.konveyor.forklift.openstack
 
+import future.keywords.if
 
 default has_boot_menu_enabled = false
 
-has_boot_menu_enabled {
-	input.image.properties.hw_boot_menu == "true"
-}
+has_boot_menu_enabled if input.image.properties.hw_boot_menu == "true"
 
 concerns[flag] {
 	has_boot_menu_enabled
