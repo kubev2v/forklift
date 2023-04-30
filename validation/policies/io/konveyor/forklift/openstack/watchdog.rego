@@ -1,14 +1,13 @@
 package io.konveyor.forklift.openstack
 
+import future.keywords.if
+import future.keywords.in
+
 default has_watchdog_enabled = false
 
-has_watchdog_enabled {
-	input.flavor.extraSpecs["hw:watchdog_action"]
-}
+has_watchdog_enabled if "hw:watchdog_action" in object.keys(input.flavor.extraSpecs)
 
-has_watchdog_enabled {
-	input.image.properties.hw_watchdog_action
-}
+has_watchdog_enabled if input.image.properties.hw_watchdog_action
 
 concerns[flag] {
 	has_watchdog_enabled

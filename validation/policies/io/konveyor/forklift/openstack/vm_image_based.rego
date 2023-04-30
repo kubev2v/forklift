@@ -1,8 +1,10 @@
 package io.konveyor.forklift.openstack
 
-image_based_vm {
-	input.imageID != ""
-}
+import future.keywords.if
+
+default image_based_vm = false
+
+image_based_vm if input.imageID != ""
 
 concerns[flag] {
 	image_based_vm

@@ -1,14 +1,12 @@
 package io.konveyor.forklift.openstack
 
+import future.keywords.if
+
 default secure_boot_enabled = false
 
-secure_boot_enabled {
-	input.image.properties.os_secure_boot == "required"
-}
+secure_boot_enabled if input.image.properties.os_secure_boot == "required"
 
-secure_boot_enabled {
-	input.flavor.extraSpecs["os:secure_boot"] == "required"
-}
+secure_boot_enabled if input.flavor.extraSpecs["os:secure_boot"] == "required"
 
 concerns[flag] {
 	secure_boot_enabled
