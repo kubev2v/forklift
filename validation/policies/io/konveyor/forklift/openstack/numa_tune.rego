@@ -1,14 +1,13 @@
 package io.konveyor.forklift.openstack
 
+import future.keywords.if
+import future.keywords.in
+
 default has_numa_enabled = false
 
-has_numa_enabled {
-	input.flavor.extraSpecs["hw:pci_numa_affinity_policy"]
-}
+has_numa_enabled if "hw:pci_numa_affinity_policy" in object.keys(input.flavor.extraSpecs)
 
-has_numa_enabled {
-	input.flavor.extraSpecs["hw:numa_nodes"]
-}
+has_numa_enabled if "hw:numa_nodes" in object.keys(input.flavor.extraSpecs)
 
 concerns[flag] {
 	has_numa_enabled

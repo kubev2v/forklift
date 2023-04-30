@@ -1,10 +1,11 @@
 package io.konveyor.forklift.openstack
 
+import future.keywords.if
+import future.keywords.in
+
 default host_devices = false
 
-host_devices {
-	input.flavor.extraSpecs["pci_passthrough:alias"]
-}
+host_devices if "pci_passthrough:alias" in object.keys(input.flavor.extraSpecs)
 
 concerns[flag] {
 	host_devices
