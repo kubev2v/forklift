@@ -2,7 +2,6 @@ package plan
 
 import (
 	"context"
-	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"math/rand"
@@ -327,17 +326,10 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) (err error) {
 
 	for _, pvc := range pvcs {
 		ownerRefs := []meta.OwnerReference{vmOwnerReference(virtualMachine)}
-		patch := map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"ownerReferences": ownerRefs,
-			},
-		}
-		patchBytes, patchErr := json.Marshal(patch)
-		if patchErr != nil {
-			err = liberr.Wrap(patchErr)
-			return
-		}
-		err = r.Client.Patch(context.TODO(), &pvc, client.RawPatch(types.MergePatchType, patchBytes))
+		pvcCopy := pvc.DeepCopy()
+		pvc.OwnerReferences = ownerRefs
+		patch := client.MergeFrom(pvcCopy)
+		err = r.Client.Patch(context.TODO(), &pvc, patch)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
@@ -349,8 +341,10 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) (err error) {
 				err = liberr.Wrap(err)
 				return
 			}
-			populatorCr.SetOwnerReferences(ownerRefs)
-			err = r.Destination.Client.Update(context.TODO(), &populatorCr)
+			crCopy := populatorCr.DeepCopy()
+			populatorCr.OwnerReferences = ownerRefs
+			patch = client.MergeFrom(crCopy)
+			err = r.Destination.Client.Patch(context.TODO(), &populatorCr, patch)
 			if err != nil {
 				err = liberr.Wrap(err)
 				return
