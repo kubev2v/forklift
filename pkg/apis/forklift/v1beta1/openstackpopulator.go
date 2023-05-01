@@ -21,9 +21,10 @@ type OpenstackVolumePopulator struct {
 }
 
 type OpenstackVolumePopulatorSpec struct {
-	IdentityURL     string                `json:"identityUrl"`
-	SecretName      string                `json:"secretName"`
-	ImageID         string                `json:"imageId"`
+	IdentityURL string `json:"identityUrl"`
+	SecretName  string `json:"secretName"`
+	ImageID     string `json:"imageId"`
+	// The network attachment definition that should be used for disk transfer.
 	TransferNetwork *core.ObjectReference `json:"transferNetwork,omitempty"`
 }
 

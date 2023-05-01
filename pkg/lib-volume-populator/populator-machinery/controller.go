@@ -577,15 +577,14 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 
 		// If the pod doesn't exist yet, create it
 		if pod == nil {
-			transferNetwork, found, err := unstructured.NestedFieldNoCopy(crInstance.Object, "spec", "transferNetwork")
+			transferNetwork, found, err := unstructured.NestedStringMap(crInstance.Object, "spec", "transferNetwork")
 			if err != nil {
 				return err
 			}
 			annotations := make(map[string]string)
 			if found {
-				transferNetworkMap := transferNetwork.(map[string]interface{})
 				// Join the transfer network namespace and name
-				annotations[AnnDefaultNetwork] = fmt.Sprintf("%s/%s", transferNetworkMap["namespace"], transferNetworkMap["name"])
+				annotations[AnnDefaultNetwork] = fmt.Sprintf("%s/%s", transferNetwork["namespace"], transferNetwork["name"])
 			}
 
 			// Make the pod
