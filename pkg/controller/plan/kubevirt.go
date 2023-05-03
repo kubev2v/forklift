@@ -1795,11 +1795,6 @@ func (r *KubeVirt) createOpenStackVolumes(vm ref.Ref) (pvcNames []string, err er
 				return
 			}
 
-			if image.Status != "active" {
-				r.Log.Info("Image is not active yet", "image", image.Name)
-				continue
-			}
-
 			populatorCr := openstackutil.OpenstackVolumePopulator(image, sourceUrl, r.Plan.Spec.TransferNetwork, r.Plan.Spec.TargetNamespace, secret.Name, r.Migration.Name)
 			err = r.Client.Create(context.TODO(), populatorCr, &client.CreateOptions{})
 			if k8serr.IsAlreadyExists(err) {
