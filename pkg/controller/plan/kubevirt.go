@@ -36,6 +36,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	"github.com/pkg/errors"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -619,7 +620,7 @@ func (r *KubeVirt) createVolumesForOvirt(vm ref.Ref) (pvcNames []string, err err
 			return nil, failure
 		}
 
-		accessModes, volumeMode, failure := r.getStorageProfileModes(*storageName)
+		accessModes, volumeMode, failure := r.getDefaultVolumeAndAccessMode(*storageName)
 		if failure != nil {
 			return nil, failure
 		}
@@ -762,40 +763,27 @@ func (r *KubeVirt) areOvirtPVCsReady(vm ref.Ref, step *plan.Step) (ready bool, e
 
 var filesystemMode = core.PersistentVolumeFilesystem
 
-// Return storage profile access mode based on storage class
-func (r *KubeVirt) getStorageProfileModes(storageName string) (accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode, err error) {
-	storageProfileList := &cdi.StorageProfileList{}
-	err = r.Client.List(context.TODO(), storageProfileList)
+// Using CDI logic to set the Volume mode and Access mode of the PVC - https://github.com/kubevirt/containerized-data-importer/blob/v1.56.0/pkg/controller/datavolume/util.go#L154
+func (r *KubeVirt) getDefaultVolumeAndAccessMode(storageName string) ([]core.PersistentVolumeAccessMode, *core.PersistentVolumeMode, error) {
+	storageProfile := &cdi.StorageProfile{}
+	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: storageName}, storageProfile)
 	if err != nil {
-		return
+		return nil, nil, liberr.Wrap(err, "cannot get StorageProfile")
 	}
-	for i := range storageProfileList.Items {
-		storageProfile := &storageProfileList.Items[i]
-		if storageProfile.Name == storageName {
-			for _, claimProperty := range storageProfile.Status.ClaimPropertySets {
-				volumeMode = claimProperty.VolumeMode
-				if volumeMode != nil && *volumeMode == core.PersistentVolumeBlock {
-					// Preferring Block volume mode
-					break
-				}
-			}
-			if volumeMode == nil {
-				// volumeMode is an optional API parameter. Filesystem is the default mode used when volumeMode parameter is omitted.
-				volumeMode = &filesystemMode
-			}
-			for _, claimProperty := range storageProfile.Status.ClaimPropertySets {
-				claimPropertyVolumeMode := claimProperty.VolumeMode
-				if claimPropertyVolumeMode == nil {
-					claimPropertyVolumeMode = &filesystemMode
-				}
-				if *claimPropertyVolumeMode == *volumeMode {
-					accessModes = append(accessModes, claimProperty.AccessModes...)
-				}
-			}
-			break
+
+	if len(storageProfile.Status.ClaimPropertySets) > 0 &&
+		len(storageProfile.Status.ClaimPropertySets[0].AccessModes) > 0 {
+		accessModes := storageProfile.Status.ClaimPropertySets[0].AccessModes
+		volumeMode := storageProfile.Status.ClaimPropertySets[0].VolumeMode
+		if volumeMode == nil {
+			// volumeMode is an optional API parameter. Filesystem is the default mode used when volumeMode parameter is omitted.
+			volumeMode = &filesystemMode
 		}
+		return accessModes, volumeMode, nil
 	}
-	return
+
+	// no accessMode configured on storageProfile
+	return nil, nil, errors.Errorf("no accessMode defined on StorageProfile for %s StorageClass", storageName)
 }
 
 // Return true when the import is done with OvirtVolumePopulator
@@ -1803,7 +1791,7 @@ func (r *KubeVirt) createOpenStackVolumes(vm ref.Ref) (pvcNames []string, err er
 				err = liberr.Wrap(err)
 				return
 			}
-			accessModes, volumeMode, failure := r.getStorageProfileModes(storageName)
+			accessModes, volumeMode, failure := r.getDefaultVolumeAndAccessMode(storageName)
 			if failure != nil {
 				return nil, failure
 			}
