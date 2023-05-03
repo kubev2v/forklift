@@ -9,6 +9,6 @@ concerns[flag] {
     flag := {
         "category": "Warning",
         "label": "UEFI detected",
-        "assessment": "UEFI secure boot will be disabled on Openshift Virtualization. If the VM was set with UEFI secure boot, manual steps within the guest would be needed for the guest operating system to boot."
+        "assessment": "UEFI secure boot will be disabled on OpenShift Virtualization. If the VM was set with UEFI secure boot, manual steps within the guest would be needed for the guest operating system to boot."
     }
 }
