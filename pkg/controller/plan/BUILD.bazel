@@ -39,6 +39,7 @@ go_library(
         "//vendor/github.com/openshift/api/template/v1:template",
         "//vendor/github.com/openshift/library-go/pkg/template/generator",
         "//vendor/github.com/openshift/library-go/pkg/template/templateprocessing",
+        "//vendor/github.com/pkg/errors",
         "//vendor/github.com/prometheus/client_golang/prometheus",
         "//vendor/github.com/prometheus/client_golang/prometheus/promauto",
         "//vendor/gopkg.in/yaml.v2:yaml_v2",
