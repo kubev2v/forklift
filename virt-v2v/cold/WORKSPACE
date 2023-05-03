@@ -189,7 +189,7 @@ bazeldnf_dependencies()
 container_pull(
     name = "centos9",
     # 'tag' is also supported, but digest is encouraged for reproducibility.
-    digest = "sha256:5d4193b21043f8b98e9e1e5c39ca8945e7ed816b663febc6092f811f4514062c",  # built on 2023-05-01
+    digest = "sha256:40b2accec6e7ce1aa799610bac4a68cc378ad3dc0090ed57e984a2b119d92bd8",  # built on 2023-05-01
     registry = "quay.io",
     repository = "centos/centos",
 )
