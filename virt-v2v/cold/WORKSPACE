@@ -188,8 +188,11 @@ bazeldnf_dependencies()
 
 container_pull(
     name = "centos9",
-    # 'tag' is also supported, but digest is encouraged for reproducibility.
-    digest = "sha256:40b2accec6e7ce1aa799610bac4a68cc378ad3dc0090ed57e984a2b119d92bd8",  # built on 2023-05-01
+    # Here we prefer using tag over a digest. CentOS rebuilds images often and
+    # does not keep older images. That means we would need to update the digest
+    # regularly. Also the assumption about reproducible builds is dubious
+    # because of our use of container_run_and_extract() during build.
+    tag = "latest",
     registry = "quay.io",
     repository = "centos/centos",
 )
