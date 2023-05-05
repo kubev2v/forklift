@@ -330,7 +330,7 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) (err error) {
 		pvcCopy := pvc.DeepCopy()
 		pvc.OwnerReferences = ownerRefs
 		patch := client.MergeFrom(pvcCopy)
-		err = r.Client.Patch(context.TODO(), &pvc, patch)
+		err = r.Destination.Client.Patch(context.TODO(), &pvc, patch)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
