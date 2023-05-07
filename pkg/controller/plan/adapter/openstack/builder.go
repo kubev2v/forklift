@@ -930,7 +930,7 @@ func (r *Builder) PreTransferActions(c planbase.Client, vmRef ref.Ref) (ready bo
 			err = liberr.Wrap(
 				err,
 				"Failed to create snapshot.",
-				"volume",
+				"volumeID",
 				av.ID)
 			return true, err
 		}
@@ -945,7 +945,12 @@ func (r *Builder) PreTransferActions(c planbase.Client, vmRef ref.Ref) (ready bo
 		}
 
 		if snapshot.Status == "error" {
-			r.Log.Error(err, "Failed to create snapshot")
+			err = liberr.Wrap(
+				err,
+				"Failed to create snapshot, snapshot is in error state",
+				"volumeID",
+				snapshot.VolumeID)
+
 			return true, err
 		}
 
@@ -988,8 +993,8 @@ func (r *Builder) PreTransferActions(c planbase.Client, vmRef ref.Ref) (ready bo
 		if err != nil {
 			err = liberr.Wrap(
 				err,
-				"Failed to create snapshot.",
-				"volume",
+				"Failed to create volume from snapshot.",
+				"volumeID",
 				volume.ID)
 			return true, err
 		}
@@ -1003,7 +1008,11 @@ func (r *Builder) PreTransferActions(c planbase.Client, vmRef ref.Ref) (ready bo
 		}
 
 		if volume.Status == "error" {
-			r.Log.Error(err, "Failed to create snapshot")
+			err = liberr.Wrap(
+				err,
+				"Failed to create volume from snapshot, volume is in error state",
+				"volumeID",
+				volume.ID)
 			return true, err
 		}
 
