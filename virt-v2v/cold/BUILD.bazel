@@ -42,7 +42,7 @@ container_run_and_extract(
         "tar -cvf /libguestfs-appliance.tar /usr/lib64/guestfs/appliance",
     ],
     extract_file = "/libguestfs-appliance.tar",
-    image = "@centos9//image",
+    image = "@centos-stream-9//image",
 )
 
 container_image(

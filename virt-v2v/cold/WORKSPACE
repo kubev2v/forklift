@@ -187,12 +187,12 @@ load("@bazeldnf//:deps.bzl", "bazeldnf_dependencies", "rpm")
 bazeldnf_dependencies()
 
 container_pull(
-    name = "centos9",
+    name = "centos-stream-9",
     # Here we prefer using tag over a digest. CentOS rebuilds images often and
     # does not keep older images. That means we would need to update the digest
     # regularly. Also the assumption about reproducible builds is dubious
     # because of our use of container_run_and_extract() during build.
-    tag = "latest",
+    tag = "stream9",
     registry = "quay.io",
     repository = "centos/centos",
 )
