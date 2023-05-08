@@ -80,7 +80,7 @@ genrule(
     cmd = """
         cd operator;
         export DATE=$$(date +%Y-%m-%dT%H:%M:%SZ);
-        ../$(location :kustomize_bin) build config/manifests --load_restrictor LoadRestrictionsNone | envsubst | ../$(location @operator-sdk//file) generate bundle -q --overwrite --extra-service-accounts forklift-controller --version $${VERSION} --output-dir ../$(RULEDIR)/bundle --channels=$${CHANNELS} --default-channel=$${DEFAULT_CHANNEL}
+        ../$(location :kustomize_bin) build config/manifests --load_restrictor LoadRestrictionsNone | envsubst | ../$(location @operator-sdk//file) generate bundle -q --overwrite --extra-service-accounts forklift-controller,forklift-api --version $${VERSION} --output-dir ../$(RULEDIR)/bundle --channels=$${CHANNELS} --default-channel=$${DEFAULT_CHANNEL}
     """,
 )
 
