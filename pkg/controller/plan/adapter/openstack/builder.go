@@ -169,8 +169,8 @@ const (
 	VifModelVirtualE1000   = "VirtualE1000"
 	VifModelVirtualE1000e  = "VirtualE1000e"
 	VifModelVirtualPcnet32 = "VirtualPCNet32"
-	VifModelVirtualVmxNet  = "VirtualVmxNet"
-	VifModelVirtualVmxNet3 = "VirtualVmxNet3"
+	VifModelVirtualVmxnet  = "VirtualVmxnet"
+	VifModelVirtualVmxnet3 = "VirtualVmxnet3"
 	//Xen
 	VifModelNetfront = "netfront"
 )
@@ -591,18 +591,21 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 				kInterface := cnv.Interface{
 					Name: networkName,
 				}
-				interfaceModel := DefaultProperties[VifModel]
+				var interfaceModel string
+				vifModel := DefaultProperties[VifModel]
 				if imageVIFModel, ok := vm.Image.Properties[VifModel]; ok {
-					interfaceModel = imageVIFModel.(string)
+					vifModel = imageVIFModel.(string)
 				}
-				switch interfaceModel {
+				switch vifModel {
 				case VifModelVirtualE1000:
 					interfaceModel = VifModelE1000
 				case VifModelVirtualE1000e:
-					interfaceModel = VifModelVirtualE1000e
+					interfaceModel = VifModelE1000e
 				case VifModelVirtualPcnet32:
 					interfaceModel = VifModelPcnet
-				case VifModelVirtualVmxNet, VifModelVirtualVmxNet3, VifModelVmxnet3, VifModelNetfront:
+				case VifModelE1000, VifModelE1000e, VifModelNe2kpci, VifModelPcnet, VifModelRtl8139, VifModelVirtio:
+					interfaceModel = vifModel
+				default:
 					interfaceModel = DefaultProperties[VifModel]
 				}
 				kInterface.Model = interfaceModel
