@@ -41,6 +41,7 @@ type Client struct {
 
 // Create a VM snapshot and return its ID.
 func (r *Client) CreateSnapshot(vmRef ref.Ref) (id string, err error) {
+	r.Log.V(1).Info("Creating snapshot", "vmRef", vmRef)
 	vm, err := r.getVM(vmRef)
 	if err != nil {
 		return
@@ -56,6 +57,7 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref) (id string, err error) {
 		return
 	}
 	id = res.Result.(types.ManagedObjectReference).Value
+	r.Log.Info("Created snapshot", "vmRef", vmRef, "id", id)
 
 	return
 }
@@ -67,6 +69,11 @@ func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool,
 
 // Remove all warm migration snapshots.
 func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy) (err error) {
+
+	r.Log.V(1).Info("RemoveSnapshot",
+		"vmRef", vmRef,
+		"precopies", precopies,
+		"incremental", settings.Settings.VsphereIncrementalBackup)
 	if len(precopies) == 0 {
 		return
 	}
@@ -90,6 +97,14 @@ func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, data
 	if n >= 2 {
 		previous = precopies[n-2].Snapshot
 	}
+
+	r.Log.V(1).Info("SetCheckpoint",
+		"vmRef", vmRef,
+		"precopies", precopies,
+		"datavolumes", datavolumes,
+		"final", final,
+		"current", current,
+		"previous", previous)
 
 	if settings.Settings.VsphereIncrementalBackup && previous != "" {
 		var changeIds map[string]string
@@ -290,6 +305,11 @@ func (r *Client) getVM(vmRef ref.Ref) (vsphereVm *object.VirtualMachine, err err
 
 // Remove a VM snapshot and optionally its children.
 func (r *Client) removeSnapshot(vmRef ref.Ref, snapshot string, children bool) (err error) {
+	r.Log.Info("Removing snapshot",
+		"vmRef", vmRef,
+		"snapshot", snapshot,
+		"children", children)
+
 	vm, err := r.getVM(vmRef)
 	if err != nil {
 		return
