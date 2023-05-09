@@ -1527,22 +1527,13 @@ func (r *Migration) updateConversionProgressEl9(pod *core.Pod, step *plan.Step) 
 }
 
 func (r *Migration) setDataVolumeCheckpoints(vm *plan.VMStatus) (err error) {
-	if r.vmMap == nil {
-		r.vmMap, err = r.kubevirt.VirtualMachineMap()
-		if err != nil {
-			return
-		}
-	}
-	var vmCr VirtualMachine
-	found := false
-	if vmCr, found = r.vmMap[vm.ID]; !found {
-		vmCr.DataVolumes, err = r.kubevirt.getDVs(vm)
+	disks, err := r.kubevirt.getDVs(vm)
+	if err != nil {
 		return
 	}
 	dvs := make([]cdi.DataVolume, 0)
-	for i := range vmCr.DataVolumes {
-		dv := vmCr.DataVolumes[i].DataVolume
-		dvs = append(dvs, *dv)
+	for _, disk := range disks {
+		dvs = append(dvs, *disk.DataVolume)
 	}
 	err = r.provider.SetCheckpoints(vm.Ref, vm.Warm.Precopies, dvs, vm.Phase == AddFinalCheckpoint)
 	if err != nil {
