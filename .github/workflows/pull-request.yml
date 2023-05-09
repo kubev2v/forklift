@@ -112,8 +112,8 @@ jobs:
             kubectl get openstackvolumepopulator -A >> /tmp/artifacts/k8s-openstackvolumepopulator.log
             kubectl logs -n konveyor-forklift $(kubectl get po -n konveyor-forklift  -o=name | grep openstack-populator) >> /tmp/artifacts/k8s-forklift-openstack-populator.log
             kubectl logs -n konveyor-forklift $(kubectl get po -n konveyor-forklift  -o=name | grep forklift-volume-populator) >> /tmp/artifacts/k8s-forklift-volume-populator-controller.log
+            kubectl exec -n konveyor-forklift $(kubectl get po -n konveyor-forklift  -o=name | grep packstack|cut -d/ -f2) -- journalctl -b0 >> /tmp/artifacts/k8s-packstack-journal.log
           fi
-          
           # export kind cluster full logs
           kind export logs /tmp/artifacts/kind-logs
 
