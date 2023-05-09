@@ -416,7 +416,12 @@ func (r *Migration) CleanUp(vm *plan.VMStatus) (err error) {
 		return
 	}
 	if vm.Warm != nil {
-		_ = r.provider.RemoveSnapshots(vm.Ref, vm.Warm.Precopies)
+		if errLocal := r.provider.RemoveSnapshots(vm.Ref, vm.Warm.Precopies); errLocal != nil {
+			r.Log.Error(
+				errLocal,
+				"Failed to clean up warm migration snapshots.",
+				"vm", vm)
+		}
 	}
 
 	return
