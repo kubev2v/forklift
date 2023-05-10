@@ -30,6 +30,10 @@ container_run_and_extract(
     commands = [
         "set -x",
         "dnf -y update",
+        # Latest glibc in CentOS Stream 9 causes QEMU in TCG emulation to fail
+        # to boot and leads to kernel panic. If it is installed revert to older
+        # version.
+        "( [ \\\"\\$(rpm -q glibc)\\\" == \\\"glibc-2.34-66.el9.x86_64\\\" ] && dnf -y downgrade glibc-2.34-65.el9.x86_64 || true )",
         "dnf -y install libguestfs libguestfs-appliance libguestfs-xfs libguestfs-winsupport qemu-img supermin",
         "depmod \\$(ls /lib/modules/ |tail -n1)",
         "export LIBGUESTFS_BACKEND=direct",
