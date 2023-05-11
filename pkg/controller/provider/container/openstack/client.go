@@ -48,6 +48,7 @@ const (
 	ProjectDomainName           = "projectDomainName"
 	ProjectDomainID             = "projectDomainID"
 	DomainName                  = "domainName"
+	DomainID                    = "domainID"
 	DefaultDomain               = "defaultDomain"
 	InsecureSkipVerify          = "insecureSkipVerify"
 	CACert                      = "cacert"
@@ -79,14 +80,15 @@ func (r *Client) Connect() (err error) {
 
 	authInfo := &clientconfig.AuthInfo{
 		AuthURL:           r.URL,
-		ProjectName:       r.getSecretString(ProjectName),
-		ProjectID:         r.getSecretString(ProjectID),
-		UserDomainName:    r.getSecretString(UserDomainName),
-		UserDomainID:      r.getSecretString(UserDomainID),
-		ProjectDomainName: r.getSecretString(ProjectDomainName),
-		ProjectDomainID:   r.getSecretString(ProjectDomainID),
-		DomainName:        r.getSecretString(DomainName),
-		DefaultDomain:     r.getSecretString(DefaultDomain),
+		ProjectName:       r.getStringFromSecret(ProjectName),
+		ProjectID:         r.getStringFromSecret(ProjectID),
+		UserDomainName:    r.getStringFromSecret(UserDomainName),
+		UserDomainID:      r.getStringFromSecret(UserDomainID),
+		ProjectDomainName: r.getStringFromSecret(ProjectDomainName),
+		ProjectDomainID:   r.getStringFromSecret(ProjectDomainID),
+		DomainName:        r.getStringFromSecret(DomainName),
+		DomainID:          r.getStringFromSecret(DomainID),
+		DefaultDomain:     r.getStringFromSecret(DefaultDomain),
 		AllowReauth:       true,
 	}
 
@@ -99,22 +101,23 @@ func (r *Client) Connect() (err error) {
 
 	switch authType {
 	case clientconfig.AuthPassword, clientconfig.AuthV3Password:
-		authInfo.Username = r.getSecretString(Username)
-		authInfo.UserID = r.getSecretString(UserID)
-		authInfo.Password = r.getSecretString(Password)
+		authInfo.Username = r.getStringFromSecret(Username)
+		authInfo.UserID = r.getStringFromSecret(UserID)
+		authInfo.Password = r.getStringFromSecret(Password)
 	case clientconfig.AuthToken, clientconfig.AuthV3Token:
-		authInfo.Token = r.getSecretString(Token)
+		authInfo.Token = r.getStringFromSecret(Token)
 	case clientconfig.AuthV3ApplicationCredential:
-		authInfo.ApplicationCredentialID = r.getSecretString(ApplicationCredentialID)
-		authInfo.ApplicationCredentialName = r.getSecretString(ApplicationCredentialName)
-		authInfo.ApplicationCredentialSecret = r.getSecretString(ApplicationCredentialSecret)
+		authInfo.Username = r.getStringFromSecret(Username)
+		authInfo.ApplicationCredentialID = r.getStringFromSecret(ApplicationCredentialID)
+		authInfo.ApplicationCredentialName = r.getStringFromSecret(ApplicationCredentialName)
+		authInfo.ApplicationCredentialSecret = r.getStringFromSecret(ApplicationCredentialSecret)
 	}
 
 	var TLSClientConfig *tls.Config
 	if r.insecureSkipVerify() {
 		TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	} else {
-		cacert := []byte(r.getSecretString(CACert))
+		cacert := []byte(r.getStringFromSecret(CACert))
 		roots := x509.NewCertPool()
 		ok := roots.AppendCertsFromPEM(cacert)
 		if !ok {
@@ -154,7 +157,7 @@ func (r *Client) Connect() (err error) {
 	}
 	r.provider = provider
 
-	regionName := r.getSecretString(RegionName)
+	regionName := r.getStringFromSecret(RegionName)
 
 	identityService, err := openstack.NewIdentityV3(r.provider, gophercloud.EndpointOpts{Region: regionName})
 	if err != nil {
@@ -196,7 +199,7 @@ func (r *Client) Connect() (err error) {
 
 // insecureSkipVerify
 func (r *Client) insecureSkipVerify() bool {
-	if configuredInsecureSkipVerify := r.getSecretString(InsecureSkipVerify); configuredInsecureSkipVerify != "" {
+	if configuredInsecureSkipVerify := r.getStringFromSecret(InsecureSkipVerify); configuredInsecureSkipVerify != "" {
 		insecureSkipVerify, err := strconv.ParseBool(configuredInsecureSkipVerify)
 		if err != nil {
 			return false
@@ -208,7 +211,7 @@ func (r *Client) insecureSkipVerify() bool {
 
 // AuthType.
 func (r *Client) authType() (authType clientconfig.AuthType, err error) {
-	if configuredAuthType := r.getSecretString(AuthType); configuredAuthType == "" {
+	if configuredAuthType := r.getStringFromSecret(AuthType); configuredAuthType == "" {
 		authType = clientconfig.AuthPassword
 	} else if supportedAuthType, found := supportedAuthTypes[configuredAuthType]; found {
 		authType = supportedAuthType
@@ -218,7 +221,7 @@ func (r *Client) authType() (authType clientconfig.AuthType, err error) {
 	return
 }
 
-func (r *Client) getSecretString(key string) string {
+func (r *Client) getStringFromSecret(key string) string {
 	if value, found := r.Secret.Data[key]; found {
 		return string(value)
 	}
@@ -245,7 +248,7 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 		var instanceList []Region
 		for _, region := range regionList {
 			// TODO implement support multiple regions/projects sync per user
-			if region.ID == r.getSecretString(RegionName) {
+			if region.ID == r.getStringFromSecret(RegionName) {
 				instanceList = append(instanceList, Region{region})
 			}
 		}
@@ -256,7 +259,7 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 		object := object.(*[]Project)
 		// TODO implement support multiple regions/projects sync per user
 		opts := listopts.(*ProjectListOpts)
-		opts.Name = r.getSecretString(ProjectName)
+		opts.Name = r.getStringFromSecret(ProjectName)
 		allPages, err = projects.List(r.identityService, opts).AllPages()
 		if err != nil {
 			if !r.isForbidden(err) {
@@ -611,7 +614,7 @@ func (r *Client) getUserProjects() (userProjects []Project, err error) {
 	}
 	for _, project := range projectList {
 		// TODO implement support multiple regions/projects sync per user
-		if project.Name == r.getSecretString(ProjectName) {
+		if project.Name == r.getStringFromSecret(ProjectName) {
 			userProjects = append(userProjects, Project{project})
 		}
 	}
