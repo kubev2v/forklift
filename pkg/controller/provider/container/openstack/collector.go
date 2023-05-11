@@ -109,7 +109,7 @@ func (r *Collector) HasParity() bool {
 
 // Test connect/logout.
 func (r *Collector) Test() (_ int, err error) {
-	err = r.client.Connect()
+	err = r.client.Authenticate()
 	return
 }
 
@@ -148,6 +148,10 @@ func (r *Collector) run(ctx *Context) (err error) {
 		r.phase)
 	switch r.phase {
 	case Started:
+		err = r.client.Connect()
+		if err != nil {
+			return
+		}
 		r.startTime = time.Now()
 		r.phase = Load
 	case Load:
@@ -200,10 +204,6 @@ func (r *Collector) Shutdown() {
 
 // Load the inventory.
 func (r *Collector) load(ctx *Context) (err error) {
-	err = r.connect()
-	if err != nil {
-		return
-	}
 	mark := time.Now()
 	for _, adapter := range adapterList {
 		if ctx.canceled() {
@@ -300,10 +300,6 @@ func (r *Collector) endWatch() {
 // can block or be slow.
 func (r *Collector) refresh(ctx *Context) (err error) {
 	var deletes, updates []Updater
-	err = r.connect()
-	if err != nil {
-		return
-	}
 	mark := time.Now()
 	for _, adapter := range adapterList {
 		if ctx.canceled() {
@@ -350,9 +346,4 @@ func (r *Collector) apply(changeSet []Updater) (err error) {
 	}
 	err = tx.Commit()
 	return
-}
-
-// Connect.
-func (r *Collector) connect() error {
-	return r.client.Connect()
 }
