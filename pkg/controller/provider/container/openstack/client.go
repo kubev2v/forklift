@@ -53,6 +53,7 @@ const (
 	DefaultDomain               = "defaultDomain"
 	InsecureSkipVerify          = "insecureSkipVerify"
 	CACert                      = "cacert"
+	EndpointAvailability        = "availability"
 )
 
 var supportedAuthTypes = map[string]clientconfig.AuthType{
@@ -164,37 +165,46 @@ func (r *Client) Connect() (err error) {
 	}
 	r.provider = provider
 
-	regionName := r.getStringFromSecret(RegionName)
+	availability := gophercloud.AvailabilityPublic
+	if a := r.getStringFromSecret(EndpointAvailability); a != "" {
+		availability = gophercloud.Availability(a)
 
-	identityService, err := openstack.NewIdentityV3(r.provider, gophercloud.EndpointOpts{Region: regionName})
+	}
+
+	endpointOpts := gophercloud.EndpointOpts{
+		Region:       r.getStringFromSecret(RegionName),
+		Availability: availability,
+	}
+
+	identityService, err := openstack.NewIdentityV3(r.provider, endpointOpts)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
 	r.identityService = identityService
 
-	computeService, err := openstack.NewComputeV2(r.provider, gophercloud.EndpointOpts{Region: regionName})
+	computeService, err := openstack.NewComputeV2(r.provider, endpointOpts)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
 	r.ComputeService = computeService
 
-	imageService, err := openstack.NewImageServiceV2(r.provider, gophercloud.EndpointOpts{Region: regionName})
+	imageService, err := openstack.NewImageServiceV2(r.provider, endpointOpts)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
 	r.ImageService = imageService
 
-	networkService, err := openstack.NewNetworkV2(r.provider, gophercloud.EndpointOpts{Region: regionName})
+	networkService, err := openstack.NewNetworkV2(r.provider, endpointOpts)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
 	r.NetworkService = networkService
 
-	blockStorageService, err := openstack.NewBlockStorageV3(r.provider, gophercloud.EndpointOpts{Region: regionName})
+	blockStorageService, err := openstack.NewBlockStorageV3(r.provider, endpointOpts)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
