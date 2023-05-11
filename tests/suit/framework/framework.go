@@ -5,14 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/konveyor/forklift-controller/pkg/apis"
-	"k8s.io/klog/v2"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"time"
+
+	"github.com/konveyor/forklift-controller/pkg/apis"
+	"k8s.io/klog/v2"
 
 	forkliftv1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/onsi/ginkgo"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -488,7 +490,7 @@ func (f *Framework) ExpectEvent(dataVolumeNamespace string) gomega.AsyncAssertio
 	}, timeout, pollingInterval)
 }
 
-//runKubectlCommand ...
+// runKubectlCommand ...
 func (f *Framework) runKubectlCommand(args ...string) (string, error) {
 	var errb bytes.Buffer
 	cmd := f.createKubectlCommand(args...)
