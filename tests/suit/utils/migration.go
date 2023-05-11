@@ -3,14 +3,16 @@ package utils
 import (
 	"context"
 	"fmt"
+	"time"
+
 	forkliftv1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	cnv "kubevirt.io/client-go/api/v1"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
 )
 
 // CreateMigrationFromDefinition is used by tests to create a Plan
@@ -72,4 +74,17 @@ func WaitForMigrationSucceededWithTimeout(cl crclient.Client, namespace string, 
 		return fmt.Errorf("Migrtation %s not ready within %v, error: %w", migrationName, timeout, err)
 	}
 	return nil
+}
+
+func GetImportedVm(cl crclient.Client, namespace string, isImportedVm func(cnv.VirtualMachine) bool) (*cnv.VirtualMachine, error) {
+	vms := &cnv.VirtualMachineList{}
+	if err := cl.List(context.TODO(), vms, &crclient.ListOptions{Namespace: namespace}); err != nil {
+		return nil, err
+	}
+	for _, vm := range vms.Items {
+		if isImportedVm(vm) {
+			return &vm, nil
+		}
+	}
+	return nil, nil
 }
