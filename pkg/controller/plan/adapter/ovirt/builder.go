@@ -20,6 +20,7 @@ import (
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	cnv "kubevirt.io/client-go/api/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
@@ -394,6 +395,7 @@ func (r *Builder) mapFirmware(vm *model.Workload, cluster *model.Cluster, object
 	features := &cnv.Features{}
 	firmware := &cnv.Firmware{
 		Serial: serial,
+		UUID:   types.UID(vm.ID),
 	}
 	switch biosType {
 	case Q35Ovmf, Q35SecureBoot:
