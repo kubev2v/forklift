@@ -8,6 +8,8 @@ import (
 	"github.com/konveyor/forklift-controller/tests/suit/utils"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/types"
+	cnv "kubevirt.io/client-go/api/v1"
 )
 
 const (
@@ -74,6 +76,12 @@ var _ = Describe("[level:component]Migration tests for oVirt provider", func() {
 		Expect(err).ToNot(HaveOccurred())
 		err = utils.WaitForMigrationSucceededWithTimeout(f.CrClient, provider.Namespace, test_migration_name, 300*time.Second)
 		Expect(err).ToNot(HaveOccurred())
-
+		By("Verifying imported VM exists")
+		vmId := types.UID(vmData.GetTestVMId())
+		vm, err := utils.GetImportedVm(f.CrClient, "default", func(vm cnv.VirtualMachine) bool {
+			return vm.Spec.Template.Spec.Domain.Firmware.UUID == vmId
+		})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(vm).ToNot(BeNil())
 	})
 })
