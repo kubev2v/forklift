@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -112,21 +113,29 @@ func (r *Client) Connect() (err error) {
 	}
 
 	var TLSClientConfig *tls.Config
-	if r.insecureSkipVerify() {
-		TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	} else {
-		cacert := []byte(r.getStringFromSecret(CACert))
-		roots := x509.NewCertPool()
-		ok := roots.AppendCertsFromPEM(cacert)
-		if !ok {
-			r.Log.Info("the CA certificate is malformed or was not provided, falling back to system CA cert pool")
-			roots, err = x509.SystemCertPool()
-			if err != nil {
-				err = liberr.New("failed to configure the system's cert pool")
-				return
+	var identityUrl *url.URL
+	identityUrl, err = url.Parse(r.URL)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	if identityUrl.Scheme == "https" {
+		if r.getBoolFromSecret(InsecureSkipVerify) {
+			TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		} else {
+			cacert := []byte(r.getStringFromSecret(CACert))
+			roots := x509.NewCertPool()
+			ok := roots.AppendCertsFromPEM(cacert)
+			if !ok {
+				r.Log.Info("the CA certificate is malformed or was not provided, falling back to system CA cert pool")
+				roots, err = x509.SystemCertPool()
+				if err != nil {
+					err = liberr.New("failed to configure the system's CA cert pool")
+					return
+				}
 			}
+			TLSClientConfig = &tls.Config{RootCAs: roots}
 		}
-		TLSClientConfig = &tls.Config{RootCAs: roots}
 	}
 
 	clientOpts := &clientconfig.ClientOpts{
@@ -195,18 +204,6 @@ func (r *Client) Connect() (err error) {
 	return
 }
 
-// insecureSkipVerify
-func (r *Client) insecureSkipVerify() bool {
-	if configuredInsecureSkipVerify := r.getStringFromSecret(InsecureSkipVerify); configuredInsecureSkipVerify != "" {
-		insecureSkipVerify, err := strconv.ParseBool(configuredInsecureSkipVerify)
-		if err != nil {
-			return false
-		}
-		return insecureSkipVerify
-	}
-	return false
-}
-
 // AuthType.
 func (r *Client) authType() (authType clientconfig.AuthType, err error) {
 	if configuredAuthType := r.getStringFromSecret(AuthType); configuredAuthType == "" {
@@ -224,6 +221,17 @@ func (r *Client) getStringFromSecret(key string) string {
 		return string(value)
 	}
 	return ""
+}
+
+func (r *Client) getBoolFromSecret(key string) bool {
+	if keyStr := r.getStringFromSecret(key); keyStr != "" {
+		value, err := strconv.ParseBool(keyStr)
+		if err != nil {
+			return false
+		}
+		return value
+	}
+	return false
 }
 
 // List Servers.
