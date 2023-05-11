@@ -55,11 +55,9 @@ const (
 )
 
 var supportedAuthTypes = map[string]clientconfig.AuthType{
-	"password":                clientconfig.AuthPassword,
-	"v3password":              clientconfig.AuthV3Password,
-	"token":                   clientconfig.AuthToken,
-	"v3token":                 clientconfig.AuthV3Token,
-	"v3applicationcredential": clientconfig.AuthV3ApplicationCredential,
+	"password":              clientconfig.AuthPassword,
+	"token":                 clientconfig.AuthToken,
+	"applicationcredential": clientconfig.AuthV3ApplicationCredential,
 }
 
 // Client struct
@@ -100,11 +98,11 @@ func (r *Client) Connect() (err error) {
 	}
 
 	switch authType {
-	case clientconfig.AuthPassword, clientconfig.AuthV3Password:
+	case clientconfig.AuthPassword:
 		authInfo.Username = r.getStringFromSecret(Username)
 		authInfo.UserID = r.getStringFromSecret(UserID)
 		authInfo.Password = r.getStringFromSecret(Password)
-	case clientconfig.AuthToken, clientconfig.AuthV3Token:
+	case clientconfig.AuthToken:
 		authInfo.Token = r.getStringFromSecret(Token)
 	case clientconfig.AuthV3ApplicationCredential:
 		authInfo.Username = r.getStringFromSecret(Username)
