@@ -75,8 +75,8 @@ type Client struct {
 	Log                 logr.Logger
 }
 
-// Connect.
-func (r *Client) Connect() (err error) {
+// Authenticate.
+func (r *Client) Authenticate() (err error) {
 
 	authInfo := &clientconfig.AuthInfo{
 		AuthURL:           r.URL,
@@ -176,6 +176,18 @@ func (r *Client) Connect() (err error) {
 		return
 	}
 	r.provider = provider
+	return
+}
+
+// Connect
+func (r *Client) Connect() (err error) {
+	if r.provider == nil {
+		err = r.Authenticate()
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+	}
 
 	availability := gophercloud.AvailabilityPublic
 	if a := r.getStringFromSecret(EndpointAvailability); a != "" {
