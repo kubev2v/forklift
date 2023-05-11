@@ -113,6 +113,12 @@ func (r *Client) Connect() (err error) {
 		authInfo.ApplicationCredentialSecret = r.getStringFromSecret(ApplicationCredentialSecret)
 	}
 
+	provider, err := openstack.NewClient(r.URL)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
 	var TLSClientConfig *tls.Config
 	var identityUrl *url.URL
 	identityUrl, err = url.Parse(r.URL)
@@ -139,26 +145,32 @@ func (r *Client) Connect() (err error) {
 		}
 	}
 
+	provider.HTTPClient.Transport = &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 10 * time.Second,
+		}).DialContext,
+		MaxIdleConns:          10,
+		IdleConnTimeout:       10 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		TLSClientConfig:       TLSClientConfig,
+	}
+
 	clientOpts := &clientconfig.ClientOpts{
 		AuthType: authType,
 		AuthInfo: authInfo,
-		HTTPClient: &http.Client{
-			Transport: &http.Transport{
-				Proxy: http.ProxyFromEnvironment,
-				DialContext: (&net.Dialer{
-					Timeout:   10 * time.Second,
-					KeepAlive: 10 * time.Second,
-				}).DialContext,
-				MaxIdleConns:          10,
-				IdleConnTimeout:       10 * time.Second,
-				TLSHandshakeTimeout:   10 * time.Second,
-				ExpectContinueTimeout: 1 * time.Second,
-				TLSClientConfig:       TLSClientConfig,
-			},
-		},
 	}
 
-	provider, err := clientconfig.AuthenticatedClient(clientOpts)
+	var opts *gophercloud.AuthOptions
+	opts, err = clientconfig.AuthOptions(clientOpts)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	err = openstack.Authenticate(provider, *opts)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
