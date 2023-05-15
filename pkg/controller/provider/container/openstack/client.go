@@ -113,19 +113,13 @@ func (r *Client) Authenticate() (err error) {
 		authInfo.ApplicationCredentialSecret = r.getStringFromSecret(ApplicationCredentialSecret)
 	}
 
-	provider, err := openstack.NewClient(r.URL)
+	identityUrl, err := url.Parse(r.URL)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
 
 	var TLSClientConfig *tls.Config
-	var identityUrl *url.URL
-	identityUrl, err = url.Parse(r.URL)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
 	if identityUrl.Scheme == "https" {
 		if r.getBoolFromSecret(InsecureSkipVerify) {
 			TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
@@ -143,6 +137,12 @@ func (r *Client) Authenticate() (err error) {
 			}
 			TLSClientConfig = &tls.Config{RootCAs: roots}
 		}
+	}
+
+	provider, err := openstack.NewClient(r.URL)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
 	}
 
 	provider.HTTPClient.Transport = &http.Transport{
@@ -163,8 +163,7 @@ func (r *Client) Authenticate() (err error) {
 		AuthInfo: authInfo,
 	}
 
-	var opts *gophercloud.AuthOptions
-	opts, err = clientconfig.AuthOptions(clientOpts)
+	opts, err := clientconfig.AuthOptions(clientOpts)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -175,6 +174,7 @@ func (r *Client) Authenticate() (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
+
 	r.provider = provider
 	return
 }
