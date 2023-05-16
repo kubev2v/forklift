@@ -51,6 +51,7 @@ const (
 	Running                      = "Running"
 	Blocked                      = "Blocked"
 	Archived                     = "Archived"
+	VDDKNotConfigured            = "VDDKNotConfigured"
 )
 
 // Categories
@@ -131,6 +132,11 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	}
 	// VM Hooks.
 	err = r.validateHooks(plan)
+	if err != nil {
+		return err
+	}
+	// VDDK image
+	err = r.validateVddkImage(plan)
 	if err != nil {
 		return err
 	}
@@ -625,4 +631,42 @@ func (r *Reconciler) validateHooks(plan *api.Plan) (err error) {
 	}
 
 	return
+}
+
+func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
+	vddkNotConfigured := libcnd.Condition{
+		Type:     VDDKNotConfigured,
+		Status:   True,
+		Reason:   NotSet,
+		Category: Critical,
+		Message:  "VDDK image is necessary for this type of migration",
+	}
+
+	source := plan.Referenced.Provider.Source
+	if source == nil {
+		return nil
+	}
+	destination := plan.Referenced.Provider.Destination
+	if destination == nil {
+		return nil
+	}
+
+	if source.Type() != api.VSphere {
+		// VDDK is used for other provider types
+		return nil
+	}
+
+	el9, el9Err := plan.VSphereUsesEl9VirtV2v()
+	if el9Err != nil {
+		return el9Err
+	}
+	if el9 {
+		// VDDK image is optional when EL9 virt-v2v image is in use
+		return nil
+	}
+
+	if _, found := source.Spec.Settings["vddkInitImage"]; !found {
+		plan.Status.SetCondition(vddkNotConfigured)
+	}
+	return nil
 }
