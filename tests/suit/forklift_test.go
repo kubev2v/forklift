@@ -19,7 +19,7 @@ var _ = FDescribe("Forklift", func() {
 
 	BeforeEach(func() {
 		namespace = f.Namespace.Name
-		err := f.Clients.OvirtClient.SetupClient()
+		err := f.Clients.OvirtClient.SetupClient(false)
 		Expect(err).ToNot(HaveOccurred())
 		By("Load Source VM Details from Ovirt")
 		vmData, err = f.Clients.OvirtClient.LoadSourceDetails()
