@@ -1252,6 +1252,27 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	} else {
 		virtV2vImage = Settings.Migration.VirtV2vImageWarm
 	}
+	// VDDK image
+	var initContainers []core.Container
+	if vddkImage, found := r.Source.Provider.Spec.Settings["vddkInitImage"]; found {
+		initContainers = append(initContainers, core.Container{
+					Name:            "vddk-side-car",
+					Image:           vddkImage,
+					ImagePullPolicy: core.PullIfNotPresent,
+					VolumeMounts: []core.VolumeMount{
+						{
+							Name:      "vddk-vol-mount",
+							MountPath: "/opt",
+						},
+					},
+					SecurityContext: &core.SecurityContext{
+						AllowPrivilegeEscalation: &allowPrivilageEscalation,
+						Capabilities: &core.Capabilities{
+							Drop: []core.Capability{"ALL"},
+						},
+					},
+				})
+	}
 	// pod environment
 	environment, err := r.Builder.PodEnvironment(vm.Ref, r.Source.Secret)
 	if err != nil {
@@ -1271,25 +1292,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 				RunAsNonRoot: &nonRoot,
 			},
 			RestartPolicy: core.RestartPolicyNever,
-			InitContainers: []core.Container{
-				{
-					Name:            "vddk-side-car",
-					Image:           r.Source.Provider.Spec.Settings["vddkInitImage"],
-					ImagePullPolicy: core.PullIfNotPresent,
-					VolumeMounts: []core.VolumeMount{
-						{
-							Name:      "vddk-vol-mount",
-							MountPath: "/opt",
-						},
-					},
-					SecurityContext: &core.SecurityContext{
-						AllowPrivilegeEscalation: &allowPrivilageEscalation,
-						Capabilities: &core.Capabilities{
-							Drop: []core.Capability{"ALL"},
-						},
-					},
-				},
-			},
+			InitContainers: initContainers,
 			Containers: []core.Container{
 				{
 					Name: "virt-v2v",
