@@ -1011,6 +1011,12 @@ func (r *DiskAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	}
 	list := fb.NewList()
 	for _, object := range diskList.Items {
+		if object.StorageType == "lun" {
+			err = ctx.client.list(fmt.Sprintf("disks/%s", object.ID), &object)
+			if err != nil {
+				return
+			}
+		}
 		m := &model.Disk{
 			Base: model.Base{ID: object.ID},
 		}
