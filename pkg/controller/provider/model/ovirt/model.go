@@ -234,4 +234,19 @@ type Disk struct {
 	Backup          string `sql:""`
 	StorageType     string `sql:""`
 	ProvisionedSize int64  `sql:""`
+	Lun             Lun    `sql:""`
+}
+
+type Lun struct {
+	LogicalUnits struct {
+		LogicalUnit []LogicalUnit `json:"logicalUnit"`
+	}
+}
+
+type LogicalUnit struct {
+	Address    string `json:"address"`
+	Port       string `json:"port"`
+	Target     string `json:"target"`
+	LunMapping int32  `json:"lunMapping"`
+	Size       int64  `json:"size"`
 }

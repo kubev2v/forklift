@@ -649,6 +649,23 @@ type Disk struct {
 	ActualSize  string `json:"actual_size"`
 	Backup      string `json:"backup"`
 	StorageType string `json:"storage_type"`
+	Lun         Lun    `json:"lun_storage"`
+}
+
+// LUN Resource.
+type Lun struct {
+	LogicalUnits struct {
+		LogicalUnit []LogicalUnit `json:"logical_unit"`
+	} `json:"logical_units"`
+}
+
+type LogicalUnit struct {
+	Base
+	Address    string `json:"address"`
+	Port       string `json:"port"`
+	Target     string `json:"target"`
+	LunMapping string `json:"lun_mapping"`
+	Size       string `json:"size"`
 }
 
 // Apply to (update) the model.
@@ -663,6 +680,7 @@ func (r *Disk) ApplyTo(m *model.Disk) {
 	m.StorageType = r.StorageType
 	m.ProvisionedSize = r.int64(r.ProvisionedSize)
 	r.setStorageDomain(m)
+	r.setLun(m)
 }
 
 func (r *Disk) setStorageDomain(m *model.Disk) {
@@ -670,6 +688,24 @@ func (r *Disk) setStorageDomain(m *model.Disk) {
 		m.StorageDomain = ref.ID
 		break
 	}
+}
+
+func (r *Disk) setLun(m *model.Disk) {
+	m.Lun = model.Lun{}
+	m.Lun.LogicalUnits.LogicalUnit = []model.LogicalUnit{}
+	for _, rlu := range r.Lun.LogicalUnits.LogicalUnit {
+		mlu := &model.LogicalUnit{}
+		rlu.ApplyTo(mlu)
+		m.Lun.LogicalUnits.LogicalUnit = append(m.Lun.LogicalUnits.LogicalUnit, *mlu)
+	}
+}
+
+func (r *LogicalUnit) ApplyTo(m *model.LogicalUnit) {
+	m.Address = r.Address
+	m.Port = r.Port
+	m.Target = r.Target
+	m.LunMapping = r.int32(r.LunMapping)
+	m.Size = r.int64(r.Size)
 }
 
 // Disk (list).

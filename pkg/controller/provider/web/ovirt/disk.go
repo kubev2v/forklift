@@ -138,7 +138,10 @@ type Disk struct {
 	ActualSize      int64  `json:"actualSize"`
 	StorageType     string `json:"storageType"`
 	Status          string `json:"status"`
+	Lun             Lun    `json:"lunStorage"`
 }
+
+type Lun = model.Lun
 
 // Build the resource using the model.
 func (r *Disk) With(m *model.Disk) {
@@ -150,6 +153,7 @@ func (r *Disk) With(m *model.Disk) {
 	r.ActualSize = m.ActualSize
 	r.Shared = m.Shared
 	r.StorageDomain = m.StorageDomain
+	r.Lun = m.Lun
 }
 
 // Build self link (URI).
