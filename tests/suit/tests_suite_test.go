@@ -13,10 +13,14 @@ import (
 )
 
 const (
-	networkMapName        = "network-map-test"
-	test_migration_name   = "migration-test"
-	test_plan_name        = "plan-test"
-	test_storage_map_name = "test-storage-map-v"
+	networkMapName                 = "network-map-test"
+	test_migration_name            = "migration-test"
+	test_plan_name                 = "plan-test"
+	test_storage_map_name          = "test-storage-map-v"
+	test_network_map_name_insecure = "network-map-test-insecure"
+	test_migration_name_insecure   = "migration-test-insecure"
+	test_plan_name_insecure        = "plan-test-insecure"
+	test_storage_map_name_insecure = "test-storage-map-insecure"
 )
 
 var (

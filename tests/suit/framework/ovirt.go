@@ -10,7 +10,7 @@ import (
 
 const DefaultStorageClass = "nfs-csi"
 
-func (r *OvirtClient) SetupClient() (err error) {
+func (r *OvirtClient) SetupClient(insecure bool) (err error) {
 	r.CustomEnv = false
 	if env := os.Getenv("OVIRT_CUSTOM_ENV"); env == "true" {
 		r.CustomEnv = true
@@ -21,25 +21,36 @@ func (r *OvirtClient) SetupClient() (err error) {
 		r.storageClass = sc
 	}
 
-	mandEnvVars := []string{"OVIRT_USERNAME", "OVIRT_PASSWORD", "OVIRT_URL", "OVIRT_CACERT", "OVIRT_VM_ID"}
-	for _, field := range mandEnvVars {
+	envVars := []string{"OVIRT_USERNAME", "OVIRT_PASSWORD", "OVIRT_URL"}
+
+	if !insecure {
+		envVars = append(envVars, "OVIRT_CACERT", "OVIRT_VM_ID")
+	} else {
+		envVars = append(envVars, "OVIRT_INSECURE_VM_ID")
+	}
+	for _, field := range envVars {
 		if env := os.Getenv(field); env == "" {
 			return fmt.Errorf("%s is not set", field)
 		}
 	}
 
-	cacertFile := os.Getenv("OVIRT_CACERT")
-	fileinput, err := os.ReadFile(cacertFile)
-	if err != nil {
-		return fmt.Errorf("could not read %s", cacertFile)
+	if !insecure {
+		cacertFile := os.Getenv("OVIRT_CACERT")
+		fileinput, err := os.ReadFile(cacertFile)
+		if err != nil {
+			return fmt.Errorf("could not read %s", cacertFile)
+		}
+		r.Cacert = fileinput
+		r.Insecure = false
+		r.vmData.testVMId = os.Getenv("OVIRT_VM_ID")
+	} else {
+		r.Insecure = true
+		r.vmData.testVMId = os.Getenv("OVIRT_INSECURE_VM_ID")
 	}
 
 	r.Username = os.Getenv("OVIRT_USERNAME")
 	r.Password = os.Getenv("OVIRT_PASSWORD")
 	r.OvirtURL = os.Getenv("OVIRT_URL")
-	r.vmData.testVMId = os.Getenv("OVIRT_VM_ID")
-	r.Cacert = fileinput
-
 	return
 }
 
@@ -49,11 +60,9 @@ func (r *OvirtClient) LoadSourceDetails() (vm *OvirtVM, err error) {
 	// default test values
 	sdomains := []string{"95ef6fee-5773-46a2-9340-a636958a96b8"}
 	nics := []string{"6b6b7239-5ea1-4f08-a76e-be150ab8eb89"}
-
 	// if a real custom ovirt environment is used.
 	if r.CustomEnv {
 		defer r.Close()
-		// connect to ovirt instance
 		err = r.Connect()
 
 		// get storage domain from the test VM
@@ -77,13 +86,17 @@ func (r *OvirtClient) LoadSourceDetails() (vm *OvirtVM, err error) {
 
 // Connect - Connect to the oVirt API.
 func (r *OvirtClient) Connect() (err error) {
-	r.connection, err = ovirtsdk.NewConnectionBuilder().
+	builder := ovirtsdk.NewConnectionBuilder().
 		URL(r.OvirtURL).
-		Username(r.Username).
-		Password(r.Password).
-		CACert(r.Cacert).
-		Insecure(false).
-		Build()
+		Username(r.Username)
+
+	if r.Insecure {
+		builder = builder.Insecure(r.Insecure)
+	} else {
+		builder = builder.CACert(r.Cacert)
+	}
+
+	r.connection, err = builder.Build()
 	if err != nil {
 		return err
 	}
@@ -215,6 +228,7 @@ type OvirtClient struct {
 	storageClass string
 	vmData       OvirtVM
 	CustomEnv    bool
+	Insecure     bool
 }
 
 type OvirtVM struct {
