@@ -96,7 +96,7 @@ func (r *Client) connect() (status int, err error) {
 	}
 
 	url.Path = "/ovirt-engine/sso/oauth/token"
-	values := url.Query()
+	values := liburl.Values{}
 	values.Add("grant_type", "password")
 	values.Add("username", string(r.secret.Data["user"]))
 	values.Add("password", string(r.secret.Data["password"]))
@@ -105,10 +105,13 @@ func (r *Client) connect() (status int, err error) {
 	client.Header = http.Header{
 		"Accept": []string{"application/json"},
 	}
-
+	request := &struct {
+		Input interface{} `json:"input"`
+	}{}
+	request.Input = values
 	response := &ovirtTokenResponse{}
 	url.RawQuery = values.Encode()
-	status, err = client.Get(url.String(), response)
+	status, err = client.Post(url.String(), request, response)
 	if err != nil {
 		return
 	}
