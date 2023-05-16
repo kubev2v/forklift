@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	"github.com/konveyor/forklift-controller/pkg/controller/plan"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -66,6 +67,7 @@ const (
 	populatorPvcPrefix      = "prime"
 	populatedFromAnnoSuffix = "populated-from"
 	pvcFinalizerSuffix      = "populate-target-protection"
+	pvcKuberenetesFinalizer = "kubernetes.io/pvc-protection"
 	annSelectedNode         = "volume.kubernetes.io/selected-node"
 	controllerNameSuffix    = "populator"
 
@@ -686,9 +688,11 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 			if corev1.PodFailed == pod.Status.Phase {
 				c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPodFailed, "Populator failed: %s", pod.Status.Message)
 				// Delete failed pods so we can try again
-				err = c.kubeClient.CoreV1().Pods(populatorNamespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
-				if err != nil {
-					return err
+				if !plan.RestartLimitExceeded(pod) {
+					err = c.kubeClient.CoreV1().Pods(populatorNamespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+					if err != nil {
+						return err
+					}
 				}
 			}
 			// We'll get called again later when the pod succeeds
@@ -761,17 +765,13 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 	// *** At this point the volume population is done and we're just cleaning up ***
 	c.recorder.Eventf(pvc, corev1.EventTypeNormal, reasonPodFinished, "Populator finished")
 
-	// If the pod still exists, delete it
-	if pod != nil {
-		err = c.kubeClient.CoreV1().Pods(populatorNamespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+	// If PVC still exists, delete it
+	if pvcPrime != nil {
+		err = c.kubeClient.CoreV1().PersistentVolumeClaims(populatorNamespace).Delete(ctx, pvcPrime.Name, metav1.DeleteOptions{})
 		if err != nil {
 			return err
 		}
-	}
-
-	// If PVC' still exists, delete it
-	if pvcPrime != nil {
-		err = c.kubeClient.CoreV1().PersistentVolumeClaims(populatorNamespace).Delete(ctx, pvcPrime.Name, metav1.DeleteOptions{})
+		err = c.ensureFinalizer(ctx, pvcPrime, pvcKuberenetesFinalizer, false)
 		if err != nil {
 			return err
 		}

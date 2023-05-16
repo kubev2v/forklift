@@ -1414,7 +1414,7 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 				if r.Plan.Spec.Warm && len(importer.Status.ContainerStatuses) > 0 {
 					vm.Warm.Failures = int(importer.Status.ContainerStatuses[0].RestartCount)
 				}
-				if restartLimitExceeded(importer) {
+				if RestartLimitExceeded(importer) {
 					task.MarkedCompleted()
 					msg, _ := terminationMessage(importer)
 					task.AddError(msg)
@@ -1629,7 +1629,7 @@ func terminationMessage(pod *core.Pod) (msg string, ok bool) {
 }
 
 // Return whether the pod has failed and restarted too many times.
-func restartLimitExceeded(pod *core.Pod) (exceeded bool) {
+func RestartLimitExceeded(pod *core.Pod) (exceeded bool) {
 	if len(pod.Status.ContainerStatuses) == 0 {
 		return
 	}
