@@ -12,7 +12,7 @@ REGISTRY ?= quay.io
 REGISTRY_ACCOUNT ?= kubev2v
 REGISTRY_TAG ?= devel
 
-VERSION ?= 2.4.0
+VERSION ?= 2.4.1
 NAMESPACE ?= konveyor-forklift
 CHANNELS ?= development
 DEFAULT_CHANNEL ?= development
