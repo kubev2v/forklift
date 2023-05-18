@@ -1453,7 +1453,12 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 			step.MarkCompleted()
 			step.AddError("Guest conversion failed. See pod logs for details.")
 		default:
-			if r.Context.UseEl9VirtV2v() {
+			el9, el9Err := r.Context.Plan.VSphereUsesEl9VirtV2v()
+			if el9Err != nil {
+				err = el9Err
+				return
+			}
+			if el9 {
 				err = r.updateConversionProgressEl9(pod, step)
 				if err != nil {
 					// Just log it. Missing progress is not fatal.
@@ -1601,6 +1606,11 @@ type Predicate struct {
 
 // Evaluate predicate flags.
 func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
+	el9, el9Err := r.context.Plan.VSphereUsesEl9VirtV2v()
+	if el9Err != nil {
+		err = el9Err
+		return
+	}
 	switch flag {
 	case HasPreHook:
 		_, allowed = r.vm.FindHook(PreHook)
@@ -1609,9 +1619,9 @@ func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 	case RequiresConversion:
 		allowed = r.context.Source.Provider.RequiresConversion()
 	case CDIDiskCopy:
-		allowed = !r.context.UseEl9VirtV2v()
+		allowed = !el9
 	case VirtV2vDiskCopy:
-		allowed = r.context.UseEl9VirtV2v()
+		allowed = el9
 	}
 
 	return
