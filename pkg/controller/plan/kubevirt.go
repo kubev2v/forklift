@@ -794,7 +794,7 @@ func (r *KubeVirt) getDefaultVolumeAndAccessMode(storageName string) ([]core.Per
 
 // Return true when the import is done with OvirtVolumePopulator
 func (r *KubeVirt) useOvirtPopulator(vm *plan.VMStatus) bool {
-	return *r.Plan.Provider.Source.Spec.Type == v1beta1.OVirt && vm.Warm == nil && r.Destination.Provider.IsHost()
+	return r.Plan.IsSourceProviderOvirt() && vm.Warm == nil && r.Destination.Provider.IsHost()
 }
 
 // Return namespace specific ListOption.

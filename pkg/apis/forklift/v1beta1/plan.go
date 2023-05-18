@@ -102,3 +102,7 @@ func init() {
 func (r *Plan) IsSourceProviderOpenstack() bool {
 	return r.Provider.Source.Type() == OpenStack
 }
+
+func (r *Plan) IsSourceProviderOvirt() bool {
+	return r.Provider.Source.Type() == OVirt
+}
