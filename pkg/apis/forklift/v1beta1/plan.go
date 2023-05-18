@@ -98,3 +98,7 @@ type PlanList struct {
 func init() {
 	SchemeBuilder.Register(&Plan{}, &PlanList{})
 }
+
+func (r *Plan) IsSourceProviderOpenstack() bool {
+	return r.Provider.Source.Type() == OpenStack
+}

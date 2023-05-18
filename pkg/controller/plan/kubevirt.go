@@ -577,7 +577,7 @@ func (r *KubeVirt) getPVCs(vm *plan.VMStatus) (pvcs []core.PersistentVolumeClaim
 		pvcAnn := pvc.GetAnnotations()
 		if pvcAnn[kVM] == vmLabels[kVM] && pvcAnn[kPlan] == vmLabels[kPlan] {
 			pvcs = append(pvcs, *pvc)
-		} else if r.isOpenstack(vm) {
+		} else if r.Plan.IsSourceProviderOpenstack() {
 			if _, ok := pvc.Labels["migration"]; ok {
 				if pvc.Labels["migration"] == r.Migration.Name {
 					pvcs = append(pvcs, *pvc)
@@ -1840,11 +1840,6 @@ func (r *KubeVirt) ensureOpenStackVolumes(vm ref.Ref, ready bool) (pvcNames []st
 	}
 
 	return
-}
-
-// Return if the import done with Openstack
-func (r *KubeVirt) isOpenstack(vm *plan.VMStatus) bool {
-	return *r.Plan.Provider.Source.Spec.Type == v1beta1.OpenStack
 }
 
 func (r *KubeVirt) openstackPVCsReady(vm ref.Ref, step *plan.Step) (ready bool, err error) {

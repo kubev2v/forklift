@@ -606,7 +606,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		}
 
 		var pvcNames []string
-		if r.kubevirt.isOpenstack(vm) {
+		if r.Plan.IsSourceProviderOpenstack() {
 			pvcNames, err = r.kubevirt.ensureOpenStackVolumes(vm.Ref, ready)
 			if err != nil {
 				step.AddError(err.Error())
@@ -728,7 +728,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		case r.kubevirt.useOvirtPopulator(vm):
 			progressFn = r.updateCopyProgressForOvirt
 			readyFn = r.kubevirt.areOvirtPVCsReady
-		case r.kubevirt.isOpenstack(vm):
+		case r.Plan.IsSourceProviderOpenstack():
 			progressFn = r.updateCopyProgressForOpenstack
 			readyFn = r.kubevirt.openstackPVCsReady
 		}
