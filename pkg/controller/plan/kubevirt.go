@@ -520,7 +520,12 @@ func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus, dataVolumes []cdi.DataVo
 		// DataVolume and PVC names are the same
 		pvcNames = append(pvcNames, dv.Name)
 	}
-	if r.UseEl9VirtV2v() {
+	el9, el9Err := r.Context.Plan.VSphereUsesEl9VirtV2v()
+	if el9Err != nil {
+		err = el9Err
+		return
+	}
+	if el9 {
 		err = r.createPodToBindPVCs(vm, pvcNames)
 		if err != nil {
 			return err
@@ -1237,7 +1242,12 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	allowPrivilageEscalation := false
 	// virt-v2v image
 	var virtV2vImage string
-	if r.Context.UseEl9VirtV2v() {
+	el9, el9Err := r.Context.Plan.VSphereUsesEl9VirtV2v()
+	if el9Err != nil {
+		err = el9Err
+		return
+	}
+	if el9 {
 		virtV2vImage = Settings.Migration.VirtV2vImageCold
 	} else {
 		virtV2vImage = Settings.Migration.VirtV2vImageWarm
