@@ -5,7 +5,6 @@ import (
 	"path"
 
 	"github.com/go-logr/logr"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
@@ -103,10 +102,6 @@ func (r *Context) SetMigration(migration *api.Migration) {
 		path.Join(
 			migration.Namespace,
 			migration.Name))
-}
-
-func (r *Context) UseEl9VirtV2v() bool {
-	return r.Source.Provider.Type() == v1beta1.VSphere && r.Destination.Provider.IsHost() && !r.Plan.Spec.Warm
 }
 
 // Source.

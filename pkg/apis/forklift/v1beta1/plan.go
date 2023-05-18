@@ -21,6 +21,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/provider"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -87,6 +88,29 @@ type Plan struct {
 	// during validation.
 	Referenced `json:"-"`
 }
+
+// Decide if the plan should use EL9 image for virt-v2v conversion.
+// in combination with specified destination provider.
+func (p *Plan) VSphereUsesEl9VirtV2v() (bool, error) {
+	source := p.Referenced.Provider.Source
+	if source == nil {
+		return false, liberr.New("Cannot analyze plan, source provider is missing.")
+	}
+	destination := p.Referenced.Provider.Destination
+	if destination == nil {
+		return false, liberr.New("Cannot analyze plan, destination provider is missing.")
+	}
+
+	if source.Type() != VSphere {
+		return false, nil
+	}
+
+	if !p.Spec.Warm && destination.IsHost() {
+		return true, nil
+	}
+	return false, nil
+}
+
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type PlanList struct {
