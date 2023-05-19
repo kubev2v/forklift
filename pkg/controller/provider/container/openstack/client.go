@@ -278,11 +278,13 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 		object := object.(*[]Region)
 		allPages, err = regions.List(r.identityService, listopts.(*RegionListOpts)).AllPages()
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		var regionList []regions.Region
 		regionList, err = regions.ExtractRegions(allPages)
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		var instanceList []Region
@@ -303,14 +305,19 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 		allPages, err = projects.List(r.identityService, opts).AllPages()
 		if err != nil {
 			if !r.isForbidden(err) {
+				err = liberr.Wrap(err)
 				return
 			}
 			*object, err = r.getUserProjects()
+			if err != nil {
+				err = liberr.Wrap(err)
+			}
 			return
 		}
 		var projectList []projects.Project
 		projectList, err = projects.ExtractProjects(allPages)
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		var instanceList []Project
@@ -324,11 +331,13 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 		object := object.(*[]Flavor)
 		allPages, err = flavors.ListDetail(r.ComputeService, listopts.(*FlavorListOpts)).AllPages()
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		var flavorList []flavors.Flavor
 		flavorList, err = flavors.ExtractFlavors(allPages)
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		var instanceList []Flavor
@@ -336,6 +345,7 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 		for _, flavor := range flavorList {
 			extraSpecs, err = flavors.ListExtraSpecs(r.ComputeService, flavor.ID).Extract()
 			if err != nil {
+				err = liberr.Wrap(err)
 				return
 			}
 			instanceList = append(instanceList, Flavor{Flavor: flavor, ExtraSpecs: extraSpecs})
@@ -347,11 +357,13 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 		object := object.(*[]Image)
 		allPages, err = images.List(r.ImageService, listopts.(*ImageListOpts)).AllPages()
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		var imageList []images.Image
 		imageList, err = images.ExtractImages(allPages)
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		var instanceList []Image
@@ -365,11 +377,13 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 		object := object.(*[]VM)
 		allPages, err = servers.List(r.ComputeService, listopts.(*VMListOpts)).AllPages()
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		var serverList []servers.Server
 		serverList, err = servers.ExtractServers(allPages)
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		var instanceList []VM
@@ -383,11 +397,13 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 		object := object.(*[]Snapshot)
 		allPages, err = snapshots.List(r.BlockStorageService, nil).AllPages()
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		var snapshotList []snapshots.Snapshot
 		snapshotList, err = snapshots.ExtractSnapshots(allPages)
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		var instanceList []Snapshot
@@ -401,11 +417,13 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 		object := object.(*[]Volume)
 		allPages, err = volumes.List(r.BlockStorageService, listopts.(*VolumeListOpts)).AllPages()
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		var volumeList []volumes.Volume
 		volumeList, err = volumes.ExtractVolumes(allPages)
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		var instanceList []Volume
@@ -419,11 +437,13 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 		object := object.(*[]VolumeType)
 		allPages, err = volumetypes.List(r.BlockStorageService, listopts.(*VolumeTypeListOpts)).AllPages()
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		var volumeTypeList []volumetypes.VolumeType
 		volumeTypeList, err = volumetypes.ExtractVolumeTypes(allPages)
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		var instanceList []VolumeType
@@ -440,11 +460,13 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 		object := object.(*[]Network)
 		allPages, err = networks.List(r.NetworkService, listopts.(*NetworkListOpts)).AllPages()
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		var networkList []networks.Network
 		networkList, err = networks.ExtractNetworks(allPages)
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		var instanceList []Network
@@ -458,11 +480,13 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 		object := object.(*[]Subnet)
 		allPages, err = subnets.List(r.NetworkService, listopts.(*SubnetListOpts)).AllPages()
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		var subnetList []subnets.Subnet
 		subnetList, err = subnets.ExtractSubnets(allPages)
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		var instanceList []Subnet
@@ -485,6 +509,7 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 		var region *regions.Region
 		region, err = regions.Get(r.identityService, ID).Extract()
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		object = &Region{*region}
@@ -494,9 +519,13 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 		project, err = projects.Get(r.identityService, ID).Extract()
 		if err != nil {
 			if !r.isForbidden(err) {
+				err = liberr.Wrap(err)
 				return
 			}
 			object, err = r.getUserProject(ID)
+			if err != nil {
+				err = liberr.Wrap(err)
+			}
 			return
 		}
 		object = &Project{*project}
@@ -505,11 +534,13 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 		var flavor *flavors.Flavor
 		flavor, err = flavors.Get(r.ComputeService, ID).Extract()
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		var extraSpecs map[string]string
 		extraSpecs, err = flavors.ListExtraSpecs(r.ComputeService, ID).Extract()
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		object = &Flavor{Flavor: *flavor, ExtraSpecs: extraSpecs}
@@ -519,6 +550,7 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 		var image *images.Image
 		image, err = images.Get(r.ImageService, ID).Extract()
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		object = &Image{*image}
@@ -527,6 +559,7 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 		var snapshot *snapshots.Snapshot
 		snapshot, err = snapshots.Get(r.BlockStorageService, ID).Extract()
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		object = &Snapshot{*snapshot}
@@ -535,6 +568,7 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 		var volume *volumes.Volume
 		volume, err = volumes.Get(r.BlockStorageService, ID).Extract()
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		object = &Volume{*volume}
@@ -543,6 +577,7 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 		var volumeType *volumetypes.VolumeType
 		volumeType, err = volumetypes.Get(r.BlockStorageService, ID).Extract()
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		object = &VolumeType{*volumeType}
@@ -551,6 +586,7 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 		var server *servers.Server
 		server, err = servers.Get(r.ComputeService, ID).Extract()
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		object = &VM{*server}
@@ -559,6 +595,7 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 		var network *networks.Network
 		network, err = networks.Get(r.NetworkService, ID).Extract()
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		object = &Network{*network}
@@ -567,6 +604,7 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 		var subnet *subnets.Subnet
 		subnet, err = subnets.Get(r.NetworkService, ID).Extract()
 		if err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		object = &Subnet{*subnet}
@@ -606,6 +644,7 @@ func (r *Client) getAuthenticatedUserID() (string, error) {
 	case tokens.CreateResult:
 		u, err := a.ExtractUser()
 		if err != nil {
+			err = liberr.Wrap(err)
 			return "", err
 		}
 		return u.ID, nil
@@ -620,6 +659,7 @@ func (r *Client) getUserProject(projectID string) (project *Project, err error) 
 	var found bool
 	userProjects, err = r.getUserProjects()
 	if err != nil {
+		err = liberr.Wrap(err)
 		return
 	}
 	for _, p := range userProjects {
@@ -631,6 +671,7 @@ func (r *Client) getUserProject(projectID string) (project *Project, err error) 
 	}
 	if !found {
 		err = gophercloud.ErrDefault404{}
+		err = liberr.Wrap(err)
 		return
 	}
 	return
@@ -641,15 +682,18 @@ func (r *Client) getUserProjects() (userProjects []Project, err error) {
 	var allPages pagination.Page
 	userID, err = r.getAuthenticatedUserID()
 	if err != nil {
+		err = liberr.Wrap(err)
 		return
 	}
 	allPages, err = users.ListProjects(r.identityService, userID).AllPages()
 	if err != nil {
+		err = liberr.Wrap(err)
 		return
 	}
 	var projectList []projects.Project
 	projectList, err = projects.ExtractProjects(allPages)
 	if err != nil {
+		err = liberr.Wrap(err)
 		return
 	}
 	for _, project := range projectList {
