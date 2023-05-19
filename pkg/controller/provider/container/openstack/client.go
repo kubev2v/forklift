@@ -113,7 +113,8 @@ func (r *Client) Authenticate() (err error) {
 		authInfo.ApplicationCredentialSecret = r.getStringFromSecret(ApplicationCredentialSecret)
 	}
 
-	identityUrl, err := url.Parse(r.URL)
+	var identityUrl *url.URL
+	identityUrl, err = url.Parse(r.URL)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -139,7 +140,8 @@ func (r *Client) Authenticate() (err error) {
 		}
 	}
 
-	provider, err := openstack.NewClient(r.URL)
+	var provider *gophercloud.ProviderClient
+	provider, err = openstack.NewClient(r.URL)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -163,7 +165,8 @@ func (r *Client) Authenticate() (err error) {
 		AuthInfo: authInfo,
 	}
 
-	opts, err := clientconfig.AuthOptions(clientOpts)
+	var opts *gophercloud.AuthOptions
+	opts, err = clientconfig.AuthOptions(clientOpts)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
