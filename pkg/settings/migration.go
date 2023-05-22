@@ -1,19 +1,22 @@
 package settings
 
 import (
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"os"
 	"strings"
+
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 )
 
 // Environment variables.
 const (
-	MaxVmInFlight         = "MAX_VM_INFLIGHT"
-	HookRetry             = "HOOK_RETRY"
-	ImporterRetry         = "IMPORTER_RETRY"
-	VirtV2vImage          = "VIRT_V2V_IMAGE"
-	PrecopyInterval       = "PRECOPY_INTERVAL"
-	VirtV2vDontRequestKVM = "VIRT_V2V_DONT_REQUEST_KVM"
+	MaxVmInFlight           = "MAX_VM_INFLIGHT"
+	HookRetry               = "HOOK_RETRY"
+	ImporterRetry           = "IMPORTER_RETRY"
+	VirtV2vImage            = "VIRT_V2V_IMAGE"
+	PrecopyInterval         = "PRECOPY_INTERVAL"
+	VirtV2vDontRequestKVM   = "VIRT_V2V_DONT_REQUEST_KVM"
+	SnapshotRemovalTimeout  = "SNAPSHOT_REMOVAL_TIMEOUT"
+	SnapshotStatusCheckRate = "SNAPSHOT_STATUS_CHECK_RATE"
 )
 
 // Default virt-v2v image.
@@ -31,6 +34,10 @@ type Migration struct {
 	ImporterRetry int
 	// Warm migration precopy interval in minutes
 	PrecopyInterval int
+	// Snapshot removal timeout in minutes
+	SnapshotRemovalTimeout int
+	// Snapshot status check rate in seconds
+	SnapshotStatusCheckRate int
 	// Virt-v2v images for guest conversion
 	VirtV2vImageCold string
 	VirtV2vImageWarm string
@@ -53,6 +60,14 @@ func (r *Migration) Load() (err error) {
 		err = liberr.Wrap(err)
 	}
 	r.PrecopyInterval, err = getEnvLimit(PrecopyInterval, 60)
+	if err != nil {
+		err = liberr.Wrap(err)
+	}
+	r.SnapshotRemovalTimeout, err = getEnvLimit(SnapshotRemovalTimeout, 120)
+	if err != nil {
+		err = liberr.Wrap(err)
+	}
+	r.SnapshotStatusCheckRate, err = getEnvLimit(SnapshotStatusCheckRate, 10)
 	if err != nil {
 		err = liberr.Wrap(err)
 	}

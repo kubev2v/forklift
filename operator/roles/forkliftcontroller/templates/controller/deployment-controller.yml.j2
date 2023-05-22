@@ -65,6 +65,14 @@ spec:
         - name: PRECOPY_INTERVAL
           value: "{{ controller_precopy_interval }}"
 {% endif %}
+{% if controller_snapshot_removal_timeout_minuts is number %}
+        - name: SNAPSHOT_REMOVAL_TIMEOUT_MINUTES
+          value: "{{ controller_snapshot_removal_timeout_minuts }}"
+{% endif %}
+{% if controller_snapshot_status_check_rate_seconds is number %}
+        - name: SNAPSHOT_STATUS_CHECK_RATE_SECONDS
+          value: "{{ controller_snapshot_status_check_rate_seconds }}"
+{% endif %}
 {% if controller_max_vm_inflight is number %}
         - name: MAX_VM_INFLIGHT
           value: "{{ controller_max_vm_inflight }}"
