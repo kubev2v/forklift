@@ -57,6 +57,7 @@ go_library(
 go_test(
     name = "suit_test",
     srcs = [
+        "forklift_test.go",
         "openstack_test.go",
         "ovirt_test.go",
         "tests_suite_test.go",

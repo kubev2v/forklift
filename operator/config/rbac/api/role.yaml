@@ -18,3 +18,11 @@ rules:
     verbs:
       - get
       - list
+  - apiGroups:
+      - k8s.cni.cncf.io
+    resources:
+      - network-attachment-definitions
+    verbs:
+      - get
+      - list
+

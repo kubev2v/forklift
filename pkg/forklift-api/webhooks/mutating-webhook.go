@@ -10,3 +10,7 @@ import (
 func ServeSecretMutator(resp http.ResponseWriter, req *http.Request) {
 	mutating_webhooks.Serve(resp, req, &mutators.SecretMutator{})
 }
+
+func ServePlanMutator(resp http.ResponseWriter, req *http.Request) {
+	mutating_webhooks.Serve(resp, req, &mutators.PlanMutator{})
+}
