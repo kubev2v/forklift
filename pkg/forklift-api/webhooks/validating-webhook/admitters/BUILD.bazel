@@ -4,6 +4,7 @@ go_library(
     name = "admitters",
     srcs = [
         "plan-admitter.go",
+        "provider-admitter.go",
         "secret-admitter.go",
     ],
     importpath = "github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/validating-webhook/admitters",
