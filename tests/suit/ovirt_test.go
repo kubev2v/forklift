@@ -42,6 +42,12 @@ var _ = Describe("[level:component]Migration tests for oVirt provider", func() {
 			}, namespace, "provider-test-secret"))
 		Expect(err).ToNot(HaveOccurred())
 
+		By("Create target Openshift provider")
+		targetPr := utils.NewProvider(utils.TargetProviderName, forkliftv1.OpenShift, namespace, map[string]string{}, "", nil)
+		err = utils.CreateProviderFromDefinition(f.CrClient, targetPr)
+		Expect(err).ToNot(HaveOccurred())
+		err = utils.WaitForProviderReadyWithTimeout(f.CrClient, namespace, utils.TargetProviderName, 30*time.Second)
+		Expect(err).ToNot(HaveOccurred())
 		By("Create oVirt provider")
 		pr := utils.NewProvider(ovirtProviderName, forkliftv1.OVirt, namespace, map[string]string{}, f.OvirtClient.OvirtURL, s)
 		err = utils.CreateProviderFromDefinition(f.CrClient, pr)

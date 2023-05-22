@@ -58,8 +58,8 @@ func newPlan(providerIdentifier forkliftv1.Provider, namespace, planName, storag
 		Spec: forkliftv1.PlanSpec{
 			Provider: provider.Pair{
 				Destination: corev1.ObjectReference{
-					Name:      "host",
-					Namespace: forklift_namespace,
+					Name:      TargetProviderName,
+					Namespace: providerIdentifier.Namespace,
 				},
 				Source: corev1.ObjectReference{
 					Name:      providerIdentifier.Name,
