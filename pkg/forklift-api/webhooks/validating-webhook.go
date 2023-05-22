@@ -14,3 +14,7 @@ func ServeSecretCreate(resp http.ResponseWriter, req *http.Request) {
 func ServePlanCreate(resp http.ResponseWriter, req *http.Request) {
 	validating_webhooks.Serve(resp, req, &admitters.PlanAdmitter{})
 }
+
+func ServeProviderCreate(resp http.ResponseWriter, req *http.Request) {
+	validating_webhooks.Serve(resp, req, &admitters.ProviderAdmitter{})
+}
