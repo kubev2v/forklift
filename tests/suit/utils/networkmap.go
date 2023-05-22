@@ -63,7 +63,7 @@ func NewNetworkMap(namespace string, providerIdentifier forkliftv1.Provider, net
 	return networkMap
 }
 
-func WaitForNetworkMapReadyWithTimeout(cl crclient.Client, namespace string, networkMapName string, timeout time.Duration) error {
+func WaitForNetworkMapReadyWithTimeout(cl crclient.Client, namespace, networkMapName string, timeout time.Duration) error {
 	networkMapIdentifier := types.NamespacedName{Namespace: namespace, Name: networkMapName}
 
 	returnedNetworkMap := &forkliftv1.NetworkMap{}

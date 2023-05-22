@@ -76,7 +76,7 @@ e2e-sanity: e2e-sanity-ovirt e2e-sanity-vsphere
 
 e2e-sanity-ovirt:
 	# ovirt suite
-	KUBEVIRT_CLIENT_GO_SCHEME_REGISTRATION_VERSION=v1 go test ./tests/suit -v -ginkgo.focus ".*oVirt.*"
+	KUBEVIRT_CLIENT_GO_SCHEME_REGISTRATION_VERSION=v1 go test ./tests/suit -v -ginkgo.focus ".*oVirt.*|.*Forklift.*"
 
 e2e-sanity-vsphere:
 	# vsphere suit

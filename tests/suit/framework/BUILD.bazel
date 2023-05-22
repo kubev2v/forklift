@@ -15,6 +15,7 @@ go_library(
         "//pkg/apis/forklift/v1beta1",
         "//pkg/apis/forklift/v1beta1/ref",
         "//tests/suit/utils",
+        "//vendor/github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1:k8s_cni_cncf_io",
         "//vendor/github.com/onsi/ginkgo",
         "//vendor/github.com/onsi/gomega",
         "//vendor/github.com/ovirt/go-ovirt",

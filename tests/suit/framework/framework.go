@@ -15,6 +15,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis"
 	"k8s.io/klog/v2"
 
+	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	forkliftv1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -258,6 +259,10 @@ func (c *Clients) GetCrClient() (crclient.Client, error) {
 		return nil, err
 	}
 	err = apis.AddToScheme(scheme.Scheme)
+	if err != nil {
+		return nil, err
+	}
+	err = net.AddToScheme(scheme.Scheme)
 	if err != nil {
 		return nil, err
 	}

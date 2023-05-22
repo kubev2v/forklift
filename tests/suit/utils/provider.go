@@ -15,13 +15,15 @@ import (
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func NewProvider(providerName string, providerType forkliftv1.ProviderType, namespace string, providerSetting map[string]string, url string, secret *corev1.Secret) forkliftv1.Provider {
+func NewProvider(providerName string, providerType forkliftv1.ProviderType, namespace string, annotations, providerSetting map[string]string, url string, secret *corev1.Secret) forkliftv1.Provider {
 	// nicPairs set with the default settings for kind CI.
 
 	providerMeta := v1.ObjectMeta{
-		Namespace: namespace,
-		Name:      providerName,
+		Namespace:   namespace,
+		Name:        providerName,
+		Annotations: annotations,
 	}
+
 	var secretRef corev1.ObjectReference
 	if secret != nil {
 		secretRef = corev1.ObjectReference{
@@ -29,6 +31,7 @@ func NewProvider(providerName string, providerType forkliftv1.ProviderType, name
 			Namespace: namespace,
 		}
 	}
+
 	p := forkliftv1.Provider{
 		TypeMeta: v1.TypeMeta{
 			Kind:       "Provider",
@@ -46,7 +49,7 @@ func NewProvider(providerName string, providerType forkliftv1.ProviderType, name
 	return p
 }
 
-func WaitForProviderReadyWithTimeout(cl crclient.Client, namespace string, providerName string, timeout time.Duration) error {
+func WaitForProviderReadyWithTimeout(cl crclient.Client, namespace string, providerName string, timeout time.Duration) (*forkliftv1.Provider, error) {
 	providerIdentifier := types.NamespacedName{Namespace: namespace, Name: providerName}
 
 	returnedProvider := &forkliftv1.Provider{}
@@ -59,10 +62,10 @@ func WaitForProviderReadyWithTimeout(cl crclient.Client, namespace string, provi
 	})
 	if err != nil {
 		conditions := returnedProvider.Status.Conditions.List
-		return fmt.Errorf("Provider %s not ready within %v - Phase/condition: %v/%v",
+		return nil, fmt.Errorf("Provider %s not ready within %v - Phase/condition: %v/%v",
 			providerName, timeout, returnedProvider.Status.Phase, conditions[len(conditions)-1].Message)
 	}
-	return nil
+	return returnedProvider, nil
 }
 
 // CreateProviderFromDefinition is used by tests to create a Provider
