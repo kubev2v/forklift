@@ -13,6 +13,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/ovirt"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	"github.com/konveyor/forklift-controller/pkg/settings"
 	ovirtsdk "github.com/ovirt/go-ovirt"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
@@ -510,11 +511,11 @@ func (r Client) removePrecopies(precopies []planapi.Precopy, vmService *ovirtsdk
 			}
 
 			select {
-			case <-time.After(2 * time.Hour):
+			case <-time.After(time.Duration(settings.Settings.Migration.SnapshotRemovalTimeout)):
 				r.Log.Info("Timeout waiting for snapshot removal")
 				return
 			default:
-				time.Sleep(30 * time.Second)
+				time.Sleep(time.Duration(settings.Settings.Migration.SnapshotStatusCheckRate))
 			}
 		}
 	}
