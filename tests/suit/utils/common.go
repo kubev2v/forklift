@@ -14,6 +14,7 @@ var (
 	// DefaultStorageClass the default storage class used in tests
 	DefaultStorageClass *storagev1.StorageClass
 	forklift_namespace  = "konveyor-forklift"
+	TargetProviderName  = "host"
 )
 
 // ClientsIface is the clients interface
