@@ -58,6 +58,10 @@ spec:
           value: ${VIRT_V2V_WARM_IMAGE}
         - name: VIRT_V2V_DONT_REQUEST_KVM
           value: ${VIRT_V2V_DONT_REQUEST_KVM}
+        - name: SNAPSHOT_REMOVAL_TIMEOUT
+          value: ${SNAPSHOT_REMOVAL_TIMEOUT}
+        - name: SNAPSHOT_STATUS_CHECK_RATE
+          value: ${SNAPSHOT_STATUS_CHECK_RATE}
         - name: POPULATOR_CONTROLLER_IMAGE
           value: ${POPULATOR_CONTROLLER_IMAGE}
         - name: OVIRT_POPULATOR_IMAGE
