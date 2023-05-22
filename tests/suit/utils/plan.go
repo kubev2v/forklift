@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	forkliftv1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/provider"
@@ -25,6 +26,7 @@ func CreatePlanFromDefinition(cl crclient.Client, def *forkliftv1.Plan) error {
 	}
 	return err
 }
+
 func NewPlanWithVmName(providerIdentifier forkliftv1.Provider, namespace, planName, storageMap, networkMap string, vmNames []string, targetNameSpace string) *forkliftv1.Plan {
 	planDef := newPlan(providerIdentifier, namespace, planName, storageMap, networkMap, targetNameSpace)
 	planDef.Spec.VMs = []plan.VM{
@@ -35,7 +37,7 @@ func NewPlanWithVmName(providerIdentifier forkliftv1.Provider, namespace, planNa
 	return planDef
 }
 
-func NewPlanWithVmId(providerIdentifier forkliftv1.Provider, namespace, planName, storageMap, networkMap string, vmIds []string, targetNameSpace string) *forkliftv1.Plan {
+func NewPlanWithVmId(providerIdentifier forkliftv1.Provider, namespace, planName, storageMap, networkMap, targetNameSpace string, vmIds []string) *forkliftv1.Plan {
 	planDef := newPlan(providerIdentifier, namespace, planName, storageMap, networkMap, targetNameSpace)
 	planDef.Spec.VMs = []plan.VM{
 		{
@@ -83,7 +85,14 @@ func newPlan(providerIdentifier forkliftv1.Provider, namespace, planName, storag
 	return plan
 }
 
-func WaitForPlanReadyWithTimeout(cl crclient.Client, namespace, planName string, timeout time.Duration) error {
+func GetPlan(cl crclient.Client, namespace, planName string) (error, *forkliftv1.Plan) {
+	planIdentifier := types.NamespacedName{Namespace: namespace, Name: planName}
+	plan := &forkliftv1.Plan{}
+	err := cl.Get(context.TODO(), planIdentifier, plan)
+	return err, plan
+}
+
+func WaitForPlanReadyWithTimeout(cl crclient.Client, namespace, planName string, timeout time.Duration) (error, *forkliftv1.Plan) {
 	planIdentifier := types.NamespacedName{Namespace: namespace, Name: planName}
 
 	returnedMap := &forkliftv1.Plan{}
@@ -96,7 +105,29 @@ func WaitForPlanReadyWithTimeout(cl crclient.Client, namespace, planName string,
 		return true, nil
 	})
 	if err != nil {
-		return fmt.Errorf("Plan %s not ready within %v", planName, timeout)
+		return fmt.Errorf("Plan %s not ready within %v", planName, timeout), returnedMap
 	}
-	return nil
+	return nil, returnedMap
+}
+
+func CreateNetworkAttachmentDefinition(cl crclient.Client, name, namespace string) (error, *net.NetworkAttachmentDefinition) {
+	nad := &net.NetworkAttachmentDefinition{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+	err := cl.Create(context.TODO(), nad, &crclient.CreateOptions{})
+	return err, nad
+}
+
+func DeleteNetworkAttachmentDefinition(cl crclient.Client, name, namespace string) error {
+	nad := &net.NetworkAttachmentDefinition{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+	err := cl.Delete(context.TODO(), nad)
+	return err
 }
