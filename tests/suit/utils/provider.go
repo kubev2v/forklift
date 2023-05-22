@@ -3,6 +3,8 @@ package utils
 import (
 	"context"
 	"fmt"
+	"time"
+
 	forkliftv1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/onsi/ginkgo"
 	corev1 "k8s.io/api/core/v1"
@@ -11,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
 )
 
 func NewProvider(providerName string, providerType forkliftv1.ProviderType, namespace string, providerSetting map[string]string, url string, secret *corev1.Secret) forkliftv1.Provider {
@@ -21,7 +22,13 @@ func NewProvider(providerName string, providerType forkliftv1.ProviderType, name
 		Namespace: namespace,
 		Name:      providerName,
 	}
-
+	var secretRef corev1.ObjectReference
+	if secret != nil {
+		secretRef = corev1.ObjectReference{
+			Name:      secret.Name,
+			Namespace: namespace,
+		}
+	}
 	p := forkliftv1.Provider{
 		TypeMeta: v1.TypeMeta{
 			Kind:       "Provider",
@@ -32,10 +39,7 @@ func NewProvider(providerName string, providerType forkliftv1.ProviderType, name
 			Type:     &providerType,
 			URL:      url,
 			Settings: providerSetting,
-			Secret: corev1.ObjectReference{
-				Name:      secret.Name,
-				Namespace: namespace,
-			},
+			Secret:   secretRef,
 		},
 	}
 
