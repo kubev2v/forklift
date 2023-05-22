@@ -19,26 +19,24 @@ import (
 
 // CreatePlanFromDefinition is used by tests to create a Plan
 func CreatePlanFromDefinition(cl crclient.Client, def *forkliftv1.Plan) error {
-	var err error
-	err = cl.Create(context.TODO(), def, &crclient.CreateOptions{})
-
+	err := cl.Create(context.TODO(), def, &crclient.CreateOptions{})
 	if err == nil || apierrs.IsAlreadyExists(err) {
 		return nil
 	}
 	return err
 }
-func NewPlanWithVmName(namespace string, providerIdentifier forkliftv1.Provider, planName string, storageMap string, networkMap string, vmName []string, targetNameSpace string) *forkliftv1.Plan {
-	planDef := newPlan(namespace, providerIdentifier, planName, storageMap, networkMap, targetNameSpace)
+func NewPlanWithVmName(providerIdentifier forkliftv1.Provider, namespace, planName, storageMap, networkMap string, vmNames []string, targetNameSpace string) *forkliftv1.Plan {
+	planDef := newPlan(providerIdentifier, namespace, planName, storageMap, networkMap, targetNameSpace)
 	planDef.Spec.VMs = []plan.VM{
 		{
-			Ref: ref.Ref{Name: vmName[0]},
+			Ref: ref.Ref{Name: vmNames[0]},
 		},
 	}
 	return planDef
 }
 
-func NewPlanWithVmId(namespace string, providerIdentifier forkliftv1.Provider, planName string, storageMap string, networkMap string, vmIds []string, targetNameSpace string) *forkliftv1.Plan {
-	planDef := newPlan(namespace, providerIdentifier, planName, storageMap, networkMap, targetNameSpace)
+func NewPlanWithVmId(providerIdentifier forkliftv1.Provider, namespace, planName, storageMap, networkMap string, vmIds []string, targetNameSpace string) *forkliftv1.Plan {
+	planDef := newPlan(providerIdentifier, namespace, planName, storageMap, networkMap, targetNameSpace)
 	planDef.Spec.VMs = []plan.VM{
 		{
 			Ref: ref.Ref{ID: vmIds[0]},
@@ -47,8 +45,7 @@ func NewPlanWithVmId(namespace string, providerIdentifier forkliftv1.Provider, p
 	return planDef
 }
 
-func newPlan(namespace string, providerIdentifier forkliftv1.Provider, planName string, storageMap string, networkMap string, targetNameSpace string) *forkliftv1.Plan {
-
+func newPlan(providerIdentifier forkliftv1.Provider, namespace, planName, storageMap, networkMap, targetNameSpace string) *forkliftv1.Plan {
 	plan := &forkliftv1.Plan{
 		TypeMeta: v1.TypeMeta{
 			Kind:       "Plan",
@@ -86,7 +83,7 @@ func newPlan(namespace string, providerIdentifier forkliftv1.Provider, planName 
 	return plan
 }
 
-func WaitForPlanReadyWithTimeout(cl crclient.Client, namespace string, planName string, timeout time.Duration) error {
+func WaitForPlanReadyWithTimeout(cl crclient.Client, namespace, planName string, timeout time.Duration) error {
 	planIdentifier := types.NamespacedName{Namespace: namespace, Name: planName}
 
 	returnedMap := &forkliftv1.Plan{}
