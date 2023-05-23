@@ -485,6 +485,7 @@ func (r Client) removePrecopies(precopies []planapi.Precopy, vmService *ovirtsdk
 						_, err = snapService.Remove().Query("correlation_id", correlationID).Send()
 						if err != nil {
 							err = liberr.Wrap(err)
+							r.Log.Error(err, "Error removing snapshot")
 							return true, err
 						}
 					}
