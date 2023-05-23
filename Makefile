@@ -251,9 +251,29 @@ build-openstack-populator-image: check_container_runtmime
 push-openstack-populator-image: build-openstack-populator-image
 	$(CONTAINER_CMD) push $(OPENSTACK_POPULATOR_IMAGE)
 
-build-all-images: build-api-image build-controller-image build-validation-image build-operator-image build-virt-v2v-image build-virt-v2v-warm-image build-operator-bundle-image build-operator-index-image build-populator-controller-image build-ovirt-populator-image build-openstack-populator-image
+build-all-images: build-api-image \
+                  build-controller-image \
+                  build-validation-image \
+                  build-operator-image \
+                  build-virt-v2v-image \
+                  build-virt-v2v-warm-image \
+                  build-operator-bundle-image \
+                  build-operator-index-image \
+                  build-populator-controller-image \
+                  build-ovirt-populator-image \
+                  build-openstack-populator-image
 
-push-all-images: push-api-image push-controller-image push-validation-image push-operator-image push-virt-v2v-image push-virt-v2v-warm-image push-operator-bundle-image push-operator-index-image push-populator-controller-image push-ovirt-populator-image push-openstack-populator-image
+push-all-images:  push-api-image \
+                  push-controller-image \
+                  push-validation-image \
+                  push-operator-image \
+                  push-virt-v2v-image \
+                  push-virt-v2v-warm-image \
+                  push-operator-bundle-image \
+                  push-operator-index-image \
+                  push-populator-controller-image \
+                  push-ovirt-populator-image \
+                  push-openstack-populator-image
 
 .PHONY: check_container_runtmime
 check_container_runtmime:
