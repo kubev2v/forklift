@@ -25,6 +25,11 @@ OPM_OPTS ?=
 DEFAULT_CONTROLLER_GEN = $(GOBIN)/controller-gen
 CONTROLLER_GEN ?= $(DEFAULT_CONTROLLER_GEN)
 
+# By default use the kubectl installed by the
+# 'kubectl' target
+DEFAULT_KUBECTL = $(GOBIN)/kubectl
+KUBECTL ?= $(DEFAULT_KUBECTL)
+
 # Image URLs to use all building/pushing image targets
 CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-controller:$(REGISTRY_TAG)
 API_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-api:$(REGISTRY_TAG)
@@ -95,13 +100,12 @@ run: generate fmt vet
 		KUBEVIRT_CLIENT_GO_SCHEME_REGISTRATION_VERSION=v1 go run ./cmd/forklift-controller/main.go
 
 # Install CRDs into a cluster
-install: manifests
-	kubectl apply -f config/crds
+install: manifests kubectl
+	$(KUBECTL) apply -k operator/config/crds
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
-deploy: manifests
-	kubectl apply -f config/crds
-	kustomize build config/default | kubectl apply -f -
+deploy: manifests kubectl
+	$(KUBECTL) apply -k operator/config/default
 
 # Generate manifests e.g. CRD, Webhooks
 manifests: controller-gen
@@ -266,3 +270,8 @@ bazel-generate:
 controller-gen: $(CONTROLLER_GEN)
 $(DEFAULT_CONTROLLER_GEN):
 	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.10.0
+
+.PHONY: kubectl
+kubectl: $(KUBECTL)
+$(DEFAULT_KUBECTL):
+	curl -L https://dl.k8s.io/release/v1.25.10/bin/linux/amd64/kubectl -o $(GOBIN)/kubectl && chmod +x $(GOBIN)/kubectl
