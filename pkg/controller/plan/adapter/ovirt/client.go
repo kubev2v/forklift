@@ -435,6 +435,7 @@ func (r Client) Finalize(vms []*planapi.VMStatus, planName string) {
 	}
 
 	wg.Wait()
+	r.Log.Info("Finished removing precopies")
 }
 
 func (r Client) removePrecopies(precopies []planapi.Precopy, vmService *ovirtsdk.VmService, wg *sync.WaitGroup) {
