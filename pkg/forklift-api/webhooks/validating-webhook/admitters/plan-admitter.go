@@ -38,31 +38,31 @@ func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv
 
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		log.Error(err, "Couldn't get the cluster configuration", err.Error())
+		log.Error(err, "Couldn't get the cluster configuration")
 		return util.ToAdmissionResponseError(err)
 	}
 
 	err = api.SchemeBuilder.AddToScheme(scheme.Scheme)
 	if err != nil {
-		log.Error(err, "Couldn't build the scheme", err.Error())
+		log.Error(err, "Couldn't build the scheme")
 		return util.ToAdmissionResponseError(err)
 	}
 	err = apis.AddToScheme(scheme.Scheme)
 	if err != nil {
-		log.Error(err, "Couldn't add forklift API to the scheme", err.Error())
+		log.Error(err, "Couldn't add forklift API to the scheme")
 		return util.ToAdmissionResponseError(err)
 	}
 
 	cl, err := client.New(config, client.Options{Scheme: scheme.Scheme})
 	if err != nil {
-		log.Error(err, "Couldn't create a cluster client", err.Error())
+		log.Error(err, "Couldn't create a cluster client")
 		return util.ToAdmissionResponseError(err)
 	}
 
 	sourceProvider := api.Provider{}
 	err = cl.Get(context.TODO(), client.ObjectKey{Namespace: plan.Spec.Provider.Source.Namespace, Name: plan.Spec.Provider.Source.Name}, &sourceProvider)
 	if err != nil {
-		log.Error(err, "Couldn't get the source provider", err.Error())
+		log.Error(err, "Couldn't get the source provider")
 		return util.ToAdmissionResponseError(err)
 	}
 
@@ -74,7 +74,7 @@ func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv
 	destinationProvider := api.Provider{}
 	err = cl.Get(context.TODO(), client.ObjectKey{Namespace: plan.Spec.Provider.Destination.Namespace, Name: plan.Spec.Provider.Destination.Name}, &destinationProvider)
 	if err != nil {
-		log.Error(err, "Couldn't get the destination provider", err.Error())
+		log.Error(err, "Couldn't get the destination provider")
 		return util.ToAdmissionResponseError(err)
 	}
 
@@ -86,14 +86,14 @@ func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv
 	storageClasses := v1.StorageClassList{}
 	err = cl.List(context.TODO(), &storageClasses, &client.ListOptions{})
 	if err != nil {
-		log.Error(err, "Couldn't get the cluster storage classes", err.Error())
+		log.Error(err, "Couldn't get the cluster storage classes")
 		return util.ToAdmissionResponseError(err)
 	}
 
 	storageMap := api.StorageMap{}
 	err = cl.Get(context.TODO(), client.ObjectKey{Namespace: plan.Spec.Map.Storage.Namespace, Name: plan.Spec.Map.Storage.Name}, &storageMap)
 	if err != nil {
-		log.Error(err, "Couldn't get the storage map", err.Error())
+		log.Error(err, "Couldn't get the storage map")
 		return util.ToAdmissionResponseError(err)
 	}
 	storagePairList := storageMap.Spec.Map
