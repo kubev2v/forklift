@@ -38,6 +38,10 @@ spec:
               value: "/var/run/secrets/{{ api_tls_secret_name }}/tls.crt"
             - name: API_TLS_KEY
               value: "/var/run/secrets/{{ api_tls_secret_name }}/tls.key"
+            - name: API_HOST
+              value: {{ inventory_service_name }}.{{ app_namespace }}.svc.cluster.local
+            - name: API_PORT
+              value: "8443"
           resources:
             limits:
               cpu: {{ api_container_limits_cpu }}
