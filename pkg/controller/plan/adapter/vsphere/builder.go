@@ -211,7 +211,7 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		}
 		if parent.Variant == "ComputeResource" {
 			// This is a stand-alone host without a cluster. We
-			// need to use path to the partent resource instead.
+			// need to use path to the parent resource instead.
 			path = parent.Path
 		}
 	}
