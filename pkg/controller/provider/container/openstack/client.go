@@ -126,14 +126,19 @@ func (r *Client) Authenticate() (err error) {
 		} else {
 			cacert := []byte(r.getStringFromSecret(CACert))
 			roots := x509.NewCertPool()
-			ok := roots.AppendCertsFromPEM(cacert)
-			if !ok {
-				r.Log.Info("the CA certificate is malformed or was not provided, falling back to system CA cert pool")
+
+			if len(cacert) == 0 {
+				r.Log.Info("CA certificate was not provided, falling back to system CA cert pool")
 				roots, err = x509.SystemCertPool()
 				if err != nil {
 					err = liberr.New("failed to configure the system's CA cert pool")
 					return
 				}
+			}
+
+			ok := roots.AppendCertsFromPEM(cacert)
+			if !ok {
+				err = liberr.New("CA certificate is malformed, failed to configure the CA cert pool")
 			}
 			TLSClientConfig = &tls.Config{RootCAs: roots}
 		}
