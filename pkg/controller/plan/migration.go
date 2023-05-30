@@ -673,7 +673,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		}
 
 		if r.kubevirt.useOvirtPopulator(vm) {
-			pvcNames, err = r.kubevirt.createVolumesForOvirt(vm.Ref)
+			pvcNames, err = r.kubevirt.createVolumesForOvirt(vm)
 			if err != nil {
 				step.AddError(err.Error())
 				err = nil
@@ -1025,6 +1025,21 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 	}
 	vm.ReflectPipeline()
 	if vm.Phase == Completed && vm.Error == nil {
+		// Detach LUNs
+		err = r.provider.DetachDisk(vm.Ref)
+		if err != nil {
+			step, found := vm.FindStep(r.step(vm))
+			if !found {
+				vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
+			}
+			step.AddError(err.Error())
+			r.Log.Error(err,
+				"Could not detach source VM LUN disks.",
+				"vm",
+				vm.String())
+			err = nil
+			return
+		}
 		vm.SetCondition(
 			libcnd.Condition{
 				Type:     Succeeded,
@@ -1033,6 +1048,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				Message:  "The VM migration has SUCCEEDED.",
 				Durable:  true,
 			})
+
 		// Power on the destination VM if the source VM was originally powered on.
 		err = r.setRunning(vm, vm.RestorePowerState == On)
 		if err != nil {
@@ -1336,6 +1352,10 @@ func (r *Migration) updateCopyProgressForOvirt(vm *plan.VMStatus, step *plan.Ste
 		return
 	}
 	for _, pvc := range pvcs {
+		if _, ok := pvc.Annotations["lun"]; !ok {
+			// it's a lun
+			continue
+		}
 		claim := pvc.Spec.DataSource.Name
 		task, found := step.FindTask(claim)
 		if !found {

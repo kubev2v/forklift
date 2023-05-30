@@ -106,7 +106,12 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 		return
 	}
 	for _, da := range vm.DiskAttachments {
-		if !r.plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{ID: da.Disk.StorageDomain}) {
+		if da.Disk.StorageType != "lun" {
+			if !r.plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{ID: da.Disk.StorageDomain}) {
+				return
+			}
+		} else if len(da.Disk.Lun.LogicalUnits.LogicalUnit) > 0 && da.Disk.Lun.LogicalUnits.LogicalUnit[0].Address == "" {
+			// Have LUN disk but without the relevant data. This might happen with older oVirt versions.
 			return
 		}
 	}

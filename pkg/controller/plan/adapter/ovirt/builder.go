@@ -198,7 +198,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 			return
 		}
 		for _, da := range vm.DiskAttachments {
-			if da.Disk.StorageDomain == sd.ID {
+			if da.Disk.StorageType == "image" && da.Disk.StorageDomain == sd.ID {
 				storageClass := mapped.Destination.StorageClass
 				size := da.Disk.ProvisionedSize
 				if da.Disk.ActualSize > size {
@@ -427,16 +427,6 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 	for _, da := range vm.DiskAttachments {
 		claimName := pvcMap[da.Disk.ID].Name
 		volumeName := da.Disk.ID
-		volume := cnv.Volume{
-			Name: volumeName,
-			VolumeSource: cnv.VolumeSource{
-				PersistentVolumeClaim: &cnv.PersistentVolumeClaimVolumeSource{
-					PersistentVolumeClaimVolumeSource: core.PersistentVolumeClaimVolumeSource{
-						ClaimName: claimName,
-					},
-				},
-			},
-		}
 		var bus string
 		switch da.Interface {
 		case VirtioScsi:
@@ -446,11 +436,34 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 		default:
 			bus = Virtio
 		}
-		disk := cnv.Disk{
+		var disk cnv.Disk
+		if da.Disk.Disk.StorageType == "lun" {
+			claimName = volumeName
+			disk = cnv.Disk{
+				Name: volumeName,
+				DiskDevice: cnv.DiskDevice{
+					LUN: &cnv.LunTarget{
+						Bus: cnv.DiskBus(bus),
+					},
+				},
+			}
+		} else {
+			disk = cnv.Disk{
+				Name: volumeName,
+				DiskDevice: cnv.DiskDevice{
+					Disk: &cnv.DiskTarget{
+						Bus: cnv.DiskBus(bus),
+					},
+				},
+			}
+		}
+		volume := cnv.Volume{
 			Name: volumeName,
-			DiskDevice: cnv.DiskDevice{
-				Disk: &cnv.DiskTarget{
-					Bus: cnv.DiskBus(bus),
+			VolumeSource: cnv.VolumeSource{
+				PersistentVolumeClaim: &cnv.PersistentVolumeClaimVolumeSource{
+					PersistentVolumeClaimVolumeSource: core.PersistentVolumeClaimVolumeSource{
+						ClaimName: claimName,
+					},
 				},
 			},
 		}
@@ -478,18 +491,22 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 			vmRef.String())
 	}
 	for _, da := range vm.DiskAttachments {
-		mB := da.Disk.ProvisionedSize / 0x100000
-		list = append(
-			list,
-			&plan.Task{
-				Name: da.Disk.ID,
-				Progress: libitr.Progress{
-					Total: mB,
-				},
-				Annotations: map[string]string{
-					"unit": "MB",
-				},
-			})
+		// We don't add a task for LUNs because we don't copy their content but rather assume we can connect to
+		// the LUNs that are used in the source environment also from the target environment.
+		if da.Disk.StorageType != "lun" {
+			mB := da.Disk.ProvisionedSize / 0x100000
+			list = append(
+				list,
+				&plan.Task{
+					Name: da.Disk.ID,
+					Progress: libitr.Progress{
+						Total: mB,
+					},
+					Annotations: map[string]string{
+						"unit": "MB",
+					},
+				})
+		}
 	}
 
 	return
@@ -577,4 +594,111 @@ func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName
 
 func (r *Builder) PreTransferActions(c planbase.Client, vmRef ref.Ref) (ready bool, err error) {
 	return true, nil
+}
+
+// Create PVs specs for the VM LUNs.
+func (r *Builder) LunPersistentVolumes(vmRef ref.Ref) (pvs []core.PersistentVolume, err error) {
+	vm := &model.Workload{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(
+			err,
+			"VM lookup failed.",
+			"vm",
+			vmRef.String())
+		return
+	}
+	for _, da := range vm.DiskAttachments {
+		if da.Disk.StorageType == "lun" {
+			volMode := core.PersistentVolumeBlock
+			logicalUnit := da.Disk.Lun.LogicalUnits.LogicalUnit[0]
+
+			pvSpec := core.PersistentVolume{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      da.Disk.ID,
+					Namespace: r.Plan.Spec.TargetNamespace,
+					Annotations: map[string]string{
+						AnnImportDiskId: da.Disk.ID,
+						"vmID":          vm.ID,
+						"plan":          string(r.Plan.UID),
+						"lun":           "true",
+					},
+					Labels: map[string]string{
+						"volume": fmt.Sprintf("%v-%v", vm.Name, da.ID),
+					},
+				},
+				Spec: core.PersistentVolumeSpec{
+					PersistentVolumeSource: core.PersistentVolumeSource{
+						ISCSI: &core.ISCSIPersistentVolumeSource{
+							TargetPortal: logicalUnit.Address + ":" + logicalUnit.Port,
+							IQN:          logicalUnit.Target,
+							Lun:          logicalUnit.LunMapping,
+							ReadOnly:     false,
+						},
+					},
+					Capacity: core.ResourceList{
+						core.ResourceStorage: *resource.NewQuantity(logicalUnit.Size, resource.BinarySI),
+					},
+					AccessModes: []core.PersistentVolumeAccessMode{
+						core.ReadWriteMany,
+					},
+					VolumeMode: &volMode,
+				},
+			}
+			pvs = append(pvs, pvSpec)
+		}
+	}
+	return
+}
+
+// Create PVCs specs for the VM LUNs.
+func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.PersistentVolumeClaim, err error) {
+	vm := &model.Workload{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(
+			err,
+			"VM lookup failed.",
+			"vm",
+			vmRef.String())
+		return
+	}
+	for _, da := range vm.DiskAttachments {
+		if da.Disk.StorageType == "lun" {
+			sc := ""
+			volMode := core.PersistentVolumeBlock
+			pvcSpec := core.PersistentVolumeClaim{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      da.Disk.ID,
+					Namespace: r.Plan.Spec.TargetNamespace,
+					Annotations: map[string]string{
+						AnnImportDiskId: da.Disk.ID,
+						"vmID":          vm.ID,
+						"plan":          string(r.Plan.UID),
+						"lun":           "true",
+					},
+					Labels: map[string]string{"migration": r.Migration.Name},
+				},
+				Spec: core.PersistentVolumeClaimSpec{
+					AccessModes: []core.PersistentVolumeAccessMode{
+						core.ReadWriteMany,
+					},
+					Selector: &meta.LabelSelector{
+						MatchLabels: map[string]string{
+							"volume": fmt.Sprintf("%v-%v", vm.Name, da.ID),
+						},
+					},
+					StorageClassName: &sc,
+					VolumeMode:       &volMode,
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceStorage: *resource.NewQuantity(da.Disk.Lun.LogicalUnits.LogicalUnit[0].Size, resource.BinarySI),
+						},
+					},
+				},
+			}
+			pvcs = append(pvcs, pvcSpec)
+		}
+	}
+	return
 }

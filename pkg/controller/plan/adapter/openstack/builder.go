@@ -1153,3 +1153,15 @@ func (r *Builder) cleanup(c planbase.Client, imageName string) {
 		}
 	}
 }
+
+// Build LUN PVs.
+func (r *Builder) LunPersistentVolumes(vmRef ref.Ref) (pvs []core.PersistentVolume, err error) {
+	// do nothing
+	return
+}
+
+// Build LUN PVCs.
+func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.PersistentVolumeClaim, err error) {
+	// do nothing
+	return
+}
