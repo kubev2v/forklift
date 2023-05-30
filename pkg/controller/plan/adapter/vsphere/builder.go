@@ -823,3 +823,15 @@ func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName
 func (r *Builder) PreTransferActions(c planbase.Client, vmRef ref.Ref) (ready bool, err error) {
 	return true, nil
 }
+
+// Build LUN PVs.
+func (r *Builder) LunPersistentVolumes(vmRef ref.Ref) (pvs []core.PersistentVolume, err error) {
+	// do nothing
+	return
+}
+
+// Build LUN PVCs.
+func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.PersistentVolumeClaim, err error) {
+	// do nothing
+	return
+}

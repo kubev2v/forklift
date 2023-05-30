@@ -586,13 +586,13 @@ func (r *KubeVirt) getPVCs(vm *plan.VMStatus) (pvcs []core.PersistentVolumeClaim
 	return
 }
 
-func (r *KubeVirt) createVolumesForOvirt(vm ref.Ref) (pvcNames []string, err error) {
-	secret, err := r.ensureSecret(vm, r.copyDataFromProviderSecret)
+func (r *KubeVirt) createVolumesForOvirt(vm *plan.VMStatus) (pvcNames []string, err error) {
+	secret, err := r.ensureSecret(vm.Ref, r.copyDataFromProviderSecret)
 	if err != nil {
 		return
 	}
 	ovirtVm := &ovirt.Workload{}
-	err = r.Source.Inventory.Find(ovirtVm, vm)
+	err = r.Source.Inventory.Find(ovirtVm, vm.Ref)
 	if err != nil {
 		return
 	}
@@ -601,8 +601,12 @@ func (r *KubeVirt) createVolumesForOvirt(vm ref.Ref) (pvcNames []string, err err
 		return
 	}
 
-	storageName := &r.Context.Map.Storage.Spec.Map[0].Destination.StorageClass
 	for _, da := range ovirtVm.DiskAttachments {
+		if da.Disk.StorageType == "lun" {
+			continue
+		}
+		// The VM has a disk image so the storage map is necessarily not empty, and we can read the storage class from it.
+		storageName := &r.Context.Map.Storage.Spec.Map[0].Destination.StorageClass
 		populatorCr := util.OvirtVolumePopulator(da, sourceUrl, r.Plan.Spec.TransferNetwork, r.Plan.Spec.TargetNamespace, secret.Name, vm.ID, string(r.Migration.UID))
 		failure := r.Client.Create(context.Background(), populatorCr, &client.CreateOptions{})
 		if failure != nil && !k8serr.IsAlreadyExists(failure) {
@@ -626,6 +630,29 @@ func (r *KubeVirt) createVolumesForOvirt(vm ref.Ref) (pvcNames []string, err err
 		pvcNames = append(pvcNames, pvc.Name)
 	}
 
+	err = r.createLunDisks(vm)
+
+	return
+}
+
+// Creates the PVs and PVCs for LUN disks.
+func (r *KubeVirt) createLunDisks(vm *plan.VMStatus) (err error) {
+	lunPvcs, err := r.Builder.LunPersistentVolumeClaims(vm.Ref)
+	if err != nil {
+		return
+	}
+	err = r.EnsurePersistentVolumeClaim(vm, lunPvcs)
+	if err != nil {
+		return
+	}
+	lunPvs, err := r.Builder.LunPersistentVolumes(vm.Ref)
+	if err != nil {
+		return
+	}
+	err = r.EnsurePersistentVolume(vm, lunPvs)
+	if err != nil {
+		return
+	}
 	return
 }
 
@@ -713,6 +740,9 @@ func (r *KubeVirt) areOvirtPVCsReady(vm ref.Ref, step *plan.Step) (ready bool, e
 	ready = true
 
 	for _, da := range ovirtVm.DiskAttachments {
+		if da.Disk.StorageType == "lun" {
+			continue
+		}
 		obj := client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: da.Disk.ID}
 		pvc := core.PersistentVolumeClaim{}
 		err = r.Client.Get(context.Background(), obj, &pvc)
@@ -1037,6 +1067,8 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 	if err != nil {
 		return
 	}
+
+	err = r.createLunDisks(vm)
 
 	return
 }
@@ -1955,5 +1987,86 @@ func (r *KubeVirt) setPopulatorPodLabels(pod core.Pod, migrationId string) (err 
 	pod.Labels[kMigration] = migrationId
 	patch := client.MergeFrom(podCopy)
 	err = r.Destination.Client.Patch(context.TODO(), &pod, patch)
+	return
+}
+
+// Ensure the PV exist on the destination.
+func (r *KubeVirt) EnsurePersistentVolume(vm *plan.VMStatus, persistentVolumes []core.PersistentVolume) (err error) {
+	list := &core.PersistentVolumeList{}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: labels.SelectorFromSet(r.vmLabels(vm.Ref)),
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		})
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	for _, pv := range persistentVolumes {
+		exists := false
+		for _, item := range list.Items {
+			if val, ok := item.Labels["volume"]; ok {
+				if val == pv.Labels["volume"] {
+					exists = true
+					break
+				}
+			}
+		}
+
+		if !exists {
+			err = r.Destination.Client.Create(context.TODO(), &pv)
+			if err != nil {
+				err = liberr.Wrap(err)
+				return
+			}
+			r.Log.Info("Created PersistentVolume.",
+				"pv",
+				path.Join(
+					pv.Namespace,
+					pv.Name),
+				"vm",
+				vm.String())
+		}
+	}
+	return
+}
+
+// Ensure the PV exist on the destination.
+func (r *KubeVirt) EnsurePersistentVolumeClaim(vm *plan.VMStatus, persistentVolumeClaims []core.PersistentVolumeClaim) (err error) {
+	list, err := r.getPVCs(vm)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	for _, pvc := range persistentVolumeClaims {
+		exists := false
+		for _, item := range list {
+			if val, ok := item.Labels["volume"]; ok {
+				if val == pvc.Labels["volume"] {
+					exists = true
+					break
+				}
+			}
+		}
+
+		if !exists {
+			err = r.Destination.Client.Create(context.TODO(), &pvc)
+			if err != nil {
+				err = liberr.Wrap(err)
+				return
+			}
+			r.Log.Info("Created PersistentVolumeClaim.",
+				"pvc",
+				path.Join(
+					pvc.Namespace,
+					pvc.Name),
+				"vm",
+				vm.String())
+		}
+	}
 	return
 }
