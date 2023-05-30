@@ -187,6 +187,11 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		return
 	}
 
+	sslVerify := ""
+	if container.GetInsecureSkipVerifyFlag(sourceSecret) {
+		sslVerify = "no_verify=1"
+	}
+
 	host, err := r.host(vm.Host)
 	if err != nil {
 		err = liberr.Wrap(
@@ -196,37 +201,52 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 			vm.Host)
 		return
 	}
-	path := host.Path
-	// Check parent resource
-	if host.Parent.Kind == "Cluster" {
-		parent := &model.Cluster{}
-		err = r.Source.Inventory.Get(parent, host.Parent.ID)
-		if err != nil {
-			err = liberr.Wrap(
-				err,
-				"Cluster lookup failed.",
-				"cluster",
-				host.Parent.ID)
+
+	var libvirtURL liburl.URL
+	if hostDef, found := r.hosts[host.ID]; found {
+		// Connect through ESXi
+		hostSecret, nErr := r.hostSecret(hostDef)
+		if nErr != nil {
+			err = nErr
 			return
 		}
-		if parent.Variant == "ComputeResource" {
-			// This is a stand-alone host without a cluster. We
-			// need to use path to the parent resource instead.
-			path = parent.Path
+		libvirtURL = liburl.URL{
+			Scheme:   "esx",
+			Host:     hostDef.Spec.IpAddress,
+			User:     liburl.User(string(hostSecret.Data["user"])),
+			Path:     "",
+			RawQuery: sslVerify,
+		}
+	} else {
+		// Connect through VCenter
+		path := host.Path
+		// Check parent resource
+		if host.Parent.Kind == "Cluster" {
+			parent := &model.Cluster{}
+			err = r.Source.Inventory.Get(parent, host.Parent.ID)
+			if err != nil {
+				err = liberr.Wrap(
+					err,
+					"Cluster lookup failed.",
+					"cluster",
+					host.Parent.ID)
+				return
+			}
+			if parent.Variant == "ComputeResource" {
+				// This is a stand-alone host without a cluster. We
+				// need to use path to the parent resource instead.
+				path = parent.Path
+			}
+		}
+		libvirtURL = liburl.URL{
+			Scheme:   "vpx",
+			Host:     host.ManagementServerIp, // VCenter
+			User:     liburl.User(string(sourceSecret.Data["user"])),
+			Path:     path, // E.g.: /Datacenter/Cluster/host.example.com
+			RawQuery: sslVerify,
 		}
 	}
 
-	sslVerify := ""
-	if container.GetInsecureSkipVerifyFlag(sourceSecret) {
-		sslVerify = "no_verify=1"
-	}
-	libvirtURL := &liburl.URL{
-		Scheme:   "vpx",
-		Host:     host.ManagementServerIp, // VCenter
-		User:     liburl.User(string(sourceSecret.Data["user"])),
-		Path:     path, // E.g.: /Datacenter/Cluster/host.example.com
-		RawQuery: sslVerify,
-	}
 	env = append(
 		env,
 		core.EnvVar{
@@ -247,6 +267,7 @@ func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
 	if err != nil {
 		return
 	}
+	thumbprint := string(in.Data["thumbprint"])
 	if hostDef, found := r.hosts[hostID]; found {
 		hostSecret, nErr := r.hostSecret(hostDef)
 		if nErr != nil {
@@ -254,12 +275,19 @@ func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
 			return
 		}
 		in = hostSecret
+		// Get host thumbprint
+		h, nErr := r.host(hostID)
+		if nErr != nil {
+			err = nErr
+			return
+		}
+		thumbprint = h.Thumbprint
 	}
 
 	object.StringData = map[string]string{
 		"accessKeyId": string(in.Data["user"]),
 		"secretKey":   string(in.Data["password"]),
-		"thumbprint":  string(in.Data["thumbprint"]),
+		"thumbprint":  thumbprint,
 	}
 
 	return
