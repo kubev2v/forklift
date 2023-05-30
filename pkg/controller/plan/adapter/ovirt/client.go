@@ -544,3 +544,37 @@ func allJobsFinished(jobs []*ovirtsdk.Job) bool {
 
 	return true
 }
+
+// Remove disk attachment from the VM.
+func (r *Client) DetachDisk(vmRef ref.Ref) (err error) {
+	_, vmService, err := r.getVM(vmRef)
+	if err != nil {
+		return
+	}
+	vm := &model.Workload{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(
+			err,
+			"VM lookup failed.",
+			"vm",
+			vmRef.String())
+	}
+	diskAttachments := vm.DiskAttachments
+	for _, da := range diskAttachments {
+		if da.Disk.StorageType == "lun" {
+			_, err = vmService.DiskAttachmentsService().AttachmentService(da.ID).Remove().Send()
+			if err != nil {
+				err = liberr.Wrap(
+					err,
+					"failed to detach the LUN disk.",
+					"vm",
+					vmRef.String(),
+					"disk",
+					da)
+				return
+			}
+		}
+	}
+	return
+}

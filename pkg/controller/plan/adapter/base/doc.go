@@ -53,11 +53,14 @@ type Builder interface {
 	ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string
 	// Conversion Pod environment
 	PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env []core.EnvVar, err error)
-
 	// Create PersistentVolumeClaim with a DataSourceRef
 	PersistentVolumeClaimWithSourceRef(da interface{}, storageName *string, populatorName string, accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode) *core.PersistentVolumeClaim
 	// Add custom steps before creating PVC/DataVolume
 	PreTransferActions(c Client, vmRef ref.Ref) (ready bool, err error)
+	// Build LUN PVs.
+	LunPersistentVolumes(vmRef ref.Ref) (pvs []core.PersistentVolume, err error)
+	// Build LUN PVCs.
+	LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.PersistentVolumeClaim, err error)
 }
 
 // Client API.
@@ -83,6 +86,8 @@ type Client interface {
 	Close()
 	// Finalize migrations
 	Finalize(vms []*planapi.VMStatus, planName string)
+	// Remove disk attachment from the VM.
+	DetachDisk(vmRef ref.Ref) error
 }
 
 // Validator API.

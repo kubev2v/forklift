@@ -395,3 +395,8 @@ func (r *Client) Finalize(vms []*planapi.VMStatus, migrationName string) {
 		}
 	}
 }
+
+func (r *Client) DetachDisk(vmRef ref.Ref) (err error) {
+	// no-op
+	return
+}
