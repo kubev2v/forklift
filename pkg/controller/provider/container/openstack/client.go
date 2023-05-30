@@ -125,22 +125,18 @@ func (r *Client) Authenticate() (err error) {
 			TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 		} else {
 			cacert := []byte(r.getStringFromSecret(CACert))
-			roots := x509.NewCertPool()
-
 			if len(cacert) == 0 {
-				r.Log.Info("CA certificate was not provided, falling back to system CA cert pool")
-				roots, err = x509.SystemCertPool()
-				if err != nil {
-					err = liberr.New("failed to configure the system's CA cert pool")
+				r.Log.Info("CA certificate was not provided,system CA cert pool is used")
+			} else {
+				roots := x509.NewCertPool()
+				ok := roots.AppendCertsFromPEM(cacert)
+				if !ok {
+					err = liberr.New("CA certificate is malformed, failed to configure the CA cert pool")
 					return
 				}
+				TLSClientConfig = &tls.Config{RootCAs: roots}
 			}
 
-			ok := roots.AppendCertsFromPEM(cacert)
-			if !ok {
-				err = liberr.New("CA certificate is malformed, failed to configure the CA cert pool")
-			}
-			TLSClientConfig = &tls.Config{RootCAs: roots}
 		}
 	}
 
