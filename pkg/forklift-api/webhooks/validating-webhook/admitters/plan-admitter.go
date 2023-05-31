@@ -128,8 +128,8 @@ func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv
 		},
 		&admitter.sourceProvider)
 	if err != nil {
-		log.Error(err, "Couldn't get the source provider")
-		return util.ToAdmissionResponseError(err)
+		log.Error(err, "Couldn't get the source provider, passing unwillingly")
+		return util.ToAdmissionResponseAllow()
 	}
 
 	err = admitter.client.Get(
@@ -140,8 +140,8 @@ func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv
 		},
 		&admitter.destinationProvider)
 	if err != nil {
-		log.Error(err, "Couldn't get the destination provider")
-		return util.ToAdmissionResponseError(err)
+		log.Error(err, "Couldn't get the destination provider, passing unwillingly")
+		return util.ToAdmissionResponseAllow()
 	}
 
 	response := admitter.validateStorage()
