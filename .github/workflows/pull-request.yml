@@ -38,7 +38,7 @@ jobs:
 
       - name: Build and setup everything with bazel
         id: forkliftci
-        uses: kubev2v/forkliftci@v1.0
+        uses: kubev2v/forkliftci@v2.0
         with:
           gh_access_token: ${{ secrets.GITHUB_TOKEN }}
           provider_name: ${{ matrix.source_provider }}
@@ -57,7 +57,7 @@ jobs:
           OVIRT_USERNAME: admin@internal
           OVIRT_PASSWORD: 123456
           OVIRT_URL: https://fakeovirt.konveyor-forklift:30001/ovirt-engine/api
-          OVIRT_CACERT: /home/runner/work/_actions/kubev2v/forkliftci/v1.0/cluster/providers/ovirt/e2e_cacert.cer
+          OVIRT_CACERT: /home/runner/work/_actions/kubev2v/forkliftci/v2.0/cluster/providers/ovirt/e2e_cacert.cer
           STORAGE_CLASS: nfs-csi
           OVIRT_VM_ID: 31573c08-717b-43e0-825f-69a36fb0e1a1
         run: |
