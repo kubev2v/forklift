@@ -7,15 +7,14 @@ import (
 
 	"encoding/json"
 	"fmt"
-	"net/http"
 
 	admissionv1 "k8s.io/api/admission/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 
 	"github.com/konveyor/forklift-controller/pkg/apis"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/util"
 )
 
@@ -26,28 +25,28 @@ type PlanAdmitter struct {
 	destinationProvider api.Provider
 }
 
-func (admitter *PlanAdmitter) validateStorage() *admissionv1.AdmissionResponse {
+func (admitter *PlanAdmitter) validateStorage() error {
 
 	if admitter.plan.Spec.Warm {
 		log.Info("Warm migration supports all storages, passing")
-		return util.ToAdmissionResponseAllow()
+		return nil
 	}
 
 	if admitter.sourceProvider.Type() == api.VSphere {
 		log.Info("Provider supports all storages, passing")
-		return util.ToAdmissionResponseAllow()
+		return nil
 	}
 
 	if !admitter.destinationProvider.IsHost() {
 		log.Info("Migration to a remote provider supports all storages, passing")
-		return util.ToAdmissionResponseAllow()
+		return nil
 	}
 
 	storageClasses := v1.StorageClassList{}
 	err := admitter.client.List(context.TODO(), &storageClasses, &client.ListOptions{})
 	if err != nil {
 		log.Error(err, "Couldn't get the cluster storage classes")
-		return util.ToAdmissionResponseError(err)
+		return err
 	}
 
 	storageMap := api.StorageMap{}
@@ -60,7 +59,7 @@ func (admitter *PlanAdmitter) validateStorage() *admissionv1.AdmissionResponse {
 		&storageMap)
 	if err != nil {
 		log.Error(err, "Couldn't get the storage map")
-		return util.ToAdmissionResponseError(err)
+		return err
 	}
 	storagePairList := storageMap.Spec.Map
 	var badStorageClasses []string
@@ -75,13 +74,12 @@ func (admitter *PlanAdmitter) validateStorage() *admissionv1.AdmissionResponse {
 	if len(badStorageClasses) > 0 {
 		err := liberr.New(fmt.Sprintf("Static storage class(es) found: %v", badStorageClasses))
 		log.Error(err, "Static storage class(es) found failing", "classes", badStorageClasses)
-		return util.ToAdmissionResponseError(err)
+		return err
 	}
 
 	log.Info("Passed storage validation")
-	return util.ToAdmissionResponseAllow()
+	return nil
 }
-
 
 func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
 	log.Info("Plan admitter was called")
@@ -139,9 +137,9 @@ func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv
 		return util.ToAdmissionResponseAllow()
 	}
 
-	response := admitter.validateStorage()
-	if !response.Allowed {
-		return response
+	err = admitter.validateStorage()
+	if err != nil {
+		return util.ToAdmissionResponseError(err)
 	}
 
 	return util.ToAdmissionResponseAllow()
