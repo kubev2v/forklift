@@ -68,6 +68,7 @@ func ToAdmissionResponseError(err error) *admissionv1.AdmissionResponse {
 	//log.Log.Reason(err).Error("admission generic error")
 
 	return &admissionv1.AdmissionResponse{
+		Allowed: false,
 		Result: &v1.Status{
 			Message: err.Error(),
 			Code:    http.StatusBadRequest,

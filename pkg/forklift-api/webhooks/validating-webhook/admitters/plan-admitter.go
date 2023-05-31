@@ -73,14 +73,9 @@ func (admitter *PlanAdmitter) validateStorage() *admissionv1.AdmissionResponse {
 		}
 	}
 	if len(badStorageClasses) > 0 {
-		log.Error(fmt.Errorf("storage class(es) '%v' is static, failing", badStorageClasses), "Storage class(es) is static")
-		return &admissionv1.AdmissionResponse{
-			Allowed: false,
-			Result: &metav1.Status{
-				Code:    http.StatusBadRequest,
-				Message: fmt.Sprintf("This plan requires dynamic volume provisioning. Therefore the following destination storage classes cannot be used: %v", badStorageClasses),
-			},
-		}
+		err := liberr.New(fmt.Sprintf("Static storage class(es) found: %v", badStorageClasses))
+		log.Error(err, "Static storage class(es) found failing", "classes", badStorageClasses)
+		return util.ToAdmissionResponseError(err)
 	}
 
 	log.Info("Passed storage validation")
