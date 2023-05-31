@@ -30,8 +30,6 @@ type HostSpec struct {
 	Provider core.ObjectReference `json:"provider" ref:"Provider"`
 	// IP address used for disk transfer.
 	IpAddress string `json:"ipAddress"`
-	// Certificate SHA-1 fingerprint, called thumbprint by VMware.
-	Thumbprint string `json:"thumbprint,omitempty"`
 	// Credentials.
 	Secret core.ObjectReference `json:"secret" ref:"Secret"`
 }
