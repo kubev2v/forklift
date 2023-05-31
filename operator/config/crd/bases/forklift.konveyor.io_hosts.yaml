@@ -130,9 +130,6 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
-              thumbprint:
-                description: Certificate SHA-1 fingerprint, called thumbprint by VMware.
-                type: string
               type:
                 description: Type used to qualify the name.
                 type: string
