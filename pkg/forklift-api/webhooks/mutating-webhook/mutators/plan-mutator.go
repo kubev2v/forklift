@@ -18,111 +18,35 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	AnnPopulatorLabels = "populatorLabels"
+)
+
 type PlanMutator struct {
+	ar   *admissionv1.AdmissionReview
+	plan api.Plan
 }
 
 func (mutator *PlanMutator) Mutate(ar *admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
 	log.Info("plan mutator was called")
+	mutator.ar = ar
 	raw := ar.Request.Object.Raw
-	plan := &api.Plan{}
-	err := json.Unmarshal(raw, plan)
+	err := json.Unmarshal(raw, &mutator.plan)
 	if err != nil {
 		log.Error(err, "mutating webhook error, failed to unmarshel plan")
 		return util.ToAdmissionResponseError(err)
 	}
 
-	var planChanged bool
-
-	if plan.Spec.TransferNetwork == nil {
-		config, err := rest.InClusterConfig()
-		if err != nil {
-			log.Error(err, "Couldn't get the cluster configuration", err.Error())
-			return util.ToAdmissionResponseError(err)
-		}
-
-		err = api.SchemeBuilder.AddToScheme(scheme.Scheme)
-		if err != nil {
-			log.Error(err, "Couldn't build the scheme", err.Error())
-			return util.ToAdmissionResponseError(err)
-		}
-		err = apis.AddToScheme(scheme.Scheme)
-		if err != nil {
-			log.Error(err, "Couldn't add forklift API to the scheme", err.Error())
-			return util.ToAdmissionResponseError(err)
-		}
-		err = net.AddToScheme(scheme.Scheme)
-		if err != nil {
-			log.Error(err, "Couldn't add network-attachment-definition-client to the scheme", err.Error())
-			return util.ToAdmissionResponseError(err)
-		}
-
-		cl, err := client.New(config, client.Options{Scheme: scheme.Scheme})
-		if err != nil {
-			log.Error(err, "Couldn't create a cluster client", err.Error())
-			return util.ToAdmissionResponseError(err)
-		}
-
-		targetProvider := api.Provider{}
-		err = cl.Get(context.TODO(), client.ObjectKey{Namespace: plan.Spec.Provider.Destination.Namespace, Name: plan.Spec.Provider.Destination.Name}, &targetProvider)
-		if err != nil {
-			log.Error(err, "Couldn't get the target provider", err.Error())
-			return util.ToAdmissionResponseError(err)
-		}
-
-		if network := targetProvider.Annotations["forklift.konveyor.io/defaultTransferNetwork"]; network != "" {
-			key := client.ObjectKey{
-				Namespace: plan.Spec.TargetNamespace,
-				Name:      network,
-			}
-
-			var tcl client.Client // target client, i.e., client to a possibly remote cluster
-			if targetProvider.IsHost() {
-				tcl = cl
-			} else {
-				ref := targetProvider.Spec.Secret
-				secret := &core.Secret{}
-				err = cl.Get(
-					context.TODO(),
-					client.ObjectKey{
-						Namespace: ref.Namespace,
-						Name:      ref.Name,
-					},
-					secret)
-				if err != nil {
-					log.Error(err, "Failed to get secret for target provider", err.Error())
-					return util.ToAdmissionResponseError(err)
-				}
-				tcl, err = targetProvider.Client(secret)
-			}
-			if err != nil {
-				log.Error(err, "Failed to initiate client to target cluster", err.Error())
-				return util.ToAdmissionResponseError(err)
-			}
-
-			netAttachDef := &net.NetworkAttachmentDefinition{}
-			if err = tcl.Get(context.TODO(), key, netAttachDef); err == nil {
-				log.Info("Patching the plan's transfer network")
-				plan.Spec.TransferNetwork = &core.ObjectReference{
-					Name:      network,
-					Namespace: plan.Spec.TargetNamespace,
-				}
-				planChanged = true
-			} else if !k8serr.IsNotFound(err) { // TODO: else if !NotFound ...
-				log.Error(err, "Failed to get the network-attachment-definition", err.Error())
-				return util.ToAdmissionResponseError(err)
-			}
-		}
+	specChanged, err := mutator.setTransferNetworkIfNotSet()
+	if err != nil {
+		return util.ToAdmissionResponseError(err)
 	}
-
-	if planChanged {
-		patchBytes, err := util.GeneratePatchPayload(util.PatchOperation{
-			Op:    "replace",
-			Path:  "/spec",
-			Value: plan.Spec,
-		})
-
+	metadataChanged := mutator.addPopulatorLabelsAnnotation()
+	if specChanged || metadataChanged {
+		patches := mutator.patchPayload(specChanged, metadataChanged)
+		patchBytes, err := util.GeneratePatchPayload(patches...)
 		if err != nil {
-			log.Error(err, "mutating webhook error, failed to generete paylod for patch request")
+			log.Error(err, "mutating webhook error, failed to generate payload for patch request")
 			return util.ToAdmissionResponseError(err)
 		}
 
@@ -141,4 +65,123 @@ func (mutator *PlanMutator) Mutate(ar *admissionv1.AdmissionReview) *admissionv1
 			},
 		}
 	}
+}
+
+func (mutator *PlanMutator) setTransferNetworkIfNotSet() (bool, error) {
+	var planChanged bool
+
+	if mutator.plan.Spec.TransferNetwork == nil {
+		config, err := rest.InClusterConfig()
+		if err != nil {
+			log.Error(err, "Couldn't get the cluster configuration", err.Error())
+			return false, err
+		}
+
+		err = api.SchemeBuilder.AddToScheme(scheme.Scheme)
+		if err != nil {
+			log.Error(err, "Couldn't build the scheme", err.Error())
+			return false, err
+		}
+		err = apis.AddToScheme(scheme.Scheme)
+		if err != nil {
+			log.Error(err, "Couldn't add forklift API to the scheme", err.Error())
+			return false, err
+		}
+		err = net.AddToScheme(scheme.Scheme)
+		if err != nil {
+			log.Error(err, "Couldn't add network-attachment-definition-client to the scheme", err.Error())
+			return false, err
+		}
+
+		cl, err := client.New(config, client.Options{Scheme: scheme.Scheme})
+		if err != nil {
+			log.Error(err, "Couldn't create a cluster client", err.Error())
+			return false, err
+		}
+
+		targetProvider := api.Provider{}
+		err = cl.Get(context.TODO(), client.ObjectKey{Namespace: mutator.plan.Spec.Provider.Destination.Namespace, Name: mutator.plan.Spec.Provider.Destination.Name}, &targetProvider)
+		if err != nil {
+			log.Error(err, "Couldn't get the target provider", err.Error())
+			return false, err
+		}
+
+		if network := targetProvider.Annotations["forklift.konveyor.io/defaultTransferNetwork"]; network != "" {
+			key := client.ObjectKey{
+				Namespace: mutator.plan.Spec.TargetNamespace,
+				Name:      network,
+			}
+
+			var tcl client.Client // target client, i.e., client to a possibly remote cluster
+			if targetProvider.IsHost() {
+				tcl = cl
+			} else {
+				ref := targetProvider.Spec.Secret
+				secret := &core.Secret{}
+				err = cl.Get(
+					context.TODO(),
+					client.ObjectKey{
+						Namespace: ref.Namespace,
+						Name:      ref.Name,
+					},
+					secret)
+				if err != nil {
+					log.Error(err, "Failed to get secret for target provider", err.Error())
+					return false, err
+				}
+				tcl, err = targetProvider.Client(secret)
+			}
+			if err != nil {
+				log.Error(err, "Failed to initiate client to target cluster", err.Error())
+				return false, err
+			}
+
+			netAttachDef := &net.NetworkAttachmentDefinition{}
+			if err = tcl.Get(context.TODO(), key, netAttachDef); err == nil {
+				log.Info("Patching the plan's transfer network")
+				mutator.plan.Spec.TransferNetwork = &core.ObjectReference{
+					Name:      network,
+					Namespace: mutator.plan.Spec.TargetNamespace,
+				}
+				planChanged = true
+			} else if !k8serr.IsNotFound(err) { // TODO: else if !NotFound ...
+				log.Error(err, "Failed to get the network-attachment-definition", err.Error())
+				return false, err
+			}
+		}
+	}
+	return planChanged, nil
+}
+
+func (mutator *PlanMutator) addPopulatorLabelsAnnotation() bool {
+	if mutator.ar.Request.Operation == admissionv1.Create {
+		if _, ok := mutator.plan.Annotations[AnnPopulatorLabels]; !ok {
+			if mutator.plan.Annotations == nil {
+				mutator.plan.Annotations = make(map[string]string)
+			}
+			mutator.plan.Annotations[AnnPopulatorLabels] = "True"
+			log.Info("Patching the plan's annotation")
+			return true
+		}
+	}
+	return false
+}
+
+func (mutator *PlanMutator) patchPayload(specChanged, metadataChanged bool) []util.PatchOperation {
+	var patches []util.PatchOperation
+	if specChanged {
+		patches = append(patches, util.PatchOperation{
+			Op:    "replace",
+			Path:  "/spec",
+			Value: mutator.plan.Spec,
+		})
+	}
+	if metadataChanged {
+		patches = append(patches, util.PatchOperation{
+			Op:    "replace",
+			Path:  "/metadata",
+			Value: mutator.plan.ObjectMeta,
+		})
+	}
+	return patches
 }
