@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -83,9 +84,19 @@ func loadConfig(secretName, endpoint string) openstackConfig {
 		klog.Error(err.Error())
 		insecureSkipVerify = []byte("false")
 	}
-	cacert, err := os.ReadFile("/etc/secret-volume/cacert")
+	insecure, err := strconv.ParseBool(string(insecureSkipVerify))
 	if err != nil {
-		klog.Error(err.Error())
+		klog.Fatal(err.Error())
+	}
+	//If the insecure option is set, the ca file field in the secret is not required.
+	var cacert []byte
+	if insecure {
+		cacert = []byte("")
+	} else {
+		cacert, err = os.ReadFile("/etc/secret-volume/cacert")
+		if err != nil {
+			klog.Error(err.Error())
+		}
 	}
 
 	return openstackConfig{

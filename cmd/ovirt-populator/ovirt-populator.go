@@ -20,7 +20,7 @@ type engineConfig struct {
 	URL      string
 	username string
 	password string
-	ca       string
+	cacert   string
 	insecure bool
 }
 
@@ -88,7 +88,7 @@ func populate(engineURL, diskID, volPath string) {
 		}
 
 		defer cert.Close()
-		_, err = cert.Write([]byte(engineConfig.ca))
+		_, err = cert.Write([]byte(engineConfig.cacert))
 		if err != nil {
 			klog.Fatalf("Failed to write CA to file: %v", err)
 		}
@@ -164,10 +164,6 @@ func loadEngineConfig(engineURL string) engineConfig {
 	if err != nil {
 		klog.Fatal(err.Error())
 	}
-	ca, err := os.ReadFile("/etc/secret-volume/cacert")
-	if err != nil {
-		klog.Fatal(err.Error())
-	}
 
 	var insecureSkipVerify []byte
 	_, err = os.Stat("/etc/secret-volume/insecureSkipVerify")
@@ -188,12 +184,22 @@ func loadEngineConfig(engineURL string) engineConfig {
 	if err != nil {
 		klog.Fatal(err.Error())
 	}
+	//If the insecure option is set, the ca file field in the secret is not required.
+	var cacert []byte
+	if insecure {
+		cacert = []byte("")
+	} else {
+		cacert, err = os.ReadFile("/etc/secret-volume/cacert")
+		if err != nil {
+			klog.Error(err.Error())
+		}
+	}
 
 	return engineConfig{
 		URL:      engineURL,
 		username: string(user),
 		password: string(pass),
-		ca:       string(ca),
+		cacert:   string(cacert),
 		insecure: insecure,
 	}
 }
