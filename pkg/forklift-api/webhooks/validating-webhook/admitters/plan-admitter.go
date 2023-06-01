@@ -14,14 +14,14 @@ import (
 
 	"github.com/konveyor/forklift-controller/pkg/apis"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/util"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 )
 
 type PlanAdmitter struct {
-	client client.Client
-	plan api.Plan
-	sourceProvider api.Provider
+	client              client.Client
+	plan                api.Plan
+	sourceProvider      api.Provider
 	destinationProvider api.Provider
 }
 
@@ -54,7 +54,7 @@ func (admitter *PlanAdmitter) validateStorage() error {
 		context.TODO(),
 		client.ObjectKey{
 			Namespace: admitter.plan.Spec.Map.Storage.Namespace,
-			Name: admitter.plan.Spec.Map.Storage.Name,
+			Name:      admitter.plan.Spec.Map.Storage.Name,
 		},
 		&storageMap)
 	if err != nil {
@@ -107,6 +107,17 @@ func (admitter *PlanAdmitter) validateVDDK() error {
 	return nil
 }
 
+func (admitter *PlanAdmitter) validateWarmMigrations() error {
+	providerType := admitter.sourceProvider.Type()
+	isWarmMigration := admitter.plan.Spec.Warm
+	if providerType == api.OpenStack && isWarmMigration {
+		err := liberr.New("warm migration is not supported by the provider")
+		log.Error(err, "provider", providerType)
+		return err
+	}
+	return nil
+}
+
 func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
 	log.Info("Plan admitter was called")
 	raw := ar.Request.Object.Raw
@@ -143,7 +154,7 @@ func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv
 		context.TODO(),
 		client.ObjectKey{
 			Namespace: admitter.plan.Spec.Provider.Source.Namespace,
-			Name: admitter.plan.Spec.Provider.Source.Name,
+			Name:      admitter.plan.Spec.Provider.Source.Name,
 		},
 		&admitter.sourceProvider)
 	if err != nil {
@@ -155,7 +166,7 @@ func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv
 		context.TODO(),
 		client.ObjectKey{
 			Namespace: admitter.plan.Spec.Provider.Destination.Namespace,
-			Name: admitter.plan.Spec.Provider.Destination.Name,
+			Name:      admitter.plan.Spec.Provider.Destination.Name,
 		},
 		&admitter.destinationProvider)
 	if err != nil {
@@ -172,6 +183,11 @@ func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv
 	}
 
 	err = admitter.validateVDDK()
+	if err != nil {
+		return util.ToAdmissionResponseError(err)
+	}
+
+	err = admitter.validateWarmMigrations()
 	if err != nil {
 		return util.ToAdmissionResponseError(err)
 	}
