@@ -11,6 +11,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
+const (
+	AnnPopulatorLabels = "populatorLabels"
+)
+
 var _ = FDescribe("Forklift", func() {
 	f := framework.NewFramework("migration-func-test")
 	var vmData *framework.OvirtVM
@@ -122,6 +126,18 @@ var _ = FDescribe("Forklift", func() {
 			Expect(plan).ToNot(BeNil())
 			Expect(plan.Spec.TransferNetwork).ToNot(BeNil())
 			Expect(plan.Spec.TransferNetwork.Name).To(Equal(planNetwork))
+		})
+
+		It("Annotation of new plan should be set with populator labels annotation true", func() {
+			By("Create plan")
+			planDef := utils.NewPlanWithVmId(*provider, namespace, test_plan_name, test_storage_map_name, networkMapName, targetNS.Name, []string{vmData.GetTestVMId()})
+			err = utils.CreatePlanFromDefinition(f.CrClient, planDef)
+			Expect(err).ToNot(HaveOccurred())
+			err, plan := utils.WaitForPlanReadyWithTimeout(f.CrClient, namespace, planDef.Name, 15*time.Second)
+			Expect(err).ToNot(HaveOccurred())
+			By("Verify created plan")
+			Expect(plan).ToNot(BeNil())
+			Expect(plan.Annotations[AnnPopulatorLabels]).To(Equal("True"))
 		})
 	})
 })
