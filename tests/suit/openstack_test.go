@@ -69,9 +69,19 @@ var _ = Describe("[level:component]Migration tests for OpenStack provider", func
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Creating plan")
-		planDenf := utils.NewPlanWithVmId(*provider, namespace, test_plan_name, test_storage_map_name, networkMapName, namespace, []string{vmData.GetTestVMId()})
-		err = utils.CreatePlanFromDefinition(f.CrClient, planDenf)
+		planDef := utils.NewPlanWithVmId(*provider, namespace, test_plan_name, test_storage_map_name, networkMapName, namespace, []string{vmData.GetTestVMId()})
+
+		planDef.Spec.Warm = true
+		err = utils.CreatePlanFromDefinition(f.CrClient, planDef)
+		Expect(err).To(HaveOccurred())
+
+		planDef.Spec.Warm = false
+		err = utils.CreatePlanFromDefinition(f.CrClient, planDef)
 		Expect(err).ToNot(HaveOccurred())
+
+		err = utils.UpdatePlanWarmMigration(f.CrClient, planDef, true)
+		Expect(err).To(HaveOccurred())
+
 		err, _ = utils.WaitForPlanReadyWithTimeout(f.CrClient, namespace, test_plan_name, 15*time.Second)
 		Expect(err).ToNot(HaveOccurred())
 		By("Creating migration")
