@@ -92,6 +92,11 @@ func GetPlan(cl crclient.Client, namespace, planName string) (error, *forkliftv1
 	return err, plan
 }
 
+func UpdatePlanWarmMigration(cl crclient.Client, plan *forkliftv1.Plan, isWarmMigration bool) error {
+	plan.Spec.Warm = isWarmMigration
+	return cl.Update(context.TODO(), plan)
+}
+
 func WaitForPlanReadyWithTimeout(cl crclient.Client, namespace, planName string, timeout time.Duration) (error, *forkliftv1.Plan) {
 	planIdentifier := types.NamespacedName{Namespace: namespace, Name: planName}
 
