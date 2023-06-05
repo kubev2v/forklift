@@ -101,7 +101,10 @@
       k8s:
         state: present
         definition: "{{ lookup('template', 'validation/ca.yml.j2') }}"
-
+    - name: "Configure inventory certificate on K8s"
+      k8s:
+        state: present
+        definition: "{{ lookup('template', 'controller/ca.yml.j2') }}"
 
   - name: "Setup api service"
     k8s:
