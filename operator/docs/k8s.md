@@ -65,7 +65,6 @@ metadata:
 spec:
   feature_ui: false
   feature_validation: true
-  must_gather_api_tls_enabled: false
   ui_tls_enabled: false
 EOF
 ```
@@ -82,7 +81,6 @@ spec:
   feature_ui: true
   feature_auth_required: false
   feature_validation: true
-  must_gather_api_tls_enabled: false
   ui_tls_enabled: false
 EOF
 ```
