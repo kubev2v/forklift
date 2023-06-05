@@ -66,7 +66,6 @@ spec:
   feature_ui: false
   feature_validation: true
   inventory_tls_enabled: false
-  validation_tls_enabled: false
   must_gather_api_tls_enabled: false
   ui_tls_enabled: false
 EOF
@@ -85,7 +84,6 @@ spec:
   feature_auth_required: false
   feature_validation: true
   inventory_tls_enabled: false
-  validation_tls_enabled: false
   must_gather_api_tls_enabled: false
   ui_tls_enabled: false
 EOF
