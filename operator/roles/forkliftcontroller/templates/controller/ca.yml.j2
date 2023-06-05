@@ -1,0 +1,38 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ inventory_selfsigned_issuer_name }}
+  namespace: {{ app_namespace }}
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ inventory_certificate_name }}
+  namespace: {{ app_namespace }}
+spec:
+  isCA: true
+  dnsNames:
+  - {{ inventory_service_name }}.{{ app_namespace }}.svc
+  - {{ inventory_service_name }}.{{ app_namespace }}.svc.cluster.local
+  commonName: {{ inventory_certificate_name }}
+  secretName: {{ inventory_tls_secret_name }}
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: {{ inventory_selfsigned_issuer_name }}
+    kind: Issuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ inventory_issuer_name }}
+  namespace: {{ app_namespace }}
+spec:
+  ca:
+    secretName: {{ inventory_tls_secret_name }}
+

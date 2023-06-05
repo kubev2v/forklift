@@ -13,17 +13,10 @@ metadata:
   namespace: {{ app_namespace }}
 spec:
   ports:
-{% if inventory_tls_enabled|bool %}
   - name: api-https
     port: 8443
     targetPort: 8443
     protocol: TCP
-{% else %}
-  - name: api-http
-    port: 8080
-    targetPort: 8080
-    protocol: TCP
-{% endif %}
   selector:
     control-plane: controller-manager
     controller-tools.k8s.io: "1.0"

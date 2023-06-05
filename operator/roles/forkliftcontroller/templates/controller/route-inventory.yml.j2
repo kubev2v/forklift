@@ -13,8 +13,6 @@ spec:
   to:
     kind: Service
     name: {{ inventory_service_name }}
-{% if inventory_tls_enabled|bool %}
   tls:
     termination: reencrypt
     insecureEdgeTerminationPolicy: Redirect
-{% endif %}
