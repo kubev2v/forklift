@@ -46,7 +46,9 @@ inventory_container_limits_memory: "1Gi"
 inventory_container_requests_cpu: "500m"
 inventory_container_requests_memory: "500Mi"
 inventory_tls_secret_name: "{{ inventory_service_name }}-serving-cert"
-inventory_tls_enabled: true
+inventory_selfsigned_issuer_name: "{{ inventory_service_name }}-selfsigned-issuer"
+inventory_issuer_name: "{{ inventory_service_name }}-issuer"
+inventory_certificate_name: "{{ inventory_service_name }}-selfsigned-ca"
 
 validation_image_fqin: "{{ lookup( 'env', 'VALIDATION_IMAGE') or lookup( 'env', 'RELATED_IMAGE_VALIDATION') }}"
 validation_configmap_name: "{{ validation_service_name }}-config"

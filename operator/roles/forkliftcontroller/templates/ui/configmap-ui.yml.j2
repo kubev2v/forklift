@@ -13,11 +13,7 @@ data:
       "namespace": "{{ app_namespace }}",
       "configNamespace": "{{ app_namespace }}",
       "clusterApi": "https://kubernetes.default.svc.cluster.local",
-{% if inventory_tls_enabled|bool %}
       "inventoryApi": "https://{{ inventory_service_name }}.{{ app_namespace }}.svc.cluster.local:8443",
-{% else %}
-      "inventoryApi": "http://{{ inventory_service_name }}.{{ app_namespace }}.svc.cluster.local:8080",
-{% endif %}
 {% if must_gather_api_tls_enabled|bool %}
       "mustGatherApi": "https://{{ must_gather_api_service_name }}.{{ app_namespace }}.svc.cluster.local:8443",
 {% else %}
