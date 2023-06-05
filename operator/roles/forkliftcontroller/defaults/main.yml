@@ -126,7 +126,9 @@ must_gather_api_container_limits_memory: "1Gi"
 must_gather_api_container_requests_cpu: "100m"
 must_gather_api_container_requests_memory: "150Mi"
 must_gather_api_tls_secret_name: "{{ must_gather_api_service_name }}-serving-cert"
-must_gather_api_tls_enabled: true
+must_gather_api_selfsigned_issuer_name: "{{ must_gather_api_service_name }}-selfsigned-issuer"
+must_gather_api_issuer_name: "{{ must_gather_api_service_name  }}-issuer"
+must_gather_api_certificate_name: "{{ must_gather_api_service_name }}-selfsigned-ca"
 must_gather_api_db_path: "/tmp/gatherings.db"
 must_gather_api_cleanup_max_age: "-1"
 must_gather_api_debug: false

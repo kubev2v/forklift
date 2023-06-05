@@ -15,14 +15,7 @@ spec:
     app: {{ app_name }}
     service: {{ must_gather_api_service_name }}
   ports:
-{% if must_gather_api_tls_enabled|bool %}
   - name: api-https
     port: 8443
     targetPort: 8443
     protocol: TCP
-{% else %}
-  - name: api-http
-    port: 8080
-    targetPort: 8080
-    protocol: TCP
-{% endif %}
