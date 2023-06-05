@@ -36,6 +36,12 @@ jobs:
       - name: Check out forklift repository
         uses: actions/checkout@v3
 
+      - name: Checkout forkliftci
+        uses: actions/checkout@v3
+        with:
+          repository: kubev2v/forkliftci
+          ref: v2.0
+
       - name: Build and setup everything with bazel
         id: forkliftci
         uses: kubev2v/forkliftci@v2.0
@@ -51,80 +57,16 @@ jobs:
         run: |
           curl -k "${{ steps.forkliftci.outputs.cluster }}/apis/forklift.konveyor.io/v1beta1/namespaces/konveyor-forklift/providers" --header "Authorization: Bearer ${{ steps.forkliftci.outputs.token }}"
 
-      # Run e2e sanity
       - name: Run e2e sanity suite
-        env:
-          OVIRT_USERNAME: admin@internal
-          OVIRT_PASSWORD: 123456
-          OVIRT_URL: https://fakeovirt.konveyor-forklift:30001/ovirt-engine/api
-          OVIRT_CACERT: /home/runner/work/_actions/kubev2v/forkliftci/v2.0/cluster/providers/ovirt/e2e_cacert.cer
-          STORAGE_CLASS: nfs-csi
-          OVIRT_VM_ID: 31573c08-717b-43e0-825f-69a36fb0e1a1
-          OVIRT_INSECURE_VM_ID: 4db71538-9255-4ba3-a291-1240682dd8c6
-        run: |
-          GOPATH=${GITHUB_WORKSPACE}/go make e2e-sanity-${{ matrix.source_provider }}
-
-      # TODO: execute this step only on failures
-      - name: save k8s logs
-        if: always()
-        run: |
-          mkdir /tmp/artifacts/
-          set +e
-          kubectl get pods -n konveyor-forklift >> /tmp/artifacts/k8s-pods.log
-          kubectl get events --field-selector type!=Normal -A --sort-by='.lastTimestamp' >> /tmp/artifacts/k8s_abnormal_events.log
-          kubectl get all -n konveyor-forklift -o yaml >> /tmp/artifacts/k8s-all-forklift-objects.log
-          kubectl get migrations -A -o yaml >> /tmp/artifacts/k8s-all-migrations.log
-          kubectl get plans -A -o yaml >> /tmp/artifacts/k8s-all-plans.log
-          kubectl get Virtualmachines -A -o yaml >> /tmp/artifacts/k8s-all-Virtualmachines.log
-          kubectl logs -n konveyor-forklift $(kubectl get po -n konveyor-forklift  -o=name | grep forklift-controller) >> /tmp/artifacts/k8s-forklift-controller-inventory.log
-          kubectl get Storageclasses -A -o yaml >> /tmp/artifacts/k8s-storage-classes.log
-
-          # CRDs in e2e-tests generated Namespace
-          generatedNS=$(kubectl get ns -o=name |grep forklift-e2e-tests | cut -d/ -f2)
-          kubectl get secrets -n ${generatedNS} -o yaml >> /tmp/artifacts/k8s-secrets.log
-          kubectl describe pods -n ${generatedNS} >> /tmp/artifacts/k8s-pods-describe-forklift-tests.log
-          kubectl get events -n ${generatedNS} --sort-by='.lastTimestamp' >> /tmp/artifacts/k8s-events-forklift-tests.log
-          kubectl api-resources --verbs=list --namespaced -o name | grep forklift.konveyor.io | xargs -n 1 kubectl get -oyaml  --show-kind --ignore-not-found -n ${generatedNS}  >> /tmp/artifacts/k8s-objects-forklift-tests.log
-          
-          
-          kubectl describe pods -n konveyor-forklift >> /tmp/artifacts/k8s-pods-describe-konveyor-forklift.log
-
-          # CSI controller
-          kubectl logs -n kube-system $(kubectl get po -n kube-system  -o=name | grep csi-nfs-controller)  csi-provisioner >> /tmp/artifacts/k8s-csi-nfs-provisioner.log
-          kubectl logs -n kube-system $(kubectl get po -n kube-system  -o=name | grep csi-nfs-controller)  nfs >> /tmp/artifacts/k8s-csi-nfs.log
-          
-          # PVCs
-          kubectl get pvc -A >> /tmp/artifacts/k8s-pvc.log
-          
-          # ovirt logs
-          if [ "${{ matrix.source_provider }}" == 'ovirt' ] ; then
-            kubectl get ovirtvolumepopulator -A >> /tmp/artifacts/k8s-ovirtvolumepopulator.log
-            kubectl logs -n konveyor-forklift $(kubectl get po -n konveyor-forklift  -o=name | grep fakeovirt)  >> /tmp/artifacts/k8s-fakeovirt.log
-            kubectl logs -n konveyor-forklift $(kubectl get po -n konveyor-forklift  -o=name | grep ovirt-imageio)  >> /tmp/artifacts/k8s-ovirt-imageio.log
-            kubectl logs -n konveyor-forklift $(kubectl get po -n konveyor-forklift  -o=name | grep ovirt-populator) >> /tmp/artifacts/k8s-forklift-ovirt-populator.log
-            kubectl logs -n konveyor-forklift $(kubectl get po -n konveyor-forklift  -o=name | grep forklift-volume-populator) >> /tmp/artifacts/k8s-forklift-volume-populator.log
-          fi
-          
-          # openstack logs
-          if [ "${{ matrix.source_provider }}" == 'openstack' ] ; then
-            kubectl cp konveyor-forklift/$(kubectl get po -n konveyor-forklift  -o=name | grep packstack|cut -d/ -f2):/var/log/cinder/volume.log /tmp/artifacts/k8s-packstack-cinder-volume.log
-            kubectl cp konveyor-forklift/$(kubectl get po -n konveyor-forklift  -o=name | grep packstack|cut -d/ -f2):/var/log/nova/nova-compute.log /tmp/artifacts/k8s-packstack-nova-compute.log
-            kubectl cp konveyor-forklift/$(kubectl get po -n konveyor-forklift  -o=name | grep packstack|cut -d/ -f2):/var/log/glance/api.log /tmp/artifacts/k8s-packstack-glance-api.log
-            kubectl get openstackvolumepopulator -A >> /tmp/artifacts/k8s-openstackvolumepopulator.log
-            kubectl logs -n konveyor-forklift $(kubectl get po -n konveyor-forklift  -o=name | grep openstack-populator) >> /tmp/artifacts/k8s-forklift-openstack-populator.log
-            kubectl logs -n konveyor-forklift $(kubectl get po -n konveyor-forklift  -o=name | grep forklift-volume-populator) >> /tmp/artifacts/k8s-forklift-volume-populator-controller.log
-            kubectl exec -n konveyor-forklift $(kubectl get po -n konveyor-forklift  -o=name | grep packstack|cut -d/ -f2) -- journalctl -b0 >> /tmp/artifacts/k8s-packstack-journal.log
-            kubectl exec -n konveyor-forklift $(kubectl get po -n konveyor-forklift  -o=name | grep packstack|cut -d/ -f2) -- bash -c "more /var/log/rabbitmq/*.log" >> /tmp/artifacts/k8s-packstack-rabbitmq.log
-          fi
-          # export kind cluster full logs
-          kind export logs /tmp/artifacts/kind-logs
-
-      - uses: actions/upload-artifact@master
-        if: always()
+        uses: kubev2v/forkliftci/ci/run-suite@v3.0
         with:
-          name: ${{ matrix.source_provider }}-k8s-forklift-logs
-          path: /tmp/artifacts
+          suite_name: e2e-sanity-${{ matrix.source_provider }}
 
+      - name: save k8s logs and upload-artifact
+        if: ${{ always() }}
+        uses: kubev2v/forkliftci/ci/save-artifacts@v3.0
+        with:
+          source_provider: ${{ matrix.source_provider }}
 
 
   build:
