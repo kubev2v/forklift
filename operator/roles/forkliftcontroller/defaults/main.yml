@@ -61,7 +61,9 @@ validation_container_limits_memory: "300Mi"
 validation_container_requests_cpu: "400m"
 validation_container_requests_memory: "50Mi"
 validation_tls_secret_name: "{{ validation_service_name }}-serving-cert"
-validation_tls_enabled: true
+validation_selfsigned_issuer_name: "{{ validation_service_name }}-selfsigned-issuer"
+validation_issuer_name: "{{ validation_service_name }}-issuer"
+validation_certificate_name: "{{ validation_service_name }}-selfsigned-ca"
 validation_state: absent
 
 ui_image_fqin: "{{ lookup( 'env', 'UI_IMAGE') or lookup( 'env', 'RELATED_IMAGE_UI') }}"

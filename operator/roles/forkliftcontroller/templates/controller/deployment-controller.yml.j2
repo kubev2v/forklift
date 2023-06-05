@@ -152,18 +152,15 @@ spec:
           value: '8082'
         - name: SECRET_NAME
           value: webhook-server-secret
-{% if feature_validation|bool and validation_tls_enabled|bool %}
+{% if feature_validation|bool %}
         - name: POLICY_AGENT_URL
           value: "https://{{ validation_service_name }}.{{ app_namespace }}.svc.cluster.local:8181"
         - name: POLICY_AGENT_CA
-          value: "/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt"
+{% if k8s_cluster|bool %}
+          value: /var/run/secrets/{{ validation_tls_secret_name }}/ca.crt
 {% else %}
-        - name: POLICY_AGENT_URL
-          value: "http://{{ validation_service_name }}.{{ app_namespace }}.svc.cluster.local:8181"
-        - name: POLICY_AGENT_CA
-          value: ""
+          value: "/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt"
 {% endif %}
-{% if feature_validation|bool %}
         - name: POLICY_AGENT_SEARCH_INTERVAL
           value: "{{ validation_policy_agent_search_interval }}"
 {% endif %}
@@ -211,6 +208,10 @@ spec:
         - mountPath: /var/run/secrets/{{ inventory_tls_secret_name }}
           name: {{ inventory_service_name }}-serving-cert
 {% endif %}
+{% if feature_validation|bool %}
+        - name: {{ validation_tls_secret_name }}
+          mountPath: /var/run/secrets/{{ validation_tls_secret_name }}
+{% endif %}
       terminationGracePeriodSeconds: 10
       volumes:
       - name: cert
@@ -222,6 +223,12 @@ spec:
         secret:
           defaultMode: 420
           secretName: {{ inventory_tls_secret_name }}
+{% endif %}
+{% if feature_validation|bool %}
+      - name: {{ validation_tls_secret_name }}
+        secret:
+          secretName: {{ validation_tls_secret_name }}
+          defaultMode: 420
 {% endif %}
       - name: inventory
         emptyDir: {}
