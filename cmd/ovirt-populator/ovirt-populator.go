@@ -131,7 +131,10 @@ func populate(engineURL, diskID, volPath string) {
 			klog.Info(text)
 			err = json.Unmarshal([]byte(text), &progressOutput)
 			if err != nil {
-				klog.Error(err)
+				var syntaxError *json.SyntaxError
+				if !errors.As(err, &syntaxError) {
+					klog.Error(err)
+				}
 			}
 
 			progressGague.WithLabelValues(diskID).Set(float64(progressOutput.Transferred))
