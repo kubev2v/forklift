@@ -420,6 +420,12 @@ func (r *Client) cacert() []byte {
 }
 
 func (r Client) Finalize(vms []*planapi.VMStatus, planName string) {
+	defer func() {
+		if p := recover(); p != nil {
+			r.Log.Info("Recovered from panic:", p)
+		}
+	}()
+
 	if !r.Plan.Spec.Warm {
 		r.Log.Info("Skipping precopy removal for cold migration")
 		return
