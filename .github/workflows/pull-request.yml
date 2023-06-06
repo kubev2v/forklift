@@ -40,14 +40,14 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: kubev2v/forkliftci
-          ref: v2.0
+          ref: v3.0
 
       - name: Build and setup everything with bazel
         id: forkliftci
-        uses: kubev2v/forkliftci@v2.0
+        uses: kubev2v/forkliftci/ci/build-and-setup@v3.0
         with:
-          gh_access_token: ${{ secrets.GITHUB_TOKEN }}
           provider_name: ${{ matrix.source_provider }}
+          gh_access_token: ${{ secrets.GITHUB_TOKEN }}
 
       - run: kubectl version
 
