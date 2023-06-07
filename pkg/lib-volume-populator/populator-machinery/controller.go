@@ -472,7 +472,11 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 		return nil
 	}
 
-	if c.gk.Group != *dataSourceRef.APIGroup || c.gk.Kind != dataSourceRef.Kind || "" == dataSourceRef.Name {
+	apiGroup := ""
+	if dataSourceRef.APIGroup != nil {
+		apiGroup = *dataSourceRef.APIGroup
+	}
+	if c.gk.Group != apiGroup || c.gk.Kind != dataSourceRef.Kind || "" == dataSourceRef.Name {
 		// Ignore PVCs that aren't for this populator to handle
 		return nil
 	}
