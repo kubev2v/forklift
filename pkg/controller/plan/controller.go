@@ -223,6 +223,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	}
 
 	// Set PopulatorDataSource with labels when needed
+	// must be after Referenced data is set (in 'validate')
 	if _, ok := plan.Annotations[AnnPopulatorLabels]; !ok {
 		r.setPopulatorDataSourceLabels(plan)
 	}
@@ -285,6 +286,10 @@ func (r *Reconciler) setPopulatorDataSourceLabels(plan *api.Plan) {
 			plan.Annotations[AnnPopulatorLabels] = "True"
 			patch := client.MergeFrom(planCopy)
 			err = r.Client.Patch(context.TODO(), plan, patch)
+			// Restore Referenced data that is not returned back from the server
+			plan.Referenced = planCopy.Referenced
+			// Restore original status with staged conditions
+			plan.Status = planCopy.Status
 		}
 	}
 }
