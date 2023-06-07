@@ -330,15 +330,13 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 			}
 		}
 	}()
-	var migration *api.Migration
-	snapshot := plan.Status.Migration.ActiveSnapshot()
 	ctx, err := plancontext.New(r, plan, r.Log)
 	if err != nil {
 		return
 	}
 	//
 	// Find and validate the current (active) migration.
-	migration, err = r.activeMigration(plan)
+	migration, err := r.activeMigration(plan)
 	if err != nil {
 		return
 	}
@@ -356,6 +354,7 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	// The active snapshot may be marked canceled by:
 	//   activeMigration()
 	//   matchSnapshot()
+	snapshot := plan.Status.Migration.ActiveSnapshot()
 	if snapshot.HasCondition(Canceled) {
 		r.Log.Info("migration (active) marked as canceled.")
 		for _, vm := range plan.Status.Migration.VMs {
