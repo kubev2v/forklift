@@ -84,7 +84,13 @@ e2e-sanity-vsphere:
 
 e2e-sanity-openstack:
 	# openstack suit
-	go test ./tests/suit -v -ginkgo.focus ".*OpenStack.*"
+	go test ./tests/suit -v -ginkgo.focus ".*Migration tests for OpenStack.*"
+
+e2e-sanity-openstack-extended:
+	# openstack extended suit
+	sudo bash -c  'echo "127.0.0.1 packstack.konveyor-forklift" >>/etc/hosts'
+	go test ./tests/suit -v -ginkgo.focus ".*Migration Extended tests for OpenStack.*" -ginkgo.parallel.total 1
+
 
 # Build forklift-controller binary
 forklift-controller: generate fmt vet

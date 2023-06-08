@@ -1,6 +1,8 @@
 package framework
 
 import (
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"github.com/konveyor/forklift-controller/tests/suit/utils"
 )
@@ -10,6 +12,27 @@ func (r *OpenStackClient) SetupClient(vmName string, networkName string, volumeT
 	r.vmData.testNetworkName = networkName
 	r.vmData.testVolumeName = volumeTypeName
 	return nil
+}
+
+// LoadCA - Load CA from openstack
+func (r *OpenStackClient) LoadCA(f *Framework, namespace string, contName string) (ca string, err error) {
+	pod, err := utils.FindPodByPrefix(f.K8sClient, namespace, contName, fmt.Sprintf("app=%s", contName))
+	caCert, err := r.getFileContent(f, namespace, pod.Name, contName, "/etc/pki/ca-trust/source/anchors/packstack-ca.pem")
+	if err != nil {
+		return "", fmt.Errorf("error getting CA Certificate - %v", err)
+	}
+	block, _ := pem.Decode([]byte(caCert))
+	if block == nil {
+		return "", fmt.Errorf("error decoding CA Cert Certificate ")
+	}
+
+	_, err = x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return "", fmt.Errorf("error parsing Cert Certificate ")
+	}
+
+	r.CACertificate = caCert
+	return caCert, nil
 }
 
 // LoadSourceDetails - Load Source VM details from openstack
@@ -38,8 +61,17 @@ func (r *OpenStackClient) LoadSourceDetails(f *Framework, namespace string, cont
 	r.vmData.testVMId = vmId
 	r.vmData.networkId = networkId
 	r.vmData.volumeTypeId = volumeTypeId
-
 	return &r.vmData, nil
+}
+
+// getIdForEntity - get the ID of the osp entity by given name
+func (r *OpenStackClient) getFileContent(f *Framework, namespace string, podName string, contName string,
+	filename string) (content string, err error) {
+	content, _, err = f.ExecCommandInContainerWithFullOutput(namespace, podName, contName,
+		"/bin/bash",
+		"-c",
+		fmt.Sprintf("cat %s", filename))
+	return
 }
 
 // getIdForEntity - get the ID of the osp entity by given name
@@ -69,8 +101,9 @@ func (r *OpenStackVM) GetTestVMId() string {
 
 // OpenStackClient - OpenStack VM Client
 type OpenStackClient struct {
-	vmData    OpenStackVM
-	CustomEnv bool
+	vmData        OpenStackVM
+	CustomEnv     bool
+	CACertificate string
 }
 
 type OpenStackVM struct {
