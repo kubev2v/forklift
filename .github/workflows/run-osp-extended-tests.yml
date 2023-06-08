@@ -5,6 +5,9 @@ on:
       description: 'run e2e openstack  extended tests on Self hosted runner'
   workflow_call:
 
+  issue_comment:
+    types: [ created ]
+
 # ensures that only a single workflow  will run at the same time
 # if another workflow triggered it will pending until first completion.
 concurrency:
@@ -15,36 +18,15 @@ jobs:
   create_ovirt_runner:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out forkliftci repository
-        uses: actions/checkout@v3
-
-      - name: Checkout forkliftci
-        uses: actions/checkout@v3
+      - name: prepare the secrets
+        uses: kubev2v/forkliftci/ci/prepare-ansible-secrets@v4.0
         with:
-          #repository: kubev2v/forkliftci
-          repository: eslutsky/forkliftci
-          ref: provision-gh-worker
-          path: forkliftci
+          OKD_ENGINE_SECRETS: ${{ secrets.OKD_ENGINE_SECRETS }}
+          OKD_SSH_KEY: ${{ secrets.OKD_SSH_KEY }}
 
-      - name: run hosted_runner deployment
-        shell: bash
-        run: |
-          cd ${GITHUB_WORKSPACE}/forkliftci/cluster/gh-action-runner/
-          pwd
-          source utils.sh
-          
-          mkdir .conf/
-          echo ${{ secrets.OKD_ENGINE_SECRETS }} >${SECRETS_PATH}.b64
-          echo ${{ secrets.OKD_SSH_KEY }}  >>/tmp/id_ssh_rsa.b64
+      - name: provision self hosted runner
+        uses: kubev2v/forkliftci/ci/create-self-runner@v4.0
 
-
-          cat ${SECRETS_PATH}.b64 | base64 -d >${SECRETS_PATH}
-          cat /tmp/id_ssh_rsa.b64 | base64 -d >/tmp/id_ssh_rsa
-          sudo chown root:root /tmp/id_ssh_rsa
-          sudo chmod 600 /tmp/id_ssh_rsa
-
-          # deploy okd on ovirt using ansible
-          gh_action_runner_create
   ci_setup:
     runs-on: self-hosted
     #runs-on: ubuntu-latest
@@ -62,71 +44,46 @@ jobs:
       - name: Checkout forkliftci
         uses: actions/checkout@v3
         with:
-          #repository: kubev2v/forkliftci
-          repository: eslutsky/forkliftci
-          ref: provision-gh-worker
-          #path: forkliftci
+          repository: kubev2v/forkliftci
+          ref: v4.0
 
       - name: add docker-hub token
         run: echo "${{ secrets.DOCKER_HUB_TOKEN }}" | docker login --username "${{  secrets.DOCKER_HUB_USER }}" --password-stdin
 
       - name: build and setup everything
-        #uses: kubev2v/forkliftci/ci/build-and-setup@main
-        uses: eslutsky/forkliftci/ci/build-and-setup@provision-gh-worker
+        #uses: kubev2v/forkliftci/ci/build-and-setup@v4.0
+        uses: eslutsky/forkliftci/ci/build-and-setup@add-ssl-to-action
         with:
           provider_name: openstack
           gh_access_token: ${{ secrets.GITHUB_TOKEN }}
+          enable_openstack_ssl: true
 
       - run: kubectl version
 
       - run: kubectl get pods -n konveyor-forklift
 
-      # e2e-sanity-openstack
       - name: run e2e-sanity-openstack
-       # uses: kubev2v/forkliftci/ci/run-suite@main
-        uses: eslutsky/forkliftci/ci/run-suite@provision-gh-worker
+        uses: kubev2v/forkliftci/ci/run-suite@v3.0
         with:
-          suite_name: e2e-sanity-openstack
+          suite_name: e2e-sanity-openstack-extended
 
-      - name: save logs
+      - name: save k8s logs and upload-artifact
         if: ${{ always() }}
-        uses: kubev2v/forkliftci/ci/save-artifacts@main
+        uses: kubev2v/forkliftci/ci/save-artifacts@v3.0
         with:
           source_provider: openstack
 
-
   remove_ovirt_runner:
     runs-on: ubuntu-latest
-    if: ${{ failure() || cancelled() }}
+    if: ${{ success() || failure() || cancelled() }}
     needs: [create_ovirt_runner,ci_setup]
     steps:
-      - name: Check out forkliftci repository
-        uses: actions/checkout@v3
-
-      - name: Checkout forkliftci
-        uses: actions/checkout@v3
+      - name: prepare the secrets
+        uses: kubev2v/forkliftci/ci/prepare-ansible-secrets@v4.0
         with:
-          #repository: kubev2v/forkliftci
-          repository: eslutsky/forkliftci
-          ref: provision-gh-worker
-          path: forkliftci
-
-      - name: run hosted_runner deployment
-        shell: bash
-        run: |
-          cd ${GITHUB_WORKSPACE}/forkliftci/cluster/gh-action-runner/
-          pwd
-          source utils.sh
-          
-          mkdir .conf/
-          echo ${{ secrets.OKD_ENGINE_SECRETS }} >${SECRETS_PATH}.b64
-          echo ${{ secrets.OKD_SSH_KEY }}  >>/tmp/id_ssh_rsa.b64
-
-
-          cat ${SECRETS_PATH}.b64 | base64 -d >${SECRETS_PATH}
-          cat /tmp/id_ssh_rsa.b64 | base64 -d >/tmp/id_ssh_rsa
-          sudo chown root:root /tmp/id_ssh_rsa
-          sudo chmod 600 /tmp/id_ssh_rsa
-
-          # deploy okd on ovirt using ansible
-          gh_action_runner_create -t cleanup
+          OKD_ENGINE_SECRETS: ${{ secrets.OKD_ENGINE_SECRETS }}
+          OKD_SSH_KEY: ${{ secrets.OKD_SSH_KEY }}
+      - name: provision self hosted runner
+        uses: kubev2v/forkliftci/ci/create-self-runner@v4.0
+        with:
+          perform_cleanup: true
