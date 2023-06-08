@@ -3,12 +3,23 @@ package utils
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"os/exec"
 
 	"github.com/onsi/ginkgo"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
+
+// fedora
+const UpdateTrustCMD = "sudo update-ca-trust"
+const SystemCAPath = "/etc/pki/ca-trust/source/anchors/packstack.crt"
+
+// Ubuntu
+//const UpdateTrustCMD = "sudo update-ca-certificates"
+//const SystemCAPath = "/usr/local/share/ca-certificates/packstack.crt"
 
 var (
 	// DefaultStorageClass the default storage class used in tests
@@ -58,4 +69,38 @@ func CacheTestsData(client *kubernetes.Clientset, cdiNs string) {
 	if DefaultStorageClass == nil {
 		DefaultStorageClass = GetDefaultStorageClass(client)
 	}
+}
+
+func RemoveLocalCA() error {
+	cmd := exec.Command("/bin/sh", "-c", fmt.Sprintf("sudo rm -rf %s && %s", SystemCAPath, UpdateTrustCMD))
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func UpdateLocalCA(caCert string) error {
+
+	file, err := ioutil.TempFile("/tmp", "prefix")
+	if err != nil {
+		return err
+	}
+
+	// write the CA into the Temp file
+	_, err = file.WriteString(caCert)
+	if err != nil {
+		return err
+	}
+
+	defer os.Remove(file.Name())
+
+	fmt.Println(file.Name())
+
+	//	ginkgo.Fail(fmt.Sprintf("Unable to get filenams: %s", file.Name()))
+
+	cmd := exec.Command("/bin/sh", "-c", fmt.Sprintf("sudo cp %s %s && %s", file.Name(), SystemCAPath, UpdateTrustCMD))
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+	return nil
 }
