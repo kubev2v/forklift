@@ -1,19 +1,14 @@
 package admitters
 
 import (
-	//	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 
-	//	"fmt"
-	//	"net"
-	//	"regexp"
-	//	"strings"
-
-	//webhookutils "github.com/konveyor/forklift-controller/pkg/util/webhooks"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container"
+	webhookutils "github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/util"
+	libcontainer "github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	admissionv1 "k8s.io/api/admission/v1beta1"
 	core "k8s.io/api/core/v1"
@@ -23,42 +18,30 @@ import (
 var log = logging.WithName("admitter")
 
 type SecretAdmitter struct {
+	secret core.Secret
 }
 
 func (admitter *SecretAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
 	log.Info("secret admitter was called")
 	raw := ar.Request.Object.Raw
-	secret := &core.Secret{}
-	err := json.Unmarshal(raw, secret)
+
+	err := json.Unmarshal(raw, &admitter.secret)
 	if err != nil {
-		return &admissionv1.AdmissionResponse{
-			Allowed: false,
-			Result: &metav1.Status{
-				Code:    http.StatusBadRequest,
-				Message: err.Error(),
-			},
-		}
+		log.Error(err, "secret webhook error, failed to unmarshel secret")
+		return webhookutils.ToAdmissionResponseError(err)
 	}
 
-	if createdForProviderType, ok := secret.GetLabels()["createdForProviderType"]; ok {
-		provider := &api.Provider{}
+	if createdForProviderType, ok := admitter.secret.GetLabels()["createdForProviderType"]; ok {
 		providerType := api.ProviderType(createdForProviderType)
-		buildProvider(provider, &providerType, secret)
-
-		collector := container.Build(nil, provider, secret)
-		if collector == nil {
-			return &admissionv1.AdmissionResponse{
-				Allowed: false,
-				Result: &metav1.Status{
-					Code:    http.StatusBadRequest,
-					Message: fmt.Sprintf("Incorrect 'createdForProviderType' value. Options %s", api.ProviderTypes),
-				},
-			}
+		collector, err := admitter.buildProviderCollector(&providerType)
+		if err != nil {
+			return webhookutils.ToAdmissionResponseError(err)
 		}
 
 		log.Info("Starting provider connection test")
 		status, err := collector.Test()
-		if err != nil && (status == http.StatusUnauthorized || status == http.StatusBadRequest) {
+		switch {
+		case err != nil && (status == http.StatusUnauthorized || status == http.StatusBadRequest):
 			log.Info("Connection test failed, failing", "status", status)
 			return &admissionv1.AdmissionResponse{
 				Allowed: false,
@@ -67,27 +50,33 @@ func (admitter *SecretAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissio
 					Message: "Invalid credentials",
 				},
 			}
-		} else {
-			if err != nil {
-				log.Info("Connection test failed, yet passing", "status", status, "error", err.Error())
-			} else {
-				log.Info("Test succeeded, passing")
-			}
-			return &admissionv1.AdmissionResponse{
-				Allowed: true,
-			}
+		case err != nil:
+			log.Info("Connection test failed, yet passing", "status", status, "error", err.Error())
+		default:
+			log.Info("Test succeeded, passing")
 		}
+		return webhookutils.ToAdmissionResponseAllow()
 	} else { // should never happen because of the validating webhook configuration
 		log.Info("Secret is not set with 'createdForProviderType', passing")
-		return &admissionv1.AdmissionResponse{
-			Allowed: true,
-		}
+		return webhookutils.ToAdmissionResponseAllow()
 	}
 }
 
-func buildProvider(provider *api.Provider, providerType *api.ProviderType, secret *core.Secret) {
-	provider.Spec.URL = string(secret.Data["url"])
-	provider.Spec.Type = providerType
-	provider.Name = secret.Name
-	provider.Namespace = secret.Namespace
+func (admitter *SecretAdmitter) buildProviderCollector(providerType *api.ProviderType) (libcontainer.Collector, error) {
+	provider := &api.Provider{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      admitter.secret.Name,
+			Namespace: admitter.secret.Namespace,
+		},
+		Spec: api.ProviderSpec{
+			Type: providerType,
+			URL:  string(admitter.secret.Data["url"]),
+		},
+	}
+
+	if collector := container.Build(nil, provider, &admitter.secret); collector != nil {
+		return collector, nil
+	} else {
+		return nil, fmt.Errorf("incorrect 'createdForProviderType' value. Options %s", api.ProviderTypes)
+	}
 }
