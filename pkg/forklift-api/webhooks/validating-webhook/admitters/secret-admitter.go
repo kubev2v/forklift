@@ -56,10 +56,9 @@ func (admitter *SecretAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissio
 			log.Info("Test succeeded, passing")
 		}
 		return webhookutils.ToAdmissionResponseAllow()
-	} else { // should never happen because of the validating webhook configuration
-		log.Info("Secret is not set with 'createdForProviderType', passing")
-		return webhookutils.ToAdmissionResponseAllow()
 	}
+
+	return webhookutils.ToAdmissionResponseAllow()
 }
 
 func (admitter *SecretAdmitter) buildProviderCollector(providerType *api.ProviderType) (libcontainer.Collector, error) {
