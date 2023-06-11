@@ -524,11 +524,11 @@ func (r Client) removePrecopies(precopies []planapi.Precopy, vmService *ovirtsdk
 			}
 
 			select {
-			case <-time.After(time.Duration(settings.Settings.Migration.SnapshotRemovalTimeout)):
+			case <-time.After(time.Duration(settings.Settings.Migration.SnapshotRemovalTimeout) * time.Minute):
 				r.Log.Info("Timeout waiting for snapshot removal")
 				return
 			default:
-				time.Sleep(time.Duration(settings.Settings.Migration.SnapshotStatusCheckRate))
+				time.Sleep(time.Duration(settings.Settings.Migration.SnapshotStatusCheckRate) * time.Second)
 			}
 		}
 	}
