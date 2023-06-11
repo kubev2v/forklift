@@ -4,18 +4,19 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
-	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
-	"github.com/konveyor/forklift-controller/pkg/settings"
 	"io/ioutil"
 	"net"
 	"net/http"
 	liburl "net/url"
 	"reflect"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"time"
+
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
+	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
+	"github.com/konveyor/forklift-controller/pkg/settings"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 // Application settings.
@@ -295,17 +296,15 @@ func (c *RestClient) buildTransport() (err error) {
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	}
-	if Settings.Inventory.TLS.Enabled {
-		pool := x509.NewCertPool()
-		ca, xErr := ioutil.ReadFile(Settings.Inventory.TLS.CA)
-		if xErr != nil {
-			err = liberr.Wrap(xErr)
-			return
-		}
-		pool.AppendCertsFromPEM(ca)
-		transport.TLSClientConfig = &tls.Config{
-			RootCAs: pool,
-		}
+	pool := x509.NewCertPool()
+	ca, xErr := ioutil.ReadFile(Settings.Inventory.TLS.CA)
+	if xErr != nil {
+		err = liberr.Wrap(xErr)
+		return
+	}
+	pool.AppendCertsFromPEM(ca)
+	transport.TLSClientConfig = &tls.Config{
+		RootCAs: pool,
 	}
 
 	c.Transport = transport
@@ -334,11 +333,7 @@ func (c *RestClient) url(path string) string {
 	path = (&Handler{}).Link(path, c.Params)
 	url, _ := liburl.Parse(path)
 	if url.Host == "" {
-		if Settings.Inventory.TLS.Enabled {
-			url.Scheme = "https"
-		} else {
-			url.Scheme = "http"
-		}
+		url.Scheme = "https"
 		url.Host = c.Host
 	}
 
