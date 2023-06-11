@@ -43,8 +43,6 @@ type Inventory struct {
 	Port int
 	// TLS
 	TLS struct {
-		// Enabled.
-		Enabled bool
 		// Certificate path
 		Certificate string
 		// Key path

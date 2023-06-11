@@ -65,7 +65,7 @@ func Add(mgr manager.Manager) error {
 	container := libcontainer.New()
 	web := libweb.New(container, web.All(container)...)
 	web.Port = Settings.Inventory.Port
-	web.TLS.Enabled = Settings.Inventory.TLS.Enabled
+	web.TLS.Enabled = true
 	web.TLS.Certificate = Settings.Inventory.TLS.Certificate
 	web.TLS.Key = Settings.Inventory.TLS.Key
 	web.AllowedOrigins = Settings.Inventory.CORS.AllowedOrigins
