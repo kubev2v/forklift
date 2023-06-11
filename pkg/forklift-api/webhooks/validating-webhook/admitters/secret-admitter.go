@@ -42,6 +42,15 @@ type SecretAdmitter struct {
 	secret core.Secret
 }
 
+var resourceTypeToValidateFunc = map[string]func(*SecretAdmitter) *admissionv1.AdmissionResponse{
+	"hosts": func(admitter *SecretAdmitter) *admissionv1.AdmissionResponse {
+		return admitter.validateHostSecret()
+	},
+	"providers": func(admitter *SecretAdmitter) *admissionv1.AdmissionResponse {
+		return admitter.validateProviderSecret()
+	},
+}
+
 func (admitter *SecretAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
 	log.Info("secret admitter was called")
 	raw := ar.Request.Object.Raw
@@ -52,6 +61,16 @@ func (admitter *SecretAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissio
 		return webhookutils.ToAdmissionResponseError(err)
 	}
 
+	// The label createdForResourceType must exist due to the configuration of the webhook
+	resourceType := admitter.secret.GetLabels()["createdForResourceType"]
+	if validate, ok := resourceTypeToValidateFunc[resourceType]; ok {
+		return validate(admitter)
+	}
+
+	return webhookutils.ToAdmissionResponseAllow()
+}
+
+func (admitter *SecretAdmitter) validateProviderSecret() *admissionv1.AdmissionResponse {
 	if createdForProviderType, ok := admitter.secret.GetLabels()["createdForProviderType"]; ok {
 		providerType := api.ProviderType(createdForProviderType)
 		collector, err := admitter.buildProviderCollector(&providerType)
@@ -60,50 +79,52 @@ func (admitter *SecretAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissio
 		}
 
 		log.Info("Starting provider connection test")
-		status, err := collector.Test()
+		if status, err := collector.Test(); err != nil {
+			if status == http.StatusUnauthorized || status == http.StatusBadRequest {
+				log.Info("Connection test failed, failing", "status", status)
+				return &admissionv1.AdmissionResponse{
+					Allowed: false,
+					Result: &metav1.Status{
+						Code:    http.StatusForbidden,
+						Message: "Invalid credentials",
+					},
+				}
+			} else {
+				log.Info("Connection test failed, yet passing", "status", status, "error", err.Error())
+			}
+		} else {
+			log.Info("Test succeeded, passing")
+		}
+		return webhookutils.ToAdmissionResponseAllow()
+	} else {
+		err := errors.New("provider secret is labeled with 'createdForResourceType' but without 'createdForProviderType'")
+		return webhookutils.ToAdmissionResponseError(err)
+	}
+}
+
+func (admitter *SecretAdmitter) validateHostSecret() *admissionv1.AdmissionResponse {
+	if hostName, ok := admitter.secret.GetLabels()["createdForResource"]; ok {
+		tested, err := admitter.testConnectionToHost(hostName)
 		switch {
-		case err != nil && (status == http.StatusUnauthorized || status == http.StatusBadRequest):
-			log.Info("Connection test failed, failing", "status", status)
+		case tested && err != nil:
+			log.Info("Test connection to the host failed")
 			return &admissionv1.AdmissionResponse{
 				Allowed: false,
 				Result: &metav1.Status{
 					Code:    http.StatusForbidden,
-					Message: "Invalid credentials",
+					Message: err.Error(),
 				},
 			}
 		case err != nil:
-			log.Info("Connection test failed, yet passing", "status", status, "error", err.Error())
+			log.Info("Couldn't test connection to the host, yet passing", "error", err.Error())
 		default:
 			log.Info("Test succeeded, passing")
 		}
 		return webhookutils.ToAdmissionResponseAllow()
+	} else {
+		err := errors.New("host secret is labeled with 'createdForResourceType' but without 'createdForResource'")
+		return webhookutils.ToAdmissionResponseError(err)
 	}
-
-	if resourceType, ok := admitter.secret.GetLabels()["createdForResourceType"]; ok {
-		switch resourceType {
-		case "hosts":
-			if hostName, ok := admitter.secret.GetLabels()["createdForResource"]; ok {
-				if tested, err := admitter.validateHostSecret(hostName); err != nil {
-					if tested {
-						return &admissionv1.AdmissionResponse{
-							Allowed: false,
-							Result: &metav1.Status{
-								Code:    http.StatusForbidden,
-								Message: err.Error(),
-							},
-						}
-					} else {
-						return webhookutils.ToAdmissionResponseError(err)
-					}
-				}
-			} else {
-				err = errors.New("host secret is labeled with 'createdForResourceType' but without 'createdForResource'")
-				return webhookutils.ToAdmissionResponseError(err)
-			}
-		}
-	}
-
-	return webhookutils.ToAdmissionResponseAllow()
 }
 
 func (admitter *SecretAdmitter) buildProviderCollector(providerType *api.ProviderType) (libcontainer.Collector, error) {
@@ -125,7 +146,7 @@ func (admitter *SecretAdmitter) buildProviderCollector(providerType *api.Provide
 	}
 }
 
-func (admitter *SecretAdmitter) validateHostSecret(hostName string) (tested bool, err error) {
+func (admitter *SecretAdmitter) testConnectionToHost(hostName string) (tested bool, err error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		log.Error(err, "Couldn't get the cluster configuration", err.Error())
@@ -167,16 +188,6 @@ func (admitter *SecretAdmitter) validateHostSecret(hostName string) (tested bool
 		}
 	}
 
-	log.Info("Testing provider connection")
-	tested, err = admitter.testConnectionToHost(provider, hostName)
-	if !tested && err != nil {
-		log.Error(err, "Couldn't test connection to the host")
-		err = fmt.Errorf("failed to initiate test connection to the host. Error: %s", err.Error())
-	}
-	return tested, err
-}
-
-func (admitter *SecretAdmitter) testConnectionToHost(provider *api.Provider, host string) (bool, error) {
 	switch provider.Type() {
 	case api.VSphere:
 		inventory, err := web.NewClient(provider)
@@ -184,7 +195,7 @@ func (admitter *SecretAdmitter) testConnectionToHost(provider *api.Provider, hos
 			return false, err
 		}
 		hostModel := &vsphere.Host{}
-		err = inventory.Get(hostModel, host)
+		err = inventory.Get(hostModel, hostName)
 		if err != nil {
 			return false, err
 		}
@@ -194,13 +205,8 @@ func (admitter *SecretAdmitter) testConnectionToHost(provider *api.Provider, hos
 			Secret: &admitter.secret,
 			URL:    url,
 		}
-		if err = h.TestConnection(); err != nil {
-			log.Info("Test connection to the host failed")
-			err = fmt.Errorf("could not connect to the ESXi host, please check credentials. Error: %s", err.Error())
-		} else {
-			log.Info("Connection test, succeeded")
-		}
-		return true, err
+		log.Info("Testing provider connection")
+		return true, h.TestConnection()
 	default:
 		return true, nil
 	}
