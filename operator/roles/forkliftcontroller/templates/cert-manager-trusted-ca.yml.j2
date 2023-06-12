@@ -2,7 +2,7 @@
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: {{ app_namespace }}-issuer-selfsigned
+  name: {{ app_name }}-issuer-selfsigned
   namespace: {{ app_namespace }}
 spec:
   selfSigned: {}
@@ -10,10 +10,10 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: {{ app_namespace }}-certificate
+  name: {{ app_name }}-certificate
   namespace: {{ app_namespace }}
 spec:
-  commonName: {{ app_namespace }}-certificate
+  commonName: {{ app_name }}-certificate
   dnsNames:
   - svc
   - svc.cluster.local
@@ -21,17 +21,17 @@ spec:
   issuerRef:
     group: cert-manager.io
     kind: Issuer
-    name: {{ app_namespace }}-issuer-selfsigned
+    name: {{ app_name }}-issuer-selfsigned
   privateKey:
     algorithm: ECDSA
     size: 256
-  secretName: {{ app_namespace }}-cert
+  secretName: {{ app_name }}-cert
 ---
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: {{ app_namespace }}-issuer
+  name: {{ app_name }}-issuer
   namespace: {{ app_namespace }}
 spec:
   ca:
-    secretName: {{ app_namespace }}-cert
+    secretName: {{ app_name }}-cert
