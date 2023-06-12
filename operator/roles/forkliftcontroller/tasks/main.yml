@@ -93,6 +93,10 @@
 
   - when: k8s_cluster|bool
     block:
+    - name: "Create a trusted CA issuer"
+      k8s:
+        state: present
+        definition: "{{ lookup('template', 'cert-manager-trusted-ca.yml.j2') }}"
     - name: "Configure webhook certificate on K8s"
       k8s:
         state: present
