@@ -2,6 +2,7 @@ package validation
 
 import (
 	"context"
+
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/provider"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
@@ -141,18 +142,6 @@ func (r *ProviderPair) validateSource(pair provider.Pair) (result libcnd.Conditi
 		}
 		result.SetCondition(newCnd)
 	}
-	// An openshift source is not supported.
-	r.Referenced.Source = pv.Referenced
-	if r.Referenced.Source != nil && r.Referenced.Source.Type() == api.OpenShift {
-		result.SetCondition(libcnd.Condition{
-			Type:     SourceProviderNotValid,
-			Status:   True,
-			Reason:   TypeNotValid,
-			Category: Critical,
-			Message:  "The provider is not valid.",
-		})
-		return
-	}
 
 	return
 }
@@ -191,6 +180,7 @@ func (r *ProviderPair) validateDestination(pair provider.Pair) (result libcnd.Co
 		})
 		return
 	}
+	r.Referenced.Source = pv.Referenced
 
 	return
 }
