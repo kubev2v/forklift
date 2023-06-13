@@ -53,6 +53,9 @@ spec:
               name:
                 description: 'An object Name. vsphere: A qualified name.'
                 type: string
+              namespace:
+                description: The VM Namespace Only relevant for an openshift source.
+                type: string
               provider:
                 description: Provider
                 properties:
