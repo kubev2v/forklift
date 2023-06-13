@@ -46,8 +46,10 @@ spec:
           value: "8443"
         - name: METRICS_PORT
           value: '8081'
+{% if k8s_cluster|bool %}
         - name: API_TLS_CA
           value: /var/run/secrets/{{ inventory_tls_secret_name }}/ca.crt
+{% endif %}
         - name: SECRET_NAME
           value: webhook-server-secret
 {% if controller_log_level is defined and controller_log_level is number %}
@@ -112,8 +114,10 @@ spec:
           readOnly: true
         - mountPath: {{ profiler_volume_path }}
           name: profiler
+{% if k8s_cluster|bool %}
         - mountPath: /var/run/secrets/{{ inventory_tls_secret_name }}
           name: {{ inventory_service_name }}-serving-cert
+{% endif %}
       - name: inventory
         command:
         - /usr/local/bin/forklift-controller
