@@ -78,6 +78,10 @@ spec:
                         name:
                           description: 'An object Name. vsphere: A qualified name.'
                           type: string
+                        namespace:
+                          description: The VM Namespace Only relevant for an openshift
+                            source.
+                          type: string
                         type:
                           description: Type used to qualify the name.
                           type: string
@@ -227,6 +231,10 @@ spec:
                       type: string
                     name:
                       description: 'An object Name. vsphere: A qualified name.'
+                      type: string
+                    namespace:
+                      description: The VM Namespace Only relevant for an openshift
+                        source.
                       type: string
                     type:
                       description: Type used to qualify the name.

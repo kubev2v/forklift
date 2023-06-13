@@ -13,6 +13,9 @@ type Ref struct {
 	// vsphere:
 	//   A qualified name.
 	Name string `json:"name,omitempty"`
+	// The VM Namespace
+	// Only relevant for an openshift source.
+	Namespace string `json:"namespace,omitempty"`
 	// Type used to qualify the name.
 	Type string `json:"type,omitempty"`
 }
