@@ -9,6 +9,7 @@ go_library(
         "//pkg/apis/forklift/v1beta1",
         "//pkg/apis/forklift/v1beta1/plan",
         "//pkg/controller/plan/context",
+        "//pkg/controller/plan/scheduler/ocp",
         "//pkg/controller/plan/scheduler/openstack",
         "//pkg/controller/plan/scheduler/ovirt",
         "//pkg/controller/plan/scheduler/vsphere",

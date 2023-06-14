@@ -22,7 +22,7 @@ type Ref struct {
 
 // Determine if the ref either the ID or Name is set.
 func (r Ref) NotSet() bool {
-	return r.ID == "" && r.Name == ""
+	return r.ID == "" && r.Name == "" && r.Type == ""
 }
 
 // String representation.
