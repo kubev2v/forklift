@@ -70,6 +70,7 @@ func (r *Provider) Validate(ref core.ObjectReference) (result libcnd.Conditions,
 	}
 	provider := api.Provider{}
 	err = r.Get(context.TODO(), key, &provider)
+
 	if k8serr.IsNotFound(err) {
 		err = nil
 		newCnd.Reason = NotFound
@@ -110,13 +111,14 @@ func (r *ProviderPair) Validate(pair provider.Pair) (result libcnd.Conditions, e
 	if err != nil {
 		return
 	}
+
 	result.UpdateConditions(conditions)
 	conditions, err = r.validateDestination(pair)
 	if err != nil {
 		return
 	}
-	result.UpdateConditions(conditions)
 
+	result.UpdateConditions(conditions)
 	return
 }
 
@@ -153,6 +155,7 @@ func (r *ProviderPair) validateDestination(pair provider.Pair) (result libcnd.Co
 	if err != nil {
 		return
 	}
+
 	// Remap the condition to be destination oriented.
 	for _, newCnd := range conditions.List {
 		switch newCnd.Type {
