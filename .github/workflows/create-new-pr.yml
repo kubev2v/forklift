@@ -1,0 +1,39 @@
+name: new PR greeter
+on:
+  pull_request_target:
+    types: [opened,reopened]
+
+jobs:
+  new_pr_greeter:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Checkout forklift
+        uses: actions/checkout@v3
+
+      - id: codeowner
+        uses: SvanBoxel/codeowners-action@v1
+        with:
+          path: './.github/CODEOWNERS'
+
+      - name: fail if the commenter doesnt exists in codeowners
+        id: allowedaccess
+        run: |
+          echo allowed=$(echo '${{ steps.codeowner.outputs.codeowners }}' | \
+          jq  -r '."tests/" | index("@${{ github.actor }}")') >> $GITHUB_OUTPUT 
+
+      - name: Add comment to PR
+        uses: actions/github-script@v6
+        if: ${{ steps.allowedaccess.outputs.allowed == '1' }}
+        with:
+          script: |
+
+            const body = `Welcome ${{ github.actor }}, you can run extended openstack test with **/test-osp-extended** comment`;
+
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            })
