@@ -2,12 +2,13 @@ package network
 
 import (
 	"errors"
+	"path"
+
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	refapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/controller/validation"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
-	"path"
 )
 
 // Types
@@ -61,6 +62,7 @@ func (r *Reconciler) validate(mp *api.NetworkMap) error {
 	}
 	mp.Referenced.Provider.Source = pv.Referenced.Source
 	mp.Referenced.Provider.Destination = pv.Referenced.Destination
+
 	err = r.validateSource(mp)
 	if err != nil {
 		return err

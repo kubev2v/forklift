@@ -18,6 +18,7 @@ package network
 
 import (
 	"context"
+
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/base"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
