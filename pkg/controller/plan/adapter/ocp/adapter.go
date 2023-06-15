@@ -18,12 +18,7 @@ func (r *Adapter) Builder(ctx *plancontext.Context) (builder base.Builder, err e
 // Constructs a openshift validator.
 func (r *Adapter) Validator(plan *api.Plan) (validator base.Validator, err error) {
 	v := &Validator{plan: plan}
-	err = v.Load()
-	if err != nil {
-		return
-	}
-	validator = v
-	return
+	return v, nil
 }
 
 // Constructs an openshift client.

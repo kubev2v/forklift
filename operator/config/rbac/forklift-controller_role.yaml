@@ -74,6 +74,7 @@ rules:
   resources:
   - virtualmachines
   - virtualmachines/finalizers
+  - virtualmachineexports
   verbs:
   - get
   - list
@@ -110,3 +111,15 @@ rules:
   verbs:
   - get
   - list
+- apiGroups:
+  - export.kubevirt.io
+  resources:
+  - virtualmachineexports
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
