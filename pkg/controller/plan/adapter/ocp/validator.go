@@ -15,12 +15,12 @@ type Validator struct {
 
 // MaintenanceMode implements base.Validator
 func (*Validator) MaintenanceMode(vmRef ref.Ref) (bool, error) {
-	return false, nil
+	return true, nil
 }
 
 // PodNetwork implements base.Validator
 func (*Validator) PodNetwork(vmRef ref.Ref) (bool, error) {
-	return false, nil
+	return true, nil
 }
 
 // WarmMigration implements base.Validator

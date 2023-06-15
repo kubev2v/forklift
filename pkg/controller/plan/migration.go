@@ -649,6 +649,15 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		}
 
 		var pvcNames []string
+		if r.Plan.IsSourceProviderOCP() {
+			err = r.kubevirt.ensureOCPVolumes(vm.Ref)
+			if err != nil {
+				step.AddError(err.Error())
+				err = nil
+				break
+			}
+		}
+
 		if r.Plan.IsSourceProviderOpenstack() {
 			pvcNames, err = r.kubevirt.ensureOpenStackVolumes(vm.Ref, ready)
 			if err != nil {

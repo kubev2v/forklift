@@ -40,6 +40,7 @@ import (
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	export "kubevirt.io/api/export/v1alpha1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -2067,4 +2068,55 @@ func (r *KubeVirt) EnsurePersistentVolumeClaim(vm *plan.VMStatus, persistentVolu
 		}
 	}
 	return
+}
+
+// OCP source
+func (r *KubeVirt) ensureOCPVolumes(vm ref.Ref) error {
+	apiGroup := "kubevirt.io"
+	secretFunc := func(secret *core.Secret) error {
+		*&secret.StringData = map[string]string{
+			"token": "123456789", // TODO: set something real
+		}
+		return nil
+	}
+
+	s, err := r.secret(vm, secretFunc)
+	if err != nil {
+		return err
+	}
+	// Check if VM export exists
+	vmExport := &export.VirtualMachineExport{}
+	err = r.Client.Get(context.Background(), client.ObjectKey{Namespace: vm.Namespace, Name: vm.Name}, vmExport)
+	if err != nil {
+		if !k8serr.IsNotFound(err) {
+			return liberr.Wrap(err)
+
+		}
+		// Create VM export
+		vmExport = &export.VirtualMachineExport{
+			TypeMeta: meta.TypeMeta{
+				Kind:       "VirtualMachineExport",
+				APIVersion: "kubevirt.io/v1alpha3",
+			},
+			ObjectMeta: meta.ObjectMeta{
+				Name:      vm.Name,
+				Namespace: vm.Namespace,
+			},
+			Spec: export.VirtualMachineExportSpec{
+				TokenSecretRef: &s.Name,
+				Source: core.TypedLocalObjectReference{
+					APIGroup: &apiGroup,
+					Kind:     "VirtualMachine",
+					Name:     vm.Name,
+				},
+			},
+		}
+
+		err = r.Client.Create(context.Background(), vmExport, &client.CreateOptions{})
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+	}
+
+	return nil
 }
