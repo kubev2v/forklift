@@ -12,8 +12,8 @@ package v1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_BrokerTemplateInstance = map[string]string{
-	"":         "BrokerTemplateInstance holds the service broker-related state associated with a TemplateInstance.  BrokerTemplateInstance is part of an experimental API.",
-	"metadata": "Standard object metadata.",
+	"":         "BrokerTemplateInstance holds the service broker-related state associated with a TemplateInstance.  BrokerTemplateInstance is part of an experimental API.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"spec":     "spec describes the state of this BrokerTemplateInstance.",
 }
 
@@ -22,8 +22,8 @@ func (BrokerTemplateInstance) SwaggerDoc() map[string]string {
 }
 
 var map_BrokerTemplateInstanceList = map[string]string{
-	"":         "BrokerTemplateInstanceList is a list of BrokerTemplateInstance objects.",
-	"metadata": "Standard object metadata.",
+	"":         "BrokerTemplateInstanceList is a list of BrokerTemplateInstance objects.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"items":    "items is a list of BrokerTemplateInstances",
 }
 
@@ -58,8 +58,8 @@ func (Parameter) SwaggerDoc() map[string]string {
 }
 
 var map_Template = map[string]string{
-	"":           "Template contains the inputs needed to produce a Config.",
-	"metadata":   "Standard object's metadata.",
+	"":           "Template contains the inputs needed to produce a Config.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata":   "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"message":    "message is an optional instructional message that will be displayed when this template is instantiated. This field should inform the user how to utilize the newly created resources. Parameter substitution will be performed on the message before being displayed so that generated credentials and other parameters can be included in the output.",
 	"objects":    "objects is an array of resources to include in this template. If a namespace value is hardcoded in the object, it will be removed during template instantiation, however if the namespace value is, or contains, a ${PARAMETER_REFERENCE}, the resolved value after parameter substitution will be respected and the object will be created in that namespace.",
 	"parameters": "parameters is an optional array of Parameters used during the Template to Config transformation.",
@@ -71,8 +71,8 @@ func (Template) SwaggerDoc() map[string]string {
 }
 
 var map_TemplateInstance = map[string]string{
-	"":         "TemplateInstance requests and records the instantiation of a Template. TemplateInstance is part of an experimental API.",
-	"metadata": "Standard object metadata.",
+	"":         "TemplateInstance requests and records the instantiation of a Template. TemplateInstance is part of an experimental API.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"spec":     "spec describes the desired state of this TemplateInstance.",
 	"status":   "status describes the current state of this TemplateInstance.",
 }
@@ -95,8 +95,8 @@ func (TemplateInstanceCondition) SwaggerDoc() map[string]string {
 }
 
 var map_TemplateInstanceList = map[string]string{
-	"":         "TemplateInstanceList is a list of TemplateInstance objects.",
-	"metadata": "Standard object metadata.",
+	"":         "TemplateInstanceList is a list of TemplateInstance objects.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"items":    "items is a list of Templateinstances",
 }
 
@@ -147,8 +147,8 @@ func (TemplateInstanceStatus) SwaggerDoc() map[string]string {
 }
 
 var map_TemplateList = map[string]string{
-	"":         "TemplateList is a list of Template objects.",
-	"metadata": "Standard object's metadata.",
+	"":         "TemplateList is a list of Template objects.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"items":    "Items is a list of templates",
 }
 

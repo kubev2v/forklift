@@ -9,7 +9,7 @@ import (
 
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"k8s.io/apimachinery/pkg/fields"
-	cnv "kubevirt.io/client-go/api/v1"
+	cnv "kubevirt.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 

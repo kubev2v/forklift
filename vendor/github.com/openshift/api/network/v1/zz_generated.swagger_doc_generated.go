@@ -12,14 +12,15 @@ package v1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_ClusterNetwork = map[string]string{
-	"":                 "ClusterNetwork describes the cluster network. There is normally only one object of this type, named \"default\", which is created by the SDN network plugin based on the master configuration when the cluster is brought up for the first time.",
-	"metadata":         "Standard object's metadata.",
+	"":                 "ClusterNetwork describes the cluster network. There is normally only one object of this type, named \"default\", which is created by the SDN network plugin based on the master configuration when the cluster is brought up for the first time.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata":         "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"network":          "Network is a CIDR string specifying the global overlay network's L3 space",
 	"hostsubnetlength": "HostSubnetLength is the number of bits of network to allocate to each node. eg, 8 would mean that each node would have a /24 slice of the overlay network for its pods",
 	"serviceNetwork":   "ServiceNetwork is the CIDR range that Service IP addresses are allocated from",
 	"pluginName":       "PluginName is the name of the network plugin being used",
-	"clusterNetworks":  "ClusterNetworks is a list of ClusterNetwork objects that defines the global overlay network's L3 space by specifying a set of CIDR and netmasks that the SDN can allocate addressed from.",
+	"clusterNetworks":  "ClusterNetworks is a list of ClusterNetwork objects that defines the global overlay network's L3 space by specifying a set of CIDR and netmasks that the SDN can allocate addresses from.",
 	"vxlanPort":        "VXLANPort sets the VXLAN destination port used by the cluster. It is set by the master configuration file on startup and cannot be edited manually. Valid values for VXLANPort are integers 1-65535 inclusive and if unset defaults to 4789. Changing VXLANPort allows users to resolve issues between openshift SDN and other software trying to use the same VXLAN destination port.",
+	"mtu":              "MTU is the MTU for the overlay network. This should be 50 less than the MTU of the network connecting the nodes. It is normally autodetected by the cluster network operator.",
 }
 
 func (ClusterNetwork) SwaggerDoc() map[string]string {
@@ -37,8 +38,8 @@ func (ClusterNetworkEntry) SwaggerDoc() map[string]string {
 }
 
 var map_ClusterNetworkList = map[string]string{
-	"":         "ClusterNetworkList is a collection of ClusterNetworks",
-	"metadata": "Standard object's metadata.",
+	"":         "ClusterNetworkList is a collection of ClusterNetworks\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"items":    "Items is the list of cluster networks",
 }
 
@@ -47,8 +48,8 @@ func (ClusterNetworkList) SwaggerDoc() map[string]string {
 }
 
 var map_EgressNetworkPolicy = map[string]string{
-	"":         "EgressNetworkPolicy describes the current egress network policy for a Namespace. When using the 'redhat/openshift-ovs-multitenant' network plugin, traffic from a pod to an IP address outside the cluster will be checked against each EgressNetworkPolicyRule in the pod's namespace's EgressNetworkPolicy, in order. If no rule matches (or no EgressNetworkPolicy is present) then the traffic will be allowed by default.",
-	"metadata": "metadata for EgressNetworkPolicy",
+	"":         "EgressNetworkPolicy describes the current egress network policy for a Namespace. When using the 'redhat/openshift-ovs-multitenant' network plugin, traffic from a pod to an IP address outside the cluster will be checked against each EgressNetworkPolicyRule in the pod's namespace's EgressNetworkPolicy, in order. If no rule matches (or no EgressNetworkPolicy is present) then the traffic will be allowed by default.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"spec":     "spec is the specification of the current egress network policy",
 }
 
@@ -57,8 +58,8 @@ func (EgressNetworkPolicy) SwaggerDoc() map[string]string {
 }
 
 var map_EgressNetworkPolicyList = map[string]string{
-	"":         "EgressNetworkPolicyList is a collection of EgressNetworkPolicy",
-	"metadata": "metadata for EgressNetworkPolicyList",
+	"":         "EgressNetworkPolicyList is a collection of EgressNetworkPolicy\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"items":    "items is the list of policies",
 }
 
@@ -68,8 +69,8 @@ func (EgressNetworkPolicyList) SwaggerDoc() map[string]string {
 
 var map_EgressNetworkPolicyPeer = map[string]string{
 	"":             "EgressNetworkPolicyPeer specifies a target to apply egress network policy to",
-	"cidrSelector": "cidrSelector is the CIDR range to allow/deny traffic to. If this is set, dnsName must be unset",
-	"dnsName":      "dnsName is the domain name to allow/deny traffic to. If this is set, cidrSelector must be unset",
+	"cidrSelector": "CIDRSelector is the CIDR range to allow/deny traffic to. If this is set, dnsName must be unset Ideally we would have liked to use the cidr openapi format for this property. But openshift-sdn only supports v4 while specifying the cidr format allows both v4 and v6 cidrs We are therefore using a regex pattern to validate instead.",
+	"dnsName":      "DNSName is the domain name to allow/deny traffic to. If this is set, cidrSelector must be unset",
 }
 
 func (EgressNetworkPolicyPeer) SwaggerDoc() map[string]string {
@@ -96,8 +97,8 @@ func (EgressNetworkPolicySpec) SwaggerDoc() map[string]string {
 }
 
 var map_HostSubnet = map[string]string{
-	"":            "HostSubnet describes the container subnet network on a node. The HostSubnet object must have the same name as the Node object it corresponds to.",
-	"metadata":    "Standard object's metadata.",
+	"":            "HostSubnet describes the container subnet network on a node. The HostSubnet object must have the same name as the Node object it corresponds to.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata":    "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"host":        "Host is the name of the node. (This is the same as the object's name, but both fields must be set.)",
 	"hostIP":      "HostIP is the IP address to be used as a VTEP by other nodes in the overlay network",
 	"subnet":      "Subnet is the CIDR range of the overlay network assigned to the node for its pods",
@@ -110,8 +111,8 @@ func (HostSubnet) SwaggerDoc() map[string]string {
 }
 
 var map_HostSubnetList = map[string]string{
-	"":         "HostSubnetList is a collection of HostSubnets",
-	"metadata": "Standard object's metadata.",
+	"":         "HostSubnetList is a collection of HostSubnets\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"items":    "Items is the list of host subnets",
 }
 
@@ -120,8 +121,8 @@ func (HostSubnetList) SwaggerDoc() map[string]string {
 }
 
 var map_NetNamespace = map[string]string{
-	"":          "NetNamespace describes a single isolated network. When using the redhat/openshift-ovs-multitenant plugin, every Namespace will have a corresponding NetNamespace object with the same name. (When using redhat/openshift-ovs-subnet, NetNamespaces are not used.)",
-	"metadata":  "Standard object's metadata.",
+	"":          "NetNamespace describes a single isolated network. When using the redhat/openshift-ovs-multitenant plugin, every Namespace will have a corresponding NetNamespace object with the same name. (When using redhat/openshift-ovs-subnet, NetNamespaces are not used.)\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata":  "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"netname":   "NetName is the name of the network namespace. (This is the same as the object's name, but both fields must be set.)",
 	"netid":     "NetID is the network identifier of the network namespace assigned to each overlay network packet. This can be manipulated with the \"oc adm pod-network\" commands.",
 	"egressIPs": "EgressIPs is a list of reserved IPs that will be used as the source for external traffic coming from pods in this namespace. (If empty, external traffic will be masqueraded to Node IPs.)",
@@ -132,8 +133,8 @@ func (NetNamespace) SwaggerDoc() map[string]string {
 }
 
 var map_NetNamespaceList = map[string]string{
-	"":         "NetNamespaceList is a collection of NetNamespaces",
-	"metadata": "Standard object's metadata.",
+	"":         "NetNamespaceList is a collection of NetNamespaces\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"items":    "Items is the list of net namespaces",
 }
 

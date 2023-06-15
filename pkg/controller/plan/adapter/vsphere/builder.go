@@ -28,7 +28,7 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	cnv "kubevirt.io/client-go/api/v1"
+	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -614,8 +614,10 @@ func (r *Builder) mapDisks(vm *model.VM, persistentVolumeClaims []core.Persisten
 		volume := cnv.Volume{
 			Name: volumeName,
 			VolumeSource: cnv.VolumeSource{
-				PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
-					ClaimName: pvc.Name,
+				PersistentVolumeClaim: &cnv.PersistentVolumeClaimVolumeSource{
+					PersistentVolumeClaimVolumeSource: core.PersistentVolumeClaimVolumeSource{
+						ClaimName: pvc.Name,
+					},
 				},
 			},
 		}

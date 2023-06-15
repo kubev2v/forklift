@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/klog/v2"
-	cnv "kubevirt.io/client-go/api/v1"
+	cnv "kubevirt.io/api/core/v1"
 	libvirtxml "libvirt.org/libvirt-go-xml"
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
