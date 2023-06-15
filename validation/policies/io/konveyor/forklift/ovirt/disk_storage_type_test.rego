@@ -46,3 +46,21 @@ test_with_invalid_storage_type {
     results := concerns with input as mock_vm
     count(results) == 1
 }
+
+test_with_valid_lun_storage_type {
+    mock_vm := {
+        "name": "test",
+        "diskAttachments": [
+            {
+              "id": "b749c132-bb97-4145-b86e-a1751cf75e21",
+              "interface": "virtio_scsi",
+              "disk":
+                { "storageType": "lun",
+                  "status": "ok"
+                }
+            }
+        ]
+    }
+    results := concerns with input as mock_vm
+    count(results) == 0
+}
