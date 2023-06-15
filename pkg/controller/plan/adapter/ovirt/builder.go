@@ -21,7 +21,7 @@ import (
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
-	cnv "kubevirt.io/client-go/api/v1"
+	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
 
@@ -430,8 +430,10 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 		volume := cnv.Volume{
 			Name: volumeName,
 			VolumeSource: cnv.VolumeSource{
-				PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
-					ClaimName: claimName,
+				PersistentVolumeClaim: &cnv.PersistentVolumeClaimVolumeSource{
+					PersistentVolumeClaimVolumeSource: core.PersistentVolumeClaimVolumeSource{
+						ClaimName: claimName,
+					},
 				},
 			},
 		}
@@ -448,7 +450,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 			Name: volumeName,
 			DiskDevice: cnv.DiskDevice{
 				Disk: &cnv.DiskTarget{
-					Bus: bus,
+					Bus: cnv.DiskBus(bus),
 				},
 			},
 		}

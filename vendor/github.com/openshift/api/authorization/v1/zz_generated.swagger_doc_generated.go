@@ -20,7 +20,7 @@ var map_Action = map[string]string{
 	"resource":           "Resource is one of the existing resource types",
 	"resourceName":       "ResourceName is the name of the resource being requested for a \"get\" or deleted for a \"delete\"",
 	"path":               "Path is the path of a non resource URL",
-	"isNonResourceURL":   "IsNonResourceURL is true if this is a request for a non-resource URL (outside of the resource hieraarchy)",
+	"isNonResourceURL":   "IsNonResourceURL is true if this is a request for a non-resource URL (outside of the resource hierarchy)",
 	"content":            "Content is the actual content of the request for create and update",
 }
 
@@ -29,8 +29,8 @@ func (Action) SwaggerDoc() map[string]string {
 }
 
 var map_ClusterRole = map[string]string{
-	"":                "ClusterRole is a logical grouping of PolicyRules that can be referenced as a unit by ClusterRoleBindings.",
-	"metadata":        "Standard object's metadata.",
+	"":                "ClusterRole is a logical grouping of PolicyRules that can be referenced as a unit by ClusterRoleBindings.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata":        "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"rules":           "Rules holds all the PolicyRules for this ClusterRole",
 	"aggregationRule": "AggregationRule is an optional field that describes how to build the Rules for this ClusterRole. If AggregationRule is set, then the Rules are controller managed and direct changes to Rules will be stomped by the controller.",
 }
@@ -40,8 +40,8 @@ func (ClusterRole) SwaggerDoc() map[string]string {
 }
 
 var map_ClusterRoleBinding = map[string]string{
-	"":           "ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference any ClusterRole in the same namespace or in the global namespace. It adds who information via (Users and Groups) OR Subjects and namespace information by which namespace it exists in. ClusterRoleBindings in a given namespace only have effect in that namespace (excepting the master namespace which has power in all namespaces).",
-	"metadata":   "Standard object's metadata.",
+	"":           "ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference any ClusterRole in the same namespace or in the global namespace. It adds who information via (Users and Groups) OR Subjects and namespace information by which namespace it exists in. ClusterRoleBindings in a given namespace only have effect in that namespace (excepting the master namespace which has power in all namespaces).\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata":   "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"userNames":  "UserNames holds all the usernames directly bound to the role. This field should only be specified when supporting legacy clients and servers. See Subjects for further details.",
 	"groupNames": "GroupNames holds all the groups directly bound to the role. This field should only be specified when supporting legacy clients and servers. See Subjects for further details.",
 	"subjects":   "Subjects hold object references to authorize with this rule. This field is ignored if UserNames or GroupNames are specified to support legacy clients and servers. Thus newer clients that do not need to support backwards compatibility should send only fully qualified Subjects and should omit the UserNames and GroupNames fields. Clients that need to support backwards compatibility can use this field to build the UserNames and GroupNames.",
@@ -53,8 +53,8 @@ func (ClusterRoleBinding) SwaggerDoc() map[string]string {
 }
 
 var map_ClusterRoleBindingList = map[string]string{
-	"":         "ClusterRoleBindingList is a collection of ClusterRoleBindings",
-	"metadata": "Standard object's metadata.",
+	"":         "ClusterRoleBindingList is a collection of ClusterRoleBindings\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"items":    "Items is a list of ClusterRoleBindings",
 }
 
@@ -63,8 +63,8 @@ func (ClusterRoleBindingList) SwaggerDoc() map[string]string {
 }
 
 var map_ClusterRoleList = map[string]string{
-	"":         "ClusterRoleList is a collection of ClusterRoles",
-	"metadata": "Standard object's metadata.",
+	"":         "ClusterRoleList is a collection of ClusterRoles\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"items":    "Items is a list of ClusterRoles",
 }
 
@@ -83,7 +83,7 @@ func (GroupRestriction) SwaggerDoc() map[string]string {
 }
 
 var map_IsPersonalSubjectAccessReview = map[string]string{
-	"": "IsPersonalSubjectAccessReview is a marker for PolicyRule.AttributeRestrictions that denotes that subjectaccessreviews on self should be allowed",
+	"": "IsPersonalSubjectAccessReview is a marker for PolicyRule.AttributeRestrictions that denotes that subjectaccessreviews on self should be allowed\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 }
 
 func (IsPersonalSubjectAccessReview) SwaggerDoc() map[string]string {
@@ -91,7 +91,7 @@ func (IsPersonalSubjectAccessReview) SwaggerDoc() map[string]string {
 }
 
 var map_LocalResourceAccessReview = map[string]string{
-	"": "LocalResourceAccessReview is a means to request a list of which users and groups are authorized to perform the action specified by spec in a particular namespace",
+	"": "LocalResourceAccessReview is a means to request a list of which users and groups are authorized to perform the action specified by spec in a particular namespace\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 }
 
 func (LocalResourceAccessReview) SwaggerDoc() map[string]string {
@@ -99,7 +99,7 @@ func (LocalResourceAccessReview) SwaggerDoc() map[string]string {
 }
 
 var map_LocalSubjectAccessReview = map[string]string{
-	"":       "LocalSubjectAccessReview is an object for requesting information about whether a user or group can perform an action in a particular namespace",
+	"":       "LocalSubjectAccessReview is an object for requesting information about whether a user or group can perform an action in a particular namespace\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"user":   "User is optional.  If both User and Groups are empty, the current authenticated user is used.",
 	"groups": "Groups is optional.  Groups is the list of groups to which the User belongs.",
 	"scopes": "Scopes to use for the evaluation.  Empty means \"use the unscoped (full) permissions of the user/groups\". Nil for a self-SAR, means \"use the scopes on this request\". Nil for a regular SAR, means the same as empty.",
@@ -164,7 +164,7 @@ func (PolicyRule) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceAccessReview = map[string]string{
-	"": "ResourceAccessReview is a means to request a list of which users and groups are authorized to perform the action specified by spec",
+	"": "ResourceAccessReview is a means to request a list of which users and groups are authorized to perform the action specified by spec\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 }
 
 func (ResourceAccessReview) SwaggerDoc() map[string]string {
@@ -172,7 +172,7 @@ func (ResourceAccessReview) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceAccessReviewResponse = map[string]string{
-	"":               "ResourceAccessReviewResponse describes who can perform the action",
+	"":               "ResourceAccessReviewResponse describes who can perform the action\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"namespace":      "Namespace is the namespace used for the access review",
 	"users":          "UsersSlice is the list of users who can perform the action",
 	"groups":         "GroupsSlice is the list of groups who can perform the action",
@@ -184,8 +184,8 @@ func (ResourceAccessReviewResponse) SwaggerDoc() map[string]string {
 }
 
 var map_Role = map[string]string{
-	"":         "Role is a logical grouping of PolicyRules that can be referenced as a unit by RoleBindings.",
-	"metadata": "Standard object's metadata.",
+	"":         "Role is a logical grouping of PolicyRules that can be referenced as a unit by RoleBindings.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"rules":    "Rules holds all the PolicyRules for this Role",
 }
 
@@ -194,8 +194,8 @@ func (Role) SwaggerDoc() map[string]string {
 }
 
 var map_RoleBinding = map[string]string{
-	"":           "RoleBinding references a Role, but not contain it.  It can reference any Role in the same namespace or in the global namespace. It adds who information via (Users and Groups) OR Subjects and namespace information by which namespace it exists in. RoleBindings in a given namespace only have effect in that namespace (excepting the master namespace which has power in all namespaces).",
-	"metadata":   "Standard object's metadata.",
+	"":           "RoleBinding references a Role, but not contain it.  It can reference any Role in the same namespace or in the global namespace. It adds who information via (Users and Groups) OR Subjects and namespace information by which namespace it exists in. RoleBindings in a given namespace only have effect in that namespace (excepting the master namespace which has power in all namespaces).\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata":   "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"userNames":  "UserNames holds all the usernames directly bound to the role. This field should only be specified when supporting legacy clients and servers. See Subjects for further details.",
 	"groupNames": "GroupNames holds all the groups directly bound to the role. This field should only be specified when supporting legacy clients and servers. See Subjects for further details.",
 	"subjects":   "Subjects hold object references to authorize with this rule. This field is ignored if UserNames or GroupNames are specified to support legacy clients and servers. Thus newer clients that do not need to support backwards compatibility should send only fully qualified Subjects and should omit the UserNames and GroupNames fields. Clients that need to support backwards compatibility can use this field to build the UserNames and GroupNames.",
@@ -207,8 +207,8 @@ func (RoleBinding) SwaggerDoc() map[string]string {
 }
 
 var map_RoleBindingList = map[string]string{
-	"":         "RoleBindingList is a collection of RoleBindings",
-	"metadata": "Standard object's metadata.",
+	"":         "RoleBindingList is a collection of RoleBindings\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"items":    "Items is a list of RoleBindings",
 }
 
@@ -217,8 +217,8 @@ func (RoleBindingList) SwaggerDoc() map[string]string {
 }
 
 var map_RoleBindingRestriction = map[string]string{
-	"":         "RoleBindingRestriction is an object that can be matched against a subject (user, group, or service account) to determine whether rolebindings on that subject are allowed in the namespace to which the RoleBindingRestriction belongs.  If any one of those RoleBindingRestriction objects matches a subject, rolebindings on that subject in the namespace are allowed.",
-	"metadata": "Standard object's metadata.",
+	"":         "RoleBindingRestriction is an object that can be matched against a subject (user, group, or service account) to determine whether rolebindings on that subject are allowed in the namespace to which the RoleBindingRestriction belongs.  If any one of those RoleBindingRestriction objects matches a subject, rolebindings on that subject in the namespace are allowed.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"spec":     "Spec defines the matcher.",
 }
 
@@ -227,8 +227,8 @@ func (RoleBindingRestriction) SwaggerDoc() map[string]string {
 }
 
 var map_RoleBindingRestrictionList = map[string]string{
-	"":         "RoleBindingRestrictionList is a collection of RoleBindingRestriction objects.",
-	"metadata": "Standard object's metadata.",
+	"":         "RoleBindingRestrictionList is a collection of RoleBindingRestriction objects.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"items":    "Items is a list of RoleBindingRestriction objects.",
 }
 
@@ -248,8 +248,8 @@ func (RoleBindingRestrictionSpec) SwaggerDoc() map[string]string {
 }
 
 var map_RoleList = map[string]string{
-	"":         "RoleList is a collection of Roles",
-	"metadata": "Standard object's metadata.",
+	"":         "RoleList is a collection of Roles\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"items":    "Items is a list of Roles",
 }
 
@@ -258,7 +258,7 @@ func (RoleList) SwaggerDoc() map[string]string {
 }
 
 var map_SelfSubjectRulesReview = map[string]string{
-	"":       "SelfSubjectRulesReview is a resource you can create to determine which actions you can perform in a namespace",
+	"":       "SelfSubjectRulesReview is a resource you can create to determine which actions you can perform in a namespace\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"spec":   "Spec adds information about how to conduct the check",
 	"status": "Status is completed by the server to tell which permissions you have",
 }
@@ -297,7 +297,7 @@ func (ServiceAccountRestriction) SwaggerDoc() map[string]string {
 }
 
 var map_SubjectAccessReview = map[string]string{
-	"":       "SubjectAccessReview is an object for requesting information about whether a user or group can perform an action",
+	"":       "SubjectAccessReview is an object for requesting information about whether a user or group can perform an action\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"user":   "User is optional. If both User and Groups are empty, the current authenticated user is used.",
 	"groups": "GroupsSlice is optional. Groups is the list of groups to which the User belongs.",
 	"scopes": "Scopes to use for the evaluation.  Empty means \"use the unscoped (full) permissions of the user/groups\". Nil for a self-SAR, means \"use the scopes on this request\". Nil for a regular SAR, means the same as empty.",
@@ -308,7 +308,7 @@ func (SubjectAccessReview) SwaggerDoc() map[string]string {
 }
 
 var map_SubjectAccessReviewResponse = map[string]string{
-	"":                "SubjectAccessReviewResponse describes whether or not a user or group can perform an action",
+	"":                "SubjectAccessReviewResponse describes whether or not a user or group can perform an action\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"namespace":       "Namespace is the namespace used for the access review",
 	"allowed":         "Allowed is required.  True if the action would be allowed, false otherwise.",
 	"reason":          "Reason is optional.  It indicates why a request was allowed or denied.",
@@ -320,7 +320,7 @@ func (SubjectAccessReviewResponse) SwaggerDoc() map[string]string {
 }
 
 var map_SubjectRulesReview = map[string]string{
-	"":       "SubjectRulesReview is a resource you can create to determine which actions another user can perform in a namespace",
+	"":       "SubjectRulesReview is a resource you can create to determine which actions another user can perform in a namespace\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"spec":   "Spec adds information about how to conduct the check",
 	"status": "Status is completed by the server to tell which permissions you have",
 }
