@@ -46,7 +46,7 @@ func (Client) PowerState(vmRef ref.Ref) (string, error) {
 
 // PoweredOff implements base.Client
 func (Client) PoweredOff(vmRef ref.Ref) (bool, error) {
-	return false, nil
+	return true, nil
 }
 
 // RemoveSnapshots implements base.Client

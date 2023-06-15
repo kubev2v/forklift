@@ -33,6 +33,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	cnv "kubevirt.io/api/core/v1"
+	export "kubevirt.io/api/export/v1alpha1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -104,6 +105,10 @@ func main() {
 	}
 	if err := cdi.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Error(err, "unable to add kubevirt CDI APIs to scheme")
+		os.Exit(1)
+	}
+	if err := export.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "unable to add kubevirt export APIs to scheme")
 		os.Exit(1)
 	}
 	if err := template.Install(mgr.GetScheme()); err != nil {

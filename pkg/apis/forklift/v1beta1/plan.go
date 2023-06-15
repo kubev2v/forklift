@@ -129,3 +129,7 @@ func (r *Plan) IsSourceProviderOpenstack() bool {
 func (r *Plan) IsSourceProviderOvirt() bool {
 	return r.Provider.Source.Type() == OVirt
 }
+
+func (r *Plan) IsSourceProviderOCP() bool {
+	return r.Provider.Source.Type() == OpenShift
+}
