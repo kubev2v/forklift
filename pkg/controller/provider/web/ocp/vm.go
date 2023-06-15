@@ -9,7 +9,7 @@ import (
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
-	cnv "kubevirt.io/client-go/api/v1"
+	cnv "kubevirt.io/api/core/v1"
 )
 
 // Routes.

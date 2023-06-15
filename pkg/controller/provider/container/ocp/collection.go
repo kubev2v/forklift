@@ -10,7 +10,7 @@ import (
 	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 	core "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
-	cnv "kubevirt.io/client-go/api/v1"
+	cnv "kubevirt.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )

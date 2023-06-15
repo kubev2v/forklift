@@ -16,6 +16,15 @@ import (
 // 4. all allow RoleBinding PolicyRules in the namespace - short circuit on match
 // 5. deny by default
 
+const (
+	// GroupKind is string representation of kind used in role binding subjects that represents the "group".
+	GroupKind = "Group"
+	// UserKind is string representation of kind used in role binding subjects that represents the "user".
+	UserKind = "User"
+
+	ScopesKey = "scopes.authorization.openshift.io"
+)
+
 // PolicyRule holds information that describes a policy rule, but does not contain information
 // about who the rule applies to or which namespace the rule applies to.
 type PolicyRule struct {
@@ -23,11 +32,14 @@ type PolicyRule struct {
 	Verbs []string `json:"verbs" protobuf:"bytes,1,rep,name=verbs"`
 	// AttributeRestrictions will vary depending on what the Authorizer/AuthorizationAttributeBuilder pair supports.
 	// If the Authorizer does not recognize how to handle the AttributeRestrictions, the Authorizer should report an error.
+	// +kubebuilder:pruning:PreserveUnknownFields
 	AttributeRestrictions kruntime.RawExtension `json:"attributeRestrictions,omitempty" protobuf:"bytes,2,opt,name=attributeRestrictions"`
 	// APIGroups is the name of the APIGroup that contains the resources.  If this field is empty, then both kubernetes and origin API groups are assumed.
 	// That means that if an action is requested against one of the enumerated resources in either the kubernetes or the origin API group, the request
 	// will be allowed
-	APIGroups []string `json:"apiGroups" protobuf:"bytes,3,rep,name=apiGroups"`
+	// +optional
+	// +nullable
+	APIGroups []string `json:"apiGroups,omitempty" protobuf:"bytes,3,rep,name=apiGroups"`
 	// Resources is a list of resources this rule applies to.  ResourceAll represents all resources.
 	Resources []string `json:"resources" protobuf:"bytes,4,rep,name=resources"`
 	// ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.
@@ -40,6 +52,9 @@ type PolicyRule struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // IsPersonalSubjectAccessReview is a marker for PolicyRule.AttributeRestrictions that denotes that subjectaccessreviews on self should be allowed
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type IsPersonalSubjectAccessReview struct {
 	metav1.TypeMeta `json:",inline"`
 }
@@ -48,9 +63,14 @@ type IsPersonalSubjectAccessReview struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Role is a logical grouping of PolicyRules that can be referenced as a unit by RoleBindings.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type Role struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard object's metadata.
+
+	// metadata is the standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Rules holds all the PolicyRules for this Role
@@ -72,20 +92,27 @@ func (t OptionalNames) String() string {
 // RoleBinding references a Role, but not contain it.  It can reference any Role in the same namespace or in the global namespace.
 // It adds who information via (Users and Groups) OR Subjects and namespace information by which namespace it exists in.
 // RoleBindings in a given namespace only have effect in that namespace (excepting the master namespace which has power in all namespaces).
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type RoleBinding struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard object's metadata.
+
+	// metadata is the standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// UserNames holds all the usernames directly bound to the role.
 	// This field should only be specified when supporting legacy clients and servers.
 	// See Subjects for further details.
 	// +k8s:conversion-gen=false
+	// +optional
 	UserNames OptionalNames `json:"userNames" protobuf:"bytes,2,rep,name=userNames"`
 	// GroupNames holds all the groups directly bound to the role.
 	// This field should only be specified when supporting legacy clients and servers.
 	// See Subjects for further details.
 	// +k8s:conversion-gen=false
+	// +optional
 	GroupNames OptionalNames `json:"groupNames" protobuf:"bytes,3,rep,name=groupNames"`
 	// Subjects hold object references to authorize with this rule.
 	// This field is ignored if UserNames or GroupNames are specified to support legacy clients and servers.
@@ -121,6 +148,9 @@ type NamedRoleBinding struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // SelfSubjectRulesReview is a resource you can create to determine which actions you can perform in a namespace
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type SelfSubjectRulesReview struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -144,6 +174,9 @@ type SelfSubjectRulesReviewSpec struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // SubjectRulesReview is a resource you can create to determine which actions another user can perform in a namespace
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type SubjectRulesReview struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -176,6 +209,9 @@ type SubjectRulesReviewStatus struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ResourceAccessReviewResponse describes who can perform the action
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type ResourceAccessReviewResponse struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -196,12 +232,15 @@ type ResourceAccessReviewResponse struct {
 
 // +genclient
 // +genclient:nonNamespaced
-// +genclient:skipVerbs=get,list,create,update,patch,delete,deleteCollection,watch
+// +genclient:skipVerbs=apply,get,list,create,update,patch,delete,deleteCollection,watch
 // +genclient:method=Create,verb=create,result=ResourceAccessReviewResponse
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ResourceAccessReview is a means to request a list of which users and groups are authorized to perform the
 // action specified by spec
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type ResourceAccessReview struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -212,6 +251,9 @@ type ResourceAccessReview struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // SubjectAccessReviewResponse describes whether or not a user or group can perform an action
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type SubjectAccessReviewResponse struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -238,11 +280,14 @@ func (t OptionalScopes) String() string {
 
 // +genclient
 // +genclient:nonNamespaced
-// +genclient:skipVerbs=get,list,create,update,patch,delete,deleteCollection,watch
+// +genclient:skipVerbs=apply,get,list,create,update,patch,delete,deleteCollection,watch
 // +genclient:method=Create,verb=create,result=SubjectAccessReviewResponse
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // SubjectAccessReview is an object for requesting information about whether a user or group can perform an action
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type SubjectAccessReview struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -261,11 +306,14 @@ type SubjectAccessReview struct {
 }
 
 // +genclient
-// +genclient:skipVerbs=get,list,create,update,patch,delete,deleteCollection,watch
+// +genclient:skipVerbs=apply,get,list,create,update,patch,delete,deleteCollection,watch
 // +genclient:method=Create,verb=create,result=ResourceAccessReviewResponse
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // LocalResourceAccessReview is a means to request a list of which users and groups are authorized to perform the action specified by spec in a particular namespace
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type LocalResourceAccessReview struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -274,11 +322,14 @@ type LocalResourceAccessReview struct {
 }
 
 // +genclient
-// +genclient:skipVerbs=get,list,create,update,patch,delete,deleteCollection,watch
+// +genclient:skipVerbs=apply,get,list,create,update,patch,delete,deleteCollection,watch
 // +genclient:method=Create,verb=create,result=SubjectAccessReviewResponse
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // LocalSubjectAccessReview is an object for requesting information about whether a user or group can perform an action in a particular namespace
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type LocalSubjectAccessReview struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -314,18 +365,24 @@ type Action struct {
 	ResourceName string `json:"resourceName" protobuf:"bytes,6,opt,name=resourceName"`
 	// Path is the path of a non resource URL
 	Path string `json:"path" protobuf:"bytes,8,opt,name=path"`
-	// IsNonResourceURL is true if this is a request for a non-resource URL (outside of the resource hieraarchy)
+	// IsNonResourceURL is true if this is a request for a non-resource URL (outside of the resource hierarchy)
 	IsNonResourceURL bool `json:"isNonResourceURL" protobuf:"varint,9,opt,name=isNonResourceURL"`
 	// Content is the actual content of the request for create and update
+	// +kubebuilder:pruning:PreserveUnknownFields
 	Content kruntime.RawExtension `json:"content,omitempty" protobuf:"bytes,7,opt,name=content"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // RoleBindingList is a collection of RoleBindings
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type RoleBindingList struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard object's metadata.
+
+	// metadata is the standard list's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is a list of RoleBindings
@@ -335,9 +392,14 @@ type RoleBindingList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // RoleList is a collection of Roles
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type RoleList struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard object's metadata.
+
+	// metadata is the standard list's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is a list of Roles
@@ -349,9 +411,14 @@ type RoleList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClusterRole is a logical grouping of PolicyRules that can be referenced as a unit by ClusterRoleBindings.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type ClusterRole struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard object's metadata.
+
+	// metadata is the standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Rules holds all the PolicyRules for this ClusterRole
@@ -370,20 +437,27 @@ type ClusterRole struct {
 // ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference any ClusterRole in the same namespace or in the global namespace.
 // It adds who information via (Users and Groups) OR Subjects and namespace information by which namespace it exists in.
 // ClusterRoleBindings in a given namespace only have effect in that namespace (excepting the master namespace which has power in all namespaces).
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type ClusterRoleBinding struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard object's metadata.
+
+	// metadata is the standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// UserNames holds all the usernames directly bound to the role.
 	// This field should only be specified when supporting legacy clients and servers.
 	// See Subjects for further details.
 	// +k8s:conversion-gen=false
+	// +optional
 	UserNames OptionalNames `json:"userNames" protobuf:"bytes,2,rep,name=userNames"`
 	// GroupNames holds all the groups directly bound to the role.
 	// This field should only be specified when supporting legacy clients and servers.
 	// See Subjects for further details.
 	// +k8s:conversion-gen=false
+	// +optional
 	GroupNames OptionalNames `json:"groupNames" protobuf:"bytes,3,rep,name=groupNames"`
 	// Subjects hold object references to authorize with this rule.
 	// This field is ignored if UserNames or GroupNames are specified to support legacy clients and servers.
@@ -417,9 +491,14 @@ type NamedClusterRoleBinding struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClusterRoleBindingList is a collection of ClusterRoleBindings
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type ClusterRoleBindingList struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard object's metadata.
+
+	// metadata is the standard list's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is a list of ClusterRoleBindings
@@ -429,9 +508,14 @@ type ClusterRoleBindingList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClusterRoleList is a collection of ClusterRoles
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type ClusterRoleList struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard object's metadata.
+
+	// metadata is the standard list's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is a list of ClusterRoles
@@ -446,10 +530,14 @@ type ClusterRoleList struct {
 // subject are allowed in the namespace to which the RoleBindingRestriction
 // belongs.  If any one of those RoleBindingRestriction objects matches
 // a subject, rolebindings on that subject in the namespace are allowed.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type RoleBindingRestriction struct {
 	metav1.TypeMeta `json:",inline"`
 
-	// Standard object's metadata.
+	// metadata is the standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec defines the matcher.
@@ -475,10 +563,14 @@ type RoleBindingRestrictionSpec struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // RoleBindingRestrictionList is a collection of RoleBindingRestriction objects.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type RoleBindingRestrictionList struct {
 	metav1.TypeMeta `json:",inline"`
 
-	// Standard object's metadata.
+	// metadata is the standard list's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is a list of RoleBindingRestriction objects.

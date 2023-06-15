@@ -12,8 +12,8 @@ package v1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_Project = map[string]string{
-	"":         "Projects are the unit of isolation and collaboration in OpenShift. A project has one or more members, a quota on the resources that the project may consume, and the security controls on the resources in the project. Within a project, members may have different roles - project administrators can set membership, editors can create and manage the resources, and viewers can see but not access running containers. In a normal cluster project administrators are not able to alter their quotas - that is restricted to cluster administrators.\n\nListing or watching projects will return only projects the user has the reader role on.\n\nAn OpenShift project is an alternative representation of a Kubernetes namespace. Projects are exposed as editable to end users while namespaces are not. Direct creation of a project is typically restricted to administrators, while end users should use the requestproject resource.",
-	"metadata": "Standard object's metadata.",
+	"":         "Projects are the unit of isolation and collaboration in OpenShift. A project has one or more members, a quota on the resources that the project may consume, and the security controls on the resources in the project. Within a project, members may have different roles - project administrators can set membership, editors can create and manage the resources, and viewers can see but not access running containers. In a normal cluster project administrators are not able to alter their quotas - that is restricted to cluster administrators.\n\nListing or watching projects will return only projects the user has the reader role on.\n\nAn OpenShift project is an alternative representation of a Kubernetes namespace. Projects are exposed as editable to end users while namespaces are not. Direct creation of a project is typically restricted to administrators, while end users should use the requestproject resource.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"spec":     "Spec defines the behavior of the Namespace.",
 	"status":   "Status describes the current status of a Namespace",
 }
@@ -23,8 +23,8 @@ func (Project) SwaggerDoc() map[string]string {
 }
 
 var map_ProjectList = map[string]string{
-	"":         "ProjectList is a list of Project objects.",
-	"metadata": "Standard object's metadata.",
+	"":         "ProjectList is a list of Project objects.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"items":    "Items is the list of projects",
 }
 
@@ -33,8 +33,8 @@ func (ProjectList) SwaggerDoc() map[string]string {
 }
 
 var map_ProjectRequest = map[string]string{
-	"":            "ProjecRequest is the set of options necessary to fully qualify a project request",
-	"metadata":    "Standard object's metadata.",
+	"":            "ProjectRequest is the set of options necessary to fully qualify a project request\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata":    "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"displayName": "DisplayName is the display name to apply to a project",
 	"description": "Description is the description to apply to a project",
 }
@@ -53,8 +53,9 @@ func (ProjectSpec) SwaggerDoc() map[string]string {
 }
 
 var map_ProjectStatus = map[string]string{
-	"":      "ProjectStatus is information about the current status of a Project",
-	"phase": "Phase is the current lifecycle phase of the project",
+	"":           "ProjectStatus is information about the current status of a Project",
+	"phase":      "Phase is the current lifecycle phase of the project",
+	"conditions": "Represents the latest available observations of the project current state.",
 }
 
 func (ProjectStatus) SwaggerDoc() map[string]string {
