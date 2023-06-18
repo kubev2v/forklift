@@ -65,6 +65,10 @@ func (r *OvirtClient) LoadSourceDetails() (vm *OvirtVM, err error) {
 		defer r.Close()
 		err = r.Connect()
 
+		if err != nil {
+			return nil, fmt.Errorf("error connecting to oVirt engine - %v", err)
+		}
+
 		// get storage domain from the test VM
 		sdomains, err = r.vmData.getSDFromVM(r.connection, ref.Ref{ID: r.vmData.testVMId})
 		if err != nil {
@@ -88,7 +92,8 @@ func (r *OvirtClient) LoadSourceDetails() (vm *OvirtVM, err error) {
 func (r *OvirtClient) Connect() (err error) {
 	builder := ovirtsdk.NewConnectionBuilder().
 		URL(r.OvirtURL).
-		Username(r.Username)
+		Username(r.Username).
+		Password(r.Password)
 
 	if r.Insecure {
 		builder = builder.Insecure(r.Insecure)
