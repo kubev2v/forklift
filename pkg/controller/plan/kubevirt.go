@@ -1717,6 +1717,23 @@ func (r *KubeVirt) secret(vmRef ref.Ref, setSecretData func(*core.Secret) error)
 	return
 }
 
+// Build the credential secret for the data transfer (CDI importer / popoulator pod).
+func (r *KubeVirt) secretWithNamespace(vmRef ref.Ref, setSecretData func(*core.Secret) error, namespace string) (secret *core.Secret, err error) {
+	secret = &core.Secret{
+		ObjectMeta: meta.ObjectMeta{
+			Labels:    r.vmLabels(vmRef),
+			Namespace: namespace,
+			GenerateName: strings.Join(
+				[]string{
+					r.Plan.Name,
+					vmRef.ID},
+				"-") + "-",
+		},
+	}
+	err = setSecretData(secret)
+	return
+}
+
 // Labels for plan and migration.
 func (r *KubeVirt) planLabels() map[string]string {
 	return map[string]string{
@@ -2074,16 +2091,23 @@ func (r *KubeVirt) EnsurePersistentVolumeClaim(vm *plan.VMStatus, persistentVolu
 func (r *KubeVirt) ensureOCPVolumes(vm ref.Ref) error {
 	apiGroup := "kubevirt.io"
 	secretFunc := func(secret *core.Secret) error {
-		*&secret.StringData = map[string]string{
+		secret.StringData = map[string]string{
 			"token": "123456789", // TODO: set something real
 		}
 		return nil
 	}
 
-	s, err := r.secret(vm, secretFunc)
+	s, err := r.secretWithNamespace(vm, secretFunc, vm.Namespace)
 	if err != nil {
 		return err
 	}
+	err = r.Client.Create(context.Background(), s)
+	if err != nil {
+		if !k8serr.IsAlreadyExists(err) {
+			return liberr.Wrap(err)
+		}
+	}
+
 	// Check if VM export exists
 	vmExport := &export.VirtualMachineExport{}
 	err = r.Client.Get(context.Background(), client.ObjectKey{Namespace: vm.Namespace, Name: vm.Name}, vmExport)
