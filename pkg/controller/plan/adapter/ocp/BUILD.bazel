@@ -18,8 +18,13 @@ go_library(
         "//pkg/controller/plan/adapter/base",
         "//pkg/controller/plan/context",
         "//pkg/controller/provider/web",
+        "//pkg/lib/error",
         "//vendor/k8s.io/api/core/v1:core",
+        "//vendor/k8s.io/apimachinery/pkg/api/errors",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:meta",
         "//vendor/kubevirt.io/api/core/v1:core",
+        "//vendor/kubevirt.io/api/export/v1alpha1",
         "//vendor/kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
     ],
 )
