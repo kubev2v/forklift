@@ -2135,37 +2135,51 @@ func (r *KubeVirt) ensureOCPVolumes(vm ref.Ref) error {
 	// TODO Get SC from map
 	// TODO Get size properly
 	storageClass := "nfs-csi"
-	dataVolume := &cdi.DataVolume{
-		ObjectMeta: meta.ObjectMeta{
-			OwnerReferences: []meta.OwnerReference{ownerRef},
-			Name:            fmt.Sprintf("%s-data-volume", vm.Name),
-			Namespace:       vm.Namespace,
-		},
-		Spec: cdi.DataVolumeSpec{
-			Source: &cdi.DataVolumeSource{
-				HTTP: &cdi.DataVolumeSourceHTTP{
-					URL:                vmExport.Status.Links.External.Volumes[0].Formats[1].Url,
-					CertConfigMap:      configMap.Name,
-					SecretExtraHeaders: []string{secret.Name},
-				},
-			},
-			Storage: &cdi.StorageSpec{
-				Resources: core.ResourceRequirements{
-					Requests: core.ResourceList{
-						core.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
-					},
-				},
-				StorageClassName: &storageClass,
-			},
-		},
-	}
 
-	err = r.Destination.Client.Create(context.Background(), dataVolume, &client.CreateOptions{})
-	if err != nil {
-		if !k8serr.IsAlreadyExists(err) {
+	for _, volume := range vmExport.Status.Links.External.Volumes {
+		// Get PVC
+		pvc := &core.PersistentVolumeClaim{}
+		err = r.Client.Get(context.Background(), client.ObjectKey{Namespace: vm.Namespace, Name: volume.Name}, pvc)
+		if err != nil {
 			return liberr.Wrap(err)
+		}
+		size := pvc.Spec.Resources.Requests["storage"]
+		dataVolume := &cdi.DataVolume{
+			ObjectMeta: meta.ObjectMeta{
+				OwnerReferences: []meta.OwnerReference{ownerRef},
+				Name:            fmt.Sprintf("%s-data-volume", vm.Name),
+				Namespace:       vm.Namespace,
+			},
+			Spec: *createDataVolumeSpec(size, storageClass, volume.Formats[1].Url, configMap.Name, secret.Name),
+		}
+
+		err = r.Destination.Client.Create(context.Background(), dataVolume, &client.CreateOptions{})
+		if err != nil {
+			if !k8serr.IsAlreadyExists(err) {
+				return liberr.Wrap(err)
+			}
 		}
 	}
 
 	return nil
+}
+
+func createDataVolumeSpec(size resource.Quantity, storageClassName, url, configMap, secret string) *cdi.DataVolumeSpec {
+	return &cdi.DataVolumeSpec{
+		Source: &cdi.DataVolumeSource{
+			HTTP: &cdi.DataVolumeSourceHTTP{
+				URL:                url,
+				CertConfigMap:      configMap,
+				SecretExtraHeaders: []string{secret},
+			},
+		},
+		Storage: &cdi.StorageSpec{
+			Resources: core.ResourceRequirements{
+				Requests: core.ResourceList{
+					core.ResourceStorage: size,
+				},
+			},
+			StorageClassName: &storageClassName,
+		},
+	}
 }
