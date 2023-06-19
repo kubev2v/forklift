@@ -649,6 +649,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		}
 
 		var pvcNames []string
+		var dataVolumes []cdi.DataVolume
 		if r.Plan.IsSourceProviderOCP() {
 			if !ready {
 				return
@@ -659,6 +660,10 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				err = nil
 				break
 			}
+			step.MarkCompleted()
+			step.Phase = Completed
+			vm.Phase = r.next(vm.Phase)
+			return
 		}
 
 		if r.Plan.IsSourceProviderOpenstack() {
@@ -702,7 +707,6 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			vm.Phase = r.next(vm.Phase)
 			return
 		}
-		var dataVolumes []cdi.DataVolume
 		dataVolumes, err = r.kubevirt.DataVolumes(vm)
 		if err != nil {
 			if !errors.As(err, &web.ProviderNotReadyError{}) {
