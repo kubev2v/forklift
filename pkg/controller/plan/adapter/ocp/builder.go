@@ -52,8 +52,8 @@ func (r *Builder) PreTransferActions(c base.Client, vmRef ref.Ref) (ready bool, 
 	err = r.Client.Get(context.Background(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vmExport)
 	if err != nil {
 		if !k8serr.IsNotFound(err) {
+			r.Log.Error(err, "Failed to get VM export.", "vm", vmRef.Name)
 			return true, liberr.Wrap(err)
-
 		}
 		// Create VM export
 		vmExport = &export.VirtualMachineExport{

@@ -648,10 +648,11 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			break
 		}
 
-		r.Log.Info("Benny transfer is ready", "ready", ready)
-
 		var pvcNames []string
 		if r.Plan.IsSourceProviderOCP() {
+			if !ready {
+				return
+			}
 			err = r.kubevirt.ensureOCPVolumes(vm.Ref)
 			if err != nil {
 				step.AddError(err.Error())
