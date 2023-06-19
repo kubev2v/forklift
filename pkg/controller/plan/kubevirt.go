@@ -2131,9 +2131,7 @@ func (r *KubeVirt) ensureOCPVolumes(vm ref.Ref) error {
 		}
 	}
 	// Create DataVolumes on the destination
-	// TODO iterate over all volumes
 	// TODO Get SC from map
-	// TODO Get size properly
 	storageClass := "nfs-csi"
 
 	for _, volume := range vmExport.Status.Links.External.Volumes {
