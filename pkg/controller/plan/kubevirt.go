@@ -2078,12 +2078,14 @@ func (r *KubeVirt) ensureOCPVolumes(vm ref.Ref) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+
 	ownerRef := meta.OwnerReference{
 		Name:       vmExport.Name,
 		Kind:       "VirtualMachineExport",
 		UID:        vmExport.UID,
 		APIVersion: vmExport.APIVersion,
 	}
+
 	// Export pod is ready
 	// Create config maps with CA on the destination
 	configMap := &core.ConfigMap{
@@ -2103,6 +2105,13 @@ func (r *KubeVirt) ensureOCPVolumes(vm ref.Ref) error {
 		}
 	}
 
+	// Read secret token
+	tokenSecret := &core.Secret{}
+	err = r.Client.Get(context.Background(), client.ObjectKey{Namespace: vm.Namespace, Name: *vmExport.Status.TokenSecretRef}, tokenSecret)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
 	// Create secret token header
 	secret := &core.Secret{
 		ObjectMeta: meta.ObjectMeta{
@@ -2111,7 +2120,7 @@ func (r *KubeVirt) ensureOCPVolumes(vm ref.Ref) error {
 			Namespace:       vm.Namespace,
 		},
 		StringData: map[string]string{
-			"token": fmt.Sprintf("x-kubevirt-export-token: %s", *vmExport.Status.TokenSecretRef),
+			"token": fmt.Sprintf("x-kubevirt-export-token:%s", tokenSecret.Data["token"]),
 		},
 	}
 
