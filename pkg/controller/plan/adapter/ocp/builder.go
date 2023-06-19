@@ -1,13 +1,21 @@
 package ocp
 
 import (
+	"context"
+
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	export "kubevirt.io/api/export/v1alpha1"
+
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	core "k8s.io/api/core/v1"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type Builder struct {
@@ -36,8 +44,48 @@ func (*Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env []
 }
 
 // PreTransferActions implements base.Builder
-func (*Builder) PreTransferActions(c base.Client, vmRef ref.Ref) (ready bool, err error) {
-	return true, nil
+func (r *Builder) PreTransferActions(c base.Client, vmRef ref.Ref) (ready bool, err error) {
+	apiGroup := "kubevirt.io"
+
+	// Check if VM export exists
+	vmExport := &export.VirtualMachineExport{}
+	err = r.Client.Get(context.Background(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vmExport)
+	if err != nil {
+		if !k8serr.IsNotFound(err) {
+			return true, liberr.Wrap(err)
+
+		}
+		// Create VM export
+		vmExport = &export.VirtualMachineExport{
+			TypeMeta: meta.TypeMeta{
+				Kind:       "VirtualMachineExport",
+				APIVersion: "kubevirt.io/v1alpha3",
+			},
+			ObjectMeta: meta.ObjectMeta{
+				Name:      vmRef.Name,
+				Namespace: vmRef.Namespace,
+			},
+			Spec: export.VirtualMachineExportSpec{
+				Source: core.TypedLocalObjectReference{
+					APIGroup: &apiGroup,
+					Kind:     "VirtualMachine",
+					Name:     vmRef.Name,
+				},
+			},
+		}
+
+		err = r.Client.Create(context.Background(), vmExport, &client.CreateOptions{})
+		if err != nil {
+			return true, liberr.Wrap(err)
+		}
+	}
+	if vmExport.Status != nil && vmExport.Status.Phase == export.Ready {
+		r.Log.Info("VM export is ready.", "vm", vmRef.Name)
+		return true, nil
+	}
+
+	r.Log.Info("Waiting for VM export to be ready...", "vm", vmRef.Name)
+	return false, nil
 }
 
 // ResolveDataVolumeIdentifier implements base.Builder

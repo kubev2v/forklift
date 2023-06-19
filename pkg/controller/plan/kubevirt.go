@@ -1717,23 +1717,6 @@ func (r *KubeVirt) secret(vmRef ref.Ref, setSecretData func(*core.Secret) error)
 	return
 }
 
-// Build the credential secret for the data transfer (CDI importer / popoulator pod).
-func (r *KubeVirt) secretWithNamespace(vmRef ref.Ref, setSecretData func(*core.Secret) error, namespace string) (secret *core.Secret, err error) {
-	secret = &core.Secret{
-		ObjectMeta: meta.ObjectMeta{
-			Labels:    r.vmLabels(vmRef),
-			Namespace: namespace,
-			GenerateName: strings.Join(
-				[]string{
-					r.Plan.Name,
-					vmRef.ID},
-				"-") + "-",
-		},
-	}
-	err = setSecretData(secret)
-	return
-}
-
 // Labels for plan and migration.
 func (r *KubeVirt) planLabels() map[string]string {
 	return map[string]string{
@@ -2089,55 +2072,88 @@ func (r *KubeVirt) EnsurePersistentVolumeClaim(vm *plan.VMStatus, persistentVolu
 
 // OCP source
 func (r *KubeVirt) ensureOCPVolumes(vm ref.Ref) error {
-	apiGroup := "kubevirt.io"
-	secretFunc := func(secret *core.Secret) error {
-		secret.StringData = map[string]string{
-			"token": "123456789", // TODO: set something real
-		}
-		return nil
-	}
-
-	s, err := r.secretWithNamespace(vm, secretFunc, vm.Namespace)
+	// Get vm export
+	vmExport := &export.VirtualMachineExport{}
+	err := r.Client.Get(context.Background(), client.ObjectKey{Namespace: vm.Namespace, Name: vm.Name}, vmExport)
 	if err != nil {
-		return err
+		return liberr.Wrap(err)
 	}
-	err = r.Client.Create(context.Background(), s)
+	ownerRef := meta.OwnerReference{
+		Name:       vmExport.Name,
+		Kind:       "VirtualMachineExport",
+		UID:        vmExport.UID,
+		APIVersion: vmExport.APIVersion,
+	}
+	// Export pod is ready
+	// Create config maps with CA on the destination
+	configMap := &core.ConfigMap{
+		ObjectMeta: meta.ObjectMeta{
+			Name:            fmt.Sprintf("%s-ca", vm.Name),
+			Namespace:       vm.Namespace,
+			OwnerReferences: []meta.OwnerReference{ownerRef},
+		},
+		Data: map[string]string{
+			"ca.pem": vmExport.Status.Links.External.Cert,
+		},
+	}
+	err = r.Destination.Client.Create(context.Background(), configMap, &client.CreateOptions{})
 	if err != nil {
 		if !k8serr.IsAlreadyExists(err) {
 			return liberr.Wrap(err)
 		}
 	}
 
-	// Check if VM export exists
-	vmExport := &export.VirtualMachineExport{}
-	err = r.Client.Get(context.Background(), client.ObjectKey{Namespace: vm.Namespace, Name: vm.Name}, vmExport)
-	if err != nil {
-		if !k8serr.IsNotFound(err) {
-			return liberr.Wrap(err)
+	// Create secret token header
+	secret := &core.Secret{
+		ObjectMeta: meta.ObjectMeta{
+			OwnerReferences: []meta.OwnerReference{ownerRef},
+			Name:            fmt.Sprintf("%s-token", vm.Name),
+			Namespace:       vm.Namespace,
+		},
+		StringData: map[string]string{
+			"token": fmt.Sprintf("x-kubevirt-export-token: %s", *vmExport.Status.TokenSecretRef),
+		},
+	}
 
+	err = r.Destination.Client.Create(context.Background(), secret, &client.CreateOptions{})
+	if err != nil {
+		if !k8serr.IsAlreadyExists(err) {
+			return liberr.Wrap(err)
 		}
-		// Create VM export
-		vmExport = &export.VirtualMachineExport{
-			TypeMeta: meta.TypeMeta{
-				Kind:       "VirtualMachineExport",
-				APIVersion: "kubevirt.io/v1alpha3",
-			},
-			ObjectMeta: meta.ObjectMeta{
-				Name:      vm.Name,
-				Namespace: vm.Namespace,
-			},
-			Spec: export.VirtualMachineExportSpec{
-				TokenSecretRef: &s.Name,
-				Source: core.TypedLocalObjectReference{
-					APIGroup: &apiGroup,
-					Kind:     "VirtualMachine",
-					Name:     vm.Name,
+	}
+	// Create DataVolumes on the destination
+	// TODO iterate over all volumes
+	// TODO Get SC from map
+	// TODO Get size properly
+	storageClass := "nfs-csi"
+	dataVolume := &cdi.DataVolume{
+		ObjectMeta: meta.ObjectMeta{
+			OwnerReferences: []meta.OwnerReference{ownerRef},
+			Name:            fmt.Sprintf("%s-data-volume", vm.Name),
+			Namespace:       vm.Namespace,
+		},
+		Spec: cdi.DataVolumeSpec{
+			Source: &cdi.DataVolumeSource{
+				HTTP: &cdi.DataVolumeSourceHTTP{
+					URL:                vmExport.Status.Links.External.Volumes[0].Formats[1].Url,
+					CertConfigMap:      configMap.Name,
+					SecretExtraHeaders: []string{secret.Name},
 				},
 			},
-		}
+			Storage: &cdi.StorageSpec{
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
+					},
+				},
+				StorageClassName: &storageClass,
+			},
+		},
+	}
 
-		err = r.Client.Create(context.Background(), vmExport, &client.CreateOptions{})
-		if err != nil {
+	err = r.Destination.Client.Create(context.Background(), dataVolume, &client.CreateOptions{})
+	if err != nil {
+		if !k8serr.IsAlreadyExists(err) {
 			return liberr.Wrap(err)
 		}
 	}
