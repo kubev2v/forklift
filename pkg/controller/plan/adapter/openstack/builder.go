@@ -613,6 +613,11 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 					if macAddress, ok := m["OS-EXT-IPS-MAC:mac_addr"]; ok {
 						kInterface.MacAddress = macAddress.(string)
 					}
+					if ipType, ok := m["OS-EXT-IPS:type"]; ok {
+						if ipType.(string) == "floating" {
+							continue
+						}
+					}
 				}
 
 				var vmNetworkID string
