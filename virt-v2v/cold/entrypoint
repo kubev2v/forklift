@@ -2,13 +2,32 @@
 set -o pipefail
 shopt -s nullglob
 
-if [ -z "$V2V_libvirtURL" ] || \
-    [ -z "$V2V_secretKey" ] || \
-    [ -z "$V2V_vmName" ] ; then
+if [ -z "$V2V_provider"] ; then
     echo "Following environment needs to be defined:"
     echo
-    echo "    V2V_libvirtURL, V2V_secretKey, V2V_vmName"
+    echo "    V2V_provider"
     exit 1
+fi
+
+if [ "$V2V_provider" == "vsphere" ] ; then
+  if [ -z "$V2V_libvirtURL" ] || \
+      [ -z "$V2V_secretKey" ] || \
+      [ -z "$V2V_vmName" ] ; then
+      echo "Following environment needs to be defined:"
+      echo
+      echo "    V2V_libvirtURL, V2V_secretKey, V2V_vmName"
+      exit 1
+  fi
+fi
+
+if [ "$V2V_provider" == "ova" ] ; then
+  if [ -z "$V2V_diskPath" ] || \
+      [ -z "$V2V_vmName" ] ; then
+      echo "Following environment needs to be defined:"
+      echo
+      echo "    V2V_diskPath, V2V_vmName"
+      exit 1
+  fi
 fi
 
 export LIBGUESTFS_PATH=/usr/lib64/guestfs/appliance
@@ -53,26 +72,37 @@ for disk in /dev/block[0-9]* ; do
 	ln -s "$disk" "$DIR/$V2V_vmName-sd$(gen_name "$((num+1))")"
 done
 
-# Store password to file
-echo -n "$V2V_secretKey" > "$DIR/vmware.pw"
-args=("${args[@]}"
-    -ip "$DIR/vmware.pw"
-)
+if [ "$V2V_provider" == "vsphere" ] ; then
+  # Store password to file
+  echo -n "$V2V_secretKey" > "$DIR/vmware.pw"
+  args=("${args[@]}"
+      -ip "$DIR/vmware.pw"
+  )
 
-# Use VDDK if present
-if [ -d "/opt/vmware-vix-disklib-distrib" ]; then
-    args=("${args[@]}"
-        -it vddk
-        -io vddk-libdir=/opt/vmware-vix-disklib-distrib
-        -io "vddk-thumbprint=$V2V_thumbprint"
-    )
+  # Use VDDK if present
+  if [ -d "/opt/vmware-vix-disklib-distrib" ]; then
+      args=("${args[@]}"
+          -it vddk
+          -io vddk-libdir=/opt/vmware-vix-disklib-distrib
+          -io "vddk-thumbprint=$V2V_thumbprint"
+      )
+  fi
 fi
 
 echo "Starting virt-v2v"
 set -x
 ls -l "$DIR"
-exec virt-v2v -v -x \
-    -i libvirt \
-    -ic "$V2V_libvirtURL" \
-    "${args[@]}" \
-    -- "$V2V_vmName" |& /usr/local/bin/virt-v2v-monitor
+if [ "$V2V_provider" == "vsphere" ] ; then
+  exec virt-v2v -v -x \
+      -i libvirt \
+      -ic "$V2V_libvirtURL" \
+      "${args[@]}" \
+      -- "$V2V_vmName" |& /usr/local/bin/virt-v2v-monitor
+fi
+
+if [ "$V2V_provider" == "ova" ] ; then
+  exec virt-v2v -v -x \
+      -i ova "$V2V_diskPath" \
+      "${args[@]}" \
+      |& /usr/local/bin/virt-v2v-monitor
+fi
