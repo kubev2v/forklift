@@ -26,6 +26,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
 
@@ -654,7 +655,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			if !ready {
 				return
 			}
-			err = r.kubevirt.ensureOCPVolumes(vm.Ref)
+			err = r.kubevirt.ensureOCPVolumes(vm)
 			if err != nil {
 				step.AddError(err.Error())
 				err = nil
@@ -1442,7 +1443,6 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 			if !found {
 				continue
 			}
-
 			conditions := dv.Conditions()
 			switch dv.Status.Phase {
 			case cdi.Succeeded, cdi.Paused:
@@ -1482,10 +1482,29 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 				var importer *core.Pod
 				var found bool
 				var kErr error
-				if dv.PVC == nil {
+				if dv.PVC == nil && !r.Plan.IsSourceProviderOCP() {
 					found = false
 				} else {
-					importer, found, kErr = r.kubevirt.GetImporterPod(*dv.PVC)
+					if r.Plan.IsSourceProviderOCP() {
+						pvc := &core.PersistentVolumeClaim{}
+						err = r.Destination.Client.Get(context.TODO(), types.NamespacedName{
+							Namespace: r.Plan.Spec.TargetNamespace,
+							Name:      dv.Status.ClaimName,
+						}, pvc)
+						if err != nil {
+							log.Error(
+								err,
+								"Could not get PVC for DataVolume.",
+								"vm",
+								vm.String(),
+								"dv",
+								path.Join(dv.Namespace, dv.Name))
+							continue
+						}
+						importer, found, kErr = r.kubevirt.GetImporterPod(*pvc)
+					} else {
+						importer, found, kErr = r.kubevirt.GetImporterPod(*dv.PVC)
+					}
 				}
 				if kErr != nil {
 					log.Error(
