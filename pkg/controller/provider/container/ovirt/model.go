@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/go-logr/logr"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
@@ -11,8 +14,6 @@ import (
 	libcnt "github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
-	"strconv"
-	"strings"
 )
 
 // Event codes.
@@ -799,6 +800,7 @@ func (r *VMAdapter) Event() []int {
 		// Add
 		USER_ADD_VM,
 		USER_ADD_VM_FINISHED_SUCCESS,
+		IMPORTEXPORT_IMPORT_VM,
 		// Update
 		USER_UPDATE_VM,
 		SYSTEM_UPDATE_VM,
@@ -814,7 +816,6 @@ func (r *VMAdapter) Event() []int {
 		NETWORK_USER_REMOVE_VM_INTERFACE,
 		USER_CREATE_SNAPSHOT_FINISHED_SUCCESS,
 		USER_REMOVE_SNAPSHOT_FINISHED_SUCCESS,
-		IMPORTEXPORT_IMPORT_VM,
 		VM_ADD_HOST_DEVICES,
 		VM_REMOVE_HOST_DEVICES,
 		USER_RUN_VM,
@@ -869,7 +870,8 @@ func (r *VMAdapter) Apply(ctx *Context, event *Event) (updater Updater, err erro
 	}()
 	switch event.code() {
 	case USER_ADD_VM,
-		USER_ADD_VM_FINISHED_SUCCESS:
+		USER_ADD_VM_FINISHED_SUCCESS,
+		IMPORTEXPORT_IMPORT_VM:
 		object := &VM{}
 		err = ctx.client.get(event.VM.Ref, object, r.follow())
 		if err != nil {
@@ -897,7 +899,6 @@ func (r *VMAdapter) Apply(ctx *Context, event *Event) (updater Updater, err erro
 		NETWORK_USER_REMOVE_VM_INTERFACE,
 		USER_CREATE_SNAPSHOT_FINISHED_SUCCESS,
 		USER_REMOVE_SNAPSHOT_FINISHED_SUCCESS,
-		IMPORTEXPORT_IMPORT_VM,
 		VM_ADD_HOST_DEVICES,
 		VM_REMOVE_HOST_DEVICES,
 		USER_RUN_VM,
