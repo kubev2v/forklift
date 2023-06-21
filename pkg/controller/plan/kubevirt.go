@@ -40,7 +40,6 @@ import (
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	export "kubevirt.io/api/export/v1alpha1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -1095,7 +1094,7 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 	//convention it will be automatically changed.
 	var originalName string
 
-	if errs := k8svalidation.IsDNS1123Label(vm.Name); len(errs) > 0 {
+	if errs := k8svalidation.IsDNS1123Label(vm.Name); !r.Plan.IsSourceProviderOCP() && len(errs) > 0 {
 		originalName = vm.Name
 		vm.Name, err = r.changeVmNameDNS1123(vm.Name, r.Plan.Spec.TargetNamespace)
 		if err != nil {
@@ -1120,6 +1119,14 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 		annotations[AnnOriginalName] = originalName
 		annotations[AnnOriginalID] = vm.ID
 		object.ObjectMeta.Annotations = annotations
+	}
+
+	// TODO: figure out a better way
+	if r.Plan.IsSourceProviderOCP() {
+		namespaceNameSplit := strings.Split(vm.Name, "/")
+		vmName := namespaceNameSplit[1]
+		object.Name = vmName
+
 	}
 	running := false
 	object.Spec.Running = &running
@@ -1173,6 +1180,12 @@ func (r *KubeVirt) vmTemplate(vm *plan.VMStatus) (virtualMachine *cnv.VirtualMac
 	} else {
 		virtualMachine.Labels = vmLabels
 	}
+
+	// For OCP source
+	if virtualMachine.Spec.Template == nil {
+		virtualMachine.Spec.Template = &cnv.VirtualMachineInstanceTemplateSpec{}
+	}
+
 	virtualMachine.Name = vm.Name
 	virtualMachine.Namespace = r.Plan.Spec.TargetNamespace
 	virtualMachine.Spec.Template.Spec.Volumes = []cnv.Volume{}
@@ -2071,113 +2084,12 @@ func (r *KubeVirt) EnsurePersistentVolumeClaim(vm *plan.VMStatus, persistentVolu
 }
 
 // OCP source
-func (r *KubeVirt) ensureOCPVolumes(vm ref.Ref) error {
-	// Get vm export
-	vmExport := &export.VirtualMachineExport{}
-	err := r.Client.Get(context.Background(), client.ObjectKey{Namespace: vm.Namespace, Name: vm.Name}, vmExport)
+func (r *KubeVirt) ensureOCPVolumes(vm *plan.VMStatus) error {
+	_, err := r.DataVolumes(vm)
 	if err != nil {
+		r.Log.Info("DataVolumes are not ready yet", "error", err)
 		return liberr.Wrap(err)
-	}
-
-	ownerRef := meta.OwnerReference{
-		Name:       vmExport.Name,
-		Kind:       "VirtualMachineExport",
-		UID:        vmExport.UID,
-		APIVersion: vmExport.APIVersion,
-	}
-
-	// Export pod is ready
-	// Create config maps with CA on the destination
-	configMap := &core.ConfigMap{
-		ObjectMeta: meta.ObjectMeta{
-			Name:            fmt.Sprintf("%s-ca", vm.Name),
-			Namespace:       vm.Namespace,
-			OwnerReferences: []meta.OwnerReference{ownerRef},
-		},
-		Data: map[string]string{
-			"ca.pem": vmExport.Status.Links.External.Cert,
-		},
-	}
-	err = r.Destination.Client.Create(context.Background(), configMap, &client.CreateOptions{})
-	if err != nil {
-		if !k8serr.IsAlreadyExists(err) {
-			return liberr.Wrap(err)
-		}
-	}
-
-	// Read secret token
-	tokenSecret := &core.Secret{}
-	err = r.Client.Get(context.Background(), client.ObjectKey{Namespace: vm.Namespace, Name: *vmExport.Status.TokenSecretRef}, tokenSecret)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
-	// Create secret token header
-	secret := &core.Secret{
-		ObjectMeta: meta.ObjectMeta{
-			OwnerReferences: []meta.OwnerReference{ownerRef},
-			Name:            fmt.Sprintf("%s-token", vm.Name),
-			Namespace:       vm.Namespace,
-		},
-		StringData: map[string]string{
-			"token": fmt.Sprintf("x-kubevirt-export-token:%s", tokenSecret.Data["token"]),
-		},
-	}
-
-	err = r.Destination.Client.Create(context.Background(), secret, &client.CreateOptions{})
-	if err != nil {
-		if !k8serr.IsAlreadyExists(err) {
-			return liberr.Wrap(err)
-		}
-	}
-	// Create DataVolumes on the destination
-	// TODO Get SC from map
-	storageClass := "nfs-csi"
-
-	for _, volume := range vmExport.Status.Links.External.Volumes {
-		// Get PVC
-		pvc := &core.PersistentVolumeClaim{}
-		err = r.Client.Get(context.Background(), client.ObjectKey{Namespace: vm.Namespace, Name: volume.Name}, pvc)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		size := pvc.Spec.Resources.Requests["storage"]
-		dataVolume := &cdi.DataVolume{
-			ObjectMeta: meta.ObjectMeta{
-				OwnerReferences: []meta.OwnerReference{ownerRef},
-				Name:            fmt.Sprintf("%s-data-volume", vm.Name),
-				Namespace:       vm.Namespace,
-			},
-			Spec: *createDataVolumeSpec(size, storageClass, volume.Formats[1].Url, configMap.Name, secret.Name),
-		}
-
-		err = r.Destination.Client.Create(context.Background(), dataVolume, &client.CreateOptions{})
-		if err != nil {
-			if !k8serr.IsAlreadyExists(err) {
-				return liberr.Wrap(err)
-			}
-		}
 	}
 
 	return nil
-}
-
-func createDataVolumeSpec(size resource.Quantity, storageClassName, url, configMap, secret string) *cdi.DataVolumeSpec {
-	return &cdi.DataVolumeSpec{
-		Source: &cdi.DataVolumeSource{
-			HTTP: &cdi.DataVolumeSourceHTTP{
-				URL:                url,
-				CertConfigMap:      configMap,
-				SecretExtraHeaders: []string{secret},
-			},
-		},
-		Storage: &cdi.StorageSpec{
-			Resources: core.ResourceRequirements{
-				Requests: core.ResourceList{
-					core.ResourceStorage: size,
-				},
-			},
-			StorageClassName: &storageClassName,
-		},
-	}
 }
