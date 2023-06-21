@@ -2,27 +2,33 @@ name: openstack-extended-tests
 on:
   workflow_dispatch:
     name:
-      description: 'run e2e openstack  extended tests on Self hosted runner'
+      description: 'run e2e openstack extended tests on a self hosted runner'
   workflow_call:
   issue_comment:
     types: [ created ]
 
 # ensures that only a single workflow  will run at the same time
-# if another workflow triggered it will pending until first completion.
+# if another workflow triggered it will be pending until first completion.
 concurrency:
   group: hosted-e2e
 
 # A workflow run is made up of one or more jobs that can run sequentially
 jobs:
   create_ovirt_runner:
-    if: github.event.issue.pull_request && contains(github.event.comment.body, '/test-osp-extended')
+    if: github.event_name == 'workflow_dispatch' ||
+        ( github.event_name == 'issue_comment' &&
+          startsWith(github.event.comment.body, '/test-osp-extended') && (
+          github.event.comment.author_association == 'MEMBER' ||
+          github.event.comment.author_association == 'COLLABORATOR')
+        )
     runs-on: ubuntu-latest
     steps:
       - name: Get PR branch
         uses: xt0rted/pull-request-comment-branch@v1
         id: comment-branch
+        if: github.event_name == 'issue_comment'
       - name: Set latest commit status as pending
-        if: always()
+        if: github.event_name == 'issue_comment'
         uses: myrotvorets/set-commit-status-action@master
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
@@ -31,16 +37,6 @@ jobs:
 
       - name: Checkout forklift
         uses: actions/checkout@v3
-
-      - id: codeowner
-        uses: SvanBoxel/codeowners-action@v1
-        with:
-          path: './.github/CODEOWNERS'
-
-      - name: fail if the commenter doesnt exists in codeowners
-        run: |
-          [[ $(echo '${{ steps.codeowner.outputs.codeowners }}' | \
-          jq  -r '."tests/" | index("@${{ github.event.comment.user.login }}")') -eq 1 ]]
 
       - name: prepare the secrets
         uses: kubev2v/forkliftci/ci/prepare-ansible-secrets@v5.0
@@ -60,9 +56,7 @@ jobs:
           status: ${{ job.status }}
 
   ci_setup:
-    if: github.event.issue.pull_request && contains(github.event.comment.body, '/test-osp-extended')
     runs-on: self-hosted
-    #runs-on: ubuntu-latest
     needs: create_ovirt_runner
     env:
       USE_BAZEL_VERSION: 5.4.0
@@ -106,13 +100,13 @@ jobs:
           source_provider: openstack
 
       - name: Get PR branch
-        if: always()
+        if: always() && github.event_name == 'issue_comment'
         uses: xt0rted/pull-request-comment-branch@v1
         id: comment-branch
 
       - name: Set latest commit status as ${{ job.status }}
         uses: myrotvorets/set-commit-status-action@master
-        if: always()
+        if: always() && github.event_name == 'issue_comment'
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -120,10 +114,10 @@ jobs:
 
       - name: Add comment to PR
         uses: actions/github-script@v6
-        if: always()
+        if: always() && github.event_name == 'issue_comment'
         with:
           script: |
-            const name = '${{ github.workflow   }}';
+            const name = '${{ github.workflow }}';
             const url = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}';
             const success = '${{ job.status }}' === 'success';
             const body = `${name}: ${success ? 'succeeded ✅' : 'failed ❌'}\n${url}`;
