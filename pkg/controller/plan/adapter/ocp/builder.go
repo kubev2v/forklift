@@ -85,16 +85,17 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 		if err != nil {
 			return nil, liberr.Wrap(err)
 		}
+
 		size := pvc.Spec.Resources.Requests["storage"]
-
 		dataVolume := dvTemplate.DeepCopy()
-
 		dataVolume.Annotations[planbase.AnnDiskSource] = fmt.Sprintf("%s/%s", pvc.Namespace, pvc.Name)
 
-		// Choose format based on PVC volume mode
-		//	url := getExportURL(volume.Formats, pvc)
+		url := getExportURL(volume.Formats)
+		if url == "" {
+			return nil, liberr.Wrap(fmt.Errorf("failed to get export URL, available formats: %v", volume.Formats))
+		}
 
-		dataVolume.Spec = *createDataVolumeSpec(size, storageClass, volume.Formats[1].Url, configMap.Name, secret.Name)
+		dataVolume.Spec = *createDataVolumeSpec(size, storageClass, url, configMap.Name, secret.Name)
 
 		err = r.Destination.Client.Create(context.TODO(), dataVolume, &client.CreateOptions{})
 		if err != nil {
@@ -114,13 +115,16 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 	return dataVolumes, nil
 }
 
-// func getExportURL(virtualMachineExportVolumeFormat []export.VirtualMachineExportVolumeFormat, pvc *core.PersistentVolumeClaim) (url string) {
-// 	for i, format := range virtualMachineExportVolumeFormat {
-// 		if pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == core.PersistentVolumeBlock {
-// 			return format.Url
-// 		}
-// 	}
-// }
+func getExportURL(virtualMachineExportVolumeFormat []export.VirtualMachineExportVolumeFormat) (url string) {
+	for _, format := range virtualMachineExportVolumeFormat {
+		// TODO: revisit this, I'm not sure if it's correct
+		if format.Format == export.KubeVirtGz || format.Format == export.ArchiveGz {
+			return format.Url
+		}
+	}
+
+	return ""
+}
 
 // PersistentVolumeClaimWithSourceRef implements base.Builder
 func (*Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName *string, populatorName string, accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode) *core.PersistentVolumeClaim {
@@ -277,40 +281,65 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 		return liberr.Wrap(err)
 	}
 
-	// Target VM
 	targetVMspec := sourceVm.Spec
+
+	// TODO: move logic to mapDisks
+	pvcMap := make(map[string]*core.PersistentVolumeClaim)
+	for i := range persistentVolumeClaims {
+		pvc := &persistentVolumeClaims[i]
+		if source, ok := pvc.Annotations[planbase.AnnDiskSource]; ok {
+			pvcMap[source] = pvc
+		}
+	}
+
+	diskMap := make(map[string]*cnv.Disk)
+	for i := range sourceVm.Spec.Template.Spec.Domain.Devices.Disks {
+		disk := &sourceVm.Spec.Template.Spec.Domain.Devices.Disks[i]
+		// Find matching volume
+		for _, vol := range sourceVm.Spec.Template.Spec.Volumes {
+			if vol.Name == disk.Name {
+				key := pvcSourceName(vmRef.Namespace, vol.PersistentVolumeClaim.ClaimName)
+				if _, ok := pvcMap[key]; ok {
+					diskMap[key] = disk
+					continue
+				}
+			}
+		}
+	}
 
 	// Clear original disks and volumes, will be required for other mapped devices later
 	targetVMspec.Template.Spec.Domain.Devices.Disks = []cnv.Disk{}
 	targetVMspec.Template.Spec.Volumes = []cnv.Volume{}
 
-	for _, vol := range persistentVolumeClaims {
-		volumeName := vol.Name
-		targetVMspec.Template.Spec.Volumes = append(targetVMspec.Template.Spec.Volumes, cnv.Volume{
-			Name: volumeName,
-			VolumeSource: cnv.VolumeSource{
-				PersistentVolumeClaim: &cnv.PersistentVolumeClaimVolumeSource{
-					PersistentVolumeClaimVolumeSource: core.PersistentVolumeClaimVolumeSource{
-						ClaimName: volumeName,
+	for _, volume := range persistentVolumeClaims {
+		if disk, ok := diskMap[volume.Annotations[planbase.AnnDiskSource]]; ok {
+			targetVolume := cnv.Volume{
+				Name: disk.Name,
+				VolumeSource: cnv.VolumeSource{
+					PersistentVolumeClaim: &cnv.PersistentVolumeClaimVolumeSource{
+						PersistentVolumeClaimVolumeSource: core.PersistentVolumeClaimVolumeSource{
+							ClaimName: volume.Name,
+						},
 					},
 				},
-			},
-		})
+			}
+			targetVMspec.Template.Spec.Volumes = append(targetVMspec.Template.Spec.Volumes, targetVolume)
 
-		// TODO copy interfaces properly and use original name
-		disk := cnv.Disk{
-			Name: volumeName,
-			DiskDevice: cnv.DiskDevice{
-				Disk: &cnv.DiskTarget{
-					Bus: cnv.DiskBus("scsi"),
+			targetDisk := cnv.Disk{
+				Name: disk.Name,
+				DiskDevice: cnv.DiskDevice{
+					Disk: &cnv.DiskTarget{
+						Bus: disk.Disk.Bus,
+					},
 				},
-			},
+			}
+
+			targetVMspec.Template.Spec.Domain.Devices.Disks = append(targetVMspec.Template.Spec.Domain.Devices.Disks, targetDisk)
 		}
-		targetVMspec.Template.Spec.Domain.Devices.Disks = append(targetVMspec.Template.Spec.Domain.Devices.Disks, disk)
 	}
 
 	// Clear MAC address on target VM
-	// TODO: temporary hack, REMOVE this
+	// TODO: temporary hack for internal migration, REMOVE this
 	for i := range targetVMspec.Template.Spec.Domain.Devices.Interfaces {
 		targetVMspec.Template.Spec.Domain.Devices.Interfaces[i].MacAddress = ""
 	}
@@ -338,4 +367,8 @@ func createDataVolumeSpec(size resource.Quantity, storageClassName, url, configM
 			StorageClassName: &storageClassName,
 		},
 	}
+}
+
+func pvcSourceName(namespace, name string) string {
+	return fmt.Sprintf("%s/%s", namespace, name)
 }
