@@ -251,18 +251,17 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 
 	// Apply changes.
 	plan.Status.ObservedGeneration = plan.Generation
-	referenced := plan.Referenced
+	// data is not persisted, so we don't get it back from the server
+	copyPlan := plan.DeepCopy()
 	err = r.Status().Update(context.TODO(), plan)
 	if err != nil {
 		return
 	}
-	// Referenced data is not persisted so we don't get it back from the server
-	plan.Referenced = referenced
 
 	//
 	// Execute.
 	// The plan is updated as needed to reflect status.
-	result.RequeueAfter, err = r.execute(plan)
+	result.RequeueAfter, err = r.execute(copyPlan)
 	if err != nil {
 		return
 	}
