@@ -1,10 +1,8 @@
-package vsphere
+package ova
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	liburl "net/url"
 	"path"
 	"regexp"
 	"sort"
@@ -15,16 +13,12 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	container "github.com/konveyor/forklift-controller/pkg/controller/provider/container/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
-	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
-	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -127,8 +121,6 @@ var backingFilePattern = regexp.MustCompile("-\\d\\d\\d\\d\\d\\d.vmdk")
 // vSphere builder.
 type Builder struct {
 	*plancontext.Context
-	// Host CRs.
-	hosts map[string]*api.Host
 	// MAC addresses already in use on the destination cluster. k=mac, v=vmName
 	macConflictsMap map[string]string
 }
@@ -170,7 +162,7 @@ func (r *Builder) macConflicts(vm *model.VM) (conflictingVMs []string, err error
 }
 
 // Create DataVolume certificate configmap.
-// No-op for vSphere.
+// No-op for OVA.
 func (r *Builder) ConfigMap(_ ref.Ref, _ *core.Secret, _ *core.ConfigMap) (err error) {
 	return
 }
@@ -187,66 +179,6 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		return
 	}
 
-	sslVerify := ""
-	if container.GetInsecureSkipVerifyFlag(sourceSecret) {
-		sslVerify = "no_verify=1"
-	}
-
-	host, err := r.host(vm.Host)
-	if err != nil {
-		err = liberr.Wrap(
-			err,
-			"Host lookup failed.",
-			"host",
-			vm.Host)
-		return
-	}
-
-	var libvirtURL liburl.URL
-	if hostDef, found := r.hosts[host.ID]; found {
-		// Connect through ESXi
-		hostSecret, nErr := r.hostSecret(hostDef)
-		if nErr != nil {
-			err = nErr
-			return
-		}
-		libvirtURL = liburl.URL{
-			Scheme:   "esx",
-			Host:     hostDef.Spec.IpAddress,
-			User:     liburl.User(string(hostSecret.Data["user"])),
-			Path:     "",
-			RawQuery: sslVerify,
-		}
-	} else {
-		// Connect through VCenter
-		path := host.Path
-		// Check parent resource
-		if host.Parent.Kind == "Cluster" {
-			parent := &model.Cluster{}
-			err = r.Source.Inventory.Get(parent, host.Parent.ID)
-			if err != nil {
-				err = liberr.Wrap(
-					err,
-					"Cluster lookup failed.",
-					"cluster",
-					host.Parent.ID)
-				return
-			}
-			if parent.Variant == "ComputeResource" {
-				// This is a stand-alone host without a cluster. We
-				// need to use path to the parent resource instead.
-				path = parent.Path
-			}
-		}
-		libvirtURL = liburl.URL{
-			Scheme:   "vpx",
-			Host:     host.ManagementServerIp, // VCenter
-			User:     liburl.User(string(sourceSecret.Data["user"])),
-			Path:     path, // E.g.: /Datacenter/Cluster/host.example.com
-			RawQuery: sslVerify,
-		}
-	}
-
 	env = append(
 		env,
 		core.EnvVar{
@@ -254,12 +186,12 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 			Value: vm.Name,
 		},
 		core.EnvVar{
-			Name:  "V2V_libvirtURL",
-			Value: libvirtURL.String(),
+			Name:  "V2V_diskPath",
+			Value: "/mnt/nfs/centos44_new.ova",
 		},
 		core.EnvVar{
 			Name:  "V2V_provider",
-			Value: "vsphere",
+			Value: "ova",
 		},
 	)
 	return
@@ -267,27 +199,7 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 
 // Build the DataVolume credential secret.
 func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
-	hostID, err := r.hostID(vmRef)
-	if err != nil {
-		return
-	}
 	thumbprint := string(in.Data["thumbprint"])
-	if hostDef, found := r.hosts[hostID]; found {
-		hostSecret, nErr := r.hostSecret(hostDef)
-		if nErr != nil {
-			err = nErr
-			return
-		}
-		in = hostSecret
-		// Get host thumbprint
-		h, nErr := r.host(hostID)
-		if nErr != nil {
-			err = nErr
-			return
-		}
-		thumbprint = h.Thumbprint
-	}
-
 	object.StringData = map[string]string{
 		"accessKeyId": string(in.Data["user"]),
 		"secretKey":   string(in.Data["password"]),
@@ -310,27 +222,6 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 		return
 	}
 
-	url := r.Source.Provider.Spec.URL
-	thumbprint := string(r.Source.Secret.Data["thumbprint"])
-	hostID, err := r.hostID(vmRef)
-	if err != nil {
-		return
-	}
-	if hostDef, found := r.hosts[hostID]; found {
-		hostURL := liburl.URL{
-			Scheme: "https",
-			Host:   hostDef.Spec.IpAddress,
-			Path:   vim25.Path,
-		}
-		url = hostURL.String()
-		h, nErr := r.host(hostID)
-		if nErr != nil {
-			err = nErr
-			return
-		}
-		thumbprint = h.Thumbprint
-	}
-
 	dsMapIn := r.Context.Map.Storage.Spec.Map
 	for i := range dsMapIn {
 		mapped := &dsMapIn[i]
@@ -345,28 +236,9 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 			if disk.Datastore.ID == ds.ID {
 				storageClass := mapped.Destination.StorageClass
 				var dvSource cdi.DataVolumeSource
-				el9, el9Err := r.Context.Plan.VSphereUsesEl9VirtV2v()
-				if el9Err != nil {
-					err = el9Err
-					return
-				}
-				if el9 {
-					// Let virt-v2v do the copying
-					dvSource = cdi.DataVolumeSource{
-						Blank: &cdi.DataVolumeBlankImage{},
-					}
-				} else {
-					// Let CDI do the copying
-					dvSource = cdi.DataVolumeSource{
-						VDDK: &cdi.DataVolumeSourceVDDK{
-							BackingFile:  trimBackingFileName(disk.File),
-							UUID:         vm.UUID,
-							URL:          url,
-							SecretRef:    secret.Name,
-							Thumbprint:   thumbprint,
-							InitImageURL: r.Source.Provider.Spec.Settings["vddkInitImage"],
-						},
-					}
+				// Let virt-v2v do the copying
+				dvSource = cdi.DataVolumeSource{
+					Blank: &cdi.DataVolumeBlankImage{},
 				}
 				dvSpec := cdi.DataVolumeSpec{
 					Source: &dvSource,
@@ -448,11 +320,6 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 		return
 	}
 
-	host, err := r.host(vm.Host)
-	if err != nil {
-		return
-	}
-
 	if object.Template == nil {
 		object.Template = &cnv.VirtualMachineInstanceTemplateSpec{}
 	}
@@ -460,7 +327,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	r.mapFirmware(vm, object)
 	r.mapCPU(vm, object)
 	r.mapMemory(vm, object)
-	r.mapClock(host, object)
+	r.mapClock(object)
 	r.mapInput(object)
 	err = r.mapNetworks(vm, object)
 	if err != nil {
@@ -541,13 +408,9 @@ func (r *Builder) mapInput(object *cnv.VirtualMachineSpec) {
 	object.Template.Spec.Domain.Devices.Inputs = []cnv.Input{tablet}
 }
 
-func (r *Builder) mapClock(host *model.Host, object *cnv.VirtualMachineSpec) {
+func (r *Builder) mapClock(object *cnv.VirtualMachineSpec) {
 	clock := &cnv.Clock{
 		Timer: &cnv.Timer{},
-	}
-	if host.Timezone != "" {
-		tz := cnv.ClockOffsetTimezone(host.Timezone)
-		clock.ClockOffset.Timezone = &tz
 	}
 	object.Template.Spec.Domain.Clock = clock
 }
@@ -711,57 +574,6 @@ func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVol
 	return trimBackingFileName(pvc.Annotations[AnnImportBackingFile])
 }
 
-// Load
-func (r *Builder) Load() (err error) {
-	err = r.loadHosts()
-	if err != nil {
-		return
-	}
-
-	return
-}
-
-// Load host CRs.
-func (r *Builder) loadHosts() (err error) {
-	list := &api.HostList{}
-	err = r.List(
-		context.TODO(),
-		list,
-		&client.ListOptions{
-			Namespace: r.Source.Provider.Namespace,
-		},
-	)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	hostMap := map[string]*api.Host{}
-	for i := range list.Items {
-		host := &list.Items[i]
-		ref := host.Spec.Ref
-		if !host.Status.HasCondition(libcnd.Ready) {
-			continue
-		}
-		m := &model.Host{}
-		pErr := r.Source.Inventory.Find(m, ref)
-		if pErr != nil {
-			if errors.As(pErr, &web.NotFoundError{}) {
-				continue
-			} else {
-				err = pErr
-				return
-			}
-		}
-		ref.ID = m.ID
-		ref.Name = m.Name
-		hostMap[ref.ID] = host
-	}
-
-	r.hosts = hostMap
-
-	return
-}
-
 // Find host ID for VM.
 func (r *Builder) hostID(vmRef ref.Ref) (hostID string, err error) {
 	vm := &model.VM{}
@@ -826,16 +638,4 @@ func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName
 
 func (r *Builder) PreTransferActions(c planbase.Client, vmRef ref.Ref) (ready bool, err error) {
 	return true, nil
-}
-
-// Build LUN PVs.
-func (r *Builder) LunPersistentVolumes(vmRef ref.Ref) (pvs []core.PersistentVolume, err error) {
-	// do nothing
-	return
-}
-
-// Build LUN PVCs.
-func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.PersistentVolumeClaim, err error) {
-	// do nothing
-	return
 }

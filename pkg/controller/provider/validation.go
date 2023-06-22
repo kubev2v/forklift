@@ -84,11 +84,9 @@ func (r *Reconciler) validate(provider *api.Provider) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	if !(provider.Type() == api.Ova) {
-		err = r.testConnection(provider, secret)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
+	err = r.testConnection(provider, secret)
+	if err != nil {
+		return liberr.Wrap(err)
 	}
 	err = r.inventoryCreated(provider)
 	if err != nil {
@@ -131,10 +129,7 @@ func (r *Reconciler) validateType(provider *api.Provider) error {
 
 // Validate the URL.
 func (r *Reconciler) validateURL(provider *api.Provider) error {
-	if provider.IsHost() {
-		return nil
-	}
-	if provider.Type() == api.Ova {
+	if provider.IsHost() || provider.Type() == api.Ova {
 		return nil
 	}
 	if provider.Spec.URL == "" {
@@ -258,6 +253,11 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 				"password",
 				"cacert",
 			}
+		}
+	case api.Ova:
+		keyList = []string{
+			"url",
+			"insecureSkipVerify",
 		}
 	}
 	for _, key := range keyList {

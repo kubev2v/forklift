@@ -1,0 +1,32 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "ova",
+    srcs = [
+        "adapter.go",
+        "builder.go",
+        "validator.go",
+    ],
+    importpath = "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/ova",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/apis/forklift/v1beta1",
+        "//pkg/apis/forklift/v1beta1/plan",
+        "//pkg/apis/forklift/v1beta1/ref",
+        "//pkg/controller/plan/adapter/base",
+        "//pkg/controller/plan/context",
+        "//pkg/controller/provider/model/vsphere",
+        "//pkg/controller/provider/web",
+        "//pkg/controller/provider/web/base",
+        "//pkg/controller/provider/web/ocp",
+        "//pkg/controller/provider/web/vsphere",
+        "//pkg/lib/error",
+        "//pkg/lib/itinerary",
+        "//vendor/github.com/vmware/govmomi/vim25/types",
+        "//vendor/k8s.io/api/core/v1:core",
+        "//vendor/k8s.io/apimachinery/pkg/api/resource",
+        "//vendor/kubevirt.io/api/core/v1:core",
+        "//vendor/kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
+    ],
+)

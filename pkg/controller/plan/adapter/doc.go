@@ -5,6 +5,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/openstack"
+	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/ova"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/vsphere"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
@@ -28,6 +29,8 @@ func New(provider *api.Provider) (adapter Adapter, err error) {
 		adapter = &openstack.Adapter{}
 	case api.OpenShift:
 		adapter = &ocp.Adapter{}
+	case api.Ova:
+		adapter = &ova.Adapter{}
 	default:
 		err = liberr.New("provider not supported.")
 	}

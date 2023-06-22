@@ -1452,6 +1452,15 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 			},
 		},
 	})
+	volumes = append(volumes, core.Volume{
+		Name: "nfs",
+		VolumeSource: core.VolumeSource{
+			NFS: &core.NFSVolumeSource{
+				Server: "10.46.9.67",
+				Path:   "/sd1/sd/ova",
+			},
+		},
+	})
 	mounts = append(mounts,
 		core.VolumeMount{
 			Name:      "libvirt-domain-xml",
@@ -1460,6 +1469,10 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 		core.VolumeMount{
 			Name:      "vddk-vol-mount",
 			MountPath: "/opt",
+		},
+		core.VolumeMount{
+			Name:      "nfs",
+			MountPath: "/mnt/nfs/",
 		},
 	)
 
