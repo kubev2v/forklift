@@ -1069,8 +1069,8 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 			r.Log.Error(err, "Failed to update the VM name to meet DNS1123 protocol requirements.")
 			return
 		}
-		r.Log.Info("VM name ", originalName, " was incompatible with DNS1123 RFC, changing to ",
-			vm.Name)
+		r.Log.Info("VM name is incompatible with DNS1123 RFC, renaming",
+			"originalName", originalName, "newName", vm.Name)
 	}
 
 	var ok bool
