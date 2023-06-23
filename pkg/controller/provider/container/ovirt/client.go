@@ -103,15 +103,11 @@ func (r *Client) connect() (status int, err error) {
 	values.Add("scope", "ovirt-app-api")
 
 	client.Header = http.Header{
-		"Accept": []string{"application/json"},
+		"Accept":       []string{"application/json"},
+		"Content-Type": []string{"application/x-www-form-urlencoded"},
 	}
-	request := &struct {
-		Input interface{} `json:"input"`
-	}{}
-	request.Input = values
 	response := &ovirtTokenResponse{}
-	url.RawQuery = values.Encode()
-	status, err = client.Post(url.String(), request, response)
+	status, err = client.Post(url.String(), values.Encode(), response)
 	if err != nil {
 		return
 	}
