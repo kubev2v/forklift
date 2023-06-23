@@ -161,7 +161,10 @@ func (r *Client) Get(url string, out interface{}, params ...Param) (status int, 
 	return
 }
 
-// HTTP POST (method).
+/*
+HTTP POST (method).
+When the `in interface{}` is a string, it is passed as raw bytes otherwise it uses the json.Marshal on it.
+*/
 func (r *Client) Post(url string, in interface{}, out interface{}) (status int, err error) {
 	parsedURL, err := liburl.Parse(url)
 	if err != nil {
@@ -172,8 +175,14 @@ func (r *Client) Post(url string, in interface{}, out interface{}) (status int, 
 			url)
 		return
 	}
-	body, _ := json.Marshal(in)
-	reader := bytes.NewReader(body)
+	var reader *bytes.Reader
+	switch v := in.(type) {
+	case string:
+		reader = bytes.NewReader([]byte(v))
+	default:
+		body, _ := json.Marshal(in)
+		reader = bytes.NewReader(body)
+	}
 	request := &http.Request{
 		Header: r.Header,
 		Method: http.MethodPost,
