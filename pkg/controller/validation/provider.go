@@ -145,6 +145,8 @@ func (r *ProviderPair) validateSource(pair provider.Pair) (result libcnd.Conditi
 		result.SetCondition(newCnd)
 	}
 
+	r.Referenced.Source = pv.Referenced
+
 	return
 }
 
@@ -171,19 +173,8 @@ func (r *ProviderPair) validateDestination(pair provider.Pair) (result libcnd.Co
 		}
 		result.SetCondition(newCnd)
 	}
-	// A non-openshift destination is not supported.
+
 	r.Referenced.Destination = pv.Referenced
-	if r.Referenced.Destination != nil && r.Referenced.Destination.Type() != api.OpenShift {
-		result.SetCondition(libcnd.Condition{
-			Type:     DestinationProviderNotValid,
-			Status:   True,
-			Reason:   TypeNotValid,
-			Category: Critical,
-			Message:  "The destination provider is not valid.",
-		})
-		return
-	}
-	r.Referenced.Source = pv.Referenced
 
 	return
 }
