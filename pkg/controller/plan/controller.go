@@ -251,9 +251,11 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 
 	// Apply changes.
 	plan.Status.ObservedGeneration = plan.Generation
-	// data is not persisted, so we don't get it back from the server
-	copyPlan := plan.DeepCopy()
-	err = r.Status().Update(context.TODO(), plan)
+	// At this point, the plan contains data that is not persisted by design, like the Referenced data
+	// and the staged flags in the status, and more data that has been loaded in the validate function,
+	// like the name of the VMs in the spec section, therefore we don't want the plan to be overridden
+	// by data from the server (even the spec section is overridden) and so we pass a copy of the plan
+	err = r.Status().Update(context.TODO(), plan.DeepCopy())
 	if err != nil {
 		return
 	}
@@ -261,7 +263,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	//
 	// Execute.
 	// The plan is updated as needed to reflect status.
-	result.RequeueAfter, err = r.execute(copyPlan)
+	result.RequeueAfter, err = r.execute(plan)
 	if err != nil {
 		return
 	}
