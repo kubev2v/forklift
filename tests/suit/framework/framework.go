@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	cnv "kubevirt.io/api/core/v1"
 
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -263,6 +264,11 @@ func (c *Clients) GetCrClient() (crclient.Client, error) {
 		return nil, err
 	}
 	err = net.AddToScheme(scheme.Scheme)
+	if err != nil {
+		return nil, err
+	}
+
+	err = cnv.AddToScheme(scheme.Scheme)
 	if err != nil {
 		return nil, err
 	}
