@@ -9,6 +9,7 @@ import (
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
 	export "kubevirt.io/api/export/v1alpha1"
 
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
@@ -73,9 +74,11 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 		return nil, liberr.Wrap(err)
 	}
 
-	// Create DataVolumes on the destination
-	// TODO Get SC from map
-	storageClass := "nfs-csi"
+	// Build storage map
+	storageMap := map[string]v1beta1.DestinationStorage{}
+	for _, storage := range r.Map.Storage.Spec.Map {
+		storageMap[storage.Source.Name] = storage.Destination
+	}
 
 	dataVolumes := []cdi.DataVolume{}
 	for _, volume := range vmExport.Status.Links.External.Volumes {
@@ -94,8 +97,8 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 		if url == "" {
 			return nil, liberr.Wrap(fmt.Errorf("failed to get export URL, available formats: %v", volume.Formats))
 		}
-
-		dataVolume.Spec = *createDataVolumeSpec(size, storageClass, url, configMap.Name, secret.Name)
+		storageClassName := storageMap[*pvc.Spec.StorageClassName].StorageClass
+		dataVolume.Spec = *createDataVolumeSpec(size, storageClassName, url, configMap.Name, secret.Name)
 
 		err = r.Destination.Client.Create(context.TODO(), dataVolume, &client.CreateOptions{})
 		if err != nil {
