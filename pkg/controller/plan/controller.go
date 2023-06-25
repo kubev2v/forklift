@@ -286,11 +286,13 @@ func (r *Reconciler) setPopulatorDataSourceLabels(plan *api.Plan) {
 			}
 			plan.Annotations[AnnPopulatorLabels] = "True"
 			patch := client.MergeFrom(planCopy)
-			err = r.Client.Patch(context.TODO(), plan, patch)
+			r.Client.Patch(context.TODO(), plan, patch)
 			// Restore Referenced data that is not returned back from the server
 			plan.Referenced = planCopy.Referenced
 			// Restore original status with staged conditions
 			plan.Status = planCopy.Status
+			// Restore original spec with VM names
+			plan.Spec = planCopy.Spec
 		}
 	}
 }
