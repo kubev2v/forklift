@@ -1,7 +1,7 @@
 ![Build](https://github.com/kubev2v/forklift/workflows/Build%20and%20push%20images/badge.svg)&nbsp;![CI](https://github.com/kubev2v/forklift/workflows/CI/badge.svg)&nbsp;[![Code Coverage](https://codecov.io/gh/kubev2v/forklift/branch/main/graph/badge.svg)](https://codecov.io/gh/kubev2v/forklift)
 
 # forklift-controller
-
+test only
 Konveyor Forklift controller.
 
 ---
