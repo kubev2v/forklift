@@ -35,6 +35,7 @@ go_library(
         "//vendor/k8s.io/client-go/tools/clientcmd",
         "//vendor/k8s.io/client-go/tools/remotecommand",
         "//vendor/k8s.io/klog/v2:klog",
+        "//vendor/kubevirt.io/api/core/v1:core",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
     ],
 )
