@@ -1,11 +1,12 @@
 package ocp
 
 import (
+	"path"
+	"strings"
+
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	"path"
-	"strings"
 )
 
 // Errors.
@@ -204,7 +205,11 @@ func (r *Finder) VM(ref *base.Ref) (object interface{}, err error) {
 	err = r.ByRef(vm, *ref)
 	if err == nil {
 		ref.ID = vm.UID
-		ref.Name = path.Join(vm.Namespace, vm.Name)
+
+		if ref.Namespace == "" {
+			ref.Name = path.Join(vm.Namespace, vm.Name)
+		}
+
 		object = vm
 	}
 

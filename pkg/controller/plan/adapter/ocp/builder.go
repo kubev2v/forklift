@@ -3,7 +3,6 @@ package ocp
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
@@ -33,13 +32,10 @@ type Builder struct {
 func (r *Builder) ConfigMap(vmRef ref.Ref, secret *core.Secret, object *core.ConfigMap) error {
 	vmExport := &export.VirtualMachineExport{}
 	r.Log.Info("Fetching vmExport", "vmRef", vmRef)
-	// TODO: check why the name includes the namespace too
-	namespaceNameSplit := strings.Split(vmRef.Name, "/")
-	vmName := namespaceNameSplit[1]
 
 	key := client.ObjectKey{
 		Namespace: vmRef.Namespace,
-		Name:      vmName,
+		Name:      vmRef.Name,
 	}
 	err := r.Client.Get(context.TODO(), key, vmExport)
 	if err != nil {
@@ -58,14 +54,9 @@ func (r *Builder) ConfigMap(vmRef ref.Ref, secret *core.Secret, object *core.Con
 func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume) (dvs []cdi.DataVolume, err error) {
 	// Get VM export
 	vmExport := &export.VirtualMachineExport{}
-
-	// TODO: check why the name includes the namespace too
-	namespaceNameSplit := strings.Split(vmRef.Name, "/")
-	vmName := namespaceNameSplit[1]
-
 	key := client.ObjectKey{
 		Namespace: vmRef.Namespace,
-		Name:      vmName,
+		Name:      vmRef.Name,
 	}
 
 	err = r.Client.Get(context.TODO(), key, vmExport)
@@ -270,13 +261,9 @@ func (*Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err err
 // VirtualMachine implements base.Builder
 func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []core.PersistentVolumeClaim) error {
 	sourceVm := &cnv.VirtualMachine{}
-	// TODO: figure out and remove
-	namespaceNameSplit := strings.Split(vmRef.Name, "/")
-	vmName := namespaceNameSplit[1]
-
 	key := client.ObjectKey{
 		Namespace: vmRef.Namespace,
-		Name:      vmName,
+		Name:      vmRef.Name,
 	}
 
 	err := r.Client.Get(context.TODO(), key, sourceVm)
