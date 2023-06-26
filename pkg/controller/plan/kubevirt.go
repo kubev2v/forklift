@@ -1121,13 +1121,6 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 		object.ObjectMeta.Annotations = annotations
 	}
 
-	// TODO: figure out a better way
-	if r.Plan.IsSourceProviderOCP() {
-		namespaceNameSplit := strings.Split(vm.Name, "/")
-		vmName := namespaceNameSplit[1]
-		object.Name = vmName
-
-	}
 	running := false
 	object.Spec.Running = &running
 
@@ -1660,10 +1653,12 @@ func (r *KubeVirt) ensureSecret(vmRef ref.Ref, setSecretData func(*core.Secret) 
 	if err != nil {
 		return
 	}
+
 	newSecret, err := r.secret(vmRef, setSecretData)
 	if err != nil {
 		return
 	}
+
 	list := &core.SecretList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
