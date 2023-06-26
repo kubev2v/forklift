@@ -292,6 +292,7 @@ func (r *Migration) begin() (err error) {
 		} else {
 			status = current
 		}
+
 		if status.Phase != Completed || status.HasAnyCondition(Canceled, Failed) {
 			pipeline, pErr := r.buildPipeline(&vm)
 			if pErr != nil {
