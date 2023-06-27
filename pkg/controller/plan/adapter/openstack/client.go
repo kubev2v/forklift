@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -26,6 +27,37 @@ import (
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
 
+const (
+	RegionName                  = "regionName"
+	AuthType                    = "authType"
+	Username                    = "username"
+	UserID                      = "userID"
+	Password                    = "password"
+	ApplicationCredentialID     = "applicationCredentialID"
+	ApplicationCredentialName   = "applicationCredentialName"
+	ApplicationCredentialSecret = "applicationCredentialSecret"
+	Token                       = "token"
+	SystemScope                 = "systemScope"
+	ProjectName                 = "projectName"
+	ProjectID                   = "projectID"
+	UserDomainName              = "userDomainName"
+	UserDomainID                = "userDomainID"
+	ProjectDomainName           = "projectDomainName"
+	ProjectDomainID             = "projectDomainID"
+	DomainName                  = "domainName"
+	DomainID                    = "domainID"
+	DefaultDomain               = "defaultDomain"
+	InsecureSkipVerify          = "insecureSkipVerify"
+	CACert                      = "cacert"
+	EndpointAvailability        = "availability"
+)
+
+var supportedAuthTypes = map[string]clientconfig.AuthType{
+	"password":              clientconfig.AuthPassword,
+	"token":                 clientconfig.AuthToken,
+	"applicationcredential": clientconfig.AuthV3ApplicationCredential,
+}
+
 // Client
 type Client struct {
 	*plancontext.Context
@@ -38,79 +70,140 @@ type Client struct {
 
 // Connect.
 func (r *Client) connect() (err error) {
-	var TLSClientConfig *tls.Config
 
-	if r.insecure() {
-		TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	} else {
-		cacert := []byte(r.cacert())
-		roots := x509.NewCertPool()
-		ok := roots.AppendCertsFromPEM(cacert)
-		if !ok {
-			r.Log.Info("the CA certificate is malformed or was not provided, falling back to system CA cert pool")
-			roots, err = x509.SystemCertPool()
-			if err != nil {
-				err = liberr.New("failed to configure the system's cert pool")
-				return
-			}
-		}
-		TLSClientConfig = &tls.Config{RootCAs: roots}
+	authInfo := &clientconfig.AuthInfo{
+		AuthURL:           r.Source.Provider.Spec.URL,
+		ProjectName:       r.getStringFromSecret(ProjectName),
+		ProjectID:         r.getStringFromSecret(ProjectID),
+		UserDomainName:    r.getStringFromSecret(UserDomainName),
+		UserDomainID:      r.getStringFromSecret(UserDomainID),
+		ProjectDomainName: r.getStringFromSecret(ProjectDomainName),
+		ProjectDomainID:   r.getStringFromSecret(ProjectDomainID),
+		DomainName:        r.getStringFromSecret(DomainName),
+		DomainID:          r.getStringFromSecret(DomainID),
+		DefaultDomain:     r.getStringFromSecret(DefaultDomain),
+		AllowReauth:       true,
 	}
 
-	clientOpts := &clientconfig.ClientOpts{
-		AuthInfo: &clientconfig.AuthInfo{
-			AuthURL:     r.Source.Provider.Spec.URL,
-			Username:    r.username(),
-			Password:    r.password(),
-			ProjectName: r.projectName(),
-			DomainName:  r.domainName(),
-			AllowReauth: true,
-		},
-		HTTPClient: &http.Client{
-			Transport: &http.Transport{
-				Proxy: http.ProxyFromEnvironment,
-				DialContext: (&net.Dialer{
-					Timeout:   10 * time.Second,
-					KeepAlive: 10 * time.Second,
-				}).DialContext,
-				MaxIdleConns:          10,
-				IdleConnTimeout:       10 * time.Second,
-				TLSHandshakeTimeout:   10 * time.Second,
-				ExpectContinueTimeout: 1 * time.Second,
-				TLSClientConfig:       TLSClientConfig,
-			},
-		},
-	}
-
-	provider, err := clientconfig.AuthenticatedClient(clientOpts)
+	var authType clientconfig.AuthType
+	authType, err = r.authType()
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
+
+	switch authType {
+	case clientconfig.AuthPassword:
+		authInfo.Username = r.getStringFromSecret(Username)
+		authInfo.UserID = r.getStringFromSecret(UserID)
+		authInfo.Password = r.getStringFromSecret(Password)
+	case clientconfig.AuthToken:
+		authInfo.Token = r.getStringFromSecret(Token)
+	case clientconfig.AuthV3ApplicationCredential:
+		authInfo.Username = r.getStringFromSecret(Username)
+		authInfo.ApplicationCredentialID = r.getStringFromSecret(ApplicationCredentialID)
+		authInfo.ApplicationCredentialName = r.getStringFromSecret(ApplicationCredentialName)
+		authInfo.ApplicationCredentialSecret = r.getStringFromSecret(ApplicationCredentialSecret)
+	}
+
+	identityUrl, err := url.Parse(r.Source.Provider.Spec.URL)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	var TLSClientConfig *tls.Config
+	if identityUrl.Scheme == "https" {
+		if r.getBoolFromSecret(InsecureSkipVerify) {
+			TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		} else {
+			cacert := []byte(r.getStringFromSecret(CACert))
+			if len(cacert) == 0 {
+				r.Log.Info("CA certificate was not provided,system CA cert pool is used")
+			} else {
+				roots := x509.NewCertPool()
+				ok := roots.AppendCertsFromPEM(cacert)
+				if !ok {
+					err = liberr.New("CA certificate is malformed, failed to configure the CA cert pool")
+					return
+				}
+				TLSClientConfig = &tls.Config{RootCAs: roots}
+			}
+
+		}
+	}
+
+	provider, err := openstack.NewClient(r.Source.Provider.Spec.URL)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	provider.HTTPClient.Transport = &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 10 * time.Second,
+		}).DialContext,
+		MaxIdleConns:          10,
+		IdleConnTimeout:       10 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		TLSClientConfig:       TLSClientConfig,
+	}
+
+	clientOpts := &clientconfig.ClientOpts{
+		AuthType: authType,
+		AuthInfo: authInfo,
+	}
+
+	opts, err := clientconfig.AuthOptions(clientOpts)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	err = openstack.Authenticate(provider, *opts)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
 	r.provider = provider
 
-	identityService, err := openstack.NewIdentityV3(r.provider, gophercloud.EndpointOpts{Region: r.region()})
+	availability := gophercloud.AvailabilityPublic
+	if a := r.getStringFromSecret(EndpointAvailability); a != "" {
+		availability = gophercloud.Availability(a)
+
+	}
+
+	endpointOpts := gophercloud.EndpointOpts{
+		Region:       r.getStringFromSecret(RegionName),
+		Availability: availability,
+	}
+
+	identityService, err := openstack.NewIdentityV3(r.provider, endpointOpts)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
 	r.identityService = identityService
 
-	computeService, err := openstack.NewComputeV2(r.provider, gophercloud.EndpointOpts{Region: r.region()})
+	computeService, err := openstack.NewComputeV2(r.provider, endpointOpts)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
 	r.computeService = computeService
 
-	imageService, err := openstack.NewImageServiceV2(r.provider, gophercloud.EndpointOpts{Region: r.region()})
+	imageService, err := openstack.NewImageServiceV2(r.provider, endpointOpts)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
 	r.imageService = imageService
 
-	blockStorageService, err := openstack.NewBlockStorageV3(r.provider, gophercloud.EndpointOpts{Region: r.region()})
+	blockStorageService, err := openstack.NewBlockStorageV3(r.provider, endpointOpts)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -120,62 +213,32 @@ func (r *Client) connect() (err error) {
 	return
 }
 
-// Username.
-func (r *Client) username() string {
-	if username, found := r.Source.Secret.Data["username"]; found {
-		return string(username)
+// AuthType.
+func (r *Client) authType() (authType clientconfig.AuthType, err error) {
+	if configuredAuthType := r.getStringFromSecret(AuthType); configuredAuthType == "" {
+		authType = clientconfig.AuthPassword
+	} else if supportedAuthType, found := supportedAuthTypes[configuredAuthType]; found {
+		authType = supportedAuthType
+	} else {
+		err = liberr.New("unsupported authentication type", "authType", configuredAuthType)
+	}
+	return
+}
+
+func (r *Client) getStringFromSecret(key string) string {
+	if value, found := r.Source.Secret.Data[key]; found {
+		return string(value)
 	}
 	return ""
 }
 
-// Password.
-func (r *Client) password() string {
-	if password, found := r.Source.Secret.Data["password"]; found {
-		return string(password)
-	}
-	return ""
-}
-
-// Project Name
-func (r *Client) projectName() string {
-	if projectName, found := r.Source.Secret.Data["projectName"]; found {
-		return string(projectName)
-	}
-	return ""
-}
-
-// Domain Name
-func (r *Client) domainName() string {
-	if domainName, found := r.Source.Secret.Data["domainName"]; found {
-		return string(domainName)
-	}
-	return ""
-}
-
-// Region
-func (r *Client) region() string {
-	if region, found := r.Source.Secret.Data["regionName"]; found {
-		return string(region)
-	}
-	return ""
-}
-
-// CA Certificate
-func (r *Client) cacert() string {
-	if cacert, found := r.Source.Secret.Data["cacert"]; found {
-		return string(cacert)
-	}
-	return ""
-}
-
-// Insecure
-func (r *Client) insecure() bool {
-	if insecure, found := r.Source.Secret.Data["insecureSkipVerify"]; found {
-		insecure, err := strconv.ParseBool(string(insecure))
+func (r *Client) getBoolFromSecret(key string) bool {
+	if keyStr := r.getStringFromSecret(key); keyStr != "" {
+		value, err := strconv.ParseBool(keyStr)
 		if err != nil {
 			return false
 		}
-		return insecure
+		return value
 	}
 	return false
 }
