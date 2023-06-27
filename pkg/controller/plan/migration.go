@@ -1691,7 +1691,6 @@ func (r *Migration) setOpenStackPopulatorLabels(vm *plan.VMStatus, pvcs []core.P
 	return
 }
 
-//
 func (r *Migration) setPopulatorPodsWithLabels(vm *plan.VMStatus, migrationID string) {
 	podList, err := r.kubevirt.GetPodsWithLabels(map[string]string{})
 	if err != nil {

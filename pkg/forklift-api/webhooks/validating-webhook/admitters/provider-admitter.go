@@ -6,17 +6,16 @@ import (
 
 	"github.com/konveyor/forklift-controller/pkg/apis"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/util"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	admissionv1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-
 type ProviderAdmitter struct {
-	client client.Client
+	client   client.Client
 	provider api.Provider
 }
 
@@ -58,7 +57,7 @@ func (admitter *ProviderAdmitter) validateVDDK() error {
 			context.TODO(),
 			client.ObjectKey{
 				Namespace: plan.Spec.Provider.Destination.Namespace,
-				Name: plan.Spec.Provider.Destination.Name,
+				Name:      plan.Spec.Provider.Destination.Name,
 			},
 			&destinationProvider)
 		if err != nil {
