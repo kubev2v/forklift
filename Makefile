@@ -63,7 +63,7 @@ BAZEL_OPTS +=	--sandbox_writable_path=$${XDG_RUNTIME_DIR}
 $(shell [ -d $(XDG_RUNTIME_DIR) ] || mkdir -p $(XDG_RUNTIME_DIR))
 endif
 
-ci: all
+ci: all tidy vendor bazel-generate generate-verify
 
 all: test forklift-controller
 
@@ -125,9 +125,20 @@ fmt:
 vet:
 	go vet ./pkg/... ./cmd/...
 
+# Run go mod tidy against code
+tidy:
+	go mod tidy
+
+# Run go mod vendor against code
+vendor:
+	go mod vendor
+
 # Generate code
 generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="./hack/boilerplate.go.txt" paths="./pkg/apis/..."
+
+generate-verify: generate
+	./hack/verify-generate.sh
 
 build-controller-image: check_container_runtmime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
