@@ -111,7 +111,6 @@ func (p *Plan) VSphereUsesEl9VirtV2v() (bool, error) {
 	return false, nil
 }
 
-
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type PlanList struct {
 	meta.TypeMeta `json:",inline"`
