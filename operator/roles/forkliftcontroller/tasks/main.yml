@@ -129,7 +129,7 @@
       state: present
       definition: "{{ lookup('template', 'api/mutatingwebhookconfiguration-forklift-api.yml.j2') }}"
 
-  - name: "Set up default provider"
+  - name: "Setup default provider"
     k8s:
       state: present
       definition: "{{ lookup('template', 'controller/provider-host.yml.j2') }}"
@@ -167,7 +167,7 @@
   - when: feature_ui_plugin|bool and not k8s_cluster|bool
     block:
 
-    - name: "Setup UI configmap"
+    - name: "Setup UI plugin configmap"
       k8s:
         state: "{{ ui_plugin_state }}"
         definition: "{{ lookup('template', 'ui-plugin/configmap-ui-plugin.yml.j2') }}"
