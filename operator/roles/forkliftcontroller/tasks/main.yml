@@ -1,11 +1,6 @@
 ---
 - block:
 
-  - name: "Set UI feature state"
-    set_fact:
-      ui_state: "present"
-    when: feature_ui|bool
-
   - name: "Set UI plugin feature state"
     set_fact:
       ui_plugin_state: "present"
@@ -169,85 +164,6 @@
         state: "{{ must_gather_api_state }}"
         definition: "{{ lookup('template', 'must-gather-api/deployment-must-gather-api.yml.j2') }}"
 
-  # Non-k8s UI tasks
-  - when: feature_ui|bool and not k8s_cluster|bool
-    block:
-
-    - name: "Setup UI route"
-      k8s:
-        state: "{{ ui_state }}"
-        definition: "{{ lookup('template', 'ui/route-ui.yml.j2') }}"
-
-    - name: "Obtain UI route"
-      k8s_info:
-        api_version: "route.openshift.io/v1"
-        kind: "Route"
-        namespace: "{{ app_namespace }}"
-        name: "{{ ui_route_name }}"
-      register: route
-      until: (route.resources|length) > 0
-      delay: 10
-      retries: 6
-
-    - name: "Extract UI FQDN from the route"
-      set_fact:
-        ui_route_fqdn: "{{ route.resources[0].spec.host }}"
-
-    - name: "Obtain OCP cluster version"
-      k8s_info:
-        kind: ClusterVersion
-        name: version
-      register: ocp_cv
-
-    - name: "Extract OCP cluster version"
-      set_fact:
-        forklift_cluster_version: "{{ ocp_cv | json_query(query) | first }}"
-      vars:
-        query: "resources[0].status.history[?state=='Completed'].version"
-      when: (ocp_cv.resources|length) > 0
-
-    - name: "Check if UI oauthclient exists already so we don't update it"
-      k8s_info:
-        api_version: v1
-        kind: OAuthClient
-        name: "{{ ui_service_name }}"
-        namespace: "{{ app_namespace }}"
-      register: ui_oauthclient_status
-
-    - when: (ui_oauthclient_status.resources | length) == 0
-      block:
-      - name: "Generate random secret value for oauth client"
-        set_fact:
-          ui_oauth_secret: "{{ 99999999 | random | to_uuid | b64encode }}"
-
-      - name: "Setup UI oauthclient"
-        k8s:
-          state: present
-          definition: "{{ lookup('template', 'ui/oauthclient-ui.yml.j2') }}"
-
-    - name: "Use existing secret value for oauth client"
-      set_fact:
-        ui_oauth_secret: "{{ ui_oauthclient_status.resources[0].secret }}"
-      when: (ui_oauthclient_status.resources | length) > 0
-
-  - when: feature_ui|bool
-    block:
-
-    - name: "Setup UI config map"
-      k8s:
-        state: "{{ ui_state }}"
-        definition: "{{ lookup('template', 'ui/configmap-ui.yml.j2') }}"
-
-    - name: "Setup UI service"
-      k8s:
-        state: "{{ ui_state }}"
-        definition: "{{ lookup('template', 'ui/service-ui.yml.j2') }}"
-
-    - name: "Setup UI deployment"
-      k8s:
-        state: "{{ ui_state }}"
-        definition: "{{ lookup('template', 'ui/deployment-ui.yml.j2') }}"
-
   - when: feature_ui_plugin|bool and not k8s_cluster|bool
     block:
 
@@ -301,15 +217,6 @@
       loop_var: resource_kind
     vars:
       feature_label: "{{ ui_plugin_service_name }}"
-
-  - when: not feature_ui|bool
-    name: "Cleanup {{ ui_service_name }} if disabled"
-    include_tasks: cleanup.yml
-    loop: "{{ forklift_resources }}"
-    loop_control:
-      loop_var: resource_kind
-    vars:
-      feature_label: "{{ ui_service_name }}"
 
   - when: not feature_validation|bool
     name: "Cleanup {{ validation_service_name }} if disabled"

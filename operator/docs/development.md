@@ -133,7 +133,6 @@ metadata:
   name: forklift-controller
   namespace: konveyor-forklift
 spec:
-  feature_ui: true
   feature_validation: true
 EOF
 ```
