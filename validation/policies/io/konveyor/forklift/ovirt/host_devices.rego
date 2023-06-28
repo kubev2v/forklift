@@ -11,6 +11,6 @@ concerns[flag] {
     flag := {
         "category": "Warning",
         "label": "VM has mapped host devices",
-        "assessment": "The VM is configured with hardware devices mapped from the host. This functionality is not currently supported by OpenShift Virtualization. The VM can be migrated but it will not have any host devices attached to it in the target environment."
+        "assessment": "The VM is configured with hardware devices mapped from the host. This functionality is not currently supported by OpenShift Virtualization. The VM can be migrated but it will not have any host device attached to it in the target environment."
     }
 }
