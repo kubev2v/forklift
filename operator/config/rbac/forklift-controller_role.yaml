@@ -74,7 +74,6 @@ rules:
   resources:
   - virtualmachines
   - virtualmachines/finalizers
-  - virtualmachineexports
   verbs:
   - get
   - list
