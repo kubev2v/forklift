@@ -18,7 +18,6 @@ metadata:
           "namespace": "konveyor-forklift"
         },
         "spec": {
-          "feature_ui": "false",
           "feature_ui_plugin": "true",
           "feature_validation": "true",
           "feature_must_gather_api": "true",

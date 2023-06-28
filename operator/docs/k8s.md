@@ -54,7 +54,7 @@ konveyor-forklift-bx8pt                               1/1     Running     0     
 
 If this looks Ok, then you can proceed to create the forkliftcontroller CR that will install the rest of Forklift components.
 
-### Creating a _ForkliftController_ CR (SSL/TLS disabled)
+### Creating a _ForkliftController_ CR
 ```
 $ cat << EOF | kubectl -n konveyor-forklift apply -f -
 apiVersion: forklift.konveyor.io/v1beta1
@@ -62,25 +62,6 @@ kind: ForkliftController
 metadata:
   name: forklift-controller
   namespace: konveyor-forklift
-spec:
-  feature_ui: false
-  feature_validation: true
-  ui_tls_enabled: false
-EOF
-```
-
-### Creating a _ForkliftController_ CR (SSL/TLS disabled) with UI
-```
-$ cat << EOF | kubectl -n konveyor-forklift apply -f -
-apiVersion: forklift.konveyor.io/v1beta1
-kind: ForkliftController
-metadata:
-  name: forklift-controller
-  namespace: konveyor-forklift
-spec:
-  feature_ui: true
-  feature_auth_required: false
-  feature_validation: true
-  ui_tls_enabled: false
+spec: {}
 EOF
 ```
