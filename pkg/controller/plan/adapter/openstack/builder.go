@@ -991,6 +991,7 @@ func (r *Builder) PreTransferActions(c planbase.Client, vmRef ref.Ref) (ready bo
 
 			continue
 		}
+
 		volume, err := volumes.Create(client.blockStorageService, volumes.CreateOpts{
 			Name:        imageName,
 			SnapshotID:  snap.ID,
@@ -1054,6 +1055,21 @@ func (r *Builder) PreTransferActions(c planbase.Client, vmRef ref.Ref) (ready bo
 			}
 			r.Log.Info("Image already exists", "id", imagelist)
 			continue
+		}
+
+		// Workaround for https://bugs.launchpad.net/cinder/+bug/1945500
+		for k := range vol.VolumeImageMetadata {
+			if strings.HasPrefix(k, "os_glance") {
+				err = volumeactions.UnsetImageMetadata(client.blockStorageService, vol.ID, volumeactions.UnsetImageMetadataOpts{Key: k}).ExtractErr()
+				if err != nil {
+					err = liberr.Wrap(
+						err,
+						"Failed to remove reserved glance metadata from volume.",
+						"volumeID",
+						vol.ID)
+					return true, err
+				}
+			}
 		}
 
 		image, err := volumeactions.UploadImage(client.blockStorageService, vol.ID, volumeactions.UploadImageOpts{
