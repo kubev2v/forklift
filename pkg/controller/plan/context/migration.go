@@ -124,19 +124,23 @@ func (r *Source) build(ctx *Context) (err error) {
 		err = liberr.Wrap(NotEnoughDataError{})
 		return
 	}
-	ref := r.Provider.Spec.Secret
-	r.Secret = &core.Secret{}
-	err = ctx.Get(
-		context.TODO(),
-		k8sclient.ObjectKey{
-			Namespace: ref.Namespace,
-			Name:      ref.Name,
-		},
-		r.Secret)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
+
+	if !r.Provider.IsHost() {
+		ref := r.Provider.Spec.Secret
+		r.Secret = &core.Secret{}
+		err = ctx.Get(
+			context.TODO(),
+			k8sclient.ObjectKey{
+				Namespace: ref.Namespace,
+				Name:      ref.Name,
+			},
+			r.Secret)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
 	}
+
 	r.Inventory, err = web.NewClient(r.Provider)
 	if err != nil {
 		err = liberr.Wrap(err)
