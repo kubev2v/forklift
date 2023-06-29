@@ -643,7 +643,9 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		ready, err = r.builder.PreTransferActions(r.provider, vm.Ref)
 		if err != nil {
 			err = liberr.Wrap(err)
-			return
+			step.AddError(err.Error())
+			err = nil
+			break
 		}
 
 		var pvcNames []string
