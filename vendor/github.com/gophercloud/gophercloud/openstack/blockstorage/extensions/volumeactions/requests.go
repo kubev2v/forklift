@@ -318,6 +318,24 @@ func SetImageMetadata(client *gophercloud.ServiceClient, id string, opts ImageMe
 	return
 }
 
+// UnsetImageMetadataOpts contains the key to unset from the image metadata.
+type UnsetImageMetadataOpts struct {
+	Key string `json:"key"`
+}
+
+func UnsetImageMetadata(client *gophercloud.ServiceClient, id string, opts UnsetImageMetadataOpts) (r UnsetImageMetadataResult) {
+	b, err := gophercloud.BuildRequestBody(opts, "os-unset_image_metadata")
+	if err != nil {
+		r.Err = err
+		return
+	}
+	resp, err := client.Post(actionURL(client, id), b, nil, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
+	})
+	_, r.Header, r.Err = gophercloud.ParseResponse(resp, err)
+	return
+}
+
 // BootableOpts contains options for setting bootable status to a volume.
 type BootableOpts struct {
 	// Enables or disables the bootable attribute. You can boot an instance from a bootable volume.
