@@ -620,6 +620,13 @@ func (r *Client) isNotFound(err error) bool {
 	switch liberr.Unwrap(err).(type) {
 	case gophercloud.ErrResourceNotFound, gophercloud.ErrDefault404:
 		return true
+	case gophercloud.ErrUnexpectedResponseCode:
+		if gopherlcoudErr, ok := liberr.Unwrap(err).(gophercloud.ErrUnexpectedResponseCode); ok {
+			if gopherlcoudErr.GetStatusCode() == http.StatusNotFound {
+				return true
+			}
+		}
+		return false
 	default:
 		return false
 	}
