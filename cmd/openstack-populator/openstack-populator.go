@@ -3,9 +3,13 @@ package main
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"flag"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -20,6 +24,42 @@ import (
 
 	"k8s.io/klog/v2"
 )
+
+const (
+	RegionName                  = "regionName"
+	AuthType                    = "authType"
+	Username                    = "username"
+	UserID                      = "userID"
+	Password                    = "password"
+	ApplicationCredentialID     = "applicationCredentialID"
+	ApplicationCredentialName   = "applicationCredentialName"
+	ApplicationCredentialSecret = "applicationCredentialSecret"
+	Token                       = "token"
+	SystemScope                 = "systemScope"
+	ProjectName                 = "projectName"
+	ProjectID                   = "projectID"
+	UserDomainName              = "userDomainName"
+	UserDomainID                = "userDomainID"
+	ProjectDomainName           = "projectDomainName"
+	ProjectDomainID             = "projectDomainID"
+	DomainName                  = "domainName"
+	DomainID                    = "domainID"
+	DefaultDomain               = "defaultDomain"
+	InsecureSkipVerify          = "insecureSkipVerify"
+	CACert                      = "cacert"
+	EndpointAvailability        = "availability"
+)
+
+const (
+	UnsupportedAuthTypeErrStr = "unsupported authentication type"
+	MalformedCAErrStr         = "CA certificate is malformed, failed to configure the CA cert pool"
+)
+
+var supportedAuthTypes = map[string]clientconfig.AuthType{
+	"password":              clientconfig.AuthPassword,
+	"token":                 clientconfig.AuthToken,
+	"applicationcredential": clientconfig.AuthV3ApplicationCredential,
+}
 
 func main() {
 	var (
@@ -48,69 +88,7 @@ func main() {
 	populate(volumePath, identityEndpoint, secretName, imageID)
 }
 
-type openstackConfig struct {
-	username           string
-	password           string
-	domainName         string
-	projectName        string
-	insecureSkipVerify string
-	region             string
-	cacert             string
-}
-
-func loadConfig(secretName, endpoint string) openstackConfig {
-	username, err := os.ReadFile("/etc/secret-volume/username")
-	if err != nil {
-		klog.Fatal(err.Error())
-	}
-	password, err := os.ReadFile("/etc/secret-volume/password")
-	if err != nil {
-		klog.Fatal(err.Error())
-	}
-	projectName, err := os.ReadFile("/etc/secret-volume/projectName")
-	if err != nil {
-		klog.Fatal(err.Error())
-	}
-	region, err := os.ReadFile("/etc/secret-volume/regionName")
-	if err != nil {
-		klog.Fatal(err.Error())
-	}
-	domainName, err := os.ReadFile("/etc/secret-volume/domainName")
-	if err != nil {
-		klog.Fatal(err.Error())
-	}
-	insecureSkipVerify, err := os.ReadFile("/etc/secret-volume/insecureSkipVerify")
-	if err != nil {
-		klog.Error(err.Error())
-		insecureSkipVerify = []byte("false")
-	}
-	insecure, err := strconv.ParseBool(string(insecureSkipVerify))
-	if err != nil {
-		klog.Fatal(err.Error())
-	}
-	//If the insecure option is set, the ca file field in the secret is not required.
-	var cacert []byte
-	if insecure {
-		cacert = []byte("")
-	} else {
-		cacert, err = os.ReadFile("/etc/secret-volume/cacert")
-		if err != nil {
-			klog.Error(err.Error())
-		}
-	}
-
-	return openstackConfig{
-		username:           string(username),
-		password:           string(password),
-		insecureSkipVerify: string(insecureSkipVerify),
-		projectName:        string(projectName),
-		region:             string(region),
-		domainName:         string(domainName),
-		cacert:             string(cacert),
-	}
-}
-
-func populate(fileName, endpoint, secretName, imageID string) {
+func populate(fileName, identityEndpoint, secretName, imageID string) {
 	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(":2112", nil)
 	progressGague := prometheus.NewGaugeVec(
@@ -128,48 +106,22 @@ func populate(fileName, endpoint, secretName, imageID string) {
 		klog.Info("Prometheus progress counter registered.")
 	}
 
-	config := loadConfig(secretName, endpoint)
-	var tlsConfig *tls.Config
-	var err error
-
-	if config.insecureSkipVerify == "true" {
-		tlsConfig = &tls.Config{InsecureSkipVerify: true}
-	} else if config.cacert != "" {
-		cacert := []byte(config.cacert)
-		roots := x509.NewCertPool()
-		ok := roots.AppendCertsFromPEM(cacert)
-		if !ok {
-			klog.Fatal("Failed to parse certificate")
-		}
-		tlsConfig = &tls.Config{RootCAs: roots}
+	availability := gophercloud.AvailabilityPublic
+	if a := getStringFromSecret(EndpointAvailability); a != "" {
+		availability = gophercloud.Availability(a)
 	}
-
-	clientOpts := &clientconfig.ClientOpts{
-		AuthInfo: &clientconfig.AuthInfo{
-			AuthURL:     endpoint,
-			DomainName:  config.domainName,
-			Username:    config.username,
-			Password:    config.password,
-			ProjectName: config.projectName,
-			AllowReauth: true,
-		},
-		HTTPClient: &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: tlsConfig,
-			},
-		},
+	endpointOpts := gophercloud.EndpointOpts{
+		Region:       getStringFromSecret(RegionName),
+		Availability: availability,
 	}
-
-	provider, err := clientconfig.AuthenticatedClient(clientOpts)
+	provider, err := getProviderClient(identityEndpoint)
 	if err != nil {
 		klog.Fatal(err)
 	}
-
-	imageService, err := openstack.NewImageServiceV2(provider, gophercloud.EndpointOpts{Region: config.region})
+	imageService, err := openstack.NewImageServiceV2(provider, endpointOpts)
 	if err != nil {
 		klog.Fatal(err)
 	}
-
 	image, err := imagedata.Download(imageService, imageID).Extract()
 	if err != nil {
 		klog.Fatal(err)
@@ -231,4 +183,139 @@ func writeData(reader io.ReadCloser, file *os.File, imageID string, progress *pr
 	progress.WithLabelValues(imageID).Set(float64(*total))
 
 	return nil
+}
+
+func getAuthType() (authType clientconfig.AuthType, err error) {
+	if configuredAuthType := getStringFromSecret(AuthType); configuredAuthType == "" {
+		authType = clientconfig.AuthPassword
+	} else if supportedAuthType, found := supportedAuthTypes[configuredAuthType]; found {
+		authType = supportedAuthType
+	} else {
+		err = errors.New(UnsupportedAuthTypeErrStr)
+		klog.Fatal(err.Error(), "authType", configuredAuthType)
+	}
+	return
+}
+
+func getStringFromSecret(key string) string {
+	value, err := os.ReadFile(fmt.Sprintf("/etc/secret-volume/%s", key))
+	if err != nil {
+		klog.Info(err.Error())
+		return ""
+	}
+	return string(value)
+}
+
+func getBoolFromSecret(key string) bool {
+	if keyStr := getStringFromSecret(key); keyStr != "" {
+		value, err := strconv.ParseBool(keyStr)
+		if err != nil {
+			return false
+		}
+		return value
+	}
+	return false
+}
+
+func getProviderClient(identityEndpoint string) (provider *gophercloud.ProviderClient, err error) {
+
+	authInfo := &clientconfig.AuthInfo{
+		AuthURL:           identityEndpoint,
+		ProjectName:       getStringFromSecret(ProjectName),
+		ProjectID:         getStringFromSecret(ProjectID),
+		UserDomainName:    getStringFromSecret(UserDomainName),
+		UserDomainID:      getStringFromSecret(UserDomainID),
+		ProjectDomainName: getStringFromSecret(ProjectDomainName),
+		ProjectDomainID:   getStringFromSecret(ProjectDomainID),
+		DomainName:        getStringFromSecret(DomainName),
+		DomainID:          getStringFromSecret(DomainID),
+		DefaultDomain:     getStringFromSecret(DefaultDomain),
+		AllowReauth:       true,
+	}
+
+	var authType clientconfig.AuthType
+	authType, err = getAuthType()
+	if err != nil {
+		klog.Fatal(err.Error())
+		return
+	}
+
+	switch authType {
+	case clientconfig.AuthPassword:
+		authInfo.Username = getStringFromSecret(Username)
+		authInfo.UserID = getStringFromSecret(UserID)
+		authInfo.Password = getStringFromSecret(Password)
+	case clientconfig.AuthToken:
+		authInfo.Token = getStringFromSecret(Token)
+	case clientconfig.AuthV3ApplicationCredential:
+		authInfo.Username = getStringFromSecret(Username)
+		authInfo.ApplicationCredentialID = getStringFromSecret(ApplicationCredentialID)
+		authInfo.ApplicationCredentialName = getStringFromSecret(ApplicationCredentialName)
+		authInfo.ApplicationCredentialSecret = getStringFromSecret(ApplicationCredentialSecret)
+	}
+
+	identityUrl, err := url.Parse(identityEndpoint)
+	if err != nil {
+		klog.Fatal(err.Error())
+		return
+	}
+
+	var TLSClientConfig *tls.Config
+	if identityUrl.Scheme == "https" {
+		if getBoolFromSecret(InsecureSkipVerify) {
+			TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		} else {
+			cacert := []byte(getStringFromSecret(CACert))
+			if len(cacert) == 0 {
+				klog.Info("CA certificate was not provided,system CA cert pool is used")
+			} else {
+				roots := x509.NewCertPool()
+				ok := roots.AppendCertsFromPEM(cacert)
+				if !ok {
+					err = errors.New(MalformedCAErrStr)
+					klog.Fatal(err.Error())
+					return
+				}
+				TLSClientConfig = &tls.Config{RootCAs: roots}
+			}
+
+		}
+	}
+
+	provider, err = openstack.NewClient(identityEndpoint)
+	if err != nil {
+		klog.Fatal(err.Error())
+		return
+	}
+
+	provider.HTTPClient.Transport = &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 10 * time.Second,
+		}).DialContext,
+		MaxIdleConns:          10,
+		IdleConnTimeout:       10 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		TLSClientConfig:       TLSClientConfig,
+	}
+
+	clientOpts := &clientconfig.ClientOpts{
+		AuthType: authType,
+		AuthInfo: authInfo,
+	}
+
+	opts, err := clientconfig.AuthOptions(clientOpts)
+	if err != nil {
+		klog.Fatal(err.Error())
+		return
+	}
+
+	err = openstack.Authenticate(provider, *opts)
+	if err != nil {
+		klog.Fatal(err.Error())
+		return
+	}
+	return
 }
