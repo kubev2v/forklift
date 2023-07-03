@@ -174,6 +174,7 @@ type DiskAttachment struct {
 	Interface       string `json:"interface"`
 	SCSIReservation bool   `json:"scsiReservation"`
 	Disk            string `json:"disk"`
+	Bootable        bool   `json:"bootable"`
 }
 
 type NIC struct {

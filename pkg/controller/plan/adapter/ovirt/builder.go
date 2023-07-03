@@ -454,6 +454,11 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 				},
 			},
 		}
+		if da.DiskAttachment.Bootable {
+			var bootOrder uint = 1
+			disk.BootOrder = &bootOrder
+		}
+
 		kVolumes = append(kVolumes, volume)
 		kDisks = append(kDisks, disk)
 	}
