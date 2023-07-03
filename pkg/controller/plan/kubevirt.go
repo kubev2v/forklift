@@ -1113,6 +1113,7 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 			vm.String())
 		object = r.emptyVm(vm)
 	}
+
 	//Add the original name and ID info to the VM annotations
 	if len(originalName) > 0 {
 		annotations := make(map[string]string)

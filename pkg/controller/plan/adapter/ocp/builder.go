@@ -274,7 +274,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*planapi.Task, err error) {
 }
 
 // TemplateLabels implements base.Builder
-func (*Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err error) {
+func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err error) {
 	return nil, nil
 }
 
@@ -288,7 +288,6 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	}
 
 	sourceVm, err := r.generateVmFromDefinition(vmExport)
-	r.Log.Info("Benny sourceVm definition", "sourceVm", sourceVm)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -361,13 +360,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 		}
 	}
 
-	// Clear MAC address on target VM
-	// TODO: temporary hack for internal migration, REMOVE this
-	for i := range targetVMspec.Template.Spec.Domain.Devices.Interfaces {
-		targetVMspec.Template.Spec.Domain.Devices.Interfaces[i].MacAddress = ""
-	}
-
-	object.Template.Spec = targetVMspec.Template.Spec
+	object.Template = targetVMspec.Template
 
 	return nil
 }
