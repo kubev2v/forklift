@@ -9,6 +9,7 @@ go_library(
         "//pkg/apis/forklift/v1beta1",
         "//pkg/controller/provider/model/ocp",
         "//pkg/controller/provider/model/openstack",
+        "//pkg/controller/provider/model/ova",
         "//pkg/controller/provider/model/ovirt",
         "//pkg/controller/provider/model/vsphere",
     ],

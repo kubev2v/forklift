@@ -142,6 +142,8 @@ spec:
           value: '8082'
         - name: SECRET_NAME
           value: webhook-server-secret
+        - name: OVA_PROVIDER_SERVER_IMAGE
+          value: {{ ova_provider_server_fqin }}
 {% if feature_validation|bool %}
         - name: POLICY_AGENT_URL
           value: "https://{{ validation_service_name }}.{{ app_namespace }}.svc.cluster.local:8181"

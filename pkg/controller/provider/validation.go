@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container"
@@ -141,6 +142,20 @@ func (r *Reconciler) validateURL(provider *api.Provider) error {
 				Category: Critical,
 				Message:  "The `url` is not valid.",
 			})
+	}
+	if provider.Type() == api.Ova {
+		if !isValidNFSPath(provider.Spec.URL) {
+			provider.Status.Phase = ValidationFailed
+			provider.Status.SetCondition(
+				libcnd.Condition{
+					Type:     UrlNotValid,
+					Status:   True,
+					Reason:   Malformed,
+					Category: Critical,
+					Message:  fmt.Sprintf("The NFS path is malformed"),
+				})
+		}
+		return nil
 	}
 	_, err := url.Parse(provider.Spec.URL)
 	if err != nil {
@@ -337,4 +352,10 @@ func (r *Reconciler) inventoryCreated(provider *api.Provider) error {
 	}
 
 	return nil
+}
+
+func isValidNFSPath(nfsPath string) bool {
+	nfsRegex := `^[^:]+:\/[^:].*$`
+	re := regexp.MustCompile(nfsRegex)
+	return re.MatchString(nfsPath)
 }

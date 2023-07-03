@@ -40,6 +40,8 @@ const (
 	OVirt ProviderType = "ovirt"
 	// OpenStack
 	OpenStack ProviderType = "openstack"
+	// OVA
+	Ova ProviderType = "ova"
 )
 
 var ProviderTypes = []ProviderType{
@@ -47,6 +49,7 @@ var ProviderTypes = []ProviderType{
 	VSphere,
 	OVirt,
 	OpenStack,
+	Ova,
 }
 
 func (t ProviderType) String() string {
@@ -164,5 +167,5 @@ func (p *Provider) HasReconciled() bool {
 
 // This provider requires VM guest conversion.
 func (p *Provider) RequiresConversion() bool {
-	return p.Type() == VSphere
+	return p.Type() == VSphere || p.Type() == Ova
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ova"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
@@ -75,6 +76,14 @@ func NewClient(provider *api.Provider) (client Client, err error) {
 			finder:   &openstack.Finder{},
 			restClient: base.RestClient{
 				Resolver: &openstack.Resolver{Provider: provider},
+			},
+		}
+	case api.Ova:
+		client = &ProviderClient{
+			provider: provider,
+			finder:   &ova.Finder{},
+			restClient: base.RestClient{
+				Resolver: &ova.Resolver{Provider: provider},
 			},
 		}
 	default:
