@@ -1,0 +1,12 @@
+---
+kind: SecurityContextConstraints
+apiVersion: security.openshift.io/v1
+metadata:
+  name: forklift-controller-scc
+users:
+  - system:serviceaccount:konveyor-forklift:forklift-controller
+runAsUser:
+  type: RunAsAny
+seLinuxContext:
+  type: RunAsAny
+allowPrivilegedContainer: false

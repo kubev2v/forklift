@@ -23,6 +23,7 @@ build --action_env=POPULATOR_CONTROLLER_IMAGE=quay.io/kubev2v/populator-controll
 build --action_env=OPENSTACK_POPULATOR_IMAGE=quay.io/kubev2v/openstack-populator:latest
 build --action_env=OVIRT_POPULATOR_IMAGE=quay.io/kubev2v/ovirt-populator:latest
 build --action_env=OPERATOR_IMAGE=quay.io/kubev2v/forklift-operator:latest
+build --action_env=OVA_PROVIDER_SERVER_IMAGE=quay.io/kubev2v/forklift-ova-provider-server:latest
 
 # Appliance build
 # container_run_and_extract() does not work inside Podman and Docker
