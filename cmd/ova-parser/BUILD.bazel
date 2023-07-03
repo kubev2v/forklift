@@ -1,0 +1,14 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "ova-parser_lib",
+    srcs = ["ova-parser.go"],
+    importpath = "github.com/konveyor/forklift-controller/cmd/ova-parser",
+    visibility = ["//visibility:private"],
+)
+
+go_binary(
+    name = "ova-parser",
+    embed = [":ova-parser_lib"],
+    visibility = ["//visibility:public"],
+)

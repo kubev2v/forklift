@@ -1,0 +1,11 @@
+# Builder stage
+FROM registry.access.redhat.com/ubi8/go-toolset:1.18.9-8 as builder
+ENV GOPATH=$APP_ROOT
+COPY . .
+RUN CGO_ENABLED=0 go build -o ova-parser github.com/konveyor/forklift-controller/cmd/ova-parser
+
+# Final stage
+FROM quay.io/centos/centos:stream9-minimal
+COPY --from=builder /opt/app-root/src/ova-parser /usr/local/bin/ova-parser
+RUN microdnf install -y tar && microdnf clean all
+ENTRYPOINT ["/usr/local/bin/ova-parser"]
