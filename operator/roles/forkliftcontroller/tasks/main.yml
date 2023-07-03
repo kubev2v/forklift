@@ -79,6 +79,11 @@
       definition: "{{ lookup('template', 'controller/route-inventory.yml.j2') }}"
     when: not k8s_cluster|bool
 
+  - name: "Setup forklift-controller security context constraints"
+    k8s:
+      state: present
+      definition: "{{ lookup('template', 'controller/controller-scc.yml.j2') }}"
+
   - when: feature_volume_populator|bool
     block:
     - name: "Setup populator controller deployment"
