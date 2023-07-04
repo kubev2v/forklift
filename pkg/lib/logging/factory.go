@@ -1,11 +1,12 @@
 package logging
 
 import (
+	"os"
+
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"os"
 )
 
 // Builder.
@@ -30,10 +31,12 @@ func (b *ZapBuilder) New() (logger logr.Logger) {
 	}
 	if Settings.Development {
 		cfg := zap.NewDevelopmentEncoderConfig()
+		cfg.EncodeTime = zapcore.TimeEncoderOfLayout("2006-01-02 15:04:05.000")
 		encoder = zapcore.NewConsoleEncoder(cfg)
 		options = append(options, zap.Development())
 	} else {
 		cfg := zap.NewProductionEncoderConfig()
+		cfg.EncodeTime = zapcore.TimeEncoderOfLayout("2006-01-02 15:04:05.000")
 		encoder = zapcore.NewJSONEncoder(cfg)
 	}
 	logger = zapr.NewLogger(
