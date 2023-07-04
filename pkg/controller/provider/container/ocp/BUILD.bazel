@@ -18,7 +18,6 @@ go_library(
         "//pkg/lib/inventory/model",
         "//pkg/lib/logging",
         "//pkg/lib/ref",
-        "//vendor/github.com/go-logr/logr",
         "//vendor/github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1:k8s_cni_cncf_io",
         "//vendor/k8s.io/api/core/v1:core",
         "//vendor/k8s.io/api/storage/v1:storage",

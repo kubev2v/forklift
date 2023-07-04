@@ -8,6 +8,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/k8s.io/client-go/informers/admissionregistration/v1:admissionregistration",
+        "//vendor/k8s.io/client-go/informers/admissionregistration/v1alpha1",
         "//vendor/k8s.io/client-go/informers/admissionregistration/v1beta1",
         "//vendor/k8s.io/client-go/informers/internalinterfaces",
     ],

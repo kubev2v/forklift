@@ -76,7 +76,7 @@ func Add(mgr manager.Manager) error {
 	}
 	// Primary CR.
 	err = cnt.Watch(
-		&source.Kind{Type: &api.Plan{}},
+		source.Kind(mgr.GetCache(), &api.Plan{}),
 		&handler.EnqueueRequestForObject{},
 		&PlanPredicate{})
 	if err != nil {
@@ -97,9 +97,7 @@ func Add(mgr manager.Manager) error {
 	// References.
 	// Provider.
 	err = cnt.Watch(
-		&source.Kind{
-			Type: &api.Provider{},
-		},
+		source.Kind(mgr.GetCache(), &api.Provider{}),
 		libref.Handler(&api.Plan{}),
 		&ProviderPredicate{
 			client:  mgr.GetClient(),
@@ -111,9 +109,7 @@ func Add(mgr manager.Manager) error {
 	}
 	// NetworkMap.
 	err = cnt.Watch(
-		&source.Kind{
-			Type: &api.NetworkMap{},
-		},
+		source.Kind(mgr.GetCache(), &api.NetworkMap{}),
 		libref.Handler(&api.Plan{}),
 		&NetMapPredicate{})
 	if err != nil {
@@ -122,9 +118,7 @@ func Add(mgr manager.Manager) error {
 	}
 	// StorageMap.
 	err = cnt.Watch(
-		&source.Kind{
-			Type: &api.StorageMap{},
-		},
+		source.Kind(mgr.GetCache(), &api.StorageMap{}),
 		libref.Handler(&api.Plan{}),
 		&DsMapPredicate{})
 	if err != nil {
@@ -133,9 +127,7 @@ func Add(mgr manager.Manager) error {
 	}
 	// Hook..
 	err = cnt.Watch(
-		&source.Kind{
-			Type: &api.Hook{},
-		},
+		source.Kind(mgr.GetCache(), &api.Hook{}),
 		handler.EnqueueRequestsFromMapFunc(RequestForMigration),
 		&HookPredicate{})
 	if err != nil {
@@ -144,9 +136,7 @@ func Add(mgr manager.Manager) error {
 	}
 	// Migration.
 	err = cnt.Watch(
-		&source.Kind{
-			Type: &api.Migration{},
-		},
+		source.Kind(mgr.GetCache(), &api.Migration{}),
 		handler.EnqueueRequestsFromMapFunc(RequestForMigration),
 		&MigrationPredicate{})
 	if err != nil {

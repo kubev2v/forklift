@@ -6,7 +6,6 @@ import (
 	libpath "path"
 	"time"
 
-	"github.com/go-logr/logr"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/openstack"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
@@ -40,7 +39,7 @@ type Collector struct {
 	// DB client.
 	db libmodel.DB
 	// Logger.
-	log logr.Logger
+	log logging.LevelLogger
 	// has parity.
 	parity bool
 	// REST client.

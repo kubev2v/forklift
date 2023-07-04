@@ -5,9 +5,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/go-logr/logr"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	fb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 )
 
 // Database client.
@@ -55,7 +55,7 @@ type Client struct {
 	// Journal
 	journal Journal
 	// Logger
-	log logr.Logger
+	log logging.LevelLogger
 }
 
 // Create the database.
@@ -396,7 +396,7 @@ type Tx struct {
 	// DataModel.
 	dm *DataModel
 	// Logger.
-	log logr.Logger
+	log logging.LevelLogger
 	// Started timestamp.
 	started time.Time
 	// Labels associated with the transaction.
@@ -688,7 +688,7 @@ type Labeler struct {
 	// DB transaction.
 	tx *sql.Tx
 	// Logger.
-	log logr.Logger
+	log logging.LevelLogger
 }
 
 // Insert labels for the model into the DB.

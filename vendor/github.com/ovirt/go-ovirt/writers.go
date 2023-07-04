@@ -1010,6 +1010,9 @@ func XMLCheckpointWriteOne(writer *XMLWriter, object *Checkpoint, tag string) er
 	if r, ok := object.ParentId(); ok {
 		writer.WriteCharacter("parent_id", r)
 	}
+	if r, ok := object.State(); ok {
+		XMLCheckpointStateWriteOne(writer, r, "state")
+	}
 	if r, ok := object.Vm(); ok {
 		XMLVmWriteOne(writer, r, "vm")
 	}
@@ -3072,6 +3075,54 @@ func XMLExternalProviderWriteMany(writer *XMLWriter, structSlice *ExternalProvid
 	writer.WriteStart("", plural, nil)
 	for _, o := range structSlice.Slice() {
 		XMLExternalProviderWriteOne(writer, o, singular)
+	}
+	writer.WriteEnd(plural)
+	return nil
+}
+
+func XMLExternalTemplateImportWriteOne(writer *XMLWriter, object *ExternalTemplateImport, tag string) error {
+	if object == nil {
+		return fmt.Errorf("input object pointer is nil")
+	}
+	if tag == "" {
+		tag = "external_template_import"
+	}
+	writer.WriteStart("", tag, nil)
+	if r, ok := object.Cluster(); ok {
+		XMLClusterWriteOne(writer, r, "cluster")
+	}
+	if r, ok := object.CpuProfile(); ok {
+		XMLCpuProfileWriteOne(writer, r, "cpu_profile")
+	}
+	if r, ok := object.Host(); ok {
+		XMLHostWriteOne(writer, r, "host")
+	}
+	if r, ok := object.Quota(); ok {
+		XMLQuotaWriteOne(writer, r, "quota")
+	}
+	if r, ok := object.StorageDomain(); ok {
+		XMLStorageDomainWriteOne(writer, r, "storage_domain")
+	}
+	if r, ok := object.Template(); ok {
+		XMLTemplateWriteOne(writer, r, "template")
+	}
+	if r, ok := object.Url(); ok {
+		writer.WriteCharacter("url", r)
+	}
+	writer.WriteEnd(tag)
+	return nil
+}
+
+func XMLExternalTemplateImportWriteMany(writer *XMLWriter, structSlice *ExternalTemplateImportSlice, plural, singular string) error {
+	if plural == "" {
+		plural = "external_template_imports"
+	}
+	if singular == "" {
+		singular = "external_template_import"
+	}
+	writer.WriteStart("", plural, nil)
+	for _, o := range structSlice.Slice() {
+		XMLExternalTemplateImportWriteOne(writer, o, singular)
 	}
 	writer.WriteEnd(plural)
 	return nil
@@ -5955,6 +6006,9 @@ func XMLMDevTypeWriteOne(writer *XMLWriter, object *MDevType, tag string) error 
 	}
 	if r, ok := object.Description(); ok {
 		writer.WriteCharacter("description", r)
+	}
+	if r, ok := object.HumanReadableName(); ok {
+		writer.WriteCharacter("human_readable_name", r)
 	}
 	if r, ok := object.Name(); ok {
 		writer.WriteCharacter("name", r)
@@ -12731,6 +12785,28 @@ func XMLBootProtocolWriteMany(writer *XMLWriter, enums []BootProtocol, plural, s
 	}
 	if singular == "" {
 		singular = "boot_protocol"
+	}
+	writer.WriteStart("", plural, nil)
+	for _, e := range enums {
+		writer.WriteCharacter(singular, string(e))
+	}
+	writer.WriteEnd(plural)
+	return nil
+}
+
+func XMLCheckpointStateWriteOne(writer *XMLWriter, enum CheckpointState, tag string) {
+	if tag == "" {
+		tag = "checkpoint_state"
+	}
+	writer.WriteCharacter(tag, string(enum))
+}
+
+func XMLCheckpointStateWriteMany(writer *XMLWriter, enums []CheckpointState, plural, singular string) error {
+	if plural == "" {
+		plural = "checkpoint_states"
+	}
+	if singular == "" {
+		singular = "checkpoint_state"
 	}
 	writer.WriteStart("", plural, nil)
 	for _, e := range enums {

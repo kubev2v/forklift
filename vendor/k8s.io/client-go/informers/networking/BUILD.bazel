@@ -9,6 +9,7 @@ go_library(
     deps = [
         "//vendor/k8s.io/client-go/informers/internalinterfaces",
         "//vendor/k8s.io/client-go/informers/networking/v1:networking",
+        "//vendor/k8s.io/client-go/informers/networking/v1alpha1",
         "//vendor/k8s.io/client-go/informers/networking/v1beta1",
     ],
 )

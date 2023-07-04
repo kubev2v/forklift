@@ -11,7 +11,6 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/gorilla/websocket"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
@@ -333,7 +332,7 @@ type WatchReader struct {
 	// Event handler.
 	handler EventHandler
 	// Logger.
-	log logr.Logger
+	log logging.LevelLogger
 	// Started.
 	started bool
 	// Done.

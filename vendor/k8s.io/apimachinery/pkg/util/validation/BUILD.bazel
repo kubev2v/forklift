@@ -6,5 +6,8 @@ go_library(
     importmap = "github.com/konveyor/forklift-controller/vendor/k8s.io/apimachinery/pkg/util/validation",
     importpath = "k8s.io/apimachinery/pkg/util/validation",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/k8s.io/apimachinery/pkg/util/validation/field"],
+    deps = [
+        "//vendor/k8s.io/apimachinery/pkg/util/validation/field",
+        "//vendor/k8s.io/utils/net",
+    ],
 )
