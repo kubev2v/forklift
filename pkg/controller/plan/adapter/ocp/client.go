@@ -7,14 +7,14 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	cnv "kubevirt.io/api/core/v1"
 	export "kubevirt.io/api/export/v1alpha1"
-	kubecli "kubevirt.io/client-go/kubecli"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type Client struct {
 	*plancontext.Context
-	kubecli.KubevirtClient
 }
 
 // CheckSnapshotReady implements base.Client
@@ -48,7 +48,24 @@ func (r Client) Finalize(vms []*planapi.VMStatus, planName string) {
 }
 
 // PowerOff implements base.Client
-func (Client) PowerOff(vmRef ref.Ref) error {
+func (r Client) PowerOff(vmRef ref.Ref) error {
+	r.Log.Info("power off source")
+	vm := cnv.VirtualMachine{}
+	err := r.Client.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, &vm)
+	if err != nil {
+		return err
+	}
+
+	// TODO: is vm.Spec.RunStrategy = &runStrategyHalted also needed?
+	running := false
+	vm.Spec.Running = &running
+	err = r.Client.Update(context.Background(), &vm)
+	if err != nil {
+		return err
+	}
+
+	r.Log.Info("power off source complete", "vm", vm.Spec.Running)
+
 	return nil
 }
 
