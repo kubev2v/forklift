@@ -25,6 +25,7 @@ import (
 	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	"github.com/konveyor/forklift-controller/pkg/apis"
 	"github.com/konveyor/forklift-controller/pkg/controller"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	"github.com/konveyor/forklift-controller/pkg/webhook"
 	template "github.com/openshift/api/template/v1"
@@ -35,7 +36,6 @@ import (
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
@@ -51,8 +51,9 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	logf.SetLogger(
-		zap.New(zap.UseDevMode(Settings.Logging.Development)))
+
+	logger := logging.Factory.New()
+	logf.SetLogger(logger)
 	log = logf.Log.WithName("entrypoint")
 }
 

@@ -38,6 +38,7 @@ go_library(
     deps = [
         "//pkg/apis",
         "//pkg/controller",
+        "//pkg/lib/logging",
         "//pkg/settings",
         "//pkg/webhook",
         "//vendor/github.com/go-logr/logr",
@@ -50,7 +51,6 @@ go_library(
         "//vendor/kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client/config",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/log",
-        "//vendor/sigs.k8s.io/controller-runtime/pkg/log/zap",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/manager",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/manager/signals",
     ],
