@@ -11,7 +11,6 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/runtime",
         "//vendor/k8s.io/client-go/pkg/apis/clientauthentication",
         "//vendor/k8s.io/client-go/pkg/apis/clientauthentication/v1:clientauthentication",
-        "//vendor/k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1",
         "//vendor/k8s.io/client-go/pkg/apis/clientauthentication/v1beta1",
     ],
 )

@@ -2,17 +2,17 @@ package web
 
 import (
 	"fmt"
+	"net/http"
+	"strconv"
+	"time"
+
 	"github.com/gin-gonic/gin"
-	"github.com/go-logr/logr"
 	"github.com/gorilla/websocket"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
 	"github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	"github.com/konveyor/forklift-controller/pkg/lib/ref"
-	"net/http"
-	"strconv"
-	"time"
 )
 
 // Web request handler.
@@ -149,7 +149,7 @@ type WatchWriter struct {
 	// Resource.
 	builder ResourceBuilder
 	// Logger.
-	log logr.Logger
+	log logging.LevelLogger
 	// Done.
 	done bool
 }

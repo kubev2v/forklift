@@ -2,11 +2,12 @@ package ocp
 
 import (
 	"context"
-	"github.com/go-logr/logr"
+
 	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libocp "github.com/konveyor/forklift-controller/pkg/lib/inventory/container/ocp"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 	core "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
@@ -18,7 +19,7 @@ import (
 // StorageClass
 type StorageClass struct {
 	libocp.BaseCollection
-	log logr.Logger
+	log logging.LevelLogger
 }
 
 // Get the kubernetes object being collected.
@@ -115,7 +116,7 @@ func (r *StorageClass) Generic(e event.GenericEvent) bool {
 // NetworkAttachmentDefinition
 type NetworkAttachmentDefinition struct {
 	libocp.BaseCollection
-	log logr.Logger
+	log logging.LevelLogger
 }
 
 // Get the kubernetes object being collected.
@@ -212,7 +213,7 @@ func (r *NetworkAttachmentDefinition) Generic(e event.GenericEvent) bool {
 // Namespace
 type Namespace struct {
 	libocp.BaseCollection
-	log logr.Logger
+	log logging.LevelLogger
 }
 
 // Get the kubernetes object being collected.
@@ -309,7 +310,7 @@ func (r *Namespace) Generic(e event.GenericEvent) bool {
 // VM
 type VM struct {
 	libocp.BaseCollection
-	log logr.Logger
+	log logging.LevelLogger
 }
 
 // Get the kubernetes object being collected.

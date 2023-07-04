@@ -12,11 +12,11 @@ go_library(
     importpath = "k8s.io/apimachinery/pkg/labels",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/google/go-cmp/cmp",
         "//vendor/k8s.io/apimachinery/pkg/selection",
         "//vendor/k8s.io/apimachinery/pkg/util/sets",
         "//vendor/k8s.io/apimachinery/pkg/util/validation",
         "//vendor/k8s.io/apimachinery/pkg/util/validation/field",
         "//vendor/k8s.io/klog/v2:klog",
+        "//vendor/k8s.io/utils/strings/slices",
     ],
 )

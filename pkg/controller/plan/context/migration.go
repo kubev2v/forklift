@@ -4,10 +4,10 @@ import (
 	"context"
 	"path"
 
-	"github.com/go-logr/logr"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -22,7 +22,7 @@ func (e NotEnoughDataError) Error() string {
 
 // Factory.
 func New(
-	client k8sclient.Client, plan *api.Plan, log logr.Logger) (ctx *Context, err error) {
+	client k8sclient.Client, plan *api.Plan, log logging.LevelLogger) (ctx *Context, err error) {
 	ctx = &Context{
 		Client:    client,
 		Plan:      plan,
@@ -60,7 +60,7 @@ type Context struct {
 	// Hooks.
 	Hooks []*api.Hook
 	// Logger.
-	Log logr.Logger
+	Log logging.LevelLogger
 }
 
 // Build.

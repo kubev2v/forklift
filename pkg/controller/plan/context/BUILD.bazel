@@ -12,7 +12,7 @@ go_library(
         "//pkg/apis/forklift/v1beta1",
         "//pkg/controller/provider/web",
         "//pkg/lib/error",
-        "//vendor/github.com/go-logr/logr",
+        "//pkg/lib/logging",
         "//vendor/k8s.io/api/core/v1:core",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
     ],

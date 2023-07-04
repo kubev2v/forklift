@@ -1,13 +1,15 @@
 package ref
 
 import (
+	"context"
+	"reflect"
+	"strings"
+
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	"k8s.io/apimachinery/pkg/types"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"strings"
 )
 
 // Build an event handler.
@@ -22,7 +24,7 @@ func Handler(owner interface{}) handler.EventHandler {
 	log := logging.WithName("ref|handler")
 	ownerKind := ToKind(owner)
 	return handler.EnqueueRequestsFromMapFunc(
-		func(a client.Object) []reconcile.Request {
+		func(ctx context.Context, a client.Object) []reconcile.Request {
 			refKind := ToKind(a)
 			list := GetRequests(ownerKind, a)
 			if len(list) > 0 {

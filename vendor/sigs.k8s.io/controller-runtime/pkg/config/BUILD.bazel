@@ -4,6 +4,7 @@ go_library(
     name = "config",
     srcs = [
         "config.go",
+        "controller.go",
         "doc.go",
     ],
     importmap = "github.com/konveyor/forklift-controller/vendor/sigs.k8s.io/controller-runtime/pkg/config",

@@ -33,12 +33,15 @@ func (b *ZapBuilder) New() (logger logr.Logger) {
 		cfg := zap.NewDevelopmentEncoderConfig()
 		cfg.EncodeTime = zapcore.TimeEncoderOfLayout("2006-01-02 15:04:05.000")
 		encoder = zapcore.NewConsoleEncoder(cfg)
+		cfg.EncodeTime = zapcore.TimeEncoderOfLayout("2006-01-02 15:04:05.000")
 		options = append(options, zap.Development())
 	} else {
 		cfg := zap.NewProductionEncoderConfig()
 		cfg.EncodeTime = zapcore.TimeEncoderOfLayout("2006-01-02 15:04:05.000")
 		encoder = zapcore.NewJSONEncoder(cfg)
+		options = append(options, zap.Development())
 	}
+
 	logger = zapr.NewLogger(
 		zap.New(
 			zapcore.NewCore(

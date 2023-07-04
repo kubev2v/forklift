@@ -18,6 +18,7 @@ package hook
 
 import (
 	"context"
+
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/base"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
@@ -64,7 +65,10 @@ func Add(mgr manager.Manager) error {
 	}
 	// Primary CR.
 	err = cnt.Watch(
-		&source.Kind{Type: &api.Hook{}},
+		source.Kind(
+			mgr.GetCache(),
+			&api.Hook{},
+		),
 		&handler.EnqueueRequestForObject{},
 		&HookPredicate{})
 	if err != nil {

@@ -8,9 +8,14 @@ import (
 	"strconv"
 	"strings"
 
+<<<<<<< HEAD
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+=======
+>>>>>>> 8e7399f3 (bump all dependencies)
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/clientcmd/api"
 
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
@@ -558,6 +563,52 @@ func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVol
 	return pvc.Annotations[AnnImportDiskId]
 }
 
+<<<<<<< HEAD
+=======
+// Build a PersistentVolumeClaim with DataSourceRef for VolumePopulator
+func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName *string, populatorName string,
+	accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode) *core.PersistentVolumeClaim {
+	diskAttachment := da.(model.XDiskAttachment)
+
+	// We add 10% overhead because of the fsOverhead in CDI, around 5% to ext4 and 5% for root partition.
+	diskSize := diskAttachment.Disk.ProvisionedSize
+	// Accounting for fsOverhead is only required for `volumeMode: Filesystem`, as we may not have enough space
+	// after creating a filesystem on an underlying block device
+	if *volumeMode == core.PersistentVolumeFilesystem {
+		diskSize = int64(float64(diskSize) * 1.1)
+	}
+
+	return &core.PersistentVolumeClaim{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      diskAttachment.DiskAttachment.ID,
+			Namespace: r.Plan.Spec.TargetNamespace,
+			Annotations: map[string]string{
+				AnnImportDiskId: diskAttachment.Disk.ID,
+			},
+			Labels: map[string]string{"migration": r.Migration.Name},
+		},
+		Spec: core.PersistentVolumeClaimSpec{
+			AccessModes: accessModes,
+			Resources: core.ResourceRequirements{
+				Requests: map[core.ResourceName]resource.Quantity{
+					core.ResourceStorage: *resource.NewQuantity(diskSize, resource.BinarySI)},
+			},
+			StorageClassName: storageName,
+			VolumeMode:       volumeMode,
+			DataSourceRef: &core.TypedObjectReference{
+				APIGroup: &api.SchemeGroupVersion.Group,
+				Kind:     v1beta1.OvirtVolumePopulatorKind,
+				Name:     populatorName,
+			},
+		},
+	}
+}
+
+func (r *Builder) PreTransferActions(c planbase.Client, vmRef ref.Ref) (ready bool, err error) {
+	return true, nil
+}
+
+>>>>>>> 8e7399f3 (bump all dependencies)
 // Create PVs specs for the VM LUNs.
 func (r *Builder) LunPersistentVolumes(vmRef ref.Ref) (pvs []core.PersistentVolume, err error) {
 	vm := &model.Workload{}

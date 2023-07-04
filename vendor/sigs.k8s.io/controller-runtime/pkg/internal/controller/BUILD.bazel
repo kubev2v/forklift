@@ -8,14 +8,15 @@ go_library(
     visibility = ["//vendor/sigs.k8s.io/controller-runtime/pkg:__subpackages__"],
     deps = [
         "//vendor/github.com/go-logr/logr",
+        "//vendor/k8s.io/apimachinery/pkg/types",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor/k8s.io/apimachinery/pkg/util/uuid",
         "//vendor/k8s.io/client-go/util/workqueue",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/handler",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/internal/controller/metrics",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/log",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/predicate",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/reconcile",
-        "//vendor/sigs.k8s.io/controller-runtime/pkg/runtime/inject",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/source",
     ],
 )

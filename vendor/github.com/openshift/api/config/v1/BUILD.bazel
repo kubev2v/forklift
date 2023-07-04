@@ -4,6 +4,7 @@ go_library(
     name = "config",
     srcs = [
         "doc.go",
+        "feature_gates.go",
         "register.go",
         "stringsource.go",
         "types.go",

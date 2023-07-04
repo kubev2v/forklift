@@ -1,6 +1,8 @@
 package plan
 
 import (
+	"context"
+
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/handler"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
@@ -275,7 +277,7 @@ func (r MigrationPredicate) Generic(e event.GenericEvent) bool {
 }
 
 // Plan request for Migration.
-func RequestForMigration(a client.Object) (list []reconcile.Request) {
+func RequestForMigration(ctx context.Context, a client.Object) (list []reconcile.Request) {
 	if m, cast := a.(*api.Migration); cast {
 		ref := &m.Spec.Plan
 		if !libref.RefSet(ref) {

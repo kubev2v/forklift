@@ -109,7 +109,7 @@ func Add(mgr manager.Manager) error {
 	}
 	// Primary CR.
 	err = cnt.Watch(
-		&source.Kind{Type: &api.Provider{}},
+		source.Kind(mgr.GetCache(), &api.Provider{}),
 		&handler.EnqueueRequestForObject{},
 		&ProviderPredicate{})
 	if err != nil {

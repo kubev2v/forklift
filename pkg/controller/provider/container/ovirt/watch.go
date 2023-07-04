@@ -22,7 +22,8 @@ package ovirt
 import (
 	"context"
 	"errors"
-	"github.com/go-logr/logr"
+	"time"
+
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	refapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
@@ -30,8 +31,8 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/validation/policy"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	"github.com/konveyor/forklift-controller/pkg/settings"
-	"time"
 )
 
 const (
@@ -63,7 +64,7 @@ type VMEventHandler struct {
 	// Last search.
 	lastSearch time.Time
 	// Logger.
-	log logr.Logger
+	log logging.LevelLogger
 	// Context
 	context context.Context
 	// Context cancel.
@@ -367,7 +368,7 @@ type ClusterEventHandler struct {
 	// DB.
 	DB libmodel.DB
 	// Logger.
-	log logr.Logger
+	log logging.LevelLogger
 }
 
 // Cluster updated.
@@ -408,7 +409,7 @@ type HostEventHandler struct {
 	// DB.
 	DB libmodel.DB
 	// Logger.
-	log logr.Logger
+	log logging.LevelLogger
 }
 
 // Host updated.
@@ -466,7 +467,7 @@ type NICProfileHandler struct {
 	// DB.
 	DB libmodel.DB
 	// Logger.
-	log logr.Logger
+	log logging.LevelLogger
 }
 
 // Profile updated.
@@ -533,7 +534,7 @@ type DiskProfileHandler struct {
 	// DB.
 	DB libmodel.DB
 	// Logger.
-	log logr.Logger
+	log logging.LevelLogger
 }
 
 // Profile updated.

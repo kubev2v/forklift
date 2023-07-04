@@ -2,10 +2,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "clientset",
-    srcs = [
-        "clientset.go",
-        "doc.go",
-    ],
+    srcs = ["clientset.go"],
     importmap = "github.com/konveyor/forklift-controller/vendor/k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset",
     importpath = "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset",
     visibility = ["//visibility:public"],
