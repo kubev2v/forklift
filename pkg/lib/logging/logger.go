@@ -1,10 +1,11 @@
 package logging
 
 import (
-	"github.com/go-logr/logr"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"os"
 	"strconv"
+
+	"github.com/go-logr/logr"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 )
 
 const (
@@ -45,8 +46,68 @@ type Logger struct {
 	level int
 }
 
-// Get a named logger.
-func WithName(name string, kvpair ...interface{}) *Logger {
+type LevelLogger interface {
+	Info(msg string, kv ...interface{})
+	Enabled() bool
+	Error(err error, msg string, kv ...interface{})
+	WithValues(kv ...interface{}) LevelLogger
+	WithName(name string) LevelLogger
+	V(level int) LevelLogger
+	Trace(err error, kvpair ...interface{})
+}
+
+type levelLoggerImpl struct {
+	real  logr.Logger
+	level int
+}
+
+func (l *levelLoggerImpl) Info(msg string, kv ...interface{}) {
+	if Settings.allowed(l.level) {
+		l.real.Info(msg, kv...)
+	}
+}
+
+func (l *levelLoggerImpl) Enabled() bool {
+	return l.real.Enabled()
+}
+
+func (l *levelLoggerImpl) Error(err error, msg string, kv ...interface{}) {
+	l.real.Error(err, msg, kv...)
+}
+
+func (l *levelLoggerImpl) V(level int) LevelLogger {
+	return &levelLoggerImpl{
+		real:  l.real.V(level),
+		level: level,
+	}
+}
+
+func (l *levelLoggerImpl) WithValues(kv ...interface{}) LevelLogger {
+	return &levelLoggerImpl{
+		real:  l.real.WithValues(kv...),
+		level: l.level,
+	}
+}
+
+func (l *levelLoggerImpl) WithName(name string) LevelLogger {
+	return &levelLoggerImpl{
+		real:  l.real.WithName(name),
+		level: l.level,
+	}
+}
+
+func (l *levelLoggerImpl) Trace(err error, kvpair ...interface{}) {
+	l.real.Error(err, None, kvpair...)
+}
+
+// Logs at info.
+func (l *Logger) Info(level int, message string, kvpair ...interface{}) {
+	if Settings.allowed(l.level) {
+		l.Real.Info(message, kvpair...)
+	}
+}
+
+func WithName(name string, kvpair ...interface{}) LevelLogger {
 	l := &Logger{
 		Real: Factory.New(),
 		name: name,
@@ -54,13 +115,9 @@ func WithName(name string, kvpair ...interface{}) *Logger {
 	l.Real = l.Real.WithValues(kvpair...)
 	l.Real = l.Real.WithName(name)
 
-	return l
-}
-
-// Logs at info.
-func (l *Logger) Info(message string, kvpair ...interface{}) {
-	if Settings.allowed(l.level) {
-		l.Real.Info(message, kvpair...)
+	return &levelLoggerImpl{
+		real:  l.Real,
+		level: 0,
 	}
 }
 
@@ -109,34 +166,16 @@ func (l *Logger) Trace(err error, kvpair ...interface{}) {
 }
 
 // Get whether logger is enabled.
-func (l *Logger) Enabled() bool {
+func (l *Logger) Enabled(level int) bool {
 	return l.Real.Enabled()
 }
 
 // Get logger with verbosity level.
-func (l *Logger) V(level int) logr.InfoLogger {
+func (l *Logger) V(level int) *Logger {
 	return &Logger{
 		Real:  Factory.V(level, l.Real),
 		name:  l.name,
 		level: level,
-	}
-}
-
-// Get logger with name.
-func (l *Logger) WithName(name string) logr.Logger {
-	return &Logger{
-		Real:  l.Real.WithName(name),
-		name:  name,
-		level: l.level,
-	}
-}
-
-// Get logger with values.
-func (l *Logger) WithValues(kvpair ...interface{}) logr.Logger {
-	return &Logger{
-		Real:  l.Real.WithValues(kvpair...),
-		name:  l.name,
-		level: l.level,
 	}
 }
 

@@ -18,7 +18,6 @@ go_library(
         "//pkg/lib/ref",
         "//vendor/github.com/gin-contrib/cors",
         "//vendor/github.com/gin-gonic/gin",
-        "//vendor/github.com/go-logr/logr",
         "//vendor/github.com/gorilla/websocket",
     ],
 )

@@ -7,13 +7,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-logr/logr"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	fb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
 	libcnt "github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 )
 
 // Event codes.
@@ -125,7 +125,7 @@ type Context struct {
 	// oVirt client.
 	client *Client
 	// Log.
-	log logr.Logger
+	log logging.LevelLogger
 }
 
 // The adapter request is canceled.

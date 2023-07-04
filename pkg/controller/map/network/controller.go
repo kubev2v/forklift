@@ -67,7 +67,7 @@ func Add(mgr manager.Manager) error {
 	}
 	// Primary CR.
 	err = cnt.Watch(
-		&source.Kind{Type: &api.NetworkMap{}},
+		source.Kind(mgr.GetCache(), &api.NetworkMap{}),
 		&handler.EnqueueRequestForObject{},
 		&MapPredicate{})
 	if err != nil {
@@ -87,9 +87,7 @@ func Add(mgr manager.Manager) error {
 	}
 	// References.
 	err = cnt.Watch(
-		&source.Kind{
-			Type: &api.Provider{},
-		},
+		source.Kind(mgr.GetCache(), &api.Provider{}),
 		libref.Handler(&api.NetworkMap{}),
 		&ProviderPredicate{
 			client:  mgr.GetClient(),

@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "admissionregistration",
     srcs = [
+        "matchcondition.go",
         "mutatingwebhook.go",
         "mutatingwebhookconfiguration.go",
         "rule.go",

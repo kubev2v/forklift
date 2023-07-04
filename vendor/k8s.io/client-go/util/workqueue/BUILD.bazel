@@ -16,7 +16,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/golang.org/x/time/rate",
-        "//vendor/k8s.io/apimachinery/pkg/util/clock",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor/k8s.io/utils/clock",
     ],
 )

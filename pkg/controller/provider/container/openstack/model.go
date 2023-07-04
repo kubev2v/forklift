@@ -5,11 +5,11 @@ import (
 	"errors"
 	"time"
 
-	"github.com/go-logr/logr"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/openstack"
 	libclient "github.com/konveyor/forklift-controller/pkg/lib/client/openstack"
 	fb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 )
 
 // All adapters.
@@ -43,7 +43,7 @@ type Context struct {
 	// OpenStack client.
 	client *Client
 	// Log.
-	log logr.Logger
+	log logging.LevelLogger
 }
 
 // The adapter request is canceled.

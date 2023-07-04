@@ -5,13 +5,16 @@ go_library(
     srcs = [
         "doc.go",
         "document.go",
+        "document_v3.go",
         "openapi.go",
     ],
     importmap = "github.com/konveyor/forklift-controller/vendor/k8s.io/kube-openapi/pkg/util/proto",
     importpath = "k8s.io/kube-openapi/pkg/util/proto",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/googleapis/gnostic/openapiv2",
+        "//vendor/github.com/google/gnostic/openapiv2",
+        "//vendor/github.com/google/gnostic/openapiv3",
         "//vendor/gopkg.in/yaml.v2:yaml_v2",
+        "//vendor/gopkg.in/yaml.v3:yaml_v3",
     ],
 )

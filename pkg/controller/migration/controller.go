@@ -66,9 +66,7 @@ func Add(mgr manager.Manager) error {
 	}
 	// Primary CR.
 	err = cnt.Watch(
-		&source.Kind{
-			Type: &api.Migration{},
-		},
+		source.Kind(mgr.GetCache(), &api.Migration{}),
 		&handler.EnqueueRequestForObject{},
 		&MigrationPredicate{})
 	if err != nil {
@@ -77,9 +75,7 @@ func Add(mgr manager.Manager) error {
 	}
 	// References.
 	err = cnt.Watch(
-		&source.Kind{
-			Type: &api.Plan{},
-		},
+		source.Kind(mgr.GetCache(), &api.Plan{}),
 		libref.Handler(&api.Migration{}),
 		&PlanPredicate{})
 	if err != nil {

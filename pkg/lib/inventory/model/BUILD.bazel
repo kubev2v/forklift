@@ -22,7 +22,6 @@ go_library(
         "//pkg/lib/filebacked",
         "//pkg/lib/logging",
         "//pkg/lib/ref",
-        "//vendor/github.com/go-logr/logr",
         "//vendor/github.com/mattn/go-sqlite3",
         "//vendor/github.com/pkg/errors",
     ],

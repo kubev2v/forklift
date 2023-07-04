@@ -5,7 +5,6 @@ import (
 	"path"
 	"time"
 
-	"github.com/go-logr/logr"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
@@ -43,7 +42,7 @@ type Collector struct {
 	// Credentials secret.
 	secret *core.Secret
 	// Logger.
-	log logr.Logger
+	log logging.LevelLogger
 	// Collections
 	collections []Collection
 	// The k8s manager.
@@ -305,9 +304,10 @@ func (r *Collector) buildManager() (err error) {
 	}
 	for _, collection := range r.collections {
 		err = dsController.Watch(
-			&source.Kind{
-				Type: collection.Object(),
-			},
+			source.Kind(
+				r.manager.GetCache(),
+				collection.Object(),
+			),
 			&handler.EnqueueRequestForObject{},
 			collection)
 		if err != nil {

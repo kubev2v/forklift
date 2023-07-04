@@ -18,6 +18,8 @@ package host
 
 import (
 	"context"
+	"time"
+
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/base"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
@@ -33,7 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"time"
 )
 
 const (
@@ -68,7 +69,7 @@ func Add(mgr manager.Manager) error {
 	}
 	// Primary CR.
 	err = cnt.Watch(
-		&source.Kind{Type: &api.Host{}},
+		source.Kind(mgr.GetCache(), &api.Host{}),
 		&handler.EnqueueRequestForObject{},
 		&HostPredicate{})
 	if err != nil {
@@ -88,9 +89,7 @@ func Add(mgr manager.Manager) error {
 	}
 	// References.
 	err = cnt.Watch(
-		&source.Kind{
-			Type: &api.Provider{},
-		},
+		source.Kind(mgr.GetCache(), &api.Provider{}),
 		libref.Handler(&api.Host{}),
 		&ProviderPredicate{
 			client:  mgr.GetClient(),
@@ -101,9 +100,7 @@ func Add(mgr manager.Manager) error {
 		return err
 	}
 	err = cnt.Watch(
-		&source.Kind{
-			Type: &core.Secret{},
-		},
+		source.Kind(mgr.GetCache(), &core.Secret{}),
 		libref.Handler(&api.Host{}))
 	if err != nil {
 		log.Trace(err)

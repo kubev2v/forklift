@@ -21,7 +21,6 @@ go_library(
         "//pkg/lib/logging",
         "//pkg/lib/ref",
         "//pkg/settings",
-        "//vendor/github.com/go-logr/logr",
         "//vendor/github.com/vmware/govmomi",
         "//vendor/github.com/vmware/govmomi/property",
         "//vendor/github.com/vmware/govmomi/session",

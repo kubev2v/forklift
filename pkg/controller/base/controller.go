@@ -2,6 +2,8 @@ package base
 
 import (
 	"errors"
+	"time"
+
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
@@ -10,7 +12,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
 )
 
 const (
@@ -23,7 +24,7 @@ const (
 type Reconciler struct {
 	record.EventRecorder
 	client.Client
-	Log *logging.Logger
+	Log logging.LevelLogger
 }
 
 // Reconcile started.

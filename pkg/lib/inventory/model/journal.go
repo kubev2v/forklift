@@ -2,12 +2,12 @@ package model
 
 import (
 	"fmt"
-	"github.com/go-logr/logr"
+	"sync"
+
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	fb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	"github.com/konveyor/forklift-controller/pkg/lib/ref"
-	"sync"
 )
 
 // Serial number pool.
@@ -168,7 +168,7 @@ type Watch struct {
 	// Journal.
 	journal *Journal
 	// Logger.
-	log logr.Logger
+	log logging.LevelLogger
 	// Started
 	started bool
 	// Done
@@ -289,7 +289,7 @@ func (w *Watch) terminate() {
 type Journal struct {
 	mutex sync.RWMutex
 	// Logger.
-	log logr.Logger
+	log logging.LevelLogger
 	// List of registered watches.
 	watches []*Watch
 }
