@@ -1,14 +1,20 @@
 package ocp
 
 import (
+	"context"
+
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	export "kubevirt.io/api/export/v1alpha1"
+	kubecli "kubevirt.io/client-go/kubecli"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
 
 type Client struct {
 	*plancontext.Context
+	kubecli.KubevirtClient
 }
 
 // CheckSnapshotReady implements base.Client
@@ -26,7 +32,19 @@ func (Client) CreateSnapshot(vmRef ref.Ref) (string, error) {
 }
 
 // Finalize implements base.Client
-func (Client) Finalize(vms []*planapi.VMStatus, planName string) {
+func (r Client) Finalize(vms []*planapi.VMStatus, planName string) {
+	for _, vm := range vms {
+		vmExport := &export.VirtualMachineExport{ObjectMeta: v1.ObjectMeta{
+			Name:      vm.Name,
+			Namespace: vm.Namespace,
+		}}
+
+		err := r.Client.Delete(context.TODO(), vmExport)
+		if err != nil {
+			r.Log.Info("Failed to delete VMExport", "VMExport", vmExport, "Error", err)
+			continue
+		}
+	}
 }
 
 // PowerOff implements base.Client
