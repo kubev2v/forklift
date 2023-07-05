@@ -6,6 +6,7 @@ import (
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cnv "kubevirt.io/api/core/v1"
 	export "kubevirt.io/api/export/v1alpha1"
@@ -49,7 +50,6 @@ func (r Client) Finalize(vms []*planapi.VMStatus, planName string) {
 
 // PowerOff implements base.Client
 func (r Client) PowerOff(vmRef ref.Ref) error {
-	r.Log.Info("power off source")
 	vm := cnv.VirtualMachine{}
 	err := r.Client.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, &vm)
 	if err != nil {
@@ -64,19 +64,41 @@ func (r Client) PowerOff(vmRef ref.Ref) error {
 		return err
 	}
 
-	r.Log.Info("power off source complete", "vm", vm.Spec.Running)
-
 	return nil
 }
 
 // PowerOn implements base.Client
-func (Client) PowerOn(vmRef ref.Ref) error {
+func (r Client) PowerOn(vmRef ref.Ref) error {
+	vm := cnv.VirtualMachine{}
+	err := r.Client.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, &vm)
+	if err != nil {
+		return err
+	}
+
+	running := true
+	vm.Spec.Running = &running
+	err = r.Client.Update(context.Background(), &vm)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 // PowerState implements base.Client
-func (Client) PowerState(vmRef ref.Ref) (string, error) {
-	return "", nil
+func (r Client) PowerState(vmRef ref.Ref) (string, error) {
+	vm := cnv.VirtualMachine{}
+	err := r.Client.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, &vm)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return "", err
+	}
+
+	if vm.Spec.Running != nil && *vm.Spec.Running {
+		return "On", nil
+	}
+
+	return "Off", nil
 }
 
 // PoweredOff implements base.Client
