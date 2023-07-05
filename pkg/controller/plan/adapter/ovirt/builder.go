@@ -8,14 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-<<<<<<< HEAD
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-=======
->>>>>>> 8e7399f3 (bump all dependencies)
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/clientcmd/api"
 
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
@@ -597,7 +592,7 @@ func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName
 			VolumeMode:       volumeMode,
 			DataSourceRef: &core.TypedObjectReference{
 				APIGroup: &api.SchemeGroupVersion.Group,
-				Kind:     v1beta1.OvirtVolumePopulatorKind,
+				Kind:     api.OvirtVolumePopulatorKind,
 				Name:     populatorName,
 			},
 		},
