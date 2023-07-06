@@ -24,7 +24,7 @@ The environment which you can set across all projects.
 | Name             | Default value | Description                                                            |
 |------------------|---------------|------------------------------------------------------------------------|
 | REGISTRY_TAG     | devel         | The tag with which the image will be built and pushed to the registry. |
-| REGISTRY_ACCOUNT |               | The user account name to which the built image should be pushed.       |
+| REGISTRY_ORG     | kubev2v       | The registry organization to which the built image should be pushed.   |
 | REGISTRY         | quay.io       | The registry address to which the images should be pushed.             |
 
 ## Operator
@@ -56,23 +56,23 @@ Another option to override the default values can use `--action_env` as in the e
 ### Runing operator build
 
 ```bash
-export REGISTRY_ACCOUNT=username
+export REGISTRY_ORG=organization
 export REGISTRY=quay.io
 export REGISTRY_TAG=latest
 
-CONTROLLER_IMAGE=quay.io/${REGISTRY_ACCOUNT}/forklift-controller:${REGISTRY_TAG}
-OPERATOR_IMAGE=quay.io/${REGISTRY_ACCOUNT}/forklift-operator:${REGISTRY_TAG}
+CONTROLLER_IMAGE=${REGISTRY}/${REGISTRY_ORG}/forklift-controller:${REGISTRY_TAG}
+OPERATOR_IMAGE=${REGISTRY}/${REGISTRY_ORG}/forklift-operator:${REGISTRY_TAG}
 # If YAML files are added/modified `bazel clean` needs to be performed before building the image for the change to take effect
 bazel run push-forklift-operator
 bazel run push-forklift-operator-bundle --action_env OPERATOR_IMAGE=${OPERATOR_IMAGE} --action_env CONTROLLER_IMAGE=${CONTROLLER_IMAGE}
 # The build of the catalog requires already pushed bundle
 # For http registry add --action_env OPM_OPTS="--use-http"
-bazel run push-forklift-operator-index --action_env REGISTRY=${REGISTRY} --action_env REGISTRY_ACCOUNT=${REGISTRY_ACCOUNT} --action_env REGISTRY_TAG=${REGISTRY_TAG}
+bazel run push-forklift-operator-index --action_env REGISTRY=${REGISTRY} --action_env REGISTRY_ORG=${REGISTRY_ORG} --action_env REGISTRY_TAG=${REGISTRY_TAG}
 ```
 
-### Instaling custom operator
+### Installing custom operator
 
-1. Modify the _image_ value under `oprator/forklift-operator-catalog.yaml` to point to the desired forklift-operator-index image.
+1. Modify the _image_ value under `operator/forklift-operator-catalog.yaml` to point to the desired forklift-operator-index image.
 2. Run `oc create -f operator/forklift-operator-catalog.yaml`
 3. A new _Forklift operator_ should be available now in the _OperatorHub_ (without community tag).
 
@@ -89,27 +89,27 @@ Logging can be configured using environment variables:
 Verbosity:
 
 - Info(0) used for `Info` logging.
-  - Reconcile begin,end,error.
-  - Condition added,update,deleted.
+  - Reconcile begin, end, error.
+  - Condition added, update, deleted.
   - Plan postponed.
-  - Migration (k8s) resources created,deleted.
-  - Migration started,stopped,run (with phase),canceled,succeeded,failed.
-  - Snapshot created,updated,deleted,changed.
+  - Migration (k8s) resources created, deleted.
+  - Migration started, stopped, run (with phase), canceled, succeeded, failed.
+  - Snapshot created , updated, deleted, changed.
   - Inventory watch ensured.
   - Policy agent disabled.
 - Info(1) used for `Info+` logging.
   - Connection testing.
-  - Plan postpone detials.
+  - Plan postpone details.
   - Pending migration details.
-  - Migration (k8s) resources found,updated.
+  - Migration (k8s) resources found, updated.
   - Scheduler details.
 - Info(2) used for `Info++` logging.
   - Full conditions list.
   - Migrating VM status (full definition).
-  - Provider inventory data reconciler started,stopped.
+  - Provider inventory data reconciler started, stopped.
 - Info(3) used for `Info+++` logging.
-  - Inventory watch: resources changed;queued reconcile events.
-  - Data reconciler: models created,updated,deleted.
+  - Inventory watch: resources changed; queued reconcile events.
+  - Data reconciler: models created, updated, deleted.
   - VM validation succeeded.
 - Info(4) used for `Debug` logging.
   - Policy agent HTTP request.

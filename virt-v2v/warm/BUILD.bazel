@@ -10,7 +10,7 @@ container_push(
     format = "Docker",
     image = ":forklift-virt-v2v-warm",
     registry = "$${REGISTRY:-quay.io}",
-    repository = "$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}forklift-virt-v2v-warm",
+    repository = "$${REGISTRY_ORG:-}$${REGISTRY_ORG:+/}forklift-virt-v2v-warm",
     tag = "$${REGISTRY_TAG:-devel}",
 )
 

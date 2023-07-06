@@ -157,7 +157,7 @@ genrule(
         if [ ! -z "$${XDG_RUNTIME_DIR}" ]; then
           PODMAN_AUTH_FILE="$${XDG_RUNTIME_DIR}/containers/auth.json"
           if [ "$${CONTAINER_RUNTIME}" == "podman" ]; then
-            if [ -e "$${PODMAN_AUTH_FILE}" ]; then 
+            if [ -e "$${PODMAN_AUTH_FILE}" ]; then
               DOCKER_CONFIG="$$(mktemp -d)"
               DOCKER_AUTH_FILE="$${DOCKER_CONFIG}/config.json"
               cp "$${PODMAN_AUTH_FILE}" "$${DOCKER_AUTH_FILE}"
@@ -167,7 +167,7 @@ genrule(
             fi
           fi
         fi
-        OPERATOR_BUNDLE_IMAGE="$${REGISTRY:-quay.io}/$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}forklift-operator-bundle:$${REGISTRY_TAG:-devel}"
+        OPERATOR_BUNDLE_IMAGE="$${REGISTRY:-quay.io}/$${REGISTRY_ORG:-}$${REGISTRY_ORG:+/}forklift-operator-bundle:$${REGISTRY_TAG:-devel}"
         cat $(location catalog/operator.yml) | envsubst > $@
         $(location @opm//file) render "$${OPERATOR_BUNDLE_IMAGE}" -o yaml $${OPM_OPTS:-} >> $@
         if [ "$${CONTAINER_RUNTIME}" == "podman" && ! -z "$${DOCKER_CONFIG}" ]; then

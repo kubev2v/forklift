@@ -63,7 +63,7 @@ container_push(
     format = "Docker",
     image = "//cmd/forklift-controller:forklift-controller-image",
     registry = "$${REGISTRY:-quay.io}",
-    repository = "$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}forklift-controller",
+    repository = "$${REGISTRY_ORG:-}$${REGISTRY_ORG:+/}forklift-controller",
     tag = "$${REGISTRY_TAG:-devel}",
 )
 
@@ -72,7 +72,7 @@ container_push(
     format = "Docker",
     image = "//cmd/forklift-api:forklift-api-image",
     registry = "$${REGISTRY:-quay.io}",
-    repository = "$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}forklift-api",
+    repository = "$${REGISTRY_ORG:-}$${REGISTRY_ORG:+/}forklift-api",
     tag = "$${REGISTRY_TAG:-devel}",
 )
 
@@ -81,7 +81,7 @@ container_push(
     format = "Docker",
     image = "//operator:forklift-operator-index-image",
     registry = "$${REGISTRY:-quay.io}",
-    repository = "$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}forklift-operator-index",
+    repository = "$${REGISTRY_ORG:-}$${REGISTRY_ORG:+/}forklift-operator-index",
     tag = "$${REGISTRY_TAG:-devel}",
 )
 
@@ -90,7 +90,7 @@ container_push(
     format = "Docker",
     image = "//operator:forklift-operator-bundle-image",
     registry = "$${REGISTRY:-quay.io}",
-    repository = "$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}forklift-operator-bundle",
+    repository = "$${REGISTRY_ORG:-}$${REGISTRY_ORG:+/}forklift-operator-bundle",
     tag = "$${REGISTRY_TAG:-devel}",
 )
 
@@ -99,7 +99,7 @@ container_push(
     format = "Docker",
     image = "//operator:forklift-operator-image",
     registry = "$${REGISTRY:-quay.io}",
-    repository = "$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}forklift-operator",
+    repository = "$${REGISTRY_ORG:-}$${REGISTRY_ORG:+/}forklift-operator",
     tag = "$${REGISTRY_TAG:-devel}",
 )
 
@@ -108,7 +108,7 @@ container_push(
     format = "Docker",
     image = "//validation:forklift-validation-image",
     registry = "$${REGISTRY:-quay.io}",
-    repository = "$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}forklift-validation",
+    repository = "$${REGISTRY_ORG:-}$${REGISTRY_ORG:+/}forklift-validation",
     tag = "$${REGISTRY_TAG:-devel}",
 )
 
@@ -117,6 +117,6 @@ container_push(
     format = "Docker",
     image = "//cmd/populator-controller:populator-controller-image",
     registry = "$${REGISTRY:-quay.io}",
-    repository = "$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}populator-controller",
+    repository = "$${REGISTRY_ORG:-}$${REGISTRY_ORG:+/}populator-controller",
     tag = "$${REGISTRY_TAG:-devel}",
 )

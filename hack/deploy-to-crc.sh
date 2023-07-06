@@ -18,7 +18,7 @@ if [ -z "${CONTAINER_CMD}" ]; then
 fi
 
 [[ -z "${REGISTRY}" ]] && export REGISTRY=$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')
-[[ -z "${REGISTRY_ACCOUNT}" ]] && export REGISTRY_ACCOUNT=openshift
+[[ -z "${REGISTRY_ORG}" ]] && export REGISTRY_ORG=openshift
 [[ -z "${REGISTRY_TAG}" ]] && export REGISTRY_TAG=devel
 
 CERT_PATH=/etc/pki/ca-trust/source/anchors/${REGISTRY}.crt
@@ -41,5 +41,5 @@ spec:
   displayName: Forklift (devel)
   publisher: Konveyor
   sourceType: grpc
-  image: image-registry.openshift-image-registry.svc:5000/${REGISTRY_ACCOUNT}/forklift-operator-index:${REGISTRY_TAG}
+  image: image-registry.openshift-image-registry.svc:5000/${REGISTRY_ORG}/forklift-operator-index:${REGISTRY_TAG}
 EOF
