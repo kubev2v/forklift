@@ -7,6 +7,7 @@ build --action_env=VERSION=2.5.0
 build --action_env=NAMESPACE=konveyor-forklift
 build --action_env=CHANNELS=development
 build --action_env=DEFAULT_CHANNEL=development
+build --action_env=OPM_OPTS
 
 ## Images which should be installed
 build --action_env=CONTROLLER_IMAGE=quay.io/kubev2v/forklift-controller:latest
