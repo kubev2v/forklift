@@ -9,7 +9,7 @@ CONTAINER_CMD := $(shell command -v docker)
 endif
 
 REGISTRY ?= quay.io
-REGISTRY_ACCOUNT ?= kubev2v
+REGISTRY_ORG ?= kubev2v
 REGISTRY_TAG ?= devel
 
 VERSION ?= 2.5.0
@@ -31,18 +31,18 @@ DEFAULT_KUBECTL = $(GOBIN)/kubectl
 KUBECTL ?= $(DEFAULT_KUBECTL)
 
 # Image URLs to use all building/pushing image targets
-CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-controller:$(REGISTRY_TAG)
-API_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-api:$(REGISTRY_TAG)
-VALIDATION_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-validation:$(REGISTRY_TAG)
-VIRT_V2V_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-virt-v2v:$(REGISTRY_TAG)
-VIRT_V2V_WARM_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-virt-v2v-warm:$(REGISTRY_TAG)
-OPERATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-operator:$(REGISTRY_TAG)
-OPERATOR_BUNDLE_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-operator-bundle:$(REGISTRY_TAG)
-OPERATOR_INDEX_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-operator-index:$(REGISTRY_TAG)
-POPULATOR_CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/populator-controller:$(REGISTRY_TAG)
-OVIRT_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/ovirt-populator:$(REGISTRY_TAG)
-OPENSTACK_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/openstack-populator:$(REGISTRY_TAG)
-OVA_PROVIDER_SERVER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/ova-provider-server:$(REGISTRY_TAG)
+CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-controller:$(REGISTRY_TAG)
+API_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-api:$(REGISTRY_TAG)
+VALIDATION_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-validation:$(REGISTRY_TAG)
+VIRT_V2V_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-virt-v2v:$(REGISTRY_TAG)
+VIRT_V2V_WARM_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-virt-v2v-warm:$(REGISTRY_TAG)
+OPERATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator:$(REGISTRY_TAG)
+OPERATOR_BUNDLE_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-bundle:$(REGISTRY_TAG)
+OPERATOR_INDEX_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-index:$(REGISTRY_TAG)
+POPULATOR_CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/populator-controller:$(REGISTRY_TAG)
+OVIRT_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/ovirt-populator:$(REGISTRY_TAG)
+OPENSTACK_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/openstack-populator:$(REGISTRY_TAG)
+OVA_PROVIDER_SERVER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/ova-provider-server:$(REGISTRY_TAG)
 
 ### External images
 MUST_GATHER_IMAGE ?= quay.io/kubev2v/forklift-must-gather:latest
@@ -240,7 +240,7 @@ build-operator-index-image: check_container_runtime
 		--action_env OPT_OPTS=$(OPM_OPTS) \
 		--action_env REGISTRY=$(REGISTRY) \
 		--action_env REGISTRY_TAG=$(REGISTRY_TAG) \
-		--action_env REGISTRY_ACCOUNT=$(REGISTRY_ACCOUNT)
+		--action_env REGISTRY_ORG=$(REGISTRY_ORG)
 
 push-operator-index-image: build-operator-index-image
 	$(CONTAINER_CMD) tag bazel/operator:forklift-operator-index-image $(OPERATOR_INDEX_IMAGE)
