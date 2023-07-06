@@ -69,6 +69,7 @@ func (r Client) PowerOff(vmRef ref.Ref) error {
 
 // PowerOn implements base.Client
 func (r Client) PowerOn(vmRef ref.Ref) error {
+	r.Log.Info("Benny powerOn")
 	vm := cnv.VirtualMachine{}
 	err := r.Client.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, &vm)
 	if err != nil {
@@ -102,7 +103,18 @@ func (r Client) PowerState(vmRef ref.Ref) (string, error) {
 }
 
 // PoweredOff implements base.Client
-func (Client) PoweredOff(vmRef ref.Ref) (bool, error) {
+func (r Client) PoweredOff(vmRef ref.Ref) (bool, error) {
+	vm := cnv.VirtualMachine{}
+	err := r.Client.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, &vm)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return false, err
+	}
+
+	if vm.Spec.Running != nil && *vm.Spec.Running {
+		return false, nil
+	}
+
 	return true, nil
 }
 
