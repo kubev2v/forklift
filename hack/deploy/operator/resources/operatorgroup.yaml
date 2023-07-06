@@ -1,0 +1,8 @@
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: migration
+  namespace: OPERATOR_NAMESPACE_PLACEHOLDER
+spec:
+  targetNamespaces:
+    - OPERATOR_NAMESPACE_PLACEHOLDER

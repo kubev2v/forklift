@@ -3,21 +3,41 @@ GOPATH ?= `go env GOPATH`
 GOBIN ?= $(GOPATH)/bin
 GO111MODULE = auto
 
-CONTAINER_CMD ?= $(shell command -v podman)
+
+CONTAINER_RUNTIME ?=
+
+ifeq ($(CONTAINER_RUNTIME),)
+CONTAINER_CMD ?= $(shell type -P podman)
 ifeq ($(CONTAINER_CMD),)
-CONTAINER_CMD := $(shell command -v docker)
+CONTAINER_CMD := $(shell type -P docker)
+endif
+CONTAINER_RUNTIME=$(shell basename $(CONTAINER_CMD))
+else
+CONTAINER_CMD := $(shell type -P $(CONTAINER_RUNTIME))
 endif
 
 REGISTRY ?= quay.io
+# TODO remove REGISTRY_ORG check once the changes are merged in forkliftci
+ifneq (,$(REGISTRY_ORG))
+ifeq (,$(REGISTRY_ORG))
+REGISTRY_ORG = $(REGISTRY_ORG)
+endif
+endif
 REGISTRY_ORG ?= kubev2v
 REGISTRY_TAG ?= devel
 
 VERSION ?= 2.5.0
 NAMESPACE ?= konveyor-forklift
+OPERATOR_NAME ?= forklift-operator
 CHANNELS ?= development
 DEFAULT_CHANNEL ?= development
+CATALOG_NAMESPACE ?= konveyor-forklift
+CATALOG_NAME ?= forklift-catalog
+CATALOG_DISPLAY_NAME ?= Konveyor Forklift
+CATALOG_PUBLISHER ?= Community
 
 # Use OPM_OPTS="--use-http" when using a non HTTPS registry
+# Use OPM_OPTS="--skip-tls-verify" when using an HTTPS registry with self-signed certificate
 OPM_OPTS ?=
 
 # By default use the controller gen installed by the
@@ -109,10 +129,6 @@ run: generate fmt vet
 # Install CRDs into a cluster
 install: manifests kubectl
 	$(KUBECTL) apply -k operator/config/crds
-
-# Deploy controller in the configured Kubernetes cluster in ~/.kube/config
-deploy: manifests kubectl
-	$(KUBECTL) apply -k operator/config/default
 
 # Generate manifests e.g. CRD, Webhooks
 manifests: controller-gen
@@ -237,7 +253,7 @@ build-operator-index-image: check_container_runtime
 		--action_env VERSION=$(VERSION) \
 		--action_env CHANNELS=$(CHANNELS) \
 		--action_env DEFAULT_CHANNEL=$(DEFAULT_CHANNEL) \
-		--action_env OPT_OPTS=$(OPM_OPTS) \
+		--action_env OPM_OPTS=$(OPM_OPTS) \
 		--action_env REGISTRY=$(REGISTRY) \
 		--action_env REGISTRY_TAG=$(REGISTRY_TAG) \
 		--action_env REGISTRY_ORG=$(REGISTRY_ORG)
@@ -322,3 +338,150 @@ $(DEFAULT_CONTROLLER_GEN):
 kubectl: $(KUBECTL)
 $(DEFAULT_KUBECTL):
 	curl -L https://dl.k8s.io/release/v1.25.10/bin/linux/amd64/kubectl -o $(GOBIN)/kubectl && chmod +x $(GOBIN)/kubectl
+
+# The directory where the 'crc' binary will be installed (this path
+# will be added to the PATH variable). (default: ${HOME}/.local/bin)
+CRC_BIN_DIR ?=
+# Number of CPUS for CRC. By default all of the available CPUs will
+# be used
+CRC_CPUS ?= 8
+# Memory for CRC in MB. (default: 16384)
+CRC_MEM ?= 16384
+# Disk size in GB. (default: 100)
+CRC_DISK ?= 100
+# Select openshift/okd installation type (default: okd)
+CRC_PRESET ?= okd
+# Pull secret file. If not provided it will be requested at
+# installation time by the script
+CRC_PULL_SECRET_FILE ?=
+# Bundle to deploy. If not specified the default bundle will be
+# installed. OKD default bundle doesn't work for now because of
+# expired certificates so the installation script will temporarily
+# overwrite it with:
+# docker://quay.io/crcont/okd-bundle:4.13.0-0.okd-2023-06-04-080300
+CRC_BUNDLE ?=
+# Use the integrated CRC registry instead of local one. (default: '')
+# Non empty variable is considered as true.
+CRC_USE_INTEGRATED_REGISTRY ?=
+
+install-crc:
+	ROOTLESS=$(ROOTLESS) \
+	CRC_BIN_DIR=$(CRC_BIN_DIR) \
+	CRC_CPUS=$(CRC_CPUS) \
+	CRC_MEM=$(CRC_MEM) \
+	CRC_DISK=$(CRC_DISK) \
+	CRC_PRESET=$(CRC_PRESET) \
+	CRC_PULL_SECRET_FILE=$(CRC_PULL_SECRET_FILE) \
+	CRC_BUNDLE=$(CRC_BUNDLE) \
+	CRC_USE_INTEGRATED_REGISTRY=$(CRC_USE_INTEGRATED_REGISTRY) \
+	./hack/installation/crc.sh;
+	eval `crc oc-env`; \
+	oc new-project "${REGISTRY_ORG}"
+
+uninstall-crc:
+	crc delete -f
+
+# Driver: kvm2, docker or podman.
+MINIKUBE_DRIVER ?= $(CONTAINER_RUNTIME)
+MINIKUBE_CPUS ?= max
+MINIKUBE_MEMORY ?= 16384
+MINIKUBE_ADDONS ?= olm,kubevirt
+MINIKUBE_USE_INTEGRATED_REGISTRY ?=
+
+install-minikube:
+	ROOTLESS=$(ROOTLESS) \
+	MINIKUBE_DRIVER=$(MINIKUBE_DRIVER) \
+	MINIKUBE_CPUS=$(MINIKUBE_CPUS) \
+	MINIKUBE_MEMORY=$(MINIKUBE_MEMORY) \
+	MINIKUBE_ADDONS=$(MINIKUBE_ADDONS) \
+	MINIKUBE_USE_INTEGRATED_REGISTRY=$(MINIKUBE_USE_INTEGRATED_REGISTRY) \
+	./hack/installation/minikube.sh
+
+uninstall-minikube: uninstall-local-registry
+	minikube delete
+
+ROOTLESS ?= true
+# Kind version to install (default: v0.15.0)
+KIND_VERSION ?= v0.15.0
+# Kind operator Livecycle Manager version (default: v.0.25.0)
+OLM_VERSION ?= v0.25.0
+# Kind cert manager operator version (default: v1.12.2)
+CERT_MANAGER_VERSION ?= v1.12.2
+
+install-kind: install-local-registry
+	ROOTLESS=$(ROOTLESS) \
+	KIND_VERSION=$(KIND_VERSION) \
+	OLM_VERSION=$(OLM_VERSION) \
+	CERT_MANAGER_VERSION=$(CERT_MANAGER_VERSION) \
+	./hack/installation/kind.sh; \
+	[ $(CONTAINER_RUNTIME) != "podman" ] || export KIND_EXPERIMENTAL_PROVIDER="podman"; kind export kubeconfig --name forklift
+
+uninstall-kind: uninstall-local-registry
+	[ $(CONTAINER_RUNTIME) != "podman" ] || export KIND_EXPERIMENTAL_PROVIDER="podman"; kind delete clusters forklift
+
+define DEPLOYMENT_VARS
+OPERATOR_NAMESPACE=$(NAMESPACE)
+OPERATOR_NAME=$(OPERATOR_NAME)
+SUBSCRIPTION_CHANNEL=$(CHANNELS)
+CATALOG_NAMESPACE=$(CATALOG_NAMESPACE)
+CATALOG_NAME=$(CATALOG_NAME)
+CATALOG_DISPLAY_NAME=$(CATALOG_DISPLAY_NAME)
+CATALOG_IMAGE=$(OPERATOR_INDEX_IMAGE)
+CATALOG_PUBLISHER=$(CATALOG_PUBLISHER)
+REGISTRY_ORG=$(REGISTRY_ORG)
+endef
+export DEPLOYMENT_VARS
+
+# Deploy the operator and create a forklift controller in the configured Kubernetes cluster in ~/.kube/config
+deploy: kubectl
+	@echo -n "- Deploying to OKD: "
+	@$(KUBECTL) get clusterrole system:image-puller &>/dev/null; OKD=$$?; \
+	if [ $${OKD} -eq 0 ]; then echo "yes"; else echo "no"; fi; \
+	echo "- Creating env files."; \
+	for i in operator forklift rolebinding/{catalog,operator,default}; do \
+		echo "$$DEPLOYMENT_VARS" > hack/deploy/$${i}/deploy.env; \
+	done; \
+	echo "- Creating the operator namespace: $(NAMESPACE)"; \
+	$(KUBECTL) get namespace $(NAMESPACE) &>/dev/null || $(KUBECTL) create namespace $(NAMESPACE); \
+	$(KUBECTL) get namespace $(CATALOG_NAMESPACE) &>/dev/null || $(KUBECTL) create namespace $(CATALOG_NAMESPACE); \
+	$(KUBECTL) get namespace $(REGISTRY_ORG) &>/dev/null || $(KUBECTL) create namespace $(REGISTRY_ORG); \
+	echo "- Creating the CatalogSource, OperatorGroup and the Subscription manifests"; \
+	$(KUBECTL) apply -k hack/deploy/operator ; \
+	if [ $$OKD -eq 0 ]; then \
+		echo "- Creating the required RoleBindings for the deployment"; \
+		$(KUBECTL) apply -k hack/deploy/rolebinding/default; \
+		$(KUBECTL) apply -k hack/deploy/rolebinding/catalog ; \
+	fi; \
+	echo -n "- Waiting for the operator to be installed"; \
+	until $(KUBECTL) -n $(NAMESPACE) get clusterserviceversion $(OPERATOR_NAME).v$(VERSION) &>/dev/null; do \
+		sleep 1; echo -n "."; \
+	done; \
+	echo; \
+	if [ $$OKD -eq 0 ]; then \
+		echo "- Applying required role bindings"; \
+		$(KUBECTL) apply -k hack/deploy/rolebinding/operator; \
+	fi; \
+	$(KUBECTL) -n $(NAMESPACE)  wait --timeout=60s --for=jsonpath=.status.phase=Succeeded clusterserviceversion $(OPERATOR_NAME).v$(VERSION); \
+	echo "- Creating the Forklift Controller"; \
+	$(KUBECTL) apply -k hack/deploy/forklift; \
+	echo "Done!"
+
+undeploy: kubectl
+	@echo "- Removing the operator namespace: $(NAMESPACE)"
+	@$(KUBECTL) get namespace $(NAMESPACE) -o name 2>/dev/null | xargs -r $(KUBECTL) delete ;
+	@echo "- Removing the CatalogSource"
+	@$(KUBECTL) get catalogsource -n $(CATALOG_NAMESPACE) -o name $(CATALOG_NAME) 2>/dev/null | xargs -r $(KUBECTL) -n $(CATALOG_NAMESPACE) delete;
+	@echo "- Removing the Operator"
+	@$(KUBECTL) get operator $(OPERATOR_NAME).$(NAMESPACE) -o name 2>/dev/null | xargs -r $(KUBECTL) delete;
+	@echo "- Removing the Webhooks"
+	@$(KUBECTL) get mutatingwebhookconfiguration forklift-api -o name 2>/dev/null | xargs -r $(KUBECTL) delete;
+	@$(KUBECTL) get validatingwebhookconfiguration forklift-api -o name 2>/dev/null | xargs -r $(KUBECTL) delete;
+	@echo "- Removing the ConsolePlugin"
+	@$(KUBECTL) get consoleplugin forklift-console-plugin -o name 2>/dev/null | xargs -r $(KUBECTL) delete;
+	@echo "- Removing the CRDs"
+	@$(KUBECTL) get crd -l operators.coreos.com/forklift-operator.konveyor-forklift -o name 2>/dev/null | xargs -r $(KUBECTL) delete;
+	@echo "- Removing the RoleBindings"
+	@for ROLE_BINDING in forklift-{default,operator,controller,api,catalog,catalog-default} ; do \
+		$(KUBECTL) -n $(REGISTRY_ORG) get rolebinding $${ROLE_BINDING} -o name 2>/dev/null | xargs -r $(KUBECTL) -n $(REGISTRY_ORG) delete ; \
+	done;
+	@echo "Done!"
