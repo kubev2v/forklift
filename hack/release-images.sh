@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
 
-set -e 
+set -e
 
-if [[ -z "${REGISTRY}" || -z "${REGISTRY_TAG}" || -z  "${REGISTRY_ACCOUNT}" ]]; then
-    echo "Please set all REGISTRY, REGISTRY_TAG and REGISTRY_ACCOUNT environment variables!" 
+if [[ -z "${REGISTRY}" || -z "${REGISTRY_TAG}" || -z  "${REGISTRY_ORG}" ]]; then
+    echo "Please set all REGISTRY, REGISTRY_TAG and REGISTRY_ORG environment variables!"
     exit 1
 fi
 
-CONTROLLER_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-controller:${REGISTRY_TAG}
-OPERATOR_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-operator:${REGISTRY_TAG}
-MUST_GATHER_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-must-gather:${REGISTRY_TAG}
-MUST_GATHER_API_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-must-gather-api:${REGISTRY_TAG}
-UI_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-ui:${REGISTRY_TAG}
-UI_PLUGIN_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-console-plugin:${REGISTRY_TAG}
-VALIDATION_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-validation:${REGISTRY_TAG}
-VIRT_V2V_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-virt-v2v:${REGISTRY_TAG}
-VIRT_V2V_WARM_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-virt-v2v-warm:${REGISTRY_TAG}
-API_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-api:${REGISTRY_TAG}
-POPULATOR_CONTROLLER_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/populator-controller:${REGISTRY_TAG}
-OVA_PROVIDER_SERVER=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-ova-provider-server:${REGISTRY_TAG}
+CONTROLLER_IMAGE=${REGISTRY}/${REGISTRY_ORG}/forklift-controller:${REGISTRY_TAG}
+OPERATOR_IMAGE=${REGISTRY}/${REGISTRY_ORG}/forklift-operator:${REGISTRY_TAG}
+MUST_GATHER_IMAGE=${REGISTRY}/${REGISTRY_ORG}/forklift-must-gather:${REGISTRY_TAG}
+MUST_GATHER_API_IMAGE=${REGISTRY}/${REGISTRY_ORG}/forklift-must-gather-api:${REGISTRY_TAG}
+UI_IMAGE=${REGISTRY}/${REGISTRY_ORG}/forklift-ui:${REGISTRY_TAG}
+UI_PLUGIN_IMAGE=${REGISTRY}/${REGISTRY_ORG}/forklift-console-plugin:${REGISTRY_TAG}
+VALIDATION_IMAGE=${REGISTRY}/${REGISTRY_ORG}/forklift-validation:${REGISTRY_TAG}
+VIRT_V2V_IMAGE=${REGISTRY}/${REGISTRY_ORG}/forklift-virt-v2v:${REGISTRY_TAG}
+VIRT_V2V_WARM_IMAGE=${REGISTRY}/${REGISTRY_ORG}/forklift-virt-v2v-warm:${REGISTRY_TAG}
+API_IMAGE=${REGISTRY}/${REGISTRY_ORG}/forklift-api:${REGISTRY_TAG}
+POPULATOR_CONTROLLER_IMAGE=${REGISTRY}/${REGISTRY_ORG}/populator-controller:${REGISTRY_TAG}
+OVA_PROVIDER_SERVER=${REGISTRY}/${REGISTRY_ORG}/forklift-ova-provider-server:${REGISTRY_TAG}
 
 bazel run push-forklift-api
 bazel run --package_path=virt-v2v/cold push-forklift-virt-v2v
@@ -44,4 +44,4 @@ bazel run push-forklift-operator-bundle \
 bazel run push-forklift-operator-index \
     --action_env REGISTRY=${REGISTRY} \
     --action_env REGISTRY_TAG=${REGISTRY_TAG} \
-    --action_env REGISTRY_ACCOUNT=${REGISTRY_ACCOUNT}
+    --action_env REGISTRY_ORG=${REGISTRY_ORG}

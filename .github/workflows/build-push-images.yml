@@ -14,7 +14,7 @@ jobs:
       REGISTRY: quay.io
       # Set tag 'latest' on main branch
       REGISTRY_TAG: ${{ (github.head_ref||github.ref_name)=='main' && 'latest' || (github.head_ref||github.ref_name) }}
-      REGISTRY_ACCOUNT: kubev2v
+      REGISTRY_ORG: kubev2v
       USE_BAZEL_VERSION: 5.4.0
     steps:
       - name: Checkout forklift
