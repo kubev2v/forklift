@@ -85,10 +85,15 @@ jobs:
 
       - run: kubectl get pods -n konveyor-forklift
 
-      - name: run e2e-sanity-openstack
+      - name: run e2e-sanity-openstack extended
         uses: kubev2v/forkliftci/ci/run-suite@v6.0
         with:
           suite_name: e2e-sanity-openstack-extended
+
+      - name: run e2e-sanity-openstack migration
+        uses: kubev2v/forkliftci/ci/run-suite@v6.0
+        with:
+          suite_name: e2e-sanity-openstack
 
       - name: save k8s logs and upload-artifact
         if: ${{ always() }}
