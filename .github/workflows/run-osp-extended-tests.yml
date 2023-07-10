@@ -74,9 +74,6 @@ jobs:
           repository: kubev2v/forkliftci
           ref: v6.0
 
-      - name: add docker-hub token
-        run: echo "${{ secrets.DOCKER_HUB_TOKEN }}" | docker login --username "${{  secrets.DOCKER_HUB_USER }}" --password-stdin
-
       - name: build and setup everything
         uses: kubev2v/forkliftci/ci/build-and-setup@v6.0
         with:
