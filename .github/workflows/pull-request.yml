@@ -33,6 +33,16 @@ jobs:
       USE_BAZEL_VERSION: 5.4.0
     timeout-minutes: 45
     steps:
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: false
+          swap-storage: false
+          docker-images: false
       - name: Check out forklift repository
         uses: actions/checkout@v3
 
