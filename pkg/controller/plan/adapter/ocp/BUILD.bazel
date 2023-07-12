@@ -30,5 +30,6 @@ go_library(
         "//vendor/kubevirt.io/api/export/v1alpha1",
         "//vendor/kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/client/config",
     ],
 )

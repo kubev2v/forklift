@@ -30,6 +30,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// Network types
+const (
+	Pod    = "pod"
+	Multus = "multus"
+)
+
 type Builder struct {
 	*plancontext.Context
 	macConflictsMap map[string]string
