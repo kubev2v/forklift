@@ -994,6 +994,7 @@ func (r *DiskAdapter) Event() []int {
 		USER_FORCE_REMOVE_STORAGE_DOMAIN,
 		USER_ADD_VM,
 		USER_ADD_VM_FINISHED_SUCCESS,
+		IMPORTEXPORT_IMPORT_VM,
 		USER_REMOVE_VM,
 		// StorageDomain.
 		USER_DETACH_STORAGE_DOMAIN_FROM_POOL,
@@ -1056,6 +1057,7 @@ func (r *DiskAdapter) Apply(ctx *Context, event *Event) (updater Updater, err er
 			err = collection.Delete(desired)
 		case USER_ADD_VM,
 			USER_ADD_VM_FINISHED_SUCCESS,
+			IMPORTEXPORT_IMPORT_VM,
 			USER_REMOVE_VM:
 			err = collection.Reconcile(desired)
 		default:
