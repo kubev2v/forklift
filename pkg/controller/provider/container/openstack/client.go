@@ -617,28 +617,23 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 }
 
 func (r *Client) isNotFound(err error) bool {
-	switch liberr.Unwrap(err).(type) {
-	case gophercloud.ErrResourceNotFound, gophercloud.ErrDefault404:
-		return true
+	switch unWrapErr := liberr.Unwrap(err).(type) {
 	case gophercloud.ErrUnexpectedResponseCode:
-		if gopherlcoudErr, ok := liberr.Unwrap(err).(gophercloud.ErrUnexpectedResponseCode); ok {
-			if gopherlcoudErr.GetStatusCode() == http.StatusNotFound {
-				return true
-			}
+		if unWrapErr.GetStatusCode() == http.StatusNotFound {
+			return true
 		}
-		return false
-	default:
-		return false
 	}
+	return false
 }
 
 func (r *Client) isForbidden(err error) bool {
-	switch liberr.Unwrap(err).(type) {
-	case gophercloud.ErrDefault403:
-		return true
-	default:
-		return false
+	switch unWrapErr := liberr.Unwrap(err).(type) {
+	case gophercloud.ErrUnexpectedResponseCode:
+		if unWrapErr.GetStatusCode() == http.StatusForbidden {
+			return true
+		}
 	}
+	return false
 }
 
 func (r *Client) getAuthenticatedUserID() (string, error) {
