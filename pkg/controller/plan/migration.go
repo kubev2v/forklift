@@ -650,8 +650,6 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			break
 		}
 
-		var pvcNames []string
-		var dataVolumes []cdi.DataVolume
 		if r.Plan.IsSourceProviderOCP() {
 			if !ready {
 				return
@@ -668,6 +666,8 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			return
 		}
 
+		var pvcNames []string
+		var dataVolumes []cdi.DataVolume
 		if r.Plan.IsSourceProviderOpenstack() {
 			pvcNames, err = r.kubevirt.ensureOpenStackVolumes(vm.Ref, ready)
 			if err != nil {
@@ -1486,6 +1486,7 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 				if dv.PVC == nil && !r.Plan.IsSourceProviderOCP() {
 					found = false
 				} else {
+					var importerPVC core.PersistentVolumeClaim
 					if r.Plan.IsSourceProviderOCP() {
 						pvc := &core.PersistentVolumeClaim{}
 						err = r.Destination.Client.Get(context.TODO(), types.NamespacedName{
@@ -1502,11 +1503,14 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 								path.Join(dv.Namespace, dv.Name))
 							continue
 						}
-						importer, found, kErr = r.kubevirt.GetImporterPod(*pvc)
+						importerPVC = *pvc
 					} else {
-						importer, found, kErr = r.kubevirt.GetImporterPod(*dv.PVC)
+						importerPVC = *dv.PVC
 					}
+
+					importer, found, kErr = r.kubevirt.GetImporterPod(importerPVC)
 				}
+
 				if kErr != nil {
 					log.Error(
 						kErr,

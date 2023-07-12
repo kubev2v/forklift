@@ -106,11 +106,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 			}
 		}
 
-		dv := &cdi.DataVolume{}
-		err = r.Destination.Client.Get(context.TODO(), client.ObjectKey{Namespace: dataVolume.Namespace, Name: dataVolume.Name}, dv)
-		if err != nil {
-			return nil, liberr.Wrap(err)
-		}
+		dataVolumes = append(dataVolumes, *dataVolume)
 	}
 
 	return dataVolumes, nil
@@ -139,7 +135,7 @@ func (*Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env []
 
 // PreTransferActions implements base.Builder
 func (r *Builder) PreTransferActions(c base.Client, vmRef ref.Ref) (ready bool, err error) {
-	apiGroup := "kubevirt.io"
+	apiGroup := cnv.GroupVersion.Group
 
 	// Check if VM export exists
 	vmExport := &export.VirtualMachineExport{}
@@ -236,7 +232,8 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*planapi.Task, err error) {
 	for _, vol := range vm.Spec.Template.Spec.Volumes {
 		var size resource.Quantity
 		var volName, volNamespace string
-		if vol.PersistentVolumeClaim != nil {
+		switch {
+		case vol.PersistentVolumeClaim != nil:
 			pvc := &core.PersistentVolumeClaim{}
 			err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vol.PersistentVolumeClaim.ClaimName}, pvc)
 			if err != nil {
@@ -245,7 +242,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*planapi.Task, err error) {
 			volName = pvc.Name
 			volNamespace = pvc.Namespace
 			size = pvc.Spec.Resources.Requests["storage"]
-		} else if vol.DataVolume != nil {
+		case vol.DataVolume != nil:
 			pvc := &core.PersistentVolumeClaim{}
 			err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vol.DataVolume.Name}, pvc)
 			if err != nil {
@@ -254,6 +251,9 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*planapi.Task, err error) {
 			volName = pvc.Name
 			volNamespace = pvc.Namespace
 			size = pvc.Spec.Resources.Requests["storage"]
+		default:
+			r.Log.Info("Unsupported volume type", "type", vol.VolumeSource)
+			continue
 		}
 
 		mB := size.Value() / 1024 / 1024
@@ -287,13 +287,19 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 		return liberr.Wrap(err)
 	}
 
-	sourceVm, err := r.generateVmFromDefinition(vmExport)
+	sourceVm, err := r.getSourceVmFromDefinition(vmExport)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 
-	targetVMspec := sourceVm.Spec
+	targetVmSpec := sourceVm.Spec.DeepCopy()
+	object.Template = targetVmSpec.Template
+	r.mapDisks(sourceVm, targetVmSpec, persistentVolumeClaims, vmRef)
 
+	return nil
+}
+
+func (r *Builder) mapDisks(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.VirtualMachineSpec, persistentVolumeClaims []core.PersistentVolumeClaim, vmRef ref.Ref) {
 	// TODO: move logic to mapDisks
 	pvcMap := make(map[string]*core.PersistentVolumeClaim)
 	for i := range persistentVolumeClaims {
@@ -330,8 +336,8 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	}
 
 	// Clear original disks and volumes, will be required for other mapped devices later
-	targetVMspec.Template.Spec.Domain.Devices.Disks = []cnv.Disk{}
-	targetVMspec.Template.Spec.Volumes = []cnv.Volume{}
+	targetVmSpec.Template.Spec.Domain.Devices.Disks = []cnv.Disk{}
+	targetVmSpec.Template.Spec.Volumes = []cnv.Volume{}
 
 	for _, volume := range persistentVolumeClaims {
 		if disk, ok := diskMap[volume.Annotations[planbase.AnnDiskSource]]; ok {
@@ -345,7 +351,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 					},
 				},
 			}
-			targetVMspec.Template.Spec.Volumes = append(targetVMspec.Template.Spec.Volumes, targetVolume)
+			targetVmSpec.Template.Spec.Volumes = append(targetVmSpec.Template.Spec.Volumes, targetVolume)
 
 			targetDisk := cnv.Disk{
 				Name: disk.Name,
@@ -356,16 +362,12 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 				},
 			}
 
-			targetVMspec.Template.Spec.Domain.Devices.Disks = append(targetVMspec.Template.Spec.Domain.Devices.Disks, targetDisk)
+			targetVmSpec.Template.Spec.Domain.Devices.Disks = append(targetVmSpec.Template.Spec.Domain.Devices.Disks, targetDisk)
 		}
 	}
-
-	object.Template = targetVMspec.Template
-
-	return nil
 }
 
-func (r *Builder) generateVmFromDefinition(vme *export.VirtualMachineExport) (*cnv.VirtualMachine, error) {
+func (r *Builder) getSourceVmFromDefinition(vme *export.VirtualMachineExport) (*cnv.VirtualMachine, error) {
 	var vmManifestUrl string
 	for _, manifest := range vme.Status.Links.Internal.Manifests {
 		if manifest.Type == export.AllManifests {
