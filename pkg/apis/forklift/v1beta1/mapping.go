@@ -118,6 +118,30 @@ func (r *NetworkMap) FindNetwork(networkID string) (pair NetworkPair, found bool
 	return
 }
 
+// Find network map for source type.
+func (r *NetworkMap) FindNetworkByType(networkType string) (pair NetworkPair, found bool) {
+	for _, pair = range r.Spec.Map {
+		if pair.Source.Type == networkType {
+			found = true
+			break
+		}
+	}
+
+	return
+}
+
+// Find network map for source name and namespace.
+func (r *NetworkMap) FindNetworkByNameAndNamespace(namespace, name string) (pair NetworkPair, found bool) {
+	for _, pair = range r.Spec.Map {
+		if pair.Source.Namespace == namespace && pair.Source.Name == name {
+			found = true
+			break
+		}
+	}
+
+	return
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type NetworkMapList struct {
 	meta.TypeMeta `json:",inline"`

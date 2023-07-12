@@ -4,6 +4,8 @@ import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 // Openshift adapter.
@@ -17,7 +19,17 @@ func (r *Adapter) Builder(ctx *plancontext.Context) (builder base.Builder, err e
 
 // Constructs a openshift validator.
 func (r *Adapter) Validator(plan *api.Plan) (validator base.Validator, err error) {
-	v := &Validator{plan: plan}
+	conf, err := config.GetConfig()
+	if err != nil {
+		return
+	}
+
+	client, err := k8sclient.New(conf, k8sclient.Options{})
+	if err != nil {
+		return
+	}
+
+	v := &Validator{plan: plan, client: client}
 	return v, nil
 }
 
