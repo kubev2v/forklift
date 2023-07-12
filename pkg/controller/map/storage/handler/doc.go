@@ -4,6 +4,7 @@ import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/map/storage/handler/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/map/storage/handler/openstack"
+	"github.com/konveyor/forklift-controller/pkg/controller/map/storage/handler/ova"
 	"github.com/konveyor/forklift-controller/pkg/controller/map/storage/handler/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/map/storage/handler/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/watch/handler"
@@ -44,6 +45,11 @@ func New(
 			provider)
 	case api.OpenStack:
 		h, err = openstack.New(
+			client,
+			channel,
+			provider)
+	case api.Ova:
+		h, err = ova.New(
 			client,
 			channel,
 			provider)

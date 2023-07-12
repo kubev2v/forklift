@@ -1,9 +1,6 @@
 package ova
 
 import (
-	"path"
-	"strings"
-
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ova"
 	"github.com/konveyor/forklift-controller/pkg/controller/watch/handler"
@@ -11,22 +8,24 @@ import (
 	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	"golang.org/x/net/context"
+	"path"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"strings"
 )
 
 // Package logger.
-var log = logging.WithName("storageMap|ova")
+var log = logging.WithName("networkMap|ova")
 
 // Provider watch event handler.
 type Handler struct {
 	*handler.Handler
 }
 
-// Ensure watch on Disk.
+// Ensure watch on networks.
 func (r *Handler) Watch(watch *handler.WatchManager) (err error) {
 	w, err := watch.Ensure(
 		r.Provider(),
-		&ova.Disk{},
+		&ova.Network{},
 		r)
 	if err != nil {
 		return
@@ -46,37 +45,37 @@ func (r *Handler) Watch(watch *handler.WatchManager) (err error) {
 
 // Resource created.
 func (r *Handler) Created(e libweb.Event) {
-	if ds, cast := e.Resource.(*ova.Disk); cast {
-		r.changed(ds)
+	if network, cast := e.Resource.(*ova.Network); cast {
+		r.changed(network)
 	}
 }
 
 // Resource created.
 func (r *Handler) Updated(e libweb.Event) {
-	if ds, cast := e.Resource.(*ova.Disk); cast {
-		updated := e.Updated.(*ova.Disk)
-		if updated.Path != ds.Path {
-			r.changed(ds, updated)
+	if network, cast := e.Resource.(*ova.Network); cast {
+		updated := e.Updated.(*ova.Network)
+		if updated.Path != network.Path {
+			r.changed(network, updated)
 		}
 	}
 }
 
 // Resource deleted.
 func (r *Handler) Deleted(e libweb.Event) {
-	if ds, cast := e.Resource.(*ova.Disk); cast {
-		r.changed(ds)
+	if network, cast := e.Resource.(*ova.Network); cast {
+		r.changed(network)
 	}
 }
 
-// Storage changed.
-// Find all of the StorageMap CRs the reference both the
-// provider and the changed storage domain and enqueue reconcile events.
-func (r *Handler) changed(models ...*ova.Disk) {
+// Network changed.
+// Find all of the NetworkMap CRs the reference both the
+// provider and the changed network and enqueue reconcile events.
+func (r *Handler) changed(models ...*ova.Network) {
 	log.V(3).Info(
-		"Disk changed.",
+		"Network changed.",
 		"id",
 		models[0].ID)
-	list := api.StorageMapList{}
+	list := api.NetworkMapList{}
 	err := r.List(context.TODO(), &list)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -91,8 +90,8 @@ func (r *Handler) changed(models ...*ova.Disk) {
 		referenced := false
 		for _, pair := range mp.Spec.Map {
 			ref := pair.Source
-			for _, ds := range models {
-				if ref.ID == ds.ID || strings.HasSuffix(ds.Path, ref.Name) {
+			for _, network := range models {
+				if ref.ID == network.ID || strings.HasSuffix(network.Path, ref.Name) {
 					referenced = true
 					break
 				}
