@@ -46,7 +46,7 @@ func (r *Builder) ConfigMap(vmRef ref.Ref, secret *core.Secret, object *core.Con
 	}
 	err := r.Client.Get(context.TODO(), key, vmExport)
 	if err != nil {
-		r.Log.Error(err, "Failed to get VM export ConfigMap")
+		r.Log.Error(err, "Failed to get VM-export ConfigMap")
 		return liberr.Wrap(err)
 	}
 
@@ -59,7 +59,6 @@ func (r *Builder) ConfigMap(vmRef ref.Ref, secret *core.Secret, object *core.Con
 
 // DataVolumes implements base.Builder
 func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume) (dvs []cdi.DataVolume, err error) {
-	// Get VM export
 	vmExport := &export.VirtualMachineExport{}
 	key := client.ObjectKey{
 		Namespace: vmRef.Namespace,
@@ -68,7 +67,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 
 	err = r.Client.Get(context.TODO(), key, vmExport)
 	if err != nil {
-		r.Log.Error(err, "Failed to get VM export ConfigMap")
+		r.Log.Error(err, "Failed to get VM-export ConfigMap")
 		return nil, liberr.Wrap(err)
 	}
 
@@ -142,7 +141,7 @@ func (r *Builder) PreTransferActions(c base.Client, vmRef ref.Ref) (ready bool, 
 	err = r.Client.Get(context.Background(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vmExport)
 	if err != nil {
 		if !k8serr.IsNotFound(err) {
-			r.Log.Error(err, "Failed to get VM export.", "vm", vmRef.Name)
+			r.Log.Error(err, "Failed to get VM-export.", "vm", vmRef.Name)
 			return true, liberr.Wrap(err)
 		}
 		// Create VM export
@@ -170,11 +169,11 @@ func (r *Builder) PreTransferActions(c base.Client, vmRef ref.Ref) (ready bool, 
 		}
 	}
 	if vmExport.Status != nil && vmExport.Status.Phase == export.Ready {
-		r.Log.Info("VM export is ready.", "vm", vmRef.Name)
+		r.Log.Info("VM-export is ready.", "vm", vmRef.Name)
 		return true, nil
 	}
 
-	r.Log.Info("Waiting for VM export to be ready...", "vm", vmRef.Name)
+	r.Log.Info("Waiting for VM-export to be ready...", "vm", vmRef.Name)
 	return false, nil
 }
 
@@ -193,13 +192,17 @@ func (r *Builder) Secret(vmRef ref.Ref, in *core.Secret, object *core.Secret) er
 	vmExport := &export.VirtualMachineExport{}
 	err := r.Client.Get(context.Background(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vmExport)
 	if err != nil {
-		r.Log.Error(err, "Failed to get VM export Secret")
+		r.Log.Error(err, "Failed to get VM-export Secret")
 		return liberr.Wrap(err)
 	}
 
 	// Export pod is ready
 	// Create config maps with CA on the destination
 	// Read secret token
+	if vmExport.Status.TokenSecretRef == nil {
+		r.Log.Error(err, "Token secret ref is nil")
+		return liberr.Wrap(err, "Token secret ref is nil")
+	}
 	tokenSecret := &core.Secret{}
 	err = r.Client.Get(context.Background(), client.ObjectKey{Namespace: vmRef.Namespace, Name: *vmExport.Status.TokenSecretRef}, tokenSecret)
 	if err != nil {
@@ -280,7 +283,6 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 
 // VirtualMachine implements base.Builder
 func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []core.PersistentVolumeClaim) error {
-	// Get vm export
 	vmExport := &export.VirtualMachineExport{}
 	err := r.Client.Get(context.Background(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vmExport)
 	if err != nil {
