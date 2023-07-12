@@ -161,6 +161,7 @@ func main() {
 
 func connHendler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode("")
 }
 
 func vmHandler(w http.ResponseWriter, r *http.Request) {

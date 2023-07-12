@@ -131,13 +131,13 @@ func (h *DiskHandler) watch(ctx *gin.Context) {
 // REST Resource.
 type Disk struct {
 	Resource
-	FilePath                string
-	Capacity                string
-	CapacityAllocationUnits string
-	DiskId                  string
-	FileRef                 string
-	Format                  string
-	PopulatedSize           string
+	FilePath                string `json:"filePath"`
+	Capacity                string `json:"capacity"`
+	CapacityAllocationUnits string `json:"capacityAllocationUnits"`
+	DiskId                  string `json:"diskId"`
+	FileRef                 string `json:"fileRef"`
+	Format                  string `json:"format"`
+	PopulatedSize           string `json:"populatedSize"`
 }
 
 // Build the resource using the model.

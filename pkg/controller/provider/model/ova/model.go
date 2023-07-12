@@ -1,123 +1,89 @@
 package ova
 
 import (
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/base"
+	"strings"
+
+	pathlib "path"
+
+	"github.com/gin-gonic/gin"
+	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ova"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 )
 
-// Errors
-var NotFound = libmodel.NotFound
+// Package logger.
+var log = logging.WithName("web|ova")
 
-type InvalidRefError = base.InvalidRefError
-
+// Fields.
 const (
-	MaxDetail = base.MaxDetail
+	DetailParam = base.DetailParam
+	NameParam   = base.NameParam
 )
 
-// Types
-type ListOptions = base.ListOptions
-type Concern = base.Concern
-type Ref = base.Ref
-
-// Model.
-type Model interface {
-	base.Model
-	GetName() string
+// Base handler.
+type Handler struct {
+	base.Handler
 }
 
-// Base OVA model.
-type Base struct {
-	// Managed object ID.
-	ID string `sql:"pk"`
-	// Variant
-	Variant string `sql:"d0,index(variant)"`
-	// Name
-	Name string `sql:"d0,index(name)"`
-	// Revision
-	Revision int64 `sql:"incremented,d0,index(revision)"`
+// Build list predicate.
+func (h Handler) Predicate(ctx *gin.Context) (p libmodel.Predicate) {
+	q := ctx.Request.URL.Query()
+	name := q.Get(NameParam)
+	if len(name) > 0 {
+		path := strings.Split(name, "/")
+		name := path[len(path)-1]
+		p = libmodel.Eq(NameParam, name)
+	}
+
+	return
 }
 
-func (m *Base) Pk() string {
-	return m.ID
+// Build list options.
+func (h Handler) ListOptions(ctx *gin.Context) libmodel.ListOptions {
+	detail := h.Detail
+	if detail > 0 {
+		detail = model.MaxDetail
+	}
+	return libmodel.ListOptions{
+		Predicate: h.Predicate(ctx),
+		Detail:    detail,
+		Page:      &h.Page,
+	}
 }
 
-// String representation.
-func (m *Base) String() string {
-	return m.ID
+// Path builder.
+type PathBuilder struct {
+	// Database.
+	DB libmodel.DB
+	// Cached resource
+	cache map[string]string
 }
 
-// Get labels.
-func (m *Base) Labels() libmodel.Labels {
-	return nil
-}
+func (r *PathBuilder) Path(m model.Model) (path string) {
+	var err error
+	if r.cache == nil {
+		r.cache = map[string]string{}
+	}
+	switch m.(type) {
+	case *model.VM:
+		vm := m.(*model.VM)
+		path = pathlib.Join(vm.UUID)
+	case *model.Network:
+		net := m.(*model.Network)
+		path = pathlib.Join(net.ID)
+	case *model.Disk:
+		disk := m.(*model.Disk)
+		path = pathlib.Join(disk.ID)
+	}
 
-// Name.
-func (m *Base) GetName() string {
-	return m.Name
-}
+	if err != nil {
+		log.Error(
+			err,
+			"path builder failed.",
+			"model",
+			libmodel.Describe(m))
+	}
 
-// Determine if current revision has been validated.
-func (m *VM) Validated() bool {
-	return m.RevisionValidated == m.Revision
-}
-
-type Network struct {
-	Base
-	Description string `sql:""`
-}
-
-type VM struct {
-	Base
-	OvaPath               string    `sql:""`
-	RevisionValidated     int64     `sql:"d0,index(revisionValidated)"`
-	PolicyVersion         int       `sql:"d0,index(policyVersion)"`
-	UUID                  string    `sql:""`
-	Firmware              string    `sql:""`
-	CpuAffinity           []int32   `sql:""`
-	CpuHotAddEnabled      bool      `sql:""`
-	CpuHotRemoveEnabled   bool      `sql:""`
-	MemoryHotAddEnabled   bool      `sql:""`
-	FaultToleranceEnabled bool      `sql:""`
-	CpuCount              int32     `sql:""`
-	CoresPerSocket        int32     `sql:""`
-	MemoryMB              int32     `sql:""`
-	BalloonedMemory       int32     `sql:""`
-	IpAddress             string    `sql:""`
-	NumaNodeAffinity      []string  `sql:""`
-	StorageUsed           int64     `sql:""`
-	ChangeTrackingEnabled bool      `sql:""`
-	Devices               []Device  `sql:""`
-	NICs                  []NIC     `sql:""`
-	Disks                 []Disk    `sql:""`
-	Networks              []Network `sql:""`
-	Concerns              []Concern `sql:""`
-}
-
-// Virtual Disk.
-type Disk struct {
-	Base
-	FilePath                string `sql:""`
-	Capacity                string `sql:""`
-	CapacityAllocationUnits string `sql:""`
-	DiskId                  string `sql:""`
-	FileRef                 string `sql:""`
-	Format                  string `sql:""`
-	PopulatedSize           string `sql:""`
-}
-
-// Virtual Device.
-type Device struct {
-	Kind string `sql:""`
-}
-
-type Conf struct {
-	Key   string `sql:""`
-	Value string `sql:""`
-}
-
-// Virtual ethernet card.
-type NIC struct {
-	Name   string `sql:""`
-	MAC    string `sql:""`
-	Config []Conf `sql:""`
+	return
 }
