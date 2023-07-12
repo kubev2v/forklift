@@ -1094,7 +1094,7 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 	//convention it will be automatically changed.
 	var originalName string
 
-	if errs := k8svalidation.IsDNS1123Label(vm.Name); !r.Plan.IsSourceProviderOCP() && len(errs) > 0 {
+	if errs := k8svalidation.IsDNS1123Label(vm.Name); len(errs) > 0 {
 		originalName = vm.Name
 		vm.Name, err = r.changeVmNameDNS1123(vm.Name, r.Plan.Spec.TargetNamespace)
 		if err != nil {
