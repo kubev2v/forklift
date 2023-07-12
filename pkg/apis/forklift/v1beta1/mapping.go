@@ -153,6 +153,18 @@ func (r *StorageMap) FindStorage(storageID string) (pair StoragePair, found bool
 	return
 }
 
+// Find storage map for source Name.
+func (r *StorageMap) FindStorageByName(storageName string) (pair StoragePair, found bool) {
+	for _, pair = range r.Spec.Map {
+		if pair.Source.Name == storageName {
+			found = true
+			break
+		}
+	}
+
+	return
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type StorageMapList struct {
 	meta.TypeMeta `json:",inline"`
