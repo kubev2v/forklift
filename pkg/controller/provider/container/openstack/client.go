@@ -18,6 +18,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumetypes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
+	"github.com/gophercloud/gophercloud/openstack/identity/v3/applicationcredentials"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/regions"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
@@ -301,31 +302,10 @@ func (r *Client) list(object interface{}, listopts interface{}) (err error) {
 	case *[]Project:
 		object := object.(*[]Project)
 		// TODO implement support multiple regions/projects sync per user
-		opts := listopts.(*ProjectListOpts)
-		opts.Name = r.getStringFromSecret(ProjectName)
-		allPages, err = projects.List(r.identityService, opts).AllPages()
-		if err != nil {
-			if !r.isForbidden(err) {
-				err = liberr.Wrap(err)
-				return
-			}
-			*object, err = r.getUserProjects()
-			if err != nil {
-				err = liberr.Wrap(err)
-			}
-			return
-		}
-		var projectList []projects.Project
-		projectList, err = projects.ExtractProjects(allPages)
+		*object, err = r.getUserProjects()
 		if err != nil {
 			err = liberr.Wrap(err)
-			return
 		}
-		var instanceList []Project
-		for _, project := range projectList {
-			instanceList = append(instanceList, Project{project})
-		}
-		*object = instanceList
 		return
 
 	case *[]Flavor:
@@ -699,9 +679,38 @@ func (r *Client) getUserProjects() (userProjects []Project, err error) {
 		err = liberr.Wrap(err)
 		return
 	}
+
+	projectName := r.getStringFromSecret(ProjectName)
+	projectID := r.getStringFromSecret(ProjectID)
+
+	if projectName == "" && projectID == "" {
+		applicationCredentialID := r.getStringFromSecret(ApplicationCredentialID)
+		if applicationCredentialID != "" {
+			var applicationCredential *applicationcredentials.ApplicationCredential
+			applicationCredential, err = applicationcredentials.Get(r.identityService, userID, applicationCredentialID).Extract()
+			if err != nil {
+				err = liberr.Wrap(err)
+				return
+			}
+			projectID = applicationCredential.ProjectID
+		}
+		applicationCredentialName := r.getStringFromSecret(ApplicationCredentialName)
+		if applicationCredentialName != "" {
+			var applicationCredentials []applicationcredentials.ApplicationCredential
+			allPages, err = applicationcredentials.List(r.identityService, userID, &applicationcredentials.ListOpts{Name: applicationCredentialName}).AllPages()
+			if err != nil {
+				err = liberr.Wrap(err)
+				return
+			}
+			applicationCredentials, err = applicationcredentials.ExtractApplicationCredentials(allPages)
+			projectID = applicationCredentials[0].ProjectID
+		}
+
+	}
+
 	for _, project := range projectList {
 		// TODO implement support multiple regions/projects sync per user
-		if project.Name == r.getStringFromSecret(ProjectName) {
+		if project.Name == projectName || project.ID == projectID {
 			userProjects = append(userProjects, Project{project})
 		}
 	}
