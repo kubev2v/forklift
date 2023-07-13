@@ -28,11 +28,6 @@ func (b *Base) int64(s string) (v int64) {
 	return
 }
 
-func (vm *VM) int64(s string) (v int64) {
-	v, _ = strconv.ParseInt(s, 10, 64)
-	return
-}
-
 // VM.
 type VM struct {
 	Name                  string   `json:"Name"`
@@ -67,12 +62,12 @@ type VM struct {
 	} `json:"Nics"`
 	Disks []struct {
 		FilePath                string `json:"FilePath"`
-		Capacity                string `json:"Capacity"`
+		Capacity                int64  `json:"Capacity"`
 		CapacityAllocationUnits string `json:"CapacityAllocationUnits"`
 		DiskId                  string `json:"DiskId"`
 		FileRef                 string `json:"FileRef"`
 		Format                  string `json:"Format"`
-		PopulatedSize           string `json:"PopulatedSize"`
+		PopulatedSize           int64  `json:"PopulatedSize"`
 	} `json:"Disks"`
 	Networks []struct {
 		Name        string `json:"Name"`
@@ -135,12 +130,12 @@ func (r *VM) addDisks(m *model.VM) {
 			m.Disks,
 			model.Disk{
 				FilePath:                disk.FilePath,
-				Capacity:                r.int64(disk.Capacity),
+				Capacity:                disk.Capacity,
 				CapacityAllocationUnits: disk.CapacityAllocationUnits,
 				DiskId:                  disk.DiskId,
 				FileRef:                 disk.FileRef,
 				Format:                  disk.Format,
-				PopulatedSize:           r.int64(disk.PopulatedSize),
+				PopulatedSize:           disk.PopulatedSize,
 			})
 	}
 }

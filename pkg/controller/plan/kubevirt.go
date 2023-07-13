@@ -1458,8 +1458,8 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 		Name: "nfs",
 		VolumeSource: core.VolumeSource{
 			NFS: &core.NFSVolumeSource{
-				Server: "10.46.9.67",
-				Path:   "/sd1/sd/ova",
+				Server: server,
+				Path:   "/ova/ova",
 			},
 		},
 	})
@@ -1474,7 +1474,7 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 		},
 		core.VolumeMount{
 			Name:      "nfs",
-			MountPath: "/mnt/nfs/",
+			MountPath: "/mnt/nfs",
 		},
 	)
 

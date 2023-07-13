@@ -1,13 +1,14 @@
 package main
 
 import (
+	"archive/tar"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -50,12 +51,12 @@ type DiskSection struct {
 
 type Disk struct {
 	XMLName                 xml.Name `xml:"Disk"`
-	Capacity                string   `xml:"capacity,attr"`
+	Capacity                int64    `xml:"capacity,attr"`
 	CapacityAllocationUnits string   `xml:"capacityAllocationUnits,attr"`
 	DiskId                  string   `xml:"diskId,attr"`
 	FileRef                 string   `xml:"fileRef,attr"`
 	Format                  string   `xml:"format,attr"`
-	PopulatedSize           string   `xml:"populatedSize,attr"`
+	PopulatedSize           int64    `xml:"populatedSize,attr"`
 }
 
 type NetworkSection struct {
@@ -117,12 +118,12 @@ type VM struct {
 // Virtual Disk.
 type VmDisk struct {
 	FilePath                string
-	Capacity                string
+	Capacity                int64
 	CapacityAllocationUnits string
 	DiskId                  string
 	FileRef                 string
 	Format                  string
-	PopulatedSize           string
+	PopulatedSize           int64
 }
 
 // Virtual Device.
@@ -153,15 +154,16 @@ func main() {
 	http.HandleFunc("/disks", diskHandler)
 	http.HandleFunc("/networks", networkHandler)
 	http.HandleFunc("/watch", watchdHandler)
-	http.HandleFunc("/test_connection", connHendler)
+	http.HandleFunc("/test_connection", connHandler)
 
 	http.ListenAndServe(":8080", nil)
 
 }
 
-func connHendler(w http.ResponseWriter, r *http.Request) {
+func connHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode("")
+	json.NewEncoder(w).Encode("Test connection successful")
+	fmt.Println("Test connection handeler was called")
 }
 
 func vmHandler(w http.ResponseWriter, r *http.Request) {
@@ -169,14 +171,15 @@ func vmHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
-	vmXML, ovfPath := scanOVAsOnNFS()
-	vmStruct, err := convertToVmStruct(vmXML, ovfPath)
+	vmXML, ovaPath := scanOVAsOnNFS()
+	vmStruct, err := convertToVmStruct(vmXML, ovaPath)
 	if err != nil {
 		fmt.Println("Error processing OVF file:", err)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(vmStruct)
+	fmt.Println("VM handeler was called")
 }
 
 func diskHandler(w http.ResponseWriter, r *http.Request) {
@@ -184,8 +187,8 @@ func diskHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
-	xmlStruct, ovfPath := scanOVAsOnNFS()
-	diskStruct, err := convertToDiskStruct(xmlStruct, ovfPath)
+	xmlStruct, ovaPath := scanOVAsOnNFS()
+	diskStruct, err := convertToDiskStruct(xmlStruct, ovaPath)
 	if err != nil {
 		fmt.Println("Error processing OVF file:", err)
 		return
@@ -193,6 +196,7 @@ func diskHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(diskStruct)
+	fmt.Println("Disk handeler was called")
 }
 
 func networkHandler(w http.ResponseWriter, r *http.Request) {
@@ -209,6 +213,7 @@ func networkHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(netStruct)
+	fmt.Println("Network handeler was called")
 }
 
 func watchdHandler(w http.ResponseWriter, r *http.Request) {
@@ -217,90 +222,105 @@ func watchdHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func scanOVAsOnNFS() (envelopes []Envelope, ovaPaths []string) {
-	ovaFiles, err := findOVAFiles("/ova")
+	ovaFiles, ovfFiles, err := findOVAFiles("/ova")
 	if err != nil {
-		fmt.Println("Error finding OVA files:", err)
+		fmt.Println("Error finding OVA anf OVF files:", err)
 		return
 	}
+
+	var filesPath []string
 
 	for _, ovaFile := range ovaFiles {
 		fmt.Println("Processing OVA file:", ovaFile)
 
-		ovfPath, tmpDir, err := extractOVFFromOVA(ovaFile)
+		xmlStruct, err := readOVFFromOVA(ovaFile)
 		if err != nil {
-			fmt.Println("Error extracting OVF from OVA:", err)
+			fmt.Println("Error processing OVF from OVA:", err)
 			continue
 		}
-
-		xmlStruct, err := processOVF(ovfPath)
-		if err != nil {
-			fmt.Println("Error processing OVF file:", err)
-			os.RemoveAll(tmpDir)
-		}
-
-		os.RemoveAll(tmpDir)
 		envelopes = append(envelopes, *xmlStruct)
-		ovaPaths = append(ovaPaths, ovfPath)
+		filesPath = append(filesPath, ovaFile)
+	}
+
+	for _, ovfFile := range ovfFiles {
+		fmt.Println("Processing OVF file:", ovfFile)
+
+		xmlStruct, err := readOVF(ovfFile)
+		if err != nil {
+			fmt.Println("Error processing OVF:", err)
+			continue
+		}
+		envelopes = append(envelopes, *xmlStruct)
+		filesPath = append(filesPath, ovfFile)
 
 	}
-	return *&envelopes, ovaPaths
+	return envelopes, filesPath
 }
 
-func findOVAFiles(directory string) ([]string, error) {
-	var ovaFiles []string
+func findOVAFiles(directory string) ([]string, []string, error) {
+	var ovaFiles, ovfFiles []string
 
-	err := filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
+	dirs, err := ioutil.ReadDir(directory)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	for _, dir := range dirs {
+		if dir.IsDir() {
+			newDir := directory + "/" + dir.Name()
+			files, err := ioutil.ReadDir(newDir)
+			if err != nil {
+				return nil, nil, err
+			}
+			for _, file := range files {
+				if strings.HasSuffix(strings.ToLower(file.Name()), ".ova") {
+					ovaFiles = append(ovaFiles, filepath.Join(directory, dir.Name(), file.Name()))
+				}
+
+				if strings.HasSuffix(strings.ToLower(file.Name()), ".ovf") {
+					ovfFiles = append(ovfFiles, filepath.Join(directory, dir.Name(), file.Name()))
+				}
+			}
 		}
+	}
+	return ovaFiles, ovfFiles, nil
+}
 
-		if !info.IsDir() && strings.HasSuffix(strings.ToLower(info.Name()), ".ova") {
-			ovaFiles = append(ovaFiles, path)
-		}
-
-		return nil
-	})
-
+func readOVFFromOVA(ovaFile string) (*Envelope, error) {
+	var envelope Envelope
+	file, err := os.Open(ovaFile)
 	if err != nil {
 		return nil, err
 	}
+	defer file.Close()
 
-	return ovaFiles, nil
+	reader := tar.NewReader(file)
+	for {
+		hdr, err := reader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		if strings.HasSuffix(hdr.Name, ".ovf") {
+			decoder := xml.NewDecoder(reader)
+			err = decoder.Decode(&envelope)
+			if err != nil {
+				return nil, err
+			}
+			break
+		}
+	}
+
+	return &envelope, nil
 }
 
-func extractOVFFromOVA(ovaFile string) (string, string, error) {
-	tmpDir, err := ioutil.TempDir("", "ova_extraction")
-	print(tmpDir)
-	if err != nil {
-		os.RemoveAll(tmpDir)
-		return "", "", err
-	}
-
-	cmd := exec.Command("tar", "-xf", ovaFile, "-C", tmpDir, "*.ovf")
-	err = cmd.Run()
-	if err != nil {
-		os.RemoveAll(tmpDir)
-		return "", "", err
-	}
-
-	ovfFiles, err := filepath.Glob(filepath.Join(tmpDir, "*.ovf"))
-	if err != nil {
-		os.RemoveAll(tmpDir)
-		return "", "", err
-	}
-
-	if len(ovfFiles) == 0 {
-		os.RemoveAll(tmpDir)
-		return "", "", fmt.Errorf("no OVF file found in the OVA")
-	}
-
-	return ovfFiles[0], tmpDir, nil
-}
-
-func processOVF(ovfPath string) (*Envelope, error) {
+func readOVF(ovfFile string) (*Envelope, error) {
 	var envelope Envelope
 
-	xmlFile, err := os.Open(ovfPath)
+	xmlFile, err := os.Open(ovfFile)
 	if err != nil {
 		return nil, err
 	}
@@ -312,39 +332,6 @@ func processOVF(ovfPath string) (*Envelope, error) {
 	if err != nil {
 		return &envelope, err
 	}
-
-	fmt.Println("Virtual Systems:")
-	for _, virtualSystem := range envelope.VirtualSystem {
-		fmt.Println("Virtual System ID:", virtualSystem.ID)
-		fmt.Println("Virtual System Name:", virtualSystem.Name)
-		fmt.Println("Operating System Description:", virtualSystem.OperatingSystemSection.Description)
-		fmt.Println("Virtual Hardware Info:", virtualSystem.HardwareSection.Info)
-
-		fmt.Println("Virtual System Items:")
-		for _, item := range virtualSystem.HardwareSection.Items {
-			fmt.Printf("ElementName: %s, InstanceID: %s, ResourceType: %s\n", item.ElementName, item.InstanceID, item.ResourceType)
-			for _, conf := range item.Configs {
-				fmt.Printf("conf req: %s, key: %s, value: %s", conf.Required, conf.Key, conf.Value)
-			}
-		}
-
-		fmt.Println("Disk Settings:")
-		for _, disk := range envelope.DiskSection.Disks {
-			fmt.Printf("DiskSize: %s, DiskId: %s\n", disk.Capacity, disk.DiskId)
-		}
-
-		fmt.Println("Network Settings:")
-		for _, network := range envelope.NetworkSection.Networks {
-			fmt.Printf("NetworkName: %s, NetworkId: %s\n", network.Name, network.Description)
-		}
-
-		fmt.Println("Config:")
-		for _, conf := range virtualSystem.HardwareSection.Configs {
-			fmt.Printf("conf req: %s, key: %s, value: %s", conf.Required, conf.Key, conf.Value)
-		}
-		fmt.Println()
-	}
-
 	return &envelope, nil
 }
 
@@ -384,7 +371,7 @@ func convertToVmStruct(envelope []Envelope, ovaPath []string) ([]VM, error) {
 
 			for _, disk := range vmXml.DiskSection.Disks {
 				newVM.Disks = append(newVM.Disks, VmDisk{
-					FilePath:                ovaPath[i],
+					FilePath:                getDiskPath(ovaPath[i]),
 					Capacity:                disk.Capacity,
 					CapacityAllocationUnits: disk.CapacityAllocationUnits,
 					DiskId:                  disk.DiskId,
@@ -439,7 +426,7 @@ func convertToDiskStruct(envelope []Envelope, ovaPath []string) ([]VmDisk, error
 		ova := envelope[i]
 		for _, disk := range ova.DiskSection.Disks {
 			newDisk := VmDisk{
-				FilePath:                ovaPath[i],
+				FilePath:                getDiskPath(ovaPath[i]),
 				Capacity:                disk.Capacity,
 				CapacityAllocationUnits: disk.CapacityAllocationUnits,
 				DiskId:                  disk.DiskId,
@@ -453,4 +440,16 @@ func convertToDiskStruct(envelope []Envelope, ovaPath []string) ([]VmDisk, error
 	}
 
 	return disks, nil
+}
+
+func getDiskPath(path string) string {
+	if filepath.Ext(path) != ".ovf" {
+		return path
+	}
+
+	i := strings.LastIndex(path, "/")
+	if i > -1 {
+		return path[:i+1]
+	}
+	return path
 }
