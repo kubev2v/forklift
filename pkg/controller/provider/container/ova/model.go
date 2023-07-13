@@ -3,6 +3,7 @@ package ova
 import (
 	"context"
 	"errors"
+
 	"github.com/go-logr/logr"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ova"
 	fb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
