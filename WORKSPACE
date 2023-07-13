@@ -36,6 +36,13 @@ http_file(
     ],
 )
 
+load("@io_bazel_rules_docker//contrib:dockerfile_build.bzl", "dockerfile_image")
+
+dockerfile_image(
+    name = "ova-provider-server-image-dockerfile",
+    dockerfile = "//:ova_provider_server_containerfile",
+)
+
 load(
     "@io_bazel_rules_docker//toolchains/docker:toolchain.bzl",
     docker_toolchain_configure = "toolchain_configure",
