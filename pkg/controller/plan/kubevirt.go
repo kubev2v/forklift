@@ -1452,6 +1452,8 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 			},
 		},
 	})
+	server := r.Source.Provider.Spec.URL
+	//path from disk
 	volumes = append(volumes, core.Volume{
 		Name: "nfs",
 		VolumeSource: core.VolumeSource{

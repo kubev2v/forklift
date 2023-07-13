@@ -1,30 +1,24 @@
 package ova
 
 import (
-	"context"
 	"fmt"
-	"path"
-	"regexp"
-	"sort"
-	"strings"
-
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/ova"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
+	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ova"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
-	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"math"
+	"path"
+	"regexp"
 )
 
 // BIOS types
@@ -68,54 +62,8 @@ const (
 	AnnImportBackingFile = "cdi.kubevirt.io/storage.import.backingFile"
 )
 
-// Map of vmware guest ids to osinfo ids.
-var osMap = map[string]string{
-	"centos64Guest":         "centos5.11",
-	"centos6_64Guest":       "centos6.10",
-	"centos6Guest":          "centos6.10",
-	"centos7_64Guest":       "centos7.0",
-	"centos7Guest":          "centos7.0",
-	"centos8_64Guest":       "centos8",
-	"centos8Guest":          "centos8",
-	"debian4_64Guest":       "debian4",
-	"debian4Guest":          "debian4",
-	"debian5_64Guest":       "debian5",
-	"debian5Guest":          "debian5",
-	"debian6_64Guest":       "debian6",
-	"debian6Guest":          "debian6",
-	"debian7_64Guest":       "debian7",
-	"debian7Guest":          "debian7",
-	"debian8_64Guest":       "debian8",
-	"debian8Guest":          "debian8",
-	"debian9_64Guest":       "debian9",
-	"debian9Guest":          "debian9",
-	"debian10_64Guest":      "debian10",
-	"debian10Guest":         "debian10",
-	"fedora64Guest":         "fedora31",
-	"fedoraGuest":           "fedora31",
-	"genericLinuxGuest":     "linux",
-	"rhel6_64Guest":         "rhel6.10",
-	"rhel6Guest":            "rhel6.10",
-	"rhel7_64Guest":         "rhel7.7",
-	"rhel7Guest":            "rhel7.7",
-	"rhel8_64Guest":         "rhel8.1",
-	"ubuntu64Guest":         "ubuntu18.04",
-	"ubuntuGuest":           "ubuntu18.04",
-	"win2000AdvServGuest":   "win2k",
-	"win2000ProGuest":       "win2k",
-	"win2000ServGuest":      "win2k",
-	"windows7Guest":         "win7",
-	"windows7Server64Guest": "win2k8r2",
-	"windows8_64Guest":      "win8",
-	"windows8Guest":         "win8",
-	"windows8Server64Guest": "win2k12r2",
-	"windows9_64Guest":      "win10",
-	"windows9Guest":         "win10",
-	"windows9Server64Guest": "win2k19",
-}
-
 // Regex which matches the snapshot identifier suffix of a
-// vSphere disk backing file.
+// OVA disk backing file.
 var backingFilePattern = regexp.MustCompile("-\\d\\d\\d\\d\\d\\d.vmdk")
 
 // vSphere builder.
@@ -185,9 +133,10 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 			Name:  "V2V_vmName",
 			Value: vm.Name,
 		},
+		// TODO support many disks
 		core.EnvVar{
 			Name:  "V2V_diskPath",
-			Value: "/mnt/nfs/centos44_new.ova",
+			Value: "/mnt/nfs/ova/centos44_new.ova",
 		},
 		core.EnvVar{
 			Name:  "V2V_provider",
@@ -199,13 +148,7 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 
 // Build the DataVolume credential secret.
 func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
-	thumbprint := string(in.Data["thumbprint"])
-	object.StringData = map[string]string{
-		"accessKeyId": string(in.Data["user"]),
-		"secretKey":   string(in.Data["password"]),
-		"thumbprint":  thumbprint,
-	}
-
+	// TODO only if we want to save some data for DV.
 	return
 }
 
@@ -226,14 +169,15 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 	for i := range dsMapIn {
 		mapped := &dsMapIn[i]
 		ref := mapped.Source
-		ds := &model.Datastore{}
+		ds := &model.Disk{}
 		fErr := r.Source.Inventory.Find(ds, ref)
 		if fErr != nil {
 			err = fErr
 			return
 		}
 		for _, disk := range vm.Disks {
-			if disk.Datastore.ID == ds.ID {
+			if disk.ID == ds.ID {
+				diskSize := disk.Capacity * int64(math.Pow(2, 20))
 				storageClass := mapped.Destination.StorageClass
 				var dvSource cdi.DataVolumeSource
 				// Let virt-v2v do the copying
@@ -245,7 +189,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 					Storage: &cdi.StorageSpec{
 						Resources: core.ResourceRequirements{
 							Requests: core.ResourceList{
-								core.ResourceStorage: *resource.NewQuantity(disk.Capacity, resource.BinarySI),
+								core.ResourceStorage: *resource.NewQuantity(diskSize, resource.BinarySI),
 							},
 						},
 						StorageClassName: &storageClass,
@@ -265,7 +209,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 				if dv.ObjectMeta.Annotations == nil {
 					dv.ObjectMeta.Annotations = make(map[string]string)
 				}
-				dv.ObjectMeta.Annotations[planbase.AnnDiskSource] = trimBackingFileName(disk.File)
+				dv.ObjectMeta.Annotations[planbase.AnnDiskSource] = trimBackingFileName(disk.FilePath)
 				dvs = append(dvs, *dv)
 			}
 		}
@@ -287,24 +231,17 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 		return
 	}
 
-	if vm.IsTemplate {
+	/*if vm.IsTemplate {
 		err = liberr.New(
 			fmt.Sprintf(
 				"VM %s is a template",
 				vmRef.String()))
 		return
-	}
-	if types.VirtualMachineConnectionState(vm.ConnectionState) != types.VirtualMachineConnectionStateConnected {
+	}*/
+	if r.Plan.Spec.Warm {
 		err = liberr.New(
 			fmt.Sprintf(
-				"VM %s is not connected",
-				vmRef.String()))
-		return
-	}
-	if r.Plan.Spec.Warm && !vm.ChangeTrackingEnabled {
-		err = liberr.New(
-			fmt.Sprintf(
-				"Changed Block Tracking (CBT) is disabled for VM %s",
+				"Warm migration is disabled for VM %s from OVA provider",
 				vmRef.String()))
 		return
 	}
@@ -353,15 +290,11 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 			return
 		}
 
-		needed := []vsphere.NIC{}
+		needed := []ova.NIC{}
 		for _, nic := range vm.NICs {
-			switch network.Variant {
-			case vsphere.NetDvPortGroup:
-				if nic.Network.ID == network.Key {
-					needed = append(needed, nic)
-				}
+			switch network.Variant { // TODO ??
 			default:
-				if nic.Network.ID == network.ID {
+				if nic.Name == network.Name {
 					needed = append(needed, nic)
 				}
 			}
@@ -462,9 +395,10 @@ func (r *Builder) mapDisks(vm *model.VM, persistentVolumeClaims []core.Persisten
 	var kDisks []cnv.Disk
 
 	disks := vm.Disks
-	sort.Slice(disks, func(i, j int) bool {
+	// TODO might need sort by the disk id (incremental name)
+	/*sort.Slice(disks, func(i, j int) bool {
 		return disks[i].Key < disks[j].Key
-	})
+	})*/
 	pvcMap := make(map[string]*core.PersistentVolumeClaim)
 	for i := range persistentVolumeClaims {
 		pvc := &persistentVolumeClaims[i]
@@ -476,7 +410,7 @@ func (r *Builder) mapDisks(vm *model.VM, persistentVolumeClaims []core.Persisten
 		}
 	}
 	for i, disk := range disks {
-		pvc := pvcMap[trimBackingFileName(disk.File)]
+		pvc := pvcMap[trimBackingFileName(disk.DiskId)]
 		volumeName := fmt.Sprintf("vol-%v", i)
 		volume := cnv.Volume{
 			Name: volumeName,
@@ -520,7 +454,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 		list = append(
 			list,
 			&plan.Task{
-				Name: trimBackingFileName(disk.File),
+				Name: trimBackingFileName(disk.DiskId),
 				Progress: libitr.Progress{
 					Total: mB,
 				},
@@ -545,16 +479,7 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 		return
 	}
 
-	var os string
-	if vm.GuestID != "" {
-		os = osMap[vm.GuestID]
-	} else if strings.Contains(vm.GuestName, "linux") || strings.Contains(vm.GuestName, "rhel") {
-		os = DefaultLinux
-	} else if strings.Contains(vm.GuestName, "win") {
-		os = DefaultWindows
-	} else {
-		os = Unknown
-	}
+	os := Unknown
 
 	labels = make(map[string]string)
 	labels[fmt.Sprintf(TemplateOSLabel, os)] = "true"
@@ -572,55 +497,6 @@ func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
 // Return a stable identifier for a PersistentDataVolume.
 func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string {
 	return trimBackingFileName(pvc.Annotations[AnnImportBackingFile])
-}
-
-// Find host ID for VM.
-func (r *Builder) hostID(vmRef ref.Ref) (hostID string, err error) {
-	vm := &model.VM{}
-	err = r.Source.Inventory.Find(vm, vmRef)
-	if err != nil {
-		err = liberr.Wrap(
-			err,
-			"VM lookup failed.",
-			"vm",
-			vmRef.String())
-		return
-	}
-
-	hostID = vm.Host
-
-	return
-}
-
-// Find host CR secret.
-func (r *Builder) hostSecret(host *api.Host) (secret *core.Secret, err error) {
-	ref := host.Spec.Secret
-	secret = &core.Secret{}
-	err = r.Get(
-		context.TODO(),
-		client.ObjectKey{
-			Namespace: ref.Namespace,
-			Name:      ref.Name,
-		},
-		secret)
-	err = liberr.Wrap(err)
-
-	return
-}
-
-// Find host in the inventory.
-func (r *Builder) host(hostID string) (host *model.Host, err error) {
-	host = &model.Host{}
-	err = r.Source.Inventory.Get(host, hostID)
-	if err != nil {
-		err = liberr.Wrap(
-			err,
-			"Host lookup failed.",
-			"host",
-			hostID)
-	}
-
-	return
 }
 
 // Trims the snapshot suffix from a disk backing file name if there is one.

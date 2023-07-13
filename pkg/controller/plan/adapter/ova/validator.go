@@ -4,11 +4,11 @@ import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
+	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ova"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 )
 
-// vSphere validator.
+// OVA validator.
 type Validator struct {
 	plan      *api.Plan
 	inventory web.Client
@@ -16,13 +16,13 @@ type Validator struct {
 
 // Load.
 func (r *Validator) Load() (err error) {
-	//r.inventory, err = web.NewClient(r.plan.Referenced.Provider.Source)
+	r.inventory, err = web.NewClient(r.plan.Referenced.Provider.Source)
 	return
 }
 
 // Validate whether warm migration is supported from this provider type.
 func (r *Validator) WarmMigration() (ok bool) {
-	ok = true
+	ok = false
 	return
 }
 
@@ -79,7 +79,8 @@ func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
 			return
 		}
 		for _, nic := range vm.NICs {
-			if nic.Network.ID == network.ID && mapped.Destination.Type == Pod {
+			// TODO move from NIC name to NIC ID? ID should be unique
+			if nic.Name == network.Name && mapped.Destination.Type == Pod {
 				podMapped++
 			}
 		}
@@ -106,7 +107,7 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 	}
 
 	for _, disk := range vm.Disks {
-		if !r.plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{ID: disk.Datastore.ID}) {
+		if !r.plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{ID: disk.ID}) {
 			return
 		}
 	}
