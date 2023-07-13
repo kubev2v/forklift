@@ -50,6 +50,15 @@ load(
 )
 
 container_push(
+    name = "push-ova-provider-server",
+    format = "Docker",
+    image = "//cmd/ova-provider-server:ova-provider-server-image",
+    registry = "$${REGISTRY:-quay.io}",
+    repository = "$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}forklift-ova-provider-server",
+    tag = "$${REGISTRY_TAG:-devel}",
+)
+
+container_push(
     name = "push-forklift-controller",
     format = "Docker",
     image = "//cmd/forklift-controller:forklift-controller-image",

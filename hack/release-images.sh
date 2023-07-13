@@ -26,7 +26,7 @@ bazel run --package_path=virt-v2v/warm push-forklift-virt-v2v-warm
 bazel run push-populator-controller
 bazel run push-forklift-controller
 bazel run push-forklift-validation
-bazel run push-ova-provider-server-image
+bazel run push-ova-provider-server
 bazel run push-forklift-operator
 bazel run push-forklift-operator-bundle \
     --action_env OPERATOR_IMAGE=${OPERATOR_IMAGE} \
