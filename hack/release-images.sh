@@ -39,7 +39,7 @@ bazel run push-forklift-operator-bundle \
     --action_env VIRT_V2V_WARM_IMAGE=${VIRT_V2V_WARM_IMAGE} \
     --action_env CONTROLLER_IMAGE=${CONTROLLER_IMAGE} \
     --action_env API_IMAGE=${API_IMAGE} \
-    --action_env POPULATOR_CONTROLLER_IMAGE=${POPULATOR_CONTROLLER_IMAGE}
+    --action_env POPULATOR_CONTROLLER_IMAGE=${POPULATOR_CONTROLLER_IMAGE} \
     --action_env OVA_PROVIDER_SERVER=${OVA_PROVIDER_SERVER=} \
 bazel run push-forklift-operator-index \
     --action_env REGISTRY=${REGISTRY} \
