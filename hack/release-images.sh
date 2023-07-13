@@ -18,6 +18,7 @@ VIRT_V2V_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-virt-v2v:${REGISTRY_TAG}
 VIRT_V2V_WARM_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-virt-v2v-warm:${REGISTRY_TAG}
 API_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-api:${REGISTRY_TAG}
 POPULATOR_CONTROLLER_IMAGE=${REGISTRY}/${REGISTRY_ACCOUNT}/populator-controller:${REGISTRY_TAG}
+OVA_PROVIDER_SERVER=${REGISTRY}/${REGISTRY_ACCOUNT}/forklift-ova-provider-server:${REGISTRY_TAG}
 
 bazel run push-forklift-api
 bazel run --package_path=virt-v2v/cold push-forklift-virt-v2v
@@ -25,6 +26,7 @@ bazel run --package_path=virt-v2v/warm push-forklift-virt-v2v-warm
 bazel run push-populator-controller
 bazel run push-forklift-controller
 bazel run push-forklift-validation
+bazel run push-ova-provider-server-image
 bazel run push-forklift-operator
 bazel run push-forklift-operator-bundle \
     --action_env OPERATOR_IMAGE=${OPERATOR_IMAGE} \
@@ -38,6 +40,7 @@ bazel run push-forklift-operator-bundle \
     --action_env CONTROLLER_IMAGE=${CONTROLLER_IMAGE} \
     --action_env API_IMAGE=${API_IMAGE} \
     --action_env POPULATOR_CONTROLLER_IMAGE=${POPULATOR_CONTROLLER_IMAGE}
+    --action_env OVA_PROVIDER_SERVER=${OVA_PROVIDER_SERVER=} \
 bazel run push-forklift-operator-index \
     --action_env REGISTRY=${REGISTRY} \
     --action_env REGISTRY_TAG=${REGISTRY_TAG} \
