@@ -1309,9 +1309,17 @@ func (r *Migration) setRunning(vm *plan.VMStatus, running bool) (err error) {
 	var vmCr VirtualMachine
 	found := false
 	if vmCr, found = r.vmMap[vm.ID]; !found {
-		msg := "VirtualMachine CR not found."
-		vm.AddError(msg)
-		return
+		// Recreate the map and check again, the map may be stale
+		r.vmMap, err = r.kubevirt.VirtualMachineMap()
+		if err != nil {
+			return
+		}
+
+		if vmCr, found = r.vmMap[vm.ID]; !found {
+			msg := "VirtualMachine CR not found."
+			vm.AddError(msg)
+			return
+		}
 	}
 
 	if vmCr.Spec.Running != nil && *vmCr.Spec.Running == running {
