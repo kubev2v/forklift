@@ -42,6 +42,7 @@ OPERATOR_INDEX_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/forklift-operator-index:
 POPULATOR_CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/populator-controller:$(REGISTRY_TAG)
 OVIRT_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/ovirt-populator:$(REGISTRY_TAG)
 OPENSTACK_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/openstack-populator:$(REGISTRY_TAG)
+OVA_PROVIDER_SERVER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ACCOUNT)/ova-provider-server:$(REGISTRY_TAG)
 
 ### External images
 MUST_GATHER_IMAGE ?= quay.io/kubev2v/forklift-must-gather:latest
@@ -221,7 +222,8 @@ build-operator-bundle-image: check_container_runtmime
 		--action_env API_IMAGE=$(API_IMAGE) \
 		--action_env POPULATOR_CONTROLLER_IMAGE=$(POPULATOR_CONTROLLER_IMAGE) \
 		--action_env OVIRT_POPULATOR_IMAGE=$(OVIRT_POPULATOR_IMAGE) \
-		--action_env OPENSTACK_POPULATOR_IMAGE=$(OPENSTACK_POPULATOR_IMAGE)
+		--action_env OPENSTACK_POPULATOR_IMAGE=$(OPENSTACK_POPULATOR_IMAGE)\
+		--action_env OVA_PROVIDER_SERVER_IMAGE=$(OVA_PROVIDER_SERVER_IMAGE)
 
 push-operator-bundle-image: build-operator-bundle-image
 	 $(CONTAINER_CMD) tag bazel/operator:forklift-operator-bundle-image $(OPERATOR_BUNDLE_IMAGE)
@@ -268,6 +270,12 @@ build-openstack-populator-image: check_container_runtmime
 push-openstack-populator-image: build-openstack-populator-image
 	$(CONTAINER_CMD) push $(OPENSTACK_POPULATOR_IMAGE)
 
+build-ova-provider-server-image: check_container_runtmime
+	$(CONTAINER_CMD) build -f hack/ova-provider-server/Containerfile -t $(OVA_PROVIDER_SERVER_IMAGE) .
+
+push-ova-provider-server-image: build-ova-provider-server-image
+	$(CONTAINER_CMD) push $(OVA_PROVIDER_SERVER_IMAGE)
+
 build-all-images: build-api-image \
                   build-controller-image \
                   build-validation-image \
@@ -278,7 +286,8 @@ build-all-images: build-api-image \
                   build-operator-index-image \
                   build-populator-controller-image \
                   build-ovirt-populator-image \
-                  build-openstack-populator-image
+                  build-openstack-populator-image\
+                  build-ova-provider-server-image
 
 push-all-images:  push-api-image \
                   push-controller-image \
@@ -290,7 +299,8 @@ push-all-images:  push-api-image \
                   push-operator-index-image \
                   push-populator-controller-image \
                   push-ovirt-populator-image \
-                  push-openstack-populator-image
+                  push-openstack-populator-image\
+                  push-ova-provider-server-image
 
 .PHONY: check_container_runtmime
 check_container_runtmime:
