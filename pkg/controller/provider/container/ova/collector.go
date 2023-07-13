@@ -304,7 +304,8 @@ func (r *Collector) endWatch() {
 // DB transaction while using the provider API which
 // can block or be slow.
 func (r *Collector) refresh(ctx *Context) (err error) {
-	var updates []Updater
+	// TODO fix the refresh to not refresh every reconcile
+	/*var updates []Updater
 	mark := time.Now()
 	for _, adapter := range adapterList {
 		if ctx.canceled() {
@@ -322,7 +323,7 @@ func (r *Collector) refresh(ctx *Context) (err error) {
 	r.log.Info(
 		"Refresh finished.",
 		"duration",
-		time.Since(mark))
+		time.Since(mark))*/
 	return
 }
 
