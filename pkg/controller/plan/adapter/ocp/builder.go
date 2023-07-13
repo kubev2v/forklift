@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
@@ -303,6 +304,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	targetVmSpec := sourceVm.Spec.DeepCopy()
 	object.Template = targetVmSpec.Template
 	r.mapDisks(sourceVm, targetVmSpec, persistentVolumeClaims, vmRef)
+	r.mapNetworks(sourceVm, targetVmSpec)
 
 	return nil
 }
@@ -373,6 +375,53 @@ func (r *Builder) mapDisks(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.Virtu
 			targetVmSpec.Template.Spec.Domain.Devices.Disks = append(targetVmSpec.Template.Spec.Domain.Devices.Disks, targetDisk)
 		}
 	}
+}
+
+func (r *Builder) mapNetworks(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.VirtualMachineSpec) {
+	var networks []cnv.Network
+	var interfaces []cnv.Interface
+
+	// Map networks to NICs
+	interfacesMap := make(map[string]*cnv.Interface)
+	for _, ifc := range sourceVm.Spec.Template.Spec.Domain.Devices.Interfaces {
+		networkName := ifc.Name
+		interfacesMap[networkName] = &ifc
+	}
+
+	var kInterface *cnv.Interface
+
+	for _, network := range sourceVm.Spec.Template.Spec.Networks {
+		targetNetwork := cnv.Network{Name: network.Name}
+
+		kInterface = interfacesMap[network.Name]
+		kInterface.Name = network.Name
+
+		switch {
+		case network.Multus != nil:
+			namespace := strings.Split(network.Multus.NetworkName, "/")[0]
+			name := strings.Split(network.Multus.NetworkName, "/")[1]
+			pair, found := r.Map.Network.FindNetworkByNameAndNamespace(namespace, name)
+			if !found {
+				r.Log.Info("Network not found", "namespace", namespace, "name", name)
+				continue
+			}
+			targetNetwork.Multus = &cnv.MultusNetwork{
+				NetworkName: fmt.Sprintf("%s/%s", pair.Destination.Namespace, pair.Destination.Name),
+			}
+
+		case network.Pod != nil:
+			targetNetwork.Pod = &cnv.PodNetwork{}
+		default:
+			r.Log.Error(nil, "Unknown network type")
+			continue
+		}
+
+		networks = append(networks, targetNetwork)
+		interfaces = append(interfaces, *kInterface)
+	}
+
+	targetVmSpec.Template.Spec.Networks = networks
+	targetVmSpec.Template.Spec.Domain.Devices.Interfaces = interfaces
 }
 
 func (r *Builder) getSourceVmFromDefinition(vme *export.VirtualMachineExport) (*cnv.VirtualMachine, error) {
