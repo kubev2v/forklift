@@ -61,6 +61,8 @@ type VM struct {
 		} `json:"Config"`
 	} `json:"Nics"`
 	Disks []struct {
+		ID                      string `json:"Id"`
+		Name                    string `json:"Name"`
 		FilePath                string `json:"FilePath"`
 		Capacity                int64  `json:"Capacity"`
 		CapacityAllocationUnits string `json:"CapacityAllocationUnits"`
@@ -178,6 +180,8 @@ func (r *Network) ApplyTo(m *model.Network) {
 
 // Disk.
 type Disk struct {
+	ID                      string `json:"Id"`
+	Name                    string `json:"Name"`
 	FilePath                string `json:"FilePath"`
 	Capacity                int64  `json:"Capacity"`
 	CapacityAllocationUnits string `json:"Capacity_allocation_units"`

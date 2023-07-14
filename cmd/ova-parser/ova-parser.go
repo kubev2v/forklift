@@ -51,6 +51,8 @@ type DiskSection struct {
 
 type Disk struct {
 	XMLName                 xml.Name `xml:"Disk"`
+	Id                      string   `xml:"id"`
+	Name                    string   `xml:"name"`
 	Capacity                int64    `xml:"capacity,attr"`
 	CapacityAllocationUnits string   `xml:"capacityAllocationUnits,attr"`
 	DiskId                  string   `xml:"diskId,attr"`
@@ -117,6 +119,8 @@ type VM struct {
 
 // Virtual Disk.
 type VmDisk struct {
+	Id                      string
+	Name                    string
 	FilePath                string
 	Capacity                int64
 	CapacityAllocationUnits string
@@ -371,6 +375,8 @@ func convertToVmStruct(envelope []Envelope, ovaPath []string) ([]VM, error) {
 
 			for _, disk := range vmXml.DiskSection.Disks {
 				newVM.Disks = append(newVM.Disks, VmDisk{
+					Id:                      disk.DiskId,
+					Name:                    disk.DiskId,
 					FilePath:                getDiskPath(ovaPath[i]),
 					Capacity:                disk.Capacity,
 					CapacityAllocationUnits: disk.CapacityAllocationUnits,
@@ -426,6 +432,8 @@ func convertToDiskStruct(envelope []Envelope, ovaPath []string) ([]VmDisk, error
 		ova := envelope[i]
 		for _, disk := range ova.DiskSection.Disks {
 			newDisk := VmDisk{
+				Id:                      disk.DiskId,
+				Name:                    disk.DiskId,
 				FilePath:                getDiskPath(ovaPath[i]),
 				Capacity:                disk.Capacity,
 				CapacityAllocationUnits: disk.CapacityAllocationUnits,
