@@ -364,12 +364,13 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 						},
 					}
 				}
+				bufferedCapacity := int64(float64(disk.Capacity) * 1.1)
 				dvSpec := cdi.DataVolumeSpec{
 					Source: &dvSource,
 					Storage: &cdi.StorageSpec{
 						Resources: core.ResourceRequirements{
 							Requests: core.ResourceList{
-								core.ResourceStorage: *resource.NewQuantity(disk.Capacity, resource.BinarySI),
+								core.ResourceStorage: *resource.NewQuantity(bufferedCapacity, resource.BinarySI),
 							},
 						},
 						StorageClassName: &storageClass,
