@@ -545,8 +545,7 @@ func allJobsFinished(jobs []*ovirtsdk.Job) bool {
 	return true
 }
 
-// Remove disk attachment from the VM.
-func (r *Client) DetachDisk(vmRef ref.Ref) (err error) {
+func (r *Client) DetachDisks(vmRef ref.Ref) (err error) {
 	_, vmService, err := r.getVM(vmRef)
 	if err != nil {
 		return

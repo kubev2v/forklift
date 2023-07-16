@@ -86,8 +86,8 @@ type Client interface {
 	Close()
 	// Finalize migrations
 	Finalize(vms []*planapi.VMStatus, planName string)
-	// Remove disk attachment from the VM.
-	DetachDisk(vmRef ref.Ref) error
+	// Detach disks that are attached to the target VM without being cloned.
+	DetachDisks(vmRef ref.Ref) error
 }
 
 // Validator API.
