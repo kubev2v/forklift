@@ -17,10 +17,10 @@ CONTAINER_CMD := $(shell type -P $(CONTAINER_RUNTIME))
 endif
 
 REGISTRY ?= quay.io
-# TODO remove REGISTRY_ORG check once the changes are merged in forkliftci
-ifneq (,$(REGISTRY_ORG))
+# TODO remove REGISTRY_ACCOUNT check once the changes are merged in forkliftci
+ifneq (,$(REGISTRY_ACCOUNT))
 ifeq (,$(REGISTRY_ORG))
-REGISTRY_ORG = $(REGISTRY_ORG)
+REGISTRY_ORG = $(REGISTRY_ACCOUNT)
 endif
 endif
 REGISTRY_ORG ?= kubev2v
