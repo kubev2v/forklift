@@ -2006,13 +2006,12 @@ func (r *KubeVirt) EnsurePersistentVolume(vm *plan.VMStatus, persistentVolumes [
 	}
 
 	for _, pv := range persistentVolumes {
+		pvVolume := pv.Labels["volume"]
 		exists := false
 		for _, item := range list.Items {
-			if val, ok := item.Labels["volume"]; ok {
-				if val == pv.Labels["volume"] {
-					exists = true
-					break
-				}
+			if val, ok := item.Labels["volume"]; ok && val == pvVolume {
+				exists = true
+				break
 			}
 		}
 
@@ -2043,13 +2042,12 @@ func (r *KubeVirt) EnsurePersistentVolumeClaim(vm *plan.VMStatus, persistentVolu
 	}
 
 	for _, pvc := range persistentVolumeClaims {
+		pvcVolume := pvc.Labels["volume"]
 		exists := false
 		for _, item := range list {
-			if val, ok := item.Labels["volume"]; ok {
-				if val == pvc.Labels["volume"] {
-					exists = true
-					break
-				}
+			if val, ok := item.Labels["volume"]; ok && val == pvcVolume {
+				exists = true
+				break
 			}
 		}
 
