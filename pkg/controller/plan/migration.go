@@ -1025,7 +1025,6 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 	}
 	vm.ReflectPipeline()
 	if vm.Phase == Completed && vm.Error == nil {
-		// Detach LUNs
 		err = r.provider.DetachDisks(vm.Ref)
 		if err != nil {
 			step, found := vm.FindStep(r.step(vm))
@@ -1034,7 +1033,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 			step.AddError(err.Error())
 			r.Log.Error(err,
-				"Could not detach source VM LUN disks.",
+				"Could not detach LUN disk(s) from the source VM.",
 				"vm",
 				vm.String())
 			err = nil
