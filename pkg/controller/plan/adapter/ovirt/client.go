@@ -559,6 +559,7 @@ func (r *Client) DetachDisk(vmRef ref.Ref) (err error) {
 			"VM lookup failed.",
 			"vm",
 			vmRef.String())
+		return
 	}
 	diskAttachments := vm.DiskAttachments
 	for _, da := range diskAttachments {
@@ -567,7 +568,7 @@ func (r *Client) DetachDisk(vmRef ref.Ref) (err error) {
 			if err != nil {
 				err = liberr.Wrap(
 					err,
-					"failed to detach the LUN disk.",
+					"failed to detach LUN disk.",
 					"vm",
 					vmRef.String(),
 					"disk",
