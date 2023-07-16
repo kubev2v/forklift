@@ -141,7 +141,7 @@ generate: controller-gen
 generate-verify: generate
 	./hack/verify-generate.sh
 
-build-controller-image: check_container_runtmime
+build-controller-image: check_container_runtime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
 	bazel run cmd/forklift-controller:forklift-controller-image \
 		$(BAZEL_OPTS) \
@@ -151,7 +151,7 @@ push-controller-image: build-controller-image
 	$(CONTAINER_CMD) tag bazel/cmd/forklift-controller:forklift-controller-image $(CONTROLLER_IMAGE)
 	$(CONTAINER_CMD) push $(CONTROLLER_IMAGE)
 
-build-api-image: check_container_runtmime
+build-api-image: check_container_runtime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
 	bazel run cmd/forklift-api:forklift-api-image \
 		$(BAZEL_OPTS) \
@@ -161,7 +161,7 @@ push-api-image: build-api-image
 	$(CONTAINER_CMD) tag bazel/cmd/forklift-api:forklift-api-image $(API_IMAGE)
 	$(CONTAINER_CMD) push $(API_IMAGE)
 
-build-validation-image: check_container_runtmime
+build-validation-image: check_container_runtime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
 	bazel run validation:forklift-validation-image \
 		$(BAZEL_OPTS) \
@@ -171,7 +171,7 @@ push-validation-image: build-validation-image
 	$(CONTAINER_CMD) tag bazel/validation:forklift-validation-image $(VALIDATION_IMAGE)
 	$(CONTAINER_CMD) push $(VALIDATION_IMAGE)
 
-build-operator-image: check_container_runtmime
+build-operator-image: check_container_runtime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
 	bazel run operator:forklift-operator-image \
 		$(BAZEL_OPTS) \
@@ -181,7 +181,7 @@ push-operator-image: build-operator-image
 	$(CONTAINER_CMD) tag bazel/operator:forklift-operator-image $(OPERATOR_IMAGE)
 	$(CONTAINER_CMD) push $(OPERATOR_IMAGE)
 
-build-virt-v2v-image: check_container_runtmime
+build-virt-v2v-image: check_container_runtime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
 	bazel run --package_path=virt-v2v/cold forklift-virt-v2v \
 		$(BAZEL_OPTS) \
@@ -191,7 +191,7 @@ push-virt-v2v-image: build-virt-v2v-image
 	$(CONTAINER_CMD) tag bazel:forklift-virt-v2v $(VIRT_V2V_IMAGE)
 	$(CONTAINER_CMD) push $(VIRT_V2V_IMAGE)
 
-build-virt-v2v-warm-image: check_container_runtmime
+build-virt-v2v-warm-image: check_container_runtime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
 	bazel run --package_path=virt-v2v/warm forklift-virt-v2v-warm \
 		$(BAZEL_OPTS) \
@@ -201,7 +201,7 @@ push-virt-v2v-warm-image: build-virt-v2v-warm-image
 	$(CONTAINER_CMD) tag bazel:forklift-virt-v2v-warm ${VIRT_V2V_WARM_IMAGE}
 	$(CONTAINER_CMD) push ${VIRT_V2V_WARM_IMAGE}
 
-build-operator-bundle-image: check_container_runtmime
+build-operator-bundle-image: check_container_runtime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
 	bazel run operator:forklift-operator-bundle-image \
 		$(BAZEL_OPTS) \
@@ -229,7 +229,7 @@ push-operator-bundle-image: build-operator-bundle-image
 	 $(CONTAINER_CMD) tag bazel/operator:forklift-operator-bundle-image $(OPERATOR_BUNDLE_IMAGE)
 	 $(CONTAINER_CMD) push $(OPERATOR_BUNDLE_IMAGE)
 
-build-operator-index-image: check_container_runtmime
+build-operator-index-image: check_container_runtime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
 	bazel run operator:forklift-operator-index-image \
 		$(BAZEL_OPTS) \
@@ -246,7 +246,7 @@ push-operator-index-image: build-operator-index-image
 	$(CONTAINER_CMD) tag bazel/operator:forklift-operator-index-image $(OPERATOR_INDEX_IMAGE)
 	$(CONTAINER_CMD) push $(OPERATOR_INDEX_IMAGE)
 
-build-populator-controller-image: check_container_runtmime
+build-populator-controller-image: check_container_runtime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
 	bazel run cmd/populator-controller:populator-controller-image \
 		$(BAZEL_OPTS) \
@@ -264,13 +264,13 @@ build-ovirt-populator-image:
 push-ovirt-populator-image: build-ovirt-populator-image
 	$(CONTAINER_CMD) push $(OVIRT_POPULATOR_IMAGE)
 
-build-openstack-populator-image: check_container_runtmime
+build-openstack-populator-image: check_container_runtime
 	$(CONTAINER_CMD) build -f hack/openstack-populator/Containerfile -t $(OPENSTACK_POPULATOR_IMAGE) .
 
 push-openstack-populator-image: build-openstack-populator-image
 	$(CONTAINER_CMD) push $(OPENSTACK_POPULATOR_IMAGE)
 
-build-ova-provider-server-image: check_container_runtmime
+build-ova-provider-server-image: check_container_runtime
 	$(CONTAINER_CMD) build -f hack/ova-provider-server/Containerfile -t $(OVA_PROVIDER_SERVER_IMAGE) .
 
 push-ova-provider-server-image: build-ova-provider-server-image
@@ -302,8 +302,8 @@ push-all-images:  push-api-image \
                   push-openstack-populator-image\
                   push-ova-provider-server-image
 
-.PHONY: check_container_runtmime
-check_container_runtmime:
+.PHONY: check_container_runtime
+check_container_runtime:
 	@if [ ! -x "$(CONTAINER_CMD)" ]; then \
 			echo "Container runtime was not automatically detected"; \
 			echo "Please install podman or docker and make sure it's available in PATH"; \
