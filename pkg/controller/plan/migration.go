@@ -1026,7 +1026,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 	vm.ReflectPipeline()
 	if vm.Phase == Completed && vm.Error == nil {
 		// Detach LUNs
-		err = r.provider.DetachDisk(vm.Ref)
+		err = r.provider.DetachDisks(vm.Ref)
 		if err != nil {
 			step, found := vm.FindStep(r.step(vm))
 			if !found {
