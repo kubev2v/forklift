@@ -86,7 +86,7 @@ type Client interface {
 	Close()
 	// Finalize migrations
 	Finalize(vms []*planapi.VMStatus, planName string)
-	// Detach disks that are attached to the target VM without being cloned.
+	// Detach disks that are attached to the target VM without being cloned (e.g., LUNs).
 	DetachDisks(vmRef ref.Ref) error
 }
 
