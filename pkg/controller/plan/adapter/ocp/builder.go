@@ -13,6 +13,9 @@ import (
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
 	export "kubevirt.io/api/export/v1alpha1"
 
+	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
+	template "github.com/openshift/api/template/v1"
+
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
@@ -285,7 +288,26 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*planapi.Task, err error) {
 
 // TemplateLabels implements base.Builder
 func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err error) {
-	return nil, nil
+	vm := &model.VM{}
+	err = r.Source.Inventory.Get(vm, vmRef.ID)
+	if err != nil {
+		return nil, liberr.Wrap(err, "failed to get VM", "vm", vmRef)
+	}
+
+	templateName, ok := vm.Object.Labels["vm.kubevirt.io/template"]
+	if !ok {
+		r.Log.Info("Template not set")
+		return nil, nil
+	}
+
+	t := &template.Template{}
+	err = r.Destination.Client.Get(context.TODO(), client.ObjectKey{Namespace: "openshift", Name: templateName}, t)
+	if err != nil {
+		r.Log.Info("Template not found")
+		return nil, nil
+	}
+
+	return t.Labels, nil
 }
 
 // VirtualMachine implements base.Builder
