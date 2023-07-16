@@ -371,7 +371,7 @@ func (r *Client) thumbprint() string {
 	return ""
 }
 
-func (r *Client) DetachDisk(vmRef ref.Ref) (err error) {
+func (r *Client) DetachDisks(vmRef ref.Ref) (err error) {
 	// no-op
 	return
 }
