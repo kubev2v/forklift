@@ -1351,8 +1351,8 @@ func (r *Migration) updateCopyProgressForOvirt(vm *plan.VMStatus, step *plan.Ste
 		return
 	}
 	for _, pvc := range pvcs {
-		if _, ok := pvc.Annotations["lun"]; !ok {
-			// it's a lun
+		if _, ok := pvc.Annotations["lun"]; ok {
+			// skip LUNs
 			continue
 		}
 		claim := pvc.Spec.DataSource.Name
