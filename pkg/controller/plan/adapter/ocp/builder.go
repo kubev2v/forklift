@@ -13,9 +13,6 @@ import (
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
 	export "kubevirt.io/api/export/v1alpha1"
 
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
-	template "github.com/openshift/api/template/v1"
-
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
@@ -123,7 +120,6 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 
 func getExportURL(virtualMachineExportVolumeFormat []export.VirtualMachineExportVolumeFormat) (url string) {
 	for _, format := range virtualMachineExportVolumeFormat {
-		// TODO: revisit this, I'm not sure if it's correct
 		if format.Format == export.KubeVirtGz || format.Format == export.ArchiveGz {
 			return format.Url
 		}
@@ -230,8 +226,6 @@ func (r *Builder) Secret(vmRef ref.Ref, in *core.Secret, object *core.Secret) er
 // Tasks implements base.Builder
 func (r *Builder) Tasks(vmRef ref.Ref) (list []*planapi.Task, err error) {
 	vm := &cnv.VirtualMachine{}
-	// TODO: check why the name includes the namespace too
-
 	key := client.ObjectKey{
 		Namespace: vmRef.Namespace,
 		Name:      vmRef.Name,
@@ -288,26 +282,9 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*planapi.Task, err error) {
 
 // TemplateLabels implements base.Builder
 func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err error) {
-	vm := &model.VM{}
-	err = r.Source.Inventory.Get(vm, vmRef.ID)
-	if err != nil {
-		return nil, liberr.Wrap(err, "failed to get VM", "vm", vmRef)
-	}
+	// The VM is build from configuration, we don't need the label
 
-	templateName, ok := vm.Object.Labels["vm.kubevirt.io/template"]
-	if !ok {
-		r.Log.Info("Template not set")
-		return nil, nil
-	}
-
-	t := &template.Template{}
-	err = r.Destination.Client.Get(context.TODO(), client.ObjectKey{Namespace: "openshift", Name: templateName}, t)
-	if err != nil {
-		r.Log.Info("Template not found")
-		return nil, nil
-	}
-
-	return t.Labels, nil
+	return nil, nil
 }
 
 // VirtualMachine implements base.Builder
@@ -332,7 +309,6 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 }
 
 func (r *Builder) mapDisks(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.VirtualMachineSpec, persistentVolumeClaims []core.PersistentVolumeClaim, vmRef ref.Ref) {
-	// TODO: move logic to mapDisks
 	pvcMap := make(map[string]*core.PersistentVolumeClaim)
 	for i := range persistentVolumeClaims {
 		pvc := &persistentVolumeClaims[i]
