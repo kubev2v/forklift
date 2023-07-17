@@ -54,7 +54,7 @@ container_push(
     format = "Docker",
     image = "//cmd/ova-provider-server:ova-provider-server-image",
     registry = "$${REGISTRY:-quay.io}",
-    repository = "$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}forklift-ova-provider-server",
+    repository = "$${REGISTRY_ORG:-}$${REGISTRY_ORG:+/}forklift-ova-provider-server",
     tag = "$${REGISTRY_TAG:-devel}",
 )
 
@@ -63,7 +63,7 @@ container_push(
     format = "Docker",
     image = "//cmd/ovirt-populator:ovirt-populator-image",
     registry = "$${REGISTRY:-quay.io}",
-    repository = "$${REGISTRY_ACCOUNT:-}$${REGISTRY_ACCOUNT:+/}ovirt-populator",
+    repository = "$${REGISTRY_ORG:-}$${REGISTRY_ORG:+/}ovirt-populator",
     tag = "$${REGISTRY_TAG:-devel}",
 )
 
