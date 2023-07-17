@@ -126,3 +126,8 @@ func (Client) RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy) error 
 func (Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []cdi.DataVolume, final bool) (err error) {
 	return nil
 }
+
+func (r Client) DetachDisks(vmRef ref.Ref) (err error) {
+	// no-op
+	return
+}
