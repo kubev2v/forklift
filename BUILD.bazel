@@ -68,6 +68,15 @@ container_push(
 )
 
 container_push(
+    name = "push-openstack-populator",
+    format = "Docker",
+    image = "//cmd/openstack-populator:openstack-populator-image",
+    registry = "$${REGISTRY:-quay.io}",
+    repository = "$${REGISTRY_ORG:-}$${REGISTRY_ORG:+/}openstack-populator",
+    tag = "$${REGISTRY_TAG:-devel}",
+)
+
+container_push(
     name = "push-forklift-controller",
     format = "Docker",
     image = "//cmd/forklift-controller:forklift-controller-image",
