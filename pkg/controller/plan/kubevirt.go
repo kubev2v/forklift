@@ -1105,13 +1105,17 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 			"originalName", originalName, "newName", vm.Name)
 	}
 
-	var ok bool
-	object, ok = r.vmTemplate(vm)
-	if !ok {
-		r.Log.Info("Building VirtualMachine without template.",
-			"vm",
-			vm.String())
+	if r.Plan.IsSourceProviderOCP() {
 		object = r.emptyVm(vm)
+	} else {
+		var ok bool
+		object, ok = r.vmTemplate(vm)
+		if !ok {
+			r.Log.Info("Building VirtualMachine without template.",
+				"vm",
+				vm.String())
+			object = r.emptyVm(vm)
+		}
 	}
 
 	//Add the original name and ID info to the VM annotations

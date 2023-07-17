@@ -25,6 +25,7 @@ func (Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (bool, error) {
 
 // Close implements base.Client
 func (Client) Close() {
+	// NOOP for OCP
 }
 
 // CreateSnapshot implements base.Client
@@ -56,7 +57,6 @@ func (r Client) PowerOff(vmRef ref.Ref) error {
 		return err
 	}
 
-	// TODO: is vm.Spec.RunStrategy = &runStrategyHalted also needed?
 	running := false
 	vm.Spec.Running = &running
 	err = r.Client.Update(context.Background(), &vm)
