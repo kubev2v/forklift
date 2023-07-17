@@ -524,3 +524,15 @@ func createDataVolumeSpec(size resource.Quantity, storageClassName, url, configM
 func pvcSourceName(namespace, name string) string {
 	return fmt.Sprintf("%s/%s", namespace, name)
 }
+
+// Build LUN PVs.
+func (r *Builder) LunPersistentVolumes(vmRef ref.Ref) (pvs []core.PersistentVolume, err error) {
+	// do nothing
+	return
+}
+
+// Build LUN PVCs.
+func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.PersistentVolumeClaim, err error) {
+	// do nothing
+	return
+}
