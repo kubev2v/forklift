@@ -22,6 +22,7 @@ OVA_PROVIDER_SERVER=${REGISTRY}/${REGISTRY_ORG}/forklift-ova-provider-server:${R
 
 bazel run push-forklift-api
 bazel run push-ovirt-populator
+bazel run push-openstack-populator
 bazel run --package_path=virt-v2v/cold push-forklift-virt-v2v
 bazel run --package_path=virt-v2v/warm push-forklift-virt-v2v-warm
 bazel run push-populator-controller
