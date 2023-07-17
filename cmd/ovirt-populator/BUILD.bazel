@@ -27,3 +27,14 @@ go_library(
         "//vendor/k8s.io/klog/v2:klog",
     ],
 )
+
+load(
+    "@io_bazel_rules_docker//container:container.bzl",
+    "container_image",
+)
+
+container_image(
+    name = "ovirt-populator-image",
+    base = "@ovirt-populator-image-dockerfile//image:dockerfile_image.tar",
+    visibility = ["//visibility:public"],
+)

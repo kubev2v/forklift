@@ -43,6 +43,11 @@ dockerfile_image(
     dockerfile = "//:ova_provider_server_containerfile",
 )
 
+dockerfile_image(
+    name = "ovirt-populator-image-dockerfile",
+    dockerfile = "//:ovirt_populator_containerfile",
+)
+
 load(
     "@io_bazel_rules_docker//toolchains/docker:toolchain.bzl",
     docker_toolchain_configure = "toolchain_configure",
