@@ -7,6 +7,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/forklift-api",
+        "//pkg/lib/logging",
         "//vendor/github.com/go-logr/logr",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/log",
     ],
