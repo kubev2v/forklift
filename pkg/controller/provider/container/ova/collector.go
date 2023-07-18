@@ -21,7 +21,7 @@ const (
 	// Retry interval.
 	RetryInterval = 5 * time.Second
 	// Refresh interval.
-	RefreshInterval = 10 * time.Second
+	RefreshInterval = 5 * time.Minute
 )
 
 // Phases

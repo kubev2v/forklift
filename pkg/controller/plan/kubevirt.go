@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	template "github.com/openshift/api/template/v1"
 	"github.com/openshift/library-go/pkg/template/generator"
 	"github.com/openshift/library-go/pkg/template/templateprocessing"
@@ -1452,16 +1453,43 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 			},
 		},
 	})
-	mounts = append(mounts,
-		core.VolumeMount{
-			Name:      "libvirt-domain-xml",
-			MountPath: "/mnt/v2v",
-		},
-		core.VolumeMount{
-			Name:      "vddk-vol-mount",
-			MountPath: "/opt",
-		},
-	)
+
+	if r.Source.Provider.Type() == api.Ova {
+		server := r.Source.Provider.Spec.URL
+		splitted := strings.Split(server, ":")
+
+		if len(splitted) != 2 {
+			r.Log.Info("The NFS server path format is wrong")
+			return
+		}
+		nfsServer := splitted[0]
+		nfsPath := splitted[1]
+
+		//path from disk
+		volumes = append(volumes, core.Volume{
+			Name: "nfs",
+			VolumeSource: core.VolumeSource{
+				NFS: &core.NFSVolumeSource{
+					Server: nfsServer,
+					Path:   nfsPath,
+				},
+			},
+		})
+		mounts = append(mounts,
+			core.VolumeMount{
+				Name:      "libvirt-domain-xml",
+				MountPath: "/mnt/v2v",
+			},
+			core.VolumeMount{
+				Name:      "vddk-vol-mount",
+				MountPath: "/opt",
+			},
+			core.VolumeMount{
+				Name:      "nfs",
+				MountPath: "/ova",
+			},
+		)
+	}
 
 	// Temporary space for VDDK library
 	volumes = append(volumes, core.Volume{

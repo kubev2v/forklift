@@ -132,12 +132,12 @@ func (h *DiskHandler) watch(ctx *gin.Context) {
 type Disk struct {
 	Resource
 	FilePath                string
-	Capacity                string
+	Capacity                int64
 	CapacityAllocationUnits string
 	DiskId                  string
 	FileRef                 string
 	Format                  string
-	PopulatedSize           string
+	PopulatedSize           int64
 }
 
 // Build the resource using the model.

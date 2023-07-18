@@ -262,7 +262,7 @@ func (r *Finder) Network(ref *base.Ref) (object interface{}, err error) {
 //	ProviderNotReadyErr
 //	NotFoundErr
 //	RefNotUniqueErr
-func (r *Finder) Disk(ref *base.Ref) (object interface{}, err error) {
+func (r *Finder) Storage(ref *base.Ref) (object interface{}, err error) {
 	disk := &Disk{}
 	err = r.ByRef(disk, *ref)
 	if err == nil {

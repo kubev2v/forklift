@@ -14,6 +14,7 @@ bazel run \
 
 # These are the packages we really depend on.
 virt_v2v="
+  tar
   virt-v2v
   virtio-win
 "
