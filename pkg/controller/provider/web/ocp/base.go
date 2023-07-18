@@ -1,6 +1,8 @@
 package ocp
 
 import (
+	pathlib "path"
+
 	"github.com/gin-gonic/gin"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
@@ -61,4 +63,63 @@ func (h Handler) ListOptions(ctx *gin.Context) libmodel.ListOptions {
 		Detail:    detail,
 		Page:      &h.Page,
 	}
+}
+
+// Path builder.
+type PathBuilder struct {
+	// Database.
+	DB libmodel.DB
+	// Cached resources.
+	cache map[string]string
+}
+
+// Build.
+func (r *PathBuilder) Path(m model.Model) (path string) {
+	var err error
+	if r.cache == nil {
+		r.cache = map[string]string{}
+	}
+	switch val := m.(type) {
+	case *model.Namespace:
+		path = val.Name
+	case *model.VM:
+		path, err = r.forNamespace(val.Namespace, val.UID)
+	}
+
+	if err != nil {
+		log.Error(
+			err,
+			"path builder failed.",
+			"model",
+			libmodel.Describe(m))
+	}
+
+	return
+}
+
+// Path based on Namespace.
+func (r *PathBuilder) forNamespace(id, leaf string) (path string, err error) {
+	name, cached := r.cache[id]
+	if !cached {
+		m := &model.Namespace{
+			Base: model.Base{Name: id},
+		}
+
+		it, ferr := r.DB.Find(m, libmodel.ListOptions{Predicate: libmodel.Eq("name", id)})
+		if ferr != nil {
+			err = ferr
+			return
+		}
+
+		_, ok := it.Next()
+		if ok {
+			name = m.Name
+			r.cache[id] = name
+		}
+
+	}
+
+	path = pathlib.Join(name, leaf)
+
+	return
 }
