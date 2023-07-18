@@ -16,6 +16,8 @@ type Resource struct {
 	Name string `json:"name"`
 	// self link.
 	SelfLink string `json:"selfLink"`
+
+	Path string `json:"path,omitempty"`
 }
 
 // Populate the fields with the specified object.
