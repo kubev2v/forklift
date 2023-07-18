@@ -149,24 +149,24 @@ func (admitter *SecretAdmitter) buildProviderCollector(providerType *api.Provide
 func (admitter *SecretAdmitter) testConnectionToHost(hostName string) (tested bool, err error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		log.Error(err, "Couldn't get the cluster configuration", err.Error())
+		log.Error(err, "Couldn't get the cluster configuration")
 		return
 	}
 
 	err = api.SchemeBuilder.AddToScheme(scheme.Scheme)
 	if err != nil {
-		log.Error(err, "Couldn't build the scheme", err.Error())
+		log.Error(err, "Couldn't build the scheme")
 		return
 	}
 	err = apis.AddToScheme(scheme.Scheme)
 	if err != nil {
-		log.Error(err, "Couldn't add forklift API to the scheme", err.Error())
+		log.Error(err, "Couldn't add forklift API to the scheme")
 		return
 	}
 
 	cl, err := client.New(config, client.Options{Scheme: scheme.Scheme})
 	if err != nil {
-		log.Error(err, "Couldn't create a cluster client", err.Error())
+		log.Error(err, "Couldn't create a cluster client")
 		return
 	}
 
@@ -183,7 +183,7 @@ func (admitter *SecretAdmitter) testConnectionToHost(hostName string) (tested bo
 			err = nil
 			return
 		} else {
-			log.Error(err, "Couldn't get the target provider", err.Error())
+			log.Error(err, "Couldn't get the target provider")
 			return
 		}
 	}
