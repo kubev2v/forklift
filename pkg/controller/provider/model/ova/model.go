@@ -81,6 +81,8 @@ type VM struct {
 	CpuCount              int32     `sql:""`
 	CoresPerSocket        int32     `sql:""`
 	MemoryMB              int32     `sql:""`
+	MemoryUnits           string    `sql:""`
+	CpuUnits              string    `sql:""`
 	BalloonedMemory       int32     `sql:""`
 	IpAddress             string    `sql:""`
 	NumaNodeAffinity      []string  `sql:""`
@@ -97,12 +99,12 @@ type VM struct {
 type Disk struct {
 	Base
 	FilePath                string `sql:""`
-	Capacity                string `sql:""`
+	Capacity                int64  `sql:""`
 	CapacityAllocationUnits string `sql:""`
 	DiskId                  string `sql:""`
 	FileRef                 string `sql:""`
 	Format                  string `sql:""`
-	PopulatedSize           string `sql:""`
+	PopulatedSize           int64  `sql:""`
 }
 
 // Virtual Device.
@@ -117,7 +119,8 @@ type Conf struct {
 
 // Virtual ethernet card.
 type NIC struct {
-	Name   string `sql:""`
-	MAC    string `sql:""`
-	Config []Conf `sql:""`
+	Name    string `sql:""`
+	MAC     string `sql:""`
+	Network string `sql:""`
+	Config  []Conf `sql:""`
 }

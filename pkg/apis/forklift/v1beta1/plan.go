@@ -104,6 +104,8 @@ func (p *Plan) VSphereUsesEl9VirtV2v() (bool, error) {
 	switch source.Type() {
 	case VSphere:
 		return !p.Spec.Warm && destination.IsHost(), nil
+	case Ova:
+		return true, nil
 	default:
 		return false, nil
 	}

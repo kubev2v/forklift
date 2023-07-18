@@ -6,6 +6,7 @@ import (
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/scheduler/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/scheduler/openstack"
+	"github.com/konveyor/forklift-controller/pkg/controller/plan/scheduler/ova"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/scheduler/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/scheduler/vsphere"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
@@ -39,6 +40,11 @@ func New(ctx *plancontext.Context) (scheduler Scheduler, err error) {
 		}
 	case api.OpenShift:
 		scheduler = &ocp.Scheduler{
+			Context:     ctx,
+			MaxInFlight: settings.Settings.MaxInFlight,
+		}
+	case api.Ova:
+		scheduler = &ova.Scheduler{
 			Context:     ctx,
 			MaxInFlight: settings.Settings.MaxInFlight,
 		}

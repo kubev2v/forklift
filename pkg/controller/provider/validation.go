@@ -247,12 +247,18 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 				"user",
 				"password",
 			}
+
 		} else {
 			keyList = []string{
 				"user",
 				"password",
 				"cacert",
 			}
+		}
+	case api.Ova:
+		keyList = []string{
+			"url",
+			"insecureSkipVerify",
 		}
 	}
 	for _, key := range keyList {
