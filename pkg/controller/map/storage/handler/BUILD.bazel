@@ -9,6 +9,7 @@ go_library(
         "//pkg/apis/forklift/v1beta1",
         "//pkg/controller/map/storage/handler/ocp",
         "//pkg/controller/map/storage/handler/openstack",
+        "//pkg/controller/map/storage/handler/ova",
         "//pkg/controller/map/storage/handler/ovirt",
         "//pkg/controller/map/storage/handler/vsphere",
         "//pkg/controller/watch/handler",

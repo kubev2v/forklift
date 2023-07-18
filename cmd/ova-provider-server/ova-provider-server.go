@@ -2,16 +2,23 @@ package main
 
 import (
 	"archive/tar"
+	"bytes"
+	"crypto/sha256"
+	"encoding/gob"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 // xml struct
@@ -28,6 +35,7 @@ type Item struct {
 	HostResource    string          `xml:"HostResource,omitempty"`
 	Connection      string          `xml:"Connection,omitempty"`
 	Configs         []VirtualConfig `xml:"Config"`
+	CoresPerSocket  string          `xml:"CoresPerSocket"`
 }
 
 type VirtualConfig struct {
@@ -43,6 +51,12 @@ type VirtualHardwareSection struct {
 	Configs []VirtualConfig `xml:"Config"`
 }
 
+type References struct {
+	File []struct {
+		Href string `xml:"href,attr"`
+	} `xml:"File"`
+}
+
 type DiskSection struct {
 	XMLName xml.Name `xml:"DiskSection"`
 	Info    string   `xml:"Info"`
@@ -51,12 +65,12 @@ type DiskSection struct {
 
 type Disk struct {
 	XMLName                 xml.Name `xml:"Disk"`
-	Capacity                string   `xml:"capacity,attr"`
+	Capacity                int64    `xml:"capacity,attr"`
 	CapacityAllocationUnits string   `xml:"capacityAllocationUnits,attr"`
 	DiskId                  string   `xml:"diskId,attr"`
 	FileRef                 string   `xml:"fileRef,attr"`
 	Format                  string   `xml:"format,attr"`
-	PopulatedSize           string   `xml:"populatedSize,attr"`
+	PopulatedSize           int64    `xml:"populatedSize,attr"`
 }
 
 type NetworkSection struct {
@@ -77,6 +91,7 @@ type VirtualSystem struct {
 	OperatingSystemSection struct {
 		Info        string `xml:"Info"`
 		Description string `xml:"Description"`
+		OsType      string `xml:"osType,attr"`
 	} `xml:"OperatingSystemSection"`
 	HardwareSection VirtualHardwareSection `xml:"VirtualHardwareSection"`
 }
@@ -86,12 +101,14 @@ type Envelope struct {
 	VirtualSystem  []VirtualSystem `xml:"VirtualSystem"`
 	DiskSection    DiskSection     `xml:"DiskSection"`
 	NetworkSection NetworkSection  `xml:"NetworkSection"`
+	References     References      `xml:"References"`
 }
 
 // vm struct
 type VM struct {
 	Name                  string
 	OvaPath               string
+	OsType                string
 	RevisionValidated     int64
 	PolicyVersion         int
 	UUID                  string
@@ -104,6 +121,8 @@ type VM struct {
 	CpuCount              int32
 	CoresPerSocket        int32
 	MemoryMB              int32
+	MemoryUnits           string
+	CpuUnits              string
 	BalloonedMemory       int32
 	IpAddress             string
 	NumaNodeAffinity      []string
@@ -117,13 +136,15 @@ type VM struct {
 
 // Virtual Disk.
 type VmDisk struct {
+	ID                      string
+	Name                    string
 	FilePath                string
-	Capacity                string
+	Capacity                int64
 	CapacityAllocationUnits string
 	DiskId                  string
 	FileRef                 string
 	Format                  string
-	PopulatedSize           string
+	PopulatedSize           int64
 }
 
 // Virtual Device.
@@ -138,17 +159,27 @@ type Conf struct {
 
 // Virtual ethernet card.
 type NIC struct {
-	Name   string `json:"name"`
-	MAC    string `json:"mac"`
-	Config []Conf
+	Name    string `json:"name"`
+	MAC     string `json:"mac"`
+	Network string
+	Config  []Conf
 }
 
 type VmNetwork struct {
 	Name        string
 	Description string
+	ID          string
 }
 
+var vmIDMap *UUIDMap
+var diskIDMap *UUIDMap
+var networkIDMap *UUIDMap
+
 func main() {
+
+	vmIDMap = NewUUIDMap()
+	diskIDMap = NewUUIDMap()
+	networkIDMap = NewUUIDMap()
 
 	http.HandleFunc("/vms", vmHandler)
 	http.HandleFunc("/disks", diskHandler)
@@ -346,20 +377,31 @@ func convertToVmStruct(envelope []Envelope, ovaPath []string) ([]VM, error) {
 			newVM := VM{
 				OvaPath: ovaPath[i],
 				Name:    virtualSystem.Name,
+				OsType:  virtualSystem.OperatingSystemSection.OsType,
 			}
 
 			for _, item := range virtualSystem.HardwareSection.Items {
 				if strings.Contains(item.ElementName, "Network adapter") {
 					newVM.NICs = append(newVM.NICs, NIC{
-						Name: item.ElementName,
-						MAC:  item.Address,
+						Name:    item.ElementName,
+						MAC:     item.Address,
+						Network: item.Connection,
 					})
 					//for _conf := range item.
 				} else if strings.Contains(item.Description, "Number of Virtual CPUs") {
 					newVM.CpuCount = item.VirtualQuantity
-
+					newVM.CpuUnits = item.AllocationUnits
+					if item.CoresPerSocket != "" {
+						num, err := strconv.ParseInt(item.CoresPerSocket, 10, 32)
+						if err != nil {
+							newVM.CoresPerSocket = 1
+						} else {
+							newVM.CoresPerSocket = int32(num)
+						}
+					}
 				} else if strings.Contains(item.Description, "Memory Size") {
 					newVM.MemoryMB = item.VirtualQuantity
+					newVM.MemoryUnits = item.AllocationUnits
 
 				} else {
 					newVM.Devices = append(newVM.Devices, Device{
@@ -369,7 +411,8 @@ func convertToVmStruct(envelope []Envelope, ovaPath []string) ([]VM, error) {
 
 			}
 
-			for _, disk := range vmXml.DiskSection.Disks {
+			for j, disk := range vmXml.DiskSection.Disks {
+				name := envelope[i].References.File[j].Href
 				newVM.Disks = append(newVM.Disks, VmDisk{
 					FilePath:                getDiskPath(ovaPath[i]),
 					Capacity:                disk.Capacity,
@@ -378,13 +421,17 @@ func convertToVmStruct(envelope []Envelope, ovaPath []string) ([]VM, error) {
 					FileRef:                 disk.FileRef,
 					Format:                  disk.Format,
 					PopulatedSize:           disk.PopulatedSize,
+					Name:                    name,
 				})
+				newVM.Disks[j].ID = diskIDMap.GetUUID(newVM.Disks[j], ovaPath[i]+"/"+name)
+
 			}
 
 			for _, network := range vmXml.NetworkSection.Networks {
 				newVM.Networks = append(newVM.Networks, VmNetwork{
 					Name:        network.Name,
 					Description: network.Description,
+					ID:          networkIDMap.GetUUID(network.Name, network.Name),
 				})
 			}
 
@@ -399,6 +446,15 @@ func convertToVmStruct(envelope []Envelope, ovaPath []string) ([]VM, error) {
 					newVM.CpuHotRemoveEnabled, _ = strconv.ParseBool(conf.Value)
 				}
 			}
+
+			var id string
+			if isValidUUID(virtualSystem.ID) {
+				id = virtualSystem.ID
+			} else {
+				id = vmIDMap.GetUUID(newVM, ovaPath[i])
+			}
+			newVM.UUID = id
+
 			vms = append(vms, newVM)
 		}
 	}
@@ -412,6 +468,7 @@ func convertToNetworkStruct(envelope []Envelope) ([]VmNetwork, error) {
 			newNetwork := VmNetwork{
 				Name:        network.Name,
 				Description: network.Description,
+				ID:          networkIDMap.GetUUID(network.Name, network.Name),
 			}
 			networks = append(networks, newNetwork)
 		}
@@ -422,9 +479,9 @@ func convertToNetworkStruct(envelope []Envelope) ([]VmNetwork, error) {
 
 func convertToDiskStruct(envelope []Envelope, ovaPath []string) ([]VmDisk, error) {
 	var disks []VmDisk
-	for i := 0; i < len(envelope); i++ {
-		ova := envelope[i]
-		for _, disk := range ova.DiskSection.Disks {
+	for i, ova := range envelope {
+		for j, disk := range ova.DiskSection.Disks {
+			name := ova.References.File[j].Href
 			newDisk := VmDisk{
 				FilePath:                getDiskPath(ovaPath[i]),
 				Capacity:                disk.Capacity,
@@ -433,8 +490,9 @@ func convertToDiskStruct(envelope []Envelope, ovaPath []string) ([]VmDisk, error
 				FileRef:                 disk.FileRef,
 				Format:                  disk.Format,
 				PopulatedSize:           disk.PopulatedSize,
+				Name:                    name,
 			}
-
+			newDisk.ID = diskIDMap.GetUUID(newDisk, ovaPath[i]+"/"+name)
 			disks = append(disks, newDisk)
 		}
 	}
@@ -452,4 +510,38 @@ func getDiskPath(path string) string {
 		return path[:i+1]
 	}
 	return path
+}
+
+type UUIDMap struct {
+	m map[string]string
+}
+
+func NewUUIDMap() *UUIDMap {
+	return &UUIDMap{
+		m: make(map[string]string),
+	}
+}
+
+func (um *UUIDMap) GetUUID(object interface{}, key string) string {
+	var id string
+	id, ok := um.m[key]
+
+	if !ok {
+		var buf bytes.Buffer
+		enc := gob.NewEncoder(&buf)
+
+		if err := enc.Encode(object); err != nil {
+			log.Fatal(err)
+		}
+
+		hash := sha256.Sum256(buf.Bytes())
+		um.m[key] = hex.EncodeToString(hash[:])
+		id = um.m[key]
+	}
+	return id
+}
+
+func isValidUUID(id string) bool {
+	_, err := uuid.Parse(id)
+	return err == nil
 }

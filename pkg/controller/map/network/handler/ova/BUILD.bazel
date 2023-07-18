@@ -6,7 +6,7 @@ go_library(
         "doc.go",
         "handler.go",
     ],
-    importpath = "github.com/konveyor/forklift-controller/pkg/controller/map/storage/handler/ova",
+    importpath = "github.com/konveyor/forklift-controller/pkg/controller/map/network/handler/ova",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/apis/forklift/v1beta1",

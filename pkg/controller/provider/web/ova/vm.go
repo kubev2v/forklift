@@ -216,6 +216,8 @@ type VM struct {
 	CpuCount              int32
 	CoresPerSocket        int32
 	MemoryMB              int32
+	MemoryUnits           string
+	CpuUnits              string
 	BalloonedMemory       int32
 	IpAddress             string
 	NumaNodeAffinity      []string
@@ -242,6 +244,8 @@ func (r *VM) With(m *model.VM) {
 	r.CoresPerSocket = m.CoresPerSocket
 	r.MemoryMB = m.MemoryMB
 	r.BalloonedMemory = m.BalloonedMemory
+	r.MemoryUnits = m.MemoryUnits
+	r.CpuUnits = m.CpuUnits
 	r.IpAddress = m.IpAddress
 	r.StorageUsed = m.StorageUsed
 	r.FaultToleranceEnabled = m.FaultToleranceEnabled

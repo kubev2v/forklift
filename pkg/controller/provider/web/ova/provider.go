@@ -160,7 +160,7 @@ type Provider struct {
 	Product      string       `json:"product"`
 	VMCount      int64        `json:"vmCount"`
 	NetworkCount int64        `json:"networkCount"`
-	DiskCount    int64
+	DiskCount    int64        `json:"diskCount"`
 }
 
 // Set fields with the specified object.
