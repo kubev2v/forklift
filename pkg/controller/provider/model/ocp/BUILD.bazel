@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "doc.go",
         "model.go",
+        "tree.go",
     ],
     importpath = "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp",
     visibility = ["//visibility:public"],
@@ -12,6 +13,7 @@ go_library(
         "//pkg/apis/forklift/v1beta1",
         "//pkg/controller/provider/model/base",
         "//pkg/lib/inventory/model",
+        "//pkg/lib/ref",
         "//vendor/github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1:k8s_cni_cncf_io",
         "//vendor/k8s.io/api/core/v1:core",
         "//vendor/k8s.io/api/storage/v1:storage",

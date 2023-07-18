@@ -3,18 +3,19 @@ package web
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/go-logr/logr"
-	"github.com/gorilla/websocket"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	"github.com/konveyor/forklift-controller/pkg/lib/ref"
 	"io/ioutil"
 	"net/http"
 	liburl "net/url"
 	"reflect"
 	"runtime"
 	"time"
+
+	"github.com/go-logr/logr"
+	"github.com/gorilla/websocket"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	"github.com/konveyor/forklift-controller/pkg/lib/ref"
 )
 
 // Header.
