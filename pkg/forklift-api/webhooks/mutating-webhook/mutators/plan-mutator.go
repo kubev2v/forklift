@@ -73,36 +73,36 @@ func (mutator *PlanMutator) setTransferNetworkIfNotSet() (bool, error) {
 	if mutator.plan.Spec.TransferNetwork == nil {
 		config, err := rest.InClusterConfig()
 		if err != nil {
-			log.Error(err, "Couldn't get the cluster configuration", err.Error())
+			log.Error(err, "Couldn't get the cluster configuration")
 			return false, err
 		}
 
 		err = api.SchemeBuilder.AddToScheme(scheme.Scheme)
 		if err != nil {
-			log.Error(err, "Couldn't build the scheme", err.Error())
+			log.Error(err, "Couldn't build the scheme")
 			return false, err
 		}
 		err = apis.AddToScheme(scheme.Scheme)
 		if err != nil {
-			log.Error(err, "Couldn't add forklift API to the scheme", err.Error())
+			log.Error(err, "Couldn't add forklift API to the scheme")
 			return false, err
 		}
 		err = net.AddToScheme(scheme.Scheme)
 		if err != nil {
-			log.Error(err, "Couldn't add network-attachment-definition-client to the scheme", err.Error())
+			log.Error(err, "Couldn't add network-attachment-definition-client to the scheme")
 			return false, err
 		}
 
 		cl, err := client.New(config, client.Options{Scheme: scheme.Scheme})
 		if err != nil {
-			log.Error(err, "Couldn't create a cluster client", err.Error())
+			log.Error(err, "Couldn't create a cluster client")
 			return false, err
 		}
 
 		targetProvider := api.Provider{}
 		err = cl.Get(context.TODO(), client.ObjectKey{Namespace: mutator.plan.Spec.Provider.Destination.Namespace, Name: mutator.plan.Spec.Provider.Destination.Name}, &targetProvider)
 		if err != nil {
-			log.Error(err, "Couldn't get the target provider", err.Error())
+			log.Error(err, "Couldn't get the target provider")
 			return false, err
 		}
 
@@ -126,13 +126,13 @@ func (mutator *PlanMutator) setTransferNetworkIfNotSet() (bool, error) {
 					},
 					secret)
 				if err != nil {
-					log.Error(err, "Failed to get secret for target provider", err.Error())
+					log.Error(err, "Failed to get secret for target provider")
 					return false, err
 				}
 				tcl, err = targetProvider.Client(secret)
 			}
 			if err != nil {
-				log.Error(err, "Failed to initiate client to target cluster", err.Error())
+				log.Error(err, "Failed to initiate client to target cluster")
 				return false, err
 			}
 
@@ -145,7 +145,7 @@ func (mutator *PlanMutator) setTransferNetworkIfNotSet() (bool, error) {
 				}
 				planChanged = true
 			} else if !k8serr.IsNotFound(err) { // TODO: else if !NotFound ...
-				log.Error(err, "Failed to get the network-attachment-definition", err.Error())
+				log.Error(err, "Failed to get the network-attachment-definition")
 				return false, err
 			}
 		}
