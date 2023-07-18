@@ -599,9 +599,7 @@ func (r *Client) get(object interface{}, ID string) (err error) {
 func (r *Client) isNotFound(err error) bool {
 	switch unWrapErr := liberr.Unwrap(err).(type) {
 	case gophercloud.ErrUnexpectedResponseCode:
-		if unWrapErr.GetStatusCode() == http.StatusNotFound {
-			return true
-		}
+		return unWrapErr.GetStatusCode() == http.StatusNotFound
 	}
 	return false
 }
@@ -609,9 +607,7 @@ func (r *Client) isNotFound(err error) bool {
 func (r *Client) isForbidden(err error) bool {
 	switch unWrapErr := liberr.Unwrap(err).(type) {
 	case gophercloud.ErrUnexpectedResponseCode:
-		if unWrapErr.GetStatusCode() == http.StatusForbidden {
-			return true
-		}
+		return unWrapErr.GetStatusCode() == http.StatusForbidden
 	}
 	return false
 }
