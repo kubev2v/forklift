@@ -19,12 +19,15 @@ package main
 import (
 	"github.com/go-logr/logr"
 	forklift_api "github.com/konveyor/forklift-controller/pkg/forklift-api"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var log logr.Logger
 
 func init() {
+	logger := logging.Factory.New()
+	logf.SetLogger(logger)
 	log = logf.Log.WithName("entrypoint")
 }
 
