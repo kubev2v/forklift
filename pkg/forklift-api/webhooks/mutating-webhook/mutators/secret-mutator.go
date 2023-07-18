@@ -37,8 +37,7 @@ func (mutator *SecretMutator) Mutate(ar *admissionv1.AdmissionReview) *admission
 		return util.ToAdmissionResponseError(err)
 	}
 
-	var insecure = false
-	var secretChanged = false
+	var insecure, secretChanged bool
 	// Applies to all secrets with 'createdForProviderType' label.
 	if insecureSkipVerify, ok := secret.Data["insecureSkipVerify"]; ok {
 		insecure, err = strconv.ParseBool(string(insecureSkipVerify))
