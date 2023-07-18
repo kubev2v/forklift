@@ -3,6 +3,7 @@ package web
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	liburl "net/url"
@@ -412,7 +413,7 @@ func (r *WatchReader) start() {
 			case libmodel.Parity:
 				r.handler.Parity()
 			case libmodel.Error:
-				r.handler.Error(&Watch{reader: r}, nil)
+				r.handler.Error(&Watch{reader: r}, errors.New("unknown error event received"))
 			case libmodel.End:
 				return
 			case libmodel.Created:
