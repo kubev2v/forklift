@@ -416,9 +416,9 @@ rpm(
 )
 
 rpm(
-    name = "edk2-ovmf-0__20230301gitf80f052277c8-5.el9.x86_64",
-    sha256 = "b954e96a494ec82f706446af8c687d93be5efaf4d7a9d578dafc8b93aac5aa5e",
-    urls = ["https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/edk2-ovmf-20230301gitf80f052277c8-5.el9.noarch.rpm"],
+    name = "edk2-ovmf-0__20230524-1.el9.x86_64",
+    sha256 = "305d1fd87fbd3e981ac452dfda09a70d370276ee5a914f379a8ca6f6d7f2a6f1",
+    urls = ["https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/edk2-ovmf-20230524-1.el9.noarch.rpm"],
 )
 
 rpm(
@@ -536,21 +536,21 @@ rpm(
 )
 
 rpm(
-    name = "glibc-0__2.34-68.el9.x86_64",
-    sha256 = "da8e289983a09918266524dbe6fb575229ec1c2f0a334c42cb88ae197b996aa1",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/glibc-2.34-68.el9.x86_64.rpm"],
+    name = "glibc-0__2.34-70.el9.x86_64",
+    sha256 = "4a97b5d37f35dbec825dc63d4def4ad819f719f5c03676e1bee5ab76a06a6fa6",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/glibc-2.34-70.el9.x86_64.rpm"],
 )
 
 rpm(
-    name = "glibc-common-0__2.34-68.el9.x86_64",
-    sha256 = "064ea99433d1d62657a1b345017132f9c468e65b570823d38ab84f03fcc50ac3",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/glibc-common-2.34-68.el9.x86_64.rpm"],
+    name = "glibc-common-0__2.34-70.el9.x86_64",
+    sha256 = "913e3b5638ac365c9125718c0d5662d25e5960ac18774cc3eb165e2344e701e3",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/glibc-common-2.34-70.el9.x86_64.rpm"],
 )
 
 rpm(
-    name = "glibc-langpack-en-0__2.34-68.el9.x86_64",
-    sha256 = "07fd51764c3e78ba0794669dd2fddd6b275169f65450f3d5c9631d79af01eacc",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/glibc-langpack-en-2.34-68.el9.x86_64.rpm"],
+    name = "glibc-langpack-en-0__2.34-70.el9.x86_64",
+    sha256 = "08d6e0573d94a7b1b41656edaca2ee72b07cf2ec9fec222b68b13a735e6c5a87",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/glibc-langpack-en-2.34-70.el9.x86_64.rpm"],
 )
 
 rpm(
@@ -2180,9 +2180,9 @@ rpm(
 )
 
 rpm(
-    name = "xfsprogs-0__5.19.0-2.el9.x86_64",
-    sha256 = "8bd7f10732502b9f43d7ed50ed727f8294be5796838542765624db92f8439207",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/xfsprogs-5.19.0-2.el9.x86_64.rpm"],
+    name = "xfsprogs-0__5.19.0-3.el9.x86_64",
+    sha256 = "b29d841ef1a97dd7e0e8ca0546b3a648aa1e5f5cde35eb50f624f0dbb58e3194",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/xfsprogs-5.19.0-3.el9.x86_64.rpm"],
 )
 
 rpm(
