@@ -391,7 +391,7 @@ install-minikube:
 	MINIKUBE_USE_INTEGRATED_REGISTRY=$(MINIKUBE_USE_INTEGRATED_REGISTRY) \
 	./hack/installation/minikube.sh
 
-uninstall-minikube: uninstall-local-registry
+uninstall-minikube:
 	minikube delete
 
 ROOTLESS ?= true
@@ -402,7 +402,7 @@ OLM_VERSION ?= v0.25.0
 # Kind cert manager operator version (default: v1.12.2)
 CERT_MANAGER_VERSION ?= v1.12.2
 
-install-kind: install-local-registry
+install-kind:
 	ROOTLESS=$(ROOTLESS) \
 	KIND_VERSION=$(KIND_VERSION) \
 	OLM_VERSION=$(OLM_VERSION) \
@@ -410,7 +410,7 @@ install-kind: install-local-registry
 	./hack/installation/kind.sh; \
 	[ $(CONTAINER_RUNTIME) != "podman" ] || export KIND_EXPERIMENTAL_PROVIDER="podman"; kind export kubeconfig --name forklift
 
-uninstall-kind: uninstall-local-registry
+uninstall-kind:
 	[ $(CONTAINER_RUNTIME) != "podman" ] || export KIND_EXPERIMENTAL_PROVIDER="podman"; kind delete clusters forklift
 
 define DEPLOYMENT_VARS
