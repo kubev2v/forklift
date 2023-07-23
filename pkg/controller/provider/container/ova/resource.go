@@ -61,7 +61,7 @@ type VM struct {
 		} `json:"Config"`
 	} `json:"Nics"`
 	Disks []struct {
-		ID                      string `json:"Id"`
+		ID                      string `json:"ID"`
 		Name                    string `json:"Name"`
 		FilePath                string `json:"FilePath"`
 		Capacity                int64  `json:"Capacity"`
@@ -72,6 +72,7 @@ type VM struct {
 		PopulatedSize           int64  `json:"PopulatedSize"`
 	} `json:"Disks"`
 	Networks []struct {
+		ID          string `json:"ID"`
 		Name        string `json:"Name"`
 		Description string `json:"Description"`
 	} `json:"Networks"`
@@ -80,6 +81,7 @@ type VM struct {
 // Apply to (update) the model.
 func (r *VM) ApplyTo(m *model.VM) {
 	m.Name = r.Name
+	m.ID = r.UUID
 	m.OvaPath = r.OvaPath
 	m.RevisionValidated = r.RevisionValidated
 	m.PolicyVersion = r.PolicyVersion
@@ -131,6 +133,10 @@ func (r *VM) addDisks(m *model.VM) {
 		m.Disks = append(
 			m.Disks,
 			model.Disk{
+				Base: model.Base{
+					Name: disk.Name,
+					ID:   disk.ID,
+				},
 				FilePath:                disk.FilePath,
 				Capacity:                disk.Capacity,
 				CapacityAllocationUnits: disk.CapacityAllocationUnits,
@@ -160,27 +166,31 @@ func (r *VM) addNetworks(m *model.VM) {
 			m.Networks,
 			model.Network{
 				Description: network.Description,
+				Base: model.Base{
+					Name: network.Name,
+					ID:   network.ID,
+				},
 			})
 	}
 }
 
 // Network.
 type Network struct {
+	ID          string `json:"ID"`
 	Name        string `json:"Name"`
 	Description string `json:"Description"`
 }
 
 // Apply to (update) the model.
 func (r *Network) ApplyTo(m *model.Network) {
+	m.ID = r.ID
 	m.Description = r.Description
+	m.Base.Name = r.Name
 }
-
-// Network (list).
-//type NetworkList []Network `json:"network"`
 
 // Disk.
 type Disk struct {
-	ID                      string `json:"Id"`
+	ID                      string `json:"ID"`
 	Name                    string `json:"Name"`
 	FilePath                string `json:"FilePath"`
 	Capacity                int64  `json:"Capacity"`
@@ -193,6 +203,8 @@ type Disk struct {
 
 // Apply to (update) the model.
 func (r *Disk) ApplyTo(m *model.Disk) {
+	m.Base.Name = r.Name
+	m.Base.ID = r.ID
 	m.FilePath = r.FilePath
 	m.Capacity = r.Capacity
 	m.CapacityAllocationUnits = r.CapacityAllocationUnits
@@ -200,9 +212,4 @@ func (r *Disk) ApplyTo(m *model.Disk) {
 	m.FileRef = r.FileRef
 	m.Format = r.Format
 	m.PopulatedSize = r.PopulatedSize
-}
-
-// Disk (list).
-type DiskList struct {
-	Items []Disk `json:"Disk"`
 }

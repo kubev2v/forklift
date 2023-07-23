@@ -97,12 +97,12 @@ type VM struct {
 type Disk struct {
 	Base
 	FilePath                string `sql:""`
-	Capacity                string `sql:""`
+	Capacity                int64  `sql:""`
 	CapacityAllocationUnits string `sql:""`
 	DiskId                  string `sql:""`
 	FileRef                 string `sql:""`
 	Format                  string `sql:""`
-	PopulatedSize           string `sql:""`
+	PopulatedSize           int64  `sql:""`
 }
 
 // Virtual Device.

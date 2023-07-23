@@ -1,6 +1,10 @@
 package ova
 
 import (
+	"net"
+	"net/http"
+	"time"
+
 	"github.com/go-logr/logr"
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
@@ -8,9 +12,6 @@ import (
 	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
 	core "k8s.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
-	"net"
-	"net/http"
-	"time"
 )
 
 // OVA VM Client
@@ -81,7 +82,7 @@ func (r *Client) PowerOff(vmRef ref.Ref) (err error) {
 
 // Determine whether the VM has been powered off.
 func (r *Client) PoweredOff(vmRef ref.Ref) (poweredOff bool, err error) {
-	return
+	return true, nil
 }
 
 // Close the connection to the OVA provider server.
@@ -89,6 +90,10 @@ func (r *Client) Close() {
 	if r.client != nil {
 		r.client = nil
 	}
+}
+
+func (r *Client) DetachDisks(vmRef ref.Ref) (err error) {
+	return
 }
 
 func (r Client) Finalize(vms []*planapi.VMStatus, planName string) {

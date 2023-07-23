@@ -1453,13 +1453,21 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 		},
 	})
 	server := r.Source.Provider.Spec.URL
+	splitted := strings.Split(server, ":")
+
+	if len(splitted) != 2 {
+		fmt.Println("The string does not contain a ':'")
+	}
+	nfsServer := splitted[0]
+	nfsPath := splitted[1]
+
 	//path from disk
 	volumes = append(volumes, core.Volume{
 		Name: "nfs",
 		VolumeSource: core.VolumeSource{
 			NFS: &core.NFSVolumeSource{
-				Server: server,
-				Path:   "/ova/ova",
+				Server: nfsServer,
+				Path:   nfsPath,
 			},
 		},
 	})
@@ -1474,7 +1482,7 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 		},
 		core.VolumeMount{
 			Name:      "nfs",
-			MountPath: "/mnt/nfs",
+			MountPath: "/ova",
 		},
 	)
 

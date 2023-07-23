@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/tar"
+	"crypto/rand"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -43,6 +44,12 @@ type VirtualHardwareSection struct {
 	Configs []VirtualConfig `xml:"Config"`
 }
 
+type References struct {
+	File []struct {
+		Href string `xml:"href,attr"`
+	} `xml:"File"`
+}
+
 type DiskSection struct {
 	XMLName xml.Name `xml:"DiskSection"`
 	Info    string   `xml:"Info"`
@@ -51,12 +58,12 @@ type DiskSection struct {
 
 type Disk struct {
 	XMLName                 xml.Name `xml:"Disk"`
-	Capacity                string   `xml:"capacity,attr"`
+	Capacity                int64    `xml:"capacity,attr"`
 	CapacityAllocationUnits string   `xml:"capacityAllocationUnits,attr"`
 	DiskId                  string   `xml:"diskId,attr"`
 	FileRef                 string   `xml:"fileRef,attr"`
 	Format                  string   `xml:"format,attr"`
-	PopulatedSize           string   `xml:"populatedSize,attr"`
+	PopulatedSize           int64    `xml:"populatedSize,attr"`
 }
 
 type NetworkSection struct {
@@ -86,6 +93,7 @@ type Envelope struct {
 	VirtualSystem  []VirtualSystem `xml:"VirtualSystem"`
 	DiskSection    DiskSection     `xml:"DiskSection"`
 	NetworkSection NetworkSection  `xml:"NetworkSection"`
+	References     References      `xml:"References"`
 }
 
 // vm struct
@@ -117,13 +125,15 @@ type VM struct {
 
 // Virtual Disk.
 type VmDisk struct {
+	ID                      string
+	Name                    string
 	FilePath                string
-	Capacity                string
+	Capacity                int64
 	CapacityAllocationUnits string
 	DiskId                  string
 	FileRef                 string
 	Format                  string
-	PopulatedSize           string
+	PopulatedSize           int64
 }
 
 // Virtual Device.
@@ -146,9 +156,18 @@ type NIC struct {
 type VmNetwork struct {
 	Name        string
 	Description string
+	ID          string
 }
 
+var vmIDMap *UUIDMap
+var diskIDMap *UUIDMap
+var networkIDMap *UUIDMap
+
 func main() {
+
+	vmIDMap = NewUUIDMap()
+	diskIDMap = NewUUIDMap()
+	networkIDMap = NewUUIDMap()
 
 	http.HandleFunc("/vms", vmHandler)
 	http.HandleFunc("/disks", diskHandler)
@@ -346,6 +365,7 @@ func convertToVmStruct(envelope []Envelope, ovaPath []string) ([]VM, error) {
 			newVM := VM{
 				OvaPath: ovaPath[i],
 				Name:    virtualSystem.Name,
+				UUID:    vmIDMap.GetUUID(ovaPath[i]),
 			}
 
 			for _, item := range virtualSystem.HardwareSection.Items {
@@ -369,7 +389,8 @@ func convertToVmStruct(envelope []Envelope, ovaPath []string) ([]VM, error) {
 
 			}
 
-			for _, disk := range vmXml.DiskSection.Disks {
+			for j, disk := range vmXml.DiskSection.Disks {
+				name := envelope[i].References.File[j].Href
 				newVM.Disks = append(newVM.Disks, VmDisk{
 					FilePath:                getDiskPath(ovaPath[i]),
 					Capacity:                disk.Capacity,
@@ -378,6 +399,8 @@ func convertToVmStruct(envelope []Envelope, ovaPath []string) ([]VM, error) {
 					FileRef:                 disk.FileRef,
 					Format:                  disk.Format,
 					PopulatedSize:           disk.PopulatedSize,
+					Name:                    name,
+					ID:                      diskIDMap.GetUUID(ovaPath[i] + "/" + name),
 				})
 			}
 
@@ -385,6 +408,7 @@ func convertToVmStruct(envelope []Envelope, ovaPath []string) ([]VM, error) {
 				newVM.Networks = append(newVM.Networks, VmNetwork{
 					Name:        network.Name,
 					Description: network.Description,
+					ID:          networkIDMap.GetUUID(network.Name),
 				})
 			}
 
@@ -412,6 +436,7 @@ func convertToNetworkStruct(envelope []Envelope) ([]VmNetwork, error) {
 			newNetwork := VmNetwork{
 				Name:        network.Name,
 				Description: network.Description,
+				ID:          networkIDMap.GetUUID(network.Name),
 			}
 			networks = append(networks, newNetwork)
 		}
@@ -422,9 +447,9 @@ func convertToNetworkStruct(envelope []Envelope) ([]VmNetwork, error) {
 
 func convertToDiskStruct(envelope []Envelope, ovaPath []string) ([]VmDisk, error) {
 	var disks []VmDisk
-	for i := 0; i < len(envelope); i++ {
-		ova := envelope[i]
-		for _, disk := range ova.DiskSection.Disks {
+	for i, ova := range envelope {
+		for j, disk := range ova.DiskSection.Disks {
+			name := ova.References.File[j].Href
 			newDisk := VmDisk{
 				FilePath:                getDiskPath(ovaPath[i]),
 				Capacity:                disk.Capacity,
@@ -433,6 +458,8 @@ func convertToDiskStruct(envelope []Envelope, ovaPath []string) ([]VmDisk, error
 				FileRef:                 disk.FileRef,
 				Format:                  disk.Format,
 				PopulatedSize:           disk.PopulatedSize,
+				Name:                    name,
+				ID:                      diskIDMap.GetUUID(ovaPath[i] + "/" + name),
 			}
 
 			disks = append(disks, newDisk)
@@ -452,4 +479,33 @@ func getDiskPath(path string) string {
 		return path[:i+1]
 	}
 	return path
+}
+
+type UUIDMap struct {
+	m map[string]string
+}
+
+func NewUUIDMap() *UUIDMap {
+	return &UUIDMap{
+		m: make(map[string]string),
+	}
+}
+
+func (um *UUIDMap) GetUUID(filename string) string {
+	var id string
+	id, ok := um.m[filename]
+
+	if !ok {
+		uuid := make([]byte, 16)
+		n, err := io.ReadFull(rand.Reader, uuid)
+		if n != len(uuid) || err != nil {
+			return ""
+		}
+		uuid[6] = (uuid[6] & 0x0f) | 0x40
+		uuid[8] = (uuid[8] & 0x3f) | 0x80
+		id = fmt.Sprintf("%x-%x-%x-%x-%x", uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:])
+
+		um.m[filename] = id
+	}
+	return id
 }

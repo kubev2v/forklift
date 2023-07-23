@@ -2,6 +2,13 @@ package ova
 
 import (
 	"fmt"
+	"math"
+	"path"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
+
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
@@ -16,9 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
-	"math"
-	"path"
-	"regexp"
 )
 
 // BIOS types
@@ -133,16 +137,27 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 			Name:  "V2V_vmName",
 			Value: vm.Name,
 		},
-		// TODO support many disks
-		core.EnvVar{
-			Name:  "V2V_diskPath",
-			Value: "/mnt/nfs/ova/centos44_new.ova",
-		},
 		core.EnvVar{
 			Name:  "V2V_provider",
 			Value: "ova",
 		},
 	)
+
+	if strings.HasSuffix(vm.OvaPath, ".ova") {
+		env = append(env,
+			core.EnvVar{
+				Name:  "V2V_diskPath",
+				Value: vm.OvaPath,
+			})
+	} else {
+		for _, disk := range vm.Disks {
+			env = append(env,
+				core.EnvVar{
+					Name:  "V2V_diskPath",
+					Value: getDiskSourcePath(vm.OvaPath, disk.Name),
+				})
+		}
+	}
 	return
 }
 
@@ -177,7 +192,10 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 		}
 		for _, disk := range vm.Disks {
 			if disk.ID == ds.ID {
-				diskSize := disk.Capacity * int64(math.Pow(2, 20))
+				diskSize, err := getResourceCapacity(disk.Capacity, disk.CapacityAllocationUnits)
+				if err != nil {
+					return nil, err
+				}
 				storageClass := mapped.Destination.StorageClass
 				var dvSource cdi.DataVolumeSource
 				// Let virt-v2v do the copying
@@ -209,7 +227,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 				if dv.ObjectMeta.Annotations == nil {
 					dv.ObjectMeta.Annotations = make(map[string]string)
 				}
-				dv.ObjectMeta.Annotations[planbase.AnnDiskSource] = trimBackingFileName(disk.FilePath)
+				dv.ObjectMeta.Annotations[planbase.AnnDiskSource] = getDiskSourcePath(disk.FilePath, disk.Name)
 				dvs = append(dvs, *dv)
 			}
 		}
@@ -231,13 +249,6 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 		return
 	}
 
-	/*if vm.IsTemplate {
-		err = liberr.New(
-			fmt.Sprintf(
-				"VM %s is a template",
-				vmRef.String()))
-		return
-	}*/
 	if r.Plan.Spec.Warm {
 		err = liberr.New(
 			fmt.Sprintf(
@@ -359,6 +370,9 @@ func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec) {
 }
 
 func (r *Builder) mapCPU(vm *model.VM, object *cnv.VirtualMachineSpec) {
+	if vm.CoresPerSocket == 0 {
+		vm.CoresPerSocket = 1
+	}
 	object.Template.Spec.Domain.Machine = &cnv.Machine{Type: "q35"}
 	object.Template.Spec.Domain.CPU = &cnv.CPU{
 		Sockets: uint32(vm.CpuCount / vm.CoresPerSocket),
@@ -410,7 +424,7 @@ func (r *Builder) mapDisks(vm *model.VM, persistentVolumeClaims []core.Persisten
 		}
 	}
 	for i, disk := range disks {
-		pvc := pvcMap[trimBackingFileName(disk.DiskId)]
+		pvc := pvcMap[getDiskSourcePath(disk.FilePath, disk.Name)]
 		volumeName := fmt.Sprintf("vol-%v", i)
 		volume := cnv.Volume{
 			Name: volumeName,
@@ -454,7 +468,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 		list = append(
 			list,
 			&plan.Task{
-				Name: trimBackingFileName(disk.DiskId),
+				Name: getDiskSourcePath(disk.FilePath, disk.Name),
 				Progress: libitr.Progress{
 					Total: mB,
 				},
@@ -508,10 +522,56 @@ func trimBackingFileName(fileName string) string {
 	return backingFilePattern.ReplaceAllString(fileName, ".vmdk")
 }
 
+func getDiskSourcePath(filePath string, diskName string) string {
+
+	if strings.HasSuffix(filePath, ".ova") {
+		return filePath
+	}
+
+	return filepath.Dir(filePath) + "/" + diskName
+}
+
+func getResourceCapacity(capacity int64, units string) (int64, error) {
+
+	if units == "" {
+		return 0, nil
+	}
+
+	re := regexp.MustCompile("[0-9]+")
+
+	numbers := re.FindAllString(units, -1)
+	if len(numbers) != 2 {
+		return 0, nil
+	}
+	base, err := strconv.Atoi(numbers[0])
+	if err != nil {
+		return 0, err
+	}
+	pow, err := strconv.Atoi(numbers[1])
+	if err != nil {
+		return 0, err
+	}
+
+	return capacity * int64(math.Pow(float64(base), float64(pow))), nil
+
+}
+
 func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName *string, populatorName string, accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode) *core.PersistentVolumeClaim {
 	return nil
 }
 
 func (r *Builder) PreTransferActions(c planbase.Client, vmRef ref.Ref) (ready bool, err error) {
 	return true, nil
+}
+
+// Build LUN PVs.
+func (r *Builder) LunPersistentVolumes(vmRef ref.Ref) (pvs []core.PersistentVolume, err error) {
+	// do nothing
+	return
+}
+
+// Build LUN PVCs.
+func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.PersistentVolumeClaim, err error) {
+	// do nothing
+	return
 }
