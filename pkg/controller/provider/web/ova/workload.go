@@ -23,17 +23,11 @@ type WorkloadHandler struct {
 }
 
 // Add routes to the `gin` router.
-// no-op
 func (h *WorkloadHandler) AddRoutes(e *gin.Engine) {
 	e.GET(WorkloadRoot, h.Get)
 }
 
-// List resources in a REST collection.
-func (h WorkloadHandler) List(ctx *gin.Context) {
-}
-
 // Get a specific REST resource.
-// no-op
 func (h WorkloadHandler) Get(ctx *gin.Context) {
 	status, err := h.Prepare(ctx)
 	if status != http.StatusOK {

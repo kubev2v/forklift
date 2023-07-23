@@ -95,10 +95,7 @@ func (h *ProviderHandler) ListContent(ctx *gin.Context) (content []interface{}, 
 	ns := q.Get(base.NsParam)
 	for _, collector := range list {
 		if p, cast := collector.Owner().(*api.Provider); cast {
-			if p.Type() != api.OVirt {
-				continue
-			}
-			if ns != "" && ns != p.Namespace {
+			if p.Type() != api.OVirt || (ns != "" && ns != p.Namespace) {
 				continue
 			}
 			if collector, found := h.Container.Get(p); found {
