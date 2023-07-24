@@ -98,11 +98,11 @@ func (h *ProviderHandler) ListContent(ctx *gin.Context) (content []interface{}, 
 			if p.Type() != api.OVirt || (ns != "" && ns != p.Namespace) {
 				continue
 			}
-			if collector, found := h.Container.Get(p); found {
-				h.Collector = collector
-			} else {
+			collector, found := h.Container.Get(p)
+			if !found {
 				continue
 			}
+			h.Collector = collector
 			m := &model.Provider{}
 			m.With(p)
 			r := Provider{}
