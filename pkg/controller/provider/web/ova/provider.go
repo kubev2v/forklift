@@ -95,17 +95,14 @@ func (h *ProviderHandler) ListContent(ctx *gin.Context) (content []interface{}, 
 	ns := q.Get(base.NsParam)
 	for _, collector := range list {
 		if p, cast := collector.Owner().(*api.Provider); cast {
-			if p.Type() != api.Ova {
+			if p.Type() != api.Ova || (ns != "" && ns != p.Namespace) {
 				continue
 			}
-			if ns != "" && ns != p.Namespace {
+			collector, found := h.Container.Get(p)
+			if !found {
 				continue
 			}
-			if collector, found := h.Container.Get(p); found {
-				h.Collector = collector
-			} else {
-				continue
-			}
+			h.Collector = collector
 			m := &model.Provider{}
 			m.With(p)
 			r := Provider{}
