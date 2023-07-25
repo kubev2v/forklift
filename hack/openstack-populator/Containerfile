@@ -5,6 +5,7 @@ COPY go.mod ./
 COPY go.sum ./
 COPY cmd/openstack-populator/openstack-populator.go ./
 COPY vendor/ ./vendor/
+COPY pkg/ ./pkg/
 RUN go build -o openstack-populator
 
 FROM registry.access.redhat.com/ubi9-minimal:9.1.0-1760.1675784957
