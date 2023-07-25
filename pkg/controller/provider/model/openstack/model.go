@@ -106,30 +106,6 @@ type Fault struct {
 	Message string    `sql:""`
 }
 
-// VM Status
-const (
-	VmStatusActive           = "ACTIVE"
-	VmStatusBuild            = "BUILD"
-	VmStatusDeleted          = "DELETED"
-	VmStatusError            = "ERROR"
-	VmStatusHardReboot       = "HARD_REBOOT"
-	VmStatusMigrating        = "MIGRATING"
-	VmStatusPassword         = "PASSWORD"
-	VmStatusPaused           = "PAUSED"
-	VmStatusReboot           = "REBOOT"
-	VmStatusRebuild          = "REBUILD"
-	VmStatusRescue           = "RESCUE"
-	VmStatusResize           = "RESIZE"
-	VmStatusRevertResize     = "REVERT_RESIZE"
-	VmStatusShelved          = "SHELVED"
-	VmStatusShelvedOffloaded = "SHELVED_OFFLOADED"
-	VmStatusShutoff          = "SHUTOFF"
-	VmStatusSoftDeleted      = "SOFT_DELETED"
-	VmStatusSuspended        = "SUSPENDED"
-	VmStatusUnknown          = "UNKNOWN"
-	VmStatusVerifyResize     = "VERIFY_RESIZE"
-)
-
 type VM struct {
 	Base
 	RevisionValidated int64                    `sql:"d0,index(revisionValidated)"`

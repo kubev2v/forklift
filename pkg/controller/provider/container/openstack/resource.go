@@ -5,21 +5,12 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/snapshots"
-	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
-	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumetypes"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
-	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
-	"github.com/gophercloud/gophercloud/openstack/identity/v3/regions"
-	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/openstack"
+	libclient "github.com/konveyor/forklift-controller/pkg/lib/client/openstack"
 )
 
 type Region struct {
-	regions.Region
+	libclient.Region
 }
 
 func (r *Region) ApplyTo(m *model.Region) {
@@ -35,11 +26,11 @@ func (r *Region) equalsTo(m *model.Region) bool {
 }
 
 type RegionListOpts struct {
-	regions.ListOpts
+	libclient.RegionListOpts
 }
 
 type Project struct {
-	projects.Project
+	libclient.Project
 }
 
 func (r *Project) ApplyTo(m *model.Project) {
@@ -61,11 +52,11 @@ func (r *Project) equalsTo(m *model.Project) bool {
 }
 
 type ProjectListOpts struct {
-	projects.ListOpts
+	libclient.ProjectListOpts
 }
 
 type Image struct {
-	images.Image
+	libclient.Image
 }
 
 func (r *Image) ApplyTo(m *model.Image) {
@@ -97,31 +88,21 @@ func (r *Image) updatedAfter(m *model.Image) bool {
 	return r.UpdatedAt.After(m.UpdatedAt)
 }
 
-const (
-	FilterGTE                images.ImageDateFilter = images.FilterGTE
-	ImageStatusDeleted       images.ImageStatus     = images.ImageStatusDeleted
-	ImageStatusPendingDelete images.ImageStatus     = images.ImageStatusPendingDelete
-)
-
-type ImageDateQuery struct {
-	images.ImageDateQuery
-}
-
 type ImageListOpts struct {
-	images.ListOpts
+	libclient.ImageListOpts
 }
 
-func (r *ImageListOpts) setUpdateAtQueryFilterGT(lastSync time.Time) {
-	r.UpdatedAtQuery = &images.ImageDateQuery{Date: lastSync, Filter: images.FilterGT}
+type ImageCreateOpts struct {
+	libclient.ImageCreateOpts
 }
 
 type Flavor struct {
-	flavors.Flavor
+	libclient.Flavor
 	ExtraSpecs map[string]string
 }
 
 type FlavorListOpts struct {
-	flavors.ListOpts
+	libclient.FlavorListOpts
 }
 
 func (r *Flavor) ApplyTo(m *model.Flavor) {
@@ -153,11 +134,11 @@ func (r *Flavor) equalsTo(m *model.Flavor) bool {
 }
 
 type SnapshotListOpts struct {
-	snapshots.ListOpts
+	libclient.SnapshotListOpts
 }
 
 type Snapshot struct {
-	snapshots.Snapshot
+	libclient.Snapshot
 }
 
 func (r *Snapshot) ApplyTo(m *model.Snapshot) {
@@ -180,11 +161,11 @@ const (
 )
 
 type VolumeListOpts struct {
-	volumes.ListOpts
+	libclient.VolumeListOpts
 }
 
 type Volume struct {
-	volumes.Volume
+	libclient.Volume
 }
 
 func (r *Volume) ApplyTo(m *model.Volume) {
@@ -226,11 +207,11 @@ func (r *Volume) updatedAfter(m *model.Volume) bool {
 }
 
 type VolumeTypeListOpts struct {
-	volumetypes.ListOpts
+	libclient.VolumeTypeListOpts
 }
 
 type VolumeType struct {
-	volumetypes.VolumeType
+	libclient.VolumeType
 }
 
 func (r *VolumeType) ApplyTo(m *model.VolumeType) {
@@ -256,7 +237,7 @@ func (r *VolumeType) equalsTo(m *model.VolumeType) bool {
 }
 
 type Fault struct {
-	servers.Fault
+	libclient.Fault
 }
 
 func (r *Fault) ApplyTo(m *model.Fault) {
@@ -274,11 +255,11 @@ func (r *Fault) equalsTo(m *model.Fault) bool {
 }
 
 type VM struct {
-	servers.Server
+	libclient.VM
 }
 
 type VMListOpts struct {
-	servers.ListOpts
+	libclient.VMListOpts
 }
 
 func (r *VM) ApplyTo(m *model.VM) {
@@ -317,7 +298,7 @@ func (r *VM) addFlavorID(m *model.VM) {
 
 func (r *VM) addFault(m *model.VM) {
 	m.Fault = model.Fault{}
-	f := &Fault{r.Fault}
+	f := &Fault{libclient.Fault{Fault: r.Fault}}
 	f.ApplyTo(&m.Fault)
 }
 
@@ -338,7 +319,7 @@ func (r *VM) equalAttachedVolumes(m *model.VM) bool {
 	}
 	for _, rAttachedVolume := range r.AttachedVolumes {
 		found := false
-		attachedVolume := &AttachedVolume{rAttachedVolume}
+		attachedVolume := &AttachedVolume{libclient.AttachedVolume{AttachedVolume: rAttachedVolume}}
 		for _, mAttachedVolume := range m.AttachedVolumes {
 			if attachedVolume.equalsTo(&mAttachedVolume) {
 				found = true
@@ -361,7 +342,7 @@ func (r *VM) equalsTo(m *model.VM) bool {
 	if m.FlavorID != flavorID {
 		return false
 	}
-	f := &Fault{r.Fault}
+	f := &Fault{libclient.Fault{Fault: r.Fault}}
 	if !f.equalsTo(&m.Fault) {
 		return false
 	}
@@ -389,7 +370,7 @@ func (r *VM) equalsTo(m *model.VM) bool {
 }
 
 type AttachedVolume struct {
-	servers.AttachedVolume
+	libclient.AttachedVolume
 }
 
 func (r *AttachedVolume) ApplyTo(m *model.AttachedVolume) {
@@ -401,11 +382,11 @@ func (r *AttachedVolume) equalsTo(m *model.AttachedVolume) bool {
 }
 
 type Network struct {
-	networks.Network
+	libclient.Network
 }
 
 type NetworkListOpts struct {
-	networks.ListOpts
+	libclient.NetworkListOpts
 }
 
 func (r *Network) ApplyTo(m *model.Network) {
@@ -429,11 +410,11 @@ func (r *Network) updatedAfter(m *model.Network) bool {
 }
 
 type Subnet struct {
-	subnets.Subnet
+	libclient.Subnet
 }
 
 type SubnetListOpts struct {
-	subnets.ListOpts
+	libclient.SubnetListOpts
 }
 
 func (r *Subnet) ApplyTo(m *model.Subnet) {
@@ -461,7 +442,7 @@ func (r *Subnet) ApplyTo(m *model.Subnet) {
 func (r *Subnet) addAllocationPools(m *model.Subnet) {
 	m.AllocationPools = []model.AllocationPool{}
 	for i := range r.AllocationPools {
-		allocationPool := AllocationPool{r.AllocationPools[i]}
+		allocationPool := AllocationPool{libclient.AllocationPool{AllocationPool: r.AllocationPools[i]}}
 		ap := &model.AllocationPool{}
 		allocationPool.ApplyTo(ap)
 		m.AllocationPools = append(m.AllocationPools, *ap)
@@ -470,7 +451,7 @@ func (r *Subnet) addAllocationPools(m *model.Subnet) {
 func (r *Subnet) addHostRoutes(m *model.Subnet) {
 	m.HostRoutes = []model.HostRoute{}
 	for i := range r.HostRoutes {
-		hostRoute := HostRoute{r.HostRoutes[i]}
+		hostRoute := HostRoute{libclient.HostRoute{HostRoute: r.HostRoutes[i]}}
 		hr := &model.HostRoute{}
 		hostRoute.ApplyTo(hr)
 		m.HostRoutes = append(m.HostRoutes, *hr)
@@ -488,13 +469,13 @@ func (r *Subnet) equalsTo(m *model.Subnet) bool {
 		return false
 	}
 	for i := range r.HostRoutes {
-		hostRoute := HostRoute{r.HostRoutes[i]}
+		hostRoute := HostRoute{libclient.HostRoute{HostRoute: r.HostRoutes[i]}}
 		if !hostRoute.equalsTo(&m.HostRoutes[i]) {
 			return false
 		}
 	}
 	for i := range r.AllocationPools {
-		allocationPool := AllocationPool{r.AllocationPools[i]}
+		allocationPool := AllocationPool{libclient.AllocationPool{AllocationPool: r.AllocationPools[i]}}
 		if !allocationPool.equalsTo(&m.AllocationPools[i]) {
 			return false
 		}
@@ -516,7 +497,7 @@ func (r *Subnet) equalsTo(m *model.Subnet) bool {
 }
 
 type AllocationPool struct {
-	subnets.AllocationPool
+	libclient.AllocationPool
 }
 
 func (r *AllocationPool) ApplyTo(m *model.AllocationPool) {
@@ -529,7 +510,7 @@ func (r *AllocationPool) equalsTo(m *model.AllocationPool) bool {
 }
 
 type HostRoute struct {
-	subnets.HostRoute
+	libclient.HostRoute
 }
 
 func (r *HostRoute) ApplyTo(m *model.HostRoute) {
