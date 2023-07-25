@@ -5,7 +5,6 @@ import (
 	"encoding/xml"
 	"fmt"
 	"math/rand"
-	"net/url"
 	"path"
 	"sort"
 	"strconv"
@@ -22,7 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/klog/v2"
 	cnv "kubevirt.io/api/core/v1"
 	libvirtxml "libvirt.org/libvirt-go-xml"
 
@@ -31,12 +29,8 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	"github.com/konveyor/forklift-controller/pkg/controller/plan/util"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	"github.com/pkg/errors"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -268,6 +262,7 @@ func (r *KubeVirt) DeleteImporterPod(pvc core.PersistentVolumeClaim) (err error)
 func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) (err error) {
 	newVM, err := r.virtualMachine(vm)
 	if err != nil {
+		err = liberr.Wrap(err)
 		return
 	}
 
@@ -319,7 +314,7 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
-	pvcs, err := r.getPVCs(vm)
+	pvcs, err := r.getPVCs(vm.Ref)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -459,6 +454,21 @@ func (r *KubeVirt) DataVolumes(vm *plan.VMStatus) (dataVolumes []cdi.DataVolume,
 	return
 }
 
+func (r *KubeVirt) PopulatorVolumes(vmRef ref.Ref) (pvcNames []string, err error) {
+	secret, err := r.ensureSecret(vmRef, r.copyDataFromProviderSecret)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	annotations := r.vmLabels(vmRef)
+	err = r.createLunDisks(vmRef)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	return r.Builder.PopulatorVolumes(vmRef, annotations, secret.Name)
+}
+
 // Ensure the DataVolumes exist on the destination.
 func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus, dataVolumes []cdi.DataVolume) (err error) {
 	list := &cdi.DataVolumeList{}
@@ -516,6 +526,14 @@ func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus, dataVolumes []cdi.DataVo
 	return
 }
 
+func (r *KubeVirt) EnsurePopulatorVolumes(vm *plan.VMStatus, pvcNames []string) (err error) {
+	err = r.createPodToBindPVCs(vm, pvcNames)
+	if err != nil {
+		err = liberr.Wrap(err)
+	}
+	return
+}
+
 // Return DataVolumes associated with a VM.
 func (r *KubeVirt) getDVs(vm *plan.VMStatus) (dvs []DataVolume, err error) {
 	dvsList := &cdi.DataVolumeList{}
@@ -543,7 +561,7 @@ func (r *KubeVirt) getDVs(vm *plan.VMStatus) (dvs []DataVolume, err error) {
 }
 
 // Return PersistentVolumeClaims associated with a VM.
-func (r *KubeVirt) getPVCs(vm *plan.VMStatus) (pvcs []core.PersistentVolumeClaim, err error) {
+func (r *KubeVirt) getPVCs(vmRef ref.Ref) (pvcs []core.PersistentVolumeClaim, err error) {
 	pvcsList := &core.PersistentVolumeClaimList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
@@ -557,100 +575,33 @@ func (r *KubeVirt) getPVCs(vm *plan.VMStatus) (pvcs []core.PersistentVolumeClaim
 	}
 
 	pvcs = []core.PersistentVolumeClaim{}
-	vmLabels := r.vmLabels(vm.Ref)
+	vmLabels := r.vmLabels(vmRef)
 	for i := range pvcsList.Items {
 		pvc := &pvcsList.Items[i]
 		pvcAnn := pvc.GetAnnotations()
 		if pvcAnn[kVM] == vmLabels[kVM] && pvcAnn[kPlan] == vmLabels[kPlan] {
 			pvcs = append(pvcs, *pvc)
-		} else if r.Plan.IsSourceProviderOpenstack() {
-			if _, ok := pvc.Labels["migration"]; ok {
-				if pvc.Labels["migration"] == r.Migration.Name {
-					pvcs = append(pvcs, *pvc)
-				}
-			}
-		} else if r.useOvirtPopulator(vm) {
-			ovirtVm := &ovirt.Workload{}
-			err = r.Source.Inventory.Find(ovirtVm, vm.Ref)
-			if err != nil {
-				return
-			}
-			for _, da := range ovirtVm.DiskAttachments {
-				if pvc.Spec.DataSource != nil && da.Disk.ID == pvc.Spec.DataSource.Name {
-					pvcs = append(pvcs, *pvc)
-					break
-				}
-			}
 		}
 	}
-
-	return
-}
-
-func (r *KubeVirt) createVolumesForOvirt(vm *plan.VMStatus) (pvcNames []string, err error) {
-	secret, err := r.ensureSecret(vm.Ref, r.copyDataFromProviderSecret)
-	if err != nil {
-		return
-	}
-	ovirtVm := &ovirt.Workload{}
-	err = r.Source.Inventory.Find(ovirtVm, vm.Ref)
-	if err != nil {
-		return
-	}
-	sourceUrl, err := url.Parse(r.Source.Provider.Spec.URL)
-	if err != nil {
-		return
-	}
-
-	for _, da := range ovirtVm.DiskAttachments {
-		if da.Disk.StorageType == "lun" {
-			continue
-		}
-		// The VM has a disk image so the storage map is necessarily not empty, and we can read the storage class from it.
-		storageName := &r.Context.Map.Storage.Spec.Map[0].Destination.StorageClass
-		populatorCr := util.OvirtVolumePopulator(da, sourceUrl, r.Plan.Spec.TransferNetwork, r.Plan.Spec.TargetNamespace, secret.Name, vm.ID, string(r.Migration.UID))
-		failure := r.Client.Create(context.Background(), populatorCr, &client.CreateOptions{})
-		if failure != nil && !k8serr.IsAlreadyExists(failure) {
-			return nil, failure
-		}
-
-		accessModes, volumeMode, failure := r.getDefaultVolumeAndAccessMode(*storageName)
-		if failure != nil {
-			return nil, failure
-		}
-
-		pvc := r.Builder.PersistentVolumeClaimWithSourceRef(da, storageName, populatorCr.Name, accessModes, volumeMode)
-		if pvc == nil {
-			klog.Errorf("Couldn't build the PVC %v", da.DiskAttachment.ID)
-			return
-		}
-		err = r.Client.Create(context.TODO(), pvc, &client.CreateOptions{})
-		if err != nil {
-			return
-		}
-		pvcNames = append(pvcNames, pvc.Name)
-	}
-
-	err = r.createLunDisks(vm)
 
 	return
 }
 
 // Creates the PVs and PVCs for LUN disks.
-func (r *KubeVirt) createLunDisks(vm *plan.VMStatus) (err error) {
-	lunPvcs, err := r.Builder.LunPersistentVolumeClaims(vm.Ref)
+func (r *KubeVirt) createLunDisks(vmRef ref.Ref) (err error) {
+	lunPvcs, err := r.Builder.LunPersistentVolumeClaims(vmRef)
 	if err != nil {
 		return
 	}
-	err = r.EnsurePersistentVolumeClaim(vm, lunPvcs)
+	err = r.EnsurePersistentVolumeClaim(vmRef, lunPvcs)
 	if err != nil {
 		return
 	}
-	lunPvs, err := r.Builder.LunPersistentVolumes(vm.Ref)
+	lunPvs, err := r.Builder.LunPersistentVolumes(vmRef)
 	if err != nil {
 		return
 	}
-	err = r.EnsurePersistentVolume(vm, lunPvs)
+	err = r.EnsurePersistentVolume(vmRef, lunPvs)
 	if err != nil {
 		return
 	}
@@ -658,7 +609,10 @@ func (r *KubeVirt) createLunDisks(vm *plan.VMStatus) (err error) {
 }
 
 // Creates a pod associated with PVCs to create node bind (wait for consumer)
-func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) error {
+func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) (err error) {
+	if len(pvcNames) == 0 {
+		return
+	}
 	volumes := []core.Volume{}
 	for _, pvcName := range pvcNames {
 		volumes = append(volumes, core.Volume{
@@ -704,7 +658,7 @@ func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) err
 	// Align with the conversion pod request, to prevent breakage
 	r.setKvmOnPodSpec(&pod.Spec)
 
-	err := r.Client.Create(context.TODO(), pod, &client.CreateOptions{})
+	err = r.Client.Create(context.TODO(), pod, &client.CreateOptions{})
 	if err != nil {
 		return err
 	}
@@ -732,72 +686,6 @@ func (r *KubeVirt) setKvmOnPodSpec(podSpec *core.PodSpec) {
 	}
 }
 
-func (r *KubeVirt) areOvirtPVCsReady(vm ref.Ref, step *plan.Step) (ready bool, err error) {
-	ovirtVm := &ovirt.Workload{}
-	err = r.Source.Inventory.Find(ovirtVm, vm)
-	if err != nil {
-		return
-	}
-	ready = true
-
-	for _, da := range ovirtVm.DiskAttachments {
-		if da.Disk.StorageType == "lun" {
-			continue
-		}
-		obj := client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: da.Disk.ID}
-		pvc := core.PersistentVolumeClaim{}
-		err = r.Client.Get(context.Background(), obj, &pvc)
-		if err != nil {
-			return
-		}
-
-		if pvc.Status.Phase != core.ClaimBound {
-			ready = false
-			break
-		}
-
-		task, found := step.FindTask(da.Disk.ID)
-		if !found {
-			continue
-		}
-
-		task.MarkCompleted()
-	}
-
-	return
-}
-
-var filesystemMode = core.PersistentVolumeFilesystem
-
-// Using CDI logic to set the Volume mode and Access mode of the PVC - https://github.com/kubevirt/containerized-data-importer/blob/v1.56.0/pkg/controller/datavolume/util.go#L154
-func (r *KubeVirt) getDefaultVolumeAndAccessMode(storageName string) ([]core.PersistentVolumeAccessMode, *core.PersistentVolumeMode, error) {
-	storageProfile := &cdi.StorageProfile{}
-	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: storageName}, storageProfile)
-	if err != nil {
-		return nil, nil, liberr.Wrap(err, "cannot get StorageProfile")
-	}
-
-	if len(storageProfile.Status.ClaimPropertySets) > 0 &&
-		len(storageProfile.Status.ClaimPropertySets[0].AccessModes) > 0 {
-		accessModes := storageProfile.Status.ClaimPropertySets[0].AccessModes
-		volumeMode := storageProfile.Status.ClaimPropertySets[0].VolumeMode
-		if volumeMode == nil {
-			// volumeMode is an optional API parameter. Filesystem is the default mode used when volumeMode parameter is omitted.
-			volumeMode = &filesystemMode
-		}
-		return accessModes, volumeMode, nil
-	}
-
-	// no accessMode configured on storageProfile
-	return nil, nil, errors.Errorf("no accessMode defined on StorageProfile for %s StorageClass", storageName)
-}
-
-// Return true when the import is done with OvirtVolumePopulator
-func (r *KubeVirt) useOvirtPopulator(vm *plan.VMStatus) bool {
-	return r.Plan.IsSourceProviderOvirt() && vm.Warm == nil && r.Destination.Provider.IsHost()
-}
-
-// Return namespace specific ListOption.
 func (r *KubeVirt) getListOptionsNamespaced() (listOptions *client.ListOptions) {
 	return &client.ListOptions{
 		Namespace: r.Plan.Spec.TargetNamespace,
@@ -967,23 +855,9 @@ func (r *KubeVirt) DeleteHookJobs(vm *plan.VMStatus) (err error) {
 	return
 }
 
-// Get the OpenstackVolumePopulator CustomResource based on the image name.
-func (r *KubeVirt) getOpenstackPopulatorCr(name string) (populatorCr v1beta1.OpenstackVolumePopulator, err error) {
-	populatorCr = v1beta1.OpenstackVolumePopulator{}
-	err = r.Destination.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: name}, &populatorCr)
-	return
-}
-
-// Get the OvirtVolumePopulator CustomResource based on the PVC name.
-func (r *KubeVirt) getOvirtPopulatorCr(name string) (populatorCr v1beta1.OvirtVolumePopulator, err error) {
-	populatorCr = v1beta1.OvirtVolumePopulator{}
-	err = r.Destination.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: name}, &populatorCr)
-	return
-}
-
 // Set the Populator Pod Ownership.
 func (r *KubeVirt) SetPopulatorPodOwnership(vm *plan.VMStatus) (err error) {
-	pvcs, err := r.getPVCs(vm)
+	pvcs, err := r.getPVCs(vm.Ref)
 	if err != nil {
 		return
 	}
@@ -1069,7 +943,7 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 		return
 	}
 
-	err = r.createLunDisks(vm)
+	err = r.createLunDisks(vm.Ref)
 
 	return
 }
@@ -1085,7 +959,7 @@ func (r *KubeVirt) getGeneratedName(vm *plan.VMStatus) string {
 
 // Build the Kubevirt VM CR.
 func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine, err error) {
-	pvcs, err := r.getPVCs(vm)
+	pvcs, err := r.getPVCs(vm.Ref)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -1106,17 +980,13 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 			"originalName", originalName, "newName", vm.Name)
 	}
 
-	if r.Plan.IsSourceProviderOCP() {
+	var ok bool
+	object, ok = r.vmTemplate(vm)
+	if !ok {
+		r.Log.Info("Building VirtualMachine without template.",
+			"vm",
+			vm.String())
 		object = r.emptyVm(vm)
-	} else {
-		var ok bool
-		object, ok = r.vmTemplate(vm)
-		if !ok {
-			r.Log.Info("Building VirtualMachine without template.",
-				"vm",
-				vm.String())
-			object = r.emptyVm(vm)
-		}
 	}
 
 	//Add the original name and ID info to the VM annotations
@@ -1142,8 +1012,7 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 func (r *KubeVirt) vmTemplate(vm *plan.VMStatus) (virtualMachine *cnv.VirtualMachine, ok bool) {
 	tmpl, err := r.findTemplate(vm)
 	if err != nil {
-		r.Log.Error(err,
-			"Could not find Template for destination VM.",
+		r.Log.Info("could not find template for destination VM.",
 			"vm",
 			vm.String())
 		return
@@ -1889,138 +1758,6 @@ func vmOwnerReference(vm *cnv.VirtualMachine) (ref meta.OwnerReference) {
 	return
 }
 
-// TODO move elsewhere
-func (r *KubeVirt) ensureOpenStackVolumes(vm ref.Ref, ready bool) (pvcNames []string, err error) {
-	secret, err := r.ensureSecret(vm, r.copyDataFromProviderSecret)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-
-	openstackVm := &openstack.Workload{}
-	err = r.Source.Inventory.Find(openstackVm, vm)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	sourceUrl, err := url.Parse(r.Source.Provider.Spec.URL)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-
-	storageName := r.Context.Map.Storage.Spec.Map[0].Destination.StorageClass
-
-	if len(openstackVm.Volumes) > 0 {
-		for _, vol := range openstackVm.Volumes {
-			image := &openstack.Image{}
-			err = r.Source.Inventory.Find(image, ref.Ref{Name: fmt.Sprintf("%s-%s", r.Migration.Name, vol.ID)})
-			if err != nil {
-				if !ready {
-					err = nil
-					r.Log.Info("Image is not found yet")
-					continue
-				}
-				err = liberr.Wrap(err)
-				return
-			}
-
-			if image.Status != "active" {
-				r.Log.Info("Image is not active yet", "image", image.Name)
-				continue
-			}
-			populatorCr := util.OpenstackVolumePopulator(image, sourceUrl, r.Plan.Spec.TransferNetwork, r.Plan.Spec.TargetNamespace, secret.Name, vm.ID, string(r.Migration.UID))
-			err = r.Client.Create(context.TODO(), populatorCr, &client.CreateOptions{})
-			if k8serr.IsAlreadyExists(err) {
-				err = nil
-			} else if err != nil {
-				err = liberr.Wrap(err)
-				return
-			}
-			accessModes, volumeMode, failure := r.getDefaultVolumeAndAccessMode(storageName)
-			if failure != nil {
-				return nil, failure
-			}
-
-			pvc := r.Builder.PersistentVolumeClaimWithSourceRef(image, &storageName, populatorCr.Name, accessModes, volumeMode)
-			err = r.Client.Create(context.TODO(), pvc, &client.CreateOptions{})
-			if k8serr.IsAlreadyExists(err) {
-				err = nil
-				continue
-			} else if err != nil {
-				err = liberr.Wrap(err)
-				return
-			}
-			pvcNames = append(pvcNames, pvc.Name)
-		}
-	}
-
-	return
-}
-
-func (r *KubeVirt) openstackPVCsReady(vm ref.Ref, step *plan.Step) (ready bool, err error) {
-	openstackVm := &openstack.Workload{}
-	err = r.Source.Inventory.Find(openstackVm, vm)
-	if err != nil {
-		return
-	}
-	ready = true
-
-	for _, vol := range openstackVm.Volumes {
-		lookupName := fmt.Sprintf("%s-%s", r.Migration.Name, vol.ID)
-		image := &openstack.Image{}
-		err = r.Source.Inventory.Find(image, ref.Ref{Name: lookupName})
-		if err != nil {
-			return
-		}
-
-		obj := client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: image.ID}
-		pvc := core.PersistentVolumeClaim{}
-		err = r.Client.Get(context.Background(), obj, &pvc)
-		if err != nil {
-			return
-		}
-
-		if pvc.Status.Phase != core.ClaimBound {
-			ready = false
-			return
-		}
-		var task *plan.Task
-		found := false
-		task, found = step.FindTask(lookupName)
-		if !found {
-			return
-		}
-		task.MarkCompleted()
-	}
-
-	return
-}
-
-func (r *KubeVirt) setOpenStackPopulatorLabels(populatorCr v1beta1.OpenstackVolumePopulator, vmId, migrationId string) (err error) {
-	populatorCrCopy := populatorCr.DeepCopy()
-	if populatorCr.Labels == nil {
-		populatorCr.Labels = make(map[string]string)
-	}
-	populatorCr.Labels["vmID"] = vmId
-	populatorCr.Labels["migration"] = migrationId
-	patch := client.MergeFrom(populatorCrCopy)
-	err = r.Destination.Client.Patch(context.TODO(), &populatorCr, patch)
-	return
-}
-
-func (r *KubeVirt) setOvirtPopulatorLabels(populatorCr v1beta1.OvirtVolumePopulator, vmId, migrationId string) (err error) {
-	populatorCrCopy := populatorCr.DeepCopy()
-	if populatorCr.Labels == nil {
-		populatorCr.Labels = make(map[string]string)
-	}
-	populatorCr.Labels["vmID"] = vmId
-	populatorCr.Labels["migration"] = migrationId
-	patch := client.MergeFrom(populatorCrCopy)
-	err = r.Destination.Client.Patch(context.TODO(), &populatorCr, patch)
-	return
-}
-
 func (r *KubeVirt) setPopulatorPodLabels(pod core.Pod, migrationId string) (err error) {
 	podCopy := pod.DeepCopy()
 	if pod.Labels == nil {
@@ -2033,13 +1770,13 @@ func (r *KubeVirt) setPopulatorPodLabels(pod core.Pod, migrationId string) (err 
 }
 
 // Ensure the PV exist on the destination.
-func (r *KubeVirt) EnsurePersistentVolume(vm *plan.VMStatus, persistentVolumes []core.PersistentVolume) (err error) {
+func (r *KubeVirt) EnsurePersistentVolume(vmRef ref.Ref, persistentVolumes []core.PersistentVolume) (err error) {
 	list := &core.PersistentVolumeList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
 		list,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(r.vmLabels(vm.Ref)),
+			LabelSelector: labels.SelectorFromSet(r.vmLabels(vmRef)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		})
 	if err != nil {
@@ -2069,15 +1806,15 @@ func (r *KubeVirt) EnsurePersistentVolume(vm *plan.VMStatus, persistentVolumes [
 					pv.Namespace,
 					pv.Name),
 				"vm",
-				vm.String())
+				vmRef.String())
 		}
 	}
 	return
 }
 
 // Ensure the PV exist on the destination.
-func (r *KubeVirt) EnsurePersistentVolumeClaim(vm *plan.VMStatus, persistentVolumeClaims []core.PersistentVolumeClaim) (err error) {
-	list, err := r.getPVCs(vm)
+func (r *KubeVirt) EnsurePersistentVolumeClaim(vmRef ref.Ref, persistentVolumeClaims []core.PersistentVolumeClaim) (err error) {
+	list, err := r.getPVCs(vmRef)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -2104,20 +1841,9 @@ func (r *KubeVirt) EnsurePersistentVolumeClaim(vm *plan.VMStatus, persistentVolu
 				path.Join(
 					pvc.Namespace,
 					pvc.Name),
-				"vm",
-				vm.String())
+				"vmRef",
+				vmRef.String())
 		}
 	}
 	return
-}
-
-// OCP source
-func (r *KubeVirt) ensureOCPVolumes(vm *plan.VMStatus) error {
-	_, err := r.DataVolumes(vm)
-	if err != nil {
-		r.Log.Info("DataVolumes are not ready yet", "error", err)
-		return liberr.Wrap(err)
-	}
-
-	return nil
 }

@@ -1,19 +1,16 @@
 package openstack
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"path"
 	"strconv"
 	"strings"
 
-	"github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions"
-	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/snapshots"
-	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
-	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
-	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
@@ -21,10 +18,13 @@ import (
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
 	core "k8s.io/api/core/v1"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Openstack builder.
@@ -260,7 +260,7 @@ var DefaultProperties = map[string]string{
 }
 
 // Create the destination Kubevirt VM.
-func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []core.PersistentVolumeClaim) (err error) {
+func (r *Builder) VirtualMachine(vmRef ref.Ref, vmSpec *cnv.VirtualMachineSpec, persistentVolumeClaims []core.PersistentVolumeClaim) (err error) {
 	vm := &model.Workload{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
@@ -283,17 +283,17 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 		return
 	}
 
-	if object.Template == nil {
-		object.Template = &cnv.VirtualMachineInstanceTemplateSpec{}
+	if vmSpec.Template == nil {
+		vmSpec.Template = &cnv.VirtualMachineInstanceTemplateSpec{}
 	}
 
-	r.mapFirmware(vm, object)
-	r.mapResources(vm, object)
-	r.mapHardwareRng(vm, object)
-	r.mapInput(vm, object)
-	r.mapVideo(vm, object)
-	r.mapDisks(vm, persistentVolumeClaims, object)
-	err = r.mapNetworks(vm, object)
+	r.mapFirmware(vm, vmSpec)
+	r.mapResources(vm, vmSpec)
+	r.mapHardwareRng(vm, vmSpec)
+	r.mapInput(vm, vmSpec)
+	r.mapVideo(vm, vmSpec)
+	r.mapDisks(vm, persistentVolumeClaims, vmSpec)
+	err = r.mapNetworks(vm, vmSpec)
 	if err != nil {
 		err = liberr.Wrap(
 			err,
@@ -495,8 +495,6 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 	var kVolumes []cnv.Volume
 	var kDisks []cnv.Disk
 
-	pvcMap := make(map[string]*core.PersistentVolumeClaim)
-
 	// The disk bus is common for all the VM disks and it's configured in the image properties.
 	bus := DefaultProperties[DiskBus]
 	if imageDiskBus, ok := vm.Image.Properties[DiskBus]; ok {
@@ -521,20 +519,16 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 		bus = VirtioBus
 	}
 
-	for i := range persistentVolumeClaims {
-		pvc := &persistentVolumeClaims[i]
-		pvcMap[pvc.Annotations[AnnImportDiskId]] = pvc
-	}
-	for i, av := range vm.Volumes {
-		image := &model.Image{}
-		err := r.Source.Inventory.Find(image, ref.Ref{Name: fmt.Sprintf("%s-%s", r.Migration.Name, av.ID)})
+	for _, pvc := range persistentVolumeClaims {
+		image, err := r.getImageFromPVC(&pvc)
 		if err != nil {
+			r.Log.Error(err, "image not found in inventory", "imageID", pvc.Name)
 			return
 		}
-		pvc := pvcMap[av.ID]
-		volumeName := fmt.Sprintf("vol-%v", i)
-		volume := cnv.Volume{
-			Name: volumeName,
+
+		cnvVolumeName := fmt.Sprintf("vol-%v", pvc.Annotations[AnnImportDiskId])
+		cnvVolume := cnv.Volume{
+			Name: cnvVolumeName,
 			VolumeSource: cnv.VolumeSource{
 				PersistentVolumeClaim: &cnv.PersistentVolumeClaimVolumeSource{
 					PersistentVolumeClaimVolumeSource: core.PersistentVolumeClaimVolumeSource{
@@ -551,7 +545,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 				bus = CDROMBus.(string)
 			}
 			disk = cnv.Disk{
-				Name: volumeName,
+				Name: cnvVolumeName,
 				DiskDevice: cnv.DiskDevice{
 					CDRom: &cnv.CDRomTarget{
 						Bus: cnv.DiskBus(bus),
@@ -560,7 +554,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 			}
 		case QCOW2, RAW:
 			disk = cnv.Disk{
-				Name: volumeName,
+				Name: cnvVolumeName,
 				DiskDevice: cnv.DiskDevice{
 					Disk: &cnv.DiskTarget{
 						Bus: cnv.DiskBus(bus),
@@ -570,7 +564,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 		default:
 			r.Log.Info("image disk format not supported", "format", image.DiskFormat)
 		}
-		kVolumes = append(kVolumes, volume)
+		kVolumes = append(kVolumes, cnvVolume)
 		kDisks = append(kDisks, disk)
 	}
 
@@ -629,7 +623,7 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 						break
 					}
 				}
-				var networkPair *v1beta1.NetworkPair
+				var networkPair *api.NetworkPair
 				networkMaps := r.Context.Map.Network.Spec.Map
 				found := false
 				for i := range networkMaps {
@@ -691,9 +685,9 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 }
 
 // Build tasks.
-func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
-	vm := &model.Workload{}
-	err = r.Source.Inventory.Find(vm, vmRef)
+func (r *Builder) Tasks(vmRef ref.Ref) (tasks []*plan.Task, err error) {
+	workload := &model.Workload{}
+	err = r.Source.Inventory.Find(workload, vmRef)
 	if err != nil {
 		err = liberr.Wrap(
 			err,
@@ -702,19 +696,35 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 			vmRef.String())
 	}
 
-	for _, va := range vm.Volumes {
-		gb := int64(va.Size)
-		list = append(
-			list,
-			&plan.Task{
-				Name: fmt.Sprintf("%s-%s", r.Migration.Name, va.ID),
-				Progress: libitr.Progress{
-					Total: gb * 1024,
-				},
-				Annotations: map[string]string{
-					"unit": "MB",
-				},
-			})
+	taskMap := map[string]int64{}
+	imageID := workload.ImageID
+
+	if imageID != "" {
+		taskName := getVmSnapshotName(r.Context, workload.ID)
+		taskTotal := int64(0)
+		taskTotal = workload.Image.SizeBytes / 1024 / 1024
+		taskMap[taskName] = taskTotal
+	}
+
+	for _, volume := range workload.Volumes {
+		taskName := getImageFromVolumeName(r.Context, workload.ID, volume.ID)
+		taskTotal := int64(volume.Size * 1024)
+		taskMap[taskName] = taskTotal
+	}
+
+	for taskName, taskTotal := range taskMap {
+		r.Log.Info("creating task", "taskName", taskName, "taskTotal", taskTotal)
+		task := &plan.Task{
+			Name: taskName,
+			Progress: libitr.Progress{
+				Total: taskTotal,
+			},
+			Annotations: map[string]string{
+				"unit": "MB",
+			},
+		}
+		r.Log.Info("adding task to the plan", "task", task.Name)
+		tasks = append(tasks, task)
 	}
 
 	return
@@ -843,317 +853,6 @@ func (r *Builder) PodEnvironment(_ ref.Ref, _ *core.Secret) (env []core.EnvVar, 
 	return
 }
 
-func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName *string, populatorName string, accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode) *core.PersistentVolumeClaim {
-	image := da.(*model.Image)
-	apiGroup := "forklift.konveyor.io"
-	virtualSize := image.VirtualSize
-	// virtual_size may not always be available
-	if virtualSize == 0 {
-		virtualSize = image.SizeBytes
-	}
-	if *volumeMode == core.PersistentVolumeFilesystem {
-		virtualSize = int64(float64(virtualSize) * 1.1)
-	}
-	return &core.PersistentVolumeClaim{
-		ObjectMeta: meta.ObjectMeta{
-			Name:      image.ID,
-			Namespace: r.Plan.Spec.TargetNamespace,
-			Annotations: map[string]string{
-				AnnImportDiskId: image.Name[len(r.Migration.Name)+1:],
-			},
-			Labels: map[string]string{"migration": r.Migration.Name},
-		},
-		Spec: core.PersistentVolumeClaimSpec{
-			AccessModes: accessModes,
-			Resources: core.ResourceRequirements{
-				Requests: map[core.ResourceName]resource.Quantity{
-					core.ResourceStorage: *resource.NewQuantity(virtualSize, resource.BinarySI)},
-			},
-			StorageClassName: storageName,
-			VolumeMode:       volumeMode,
-			DataSourceRef: &core.TypedLocalObjectReference{
-				APIGroup: &apiGroup,
-				Kind:     v1beta1.OpenstackVolumePopulatorKind,
-				Name:     populatorName,
-			},
-		},
-	}
-}
-
-func (r *Builder) PreTransferActions(c planbase.Client, vmRef ref.Ref) (ready bool, err error) {
-	// TODO:
-	// 1. Dedup
-	// 2. Improve concurrency, as soon as the image is ready we can create the PVC, no need to wait
-	// for everything to finish
-	client, ok := c.(*Client)
-	if !ok {
-		return false, nil
-	}
-
-	vm := &model.Workload{}
-	err = r.Source.Inventory.Find(vm, vmRef)
-	r.Source.Inventory.Find(vm, vmRef)
-	if err != nil {
-		err = liberr.Wrap(
-			err,
-			"VM lookup failed.",
-			"vm",
-			vmRef.String())
-		return true, err
-	}
-
-	var snaplist []snapshots.Snapshot
-	for _, av := range vm.Volumes {
-		imageName := fmt.Sprintf("%s-%s", r.Migration.Name, av.ID)
-		pager := snapshots.List(client.blockStorageService, snapshots.ListOpts{
-			Name:  imageName,
-			Limit: 1,
-		})
-		pages, err := pager.AllPages()
-		if err != nil {
-			return true, err
-		}
-		isEmpty, err := pages.IsEmpty()
-		if err != nil {
-			return true, err
-		}
-		if !isEmpty {
-			snaps, err := snapshots.ExtractSnapshots(pages)
-			if err != nil {
-				return true, err
-			}
-
-			snaplist = append(snaplist, snaps...)
-			continue
-		}
-
-		snapshot, err := snapshots.Create(client.blockStorageService, snapshots.CreateOpts{
-			Name:        imageName,
-			VolumeID:    av.ID,
-			Force:       true,
-			Description: imageName,
-		}).Extract()
-		if err != nil {
-			err = liberr.Wrap(
-				err,
-				"Failed to create snapshot.",
-				"volumeID",
-				av.ID)
-			return true, err
-		}
-
-		snaplist = append(snaplist, *snapshot)
-	}
-
-	for _, snap := range snaplist {
-		snapshot, err := snapshots.Get(client.blockStorageService, snap.ID).Extract()
-		if err != nil {
-			return true, err
-		}
-
-		if snapshot.Status == "error" {
-			err = liberr.Wrap(
-				err,
-				"Failed to create snapshot, snapshot is in error state",
-				"volumeID",
-				snapshot.VolumeID)
-
-			return true, err
-		}
-
-		if snapshot.Status != "available" {
-			r.Log.Info("Snapshot not ready yet, recheking...", "snapshot", snap.Name)
-			return false, nil
-		}
-	}
-
-	var vollist []volumes.Volume
-	for _, snap := range snaplist {
-		imageName := fmt.Sprintf("%s-%s", r.Migration.Name, snap.VolumeID)
-		pager := volumes.List(client.blockStorageService, volumes.ListOpts{
-			Name:  imageName,
-			Limit: 1,
-		})
-		pages, err := pager.AllPages()
-		if err != nil {
-			return true, err
-		}
-		isEmpty, err := pages.IsEmpty()
-		if err != nil {
-			return true, err
-		}
-		if !isEmpty {
-			vols, err := volumes.ExtractVolumes(pages)
-			if err != nil {
-				return true, err
-			}
-			vollist = append(vollist, vols...)
-
-			continue
-		}
-
-		volume, err := volumes.Create(client.blockStorageService, volumes.CreateOpts{
-			Name:        imageName,
-			SnapshotID:  snap.ID,
-			Size:        snap.Size,
-			Description: imageName,
-		}).Extract()
-		if err != nil {
-			err = liberr.Wrap(
-				err,
-				"Failed to create volume from snapshot.",
-				"volumeID",
-				volume.ID)
-			return true, err
-		}
-		vollist = append(vollist, *volume)
-	}
-
-	for _, vol := range vollist {
-		volume, err := volumes.Get(client.blockStorageService, vol.ID).Extract()
-		if err != nil {
-			return true, err
-		}
-
-		if volume.Status == "error" {
-			err = liberr.Wrap(
-				err,
-				"Failed to create volume from snapshot, volume is in error state",
-				"volumeID",
-				volume.ID)
-			return true, err
-		}
-
-		if volume.Status != "available" && volume.Status != "uploading" {
-			r.Log.Info("Volume not ready yet, recheking...", "volume", vol.Name)
-			return false, nil
-		}
-	}
-
-	var imagelist []string
-
-	for _, vol := range vollist {
-		pager := images.List(client.imageService, images.ListOpts{
-			Name:  vol.Description,
-			Limit: 1,
-		})
-		pages, err := pager.AllPages()
-		if err != nil {
-			return true, err
-		}
-		isEmpty, err := pages.IsEmpty()
-		if err != nil {
-			return true, err
-		}
-		if !isEmpty {
-			imgs, err := images.ExtractImages(pages)
-			if err != nil {
-				return true, err
-			}
-			for _, i := range imgs {
-				imagelist = append(imagelist, i.ID)
-			}
-			r.Log.Info("Image already exists", "id", imagelist)
-			continue
-		}
-
-		// Workaround for https://bugs.launchpad.net/cinder/+bug/1945500
-		for k := range vol.VolumeImageMetadata {
-			if strings.HasPrefix(k, "os_glance") {
-				err = volumeactions.UnsetImageMetadata(client.blockStorageService, vol.ID, volumeactions.UnsetImageMetadataOpts{Key: k}).ExtractErr()
-				if err != nil {
-					err = liberr.Wrap(
-						err,
-						"Failed to remove reserved glance metadata from volume.",
-						"volumeID",
-						vol.ID)
-					return true, err
-				}
-			}
-		}
-
-		image, err := volumeactions.UploadImage(client.blockStorageService, vol.ID, volumeactions.UploadImageOpts{
-			ImageName:  vol.Description,
-			DiskFormat: "raw",
-		}).Extract()
-		if err != nil {
-			err = liberr.Wrap(
-				err,
-				"Failed to create image.",
-				"image",
-				image.ImageID)
-			return false, err
-		}
-
-		imagelist = append(imagelist, image.ImageID)
-	}
-
-	for _, imageID := range imagelist {
-		img, err := images.Get(client.imageService, imageID).Extract()
-		if err != nil {
-			return true, err
-		}
-
-		// TODO also check for "saving" and "error"
-		if img.Status != images.ImageStatusActive {
-			r.Log.Info("Image not ready yet, recheking...", "image", img)
-			return false, nil
-		} else if img.Status == images.ImageStatusActive {
-			// TODO figure out a better way, since when the image in the inventory may be out of sync
-			// with openstack, and be ready in openstack, but not in the inventory
-			if !r.imageReady(img.Name) {
-				r.Log.Info("Image not ready yet in inventory, recheking...", "image", img.Name)
-				return false, nil
-			} else {
-				r.Log.Info("Image is ready, cleaning up...", "image", img.Name)
-				r.cleanup(c, img.Name)
-			}
-		}
-	}
-
-	return true, nil
-}
-
-func (r *Builder) imageReady(imageName string) bool {
-	image := &model.Image{}
-	err := r.Source.Inventory.Find(image, ref.Ref{Name: imageName})
-	if err == nil {
-		r.Log.Info("Image status in inventory", "image", image.Status)
-		return image.Status == "active"
-	}
-	return false
-}
-
-func (r *Builder) cleanup(c planbase.Client, imageName string) {
-	client, ok := c.(*Client)
-	if !ok {
-		r.Log.Info("Couldn't cast client (should never happen)")
-		return
-	}
-
-	volume := &model.Volume{}
-	err := r.Source.Inventory.Find(volume, ref.Ref{Name: imageName})
-	if err != nil {
-		r.Log.Info("couldn't find volume for deletion, skipping...", "name", imageName)
-	} else {
-		err = volumes.Delete(client.blockStorageService, volume.ID, volumes.DeleteOpts{Cascade: true}).ExtractErr()
-		if err != nil {
-			r.Log.Error(err, "error removing volume", "name", imageName)
-		}
-	}
-
-	snapshot := &model.Snapshot{}
-	err = r.Source.Inventory.Find(snapshot, ref.Ref{Name: imageName})
-	if err != nil {
-		r.Log.Info("couldn't find snapshot for deletion, skipping...", "name", imageName)
-	} else {
-		err = snapshots.Delete(client.blockStorageService, snapshot.ID).ExtractErr()
-		if err != nil {
-			r.Log.Error(err, "error removing snapshot", "name", imageName)
-		}
-	}
-}
-
 // Build LUN PVs.
 func (r *Builder) LunPersistentVolumes(vmRef ref.Ref) (pvs []core.PersistentVolume, err error) {
 	// do nothing
@@ -1163,5 +862,380 @@ func (r *Builder) LunPersistentVolumes(vmRef ref.Ref) (pvs []core.PersistentVolu
 // Build LUN PVCs.
 func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.PersistentVolumeClaim, err error) {
 	// do nothing
+	return
+}
+
+func (r *Builder) SupportsVolumePopulators() bool {
+	return true
+}
+
+func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) (pvcNames []string, err error) {
+	workload := &model.Workload{}
+	err = r.Source.Inventory.Find(workload, vmRef)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	images, err := r.getImagesFromVolumes(workload)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	if workload.ImageID != "" {
+		var image model.Image
+		image, err = r.getVMSnapshotImage(workload)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+		images = append(images, image)
+	}
+
+	for _, image := range images {
+
+		if image.Status != string(ImageStatusActive) {
+			r.Log.Info("the image is not ready yet", "image", image.Name)
+			continue
+		}
+
+		originalVolumeDiskId := image.Name
+		if imageProperty, ok := image.Properties[forkliftPropertyOriginalVolumeID]; ok {
+			originalVolumeDiskId = imageProperty.(string)
+		}
+
+		_, err = r.getVolumePopulator(image.Name)
+		if err != nil {
+			if !k8serr.IsNotFound(err) {
+				err = liberr.Wrap(err)
+				return
+			}
+		}
+
+		var populatorName string
+		populatorName, err = r.createVolumePopulatorCR(image, secretName, vmRef.ID)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+
+		storageClassName := r.Context.Map.Storage.Spec.Map[0].Destination.StorageClass
+		volumeType := r.getVolumeType(workload, originalVolumeDiskId)
+		if volumeType != "" {
+			storageClassName, err = r.getStorageClassName(workload, volumeType)
+			if err != nil {
+				err = liberr.Wrap(err)
+				return
+			}
+		}
+
+		var pvc *core.PersistentVolumeClaim
+		pvc, err = r.persistentVolumeClaimWithSourceRef(image, storageClassName, populatorName, annotations)
+		if err != nil {
+			if !k8serr.IsAlreadyExists(err) {
+				err = liberr.Wrap(err, "couldn't build the PVC",
+					"image", image.Name, "storageClassName", storageClassName, "populatorName", populatorName)
+				return
+			}
+			err = nil
+			continue
+		}
+		pvcNames = append(pvcNames, pvc.Name)
+	}
+	return
+}
+
+func (r *Builder) getVMSnapshotImage(workload *model.Workload) (image model.Image, err error) {
+	image = model.Image{}
+	imageName := getVmSnapshotName(r.Context, workload.ID)
+	err = r.Source.Inventory.Find(&image, ref.Ref{Name: imageName})
+	if err != nil {
+		if errors.As(err, &model.NotFoundError{}) {
+			err = nil
+			r.Log.Info("the vm snapshot image has not been created yet", "imageName", imageName)
+			return
+		}
+		r.Log.Error(err, "error retrieving the vm snapshot image information", "imageName", imageName)
+		return
+	}
+	r.Log.Info("appending vm snapshot image", "imageName", imageName)
+	return
+}
+
+func (r *Builder) getImagesFromVolumes(workload *model.Workload) (images []model.Image, err error) {
+	images = []model.Image{}
+	for _, volume := range workload.Volumes {
+		image := model.Image{}
+		imageName := getImageFromVolumeName(r.Context, workload.ID, volume.ID)
+		err = r.Source.Inventory.Find(&image, ref.Ref{Name: imageName})
+		if err != nil {
+			if errors.As(err, &model.NotFoundError{}) {
+				err = nil
+				r.Log.Info("the image from volume has not been created yet", "imageName", imageName)
+				continue
+			}
+			r.Log.Error(err, "error retrieving the image from volume information", "imageName", imageName)
+			return
+		}
+		if _, ok := image.Properties[forkliftPropertyOriginalVolumeID]; !ok {
+			r.Log.Info("the image properties have not been updated yet", "image", image.Name)
+			continue
+		}
+		r.Log.Info("appending image from volume", "imageName", imageName)
+		images = append(images, image)
+	}
+	return
+}
+
+func (r *Builder) createVolumePopulatorCR(image model.Image, secretName, vmId string) (name string, err error) {
+	populatorCR := &api.OpenstackVolumePopulator{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      image.Name,
+			Namespace: r.Plan.Spec.TargetNamespace,
+			Labels:    map[string]string{"vmID": vmId, "migration": getMigrationID(r.Context)},
+		},
+		Spec: api.OpenstackVolumePopulatorSpec{
+			IdentityURL:     r.Source.Provider.Spec.URL,
+			SecretName:      secretName,
+			ImageID:         image.ID,
+			TransferNetwork: r.Plan.Spec.TransferNetwork,
+		},
+	}
+	err = r.Context.Client.Create(context.TODO(), populatorCR, &client.CreateOptions{})
+	if err != nil {
+		if !k8serr.IsAlreadyExists(err) {
+			err = liberr.Wrap(err)
+			return
+		} else {
+			err = nil
+		}
+	}
+	name = populatorCR.Name
+	return
+}
+
+func (r *Builder) getVolumeType(workload *model.Workload, volumeID string) (volumeType string) {
+	for _, volume := range workload.Volumes {
+		if volume.ID == volumeID {
+			volumeType = volume.VolumeType
+			return
+		}
+	}
+	return
+}
+
+func (r *Builder) getStorageClassName(workload *model.Workload, volumeTypeName string) (storageClassName string, err error) {
+	var volumeTypeID string
+	for _, volumeType := range workload.VolumeTypes {
+		if volumeTypeName == volumeType.Name {
+			volumeTypeID = volumeType.ID
+		}
+	}
+	if volumeTypeID == "" {
+		err = liberr.New("volume type not found", "volumeType", volumeTypeName)
+		return
+	}
+	for _, storageMap := range r.Context.Map.Storage.Spec.Map {
+		if storageMap.Source.ID == volumeTypeID {
+			storageClassName = storageMap.Destination.StorageClass
+		}
+	}
+	if storageClassName == "" {
+		err = liberr.New("no storage class map found for volume type", "volumeTypeID", volumeTypeID)
+		return
+	}
+	return
+}
+
+// Using CDI logic to set the Volume mode and Access mode of the PVC - https://github.com/kubevirt/containerized-data-importer/blob/v1.56.0/pkg/controller/datavolume/util.go#L154
+func (r *Builder) getVolumeAndAccessMode(storageClassName string) ([]core.PersistentVolumeAccessMode, *core.PersistentVolumeMode, error) {
+	filesystemMode := core.PersistentVolumeFilesystem
+	storageProfile := &cdi.StorageProfile{}
+	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: storageClassName}, storageProfile)
+	if err != nil {
+		return nil, nil, liberr.Wrap(err, "cannot get storage profile", "storageClassName", storageClassName)
+	}
+
+	if len(storageProfile.Status.ClaimPropertySets) > 0 &&
+		len(storageProfile.Status.ClaimPropertySets[0].AccessModes) > 0 {
+		accessModes := storageProfile.Status.ClaimPropertySets[0].AccessModes
+		volumeMode := storageProfile.Status.ClaimPropertySets[0].VolumeMode
+		if volumeMode == nil {
+			// volumeMode is an optional API parameter. Filesystem is the default mode used when volumeMode parameter is omitted.
+			volumeMode = &filesystemMode
+		}
+		return accessModes, volumeMode, nil
+	}
+
+	// no accessMode configured on storageProfile
+	return nil, nil, liberr.New("no accessMode defined on StorageProfile for StorageClass", "storageClassName", storageClassName)
+
+}
+
+// Get the OpenstackVolumePopulator CustomResource based on the image name.
+func (r *Builder) getVolumePopulator(name string) (populatorCr api.OpenstackVolumePopulator, err error) {
+	populatorCr = api.OpenstackVolumePopulator{}
+	err = r.Destination.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: name}, &populatorCr)
+	return
+}
+
+func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image, storageClassName string,
+	populatorName string, annotations map[string]string) (pvc *core.PersistentVolumeClaim, err error) {
+
+	apiGroup := "forklift.konveyor.io"
+	virtualSize := image.VirtualSize
+	// virtual_size may not always be available
+	if virtualSize == 0 {
+		virtualSize = image.SizeBytes
+	}
+
+	var accessModes []core.PersistentVolumeAccessMode
+	var volumeMode *core.PersistentVolumeMode
+	accessModes, volumeMode, err = r.getVolumeAndAccessMode(storageClassName)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	if *volumeMode == core.PersistentVolumeFilesystem {
+		virtualSize = int64(float64(virtualSize) * 1.1)
+	}
+
+	// The image might be a VM Snapshot Image and has no volume associated to it
+	if originalVolumeDiskId, ok := image.Properties["forklift_original_volume_id"]; ok {
+		annotations[AnnImportDiskId] = originalVolumeDiskId.(string)
+		r.Log.Info("the image comes from a volume", "volumeID", originalVolumeDiskId)
+	} else {
+		annotations[AnnImportDiskId] = image.ID
+		r.Log.Info("the image comes from a vm snapshot", "imageID", image.ID)
+	}
+
+	pvc = &core.PersistentVolumeClaim{
+		ObjectMeta: meta.ObjectMeta{
+			Name:        image.ID,
+			Namespace:   r.Plan.Spec.TargetNamespace,
+			Annotations: annotations,
+		},
+		Spec: core.PersistentVolumeClaimSpec{
+			AccessModes: accessModes,
+			Resources: core.ResourceRequirements{
+				Requests: map[core.ResourceName]resource.Quantity{
+					core.ResourceStorage: *resource.NewQuantity(virtualSize, resource.BinarySI)},
+			},
+			StorageClassName: &storageClassName,
+			VolumeMode:       volumeMode,
+			DataSourceRef: &core.TypedLocalObjectReference{
+				APIGroup: &apiGroup,
+				Kind:     api.OpenstackVolumePopulatorKind,
+				Name:     populatorName,
+			},
+		},
+	}
+
+	err = r.Client.Create(context.TODO(), pvc, &client.CreateOptions{})
+	return
+}
+
+func (r *Builder) PopulatorTransferredBytes(persistentVolumeClaim *core.PersistentVolumeClaim) (transferredBytes int64, err error) {
+	image, err := r.getImageFromPVC(persistentVolumeClaim)
+	if err != nil {
+		return
+	}
+	populatorCr, err := r.getVolumePopulator(image.Name)
+	if err != nil {
+		return
+	}
+	transferredBytes, err = strconv.ParseInt(populatorCr.Status.Transferred, 10, 64)
+	if err != nil {
+		transferredBytes = 0
+		err = nil
+		return
+	}
+	return
+}
+
+// Get the Openstack image from the inventory based on the PVC.
+func (r *Builder) getImageFromPVC(pvc *core.PersistentVolumeClaim) (image *model.Image, err error) {
+	image = &model.Image{}
+	err = r.Source.Inventory.Find(image, ref.Ref{ID: pvc.Name})
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	return
+}
+
+func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []core.PersistentVolumeClaim) (err error) {
+	workload := &model.Workload{}
+	err = r.Source.Inventory.Find(workload, vmRef)
+	if err != nil {
+		return
+	}
+	var images []*model.Image
+	for _, volume := range workload.Volumes {
+		lookupName := getImageFromVolumeName(r.Context, vmRef.ID, volume.ID)
+		image, err := r.getImageByName(lookupName)
+		if err != nil {
+			continue
+		}
+		images = append(images, image)
+	}
+	if len(images) != len(pvcs) {
+		// To be sure we have every disk based on what already migrated and what's not.
+		// e.g when initializing the plan and the PVC has not been created yet (but the populator CR is) or when the disks that are attached to the source VM change.
+		for _, pvc := range pvcs {
+			image, err := r.getImageFromPVC(&pvc)
+			if err != nil {
+				continue
+			}
+			images = append(images, image)
+		}
+	}
+	migrationID := string(r.Plan.Status.Migration.ActiveSnapshot().Migration.UID)
+	for _, image := range images {
+		populatorCr, err := r.getVolumePopulator(image.Name)
+		if err != nil {
+			continue
+		}
+		err = r.setPopulatorLabels(populatorCr, vmRef.ID, migrationID)
+		if err != nil {
+			r.Log.Error(err, "Couldn't update the Populator Custom Resource labels.",
+				"vmRef", vmRef, "migration", migrationID, "OpenStackVolumePopulator", populatorCr.Name)
+			continue
+		}
+	}
+	return
+}
+
+// Get the Openstack image from the inventory based on the name.
+func (r *Builder) getImageByName(name string) (image *model.Image, err error) {
+	image = &model.Image{}
+	err = r.Source.Inventory.Find(image, ref.Ref{Name: name})
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	return
+}
+func (r *Builder) setPopulatorLabels(populatorCr api.OpenstackVolumePopulator, vmId, migrationId string) (err error) {
+	populatorCrCopy := populatorCr.DeepCopy()
+	if populatorCr.Labels == nil {
+		populatorCr.Labels = make(map[string]string)
+	}
+	populatorCr.Labels["vmID"] = vmId
+	populatorCr.Labels["migration"] = migrationId
+	patch := client.MergeFrom(populatorCrCopy)
+	err = r.Destination.Client.Patch(context.TODO(), &populatorCr, patch)
+	return
+}
+
+func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error) {
+	image, err := r.getImageFromPVC(pvc)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	taskName = image.Name
 	return
 }

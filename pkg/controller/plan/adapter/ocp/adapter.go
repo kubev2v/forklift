@@ -35,7 +35,8 @@ func (r *Adapter) Validator(plan *api.Plan) (validator base.Validator, err error
 
 // Constructs an openshift client.
 func (r *Adapter) Client(ctx *plancontext.Context) (client base.Client, err error) {
-	return Client{Context: ctx}, nil
+	client = &Client{Context: ctx}
+	return client, nil
 }
 
 // Constucts a destination client.
