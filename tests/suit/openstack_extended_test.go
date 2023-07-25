@@ -1,7 +1,7 @@
 package suit_test
 
 import (
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/openstack"
+	"github.com/konveyor/forklift-controller/pkg/lib/client/openstack"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	"github.com/konveyor/forklift-controller/tests/suit/framework"
 	"github.com/konveyor/forklift-controller/tests/suit/utils"
@@ -30,21 +30,21 @@ var _ = Describe("[level:component]Migration Extended tests for OpenStack provid
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Create Secret from Definition")
-		s, err := utils.CreateSecretFromDefinition(f.K8sClient, utils.NewSecretDefinition(nil,
-			map[string]string{
-				"username":    "admin",
-				"password":    "12e2f14739194a6c",
-				"domainName":  "default",
-				"projectName": "admin",
-				"regionName":  "RegionOne",
-				"cacert":      packstackCA,
-			}, nil, namespace, "os-test-secret"))
+		clientOpts := map[string]string{
+			"username":    "admin",
+			"password":    "12e2f14739194a6c",
+			"domainName":  "default",
+			"projectName": "admin",
+			"regionName":  "RegionOne",
+			"cacert":      packstackCA,
+		}
+		_, err = utils.CreateSecretFromDefinition(f.K8sClient, utils.NewSecretDefinition(nil, clientOpts, nil, namespace, "os-test-secret"))
 		Expect(err).ToNot(HaveOccurred())
 
 		client := openstack.Client{
-			Secret: s,
-			URL:    keystoneSecureURL,
-			Log:    logging.WithName("test"),
+			URL:     keystoneSecureURL,
+			Options: clientOpts,
+			Log:     logging.WithName("test"),
 		}
 		err = client.Connect()
 		Expect(err).ToNot(HaveOccurred())
@@ -56,22 +56,22 @@ var _ = Describe("[level:component]Migration Extended tests for OpenStack provid
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Create Secret from Definition")
-		s, err := utils.CreateSecretFromDefinition(f.K8sClient, utils.NewSecretDefinition(nil,
-			map[string]string{
-				"username":           "admin",
-				"password":           "12e2f14739194a6c",
-				"domainName":         "default",
-				"projectName":        "admin",
-				"regionName":         "RegionOne",
-				"insecureSkipVerify": "true",
-				"cacert":             "",
-			}, nil, namespace, "os-test-secret"))
+		clientOpts := map[string]string{
+			"username":           "admin",
+			"password":           "12e2f14739194a6c",
+			"domainName":         "default",
+			"projectName":        "admin",
+			"regionName":         "RegionOne",
+			"insecureSkipVerify": "true",
+			"cacert":             "",
+		}
+		_, err = utils.CreateSecretFromDefinition(f.K8sClient, utils.NewSecretDefinition(nil, clientOpts, nil, namespace, "os-test-secret"))
 		Expect(err).ToNot(HaveOccurred())
 
 		client := openstack.Client{
-			Secret: s,
-			URL:    keystoneSecureURL,
-			Log:    logging.WithName("test"),
+			URL:     keystoneSecureURL,
+			Options: clientOpts,
+			Log:     logging.WithName("test"),
 		}
 		err = client.Connect()
 		Expect(err).ToNot(HaveOccurred())
@@ -94,21 +94,21 @@ var _ = Describe("[level:component]Migration Extended tests for OpenStack provid
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Create Secret from Definition")
-		s, err := utils.CreateSecretFromDefinition(f.K8sClient, utils.NewSecretDefinition(nil,
-			map[string]string{
-				"username":    "admin",
-				"password":    "12e2f14739194a6c",
-				"domainName":  "default",
-				"projectName": "admin",
-				"regionName":  "RegionOne",
-				"cacert":      "",
-			}, nil, namespace, "os-test-secret"))
+		clientOpts := map[string]string{
+			"username":    "admin",
+			"password":    "12e2f14739194a6c",
+			"domainName":  "default",
+			"projectName": "admin",
+			"regionName":  "RegionOne",
+			"cacert":      "",
+		}
+		_, err = utils.CreateSecretFromDefinition(f.K8sClient, utils.NewSecretDefinition(nil, clientOpts, nil, namespace, "os-test-secret"))
 		Expect(err).ToNot(HaveOccurred())
 
 		client := openstack.Client{
-			Secret: s,
-			URL:    keystoneSecureURL,
-			Log:    logging.WithName("test"),
+			URL:     keystoneSecureURL,
+			Options: clientOpts,
+			Log:     logging.WithName("test"),
 		}
 		err = client.Connect()
 		Expect(err).ToNot(HaveOccurred())
@@ -133,21 +133,21 @@ var _ = Describe("[level:component]Migration Extended tests for OpenStack provid
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Create Secret from Definition")
-		s, err := utils.CreateSecretFromDefinition(f.K8sClient, utils.NewSecretDefinition(nil,
-			map[string]string{
-				"username":    "admin",
-				"password":    "12e2f14739194a6c",
-				"domainName":  "default",
-				"projectName": "admin",
-				"regionName":  "RegionOne",
-				"cacert":      packstackCA + "bad",
-			}, nil, namespace, "os-test-secret"))
+		clientOpts := map[string]string{
+			"username":    "admin",
+			"password":    "12e2f14739194a6c",
+			"domainName":  "default",
+			"projectName": "admin",
+			"regionName":  "RegionOne",
+			"cacert":      packstackCA + "bad",
+		}
+		_, err = utils.CreateSecretFromDefinition(f.K8sClient, utils.NewSecretDefinition(nil, clientOpts, nil, namespace, "os-test-secret"))
 		Expect(err).ToNot(HaveOccurred())
 
 		client := openstack.Client{
-			Secret: s,
-			URL:    keystoneSecureURL,
-			Log:    logging.WithName("test"),
+			URL:     keystoneSecureURL,
+			Options: clientOpts,
+			Log:     logging.WithName("test"),
 		}
 		err = client.Connect()
 		Expect(err).To(HaveOccurred())
