@@ -1,65 +1,19 @@
 package main
 
 import (
-	"crypto/tls"
-	"crypto/x509"
-	"errors"
 	"flag"
-	"fmt"
 	"io"
-	"net"
 	"net/http"
-	"net/url"
 	"os"
-	"strconv"
+	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack"
-	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/imagedata"
-	"github.com/gophercloud/utils/openstack/clientconfig"
+	libclient "github.com/konveyor/forklift-controller/pkg/lib/client/openstack"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-
 	"k8s.io/klog/v2"
 )
-
-const (
-	RegionName                  = "regionName"
-	AuthType                    = "authType"
-	Username                    = "username"
-	UserID                      = "userID"
-	Password                    = "password"
-	ApplicationCredentialID     = "applicationCredentialID"
-	ApplicationCredentialName   = "applicationCredentialName"
-	ApplicationCredentialSecret = "applicationCredentialSecret"
-	Token                       = "token"
-	SystemScope                 = "systemScope"
-	ProjectName                 = "projectName"
-	ProjectID                   = "projectID"
-	UserDomainName              = "userDomainName"
-	UserDomainID                = "userDomainID"
-	ProjectDomainName           = "projectDomainName"
-	ProjectDomainID             = "projectDomainID"
-	DomainName                  = "domainName"
-	DomainID                    = "domainID"
-	DefaultDomain               = "defaultDomain"
-	InsecureSkipVerify          = "insecureSkipVerify"
-	CACert                      = "cacert"
-	EndpointAvailability        = "availability"
-)
-
-const (
-	UnsupportedAuthTypeErrStr = "unsupported authentication type"
-	MalformedCAErrStr         = "CA certificate is malformed, failed to configure the CA cert pool"
-)
-
-var supportedAuthTypes = map[string]clientconfig.AuthType{
-	"password":              clientconfig.AuthPassword,
-	"token":                 clientconfig.AuthToken,
-	"applicationcredential": clientconfig.AuthV3ApplicationCredential,
-}
 
 func main() {
 	var (
@@ -106,27 +60,27 @@ func populate(fileName, identityEndpoint, secretName, imageID string) {
 		klog.Info("Prometheus progress counter registered.")
 	}
 
-	availability := gophercloud.AvailabilityPublic
-	if a := getStringFromSecret(EndpointAvailability); a != "" {
-		availability = gophercloud.Availability(a)
-	}
-	endpointOpts := gophercloud.EndpointOpts{
-		Region:       getStringFromSecret(RegionName),
-		Availability: availability,
-	}
-	provider, err := getProviderClient(identityEndpoint)
+	options, err := readOptions()
 	if err != nil {
 		klog.Fatal(err)
 	}
-	imageService, err := openstack.NewImageServiceV2(provider, endpointOpts)
+
+	client := &libclient.Client{
+		URL:     identityEndpoint,
+		Options: options,
+	}
+
+	err = client.Connect()
 	if err != nil {
 		klog.Fatal(err)
 	}
-	image, err := imagedata.Download(imageService, imageID).Extract()
+
+	klog.Info("Downloading the image: ", imageID)
+	imageReader, err := client.DownloadImage(imageID)
 	if err != nil {
 		klog.Fatal(err)
 	}
-	defer image.Close()
+	defer imageReader.Close()
 
 	if err != nil {
 		klog.Fatal(err)
@@ -135,13 +89,15 @@ func populate(fileName, identityEndpoint, secretName, imageID string) {
 	if strings.HasSuffix(fileName, "disk.img") {
 		flags |= os.O_CREATE
 	}
-	f, err := os.OpenFile(fileName, flags, 0650)
+
+	klog.Info("Saving the image to: ", fileName)
+	file, err := os.OpenFile(fileName, flags, 0650)
 	if err != nil {
 		klog.Fatal(err)
 	}
-	defer f.Close()
+	defer file.Close()
 
-	err = writeData(image, f, imageID, progressGague)
+	err = writeData(imageReader, file, imageID, progressGague)
 	if err != nil {
 		klog.Fatal(err)
 	}
@@ -167,6 +123,8 @@ func writeData(reader io.ReadCloser, file *os.File, imageID string, progress *pr
 		for {
 			select {
 			case <-done:
+				klog.Info("Total: ", *total)
+				klog.Info("Finished!")
 				return
 			default:
 				progress.WithLabelValues(imageID).Set(float64(*total))
@@ -185,137 +143,34 @@ func writeData(reader io.ReadCloser, file *os.File, imageID string, progress *pr
 	return nil
 }
 
-func getAuthType() (authType clientconfig.AuthType, err error) {
-	if configuredAuthType := getStringFromSecret(AuthType); configuredAuthType == "" {
-		authType = clientconfig.AuthPassword
-	} else if supportedAuthType, found := supportedAuthTypes[configuredAuthType]; found {
-		authType = supportedAuthType
-	} else {
-		err = errors.New(UnsupportedAuthTypeErrStr)
-		klog.Fatal(err.Error(), "authType", configuredAuthType)
-	}
-	return
-}
-
-func getStringFromSecret(key string) string {
-	value, err := os.ReadFile(fmt.Sprintf("/etc/secret-volume/%s", key))
+func readOptions() (options map[string]string, err error) {
+	options = map[string]string{}
+	secretDirPath := "/etc/secret-volume"
+	dirEntries, err := os.ReadDir(secretDirPath)
 	if err != nil {
-		klog.Info(err.Error())
-		return ""
-	}
-	return string(value)
-}
-
-func getBoolFromSecret(key string) bool {
-	if keyStr := getStringFromSecret(key); keyStr != "" {
-		value, err := strconv.ParseBool(keyStr)
-		if err != nil {
-			return false
-		}
-		return value
-	}
-	return false
-}
-
-func getProviderClient(identityEndpoint string) (provider *gophercloud.ProviderClient, err error) {
-
-	authInfo := &clientconfig.AuthInfo{
-		AuthURL:           identityEndpoint,
-		ProjectName:       getStringFromSecret(ProjectName),
-		ProjectID:         getStringFromSecret(ProjectID),
-		UserDomainName:    getStringFromSecret(UserDomainName),
-		UserDomainID:      getStringFromSecret(UserDomainID),
-		ProjectDomainName: getStringFromSecret(ProjectDomainName),
-		ProjectDomainID:   getStringFromSecret(ProjectDomainID),
-		DomainName:        getStringFromSecret(DomainName),
-		DomainID:          getStringFromSecret(DomainID),
-		DefaultDomain:     getStringFromSecret(DefaultDomain),
-		AllowReauth:       true,
-	}
-
-	var authType clientconfig.AuthType
-	authType, err = getAuthType()
-	if err != nil {
-		klog.Fatal(err.Error())
 		return
 	}
-
-	switch authType {
-	case clientconfig.AuthPassword:
-		authInfo.Username = getStringFromSecret(Username)
-		authInfo.UserID = getStringFromSecret(UserID)
-		authInfo.Password = getStringFromSecret(Password)
-	case clientconfig.AuthToken:
-		authInfo.Token = getStringFromSecret(Token)
-	case clientconfig.AuthV3ApplicationCredential:
-		authInfo.Username = getStringFromSecret(Username)
-		authInfo.ApplicationCredentialID = getStringFromSecret(ApplicationCredentialID)
-		authInfo.ApplicationCredentialName = getStringFromSecret(ApplicationCredentialName)
-		authInfo.ApplicationCredentialSecret = getStringFromSecret(ApplicationCredentialSecret)
-	}
-
-	identityUrl, err := url.Parse(identityEndpoint)
-	if err != nil {
-		klog.Fatal(err.Error())
-		return
-	}
-
-	var TLSClientConfig *tls.Config
-	if identityUrl.Scheme == "https" {
-		if getBoolFromSecret(InsecureSkipVerify) {
-			TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-		} else {
-			cacert := []byte(getStringFromSecret(CACert))
-			if len(cacert) == 0 {
-				klog.Info("CA certificate was not provided,system CA cert pool is used")
-			} else {
-				roots := x509.NewCertPool()
-				ok := roots.AppendCertsFromPEM(cacert)
-				if !ok {
-					err = errors.New(MalformedCAErrStr)
-					klog.Fatal(err.Error())
-					return
-				}
-				TLSClientConfig = &tls.Config{RootCAs: roots}
+	klog.Info("Options:")
+	for _, dirEntry := range dirEntries {
+		if !dirEntry.Type().IsDir() {
+			option := dirEntry.Name()
+			if strings.HasPrefix(option, "..") {
+				continue
 			}
+			filePath := filepath.Join(secretDirPath, option)
+			var fileContent []byte
+			fileContent, err = os.ReadFile(filePath)
+			if err != nil {
+				return
+			}
+			value := string(fileContent)
+			options[option] = value
+			if option == "password" || option == "applicationCredentialSecret" || option == "token" {
+				value = strings.Repeat("*", len(value))
+			}
+			klog.Info(" - ", option, " = ", value)
 
 		}
-	}
-
-	provider, err = openstack.NewClient(identityEndpoint)
-	if err != nil {
-		klog.Fatal(err.Error())
-		return
-	}
-
-	provider.HTTPClient.Transport = &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:   10 * time.Second,
-			KeepAlive: 10 * time.Second,
-		}).DialContext,
-		MaxIdleConns:          10,
-		IdleConnTimeout:       10 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-		TLSClientConfig:       TLSClientConfig,
-	}
-
-	clientOpts := &clientconfig.ClientOpts{
-		AuthType: authType,
-		AuthInfo: authInfo,
-	}
-
-	opts, err := clientconfig.AuthOptions(clientOpts)
-	if err != nil {
-		klog.Fatal(err.Error())
-		return
-	}
-
-	err = openstack.Authenticate(provider, *opts)
-	if err != nil {
-		klog.Fatal(err.Error())
-		return
 	}
 	return
 }
