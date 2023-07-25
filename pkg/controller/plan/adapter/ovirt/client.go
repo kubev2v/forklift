@@ -578,3 +578,8 @@ func (r *Client) DetachDisks(vmRef ref.Ref) (err error) {
 	}
 	return
 }
+
+func (r *Client) PreTransferActions(vmRef ref.Ref) (ready bool, err error) {
+	ready = true
+	return
+}

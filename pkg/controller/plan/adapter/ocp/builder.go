@@ -16,14 +16,12 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
-	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	core "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes/scheme"
 	cnv "kubevirt.io/api/core/v1"
@@ -128,59 +126,9 @@ func getExportURL(virtualMachineExportVolumeFormat []export.VirtualMachineExport
 	return ""
 }
 
-// PersistentVolumeClaimWithSourceRef implements base.Builder
-func (*Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName *string, populatorName string, accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode) *core.PersistentVolumeClaim {
-	return nil
-}
-
 // PodEnvironment implements base.Builder
 func (*Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env []core.EnvVar, err error) {
 	return nil, nil
-}
-
-// PreTransferActions implements base.Builder
-func (r *Builder) PreTransferActions(c base.Client, vmRef ref.Ref) (ready bool, err error) {
-	apiGroup := cnv.GroupVersion.Group
-
-	// Check if VM export exists
-	vmExport := &export.VirtualMachineExport{}
-	err = r.Client.Get(context.Background(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vmExport)
-	if err != nil {
-		if !k8serr.IsNotFound(err) {
-			r.Log.Error(err, "Failed to get VM-export.", "vm", vmRef.Name)
-			return true, liberr.Wrap(err)
-		}
-		// Create VM export
-		vmExport = &export.VirtualMachineExport{
-			TypeMeta: meta.TypeMeta{
-				Kind:       "VirtualMachineExport",
-				APIVersion: "kubevirt.io/v1alpha3",
-			},
-			ObjectMeta: meta.ObjectMeta{
-				Name:      vmRef.Name,
-				Namespace: vmRef.Namespace,
-			},
-			Spec: export.VirtualMachineExportSpec{
-				Source: core.TypedLocalObjectReference{
-					APIGroup: &apiGroup,
-					Kind:     "VirtualMachine",
-					Name:     vmRef.Name,
-				},
-			},
-		}
-
-		err = r.Client.Create(context.Background(), vmExport, &client.CreateOptions{})
-		if err != nil {
-			return true, liberr.Wrap(err)
-		}
-	}
-	if vmExport.Status != nil && vmExport.Status.Phase == export.Ready {
-		r.Log.Info("VM-export is ready.", "vm", vmRef.Name)
-		return true, nil
-	}
-
-	r.Log.Info("Waiting for VM-export to be ready...", "vm", vmRef.Name)
-	return false, nil
 }
 
 // ResolveDataVolumeIdentifier implements base.Builder
@@ -283,8 +231,8 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*planapi.Task, err error) {
 // TemplateLabels implements base.Builder
 func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err error) {
 	// The VM is build from configuration, we don't need the label
-
-	return nil, nil
+	err = liberr.New("templates are not used by this provider")
+	return
 }
 
 // VirtualMachine implements base.Builder
@@ -523,6 +471,30 @@ func createDataVolumeSpec(size resource.Quantity, storageClassName, url, configM
 
 func pvcSourceName(namespace, name string) string {
 	return fmt.Sprintf("%s/%s", namespace, name)
+}
+
+func (r *Builder) SupportsVolumePopulators() bool {
+	return false
+}
+
+func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) (pvcNames []string, err error) {
+	err = planbase.VolumePopulatorNotSupportedError
+	return
+}
+
+func (r *Builder) PopulatorTransferredBytes(persistentVolumeClaim *core.PersistentVolumeClaim) (transferredBytes int64, err error) {
+	err = planbase.VolumePopulatorNotSupportedError
+	return
+}
+
+func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []core.PersistentVolumeClaim) (err error) {
+	err = planbase.VolumePopulatorNotSupportedError
+	return
+}
+
+func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error) {
+	err = planbase.VolumePopulatorNotSupportedError
+	return
 }
 
 // Build LUN PVs.

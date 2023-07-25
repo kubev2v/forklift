@@ -533,14 +533,6 @@ func getResourceCapacity(capacity int64, units string) (int64, error) {
 
 }
 
-func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName *string, populatorName string, accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode) *core.PersistentVolumeClaim {
-	return nil
-}
-
-func (r *Builder) PreTransferActions(c planbase.Client, vmRef ref.Ref) (ready bool, err error) {
-	return true, nil
-}
-
 // Build LUN PVs.
 func (r *Builder) LunPersistentVolumes(vmRef ref.Ref) (pvs []core.PersistentVolume, err error) {
 	// do nothing
@@ -550,5 +542,34 @@ func (r *Builder) LunPersistentVolumes(vmRef ref.Ref) (pvs []core.PersistentVolu
 // Build LUN PVCs.
 func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.PersistentVolumeClaim, err error) {
 	// do nothing
+	return
+}
+
+func (r *Builder) SupportsVolumePopulators() bool {
+	return false
+}
+
+func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) (pvcNames []string, err error) {
+	err = planbase.VolumePopulatorNotSupportedError
+	return
+}
+
+func (r *Builder) PrePopulateActions(c planbase.Client, vmRef ref.Ref) (ready bool, err error) {
+	err = planbase.VolumePopulatorNotSupportedError
+	return
+}
+
+func (r *Builder) PopulatorTransferredBytes(persistentVolumeClaim *core.PersistentVolumeClaim) (transferredBytes int64, err error) {
+	err = planbase.VolumePopulatorNotSupportedError
+	return
+}
+
+func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []core.PersistentVolumeClaim) (err error) {
+	err = planbase.VolumePopulatorNotSupportedError
+	return
+}
+
+func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error) {
+	err = planbase.VolumePopulatorNotSupportedError
 	return
 }

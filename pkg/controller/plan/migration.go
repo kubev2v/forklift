@@ -13,13 +13,10 @@ import (
 	"time"
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/scheduler"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
@@ -88,6 +85,10 @@ const (
 // Power states.
 const (
 	On = "On"
+)
+
+const (
+	TransferCompleted = "Transfer completed."
 )
 
 var (
@@ -292,7 +293,6 @@ func (r *Migration) begin() (err error) {
 		} else {
 			status = current
 		}
-
 		if status.Phase != Completed || status.HasAnyCondition(Canceled, Failed) {
 			pipeline, pErr := r.buildPipeline(&vm)
 			if pErr != nil {
@@ -356,24 +356,20 @@ func (r *Migration) SetPopulatorDataSourceLabels() {
 	}
 
 	for _, vm := range r.Plan.Status.Migration.VMs {
-		pvcs, err := r.kubevirt.getPVCs(vm)
+		pvcs, err := r.kubevirt.getPVCs(vm.Ref)
 		if err != nil {
 			r.Log.Error(err,
 				"Couldn't get VM's PVCs.",
 				"vm",
 				vm.String())
 		}
-		if r.Plan.IsSourceProviderOpenstack() {
-			err = r.setOpenStackPopulatorLabels(vm, pvcs)
-			if err != nil {
-				r.Log.Error(err, "Couldn't set the labels.", "vm", vm.String())
-			}
-		} else if r.kubevirt.useOvirtPopulator(vm) {
-			err = r.setOvirtPopulatorLabels(vm, pvcs)
-			if err != nil {
-				r.Log.Error(err, "Couldn't set the labels.", "vm", vm.String())
-			}
+		err = r.builder.SetPopulatorDataSourceLabels(vm.Ref, pvcs)
+		if err != nil {
+			r.Log.Error(err, "Couldn't set the labels.", "vm", vm.String())
 		}
+		migrationID := string(r.Plan.Status.Migration.ActiveSnapshot().Migration.UID)
+		// populator pods
+		r.setPopulatorPodsWithLabels(vm, migrationID)
 	}
 }
 
@@ -477,7 +473,7 @@ func (r *Migration) deleteImporterPods(vm *plan.VMStatus) (err error) {
 			return
 		}
 	}
-	pvcs, err := r.kubevirt.getPVCs(vm)
+	pvcs, err := r.kubevirt.getPVCs(vm.Ref)
 	if err != nil {
 		return
 	}
@@ -641,47 +637,40 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
 			break
 		}
+
 		var ready bool
-		ready, err = r.builder.PreTransferActions(r.provider, vm.Ref)
+		ready, err = r.provider.PreTransferActions(vm.Ref)
 		if err != nil {
-			err = liberr.Wrap(err)
-			step.AddError(err.Error())
-			err = nil
-			break
-		}
-
-		if r.Plan.IsSourceProviderOCP() {
-			if !ready {
+			if !errors.As(err, &web.ProviderNotReadyError{}) {
+				step.AddError(err.Error())
+				err = nil
+				break
+			} else {
 				return
 			}
-			err = r.kubevirt.ensureOCPVolumes(vm)
-			if err != nil {
-				step.AddError(err.Error())
-				err = nil
-				break
-			}
-			step.MarkCompleted()
-			step.Phase = Completed
-			vm.Phase = r.next(vm.Phase)
-			return
 		}
 
-		var pvcNames []string
-		if r.Plan.IsSourceProviderOpenstack() {
-			pvcNames, err = r.kubevirt.ensureOpenStackVolumes(vm.Ref, ready)
+		if r.builder.SupportsVolumePopulators() {
+			var pvcNames []string
+			pvcNames, err = r.kubevirt.PopulatorVolumes(vm.Ref)
 			if err != nil {
-				step.AddError(err.Error())
-				err = nil
-				break
+				if !errors.As(err, &web.ProviderNotReadyError{}) {
+					step.AddError(err.Error())
+					err = nil
+					break
+				} else {
+					return
+				}
 			}
-			if !ready {
-				return
-			}
-			err = r.kubevirt.createPodToBindPVCs(vm, pvcNames)
+			err = r.kubevirt.EnsurePopulatorVolumes(vm, pvcNames)
 			if err != nil {
-				step.AddError(err.Error())
-				err = nil
-				break
+				if !errors.As(err, &web.ProviderNotReadyError{}) {
+					step.AddError(err.Error())
+					err = nil
+					break
+				} else {
+					return
+				}
 			}
 		}
 
@@ -690,56 +679,42 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			return
 		}
 
-		if r.kubevirt.useOvirtPopulator(vm) {
-			pvcNames, err = r.kubevirt.createVolumesForOvirt(vm)
+		if !r.builder.SupportsVolumePopulators() {
+			var dataVolumes []cdi.DataVolume
+			dataVolumes, err = r.kubevirt.DataVolumes(vm)
 			if err != nil {
-				step.AddError(err.Error())
-				err = nil
-				break
+				if !errors.As(err, &web.ProviderNotReadyError{}) {
+					step.AddError(err.Error())
+					err = nil
+					break
+				} else {
+					return
+				}
 			}
-			err = r.kubevirt.createPodToBindPVCs(vm, pvcNames)
+			if vm.Warm != nil {
+				err = r.provider.SetCheckpoints(vm.Ref, vm.Warm.Precopies, dataVolumes, false)
+				if err != nil {
+					step.AddError(err.Error())
+					err = nil
+					break
+				}
+			}
+			err = r.kubevirt.EnsureDataVolumes(vm, dataVolumes)
 			if err != nil {
-				step.AddError(err.Error())
-				err = nil
-				break
-			}
-			step.MarkCompleted()
-			step.Phase = Completed
-			vm.Phase = r.next(vm.Phase)
-			return
-		}
-		var dataVolumes []cdi.DataVolume
-		dataVolumes, err = r.kubevirt.DataVolumes(vm)
-		if err != nil {
-			if !errors.As(err, &web.ProviderNotReadyError{}) {
-				step.AddError(err.Error())
-				err = nil
-				break
-			} else {
-				return
+				if !errors.As(err, &web.ProviderNotReadyError{}) {
+					step.AddError(err.Error())
+					err = nil
+					break
+				} else {
+					return
+				}
 			}
 		}
-		if vm.Warm != nil {
-			err = r.provider.SetCheckpoints(vm.Ref, vm.Warm.Precopies, dataVolumes, false)
-			if err != nil {
-				step.AddError(err.Error())
-				err = nil
-				break
-			}
-		}
-		err = r.kubevirt.EnsureDataVolumes(vm, dataVolumes)
-		if err != nil {
-			if !errors.As(err, &web.ProviderNotReadyError{}) {
-				step.AddError(err.Error())
-				err = nil
-				break
-			} else {
-				return
-			}
-		}
+
 		step.MarkCompleted()
 		step.Phase = Completed
 		vm.Phase = r.next(vm.Phase)
+
 	case CreateVM:
 		step, found := vm.FindStep(r.step(vm))
 		if !found {
@@ -794,44 +769,12 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		step.MarkStarted()
 		step.Phase = Running
 
-		var progressFn func(*plan.VMStatus, *plan.Step) error
-		var readyFn func(ref.Ref, *plan.Step) (bool, error)
-
-		switch {
-		case r.kubevirt.useOvirtPopulator(vm):
-			progressFn = r.updateCopyProgressForOvirt
-			readyFn = r.kubevirt.areOvirtPVCsReady
-		case r.Plan.IsSourceProviderOpenstack():
-			progressFn = r.updateCopyProgressForOpenstack
-			readyFn = r.kubevirt.openstackPVCsReady
+		if r.builder.SupportsVolumePopulators() {
+			err = r.updatePopulatorCopyProgress(vm, step)
+		} else {
+			// Fallback to non-volume populator path
+			err = r.updateCopyProgress(vm, step)
 		}
-
-		if readyFn != nil {
-			ready, err := readyFn(vm.Ref, step)
-			if err != nil {
-				step.AddError(err.Error())
-				err = nil
-				break
-			}
-			err = progressFn(vm, step)
-			if err != nil {
-				step.AddError(err.Error())
-				err = nil
-				break
-			}
-
-			if ready {
-				step.Phase = Completed
-				vm.Phase = r.next(vm.Phase)
-				break
-			} else {
-				r.Log.Info("PVCs are not ready yet")
-				break
-			}
-		}
-
-		// Fallback to non-volume populator path
-		err = r.updateCopyProgress(vm, step)
 		if err != nil {
 			step.AddError(err.Error())
 			err = nil
@@ -1321,7 +1264,7 @@ func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (err error) {
 		if err != nil {
 			return
 		}
-		pvcs, err = r.kubevirt.getPVCs(vm)
+		pvcs, err = r.kubevirt.getPVCs(vm.Ref)
 		if err != nil {
 			return
 		}
@@ -1363,46 +1306,6 @@ func (r *Migration) setRunning(vm *plan.VMStatus, running bool) (err error) {
 	return
 }
 
-func (r *Migration) updateCopyProgressForOvirt(vm *plan.VMStatus, step *plan.Step) (err error) {
-	pvcs, err := r.kubevirt.getPVCs(vm)
-	if err != nil {
-		return
-	}
-	for _, pvc := range pvcs {
-		if _, ok := pvc.Annotations["lun"]; ok {
-			// skip LUNs
-			continue
-		}
-		claim := pvc.Spec.DataSource.Name
-		task, found := step.FindTask(claim)
-		if !found {
-			continue
-		}
-
-		populatorCr, err := r.kubevirt.getOvirtPopulatorCr(claim)
-		if err != nil {
-			if pvc.Status.Phase == core.ClaimBound {
-				// the populator CR is deleted and the PVC is bound - it most likely finished transferring the disk
-				task.Progress.Completed = int64(100 * float64(task.Progress.Total))
-				break
-			} else {
-				return err
-			}
-		}
-
-		progress, parseErr := strconv.ParseInt(populatorCr.Status.Progress, 10, 64)
-		if err != nil {
-			return parseErr
-		}
-
-		percent := float64(progress/0x100000) / float64(task.Progress.Total)
-		task.Progress.Completed = int64(percent * float64(task.Progress.Total))
-	}
-
-	step.ReflectTasks()
-	return
-}
-
 // Update the progress of the appropriate disk copy step. (DiskTransfer, Cutover)
 func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err error) {
 	var pendingReason string
@@ -1415,7 +1318,7 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 		return
 	}
 	if dvs == nil || len(dvs) == 0 {
-		pvcs, err = r.kubevirt.getPVCs(vm)
+		pvcs, err = r.kubevirt.getPVCs(vm.Ref)
 		if err != nil {
 			return
 		}
@@ -1430,7 +1333,7 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 			if pvc.Status.Phase == core.ClaimBound {
 				completed++
 				task.Phase = Completed
-				task.Reason = "Transfer completed."
+				task.Reason = TransferCompleted
 				task.Progress.Completed = task.Progress.Total
 				task.MarkCompleted()
 			}
@@ -1449,7 +1352,7 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 			case cdi.Succeeded, cdi.Paused:
 				completed++
 				task.Phase = Completed
-				task.Reason = "Transfer completed."
+				task.Reason = TransferCompleted
 				task.Progress.Completed = task.Progress.Total
 				task.MarkCompleted()
 			case cdi.Pending, cdi.ImportScheduled:
@@ -1676,85 +1579,41 @@ func (r *Migration) setDataVolumeCheckpoints(vm *plan.VMStatus) (err error) {
 	return
 }
 
-func (r *Migration) updateCopyProgressForOpenstack(vm *plan.VMStatus, step *plan.Step) (err error) {
-	pvcs, err := r.kubevirt.getPVCs(vm)
+func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.Step) (err error) {
+	pvcs, err := r.kubevirt.getPVCs(vm.Ref)
 	if err != nil {
 		return
 	}
 
 	for _, pvc := range pvcs {
-		image, err := r.GetOpenstackImage(pvc)
-		if err != nil {
-			return err
-		}
-
 		var task *plan.Task
-		found := false
-		task, found = step.FindTask(image.Name)
+		var taskName string
+		taskName, err = r.builder.GetPopulatorTaskName(&pvc)
 
-		if !found {
+		found := false
+		if task, found = step.FindTask(taskName); !found {
 			continue
 		}
 
-		populatorCr, err := r.kubevirt.getOpenstackPopulatorCr(image.Name)
-		if err != nil {
-			return err
+		if pvc.Status.Phase == core.ClaimBound {
+			task.Phase = Completed
+			task.Reason = TransferCompleted
+			task.Progress.Completed = task.Progress.Total
+			task.MarkCompleted()
+			continue
 		}
 
-		progress, parseErr := strconv.ParseInt(populatorCr.Status.Transferred, 10, 64)
+		var transferredBytes int64
+		transferredBytes, err = r.builder.PopulatorTransferredBytes(&pvc)
 		if err != nil {
-			return parseErr
+			return
 		}
 
-		percent := float64(progress/0x100000) / float64(task.Progress.Total)
+		percent := float64(transferredBytes/0x100000) / float64(task.Progress.Total)
 		task.Progress.Completed = int64(percent * float64(task.Progress.Total))
 	}
 
 	step.ReflectTasks()
-	return
-}
-
-// Sets the OpenStackVolumePopulator CRs with VM ID and migration ID into the labels.
-func (r *Migration) setOpenStackPopulatorLabels(vm *plan.VMStatus, pvcs []core.PersistentVolumeClaim) (err error) {
-	openstackVm := &openstack.Workload{}
-	err = r.Source.Inventory.Find(openstackVm, vm.Ref)
-	if err != nil {
-		return
-	}
-	var images []*openstack.Image
-	for _, vol := range openstackVm.Volumes {
-		lookupName := fmt.Sprintf("%s-%s", r.Migration.Name, vol.ID)
-		image, err := r.getOpenstackImageByName(lookupName)
-		if err != nil {
-			continue
-		}
-		images = append(images, image)
-	}
-	if len(images) != len(pvcs) {
-		// To be sure we have every disk based on what already migrated and what's not.
-		// e.g when initializing the plan and the PVC has not been created yet (but the populator CR is) or when the disks that are attached to the source VM change.
-		for _, pvc := range pvcs {
-			image, err := r.GetOpenstackImage(pvc)
-			if err != nil {
-				continue
-			}
-			images = append(images, image)
-		}
-	}
-	migrationID := string(r.Plan.Status.Migration.ActiveSnapshot().Migration.UID)
-	for _, image := range images {
-		populatorCr, err := r.kubevirt.getOpenstackPopulatorCr(image.Name)
-		if err != nil {
-			continue
-		}
-		err = r.kubevirt.setOpenStackPopulatorLabels(populatorCr, vm.ID, migrationID)
-		if err != nil {
-			r.Log.Error(err, "Couldn't update the Populator Custom Resource labels.", "vm", vm.String(), "migration", migrationID, "OpenStackVolumePopulator", populatorCr.Name)
-			continue
-		}
-	}
-	// populator pods
-	r.setPopulatorPodsWithLabels(vm, migrationID)
 	return
 }
 
@@ -1770,69 +1629,12 @@ func (r *Migration) setPopulatorPodsWithLabels(vm *plan.VMStatus, migrationID st
 				// un-labeled pod, we need to set it
 				err = r.kubevirt.setPopulatorPodLabels(pod, migrationID)
 				if err != nil {
-					r.Log.Error(err, "Couldn't update the Populator pod labels.", "vm", vm.String(), "migration", migrationID, "pod", pod.Name)
+					r.Log.Error(err, "couldn't update the Populator pod labels.", "vm", vm.String(), "migration", migrationID, "pod", pod.Name)
 					continue
 				}
 			}
 		}
 	}
-}
-
-// Sets the OvirtVolumePopulator CRs with VM ID and migration ID into the labels.
-func (r *Migration) setOvirtPopulatorLabels(vm *plan.VMStatus, pvcs []core.PersistentVolumeClaim) (err error) {
-	ovirtVm := &ovirt.Workload{}
-	err = r.Source.Inventory.Find(ovirtVm, vm.Ref)
-	if err != nil {
-		return
-	}
-	var diskIds []string
-	for _, da := range ovirtVm.DiskAttachments {
-		diskIds = append(diskIds, da.Disk.ID)
-	}
-	if len(diskIds) != len(pvcs) {
-		// To be sure we have every disk based on what already migrated and what's not.
-		// e.g when initializing the plan and the PVC has not been created yet (but the populator CR is) or when the disks that are attached to the source VM change.
-		for _, pvc := range pvcs {
-			diskIds = append(diskIds, pvc.Spec.DataSource.Name)
-		}
-	}
-	migrationID := string(r.Plan.Status.Migration.ActiveSnapshot().Migration.UID)
-	for _, id := range diskIds {
-		populatorCr, err := r.kubevirt.getOvirtPopulatorCr(id)
-		if err != nil {
-			continue
-		}
-		err = r.kubevirt.setOvirtPopulatorLabels(populatorCr, vm.ID, migrationID)
-		if err != nil {
-			r.Log.Error(err, "Couldn't update the Populator Custom Resource labels.", "vm", vm.String(), "migration", migrationID, "OvirtVolumePopulator", populatorCr.Name)
-			continue
-		}
-	}
-	// populator pods
-	r.setPopulatorPodsWithLabels(vm, migrationID)
-	return
-}
-
-// Get the Openstack image from the inventory based on the PVC.
-func (r *Migration) GetOpenstackImage(pvc core.PersistentVolumeClaim) (image *openstack.Image, err error) {
-	image = &openstack.Image{}
-	err = r.Source.Inventory.Find(image, ref.Ref{ID: pvc.Name})
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	return
-}
-
-// Get the Openstack image from the inventory based on the name.
-func (r *Migration) getOpenstackImageByName(name string) (image *openstack.Image, err error) {
-	image = &openstack.Image{}
-	err = r.Source.Inventory.Find(image, ref.Ref{Name: name})
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	return
 }
 
 // Step predicate.

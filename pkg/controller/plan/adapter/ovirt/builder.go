@@ -1,11 +1,13 @@
 package ovirt
 
 import (
+	"context"
 	"fmt"
+	"net/url"
 	"path"
+	"strconv"
 	"strings"
 
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -19,10 +21,12 @@ import (
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
 	core "k8s.io/api/core/v1"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // BIOS types
@@ -553,49 +557,6 @@ func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVol
 	return pvc.Annotations[AnnImportDiskId]
 }
 
-// Build a PersistentVolumeClaim with DataSourceRef for VolumePopulator
-func (r *Builder) PersistentVolumeClaimWithSourceRef(da interface{}, storageName *string, populatorName string,
-	accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode) *core.PersistentVolumeClaim {
-	diskAttachment := da.(model.XDiskAttachment)
-
-	// We add 10% overhead because of the fsOverhead in CDI, around 5% to ext4 and 5% for root partition.
-	diskSize := diskAttachment.Disk.ProvisionedSize
-	// Accounting for fsOverhead is only required for `volumeMode: Filesystem`, as we may not have enough space
-	// after creating a filesystem on an underlying block device
-	if *volumeMode == core.PersistentVolumeFilesystem {
-		diskSize = int64(float64(diskSize) * 1.1)
-	}
-
-	return &core.PersistentVolumeClaim{
-		ObjectMeta: meta.ObjectMeta{
-			Name:      diskAttachment.DiskAttachment.ID,
-			Namespace: r.Plan.Spec.TargetNamespace,
-			Annotations: map[string]string{
-				AnnImportDiskId: diskAttachment.Disk.ID,
-			},
-			Labels: map[string]string{"migration": r.Migration.Name},
-		},
-		Spec: core.PersistentVolumeClaimSpec{
-			AccessModes: accessModes,
-			Resources: core.ResourceRequirements{
-				Requests: map[core.ResourceName]resource.Quantity{
-					core.ResourceStorage: *resource.NewQuantity(diskSize, resource.BinarySI)},
-			},
-			StorageClassName: storageName,
-			VolumeMode:       volumeMode,
-			DataSourceRef: &core.TypedLocalObjectReference{
-				APIGroup: &api.SchemeGroupVersion.Group,
-				Kind:     v1beta1.OvirtVolumePopulatorKind,
-				Name:     populatorName,
-			},
-		},
-	}
-}
-
-func (r *Builder) PreTransferActions(c planbase.Client, vmRef ref.Ref) (ready bool, err error) {
-	return true, nil
-}
-
 // Create PVs specs for the VM LUNs.
 func (r *Builder) LunPersistentVolumes(vmRef ref.Ref) (pvs []core.PersistentVolume, err error) {
 	vm := &model.Workload{}
@@ -700,5 +661,235 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 			pvcs = append(pvcs, pvcSpec)
 		}
 	}
+	return
+}
+
+func (r *Builder) SupportsVolumePopulators() bool {
+	return !r.Context.Plan.Spec.Warm
+}
+
+func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) (pvcNames []string, err error) {
+	workload := &model.Workload{}
+	err = r.Source.Inventory.Find(workload, vmRef)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	for _, diskAttachment := range workload.DiskAttachments {
+		if diskAttachment.Disk.StorageType == "lun" {
+			continue
+		}
+		_, err = r.getVolumePopulator(diskAttachment.DiskAttachment.ID)
+		if err != nil {
+			if !k8serr.IsNotFound(err) {
+				err = liberr.Wrap(err)
+				return
+			}
+			var populatorName string
+			populatorName, err = r.createVolumePopulatorCR(diskAttachment, secretName, vmRef.ID)
+			if err != nil {
+				err = liberr.Wrap(err)
+				return
+			}
+			var pvc *core.PersistentVolumeClaim
+			storageClassName := r.Context.Map.Storage.Spec.Map[0].Destination.StorageClass
+			pvc, err = r.persistentVolumeClaimWithSourceRef(diskAttachment, storageClassName, populatorName, annotations)
+			if err != nil {
+				if !k8serr.IsAlreadyExists(err) {
+					err = liberr.New("couldn't build the PVC", "diskAttachmentID", diskAttachment.DiskAttachment.ID,
+						"storageClassName", storageClassName, "populatorName", populatorName)
+					return
+				}
+				err = nil
+				continue
+			}
+			pvcNames = append(pvcNames, pvc.Name)
+		}
+	}
+	return
+}
+
+// Get the OvirtVolumePopulator CustomResource based on the PVC name.
+func (r *Builder) getVolumePopulator(name string) (populatorCr api.OvirtVolumePopulator, err error) {
+	populatorCr = api.OvirtVolumePopulator{}
+	err = r.Destination.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: name}, &populatorCr)
+	return
+}
+
+func (r *Builder) createVolumePopulatorCR(diskAttachment model.XDiskAttachment, secretName, vmId string) (name string, err error) {
+	migrationId := string(r.Migration.UID)
+	providerURL, err := url.Parse(r.Source.Provider.Spec.URL)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	engineURL := url.URL{
+		Scheme: providerURL.Scheme,
+		Host:   providerURL.Host,
+	}
+	populatorCR := &api.OvirtVolumePopulator{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      diskAttachment.DiskAttachment.ID,
+			Namespace: r.Plan.Spec.TargetNamespace,
+			Labels:    map[string]string{"vmID": vmId, "migration": migrationId},
+		},
+		Spec: api.OvirtVolumePopulatorSpec{
+			EngineURL:        engineURL.String(),
+			EngineSecretName: secretName,
+			DiskID:           diskAttachment.Disk.ID,
+			TransferNetwork:  r.Plan.Spec.TransferNetwork,
+		},
+	}
+	err = r.Context.Client.Create(context.TODO(), populatorCR, &client.CreateOptions{})
+	if err != nil {
+		if !k8serr.IsAlreadyExists(err) {
+			err = liberr.Wrap(err)
+			return
+		} else {
+			err = nil
+		}
+	}
+	name = populatorCR.Name
+	return
+}
+
+func (r *Builder) getDefaultVolumeAndAccessMode(storageClassName string) ([]core.PersistentVolumeAccessMode, *core.PersistentVolumeMode, error) {
+	var filesystemMode = core.PersistentVolumeFilesystem
+	storageProfile := &cdi.StorageProfile{}
+	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: storageClassName}, storageProfile)
+	if err != nil {
+		return nil, nil, liberr.Wrap(err, "cannot get StorageProfile")
+	}
+
+	if len(storageProfile.Status.ClaimPropertySets) > 0 &&
+		len(storageProfile.Status.ClaimPropertySets[0].AccessModes) > 0 {
+		accessModes := storageProfile.Status.ClaimPropertySets[0].AccessModes
+		volumeMode := storageProfile.Status.ClaimPropertySets[0].VolumeMode
+		if volumeMode == nil {
+			// volumeMode is an optional API parameter. Filesystem is the default mode used when volumeMode parameter is omitted.
+			volumeMode = &filesystemMode
+		}
+		return accessModes, volumeMode, nil
+	}
+	// no accessMode configured on storageProfile
+	return nil, nil, liberr.New("no accessMode defined on StorageProfile for StorageClass", "storageName", storageClassName)
+}
+
+// Build a PersistentVolumeClaim with DataSourceRef for VolumePopulator
+func (r *Builder) persistentVolumeClaimWithSourceRef(diskAttachment model.XDiskAttachment, storageClassName string, populatorName string,
+	annotations map[string]string) (pvc *core.PersistentVolumeClaim, err error) {
+
+	// We add 10% overhead because of the fsOverhead in CDI, around 5% to ext4 and 5% for root partition.
+	diskSize := diskAttachment.Disk.ProvisionedSize
+
+	var accessModes []core.PersistentVolumeAccessMode
+	var volumeMode *core.PersistentVolumeMode
+	accessModes, volumeMode, err = r.getDefaultVolumeAndAccessMode(storageClassName)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	// Accounting for fsOverhead is only required for `volumeMode: Filesystem`, as we may not have enough space
+	// after creating a filesystem on an underlying block device
+	if *volumeMode == core.PersistentVolumeFilesystem {
+		diskSize = int64(float64(diskSize) * 1.1)
+	}
+
+	annotations[AnnImportDiskId] = diskAttachment.ID
+
+	pvc = &core.PersistentVolumeClaim{
+		ObjectMeta: meta.ObjectMeta{
+			Name:        diskAttachment.DiskAttachment.ID,
+			Namespace:   r.Plan.Spec.TargetNamespace,
+			Annotations: annotations,
+		},
+		Spec: core.PersistentVolumeClaimSpec{
+			AccessModes: accessModes,
+			Resources: core.ResourceRequirements{
+				Requests: map[core.ResourceName]resource.Quantity{
+					core.ResourceStorage: *resource.NewQuantity(diskSize, resource.BinarySI)},
+			},
+			StorageClassName: &storageClassName,
+			VolumeMode:       volumeMode,
+			DataSourceRef: &core.TypedLocalObjectReference{
+				APIGroup: &api.SchemeGroupVersion.Group,
+				Kind:     api.OvirtVolumePopulatorKind,
+				Name:     populatorName,
+			},
+		},
+	}
+
+	err = r.Client.Create(context.TODO(), pvc, &client.CreateOptions{})
+	return
+}
+
+func (r *Builder) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (transferredBytes int64, err error) {
+	if _, ok := pvc.Annotations["lun"]; ok {
+		// skip LUNs
+		return
+	}
+	populatorCr, err := r.getVolumePopulator(pvc.Name)
+	if err != nil {
+		return
+	}
+	transferredBytes, err = strconv.ParseInt(populatorCr.Status.Progress, 10, 64)
+	if err != nil {
+		transferredBytes = 0
+		err = nil
+		return
+	}
+	return
+}
+
+// Sets the OvirtVolumePopulator CRs with VM ID and migration ID into the labels.
+func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []core.PersistentVolumeClaim) (err error) {
+	ovirtVm := &model.Workload{}
+	err = r.Source.Inventory.Find(ovirtVm, vmRef)
+	if err != nil {
+		return
+	}
+	var diskIds []string
+	for _, da := range ovirtVm.DiskAttachments {
+		diskIds = append(diskIds, da.Disk.ID)
+	}
+	if len(diskIds) != len(pvcs) {
+		// To be sure we have every disk based on what already migrated and what's not.
+		// e.g when initializing the plan and the PVC has not been created yet (but the populator CR is) or when the disks that are attached to the source VM change.
+		for _, pvc := range pvcs {
+			diskIds = append(diskIds, pvc.Spec.DataSource.Name)
+		}
+	}
+	migrationID := string(r.Plan.Status.Migration.ActiveSnapshot().Migration.UID)
+	for _, id := range diskIds {
+		populatorCr, err := r.getVolumePopulator(id)
+		if err != nil {
+			continue
+		}
+		err = r.setOvirtPopulatorLabels(populatorCr, vmRef.ID, migrationID)
+		if err != nil {
+			r.Log.Error(err, "Couldn't update the Populator Custom Resource labels.",
+				"vmID", vmRef.ID, "migrationID", migrationID, "OvirtVolumePopulator", populatorCr.Name)
+			continue
+		}
+	}
+	return
+}
+
+func (r *Builder) setOvirtPopulatorLabels(populatorCr api.OvirtVolumePopulator, vmId, migrationId string) (err error) {
+	populatorCrCopy := populatorCr.DeepCopy()
+	if populatorCr.Labels == nil {
+		populatorCr.Labels = make(map[string]string)
+	}
+	populatorCr.Labels["vmID"] = vmId
+	populatorCr.Labels["migration"] = migrationId
+	patch := client.MergeFrom(populatorCrCopy)
+	err = r.Destination.Client.Patch(context.TODO(), &populatorCr, patch)
+	return
+}
+
+func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error) {
+	taskName = pvc.Spec.DataSource.Name
 	return
 }
