@@ -17,6 +17,16 @@ jobs:
       REGISTRY_ORG: kubev2v
       USE_BAZEL_VERSION: 5.4.0
     steps:
+      - name: Free Disk Space (Ubuntu)            
+        uses: jlumbroso/free-disk-space@main      
+        with:                                     
+          tool-cache: false                       
+          android: true                           
+          dotnet: true                            
+          haskell: true                           
+          large-packages: false                   
+          swap-storage: false                     
+          docker-images: false                    
       - name: Checkout forklift
         uses: actions/checkout@v3
 
