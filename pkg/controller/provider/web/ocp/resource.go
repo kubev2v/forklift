@@ -16,8 +16,11 @@ type Resource struct {
 	Name string `json:"name"`
 	// self link.
 	SelfLink string `json:"selfLink"`
-
+	// self path.
 	Path string `json:"path,omitempty"`
+
+	// forklift ID, for compatability with providers using ID instead of UID
+	ID string `json:"id,omitempty"`
 }
 
 // Populate the fields with the specified object.
@@ -26,4 +29,6 @@ func (r *Resource) With(m *model.Base) {
 	r.Version = m.Version
 	r.Namespace = m.Namespace
 	r.Name = m.Name
+
+	r.ID = m.UID
 }
