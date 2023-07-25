@@ -231,6 +231,11 @@ func (r *XVM) Expand(db libmodel.DB) (err error) {
 
 		err = db.Get(&image)
 		if err != nil {
+			// The image the VM has been based on could have been removed
+			if errors.Is(err, model.NotFound) {
+				err = nil
+				return
+			}
 			return
 		}
 		r.Image.With(&image)

@@ -63,12 +63,13 @@ func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) (r *Collec
 			provider.GetNamespace(),
 			provider.GetName()))
 
+	client := &Client{}
+	client.URL = provider.Spec.URL
+	client.Log = log
+	client.LoadOptionsFromSecret(secret)
+
 	r = &Collector{
-		client: &Client{
-			URL:    provider.Spec.URL,
-			Secret: secret,
-			Log:    log,
-		},
+		client:   client,
 		provider: provider,
 		db:       db,
 		log:      log,
