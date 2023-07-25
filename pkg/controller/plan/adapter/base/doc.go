@@ -5,6 +5,7 @@ import (
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	core "k8s.io/api/core/v1"
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
@@ -16,6 +17,8 @@ const (
 	// VMware or disk ID in oVirt.
 	AnnDiskSource = "forklift.konveyor.io/disk-source"
 )
+
+var VolumePopulatorNotSupportedError = liberr.New("provider does not support volume populators")
 
 // Adapter API.
 // Constructs provider-specific implementations
@@ -53,14 +56,20 @@ type Builder interface {
 	ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string
 	// Conversion Pod environment
 	PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env []core.EnvVar, err error)
-	// Create PersistentVolumeClaim with a DataSourceRef
-	PersistentVolumeClaimWithSourceRef(da interface{}, storageName *string, populatorName string, accessModes []core.PersistentVolumeAccessMode, volumeMode *core.PersistentVolumeMode) *core.PersistentVolumeClaim
-	// Add custom steps before creating PVC/DataVolume
-	PreTransferActions(c Client, vmRef ref.Ref) (ready bool, err error)
 	// Build LUN PVs.
 	LunPersistentVolumes(vmRef ref.Ref) (pvs []core.PersistentVolume, err error)
 	// Build LUN PVCs.
 	LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.PersistentVolumeClaim, err error)
+	// check whether the builder supports Volume Populators
+	SupportsVolumePopulators() bool
+	// Build populator volumes
+	PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) (pvcNames []string, err error)
+	// Transferred bytes
+	PopulatorTransferredBytes(persistentVolumeClaim *core.PersistentVolumeClaim) (transferredBytes int64, err error)
+	// Set the populator PVC labels
+	SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []core.PersistentVolumeClaim) (err error)
+	// Get the populator task name associated to a PVC
+	GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error)
 }
 
 // Client API.
@@ -79,7 +88,7 @@ type Client interface {
 	// Remove all warm migration snapshots.
 	RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy) error
 	// Check if a snapshot is ready to transfer.
-	CheckSnapshotReady(vmRef ref.Ref, snapshot string) (bool, error)
+	CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool, err error)
 	// Set DataVolume checkpoints.
 	SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []cdi.DataVolume, final bool) (err error)
 	// Close connections to the provider API.
@@ -88,6 +97,8 @@ type Client interface {
 	Finalize(vms []*planapi.VMStatus, planName string)
 	// Detach disks that are attached to the target VM without being cloned (e.g., LUNs).
 	DetachDisks(vmRef ref.Ref) error
+	// Actions on source env needed before running the populator pods
+	PreTransferActions(vmRef ref.Ref) (ready bool, err error)
 }
 
 // Validator API.

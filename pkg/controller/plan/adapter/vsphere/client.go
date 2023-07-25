@@ -230,6 +230,11 @@ func (c *Client) Finalize(vms []*planapi.VMStatus, planName string) {
 
 }
 
+func (r *Client) PreTransferActions(vmRef ref.Ref) (ready bool, err error) {
+	ready = true
+	return
+}
+
 // Get the changeId for a VM snapshot.
 func (r *Client) getChangeIds(vmRef ref.Ref, snapshotId string) (changeIdMapping map[string]string, err error) {
 	vm, err := r.getVM(vmRef)

@@ -28,7 +28,10 @@ func (r *Adapter) Validator(plan *api.Plan) (validator base.Validator, err error
 
 // Constructs an openstack client.
 func (r *Adapter) Client(ctx *plancontext.Context) (client base.Client, err error) {
-	c := &Client{Context: ctx}
+	c := &Client{
+		Context: ctx,
+	}
+	c.Log = ctx.Log.WithName("client")
 	err = c.connect()
 	if err != nil {
 		return
