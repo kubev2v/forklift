@@ -36,7 +36,7 @@ func LimitedScanLines(data []byte, atEOF bool) (advance int, token []byte, err e
 	return
 }
 
-func updateProgress(progress_counter *prometheus.CounterVec, disk, progress uint64) (err error) {
+func updateProgress(progressCounter *prometheus.CounterVec, disk, progress uint64) (err error) {
 	if disk == 0 {
 		return
 	}
@@ -44,7 +44,7 @@ func updateProgress(progress_counter *prometheus.CounterVec, disk, progress uint
 	label := strconv.FormatUint(disk, 10)
 
 	var m = &dto.Metric{}
-	if err = progress_counter.WithLabelValues(label).Write(m); err != nil {
+	if err = progressCounter.WithLabelValues(label).Write(m); err != nil {
 		return
 	}
 	previous_progress := m.Counter.GetValue()
@@ -52,7 +52,7 @@ func updateProgress(progress_counter *prometheus.CounterVec, disk, progress uint
 	change := float64(progress) - previous_progress
 	if change > 0 {
 		klog.Infof("Progress changed for disk %d about %v", disk, change)
-		progress_counter.WithLabelValues(label).Add(change)
+		progressCounter.WithLabelValues(label).Add(change)
 	}
 	return
 }
@@ -67,7 +67,7 @@ func main() {
 	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(":2112", nil)
 
-	progress_counter := prometheus.NewCounterVec(
+	progressCounter := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Subsystem: "v2v",
 			Name:      "disk_transfers",
@@ -75,7 +75,7 @@ func main() {
 		},
 		[]string{"disk_id"},
 	)
-	if err := prometheus.Register(progress_counter); err != nil {
+	if err := prometheus.Register(progressCounter); err != nil {
 		// Exit gracefully if we fail here. We don't need monitoring
 		// failures to hinder guest conversion.
 		klog.Error("Prometheus progress counter not registered:", err)
@@ -84,7 +84,7 @@ func main() {
 		klog.Info("Prometheus progress counter registered.")
 	}
 
-	var disk_nr uint64 = 0
+	var diskNumber uint64 = 0
 	var disks uint64 = 0
 	var progress uint64 = 0
 
@@ -100,21 +100,21 @@ func main() {
 		}
 
 		if match := COPY_DISK_RE.FindSubmatch(line); match != nil {
-			disk_nr, _ = strconv.ParseUint(string(match[1]), 10, 0)
+			diskNumber, _ = strconv.ParseUint(string(match[1]), 10, 0)
 			disks, _ = strconv.ParseUint(string(match[2]), 10, 0)
-			klog.Infof("Copying disk %d out of %d", disk_nr, disks)
+			klog.Infof("Copying disk %d out of %d", diskNumber, disks)
 			progress = 0
-			err = updateProgress(progress_counter, disk_nr, progress)
+			err = updateProgress(progressCounter, diskNumber, progress)
 		} else if match := DISK_PROGRESS_RE.FindSubmatch(line); match != nil {
 			progress, _ = strconv.ParseUint(string(match[1]), 10, 0)
 			klog.Infof("Progress update, completed %d %%", progress)
-			err = updateProgress(progress_counter, disk_nr, progress)
+			err = updateProgress(progressCounter, diskNumber, progress)
 		} else if match := FINISHED_RE.Find(line); match != nil {
 			// Make sure we flag conversion as finished. This is
 			// just in case we miss the last progress update for some reason.
 			klog.Infof("Finished")
 			for disk := uint64(0); disk < disks; disk++ {
-				err = updateProgress(progress_counter, disk, 100)
+				err = updateProgress(progressCounter, disk, 100)
 			}
 		} else {
 			klog.V(1).Info("Ignoring line: ", string(line))
