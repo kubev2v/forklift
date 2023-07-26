@@ -870,17 +870,18 @@ func (r *KubeVirt) SetPopulatorPodOwnership(vm *plan.VMStatus) (err error) {
 	for _, pod := range pods {
 		pvcId := strings.Split(pod.Name, "populate-")[1]
 		for _, pvc := range pvcs {
-			if string(pvc.UID) == pvcId {
-				podCopy := pod.DeepCopy()
-				err = k8sutil.SetOwnerReference(&pvc, &pod, r.Scheme())
-				if err != nil {
-					continue
-				}
-				patch := client.MergeFrom(podCopy)
-				err = r.Destination.Client.Patch(context.TODO(), &pod, patch)
-				if err != nil {
-					break
-				}
+			if string(pvc.UID) != pvcId {
+				continue
+			}
+			podCopy := pod.DeepCopy()
+			err = k8sutil.SetOwnerReference(&pvc, &pod, r.Scheme())
+			if err != nil {
+				continue
+			}
+			patch := client.MergeFrom(podCopy)
+			err = r.Destination.Client.Patch(context.TODO(), &pod, patch)
+			if err != nil {
+				break
 			}
 		}
 	}
