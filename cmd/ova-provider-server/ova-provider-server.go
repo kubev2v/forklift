@@ -294,28 +294,28 @@ func scanOVAsOnNFS() (envelopes []Envelope, ovaPaths []string) {
 }
 
 func findOVAFiles(directory string) ([]string, []string, error) {
-	var ovaFiles, ovfFiles []string
-
-	dirs, err := ioutil.ReadDir(directory)
+	childs, err := ioutil.ReadDir(directory)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	for _, dir := range dirs {
-		if dir.IsDir() {
-			newDir := directory + "/" + dir.Name()
-			files, err := ioutil.ReadDir(newDir)
-			if err != nil {
-				return nil, nil, err
-			}
-			for _, file := range files {
-				if strings.HasSuffix(strings.ToLower(file.Name()), ".ova") {
-					ovaFiles = append(ovaFiles, filepath.Join(directory, dir.Name(), file.Name()))
-				}
-
-				if strings.HasSuffix(strings.ToLower(file.Name()), ".ovf") {
-					ovfFiles = append(ovfFiles, filepath.Join(directory, dir.Name(), file.Name()))
-				}
+	var ovaFiles, ovfFiles []string
+	for _, child := range childs {
+		if !child.IsDir() {
+			continue
+		}
+		newDir := directory + "/" + child.Name()
+		files, err := ioutil.ReadDir(newDir)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, file := range files {
+			path := filepath.Join(directory, child.Name(), file.Name())
+			switch {
+			case strings.HasSuffix(strings.ToLower(file.Name()), ".ova"):
+				ovaFiles = append(ovaFiles, path)
+			case strings.HasSuffix(strings.ToLower(file.Name()), ".ovf"):
+				ovfFiles = append(ovfFiles, path)
 			}
 		}
 	}
