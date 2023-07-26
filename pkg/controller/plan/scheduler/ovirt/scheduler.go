@@ -2,11 +2,12 @@ package ovirt
 
 import (
 	"context"
+	"sync"
+
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	"sync"
 )
 
 // Package level mutex to ensure that
@@ -34,6 +35,22 @@ func (r *Scheduler) Next() (vm *plan.VMStatus, hasNext bool, err error) {
 		return
 	}
 
+	if r.calcInFlight(planList) >= r.MaxInFlight {
+		return
+	}
+
+	for _, vmStatus := range r.Plan.Status.Migration.VMs {
+		if !vmStatus.MarkedStarted() && !vmStatus.MarkedCompleted() {
+			vm = vmStatus
+			hasNext = true
+			return
+		}
+	}
+
+	return
+}
+
+func (r *Scheduler) calcInFlight(planList *api.PlanList) int {
 	inFlight := 0
 	for _, p := range planList.Items {
 		// ignore plans that aren't using the same source provider
@@ -53,18 +70,5 @@ func (r *Scheduler) Next() (vm *plan.VMStatus, hasNext bool, err error) {
 			}
 		}
 	}
-
-	if inFlight >= r.MaxInFlight {
-		return
-	}
-
-	for _, vmStatus := range r.Plan.Status.Migration.VMs {
-		if !vmStatus.MarkedStarted() && !vmStatus.MarkedCompleted() {
-			vm = vmStatus
-			hasNext = true
-			return
-		}
-	}
-
-	return
+	return inFlight
 }
