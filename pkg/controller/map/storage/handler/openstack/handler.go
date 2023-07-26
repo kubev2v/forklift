@@ -67,39 +67,26 @@ func (r *Handler) Deleted(e libweb.Event) {
 }
 
 // Storage changed.
-// Find all of the StorageMap CRs the reference both the
-// provider and the changed volume type and enqueue reconcile events.
+// Find all StorageMap CRs that reference both the provider
+// and the changed volume type, and enqueue reconcile events.
 func (r *Handler) changed(models ...*openstack.VolumeType) {
 	log.V(3).Info(
 		"Volume type changed.",
 		"id",
 		models[0].ID)
-	list := api.StorageMapList{}
-	err := r.List(context.TODO(), &list)
+	storageMapList := &api.StorageMapList{}
+	err := r.List(context.TODO(), storageMapList)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	for i := range list.Items {
-		storageMap := &list.Items[i]
+	for _, storageMap := range storageMapList.Items {
 		ref := storageMap.Spec.Provider.Source
 		if !r.MatchProvider(ref) {
 			continue
 		}
-		referenced := false
-		for _, pair := range storageMap.Spec.Map {
-			ref := pair.Source
-			for _, model := range models {
-				if ref.ID == model.ID || strings.HasSuffix(model.Path, ref.Name) {
-					referenced = true
-					break
-				}
-			}
-			if referenced {
-				break
-			}
-		}
-		if referenced {
+
+		if isReferenced(models, &storageMap) {
 			log.V(3).Info(
 				"Queue reconcile event.",
 				"map",
@@ -107,8 +94,20 @@ func (r *Handler) changed(models ...*openstack.VolumeType) {
 					storageMap.Namespace,
 					storageMap.Name))
 			r.Enqueue(event.GenericEvent{
-				Object: storageMap,
+				Object: &storageMap,
 			})
 		}
 	}
+}
+
+func isReferenced(models []*openstack.VolumeType, storageMap *api.StorageMap) bool {
+	for _, pair := range storageMap.Spec.Map {
+		ref := pair.Source
+		for _, model := range models {
+			if ref.ID == model.ID || strings.HasSuffix(model.Path, ref.Name) {
+				return true
+			}
+		}
+	}
+	return false
 }
