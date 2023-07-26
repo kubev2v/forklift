@@ -472,10 +472,10 @@ func (r *KubeVirt) PopulatorVolumes(vmRef ref.Ref) (pvcNames []string, err error
 
 // Ensure the DataVolumes exist on the destination.
 func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus, dataVolumes []cdi.DataVolume) (err error) {
-	list := &cdi.DataVolumeList{}
+	dataVolumeList := &cdi.DataVolumeList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
-		list,
+		dataVolumeList,
 		&client.ListOptions{
 			LabelSelector: labels.SelectorFromSet(r.vmLabels(vm.Ref)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
@@ -487,15 +487,7 @@ func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus, dataVolumes []cdi.DataVo
 
 	var pvcNames []string
 	for _, dv := range dataVolumes {
-		exists := false
-		for _, item := range list.Items {
-			if r.Builder.ResolveDataVolumeIdentifier(&dv) == r.Builder.ResolveDataVolumeIdentifier(&item) {
-				exists = true
-				break
-			}
-		}
-
-		if !exists {
+		if !r.isDataVolumeExistsInList(&dv, dataVolumeList) {
 			err = r.Destination.Client.Create(context.TODO(), &dv)
 			if err != nil {
 				err = liberr.Wrap(err)
@@ -533,6 +525,15 @@ func (r *KubeVirt) EnsurePopulatorVolumes(vm *plan.VMStatus, pvcNames []string) 
 		err = liberr.Wrap(err)
 	}
 	return
+}
+
+func (r *KubeVirt) isDataVolumeExistsInList(dv *cdi.DataVolume, dataVolumeList *cdi.DataVolumeList) bool {
+	for _, item := range dataVolumeList.Items {
+		if r.Builder.ResolveDataVolumeIdentifier(dv) == r.Builder.ResolveDataVolumeIdentifier(&item) {
+			return true
+		}
+	}
+	return false
 }
 
 // Return DataVolumes associated with a VM.
