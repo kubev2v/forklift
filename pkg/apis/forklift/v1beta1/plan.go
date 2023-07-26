@@ -101,14 +101,12 @@ func (p *Plan) VSphereUsesEl9VirtV2v() (bool, error) {
 		return false, liberr.New("Cannot analyze plan, destination provider is missing.")
 	}
 
-	if source.Type() != VSphere {
+	switch source.Type() {
+	case VSphere:
+		return !p.Spec.Warm && destination.IsHost(), nil
+	default:
 		return false, nil
 	}
-
-	if !p.Spec.Warm && destination.IsHost() {
-		return true, nil
-	}
-	return false, nil
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
