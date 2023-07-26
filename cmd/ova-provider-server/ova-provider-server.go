@@ -21,6 +21,11 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	invalidRequestMethodMsg = "Invalid request method"
+	errorProcessingOvfMsg   = "Error processing OVF file"
+)
+
 // xml struct
 type Item struct {
 	AllocationUnits string          `xml:"AllocationUnits,omitempty"`
@@ -199,13 +204,13 @@ func connHandler(w http.ResponseWriter, r *http.Request) {
 
 func vmHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
-		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		http.Error(w, invalidRequestMethodMsg, http.StatusMethodNotAllowed)
 		return
 	}
 	vmXML, ovaPath := scanOVAsOnNFS()
 	vmStruct, err := convertToVmStruct(vmXML, ovaPath)
 	if err != nil {
-		fmt.Println("Error processing OVF file:", err)
+		fmt.Println(errorProcessingOvfMsg, err)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -215,13 +220,13 @@ func vmHandler(w http.ResponseWriter, r *http.Request) {
 
 func diskHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
-		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		http.Error(w, invalidRequestMethodMsg, http.StatusMethodNotAllowed)
 		return
 	}
 	xmlStruct, ovaPath := scanOVAsOnNFS()
 	diskStruct, err := convertToDiskStruct(xmlStruct, ovaPath)
 	if err != nil {
-		fmt.Println("Error processing OVF file:", err)
+		fmt.Println(errorProcessingOvfMsg, err)
 		return
 	}
 
@@ -232,13 +237,13 @@ func diskHandler(w http.ResponseWriter, r *http.Request) {
 
 func networkHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
-		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		http.Error(w, invalidRequestMethodMsg, http.StatusMethodNotAllowed)
 		return
 	}
 	xmlStruct, _ := scanOVAsOnNFS()
 	netStruct, err := convertToNetworkStruct(xmlStruct)
 	if err != nil {
-		fmt.Println("Error processing OVF file:", err)
+		fmt.Println(errorProcessingOvfMsg, err)
 		return
 	}
 

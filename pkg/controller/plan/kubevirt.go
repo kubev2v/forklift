@@ -60,7 +60,8 @@ const (
 	// DV immediate bind to WaitForFirstConsumer storage class
 	AnnBindImmediate = "cdi.kubevirt.io/storage.bind.immediate.requested"
 	// Max Length for vm name
-	NameMaxLength = 63
+	NameMaxLength  = 63
+	VddkVolumeName = "vddk-vol-mount"
 )
 
 // Labels
@@ -1204,7 +1205,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 			ImagePullPolicy: core.PullIfNotPresent,
 			VolumeMounts: []core.VolumeMount{
 				{
-					Name:      "vddk-vol-mount",
+					Name:      VddkVolumeName,
 					MountPath: "/opt",
 				},
 			},
@@ -1350,7 +1351,7 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 				MountPath: "/mnt/v2v",
 			},
 			core.VolumeMount{
-				Name:      "vddk-vol-mount",
+				Name:      VddkVolumeName,
 				MountPath: "/opt",
 			},
 			core.VolumeMount{
@@ -1362,7 +1363,7 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 
 	// Temporary space for VDDK library
 	volumes = append(volumes, core.Volume{
-		Name: "vddk-vol-mount",
+		Name: VddkVolumeName,
 		VolumeSource: core.VolumeSource{
 			EmptyDir: &core.EmptyDirVolumeSource{},
 		},
