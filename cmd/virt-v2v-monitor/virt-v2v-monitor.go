@@ -80,9 +80,8 @@ func main() {
 		// failures to hinder guest conversion.
 		klog.Error("Prometheus progress counter not registered:", err)
 		return
-	} else {
-		klog.Info("Prometheus progress counter registered.")
 	}
+	klog.Info("Prometheus progress counter registered.")
 
 	var diskNumber uint64 = 0
 	var disks uint64 = 0
