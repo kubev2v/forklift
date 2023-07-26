@@ -1531,9 +1531,7 @@ func (r *Migration) updateConversionProgressEl9(pod *core.Pod, step *plan.Step) 
 			r.Log.Info("Progress seems out of range", "progress", progress)
 			progress = 100
 		}
-		if progress > 0 {
-			some_progress = true
-		}
+		some_progress = some_progress || progress > 0
 		if disk_nr > uint64(len(step.Tasks)) {
 			r.Log.Info("Ignoring progress update", "disk", disk_nr, "disks count", len(step.Tasks), "step", step.Name)
 			continue
