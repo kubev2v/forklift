@@ -1504,7 +1504,7 @@ func (r *Migration) updateConversionProgressEl9(pod *core.Pod, step *plan.Step) 
 		return
 	}
 
-	var disk_re = regexp.MustCompile(`v2v_disk_transfers\{disk_id="(\d+)"\} (\d{1,3}\.?\d*)`)
+	var diskRegex = regexp.MustCompile(`v2v_disk_transfers\{disk_id="(\d+)"\} (\d{1,3}\.?\d*)`)
 	url := fmt.Sprintf("http://%s:2112/metrics", pod.Status.PodIP)
 	resp, err := http.Get(url)
 	if err != nil {
@@ -1518,32 +1518,33 @@ func (r *Migration) updateConversionProgressEl9(pod *core.Pod, step *plan.Step) 
 	if err != nil {
 		return
 	}
-	matches := disk_re.FindAllStringSubmatch(string(body), -1)
+	matches := diskRegex.FindAllStringSubmatch(string(body), -1)
 	if matches == nil {
 		return
 	}
-	some_progress := false
+	someProgress := false
 	for _, match := range matches {
-		disk_nr, _ := strconv.ParseUint(string(match[1]), 10, 0)
+		diskNumber, _ := strconv.ParseUint(string(match[1]), 10, 0)
 		progress, _ := strconv.ParseFloat(string(match[2]), 64)
-		r.Log.Info("Progress update", "disk", disk_nr, "progress", progress, "tasks", step.Tasks)
+		r.Log.Info("Progress update", "disk", diskNumber, "progress", progress, "tasks", step.Tasks)
 		if progress > 100 {
 			r.Log.Info("Progress seems out of range", "progress", progress)
 			progress = 100
 		}
-		some_progress = some_progress || progress > 0
-		if disk_nr > uint64(len(step.Tasks)) {
-			r.Log.Info("Ignoring progress update", "disk", disk_nr, "disks count", len(step.Tasks), "step", step.Name)
+
+		someProgress = someProgress || progress > 0
+		if diskNumber > uint64(len(step.Tasks)) {
+			r.Log.Info("Ignoring progress update", "disk", diskNumber, "disks count", len(step.Tasks), "step", step.Name)
 			continue
 		}
-		task := step.Tasks[disk_nr-1]
+		task := step.Tasks[diskNumber-1]
 		if step.Name == DiskTransferV2v {
 			// Update copy progress if we're in CopyDisksVirtV2V step.
 			task.Progress.Completed = int64(float64(task.Progress.Total) * progress / 100)
 		}
 	}
 	step.ReflectTasks()
-	if step.Name == ImageConversion && some_progress {
+	if step.Name == ImageConversion && someProgress {
 		// Disk copying has already started. Transition from
 		// ConvertGuest to CopyDisksVirtV2V .
 		step.MarkCompleted()
