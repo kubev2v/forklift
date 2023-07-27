@@ -535,8 +535,11 @@ func (um *UUIDMap) GetUUID(object interface{}, key string) string {
 		}
 
 		hash := sha256.Sum256(buf.Bytes())
-		um.m[key] = hex.EncodeToString(hash[:])
-		id = um.m[key]
+		id = hex.EncodeToString(hash[:])
+		if len(id) > 36 {
+			id = id[:36]
+		}
+		um.m[key] = id
 	}
 	return id
 }
