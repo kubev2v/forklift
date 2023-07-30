@@ -266,11 +266,12 @@ push-populator-controller-image: build-populator-controller-image
 	$(CONTAINER_CMD) tag bazel/cmd/populator-controller:populator-controller-image $(POPULATOR_CONTROLLER_IMAGE)
 	$(CONTAINER_CMD) push $(POPULATOR_CONTROLLER_IMAGE)
 
-# Build the docker image
 build-ovirt-populator-image:
-	$(CONTAINER_CMD) build -f hack/ovirt-populator/Containerfile -t $(OVIRT_POPULATOR_IMAGE) .
+	export CONTAINER_CMD=$(CONTAINER_CMD); \
+	bazel run cmd/ovirt-populator:ovirt-populator-image \
+		$(BAZEL_OPTS) \
+		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
 
-# Push the docker image
 push-ovirt-populator-image: build-ovirt-populator-image
 	$(CONTAINER_CMD) push $(OVIRT_POPULATOR_IMAGE)
 
