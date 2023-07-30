@@ -275,9 +275,13 @@ push-ovirt-populator-image: build-ovirt-populator-image
 	$(CONTAINER_CMD) push $(OVIRT_POPULATOR_IMAGE)
 
 build-openstack-populator-image: check_container_runtime
-	$(CONTAINER_CMD) build -f hack/openstack-populator/Containerfile -t $(OPENSTACK_POPULATOR_IMAGE) .
+	export CONTAINER_CMD=$(CONTAINER_CMD); \
+	bazel run cmd/openstack-populator:openstack-populator-image \
+		$(BAZEL_OPTS) \
+		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
 
 push-openstack-populator-image: build-openstack-populator-image
+	$(CONTAINER_CMD) tag bazel/cmd/openstack-populator:openstack-populator-image $(OPENSTACK_POPULATOR_IMAGE)
 	$(CONTAINER_CMD) push $(OPENSTACK_POPULATOR_IMAGE)
 
 build-ova-provider-server-image: check_container_runtime
