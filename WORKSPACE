@@ -48,11 +48,6 @@ dockerfile_image(
     dockerfile = "//:ovirt_populator_containerfile",
 )
 
-dockerfile_image(
-    name = "openstack-populator-image-dockerfile",
-    dockerfile = "//:openstack_populator_containerfile",
-)
-
 load(
     "@io_bazel_rules_docker//toolchains/docker:toolchain.bzl",
     docker_toolchain_configure = "toolchain_configure",
