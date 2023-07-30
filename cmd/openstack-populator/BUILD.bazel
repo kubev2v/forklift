@@ -1,4 +1,8 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load(
+    "@io_bazel_rules_docker//container:container.bzl",
+    "container_image",
+)
 
 go_library(
     name = "openstack-populator_lib",
@@ -19,13 +23,11 @@ go_binary(
     visibility = ["//visibility:public"],
 )
 
-load(
-    "@io_bazel_rules_docker//container:container.bzl",
-    "container_image",
-)
-
 container_image(
     name = "openstack-populator-image",
-    base = "@openstack-populator-image-dockerfile//image:dockerfile_image.tar",
+    base = "@ubi9-minimal//image",
+    directory = "/usr/local/bin/",
+    entrypoint = ["/usr/local/bin/openstack-populator"],
+    files = [":openstack-populator"],
     visibility = ["//visibility:public"],
 )
