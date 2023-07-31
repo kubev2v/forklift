@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/go-logr/logr"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ova"
 	fb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 )
 
 // All adapters.
@@ -38,7 +38,7 @@ type Context struct {
 	// OVA client.
 	client *Client
 	// Log.
-	log logr.Logger
+	log logging.LevelLogger
 	// DB client.
 	db libmodel.DB
 }

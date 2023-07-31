@@ -1126,7 +1126,7 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image, storageC
 			},
 			StorageClassName: &storageClassName,
 			VolumeMode:       volumeMode,
-			DataSourceRef: &core.TypedLocalObjectReference{
+			DataSourceRef: &core.TypedObjectReference{
 				APIGroup: &apiGroup,
 				Kind:     api.OpenstackVolumePopulatorKind,
 				Name:     populatorName,

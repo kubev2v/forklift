@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions"
@@ -33,6 +32,7 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 	"github.com/gophercloud/utils/openstack/clientconfig"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
 )
 
@@ -71,7 +71,7 @@ var supportedAuthTypes = map[string]clientconfig.AuthType{
 type Client struct {
 	URL                 string
 	Options             map[string]string
-	Log                 logr.Logger
+	Log                 logging.LevelLogger
 	provider            *gophercloud.ProviderClient
 	identityService     *gophercloud.ServiceClient
 	computeService      *gophercloud.ServiceClient
