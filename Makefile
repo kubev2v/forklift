@@ -273,6 +273,7 @@ build-ovirt-populator-image:
 		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
 
 push-ovirt-populator-image: build-ovirt-populator-image
+	$(CONTAINER_CMD) tag bazel/cmd/ovirt-populator:ovirt-populator-image $(OVIRT_POPULATOR_IMAGE)
 	$(CONTAINER_CMD) push $(OVIRT_POPULATOR_IMAGE)
 
 build-openstack-populator-image: check_container_runtime
