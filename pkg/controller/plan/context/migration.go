@@ -5,10 +5,12 @@ import (
 	"path"
 
 	"github.com/go-logr/logr"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	core "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -112,6 +114,8 @@ type Source struct {
 	Inventory web.Client
 	// Provider Secret.
 	Secret *core.Secret
+	// k8s Client for OCP sources
+	Client client.Client
 }
 
 // Build.
@@ -125,9 +129,9 @@ func (r *Source) build(ctx *Context) (err error) {
 		return
 	}
 
+	r.Secret = &core.Secret{}
 	if !r.Provider.IsHost() {
 		ref := r.Provider.Spec.Secret
-		r.Secret = &core.Secret{}
 		err = ctx.Get(
 			context.TODO(),
 			k8sclient.ObjectKey{
@@ -145,6 +149,16 @@ func (r *Source) build(ctx *Context) (err error) {
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
+	}
+
+	if r.Provider.Type() == v1beta1.OpenShift {
+		client, err := r.Provider.Client(r.Secret)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return err
+		}
+
+		r.Client = client
 	}
 
 	return
