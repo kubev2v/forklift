@@ -1,0 +1,11 @@
+load(
+    "@io_bazel_rules_docker//container:container.bzl",
+    "container_pull",
+)
+
+container_pull(
+    name = "centos-stream-9",
+    registry = "quay.io",
+    repository = "centos/centos",
+    tag = "stream9",
+)
