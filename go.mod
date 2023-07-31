@@ -27,11 +27,11 @@ require (
 	go.uber.org/zap v1.24.0
 	golang.org/x/net v0.11.0
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.27.3
+	k8s.io/api v0.27.4
 	k8s.io/apiextensions-apiserver v0.27.3
-	k8s.io/apimachinery v0.27.3
+	k8s.io/apimachinery v0.27.4
 	k8s.io/apiserver v0.27.3
-	k8s.io/client-go v0.27.3
+	k8s.io/client-go v0.27.4
 	k8s.io/component-base v0.27.3
 	k8s.io/component-helpers v0.26.0
 	k8s.io/klog/v2 v2.100.1

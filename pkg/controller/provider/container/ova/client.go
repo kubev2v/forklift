@@ -7,10 +7,10 @@ import (
 	liburl "net/url"
 	"time"
 
-	"github.com/go-logr/logr"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
 )
 
@@ -27,7 +27,7 @@ type Client struct {
 	URL        string
 	client     *libweb.Client
 	Secret     *core.Secret
-	Log        logr.Logger
+	Log        logging.LevelLogger
 	serviceURL string
 }
 
