@@ -1323,6 +1323,10 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 			return
 		}
 		for _, pvc := range pvcs {
+			if _, ok := pvc.Annotations["lun"]; ok {
+				// skip LUNs
+				continue
+			}
 			var task *plan.Task
 			name := r.builder.ResolvePersistentVolumeClaimIdentifier(&pvc)
 			found := false
@@ -1585,6 +1589,10 @@ func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.St
 	}
 
 	for _, pvc := range pvcs {
+		if _, ok := pvc.Annotations["lun"]; ok {
+			// skip LUNs
+			continue
+		}
 		var task *plan.Task
 		var taskName string
 		taskName, err = r.builder.GetPopulatorTaskName(&pvc)
