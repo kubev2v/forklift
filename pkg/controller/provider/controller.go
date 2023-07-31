@@ -118,9 +118,7 @@ func Add(mgr manager.Manager) error {
 	}
 	// References.
 	err = cnt.Watch(
-		&source.Kind{
-			Type: &v1.Secret{},
-		},
+		source.Kind(mgr.GetCache(), &v1.Secret{}),
 		libref.Handler(&api.Provider{}))
 	if err != nil {
 		log.Trace(err)
