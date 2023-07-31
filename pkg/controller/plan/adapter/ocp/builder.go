@@ -38,6 +38,7 @@ const (
 type Builder struct {
 	*plancontext.Context
 	macConflictsMap map[string]string
+	sourceClient    client.Client
 }
 
 // ConfigMap implements base.Builder
@@ -49,7 +50,7 @@ func (r *Builder) ConfigMap(vmRef ref.Ref, secret *core.Secret, object *core.Con
 		Namespace: vmRef.Namespace,
 		Name:      vmRef.Name,
 	}
-	err := r.Client.Get(context.TODO(), key, vmExport)
+	err := r.sourceClient.Get(context.TODO(), key, vmExport)
 	if err != nil {
 		r.Log.Error(err, "Failed to get VM-export ConfigMap")
 		return liberr.Wrap(err)
@@ -70,7 +71,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 		Name:      vmRef.Name,
 	}
 
-	err = r.Client.Get(context.TODO(), key, vmExport)
+	err = r.sourceClient.Get(context.TODO(), key, vmExport)
 	if err != nil {
 		r.Log.Error(err, "Failed to get VM-export ConfigMap")
 		return nil, liberr.Wrap(err)
@@ -86,7 +87,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 	for _, volume := range vmExport.Status.Links.External.Volumes {
 		// Get PVC
 		pvc := &core.PersistentVolumeClaim{}
-		err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: volume.Name}, pvc)
+		err = r.sourceClient.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: volume.Name}, pvc)
 		if err != nil {
 			return nil, liberr.Wrap(err)
 		}
@@ -144,7 +145,7 @@ func (*Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolum
 // Secret implements base.Builder
 func (r *Builder) Secret(vmRef ref.Ref, in *core.Secret, object *core.Secret) error {
 	vmExport := &export.VirtualMachineExport{}
-	err := r.Client.Get(context.Background(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vmExport)
+	err := r.sourceClient.Get(context.Background(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vmExport)
 	if err != nil {
 		r.Log.Error(err, "Failed to get VM-export Secret")
 		return liberr.Wrap(err)
@@ -158,7 +159,7 @@ func (r *Builder) Secret(vmRef ref.Ref, in *core.Secret, object *core.Secret) er
 		return liberr.Wrap(err, "Token secret ref is nil")
 	}
 	tokenSecret := &core.Secret{}
-	err = r.Client.Get(context.Background(), client.ObjectKey{Namespace: vmRef.Namespace, Name: *vmExport.Status.TokenSecretRef}, tokenSecret)
+	err = r.sourceClient.Get(context.Background(), client.ObjectKey{Namespace: vmRef.Namespace, Name: *vmExport.Status.TokenSecretRef}, tokenSecret)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -179,7 +180,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*planapi.Task, err error) {
 		Name:      vmRef.Name,
 	}
 
-	err = r.Client.Get(context.TODO(), key, vm)
+	err = r.sourceClient.Get(context.TODO(), key, vm)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
@@ -190,7 +191,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*planapi.Task, err error) {
 		switch {
 		case vol.PersistentVolumeClaim != nil:
 			pvc := &core.PersistentVolumeClaim{}
-			err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vol.PersistentVolumeClaim.ClaimName}, pvc)
+			err = r.sourceClient.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vol.PersistentVolumeClaim.ClaimName}, pvc)
 			if err != nil {
 				return nil, liberr.Wrap(err)
 			}
@@ -199,7 +200,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*planapi.Task, err error) {
 			size = pvc.Spec.Resources.Requests["storage"]
 		case vol.DataVolume != nil:
 			pvc := &core.PersistentVolumeClaim{}
-			err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vol.DataVolume.Name}, pvc)
+			err = r.sourceClient.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vol.DataVolume.Name}, pvc)
 			if err != nil {
 				return nil, liberr.Wrap(err)
 			}
@@ -238,7 +239,7 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 // VirtualMachine implements base.Builder
 func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []core.PersistentVolumeClaim) error {
 	vmExport := &export.VirtualMachineExport{}
-	err := r.Client.Get(context.Background(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vmExport)
+	err := r.sourceClient.Get(context.Background(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vmExport)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -372,14 +373,14 @@ func (r *Builder) mapNetworks(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.Vi
 
 func (r *Builder) getSourceVmFromDefinition(vme *export.VirtualMachineExport) (*cnv.VirtualMachine, error) {
 	var vmManifestUrl string
-	for _, manifest := range vme.Status.Links.Internal.Manifests {
+	for _, manifest := range vme.Status.Links.External.Manifests {
 		if manifest.Type == export.AllManifests {
 			vmManifestUrl = manifest.Url
 			break
 		}
 	}
 
-	caCert := vme.Status.Links.Internal.Cert
+	caCert := vme.Status.Links.External.Cert
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM([]byte(caCert))
 
@@ -399,7 +400,7 @@ func (r *Builder) getSourceVmFromDefinition(vme *export.VirtualMachineExport) (*
 	// Read token from secret
 	token := &core.Secret{}
 	key := client.ObjectKey{Namespace: vme.Namespace, Name: *vme.Status.TokenSecretRef}
-	err = r.Client.Get(context.Background(), key, token)
+	err = r.sourceClient.Get(context.Background(), key, token)
 	if err != nil {
 		return nil, liberr.Wrap(err, "failed to get token secret")
 	}

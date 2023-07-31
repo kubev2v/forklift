@@ -15,10 +15,12 @@ import (
 	export "kubevirt.io/api/export/v1alpha1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type Client struct {
 	*plancontext.Context
+	sourceClient k8sclient.Client
 }
 
 // CheckSnapshotReady implements base.Client
@@ -44,7 +46,7 @@ func (r *Client) Finalize(vms []*planapi.VMStatus, planName string) {
 			Namespace: vm.Namespace,
 		}}
 
-		err := r.Client.Delete(context.TODO(), vmExport)
+		err := r.sourceClient.Delete(context.TODO(), vmExport)
 		if err != nil {
 			r.Log.Info("Failed to delete VMExport", "VMExport", vmExport, "Error", err)
 			continue
@@ -55,14 +57,14 @@ func (r *Client) Finalize(vms []*planapi.VMStatus, planName string) {
 // PowerOff implements base.Client
 func (r *Client) PowerOff(vmRef ref.Ref) error {
 	vm := cnv.VirtualMachine{}
-	err := r.Client.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, &vm)
+	err := r.sourceClient.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, &vm)
 	if err != nil {
 		return err
 	}
 
 	running := false
 	vm.Spec.Running = &running
-	err = r.Client.Update(context.Background(), &vm)
+	err = r.sourceClient.Update(context.Background(), &vm)
 	if err != nil {
 		return err
 	}
@@ -73,14 +75,14 @@ func (r *Client) PowerOff(vmRef ref.Ref) error {
 // PowerOn implements base.Client
 func (r *Client) PowerOn(vmRef ref.Ref) error {
 	vm := cnv.VirtualMachine{}
-	err := r.Client.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, &vm)
+	err := r.Destination.Client.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, &vm)
 	if err != nil {
 		return err
 	}
 
 	running := true
 	vm.Spec.Running = &running
-	err = r.Client.Update(context.Background(), &vm)
+	err = r.Destination.Client.Update(context.Background(), &vm)
 	if err != nil {
 		return err
 	}
@@ -91,7 +93,7 @@ func (r *Client) PowerOn(vmRef ref.Ref) error {
 // PowerState implements base.Client
 func (r *Client) PowerState(vmRef ref.Ref) (string, error) {
 	vm := cnv.VirtualMachine{}
-	err := r.Client.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, &vm)
+	err := r.sourceClient.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, &vm)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return "", err
@@ -107,7 +109,7 @@ func (r *Client) PowerState(vmRef ref.Ref) (string, error) {
 // PoweredOff implements base.Client
 func (r *Client) PoweredOff(vmRef ref.Ref) (bool, error) {
 	vm := cnv.VirtualMachine{}
-	err := r.Client.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, &vm)
+	err := r.sourceClient.Get(context.TODO(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, &vm)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return false, err
@@ -141,7 +143,7 @@ func (r *Client) PreTransferActions(vmRef ref.Ref) (ready bool, err error) {
 
 	// Check if VM export exists
 	vmExport := &export.VirtualMachineExport{}
-	err = r.Client.Get(context.Background(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vmExport)
+	err = r.sourceClient.Get(context.Background(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vmExport)
 	if err != nil {
 		if !k8serr.IsNotFound(err) {
 			r.Log.Error(err, "Failed to get VM-export.", "vm", vmRef.Name)
@@ -166,7 +168,7 @@ func (r *Client) PreTransferActions(vmRef ref.Ref) (ready bool, err error) {
 			},
 		}
 
-		err = r.Client.Create(context.Background(), vmExport, &client.CreateOptions{})
+		err = r.sourceClient.Create(context.Background(), vmExport, &client.CreateOptions{})
 		if err != nil {
 			return true, liberr.Wrap(err)
 		}
