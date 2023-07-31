@@ -2,9 +2,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 load(
     "@io_bazel_rules_docker//container:container.bzl",
     "container_image",
+    "container_layer",
 )
 load("@bazeldnf//:deps.bzl", "rpmtree")
-load("@rules_python//python:pip.bzl", "pip_install")
+load("@io_bazel_rules_docker//docker/util:run.bzl", "container_run_and_commit_layer")
 
 go_library(
     name = "ovirt-populator_lib",
@@ -24,25 +25,47 @@ go_binary(
     visibility = ["//visibility:public"],
 )
 
-genrule(
-    name = "install_ovirt_imageio",
-    outs = ["install_ovirt_imageio.sh"],
-    cmd = """
-        echo '#!/bin/bash' > $@
-        echo 'pip install ovirt-imageio' >> $@
-        chmod +x $@
-    """,
-)
-
-
-container_image(
-    name = "ovirt-populator-image",
-    base = "@ubi9-minimal//image",
-    entrypoint = ["/usr/local/bin/ovirt-populator"],
-    files = [":ovirt-populator", ":install_ovirt_imageio.sh"],
+container_layer(
+    name = "base-layer",
     tars = [
         ":deps",
     ],
+)
+
+container_image(
+    name = "base-image",
+    base = "@ubi9-minimal//image",
+    layers = [
+        ":base-layer",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+container_run_and_commit_layer(
+    name = "ovirt-imageio-layer-run",
+    commands = [
+        "update-ca-trust",
+        "pip install setuptools wheel",
+        "pip install ovirt-engine-sdk-python ovirt-imageio",
+    ],
+    image = ":base-image.tar",
+)
+
+container_image(
+    name = "ovirt-imageio-layer",
+    base = ":base-image",
+    layers = [
+        ":ovirt-imageio-layer-run",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+container_image(
+    name = "ovirt-populator-image",
+    base = ":ovirt-imageio-layer",
+    entrypoint = ["/usr/local/bin/ovirt-populator"],
+    directory = "/usr/local/bin/",
+    files = [":ovirt-populator"],
     visibility = ["//visibility:public"],
 )
 
@@ -155,5 +178,9 @@ rpmtree(
         "@zlib-0__1.2.11-40.el9.x86_64//rpm",
         "@zlib-devel-0__1.2.11-40.el9.x86_64//rpm",
     ],
+    symlinks = {
+        "/usr/bin/python": "/usr/bin/python3.9",
+        "/usr/bin/ld": "/usr/bin/ld.bfd",
+    },
     visibility = ["//visibility:public"],
 )

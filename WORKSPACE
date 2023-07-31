@@ -3413,6 +3413,13 @@ load(
 container_repositories()
 
 container_pull(
+    name = "centos-stream-9",
+    registry = "quay.io",
+    repository = "centos/centos",
+    tag = "stream9",
+)
+
+container_pull(
     name = "ubi9-minimal",
     # 'tag' is also supported, but digest is encouraged for reproducibility.
     digest = "sha256:e9ea62ea2017705205ba7bc55d20827e06abe4fe071f0793c6cae46edd5855cf",
