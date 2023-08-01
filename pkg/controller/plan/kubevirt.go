@@ -1326,7 +1326,8 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 		},
 	})
 
-	if r.Source.Provider.Type() == api.Ova {
+	switch r.Source.Provider.Type() {
+	case api.Ova:
 		server := r.Source.Provider.Spec.URL
 		splitted := strings.Split(server, ":")
 
@@ -1359,6 +1360,17 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 			core.VolumeMount{
 				Name:      "nfs",
 				MountPath: "/ova",
+			},
+		)
+	case api.VSphere:
+		mounts = append(mounts,
+			core.VolumeMount{
+				Name:      "libvirt-domain-xml",
+				MountPath: "/mnt/v2v",
+			},
+			core.VolumeMount{
+				Name:      "vddk-vol-mount",
+				MountPath: "/opt",
 			},
 		)
 	}
