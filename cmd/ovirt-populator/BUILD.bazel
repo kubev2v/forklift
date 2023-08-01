@@ -63,8 +63,8 @@ container_image(
 container_image(
     name = "ovirt-populator-image",
     base = ":ovirt-imageio-layer",
-    entrypoint = ["/usr/local/bin/ovirt-populator"],
     directory = "/usr/local/bin/",
+    entrypoint = ["/usr/local/bin/ovirt-populator"],
     files = [":ovirt-populator"],
     visibility = ["//visibility:public"],
 )
