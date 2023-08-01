@@ -104,9 +104,6 @@ func (r *Step) ReflectTasks() {
 	tasksStarted := 0
 	tasksCompleted := 0
 	completed := int64(0)
-	if len(r.Tasks) == 0 {
-		return
-	}
 	for _, task := range r.Tasks {
 		if task.MarkedStarted() {
 			tasksStarted++
