@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "logging",
@@ -14,16 +14,5 @@ go_library(
         "//vendor/github.com/go-logr/zapr",
         "//vendor/go.uber.org/zap",
         "//vendor/go.uber.org/zap/zapcore",
-    ],
-)
-
-go_test(
-    name = "logging_test",
-    srcs = ["logger_test.go"],
-    embed = [":logging"],
-    deps = [
-        "//pkg/lib/error",
-        "//vendor/github.com/go-logr/logr",
-        "//vendor/github.com/onsi/gomega",
     ],
 )
