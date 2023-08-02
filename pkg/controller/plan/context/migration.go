@@ -10,7 +10,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	core "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -115,7 +114,7 @@ type Source struct {
 	// Provider Secret.
 	Secret *core.Secret
 	// k8s Client for OCP sources
-	Client client.Client
+	k8sclient.Client
 }
 
 // Build.
@@ -152,13 +151,11 @@ func (r *Source) build(ctx *Context) (err error) {
 	}
 
 	if r.Provider.Type() == v1beta1.OpenShift {
-		client, err := r.Provider.Client(r.Secret)
+		r.Client, err = r.Provider.Client(r.Secret)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return err
 		}
-
-		r.Client = client
 	}
 
 	return
