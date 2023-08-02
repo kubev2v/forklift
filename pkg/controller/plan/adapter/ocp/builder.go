@@ -20,8 +20,10 @@ import (
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	core "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes/scheme"
 	cnv "kubevirt.io/api/core/v1"
@@ -266,36 +268,49 @@ func (r *Builder) mapDisks(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.Virtu
 		}
 	}
 
-	diskMap := make(map[string]*cnv.Disk)
-	for i := range sourceVm.Spec.Template.Spec.Domain.Devices.Disks {
-		disk := &sourceVm.Spec.Template.Spec.Domain.Devices.Disks[i]
-		// Find matching volume
-		// TODO: make this better
-		for _, vol := range sourceVm.Spec.Template.Spec.Volumes {
-			if vol.PersistentVolumeClaim != nil {
-				if vol.Name == disk.Name {
-					key := pvcSourceName(vmRef.Namespace, vol.PersistentVolumeClaim.ClaimName)
-					if _, ok := pvcMap[key]; ok {
-						diskMap[key] = disk
-						continue
-					}
-				}
-			} else if vol.DataVolume != nil {
-				if vol.Name == disk.Name {
-					key := pvcSourceName(vmRef.Namespace, vol.DataVolume.Name)
-					if _, ok := pvcMap[key]; ok {
-						diskMap[key] = disk
-						continue
-					}
-				}
-			}
-		}
-	}
+	diskMap := createDiskMap(sourceVm, pvcMap, vmRef)
+	configMaps, secrets := r.createEnvMaps(sourceVm, vmRef)
 
 	// Clear original disks and volumes, will be required for other mapped devices later
 	targetVmSpec.Template.Spec.Domain.Devices.Disks = []cnv.Disk{}
 	targetVmSpec.Template.Spec.Volumes = []cnv.Volume{}
 
+	r.mapPVCsToTarget(targetVmSpec, persistentVolumeClaims, diskMap)
+	r.mapConfigMapsToTarget(targetVmSpec, configMaps, diskMap)
+	r.mapSecretsToTarget(targetVmSpec, secrets, diskMap)
+}
+
+func createDiskMap(sourceVm *cnv.VirtualMachine, pvcMap map[string]*core.PersistentVolumeClaim, vmRef ref.Ref) map[string]*cnv.Disk {
+	diskMap := make(map[string]*cnv.Disk)
+
+	for _, disk := range sourceVm.Spec.Template.Spec.Domain.Devices.Disks {
+		currentDisk := disk
+		for _, vol := range sourceVm.Spec.Template.Spec.Volumes {
+			if vol.Name != disk.Name {
+				continue
+			}
+
+			var key string
+			switch {
+			case vol.PersistentVolumeClaim != nil:
+				key = pvcSourceName(vmRef.Namespace, vol.PersistentVolumeClaim.ClaimName)
+			case vol.DataVolume != nil:
+				key = pvcSourceName(vmRef.Namespace, vol.DataVolume.Name)
+			case vol.ConfigMap != nil:
+				key = vol.ConfigMap.Name
+			case vol.Secret != nil:
+				key = vol.Secret.SecretName
+			}
+
+			diskMap[key] = &currentDisk
+			break
+		}
+	}
+
+	return diskMap
+}
+
+func (r *Builder) mapPVCsToTarget(targetVmSpec *cnv.VirtualMachineSpec, persistentVolumeClaims []core.PersistentVolumeClaim, diskMap map[string]*cnv.Disk) {
 	for _, volume := range persistentVolumeClaims {
 		if disk, ok := diskMap[volume.Annotations[planbase.AnnDiskSource]]; ok {
 			targetVolume := cnv.Volume{
@@ -321,6 +336,148 @@ func (r *Builder) mapDisks(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.Virtu
 
 			targetVmSpec.Template.Spec.Domain.Devices.Disks = append(targetVmSpec.Template.Spec.Domain.Devices.Disks, targetDisk)
 		}
+	}
+}
+
+type envMap struct {
+	envResource interface{}
+	volName     string
+}
+
+func (r *Builder) createEnvMaps(sourceVm *cnv.VirtualMachine, vmRef ref.Ref) (map[string]*envMap, map[string]*envMap) {
+	configMaps := make(map[string]*envMap)
+	secrets := make(map[string]*envMap)
+
+	for _, envVol := range sourceVm.Spec.Template.Spec.Volumes {
+		switch {
+		case envVol.ConfigMap != nil:
+			configMap := &core.ConfigMap{}
+			err := r.sourceClient.Get(context.Background(), client.ObjectKey{Namespace: vmRef.Namespace, Name: envVol.ConfigMap.Name}, configMap)
+			if err != nil {
+				r.Log.Error(err, "Failed to get ConfigMap", "namespace", vmRef.Namespace, "name", envVol.ConfigMap.Name)
+				continue
+			}
+			configMaps[envVol.ConfigMap.Name] = &envMap{
+				envResource: configMap,
+				volName:     envVol.Name,
+			}
+
+		case envVol.Secret != nil:
+			secret := &core.Secret{}
+			err := r.sourceClient.Get(context.Background(), client.ObjectKey{Namespace: vmRef.Namespace, Name: envVol.Secret.SecretName}, secret)
+			if err != nil {
+				r.Log.Error(err, "Failed to get Secret", "namespace", vmRef.Namespace, "name", envVol.Secret.SecretName)
+				continue
+			}
+			secrets[envVol.Secret.SecretName] = &envMap{
+				envResource: secret,
+				volName:     envVol.Name,
+			}
+		}
+	}
+
+	return configMaps, secrets
+}
+
+func (r *Builder) mapConfigMapsToTarget(targetVmSpec *cnv.VirtualMachineSpec, configMaps map[string]*envMap, diskMap map[string]*cnv.Disk) {
+	for _, configMap := range configMaps {
+		// Create configmap on destination cluster
+		sourceConfigMap := configMap.envResource.(*core.ConfigMap)
+		targetConfigMap := &core.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        sourceConfigMap.Name,
+				Namespace:   r.Plan.Spec.TargetNamespace,
+				Labels:      sourceConfigMap.Labels,
+				Annotations: sourceConfigMap.Annotations,
+			},
+			Data: sourceConfigMap.Data,
+		}
+		err := r.Destination.Client.Create(context.Background(), targetConfigMap)
+		if err != nil {
+			if !errors.IsAlreadyExists(err) {
+				r.Log.Error(err, "Failed to create ConfigMap", "namespace", r.Plan.Spec.TargetNamespace, "name", targetConfigMap.Name)
+				continue
+			}
+		}
+
+		configMapVolume := cnv.Volume{
+			Name: configMap.volName,
+			VolumeSource: cnv.VolumeSource{
+				ConfigMap: &cnv.ConfigMapVolumeSource{
+					LocalObjectReference: core.LocalObjectReference{
+						Name: targetConfigMap.Name,
+					},
+				},
+			},
+		}
+
+		if disk, ok := diskMap[sourceConfigMap.Name]; ok {
+			targetDisk := cnv.Disk{
+				Name:   disk.Name,
+				Serial: disk.Serial,
+				DiskDevice: cnv.DiskDevice{
+					Disk: &cnv.DiskTarget{
+						Bus: disk.Disk.Bus,
+					},
+				},
+			}
+
+			targetVmSpec.Template.Spec.Domain.Devices.Disks = append(targetVmSpec.Template.Spec.Domain.Devices.Disks, targetDisk)
+		} else {
+			r.Log.Info("ConfigMap disk not found in diskMap, should never happen", "configMap", sourceConfigMap.Name)
+		}
+
+		targetVmSpec.Template.Spec.Volumes = append(targetVmSpec.Template.Spec.Volumes, configMapVolume)
+	}
+}
+
+func (r *Builder) mapSecretsToTarget(targetVmSpec *cnv.VirtualMachineSpec, secrets map[string]*envMap, diskMap map[string]*cnv.Disk) {
+	for _, secret := range secrets {
+		// Create secret on destination cluster
+		sourceSecret := secret.envResource.(*core.Secret)
+		targetSecret := &core.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        sourceSecret.Name,
+				Namespace:   r.Plan.Spec.TargetNamespace,
+				Labels:      sourceSecret.Labels,
+				Annotations: sourceSecret.Annotations,
+			},
+			Data: sourceSecret.Data,
+		}
+		err := r.Destination.Client.Create(context.Background(), targetSecret)
+		if err != nil {
+			if !errors.IsAlreadyExists(err) {
+				r.Log.Error(err, "Failed to create Secret", "namespace", r.Plan.Spec.TargetNamespace, "name", targetSecret.Name)
+				continue
+			}
+		}
+
+		secretVolume := cnv.Volume{
+			Name: secret.volName,
+			VolumeSource: cnv.VolumeSource{
+				Secret: &cnv.SecretVolumeSource{
+					SecretName: targetSecret.Name,
+				},
+			},
+		}
+
+		if disk, ok := diskMap[sourceSecret.Name]; ok {
+			targetDisk := cnv.Disk{
+				Name:   disk.Name,
+				Serial: disk.Serial,
+				DiskDevice: cnv.DiskDevice{
+					Disk: &cnv.DiskTarget{
+						Bus: disk.Disk.Bus,
+					},
+				},
+			}
+
+			targetVmSpec.Template.Spec.Domain.Devices.Disks = append(targetVmSpec.Template.Spec.Domain.Devices.Disks, targetDisk)
+		} else {
+			r.Log.Info("Secret disk not found in diskMap, should never happen", "secret", sourceSecret.Name)
+		}
+
+		targetVmSpec.Template.Spec.Volumes = append(targetVmSpec.Template.Spec.Volumes, secretVolume)
 	}
 }
 
