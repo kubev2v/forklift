@@ -33,6 +33,15 @@ func (r ProviderNotReadyError) Error() string {
 	return fmt.Sprintf("Provider not ready: %#v", r.Provider)
 }
 
+type ConflictError struct {
+	Provider *api.Provider
+	Err      error
+}
+
+func (r ConflictError) Error() string {
+	return fmt.Sprintf("Conflict Error: '%s' from provider: '%#v'", r.Err.Error(), r.Provider)
+}
+
 type RefNotUniqueError = base.RefNotUniqueError
 type NotFoundError = base.NotFoundError
 
