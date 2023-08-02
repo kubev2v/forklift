@@ -3,7 +3,6 @@ package utils
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 
@@ -81,7 +80,7 @@ func RemoveLocalCA() error {
 
 func UpdateLocalCA(caCert string) error {
 
-	file, err := ioutil.TempFile("/tmp", "prefix")
+	file, err := os.CreateTemp("/tmp", "prefix")
 	if err != nil {
 		return err
 	}
