@@ -19,7 +19,6 @@ package populator_machinery
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"reflect"
 	"sort"
@@ -142,7 +141,7 @@ func verifyInFlightMetric(expected string, srvAddr string) error {
 	if rsp.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to get response from serve: %s", http.StatusText(rsp.StatusCode))
 	}
-	r, err := ioutil.ReadAll(rsp.Body)
+	r, err := io.ReadAll(rsp.Body)
 	if err != nil {
 		return err
 	}
@@ -162,7 +161,7 @@ func verifyMetric(expected, srvAddr string) error {
 	if rsp.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to get response from serve: %s", http.StatusText(rsp.StatusCode))
 	}
-	r, err := ioutil.ReadAll(rsp.Body)
+	r, err := io.ReadAll(rsp.Body)
 	if err != nil {
 		return err
 	}

@@ -1,7 +1,7 @@
 package mutators
 
 import (
-	"io/ioutil"
+	"os"
 	"testing"
 
 	. "github.com/onsi/gomega"
@@ -10,10 +10,10 @@ import (
 func TestCertAppending(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	providedCa, err := ioutil.ReadFile("completeCerts.pem")
+	providedCa, err := os.ReadFile("completeCerts.pem")
 	g.Expect(err).ToNot(HaveOccurred())
 
-	newCa, err := ioutil.ReadFile("engineCert.pem")
+	newCa, err := os.ReadFile("engineCert.pem")
 	g.Expect(err).ToNot(HaveOccurred())
 
 	//Test the case where two certificates are identical but have a different line count due to new lines.

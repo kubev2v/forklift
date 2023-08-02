@@ -4,10 +4,10 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	liburl "net/url"
+	"os"
 	"reflect"
 	"time"
 
@@ -297,7 +297,7 @@ func (c *RestClient) buildTransport() (err error) {
 		ExpectContinueTimeout: 1 * time.Second,
 	}
 	pool := x509.NewCertPool()
-	ca, xErr := ioutil.ReadFile(Settings.Inventory.TLS.CA)
+	ca, xErr := os.ReadFile(Settings.Inventory.TLS.CA)
 	if xErr != nil {
 		err = liberr.Wrap(xErr)
 		return
