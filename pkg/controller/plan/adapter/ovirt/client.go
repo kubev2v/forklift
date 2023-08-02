@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/ovirt"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"github.com/konveyor/forklift-controller/pkg/settings"
@@ -28,6 +30,16 @@ const (
 	powerOn      = "On"
 	powerOff     = "Off"
 	powerUnknown = "Unknown"
+)
+
+// Snapshot event codes
+const (
+	CREATE_SNAPSHOT                  int64 = 45
+	SNAPSHOT_FINISHED_SUCCESS        int64 = 68
+	SNAPSHOT_FINISHED_FAILURE        int64 = 69
+	REMOVE_SNAPSHOT                  int64 = 342
+	REMOVE_SNAPSHOT_FINISHED_SUCCESS int64 = 356
+	REMOVE_SNAPSHOT_FINISHED_FAILURE int64 = 357
 )
 
 // oVirt VM Client
@@ -56,7 +68,14 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref) (snapshot string, err error) {
 			MustBuild(),
 	).Query("correlation_id", correlationID).Send()
 	if err != nil {
-		err = liberr.Wrap(err)
+		if strings.Contains(err.Error(), "Cannot create Snapshot") {
+			err = web.ConflictError{
+				Provider: r.Source.Provider,
+				Err:      err,
+			}
+		} else {
+			err = liberr.Wrap(err)
+		}
 		return
 	}
 	snapshot = snap.MustSnapshot().MustId()
@@ -76,23 +95,25 @@ func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool,
 		err = liberr.Wrap(err)
 		return
 	}
-	jobs, err := r.getJobs(correlationID)
+	events, err := r.getEvents(correlationID)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	if len(jobs) < 1 {
-		err = liberr.New("No jobs found for correlation ID", "correlationID", correlationID)
+	if len(events) < 1 {
+		err = liberr.New("No event found for correlation ID", "correlationID", correlationID)
 		return
 	}
 	ready = true
-	for _, job := range jobs {
-		switch job.MustStatus() {
-		case ovirtsdk.JOBSTATUS_FAILED, ovirtsdk.JOBSTATUS_ABORTED:
+	for _, event := range events {
+		switch event.MustCode() {
+		case SNAPSHOT_FINISHED_FAILURE:
 			err = liberr.New("Snapshot creation failed!", "correlationID", correlationID)
 			ready = false
-		case ovirtsdk.JOBSTATUS_STARTED, ovirtsdk.JOBSTATUS_UNKNOWN:
+		case CREATE_SNAPSHOT:
 			ready = false
+		case SNAPSHOT_FINISHED_SUCCESS:
+			ready = true
 		}
 	}
 	return
@@ -247,19 +268,19 @@ func (r *Client) getSnapshotCorrelationID(vmRef ref.Ref, snapshot *string) (corr
 }
 
 // Find oVirt jobs with the given correlation ID.
-func (r *Client) getJobs(correlationID string) (ovirtJob []*ovirtsdk.Job, err error) {
-	jobService := r.connection.SystemService().JobsService().List()
-	jobResponse, err := jobService.Search(fmt.Sprintf("correlation_id=%s", correlationID)).Send()
+func (r *Client) getEvents(correlationID string) (ovirtJob []*ovirtsdk.Event, err error) {
+	eventService := r.connection.SystemService().EventsService().List()
+	eventResponse, err := eventService.Search(fmt.Sprintf("correlation_id=%s", correlationID)).Send()
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	ovirtJobs, ok := jobResponse.Jobs()
+	ovirtEvent, ok := eventResponse.Events()
 	if !ok {
-		err = liberr.New("Job source lookup failed", "correlationID", correlationID)
+		err = liberr.New("Event source lookup failed", "correlationID", correlationID)
 		return
 	}
-	ovirtJob = ovirtJobs.Slice()
+	ovirtJob = ovirtEvent.Slice()
 	return
 }
 
@@ -513,13 +534,13 @@ func (r Client) removePrecopies(precopies []planapi.Precopy, vmService *ovirtsdk
 		}
 
 		for {
-			jobs, err := r.getJobs(correlationID)
+			events, err := r.getEvents(correlationID)
 			if err != nil {
 				err = liberr.Wrap(err)
 				r.Log.Error(err, "Error waiting for snapshot removal")
 				break
 			}
-			if allJobsFinished(jobs) {
+			if eventFinishedSuccesfully(events) {
 				break
 			}
 
@@ -534,15 +555,14 @@ func (r Client) removePrecopies(precopies []planapi.Precopy, vmService *ovirtsdk
 	}
 }
 
-func allJobsFinished(jobs []*ovirtsdk.Job) bool {
-	for _, job := range jobs {
-		status, _ := job.Status()
-		if status != ovirtsdk.JOBSTATUS_FINISHED && status != ovirtsdk.JOBSTATUS_FAILED {
-			return false
+func eventFinishedSuccesfully(events []*ovirtsdk.Event) bool {
+	for _, event := range events {
+		code := event.MustCode()
+		if code == REMOVE_SNAPSHOT_FINISHED_SUCCESS {
+			return true
 		}
 	}
-
-	return true
+	return false
 }
 
 func (r *Client) DetachDisks(vmRef ref.Ref) (err error) {
