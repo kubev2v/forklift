@@ -1596,6 +1596,9 @@ func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.St
 		var task *plan.Task
 		var taskName string
 		taskName, err = r.builder.GetPopulatorTaskName(&pvc)
+		if err != nil {
+			return
+		}
 
 		found := false
 		if task, found = step.FindTask(taskName); !found {
