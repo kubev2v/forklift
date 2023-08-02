@@ -19,7 +19,7 @@ package populator_machinery
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -815,7 +815,7 @@ func (c *controller) updateProgress(pvc *corev1.PersistentVolumeClaim, podIP str
 	}
 
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 
 	if err != nil {
 		c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPopulatorProgress, "Failed to read response, error: %w", url, err)

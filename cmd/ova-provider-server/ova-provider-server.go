@@ -10,7 +10,6 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -294,7 +293,7 @@ func scanOVAsOnNFS() (envelopes []Envelope, ovaPaths []string) {
 }
 
 func findOVAFiles(directory string) ([]string, []string, error) {
-	childs, err := ioutil.ReadDir(directory)
+	childs, err := os.ReadDir(directory)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -305,7 +304,7 @@ func findOVAFiles(directory string) ([]string, []string, error) {
 			continue
 		}
 		newDir := directory + "/" + child.Name()
-		files, err := ioutil.ReadDir(newDir)
+		files, err := os.ReadDir(newDir)
 		if err != nil {
 			return nil, nil, err
 		}

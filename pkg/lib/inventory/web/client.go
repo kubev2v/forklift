@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	liburl "net/url"
 	"reflect"
@@ -138,7 +138,7 @@ func (r *Client) Get(url string, out interface{}, params ...Param) (status int, 
 	defer func() {
 		_ = response.Body.Close()
 	}()
-	content, err := ioutil.ReadAll(response.Body)
+	content, err := io.ReadAll(response.Body)
 	if err != nil {
 		err = liberr.Wrap(
 			err,
@@ -188,7 +188,7 @@ func (r *Client) Post(url string, in interface{}, out interface{}) (status int, 
 	request := &http.Request{
 		Header: r.Header,
 		Method: http.MethodPost,
-		Body:   ioutil.NopCloser(reader),
+		Body:   io.NopCloser(reader),
 		URL:    parsedURL,
 	}
 	client := http.Client{Transport: r.Transport}
@@ -205,7 +205,7 @@ func (r *Client) Post(url string, in interface{}, out interface{}) (status int, 
 	defer func() {
 		_ = response.Body.Close()
 	}()
-	content, err := ioutil.ReadAll(response.Body)
+	content, err := io.ReadAll(response.Body)
 	if err != nil {
 		err = liberr.Wrap(
 			err,
