@@ -17,9 +17,9 @@ import (
 
 // Validator
 type Validator struct {
-	plan      *api.Plan
-	inventory web.Client
-	client    k8sclient.Client
+	plan         *api.Plan
+	inventory    web.Client
+	sourceClient k8sclient.Client
 }
 
 // MaintenanceMode implements base.Validator
@@ -34,7 +34,7 @@ func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
 	}
 
 	vm := &cnv.VirtualMachine{}
-	err = r.client.Get(context.TODO(), k8sclient.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vm)
+	err = r.sourceClient.Get(context.TODO(), k8sclient.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vm)
 	if err != nil {
 		err = liberr.Wrap(
 			err,
@@ -73,7 +73,7 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 	}
 
 	vm := &cnv.VirtualMachine{}
-	err = r.client.Get(context.TODO(), k8sclient.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vm)
+	err = r.sourceClient.Get(context.TODO(), k8sclient.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vm)
 	if err != nil {
 		err = liberr.Wrap(
 			err,
@@ -88,7 +88,7 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 		case vol.PersistentVolumeClaim != nil:
 			// Get PVC
 			pvc := &core.PersistentVolumeClaim{}
-			err = r.client.Get(context.TODO(), k8sclient.ObjectKey{
+			err = r.sourceClient.Get(context.TODO(), k8sclient.ObjectKey{
 				Namespace: vmRef.Namespace,
 				Name:      vol.PersistentVolumeClaim.ClaimName,
 			}, pvc)
@@ -130,7 +130,7 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 	}
 
 	vm := &cnv.VirtualMachine{}
-	err = r.client.Get(context.TODO(), k8sclient.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vm)
+	err = r.sourceClient.Get(context.TODO(), k8sclient.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vm)
 	if err != nil {
 		err = liberr.Wrap(
 			err,
