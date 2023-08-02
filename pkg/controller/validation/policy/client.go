@@ -5,17 +5,18 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"net"
+	"net/http"
+	liburl "net/url"
+	"os"
+	"time"
+
 	refapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	"github.com/konveyor/forklift-controller/pkg/settings"
-	"io/ioutil"
-	"net"
-	"net/http"
-	liburl "net/url"
-	"time"
 )
 
 var log = logging.WithName("validation|policy")
@@ -189,7 +190,7 @@ func (c *Client) buildTransport() (err error) {
 	}
 	if len(Settings.PolicyAgent.TLS.CA) > 0 {
 		pool := x509.NewCertPool()
-		ca, xErr := ioutil.ReadFile(Settings.PolicyAgent.TLS.CA)
+		ca, xErr := os.ReadFile(Settings.PolicyAgent.TLS.CA)
 		if xErr != nil {
 			err = liberr.Wrap(xErr)
 			return
