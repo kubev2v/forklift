@@ -807,13 +807,12 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		var snapshot string
 		snapshot, err = r.provider.CreateSnapshot(vm.Ref)
 		if err != nil {
-			if !errors.As(err, &web.ProviderNotReadyError{}) {
-				step.AddError(err.Error())
-				err = nil
-				break
-			} else {
+			if errors.As(err, &web.ProviderNotReadyError{}) || errors.As(err, &web.ConflictError{}) {
 				return
 			}
+			step.AddError(err.Error())
+			err = nil
+			break
 		}
 		now := meta.Now()
 		precopy := plan.Precopy{Snapshot: snapshot, Start: &now}
