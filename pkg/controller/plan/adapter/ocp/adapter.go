@@ -16,15 +16,45 @@ type Adapter struct{}
 
 // Constructs a openstack builder.
 func (r *Adapter) Builder(ctx *plancontext.Context) (builder base.Builder, err error) {
-	builder = &Builder{Context: ctx}
+	sourceClient, err := createClient(ctx.Source.Provider)
+	if err != nil {
+		return
+	}
+
+	builder = &Builder{Context: ctx, sourceClient: sourceClient}
 	return
 }
 
 // Constructs a openshift validator.
 func (r *Adapter) Validator(plan *api.Plan) (validator base.Validator, err error) {
-	ref := plan.Provider.Source.Spec.Secret
-	secret := &core.Secret{}
+	sourceClient, err := createClient(plan.Provider.Source)
+	if err != nil {
+		return
+	}
 
+	validator = &Validator{plan: plan, sourceClient: sourceClient}
+	return
+}
+
+// Constructs an openshift client.
+func (r *Adapter) Client(ctx *plancontext.Context) (client base.Client, err error) {
+	sourceClient, err := createClient(ctx.Source.Provider)
+	if err != nil {
+		return
+	}
+
+	client = &Client{Context: ctx, sourceClient: sourceClient}
+
+	return
+}
+
+// Constucts a destination client.
+func (r *Adapter) DestinationClient(ctx *plancontext.Context) (destinationClient base.DestinationClient, err error) {
+	destinationClient = &DestinsationClient{Context: ctx}
+	return
+}
+
+func createClient(sourceProvider *api.Provider) (sourceClient k8sclient.Client, err error) {
 	conf, err := config.GetConfig()
 	if err != nil {
 		return
@@ -35,33 +65,20 @@ func (r *Adapter) Validator(plan *api.Plan) (validator base.Validator, err error
 		return
 	}
 
-	// If the source is where we forklift runs we don't need the secret
-	if plan.Provider.Source.IsHost() {
-		secret = nil
+	if sourceProvider.IsHost() {
+		sourceClient = client
 	} else {
+		ref := sourceProvider.Spec.Secret
+		secret := &core.Secret{}
 		err = client.Get(context.TODO(), k8sclient.ObjectKey{Namespace: ref.Namespace, Name: ref.Name}, secret)
+		if err != nil {
+			return
+		}
+		sourceClient, err = sourceProvider.Client(secret)
 		if err != nil {
 			return
 		}
 	}
 
-	sourceClient, err := plan.Provider.Source.Client(secret)
-	if err != nil {
-		return
-	}
-
-	v := &Validator{plan: plan, client: sourceClient}
-	return v, nil
-}
-
-// Constructs an openshift client.
-func (r *Adapter) Client(ctx *plancontext.Context) (client base.Client, err error) {
-	client = &Client{Context: ctx}
-	return client, nil
-}
-
-// Constucts a destination client.
-func (r *Adapter) DestinationClient(ctx *plancontext.Context) (destinationClient base.DestinationClient, err error) {
-	destinationClient = &DestinsationClient{Context: ctx}
 	return
 }
