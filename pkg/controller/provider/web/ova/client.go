@@ -47,6 +47,11 @@ func (r *Resolver) Path(resource interface{}, id string) (path string, err error
 		r.ID = id
 		r.Link(provider)
 		path = r.SelfLink
+	case *Storage:
+		r := Storage{}
+		r.ID = id
+		r.Link(provider)
+		path = r.SelfLink
 	default:
 		err = liberr.Wrap(
 			base.ResourceNotResolvedError{
@@ -207,6 +212,38 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 			}
 			*resource.(*Workload) = list[0]
 		}
+	case *Storage:
+		id := ref.ID
+		if id != "" {
+			err = r.Get(resource, id)
+			return
+		}
+		name := ref.Name
+		if name != "" {
+			list := []Storage{}
+			err = r.List(
+				&list,
+				base.Param{
+					Key:   DetailParam,
+					Value: "all",
+				},
+				base.Param{
+					Key:   NameParam,
+					Value: name,
+				})
+			if err != nil {
+				break
+			}
+			if len(list) == 0 {
+				err = liberr.Wrap(NotFoundError{Ref: ref})
+				break
+			}
+			if len(list) > 1 {
+				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
+				break
+			}
+			*resource.(*Storage) = list[0]
+		}
 	default:
 		err = liberr.Wrap(
 			ResourceNotResolvedError{
@@ -255,7 +292,7 @@ func (r *Finder) Network(ref *base.Ref) (object interface{}, err error) {
 	return
 }
 
-// Find a Disk by ref.
+// Find a Storage by ref.
 // Returns the matching resource and:
 //
 //	ProviderNotSupportedErr
@@ -263,14 +300,12 @@ func (r *Finder) Network(ref *base.Ref) (object interface{}, err error) {
 //	NotFoundErr
 //	RefNotUniqueErr
 func (r *Finder) Storage(ref *base.Ref) (object interface{}, err error) {
-	disk := &Disk{}
-	err = r.ByRef(disk, *ref)
+	storage := &Storage{}
+	err = r.ByRef(storage, *ref)
 	if err == nil {
-		ref.ID = disk.ID
-		ref.Name = disk.Name
-		object = disk
+		ref.Name = storage.Name
+		object = storage
 	}
-
 	return
 }
 

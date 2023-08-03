@@ -124,3 +124,7 @@ type NIC struct {
 	Network string `sql:""`
 	Config  []Conf `sql:""`
 }
+
+type Storage struct {
+	Base
+}

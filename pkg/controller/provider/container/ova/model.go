@@ -3,8 +3,10 @@ package ova
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/go-logr/logr"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ova"
 	fb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
@@ -21,6 +23,7 @@ func init() {
 		&NetworkAdapter{},
 		&DiskAdapter{},
 		&VMAdapter{},
+		&StorageAdapter{},
 	}
 }
 
@@ -56,7 +59,7 @@ func (r *Context) canceled() (done bool) {
 // model and the inventory model.
 type Adapter interface {
 	// List REST collections.
-	List(ctx *Context) (itr fb.Iterator, err error)
+	List(ctx *Context, provider *api.Provider) (itr fb.Iterator, err error)
 	// Get object updates
 	GetUpdates(ctx *Context) (updater []Updater, err error)
 }
@@ -71,7 +74,7 @@ type NetworkAdapter struct {
 }
 
 // List the collection.
-func (r *NetworkAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
+func (r *NetworkAdapter) List(ctx *Context, provider *api.Provider) (itr fb.Iterator, err error) {
 	networkList := []Network{}
 	err = ctx.client.list("networks", &networkList)
 	if err != nil {
@@ -126,7 +129,7 @@ type VMAdapter struct {
 }
 
 // List the collection.
-func (r *VMAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
+func (r *VMAdapter) List(ctx *Context, provider *api.Provider) (itr fb.Iterator, err error) {
 	vmList := []VM{}
 	err = ctx.client.list("vms", &vmList)
 	if err != nil {
@@ -180,7 +183,7 @@ type DiskAdapter struct {
 }
 
 // List the collection.
-func (r *DiskAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
+func (r *DiskAdapter) List(ctx *Context, provider *api.Provider) (itr fb.Iterator, err error) {
 	diskList := []Disk{}
 	err = ctx.client.list("disks", &diskList)
 	if err != nil {
@@ -226,5 +229,35 @@ func (r *DiskAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 		}
 		updates = append(updates, updater)
 	}
+	return
+}
+
+type StorageAdapter struct {
+	BaseAdapter
+}
+
+func (r *StorageAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
+	return
+}
+
+// List the collection.
+func (r *StorageAdapter) List(ctx *Context, provider *api.Provider) (itr fb.Iterator, err error) {
+	storageName := fmt.Sprintf("Dummy storage for %s", provider.Name)
+	dummyStorge := Storage{
+		Name: storageName,
+		ID:   string(provider.UID),
+	}
+	list := fb.NewList()
+	m := &model.Storage{
+		Base: model.Base{
+			ID:   dummyStorge.ID,
+			Name: dummyStorge.Name,
+		},
+	}
+	dummyStorge.ApplyTo(m)
+	list.Append(m)
+
+	itr = list.Iter()
+
 	return
 }
