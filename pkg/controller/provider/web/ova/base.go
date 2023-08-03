@@ -75,6 +75,9 @@ func (r *PathBuilder) Path(m model.Model) (path string) {
 	case *model.Disk:
 		disk := m.(*model.Disk)
 		path = pathlib.Join(disk.ID)
+	case *model.Storage:
+		storage := m.(*model.Storage)
+		path = pathlib.Join(storage.ID)
 	}
 
 	if err != nil {

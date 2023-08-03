@@ -10,6 +10,7 @@ go_library(
         "network.go",
         "provider.go",
         "resource.go",
+        "storage.go",
         "tree.go",
         "vm.go",
         "workload.go",
