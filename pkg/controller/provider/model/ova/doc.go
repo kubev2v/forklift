@@ -11,5 +11,6 @@ func All() []interface{} {
 		&VM{},
 		&Network{},
 		&Disk{},
+		&Storage{},
 	}
 }
