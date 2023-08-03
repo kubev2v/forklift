@@ -192,226 +192,19 @@ func (r *Client) PreTransferActions(vmRef ref.Ref) (ready bool, err error) {
 			vmRef.String())
 		return
 	}
-	// VM Snapshot
-	vmSnapshotImage, err := r.getVmSnapshotImage(vm)
+	ready, err = r.ensureVmSnapshot(vm)
+	if err != nil || !ready {
+		return
+	}
+	ready, err = r.ensureImagesFromVolumesReady(vm)
+	if err != nil || ready {
+		return
+	}
+	err = r.ensureSnapshotsFromVolumes(vm)
 	if err != nil {
-		if !errors.Is(err, ResourceNotFoundError) {
-			err = liberr.Wrap(err)
-			r.Log.Error(err, "trying to retrieve the VM snapshot image info",
-				"vm", vm.Name)
-			return
-		}
-		r.Log.Info("creating the VM snapshot image", "vm", vm.Name)
-		vmSnapshotImage, err = r.createVmSnapshotImage(vm)
-		if err != nil {
-			err = liberr.Wrap(err)
-			r.Log.Error(err, "trying to create the VM snapshot image",
-				"vm", vm.Name)
-			return
-		}
-	}
-	switch vmSnapshotImage.Status {
-	case ImageStatusActive:
-		r.Log.Info("the VM snapshot image is ready!",
-			"vm", vm.Name, "image", vmSnapshotImage.Name, "imageID", vmSnapshotImage.ID)
-	case ImageStatusImporting, ImageStatusQueued, ImageStatusUploading, ImageStatusSaving:
-		r.Log.Info("the VM snapshot image is not ready yet, skipping...",
-			"vm", vm.Name, "image", vmSnapshotImage.Name, "imageID", vmSnapshotImage.ID)
-		return
-	default:
-		err = liberr.New("unexpected VM snapshot image status")
-		r.Log.Error(err, "checking the VM snapshot image",
-			"vm", vm.Name, "image", vmSnapshotImage.Name, "imageID", vmSnapshotImage.ID, "status", vmSnapshotImage.Status)
 		return
 	}
-	// Images from VM Volumes
-	var imagesFromVolumes []libclient.Image
-	imagesFromVolumes, err = r.getImagesFromVolumes(vm)
-	if err != nil {
-		err = liberr.Wrap(err)
-		r.Log.Error(err, "error while trying to get the images from the VM volumes",
-			"vm", vm.Name)
-		return
-	}
-	imagesFromVolumesMap := map[string]string{}
-	for _, image := range imagesFromVolumes {
-		imagesFromVolumesMap[image.ID] = image.Name
-	}
-	r.Log.Info("the images from volumes are",
-		"vm", vm.Name, "images", imagesFromVolumesMap)
-
-	ready = true
-	for _, image := range imagesFromVolumes {
-		switch image.Status {
-		case ImageStatusQueued, ImageStatusUploading, ImageStatusSaving:
-			r.Log.Info("the image is still being processed",
-				"vm", vm.Name, "image", image.Name, "status", image.Status)
-			ready = false
-		case ImageStatusActive:
-			err = r.updateImageProperty(vm, &image)
-			if err != nil {
-				return
-			}
-			r.Log.Info("the image properties have been updated",
-				"vm", vm.Name, "image", image.Name, "properties", image.Properties)
-			inventoryImage := &model.Image{}
-			err = r.Context.Source.Inventory.Find(inventoryImage, ref.Ref{ID: image.ID})
-			if err != nil {
-				if !errors.As(err, &model.NotFoundError{}) {
-					return
-				}
-				ready = false
-				err = nil
-				r.Log.Info("the image does not exist in the inventory, waiting...",
-					"vm", vm.Name, "image", image.Name, "properties", image.Properties)
-				continue
-			}
-			if _, ok := inventoryImage.Properties[forkliftPropertyOriginalVolumeID]; !ok {
-				r.Log.Info("image properties have not been synchronized, waiting...",
-					"vm", vm.Name, "image", inventoryImage.Name, "properties", inventoryImage.Properties)
-				ready = false
-				continue
-			}
-			r.Log.Info("the image properties are in sync, cleaning the image",
-				"vm", vm.Name, "image", inventoryImage.Name, "properties", inventoryImage.Properties)
-			originalVolumeID := inventoryImage.Properties[forkliftPropertyOriginalVolumeID].(string)
-			go func() {
-				err := r.cleanup(vm, originalVolumeID)
-				if err != nil {
-					r.Log.Error(err, "failed to cleanup")
-				}
-			}()
-
-		default:
-			err = liberr.New("unexpected image status")
-			r.Log.Error(err, "checking the image from volume",
-				"vm", vm.Name, "image", image.Name, "status", image.Status)
-		}
-	}
-	if len(vm.AttachedVolumes) != len(imagesFromVolumes) {
-		r.Log.Info("not all the images have been created",
-			"vm", vm.Name, "images", imagesFromVolumesMap, "attachedVolumes", vm.AttachedVolumes)
-		ready = false
-	}
-	if ready {
-		r.Log.Info("all steps finished!", "vm", vm.Name)
-		return
-	}
-	// Snapshots from VM Volumes
-	var snapshotsFromVolumes []libclient.Snapshot
-	snapshotsFromVolumes, err = r.getSnapshotsFromVolumes(vm)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	snapshotsFromVolumesMap := map[string]string{}
-	for _, snapshot := range snapshotsFromVolumes {
-		snapshotsFromVolumesMap[snapshot.ID] = snapshot.VolumeID
-	}
-	r.Log.Info("the snapshots from volumes are",
-		"vm", vm.Name, "snapshots", snapshotsFromVolumesMap)
-
-	for _, snapshot := range snapshotsFromVolumes {
-		switch snapshot.Status {
-		case SnapshotStatusCreating:
-			r.Log.Info("the snapshot is still being created, skipping...",
-				"vm", vm.Name, "snapshot", snapshot.Name)
-		case SnapshotStatusAvailable:
-			_, err = r.getVolumeFromSnapshot(vm, snapshot.ID)
-			if err != nil {
-				if !errors.Is(err, ResourceNotFoundError) {
-					err = liberr.Wrap(err)
-					r.Log.Error(err, "trying to get the snapshot info from the volume  VM snapshot",
-						"vm", vm.Name, "snapshot", snapshot.Name)
-					return
-				}
-				imageName := getImageFromVolumeName(r.Context, vm.ID, snapshot.VolumeID)
-				var image *libclient.Image
-				image, err = r.getImage(ref.Ref{Name: imageName})
-				if err == nil {
-					r.Log.Info("skipping the snapshot creation, the image already exists",
-						"vm", vm.Name, "snapshot", snapshot.Name)
-					continue
-				} else {
-					if !errors.Is(err, ResourceNotFoundError) {
-						err = liberr.Wrap(err)
-						r.Log.Error(err, "trying to get the image info from the snapshot",
-							"vm", vm.Name, "image", image.Name)
-						return
-					}
-					r.Log.Info("creating the volume from snapshot",
-						"vm", vm.Name, "snapshot", snapshot.Name)
-					_, err = r.createVolumeFromSnapshot(vm, snapshot.ID)
-					if err != nil {
-						err = liberr.Wrap(err)
-						r.Log.Error(err, "trying to create a volume from the VM snapshot",
-							"vm", vm.Name, "snapshot", snapshot.Name)
-						return
-
-					}
-				}
-			}
-		case SnapshotStatusDeleted, SnapshotStatusDeleting:
-			r.Log.Info("the snapshot is being deleted, skipping...",
-				"vm", vm.Name, "snapshot", snapshot.Name)
-		default:
-			err = liberr.New("unexpected snapshot status")
-			r.Log.Error(err, "checking the snapshot",
-				"vm", vm.Name, "snapshot", snapshot.Name, "status", snapshot.Status)
-			return
-		}
-	}
-	// Volumes from VM Snapshots
-	var volumesFromSnapshots []libclient.Volume
-	volumesFromSnapshots, err = r.getVolumesFromSnapshots(vm)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	volumesFromSnapshotsMap := map[string]string{}
-	for _, volume := range volumesFromSnapshots {
-		volumesFromSnapshotsMap[volume.ID] = volume.SnapshotID
-	}
-	r.Log.Info("the volumes from snapshots are",
-		"vm", vm.Name, "snapshots", volumesFromSnapshotsMap)
-
-	for _, volume := range volumesFromSnapshots {
-		switch volume.Status {
-		case VolumeStatusCreating:
-			r.Log.Info("the volume is still being created",
-				"vm", vm.Name, "volume", volume.Name, "snapshot", volume.SnapshotID)
-		case VolumeStatusUploading:
-			r.Log.Info("the volume is still uploading to the image, skipping...",
-				"vm", vm.Name, "volume", volume.Name, "snapshot", volume.SnapshotID)
-		case VolumeStatusAvailable:
-			_, err = r.getImageFromVolume(vm, volume.ID)
-			if err != nil {
-				if !errors.Is(err, ResourceNotFoundError) {
-					err = liberr.Wrap(err)
-					r.Log.Error(err, "while trying to get the image from the volume",
-						"vm", vm.Name, "volume", volume.Name, "snaphsot", volume.SnapshotID)
-					return
-				}
-				r.Log.Info("creating the image from the volume",
-					"vm", vm.Name, "volume", volume.Name, "snapshot", volume.SnapshotID)
-				_, err = r.createImageFromVolume(vm, volume.ID)
-				if err != nil {
-					err = liberr.Wrap(err)
-					r.Log.Error(err, "while trying to create the image from the volume",
-						"vm", vm.Name, "volume", volume.Name, "snapshot", volume.SnapshotID)
-					return
-				}
-			}
-		case VolumeStatusDeleting:
-			r.Log.Info("the volume is being deleted",
-				"vm", vm.Name, "volume", volume.Name, "snapshot", volume.SnapshotID)
-		default:
-			err = UnexpectedVolumeStatusError
-			r.Log.Error(err, "checking the volume",
-				"vm", vm.Name, "volume", volume.Name, "status", volume.Status)
-			return
-		}
-	}
+	err = r.ensureVolumesFromSnapshots(vm)
 	return
 }
 
@@ -976,6 +769,248 @@ func (r *Client) getImagesFromVolumes(vm *libclient.VM) (images []libclient.Imag
 			return
 		}
 		images = append(images, *image)
+	}
+	return
+}
+
+func (r *Client) ensureVmSnapshot(vm *libclient.VM) (ready bool, err error) {
+	vmSnapshotImage, err := r.getVmSnapshotImage(vm)
+	if err != nil {
+		if !errors.Is(err, ResourceNotFoundError) {
+			err = liberr.Wrap(err)
+			r.Log.Error(err, "trying to retrieve the VM snapshot image info",
+				"vm", vm.Name)
+			return
+		}
+		r.Log.Info("creating the VM snapshot image", "vm", vm.Name)
+		vmSnapshotImage, err = r.createVmSnapshotImage(vm)
+		if err != nil {
+			err = liberr.Wrap(err)
+			r.Log.Error(err, "trying to create the VM snapshot image",
+				"vm", vm.Name)
+			return
+		}
+	}
+	switch vmSnapshotImage.Status {
+	case ImageStatusActive:
+		r.Log.Info("the VM snapshot image is ready!",
+			"vm", vm.Name, "image", vmSnapshotImage.Name, "imageID", vmSnapshotImage.ID)
+		ready = true
+	case ImageStatusImporting, ImageStatusQueued, ImageStatusUploading, ImageStatusSaving:
+		r.Log.Info("the VM snapshot image is not ready yet, skipping...",
+			"vm", vm.Name, "image", vmSnapshotImage.Name, "imageID", vmSnapshotImage.ID)
+		return
+	default:
+		err = liberr.New("unexpected VM snapshot image status")
+		r.Log.Error(err, "checking the VM snapshot image",
+			"vm", vm.Name, "image", vmSnapshotImage.Name, "imageID", vmSnapshotImage.ID, "status", vmSnapshotImage.Status)
+		return
+	}
+	return
+}
+
+func (r *Client) ensureImagesFromVolumesReady(vm *libclient.VM) (ready bool, err error) {
+	var imagesFromVolumes []libclient.Image
+	imagesFromVolumes, err = r.getImagesFromVolumes(vm)
+	if err != nil {
+		err = liberr.Wrap(err)
+		r.Log.Error(err, "error while trying to get the images from the VM volumes",
+			"vm", vm.Name)
+		return
+	}
+	ready = true
+	for _, image := range imagesFromVolumes {
+		ready, err = r.ensureImageFromVolumeReady(vm, &image)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+		if !ready {
+			continue
+		}
+		originalVolumeID := image.Properties[forkliftPropertyOriginalVolumeID].(string)
+		go func() {
+			// executing this in a non-blocking mode
+			err := r.cleanup(vm, originalVolumeID)
+			if err != nil {
+				r.Log.Error(err, "failed to cleanup",
+					"vm", vm.Name, "image", image.Name)
+			}
+		}()
+	}
+	if len(vm.AttachedVolumes) != len(imagesFromVolumes) {
+		r.Log.Info("not all the images have been created",
+			"vm", vm.Name, "attachedVolumes", vm.AttachedVolumes, "imagesFromVolumes", imagesFromVolumes)
+		ready = false
+	}
+	if ready {
+		r.Log.Info("all steps finished!", "vm", vm.Name)
+	}
+	return
+}
+
+func (r *Client) ensureImageFromVolumeReady(vm *libclient.VM, image *libclient.Image) (ready bool, err error) {
+	switch image.Status {
+	case ImageStatusQueued, ImageStatusUploading, ImageStatusSaving:
+		r.Log.Info("the image is still being processed",
+			"vm", vm.Name, "image", image.Name, "status", image.Status)
+	case ImageStatusActive:
+		err = r.updateImageProperty(vm, image)
+		if err != nil {
+			return
+		}
+		r.Log.Info("the image properties have been updated",
+			"vm", vm.Name, "image", image.Name, "properties", image.Properties)
+		var imageUpToDate bool
+		imageUpToDate, err = r.ensureImageUpToDate(vm, image)
+		if err != nil || !imageUpToDate {
+			return
+		}
+		r.Log.Info("the image properties are in sync, cleaning the image",
+			"vm", vm.Name, "image", image.Name, "properties", image.Properties)
+		ready = true
+	default:
+		err = liberr.New("unexpected image status")
+		r.Log.Error(err, "checking the image from volume",
+			"vm", vm.Name, "image", image.Name, "status", image.Status)
+	}
+	return
+}
+
+func (r *Client) ensureImageUpToDate(vm *libclient.VM, image *libclient.Image) (upToDate bool, err error) {
+	inventoryImage := &model.Image{}
+	err = r.Context.Source.Inventory.Find(inventoryImage, ref.Ref{ID: image.ID})
+	if err != nil {
+		if !errors.As(err, &model.NotFoundError{}) {
+			return
+		}
+		r.Log.Info("the image does not exist in the inventory, waiting...",
+			"vm", vm.Name, "image", image.Name, "properties", image.Properties)
+		upToDate = false
+		err = nil
+	}
+	upToDate = true
+	if _, ok := inventoryImage.Properties[forkliftPropertyOriginalVolumeID]; !ok {
+		r.Log.Info("image properties have not been synchronized, waiting...",
+			"vm", vm.Name, "image", inventoryImage.Name, "properties", inventoryImage.Properties)
+		upToDate = false
+	}
+	return
+
+}
+
+func (r *Client) ensureSnapshotsFromVolumes(vm *libclient.VM) (err error) {
+	var snapshotsFromVolumes []libclient.Snapshot
+	snapshotsFromVolumes, err = r.getSnapshotsFromVolumes(vm)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	for _, snapshot := range snapshotsFromVolumes {
+		switch snapshot.Status {
+		case SnapshotStatusCreating:
+			r.Log.Info("the snapshot is still being created, skipping...",
+				"vm", vm.Name, "snapshot", snapshot.Name)
+		case SnapshotStatusAvailable:
+			err = r.ensureVolumeFromSnapshot(vm, &snapshot)
+		case SnapshotStatusDeleted, SnapshotStatusDeleting:
+			r.Log.Info("the snapshot is being deleted, skipping...",
+				"vm", vm.Name, "snapshot", snapshot.Name)
+		default:
+			err = liberr.New("unexpected snapshot status")
+			r.Log.Error(err, "checking the snapshot",
+				"vm", vm.Name, "snapshot", snapshot.Name, "status", snapshot.Status)
+			return
+		}
+	}
+	return
+}
+
+func (r *Client) ensureVolumeFromSnapshot(vm *libclient.VM, snapshot *libclient.Snapshot) (err error) {
+	_, err = r.getVolumeFromSnapshot(vm, snapshot.ID)
+	if err != nil {
+		if !errors.Is(err, ResourceNotFoundError) {
+			err = liberr.Wrap(err)
+			r.Log.Error(err, "trying to get the snapshot info from the volume  VM snapshot",
+				"vm", vm.Name, "snapshot", snapshot.Name)
+			return
+		}
+		imageName := getImageFromVolumeName(r.Context, vm.ID, snapshot.VolumeID)
+		var image *libclient.Image
+		image, err = r.getImage(ref.Ref{Name: imageName})
+		if err == nil {
+			r.Log.Info("skipping the snapshot creation, the image already exists",
+				"vm", vm.Name, "snapshot", snapshot.Name)
+		} else {
+			if !errors.Is(err, ResourceNotFoundError) {
+				err = liberr.Wrap(err)
+				r.Log.Error(err, "trying to get the image info from the snapshot",
+					"vm", vm.Name, "image", image.Name)
+				return
+			}
+			r.Log.Info("creating the volume from snapshot",
+				"vm", vm.Name, "snapshot", snapshot.Name)
+			_, err = r.createVolumeFromSnapshot(vm, snapshot.ID)
+			if err != nil {
+				err = liberr.Wrap(err)
+				r.Log.Error(err, "trying to create a volume from the VM snapshot",
+					"vm", vm.Name, "snapshot", snapshot.Name)
+				return
+
+			}
+		}
+	}
+	return
+}
+
+func (r *Client) ensureVolumesFromSnapshots(vm *libclient.VM) (err error) {
+	var volumesFromSnapshots []libclient.Volume
+	volumesFromSnapshots, err = r.getVolumesFromSnapshots(vm)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	for _, volume := range volumesFromSnapshots {
+		switch volume.Status {
+		case VolumeStatusCreating:
+			r.Log.Info("the volume is still being created",
+				"vm", vm.Name, "volume", volume.Name, "snapshot", volume.SnapshotID)
+		case VolumeStatusUploading:
+			r.Log.Info("the volume is still uploading to the image, skipping...",
+				"vm", vm.Name, "volume", volume.Name, "snapshot", volume.SnapshotID)
+		case VolumeStatusAvailable:
+			err = r.ensureImageFromVolume(vm, &volume)
+		case VolumeStatusDeleting:
+			r.Log.Info("the volume is being deleted",
+				"vm", vm.Name, "volume", volume.Name, "snapshot", volume.SnapshotID)
+		default:
+			err = UnexpectedVolumeStatusError
+			r.Log.Error(err, "checking the volume",
+				"vm", vm.Name, "volume", volume.Name, "status", volume.Status)
+			return
+		}
+	}
+	return
+}
+
+func (r *Client) ensureImageFromVolume(vm *libclient.VM, volume *libclient.Volume) (err error) {
+	_, err = r.getImageFromVolume(vm, volume.ID)
+	if err != nil {
+		if !errors.Is(err, ResourceNotFoundError) {
+			err = liberr.Wrap(err)
+			r.Log.Error(err, "while trying to get the image from the volume",
+				"vm", vm.Name, "volume", volume.Name, "snaphsot", volume.SnapshotID)
+			return
+		}
+		r.Log.Info("creating the image from the volume",
+			"vm", vm.Name, "volume", volume.Name, "snapshot", volume.SnapshotID)
+		_, err = r.createImageFromVolume(vm, volume.ID)
+		if err != nil {
+			err = liberr.Wrap(err)
+			r.Log.Error(err, "while trying to create the image from the volume",
+				"vm", vm.Name, "volume", volume.Name, "snapshot", volume.SnapshotID)
+			return
+		}
 	}
 	return
 }
