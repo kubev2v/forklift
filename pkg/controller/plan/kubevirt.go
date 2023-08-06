@@ -1733,7 +1733,7 @@ type VirtualMachine struct {
 // owner of the CDI DataVolume.
 func (r *VirtualMachine) Owner(dv *cdi.DataVolume) bool {
 	for _, vol := range r.Spec.Template.Spec.Volumes {
-		if vol.PersistentVolumeClaim.ClaimName == dv.Name {
+		if vol.PersistentVolumeClaim != nil && vol.PersistentVolumeClaim.ClaimName == dv.Name {
 			return true
 		}
 	}
