@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "ova",
@@ -31,4 +31,11 @@ go_library(
         "//vendor/kubevirt.io/api/core/v1:core",
         "//vendor/kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1",
     ],
+)
+
+go_test(
+    name = "ova_test",
+    srcs = ["ova_capacity_test.go"],
+    embed = [":ova"],
+    deps = ["//vendor/github.com/onsi/gomega"],
 )

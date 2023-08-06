@@ -256,9 +256,12 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	r.mapDisks(vm, persistentVolumeClaims, object)
 	r.mapFirmware(vm, object)
 	r.mapCPU(vm, object)
-	r.mapMemory(vm, object)
 	r.mapClock(object)
 	r.mapInput(object)
+	err = r.mapMemory(vm, object)
+	if err != nil {
+		return
+	}
 	err = r.mapNetworks(vm, object)
 	if err != nil {
 		return
@@ -338,15 +341,19 @@ func (r *Builder) mapClock(object *cnv.VirtualMachineSpec) {
 	object.Template.Spec.Domain.Clock = clock
 }
 
-func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec) {
+func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec) error {
 	var memoryBytes int64
-	memoryBytes, _ = getResourceCapacity(int64(vm.MemoryMB), vm.MemoryUnits)
+	memoryBytes, err := getResourceCapacity(int64(vm.MemoryMB), vm.MemoryUnits)
+	if err != nil {
+		return err
+	}
 	reservation := resource.NewQuantity(memoryBytes, resource.BinarySI)
 	object.Template.Spec.Domain.Resources = cnv.ResourceRequirements{
 		Requests: map[core.ResourceName]resource.Quantity{
 			core.ResourceMemory: *reservation,
 		},
 	}
+	return nil
 }
 
 func (r *Builder) mapCPU(vm *model.VM, object *cnv.VirtualMachineSpec) {
@@ -510,27 +517,51 @@ func getDiskSourcePath(filePath string) string {
 }
 
 func getResourceCapacity(capacity int64, units string) (int64, error) {
-	if units == "" {
-		return 0, nil
+	if units == "" || units == "byte" {
+		return capacity, nil
 	}
 
-	re := regexp.MustCompile("[0-9]+")
+	numbers, err := extractNumbers(units)
+	if err != nil || len(numbers) < 2 {
+		return 0, err
+	}
 
+	pow, err := strconv.Atoi(numbers[len(numbers)-1])
+	if err != nil {
+		return 0, err
+	}
+
+	base, err := strconv.Atoi(numbers[len(numbers)-2])
+	if err != nil {
+		return 0, err
+	}
+
+	result := capacity
+	for _, num := range numbers[:len(numbers)-2] {
+		val, err := strconv.Atoi(num)
+		if err != nil {
+			return 0, err
+		}
+		result *= int64(val)
+	}
+
+	return result * int64(math.Pow(float64(base), float64(pow))), nil
+}
+
+func extractNumbers(units string) ([]string, error) {
+	var pattern string
+	if match, _ := regexp.MatchString(`^(byte)\s*\*\s*(\d+)\^\s*(\d+)$`, units); match {
+		pattern = "[0-9]+"
+	} else if matchUncommon, _ := regexp.MatchString(`^(byte)\s*\*\s*(\d+)\s*\*\s*(\d+)\^\s*(\d+)$`, units); matchUncommon {
+		pattern = "[0-9]+"
+	} else {
+		return nil, fmt.Errorf("The capacity format is not supported %s, should be byte * num^num or byte * num * num^num", units)
+	}
+
+	re := regexp.MustCompile(pattern)
 	numbers := re.FindAllString(units, -1)
-	if len(numbers) != 2 {
-		return 0, nil
-	}
-	base, err := strconv.Atoi(numbers[0])
-	if err != nil {
-		return 0, err
-	}
-	pow, err := strconv.Atoi(numbers[1])
-	if err != nil {
-		return 0, err
-	}
 
-	return int64(capacity) * int64(math.Pow(float64(base), float64(pow))), nil
-
+	return numbers, nil
 }
 
 // Build LUN PVs.
