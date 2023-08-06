@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -o pipefail
+set -o pipefail -e
 shopt -s nullglob
 
 if [ -z "$V2V_source"] ; then
