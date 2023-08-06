@@ -219,3 +219,13 @@ func (r *Disk) ApplyTo(m *model.Disk) {
 	m.Format = r.Format
 	m.PopulatedSize = r.PopulatedSize
 }
+
+type Storage struct {
+	Name string
+	ID   string
+}
+
+func (r *Storage) ApplyTo(m *model.Storage) {
+	m.Base.Name = m.Name
+	m.Base.ID = m.ID
+}
