@@ -229,8 +229,7 @@ func (r *Collector) load(ctx *Context) (err error) {
 
 // List and create resources using the adapter.
 func (r *Collector) create(ctx *Context, adapter Adapter) (err error) {
-	itr, aErr := adapter.List(ctx)
-
+	itr, aErr := adapter.List(ctx, r.provider)
 	if aErr != nil {
 		err = aErr
 		return

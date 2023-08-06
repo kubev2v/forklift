@@ -7,9 +7,10 @@ import (
 
 // Kinds
 var (
-	VmKind   = libref.ToKind(VM{})
-	NetKind  = libref.ToKind(Network{})
-	DiskKind = libref.ToKind(Disk{})
+	VmKind      = libref.ToKind(VM{})
+	NetKind     = libref.ToKind(Network{})
+	DiskKind    = libref.ToKind(Disk{})
+	StorageKind = libref.ToKind(Storage{})
 )
 
 // Types.

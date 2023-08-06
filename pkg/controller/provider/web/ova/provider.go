@@ -147,6 +147,12 @@ func (h ProviderHandler) AddDerived(r *Provider) (err error) {
 		return
 	}
 	r.DiskCount = n
+	// Storage count
+	n, err = db.Count(&ova.Storage{}, nil)
+	if err != nil {
+		return
+	}
+	r.StorageCount = n
 
 	return
 }
@@ -161,6 +167,7 @@ type Provider struct {
 	VMCount      int64        `json:"vmCount"`
 	NetworkCount int64        `json:"networkCount"`
 	DiskCount    int64        `json:"diskCount"`
+	StorageCount int64        `json:"storageCount"`
 }
 
 // Set fields with the specified object.
