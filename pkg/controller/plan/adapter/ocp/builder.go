@@ -286,6 +286,10 @@ func createDiskMap(sourceVm *cnv.VirtualMachine, pvcMap map[string]*core.Persist
 	for _, disk := range sourceVm.Spec.Template.Spec.Domain.Devices.Disks {
 		currentDisk := disk
 		for _, vol := range sourceVm.Spec.Template.Spec.Volumes {
+			if vol.Name != disk.Name {
+				continue
+			}
+
 			var key string
 			switch {
 			case vol.PersistentVolumeClaim != nil:
@@ -297,10 +301,9 @@ func createDiskMap(sourceVm *cnv.VirtualMachine, pvcMap map[string]*core.Persist
 			case vol.Secret != nil:
 				key = vol.Secret.SecretName
 			}
-			if vol.Name == disk.Name {
-				diskMap[key] = &currentDisk
-				break
-			}
+
+			diskMap[key] = &currentDisk
+			break
 		}
 	}
 
@@ -308,10 +311,6 @@ func createDiskMap(sourceVm *cnv.VirtualMachine, pvcMap map[string]*core.Persist
 }
 
 func (r *Builder) mapPVCsToTarget(targetVmSpec *cnv.VirtualMachineSpec, persistentVolumeClaims []core.PersistentVolumeClaim, diskMap map[string]*cnv.Disk) {
-	// Clear original disks and volumes; will be required for other mapped devices later
-	targetVmSpec.Template.Spec.Domain.Devices.Disks = []cnv.Disk{}
-	targetVmSpec.Template.Spec.Volumes = []cnv.Volume{}
-
 	for _, volume := range persistentVolumeClaims {
 		if disk, ok := diskMap[volume.Annotations[planbase.AnnDiskSource]]; ok {
 			targetVolume := cnv.Volume{
@@ -424,6 +423,8 @@ func (r *Builder) mapConfigMapsToTarget(targetVmSpec *cnv.VirtualMachineSpec, co
 			}
 
 			targetVmSpec.Template.Spec.Domain.Devices.Disks = append(targetVmSpec.Template.Spec.Domain.Devices.Disks, targetDisk)
+		} else {
+			r.Log.Info("ConfigMap disk not found in diskMap, should never happen", "configMap", sourceConfigMap.Name)
 		}
 
 		targetVmSpec.Template.Spec.Volumes = append(targetVmSpec.Template.Spec.Volumes, configMapVolume)
@@ -472,6 +473,8 @@ func (r *Builder) mapSecretsToTarget(targetVmSpec *cnv.VirtualMachineSpec, secre
 			}
 
 			targetVmSpec.Template.Spec.Domain.Devices.Disks = append(targetVmSpec.Template.Spec.Domain.Devices.Disks, targetDisk)
+		} else {
+			r.Log.Info("Secret disk not found in diskMap, should never happen", "secret", sourceSecret.Name)
 		}
 
 		targetVmSpec.Template.Spec.Volumes = append(targetVmSpec.Template.Spec.Volumes, secretVolume)
