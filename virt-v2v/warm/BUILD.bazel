@@ -4,6 +4,10 @@ load(
     "container_image",
     "container_push",
 )
+load(
+    "@io_bazel_rules_docker//docker/util:run.bzl",
+    "container_run_and_extract",
+)
 
 container_push(
     name = "push-forklift-virt-v2v-warm",
@@ -14,9 +18,40 @@ container_push(
     tag = "$${REGISTRY_TAG:-devel}",
 )
 
+# Appliance build
+# NOTE: We deliberately do not use (and cannot use) rpmtree to build a base
+# layer with packages. Supermin queries the RPM database to track package files
+# and dependencies. Tar constructed by rpmtree is just a bunch of files and it
+# does not preserve the RPM database info. Therefore we imitate a Dockerfile
+# build here.
+container_run_and_extract(
+    name = "appliance",
+    commands = [
+        "set -x",
+        "dnf -y update",
+        "dnf -y install libguestfs-devel libguestfs-appliance libguestfs-xfs libguestfs-winsupport supermin",
+        "depmod \\$(ls /lib/modules/ |tail -n1)",
+        "export LIBGUESTFS_BACKEND=direct",
+        "export LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1",
+        "mkdir -p /usr/lib64/guestfs/appliance",
+        "cd /usr/lib64/guestfs/appliance",
+        "libguestfs-make-fixed-appliance --xz",
+        "cp /usr/lib64/guestfs/appliance/appliance-*.tar.xz /libguestfs-appliance.tar.xz",
+    ],
+    extract_file = "/libguestfs-appliance.tar.xz",
+    image = "@centos-stream-8//image",
+)
+
+container_image(
+    name = "appliance-image",
+    base = "@ubi8-minimal//image",
+    directory = "/usr/lib64/guestfs",
+    files = [":appliance/libguestfs-appliance.tar.xz"],
+)
+
 container_image(
     name = "virt-v2v-image",
-    base = "@libguestfs-appliance//image",
+    base = "appliance-image",
     directory = "/",
     tars = [":virt-v2v"],
 )
