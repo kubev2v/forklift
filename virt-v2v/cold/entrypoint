@@ -2,7 +2,7 @@
 set -o pipefail -e
 shopt -s nullglob
 
-if [ -z "$V2V_source"] ; then
+if [ -z "$V2V_source" ] ; then
     echo "Following environment needs to be defined:"
     echo
     echo "    V2V_source"
