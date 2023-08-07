@@ -17,6 +17,7 @@ const (
 	VirtV2vDontRequestKVM   = "VIRT_V2V_DONT_REQUEST_KVM"
 	SnapshotRemovalTimeout  = "SNAPSHOT_REMOVAL_TIMEOUT"
 	SnapshotStatusCheckRate = "SNAPSHOT_STATUS_CHECK_RATE"
+	CDIExportTokenTTL       = "CDI_EXPORT_TOKEN_TTL"
 )
 
 // Default virt-v2v image.
@@ -43,6 +44,8 @@ type Migration struct {
 	VirtV2vImageWarm string
 	// Virt-v2v require KVM flags for guest conversion
 	VirtV2vDontRequestKVM bool
+	// OCP Export token TTL minutes
+	CDIExportTokenTTL int
 }
 
 // Load settings.
@@ -84,5 +87,11 @@ func (r *Migration) Load() (err error) {
 		r.VirtV2vImageWarm = DefaultVirtV2vImage
 	}
 	r.VirtV2vDontRequestKVM = getEnvBool(VirtV2vDontRequestKVM, false)
+
+	r.CDIExportTokenTTL, err = getEnvLimit(CDIExportTokenTTL, 0)
+	if err != nil {
+		err = liberr.Wrap(err)
+	}
+
 	return
 }

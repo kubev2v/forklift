@@ -72,6 +72,10 @@ spec:
         - name: MAX_VM_INFLIGHT
           value: "{{ controller_max_vm_inflight }}"
 {% endif %}
+{% if controller_cdi_export_token_ttl is number %}
+        - name: CDI_EXPORT_TOKEN_TTL
+          value: "{{ CDI_EXPORT_TOKEN_TTL }}"
+{% endif %}
 {% if controller_vsphere_incremental_backup|bool %}
         - name: FEATURE_VSPHERE_INCREMENTAL_BACKUP
           value: "true"
