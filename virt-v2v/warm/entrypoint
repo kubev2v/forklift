@@ -2,7 +2,7 @@
 shopt -s nullglob
 
 export LIBGUESTFS_PATH=/usr/lib64/guestfs
-set -- "$LIBGUESTFS_PATH"/appliance-*.tar.xz
+set -- "$LIBGUESTFS_PATH"/libguestfs-appliance.tar.xz
 if [ -f "$1" ] ; then
     echo "Extracting libguestfs appliance..."
     APPLIANCE="/var/tmp/libguestfs-appliance"
