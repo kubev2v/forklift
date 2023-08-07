@@ -15,11 +15,6 @@ load(
 
 container_image(
     name = "forklift-controller-image",
-    #architecture = select({
-    #    "@io_bazel_rules_go//go/platform:linux_arm64": "arm64",
-    #    "//conditions:default": "amd64",
-    #}),
-    #base = "@centos-stream8//image",
     base = "@ubi9-minimal//image",
     directory = "/usr/local/bin/",
     entrypoint = ["/usr/local/bin/forklift-controller"],
