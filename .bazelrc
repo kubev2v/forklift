@@ -32,4 +32,4 @@ build --action_env=OVA_PROVIDER_SERVER_IMAGE=quay.io/kubev2v/forklift-ova-provid
 build --strategy_regexp="Action appliance/libguestfs-appliance.tar"=processwrapper-sandbox
 
 # For populator images, we need to use processwrapper sandbox as well
-build --strategy_regexp="Action ovirt-populator-image"=processwrapper-sandbox
+build --strategy_regexp="RunAndCommitLayer cmd/ovirt-populator/ovirt-imageio-layer-run-layer.tar"=processwrapper-sandbox
