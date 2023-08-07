@@ -3421,10 +3421,9 @@ container_pull(
 
 container_pull(
     name = "ubi9-minimal",
-    # 'tag' is also supported, but digest is encouraged for reproducibility.
-    digest = "sha256:e9ea62ea2017705205ba7bc55d20827e06abe4fe071f0793c6cae46edd5855cf",
     registry = "registry.access.redhat.com",
     repository = "ubi9/ubi-minimal",
+    tag = "latest",
 )
 
 container_pull(

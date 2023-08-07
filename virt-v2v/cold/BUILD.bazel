@@ -5,6 +5,7 @@ load(
 )
 load(
     "@io_bazel_rules_docker//docker/util:run.bzl",
+    "container_run_and_commit_layer",
     "container_run_and_extract",
 )
 load("@bazeldnf//:deps.bzl", "rpmtree")
@@ -59,9 +60,28 @@ container_image(
     ],
 )
 
+container_run_and_commit_layer(
+    name = "no-ems-in-fips",
+    commands = [
+        "touch /etc/crypto-policies/back-ends/openssl_fips.config",
+        "printf '[fips_sect]\ntls1-prf-ems-check = 0\nactivate = 1' > /etc/crypto-policies/back-ends/openssl_fips.config",
+        "printf '[crypto_policy]\nOptions=RHNoEnforceEMSinFIPS' >> /etc/crypto-policies/back-ends/opensslcnf.config",
+    ],
+    image = ":virt-v2v-image.tar",
+)
+
+container_image(
+    name = "virt-v2v-layer",
+    base = ":virt-v2v-image",
+    layers = [
+        ":no-ems-in-fips",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 container_image(
     name = "forklift-virt-v2v",
-    base = ":virt-v2v-image",
+    base = ":virt-v2v-layer",
     directory = "/usr/local/bin/",
     empty_dirs = ["/disks"],
     entrypoint = ["/usr/local/bin/entrypoint"],
