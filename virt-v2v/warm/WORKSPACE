@@ -143,17 +143,16 @@ container_repositories()
 
 container_pull(
     name = "ubi8-minimal",
-    # 'tag' is also supported, but digest is encouraged for reproducibility.
-    digest = "sha256:d1f8eff6032334a81d7cbfd73dacee680e8138db57ecbc91548b97bb45e698e5",
     registry = "registry.access.redhat.com",
     repository = "ubi8/ubi-minimal",
+    tag = "latest",
 )
 
 container_pull(
-    name = "libguestfs-appliance",
-    digest = "sha256:6abc2a68f4a42dbf3a7db1042a73862e763b6c864c1e04659dc6bd981e430ae5",
+    name = "centos-stream-8",
     registry = "quay.io",
-    repository = "kubev2v/libguestfs-appliance",
+    repository = "centos/centos",
+    tag = "stream8",
 )
 
 http_archive(
