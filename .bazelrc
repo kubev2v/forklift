@@ -30,4 +30,4 @@ build --action_env=OVA_PROVIDER_SERVER_IMAGE=quay.io/kubev2v/forklift-ova-provid
 # sandboxes. Use slightly less secure but working processwrapper sandbox.
 # NOTE: Same configuration is in virt-v2v/cold/.bazelrc.
 build --strategy_regexp="Action appliance/libguestfs-appliance.tar"=processwrapper-sandbox
-build --strategy_regexp="RunAndCommitLayer no-ems-in-fips.tar"=processwrapper-sandbox
+build --strategy_regexp="RunAndCommitLayer no-ems-in-fips-layer.tar"=processwrapper-sandbox
