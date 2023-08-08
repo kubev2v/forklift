@@ -39,7 +39,7 @@ type ConflictError struct {
 }
 
 func (r ConflictError) Error() string {
-	return fmt.Sprintf("Conflict Error: '%s' from provider: '%#v'", r.Err.Error(), r.Provider)
+	return fmt.Sprintf("Conflict Error from provider '%#v': %s", r.Provider, r.Err.Error())
 }
 
 type RefNotUniqueError = base.RefNotUniqueError
