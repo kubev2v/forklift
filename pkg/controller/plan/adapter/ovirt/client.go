@@ -34,10 +34,8 @@ const (
 
 // Snapshot event codes
 const (
-	CREATE_SNAPSHOT                  int64 = 45
 	SNAPSHOT_FINISHED_SUCCESS        int64 = 68
 	SNAPSHOT_FINISHED_FAILURE        int64 = 69
-	REMOVE_SNAPSHOT                  int64 = 342
 	REMOVE_SNAPSHOT_FINISHED_SUCCESS int64 = 356
 	REMOVE_SNAPSHOT_FINISHED_FAILURE int64 = 357
 )
@@ -104,14 +102,10 @@ func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool,
 		err = liberr.New("No event found for correlation ID", "correlationID", correlationID)
 		return
 	}
-	ready = true
 	for _, event := range events {
 		switch event.MustCode() {
 		case SNAPSHOT_FINISHED_FAILURE:
 			err = liberr.New("Snapshot creation failed!", "correlationID", correlationID)
-			ready = false
-		case CREATE_SNAPSHOT:
-			ready = false
 		case SNAPSHOT_FINISHED_SUCCESS:
 			ready = true
 		}
@@ -540,7 +534,7 @@ func (r Client) removePrecopies(precopies []planapi.Precopy, vmService *ovirtsdk
 				r.Log.Error(err, "Error waiting for snapshot removal")
 				break
 			}
-			if eventFinishedSuccesfully(events) {
+			if r.isSnapshotRemovalFinished(events) {
 				break
 			}
 
@@ -555,10 +549,13 @@ func (r Client) removePrecopies(precopies []planapi.Precopy, vmService *ovirtsdk
 	}
 }
 
-func eventFinishedSuccesfully(events []*ovirtsdk.Event) bool {
+func (r Client) isSnapshotRemovalFinished(events []*ovirtsdk.Event) bool {
 	for _, event := range events {
-		code := event.MustCode()
-		if code == REMOVE_SNAPSHOT_FINISHED_SUCCESS {
+		switch event.MustCode() {
+		case REMOVE_SNAPSHOT_FINISHED_FAILURE:
+			r.Log.Info("Snapshot removal failed!")
+			return true
+		case REMOVE_SNAPSHOT_FINISHED_SUCCESS:
 			return true
 		}
 	}
