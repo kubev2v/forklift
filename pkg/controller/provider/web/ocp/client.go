@@ -158,8 +158,16 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 		}
 		name := ref.Name
 		if name != "" {
-			ns, name := path.Split(name)
-			ns = strings.TrimRight(ns, "/")
+			var ns string
+
+			// ref.Namespace might be missing when passed from NetworkMaps
+			// or StorageMaps
+			if ref.Namespace != "" {
+				ns = ref.Namespace
+			} else {
+				ns, name = path.Split(name)
+				ns = strings.TrimRight(ns, "/")
+			}
 			list := []VM{}
 			err = r.List(
 				&list,
