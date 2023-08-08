@@ -15,6 +15,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	utils "github.com/konveyor/forklift-controller/pkg/controller/plan/util"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
@@ -794,7 +795,7 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(diskAttachment model.XDiskA
 	// Accounting for fsOverhead is only required for `volumeMode: Filesystem`, as we may not have enough space
 	// after creating a filesystem on an underlying block device
 	if *volumeMode == core.PersistentVolumeFilesystem {
-		diskSize = int64(float64(diskSize) * 1.1)
+		diskSize = utils.CalculateSpaceWithOverhead(diskSize, 0.1)
 	}
 
 	annotations[AnnImportDiskId] = diskAttachment.ID

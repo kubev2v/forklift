@@ -12,6 +12,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	utils "github.com/konveyor/forklift-controller/pkg/controller/plan/util"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
@@ -1099,7 +1100,7 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image, storageC
 	}
 
 	if *volumeMode == core.PersistentVolumeFilesystem {
-		virtualSize = int64(float64(virtualSize) * 1.1)
+		virtualSize = utils.CalculateSpaceWithOverhead(virtualSize, 0.1)
 	}
 
 	// The image might be a VM Snapshot Image and has no volume associated to it
