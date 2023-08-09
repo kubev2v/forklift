@@ -1480,7 +1480,7 @@ func (c *Client) UploadImage(name, volumeID string) (image *Image, err error) {
 	}
 	opts := volumeactions.UploadImageOpts{
 		ImageName:  name,
-		DiskFormat: "qcow2",
+		DiskFormat: "raw",
 	}
 	volumeImage, err := volumeactions.UploadImage(c.blockStorageService, volumeID, opts).Extract()
 	if err != nil {
