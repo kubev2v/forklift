@@ -17,7 +17,7 @@ require (
 	github.com/onsi/gomega v1.27.7
 	github.com/openshift/api v0.0.0-20230613151523-ba04973d3ed1
 	github.com/openshift/library-go v0.0.0-20230626162119-954ade536d6d
-	github.com/ovirt/go-ovirt v0.0.0-20220427092237-114c47f2835c
+	github.com/ovirt/go-ovirt v0.0.0-20230808190322-9fd1992199b2
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/profile v1.3.0
 	github.com/prometheus/client_golang v1.16.0
