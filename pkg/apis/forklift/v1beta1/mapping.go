@@ -17,6 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"fmt"
+
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/provider"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
@@ -133,7 +135,12 @@ func (r *NetworkMap) FindNetworkByType(networkType string) (pair NetworkPair, fo
 // Find network map for source name and namespace.
 func (r *NetworkMap) FindNetworkByNameAndNamespace(namespace, name string) (pair NetworkPair, found bool) {
 	for _, pair = range r.Spec.Map {
-		if pair.Source.Namespace == namespace && pair.Source.Name == name {
+		if pair.Source.Namespace != "" {
+			if pair.Source.Namespace == namespace && pair.Source.Name == name {
+				found = true
+				break
+			}
+		} else if pair.Source.Name == fmt.Sprintf("%s/%s", namespace, name) {
 			found = true
 			break
 		}
