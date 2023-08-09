@@ -474,15 +474,14 @@ func (r Client) removePrecopies(precopies []planapi.Precopy, vmService *ovirtsdk
 		snapshotID := precopies[i].Snapshot
 		snapService := snapsService.SnapshotService(snapshotID)
 		correlationID := fmt.Sprintf("%s_finalize", snapshotID[0:8])
+		cleanupTimeout := time.Now().Add(time.Duration(settings.Settings.Migration.SnapshotRemovalTimeout) * time.Minute)
 		for {
-			select {
-			case <-time.After(time.Duration(settings.Settings.Migration.SnapshotRemovalTimeout) * time.Minute):
+			if time.Now().After(cleanupTimeout) {
 				r.Log.Info("Timeout waiting for snapshot removal")
 				return
-			default:
+			} else {
 				time.Sleep(time.Duration(settings.Settings.Migration.SnapshotStatusCheckRate) * time.Second)
 			}
-
 			_, err := snapService.Get().Send()
 			if err != nil {
 				r.Log.Info("The snapshot was removed", "snapshotID", snapshotID)
