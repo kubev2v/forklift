@@ -521,31 +521,30 @@ func getResourceCapacity(capacity int64, units string) (int64, error) {
 	items := strings.Split(units, "*")
 	for i := range items {
 		item := strings.TrimSpace(items[i])
+		if i == 0 && len(item) > 0 && item != "byte" {
+			return 0, errors.New(fmt.Sprintf("units '%s' are invalid, only 'byte' is supported", units))
+		}
 		if i == 0 {
-			if len(item) > 0 && item != "byte" {
-				return 0, errors.New(fmt.Sprintf("units '%s' are invalid, only 'byte' is supported", units))
-			}
-		} else {
-			num, err := strconv.Atoi(item)
-			if err == nil {
-				capacity = capacity * int64(num)
-				continue
-			}
-			nums := strings.Split(item, "^")
-			if len(nums) == 2 {
-				base, err := strconv.Atoi(nums[0])
-				if err != nil {
-					return 0, errors.New(fmt.Sprintf("units '%s' are invalid, base component is invalid: %s", units, item))
-				}
-				pow, err := strconv.Atoi(nums[1])
-				if err != nil {
-					return 0, errors.New(fmt.Sprintf("units '%s' are invalid, pow component is invalid: %s", units, item))
-				}
-				capacity = capacity * int64(math.Pow(float64(base), float64(pow)))
-				continue
-			}
+			continue
+		}
+		num, err := strconv.Atoi(item)
+		if err == nil {
+			capacity = capacity * int64(num)
+			continue
+		}
+		nums := strings.Split(item, "^")
+		if len(nums) != 2 {
 			return 0, errors.New(fmt.Sprintf("units '%s' are invalid, item is invalid: %s", units, item))
 		}
+		base, err := strconv.Atoi(nums[0])
+		if err != nil {
+			return 0, errors.New(fmt.Sprintf("units '%s' are invalid, base component is invalid: %s", units, item))
+		}
+		pow, err := strconv.Atoi(nums[1])
+		if err != nil {
+			return 0, errors.New(fmt.Sprintf("units '%s' are invalid, pow component is invalid: %s", units, item))
+		}
+		capacity = capacity * int64(math.Pow(float64(base), float64(pow)))
 	}
 	return capacity, nil
 }
