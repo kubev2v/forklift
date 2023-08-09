@@ -1,6 +1,7 @@
 package ova
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"path"
@@ -256,9 +257,12 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	r.mapDisks(vm, persistentVolumeClaims, object)
 	r.mapFirmware(vm, object)
 	r.mapCPU(vm, object)
-	r.mapMemory(vm, object)
 	r.mapClock(object)
 	r.mapInput(object)
+	err = r.mapMemory(vm, object)
+	if err != nil {
+		return
+	}
 	err = r.mapNetworks(vm, object)
 	if err != nil {
 		return
@@ -338,15 +342,19 @@ func (r *Builder) mapClock(object *cnv.VirtualMachineSpec) {
 	object.Template.Spec.Domain.Clock = clock
 }
 
-func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec) {
+func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec) error {
 	var memoryBytes int64
-	memoryBytes, _ = getResourceCapacity(int64(vm.MemoryMB), vm.MemoryUnits)
+	memoryBytes, err := getResourceCapacity(int64(vm.MemoryMB), vm.MemoryUnits)
+	if err != nil {
+		return err
+	}
 	reservation := resource.NewQuantity(memoryBytes, resource.BinarySI)
 	object.Template.Spec.Domain.Resources = cnv.ResourceRequirements{
 		Requests: map[core.ResourceName]resource.Quantity{
 			core.ResourceMemory: *reservation,
 		},
 	}
+	return nil
 }
 
 func (r *Builder) mapCPU(vm *model.VM, object *cnv.VirtualMachineSpec) {
@@ -510,27 +518,35 @@ func getDiskSourcePath(filePath string) string {
 }
 
 func getResourceCapacity(capacity int64, units string) (int64, error) {
-	if units == "" {
-		return 0, nil
+	items := strings.Split(units, "*")
+	for i := range items {
+		item := strings.TrimSpace(items[i])
+		if i == 0 && len(item) > 0 && item != "byte" {
+			return 0, errors.New(fmt.Sprintf("units '%s' are invalid, only 'byte' is supported", units))
+		}
+		if i == 0 {
+			continue
+		}
+		num, err := strconv.Atoi(item)
+		if err == nil {
+			capacity = capacity * int64(num)
+			continue
+		}
+		nums := strings.Split(item, "^")
+		if len(nums) != 2 {
+			return 0, errors.New(fmt.Sprintf("units '%s' are invalid, item is invalid: %s", units, item))
+		}
+		base, err := strconv.Atoi(nums[0])
+		if err != nil {
+			return 0, errors.New(fmt.Sprintf("units '%s' are invalid, base component is invalid: %s", units, item))
+		}
+		pow, err := strconv.Atoi(nums[1])
+		if err != nil {
+			return 0, errors.New(fmt.Sprintf("units '%s' are invalid, pow component is invalid: %s", units, item))
+		}
+		capacity = capacity * int64(math.Pow(float64(base), float64(pow)))
 	}
-
-	re := regexp.MustCompile("[0-9]+")
-
-	numbers := re.FindAllString(units, -1)
-	if len(numbers) != 2 {
-		return 0, nil
-	}
-	base, err := strconv.Atoi(numbers[0])
-	if err != nil {
-		return 0, err
-	}
-	pow, err := strconv.Atoi(numbers[1])
-	if err != nil {
-		return 0, err
-	}
-
-	return int64(capacity) * int64(math.Pow(float64(base), float64(pow))), nil
-
+	return capacity, nil
 }
 
 // Build LUN PVs.
