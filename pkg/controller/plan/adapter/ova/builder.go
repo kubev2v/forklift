@@ -1,6 +1,7 @@
 package ova
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"path"
@@ -517,51 +518,36 @@ func getDiskSourcePath(filePath string) string {
 }
 
 func getResourceCapacity(capacity int64, units string) (int64, error) {
-	if units == "" || units == "byte" {
-		return capacity, nil
-	}
-
-	numbers, err := extractNumbers(units)
-	if err != nil || len(numbers) < 2 {
-		return 0, err
-	}
-
-	pow, err := strconv.Atoi(numbers[len(numbers)-1])
-	if err != nil {
-		return 0, err
-	}
-
-	base, err := strconv.Atoi(numbers[len(numbers)-2])
-	if err != nil {
-		return 0, err
-	}
-
-	result := capacity
-	for _, num := range numbers[:len(numbers)-2] {
-		val, err := strconv.Atoi(num)
-		if err != nil {
-			return 0, err
+	items := strings.Split(units, "*")
+	for i := range items {
+		item := strings.TrimSpace(items[i])
+		if i == 0 {
+			if len(item) > 0 && item != "byte" {
+				return 0, errors.New(fmt.Sprintf("units '%s' are invalid, only 'byte' is supported", units))
+			}
+		} else {
+			num, err := strconv.Atoi(item)
+			if err == nil {
+				capacity = capacity * int64(num)
+				continue
+			}
+			nums := strings.Split(item, "^")
+			if len(nums) == 2 {
+				base, err := strconv.Atoi(nums[0])
+				if err != nil {
+					return 0, errors.New(fmt.Sprintf("units '%s' are invalid, base component is invalid: %s", units, item))
+				}
+				pow, err := strconv.Atoi(nums[1])
+				if err != nil {
+					return 0, errors.New(fmt.Sprintf("units '%s' are invalid, pow component is invalid: %s", units, item))
+				}
+				capacity = capacity * int64(math.Pow(float64(base), float64(pow)))
+				continue
+			}
+			return 0, errors.New(fmt.Sprintf("units '%s' are invalid, item is invalid: %s", units, item))
 		}
-		result *= int64(val)
 	}
-
-	return result * int64(math.Pow(float64(base), float64(pow))), nil
-}
-
-func extractNumbers(units string) ([]string, error) {
-	var pattern string
-	if match, _ := regexp.MatchString(`^(byte)\s*\*\s*(\d+)\^\s*(\d+)$`, units); match {
-		pattern = "[0-9]+"
-	} else if matchUncommon, _ := regexp.MatchString(`^(byte)\s*\*\s*(\d+)\s*\*\s*(\d+)\^\s*(\d+)$`, units); matchUncommon {
-		pattern = "[0-9]+"
-	} else {
-		return nil, fmt.Errorf("The capacity format is not supported %s, should be byte * num^num or byte * num * num^num", units)
-	}
-
-	re := regexp.MustCompile(pattern)
-	numbers := re.FindAllString(units, -1)
-
-	return numbers, nil
+	return capacity, nil
 }
 
 // Build LUN PVs.

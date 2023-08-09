@@ -28,7 +28,7 @@ func TestGetResourceCapacity(t *testing.T) {
 		{"unsupported operand", 1, "byte + 2^20", 0, true},
 		{"diffrent base", 1, "byte * 3^10", 59049, false},
 		{"uncommon format", 1, "byte * 2 * 2^10", 2048, false},
-		{"uncommon format no spaces", 1, "byte*2*2^10", 2048, false},
+		{"uncommon format no spaces", 1, "byte*3*2^10", 2048, false},
 	}
 
 	for _, testCase := range tests {
