@@ -102,11 +102,7 @@ func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool,
 		return
 	}
 	for _, event := range events {
-		code, exists := event.Code()
-		if !exists {
-			err = liberr.New("The event does not have a code.", "event", event)
-			continue
-		}
+		code, _ := event.Code()
 		switch code {
 		case SNAPSHOT_FINISHED_FAILURE:
 			err = liberr.New("Snapshot creation failed!", "correlationID", correlationID)
@@ -530,11 +526,7 @@ func (r *Client) isSnapshotRemovalFinished(correlationID string) (finished bool,
 		return
 	}
 	for _, event := range events {
-		code, exists := event.Code()
-		if !exists {
-			err = liberr.New("The event does not have a code.", "event", event)
-			continue
-		}
+		code, _ := event.Code()
 		switch code {
 		case REMOVE_SNAPSHOT_FINISHED_FAILURE:
 			r.Log.Info("Snapshot removal failed!")
