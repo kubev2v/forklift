@@ -482,8 +482,15 @@ func (r Client) removePrecopies(precopies []planapi.Precopy, vmService *ovirtsdk
 			default:
 				time.Sleep(time.Duration(settings.Settings.Migration.SnapshotStatusCheckRate) * time.Second)
 			}
+
+			_, err := snapService.Get().Send()
+			if err != nil {
+				r.Log.Info("The snapshot was removed", "snapshotID", snapshotID)
+				break
+			}
+
 			// Try to remove the snapshot
-			_, err := snapService.Remove().Query("correlation_id", correlationID).Send()
+			_, err = snapService.Remove().Query("correlation_id", correlationID).Send()
 			if err != nil {
 				if strings.Contains(err.Error(), "Cannot remove Snapshot") {
 					err = web.ConflictError{
@@ -494,26 +501,6 @@ func (r Client) removePrecopies(precopies []planapi.Precopy, vmService *ovirtsdk
 				} else {
 					err = liberr.Wrap(err)
 					r.Log.Error(err, "Request to remove snapshot failed", "snapshotID", snapshotID)
-
-					snapshotDisksResponse, err := snapService.DisksService().List().Send()
-					if err != nil {
-						r.Log.Error(err, "Request for snapshotDisksResponse failed")
-						break
-					}
-					snapshotDisks, found := snapshotDisksResponse.Disks()
-					if !found {
-						r.Log.Error(err, "Disks not found")
-						continue
-					}
-					for _, disk := range snapshotDisks.Slice() {
-						if transferred, err := r.isDiskBeingTransferred(disk.MustId()); transferred {
-							r.Log.Info("Disk is being transferred, retrying...", "disk", disk)
-							continue
-						} else if err != nil {
-							err = liberr.Wrap(err)
-							r.Log.Error(err, "Error checking if disk is being transferred")
-						}
-					}
 				}
 			} else {
 				// Check the events of the snapshot
