@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -o pipefail -e
+set -eo pipefail
 shopt -s nullglob
 
 if [ -z "$V2V_source" ] ; then
@@ -8,6 +8,9 @@ if [ -z "$V2V_source" ] ; then
     echo "    V2V_source"
     exit 1
 fi
+
+# This variable is used to build the command with args for virt-v2v.
+args=(virt-v2v -v -x)
 
 if [ "$V2V_source" == "vCenter" ] ; then
   if [ -z "$V2V_libvirtURL" ] || \
@@ -18,6 +21,7 @@ if [ "$V2V_source" == "vCenter" ] ; then
       echo "    V2V_libvirtURL, V2V_secretKey, V2V_vmName"
       exit 1
   fi
+  args+=(-i libvirt -ic "$V2V_libvirtURL")
 fi
 
 if [ "$V2V_source" == "ova" ] ; then
@@ -28,22 +32,17 @@ if [ "$V2V_source" == "ova" ] ; then
       echo "    V2V_diskPath, V2V_vmName"
       exit 1
   fi
+  args+=(-i ova "$V2V_diskPath")
 fi
 
 export LIBGUESTFS_PATH=/usr/lib64/guestfs/appliance
 
 echo "Preparing virt-v2v"
 
-# This variable is used to build the list of arguments for virt-v2v.
-args=()
-
 # Temporary storage location
 DIR="/var/tmp/v2v"
 mkdir -p $DIR
-args=("${args[@]}"
-    -o local
-    -os "$DIR"
-)
+args+=(-o local -os "$DIR")
 
 # Generate disk name suffix from disk number. E.g. "c" (as in "sdc") for
 # 3rd disk.
@@ -75,34 +74,21 @@ done
 if [ "$V2V_source" == "vCenter" ] ; then
   # Store password to file
   echo -n "$V2V_secretKey" > "$DIR/vmware.pw"
-  args=("${args[@]}"
-      -ip "$DIR/vmware.pw"
-  )
+  args+=(-ip "$DIR/vmware.pw")
 
   # Use VDDK if present
   if [ -d "/opt/vmware-vix-disklib-distrib" ]; then
-      args=("${args[@]}"
+      args+=(
           -it vddk
           -io vddk-libdir=/opt/vmware-vix-disklib-distrib
           -io "vddk-thumbprint=$V2V_thumbprint"
       )
   fi
+  args+=(-- "$V2V_vmName")
 fi
 
 echo "Starting virt-v2v"
 set -x
 ls -l "$DIR"
-if [ "$V2V_source" == "vCenter" ] ; then
-  exec virt-v2v -v -x \
-      -i libvirt \
-      -ic "$V2V_libvirtURL" \
-      "${args[@]}" \
-      -- "$V2V_vmName" |& /usr/local/bin/virt-v2v-monitor
-fi
 
-if [ "$V2V_source" == "ova" ] ; then
-  exec virt-v2v -v -x \
-      -i ova "$V2V_diskPath" \
-      "${args[@]}"\
-      |& /usr/local/bin/virt-v2v-monitor
-fi
+exec "${args[@]}" |& /usr/local/bin/virt-v2v-monitor
