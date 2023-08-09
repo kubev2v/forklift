@@ -1,18 +1,16 @@
-//
 // Copyright (c) 2017 Joey <majunjiev@gmail.com>.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-//
 package ovirtsdk
 
 import (
@@ -45,126 +43,128 @@ type AffinityGroup struct {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *AffinityGroup) SetCluster(attr *Cluster) {
 	p.cluster = attr
@@ -176,126 +176,128 @@ func (p *AffinityGroup) SetCluster(attr *Cluster) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *AffinityGroup) Cluster() (*Cluster, bool) {
 	if p.cluster != nil {
@@ -310,126 +312,128 @@ func (p *AffinityGroup) Cluster() (*Cluster, bool) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *AffinityGroup) MustCluster() *Cluster {
 	if p.cluster == nil {
@@ -1364,43 +1368,45 @@ func (p *AgentConfiguration) MustUsername() string {
 // [source,xml]
 // ----
 // <api>
-//   <link rel="hosts" href="/ovirt-engine/api/hosts"/>
-//   <link rel="vms" href="/ovirt-engine/api/vms"/>
-//   ...
-//   <product_info>
-//     <name>oVirt Engine</name>
-//     <vendor>ovirt.org</vendor>
-//     <version>
-//       <build>0</build>
-//       <full_version>4.1.0_master</full_version>
-//       <major>4</major>
-//       <minor>1</minor>
-//       <revision>0</revision>
-//     </version>
-//   </product_info>
-//   <special_objects>
-//     <link rel="templates/blank" href="..."/>
-//     <link rel="tags/root" href="..."/>
-//   </special_objects>
-//   <summary>
-//     <vms>
-//       <total>10</total>
-//       <active>3</active>
-//     </vms>
-//     <hosts>
-//       <total>2</total>
-//       <active>2</active>
-//     </hosts>
-//     <users>
-//       <total>8</total>
-//       <active>2</active>
-//     </users>
-//     <storage_domains>
-//       <total>2</total>
-//       <active>2</active>
-//     </storage_domains>
-//   </summary>
-//   <time>2016-12-12T12:22:25.866+01:00</time>
+//
+//	<link rel="hosts" href="/ovirt-engine/api/hosts"/>
+//	<link rel="vms" href="/ovirt-engine/api/vms"/>
+//	...
+//	<product_info>
+//	  <name>oVirt Engine</name>
+//	  <vendor>ovirt.org</vendor>
+//	  <version>
+//	    <build>0</build>
+//	    <full_version>4.1.0_master</full_version>
+//	    <major>4</major>
+//	    <minor>1</minor>
+//	    <revision>0</revision>
+//	  </version>
+//	</product_info>
+//	<special_objects>
+//	  <link rel="templates/blank" href="..."/>
+//	  <link rel="tags/root" href="..."/>
+//	</special_objects>
+//	<summary>
+//	  <vms>
+//	    <total>10</total>
+//	    <active>3</active>
+//	  </vms>
+//	  <hosts>
+//	    <total>2</total>
+//	    <active>2</active>
+//	  </hosts>
+//	  <users>
+//	    <total>8</total>
+//	    <active>2</active>
+//	  </users>
+//	  <storage_domains>
+//	    <total>2</total>
+//	    <active>2</active>
+//	  </storage_domains>
+//	</summary>
+//	<time>2016-12-12T12:22:25.866+01:00</time>
+//
 // </api>
 // ----
 type Api struct {
@@ -1469,15 +1475,17 @@ func (p *Api) MustEffectiveUser() *User {
 // <api>
 // ...
 // <product_info>
-//   <name>oVirt Engine</name>
-//   <vendor>ovirt.org</vendor>
-//   <version>
-//     <build>0</build>
-//     <full_version>4.1.0_master</full_version>
-//     <major>4</major>
-//     <minor>1</minor>
-//     <revision>0</revision>
-//   </version>
+//
+//	<name>oVirt Engine</name>
+//	<vendor>ovirt.org</vendor>
+//	<version>
+//	  <build>0</build>
+//	  <full_version>4.1.0_master</full_version>
+//	  <major>4</major>
+//	  <minor>1</minor>
+//	  <revision>0</revision>
+//	</version>
+//
 // </product_info>
 // ...
 // </api>
@@ -1500,15 +1508,17 @@ func (p *Api) SetProductInfo(attr *ProductInfo) {
 // <api>
 // ...
 // <product_info>
-//   <name>oVirt Engine</name>
-//   <vendor>ovirt.org</vendor>
-//   <version>
-//     <build>0</build>
-//     <full_version>4.1.0_master</full_version>
-//     <major>4</major>
-//     <minor>1</minor>
-//     <revision>0</revision>
-//   </version>
+//
+//	<name>oVirt Engine</name>
+//	<vendor>ovirt.org</vendor>
+//	<version>
+//	  <build>0</build>
+//	  <full_version>4.1.0_master</full_version>
+//	  <major>4</major>
+//	  <minor>1</minor>
+//	  <revision>0</revision>
+//	</version>
+//
 // </product_info>
 // ...
 // </api>
@@ -1534,15 +1544,17 @@ func (p *Api) ProductInfo() (*ProductInfo, bool) {
 // <api>
 // ...
 // <product_info>
-//   <name>oVirt Engine</name>
-//   <vendor>ovirt.org</vendor>
-//   <version>
-//     <build>0</build>
-//     <full_version>4.1.0_master</full_version>
-//     <major>4</major>
-//     <minor>1</minor>
-//     <revision>0</revision>
-//   </version>
+//
+//	<name>oVirt Engine</name>
+//	<vendor>ovirt.org</vendor>
+//	<version>
+//	  <build>0</build>
+//	  <full_version>4.1.0_master</full_version>
+//	  <major>4</major>
+//	  <minor>1</minor>
+//	  <revision>0</revision>
+//	</version>
+//
 // </product_info>
 // ...
 // </api>
@@ -1780,8 +1792,10 @@ func (p *ApiSummaryItem) MustTotal() int64 {
 // [source,xml]
 // ----
 // <application href="/ovirt-engine/api/vms/123/applications/456" id="456">
-//   <name>application-test-1.0.0-0.el7</name>
-//   <vm href="/ovirt-engine/api/vms/123" id="123"/>
+//
+//	<name>application-test-1.0.0-0.el7</name>
+//	<vm href="/ovirt-engine/api/vms/123" id="123"/>
+//
 // </application>
 // ----
 type Application struct {
@@ -2456,26 +2470,28 @@ type Bonding struct {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>eth0</name>
-//   <boot_protocol>static</boot_protocol>
-//   <bridged>true</bridged>
-//   <custom_configuration>true</custom_configuration>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <ipv6>
-//     <gateway>::</gateway>
-//     <version>v6</version>
-//   </ipv6>
-//   <ipv6_boot_protocol>none</ipv6_boot_protocol>
-//   <mac>
-//     <address>52:54:00:0c:79:1d</address>
-//   </mac>
-//   <mtu>1500</mtu>
-//   <status>up</status>
+//
+//	<name>eth0</name>
+//	<boot_protocol>static</boot_protocol>
+//	<bridged>true</bridged>
+//	<custom_configuration>true</custom_configuration>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<ipv6>
+//	  <gateway>::</gateway>
+//	  <version>v6</version>
+//	</ipv6>
+//	<ipv6_boot_protocol>none</ipv6_boot_protocol>
+//	<mac>
+//	  <address>52:54:00:0c:79:1d</address>
+//	</mac>
+//	<mtu>1500</mtu>
+//	<status>up</status>
+//
 // </host_nic>
 // ----
 //
@@ -2487,35 +2503,37 @@ type Bonding struct {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>bond0</name>
-//   <mac address="00:00:00:00:00:00"/>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <boot_protocol>dhcp</boot_protocol>
-//   <bonding>
-//     <options>
-//       <option>
-//         <name>mode</name>
-//         <value>4</value>
-//         <type>Dynamic link aggregation (802.3ad)</type>
-//       </option>
-//       <option>
-//         <name>miimon</name>
-//         <value>100</value>
-//       </option>
-//     </options>
-//     <slaves>
-//       <host_nic id="123"/>
-//       <host_nic id="456"/>
-//     </slaves>
-//   </bonding>
-//   <mtu>1500</mtu>
-//   <bridged>true</bridged>
-//   <custom_configuration>false</custom_configuration>
+//
+//	<name>bond0</name>
+//	<mac address="00:00:00:00:00:00"/>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<boot_protocol>dhcp</boot_protocol>
+//	<bonding>
+//	  <options>
+//	    <option>
+//	      <name>mode</name>
+//	      <value>4</value>
+//	      <type>Dynamic link aggregation (802.3ad)</type>
+//	    </option>
+//	    <option>
+//	      <name>miimon</name>
+//	      <value>100</value>
+//	    </option>
+//	  </options>
+//	  <slaves>
+//	    <host_nic id="123"/>
+//	    <host_nic id="456"/>
+//	  </slaves>
+//	</bonding>
+//	<mtu>1500</mtu>
+//	<bridged>true</bridged>
+//	<custom_configuration>false</custom_configuration>
+//
 // </host_nic>
 // ----
 func (p *Bonding) SetActiveSlave(attr *HostNic) {
@@ -2529,26 +2547,28 @@ func (p *Bonding) SetActiveSlave(attr *HostNic) {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>eth0</name>
-//   <boot_protocol>static</boot_protocol>
-//   <bridged>true</bridged>
-//   <custom_configuration>true</custom_configuration>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <ipv6>
-//     <gateway>::</gateway>
-//     <version>v6</version>
-//   </ipv6>
-//   <ipv6_boot_protocol>none</ipv6_boot_protocol>
-//   <mac>
-//     <address>52:54:00:0c:79:1d</address>
-//   </mac>
-//   <mtu>1500</mtu>
-//   <status>up</status>
+//
+//	<name>eth0</name>
+//	<boot_protocol>static</boot_protocol>
+//	<bridged>true</bridged>
+//	<custom_configuration>true</custom_configuration>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<ipv6>
+//	  <gateway>::</gateway>
+//	  <version>v6</version>
+//	</ipv6>
+//	<ipv6_boot_protocol>none</ipv6_boot_protocol>
+//	<mac>
+//	  <address>52:54:00:0c:79:1d</address>
+//	</mac>
+//	<mtu>1500</mtu>
+//	<status>up</status>
+//
 // </host_nic>
 // ----
 //
@@ -2560,35 +2580,37 @@ func (p *Bonding) SetActiveSlave(attr *HostNic) {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>bond0</name>
-//   <mac address="00:00:00:00:00:00"/>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <boot_protocol>dhcp</boot_protocol>
-//   <bonding>
-//     <options>
-//       <option>
-//         <name>mode</name>
-//         <value>4</value>
-//         <type>Dynamic link aggregation (802.3ad)</type>
-//       </option>
-//       <option>
-//         <name>miimon</name>
-//         <value>100</value>
-//       </option>
-//     </options>
-//     <slaves>
-//       <host_nic id="123"/>
-//       <host_nic id="456"/>
-//     </slaves>
-//   </bonding>
-//   <mtu>1500</mtu>
-//   <bridged>true</bridged>
-//   <custom_configuration>false</custom_configuration>
+//
+//	<name>bond0</name>
+//	<mac address="00:00:00:00:00:00"/>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<boot_protocol>dhcp</boot_protocol>
+//	<bonding>
+//	  <options>
+//	    <option>
+//	      <name>mode</name>
+//	      <value>4</value>
+//	      <type>Dynamic link aggregation (802.3ad)</type>
+//	    </option>
+//	    <option>
+//	      <name>miimon</name>
+//	      <value>100</value>
+//	    </option>
+//	  </options>
+//	  <slaves>
+//	    <host_nic id="123"/>
+//	    <host_nic id="456"/>
+//	  </slaves>
+//	</bonding>
+//	<mtu>1500</mtu>
+//	<bridged>true</bridged>
+//	<custom_configuration>false</custom_configuration>
+//
 // </host_nic>
 // ----
 func (p *Bonding) ActiveSlave() (*HostNic, bool) {
@@ -2605,26 +2627,28 @@ func (p *Bonding) ActiveSlave() (*HostNic, bool) {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>eth0</name>
-//   <boot_protocol>static</boot_protocol>
-//   <bridged>true</bridged>
-//   <custom_configuration>true</custom_configuration>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <ipv6>
-//     <gateway>::</gateway>
-//     <version>v6</version>
-//   </ipv6>
-//   <ipv6_boot_protocol>none</ipv6_boot_protocol>
-//   <mac>
-//     <address>52:54:00:0c:79:1d</address>
-//   </mac>
-//   <mtu>1500</mtu>
-//   <status>up</status>
+//
+//	<name>eth0</name>
+//	<boot_protocol>static</boot_protocol>
+//	<bridged>true</bridged>
+//	<custom_configuration>true</custom_configuration>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<ipv6>
+//	  <gateway>::</gateway>
+//	  <version>v6</version>
+//	</ipv6>
+//	<ipv6_boot_protocol>none</ipv6_boot_protocol>
+//	<mac>
+//	  <address>52:54:00:0c:79:1d</address>
+//	</mac>
+//	<mtu>1500</mtu>
+//	<status>up</status>
+//
 // </host_nic>
 // ----
 //
@@ -2636,35 +2660,37 @@ func (p *Bonding) ActiveSlave() (*HostNic, bool) {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>bond0</name>
-//   <mac address="00:00:00:00:00:00"/>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <boot_protocol>dhcp</boot_protocol>
-//   <bonding>
-//     <options>
-//       <option>
-//         <name>mode</name>
-//         <value>4</value>
-//         <type>Dynamic link aggregation (802.3ad)</type>
-//       </option>
-//       <option>
-//         <name>miimon</name>
-//         <value>100</value>
-//       </option>
-//     </options>
-//     <slaves>
-//       <host_nic id="123"/>
-//       <host_nic id="456"/>
-//     </slaves>
-//   </bonding>
-//   <mtu>1500</mtu>
-//   <bridged>true</bridged>
-//   <custom_configuration>false</custom_configuration>
+//
+//	<name>bond0</name>
+//	<mac address="00:00:00:00:00:00"/>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<boot_protocol>dhcp</boot_protocol>
+//	<bonding>
+//	  <options>
+//	    <option>
+//	      <name>mode</name>
+//	      <value>4</value>
+//	      <type>Dynamic link aggregation (802.3ad)</type>
+//	    </option>
+//	    <option>
+//	      <name>miimon</name>
+//	      <value>100</value>
+//	    </option>
+//	  </options>
+//	  <slaves>
+//	    <host_nic id="123"/>
+//	    <host_nic id="456"/>
+//	  </slaves>
+//	</bonding>
+//	<mtu>1500</mtu>
+//	<bridged>true</bridged>
+//	<custom_configuration>false</custom_configuration>
+//
 // </host_nic>
 // ----
 func (p *Bonding) MustActiveSlave() *HostNic {
@@ -3682,126 +3708,128 @@ func (p *CloudInit) MustUsers() *UserSlice {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 type Cluster struct {
 	Struct
@@ -4340,16 +4368,18 @@ func (p *Cluster) MustLogMaxMemoryUsedThresholdType() LogMaxMemoryUsedThresholdT
 // [source,xml]
 // ----
 // <mac_pool href="/ovirt-engine/api/macpools/123" id="123">
-//   <name>Default</name>
-//   <description>Default MAC pool</description>
-//   <allow_duplicates>false</allow_duplicates>
-//   <default_pool>true</default_pool>
-//   <ranges>
-//     <range>
-//       <from>00:1A:4A:16:01:51</from>
-//       <to>00:1A:4A:16:01:E6</to>
-//     </range>
-//   </ranges>
+//
+//	<name>Default</name>
+//	<description>Default MAC pool</description>
+//	<allow_duplicates>false</allow_duplicates>
+//	<default_pool>true</default_pool>
+//	<ranges>
+//	  <range>
+//	    <from>00:1A:4A:16:01:51</from>
+//	    <to>00:1A:4A:16:01:E6</to>
+//	  </range>
+//	</ranges>
+//
 // </mac_pool>
 // ----
 func (p *Cluster) SetMacPool(attr *MacPool) {
@@ -4363,16 +4393,18 @@ func (p *Cluster) SetMacPool(attr *MacPool) {
 // [source,xml]
 // ----
 // <mac_pool href="/ovirt-engine/api/macpools/123" id="123">
-//   <name>Default</name>
-//   <description>Default MAC pool</description>
-//   <allow_duplicates>false</allow_duplicates>
-//   <default_pool>true</default_pool>
-//   <ranges>
-//     <range>
-//       <from>00:1A:4A:16:01:51</from>
-//       <to>00:1A:4A:16:01:E6</to>
-//     </range>
-//   </ranges>
+//
+//	<name>Default</name>
+//	<description>Default MAC pool</description>
+//	<allow_duplicates>false</allow_duplicates>
+//	<default_pool>true</default_pool>
+//	<ranges>
+//	  <range>
+//	    <from>00:1A:4A:16:01:51</from>
+//	    <to>00:1A:4A:16:01:E6</to>
+//	  </range>
+//	</ranges>
+//
 // </mac_pool>
 // ----
 func (p *Cluster) MacPool() (*MacPool, bool) {
@@ -4389,16 +4421,18 @@ func (p *Cluster) MacPool() (*MacPool, bool) {
 // [source,xml]
 // ----
 // <mac_pool href="/ovirt-engine/api/macpools/123" id="123">
-//   <name>Default</name>
-//   <description>Default MAC pool</description>
-//   <allow_duplicates>false</allow_duplicates>
-//   <default_pool>true</default_pool>
-//   <ranges>
-//     <range>
-//       <from>00:1A:4A:16:01:51</from>
-//       <to>00:1A:4A:16:01:E6</to>
-//     </range>
-//   </ranges>
+//
+//	<name>Default</name>
+//	<description>Default MAC pool</description>
+//	<allow_duplicates>false</allow_duplicates>
+//	<default_pool>true</default_pool>
+//	<ranges>
+//	  <range>
+//	    <from>00:1A:4A:16:01:51</from>
+//	    <to>00:1A:4A:16:01:E6</to>
+//	  </range>
+//	</ranges>
+//
 // </mac_pool>
 // ----
 func (p *Cluster) MustMacPool() *MacPool {
@@ -4433,33 +4467,35 @@ func (p *Cluster) MustMaintenanceReasonRequired() bool {
 //
 // [source,json]
 // ----
-// {
-//   "network" : [ {
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "stp" : "false",
-//     "mtu" : "0",
-//     "usages" : {
-//       "usage" : [ "vm" ]
-//     },
-//     "name" : "ovirtmgmt",
-//     "description" : "Management Network",
-//     "href" : "/ovirt-engine/api/networks/456",
-//     "id" : "456",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/networks/456/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
-//       "rel" : "vnicprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/labels",
-//       "rel" : "labels"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "network" : [ {
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "stp" : "false",
+//	    "mtu" : "0",
+//	    "usages" : {
+//	      "usage" : [ "vm" ]
+//	    },
+//	    "name" : "ovirtmgmt",
+//	    "description" : "Management Network",
+//	    "href" : "/ovirt-engine/api/networks/456",
+//	    "id" : "456",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/networks/456/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
+//	      "rel" : "vnicprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/labels",
+//	      "rel" : "labels"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 //
 // An example of the XML representation of the same logical network:
@@ -4467,17 +4503,19 @@ func (p *Cluster) MustMaintenanceReasonRequired() bool {
 // [source,xml]
 // ----
 // <network href="/ovirt-engine/api/networks/456" id="456">
-//   <name>ovirtmgmt</name>
-//   <description>Management Network</description>
-//   <link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
-//   <link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
-//   <link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
-//   <data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
-//   <stp>false</stp>
-//   <mtu>0</mtu>
-//   <usages>
-//     <usage>vm</usage>
-//   </usages>
+//
+//	<name>ovirtmgmt</name>
+//	<description>Management Network</description>
+//	<link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
+//	<link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
+//	<link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
+//	<data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
+//	<stp>false</stp>
+//	<mtu>0</mtu>
+//	<usages>
+//	  <usage>vm</usage>
+//	</usages>
+//
 // </network>
 // ----
 func (p *Cluster) SetManagementNetwork(attr *Network) {
@@ -4490,33 +4528,35 @@ func (p *Cluster) SetManagementNetwork(attr *Network) {
 //
 // [source,json]
 // ----
-// {
-//   "network" : [ {
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "stp" : "false",
-//     "mtu" : "0",
-//     "usages" : {
-//       "usage" : [ "vm" ]
-//     },
-//     "name" : "ovirtmgmt",
-//     "description" : "Management Network",
-//     "href" : "/ovirt-engine/api/networks/456",
-//     "id" : "456",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/networks/456/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
-//       "rel" : "vnicprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/labels",
-//       "rel" : "labels"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "network" : [ {
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "stp" : "false",
+//	    "mtu" : "0",
+//	    "usages" : {
+//	      "usage" : [ "vm" ]
+//	    },
+//	    "name" : "ovirtmgmt",
+//	    "description" : "Management Network",
+//	    "href" : "/ovirt-engine/api/networks/456",
+//	    "id" : "456",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/networks/456/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
+//	      "rel" : "vnicprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/labels",
+//	      "rel" : "labels"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 //
 // An example of the XML representation of the same logical network:
@@ -4524,17 +4564,19 @@ func (p *Cluster) SetManagementNetwork(attr *Network) {
 // [source,xml]
 // ----
 // <network href="/ovirt-engine/api/networks/456" id="456">
-//   <name>ovirtmgmt</name>
-//   <description>Management Network</description>
-//   <link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
-//   <link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
-//   <link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
-//   <data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
-//   <stp>false</stp>
-//   <mtu>0</mtu>
-//   <usages>
-//     <usage>vm</usage>
-//   </usages>
+//
+//	<name>ovirtmgmt</name>
+//	<description>Management Network</description>
+//	<link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
+//	<link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
+//	<link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
+//	<data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
+//	<stp>false</stp>
+//	<mtu>0</mtu>
+//	<usages>
+//	  <usage>vm</usage>
+//	</usages>
+//
 // </network>
 // ----
 func (p *Cluster) ManagementNetwork() (*Network, bool) {
@@ -4550,33 +4592,35 @@ func (p *Cluster) ManagementNetwork() (*Network, bool) {
 //
 // [source,json]
 // ----
-// {
-//   "network" : [ {
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "stp" : "false",
-//     "mtu" : "0",
-//     "usages" : {
-//       "usage" : [ "vm" ]
-//     },
-//     "name" : "ovirtmgmt",
-//     "description" : "Management Network",
-//     "href" : "/ovirt-engine/api/networks/456",
-//     "id" : "456",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/networks/456/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
-//       "rel" : "vnicprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/labels",
-//       "rel" : "labels"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "network" : [ {
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "stp" : "false",
+//	    "mtu" : "0",
+//	    "usages" : {
+//	      "usage" : [ "vm" ]
+//	    },
+//	    "name" : "ovirtmgmt",
+//	    "description" : "Management Network",
+//	    "href" : "/ovirt-engine/api/networks/456",
+//	    "id" : "456",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/networks/456/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
+//	      "rel" : "vnicprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/labels",
+//	      "rel" : "labels"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 //
 // An example of the XML representation of the same logical network:
@@ -4584,17 +4628,19 @@ func (p *Cluster) ManagementNetwork() (*Network, bool) {
 // [source,xml]
 // ----
 // <network href="/ovirt-engine/api/networks/456" id="456">
-//   <name>ovirtmgmt</name>
-//   <description>Management Network</description>
-//   <link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
-//   <link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
-//   <link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
-//   <data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
-//   <stp>false</stp>
-//   <mtu>0</mtu>
-//   <usages>
-//     <usage>vm</usage>
-//   </usages>
+//
+//	<name>ovirtmgmt</name>
+//	<description>Management Network</description>
+//	<link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
+//	<link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
+//	<link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
+//	<data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
+//	<stp>false</stp>
+//	<mtu>0</mtu>
+//	<usages>
+//	  <usage>vm</usage>
+//	</usages>
+//
 // </network>
 // ----
 func (p *Cluster) MustManagementNetwork() *Network {
@@ -5508,126 +5554,128 @@ type CpuProfile struct {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *CpuProfile) SetCluster(attr *Cluster) {
 	p.cluster = attr
@@ -5639,126 +5687,128 @@ func (p *CpuProfile) SetCluster(attr *Cluster) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *CpuProfile) Cluster() (*Cluster, bool) {
 	if p.cluster != nil {
@@ -5773,126 +5823,128 @@ func (p *CpuProfile) Cluster() (*Cluster, bool) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *CpuProfile) MustCluster() *Cluster {
 	if p.cluster == nil {
@@ -6410,16 +6462,18 @@ func (p *DataCenter) MustLocal() bool {
 // [source,xml]
 // ----
 // <mac_pool href="/ovirt-engine/api/macpools/123" id="123">
-//   <name>Default</name>
-//   <description>Default MAC pool</description>
-//   <allow_duplicates>false</allow_duplicates>
-//   <default_pool>true</default_pool>
-//   <ranges>
-//     <range>
-//       <from>00:1A:4A:16:01:51</from>
-//       <to>00:1A:4A:16:01:E6</to>
-//     </range>
-//   </ranges>
+//
+//	<name>Default</name>
+//	<description>Default MAC pool</description>
+//	<allow_duplicates>false</allow_duplicates>
+//	<default_pool>true</default_pool>
+//	<ranges>
+//	  <range>
+//	    <from>00:1A:4A:16:01:51</from>
+//	    <to>00:1A:4A:16:01:E6</to>
+//	  </range>
+//	</ranges>
+//
 // </mac_pool>
 // ----
 func (p *DataCenter) SetMacPool(attr *MacPool) {
@@ -6433,16 +6487,18 @@ func (p *DataCenter) SetMacPool(attr *MacPool) {
 // [source,xml]
 // ----
 // <mac_pool href="/ovirt-engine/api/macpools/123" id="123">
-//   <name>Default</name>
-//   <description>Default MAC pool</description>
-//   <allow_duplicates>false</allow_duplicates>
-//   <default_pool>true</default_pool>
-//   <ranges>
-//     <range>
-//       <from>00:1A:4A:16:01:51</from>
-//       <to>00:1A:4A:16:01:E6</to>
-//     </range>
-//   </ranges>
+//
+//	<name>Default</name>
+//	<description>Default MAC pool</description>
+//	<allow_duplicates>false</allow_duplicates>
+//	<default_pool>true</default_pool>
+//	<ranges>
+//	  <range>
+//	    <from>00:1A:4A:16:01:51</from>
+//	    <to>00:1A:4A:16:01:E6</to>
+//	  </range>
+//	</ranges>
+//
 // </mac_pool>
 // ----
 func (p *DataCenter) MacPool() (*MacPool, bool) {
@@ -6459,16 +6515,18 @@ func (p *DataCenter) MacPool() (*MacPool, bool) {
 // [source,xml]
 // ----
 // <mac_pool href="/ovirt-engine/api/macpools/123" id="123">
-//   <name>Default</name>
-//   <description>Default MAC pool</description>
-//   <allow_duplicates>false</allow_duplicates>
-//   <default_pool>true</default_pool>
-//   <ranges>
-//     <range>
-//       <from>00:1A:4A:16:01:51</from>
-//       <to>00:1A:4A:16:01:E6</to>
-//     </range>
-//   </ranges>
+//
+//	<name>Default</name>
+//	<description>Default MAC pool</description>
+//	<allow_duplicates>false</allow_duplicates>
+//	<default_pool>true</default_pool>
+//	<ranges>
+//	  <range>
+//	    <from>00:1A:4A:16:01:51</from>
+//	    <to>00:1A:4A:16:01:E6</to>
+//	  </range>
+//	</ranges>
+//
 // </mac_pool>
 // ----
 func (p *DataCenter) MustMacPool() *MacPool {
@@ -7603,13 +7661,15 @@ func (p *Disk) MustQcowVersion() QcowVersion {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *Disk) SetQuota(attr *Quota) {
@@ -7623,13 +7683,15 @@ func (p *Disk) SetQuota(attr *Quota) {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *Disk) Quota() (*Quota, bool) {
@@ -7646,13 +7708,15 @@ func (p *Disk) Quota() (*Quota, bool) {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *Disk) MustQuota() *Quota {
@@ -7729,14 +7793,16 @@ func (p *Disk) MustShareable() bool {
 // [source,xml]
 // ----
 // <snapshot id="456" href="/ovirt-engine/api/vms/123/snapshots/456">
-//   <actions>
-//     <link rel="restore" href="/ovirt-engine/api/vms/123/snapshots/456/restore"/>
-//   </actions>
-//   <vm id="123" href="/ovirt-engine/api/vms/123"/>
-//   <description>Virtual Machine 1 - Snapshot A</description>
-//   <type>active</type>
-//   <date>2010-08-16T14:24:29</date>
-//   <persist_memorystate>false</persist_memorystate>
+//
+//	<actions>
+//	  <link rel="restore" href="/ovirt-engine/api/vms/123/snapshots/456/restore"/>
+//	</actions>
+//	<vm id="123" href="/ovirt-engine/api/vms/123"/>
+//	<description>Virtual Machine 1 - Snapshot A</description>
+//	<type>active</type>
+//	<date>2010-08-16T14:24:29</date>
+//	<persist_memorystate>false</persist_memorystate>
+//
 // </snapshot>
 // ----
 func (p *Disk) SetSnapshot(attr *Snapshot) {
@@ -7750,14 +7816,16 @@ func (p *Disk) SetSnapshot(attr *Snapshot) {
 // [source,xml]
 // ----
 // <snapshot id="456" href="/ovirt-engine/api/vms/123/snapshots/456">
-//   <actions>
-//     <link rel="restore" href="/ovirt-engine/api/vms/123/snapshots/456/restore"/>
-//   </actions>
-//   <vm id="123" href="/ovirt-engine/api/vms/123"/>
-//   <description>Virtual Machine 1 - Snapshot A</description>
-//   <type>active</type>
-//   <date>2010-08-16T14:24:29</date>
-//   <persist_memorystate>false</persist_memorystate>
+//
+//	<actions>
+//	  <link rel="restore" href="/ovirt-engine/api/vms/123/snapshots/456/restore"/>
+//	</actions>
+//	<vm id="123" href="/ovirt-engine/api/vms/123"/>
+//	<description>Virtual Machine 1 - Snapshot A</description>
+//	<type>active</type>
+//	<date>2010-08-16T14:24:29</date>
+//	<persist_memorystate>false</persist_memorystate>
+//
 // </snapshot>
 // ----
 func (p *Disk) Snapshot() (*Snapshot, bool) {
@@ -7774,14 +7842,16 @@ func (p *Disk) Snapshot() (*Snapshot, bool) {
 // [source,xml]
 // ----
 // <snapshot id="456" href="/ovirt-engine/api/vms/123/snapshots/456">
-//   <actions>
-//     <link rel="restore" href="/ovirt-engine/api/vms/123/snapshots/456/restore"/>
-//   </actions>
-//   <vm id="123" href="/ovirt-engine/api/vms/123"/>
-//   <description>Virtual Machine 1 - Snapshot A</description>
-//   <type>active</type>
-//   <date>2010-08-16T14:24:29</date>
-//   <persist_memorystate>false</persist_memorystate>
+//
+//	<actions>
+//	  <link rel="restore" href="/ovirt-engine/api/vms/123/snapshots/456/restore"/>
+//	</actions>
+//	<vm id="123" href="/ovirt-engine/api/vms/123"/>
+//	<description>Virtual Machine 1 - Snapshot A</description>
+//	<type>active</type>
+//	<date>2010-08-16T14:24:29</date>
+//	<persist_memorystate>false</persist_memorystate>
+//
 // </snapshot>
 // ----
 func (p *Disk) MustSnapshot() *Snapshot {
@@ -7857,27 +7927,29 @@ func (p *Disk) MustStatus() DiskStatus {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *Disk) SetStorageDomain(attr *StorageDomain) {
@@ -7891,27 +7963,29 @@ func (p *Disk) SetStorageDomain(attr *StorageDomain) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *Disk) StorageDomain() (*StorageDomain, bool) {
@@ -7928,27 +8002,29 @@ func (p *Disk) StorageDomain() (*StorageDomain, bool) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *Disk) MustStorageDomain() *StorageDomain {
@@ -8581,27 +8657,29 @@ func (p *DiskProfile) MustQos() *Qos {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *DiskProfile) SetStorageDomain(attr *StorageDomain) {
@@ -8615,27 +8693,29 @@ func (p *DiskProfile) SetStorageDomain(attr *StorageDomain) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *DiskProfile) StorageDomain() (*StorageDomain, bool) {
@@ -8652,27 +8732,29 @@ func (p *DiskProfile) StorageDomain() (*StorageDomain, bool) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *DiskProfile) MustStorageDomain() *StorageDomain {
@@ -9388,13 +9470,15 @@ func (p *DiskSnapshot) MustQcowVersion() QcowVersion {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *DiskSnapshot) SetQuota(attr *Quota) {
@@ -9408,13 +9492,15 @@ func (p *DiskSnapshot) SetQuota(attr *Quota) {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *DiskSnapshot) Quota() (*Quota, bool) {
@@ -9431,13 +9517,15 @@ func (p *DiskSnapshot) Quota() (*Quota, bool) {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *DiskSnapshot) MustQuota() *Quota {
@@ -9514,14 +9602,16 @@ func (p *DiskSnapshot) MustShareable() bool {
 // [source,xml]
 // ----
 // <snapshot id="456" href="/ovirt-engine/api/vms/123/snapshots/456">
-//   <actions>
-//     <link rel="restore" href="/ovirt-engine/api/vms/123/snapshots/456/restore"/>
-//   </actions>
-//   <vm id="123" href="/ovirt-engine/api/vms/123"/>
-//   <description>Virtual Machine 1 - Snapshot A</description>
-//   <type>active</type>
-//   <date>2010-08-16T14:24:29</date>
-//   <persist_memorystate>false</persist_memorystate>
+//
+//	<actions>
+//	  <link rel="restore" href="/ovirt-engine/api/vms/123/snapshots/456/restore"/>
+//	</actions>
+//	<vm id="123" href="/ovirt-engine/api/vms/123"/>
+//	<description>Virtual Machine 1 - Snapshot A</description>
+//	<type>active</type>
+//	<date>2010-08-16T14:24:29</date>
+//	<persist_memorystate>false</persist_memorystate>
+//
 // </snapshot>
 // ----
 func (p *DiskSnapshot) SetSnapshot(attr *Snapshot) {
@@ -9535,14 +9625,16 @@ func (p *DiskSnapshot) SetSnapshot(attr *Snapshot) {
 // [source,xml]
 // ----
 // <snapshot id="456" href="/ovirt-engine/api/vms/123/snapshots/456">
-//   <actions>
-//     <link rel="restore" href="/ovirt-engine/api/vms/123/snapshots/456/restore"/>
-//   </actions>
-//   <vm id="123" href="/ovirt-engine/api/vms/123"/>
-//   <description>Virtual Machine 1 - Snapshot A</description>
-//   <type>active</type>
-//   <date>2010-08-16T14:24:29</date>
-//   <persist_memorystate>false</persist_memorystate>
+//
+//	<actions>
+//	  <link rel="restore" href="/ovirt-engine/api/vms/123/snapshots/456/restore"/>
+//	</actions>
+//	<vm id="123" href="/ovirt-engine/api/vms/123"/>
+//	<description>Virtual Machine 1 - Snapshot A</description>
+//	<type>active</type>
+//	<date>2010-08-16T14:24:29</date>
+//	<persist_memorystate>false</persist_memorystate>
+//
 // </snapshot>
 // ----
 func (p *DiskSnapshot) Snapshot() (*Snapshot, bool) {
@@ -9559,14 +9651,16 @@ func (p *DiskSnapshot) Snapshot() (*Snapshot, bool) {
 // [source,xml]
 // ----
 // <snapshot id="456" href="/ovirt-engine/api/vms/123/snapshots/456">
-//   <actions>
-//     <link rel="restore" href="/ovirt-engine/api/vms/123/snapshots/456/restore"/>
-//   </actions>
-//   <vm id="123" href="/ovirt-engine/api/vms/123"/>
-//   <description>Virtual Machine 1 - Snapshot A</description>
-//   <type>active</type>
-//   <date>2010-08-16T14:24:29</date>
-//   <persist_memorystate>false</persist_memorystate>
+//
+//	<actions>
+//	  <link rel="restore" href="/ovirt-engine/api/vms/123/snapshots/456/restore"/>
+//	</actions>
+//	<vm id="123" href="/ovirt-engine/api/vms/123"/>
+//	<description>Virtual Machine 1 - Snapshot A</description>
+//	<type>active</type>
+//	<date>2010-08-16T14:24:29</date>
+//	<persist_memorystate>false</persist_memorystate>
+//
 // </snapshot>
 // ----
 func (p *DiskSnapshot) MustSnapshot() *Snapshot {
@@ -9642,27 +9736,29 @@ func (p *DiskSnapshot) MustStatus() DiskStatus {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *DiskSnapshot) SetStorageDomain(attr *StorageDomain) {
@@ -9676,27 +9772,29 @@ func (p *DiskSnapshot) SetStorageDomain(attr *StorageDomain) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *DiskSnapshot) StorageDomain() (*StorageDomain, bool) {
@@ -9713,27 +9811,29 @@ func (p *DiskSnapshot) StorageDomain() (*StorageDomain, bool) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *DiskSnapshot) MustStorageDomain() *StorageDomain {
@@ -10484,126 +10584,128 @@ type Event struct {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *Event) SetCluster(attr *Cluster) {
 	p.cluster = attr
@@ -10615,126 +10717,128 @@ func (p *Event) SetCluster(attr *Cluster) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *Event) Cluster() (*Cluster, bool) {
 	if p.cluster != nil {
@@ -10749,126 +10853,128 @@ func (p *Event) Cluster() (*Cluster, bool) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *Event) MustCluster() *Cluster {
 	if p.cluster == nil {
@@ -11173,27 +11279,29 @@ func (p *Event) MustSeverity() LogSeverity {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *Event) SetStorageDomain(attr *StorageDomain) {
@@ -11207,27 +11315,29 @@ func (p *Event) SetStorageDomain(attr *StorageDomain) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *Event) StorageDomain() (*StorageDomain, bool) {
@@ -11244,27 +11354,29 @@ func (p *Event) StorageDomain() (*StorageDomain, bool) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *Event) MustStorageDomain() *StorageDomain {
@@ -12926,126 +13038,128 @@ type ExternalTemplateImport struct {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *ExternalTemplateImport) SetCluster(attr *Cluster) {
 	p.cluster = attr
@@ -13057,126 +13171,128 @@ func (p *ExternalTemplateImport) SetCluster(attr *Cluster) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *ExternalTemplateImport) Cluster() (*Cluster, bool) {
 	if p.cluster != nil {
@@ -13191,126 +13307,128 @@ func (p *ExternalTemplateImport) Cluster() (*Cluster, bool) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *ExternalTemplateImport) MustCluster() *Cluster {
 	if p.cluster == nil {
@@ -13365,13 +13483,15 @@ func (p *ExternalTemplateImport) MustHost() *Host {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *ExternalTemplateImport) SetQuota(attr *Quota) {
@@ -13385,13 +13505,15 @@ func (p *ExternalTemplateImport) SetQuota(attr *Quota) {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *ExternalTemplateImport) Quota() (*Quota, bool) {
@@ -13408,13 +13530,15 @@ func (p *ExternalTemplateImport) Quota() (*Quota, bool) {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *ExternalTemplateImport) MustQuota() *Quota {
@@ -13431,27 +13555,29 @@ func (p *ExternalTemplateImport) MustQuota() *Quota {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *ExternalTemplateImport) SetStorageDomain(attr *StorageDomain) {
@@ -13465,27 +13591,29 @@ func (p *ExternalTemplateImport) SetStorageDomain(attr *StorageDomain) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *ExternalTemplateImport) StorageDomain() (*StorageDomain, bool) {
@@ -13502,27 +13630,29 @@ func (p *ExternalTemplateImport) StorageDomain() (*StorageDomain, bool) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *ExternalTemplateImport) MustStorageDomain() *StorageDomain {
@@ -13599,126 +13729,128 @@ type ExternalVmImport struct {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *ExternalVmImport) SetCluster(attr *Cluster) {
 	p.cluster = attr
@@ -13730,126 +13862,128 @@ func (p *ExternalVmImport) SetCluster(attr *Cluster) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *ExternalVmImport) Cluster() (*Cluster, bool) {
 	if p.cluster != nil {
@@ -13864,126 +13998,128 @@ func (p *ExternalVmImport) Cluster() (*Cluster, bool) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *ExternalVmImport) MustCluster() *Cluster {
 	if p.cluster == nil {
@@ -14116,13 +14252,15 @@ func (p *ExternalVmImport) MustProvider() ExternalVmProviderType {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *ExternalVmImport) SetQuota(attr *Quota) {
@@ -14136,13 +14274,15 @@ func (p *ExternalVmImport) SetQuota(attr *Quota) {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *ExternalVmImport) Quota() (*Quota, bool) {
@@ -14159,13 +14299,15 @@ func (p *ExternalVmImport) Quota() (*Quota, bool) {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *ExternalVmImport) MustQuota() *Quota {
@@ -14201,27 +14343,29 @@ func (p *ExternalVmImport) MustSparse() bool {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *ExternalVmImport) SetStorageDomain(attr *StorageDomain) {
@@ -14235,27 +14379,29 @@ func (p *ExternalVmImport) SetStorageDomain(attr *StorageDomain) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *ExternalVmImport) StorageDomain() (*StorageDomain, bool) {
@@ -14272,27 +14418,29 @@ func (p *ExternalVmImport) StorageDomain() (*StorageDomain, bool) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *ExternalVmImport) MustStorageDomain() *StorageDomain {
@@ -14583,27 +14731,29 @@ func (p *File) MustName() string {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *File) SetStorageDomain(attr *StorageDomain) {
@@ -14617,27 +14767,29 @@ func (p *File) SetStorageDomain(attr *StorageDomain) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *File) StorageDomain() (*StorageDomain, bool) {
@@ -14654,27 +14806,29 @@ func (p *File) StorageDomain() (*StorageDomain, bool) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *File) MustStorageDomain() *StorageDomain {
@@ -16172,126 +16326,128 @@ func (p *GlusterHook) MustChecksum() string {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *GlusterHook) SetCluster(attr *Cluster) {
 	p.cluster = attr
@@ -16303,126 +16459,128 @@ func (p *GlusterHook) SetCluster(attr *Cluster) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *GlusterHook) Cluster() (*Cluster, bool) {
 	if p.cluster != nil {
@@ -16437,126 +16595,128 @@ func (p *GlusterHook) Cluster() (*Cluster, bool) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *GlusterHook) MustCluster() *Cluster {
 	if p.cluster == nil {
@@ -17254,126 +17414,128 @@ func (p *GlusterVolume) MustBricks() *GlusterBrickSlice {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *GlusterVolume) SetCluster(attr *Cluster) {
 	p.cluster = attr
@@ -17385,126 +17547,128 @@ func (p *GlusterVolume) SetCluster(attr *Cluster) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *GlusterVolume) Cluster() (*Cluster, bool) {
 	if p.cluster != nil {
@@ -17519,126 +17683,128 @@ func (p *GlusterVolume) Cluster() (*Cluster, bool) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *GlusterVolume) MustCluster() *Cluster {
 	if p.cluster == nil {
@@ -18551,26 +18717,28 @@ func (p *Group) MustTags() *TagSlice {
 // ----
 // <vm href="/ovirt-engine/api/vms/123" id="123">
 // ...
-//   <guest_operating_system>
-//     <architecture>x86_64</architecture>
-//     <codename>Maipo</codename>
-//     <distribution>Red Hat Enterprise Linux Server</distribution>
-//     <family>Linux</family>
-//     <kernel>
-//       <version>
-//         <build>0</build>
-//         <full_version>3.10.0-514.10.2.el7.x86_64</full_version>
-//         <major>3</major>
-//         <minor>10</minor>
-//         <revision>514</revision>
-//       </version>
-//     </kernel>
-//     <version>
-//       <full_version>7.3</full_version>
-//       <major>7</major>
-//       <minor>3</minor>
-//     </version>
-//   </guest_operating_system>
+//
+//	<guest_operating_system>
+//	  <architecture>x86_64</architecture>
+//	  <codename>Maipo</codename>
+//	  <distribution>Red Hat Enterprise Linux Server</distribution>
+//	  <family>Linux</family>
+//	  <kernel>
+//	    <version>
+//	      <build>0</build>
+//	      <full_version>3.10.0-514.10.2.el7.x86_64</full_version>
+//	      <major>3</major>
+//	      <minor>10</minor>
+//	      <revision>514</revision>
+//	    </version>
+//	  </kernel>
+//	  <version>
+//	    <full_version>7.3</full_version>
+//	    <major>7</major>
+//	    <minor>3</minor>
+//	  </version>
+//	</guest_operating_system>
+//
 // </vm>
 // ----
 type GuestOperatingSystem struct {
@@ -18708,19 +18876,21 @@ func (p *GuestOperatingSystem) MustVersion() *Version {
 // [source,xml]
 // ----
 // <host href="/ovirt-engine/api/hosts/123" id="123">
-//   ...
-//   <hardware_information>
-//     <family>Red Hat Enterprise Linux</family>
-//     <manufacturer>Red Hat</manufacturer>
-//     <product_name>RHEV Hypervisor</product_name>
-//     <serial_number>01234567-89AB-CDEF-0123-456789ABCDEF</serial_number>
-//     <supported_rng_sources>
-//       <supported_rng_source>random</supported_rng_source>
-//     </supported_rng_sources>
-//     <uuid>12345678-9ABC-DEF0-1234-56789ABCDEF0</uuid>
-//     <version>1.2-34.5.el7ev</version>
-//   </hardware_information>
-//   ...
+//
+//	...
+//	<hardware_information>
+//	  <family>Red Hat Enterprise Linux</family>
+//	  <manufacturer>Red Hat</manufacturer>
+//	  <product_name>RHEV Hypervisor</product_name>
+//	  <serial_number>01234567-89AB-CDEF-0123-456789ABCDEF</serial_number>
+//	  <supported_rng_sources>
+//	    <supported_rng_source>random</supported_rng_source>
+//	  </supported_rng_sources>
+//	  <uuid>12345678-9ABC-DEF0-1234-56789ABCDEF0</uuid>
+//	  <version>1.2-34.5.el7ev</version>
+//	</hardware_information>
+//	...
+//
 // </application>
 // ----
 type HardwareInformation struct {
@@ -19217,126 +19387,128 @@ func (p *Host) MustCertificate() *Certificate {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *Host) SetCluster(attr *Cluster) {
 	p.cluster = attr
@@ -19348,126 +19520,128 @@ func (p *Host) SetCluster(attr *Cluster) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *Host) Cluster() (*Cluster, bool) {
 	if p.cluster != nil {
@@ -19482,126 +19656,128 @@ func (p *Host) Cluster() (*Cluster, bool) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *Host) MustCluster() *Cluster {
 	if p.cluster == nil {
@@ -19821,19 +19997,21 @@ func (p *Host) MustExternalStatus() ExternalStatus {
 // [source,xml]
 // ----
 // <host href="/ovirt-engine/api/hosts/123" id="123">
-//   ...
-//   <hardware_information>
-//     <family>Red Hat Enterprise Linux</family>
-//     <manufacturer>Red Hat</manufacturer>
-//     <product_name>RHEV Hypervisor</product_name>
-//     <serial_number>01234567-89AB-CDEF-0123-456789ABCDEF</serial_number>
-//     <supported_rng_sources>
-//       <supported_rng_source>random</supported_rng_source>
-//     </supported_rng_sources>
-//     <uuid>12345678-9ABC-DEF0-1234-56789ABCDEF0</uuid>
-//     <version>1.2-34.5.el7ev</version>
-//   </hardware_information>
-//   ...
+//
+//	...
+//	<hardware_information>
+//	  <family>Red Hat Enterprise Linux</family>
+//	  <manufacturer>Red Hat</manufacturer>
+//	  <product_name>RHEV Hypervisor</product_name>
+//	  <serial_number>01234567-89AB-CDEF-0123-456789ABCDEF</serial_number>
+//	  <supported_rng_sources>
+//	    <supported_rng_source>random</supported_rng_source>
+//	  </supported_rng_sources>
+//	  <uuid>12345678-9ABC-DEF0-1234-56789ABCDEF0</uuid>
+//	  <version>1.2-34.5.el7ev</version>
+//	</hardware_information>
+//	...
+//
 // </application>
 // ----
 func (p *Host) SetHardwareInformation(attr *HardwareInformation) {
@@ -19853,19 +20031,21 @@ func (p *Host) SetHardwareInformation(attr *HardwareInformation) {
 // [source,xml]
 // ----
 // <host href="/ovirt-engine/api/hosts/123" id="123">
-//   ...
-//   <hardware_information>
-//     <family>Red Hat Enterprise Linux</family>
-//     <manufacturer>Red Hat</manufacturer>
-//     <product_name>RHEV Hypervisor</product_name>
-//     <serial_number>01234567-89AB-CDEF-0123-456789ABCDEF</serial_number>
-//     <supported_rng_sources>
-//       <supported_rng_source>random</supported_rng_source>
-//     </supported_rng_sources>
-//     <uuid>12345678-9ABC-DEF0-1234-56789ABCDEF0</uuid>
-//     <version>1.2-34.5.el7ev</version>
-//   </hardware_information>
-//   ...
+//
+//	...
+//	<hardware_information>
+//	  <family>Red Hat Enterprise Linux</family>
+//	  <manufacturer>Red Hat</manufacturer>
+//	  <product_name>RHEV Hypervisor</product_name>
+//	  <serial_number>01234567-89AB-CDEF-0123-456789ABCDEF</serial_number>
+//	  <supported_rng_sources>
+//	    <supported_rng_source>random</supported_rng_source>
+//	  </supported_rng_sources>
+//	  <uuid>12345678-9ABC-DEF0-1234-56789ABCDEF0</uuid>
+//	  <version>1.2-34.5.el7ev</version>
+//	</hardware_information>
+//	...
+//
 // </application>
 // ----
 func (p *Host) HardwareInformation() (*HardwareInformation, bool) {
@@ -19888,19 +20068,21 @@ func (p *Host) HardwareInformation() (*HardwareInformation, bool) {
 // [source,xml]
 // ----
 // <host href="/ovirt-engine/api/hosts/123" id="123">
-//   ...
-//   <hardware_information>
-//     <family>Red Hat Enterprise Linux</family>
-//     <manufacturer>Red Hat</manufacturer>
-//     <product_name>RHEV Hypervisor</product_name>
-//     <serial_number>01234567-89AB-CDEF-0123-456789ABCDEF</serial_number>
-//     <supported_rng_sources>
-//       <supported_rng_source>random</supported_rng_source>
-//     </supported_rng_sources>
-//     <uuid>12345678-9ABC-DEF0-1234-56789ABCDEF0</uuid>
-//     <version>1.2-34.5.el7ev</version>
-//   </hardware_information>
-//   ...
+//
+//	...
+//	<hardware_information>
+//	  <family>Red Hat Enterprise Linux</family>
+//	  <manufacturer>Red Hat</manufacturer>
+//	  <product_name>RHEV Hypervisor</product_name>
+//	  <serial_number>01234567-89AB-CDEF-0123-456789ABCDEF</serial_number>
+//	  <supported_rng_sources>
+//	    <supported_rng_source>random</supported_rng_source>
+//	  </supported_rng_sources>
+//	  <uuid>12345678-9ABC-DEF0-1234-56789ABCDEF0</uuid>
+//	  <version>1.2-34.5.el7ev</version>
+//	</hardware_information>
+//	...
+//
 // </application>
 // ----
 func (p *Host) MustHardwareInformation() *HardwareInformation {
@@ -21046,26 +21228,28 @@ func (p *HostDevicePassthrough) MustEnabled() bool {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>eth0</name>
-//   <boot_protocol>static</boot_protocol>
-//   <bridged>true</bridged>
-//   <custom_configuration>true</custom_configuration>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <ipv6>
-//     <gateway>::</gateway>
-//     <version>v6</version>
-//   </ipv6>
-//   <ipv6_boot_protocol>none</ipv6_boot_protocol>
-//   <mac>
-//     <address>52:54:00:0c:79:1d</address>
-//   </mac>
-//   <mtu>1500</mtu>
-//   <status>up</status>
+//
+//	<name>eth0</name>
+//	<boot_protocol>static</boot_protocol>
+//	<bridged>true</bridged>
+//	<custom_configuration>true</custom_configuration>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<ipv6>
+//	  <gateway>::</gateway>
+//	  <version>v6</version>
+//	</ipv6>
+//	<ipv6_boot_protocol>none</ipv6_boot_protocol>
+//	<mac>
+//	  <address>52:54:00:0c:79:1d</address>
+//	</mac>
+//	<mtu>1500</mtu>
+//	<status>up</status>
+//
 // </host_nic>
 // ----
 //
@@ -21077,35 +21261,37 @@ func (p *HostDevicePassthrough) MustEnabled() bool {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>bond0</name>
-//   <mac address="00:00:00:00:00:00"/>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <boot_protocol>dhcp</boot_protocol>
-//   <bonding>
-//     <options>
-//       <option>
-//         <name>mode</name>
-//         <value>4</value>
-//         <type>Dynamic link aggregation (802.3ad)</type>
-//       </option>
-//       <option>
-//         <name>miimon</name>
-//         <value>100</value>
-//       </option>
-//     </options>
-//     <slaves>
-//       <host_nic id="123"/>
-//       <host_nic id="456"/>
-//     </slaves>
-//   </bonding>
-//   <mtu>1500</mtu>
-//   <bridged>true</bridged>
-//   <custom_configuration>false</custom_configuration>
+//
+//	<name>bond0</name>
+//	<mac address="00:00:00:00:00:00"/>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<boot_protocol>dhcp</boot_protocol>
+//	<bonding>
+//	  <options>
+//	    <option>
+//	      <name>mode</name>
+//	      <value>4</value>
+//	      <type>Dynamic link aggregation (802.3ad)</type>
+//	    </option>
+//	    <option>
+//	      <name>miimon</name>
+//	      <value>100</value>
+//	    </option>
+//	  </options>
+//	  <slaves>
+//	    <host_nic id="123"/>
+//	    <host_nic id="456"/>
+//	  </slaves>
+//	</bonding>
+//	<mtu>1500</mtu>
+//	<bridged>true</bridged>
+//	<custom_configuration>false</custom_configuration>
+//
 // </host_nic>
 // ----
 type HostNic struct {
@@ -21485,33 +21671,35 @@ func (p *HostNic) MustName() string {
 //
 // [source,json]
 // ----
-// {
-//   "network" : [ {
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "stp" : "false",
-//     "mtu" : "0",
-//     "usages" : {
-//       "usage" : [ "vm" ]
-//     },
-//     "name" : "ovirtmgmt",
-//     "description" : "Management Network",
-//     "href" : "/ovirt-engine/api/networks/456",
-//     "id" : "456",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/networks/456/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
-//       "rel" : "vnicprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/labels",
-//       "rel" : "labels"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "network" : [ {
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "stp" : "false",
+//	    "mtu" : "0",
+//	    "usages" : {
+//	      "usage" : [ "vm" ]
+//	    },
+//	    "name" : "ovirtmgmt",
+//	    "description" : "Management Network",
+//	    "href" : "/ovirt-engine/api/networks/456",
+//	    "id" : "456",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/networks/456/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
+//	      "rel" : "vnicprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/labels",
+//	      "rel" : "labels"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 //
 // An example of the XML representation of the same logical network:
@@ -21519,17 +21707,19 @@ func (p *HostNic) MustName() string {
 // [source,xml]
 // ----
 // <network href="/ovirt-engine/api/networks/456" id="456">
-//   <name>ovirtmgmt</name>
-//   <description>Management Network</description>
-//   <link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
-//   <link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
-//   <link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
-//   <data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
-//   <stp>false</stp>
-//   <mtu>0</mtu>
-//   <usages>
-//     <usage>vm</usage>
-//   </usages>
+//
+//	<name>ovirtmgmt</name>
+//	<description>Management Network</description>
+//	<link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
+//	<link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
+//	<link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
+//	<data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
+//	<stp>false</stp>
+//	<mtu>0</mtu>
+//	<usages>
+//	  <usage>vm</usage>
+//	</usages>
+//
 // </network>
 // ----
 func (p *HostNic) SetNetwork(attr *Network) {
@@ -21542,33 +21732,35 @@ func (p *HostNic) SetNetwork(attr *Network) {
 //
 // [source,json]
 // ----
-// {
-//   "network" : [ {
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "stp" : "false",
-//     "mtu" : "0",
-//     "usages" : {
-//       "usage" : [ "vm" ]
-//     },
-//     "name" : "ovirtmgmt",
-//     "description" : "Management Network",
-//     "href" : "/ovirt-engine/api/networks/456",
-//     "id" : "456",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/networks/456/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
-//       "rel" : "vnicprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/labels",
-//       "rel" : "labels"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "network" : [ {
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "stp" : "false",
+//	    "mtu" : "0",
+//	    "usages" : {
+//	      "usage" : [ "vm" ]
+//	    },
+//	    "name" : "ovirtmgmt",
+//	    "description" : "Management Network",
+//	    "href" : "/ovirt-engine/api/networks/456",
+//	    "id" : "456",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/networks/456/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
+//	      "rel" : "vnicprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/labels",
+//	      "rel" : "labels"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 //
 // An example of the XML representation of the same logical network:
@@ -21576,17 +21768,19 @@ func (p *HostNic) SetNetwork(attr *Network) {
 // [source,xml]
 // ----
 // <network href="/ovirt-engine/api/networks/456" id="456">
-//   <name>ovirtmgmt</name>
-//   <description>Management Network</description>
-//   <link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
-//   <link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
-//   <link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
-//   <data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
-//   <stp>false</stp>
-//   <mtu>0</mtu>
-//   <usages>
-//     <usage>vm</usage>
-//   </usages>
+//
+//	<name>ovirtmgmt</name>
+//	<description>Management Network</description>
+//	<link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
+//	<link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
+//	<link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
+//	<data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
+//	<stp>false</stp>
+//	<mtu>0</mtu>
+//	<usages>
+//	  <usage>vm</usage>
+//	</usages>
+//
 // </network>
 // ----
 func (p *HostNic) Network() (*Network, bool) {
@@ -21602,33 +21796,35 @@ func (p *HostNic) Network() (*Network, bool) {
 //
 // [source,json]
 // ----
-// {
-//   "network" : [ {
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "stp" : "false",
-//     "mtu" : "0",
-//     "usages" : {
-//       "usage" : [ "vm" ]
-//     },
-//     "name" : "ovirtmgmt",
-//     "description" : "Management Network",
-//     "href" : "/ovirt-engine/api/networks/456",
-//     "id" : "456",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/networks/456/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
-//       "rel" : "vnicprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/labels",
-//       "rel" : "labels"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "network" : [ {
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "stp" : "false",
+//	    "mtu" : "0",
+//	    "usages" : {
+//	      "usage" : [ "vm" ]
+//	    },
+//	    "name" : "ovirtmgmt",
+//	    "description" : "Management Network",
+//	    "href" : "/ovirt-engine/api/networks/456",
+//	    "id" : "456",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/networks/456/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
+//	      "rel" : "vnicprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/labels",
+//	      "rel" : "labels"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 //
 // An example of the XML representation of the same logical network:
@@ -21636,17 +21832,19 @@ func (p *HostNic) Network() (*Network, bool) {
 // [source,xml]
 // ----
 // <network href="/ovirt-engine/api/networks/456" id="456">
-//   <name>ovirtmgmt</name>
-//   <description>Management Network</description>
-//   <link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
-//   <link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
-//   <link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
-//   <data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
-//   <stp>false</stp>
-//   <mtu>0</mtu>
-//   <usages>
-//     <usage>vm</usage>
-//   </usages>
+//
+//	<name>ovirtmgmt</name>
+//	<description>Management Network</description>
+//	<link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
+//	<link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
+//	<link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
+//	<data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
+//	<stp>false</stp>
+//	<mtu>0</mtu>
+//	<usages>
+//	  <usage>vm</usage>
+//	</usages>
+//
 // </network>
 // ----
 func (p *HostNic) MustNetwork() *Network {
@@ -21700,26 +21898,28 @@ func (p *HostNic) MustOverrideConfiguration() bool {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>eth0</name>
-//   <boot_protocol>static</boot_protocol>
-//   <bridged>true</bridged>
-//   <custom_configuration>true</custom_configuration>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <ipv6>
-//     <gateway>::</gateway>
-//     <version>v6</version>
-//   </ipv6>
-//   <ipv6_boot_protocol>none</ipv6_boot_protocol>
-//   <mac>
-//     <address>52:54:00:0c:79:1d</address>
-//   </mac>
-//   <mtu>1500</mtu>
-//   <status>up</status>
+//
+//	<name>eth0</name>
+//	<boot_protocol>static</boot_protocol>
+//	<bridged>true</bridged>
+//	<custom_configuration>true</custom_configuration>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<ipv6>
+//	  <gateway>::</gateway>
+//	  <version>v6</version>
+//	</ipv6>
+//	<ipv6_boot_protocol>none</ipv6_boot_protocol>
+//	<mac>
+//	  <address>52:54:00:0c:79:1d</address>
+//	</mac>
+//	<mtu>1500</mtu>
+//	<status>up</status>
+//
 // </host_nic>
 // ----
 //
@@ -21731,35 +21931,37 @@ func (p *HostNic) MustOverrideConfiguration() bool {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>bond0</name>
-//   <mac address="00:00:00:00:00:00"/>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <boot_protocol>dhcp</boot_protocol>
-//   <bonding>
-//     <options>
-//       <option>
-//         <name>mode</name>
-//         <value>4</value>
-//         <type>Dynamic link aggregation (802.3ad)</type>
-//       </option>
-//       <option>
-//         <name>miimon</name>
-//         <value>100</value>
-//       </option>
-//     </options>
-//     <slaves>
-//       <host_nic id="123"/>
-//       <host_nic id="456"/>
-//     </slaves>
-//   </bonding>
-//   <mtu>1500</mtu>
-//   <bridged>true</bridged>
-//   <custom_configuration>false</custom_configuration>
+//
+//	<name>bond0</name>
+//	<mac address="00:00:00:00:00:00"/>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<boot_protocol>dhcp</boot_protocol>
+//	<bonding>
+//	  <options>
+//	    <option>
+//	      <name>mode</name>
+//	      <value>4</value>
+//	      <type>Dynamic link aggregation (802.3ad)</type>
+//	    </option>
+//	    <option>
+//	      <name>miimon</name>
+//	      <value>100</value>
+//	    </option>
+//	  </options>
+//	  <slaves>
+//	    <host_nic id="123"/>
+//	    <host_nic id="456"/>
+//	  </slaves>
+//	</bonding>
+//	<mtu>1500</mtu>
+//	<bridged>true</bridged>
+//	<custom_configuration>false</custom_configuration>
+//
 // </host_nic>
 // ----
 func (p *HostNic) SetPhysicalFunction(attr *HostNic) {
@@ -21773,26 +21975,28 @@ func (p *HostNic) SetPhysicalFunction(attr *HostNic) {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>eth0</name>
-//   <boot_protocol>static</boot_protocol>
-//   <bridged>true</bridged>
-//   <custom_configuration>true</custom_configuration>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <ipv6>
-//     <gateway>::</gateway>
-//     <version>v6</version>
-//   </ipv6>
-//   <ipv6_boot_protocol>none</ipv6_boot_protocol>
-//   <mac>
-//     <address>52:54:00:0c:79:1d</address>
-//   </mac>
-//   <mtu>1500</mtu>
-//   <status>up</status>
+//
+//	<name>eth0</name>
+//	<boot_protocol>static</boot_protocol>
+//	<bridged>true</bridged>
+//	<custom_configuration>true</custom_configuration>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<ipv6>
+//	  <gateway>::</gateway>
+//	  <version>v6</version>
+//	</ipv6>
+//	<ipv6_boot_protocol>none</ipv6_boot_protocol>
+//	<mac>
+//	  <address>52:54:00:0c:79:1d</address>
+//	</mac>
+//	<mtu>1500</mtu>
+//	<status>up</status>
+//
 // </host_nic>
 // ----
 //
@@ -21804,35 +22008,37 @@ func (p *HostNic) SetPhysicalFunction(attr *HostNic) {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>bond0</name>
-//   <mac address="00:00:00:00:00:00"/>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <boot_protocol>dhcp</boot_protocol>
-//   <bonding>
-//     <options>
-//       <option>
-//         <name>mode</name>
-//         <value>4</value>
-//         <type>Dynamic link aggregation (802.3ad)</type>
-//       </option>
-//       <option>
-//         <name>miimon</name>
-//         <value>100</value>
-//       </option>
-//     </options>
-//     <slaves>
-//       <host_nic id="123"/>
-//       <host_nic id="456"/>
-//     </slaves>
-//   </bonding>
-//   <mtu>1500</mtu>
-//   <bridged>true</bridged>
-//   <custom_configuration>false</custom_configuration>
+//
+//	<name>bond0</name>
+//	<mac address="00:00:00:00:00:00"/>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<boot_protocol>dhcp</boot_protocol>
+//	<bonding>
+//	  <options>
+//	    <option>
+//	      <name>mode</name>
+//	      <value>4</value>
+//	      <type>Dynamic link aggregation (802.3ad)</type>
+//	    </option>
+//	    <option>
+//	      <name>miimon</name>
+//	      <value>100</value>
+//	    </option>
+//	  </options>
+//	  <slaves>
+//	    <host_nic id="123"/>
+//	    <host_nic id="456"/>
+//	  </slaves>
+//	</bonding>
+//	<mtu>1500</mtu>
+//	<bridged>true</bridged>
+//	<custom_configuration>false</custom_configuration>
+//
 // </host_nic>
 // ----
 func (p *HostNic) PhysicalFunction() (*HostNic, bool) {
@@ -21849,26 +22055,28 @@ func (p *HostNic) PhysicalFunction() (*HostNic, bool) {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>eth0</name>
-//   <boot_protocol>static</boot_protocol>
-//   <bridged>true</bridged>
-//   <custom_configuration>true</custom_configuration>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <ipv6>
-//     <gateway>::</gateway>
-//     <version>v6</version>
-//   </ipv6>
-//   <ipv6_boot_protocol>none</ipv6_boot_protocol>
-//   <mac>
-//     <address>52:54:00:0c:79:1d</address>
-//   </mac>
-//   <mtu>1500</mtu>
-//   <status>up</status>
+//
+//	<name>eth0</name>
+//	<boot_protocol>static</boot_protocol>
+//	<bridged>true</bridged>
+//	<custom_configuration>true</custom_configuration>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<ipv6>
+//	  <gateway>::</gateway>
+//	  <version>v6</version>
+//	</ipv6>
+//	<ipv6_boot_protocol>none</ipv6_boot_protocol>
+//	<mac>
+//	  <address>52:54:00:0c:79:1d</address>
+//	</mac>
+//	<mtu>1500</mtu>
+//	<status>up</status>
+//
 // </host_nic>
 // ----
 //
@@ -21880,35 +22088,37 @@ func (p *HostNic) PhysicalFunction() (*HostNic, bool) {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>bond0</name>
-//   <mac address="00:00:00:00:00:00"/>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <boot_protocol>dhcp</boot_protocol>
-//   <bonding>
-//     <options>
-//       <option>
-//         <name>mode</name>
-//         <value>4</value>
-//         <type>Dynamic link aggregation (802.3ad)</type>
-//       </option>
-//       <option>
-//         <name>miimon</name>
-//         <value>100</value>
-//       </option>
-//     </options>
-//     <slaves>
-//       <host_nic id="123"/>
-//       <host_nic id="456"/>
-//     </slaves>
-//   </bonding>
-//   <mtu>1500</mtu>
-//   <bridged>true</bridged>
-//   <custom_configuration>false</custom_configuration>
+//
+//	<name>bond0</name>
+//	<mac address="00:00:00:00:00:00"/>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<boot_protocol>dhcp</boot_protocol>
+//	<bonding>
+//	  <options>
+//	    <option>
+//	      <name>mode</name>
+//	      <value>4</value>
+//	      <type>Dynamic link aggregation (802.3ad)</type>
+//	    </option>
+//	    <option>
+//	      <name>miimon</name>
+//	      <value>100</value>
+//	    </option>
+//	  </options>
+//	  <slaves>
+//	    <host_nic id="123"/>
+//	    <host_nic id="456"/>
+//	  </slaves>
+//	</bonding>
+//	<mtu>1500</mtu>
+//	<bridged>true</bridged>
+//	<custom_configuration>false</custom_configuration>
+//
 // </host_nic>
 // ----
 func (p *HostNic) MustPhysicalFunction() *HostNic {
@@ -23052,27 +23262,29 @@ func (p *Image) MustSize() int64 {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *Image) SetStorageDomain(attr *StorageDomain) {
@@ -23086,27 +23298,29 @@ func (p *Image) SetStorageDomain(attr *StorageDomain) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *Image) StorageDomain() (*StorageDomain, bool) {
@@ -23123,27 +23337,29 @@ func (p *Image) StorageDomain() (*StorageDomain, bool) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *Image) MustStorageDomain() *StorageDomain {
@@ -24236,126 +24452,128 @@ func (p *InstanceType) MustCdroms() *CdromSlice {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *InstanceType) SetCluster(attr *Cluster) {
 	p.cluster = attr
@@ -24367,126 +24585,128 @@ func (p *InstanceType) SetCluster(attr *Cluster) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *InstanceType) Cluster() (*Cluster, bool) {
 	if p.cluster != nil {
@@ -24501,126 +24721,128 @@ func (p *InstanceType) Cluster() (*Cluster, bool) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *InstanceType) MustCluster() *Cluster {
 	if p.cluster == nil {
@@ -25279,13 +25501,15 @@ func (p *InstanceType) MustPlacementPolicy() *VmPlacementPolicy {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *InstanceType) SetQuota(attr *Quota) {
@@ -25299,13 +25523,15 @@ func (p *InstanceType) SetQuota(attr *Quota) {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *InstanceType) Quota() (*Quota, bool) {
@@ -25322,13 +25548,15 @@ func (p *InstanceType) Quota() (*Quota, bool) {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *InstanceType) MustQuota() *Quota {
@@ -25502,27 +25730,29 @@ func (p *InstanceType) MustStatus() TemplateStatus {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *InstanceType) SetStorageDomain(attr *StorageDomain) {
@@ -25536,27 +25766,29 @@ func (p *InstanceType) SetStorageDomain(attr *StorageDomain) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *InstanceType) StorageDomain() (*StorageDomain, bool) {
@@ -25573,27 +25805,29 @@ func (p *InstanceType) StorageDomain() (*StorageDomain, bool) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *InstanceType) MustStorageDomain() *StorageDomain {
@@ -27113,20 +27347,22 @@ func (p *Ksm) MustMergeAcrossNodes() bool {
 // [source,xml]
 // ----
 // <link_layer_discovery_protocol_element>
-//   <name>Port VLAN Id</name>
-//   <oui>32962</oui>
-//   <properties>
-//     <property>
-//       <name>vlan id</name>
-//       <value>488</value>
-//     </property>
-//     <property>
-//       <name>vlan name</name>
-//       <value>v2-0488-03-0505</value>
-//     </property>
-//   </properties>
-//   <subtype>3</subtype>
-//   <type>127</type>
+//
+//	<name>Port VLAN Id</name>
+//	<oui>32962</oui>
+//	<properties>
+//	  <property>
+//	    <name>vlan id</name>
+//	    <value>488</value>
+//	  </property>
+//	  <property>
+//	    <name>vlan name</name>
+//	    <value>v2-0488-03-0505</value>
+//	  </property>
+//	</properties>
+//	<subtype>3</subtype>
+//	<type>127</type>
+//
 // </link_layer_discovery_protocol_element>
 // ----
 type LinkLayerDiscoveryProtocolElement struct {
@@ -27795,16 +28031,18 @@ func (p *Mac) MustAddress() string {
 // [source,xml]
 // ----
 // <mac_pool href="/ovirt-engine/api/macpools/123" id="123">
-//   <name>Default</name>
-//   <description>Default MAC pool</description>
-//   <allow_duplicates>false</allow_duplicates>
-//   <default_pool>true</default_pool>
-//   <ranges>
-//     <range>
-//       <from>00:1A:4A:16:01:51</from>
-//       <to>00:1A:4A:16:01:E6</to>
-//     </range>
-//   </ranges>
+//
+//	<name>Default</name>
+//	<description>Default MAC pool</description>
+//	<allow_duplicates>false</allow_duplicates>
+//	<default_pool>true</default_pool>
+//	<ranges>
+//	  <range>
+//	    <from>00:1A:4A:16:01:51</from>
+//	    <to>00:1A:4A:16:01:E6</to>
+//	  </range>
+//	</ranges>
+//
 // </mac_pool>
 // ----
 type MacPool struct {
@@ -28393,33 +28631,35 @@ func (p *MigrationPolicy) MustName() string {
 //
 // [source,json]
 // ----
-// {
-//   "network" : [ {
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "stp" : "false",
-//     "mtu" : "0",
-//     "usages" : {
-//       "usage" : [ "vm" ]
-//     },
-//     "name" : "ovirtmgmt",
-//     "description" : "Management Network",
-//     "href" : "/ovirt-engine/api/networks/456",
-//     "id" : "456",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/networks/456/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
-//       "rel" : "vnicprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/labels",
-//       "rel" : "labels"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "network" : [ {
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "stp" : "false",
+//	    "mtu" : "0",
+//	    "usages" : {
+//	      "usage" : [ "vm" ]
+//	    },
+//	    "name" : "ovirtmgmt",
+//	    "description" : "Management Network",
+//	    "href" : "/ovirt-engine/api/networks/456",
+//	    "id" : "456",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/networks/456/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
+//	      "rel" : "vnicprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/labels",
+//	      "rel" : "labels"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 //
 // An example of the XML representation of the same logical network:
@@ -28427,17 +28667,19 @@ func (p *MigrationPolicy) MustName() string {
 // [source,xml]
 // ----
 // <network href="/ovirt-engine/api/networks/456" id="456">
-//   <name>ovirtmgmt</name>
-//   <description>Management Network</description>
-//   <link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
-//   <link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
-//   <link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
-//   <data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
-//   <stp>false</stp>
-//   <mtu>0</mtu>
-//   <usages>
-//     <usage>vm</usage>
-//   </usages>
+//
+//	<name>ovirtmgmt</name>
+//	<description>Management Network</description>
+//	<link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
+//	<link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
+//	<link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
+//	<data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
+//	<stp>false</stp>
+//	<mtu>0</mtu>
+//	<usages>
+//	  <usage>vm</usage>
+//	</usages>
+//
 // </network>
 // ----
 type Network struct {
@@ -28474,126 +28716,128 @@ type Network struct {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *Network) SetCluster(attr *Cluster) {
 	p.cluster = attr
@@ -28605,126 +28849,128 @@ func (p *Network) SetCluster(attr *Cluster) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *Network) Cluster() (*Cluster, bool) {
 	if p.cluster != nil {
@@ -28739,126 +28985,128 @@ func (p *Network) Cluster() (*Cluster, bool) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *Network) MustCluster() *Cluster {
 	if p.cluster == nil {
@@ -28987,33 +29235,35 @@ func (p *Network) MustExternalProvider() *OpenStackNetworkProvider {
 //
 // [source,json]
 // ----
-// {
-//   "network" : [ {
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "stp" : "false",
-//     "mtu" : "0",
-//     "usages" : {
-//       "usage" : [ "vm" ]
-//     },
-//     "name" : "ovirtmgmt",
-//     "description" : "Management Network",
-//     "href" : "/ovirt-engine/api/networks/456",
-//     "id" : "456",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/networks/456/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
-//       "rel" : "vnicprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/labels",
-//       "rel" : "labels"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "network" : [ {
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "stp" : "false",
+//	    "mtu" : "0",
+//	    "usages" : {
+//	      "usage" : [ "vm" ]
+//	    },
+//	    "name" : "ovirtmgmt",
+//	    "description" : "Management Network",
+//	    "href" : "/ovirt-engine/api/networks/456",
+//	    "id" : "456",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/networks/456/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
+//	      "rel" : "vnicprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/labels",
+//	      "rel" : "labels"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 //
 // An example of the XML representation of the same logical network:
@@ -29021,17 +29271,19 @@ func (p *Network) MustExternalProvider() *OpenStackNetworkProvider {
 // [source,xml]
 // ----
 // <network href="/ovirt-engine/api/networks/456" id="456">
-//   <name>ovirtmgmt</name>
-//   <description>Management Network</description>
-//   <link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
-//   <link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
-//   <link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
-//   <data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
-//   <stp>false</stp>
-//   <mtu>0</mtu>
-//   <usages>
-//     <usage>vm</usage>
-//   </usages>
+//
+//	<name>ovirtmgmt</name>
+//	<description>Management Network</description>
+//	<link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
+//	<link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
+//	<link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
+//	<data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
+//	<stp>false</stp>
+//	<mtu>0</mtu>
+//	<usages>
+//	  <usage>vm</usage>
+//	</usages>
+//
 // </network>
 // ----
 func (p *Network) SetExternalProviderPhysicalNetwork(attr *Network) {
@@ -29044,33 +29296,35 @@ func (p *Network) SetExternalProviderPhysicalNetwork(attr *Network) {
 //
 // [source,json]
 // ----
-// {
-//   "network" : [ {
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "stp" : "false",
-//     "mtu" : "0",
-//     "usages" : {
-//       "usage" : [ "vm" ]
-//     },
-//     "name" : "ovirtmgmt",
-//     "description" : "Management Network",
-//     "href" : "/ovirt-engine/api/networks/456",
-//     "id" : "456",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/networks/456/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
-//       "rel" : "vnicprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/labels",
-//       "rel" : "labels"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "network" : [ {
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "stp" : "false",
+//	    "mtu" : "0",
+//	    "usages" : {
+//	      "usage" : [ "vm" ]
+//	    },
+//	    "name" : "ovirtmgmt",
+//	    "description" : "Management Network",
+//	    "href" : "/ovirt-engine/api/networks/456",
+//	    "id" : "456",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/networks/456/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
+//	      "rel" : "vnicprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/labels",
+//	      "rel" : "labels"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 //
 // An example of the XML representation of the same logical network:
@@ -29078,17 +29332,19 @@ func (p *Network) SetExternalProviderPhysicalNetwork(attr *Network) {
 // [source,xml]
 // ----
 // <network href="/ovirt-engine/api/networks/456" id="456">
-//   <name>ovirtmgmt</name>
-//   <description>Management Network</description>
-//   <link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
-//   <link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
-//   <link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
-//   <data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
-//   <stp>false</stp>
-//   <mtu>0</mtu>
-//   <usages>
-//     <usage>vm</usage>
-//   </usages>
+//
+//	<name>ovirtmgmt</name>
+//	<description>Management Network</description>
+//	<link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
+//	<link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
+//	<link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
+//	<data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
+//	<stp>false</stp>
+//	<mtu>0</mtu>
+//	<usages>
+//	  <usage>vm</usage>
+//	</usages>
+//
 // </network>
 // ----
 func (p *Network) ExternalProviderPhysicalNetwork() (*Network, bool) {
@@ -29104,33 +29360,35 @@ func (p *Network) ExternalProviderPhysicalNetwork() (*Network, bool) {
 //
 // [source,json]
 // ----
-// {
-//   "network" : [ {
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "stp" : "false",
-//     "mtu" : "0",
-//     "usages" : {
-//       "usage" : [ "vm" ]
-//     },
-//     "name" : "ovirtmgmt",
-//     "description" : "Management Network",
-//     "href" : "/ovirt-engine/api/networks/456",
-//     "id" : "456",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/networks/456/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
-//       "rel" : "vnicprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/labels",
-//       "rel" : "labels"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "network" : [ {
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "stp" : "false",
+//	    "mtu" : "0",
+//	    "usages" : {
+//	      "usage" : [ "vm" ]
+//	    },
+//	    "name" : "ovirtmgmt",
+//	    "description" : "Management Network",
+//	    "href" : "/ovirt-engine/api/networks/456",
+//	    "id" : "456",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/networks/456/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
+//	      "rel" : "vnicprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/labels",
+//	      "rel" : "labels"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 //
 // An example of the XML representation of the same logical network:
@@ -29138,17 +29396,19 @@ func (p *Network) ExternalProviderPhysicalNetwork() (*Network, bool) {
 // [source,xml]
 // ----
 // <network href="/ovirt-engine/api/networks/456" id="456">
-//   <name>ovirtmgmt</name>
-//   <description>Management Network</description>
-//   <link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
-//   <link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
-//   <link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
-//   <data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
-//   <stp>false</stp>
-//   <mtu>0</mtu>
-//   <usages>
-//     <usage>vm</usage>
-//   </usages>
+//
+//	<name>ovirtmgmt</name>
+//	<description>Management Network</description>
+//	<link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
+//	<link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
+//	<link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
+//	<data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
+//	<stp>false</stp>
+//	<mtu>0</mtu>
+//	<usages>
+//	  <usage>vm</usage>
+//	</usages>
+//
 // </network>
 // ----
 func (p *Network) MustExternalProviderPhysicalNetwork() *Network {
@@ -29507,35 +29767,37 @@ func (p *Network) MustVnicProfiles() *VnicProfileSlice {
 // [source,xml]
 // ----
 // <network_attachment href="/ovirt-engine/api/hosts/123/nics/456/networkattachments/789" id="789">
-//   <network href="/ovirt-engine/api/networks/234" id="234"/>
-//   <host_nic href="/ovirt-engine/api/hosts/123/nics/123" id="123"/>
-//   <in_sync>true</in_sync>
-//   <ip_address_assignments>
-//     <ip_address_assignment>
-//       <assignment_method>static</assignment_method>
-//       <ip>
-//         <address>192.168.122.39</address>
-//         <gateway>192.168.122.1</gateway>
-//         <netmask>255.255.255.0</netmask>
-//         <version>v4</version>
-//       </ip>
-//     </ip_address_assignment>
-//   </ip_address_assignments>
-//   <reported_configurations>
-//     <reported_configuration>
-//       <name>mtu</name>
-//       <expected_value>1500</expected_value>
-//       <actual_value>1500</actual_value>
-//       <in_sync>true</in_sync>
-//     </reported_configuration>
-//     <reported_configuration>
-//       <name>bridged</name>
-//       <expected_value>true</expected_value>
-//       <actual_value>true</actual_value>
-//       <in_sync>true</in_sync>
-//     </reported_configuration>
-//     ...
-//   </reported_configurations>
+//
+//	<network href="/ovirt-engine/api/networks/234" id="234"/>
+//	<host_nic href="/ovirt-engine/api/hosts/123/nics/123" id="123"/>
+//	<in_sync>true</in_sync>
+//	<ip_address_assignments>
+//	  <ip_address_assignment>
+//	    <assignment_method>static</assignment_method>
+//	    <ip>
+//	      <address>192.168.122.39</address>
+//	      <gateway>192.168.122.1</gateway>
+//	      <netmask>255.255.255.0</netmask>
+//	      <version>v4</version>
+//	    </ip>
+//	  </ip_address_assignment>
+//	</ip_address_assignments>
+//	<reported_configurations>
+//	  <reported_configuration>
+//	    <name>mtu</name>
+//	    <expected_value>1500</expected_value>
+//	    <actual_value>1500</actual_value>
+//	    <in_sync>true</in_sync>
+//	  </reported_configuration>
+//	  <reported_configuration>
+//	    <name>bridged</name>
+//	    <expected_value>true</expected_value>
+//	    <actual_value>true</actual_value>
+//	    <in_sync>true</in_sync>
+//	  </reported_configuration>
+//	  ...
+//	</reported_configurations>
+//
 // </network_attachment>
 // ----
 //
@@ -29554,7 +29816,9 @@ func (p *Network) MustVnicProfiles() *VnicProfileSlice {
 // [source,xml]
 // ----
 // <networkattachment>
-//   <network id="234"/>
+//
+//	<network id="234"/>
+//
 // </networkattachment>
 // ----
 //
@@ -29570,8 +29834,10 @@ func (p *Network) MustVnicProfiles() *VnicProfileSlice {
 // [source,xml]
 // ----
 // <network_attachment>
-//   <network id="234"/>
-//   <host_nic id="456"/>
+//
+//	<network id="234"/>
+//	<host_nic id="456"/>
+//
 // </network_attachment>
 // ----
 //
@@ -29589,17 +29855,19 @@ func (p *Network) MustVnicProfiles() *VnicProfileSlice {
 // [source,xml]
 // ----
 // <network_attachment>
-//   <ip_address_assignments>
-//     <ip_address_assignment>
-//       <assignment_method>static</assignment_method>
-//       <ip>
-//         <address>7.1.1.1</address>
-//         <gateway>7.1.1.2</gateway>
-//         <netmask>255.255.255.0</netmask>
-//         <version>v4</version>
-//       </ip>
-//     </ip_address_assignment>
-//   </ip_address_assignments>
+//
+//	<ip_address_assignments>
+//	  <ip_address_assignment>
+//	    <assignment_method>static</assignment_method>
+//	    <ip>
+//	      <address>7.1.1.1</address>
+//	      <gateway>7.1.1.2</gateway>
+//	      <netmask>255.255.255.0</netmask>
+//	      <version>v4</version>
+//	    </ip>
+//	  </ip_address_assignment>
+//	</ip_address_assignments>
+//
 // </network_attachment>
 // ----
 //
@@ -29617,15 +29885,17 @@ func (p *Network) MustVnicProfiles() *VnicProfileSlice {
 // [source, xml]
 // ----
 // <network_attachment>
-//   <properties>
-//     <property>
-//       <name>bridge_opts</name>
-//       <value>
-//         forward_delay=1500 group_fwd_mask=0x0 multicast_snooping=1
-//       </value>
-//     </property>
-//   </properties>
-//   ...
+//
+//	<properties>
+//	  <property>
+//	    <name>bridge_opts</name>
+//	    <value>
+//	      forward_delay=1500 group_fwd_mask=0x0 multicast_snooping=1
+//	    </value>
+//	  </property>
+//	</properties>
+//	...
+//
 // </network_attachment>
 // ----
 type NetworkAttachment struct {
@@ -29732,26 +30002,28 @@ func (p *NetworkAttachment) MustHost() *Host {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>eth0</name>
-//   <boot_protocol>static</boot_protocol>
-//   <bridged>true</bridged>
-//   <custom_configuration>true</custom_configuration>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <ipv6>
-//     <gateway>::</gateway>
-//     <version>v6</version>
-//   </ipv6>
-//   <ipv6_boot_protocol>none</ipv6_boot_protocol>
-//   <mac>
-//     <address>52:54:00:0c:79:1d</address>
-//   </mac>
-//   <mtu>1500</mtu>
-//   <status>up</status>
+//
+//	<name>eth0</name>
+//	<boot_protocol>static</boot_protocol>
+//	<bridged>true</bridged>
+//	<custom_configuration>true</custom_configuration>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<ipv6>
+//	  <gateway>::</gateway>
+//	  <version>v6</version>
+//	</ipv6>
+//	<ipv6_boot_protocol>none</ipv6_boot_protocol>
+//	<mac>
+//	  <address>52:54:00:0c:79:1d</address>
+//	</mac>
+//	<mtu>1500</mtu>
+//	<status>up</status>
+//
 // </host_nic>
 // ----
 //
@@ -29763,35 +30035,37 @@ func (p *NetworkAttachment) MustHost() *Host {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>bond0</name>
-//   <mac address="00:00:00:00:00:00"/>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <boot_protocol>dhcp</boot_protocol>
-//   <bonding>
-//     <options>
-//       <option>
-//         <name>mode</name>
-//         <value>4</value>
-//         <type>Dynamic link aggregation (802.3ad)</type>
-//       </option>
-//       <option>
-//         <name>miimon</name>
-//         <value>100</value>
-//       </option>
-//     </options>
-//     <slaves>
-//       <host_nic id="123"/>
-//       <host_nic id="456"/>
-//     </slaves>
-//   </bonding>
-//   <mtu>1500</mtu>
-//   <bridged>true</bridged>
-//   <custom_configuration>false</custom_configuration>
+//
+//	<name>bond0</name>
+//	<mac address="00:00:00:00:00:00"/>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<boot_protocol>dhcp</boot_protocol>
+//	<bonding>
+//	  <options>
+//	    <option>
+//	      <name>mode</name>
+//	      <value>4</value>
+//	      <type>Dynamic link aggregation (802.3ad)</type>
+//	    </option>
+//	    <option>
+//	      <name>miimon</name>
+//	      <value>100</value>
+//	    </option>
+//	  </options>
+//	  <slaves>
+//	    <host_nic id="123"/>
+//	    <host_nic id="456"/>
+//	  </slaves>
+//	</bonding>
+//	<mtu>1500</mtu>
+//	<bridged>true</bridged>
+//	<custom_configuration>false</custom_configuration>
+//
 // </host_nic>
 // ----
 func (p *NetworkAttachment) SetHostNic(attr *HostNic) {
@@ -29805,26 +30079,28 @@ func (p *NetworkAttachment) SetHostNic(attr *HostNic) {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>eth0</name>
-//   <boot_protocol>static</boot_protocol>
-//   <bridged>true</bridged>
-//   <custom_configuration>true</custom_configuration>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <ipv6>
-//     <gateway>::</gateway>
-//     <version>v6</version>
-//   </ipv6>
-//   <ipv6_boot_protocol>none</ipv6_boot_protocol>
-//   <mac>
-//     <address>52:54:00:0c:79:1d</address>
-//   </mac>
-//   <mtu>1500</mtu>
-//   <status>up</status>
+//
+//	<name>eth0</name>
+//	<boot_protocol>static</boot_protocol>
+//	<bridged>true</bridged>
+//	<custom_configuration>true</custom_configuration>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<ipv6>
+//	  <gateway>::</gateway>
+//	  <version>v6</version>
+//	</ipv6>
+//	<ipv6_boot_protocol>none</ipv6_boot_protocol>
+//	<mac>
+//	  <address>52:54:00:0c:79:1d</address>
+//	</mac>
+//	<mtu>1500</mtu>
+//	<status>up</status>
+//
 // </host_nic>
 // ----
 //
@@ -29836,35 +30112,37 @@ func (p *NetworkAttachment) SetHostNic(attr *HostNic) {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>bond0</name>
-//   <mac address="00:00:00:00:00:00"/>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <boot_protocol>dhcp</boot_protocol>
-//   <bonding>
-//     <options>
-//       <option>
-//         <name>mode</name>
-//         <value>4</value>
-//         <type>Dynamic link aggregation (802.3ad)</type>
-//       </option>
-//       <option>
-//         <name>miimon</name>
-//         <value>100</value>
-//       </option>
-//     </options>
-//     <slaves>
-//       <host_nic id="123"/>
-//       <host_nic id="456"/>
-//     </slaves>
-//   </bonding>
-//   <mtu>1500</mtu>
-//   <bridged>true</bridged>
-//   <custom_configuration>false</custom_configuration>
+//
+//	<name>bond0</name>
+//	<mac address="00:00:00:00:00:00"/>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<boot_protocol>dhcp</boot_protocol>
+//	<bonding>
+//	  <options>
+//	    <option>
+//	      <name>mode</name>
+//	      <value>4</value>
+//	      <type>Dynamic link aggregation (802.3ad)</type>
+//	    </option>
+//	    <option>
+//	      <name>miimon</name>
+//	      <value>100</value>
+//	    </option>
+//	  </options>
+//	  <slaves>
+//	    <host_nic id="123"/>
+//	    <host_nic id="456"/>
+//	  </slaves>
+//	</bonding>
+//	<mtu>1500</mtu>
+//	<bridged>true</bridged>
+//	<custom_configuration>false</custom_configuration>
+//
 // </host_nic>
 // ----
 func (p *NetworkAttachment) HostNic() (*HostNic, bool) {
@@ -29881,26 +30159,28 @@ func (p *NetworkAttachment) HostNic() (*HostNic, bool) {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>eth0</name>
-//   <boot_protocol>static</boot_protocol>
-//   <bridged>true</bridged>
-//   <custom_configuration>true</custom_configuration>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <ipv6>
-//     <gateway>::</gateway>
-//     <version>v6</version>
-//   </ipv6>
-//   <ipv6_boot_protocol>none</ipv6_boot_protocol>
-//   <mac>
-//     <address>52:54:00:0c:79:1d</address>
-//   </mac>
-//   <mtu>1500</mtu>
-//   <status>up</status>
+//
+//	<name>eth0</name>
+//	<boot_protocol>static</boot_protocol>
+//	<bridged>true</bridged>
+//	<custom_configuration>true</custom_configuration>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<ipv6>
+//	  <gateway>::</gateway>
+//	  <version>v6</version>
+//	</ipv6>
+//	<ipv6_boot_protocol>none</ipv6_boot_protocol>
+//	<mac>
+//	  <address>52:54:00:0c:79:1d</address>
+//	</mac>
+//	<mtu>1500</mtu>
+//	<status>up</status>
+//
 // </host_nic>
 // ----
 //
@@ -29912,35 +30192,37 @@ func (p *NetworkAttachment) HostNic() (*HostNic, bool) {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>bond0</name>
-//   <mac address="00:00:00:00:00:00"/>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <boot_protocol>dhcp</boot_protocol>
-//   <bonding>
-//     <options>
-//       <option>
-//         <name>mode</name>
-//         <value>4</value>
-//         <type>Dynamic link aggregation (802.3ad)</type>
-//       </option>
-//       <option>
-//         <name>miimon</name>
-//         <value>100</value>
-//       </option>
-//     </options>
-//     <slaves>
-//       <host_nic id="123"/>
-//       <host_nic id="456"/>
-//     </slaves>
-//   </bonding>
-//   <mtu>1500</mtu>
-//   <bridged>true</bridged>
-//   <custom_configuration>false</custom_configuration>
+//
+//	<name>bond0</name>
+//	<mac address="00:00:00:00:00:00"/>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<boot_protocol>dhcp</boot_protocol>
+//	<bonding>
+//	  <options>
+//	    <option>
+//	      <name>mode</name>
+//	      <value>4</value>
+//	      <type>Dynamic link aggregation (802.3ad)</type>
+//	    </option>
+//	    <option>
+//	      <name>miimon</name>
+//	      <value>100</value>
+//	    </option>
+//	  </options>
+//	  <slaves>
+//	    <host_nic id="123"/>
+//	    <host_nic id="456"/>
+//	  </slaves>
+//	</bonding>
+//	<mtu>1500</mtu>
+//	<bridged>true</bridged>
+//	<custom_configuration>false</custom_configuration>
+//
 // </host_nic>
 // ----
 func (p *NetworkAttachment) MustHostNic() *HostNic {
@@ -30031,33 +30313,35 @@ func (p *NetworkAttachment) MustName() string {
 //
 // [source,json]
 // ----
-// {
-//   "network" : [ {
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "stp" : "false",
-//     "mtu" : "0",
-//     "usages" : {
-//       "usage" : [ "vm" ]
-//     },
-//     "name" : "ovirtmgmt",
-//     "description" : "Management Network",
-//     "href" : "/ovirt-engine/api/networks/456",
-//     "id" : "456",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/networks/456/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
-//       "rel" : "vnicprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/labels",
-//       "rel" : "labels"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "network" : [ {
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "stp" : "false",
+//	    "mtu" : "0",
+//	    "usages" : {
+//	      "usage" : [ "vm" ]
+//	    },
+//	    "name" : "ovirtmgmt",
+//	    "description" : "Management Network",
+//	    "href" : "/ovirt-engine/api/networks/456",
+//	    "id" : "456",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/networks/456/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
+//	      "rel" : "vnicprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/labels",
+//	      "rel" : "labels"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 //
 // An example of the XML representation of the same logical network:
@@ -30065,17 +30349,19 @@ func (p *NetworkAttachment) MustName() string {
 // [source,xml]
 // ----
 // <network href="/ovirt-engine/api/networks/456" id="456">
-//   <name>ovirtmgmt</name>
-//   <description>Management Network</description>
-//   <link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
-//   <link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
-//   <link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
-//   <data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
-//   <stp>false</stp>
-//   <mtu>0</mtu>
-//   <usages>
-//     <usage>vm</usage>
-//   </usages>
+//
+//	<name>ovirtmgmt</name>
+//	<description>Management Network</description>
+//	<link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
+//	<link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
+//	<link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
+//	<data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
+//	<stp>false</stp>
+//	<mtu>0</mtu>
+//	<usages>
+//	  <usage>vm</usage>
+//	</usages>
+//
 // </network>
 // ----
 func (p *NetworkAttachment) SetNetwork(attr *Network) {
@@ -30088,33 +30374,35 @@ func (p *NetworkAttachment) SetNetwork(attr *Network) {
 //
 // [source,json]
 // ----
-// {
-//   "network" : [ {
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "stp" : "false",
-//     "mtu" : "0",
-//     "usages" : {
-//       "usage" : [ "vm" ]
-//     },
-//     "name" : "ovirtmgmt",
-//     "description" : "Management Network",
-//     "href" : "/ovirt-engine/api/networks/456",
-//     "id" : "456",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/networks/456/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
-//       "rel" : "vnicprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/labels",
-//       "rel" : "labels"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "network" : [ {
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "stp" : "false",
+//	    "mtu" : "0",
+//	    "usages" : {
+//	      "usage" : [ "vm" ]
+//	    },
+//	    "name" : "ovirtmgmt",
+//	    "description" : "Management Network",
+//	    "href" : "/ovirt-engine/api/networks/456",
+//	    "id" : "456",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/networks/456/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
+//	      "rel" : "vnicprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/labels",
+//	      "rel" : "labels"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 //
 // An example of the XML representation of the same logical network:
@@ -30122,17 +30410,19 @@ func (p *NetworkAttachment) SetNetwork(attr *Network) {
 // [source,xml]
 // ----
 // <network href="/ovirt-engine/api/networks/456" id="456">
-//   <name>ovirtmgmt</name>
-//   <description>Management Network</description>
-//   <link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
-//   <link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
-//   <link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
-//   <data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
-//   <stp>false</stp>
-//   <mtu>0</mtu>
-//   <usages>
-//     <usage>vm</usage>
-//   </usages>
+//
+//	<name>ovirtmgmt</name>
+//	<description>Management Network</description>
+//	<link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
+//	<link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
+//	<link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
+//	<data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
+//	<stp>false</stp>
+//	<mtu>0</mtu>
+//	<usages>
+//	  <usage>vm</usage>
+//	</usages>
+//
 // </network>
 // ----
 func (p *NetworkAttachment) Network() (*Network, bool) {
@@ -30148,33 +30438,35 @@ func (p *NetworkAttachment) Network() (*Network, bool) {
 //
 // [source,json]
 // ----
-// {
-//   "network" : [ {
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "stp" : "false",
-//     "mtu" : "0",
-//     "usages" : {
-//       "usage" : [ "vm" ]
-//     },
-//     "name" : "ovirtmgmt",
-//     "description" : "Management Network",
-//     "href" : "/ovirt-engine/api/networks/456",
-//     "id" : "456",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/networks/456/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
-//       "rel" : "vnicprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/labels",
-//       "rel" : "labels"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "network" : [ {
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "stp" : "false",
+//	    "mtu" : "0",
+//	    "usages" : {
+//	      "usage" : [ "vm" ]
+//	    },
+//	    "name" : "ovirtmgmt",
+//	    "description" : "Management Network",
+//	    "href" : "/ovirt-engine/api/networks/456",
+//	    "id" : "456",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/networks/456/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
+//	      "rel" : "vnicprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/labels",
+//	      "rel" : "labels"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 //
 // An example of the XML representation of the same logical network:
@@ -30182,17 +30474,19 @@ func (p *NetworkAttachment) Network() (*Network, bool) {
 // [source,xml]
 // ----
 // <network href="/ovirt-engine/api/networks/456" id="456">
-//   <name>ovirtmgmt</name>
-//   <description>Management Network</description>
-//   <link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
-//   <link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
-//   <link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
-//   <data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
-//   <stp>false</stp>
-//   <mtu>0</mtu>
-//   <usages>
-//     <usage>vm</usage>
-//   </usages>
+//
+//	<name>ovirtmgmt</name>
+//	<description>Management Network</description>
+//	<link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
+//	<link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
+//	<link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
+//	<data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
+//	<stp>false</stp>
+//	<mtu>0</mtu>
+//	<usages>
+//	  <usage>vm</usage>
+//	</usages>
+//
 // </network>
 // ----
 func (p *NetworkAttachment) MustNetwork() *Network {
@@ -30356,13 +30650,15 @@ func (p *NetworkConfiguration) MustNics() *NicSlice {
 // [source,xml]
 // ----
 // <network_filter id="00000019-0019-0019-0019-00000000026c">
-//   <name>example-filter</name>
-//   <version>
-//     <major>4</major>
-//     <minor>0</minor>
-//     <build>-1</build>
-//     <revision>-1</revision>
-//   </version>
+//
+//	<name>example-filter</name>
+//	<version>
+//	  <major>4</major>
+//	  <minor>0</minor>
+//	  <build>-1</build>
+//	  <revision>-1</revision>
+//	</version>
+//
 // </network_filter>
 // ----
 //
@@ -30478,8 +30774,10 @@ func (p *NetworkFilter) MustVersion() *Version {
 // [source,xml]
 // ----
 // <network_filter_parameter id="123">
-//   <name>IP</name>
-//   <value>10.0.1.2</value>
+//
+//	<name>IP</name>
+//	<value>10.0.1.2</value>
+//
 // </network_filter_parameter>
 // ----
 type NetworkFilterParameter struct {
@@ -30575,15 +30873,17 @@ func (p *NetworkFilterParameter) MustName() string {
 // [source,xml]
 // ----
 // <nic href="/ovirt-engine/api/vms/123/nics/456" id="456">
-//   <name>nic1</name>
-//   <vm href="/ovirt-engine/api/vms/123" id="123"/>
-//   <interface>virtio</interface>
-//   <linked>true</linked>
-//   <mac>
-//     <address>02:00:00:00:00:00</address>
-//   </mac>
-//   <plugged>true</plugged>
-//   <vnic_profile href="/ovirt-engine/api/vnicprofiles/789" id="789"/>
+//
+//	<name>nic1</name>
+//	<vm href="/ovirt-engine/api/vms/123" id="123"/>
+//	<interface>virtio</interface>
+//	<linked>true</linked>
+//	<mac>
+//	  <address>02:00:00:00:00:00</address>
+//	</mac>
+//	<plugged>true</plugged>
+//	<vnic_profile href="/ovirt-engine/api/vnicprofiles/789" id="789"/>
+//
 // </nic>
 // ----
 func (p *NetworkFilterParameter) SetNic(attr *Nic) {
@@ -30597,15 +30897,17 @@ func (p *NetworkFilterParameter) SetNic(attr *Nic) {
 // [source,xml]
 // ----
 // <nic href="/ovirt-engine/api/vms/123/nics/456" id="456">
-//   <name>nic1</name>
-//   <vm href="/ovirt-engine/api/vms/123" id="123"/>
-//   <interface>virtio</interface>
-//   <linked>true</linked>
-//   <mac>
-//     <address>02:00:00:00:00:00</address>
-//   </mac>
-//   <plugged>true</plugged>
-//   <vnic_profile href="/ovirt-engine/api/vnicprofiles/789" id="789"/>
+//
+//	<name>nic1</name>
+//	<vm href="/ovirt-engine/api/vms/123" id="123"/>
+//	<interface>virtio</interface>
+//	<linked>true</linked>
+//	<mac>
+//	  <address>02:00:00:00:00:00</address>
+//	</mac>
+//	<plugged>true</plugged>
+//	<vnic_profile href="/ovirt-engine/api/vnicprofiles/789" id="789"/>
+//
 // </nic>
 // ----
 func (p *NetworkFilterParameter) Nic() (*Nic, bool) {
@@ -30622,15 +30924,17 @@ func (p *NetworkFilterParameter) Nic() (*Nic, bool) {
 // [source,xml]
 // ----
 // <nic href="/ovirt-engine/api/vms/123/nics/456" id="456">
-//   <name>nic1</name>
-//   <vm href="/ovirt-engine/api/vms/123" id="123"/>
-//   <interface>virtio</interface>
-//   <linked>true</linked>
-//   <mac>
-//     <address>02:00:00:00:00:00</address>
-//   </mac>
-//   <plugged>true</plugged>
-//   <vnic_profile href="/ovirt-engine/api/vnicprofiles/789" id="789"/>
+//
+//	<name>nic1</name>
+//	<vm href="/ovirt-engine/api/vms/123" id="123"/>
+//	<interface>virtio</interface>
+//	<linked>true</linked>
+//	<mac>
+//	  <address>02:00:00:00:00:00</address>
+//	</mac>
+//	<plugged>true</plugged>
+//	<vnic_profile href="/ovirt-engine/api/vnicprofiles/789" id="789"/>
+//
 // </nic>
 // ----
 func (p *NetworkFilterParameter) MustNic() *Nic {
@@ -30716,26 +31020,28 @@ func (p *NetworkLabel) MustDescription() string {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>eth0</name>
-//   <boot_protocol>static</boot_protocol>
-//   <bridged>true</bridged>
-//   <custom_configuration>true</custom_configuration>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <ipv6>
-//     <gateway>::</gateway>
-//     <version>v6</version>
-//   </ipv6>
-//   <ipv6_boot_protocol>none</ipv6_boot_protocol>
-//   <mac>
-//     <address>52:54:00:0c:79:1d</address>
-//   </mac>
-//   <mtu>1500</mtu>
-//   <status>up</status>
+//
+//	<name>eth0</name>
+//	<boot_protocol>static</boot_protocol>
+//	<bridged>true</bridged>
+//	<custom_configuration>true</custom_configuration>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<ipv6>
+//	  <gateway>::</gateway>
+//	  <version>v6</version>
+//	</ipv6>
+//	<ipv6_boot_protocol>none</ipv6_boot_protocol>
+//	<mac>
+//	  <address>52:54:00:0c:79:1d</address>
+//	</mac>
+//	<mtu>1500</mtu>
+//	<status>up</status>
+//
 // </host_nic>
 // ----
 //
@@ -30747,35 +31053,37 @@ func (p *NetworkLabel) MustDescription() string {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>bond0</name>
-//   <mac address="00:00:00:00:00:00"/>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <boot_protocol>dhcp</boot_protocol>
-//   <bonding>
-//     <options>
-//       <option>
-//         <name>mode</name>
-//         <value>4</value>
-//         <type>Dynamic link aggregation (802.3ad)</type>
-//       </option>
-//       <option>
-//         <name>miimon</name>
-//         <value>100</value>
-//       </option>
-//     </options>
-//     <slaves>
-//       <host_nic id="123"/>
-//       <host_nic id="456"/>
-//     </slaves>
-//   </bonding>
-//   <mtu>1500</mtu>
-//   <bridged>true</bridged>
-//   <custom_configuration>false</custom_configuration>
+//
+//	<name>bond0</name>
+//	<mac address="00:00:00:00:00:00"/>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<boot_protocol>dhcp</boot_protocol>
+//	<bonding>
+//	  <options>
+//	    <option>
+//	      <name>mode</name>
+//	      <value>4</value>
+//	      <type>Dynamic link aggregation (802.3ad)</type>
+//	    </option>
+//	    <option>
+//	      <name>miimon</name>
+//	      <value>100</value>
+//	    </option>
+//	  </options>
+//	  <slaves>
+//	    <host_nic id="123"/>
+//	    <host_nic id="456"/>
+//	  </slaves>
+//	</bonding>
+//	<mtu>1500</mtu>
+//	<bridged>true</bridged>
+//	<custom_configuration>false</custom_configuration>
+//
 // </host_nic>
 // ----
 func (p *NetworkLabel) SetHostNic(attr *HostNic) {
@@ -30789,26 +31097,28 @@ func (p *NetworkLabel) SetHostNic(attr *HostNic) {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>eth0</name>
-//   <boot_protocol>static</boot_protocol>
-//   <bridged>true</bridged>
-//   <custom_configuration>true</custom_configuration>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <ipv6>
-//     <gateway>::</gateway>
-//     <version>v6</version>
-//   </ipv6>
-//   <ipv6_boot_protocol>none</ipv6_boot_protocol>
-//   <mac>
-//     <address>52:54:00:0c:79:1d</address>
-//   </mac>
-//   <mtu>1500</mtu>
-//   <status>up</status>
+//
+//	<name>eth0</name>
+//	<boot_protocol>static</boot_protocol>
+//	<bridged>true</bridged>
+//	<custom_configuration>true</custom_configuration>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<ipv6>
+//	  <gateway>::</gateway>
+//	  <version>v6</version>
+//	</ipv6>
+//	<ipv6_boot_protocol>none</ipv6_boot_protocol>
+//	<mac>
+//	  <address>52:54:00:0c:79:1d</address>
+//	</mac>
+//	<mtu>1500</mtu>
+//	<status>up</status>
+//
 // </host_nic>
 // ----
 //
@@ -30820,35 +31130,37 @@ func (p *NetworkLabel) SetHostNic(attr *HostNic) {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>bond0</name>
-//   <mac address="00:00:00:00:00:00"/>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <boot_protocol>dhcp</boot_protocol>
-//   <bonding>
-//     <options>
-//       <option>
-//         <name>mode</name>
-//         <value>4</value>
-//         <type>Dynamic link aggregation (802.3ad)</type>
-//       </option>
-//       <option>
-//         <name>miimon</name>
-//         <value>100</value>
-//       </option>
-//     </options>
-//     <slaves>
-//       <host_nic id="123"/>
-//       <host_nic id="456"/>
-//     </slaves>
-//   </bonding>
-//   <mtu>1500</mtu>
-//   <bridged>true</bridged>
-//   <custom_configuration>false</custom_configuration>
+//
+//	<name>bond0</name>
+//	<mac address="00:00:00:00:00:00"/>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<boot_protocol>dhcp</boot_protocol>
+//	<bonding>
+//	  <options>
+//	    <option>
+//	      <name>mode</name>
+//	      <value>4</value>
+//	      <type>Dynamic link aggregation (802.3ad)</type>
+//	    </option>
+//	    <option>
+//	      <name>miimon</name>
+//	      <value>100</value>
+//	    </option>
+//	  </options>
+//	  <slaves>
+//	    <host_nic id="123"/>
+//	    <host_nic id="456"/>
+//	  </slaves>
+//	</bonding>
+//	<mtu>1500</mtu>
+//	<bridged>true</bridged>
+//	<custom_configuration>false</custom_configuration>
+//
 // </host_nic>
 // ----
 func (p *NetworkLabel) HostNic() (*HostNic, bool) {
@@ -30865,26 +31177,28 @@ func (p *NetworkLabel) HostNic() (*HostNic, bool) {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>eth0</name>
-//   <boot_protocol>static</boot_protocol>
-//   <bridged>true</bridged>
-//   <custom_configuration>true</custom_configuration>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <ipv6>
-//     <gateway>::</gateway>
-//     <version>v6</version>
-//   </ipv6>
-//   <ipv6_boot_protocol>none</ipv6_boot_protocol>
-//   <mac>
-//     <address>52:54:00:0c:79:1d</address>
-//   </mac>
-//   <mtu>1500</mtu>
-//   <status>up</status>
+//
+//	<name>eth0</name>
+//	<boot_protocol>static</boot_protocol>
+//	<bridged>true</bridged>
+//	<custom_configuration>true</custom_configuration>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<ipv6>
+//	  <gateway>::</gateway>
+//	  <version>v6</version>
+//	</ipv6>
+//	<ipv6_boot_protocol>none</ipv6_boot_protocol>
+//	<mac>
+//	  <address>52:54:00:0c:79:1d</address>
+//	</mac>
+//	<mtu>1500</mtu>
+//	<status>up</status>
+//
 // </host_nic>
 // ----
 //
@@ -30896,35 +31210,37 @@ func (p *NetworkLabel) HostNic() (*HostNic, bool) {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>bond0</name>
-//   <mac address="00:00:00:00:00:00"/>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <boot_protocol>dhcp</boot_protocol>
-//   <bonding>
-//     <options>
-//       <option>
-//         <name>mode</name>
-//         <value>4</value>
-//         <type>Dynamic link aggregation (802.3ad)</type>
-//       </option>
-//       <option>
-//         <name>miimon</name>
-//         <value>100</value>
-//       </option>
-//     </options>
-//     <slaves>
-//       <host_nic id="123"/>
-//       <host_nic id="456"/>
-//     </slaves>
-//   </bonding>
-//   <mtu>1500</mtu>
-//   <bridged>true</bridged>
-//   <custom_configuration>false</custom_configuration>
+//
+//	<name>bond0</name>
+//	<mac address="00:00:00:00:00:00"/>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<boot_protocol>dhcp</boot_protocol>
+//	<bonding>
+//	  <options>
+//	    <option>
+//	      <name>mode</name>
+//	      <value>4</value>
+//	      <type>Dynamic link aggregation (802.3ad)</type>
+//	    </option>
+//	    <option>
+//	      <name>miimon</name>
+//	      <value>100</value>
+//	    </option>
+//	  </options>
+//	  <slaves>
+//	    <host_nic id="123"/>
+//	    <host_nic id="456"/>
+//	  </slaves>
+//	</bonding>
+//	<mtu>1500</mtu>
+//	<bridged>true</bridged>
+//	<custom_configuration>false</custom_configuration>
+//
 // </host_nic>
 // ----
 func (p *NetworkLabel) MustHostNic() *HostNic {
@@ -30978,33 +31294,35 @@ func (p *NetworkLabel) MustName() string {
 //
 // [source,json]
 // ----
-// {
-//   "network" : [ {
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "stp" : "false",
-//     "mtu" : "0",
-//     "usages" : {
-//       "usage" : [ "vm" ]
-//     },
-//     "name" : "ovirtmgmt",
-//     "description" : "Management Network",
-//     "href" : "/ovirt-engine/api/networks/456",
-//     "id" : "456",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/networks/456/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
-//       "rel" : "vnicprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/labels",
-//       "rel" : "labels"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "network" : [ {
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "stp" : "false",
+//	    "mtu" : "0",
+//	    "usages" : {
+//	      "usage" : [ "vm" ]
+//	    },
+//	    "name" : "ovirtmgmt",
+//	    "description" : "Management Network",
+//	    "href" : "/ovirt-engine/api/networks/456",
+//	    "id" : "456",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/networks/456/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
+//	      "rel" : "vnicprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/labels",
+//	      "rel" : "labels"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 //
 // An example of the XML representation of the same logical network:
@@ -31012,17 +31330,19 @@ func (p *NetworkLabel) MustName() string {
 // [source,xml]
 // ----
 // <network href="/ovirt-engine/api/networks/456" id="456">
-//   <name>ovirtmgmt</name>
-//   <description>Management Network</description>
-//   <link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
-//   <link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
-//   <link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
-//   <data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
-//   <stp>false</stp>
-//   <mtu>0</mtu>
-//   <usages>
-//     <usage>vm</usage>
-//   </usages>
+//
+//	<name>ovirtmgmt</name>
+//	<description>Management Network</description>
+//	<link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
+//	<link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
+//	<link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
+//	<data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
+//	<stp>false</stp>
+//	<mtu>0</mtu>
+//	<usages>
+//	  <usage>vm</usage>
+//	</usages>
+//
 // </network>
 // ----
 func (p *NetworkLabel) SetNetwork(attr *Network) {
@@ -31035,33 +31355,35 @@ func (p *NetworkLabel) SetNetwork(attr *Network) {
 //
 // [source,json]
 // ----
-// {
-//   "network" : [ {
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "stp" : "false",
-//     "mtu" : "0",
-//     "usages" : {
-//       "usage" : [ "vm" ]
-//     },
-//     "name" : "ovirtmgmt",
-//     "description" : "Management Network",
-//     "href" : "/ovirt-engine/api/networks/456",
-//     "id" : "456",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/networks/456/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
-//       "rel" : "vnicprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/labels",
-//       "rel" : "labels"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "network" : [ {
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "stp" : "false",
+//	    "mtu" : "0",
+//	    "usages" : {
+//	      "usage" : [ "vm" ]
+//	    },
+//	    "name" : "ovirtmgmt",
+//	    "description" : "Management Network",
+//	    "href" : "/ovirt-engine/api/networks/456",
+//	    "id" : "456",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/networks/456/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
+//	      "rel" : "vnicprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/labels",
+//	      "rel" : "labels"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 //
 // An example of the XML representation of the same logical network:
@@ -31069,17 +31391,19 @@ func (p *NetworkLabel) SetNetwork(attr *Network) {
 // [source,xml]
 // ----
 // <network href="/ovirt-engine/api/networks/456" id="456">
-//   <name>ovirtmgmt</name>
-//   <description>Management Network</description>
-//   <link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
-//   <link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
-//   <link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
-//   <data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
-//   <stp>false</stp>
-//   <mtu>0</mtu>
-//   <usages>
-//     <usage>vm</usage>
-//   </usages>
+//
+//	<name>ovirtmgmt</name>
+//	<description>Management Network</description>
+//	<link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
+//	<link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
+//	<link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
+//	<data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
+//	<stp>false</stp>
+//	<mtu>0</mtu>
+//	<usages>
+//	  <usage>vm</usage>
+//	</usages>
+//
 // </network>
 // ----
 func (p *NetworkLabel) Network() (*Network, bool) {
@@ -31095,33 +31419,35 @@ func (p *NetworkLabel) Network() (*Network, bool) {
 //
 // [source,json]
 // ----
-// {
-//   "network" : [ {
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "stp" : "false",
-//     "mtu" : "0",
-//     "usages" : {
-//       "usage" : [ "vm" ]
-//     },
-//     "name" : "ovirtmgmt",
-//     "description" : "Management Network",
-//     "href" : "/ovirt-engine/api/networks/456",
-//     "id" : "456",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/networks/456/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
-//       "rel" : "vnicprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/labels",
-//       "rel" : "labels"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "network" : [ {
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "stp" : "false",
+//	    "mtu" : "0",
+//	    "usages" : {
+//	      "usage" : [ "vm" ]
+//	    },
+//	    "name" : "ovirtmgmt",
+//	    "description" : "Management Network",
+//	    "href" : "/ovirt-engine/api/networks/456",
+//	    "id" : "456",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/networks/456/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
+//	      "rel" : "vnicprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/labels",
+//	      "rel" : "labels"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 //
 // An example of the XML representation of the same logical network:
@@ -31129,17 +31455,19 @@ func (p *NetworkLabel) Network() (*Network, bool) {
 // [source,xml]
 // ----
 // <network href="/ovirt-engine/api/networks/456" id="456">
-//   <name>ovirtmgmt</name>
-//   <description>Management Network</description>
-//   <link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
-//   <link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
-//   <link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
-//   <data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
-//   <stp>false</stp>
-//   <mtu>0</mtu>
-//   <usages>
-//     <usage>vm</usage>
-//   </usages>
+//
+//	<name>ovirtmgmt</name>
+//	<description>Management Network</description>
+//	<link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
+//	<link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
+//	<link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
+//	<data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
+//	<stp>false</stp>
+//	<mtu>0</mtu>
+//	<usages>
+//	  <usage>vm</usage>
+//	</usages>
+//
 // </network>
 // ----
 func (p *NetworkLabel) MustNetwork() *Network {
@@ -31199,15 +31527,17 @@ func (p *NfsProfileDetail) MustProfileDetails() *ProfileDetailSlice {
 // [source,xml]
 // ----
 // <nic href="/ovirt-engine/api/vms/123/nics/456" id="456">
-//   <name>nic1</name>
-//   <vm href="/ovirt-engine/api/vms/123" id="123"/>
-//   <interface>virtio</interface>
-//   <linked>true</linked>
-//   <mac>
-//     <address>02:00:00:00:00:00</address>
-//   </mac>
-//   <plugged>true</plugged>
-//   <vnic_profile href="/ovirt-engine/api/vnicprofiles/789" id="789"/>
+//
+//	<name>nic1</name>
+//	<vm href="/ovirt-engine/api/vms/123" id="123"/>
+//	<interface>virtio</interface>
+//	<linked>true</linked>
+//	<mac>
+//	  <address>02:00:00:00:00:00</address>
+//	</mac>
+//	<plugged>true</plugged>
+//	<vnic_profile href="/ovirt-engine/api/vnicprofiles/789" id="789"/>
+//
 // </nic>
 // ----
 type Nic struct {
@@ -31506,33 +31836,35 @@ func (p *Nic) MustName() string {
 //
 // [source,json]
 // ----
-// {
-//   "network" : [ {
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "stp" : "false",
-//     "mtu" : "0",
-//     "usages" : {
-//       "usage" : [ "vm" ]
-//     },
-//     "name" : "ovirtmgmt",
-//     "description" : "Management Network",
-//     "href" : "/ovirt-engine/api/networks/456",
-//     "id" : "456",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/networks/456/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
-//       "rel" : "vnicprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/labels",
-//       "rel" : "labels"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "network" : [ {
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "stp" : "false",
+//	    "mtu" : "0",
+//	    "usages" : {
+//	      "usage" : [ "vm" ]
+//	    },
+//	    "name" : "ovirtmgmt",
+//	    "description" : "Management Network",
+//	    "href" : "/ovirt-engine/api/networks/456",
+//	    "id" : "456",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/networks/456/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
+//	      "rel" : "vnicprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/labels",
+//	      "rel" : "labels"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 //
 // An example of the XML representation of the same logical network:
@@ -31540,17 +31872,19 @@ func (p *Nic) MustName() string {
 // [source,xml]
 // ----
 // <network href="/ovirt-engine/api/networks/456" id="456">
-//   <name>ovirtmgmt</name>
-//   <description>Management Network</description>
-//   <link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
-//   <link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
-//   <link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
-//   <data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
-//   <stp>false</stp>
-//   <mtu>0</mtu>
-//   <usages>
-//     <usage>vm</usage>
-//   </usages>
+//
+//	<name>ovirtmgmt</name>
+//	<description>Management Network</description>
+//	<link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
+//	<link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
+//	<link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
+//	<data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
+//	<stp>false</stp>
+//	<mtu>0</mtu>
+//	<usages>
+//	  <usage>vm</usage>
+//	</usages>
+//
 // </network>
 // ----
 func (p *Nic) SetNetwork(attr *Network) {
@@ -31563,33 +31897,35 @@ func (p *Nic) SetNetwork(attr *Network) {
 //
 // [source,json]
 // ----
-// {
-//   "network" : [ {
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "stp" : "false",
-//     "mtu" : "0",
-//     "usages" : {
-//       "usage" : [ "vm" ]
-//     },
-//     "name" : "ovirtmgmt",
-//     "description" : "Management Network",
-//     "href" : "/ovirt-engine/api/networks/456",
-//     "id" : "456",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/networks/456/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
-//       "rel" : "vnicprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/labels",
-//       "rel" : "labels"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "network" : [ {
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "stp" : "false",
+//	    "mtu" : "0",
+//	    "usages" : {
+//	      "usage" : [ "vm" ]
+//	    },
+//	    "name" : "ovirtmgmt",
+//	    "description" : "Management Network",
+//	    "href" : "/ovirt-engine/api/networks/456",
+//	    "id" : "456",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/networks/456/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
+//	      "rel" : "vnicprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/labels",
+//	      "rel" : "labels"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 //
 // An example of the XML representation of the same logical network:
@@ -31597,17 +31933,19 @@ func (p *Nic) SetNetwork(attr *Network) {
 // [source,xml]
 // ----
 // <network href="/ovirt-engine/api/networks/456" id="456">
-//   <name>ovirtmgmt</name>
-//   <description>Management Network</description>
-//   <link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
-//   <link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
-//   <link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
-//   <data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
-//   <stp>false</stp>
-//   <mtu>0</mtu>
-//   <usages>
-//     <usage>vm</usage>
-//   </usages>
+//
+//	<name>ovirtmgmt</name>
+//	<description>Management Network</description>
+//	<link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
+//	<link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
+//	<link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
+//	<data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
+//	<stp>false</stp>
+//	<mtu>0</mtu>
+//	<usages>
+//	  <usage>vm</usage>
+//	</usages>
+//
 // </network>
 // ----
 func (p *Nic) Network() (*Network, bool) {
@@ -31623,33 +31961,35 @@ func (p *Nic) Network() (*Network, bool) {
 //
 // [source,json]
 // ----
-// {
-//   "network" : [ {
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "stp" : "false",
-//     "mtu" : "0",
-//     "usages" : {
-//       "usage" : [ "vm" ]
-//     },
-//     "name" : "ovirtmgmt",
-//     "description" : "Management Network",
-//     "href" : "/ovirt-engine/api/networks/456",
-//     "id" : "456",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/networks/456/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
-//       "rel" : "vnicprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/labels",
-//       "rel" : "labels"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "network" : [ {
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "stp" : "false",
+//	    "mtu" : "0",
+//	    "usages" : {
+//	      "usage" : [ "vm" ]
+//	    },
+//	    "name" : "ovirtmgmt",
+//	    "description" : "Management Network",
+//	    "href" : "/ovirt-engine/api/networks/456",
+//	    "id" : "456",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/networks/456/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
+//	      "rel" : "vnicprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/labels",
+//	      "rel" : "labels"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 //
 // An example of the XML representation of the same logical network:
@@ -31657,17 +31997,19 @@ func (p *Nic) Network() (*Network, bool) {
 // [source,xml]
 // ----
 // <network href="/ovirt-engine/api/networks/456" id="456">
-//   <name>ovirtmgmt</name>
-//   <description>Management Network</description>
-//   <link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
-//   <link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
-//   <link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
-//   <data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
-//   <stp>false</stp>
-//   <mtu>0</mtu>
-//   <usages>
-//     <usage>vm</usage>
-//   </usages>
+//
+//	<name>ovirtmgmt</name>
+//	<description>Management Network</description>
+//	<link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
+//	<link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
+//	<link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
+//	<data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
+//	<stp>false</stp>
+//	<mtu>0</mtu>
+//	<usages>
+//	  <usage>vm</usage>
+//	</usages>
+//
 // </network>
 // ----
 func (p *Nic) MustNetwork() *Network {
@@ -32086,17 +32428,19 @@ func (p *NicConfiguration) MustOnBoot() bool {
 // [source,xml]
 // ----
 // <host_numa_node href="/ovirt-engine/api/hosts/0923f1ea/numanodes/007cf1ab" id="007cf1ab">
-//   <cpu>
-//     <cores>
-//       <core>
-//         <index>0</index>
-//       </core>
-//     </cores>
-//   </cpu>
-//   <index>0</index>
-//   <memory>65536</memory>
-//   <node_distance>40 20 40 10</node_distance>
-//   <host href="/ovirt-engine/api/hosts/0923f1ea" id="0923f1ea"/>
+//
+//	<cpu>
+//	  <cores>
+//	    <core>
+//	      <index>0</index>
+//	    </core>
+//	  </cores>
+//	</cpu>
+//	<index>0</index>
+//	<memory>65536</memory>
+//	<node_distance>40 20 40 10</node_distance>
+//	<host href="/ovirt-engine/api/hosts/0923f1ea" id="0923f1ea"/>
+//
 // </host_numa_node>
 // ----
 type NumaNode struct {
@@ -32318,17 +32662,19 @@ type NumaNodePin struct {
 // [source,xml]
 // ----
 // <host_numa_node href="/ovirt-engine/api/hosts/0923f1ea/numanodes/007cf1ab" id="007cf1ab">
-//   <cpu>
-//     <cores>
-//       <core>
-//         <index>0</index>
-//       </core>
-//     </cores>
-//   </cpu>
-//   <index>0</index>
-//   <memory>65536</memory>
-//   <node_distance>40 20 40 10</node_distance>
-//   <host href="/ovirt-engine/api/hosts/0923f1ea" id="0923f1ea"/>
+//
+//	<cpu>
+//	  <cores>
+//	    <core>
+//	      <index>0</index>
+//	    </core>
+//	  </cores>
+//	</cpu>
+//	<index>0</index>
+//	<memory>65536</memory>
+//	<node_distance>40 20 40 10</node_distance>
+//	<host href="/ovirt-engine/api/hosts/0923f1ea" id="0923f1ea"/>
+//
 // </host_numa_node>
 // ----
 func (p *NumaNodePin) SetHostNumaNode(attr *NumaNode) {
@@ -32342,17 +32688,19 @@ func (p *NumaNodePin) SetHostNumaNode(attr *NumaNode) {
 // [source,xml]
 // ----
 // <host_numa_node href="/ovirt-engine/api/hosts/0923f1ea/numanodes/007cf1ab" id="007cf1ab">
-//   <cpu>
-//     <cores>
-//       <core>
-//         <index>0</index>
-//       </core>
-//     </cores>
-//   </cpu>
-//   <index>0</index>
-//   <memory>65536</memory>
-//   <node_distance>40 20 40 10</node_distance>
-//   <host href="/ovirt-engine/api/hosts/0923f1ea" id="0923f1ea"/>
+//
+//	<cpu>
+//	  <cores>
+//	    <core>
+//	      <index>0</index>
+//	    </core>
+//	  </cores>
+//	</cpu>
+//	<index>0</index>
+//	<memory>65536</memory>
+//	<node_distance>40 20 40 10</node_distance>
+//	<host href="/ovirt-engine/api/hosts/0923f1ea" id="0923f1ea"/>
+//
 // </host_numa_node>
 // ----
 func (p *NumaNodePin) HostNumaNode() (*NumaNode, bool) {
@@ -32369,17 +32717,19 @@ func (p *NumaNodePin) HostNumaNode() (*NumaNode, bool) {
 // [source,xml]
 // ----
 // <host_numa_node href="/ovirt-engine/api/hosts/0923f1ea/numanodes/007cf1ab" id="007cf1ab">
-//   <cpu>
-//     <cores>
-//       <core>
-//         <index>0</index>
-//       </core>
-//     </cores>
-//   </cpu>
-//   <index>0</index>
-//   <memory>65536</memory>
-//   <node_distance>40 20 40 10</node_distance>
-//   <host href="/ovirt-engine/api/hosts/0923f1ea" id="0923f1ea"/>
+//
+//	<cpu>
+//	  <cores>
+//	    <core>
+//	      <index>0</index>
+//	    </core>
+//	  </cores>
+//	</cpu>
+//	<index>0</index>
+//	<memory>65536</memory>
+//	<node_distance>40 20 40 10</node_distance>
+//	<host href="/ovirt-engine/api/hosts/0923f1ea" id="0923f1ea"/>
+//
 // </host_numa_node>
 // ----
 func (p *NumaNodePin) MustHostNumaNode() *NumaNode {
@@ -34807,7 +35157,9 @@ func (p *Option) MustValue() string {
 // [source,xml]
 // ----
 // <package>
-//   <name>libipa_hbac-1.9.2-82.11.el6_4.i686</name>
+//
+//	<name>libipa_hbac-1.9.2-82.11.el6_4.i686</name>
+//
 // </package>
 // ----
 type Package struct {
@@ -34923,126 +35275,128 @@ type Permission struct {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *Permission) SetCluster(attr *Cluster) {
 	p.cluster = attr
@@ -35054,126 +35408,128 @@ func (p *Permission) SetCluster(attr *Cluster) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *Permission) Cluster() (*Cluster, bool) {
 	if p.cluster != nil {
@@ -35188,126 +35544,128 @@ func (p *Permission) Cluster() (*Cluster, bool) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *Permission) MustCluster() *Cluster {
 	if p.cluster == nil {
@@ -35501,27 +35859,29 @@ func (p *Permission) MustRole() *Role {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *Permission) SetStorageDomain(attr *StorageDomain) {
@@ -35535,27 +35895,29 @@ func (p *Permission) SetStorageDomain(attr *StorageDomain) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *Permission) StorageDomain() (*StorageDomain, bool) {
@@ -35572,27 +35934,29 @@ func (p *Permission) StorageDomain() (*StorageDomain, bool) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *Permission) MustStorageDomain() *StorageDomain {
@@ -36163,15 +36527,17 @@ func (p *Product) MustName() string {
 // <api>
 // ...
 // <product_info>
-//   <name>oVirt Engine</name>
-//   <vendor>ovirt.org</vendor>
-//   <version>
-//     <build>0</build>
-//     <full_version>4.1.0_master</full_version>
-//     <major>4</major>
-//     <minor>1</minor>
-//     <revision>0</revision>
-//   </version>
+//
+//	<name>oVirt Engine</name>
+//	<vendor>ovirt.org</vendor>
+//	<version>
+//	  <build>0</build>
+//	  <full_version>4.1.0_master</full_version>
+//	  <major>4</major>
+//	  <minor>1</minor>
+//	  <revision>0</revision>
+//	</version>
+//
 // </product_info>
 // ...
 // </api>
@@ -36894,13 +37260,15 @@ func (p *Qos) MustType() QosType {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 type Quota struct {
@@ -37220,126 +37588,128 @@ type QuotaClusterLimit struct {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *QuotaClusterLimit) SetCluster(attr *Cluster) {
 	p.cluster = attr
@@ -37351,126 +37721,128 @@ func (p *QuotaClusterLimit) SetCluster(attr *Cluster) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *QuotaClusterLimit) Cluster() (*Cluster, bool) {
 	if p.cluster != nil {
@@ -37485,126 +37857,128 @@ func (p *QuotaClusterLimit) Cluster() (*Cluster, bool) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *QuotaClusterLimit) MustCluster() *Cluster {
 	if p.cluster == nil {
@@ -37734,13 +38108,15 @@ func (p *QuotaClusterLimit) MustName() string {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *QuotaClusterLimit) SetQuota(attr *Quota) {
@@ -37754,13 +38130,15 @@ func (p *QuotaClusterLimit) SetQuota(attr *Quota) {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *QuotaClusterLimit) Quota() (*Quota, bool) {
@@ -37777,13 +38155,15 @@ func (p *QuotaClusterLimit) Quota() (*Quota, bool) {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *QuotaClusterLimit) MustQuota() *Quota {
@@ -37945,13 +38325,15 @@ func (p *QuotaStorageLimit) MustName() string {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *QuotaStorageLimit) SetQuota(attr *Quota) {
@@ -37965,13 +38347,15 @@ func (p *QuotaStorageLimit) SetQuota(attr *Quota) {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *QuotaStorageLimit) Quota() (*Quota, bool) {
@@ -37988,13 +38372,15 @@ func (p *QuotaStorageLimit) Quota() (*Quota, bool) {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *QuotaStorageLimit) MustQuota() *Quota {
@@ -38011,27 +38397,29 @@ func (p *QuotaStorageLimit) MustQuota() *Quota {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *QuotaStorageLimit) SetStorageDomain(attr *StorageDomain) {
@@ -38045,27 +38433,29 @@ func (p *QuotaStorageLimit) SetStorageDomain(attr *StorageDomain) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *QuotaStorageLimit) StorageDomain() (*StorageDomain, bool) {
@@ -38082,27 +38472,29 @@ func (p *QuotaStorageLimit) StorageDomain() (*StorageDomain, bool) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *QuotaStorageLimit) MustStorageDomain() *StorageDomain {
@@ -38228,18 +38620,20 @@ func (p *Rate) MustPeriod() int64 {
 // [source,xml]
 // ----
 // <action>
-//   <registration_configuration>
-//     <affinity_group_mappings>
-//      <registration_affinity_group_mapping>
-//        <from>
-//          <name>affinity</name>
-//        </from>
-//        <to>
-//          <name>affinity2</name>
-//        </to>
-//      </registration_affinity_group_mapping>
-//     </affinity_group_mappings>
-//   </registration_configuration>
+//
+//	<registration_configuration>
+//	  <affinity_group_mappings>
+//	   <registration_affinity_group_mapping>
+//	     <from>
+//	       <name>affinity</name>
+//	     </from>
+//	     <to>
+//	       <name>affinity2</name>
+//	     </to>
+//	   </registration_affinity_group_mapping>
+//	  </affinity_group_mappings>
+//	</registration_configuration>
+//
 // </action>
 // ----
 type RegistrationAffinityGroupMapping struct {
@@ -38298,18 +38692,20 @@ func (p *RegistrationAffinityGroupMapping) MustTo() *AffinityGroup {
 // [source,xml]
 // ----
 // <action>
-//   <registration_configuration>
-//     <affinity_label_mappings>
-//      <registration_affinity_label_mapping>
-//        <from>
-//          <name>affinity_label</name>
-//        </from>
-//        <to>
-//          <name>affinity_label2</name>
-//        </to>
-//      </registration_affinity_label_mapping>
-//     </affinity_label_mappings>
-//   </registration_configuration>
+//
+//	<registration_configuration>
+//	  <affinity_label_mappings>
+//	   <registration_affinity_label_mapping>
+//	     <from>
+//	       <name>affinity_label</name>
+//	     </from>
+//	     <to>
+//	       <name>affinity_label2</name>
+//	     </to>
+//	   </registration_affinity_label_mapping>
+//	  </affinity_label_mappings>
+//	</registration_configuration>
+//
 // </action>
 // ----
 type RegistrationAffinityLabelMapping struct {
@@ -38374,18 +38770,20 @@ func (p *RegistrationAffinityLabelMapping) MustTo() *AffinityLabel {
 // [source,xml]
 // ----
 // <action>
-//   <registration_configuration>
-//     <cluster_mappings>
-//       <registration_cluster_mapping>
-//         <from>
-//           <name>myoriginalcluster</name>
-//         </from>
-//         <to>
-//           <name>mynewcluster</name>
-//         </to>
-//       </registration_cluster_mapping>
-//     </cluster_mappings>
-//   </registration_configuration>
+//
+//	<registration_configuration>
+//	  <cluster_mappings>
+//	    <registration_cluster_mapping>
+//	      <from>
+//	        <name>myoriginalcluster</name>
+//	      </from>
+//	      <to>
+//	        <name>mynewcluster</name>
+//	      </to>
+//	    </registration_cluster_mapping>
+//	  </cluster_mappings>
+//	</registration_configuration>
+//
 // </action>
 // ----
 type RegistrationClusterMapping struct {
@@ -38400,126 +38798,128 @@ type RegistrationClusterMapping struct {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *RegistrationClusterMapping) SetFrom(attr *Cluster) {
 	p.from = attr
@@ -38531,126 +38931,128 @@ func (p *RegistrationClusterMapping) SetFrom(attr *Cluster) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *RegistrationClusterMapping) From() (*Cluster, bool) {
 	if p.from != nil {
@@ -38665,126 +39067,128 @@ func (p *RegistrationClusterMapping) From() (*Cluster, bool) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *RegistrationClusterMapping) MustFrom() *Cluster {
 	if p.from == nil {
@@ -38799,126 +39203,128 @@ func (p *RegistrationClusterMapping) MustFrom() *Cluster {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *RegistrationClusterMapping) SetTo(attr *Cluster) {
 	p.to = attr
@@ -38930,126 +39336,128 @@ func (p *RegistrationClusterMapping) SetTo(attr *Cluster) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *RegistrationClusterMapping) To() (*Cluster, bool) {
 	if p.to != nil {
@@ -39064,126 +39472,128 @@ func (p *RegistrationClusterMapping) To() (*Cluster, bool) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *RegistrationClusterMapping) MustTo() *Cluster {
 	if p.to == nil {
@@ -39231,103 +39641,105 @@ func (p *RegistrationClusterMapping) MustTo() *Cluster {
 // [source,xml]
 // ----
 // <action>
-//   <registration_configuration>
-//     <cluster_mappings>
-//       <registration_cluster_mapping>
-//         <from>
-//           <name>myoriginalcluster</name>
-//         </from>
-//         <to>
-//           <name>mynewcluster</name>
-//         </to>
-//       </registration_cluster_mapping>
-//     </cluster_mappings>
-//     <role_mappings>
-//       <registration_role_mapping>
-//         <from>
-//           <name>SuperUser</name>
-//         </from>
-//         <to>
-//           <name>UserVmRunTimeManager</name>
-//         </to>
-//       </registration_role_mapping>
-//     </role_mappings>
-//     <domain_mappings>
-//       <registration_domain_mapping>
-//         <from>
-//           <name>redhat</name>
-//         </from>
-//         <to>
-//           <name>internal</name>
-//         </to>
-//       </registration_domain_mapping>
-//     </domain_mappings>
-//     <lun_mappings>
-//      <registration_lun_mapping>
-//        <from id="111">
-//        </from>
-//        <to id="222">
-//          <alias>weTestLun</alias>
-//          <lun_storage>
-//            <type>iscsi</type>
-//            <logical_units>
-//               <logical_unit id="36001405fb1ddb4b91e44078f1fffcfef">
-//                  <address>44.33.11.22</address>
-//                  <port>3260</port>
-//                  <portal>1</portal>
-//                  <target>iqn.2017-11.com.name.redhat:444</target>
-//               </logical_unit>
-//            </logical_units>
-//          </lun_storage>
-//        </to>
-//      </registration_lun_mapping>
-//     </lun_mappings>
-//     <affinity_group_mappings>
-//      <registration_affinity_group_mapping>
-//        <from>
-//          <name>affinity</name>
-//        </from>
-//        <to>
-//          <name>affinity2</name>
-//        </to>
-//      </registration_affinity_group_mapping>
-//     </affinity_group_mappings>
-//     <affinity_label_mappings>
-//      <registration_affinity_label_mapping>
-//        <from>
-//          <name>affinity_label</name>
-//        </from>
-//        <to>
-//          <name>affinity_label2</name>
-//        </to>
-//      </registration_affinity_label_mapping>
-//     </affinity_label_mappings>
-//     <vnic_profile_mappings>
-//       <registration_vnic_profile_mapping>
-//         <from>
-//           <name>gold</name>
-//           <network>
-//             <name>red</name>
-//           </network>
-//         </from>
-//         <to id="738dd914-8ec8-4a8b-8628-34672a5d449b"/>
-//       </registration_vnic_profile_mapping>
-//       <registration_vnic_profile_mapping>
-//         <from>
-//           <name>silver</name>
-//           <network>
-//             <name>blue</name>
-//           </network>
-//         </from>
-//         <to>
-//           <name>copper</name>
-//           <network>
-//             <name>orange</name>
-//           </network>
-//         </to>
-//       </registration_vnic_profile_mapping>
-//     </vnic_profile_mappings>
-//   </registration_configuration>
+//
+//	<registration_configuration>
+//	  <cluster_mappings>
+//	    <registration_cluster_mapping>
+//	      <from>
+//	        <name>myoriginalcluster</name>
+//	      </from>
+//	      <to>
+//	        <name>mynewcluster</name>
+//	      </to>
+//	    </registration_cluster_mapping>
+//	  </cluster_mappings>
+//	  <role_mappings>
+//	    <registration_role_mapping>
+//	      <from>
+//	        <name>SuperUser</name>
+//	      </from>
+//	      <to>
+//	        <name>UserVmRunTimeManager</name>
+//	      </to>
+//	    </registration_role_mapping>
+//	  </role_mappings>
+//	  <domain_mappings>
+//	    <registration_domain_mapping>
+//	      <from>
+//	        <name>redhat</name>
+//	      </from>
+//	      <to>
+//	        <name>internal</name>
+//	      </to>
+//	    </registration_domain_mapping>
+//	  </domain_mappings>
+//	  <lun_mappings>
+//	   <registration_lun_mapping>
+//	     <from id="111">
+//	     </from>
+//	     <to id="222">
+//	       <alias>weTestLun</alias>
+//	       <lun_storage>
+//	         <type>iscsi</type>
+//	         <logical_units>
+//	            <logical_unit id="36001405fb1ddb4b91e44078f1fffcfef">
+//	               <address>44.33.11.22</address>
+//	               <port>3260</port>
+//	               <portal>1</portal>
+//	               <target>iqn.2017-11.com.name.redhat:444</target>
+//	            </logical_unit>
+//	         </logical_units>
+//	       </lun_storage>
+//	     </to>
+//	   </registration_lun_mapping>
+//	  </lun_mappings>
+//	  <affinity_group_mappings>
+//	   <registration_affinity_group_mapping>
+//	     <from>
+//	       <name>affinity</name>
+//	     </from>
+//	     <to>
+//	       <name>affinity2</name>
+//	     </to>
+//	   </registration_affinity_group_mapping>
+//	  </affinity_group_mappings>
+//	  <affinity_label_mappings>
+//	   <registration_affinity_label_mapping>
+//	     <from>
+//	       <name>affinity_label</name>
+//	     </from>
+//	     <to>
+//	       <name>affinity_label2</name>
+//	     </to>
+//	   </registration_affinity_label_mapping>
+//	  </affinity_label_mappings>
+//	  <vnic_profile_mappings>
+//	    <registration_vnic_profile_mapping>
+//	      <from>
+//	        <name>gold</name>
+//	        <network>
+//	          <name>red</name>
+//	        </network>
+//	      </from>
+//	      <to id="738dd914-8ec8-4a8b-8628-34672a5d449b"/>
+//	    </registration_vnic_profile_mapping>
+//	    <registration_vnic_profile_mapping>
+//	      <from>
+//	        <name>silver</name>
+//	        <network>
+//	          <name>blue</name>
+//	        </network>
+//	      </from>
+//	      <to>
+//	        <name>copper</name>
+//	        <network>
+//	          <name>orange</name>
+//	        </network>
+//	      </to>
+//	    </registration_vnic_profile_mapping>
+//	  </vnic_profile_mappings>
+//	</registration_configuration>
+//
 // </action>
 // ----
 type RegistrationConfiguration struct {
@@ -39477,18 +39889,20 @@ func (p *RegistrationConfiguration) MustVnicProfileMappings() *RegistrationVnicP
 // [source,xml]
 // ----
 // <action>
-//   <registration_configuration>
-//     <domain_mappings>
-//       <registration_domain_mapping>
-//         <from>
-//           <name>redhat</name>
-//         </from>
-//         <to>
-//           <name>internal</name>
-//         </to>
-//       </registration_domain_mapping>
-//     </domain_mappings>
-//   </registration_configuration>
+//
+//	<registration_configuration>
+//	  <domain_mappings>
+//	    <registration_domain_mapping>
+//	      <from>
+//	        <name>redhat</name>
+//	      </from>
+//	      <to>
+//	        <name>internal</name>
+//	      </to>
+//	    </registration_domain_mapping>
+//	  </domain_mappings>
+//	</registration_configuration>
+//
 // </action>
 // ----
 type RegistrationDomainMapping struct {
@@ -39550,30 +39964,32 @@ func (p *RegistrationDomainMapping) MustTo() *Domain {
 // [source,xml]
 // ----
 // <action>
-//   <registration_configuration>
-//     <lun_mappings>
-//       <registration_lun_mapping>
-//     <lun_mappings>
-//      <registration_lun_mapping>
-//        <from id="111">
-//        </from>
-//        <to id="222">
-//          <alias>weTestLun</alias>
-//          <lun_storage>
-//            <type>iscsi</type>
-//            <logical_units>
-//               <logical_unit id="36001405fb1ddb4b91e44078f1fffcfef">
-//                  <address>44.33.11.22</address>
-//                  <port>3260</port>
-//                  <portal>1</portal>
-//                  <target>iqn.2017-11.com.name.redhat:444</target>
-//               </logical_unit>
-//            </logical_units>
-//          </lun_storage>
-//        </to>
-//      </registration_lun_mapping>
-//     </lun_mappings>
-//   </registration_configuration>
+//
+//	<registration_configuration>
+//	  <lun_mappings>
+//	    <registration_lun_mapping>
+//	  <lun_mappings>
+//	   <registration_lun_mapping>
+//	     <from id="111">
+//	     </from>
+//	     <to id="222">
+//	       <alias>weTestLun</alias>
+//	       <lun_storage>
+//	         <type>iscsi</type>
+//	         <logical_units>
+//	            <logical_unit id="36001405fb1ddb4b91e44078f1fffcfef">
+//	               <address>44.33.11.22</address>
+//	               <port>3260</port>
+//	               <portal>1</portal>
+//	               <target>iqn.2017-11.com.name.redhat:444</target>
+//	            </logical_unit>
+//	         </logical_units>
+//	       </lun_storage>
+//	     </to>
+//	   </registration_lun_mapping>
+//	  </lun_mappings>
+//	</registration_configuration>
+//
 // </action>
 // ----
 type RegistrationLunMapping struct {
@@ -39638,18 +40054,20 @@ func (p *RegistrationLunMapping) MustTo() *Disk {
 // [source,xml]
 // ----
 // <action>
-//   <registration_configuration>
-//     <role_mappings>
-//       <registration_eole_mapping>
-//         <from>
-//           <name>SuperUser</name>
-//         </from>
-//         <to>
-//           <name>UserVmRunTimeManager</name>
-//         </to>
-//       </registration_role_mapping>
-//     </role_mappings>
-//   </registration_configuration>
+//
+//	<registration_configuration>
+//	  <role_mappings>
+//	    <registration_eole_mapping>
+//	      <from>
+//	        <name>SuperUser</name>
+//	      </from>
+//	      <to>
+//	        <name>UserVmRunTimeManager</name>
+//	      </to>
+//	    </registration_role_mapping>
+//	  </role_mappings>
+//	</registration_configuration>
+//
 // </action>
 // ----
 type RegistrationRoleMapping struct {
@@ -39736,60 +40154,62 @@ func (p *RegistrationRoleMapping) MustTo() *Role {
 // [source,xml]
 // ----
 // <vnic_profile_mappings>
-//   <registration_vnic_profile_mapping>
-//     <from>
-//       <name>gold</name>
-//       <network>
-//         <name>red</name>
-//       </network>
-//     </from>
-//     <to id="738dd914-8ec8-4a8b-8628-34672a5d449b"/>
-//   </registration_vnic_profile_mapping>
-//   <registration_vnic_profile_mapping>
-//     <from>
-//       <name></name>
-//       <network>
-//         <name></name>
-//       </network>
-//     </from>
-//     <to id="892a12ec-2028-4451-80aa-ff3bf55d6bac"/>
-//   </registration_vnic_profile_mapping>
-//   <registration_vnic_profile_mapping>
-//     <from>
-//       <name>silver</name>
-//       <network>
-//         <name>blue</name>
-//       </network>
-//     </from>
-//     <to>
-//       <name>copper</name>
-//       <network>
-//         <name>orange</name>
-//       </network>
-//     </to>
-//   </registration_vnic_profile_mapping>
-//   <registration_vnic_profile_mapping>
-//     <from>
-//       <name>platinum</name>
-//       <network>
-//         <name>yellow</name>
-//       </network>
-//     </from>
-//     <to>
-//       <name></name>
-//       <network>
-//         <name></name>
-//       </network>
-//     </to>
-//   </registration_vnic_profile_mapping>
-//   <registration_vnic_profile_mapping>
-//     <from>
-//       <name>bronze</name>
-//       <network>
-//         <name>green</name>
-//       </network>
-//     </from>
-//   </registration_vnic_profile_mapping>
+//
+//	<registration_vnic_profile_mapping>
+//	  <from>
+//	    <name>gold</name>
+//	    <network>
+//	      <name>red</name>
+//	    </network>
+//	  </from>
+//	  <to id="738dd914-8ec8-4a8b-8628-34672a5d449b"/>
+//	</registration_vnic_profile_mapping>
+//	<registration_vnic_profile_mapping>
+//	  <from>
+//	    <name></name>
+//	    <network>
+//	      <name></name>
+//	    </network>
+//	  </from>
+//	  <to id="892a12ec-2028-4451-80aa-ff3bf55d6bac"/>
+//	</registration_vnic_profile_mapping>
+//	<registration_vnic_profile_mapping>
+//	  <from>
+//	    <name>silver</name>
+//	    <network>
+//	      <name>blue</name>
+//	    </network>
+//	  </from>
+//	  <to>
+//	    <name>copper</name>
+//	    <network>
+//	      <name>orange</name>
+//	    </network>
+//	  </to>
+//	</registration_vnic_profile_mapping>
+//	<registration_vnic_profile_mapping>
+//	  <from>
+//	    <name>platinum</name>
+//	    <network>
+//	      <name>yellow</name>
+//	    </network>
+//	  </from>
+//	  <to>
+//	    <name></name>
+//	    <network>
+//	      <name></name>
+//	    </network>
+//	  </to>
+//	</registration_vnic_profile_mapping>
+//	<registration_vnic_profile_mapping>
+//	  <from>
+//	    <name>bronze</name>
+//	    <network>
+//	      <name>green</name>
+//	    </network>
+//	  </from>
+//	</registration_vnic_profile_mapping>
+//
 // </vnic_profile_mappings>
 // ----
 type RegistrationVnicProfileMapping struct {
@@ -41016,14 +41436,16 @@ func (p *SkipIfSdActive) MustEnabled() bool {
 // [source,xml]
 // ----
 // <snapshot id="456" href="/ovirt-engine/api/vms/123/snapshots/456">
-//   <actions>
-//     <link rel="restore" href="/ovirt-engine/api/vms/123/snapshots/456/restore"/>
-//   </actions>
-//   <vm id="123" href="/ovirt-engine/api/vms/123"/>
-//   <description>Virtual Machine 1 - Snapshot A</description>
-//   <type>active</type>
-//   <date>2010-08-16T14:24:29</date>
-//   <persist_memorystate>false</persist_memorystate>
+//
+//	<actions>
+//	  <link rel="restore" href="/ovirt-engine/api/vms/123/snapshots/456/restore"/>
+//	</actions>
+//	<vm id="123" href="/ovirt-engine/api/vms/123"/>
+//	<description>Virtual Machine 1 - Snapshot A</description>
+//	<type>active</type>
+//	<date>2010-08-16T14:24:29</date>
+//	<persist_memorystate>false</persist_memorystate>
+//
 // </snapshot>
 // ----
 type Snapshot struct {
@@ -41199,126 +41621,128 @@ func (p *Snapshot) MustCdroms() *CdromSlice {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *Snapshot) SetCluster(attr *Cluster) {
 	p.cluster = attr
@@ -41330,126 +41754,128 @@ func (p *Snapshot) SetCluster(attr *Cluster) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *Snapshot) Cluster() (*Cluster, bool) {
 	if p.cluster != nil {
@@ -41464,126 +41890,128 @@ func (p *Snapshot) Cluster() (*Cluster, bool) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *Snapshot) MustCluster() *Cluster {
 	if p.cluster == nil {
@@ -42020,26 +42448,28 @@ func (p *Snapshot) MustGraphicsConsoles() *GraphicsConsoleSlice {
 // ----
 // <vm href="/ovirt-engine/api/vms/123" id="123">
 // ...
-//   <guest_operating_system>
-//     <architecture>x86_64</architecture>
-//     <codename>Maipo</codename>
-//     <distribution>Red Hat Enterprise Linux Server</distribution>
-//     <family>Linux</family>
-//     <kernel>
-//       <version>
-//         <build>0</build>
-//         <full_version>3.10.0-514.10.2.el7.x86_64</full_version>
-//         <major>3</major>
-//         <minor>10</minor>
-//         <revision>514</revision>
-//       </version>
-//     </kernel>
-//     <version>
-//       <full_version>7.3</full_version>
-//       <major>7</major>
-//       <minor>3</minor>
-//     </version>
-//   </guest_operating_system>
+//
+//	<guest_operating_system>
+//	  <architecture>x86_64</architecture>
+//	  <codename>Maipo</codename>
+//	  <distribution>Red Hat Enterprise Linux Server</distribution>
+//	  <family>Linux</family>
+//	  <kernel>
+//	    <version>
+//	      <build>0</build>
+//	      <full_version>3.10.0-514.10.2.el7.x86_64</full_version>
+//	      <major>3</major>
+//	      <minor>10</minor>
+//	      <revision>514</revision>
+//	    </version>
+//	  </kernel>
+//	  <version>
+//	    <full_version>7.3</full_version>
+//	    <major>7</major>
+//	    <minor>3</minor>
+//	  </version>
+//	</guest_operating_system>
+//
 // </vm>
 // ----
 func (p *Snapshot) SetGuestOperatingSystem(attr *GuestOperatingSystem) {
@@ -42060,26 +42490,28 @@ func (p *Snapshot) SetGuestOperatingSystem(attr *GuestOperatingSystem) {
 // ----
 // <vm href="/ovirt-engine/api/vms/123" id="123">
 // ...
-//   <guest_operating_system>
-//     <architecture>x86_64</architecture>
-//     <codename>Maipo</codename>
-//     <distribution>Red Hat Enterprise Linux Server</distribution>
-//     <family>Linux</family>
-//     <kernel>
-//       <version>
-//         <build>0</build>
-//         <full_version>3.10.0-514.10.2.el7.x86_64</full_version>
-//         <major>3</major>
-//         <minor>10</minor>
-//         <revision>514</revision>
-//       </version>
-//     </kernel>
-//     <version>
-//       <full_version>7.3</full_version>
-//       <major>7</major>
-//       <minor>3</minor>
-//     </version>
-//   </guest_operating_system>
+//
+//	<guest_operating_system>
+//	  <architecture>x86_64</architecture>
+//	  <codename>Maipo</codename>
+//	  <distribution>Red Hat Enterprise Linux Server</distribution>
+//	  <family>Linux</family>
+//	  <kernel>
+//	    <version>
+//	      <build>0</build>
+//	      <full_version>3.10.0-514.10.2.el7.x86_64</full_version>
+//	      <major>3</major>
+//	      <minor>10</minor>
+//	      <revision>514</revision>
+//	    </version>
+//	  </kernel>
+//	  <version>
+//	    <full_version>7.3</full_version>
+//	    <major>7</major>
+//	    <minor>3</minor>
+//	  </version>
+//	</guest_operating_system>
+//
 // </vm>
 // ----
 func (p *Snapshot) GuestOperatingSystem() (*GuestOperatingSystem, bool) {
@@ -42103,26 +42535,28 @@ func (p *Snapshot) GuestOperatingSystem() (*GuestOperatingSystem, bool) {
 // ----
 // <vm href="/ovirt-engine/api/vms/123" id="123">
 // ...
-//   <guest_operating_system>
-//     <architecture>x86_64</architecture>
-//     <codename>Maipo</codename>
-//     <distribution>Red Hat Enterprise Linux Server</distribution>
-//     <family>Linux</family>
-//     <kernel>
-//       <version>
-//         <build>0</build>
-//         <full_version>3.10.0-514.10.2.el7.x86_64</full_version>
-//         <major>3</major>
-//         <minor>10</minor>
-//         <revision>514</revision>
-//       </version>
-//     </kernel>
-//     <version>
-//       <full_version>7.3</full_version>
-//       <major>7</major>
-//       <minor>3</minor>
-//     </version>
-//   </guest_operating_system>
+//
+//	<guest_operating_system>
+//	  <architecture>x86_64</architecture>
+//	  <codename>Maipo</codename>
+//	  <distribution>Red Hat Enterprise Linux Server</distribution>
+//	  <family>Linux</family>
+//	  <kernel>
+//	    <version>
+//	      <build>0</build>
+//	      <full_version>3.10.0-514.10.2.el7.x86_64</full_version>
+//	      <major>3</major>
+//	      <minor>10</minor>
+//	      <revision>514</revision>
+//	    </version>
+//	  </kernel>
+//	  <version>
+//	    <full_version>7.3</full_version>
+//	    <major>7</major>
+//	    <minor>3</minor>
+//	  </version>
+//	</guest_operating_system>
+//
 // </vm>
 // ----
 func (p *Snapshot) MustGuestOperatingSystem() *GuestOperatingSystem {
@@ -42794,13 +43228,15 @@ func (p *Snapshot) MustPlacementPolicy() *VmPlacementPolicy {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *Snapshot) SetQuota(attr *Quota) {
@@ -42814,13 +43250,15 @@ func (p *Snapshot) SetQuota(attr *Quota) {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *Snapshot) Quota() (*Quota, bool) {
@@ -42837,13 +43275,15 @@ func (p *Snapshot) Quota() (*Quota, bool) {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *Snapshot) MustQuota() *Quota {
@@ -43228,27 +43668,29 @@ func (p *Snapshot) MustStopTime() time.Time {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *Snapshot) SetStorageDomain(attr *StorageDomain) {
@@ -43262,27 +43704,29 @@ func (p *Snapshot) SetStorageDomain(attr *StorageDomain) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *Snapshot) StorageDomain() (*StorageDomain, bool) {
@@ -43299,27 +43743,29 @@ func (p *Snapshot) StorageDomain() (*StorageDomain, bool) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *Snapshot) MustStorageDomain() *StorageDomain {
@@ -44080,19 +44526,21 @@ func (p *Sso) MustMethods() *MethodSlice {
 // [source,xml]
 // ----
 // <statistics>
-//   <statistic id="1234" href="/ovirt-engine/api/hosts/1234/nics/1234/statistics/1234">
-//     <name>data.current.rx</name>
-//     <description>Receive data rate</description>
-//     <values type="DECIMAL">
-//       <value>
-//         <datum>0</datum>
-//       </value>
-//     </values>
-//     <type>GAUGE</type>
-//     <unit>BYTES_PER_SECOND</unit>
-//     <host_nic id="1234" href="/ovirt-engine/api/hosts/1234/nics/1234"/>
-//   </statistic>
-//   ...
+//
+//	<statistic id="1234" href="/ovirt-engine/api/hosts/1234/nics/1234/statistics/1234">
+//	  <name>data.current.rx</name>
+//	  <description>Receive data rate</description>
+//	  <values type="DECIMAL">
+//	    <value>
+//	      <datum>0</datum>
+//	    </value>
+//	  </values>
+//	  <type>GAUGE</type>
+//	  <unit>BYTES_PER_SECOND</unit>
+//	  <host_nic id="1234" href="/ovirt-engine/api/hosts/1234/nics/1234"/>
+//	</statistic>
+//	...
+//
 // </statistics>
 // ----
 //
@@ -44241,26 +44689,28 @@ func (p *Statistic) MustHost() *Host {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>eth0</name>
-//   <boot_protocol>static</boot_protocol>
-//   <bridged>true</bridged>
-//   <custom_configuration>true</custom_configuration>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <ipv6>
-//     <gateway>::</gateway>
-//     <version>v6</version>
-//   </ipv6>
-//   <ipv6_boot_protocol>none</ipv6_boot_protocol>
-//   <mac>
-//     <address>52:54:00:0c:79:1d</address>
-//   </mac>
-//   <mtu>1500</mtu>
-//   <status>up</status>
+//
+//	<name>eth0</name>
+//	<boot_protocol>static</boot_protocol>
+//	<bridged>true</bridged>
+//	<custom_configuration>true</custom_configuration>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<ipv6>
+//	  <gateway>::</gateway>
+//	  <version>v6</version>
+//	</ipv6>
+//	<ipv6_boot_protocol>none</ipv6_boot_protocol>
+//	<mac>
+//	  <address>52:54:00:0c:79:1d</address>
+//	</mac>
+//	<mtu>1500</mtu>
+//	<status>up</status>
+//
 // </host_nic>
 // ----
 //
@@ -44272,35 +44722,37 @@ func (p *Statistic) MustHost() *Host {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>bond0</name>
-//   <mac address="00:00:00:00:00:00"/>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <boot_protocol>dhcp</boot_protocol>
-//   <bonding>
-//     <options>
-//       <option>
-//         <name>mode</name>
-//         <value>4</value>
-//         <type>Dynamic link aggregation (802.3ad)</type>
-//       </option>
-//       <option>
-//         <name>miimon</name>
-//         <value>100</value>
-//       </option>
-//     </options>
-//     <slaves>
-//       <host_nic id="123"/>
-//       <host_nic id="456"/>
-//     </slaves>
-//   </bonding>
-//   <mtu>1500</mtu>
-//   <bridged>true</bridged>
-//   <custom_configuration>false</custom_configuration>
+//
+//	<name>bond0</name>
+//	<mac address="00:00:00:00:00:00"/>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<boot_protocol>dhcp</boot_protocol>
+//	<bonding>
+//	  <options>
+//	    <option>
+//	      <name>mode</name>
+//	      <value>4</value>
+//	      <type>Dynamic link aggregation (802.3ad)</type>
+//	    </option>
+//	    <option>
+//	      <name>miimon</name>
+//	      <value>100</value>
+//	    </option>
+//	  </options>
+//	  <slaves>
+//	    <host_nic id="123"/>
+//	    <host_nic id="456"/>
+//	  </slaves>
+//	</bonding>
+//	<mtu>1500</mtu>
+//	<bridged>true</bridged>
+//	<custom_configuration>false</custom_configuration>
+//
 // </host_nic>
 // ----
 func (p *Statistic) SetHostNic(attr *HostNic) {
@@ -44314,26 +44766,28 @@ func (p *Statistic) SetHostNic(attr *HostNic) {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>eth0</name>
-//   <boot_protocol>static</boot_protocol>
-//   <bridged>true</bridged>
-//   <custom_configuration>true</custom_configuration>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <ipv6>
-//     <gateway>::</gateway>
-//     <version>v6</version>
-//   </ipv6>
-//   <ipv6_boot_protocol>none</ipv6_boot_protocol>
-//   <mac>
-//     <address>52:54:00:0c:79:1d</address>
-//   </mac>
-//   <mtu>1500</mtu>
-//   <status>up</status>
+//
+//	<name>eth0</name>
+//	<boot_protocol>static</boot_protocol>
+//	<bridged>true</bridged>
+//	<custom_configuration>true</custom_configuration>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<ipv6>
+//	  <gateway>::</gateway>
+//	  <version>v6</version>
+//	</ipv6>
+//	<ipv6_boot_protocol>none</ipv6_boot_protocol>
+//	<mac>
+//	  <address>52:54:00:0c:79:1d</address>
+//	</mac>
+//	<mtu>1500</mtu>
+//	<status>up</status>
+//
 // </host_nic>
 // ----
 //
@@ -44345,35 +44799,37 @@ func (p *Statistic) SetHostNic(attr *HostNic) {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>bond0</name>
-//   <mac address="00:00:00:00:00:00"/>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <boot_protocol>dhcp</boot_protocol>
-//   <bonding>
-//     <options>
-//       <option>
-//         <name>mode</name>
-//         <value>4</value>
-//         <type>Dynamic link aggregation (802.3ad)</type>
-//       </option>
-//       <option>
-//         <name>miimon</name>
-//         <value>100</value>
-//       </option>
-//     </options>
-//     <slaves>
-//       <host_nic id="123"/>
-//       <host_nic id="456"/>
-//     </slaves>
-//   </bonding>
-//   <mtu>1500</mtu>
-//   <bridged>true</bridged>
-//   <custom_configuration>false</custom_configuration>
+//
+//	<name>bond0</name>
+//	<mac address="00:00:00:00:00:00"/>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<boot_protocol>dhcp</boot_protocol>
+//	<bonding>
+//	  <options>
+//	    <option>
+//	      <name>mode</name>
+//	      <value>4</value>
+//	      <type>Dynamic link aggregation (802.3ad)</type>
+//	    </option>
+//	    <option>
+//	      <name>miimon</name>
+//	      <value>100</value>
+//	    </option>
+//	  </options>
+//	  <slaves>
+//	    <host_nic id="123"/>
+//	    <host_nic id="456"/>
+//	  </slaves>
+//	</bonding>
+//	<mtu>1500</mtu>
+//	<bridged>true</bridged>
+//	<custom_configuration>false</custom_configuration>
+//
 // </host_nic>
 // ----
 func (p *Statistic) HostNic() (*HostNic, bool) {
@@ -44390,26 +44846,28 @@ func (p *Statistic) HostNic() (*HostNic, bool) {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>eth0</name>
-//   <boot_protocol>static</boot_protocol>
-//   <bridged>true</bridged>
-//   <custom_configuration>true</custom_configuration>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <ipv6>
-//     <gateway>::</gateway>
-//     <version>v6</version>
-//   </ipv6>
-//   <ipv6_boot_protocol>none</ipv6_boot_protocol>
-//   <mac>
-//     <address>52:54:00:0c:79:1d</address>
-//   </mac>
-//   <mtu>1500</mtu>
-//   <status>up</status>
+//
+//	<name>eth0</name>
+//	<boot_protocol>static</boot_protocol>
+//	<bridged>true</bridged>
+//	<custom_configuration>true</custom_configuration>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<ipv6>
+//	  <gateway>::</gateway>
+//	  <version>v6</version>
+//	</ipv6>
+//	<ipv6_boot_protocol>none</ipv6_boot_protocol>
+//	<mac>
+//	  <address>52:54:00:0c:79:1d</address>
+//	</mac>
+//	<mtu>1500</mtu>
+//	<status>up</status>
+//
 // </host_nic>
 // ----
 //
@@ -44421,35 +44879,37 @@ func (p *Statistic) HostNic() (*HostNic, bool) {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>bond0</name>
-//   <mac address="00:00:00:00:00:00"/>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <boot_protocol>dhcp</boot_protocol>
-//   <bonding>
-//     <options>
-//       <option>
-//         <name>mode</name>
-//         <value>4</value>
-//         <type>Dynamic link aggregation (802.3ad)</type>
-//       </option>
-//       <option>
-//         <name>miimon</name>
-//         <value>100</value>
-//       </option>
-//     </options>
-//     <slaves>
-//       <host_nic id="123"/>
-//       <host_nic id="456"/>
-//     </slaves>
-//   </bonding>
-//   <mtu>1500</mtu>
-//   <bridged>true</bridged>
-//   <custom_configuration>false</custom_configuration>
+//
+//	<name>bond0</name>
+//	<mac address="00:00:00:00:00:00"/>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<boot_protocol>dhcp</boot_protocol>
+//	<bonding>
+//	  <options>
+//	    <option>
+//	      <name>mode</name>
+//	      <value>4</value>
+//	      <type>Dynamic link aggregation (802.3ad)</type>
+//	    </option>
+//	    <option>
+//	      <name>miimon</name>
+//	      <value>100</value>
+//	    </option>
+//	  </options>
+//	  <slaves>
+//	    <host_nic id="123"/>
+//	    <host_nic id="456"/>
+//	  </slaves>
+//	</bonding>
+//	<mtu>1500</mtu>
+//	<bridged>true</bridged>
+//	<custom_configuration>false</custom_configuration>
+//
 // </host_nic>
 // ----
 func (p *Statistic) MustHostNic() *HostNic {
@@ -44466,17 +44926,19 @@ func (p *Statistic) MustHostNic() *HostNic {
 // [source,xml]
 // ----
 // <host_numa_node href="/ovirt-engine/api/hosts/0923f1ea/numanodes/007cf1ab" id="007cf1ab">
-//   <cpu>
-//     <cores>
-//       <core>
-//         <index>0</index>
-//       </core>
-//     </cores>
-//   </cpu>
-//   <index>0</index>
-//   <memory>65536</memory>
-//   <node_distance>40 20 40 10</node_distance>
-//   <host href="/ovirt-engine/api/hosts/0923f1ea" id="0923f1ea"/>
+//
+//	<cpu>
+//	  <cores>
+//	    <core>
+//	      <index>0</index>
+//	    </core>
+//	  </cores>
+//	</cpu>
+//	<index>0</index>
+//	<memory>65536</memory>
+//	<node_distance>40 20 40 10</node_distance>
+//	<host href="/ovirt-engine/api/hosts/0923f1ea" id="0923f1ea"/>
+//
 // </host_numa_node>
 // ----
 func (p *Statistic) SetHostNumaNode(attr *NumaNode) {
@@ -44490,17 +44952,19 @@ func (p *Statistic) SetHostNumaNode(attr *NumaNode) {
 // [source,xml]
 // ----
 // <host_numa_node href="/ovirt-engine/api/hosts/0923f1ea/numanodes/007cf1ab" id="007cf1ab">
-//   <cpu>
-//     <cores>
-//       <core>
-//         <index>0</index>
-//       </core>
-//     </cores>
-//   </cpu>
-//   <index>0</index>
-//   <memory>65536</memory>
-//   <node_distance>40 20 40 10</node_distance>
-//   <host href="/ovirt-engine/api/hosts/0923f1ea" id="0923f1ea"/>
+//
+//	<cpu>
+//	  <cores>
+//	    <core>
+//	      <index>0</index>
+//	    </core>
+//	  </cores>
+//	</cpu>
+//	<index>0</index>
+//	<memory>65536</memory>
+//	<node_distance>40 20 40 10</node_distance>
+//	<host href="/ovirt-engine/api/hosts/0923f1ea" id="0923f1ea"/>
+//
 // </host_numa_node>
 // ----
 func (p *Statistic) HostNumaNode() (*NumaNode, bool) {
@@ -44517,17 +44981,19 @@ func (p *Statistic) HostNumaNode() (*NumaNode, bool) {
 // [source,xml]
 // ----
 // <host_numa_node href="/ovirt-engine/api/hosts/0923f1ea/numanodes/007cf1ab" id="007cf1ab">
-//   <cpu>
-//     <cores>
-//       <core>
-//         <index>0</index>
-//       </core>
-//     </cores>
-//   </cpu>
-//   <index>0</index>
-//   <memory>65536</memory>
-//   <node_distance>40 20 40 10</node_distance>
-//   <host href="/ovirt-engine/api/hosts/0923f1ea" id="0923f1ea"/>
+//
+//	<cpu>
+//	  <cores>
+//	    <core>
+//	      <index>0</index>
+//	    </core>
+//	  </cores>
+//	</cpu>
+//	<index>0</index>
+//	<memory>65536</memory>
+//	<node_distance>40 20 40 10</node_distance>
+//	<host href="/ovirt-engine/api/hosts/0923f1ea" id="0923f1ea"/>
+//
 // </host_numa_node>
 // ----
 func (p *Statistic) MustHostNumaNode() *NumaNode {
@@ -44601,15 +45067,17 @@ func (p *Statistic) MustName() string {
 // [source,xml]
 // ----
 // <nic href="/ovirt-engine/api/vms/123/nics/456" id="456">
-//   <name>nic1</name>
-//   <vm href="/ovirt-engine/api/vms/123" id="123"/>
-//   <interface>virtio</interface>
-//   <linked>true</linked>
-//   <mac>
-//     <address>02:00:00:00:00:00</address>
-//   </mac>
-//   <plugged>true</plugged>
-//   <vnic_profile href="/ovirt-engine/api/vnicprofiles/789" id="789"/>
+//
+//	<name>nic1</name>
+//	<vm href="/ovirt-engine/api/vms/123" id="123"/>
+//	<interface>virtio</interface>
+//	<linked>true</linked>
+//	<mac>
+//	  <address>02:00:00:00:00:00</address>
+//	</mac>
+//	<plugged>true</plugged>
+//	<vnic_profile href="/ovirt-engine/api/vnicprofiles/789" id="789"/>
+//
 // </nic>
 // ----
 func (p *Statistic) SetNic(attr *Nic) {
@@ -44623,15 +45091,17 @@ func (p *Statistic) SetNic(attr *Nic) {
 // [source,xml]
 // ----
 // <nic href="/ovirt-engine/api/vms/123/nics/456" id="456">
-//   <name>nic1</name>
-//   <vm href="/ovirt-engine/api/vms/123" id="123"/>
-//   <interface>virtio</interface>
-//   <linked>true</linked>
-//   <mac>
-//     <address>02:00:00:00:00:00</address>
-//   </mac>
-//   <plugged>true</plugged>
-//   <vnic_profile href="/ovirt-engine/api/vnicprofiles/789" id="789"/>
+//
+//	<name>nic1</name>
+//	<vm href="/ovirt-engine/api/vms/123" id="123"/>
+//	<interface>virtio</interface>
+//	<linked>true</linked>
+//	<mac>
+//	  <address>02:00:00:00:00:00</address>
+//	</mac>
+//	<plugged>true</plugged>
+//	<vnic_profile href="/ovirt-engine/api/vnicprofiles/789" id="789"/>
+//
 // </nic>
 // ----
 func (p *Statistic) Nic() (*Nic, bool) {
@@ -44648,15 +45118,17 @@ func (p *Statistic) Nic() (*Nic, bool) {
 // [source,xml]
 // ----
 // <nic href="/ovirt-engine/api/vms/123/nics/456" id="456">
-//   <name>nic1</name>
-//   <vm href="/ovirt-engine/api/vms/123" id="123"/>
-//   <interface>virtio</interface>
-//   <linked>true</linked>
-//   <mac>
-//     <address>02:00:00:00:00:00</address>
-//   </mac>
-//   <plugged>true</plugged>
-//   <vnic_profile href="/ovirt-engine/api/vnicprofiles/789" id="789"/>
+//
+//	<name>nic1</name>
+//	<vm href="/ovirt-engine/api/vms/123" id="123"/>
+//	<interface>virtio</interface>
+//	<linked>true</linked>
+//	<mac>
+//	  <address>02:00:00:00:00:00</address>
+//	</mac>
+//	<plugged>true</plugged>
+//	<vnic_profile href="/ovirt-engine/api/vnicprofiles/789" id="789"/>
+//
 // </nic>
 // ----
 func (p *Statistic) MustNic() *Nic {
@@ -45130,9 +45602,11 @@ func (p *Step) MustType() StepEnum {
 // [source,xml]
 // ----
 // <storage_connection id="123">
-//   <address>mynfs.example.com</address>
-//   <type>nfs</type>
-//   <path>/exports/mydata</path>
+//
+//	<address>mynfs.example.com</address>
+//	<type>nfs</type>
+//	<path>/exports/mydata</path>
+//
 // </storage_connection>
 // ----
 type StorageConnection struct {
@@ -45696,27 +46170,29 @@ func (p *StorageConnectionExtension) MustUsername() string {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 type StorageDomain struct {
@@ -46427,27 +46903,29 @@ type StorageDomainLease struct {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *StorageDomainLease) SetStorageDomain(attr *StorageDomain) {
@@ -46461,27 +46939,29 @@ func (p *StorageDomainLease) SetStorageDomain(attr *StorageDomain) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *StorageDomainLease) StorageDomain() (*StorageDomain, bool) {
@@ -46498,27 +46978,29 @@ func (p *StorageDomainLease) StorageDomain() (*StorageDomain, bool) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *StorageDomainLease) MustStorageDomain() *StorageDomain {
@@ -47003,126 +47485,128 @@ func (p *Template) MustCdroms() *CdromSlice {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *Template) SetCluster(attr *Cluster) {
 	p.cluster = attr
@@ -47134,126 +47618,128 @@ func (p *Template) SetCluster(attr *Cluster) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *Template) Cluster() (*Cluster, bool) {
 	if p.cluster != nil {
@@ -47268,126 +47754,128 @@ func (p *Template) Cluster() (*Cluster, bool) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *Template) MustCluster() *Cluster {
 	if p.cluster == nil {
@@ -48046,13 +48534,15 @@ func (p *Template) MustPlacementPolicy() *VmPlacementPolicy {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *Template) SetQuota(attr *Quota) {
@@ -48066,13 +48556,15 @@ func (p *Template) SetQuota(attr *Quota) {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *Template) Quota() (*Quota, bool) {
@@ -48089,13 +48581,15 @@ func (p *Template) Quota() (*Quota, bool) {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *Template) MustQuota() *Quota {
@@ -48269,27 +48763,29 @@ func (p *Template) MustStatus() TemplateStatus {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *Template) SetStorageDomain(attr *StorageDomain) {
@@ -48303,27 +48799,29 @@ func (p *Template) SetStorageDomain(attr *StorageDomain) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *Template) StorageDomain() (*StorageDomain, bool) {
@@ -48340,27 +48838,29 @@ func (p *Template) StorageDomain() (*StorageDomain, bool) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *Template) MustStorageDomain() *StorageDomain {
@@ -48888,26 +49388,28 @@ func (p *UnmanagedNetwork) MustHost() *Host {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>eth0</name>
-//   <boot_protocol>static</boot_protocol>
-//   <bridged>true</bridged>
-//   <custom_configuration>true</custom_configuration>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <ipv6>
-//     <gateway>::</gateway>
-//     <version>v6</version>
-//   </ipv6>
-//   <ipv6_boot_protocol>none</ipv6_boot_protocol>
-//   <mac>
-//     <address>52:54:00:0c:79:1d</address>
-//   </mac>
-//   <mtu>1500</mtu>
-//   <status>up</status>
+//
+//	<name>eth0</name>
+//	<boot_protocol>static</boot_protocol>
+//	<bridged>true</bridged>
+//	<custom_configuration>true</custom_configuration>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<ipv6>
+//	  <gateway>::</gateway>
+//	  <version>v6</version>
+//	</ipv6>
+//	<ipv6_boot_protocol>none</ipv6_boot_protocol>
+//	<mac>
+//	  <address>52:54:00:0c:79:1d</address>
+//	</mac>
+//	<mtu>1500</mtu>
+//	<status>up</status>
+//
 // </host_nic>
 // ----
 //
@@ -48919,35 +49421,37 @@ func (p *UnmanagedNetwork) MustHost() *Host {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>bond0</name>
-//   <mac address="00:00:00:00:00:00"/>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <boot_protocol>dhcp</boot_protocol>
-//   <bonding>
-//     <options>
-//       <option>
-//         <name>mode</name>
-//         <value>4</value>
-//         <type>Dynamic link aggregation (802.3ad)</type>
-//       </option>
-//       <option>
-//         <name>miimon</name>
-//         <value>100</value>
-//       </option>
-//     </options>
-//     <slaves>
-//       <host_nic id="123"/>
-//       <host_nic id="456"/>
-//     </slaves>
-//   </bonding>
-//   <mtu>1500</mtu>
-//   <bridged>true</bridged>
-//   <custom_configuration>false</custom_configuration>
+//
+//	<name>bond0</name>
+//	<mac address="00:00:00:00:00:00"/>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<boot_protocol>dhcp</boot_protocol>
+//	<bonding>
+//	  <options>
+//	    <option>
+//	      <name>mode</name>
+//	      <value>4</value>
+//	      <type>Dynamic link aggregation (802.3ad)</type>
+//	    </option>
+//	    <option>
+//	      <name>miimon</name>
+//	      <value>100</value>
+//	    </option>
+//	  </options>
+//	  <slaves>
+//	    <host_nic id="123"/>
+//	    <host_nic id="456"/>
+//	  </slaves>
+//	</bonding>
+//	<mtu>1500</mtu>
+//	<bridged>true</bridged>
+//	<custom_configuration>false</custom_configuration>
+//
 // </host_nic>
 // ----
 func (p *UnmanagedNetwork) SetHostNic(attr *HostNic) {
@@ -48961,26 +49465,28 @@ func (p *UnmanagedNetwork) SetHostNic(attr *HostNic) {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>eth0</name>
-//   <boot_protocol>static</boot_protocol>
-//   <bridged>true</bridged>
-//   <custom_configuration>true</custom_configuration>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <ipv6>
-//     <gateway>::</gateway>
-//     <version>v6</version>
-//   </ipv6>
-//   <ipv6_boot_protocol>none</ipv6_boot_protocol>
-//   <mac>
-//     <address>52:54:00:0c:79:1d</address>
-//   </mac>
-//   <mtu>1500</mtu>
-//   <status>up</status>
+//
+//	<name>eth0</name>
+//	<boot_protocol>static</boot_protocol>
+//	<bridged>true</bridged>
+//	<custom_configuration>true</custom_configuration>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<ipv6>
+//	  <gateway>::</gateway>
+//	  <version>v6</version>
+//	</ipv6>
+//	<ipv6_boot_protocol>none</ipv6_boot_protocol>
+//	<mac>
+//	  <address>52:54:00:0c:79:1d</address>
+//	</mac>
+//	<mtu>1500</mtu>
+//	<status>up</status>
+//
 // </host_nic>
 // ----
 //
@@ -48992,35 +49498,37 @@ func (p *UnmanagedNetwork) SetHostNic(attr *HostNic) {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>bond0</name>
-//   <mac address="00:00:00:00:00:00"/>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <boot_protocol>dhcp</boot_protocol>
-//   <bonding>
-//     <options>
-//       <option>
-//         <name>mode</name>
-//         <value>4</value>
-//         <type>Dynamic link aggregation (802.3ad)</type>
-//       </option>
-//       <option>
-//         <name>miimon</name>
-//         <value>100</value>
-//       </option>
-//     </options>
-//     <slaves>
-//       <host_nic id="123"/>
-//       <host_nic id="456"/>
-//     </slaves>
-//   </bonding>
-//   <mtu>1500</mtu>
-//   <bridged>true</bridged>
-//   <custom_configuration>false</custom_configuration>
+//
+//	<name>bond0</name>
+//	<mac address="00:00:00:00:00:00"/>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<boot_protocol>dhcp</boot_protocol>
+//	<bonding>
+//	  <options>
+//	    <option>
+//	      <name>mode</name>
+//	      <value>4</value>
+//	      <type>Dynamic link aggregation (802.3ad)</type>
+//	    </option>
+//	    <option>
+//	      <name>miimon</name>
+//	      <value>100</value>
+//	    </option>
+//	  </options>
+//	  <slaves>
+//	    <host_nic id="123"/>
+//	    <host_nic id="456"/>
+//	  </slaves>
+//	</bonding>
+//	<mtu>1500</mtu>
+//	<bridged>true</bridged>
+//	<custom_configuration>false</custom_configuration>
+//
 // </host_nic>
 // ----
 func (p *UnmanagedNetwork) HostNic() (*HostNic, bool) {
@@ -49037,26 +49545,28 @@ func (p *UnmanagedNetwork) HostNic() (*HostNic, bool) {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>eth0</name>
-//   <boot_protocol>static</boot_protocol>
-//   <bridged>true</bridged>
-//   <custom_configuration>true</custom_configuration>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <ipv6>
-//     <gateway>::</gateway>
-//     <version>v6</version>
-//   </ipv6>
-//   <ipv6_boot_protocol>none</ipv6_boot_protocol>
-//   <mac>
-//     <address>52:54:00:0c:79:1d</address>
-//   </mac>
-//   <mtu>1500</mtu>
-//   <status>up</status>
+//
+//	<name>eth0</name>
+//	<boot_protocol>static</boot_protocol>
+//	<bridged>true</bridged>
+//	<custom_configuration>true</custom_configuration>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<ipv6>
+//	  <gateway>::</gateway>
+//	  <version>v6</version>
+//	</ipv6>
+//	<ipv6_boot_protocol>none</ipv6_boot_protocol>
+//	<mac>
+//	  <address>52:54:00:0c:79:1d</address>
+//	</mac>
+//	<mtu>1500</mtu>
+//	<status>up</status>
+//
 // </host_nic>
 // ----
 //
@@ -49068,35 +49578,37 @@ func (p *UnmanagedNetwork) HostNic() (*HostNic, bool) {
 // [source,xml]
 // ----
 // <host_nic href="/ovirt-engine/api/hosts/123/nics/456" id="456">
-//   <name>bond0</name>
-//   <mac address="00:00:00:00:00:00"/>
-//   <ip>
-//     <address>192.168.122.39</address>
-//     <gateway>192.168.122.1</gateway>
-//     <netmask>255.255.255.0</netmask>
-//     <version>v4</version>
-//   </ip>
-//   <boot_protocol>dhcp</boot_protocol>
-//   <bonding>
-//     <options>
-//       <option>
-//         <name>mode</name>
-//         <value>4</value>
-//         <type>Dynamic link aggregation (802.3ad)</type>
-//       </option>
-//       <option>
-//         <name>miimon</name>
-//         <value>100</value>
-//       </option>
-//     </options>
-//     <slaves>
-//       <host_nic id="123"/>
-//       <host_nic id="456"/>
-//     </slaves>
-//   </bonding>
-//   <mtu>1500</mtu>
-//   <bridged>true</bridged>
-//   <custom_configuration>false</custom_configuration>
+//
+//	<name>bond0</name>
+//	<mac address="00:00:00:00:00:00"/>
+//	<ip>
+//	  <address>192.168.122.39</address>
+//	  <gateway>192.168.122.1</gateway>
+//	  <netmask>255.255.255.0</netmask>
+//	  <version>v4</version>
+//	</ip>
+//	<boot_protocol>dhcp</boot_protocol>
+//	<bonding>
+//	  <options>
+//	    <option>
+//	      <name>mode</name>
+//	      <value>4</value>
+//	      <type>Dynamic link aggregation (802.3ad)</type>
+//	    </option>
+//	    <option>
+//	      <name>miimon</name>
+//	      <value>100</value>
+//	    </option>
+//	  </options>
+//	  <slaves>
+//	    <host_nic id="123"/>
+//	    <host_nic id="456"/>
+//	  </slaves>
+//	</bonding>
+//	<mtu>1500</mtu>
+//	<bridged>true</bridged>
+//	<custom_configuration>false</custom_configuration>
+//
 // </host_nic>
 // ----
 func (p *UnmanagedNetwork) MustHostNic() *HostNic {
@@ -50130,21 +50642,23 @@ func (p *VirtioScsi) MustEnabled() bool {
 // [source,xml]
 // ----
 // <vm_numa_node href="/ovirt-engine/api/vms/123/numanodes/456" id="456">
-//   <cpu>
-//     <cores>
-//       <core>
-//         <index>0</index>
-//       </core>
-//     </cores>
-//   </cpu>
-//   <index>0</index>
-//   <memory>1024</memory>
-//   <numa_node_pins>
-//     <numa_node_pin>
-//       <index>0</index>
-//     </numa_node_pin>
-//   </numa_node_pins>
-//   <vm href="/ovirt-engine/api/vms/123" id="123" />
+//
+//	<cpu>
+//	  <cores>
+//	    <core>
+//	      <index>0</index>
+//	    </core>
+//	  </cores>
+//	</cpu>
+//	<index>0</index>
+//	<memory>1024</memory>
+//	<numa_node_pins>
+//	  <numa_node_pin>
+//	    <index>0</index>
+//	  </numa_node_pin>
+//	</numa_node_pins>
+//	<vm href="/ovirt-engine/api/vms/123" id="123" />
+//
 // </vm_numa_node>
 // ----
 type VirtualNumaNode struct {
@@ -50605,126 +51119,128 @@ func (p *Vm) MustCdroms() *CdromSlice {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *Vm) SetCluster(attr *Cluster) {
 	p.cluster = attr
@@ -50736,126 +51252,128 @@ func (p *Vm) SetCluster(attr *Cluster) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *Vm) Cluster() (*Cluster, bool) {
 	if p.cluster != nil {
@@ -50870,126 +51388,128 @@ func (p *Vm) Cluster() (*Cluster, bool) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *Vm) MustCluster() *Cluster {
 	if p.cluster == nil {
@@ -51389,26 +51909,28 @@ func (p *Vm) MustGraphicsConsoles() *GraphicsConsoleSlice {
 // ----
 // <vm href="/ovirt-engine/api/vms/123" id="123">
 // ...
-//   <guest_operating_system>
-//     <architecture>x86_64</architecture>
-//     <codename>Maipo</codename>
-//     <distribution>Red Hat Enterprise Linux Server</distribution>
-//     <family>Linux</family>
-//     <kernel>
-//       <version>
-//         <build>0</build>
-//         <full_version>3.10.0-514.10.2.el7.x86_64</full_version>
-//         <major>3</major>
-//         <minor>10</minor>
-//         <revision>514</revision>
-//       </version>
-//     </kernel>
-//     <version>
-//       <full_version>7.3</full_version>
-//       <major>7</major>
-//       <minor>3</minor>
-//     </version>
-//   </guest_operating_system>
+//
+//	<guest_operating_system>
+//	  <architecture>x86_64</architecture>
+//	  <codename>Maipo</codename>
+//	  <distribution>Red Hat Enterprise Linux Server</distribution>
+//	  <family>Linux</family>
+//	  <kernel>
+//	    <version>
+//	      <build>0</build>
+//	      <full_version>3.10.0-514.10.2.el7.x86_64</full_version>
+//	      <major>3</major>
+//	      <minor>10</minor>
+//	      <revision>514</revision>
+//	    </version>
+//	  </kernel>
+//	  <version>
+//	    <full_version>7.3</full_version>
+//	    <major>7</major>
+//	    <minor>3</minor>
+//	  </version>
+//	</guest_operating_system>
+//
 // </vm>
 // ----
 func (p *Vm) SetGuestOperatingSystem(attr *GuestOperatingSystem) {
@@ -51429,26 +51951,28 @@ func (p *Vm) SetGuestOperatingSystem(attr *GuestOperatingSystem) {
 // ----
 // <vm href="/ovirt-engine/api/vms/123" id="123">
 // ...
-//   <guest_operating_system>
-//     <architecture>x86_64</architecture>
-//     <codename>Maipo</codename>
-//     <distribution>Red Hat Enterprise Linux Server</distribution>
-//     <family>Linux</family>
-//     <kernel>
-//       <version>
-//         <build>0</build>
-//         <full_version>3.10.0-514.10.2.el7.x86_64</full_version>
-//         <major>3</major>
-//         <minor>10</minor>
-//         <revision>514</revision>
-//       </version>
-//     </kernel>
-//     <version>
-//       <full_version>7.3</full_version>
-//       <major>7</major>
-//       <minor>3</minor>
-//     </version>
-//   </guest_operating_system>
+//
+//	<guest_operating_system>
+//	  <architecture>x86_64</architecture>
+//	  <codename>Maipo</codename>
+//	  <distribution>Red Hat Enterprise Linux Server</distribution>
+//	  <family>Linux</family>
+//	  <kernel>
+//	    <version>
+//	      <build>0</build>
+//	      <full_version>3.10.0-514.10.2.el7.x86_64</full_version>
+//	      <major>3</major>
+//	      <minor>10</minor>
+//	      <revision>514</revision>
+//	    </version>
+//	  </kernel>
+//	  <version>
+//	    <full_version>7.3</full_version>
+//	    <major>7</major>
+//	    <minor>3</minor>
+//	  </version>
+//	</guest_operating_system>
+//
 // </vm>
 // ----
 func (p *Vm) GuestOperatingSystem() (*GuestOperatingSystem, bool) {
@@ -51472,26 +51996,28 @@ func (p *Vm) GuestOperatingSystem() (*GuestOperatingSystem, bool) {
 // ----
 // <vm href="/ovirt-engine/api/vms/123" id="123">
 // ...
-//   <guest_operating_system>
-//     <architecture>x86_64</architecture>
-//     <codename>Maipo</codename>
-//     <distribution>Red Hat Enterprise Linux Server</distribution>
-//     <family>Linux</family>
-//     <kernel>
-//       <version>
-//         <build>0</build>
-//         <full_version>3.10.0-514.10.2.el7.x86_64</full_version>
-//         <major>3</major>
-//         <minor>10</minor>
-//         <revision>514</revision>
-//       </version>
-//     </kernel>
-//     <version>
-//       <full_version>7.3</full_version>
-//       <major>7</major>
-//       <minor>3</minor>
-//     </version>
-//   </guest_operating_system>
+//
+//	<guest_operating_system>
+//	  <architecture>x86_64</architecture>
+//	  <codename>Maipo</codename>
+//	  <distribution>Red Hat Enterprise Linux Server</distribution>
+//	  <family>Linux</family>
+//	  <kernel>
+//	    <version>
+//	      <build>0</build>
+//	      <full_version>3.10.0-514.10.2.el7.x86_64</full_version>
+//	      <major>3</major>
+//	      <minor>10</minor>
+//	      <revision>514</revision>
+//	    </version>
+//	  </kernel>
+//	  <version>
+//	    <full_version>7.3</full_version>
+//	    <major>7</major>
+//	    <minor>3</minor>
+//	  </version>
+//	</guest_operating_system>
+//
 // </vm>
 // ----
 func (p *Vm) MustGuestOperatingSystem() *GuestOperatingSystem {
@@ -52144,13 +52670,15 @@ func (p *Vm) MustPlacementPolicy() *VmPlacementPolicy {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *Vm) SetQuota(attr *Quota) {
@@ -52164,13 +52692,15 @@ func (p *Vm) SetQuota(attr *Quota) {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *Vm) Quota() (*Quota, bool) {
@@ -52187,13 +52717,15 @@ func (p *Vm) Quota() (*Quota, bool) {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *Vm) MustQuota() *Quota {
@@ -52534,27 +53066,29 @@ func (p *Vm) MustStopTime() time.Time {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *Vm) SetStorageDomain(attr *StorageDomain) {
@@ -52568,27 +53102,29 @@ func (p *Vm) SetStorageDomain(attr *StorageDomain) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *Vm) StorageDomain() (*StorageDomain, bool) {
@@ -52605,27 +53141,29 @@ func (p *Vm) StorageDomain() (*StorageDomain, bool) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *Vm) MustStorageDomain() *StorageDomain {
@@ -52992,126 +53530,128 @@ func (p *VmBase) MustBios() *Bios {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *VmBase) SetCluster(attr *Cluster) {
 	p.cluster = attr
@@ -53123,126 +53663,128 @@ func (p *VmBase) SetCluster(attr *Cluster) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *VmBase) Cluster() (*Cluster, bool) {
 	if p.cluster != nil {
@@ -53257,126 +53799,128 @@ func (p *VmBase) Cluster() (*Cluster, bool) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *VmBase) MustCluster() *Cluster {
 	if p.cluster == nil {
@@ -53963,13 +54507,15 @@ func (p *VmBase) MustPlacementPolicy() *VmPlacementPolicy {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *VmBase) SetQuota(attr *Quota) {
@@ -53983,13 +54529,15 @@ func (p *VmBase) SetQuota(attr *Quota) {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *VmBase) Quota() (*Quota, bool) {
@@ -54006,13 +54554,15 @@ func (p *VmBase) Quota() (*Quota, bool) {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *VmBase) MustQuota() *Quota {
@@ -54164,27 +54714,29 @@ func (p *VmBase) MustStateless() bool {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *VmBase) SetStorageDomain(attr *StorageDomain) {
@@ -54198,27 +54750,29 @@ func (p *VmBase) SetStorageDomain(attr *StorageDomain) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *VmBase) StorageDomain() (*StorageDomain, bool) {
@@ -54235,27 +54789,29 @@ func (p *VmBase) StorageDomain() (*StorageDomain, bool) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *VmBase) MustStorageDomain() *StorageDomain {
@@ -54537,126 +55093,128 @@ func (p *VmPool) MustAutoStorageSelect() bool {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *VmPool) SetCluster(attr *Cluster) {
 	p.cluster = attr
@@ -54668,126 +55226,128 @@ func (p *VmPool) SetCluster(attr *Cluster) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *VmPool) Cluster() (*Cluster, bool) {
 	if p.cluster != nil {
@@ -54802,126 +55362,128 @@ func (p *VmPool) Cluster() (*Cluster, bool) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *VmPool) MustCluster() *Cluster {
 	if p.cluster == nil {
@@ -55618,33 +56180,35 @@ func (p *VnicProfile) MustName() string {
 //
 // [source,json]
 // ----
-// {
-//   "network" : [ {
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "stp" : "false",
-//     "mtu" : "0",
-//     "usages" : {
-//       "usage" : [ "vm" ]
-//     },
-//     "name" : "ovirtmgmt",
-//     "description" : "Management Network",
-//     "href" : "/ovirt-engine/api/networks/456",
-//     "id" : "456",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/networks/456/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
-//       "rel" : "vnicprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/labels",
-//       "rel" : "labels"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "network" : [ {
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "stp" : "false",
+//	    "mtu" : "0",
+//	    "usages" : {
+//	      "usage" : [ "vm" ]
+//	    },
+//	    "name" : "ovirtmgmt",
+//	    "description" : "Management Network",
+//	    "href" : "/ovirt-engine/api/networks/456",
+//	    "id" : "456",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/networks/456/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
+//	      "rel" : "vnicprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/labels",
+//	      "rel" : "labels"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 //
 // An example of the XML representation of the same logical network:
@@ -55652,17 +56216,19 @@ func (p *VnicProfile) MustName() string {
 // [source,xml]
 // ----
 // <network href="/ovirt-engine/api/networks/456" id="456">
-//   <name>ovirtmgmt</name>
-//   <description>Management Network</description>
-//   <link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
-//   <link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
-//   <link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
-//   <data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
-//   <stp>false</stp>
-//   <mtu>0</mtu>
-//   <usages>
-//     <usage>vm</usage>
-//   </usages>
+//
+//	<name>ovirtmgmt</name>
+//	<description>Management Network</description>
+//	<link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
+//	<link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
+//	<link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
+//	<data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
+//	<stp>false</stp>
+//	<mtu>0</mtu>
+//	<usages>
+//	  <usage>vm</usage>
+//	</usages>
+//
 // </network>
 // ----
 func (p *VnicProfile) SetNetwork(attr *Network) {
@@ -55675,33 +56241,35 @@ func (p *VnicProfile) SetNetwork(attr *Network) {
 //
 // [source,json]
 // ----
-// {
-//   "network" : [ {
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "stp" : "false",
-//     "mtu" : "0",
-//     "usages" : {
-//       "usage" : [ "vm" ]
-//     },
-//     "name" : "ovirtmgmt",
-//     "description" : "Management Network",
-//     "href" : "/ovirt-engine/api/networks/456",
-//     "id" : "456",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/networks/456/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
-//       "rel" : "vnicprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/labels",
-//       "rel" : "labels"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "network" : [ {
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "stp" : "false",
+//	    "mtu" : "0",
+//	    "usages" : {
+//	      "usage" : [ "vm" ]
+//	    },
+//	    "name" : "ovirtmgmt",
+//	    "description" : "Management Network",
+//	    "href" : "/ovirt-engine/api/networks/456",
+//	    "id" : "456",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/networks/456/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
+//	      "rel" : "vnicprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/labels",
+//	      "rel" : "labels"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 //
 // An example of the XML representation of the same logical network:
@@ -55709,17 +56277,19 @@ func (p *VnicProfile) SetNetwork(attr *Network) {
 // [source,xml]
 // ----
 // <network href="/ovirt-engine/api/networks/456" id="456">
-//   <name>ovirtmgmt</name>
-//   <description>Management Network</description>
-//   <link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
-//   <link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
-//   <link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
-//   <data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
-//   <stp>false</stp>
-//   <mtu>0</mtu>
-//   <usages>
-//     <usage>vm</usage>
-//   </usages>
+//
+//	<name>ovirtmgmt</name>
+//	<description>Management Network</description>
+//	<link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
+//	<link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
+//	<link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
+//	<data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
+//	<stp>false</stp>
+//	<mtu>0</mtu>
+//	<usages>
+//	  <usage>vm</usage>
+//	</usages>
+//
 // </network>
 // ----
 func (p *VnicProfile) Network() (*Network, bool) {
@@ -55735,33 +56305,35 @@ func (p *VnicProfile) Network() (*Network, bool) {
 //
 // [source,json]
 // ----
-// {
-//   "network" : [ {
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "stp" : "false",
-//     "mtu" : "0",
-//     "usages" : {
-//       "usage" : [ "vm" ]
-//     },
-//     "name" : "ovirtmgmt",
-//     "description" : "Management Network",
-//     "href" : "/ovirt-engine/api/networks/456",
-//     "id" : "456",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/networks/456/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
-//       "rel" : "vnicprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/networks/456/labels",
-//       "rel" : "labels"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "network" : [ {
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "stp" : "false",
+//	    "mtu" : "0",
+//	    "usages" : {
+//	      "usage" : [ "vm" ]
+//	    },
+//	    "name" : "ovirtmgmt",
+//	    "description" : "Management Network",
+//	    "href" : "/ovirt-engine/api/networks/456",
+//	    "id" : "456",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/networks/456/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/vnicprofiles",
+//	      "rel" : "vnicprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/networks/456/labels",
+//	      "rel" : "labels"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 //
 // An example of the XML representation of the same logical network:
@@ -55769,17 +56341,19 @@ func (p *VnicProfile) Network() (*Network, bool) {
 // [source,xml]
 // ----
 // <network href="/ovirt-engine/api/networks/456" id="456">
-//   <name>ovirtmgmt</name>
-//   <description>Management Network</description>
-//   <link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
-//   <link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
-//   <link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
-//   <data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
-//   <stp>false</stp>
-//   <mtu>0</mtu>
-//   <usages>
-//     <usage>vm</usage>
-//   </usages>
+//
+//	<name>ovirtmgmt</name>
+//	<description>Management Network</description>
+//	<link href="/ovirt-engine/api/networks/456/permissions" rel="permissions"/>
+//	<link href="/ovirt-engine/api/networks/456/vnicprofiles" rel="vnicprofiles"/>
+//	<link href="/ovirt-engine/api/networks/456/labels" rel="labels"/>
+//	<data_center href="/ovirt-engine/api/datacenters/123" id="123"/>
+//	<stp>false</stp>
+//	<mtu>0</mtu>
+//	<usages>
+//	  <usage>vm</usage>
+//	</usages>
+//
 // </network>
 // ----
 func (p *VnicProfile) MustNetwork() *Network {
@@ -55805,13 +56379,15 @@ func (p *VnicProfile) MustNetwork() *Network {
 // [source,xml]
 // ----
 // <network_filter id="00000019-0019-0019-0019-00000000026c">
-//   <name>example-filter</name>
-//   <version>
-//     <major>4</major>
-//     <minor>0</minor>
-//     <build>-1</build>
-//     <revision>-1</revision>
-//   </version>
+//
+//	<name>example-filter</name>
+//	<version>
+//	  <major>4</major>
+//	  <minor>0</minor>
+//	  <build>-1</build>
+//	  <revision>-1</revision>
+//	</version>
+//
 // </network_filter>
 // ----
 //
@@ -55836,13 +56412,15 @@ func (p *VnicProfile) SetNetworkFilter(attr *NetworkFilter) {
 // [source,xml]
 // ----
 // <network_filter id="00000019-0019-0019-0019-00000000026c">
-//   <name>example-filter</name>
-//   <version>
-//     <major>4</major>
-//     <minor>0</minor>
-//     <build>-1</build>
-//     <revision>-1</revision>
-//   </version>
+//
+//	<name>example-filter</name>
+//	<version>
+//	  <major>4</major>
+//	  <minor>0</minor>
+//	  <build>-1</build>
+//	  <revision>-1</revision>
+//	</version>
+//
 // </network_filter>
 // ----
 //
@@ -55870,13 +56448,15 @@ func (p *VnicProfile) NetworkFilter() (*NetworkFilter, bool) {
 // [source,xml]
 // ----
 // <network_filter id="00000019-0019-0019-0019-00000000026c">
-//   <name>example-filter</name>
-//   <version>
-//     <major>4</major>
-//     <minor>0</minor>
-//     <build>-1</build>
-//     <revision>-1</revision>
-//   </version>
+//
+//	<name>example-filter</name>
+//	<version>
+//	  <major>4</major>
+//	  <minor>0</minor>
+//	  <build>-1</build>
+//	  <revision>-1</revision>
+//	</version>
+//
 // </network_filter>
 // ----
 //
@@ -56023,16 +56603,18 @@ func (p *VnicProfile) MustQos() *Qos {
 // [source,xml]
 // ----
 // <vnic_profile_mappings>
-//   <vnic_profile_mapping>
-//     <source_network_name>red</source_network_name>
-//     <source_network_profile_name>gold</source_network_profile_name>
-//     <target_vnic_profile id="738dd914-8ec8-4a8b-8628-34672a5d449b"/>
-//   </vnic_profile_mapping>
-//   <vnic_profile_mapping>
-//     <source_network_name>blue</source_network_name>
-//     <source_network_profile_name>silver</source_network_profile_name>
-//     <target_vnic_profile id="892a12ec-2028-4451-80aa-ff3bf55d6bac"/>
-//   </vnic_profile_mapping>
+//
+//	<vnic_profile_mapping>
+//	  <source_network_name>red</source_network_name>
+//	  <source_network_profile_name>gold</source_network_profile_name>
+//	  <target_vnic_profile id="738dd914-8ec8-4a8b-8628-34672a5d449b"/>
+//	</vnic_profile_mapping>
+//	<vnic_profile_mapping>
+//	  <source_network_name>blue</source_network_name>
+//	  <source_network_profile_name>silver</source_network_profile_name>
+//	  <target_vnic_profile id="892a12ec-2028-4451-80aa-ff3bf55d6bac"/>
+//	</vnic_profile_mapping>
+//
 // </vnic_profile_mappings>
 // ----
 type VnicProfileMapping struct {
@@ -56989,126 +57571,128 @@ func (p *Action) MustClonePermissions() bool {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *Action) SetCluster(attr *Cluster) {
 	p.cluster = attr
@@ -57120,126 +57704,128 @@ func (p *Action) SetCluster(attr *Cluster) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *Action) Cluster() (*Cluster, bool) {
 	if p.cluster != nil {
@@ -57254,126 +57840,128 @@ func (p *Action) Cluster() (*Cluster, bool) {
 //
 // [source]
 // ----
-// {
-//   "cluster" : [ {
-//     "ballooning_enabled" : "false",
-//     "cpu" : {
-//       "architecture" : "x86_64",
-//       "type" : "Intel SandyBridge Family"
-//     },
-//     "custom_scheduling_policy_properties" : {
-//       "property" : [ {
-//         "name" : "HighUtilization",
-//         "value" : "80"
-//       }, {
-//         "name" : "CpuOverCommitDurationMinutes",
-//         "value" : "2"
-//       } ]
-//     },
-//     "error_handling" : {
-//       "on_error" : "migrate"
-//     },
-//     "fencing_policy" : {
-//       "enabled" : "true",
-//       "skip_if_connectivity_broken" : {
-//         "enabled" : "false",
-//         "threshold" : "50"
-//       },
-//       "skip_if_gluster_bricks_up" : "false",
-//       "skip_if_gluster_quorum_not_met" : "false",
-//       "skip_if_sd_active" : {
-//         "enabled" : "false"
-//       }
-//     },
-//     "gluster_service" : "false",
-//     "firewall_type" : "iptables",
-//     "ha_reservation" : "false",
-//     "ksm" : {
-//       "enabled" : "true",
-//       "merge_across_nodes" : "true"
-//     },
-//     "memory_policy" : {
-//       "over_commit" : {
-//         "percent" : "100"
-//       },
-//       "transparent_hugepages" : {
-//         "enabled" : "true"
-//       }
-//     },
-//     "migration" : {
-//       "auto_converge" : "inherit",
-//       "bandwidth" : {
-//         "assignment_method" : "auto"
-//       },
-//       "compressed" : "inherit",
-//       "policy" : {
-//         "id" : "00000000-0000-0000-0000-000000000000"
-//       }
-//     },
-//     "required_rng_sources" : {
-//       "required_rng_source" : [ "random" ]
-//     },
-//     "switch_type" : "legacy",
-//     "threads_as_cores" : "false",
-//     "trusted_service" : "false",
-//     "tunnel_migration" : "false",
-//     "version" : {
-//       "major" : "4",
-//       "minor" : "1"
-//     },
-//     "virt_service" : "true",
-//     "data_center" : {
-//       "href" : "/ovirt-engine/api/datacenters/123",
-//       "id" : "123"
-//     },
-//     "mac_pool" : {
-//       "href" : "/ovirt-engine/api/macpools/456",
-//       "id" : "456"
-//     },
-//     "scheduling_policy" : {
-//       "href" : "/ovirt-engine/api/schedulingpolicies/789",
-//       "id" : "789"
-//     },
-//     "actions" : {
-//       "link" : [ {
-//         "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
-//         "rel" : "resetemulatedmachine"
-//       } ]
-//     },
-//     "name" : "Default",
-//     "description" : "The default server cluster",
-//     "href" : "/ovirt-engine/api/clusters/234",
-//     "id" : "234",
-//     "link" : [ {
-//       "href" : "/ovirt-engine/api/clusters/234/permissions",
-//       "rel" : "permissions"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
-//       "rel" : "cpuprofiles"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networkfilters",
-//       "rel" : "networkfilters"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/networks",
-//       "rel" : "networks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
-//       "rel" : "affinitygroups"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
-//       "rel" : "glusterhooks"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
-//       "rel" : "glustervolumes"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
-//       "rel" : "enabledfeatures"
-//     }, {
-//       "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
-//       "rel" : "externalnetworkproviders"
-//     } ]
-//   } ]
-// }
+//
+//	{
+//	  "cluster" : [ {
+//	    "ballooning_enabled" : "false",
+//	    "cpu" : {
+//	      "architecture" : "x86_64",
+//	      "type" : "Intel SandyBridge Family"
+//	    },
+//	    "custom_scheduling_policy_properties" : {
+//	      "property" : [ {
+//	        "name" : "HighUtilization",
+//	        "value" : "80"
+//	      }, {
+//	        "name" : "CpuOverCommitDurationMinutes",
+//	        "value" : "2"
+//	      } ]
+//	    },
+//	    "error_handling" : {
+//	      "on_error" : "migrate"
+//	    },
+//	    "fencing_policy" : {
+//	      "enabled" : "true",
+//	      "skip_if_connectivity_broken" : {
+//	        "enabled" : "false",
+//	        "threshold" : "50"
+//	      },
+//	      "skip_if_gluster_bricks_up" : "false",
+//	      "skip_if_gluster_quorum_not_met" : "false",
+//	      "skip_if_sd_active" : {
+//	        "enabled" : "false"
+//	      }
+//	    },
+//	    "gluster_service" : "false",
+//	    "firewall_type" : "iptables",
+//	    "ha_reservation" : "false",
+//	    "ksm" : {
+//	      "enabled" : "true",
+//	      "merge_across_nodes" : "true"
+//	    },
+//	    "memory_policy" : {
+//	      "over_commit" : {
+//	        "percent" : "100"
+//	      },
+//	      "transparent_hugepages" : {
+//	        "enabled" : "true"
+//	      }
+//	    },
+//	    "migration" : {
+//	      "auto_converge" : "inherit",
+//	      "bandwidth" : {
+//	        "assignment_method" : "auto"
+//	      },
+//	      "compressed" : "inherit",
+//	      "policy" : {
+//	        "id" : "00000000-0000-0000-0000-000000000000"
+//	      }
+//	    },
+//	    "required_rng_sources" : {
+//	      "required_rng_source" : [ "random" ]
+//	    },
+//	    "switch_type" : "legacy",
+//	    "threads_as_cores" : "false",
+//	    "trusted_service" : "false",
+//	    "tunnel_migration" : "false",
+//	    "version" : {
+//	      "major" : "4",
+//	      "minor" : "1"
+//	    },
+//	    "virt_service" : "true",
+//	    "data_center" : {
+//	      "href" : "/ovirt-engine/api/datacenters/123",
+//	      "id" : "123"
+//	    },
+//	    "mac_pool" : {
+//	      "href" : "/ovirt-engine/api/macpools/456",
+//	      "id" : "456"
+//	    },
+//	    "scheduling_policy" : {
+//	      "href" : "/ovirt-engine/api/schedulingpolicies/789",
+//	      "id" : "789"
+//	    },
+//	    "actions" : {
+//	      "link" : [ {
+//	        "href" : "/ovirt-engine/api/clusters/234/resetemulatedmachine",
+//	        "rel" : "resetemulatedmachine"
+//	      } ]
+//	    },
+//	    "name" : "Default",
+//	    "description" : "The default server cluster",
+//	    "href" : "/ovirt-engine/api/clusters/234",
+//	    "id" : "234",
+//	    "link" : [ {
+//	      "href" : "/ovirt-engine/api/clusters/234/permissions",
+//	      "rel" : "permissions"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/cpuprofiles",
+//	      "rel" : "cpuprofiles"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networkfilters",
+//	      "rel" : "networkfilters"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/networks",
+//	      "rel" : "networks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/affinitygroups",
+//	      "rel" : "affinitygroups"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glusterhooks",
+//	      "rel" : "glusterhooks"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/glustervolumes",
+//	      "rel" : "glustervolumes"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/enabledfeatures",
+//	      "rel" : "enabledfeatures"
+//	    }, {
+//	      "href" : "/ovirt-engine/api/clusters/234/externalnetworkproviders",
+//	      "rel" : "externalnetworkproviders"
+//	    } ]
+//	  } ]
+//	}
+//
 // ----
 func (p *Action) MustCluster() *Cluster {
 	if p.cluster == nil {
@@ -57446,9 +58034,11 @@ func (p *Action) MustCommitOnSuccess() bool {
 // [source,xml]
 // ----
 // <storage_connection id="123">
-//   <address>mynfs.example.com</address>
-//   <type>nfs</type>
-//   <path>/exports/mydata</path>
+//
+//	<address>mynfs.example.com</address>
+//	<type>nfs</type>
+//	<path>/exports/mydata</path>
+//
 // </storage_connection>
 // ----
 func (p *Action) SetConnection(attr *StorageConnection) {
@@ -57462,9 +58052,11 @@ func (p *Action) SetConnection(attr *StorageConnection) {
 // [source,xml]
 // ----
 // <storage_connection id="123">
-//   <address>mynfs.example.com</address>
-//   <type>nfs</type>
-//   <path>/exports/mydata</path>
+//
+//	<address>mynfs.example.com</address>
+//	<type>nfs</type>
+//	<path>/exports/mydata</path>
+//
 // </storage_connection>
 // ----
 func (p *Action) Connection() (*StorageConnection, bool) {
@@ -57481,9 +58073,11 @@ func (p *Action) Connection() (*StorageConnection, bool) {
 // [source,xml]
 // ----
 // <storage_connection id="123">
-//   <address>mynfs.example.com</address>
-//   <type>nfs</type>
-//   <path>/exports/mydata</path>
+//
+//	<address>mynfs.example.com</address>
+//	<type>nfs</type>
+//	<path>/exports/mydata</path>
+//
 // </storage_connection>
 // ----
 func (p *Action) MustConnection() *StorageConnection {
@@ -58328,13 +58922,15 @@ func (p *Action) MustProxyTicket() *ProxyTicket {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *Action) SetQuota(attr *Quota) {
@@ -58348,13 +58944,15 @@ func (p *Action) SetQuota(attr *Quota) {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *Action) Quota() (*Quota, bool) {
@@ -58371,13 +58969,15 @@ func (p *Action) Quota() (*Quota, bool) {
 // [source,xml]
 // ----
 // <quota href="/ovirt-engine/api/datacenters/7044934e/quotas/dcad5ddc" id="dcad5ddc">
-//   <name>My Quota</name>
-//   <description>A quota for my oVirt environment</description>
-//   <cluster_hard_limit_pct>0</cluster_hard_limit_pct>
-//   <cluster_soft_limit_pct>0</cluster_soft_limit_pct>
-//   <data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
-//   <storage_hard_limit_pct>0</storage_hard_limit_pct>
-//   <storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
+//	<name>My Quota</name>
+//	<description>A quota for my oVirt environment</description>
+//	<cluster_hard_limit_pct>0</cluster_hard_limit_pct>
+//	<cluster_soft_limit_pct>0</cluster_soft_limit_pct>
+//	<data_center href="/ovirt-engine/api/datacenters/7044934e" id="7044934e"/>
+//	<storage_hard_limit_pct>0</storage_hard_limit_pct>
+//	<storage_soft_limit_pct>0</storage_soft_limit_pct>
+//
 // </quota>
 // ----
 func (p *Action) MustQuota() *Quota {
@@ -58483,103 +59083,105 @@ func (p *Action) MustReboot() bool {
 // [source,xml]
 // ----
 // <action>
-//   <registration_configuration>
-//     <cluster_mappings>
-//       <registration_cluster_mapping>
-//         <from>
-//           <name>myoriginalcluster</name>
-//         </from>
-//         <to>
-//           <name>mynewcluster</name>
-//         </to>
-//       </registration_cluster_mapping>
-//     </cluster_mappings>
-//     <role_mappings>
-//       <registration_role_mapping>
-//         <from>
-//           <name>SuperUser</name>
-//         </from>
-//         <to>
-//           <name>UserVmRunTimeManager</name>
-//         </to>
-//       </registration_role_mapping>
-//     </role_mappings>
-//     <domain_mappings>
-//       <registration_domain_mapping>
-//         <from>
-//           <name>redhat</name>
-//         </from>
-//         <to>
-//           <name>internal</name>
-//         </to>
-//       </registration_domain_mapping>
-//     </domain_mappings>
-//     <lun_mappings>
-//      <registration_lun_mapping>
-//        <from id="111">
-//        </from>
-//        <to id="222">
-//          <alias>weTestLun</alias>
-//          <lun_storage>
-//            <type>iscsi</type>
-//            <logical_units>
-//               <logical_unit id="36001405fb1ddb4b91e44078f1fffcfef">
-//                  <address>44.33.11.22</address>
-//                  <port>3260</port>
-//                  <portal>1</portal>
-//                  <target>iqn.2017-11.com.name.redhat:444</target>
-//               </logical_unit>
-//            </logical_units>
-//          </lun_storage>
-//        </to>
-//      </registration_lun_mapping>
-//     </lun_mappings>
-//     <affinity_group_mappings>
-//      <registration_affinity_group_mapping>
-//        <from>
-//          <name>affinity</name>
-//        </from>
-//        <to>
-//          <name>affinity2</name>
-//        </to>
-//      </registration_affinity_group_mapping>
-//     </affinity_group_mappings>
-//     <affinity_label_mappings>
-//      <registration_affinity_label_mapping>
-//        <from>
-//          <name>affinity_label</name>
-//        </from>
-//        <to>
-//          <name>affinity_label2</name>
-//        </to>
-//      </registration_affinity_label_mapping>
-//     </affinity_label_mappings>
-//     <vnic_profile_mappings>
-//       <registration_vnic_profile_mapping>
-//         <from>
-//           <name>gold</name>
-//           <network>
-//             <name>red</name>
-//           </network>
-//         </from>
-//         <to id="738dd914-8ec8-4a8b-8628-34672a5d449b"/>
-//       </registration_vnic_profile_mapping>
-//       <registration_vnic_profile_mapping>
-//         <from>
-//           <name>silver</name>
-//           <network>
-//             <name>blue</name>
-//           </network>
-//         </from>
-//         <to>
-//           <name>copper</name>
-//           <network>
-//             <name>orange</name>
-//           </network>
-//         </to>
-//       </registration_vnic_profile_mapping>
-//     </vnic_profile_mappings>
-//   </registration_configuration>
+//
+//	<registration_configuration>
+//	  <cluster_mappings>
+//	    <registration_cluster_mapping>
+//	      <from>
+//	        <name>myoriginalcluster</name>
+//	      </from>
+//	      <to>
+//	        <name>mynewcluster</name>
+//	      </to>
+//	    </registration_cluster_mapping>
+//	  </cluster_mappings>
+//	  <role_mappings>
+//	    <registration_role_mapping>
+//	      <from>
+//	        <name>SuperUser</name>
+//	      </from>
+//	      <to>
+//	        <name>UserVmRunTimeManager</name>
+//	      </to>
+//	    </registration_role_mapping>
+//	  </role_mappings>
+//	  <domain_mappings>
+//	    <registration_domain_mapping>
+//	      <from>
+//	        <name>redhat</name>
+//	      </from>
+//	      <to>
+//	        <name>internal</name>
+//	      </to>
+//	    </registration_domain_mapping>
+//	  </domain_mappings>
+//	  <lun_mappings>
+//	   <registration_lun_mapping>
+//	     <from id="111">
+//	     </from>
+//	     <to id="222">
+//	       <alias>weTestLun</alias>
+//	       <lun_storage>
+//	         <type>iscsi</type>
+//	         <logical_units>
+//	            <logical_unit id="36001405fb1ddb4b91e44078f1fffcfef">
+//	               <address>44.33.11.22</address>
+//	               <port>3260</port>
+//	               <portal>1</portal>
+//	               <target>iqn.2017-11.com.name.redhat:444</target>
+//	            </logical_unit>
+//	         </logical_units>
+//	       </lun_storage>
+//	     </to>
+//	   </registration_lun_mapping>
+//	  </lun_mappings>
+//	  <affinity_group_mappings>
+//	   <registration_affinity_group_mapping>
+//	     <from>
+//	       <name>affinity</name>
+//	     </from>
+//	     <to>
+//	       <name>affinity2</name>
+//	     </to>
+//	   </registration_affinity_group_mapping>
+//	  </affinity_group_mappings>
+//	  <affinity_label_mappings>
+//	   <registration_affinity_label_mapping>
+//	     <from>
+//	       <name>affinity_label</name>
+//	     </from>
+//	     <to>
+//	       <name>affinity_label2</name>
+//	     </to>
+//	   </registration_affinity_label_mapping>
+//	  </affinity_label_mappings>
+//	  <vnic_profile_mappings>
+//	    <registration_vnic_profile_mapping>
+//	      <from>
+//	        <name>gold</name>
+//	        <network>
+//	          <name>red</name>
+//	        </network>
+//	      </from>
+//	      <to id="738dd914-8ec8-4a8b-8628-34672a5d449b"/>
+//	    </registration_vnic_profile_mapping>
+//	    <registration_vnic_profile_mapping>
+//	      <from>
+//	        <name>silver</name>
+//	        <network>
+//	          <name>blue</name>
+//	        </network>
+//	      </from>
+//	      <to>
+//	        <name>copper</name>
+//	        <network>
+//	          <name>orange</name>
+//	        </network>
+//	      </to>
+//	    </registration_vnic_profile_mapping>
+//	  </vnic_profile_mappings>
+//	</registration_configuration>
+//
 // </action>
 // ----
 func (p *Action) SetRegistrationConfiguration(attr *RegistrationConfiguration) {
@@ -58625,103 +59227,105 @@ func (p *Action) SetRegistrationConfiguration(attr *RegistrationConfiguration) {
 // [source,xml]
 // ----
 // <action>
-//   <registration_configuration>
-//     <cluster_mappings>
-//       <registration_cluster_mapping>
-//         <from>
-//           <name>myoriginalcluster</name>
-//         </from>
-//         <to>
-//           <name>mynewcluster</name>
-//         </to>
-//       </registration_cluster_mapping>
-//     </cluster_mappings>
-//     <role_mappings>
-//       <registration_role_mapping>
-//         <from>
-//           <name>SuperUser</name>
-//         </from>
-//         <to>
-//           <name>UserVmRunTimeManager</name>
-//         </to>
-//       </registration_role_mapping>
-//     </role_mappings>
-//     <domain_mappings>
-//       <registration_domain_mapping>
-//         <from>
-//           <name>redhat</name>
-//         </from>
-//         <to>
-//           <name>internal</name>
-//         </to>
-//       </registration_domain_mapping>
-//     </domain_mappings>
-//     <lun_mappings>
-//      <registration_lun_mapping>
-//        <from id="111">
-//        </from>
-//        <to id="222">
-//          <alias>weTestLun</alias>
-//          <lun_storage>
-//            <type>iscsi</type>
-//            <logical_units>
-//               <logical_unit id="36001405fb1ddb4b91e44078f1fffcfef">
-//                  <address>44.33.11.22</address>
-//                  <port>3260</port>
-//                  <portal>1</portal>
-//                  <target>iqn.2017-11.com.name.redhat:444</target>
-//               </logical_unit>
-//            </logical_units>
-//          </lun_storage>
-//        </to>
-//      </registration_lun_mapping>
-//     </lun_mappings>
-//     <affinity_group_mappings>
-//      <registration_affinity_group_mapping>
-//        <from>
-//          <name>affinity</name>
-//        </from>
-//        <to>
-//          <name>affinity2</name>
-//        </to>
-//      </registration_affinity_group_mapping>
-//     </affinity_group_mappings>
-//     <affinity_label_mappings>
-//      <registration_affinity_label_mapping>
-//        <from>
-//          <name>affinity_label</name>
-//        </from>
-//        <to>
-//          <name>affinity_label2</name>
-//        </to>
-//      </registration_affinity_label_mapping>
-//     </affinity_label_mappings>
-//     <vnic_profile_mappings>
-//       <registration_vnic_profile_mapping>
-//         <from>
-//           <name>gold</name>
-//           <network>
-//             <name>red</name>
-//           </network>
-//         </from>
-//         <to id="738dd914-8ec8-4a8b-8628-34672a5d449b"/>
-//       </registration_vnic_profile_mapping>
-//       <registration_vnic_profile_mapping>
-//         <from>
-//           <name>silver</name>
-//           <network>
-//             <name>blue</name>
-//           </network>
-//         </from>
-//         <to>
-//           <name>copper</name>
-//           <network>
-//             <name>orange</name>
-//           </network>
-//         </to>
-//       </registration_vnic_profile_mapping>
-//     </vnic_profile_mappings>
-//   </registration_configuration>
+//
+//	<registration_configuration>
+//	  <cluster_mappings>
+//	    <registration_cluster_mapping>
+//	      <from>
+//	        <name>myoriginalcluster</name>
+//	      </from>
+//	      <to>
+//	        <name>mynewcluster</name>
+//	      </to>
+//	    </registration_cluster_mapping>
+//	  </cluster_mappings>
+//	  <role_mappings>
+//	    <registration_role_mapping>
+//	      <from>
+//	        <name>SuperUser</name>
+//	      </from>
+//	      <to>
+//	        <name>UserVmRunTimeManager</name>
+//	      </to>
+//	    </registration_role_mapping>
+//	  </role_mappings>
+//	  <domain_mappings>
+//	    <registration_domain_mapping>
+//	      <from>
+//	        <name>redhat</name>
+//	      </from>
+//	      <to>
+//	        <name>internal</name>
+//	      </to>
+//	    </registration_domain_mapping>
+//	  </domain_mappings>
+//	  <lun_mappings>
+//	   <registration_lun_mapping>
+//	     <from id="111">
+//	     </from>
+//	     <to id="222">
+//	       <alias>weTestLun</alias>
+//	       <lun_storage>
+//	         <type>iscsi</type>
+//	         <logical_units>
+//	            <logical_unit id="36001405fb1ddb4b91e44078f1fffcfef">
+//	               <address>44.33.11.22</address>
+//	               <port>3260</port>
+//	               <portal>1</portal>
+//	               <target>iqn.2017-11.com.name.redhat:444</target>
+//	            </logical_unit>
+//	         </logical_units>
+//	       </lun_storage>
+//	     </to>
+//	   </registration_lun_mapping>
+//	  </lun_mappings>
+//	  <affinity_group_mappings>
+//	   <registration_affinity_group_mapping>
+//	     <from>
+//	       <name>affinity</name>
+//	     </from>
+//	     <to>
+//	       <name>affinity2</name>
+//	     </to>
+//	   </registration_affinity_group_mapping>
+//	  </affinity_group_mappings>
+//	  <affinity_label_mappings>
+//	   <registration_affinity_label_mapping>
+//	     <from>
+//	       <name>affinity_label</name>
+//	     </from>
+//	     <to>
+//	       <name>affinity_label2</name>
+//	     </to>
+//	   </registration_affinity_label_mapping>
+//	  </affinity_label_mappings>
+//	  <vnic_profile_mappings>
+//	    <registration_vnic_profile_mapping>
+//	      <from>
+//	        <name>gold</name>
+//	        <network>
+//	          <name>red</name>
+//	        </network>
+//	      </from>
+//	      <to id="738dd914-8ec8-4a8b-8628-34672a5d449b"/>
+//	    </registration_vnic_profile_mapping>
+//	    <registration_vnic_profile_mapping>
+//	      <from>
+//	        <name>silver</name>
+//	        <network>
+//	          <name>blue</name>
+//	        </network>
+//	      </from>
+//	      <to>
+//	        <name>copper</name>
+//	        <network>
+//	          <name>orange</name>
+//	        </network>
+//	      </to>
+//	    </registration_vnic_profile_mapping>
+//	  </vnic_profile_mappings>
+//	</registration_configuration>
+//
 // </action>
 // ----
 func (p *Action) RegistrationConfiguration() (*RegistrationConfiguration, bool) {
@@ -58770,103 +59374,105 @@ func (p *Action) RegistrationConfiguration() (*RegistrationConfiguration, bool) 
 // [source,xml]
 // ----
 // <action>
-//   <registration_configuration>
-//     <cluster_mappings>
-//       <registration_cluster_mapping>
-//         <from>
-//           <name>myoriginalcluster</name>
-//         </from>
-//         <to>
-//           <name>mynewcluster</name>
-//         </to>
-//       </registration_cluster_mapping>
-//     </cluster_mappings>
-//     <role_mappings>
-//       <registration_role_mapping>
-//         <from>
-//           <name>SuperUser</name>
-//         </from>
-//         <to>
-//           <name>UserVmRunTimeManager</name>
-//         </to>
-//       </registration_role_mapping>
-//     </role_mappings>
-//     <domain_mappings>
-//       <registration_domain_mapping>
-//         <from>
-//           <name>redhat</name>
-//         </from>
-//         <to>
-//           <name>internal</name>
-//         </to>
-//       </registration_domain_mapping>
-//     </domain_mappings>
-//     <lun_mappings>
-//      <registration_lun_mapping>
-//        <from id="111">
-//        </from>
-//        <to id="222">
-//          <alias>weTestLun</alias>
-//          <lun_storage>
-//            <type>iscsi</type>
-//            <logical_units>
-//               <logical_unit id="36001405fb1ddb4b91e44078f1fffcfef">
-//                  <address>44.33.11.22</address>
-//                  <port>3260</port>
-//                  <portal>1</portal>
-//                  <target>iqn.2017-11.com.name.redhat:444</target>
-//               </logical_unit>
-//            </logical_units>
-//          </lun_storage>
-//        </to>
-//      </registration_lun_mapping>
-//     </lun_mappings>
-//     <affinity_group_mappings>
-//      <registration_affinity_group_mapping>
-//        <from>
-//          <name>affinity</name>
-//        </from>
-//        <to>
-//          <name>affinity2</name>
-//        </to>
-//      </registration_affinity_group_mapping>
-//     </affinity_group_mappings>
-//     <affinity_label_mappings>
-//      <registration_affinity_label_mapping>
-//        <from>
-//          <name>affinity_label</name>
-//        </from>
-//        <to>
-//          <name>affinity_label2</name>
-//        </to>
-//      </registration_affinity_label_mapping>
-//     </affinity_label_mappings>
-//     <vnic_profile_mappings>
-//       <registration_vnic_profile_mapping>
-//         <from>
-//           <name>gold</name>
-//           <network>
-//             <name>red</name>
-//           </network>
-//         </from>
-//         <to id="738dd914-8ec8-4a8b-8628-34672a5d449b"/>
-//       </registration_vnic_profile_mapping>
-//       <registration_vnic_profile_mapping>
-//         <from>
-//           <name>silver</name>
-//           <network>
-//             <name>blue</name>
-//           </network>
-//         </from>
-//         <to>
-//           <name>copper</name>
-//           <network>
-//             <name>orange</name>
-//           </network>
-//         </to>
-//       </registration_vnic_profile_mapping>
-//     </vnic_profile_mappings>
-//   </registration_configuration>
+//
+//	<registration_configuration>
+//	  <cluster_mappings>
+//	    <registration_cluster_mapping>
+//	      <from>
+//	        <name>myoriginalcluster</name>
+//	      </from>
+//	      <to>
+//	        <name>mynewcluster</name>
+//	      </to>
+//	    </registration_cluster_mapping>
+//	  </cluster_mappings>
+//	  <role_mappings>
+//	    <registration_role_mapping>
+//	      <from>
+//	        <name>SuperUser</name>
+//	      </from>
+//	      <to>
+//	        <name>UserVmRunTimeManager</name>
+//	      </to>
+//	    </registration_role_mapping>
+//	  </role_mappings>
+//	  <domain_mappings>
+//	    <registration_domain_mapping>
+//	      <from>
+//	        <name>redhat</name>
+//	      </from>
+//	      <to>
+//	        <name>internal</name>
+//	      </to>
+//	    </registration_domain_mapping>
+//	  </domain_mappings>
+//	  <lun_mappings>
+//	   <registration_lun_mapping>
+//	     <from id="111">
+//	     </from>
+//	     <to id="222">
+//	       <alias>weTestLun</alias>
+//	       <lun_storage>
+//	         <type>iscsi</type>
+//	         <logical_units>
+//	            <logical_unit id="36001405fb1ddb4b91e44078f1fffcfef">
+//	               <address>44.33.11.22</address>
+//	               <port>3260</port>
+//	               <portal>1</portal>
+//	               <target>iqn.2017-11.com.name.redhat:444</target>
+//	            </logical_unit>
+//	         </logical_units>
+//	       </lun_storage>
+//	     </to>
+//	   </registration_lun_mapping>
+//	  </lun_mappings>
+//	  <affinity_group_mappings>
+//	   <registration_affinity_group_mapping>
+//	     <from>
+//	       <name>affinity</name>
+//	     </from>
+//	     <to>
+//	       <name>affinity2</name>
+//	     </to>
+//	   </registration_affinity_group_mapping>
+//	  </affinity_group_mappings>
+//	  <affinity_label_mappings>
+//	   <registration_affinity_label_mapping>
+//	     <from>
+//	       <name>affinity_label</name>
+//	     </from>
+//	     <to>
+//	       <name>affinity_label2</name>
+//	     </to>
+//	   </registration_affinity_label_mapping>
+//	  </affinity_label_mappings>
+//	  <vnic_profile_mappings>
+//	    <registration_vnic_profile_mapping>
+//	      <from>
+//	        <name>gold</name>
+//	        <network>
+//	          <name>red</name>
+//	        </network>
+//	      </from>
+//	      <to id="738dd914-8ec8-4a8b-8628-34672a5d449b"/>
+//	    </registration_vnic_profile_mapping>
+//	    <registration_vnic_profile_mapping>
+//	      <from>
+//	        <name>silver</name>
+//	        <network>
+//	          <name>blue</name>
+//	        </network>
+//	      </from>
+//	      <to>
+//	        <name>copper</name>
+//	        <network>
+//	          <name>orange</name>
+//	        </network>
+//	      </to>
+//	    </registration_vnic_profile_mapping>
+//	  </vnic_profile_mappings>
+//	</registration_configuration>
+//
 // </action>
 // ----
 func (p *Action) MustRegistrationConfiguration() *RegistrationConfiguration {
@@ -59032,14 +59638,16 @@ func (p *Action) MustSeal() bool {
 // [source,xml]
 // ----
 // <snapshot id="456" href="/ovirt-engine/api/vms/123/snapshots/456">
-//   <actions>
-//     <link rel="restore" href="/ovirt-engine/api/vms/123/snapshots/456/restore"/>
-//   </actions>
-//   <vm id="123" href="/ovirt-engine/api/vms/123"/>
-//   <description>Virtual Machine 1 - Snapshot A</description>
-//   <type>active</type>
-//   <date>2010-08-16T14:24:29</date>
-//   <persist_memorystate>false</persist_memorystate>
+//
+//	<actions>
+//	  <link rel="restore" href="/ovirt-engine/api/vms/123/snapshots/456/restore"/>
+//	</actions>
+//	<vm id="123" href="/ovirt-engine/api/vms/123"/>
+//	<description>Virtual Machine 1 - Snapshot A</description>
+//	<type>active</type>
+//	<date>2010-08-16T14:24:29</date>
+//	<persist_memorystate>false</persist_memorystate>
+//
 // </snapshot>
 // ----
 func (p *Action) SetSnapshot(attr *Snapshot) {
@@ -59053,14 +59661,16 @@ func (p *Action) SetSnapshot(attr *Snapshot) {
 // [source,xml]
 // ----
 // <snapshot id="456" href="/ovirt-engine/api/vms/123/snapshots/456">
-//   <actions>
-//     <link rel="restore" href="/ovirt-engine/api/vms/123/snapshots/456/restore"/>
-//   </actions>
-//   <vm id="123" href="/ovirt-engine/api/vms/123"/>
-//   <description>Virtual Machine 1 - Snapshot A</description>
-//   <type>active</type>
-//   <date>2010-08-16T14:24:29</date>
-//   <persist_memorystate>false</persist_memorystate>
+//
+//	<actions>
+//	  <link rel="restore" href="/ovirt-engine/api/vms/123/snapshots/456/restore"/>
+//	</actions>
+//	<vm id="123" href="/ovirt-engine/api/vms/123"/>
+//	<description>Virtual Machine 1 - Snapshot A</description>
+//	<type>active</type>
+//	<date>2010-08-16T14:24:29</date>
+//	<persist_memorystate>false</persist_memorystate>
+//
 // </snapshot>
 // ----
 func (p *Action) Snapshot() (*Snapshot, bool) {
@@ -59077,14 +59687,16 @@ func (p *Action) Snapshot() (*Snapshot, bool) {
 // [source,xml]
 // ----
 // <snapshot id="456" href="/ovirt-engine/api/vms/123/snapshots/456">
-//   <actions>
-//     <link rel="restore" href="/ovirt-engine/api/vms/123/snapshots/456/restore"/>
-//   </actions>
-//   <vm id="123" href="/ovirt-engine/api/vms/123"/>
-//   <description>Virtual Machine 1 - Snapshot A</description>
-//   <type>active</type>
-//   <date>2010-08-16T14:24:29</date>
-//   <persist_memorystate>false</persist_memorystate>
+//
+//	<actions>
+//	  <link rel="restore" href="/ovirt-engine/api/vms/123/snapshots/456/restore"/>
+//	</actions>
+//	<vm id="123" href="/ovirt-engine/api/vms/123"/>
+//	<description>Virtual Machine 1 - Snapshot A</description>
+//	<type>active</type>
+//	<date>2010-08-16T14:24:29</date>
+//	<persist_memorystate>false</persist_memorystate>
+//
 // </snapshot>
 // ----
 func (p *Action) MustSnapshot() *Snapshot {
@@ -59178,27 +59790,29 @@ func (p *Action) MustStopGlusterService() bool {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *Action) SetStorageDomain(attr *StorageDomain) {
@@ -59212,27 +59826,29 @@ func (p *Action) SetStorageDomain(attr *StorageDomain) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *Action) StorageDomain() (*StorageDomain, bool) {
@@ -59249,27 +59865,29 @@ func (p *Action) StorageDomain() (*StorageDomain, bool) {
 // [source,xml]
 // ----
 // <storage_domain href="/ovirt-engine/api/storagedomains/123" id="123">
-//   <name>mydata</name>
-//   <description>My data</description>
-//   <available>38654705664</available>
-//   <committed>1073741824</committed>
-//   <critical_space_action_blocker>5</critical_space_action_blocker>
-//   <external_status>ok</external_status>
-//   <master>true</master>
-//   <storage>
-//     <address>mynfs.example.com</address>
-//     <nfs_version>v3</nfs_version>
-//     <path>/exports/mydata</path>
-//     <type>nfs</type>
-//   </storage>
-//   <storage_format>v3</storage_format>
-//   <type>data</type>
-//   <used>13958643712</used>
-//   <warning_low_space_indicator>10</warning_low_space_indicator>
-//   <wipe_after_delete>false</wipe_after_delete>
-//   <data_centers>
-//     <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
-//   </data_centers>
+//
+//	<name>mydata</name>
+//	<description>My data</description>
+//	<available>38654705664</available>
+//	<committed>1073741824</committed>
+//	<critical_space_action_blocker>5</critical_space_action_blocker>
+//	<external_status>ok</external_status>
+//	<master>true</master>
+//	<storage>
+//	  <address>mynfs.example.com</address>
+//	  <nfs_version>v3</nfs_version>
+//	  <path>/exports/mydata</path>
+//	  <type>nfs</type>
+//	</storage>
+//	<storage_format>v3</storage_format>
+//	<type>data</type>
+//	<used>13958643712</used>
+//	<warning_low_space_indicator>10</warning_low_space_indicator>
+//	<wipe_after_delete>false</wipe_after_delete>
+//	<data_centers>
+//	  <data_center href="/ovirt-engine/api/datacenters/456" id="456"/>
+//	</data_centers>
+//
 // </storage_domain>
 // ----
 func (p *Action) MustStorageDomain() *StorageDomain {
