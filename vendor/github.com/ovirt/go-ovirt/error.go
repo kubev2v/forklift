@@ -26,6 +26,12 @@ type AuthError struct {
 	baseError
 }
 
+// Conflict error indicates that the operation failed because of a conflict.
+// For example, another operation blocks the operation from being executed.
+type ConflictError struct {
+	baseError
+}
+
 // NotFoundError indicates that an object can't be found.
 type NotFoundError struct {
 	baseError
@@ -160,6 +166,13 @@ func BuildError(response *http.Response, fault *Fault) error {
 			}
 		} else if response.StatusCode == 404 {
 			return &NotFoundError{
+				baseError{
+					response.StatusCode,
+					buffer.String(),
+				},
+			}
+		} else if response.StatusCode == 409 {
+			return &ConflictError{
 				baseError{
 					response.StatusCode,
 					buffer.String(),
