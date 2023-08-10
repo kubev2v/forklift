@@ -1389,32 +1389,27 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 				var importer *core.Pod
 				var found bool
 				var kErr error
-				if dv.PVC == nil && !r.Plan.IsSourceProviderOCP() {
+
+				if dv.Status.ClaimName == "" {
 					found = false
 				} else {
-					var importerPVC core.PersistentVolumeClaim
-					if r.Plan.IsSourceProviderOCP() {
-						pvc := &core.PersistentVolumeClaim{}
-						err = r.Destination.Client.Get(context.TODO(), types.NamespacedName{
-							Namespace: r.Plan.Spec.TargetNamespace,
-							Name:      dv.Status.ClaimName,
-						}, pvc)
-						if err != nil {
-							log.Error(
-								err,
-								"Could not get PVC for DataVolume.",
-								"vm",
-								vm.String(),
-								"dv",
-								path.Join(dv.Namespace, dv.Name))
-							continue
-						}
-						importerPVC = *pvc
-					} else {
-						importerPVC = *dv.PVC
+					pvc := &core.PersistentVolumeClaim{}
+					err = r.Destination.Client.Get(context.TODO(), types.NamespacedName{
+						Namespace: r.Plan.Spec.TargetNamespace,
+						Name:      dv.Status.ClaimName,
+					}, pvc)
+					if err != nil {
+						log.Error(
+							err,
+							"Could not get PVC for DataVolume.",
+							"vm",
+							vm.String(),
+							"dv",
+							path.Join(dv.Namespace, dv.Name))
+						continue
 					}
 
-					importer, found, kErr = r.kubevirt.GetImporterPod(importerPVC)
+					importer, found, kErr = r.kubevirt.GetImporterPod(*pvc)
 				}
 
 				if kErr != nil {
