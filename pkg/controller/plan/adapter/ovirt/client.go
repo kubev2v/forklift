@@ -3,8 +3,8 @@ package ovirt
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -65,7 +65,8 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref) (snapshot string, err error) {
 			MustBuild(),
 	).Query("correlation_id", correlationID).Send()
 	if err != nil {
-		if strings.Contains(err.Error(), "Cannot create Snapshot") {
+		var conflictErr *ovirtsdk.ConflictError
+		if errors.As(err, &conflictErr) {
 			err = web.ConflictError{
 				Provider: r.Source.Provider,
 				Err:      err,
@@ -488,7 +489,8 @@ func (r Client) removePrecopies(precopies []planapi.Precopy, vmService *ovirtsdk
 			// Try to remove the snapshot
 			_, err = snapService.Remove().Query("correlation_id", correlationID).Send()
 			if err != nil {
-				if strings.Contains(err.Error(), "Cannot remove Snapshot") {
+				var conflictErr *ovirtsdk.ConflictError
+				if errors.As(err, &conflictErr) {
 					err = web.ConflictError{
 						Provider: r.Source.Provider,
 						Err:      err,
