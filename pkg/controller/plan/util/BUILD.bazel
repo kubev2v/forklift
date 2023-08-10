@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "openstack.go",
         "ovirt.go",
+        "utils.go",
     ],
     importpath = "github.com/konveyor/forklift-controller/pkg/controller/plan/util",
     visibility = ["//visibility:public"],
