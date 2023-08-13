@@ -159,7 +159,7 @@ func (r *KubeVirt) ListVMs() ([]VirtualMachine, error) {
 				}
 				vm.DataVolumes = append(
 					vm.DataVolumes,
-					DataVolume{
+					ExtendedDataVolume{
 						DataVolume: dv,
 						PVC:        pvc,
 					})
@@ -537,7 +537,7 @@ func (r *KubeVirt) isDataVolumeExistsInList(dv *cdi.DataVolume, dataVolumeList *
 }
 
 // Return DataVolumes associated with a VM.
-func (r *KubeVirt) getDVs(vm *plan.VMStatus) (dvs []DataVolume, err error) {
+func (r *KubeVirt) getDVs(vm *plan.VMStatus) (edvs []ExtendedDataVolume, err error) {
 	dvsList := &cdi.DataVolumeList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
@@ -552,10 +552,10 @@ func (r *KubeVirt) getDVs(vm *plan.VMStatus) (dvs []DataVolume, err error) {
 		return
 	}
 
-	dvs = []DataVolume{}
+	edvs = []ExtendedDataVolume{}
 	for i := range dvsList.Items {
 		dv := &dvsList.Items[i]
-		dvs = append(dvs, DataVolume{
+		edvs = append(edvs, ExtendedDataVolume{
 			DataVolume: dv,
 		})
 	}
@@ -1686,14 +1686,14 @@ func (r *KubeVirt) vmAllButMigrationLabels(vmRef ref.Ref) (labels map[string]str
 	return
 }
 
-// Represents a CDI DataVolume and add behavior.
-type DataVolume struct {
+// Represents a CDI DataVolume, its associated PVC, and added behavior.
+type ExtendedDataVolume struct {
 	*cdi.DataVolume
 	PVC *core.PersistentVolumeClaim
 }
 
 // Get conditions.
-func (r *DataVolume) Conditions() (cnd *libcnd.Conditions) {
+func (r *ExtendedDataVolume) Conditions() (cnd *libcnd.Conditions) {
 	cnd = &libcnd.Conditions{}
 	for _, c := range r.Status.Conditions {
 		cnd.SetCondition(libcnd.Condition{
@@ -1710,7 +1710,7 @@ func (r *DataVolume) Conditions() (cnd *libcnd.Conditions) {
 
 // Convert the Status.Progress into a
 // percentage (float).
-func (r *DataVolume) PercentComplete() (pct float64) {
+func (r *ExtendedDataVolume) PercentComplete() (pct float64) {
 	s := string(r.Status.Progress)
 	if strings.HasSuffix(s, "%") {
 		s = s[:len(s)-1]
@@ -1726,7 +1726,7 @@ func (r *DataVolume) PercentComplete() (pct float64) {
 // Represents Kubevirt VirtualMachine with associated DataVolumes.
 type VirtualMachine struct {
 	*cnv.VirtualMachine
-	DataVolumes []DataVolume
+	DataVolumes []ExtendedDataVolume
 }
 
 // Determine if `this` VirtualMachine is the
