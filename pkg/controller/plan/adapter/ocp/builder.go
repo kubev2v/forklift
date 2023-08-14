@@ -324,17 +324,7 @@ func (r *Builder) mapPVCsToTarget(targetVmSpec *cnv.VirtualMachineSpec, persiste
 				},
 			}
 			targetVmSpec.Template.Spec.Volumes = append(targetVmSpec.Template.Spec.Volumes, targetVolume)
-
-			targetDisk := cnv.Disk{
-				Name: disk.Name,
-				DiskDevice: cnv.DiskDevice{
-					Disk: &cnv.DiskTarget{
-						Bus: disk.Disk.Bus,
-					},
-				},
-			}
-
-			targetVmSpec.Template.Spec.Domain.Devices.Disks = append(targetVmSpec.Template.Spec.Domain.Devices.Disks, targetDisk)
+			targetVmSpec.Template.Spec.Domain.Devices.Disks = append(targetVmSpec.Template.Spec.Domain.Devices.Disks, *disk.DeepCopy())
 		}
 	}
 }
@@ -412,17 +402,7 @@ func (r *Builder) mapConfigMapsToTarget(targetVmSpec *cnv.VirtualMachineSpec, co
 		}
 
 		if disk, ok := diskMap[sourceConfigMap.Name]; ok {
-			targetDisk := cnv.Disk{
-				Name:   disk.Name,
-				Serial: disk.Serial,
-				DiskDevice: cnv.DiskDevice{
-					Disk: &cnv.DiskTarget{
-						Bus: disk.Disk.Bus,
-					},
-				},
-			}
-
-			targetVmSpec.Template.Spec.Domain.Devices.Disks = append(targetVmSpec.Template.Spec.Domain.Devices.Disks, targetDisk)
+			targetVmSpec.Template.Spec.Domain.Devices.Disks = append(targetVmSpec.Template.Spec.Domain.Devices.Disks, *disk.DeepCopy())
 		} else {
 			r.Log.Info("ConfigMap disk not found in diskMap, should never happen", "configMap", sourceConfigMap.Name)
 		}
@@ -462,17 +442,7 @@ func (r *Builder) mapSecretsToTarget(targetVmSpec *cnv.VirtualMachineSpec, secre
 		}
 
 		if disk, ok := diskMap[sourceSecret.Name]; ok {
-			targetDisk := cnv.Disk{
-				Name:   disk.Name,
-				Serial: disk.Serial,
-				DiskDevice: cnv.DiskDevice{
-					Disk: &cnv.DiskTarget{
-						Bus: disk.Disk.Bus,
-					},
-				},
-			}
-
-			targetVmSpec.Template.Spec.Domain.Devices.Disks = append(targetVmSpec.Template.Spec.Domain.Devices.Disks, targetDisk)
+			targetVmSpec.Template.Spec.Domain.Devices.Disks = append(targetVmSpec.Template.Spec.Domain.Devices.Disks, *disk.DeepCopy())
 		} else {
 			r.Log.Info("Secret disk not found in diskMap, should never happen", "secret", sourceSecret.Name)
 		}
