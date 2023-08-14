@@ -84,39 +84,44 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 	}
 
 	for _, vol := range vm.Spec.Template.Spec.Volumes {
+		var pvcName string
 		switch {
 		case vol.PersistentVolumeClaim != nil:
-			// Get PVC
-			pvc := &core.PersistentVolumeClaim{}
-			err = r.sourceClient.Get(context.TODO(), k8sclient.ObjectKey{
-				Namespace: vmRef.Namespace,
-				Name:      vol.PersistentVolumeClaim.ClaimName,
-			}, pvc)
-			if err != nil {
-				err = liberr.Wrap(
-					err,
-					"PVC not found.",
-					"pvc",
-					vol.PersistentVolumeClaim.ClaimName)
-				return
-			}
+			pvcName = vol.PersistentVolumeClaim.ClaimName
+		case vol.DataVolume != nil:
+			pvcName = vol.DataVolume.Name
+		default:
+			continue
+		}
 
-			storageClass := pvc.Spec.StorageClassName
-			if storageClass == nil {
-				return false, nil
-			}
+		pvc := &core.PersistentVolumeClaim{}
+		err = r.sourceClient.Get(context.TODO(), k8sclient.ObjectKey{
+			Namespace: vmRef.Namespace,
+			Name:      pvcName,
+		}, pvc)
+		if err != nil {
+			err = liberr.Wrap(
+				err,
+				"PVC not found.",
+				"pvc",
+				pvcName)
+			return
+		}
 
-			_, found := r.plan.Referenced.Map.Storage.FindStorageByName(*storageClass)
-			if !found {
-				err = liberr.Wrap(
-					err,
-					"StorageClass not found.",
-					"StorageClass",
-					*storageClass)
+		storageClass := pvc.Spec.StorageClassName
+		if storageClass == nil {
+			return false, nil
+		}
 
-				return false, err
-			}
+		_, found := r.plan.Referenced.Map.Storage.FindStorageByName(*storageClass)
+		if !found {
+			err = liberr.Wrap(
+				err,
+				"StorageClass not found.",
+				"StorageClass",
+				*storageClass)
 
+			return false, err
 		}
 	}
 
