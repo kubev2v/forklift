@@ -2,10 +2,12 @@ package ocp
 
 import (
 	"context"
+	"path"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -32,7 +34,13 @@ func (r *Adapter) Validator(plan *api.Plan) (validator base.Validator, err error
 		return
 	}
 
-	validator = &Validator{plan: plan, sourceClient: sourceClient}
+	log := logging.WithName("validator|ocp").WithValues(
+		"plan",
+		path.Join(
+			plan.GetNamespace(),
+			plan.GetName()))
+
+	validator = &Validator{plan: plan, sourceClient: sourceClient, log: log}
 	return
 }
 
