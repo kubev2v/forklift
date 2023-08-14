@@ -7,6 +7,7 @@ import (
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
@@ -20,6 +21,7 @@ type Validator struct {
 	plan         *api.Plan
 	inventory    web.Client
 	sourceClient k8sclient.Client
+	log          logging.LevelLogger
 }
 
 // MaintenanceMode implements base.Validator
@@ -91,6 +93,7 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 		case vol.DataVolume != nil:
 			pvcName = vol.DataVolume.Name
 		default:
+			r.log.Info("Not PVC or DataVolume, skipping volume...", "volume", vol.Name)
 			continue
 		}
 
