@@ -458,8 +458,9 @@ func (r *Builder) mapNetworks(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.Vi
 	// Map networks to NICs
 	interfacesMap := make(map[string]*cnv.Interface)
 	for _, ifc := range sourceVm.Spec.Template.Spec.Domain.Devices.Interfaces {
+		currentInterface := ifc
 		networkName := ifc.Name
-		interfacesMap[networkName] = &ifc
+		interfacesMap[networkName] = &currentInterface
 	}
 
 	var kInterface *cnv.Interface
