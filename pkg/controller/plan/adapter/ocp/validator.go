@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/go-logr/logr"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
@@ -21,7 +21,7 @@ type Validator struct {
 	plan         *api.Plan
 	inventory    web.Client
 	sourceClient k8sclient.Client
-	log          logging.LevelLogger
+	log          logr.Logger
 }
 
 // MaintenanceMode implements base.Validator
