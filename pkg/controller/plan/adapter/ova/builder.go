@@ -171,56 +171,46 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 		return
 	}
 
+	// For OVA provider we are assuming a single storage mapping.
 	dsMapIn := r.Context.Map.Storage.Spec.Map
-	for i := range dsMapIn {
-		mapped := &dsMapIn[i]
-		ref := mapped.Source
-		ds := &model.Disk{}
-		fErr := r.Source.Inventory.Find(ds, ref)
-		if fErr != nil {
-			err = fErr
-			return
-		}
+	for _, mapped := range dsMapIn {
 		for _, disk := range vm.Disks {
-			if disk.ID == ds.ID {
-				diskSize, err := getResourceCapacity(disk.Capacity, disk.CapacityAllocationUnits)
-				if err != nil {
-					return nil, err
-				}
-				storageClass := mapped.Destination.StorageClass
-				var dvSource cdi.DataVolumeSource
-				// Let virt-v2v do the copying
-				dvSource = cdi.DataVolumeSource{
-					Blank: &cdi.DataVolumeBlankImage{},
-				}
-				dvSpec := cdi.DataVolumeSpec{
-					Source: &dvSource,
-					Storage: &cdi.StorageSpec{
-						Resources: core.ResourceRequirements{
-							Requests: core.ResourceList{
-								core.ResourceStorage: *resource.NewQuantity(diskSize, resource.BinarySI),
-							},
-						},
-						StorageClassName: &storageClass,
-					},
-				}
-				// set the access mode and volume mode if they were specified in the storage map.
-				// otherwise, let the storage profile decide the default values.
-				if mapped.Destination.AccessMode != "" {
-					dvSpec.Storage.AccessModes = []core.PersistentVolumeAccessMode{mapped.Destination.AccessMode}
-				}
-				if mapped.Destination.VolumeMode != "" {
-					dvSpec.Storage.VolumeMode = &mapped.Destination.VolumeMode
-				}
-
-				dv := dvTemplate.DeepCopy()
-				dv.Spec = dvSpec
-				if dv.ObjectMeta.Annotations == nil {
-					dv.ObjectMeta.Annotations = make(map[string]string)
-				}
-				dv.ObjectMeta.Annotations[planbase.AnnDiskSource] = getDiskSourcePath(disk.FilePath)
-				dvs = append(dvs, *dv)
+			diskSize, err := getResourceCapacity(disk.Capacity, disk.CapacityAllocationUnits)
+			if err != nil {
+				return nil, err
 			}
+			storageClass := mapped.Destination.StorageClass
+			var dvSource cdi.DataVolumeSource
+			dvSource = cdi.DataVolumeSource{
+				Blank: &cdi.DataVolumeBlankImage{},
+			}
+			dvSpec := cdi.DataVolumeSpec{
+				Source: &dvSource,
+				Storage: &cdi.StorageSpec{
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceStorage: *resource.NewQuantity(diskSize, resource.BinarySI),
+						},
+					},
+					StorageClassName: &storageClass,
+				},
+			}
+			// set the access mode and volume mode if they were specified in the storage map.
+			// otherwise, let the storage profile decide the default values.
+			if mapped.Destination.AccessMode != "" {
+				dvSpec.Storage.AccessModes = []core.PersistentVolumeAccessMode{mapped.Destination.AccessMode}
+			}
+			if mapped.Destination.VolumeMode != "" {
+				dvSpec.Storage.VolumeMode = &mapped.Destination.VolumeMode
+			}
+
+			dv := dvTemplate.DeepCopy()
+			dv.Spec = dvSpec
+			if dv.ObjectMeta.Annotations == nil {
+				dv.ObjectMeta.Annotations = make(map[string]string)
+			}
+			dv.ObjectMeta.Annotations[planbase.AnnDiskSource] = getDiskSourcePath(disk.FilePath)
+			dvs = append(dvs, *dv)
 		}
 	}
 
