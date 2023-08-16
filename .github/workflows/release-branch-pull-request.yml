@@ -1,7 +1,5 @@
 on:
     pull_request:
-      types:
-        - opened
       branches:
         - 'release-**'
     workflow_dispatch:
