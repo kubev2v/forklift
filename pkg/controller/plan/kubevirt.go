@@ -926,7 +926,7 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 		annotations[AnnDefaultNetwork] = path.Join(
 			r.Plan.Spec.TransferNetwork.Namespace, r.Plan.Spec.TransferNetwork.Name)
 	}
-	if r.Plan.Spec.Warm || !r.Destination.Provider.IsHost() {
+	if r.Plan.Spec.Warm || !r.Destination.Provider.IsHost() || r.Plan.IsSourceProviderOCP() {
 		annotations[AnnBindImmediate] = "true"
 	}
 	// Do not delete the DV when the import completes as we check the DV to get the current
