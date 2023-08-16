@@ -39,6 +39,7 @@ func init() {
 }
 
 type SecretAdmitter struct {
+	ar     *admissionv1.AdmissionReview
 	secret core.Secret
 }
 
@@ -53,6 +54,7 @@ var resourceTypeToValidateFunc = map[string]func(*SecretAdmitter) *admissionv1.A
 
 func (admitter *SecretAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
 	log.Info("secret admitter was called")
+	admitter.ar = ar
 	raw := ar.Request.Object.Raw
 
 	err := json.Unmarshal(raw, &admitter.secret)
@@ -73,6 +75,20 @@ func (admitter *SecretAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissio
 func (admitter *SecretAdmitter) validateProviderSecret() *admissionv1.AdmissionResponse {
 	if createdForProviderType, ok := admitter.secret.GetLabels()["createdForProviderType"]; ok {
 		providerType := api.ProviderType(createdForProviderType)
+
+		// The OVA secret has only name and URL fileds,
+		// since the name can't be changed, we assume that all update requests are for the URL.
+		if admitter.ar.Request.Operation == admissionv1.Update && providerType == api.Ova {
+			log.Info("secret admitter for OVA")
+			return &admissionv1.AdmissionResponse{
+				Allowed: false,
+				Result: &metav1.Status{
+					Code:    http.StatusBadRequest,
+					Message: "Updating the URL field of an existing OVA provider is forbidden.",
+				},
+			}
+		}
+
 		collector, err := admitter.buildProviderCollector(&providerType)
 		if err != nil {
 			return webhookutils.ToAdmissionResponseError(err)
