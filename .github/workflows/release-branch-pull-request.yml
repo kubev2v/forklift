@@ -35,4 +35,4 @@ jobs:
           - name: Run test suite
             run: |
               cd ${GITHUB_WORKSPACE}/go/src/github.com/${GITHUB_REPOSITORY}
-              GOPATH=${GITHUB_WORKSPACE}/go make build-all-images
+              GOPATH=${GITHUB_WORKSPACE}/go go build ./...
