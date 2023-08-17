@@ -242,7 +242,7 @@ func (r *StorageAdapter) GetUpdates(ctx *Context) (updates []Updater, err error)
 
 // List the collection.
 func (r *StorageAdapter) List(ctx *Context, provider *api.Provider) (itr fb.Iterator, err error) {
-	storageName := fmt.Sprintf("Dummy storage for %s", provider.Name)
+	storageName := fmt.Sprintf("Dummy storage for source provider %s", provider.Name)
 	dummyStorge := Storage{
 		Name: storageName,
 		ID:   string(provider.UID),
