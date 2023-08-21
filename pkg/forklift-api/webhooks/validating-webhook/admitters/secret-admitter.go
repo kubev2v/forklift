@@ -76,16 +76,22 @@ func (admitter *SecretAdmitter) validateProviderSecret() *admissionv1.AdmissionR
 	if createdForProviderType, ok := admitter.secret.GetLabels()["createdForProviderType"]; ok {
 		providerType := api.ProviderType(createdForProviderType)
 
-		// The OVA secret has only name and URL fileds,
-		// since the name can't be changed, we assume that all update requests are for the URL.
+		// once OVA provider is creted we block URL changes.
 		if admitter.ar.Request.Operation == admissionv1.Update && providerType == api.Ova {
-			log.Info("secret admitter for OVA")
-			return &admissionv1.AdmissionResponse{
-				Allowed: false,
-				Result: &metav1.Status{
-					Code:    http.StatusBadRequest,
-					Message: "Updating the URL field of an existing OVA provider is forbidden.",
-				},
+			urlChanged, err := admitter.isOvaUrlChanged()
+			if err != nil {
+				return webhookutils.ToAdmissionResponseError(err)
+			}
+
+			if urlChanged {
+				log.Info("secret admitter for OVA")
+				return &admissionv1.AdmissionResponse{
+					Allowed: false,
+					Result: &metav1.Status{
+						Code:    http.StatusBadRequest,
+						Message: "Updating the URL field of an existing OVA provider is forbidden.",
+					},
+				}
 			}
 		}
 
@@ -226,4 +232,44 @@ func (admitter *SecretAdmitter) testConnectionToHost(hostName string) (tested bo
 	default:
 		return true, nil
 	}
+}
+
+func (admitter *SecretAdmitter) isOvaUrlChanged() (bool, error) {
+
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		log.Error(err, "Couldn't get the cluster configuration")
+		return false, err
+	}
+
+	err = api.SchemeBuilder.AddToScheme(scheme.Scheme)
+	if err != nil {
+		log.Error(err, "Couldn't build the scheme")
+		return false, err
+	}
+	err = apis.AddToScheme(scheme.Scheme)
+	if err != nil {
+		log.Error(err, "Couldn't add forklift API to the scheme")
+		return false, err
+	}
+
+	cl, err := client.New(config, client.Options{Scheme: scheme.Scheme})
+	if err != nil {
+		log.Error(err, "Couldn't create a cluster client")
+		return false, err
+	}
+
+	oldSecret := core.Secret{}
+	err = cl.Get(context.TODO(), client.ObjectKey{Namespace: admitter.secret.Namespace, Name: admitter.secret.Name}, &oldSecret)
+	if err != nil {
+		log.Error(err, "Couldn't get the target provider secrete")
+		return false, err
+	}
+
+	url := oldSecret.Data["url"]
+	newURL := admitter.secret.Data["url"]
+	if string(url) != string(newURL) {
+		return true, nil
+	}
+	return false, nil
 }
