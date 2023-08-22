@@ -244,6 +244,7 @@ type Lun struct {
 }
 
 type LogicalUnit struct {
+	LunID      string `json:"lunId"`
 	Address    string `json:"address"`
 	Port       string `json:"port"`
 	Target     string `json:"target"`
