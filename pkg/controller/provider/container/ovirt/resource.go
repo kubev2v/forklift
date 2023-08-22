@@ -701,6 +701,7 @@ func (r *Disk) setLun(m *model.Disk) {
 }
 
 func (r *LogicalUnit) ApplyTo(m *model.LogicalUnit) {
+	m.LunID = r.ID
 	m.Address = r.Address
 	m.Port = r.Port
 	m.Target = r.Target
