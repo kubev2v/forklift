@@ -92,6 +92,7 @@ func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
 
 // Validate that a VM's disk backing storage has been mapped.
 func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
+	// TODO validate ovirt version > ovirt-engine-4.5.2.1 (https://github.com/oVirt/ovirt-engine/commit/e7c1f585863a332bcecfc8c3d909c9a3a56eb922)
 	if r.plan.Referenced.Map.Storage == nil {
 		return
 	}
@@ -106,11 +107,9 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 		return
 	}
 	for _, da := range vm.DiskAttachments {
-		if da.Disk.StorageType != "lun" {
-			if !r.plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{ID: da.Disk.StorageDomain}) {
-				return
-			}
-		} else if len(da.Disk.Lun.LogicalUnits.LogicalUnit) > 0 && da.Disk.Lun.LogicalUnits.LogicalUnit[0].Address == "" {
+		if da.Disk.StorageType != "lun" && !r.plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{ID: da.Disk.StorageDomain}) {
+			return
+		} else if len(da.Disk.Lun.LogicalUnits.LogicalUnit) > 0 {
 			// Have LUN disk but without the relevant data. This might happen with older oVirt versions.
 			return
 		}
