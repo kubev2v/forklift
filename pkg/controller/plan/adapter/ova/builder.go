@@ -28,7 +28,7 @@ import (
 
 // BIOS types
 const (
-	Efi = "efi"
+	Bios = "bios"
 )
 
 // Bus types
@@ -364,8 +364,10 @@ func (r *Builder) mapFirmware(vm *model.VM, object *cnv.VirtualMachineSpec) {
 		Serial: vm.UUID,
 	}
 	switch vm.Firmware {
-	case Efi:
-		// We don't distinguish between UEFI and UEFI with secure boot but we anyway would have
+	case Bios:
+		firmware.Bootloader = &cnv.Bootloader{BIOS: &cnv.BIOS{}}
+	default:
+		// We don't distinguish between UEFI and UEFI with secure boot, but we anyway would have
 		// disabled secure boot, even if we knew it was enabled on the source, because the guest
 		// OS won't be able to boot without getting the NVRAM data. By starting the VM without
 		// secure boot we ease the procedure users need to do in order to make a guest OS that
@@ -375,8 +377,6 @@ func (r *Builder) mapFirmware(vm *model.VM, object *cnv.VirtualMachineSpec) {
 			EFI: &cnv.EFI{
 				SecureBoot: &secureBootEnabled,
 			}}
-	default:
-		firmware.Bootloader = &cnv.Bootloader{BIOS: &cnv.BIOS{}}
 	}
 	object.Template.Spec.Domain.Features = features
 	object.Template.Spec.Domain.Firmware = firmware
