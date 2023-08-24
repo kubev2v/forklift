@@ -28,7 +28,7 @@ import (
 
 // BIOS types
 const (
-	Bios = "bios"
+	BIOS = "bios"
 )
 
 // Bus types
@@ -364,7 +364,7 @@ func (r *Builder) mapFirmware(vm *model.VM, object *cnv.VirtualMachineSpec) {
 		Serial: vm.UUID,
 	}
 	switch vm.Firmware {
-	case Bios:
+	case BIOS:
 		firmware.Bootloader = &cnv.Bootloader{BIOS: &cnv.BIOS{}}
 	default:
 		// We don't distinguish between UEFI and UEFI with secure boot, but we anyway would have
