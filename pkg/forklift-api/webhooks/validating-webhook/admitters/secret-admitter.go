@@ -1,6 +1,7 @@
 package admitters
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -76,23 +77,10 @@ func (admitter *SecretAdmitter) validateProviderSecret() *admissionv1.AdmissionR
 	if createdForProviderType, ok := admitter.secret.GetLabels()["createdForProviderType"]; ok {
 		providerType := api.ProviderType(createdForProviderType)
 
-		// once OVA provider is creted we block URL changes.
 		if admitter.ar.Request.Operation == admissionv1.Update && providerType == api.Ova {
-			urlChanged, err := admitter.isOvaUrlChanged()
-			if err != nil {
-				return webhookutils.ToAdmissionResponseError(err)
-			}
-
-			if urlChanged {
-				log.Info("secret admitter for OVA")
-				return &admissionv1.AdmissionResponse{
-					Allowed: false,
-					Result: &metav1.Status{
-						Code:    http.StatusBadRequest,
-						Message: "Updating the URL field of an existing OVA provider is forbidden.",
-					},
-				}
-			}
+			// there's no need to proceed to provider connection test since the URL
+			// does not change and credentials are not specified
+			return admitter.validateUpdateOfOVAProviderSecret()
 		}
 
 		collector, err := admitter.buildProviderCollector(&providerType)
@@ -234,6 +222,26 @@ func (admitter *SecretAdmitter) testConnectionToHost(hostName string) (tested bo
 	}
 }
 
+func (admitter *SecretAdmitter) validateUpdateOfOVAProviderSecret() *admissionv1.AdmissionResponse {
+	urlChanged, err := admitter.isOvaUrlChanged()
+	if err != nil {
+		return webhookutils.ToAdmissionResponseError(err)
+	}
+
+	if urlChanged {
+		log.Info("reject changing the URL of an existing OVA provider")
+		return &admissionv1.AdmissionResponse{
+			Allowed: false,
+			Result: &metav1.Status{
+				Code:    http.StatusBadRequest,
+				Message: "Updating the URL field of an existing OVA provider is forbidden.",
+			},
+		}
+	}
+
+	return webhookutils.ToAdmissionResponseAllow()
+}
+
 func (admitter *SecretAdmitter) isOvaUrlChanged() (bool, error) {
 
 	config, err := rest.InClusterConfig()
@@ -262,14 +270,11 @@ func (admitter *SecretAdmitter) isOvaUrlChanged() (bool, error) {
 	oldSecret := core.Secret{}
 	err = cl.Get(context.TODO(), client.ObjectKey{Namespace: admitter.secret.Namespace, Name: admitter.secret.Name}, &oldSecret)
 	if err != nil {
-		log.Error(err, "Couldn't get the target provider secrete")
+		log.Error(err, "Couldn't get the target provider secret")
 		return false, err
 	}
 
 	url := oldSecret.Data["url"]
 	newURL := admitter.secret.Data["url"]
-	if string(url) != string(newURL) {
-		return true, nil
-	}
-	return false, nil
+	return !bytes.Equal(url, newURL), nil
 }
