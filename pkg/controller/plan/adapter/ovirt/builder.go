@@ -576,6 +576,25 @@ func (r *Builder) LunPersistentVolumes(vmRef ref.Ref) (pvs []core.PersistentVolu
 			volMode := core.PersistentVolumeBlock
 			logicalUnit := da.Disk.Lun.LogicalUnits.LogicalUnit[0]
 
+			var pvSource core.PersistentVolumeSource
+			if logicalUnit.Address != "" {
+				pvSource = core.PersistentVolumeSource{
+					ISCSI: &core.ISCSIPersistentVolumeSource{
+						TargetPortal: logicalUnit.Address + ":" + logicalUnit.Port,
+						IQN:          logicalUnit.Target,
+						Lun:          logicalUnit.LunMapping,
+						ReadOnly:     false,
+					},
+				}
+			} else {
+				pvSource = core.PersistentVolumeSource{
+					FC: &core.FCVolumeSource{
+						WWIDs:    []string{logicalUnit.LunID},
+						ReadOnly: false,
+					},
+				}
+			}
+
 			pvSpec := core.PersistentVolume{
 				ObjectMeta: meta.ObjectMeta{
 					Name:      da.Disk.ID,
@@ -591,14 +610,7 @@ func (r *Builder) LunPersistentVolumes(vmRef ref.Ref) (pvs []core.PersistentVolu
 					},
 				},
 				Spec: core.PersistentVolumeSpec{
-					PersistentVolumeSource: core.PersistentVolumeSource{
-						ISCSI: &core.ISCSIPersistentVolumeSource{
-							TargetPortal: logicalUnit.Address + ":" + logicalUnit.Port,
-							IQN:          logicalUnit.Target,
-							Lun:          logicalUnit.LunMapping,
-							ReadOnly:     false,
-						},
-					},
+					PersistentVolumeSource: pvSource,
 					Capacity: core.ResourceList{
 						core.ResourceStorage: *resource.NewQuantity(logicalUnit.Size, resource.BinarySI),
 					},
