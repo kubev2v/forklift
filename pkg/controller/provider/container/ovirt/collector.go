@@ -133,6 +133,22 @@ func (r *Collector) Test() (status int, err error) {
 	return
 }
 
+func (r *Collector) Version() (major, minor, build, revision string, err error) {
+	system, _, err := r.client.system()
+	if err != nil {
+		return
+	}
+	version := strings.Split(system.Product.Version.FullVersion, ".")
+	major = version[0]
+	minor = version[1]
+	build = version[2]
+	revision = "0"
+	if len(version) > 3 {
+		revision = strings.Split(version[3], "-")[0]
+	}
+	return
+}
+
 // Start the collector.
 func (r *Collector) Start() error {
 	ctx := Context{

@@ -110,3 +110,8 @@ func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
 	ok = podMapped <= 1
 	return
 }
+
+// NO-OP
+func (r *Validator) DirectStorage(vmRef ref.Ref) (bool, error) {
+	return true, nil
+}

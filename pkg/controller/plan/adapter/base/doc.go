@@ -106,6 +106,8 @@ type Client interface {
 type Validator interface {
 	// Validate that a VM's disk backing storage has been mapped.
 	StorageMapped(vmRef ref.Ref) (bool, error)
+	// Validate that a VM's direct LUN/FC has the required details (oVirt only)
+	DirectStorage(vmRef ref.Ref) (bool, error)
 	// Validate that a VM's networks have been mapped.
 	NetworksMapped(vmRef ref.Ref) (bool, error)
 	// Validate that a VM's Host isn't in maintenance mode.
