@@ -173,6 +173,10 @@ type Collector struct {
 	db model.DB
 }
 
+func (*Collector) Version() (string, string, string, string, error) {
+	return "", "", "", "", nil
+}
+
 func (r *Collector) Name() string {
 	return "tester"
 }

@@ -189,12 +189,12 @@ func (r *Client) get(path string, object interface{}, param ...libweb.Param) (er
 }
 
 // Get system.
-func (r *Client) system() (s *System, status int, err error) {
+func (r *Client) system() (system *System, status int, err error) {
 	status, err = r.connect()
 	if err != nil {
 		return
 	}
-	system := &System{}
+	system = &System{}
 	status, err = r.client.Get(r.url, system)
 	if err != nil {
 		return

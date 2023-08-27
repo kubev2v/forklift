@@ -48,6 +48,11 @@ func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) libcontain
 	}
 }
 
+// NO-OP
+func (r *Collector) Version() (_, _, _, _ string, err error) {
+	return
+}
+
 // OCP collector.
 type Collector struct {
 	*libocp.Collector
