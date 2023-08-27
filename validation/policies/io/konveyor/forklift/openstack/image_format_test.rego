@@ -5,7 +5,7 @@ test_with_valid_image_format {
 		"name": "test",
 		"image": {
 			"id": "b749c132-bb97-4145-b86e-a1751cf75e21",
-			"disk_format": "qcow2",
+			"diskFormat": "qcow2",
 		},
 	}
 	results := concerns with input as mock_vm
@@ -17,7 +17,7 @@ test_with_invalid_storage_type {
 		"name": "test",
 		"image": {
 			"id": "b749c132-bb97-4145-b86e-a1751cf75e21",
-			"disk_format": "ami",
+			"diskFormat": "ami",
 		},
 	}
 	results := concerns with input as mock_vm
