@@ -27,5 +27,6 @@ go_library(
         "//vendor/github.com/go-logr/logr",
         "//vendor/k8s.io/api/core/v1:core",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:meta",
+        "//vendor/k8s.io/klog/v2:klog",
     ],
 )
