@@ -5,7 +5,7 @@ import future.keywords.if
 default has_invalid_image_format = false
 
 has_invalid_image_format if {
-	not regex.match(`qcow2|raw`, input.image.disk_format)
+	not regex.match(`qcow2|raw`, input.image.diskFormat)
 }
 
 concerns[flag] {
