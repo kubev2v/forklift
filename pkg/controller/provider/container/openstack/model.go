@@ -755,7 +755,7 @@ func (r *VolumeAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) 
 							klog.Info("VM not found, skipping", "vmID", vmID)
 							continue
 						}
-						vm.Revision += 1
+						vm.RevisionValidated = 0
 						err = tx.Update(vm)
 						if err != nil {
 							klog.Error("Could not update VM revision", "vmID", vmID, "err", err)
