@@ -144,3 +144,8 @@ func (r *Validator) MaintenanceMode(vmRef ref.Ref) (ok bool, err error) {
 	ok = !host.InMaintenanceMode
 	return
 }
+
+// NO-OP
+func (r *Validator) DirectStorage(vmRef ref.Ref) (bool, error) {
+	return true, nil
+}

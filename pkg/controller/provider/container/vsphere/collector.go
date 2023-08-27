@@ -286,6 +286,11 @@ func (r *Collector) Test() (status int, err error) {
 	return
 }
 
+// NO-OP
+func (r *Collector) Version() (_, _, _, _ string, err error) {
+	return
+}
+
 // Start the collector.
 func (r *Collector) Start() error {
 	ctx := context.Background()

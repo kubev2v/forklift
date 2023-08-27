@@ -15,6 +15,7 @@ import (
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
+	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -34,6 +35,7 @@ const (
 	VMAlreadyExists              = "VMAlreadyExists"
 	VMNetworksNotMapped          = "VMNetworksNotMapped"
 	VMStorageNotMapped           = "VMStorageNotMapped"
+	VMStorageNotSupported        = "VMStorageNotSupported"
 	VMMultiplePodNetworkMappings = "VMMultiplePodNetworkMappings"
 	HostNotReady                 = "HostNotReady"
 	DuplicateVM                  = "DuplicateVM"
@@ -342,6 +344,14 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "VM has unmapped storage.",
 		Items:    []string{},
 	}
+	unsupportedStorage := libcnd.Condition{
+		Type:     VMStorageNotSupported,
+		Status:   True,
+		Reason:   NotValid,
+		Category: Critical,
+		Message:  "VM has unsupported storage. Migration of Direct LUN/FC from oVirt is supported as from version 4.5.2.1",
+		Items:    []string{},
+	}
 	maintenanceMode := libcnd.Condition{
 		Type:     HostNotReady,
 		Status:   True,
@@ -411,6 +421,12 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		if err != nil {
 			return err
 		}
+		if plan.Referenced.Secret == nil {
+			err = r.setupSecret(plan)
+			if err != nil {
+				return err
+			}
+		}
 		if plan.Referenced.Map.Network != nil {
 			ok, err := validator.NetworksMapped(*ref)
 			if err != nil {
@@ -434,6 +450,13 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			}
 			if !ok {
 				unmappedStorage.Items = append(unmappedStorage.Items, ref.String())
+			}
+			ok, err = validator.DirectStorage(*ref)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				unsupportedStorage.Items = append(unsupportedStorage.Items, ref.String())
 			}
 		}
 		ok, err := validator.MaintenanceMode(*ref)
@@ -490,6 +513,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(unmappedStorage.Items) > 0 {
 		plan.Status.SetCondition(unmappedStorage)
+	}
+	if len(unsupportedStorage.Items) > 0 {
+		plan.Status.SetCondition(unsupportedStorage)
 	}
 	if len(maintenanceMode.Items) > 0 {
 		plan.Status.SetCondition(maintenanceMode)
@@ -669,4 +695,18 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 		plan.Status.SetCondition(vddkNotConfigured)
 	}
 	return nil
+}
+
+func (r *Reconciler) setupSecret(plan *api.Plan) (err error) {
+	key := client.ObjectKey{
+		Namespace: plan.Referenced.Provider.Source.Spec.Secret.Namespace,
+		Name:      plan.Referenced.Provider.Source.Spec.Secret.Name,
+	}
+	secret := v1.Secret{}
+	err = r.Get(context.TODO(), key, &secret)
+	if err != nil {
+		return
+	}
+	plan.Referenced.Secret = &secret
+	return
 }

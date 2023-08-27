@@ -286,6 +286,7 @@ func (r *Client) getVM(vmRef ref.Ref) (ovirtVm *ovirtsdk.Vm, vmService *ovirtsdk
 			vmRef.String())
 		return
 	}
+
 	vmService = r.connection.SystemService().VmsService().VmService(vm.ID)
 	vmResponse, err := vmService.Get().Query("correlation_id", r.Migration.Name).Send()
 	if err != nil {

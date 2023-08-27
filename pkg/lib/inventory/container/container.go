@@ -148,4 +148,6 @@ type Collector interface {
 	Test() (int, error)
 	// Reset
 	Reset()
+	// Get the system version - currently, ovirt-only
+	Version() (string, string, string, string, error)
 }

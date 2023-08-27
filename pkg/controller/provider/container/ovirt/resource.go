@@ -13,10 +13,7 @@ type System struct {
 		Name    string `json:"name"`
 		Vendor  string `json:"vendor"`
 		Version struct {
-			Build    string `json:"build"`
-			Major    string `json:"major"`
-			Minor    string `json:"minor"`
-			Revision string `json:"revision"`
+			FullVersion string `json:"full_version"`
 		} `json:"version"`
 	} `json:"product_info"`
 }
