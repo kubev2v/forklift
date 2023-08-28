@@ -59,12 +59,6 @@ const (
 	Unknown = "unknown"
 )
 
-// Annotations
-const (
-	// CDI import backing file annotation on PVC
-	AnnImportBackingFile = "cdi.kubevirt.io/storage.import.backingFile"
-)
-
 // Error messages
 const (
 	ErrVMLookupFailed = "VM lookup failed."
@@ -209,7 +203,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 			if dv.ObjectMeta.Annotations == nil {
 				dv.ObjectMeta.Annotations = make(map[string]string)
 			}
-			dv.ObjectMeta.Annotations[planbase.AnnDiskSource] = getDiskSourcePath(disk.FilePath)
+			dv.ObjectMeta.Annotations[planbase.AnnDiskSource] = getDiskFullPath(disk)
 			dvs = append(dvs, *dv)
 		}
 	}
@@ -387,22 +381,15 @@ func (r *Builder) mapDisks(vm *model.VM, persistentVolumeClaims []core.Persisten
 	var kDisks []cnv.Disk
 
 	disks := vm.Disks
-	// TODO might need sort by the disk id (incremental name)
-	/*sort.Slice(disks, func(i, j int) bool {
-		return disks[i].Key < disks[j].Key
-	})*/
 	pvcMap := make(map[string]*core.PersistentVolumeClaim)
 	for i := range persistentVolumeClaims {
 		pvc := &persistentVolumeClaims[i]
-		// the PVC BackingFile value has already been trimmed.
 		if source, ok := pvc.Annotations[planbase.AnnDiskSource]; ok {
 			pvcMap[source] = pvc
-		} else {
-			pvcMap[pvc.Annotations[AnnImportBackingFile]] = pvc
 		}
 	}
 	for i, disk := range disks {
-		pvc := pvcMap[getDiskSourcePath(disk.FilePath)]
+		pvc := pvcMap[getDiskFullPath(disk)]
 		volumeName := fmt.Sprintf("vol-%v", i)
 		volume := cnv.Volume{
 			Name: volumeName,
@@ -446,7 +433,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 		list = append(
 			list,
 			&plan.Task{
-				Name: getDiskSourcePath(disk.FilePath),
+				Name: getDiskFullPath(disk),
 				Progress: libitr.Progress{
 					Total: mB,
 				},
@@ -481,14 +468,13 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 	return
 }
 
-// Return a stable identifier for a VDDK DataVolume.
 func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
 	return trimBackingFileName(dv.ObjectMeta.Annotations[planbase.AnnDiskSource])
 }
 
 // Return a stable identifier for a PersistentDataVolume.
 func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string {
-	return trimBackingFileName(pvc.Annotations[AnnImportBackingFile])
+	return ""
 }
 
 // Trims the snapshot suffix from a disk backing file name if there is one.
@@ -498,6 +484,10 @@ func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVol
 //	Output: [datastore13] my-vm/disk-name.vmdk
 func trimBackingFileName(fileName string) string {
 	return backingFilePattern.ReplaceAllString(fileName, ".vmdk")
+}
+
+func getDiskFullPath(disk ova.Disk) string {
+	return disk.FilePath + "::" + disk.Name
 }
 
 func getDiskSourcePath(filePath string) string {
