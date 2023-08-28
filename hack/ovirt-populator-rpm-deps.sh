@@ -11,15 +11,15 @@ bazel run \
     //:bazeldnf -- fetch \
     ${bazeldnf_repos}
 
-imageio_deps=(
-    "gcc"
-    "python3-pip"
-    "python3-devel"
-    "libxml2-devel"
-    "openssl-devel"
-    "libcurl-devel"
-    "qemu-img"
-)
+imageio_deps="
+gcc
+python3-pip
+python3-devel
+libxml2-devel
+openssl-devel
+libcurl-devel
+qemu-img
+"
 
 bazel run \
         //:bazeldnf -- rpmtree \

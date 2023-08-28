@@ -3552,21 +3552,21 @@ rpm(
 )
 
 rpm(
-    name = "centos-gpg-keys-0__9.0-21.el9.x86_64",
-    sha256 = "86bb90722a589e0bd01be53b53caedbc4d5482057ecdaf31e9cafb1360f0df02",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/centos-gpg-keys-9.0-21.el9.noarch.rpm"],
+    name = "centos-gpg-keys-0__9.0-22.el9.x86_64",
+    sha256 = "108f1f4f4aee8ccdf6535833bbab14bd3808c395ef7d1d425473aee4467e2156",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/centos-gpg-keys-9.0-22.el9.noarch.rpm"],
 )
 
 rpm(
-    name = "centos-stream-release-0__9.0-21.el9.x86_64",
-    sha256 = "4a9d6f5fa5ef78226b12efd0496b5f03c84b43d2413dac346e40f6abf527edf8",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/centos-stream-release-9.0-21.el9.noarch.rpm"],
+    name = "centos-stream-release-0__9.0-22.el9.x86_64",
+    sha256 = "78cc2608d720cb0c4a1528365036a64eb64b622a76e40d0625e805428db0d66a",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/centos-stream-release-9.0-22.el9.noarch.rpm"],
 )
 
 rpm(
-    name = "centos-stream-repos-0__9.0-21.el9.x86_64",
-    sha256 = "2b23dc5dca2de4d836f7ca928ffd4a15584df97e8e13413ee1e7a4c6a8529436",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/centos-stream-repos-9.0-21.el9.noarch.rpm"],
+    name = "centos-stream-repos-0__9.0-22.el9.x86_64",
+    sha256 = "41eee9bd192d069e855f6b8ff43e08e350d02eeab8f47a23aa2fc517936b17cc",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/centos-stream-repos-9.0-22.el9.noarch.rpm"],
 )
 
 rpm(
@@ -3588,15 +3588,9 @@ rpm(
 )
 
 rpm(
-    name = "crypto-policies-0__20230614-1.git027799d.el9.x86_64",
-    sha256 = "5638f65d785658f05b6abd4b811119b3d02ef30551dd5054ba3c2baf2a77f991",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/crypto-policies-20230614-1.git027799d.el9.noarch.rpm"],
-)
-
-rpm(
-    name = "cyrus-sasl-lib-0__2.1.27-21.el9.x86_64",
-    sha256 = "fd4292a29759f9531bbc876d1818e7a83ccac76907234002f598671d7b338469",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/cyrus-sasl-lib-2.1.27-21.el9.x86_64.rpm"],
+    name = "crypto-policies-0__20230731-1.git94f0e2c.el9.x86_64",
+    sha256 = "c210b20f244bb840cb182e2e4c2887ac5b2a54a95a6e628537cde96f90e5326b",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/crypto-policies-20230731-1.git94f0e2c.el9.noarch.rpm"],
 )
 
 rpm(
@@ -3654,51 +3648,51 @@ rpm(
 )
 
 rpm(
-    name = "glib2-0__2.68.4-9.el9.x86_64",
-    sha256 = "4e42c23971fe3c7220b12f864ba3b13679555599f0be3e4affae33e219b13b17",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/glib2-2.68.4-9.el9.x86_64.rpm"],
+    name = "glib2-0__2.68.4-11.el9.x86_64",
+    sha256 = "4f75096fde19d60137eccade0dc9451cb8baa9306c84d2aae1bd7faa8b8cff05",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/glib2-2.68.4-11.el9.x86_64.rpm"],
 )
 
 rpm(
-    name = "glibc-0__2.34-72.el9.x86_64",
-    sha256 = "c2fe4a71ada3c8e6fc05d6aac18361d25f9419149fb5da6052dd95bc0b390af6",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/glibc-2.34-72.el9.x86_64.rpm"],
+    name = "glibc-0__2.34-82.el9.x86_64",
+    sha256 = "fbc1d1f04ac348d5226d3ed4035fdb6e9f202a1412510d4b495de3f7f1b1a4d0",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/glibc-2.34-82.el9.x86_64.rpm"],
 )
 
 rpm(
-    name = "glibc-common-0__2.34-72.el9.x86_64",
-    sha256 = "db691ee074bb76fc62c983f07de4de3bf07d303df22e3134ed55f2c75840c30f",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/glibc-common-2.34-72.el9.x86_64.rpm"],
+    name = "glibc-common-0__2.34-82.el9.x86_64",
+    sha256 = "63797813fb79c4b445bf6f9fe73368362fa1d859a9332d214d4504f14ba74b6d",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/glibc-common-2.34-82.el9.x86_64.rpm"],
 )
 
 rpm(
-    name = "glibc-devel-0__2.34-72.el9.x86_64",
-    sha256 = "e5712950f3d83c87fab78bced16a222f76938320df3455dbb5550829f10223c3",
-    urls = ["https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/glibc-devel-2.34-72.el9.x86_64.rpm"],
+    name = "glibc-devel-0__2.34-82.el9.x86_64",
+    sha256 = "6f0911a6532a5817daf6629a0947acee48ee2b4fd742bf4d4e2f1cb169d2ce0d",
+    urls = ["https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/glibc-devel-2.34-82.el9.x86_64.rpm"],
 )
 
 rpm(
-    name = "glibc-headers-0__2.34-72.el9.x86_64",
-    sha256 = "832bed81c72c59b1ebf18dd18c5c6d36ad29e65a15f249630e4c767a74923d29",
-    urls = ["https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/glibc-headers-2.34-72.el9.x86_64.rpm"],
+    name = "glibc-headers-0__2.34-82.el9.x86_64",
+    sha256 = "eba586dd7b6af627783f4c2828d3359b922640165e87165d7cb99be2216899f5",
+    urls = ["https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/glibc-headers-2.34-82.el9.x86_64.rpm"],
 )
 
 rpm(
-    name = "glibc-langpack-ln-0__2.34-72.el9.x86_64",
-    sha256 = "decbc5ff4d5348d05fc6e67a832f64cad89b67de4735293ee1f75c0a4c3482e7",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/glibc-langpack-ln-2.34-72.el9.x86_64.rpm"],
+    name = "glibc-langpack-tl-0__2.34-82.el9.x86_64",
+    sha256 = "162862bf1ba4d38ccd6d8c0273bcd71d4374db7206c3b85484cecb28214240bb",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/glibc-langpack-tl-2.34-82.el9.x86_64.rpm"],
 )
 
 rpm(
-    name = "gmp-1__6.2.0-11.el9.x86_64",
-    sha256 = "01d04acb4ef7c2bf1230057c340c318265f2dc5663bb060f77cc16520fd94c87",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/gmp-6.2.0-11.el9.x86_64.rpm"],
+    name = "gmp-1__6.2.0-13.el9.x86_64",
+    sha256 = "b6d592895ccc0fcad6106cd41800cd9d68e5384c418e53a2c3ff2ac8c8b15a33",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/gmp-6.2.0-13.el9.x86_64.rpm"],
 )
 
 rpm(
-    name = "gnutls-0__3.7.6-20.el9.x86_64",
-    sha256 = "fc597ef5acc91687cc379e9ce4c91c0639ccaf46e201d04f06a05c4795e7590c",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/gnutls-3.7.6-20.el9.x86_64.rpm"],
+    name = "gnutls-0__3.7.6-23.el9.x86_64",
+    sha256 = "6fd8a96f4632f2d08efc211d04ebf7591fecd213af1374f4ffe57b614b76552b",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/gnutls-3.7.6-23.el9.x86_64.rpm"],
 )
 
 rpm(
@@ -3708,9 +3702,9 @@ rpm(
 )
 
 rpm(
-    name = "kernel-headers-0__5.14.0-344.el9.x86_64",
-    sha256 = "010f6cc5f363b9489b73729a99e089cc83f3f8cb839f29e0e82983c91196abaf",
-    urls = ["https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/kernel-headers-5.14.0-344.el9.x86_64.rpm"],
+    name = "kernel-headers-0__5.14.0-361.el9.x86_64",
+    sha256 = "d3b32b99d97d167c65f467096271a10b5056e44d80a8203ed4154f1728a979be",
+    urls = ["https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/kernel-headers-5.14.0-361.el9.x86_64.rpm"],
 )
 
 rpm(
@@ -3720,9 +3714,9 @@ rpm(
 )
 
 rpm(
-    name = "krb5-libs-0__1.20.1-8.el9.x86_64",
-    sha256 = "d3f350574b90454afdcb787e520bcaec76e176c287869d84fbe36ab4b91de323",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/krb5-libs-1.20.1-8.el9.x86_64.rpm"],
+    name = "krb5-libs-0__1.21.1-1.el9.x86_64",
+    sha256 = "3ef93138174dc618bbf4680b5df11d27cd6afb361cd02efad8bcbb5bf0769c2e",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/krb5-libs-1.21.1-1.el9.x86_64.rpm"],
 )
 
 rpm(
@@ -3744,15 +3738,9 @@ rpm(
 )
 
 rpm(
-    name = "libblkid-0__2.37.4-11.el9.x86_64",
-    sha256 = "afa7991876da0bb503b5aee392c8bd63786fba42c3d4f227949e526e984a6d85",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/libblkid-2.37.4-11.el9.x86_64.rpm"],
-)
-
-rpm(
-    name = "libbrotli-0__1.0.9-6.el9.x86_64",
-    sha256 = "10b93bc07c62f31b96cbd4141a645880e76a2bc7d7163306ce2cc61a49616202",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/libbrotli-1.0.9-6.el9.x86_64.rpm"],
+    name = "libblkid-0__2.37.4-15.el9.x86_64",
+    sha256 = "519a372517cb0d466878808afceda7afd95be9278aa67b2dd311a8a886783b77",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/libblkid-2.37.4-15.el9.x86_64.rpm"],
 )
 
 rpm(
@@ -3768,21 +3756,15 @@ rpm(
 )
 
 rpm(
-    name = "libcurl-0__7.76.1-26.el9.x86_64",
-    sha256 = "87b79f8b6c6f796be1a807c92d1fa8a9e2e880d278d2b1fe1fa7241091fcec72",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/libcurl-7.76.1-26.el9.x86_64.rpm"],
-)
-
-rpm(
     name = "libcurl-devel-0__7.76.1-26.el9.x86_64",
     sha256 = "3fb75b8cc68b693a84bf13d5ba8f22d6998564b78dddfd7cd20f2cec684bf52f",
     urls = ["https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libcurl-devel-7.76.1-26.el9.x86_64.rpm"],
 )
 
 rpm(
-    name = "libevent-0__2.1.12-6.el9.x86_64",
-    sha256 = "82179f6f214ddf523e143c16c3474ccf8832551c6305faf89edfbd83b3424d48",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/libevent-2.1.12-6.el9.x86_64.rpm"],
+    name = "libcurl-minimal-0__7.76.1-26.el9.x86_64",
+    sha256 = "b9c24d7a8e0c9e840b7d799e478870c75cb0101f8e3aaaca163d25d3f661b652",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/libcurl-minimal-7.76.1-26.el9.x86_64.rpm"],
 )
 
 rpm(
@@ -3810,9 +3792,9 @@ rpm(
 )
 
 rpm(
-    name = "libmount-0__2.37.4-11.el9.x86_64",
-    sha256 = "7fa27941dda076f5a16c504ca98a3deb3e91049b748058e2cfd9ea0e47fafe48",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/libmount-2.37.4-11.el9.x86_64.rpm"],
+    name = "libmount-0__2.37.4-15.el9.x86_64",
+    sha256 = "b615d8c2fe67089c91025f48c700986c5cb62298e3ed58dbfc3c188af4e77a96",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/libmount-2.37.4-15.el9.x86_64.rpm"],
 )
 
 rpm(
@@ -3834,12 +3816,6 @@ rpm(
 )
 
 rpm(
-    name = "libpsl-0__0.21.1-5.el9.x86_64",
-    sha256 = "42bd5fb4b34c993c103ea2d47fc69a0fcc231fcfb88646ed55403519868caa94",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/libpsl-0.21.1-5.el9.x86_64.rpm"],
-)
-
-rpm(
     name = "libselinux-0__3.5-1.el9.x86_64",
     sha256 = "7e7309502af6056593e4c247f1829fd46cc7480ed46da020446ea6c2f1553bd1",
     urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/libselinux-3.5-1.el9.x86_64.rpm"],
@@ -3855,18 +3831,6 @@ rpm(
     name = "libsigsegv-0__2.13-4.el9.x86_64",
     sha256 = "931bd0ec7050e8c3b37a9bfb489e30af32486a3c77203f1e9113eeceaa3b0a3a",
     urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/libsigsegv-2.13-4.el9.x86_64.rpm"],
-)
-
-rpm(
-    name = "libssh-0__0.10.4-11.el9.x86_64",
-    sha256 = "fc9d5d5911e7e5710faff7ee8d86127a97bb820764824fe3308a017a832439b0",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/libssh-0.10.4-11.el9.x86_64.rpm"],
-)
-
-rpm(
-    name = "libssh-config-0__0.10.4-11.el9.x86_64",
-    sha256 = "395ceff19b1fae8a0fcaf4448ebdcd0fa3ed5cbb80b721ab78317c4eebd262b9",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/libssh-config-0.10.4-11.el9.noarch.rpm"],
 )
 
 rpm(
@@ -3894,9 +3858,9 @@ rpm(
 )
 
 rpm(
-    name = "libuuid-0__2.37.4-11.el9.x86_64",
-    sha256 = "bb7e66bbe34a8f3f8d130d07d6fcfc36b4a6594d00a9edc6ba0637836847fd8f",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/libuuid-2.37.4-11.el9.x86_64.rpm"],
+    name = "libuuid-0__2.37.4-15.el9.x86_64",
+    sha256 = "383cde88a366f8d6bfb9fc29a33f8dc835cdaaf4302dc6fc90d87742a0ab0c00",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/libuuid-2.37.4-15.el9.x86_64.rpm"],
 )
 
 rpm(
@@ -3948,15 +3912,15 @@ rpm(
 )
 
 rpm(
-    name = "ncurses-base-0__6.2-8.20210508.el9.x86_64",
-    sha256 = "e4cc4a4a479b8c27776debba5c20e8ef21dc4b513da62a25ed09f88386ac08a8",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/ncurses-base-6.2-8.20210508.el9.noarch.rpm"],
+    name = "ncurses-base-0__6.2-10.20210508.el9.x86_64",
+    sha256 = "00ba56b28a3a85c3c03387bb7abeca92597c8a5fac7f53d48410ca2a20fd8065",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/ncurses-base-6.2-10.20210508.el9.noarch.rpm"],
 )
 
 rpm(
-    name = "ncurses-libs-0__6.2-8.20210508.el9.x86_64",
-    sha256 = "328f4d50e66b00f24344ebe239817204fda8e68b1d988c6943abb3c36231beaa",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/ncurses-libs-6.2-8.20210508.el9.x86_64.rpm"],
+    name = "ncurses-libs-0__6.2-10.20210508.el9.x86_64",
+    sha256 = "f4ead70a508051ed338499b35605b5b2b5bccde19c9e83f7e4b948f171b542ff",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/ncurses-libs-6.2-10.20210508.el9.x86_64.rpm"],
 )
 
 rpm(
@@ -3969,12 +3933,6 @@ rpm(
     name = "numactl-libs-0__2.0.14-7.el9.x86_64",
     sha256 = "7a3bc16b3fee48c53e0f54a7cb4cd3857eb1be3984d58da3bdf2c297d6b55af1",
     urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/numactl-libs-2.0.14-7.el9.x86_64.rpm"],
-)
-
-rpm(
-    name = "openldap-0__2.6.3-1.el9.x86_64",
-    sha256 = "847286e28d64a2e52ff858cf09fcc659f2d2d025313249da8d0f6cbd702e51cb",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/openldap-2.6.3-1.el9.x86_64.rpm"],
 )
 
 rpm(
@@ -4038,39 +3996,33 @@ rpm(
 )
 
 rpm(
-    name = "publicsuffix-list-dafsa-0__20210518-3.el9.x86_64",
-    sha256 = "992c17312bf5f144ec17b3c9733ab180c6c3641323d2deaf7c13e6bd1971f7a6",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/publicsuffix-list-dafsa-20210518-3.el9.noarch.rpm"],
+    name = "python3-0__3.9.17-2.el9.x86_64",
+    sha256 = "0c908646997be2a982c6f971230ca467c1039ad5a6cb961ee86d2c0ed1586983",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/python3-3.9.17-2.el9.x86_64.rpm"],
 )
 
 rpm(
-    name = "python3-0__3.9.17-1.el9.x86_64",
-    sha256 = "23c093877ff32ab552392d8666292791fecf42b6c0e95ebf3faf7cdd2870d2bc",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/python3-3.9.17-1.el9.x86_64.rpm"],
+    name = "python3-devel-0__3.9.17-2.el9.x86_64",
+    sha256 = "d44cfd6a67874b184a3697d4d0e6fee5bc3a94f1b8a906a6cc9517ad4b9043a5",
+    urls = ["https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/python3-devel-3.9.17-2.el9.x86_64.rpm"],
 )
 
 rpm(
-    name = "python3-devel-0__3.9.17-1.el9.x86_64",
-    sha256 = "549cab2a0a7eb37d0337de20632d29bb03dc7e76a439df495cc33a7f48e24c3d",
-    urls = ["https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/python3-devel-3.9.17-1.el9.x86_64.rpm"],
+    name = "python3-libs-0__3.9.17-2.el9.x86_64",
+    sha256 = "ceeede42edd33b2ac964dd2fce66d77363be4530cce206185ae168186696bee4",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/python3-libs-3.9.17-2.el9.x86_64.rpm"],
 )
 
 rpm(
-    name = "python3-libs-0__3.9.17-1.el9.x86_64",
-    sha256 = "ec96eabc6cc30a8b1d31a69956355c2b00697025b6241bcda25c23e9966e9952",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/python3-libs-3.9.17-1.el9.x86_64.rpm"],
+    name = "python3-pip-0__21.2.3-7.el9.x86_64",
+    sha256 = "322265d9f7192a9f8a1be86fea44d6f005a5d43ab4dcaada0a4652d0764889d8",
+    urls = ["https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/python3-pip-21.2.3-7.el9.noarch.rpm"],
 )
 
 rpm(
-    name = "python3-pip-0__21.2.3-6.el9.x86_64",
-    sha256 = "8c3643142d2700590dd10abfd670576ddb27bb20e239fe874a8f1ec077bcd0bc",
-    urls = ["https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/python3-pip-21.2.3-6.el9.noarch.rpm"],
-)
-
-rpm(
-    name = "python3-pip-wheel-0__21.2.3-6.el9.x86_64",
-    sha256 = "8e9e72535944204b48dbcb9cb34007b4991bdb4b5223e4c5874b07c6c122c1ff",
-    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/python3-pip-wheel-21.2.3-6.el9.noarch.rpm"],
+    name = "python3-pip-wheel-0__21.2.3-7.el9.x86_64",
+    sha256 = "629fa0b71150272bfc7d4f348b04d2588a70fcdd5c3b52e176ea3a7d3de71e89",
+    urls = ["https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/python3-pip-wheel-21.2.3-7.el9.noarch.rpm"],
 )
 
 rpm(
@@ -4080,9 +4032,9 @@ rpm(
 )
 
 rpm(
-    name = "qemu-img-17__8.0.0-9.el9.x86_64",
-    sha256 = "68c236cf17fec913214b306d1b4a93d9382b5162cf76dafd50917278323ac146",
-    urls = ["https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/qemu-img-8.0.0-9.el9.x86_64.rpm"],
+    name = "qemu-img-17__8.0.0-13.el9.x86_64",
+    sha256 = "2f2b859728eaacf2034ec755f5b1b8a35650f46bb11ec8005d59400ceaefaefa",
+    urls = ["https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/qemu-img-8.0.0-13.el9.x86_64.rpm"],
 )
 
 rpm(
