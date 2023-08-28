@@ -705,7 +705,6 @@ func (r *VolumeAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) 
 	}
 	for i := range volumeList {
 		volume := &Volume{volumeList[i]}
-		klog.Info("Getting update for volume", "volume", volume.ID)
 		switch volume.Status {
 		case VolumeStatusDeleting:
 			updater := func(tx *libmodel.Tx) (err error) {
