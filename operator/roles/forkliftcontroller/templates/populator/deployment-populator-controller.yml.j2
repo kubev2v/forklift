@@ -13,7 +13,7 @@ spec:
       labels:
         app: {{ app_name }}
     spec:
-      serviceAccountName: forklift-controller
+      serviceAccountName: forklift-populator-controller
       containers:
         - name: {{ populator_controller_container_name }}
           image: {{ populator_controller_image_fqin }}
