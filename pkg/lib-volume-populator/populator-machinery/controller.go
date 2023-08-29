@@ -922,6 +922,9 @@ func makePopulatePodSpec(pvcPrimeName, secretName string) corev1.PodSpec {
 		},
 		SecurityContext: &corev1.PodSecurityContext{
 			FSGroup: &user,
+			SeccompProfile: &corev1.SeccompProfile{
+				Type: corev1.SeccompProfileTypeRuntimeDefault,
+			},
 		},
 		RestartPolicy: corev1.RestartPolicyNever,
 		Volumes: []corev1.Volume{
