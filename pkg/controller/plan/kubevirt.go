@@ -655,6 +655,11 @@ func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) (er
 				},
 			},
 			Volumes: volumes,
+			SecurityContext: &core.PodSecurityContext{
+				SeccompProfile: &core.SeccompProfile{
+					Type: core.SeccompProfileTypeRuntimeDefault,
+				},
+			},
 		},
 	}
 	// Align with the conversion pod request, to prevent breakage
@@ -1236,6 +1241,9 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 				FSGroup:      &fsGroup,
 				RunAsUser:    &user,
 				RunAsNonRoot: &nonRoot,
+				SeccompProfile: &core.SeccompProfile{
+					Type: core.SeccompProfileTypeRuntimeDefault,
+				},
 			},
 			RestartPolicy:  core.RestartPolicyNever,
 			InitContainers: initContainers,
