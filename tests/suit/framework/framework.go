@@ -180,9 +180,8 @@ func (f *Framework) CreateNamespace(prefix string, labels map[string]string) (*v
 	if labels == nil {
 		labels = make(map[string]string)
 	}
-	// TODO: restore the pod-security label once https://github.com/kubev2v/forklift/issues/173 is fixed
 	// pod-security.kubernetes.io/<MODE>: <LEVEL>
-	//labels["pod-security.kubernetes.io/enforce"] = "restricted"
+	labels["pod-security.kubernetes.io/enforce"] = "restricted"
 	ns := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: fmt.Sprintf("forklift-e2e-tests-%s-", prefix),
