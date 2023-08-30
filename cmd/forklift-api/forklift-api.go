@@ -17,9 +17,13 @@ limitations under the License.
 package main
 
 import (
+	"os"
+
 	"github.com/go-logr/logr"
+	"github.com/konveyor/forklift-controller/pkg/apis"
 	forklift_api "github.com/konveyor/forklift-controller/pkg/forklift-api"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	"k8s.io/client-go/kubernetes/scheme"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -34,5 +38,12 @@ func init() {
 func main() {
 	log.Info("start forklift-api")
 	app := forklift_api.NewForkliftApi()
+
+	err := apis.AddToScheme(scheme.Scheme)
+	if err != nil {
+		log.Error(err, "unable to add forklift API to scheme")
+		os.Exit(1)
+	}
+
 	app.Execute()
 }
