@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/konveyor/forklift-controller/pkg/apis"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	adapter "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container"
@@ -163,17 +162,6 @@ func (admitter *SecretAdmitter) testConnectionToHost(hostName string) (tested bo
 		return
 	}
 
-	err = api.SchemeBuilder.AddToScheme(scheme.Scheme)
-	if err != nil {
-		log.Error(err, "Couldn't build the scheme")
-		return
-	}
-	err = apis.AddToScheme(scheme.Scheme)
-	if err != nil {
-		log.Error(err, "Couldn't add forklift API to the scheme")
-		return
-	}
-
 	cl, err := client.New(config, client.Options{Scheme: scheme.Scheme})
 	if err != nil {
 		log.Error(err, "Couldn't create a cluster client")
@@ -243,21 +231,9 @@ func (admitter *SecretAdmitter) validateUpdateOfOVAProviderSecret() *admissionv1
 }
 
 func (admitter *SecretAdmitter) isOvaUrlChanged() (bool, error) {
-
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		log.Error(err, "Couldn't get the cluster configuration")
-		return false, err
-	}
-
-	err = api.SchemeBuilder.AddToScheme(scheme.Scheme)
-	if err != nil {
-		log.Error(err, "Couldn't build the scheme")
-		return false, err
-	}
-	err = apis.AddToScheme(scheme.Scheme)
-	if err != nil {
-		log.Error(err, "Couldn't add forklift API to the scheme")
 		return false, err
 	}
 
