@@ -5,6 +5,7 @@ metadata:
   name: forklift-controller-scc
 users:
   - system:serviceaccount:{{ app_namespace }}:forklift-controller
+  - system:serviceaccount:{{ app_namespace }}:forklift-populator-controller
 runAsUser:
   type: RunAsAny
 seLinuxContext:
