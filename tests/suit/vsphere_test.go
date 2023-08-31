@@ -29,6 +29,8 @@ var _ = Describe("[level:component]Migration tests for vSphere provider", func()
 			}, namespace, "provider-test-secret"))
 		Expect(err).ToNot(HaveOccurred())
 
+		targetNS, err := f.CreateNamespace("default", map[string]string{})
+		Expect(err).ToNot(HaveOccurred())
 		By("Create target Openshift provider")
 		targetPr := utils.NewProvider(utils.TargetProviderName, forkliftv1.OpenShift, namespace, map[string]string{}, map[string]string{}, "", nil)
 		err = utils.CreateProviderFromDefinition(f.CrClient, targetPr)
@@ -55,7 +57,7 @@ var _ = Describe("[level:component]Migration tests for vSphere provider", func()
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Creating plan")
-		planDef := utils.NewPlanWithVmName(*provider, namespace, test_plan_name, test_storage_map_name, networkMapName, []string{"DC0_H0_VM0"}, "default")
+		planDef := utils.NewPlanWithVmName(*provider, namespace, test_plan_name, test_storage_map_name, networkMapName, []string{"DC0_H0_VM0"}, targetNS.Name)
 
 		err = utils.CreatePlanFromDefinition(f.CrClient, planDef)
 		Expect(err).ToNot(HaveOccurred())
