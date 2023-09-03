@@ -63,9 +63,9 @@ container_image(
 container_run_and_commit_layer(
     name = "no-ems-in-fips",
     commands = [
-        "touch /usr/share/crypto-policies/back-ends/FIPS/openssl_fips.config",
-        "echo -ne '[fips_sect]\ntls1-prf-ems-check = 0\nactivate = 1' >> /usr/share/crypto-policies/back-ends/FIPS/openssl_fips.config",
-        "echo -ne '[crypto_policy]\nOptions=RHNoEnforceEMSinFIPS' >> /usr/share/crypto-policies/back-ends/FIPS/opensslcnf.config",
+        "rm /etc/pki/tls/fips_local.cnf",
+        "echo -e '[fips_sect]\ntls1-prf-ems-check = 0\nactivate = 1' > /etc/pki/tls/fips_local.cnf",
+        "sed -i '/^\\[ crypto_policy \\]/a Options=RHNoEnforceEMSinFIPS' /etc/pki/tls/openssl.cnf",
     ],
     image = ":virt-v2v-image.tar",
 )
