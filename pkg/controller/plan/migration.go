@@ -487,7 +487,7 @@ func (r *Migration) deleteImporterPods(vm *plan.VMStatus) (err error) {
 		return
 	}
 	for _, pvc := range pvcs {
-		err = r.kubevirt.DeleteImporterPod(pvc)
+		err = r.kubevirt.DeleteImporterPods(pvc)
 		if err != nil {
 			return
 		}
@@ -797,6 +797,11 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			break
 		}
 		err = r.kubevirt.DeletePVCConsumerPod(vm)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+		err = r.deleteImporterPods(vm)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
