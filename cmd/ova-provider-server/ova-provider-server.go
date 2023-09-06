@@ -23,6 +23,8 @@ import (
 const (
 	invalidRequestMethodMsg = "Invalid request method"
 	errorProcessingOvfMsg   = "Error processing OVF file"
+	OvaExt                  = ".ova"
+	OvfExt                  = ".ovf"
 )
 
 // xml struct
@@ -292,33 +294,50 @@ func scanOVAsOnNFS() (envelopes []Envelope, ovaPaths []string) {
 	return envelopes, filesPath
 }
 
-func findOVAFiles(directory string) ([]string, []string, error) {
-	childs, err := os.ReadDir(directory)
+func findOVAFiles(directory string) (ovaFiles []string, ovfFiles []string, err error) {
+	var ovaMaxDepth = 2
+
+	err = filepath.WalkDir(directory, func(path string, info os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		relativePath, _ := filepath.Rel(directory, path)
+		depth := len(strings.Split(relativePath, string(filepath.Separator)))
+
+		switch {
+		case (depth <= ovaMaxDepth) && isOva(info.Name()):
+			ovaFiles = append(ovaFiles, path)
+
+		case (depth <= ovaMaxDepth+1) && isOvf(info.Name()):
+			ovfFiles = append(ovfFiles, path)
+		}
+
+		return nil
+	})
+
 	if err != nil {
+		fmt.Println("Error scanning OVA and OVF files:  ", err)
 		return nil, nil, err
 	}
+	return
+}
 
-	var ovaFiles, ovfFiles []string
-	for _, child := range childs {
-		if !child.IsDir() {
-			continue
-		}
-		newDir := directory + "/" + child.Name()
-		files, err := os.ReadDir(newDir)
-		if err != nil {
-			return nil, nil, err
-		}
-		for _, file := range files {
-			path := filepath.Join(directory, child.Name(), file.Name())
-			switch {
-			case strings.HasSuffix(strings.ToLower(file.Name()), ".ova"):
-				ovaFiles = append(ovaFiles, path)
-			case strings.HasSuffix(strings.ToLower(file.Name()), ".ovf"):
-				ovfFiles = append(ovfFiles, path)
-			}
-		}
-	}
-	return ovaFiles, ovfFiles, nil
+func isOva(filename string) bool {
+	return hasSuffixIgnoreCase(filename, OvaExt)
+}
+
+func isOvf(filename string) bool {
+	return hasSuffixIgnoreCase(filename, OvfExt)
+}
+
+// Checks if the given file has the desired extension
+func hasSuffixIgnoreCase(fileName, suffix string) bool {
+	return strings.HasSuffix(strings.ToLower(fileName), strings.ToLower(suffix))
 }
 
 func readOVFFromOVA(ovaFile string) (*Envelope, error) {
