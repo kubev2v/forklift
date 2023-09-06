@@ -220,6 +220,34 @@ func (r *KubeVirt) GetImporterPod(pvc core.PersistentVolumeClaim) (pod *core.Pod
 	return
 }
 
+// Get the importer pods for a PersistentVolumeClaim.
+func (r *KubeVirt) getImporterPods(pvc core.PersistentVolumeClaim) (pods []core.Pod, err error) {
+	if _, ok := pvc.Annotations[AnnImporterPodName]; !ok {
+		return
+	}
+
+	podList := &core.PodList{}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		podList,
+		&client.ListOptions{
+			Namespace:     r.Plan.Spec.TargetNamespace,
+			LabelSelector: labels.SelectorFromSet(map[string]string{"app": "containerized-data-importer"}),
+		},
+	)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	for _, pod := range podList.Items {
+		if strings.Contains(pod.Name, fmt.Sprintf("importer-%s-%s", r.Plan.Name, pvc.Annotations[kVM])) {
+			pods = append(pods, pod)
+		}
+	}
+
+	return
+}
+
 // Delete the DataVolumes associated with the VM.
 func (r *KubeVirt) DeleteDataVolumes(vm *plan.VMStatus) (err error) {
 	dvs, err := r.getDVs(vm)
@@ -236,27 +264,36 @@ func (r *KubeVirt) DeleteDataVolumes(vm *plan.VMStatus) (err error) {
 	return
 }
 
-// Delete the importer pod for a PersistentVolumeClaim.
-func (r *KubeVirt) DeleteImporterPod(pvc core.PersistentVolumeClaim) (err error) {
-	var pod *core.Pod
-	var found bool
-	pod, found, err = r.GetImporterPod(pvc)
-	if err != nil || !found {
-		return
-	}
-	err = r.Destination.Client.Delete(context.TODO(), pod)
+// Delete the importer pods for a PersistentVolumeClaim.
+func (r *KubeVirt) DeleteImporterPods(pvc core.PersistentVolumeClaim) (err error) {
+	pods, err := r.getImporterPods(pvc)
 	if err != nil {
-		err = liberr.Wrap(err)
 		return
 	}
-	r.Log.Info(
-		"Deleted importer pod.",
-		"pod",
-		path.Join(
-			pod.Namespace,
-			pod.Name),
-		"pvc",
-		pvc.Name)
+	for _, pod := range pods {
+		err = r.Destination.Client.Delete(context.TODO(), &pod)
+		if err != nil {
+			err = liberr.Wrap(err)
+			r.Log.Error(
+				err,
+				"Deleting importer pod failed.",
+				"pod",
+				path.Join(
+					pod.Namespace,
+					pod.Name),
+				"pvc",
+				pvc.Name)
+			continue
+		}
+		r.Log.Info(
+			"Deleted importer pod.",
+			"pod",
+			path.Join(
+				pod.Namespace,
+				pod.Name),
+			"pvc",
+			pvc.Name)
+	}
 	return
 }
 
