@@ -423,12 +423,23 @@ func (r *Migration) Cancel() (err error) {
 	return
 }
 
+func (r *Migration) cleanUpPopulatorPVCs(vm *plan.VMStatus) (err error) {
+	err = r.kubevirt.DeletePVCs(vm)
+	return
+}
+
 // Delete left over migration resources associated with a VM.
 func (r *Migration) cleanup(vm *plan.VMStatus) (err error) {
 	if !vm.HasCondition(Succeeded) {
 		err = r.kubevirt.DeleteVM(vm)
 		if err != nil {
 			return
+		}
+		if r.builder.SupportsVolumePopulators() {
+			err = r.cleanUpPopulatorPVCs(vm)
+			if err != nil {
+				return
+			}
 		}
 	}
 	err = r.deleteImporterPods(vm)
