@@ -77,6 +77,10 @@ func (r *RegionAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 	regionList := []libclient.Region{}
 	region := &libclient.Region{}
 	err = ctx.client.GetClientRegion(region)
+	if ctx.client.IsApplicationCredentialAuth() {
+		ctx.log.Info("Application credential auth, skipping region list")
+		return fb.NewList().Iter(), nil
+	}
 	if err != nil {
 		return
 	}
@@ -103,6 +107,11 @@ func (r *RegionAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) 
 	regionList := []libclient.Region{}
 	region := &libclient.Region{}
 	err = ctx.client.GetClientRegion(region)
+	if ctx.client.IsApplicationCredentialAuth() {
+		ctx.log.Info("Application credential auth, skipping region update")
+		return []Updater{}, nil
+	}
+
 	if err != nil {
 		return
 	}

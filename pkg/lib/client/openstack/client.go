@@ -72,12 +72,17 @@ type Client struct {
 	URL                 string
 	Options             map[string]string
 	Log                 logging.LevelLogger
+	authTypeValue       *clientconfig.AuthType
 	provider            *gophercloud.ProviderClient
 	identityService     *gophercloud.ServiceClient
 	computeService      *gophercloud.ServiceClient
 	imageService        *gophercloud.ServiceClient
 	networkService      *gophercloud.ServiceClient
 	blockStorageService *gophercloud.ServiceClient
+}
+
+func (c *Client) IsApplicationCredentialAuth() bool {
+	return *c.authTypeValue == clientconfig.AuthV3ApplicationCredential
 }
 
 func (c *Client) LoadOptionsFromSecret(secret *core.Secret) {
@@ -216,6 +221,7 @@ func (c *Client) authType() (authType clientconfig.AuthType, err error) {
 	} else {
 		err = liberr.New("unsupported authentication type", "authType", configuredAuthType)
 	}
+	c.authTypeValue = &authType
 	return
 }
 
