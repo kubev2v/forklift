@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
@@ -42,8 +41,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apiserver/pkg/storage/names"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -63,13 +60,6 @@ var log = logging.WithName(Name)
 
 // Application settings.
 var Settings = &settings.Settings
-
-const (
-	ovaServerPrefix     = "ova-server"
-	ovaImageVar         = "OVA_PROVIDER_SERVER_IMAGE"
-	nfsVolumeNamePrefix = "nfs-volume"
-	mountPath           = "/ova"
-)
 
 // Creates a new Inventory Controller and adds it to the Manager.
 func Add(mgr manager.Manager) error {
@@ -207,7 +197,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 
 		// If the deployment does not exist
 		if k8serr.IsNotFound(err) {
-			r.createOVAServerDeployment(provider, ctx)
+			r.CreateOVAServerDeployment(provider, ctx)
 		} else if err != nil {
 			return
 		}
@@ -362,141 +352,6 @@ func (r *Reconciler) getSecret(provider *api.Provider) (*v1.Secret, error) {
 	}
 
 	return secret, nil
-}
-
-func (r *Reconciler) createOVAServerDeployment(provider *api.Provider, ctx context.Context) {
-
-	deploymentName := fmt.Sprintf("%s-deployment-%s", ovaServerPrefix, provider.Name)
-	annotations := make(map[string]string)
-	labels := map[string]string{"providerName": provider.Name, "app": "forklift"}
-	url := provider.Spec.URL
-	var replicas int32 = 1
-
-	ownerReference := metav1.OwnerReference{
-		APIVersion: "forklift.konveyor.io/v1beta1",
-		Kind:       "Provider",
-		Name:       provider.Name,
-		UID:        provider.UID,
-	}
-
-	//OVA server deployment
-	deployment := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            deploymentName,
-			Namespace:       provider.Namespace,
-			Annotations:     annotations,
-			Labels:          labels,
-			OwnerReferences: []metav1.OwnerReference{ownerReference},
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"app": "forklift",
-				},
-			},
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"providerName": provider.Name,
-						"app":          "forklift",
-					},
-				},
-				Spec: r.makeOvaProviderPodSpec(url, string(provider.Name)),
-			},
-		},
-	}
-
-	err := r.Create(ctx, deployment)
-	if err != nil {
-		r.Log.Error(err, "Failed to create OVA server deployment")
-		return
-	}
-
-	// OVA Server Service
-	serviceName := fmt.Sprintf("ova-service-%s", provider.Name)
-	service := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            serviceName,
-			Namespace:       provider.Namespace,
-			Labels:          labels,
-			OwnerReferences: []metav1.OwnerReference{ownerReference},
-		},
-		Spec: v1.ServiceSpec{
-			Selector: map[string]string{
-				"providerName": provider.Name,
-				"app":          "forklift",
-			},
-			Ports: []v1.ServicePort{
-				{
-					Name:       "api-http",
-					Protocol:   v1.ProtocolTCP,
-					Port:       8080,
-					TargetPort: intstr.FromInt(8080),
-				},
-			},
-			Type: v1.ServiceTypeClusterIP,
-		},
-	}
-
-	err = r.Create(ctx, service)
-	if err != nil {
-		r.Log.Error(err, "Failed to create OVA server service")
-		return
-	}
-}
-
-func (r *Reconciler) makeOvaProviderPodSpec(url string, providerName string) v1.PodSpec {
-	splitted := strings.Split(url, ":")
-	nonRoot := false
-
-	if len(splitted) != 2 {
-		r.Log.Error(nil, "NFS server path doesn't contains :")
-	}
-	nfsServer := splitted[0]
-	nfsPath := splitted[1]
-
-	imageName, ok := os.LookupEnv(ovaImageVar)
-	if !ok {
-		r.Log.Error(nil, "Failed to find OVA server image")
-	}
-
-	nfsVolumeName := fmt.Sprintf("%s-%s", nfsVolumeNamePrefix, providerName)
-
-	ovaContainerName := fmt.Sprintf("%s-pod-%s", ovaServerPrefix, providerName)
-
-	return v1.PodSpec{
-
-		Containers: []v1.Container{
-			{
-				Name:  ovaContainerName,
-				Ports: []v1.ContainerPort{{ContainerPort: 8080, Protocol: v1.ProtocolTCP}},
-				SecurityContext: &v1.SecurityContext{
-					RunAsNonRoot: &nonRoot,
-				},
-				Image: imageName,
-				VolumeMounts: []v1.VolumeMount{
-					{
-						Name:      nfsVolumeName,
-						MountPath: "/ova",
-					},
-				},
-			},
-		},
-		ServiceAccountName: "forklift-controller",
-		Volumes: []v1.Volume{
-			{
-				Name: nfsVolumeName,
-				VolumeSource: v1.VolumeSource{
-					NFS: &v1.NFSVolumeSource{
-						Server:   nfsServer,
-						Path:     nfsPath,
-						ReadOnly: false,
-					},
-				},
-			},
-		},
-	}
 }
 
 // Provider catalog.
