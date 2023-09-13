@@ -32,6 +32,7 @@ import (
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	core "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -1336,23 +1337,19 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 
 	switch r.Source.Provider.Type() {
 	case api.Ova:
-		server := r.Source.Provider.Spec.URL
-		splitted := strings.Split(server, ":")
-
-		if len(splitted) != 2 {
-			r.Log.Info("The NFS server path format is wrong")
-			return
+		pvcName := fmt.Sprintf("ova-server-pvc-%s-%s", r.Source.Provider.Name, r.Plan.Name)
+		// If the provider runs in a different namespace then the destination VM,
+		// we need to create the PV and PVC to access the NFS.
+		if r.Plan.Spec.TargetNamespace != r.Source.Provider.Namespace {
+			r.CreatePvcForNfs(pvcName)
 		}
-		nfsServer := splitted[0]
-		nfsPath := splitted[1]
 
 		//path from disk
 		volumes = append(volumes, core.Volume{
-			Name: "nfs",
+			Name: "nfs-pvc",
 			VolumeSource: core.VolumeSource{
-				NFS: &core.NFSVolumeSource{
-					Server: nfsServer,
-					Path:   nfsPath,
+				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvcName,
 				},
 			},
 		})
@@ -1366,7 +1363,7 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 				MountPath: "/opt",
 			},
 			core.VolumeMount{
-				Name:      "nfs",
+				Name:      "nfs-pvc",
 				MountPath: "/ova",
 			},
 		)
@@ -1833,6 +1830,103 @@ func (r *KubeVirt) EnsurePersistentVolume(vmRef ref.Ref, persistentVolumes []cor
 		}
 	}
 	return
+}
+
+func (r *KubeVirt) CreatePvcForNfs(pvcName string) (err error) {
+	//TODO: set ownerReferenceso the PV and PVC deleted once the plan is done.
+	// ownerReference := meta.OwnerReference{
+	// 	APIVersion: "forklift.konveyor.io/v1beta1",
+	// 	Kind:       "Plan",
+	// 	Name:       r.Plan.Name,
+	// 	UID:        r.Plan.UID,
+	// }
+
+	sourceProvider := r.Source.Provider
+	pvName := fmt.Sprintf("ova-server-pv-%s", r.Plan.Name)
+	splitted := strings.Split(sourceProvider.Spec.URL, ":")
+
+	if len(splitted) != 2 {
+		r.Log.Error(nil, "NFS server path doesn't contains :")
+	}
+	nfsServer := splitted[0]
+	nfsPath := splitted[1]
+
+	pv := &v1.PersistentVolume{
+		ObjectMeta: meta.ObjectMeta{
+			Name: pvName,
+		},
+		Spec: v1.PersistentVolumeSpec{
+			Capacity: v1.ResourceList{
+				v1.ResourceStorage: resource.MustParse("1Gi"),
+			},
+			AccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadOnlyMany,
+			},
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				NFS: &v1.NFSVolumeSource{
+					Path:   nfsPath,
+					Server: nfsServer,
+				},
+			},
+		},
+	}
+	err = r.Create(context.TODO(), pv)
+	if err != nil {
+		r.Log.Error(err, "Failed to create OVA plan PV")
+		return
+	}
+
+	sc := ""
+	pvc := &v1.PersistentVolumeClaim{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      pvcName,
+			Namespace: r.Plan.Spec.TargetNamespace,
+		},
+		Spec: v1.PersistentVolumeClaimSpec{
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceStorage: resource.MustParse("1Gi"),
+				},
+			},
+			AccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadOnlyMany,
+			},
+			VolumeName:       pvName,
+			StorageClassName: &sc,
+		},
+	}
+	err = r.Create(context.TODO(), pvc)
+	if err != nil {
+		r.Log.Error(err, "Failed to create OVA plan PVC")
+		return
+	}
+
+	// wait until pvc and pv are bounded.
+	timeout := time.After(5 * time.Minute)
+	tick := time.Tick(5 * time.Second)
+	pvcNamespacedName := types.NamespacedName{
+		Namespace: r.Plan.Spec.TargetNamespace,
+		Name:      pvcName,
+	}
+
+	for {
+		select {
+		case <-timeout:
+			r.Log.Error(err, "Timed out waiting for PVC to be bound")
+			return
+		case <-tick:
+			err = r.Get(context.TODO(), pvcNamespacedName, pvc)
+			fmt.Print("this is pvc: ", pvc)
+			if err != nil {
+				r.Log.Error(err, "Failed to bound OVA plan PVC")
+				return
+			}
+
+			if pvc.Status.Phase == "Bound" {
+				return
+			}
+		}
+	}
 }
 
 // Ensure the PV exist on the destination.
