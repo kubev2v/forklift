@@ -48,7 +48,7 @@ func (r *Client) Connect(provider *api.Provider) (err error) {
 		},
 	}
 
-	serverURL := fmt.Sprintf("http://ova-service-%s:8080", provider.Name)
+	serverURL := fmt.Sprintf("http://ova-service-%s.%s.svc.cluster.local:8080", provider.Name, provider.Namespace)
 	if serverURL == "" {
 		return
 	}
