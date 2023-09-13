@@ -3,6 +3,7 @@ package openstack
 import (
 	"errors"
 	"strings"
+	"time"
 
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
@@ -10,6 +11,7 @@ import (
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
 	libclient "github.com/konveyor/forklift-controller/pkg/lib/client/openstack"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	"k8s.io/apimachinery/pkg/util/wait"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
 
@@ -272,12 +274,7 @@ func (r *Client) PreTransferActions(vmRef ref.Ref) (ready bool, err error) {
 			r.Log.Info("the image properties are in sync, cleaning the image",
 				"vm", vm.Name, "image", inventoryImage.Name, "properties", inventoryImage.Properties)
 			originalVolumeID := inventoryImage.Properties[forkliftPropertyOriginalVolumeID].(string)
-			err = r.cleanup(vm, originalVolumeID)
-			if err != nil {
-				r.Log.Error(err, "cleaning the image",
-					"vm", vm.Name, "image", image.Name)
-				return
-			}
+			go r.cleanup(vm, originalVolumeID)
 		default:
 			err = liberr.New("unexpected image status")
 			r.Log.Error(err, "checking the image from volume",
@@ -546,6 +543,50 @@ func (r *Client) cleanup(vm *libclient.VM, originalVolumeID string) (err error) 
 		err = nil
 		return
 	}
+
+	// Now we need to wait for the volume to be removed
+	condition := func() (done bool, err error) {
+		volume, err := r.getVolumeFromSnapshot(vm, snapshot.ID)
+		if err != nil {
+			if errors.Is(err, ResourceNotFoundError) {
+				done = true
+				err = nil
+				return
+			}
+			err = liberr.Wrap(err)
+			r.Log.Error(err, "retrieving volume from snapshot information when cleaning up",
+				"vm", vm.Name, "snapshotID", snapshot.ID)
+			return
+		}
+		switch volume.Status {
+		case VolumeStatusDeleting:
+			r.Log.Info("the volume is still being deleted, waiting...",
+				"vm", vm.Name, "volume", volume.Name, "snapshot", volume.SnapshotID)
+		default:
+			err = UnexpectedVolumeStatusError
+			r.Log.Error(err, "checking the volume",
+				"vm", vm.Name, "volume", volume.Name, "status", volume.Status)
+			return
+		}
+		return
+	}
+
+	// TODO add config
+	backoff := wait.Backoff{
+		Duration: 3 * time.Second,
+		Factor:   1.1,
+		Steps:    100,
+	}
+
+	err = wait.ExponentialBackoff(backoff, condition)
+	if err != nil {
+		err = liberr.Wrap(err)
+		r.Log.Error(err, "waiting for the volume to be removed",
+			"vm", vm.Name, "snapshotID", snapshot.ID)
+		err = nil
+		return
+	}
+
 	r.Log.Info("cleaning up the snapshot from volume",
 		"vm", vm.Name, "originalVolumeID", originalVolumeID)
 	err = r.removeSnapshotFromVolume(vm, originalVolumeID)
