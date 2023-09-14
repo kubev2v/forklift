@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	forkliftv1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/provider"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
@@ -31,11 +32,17 @@ func NewStorageMap(namespace string, providerIdentifier forkliftv1.Provider, sto
 
 	for _, sd := range storageIDs {
 		pair := forkliftv1.StoragePair{
-			Source: ref.Ref{ID: sd},
 			Destination: forkliftv1.DestinationStorage{
 				StorageClass: storageClass,
 			},
 		}
+
+		if providerIdentifier.Type() != api.Ova {
+			pair.Source = ref.Ref{ID: sd}
+		} else {
+			pair.Source = ref.Ref{Name: sd}
+		}
+
 		sdPairs = append(sdPairs, pair)
 	}
 
