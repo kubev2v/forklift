@@ -77,14 +77,12 @@ type Clients struct {
 
 	// CrClient is a controller runtime client
 	CrClient crclient.Client
-	// RestConfig provides a pointer to our REST client config.
-	RestConfig *rest.Config
 	// DynamicClient performs generic operations on arbitrary k8s API objects.
-	DynamicClient dynamic.Interface
-	// OvirtClient provides a pointer to ovirt client.
-	OvirtClient OvirtClient
-	// OpenStackClient provides a pointer to Openstack client.
+	DynamicClient   dynamic.Interface
+	RestConfig      *rest.Config
+	OvirtClient     OvirtClient
 	OpenStackClient OpenStackClient
+	OvaClient       OvaClient
 }
 
 // K8s returns Kubernetes Clientset
@@ -289,6 +287,12 @@ func (c *Clients) GetOvirtClient() (*OvirtClient, error) {
 // GetOpenStackClient instantiates and returns an OpenStackClient
 func (c *Clients) GetOpenStackClient() (*OpenStackClient, error) {
 	oc := OpenStackClient{}
+	return &oc, nil
+}
+
+// GetOvaClient instantiates and returns an OvaClient
+func (c *Clients) GetOvaClient() (*OvaClient, error) {
+	oc := OvaClient{}
 	return &oc, nil
 }
 

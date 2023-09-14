@@ -6,6 +6,7 @@ go_library(
         "exec_util.go",
         "framework.go",
         "openstack.go",
+        "ova.go",
         "ovirt.go",
     ],
     importpath = "github.com/konveyor/forklift-controller/tests/suit/framework",
