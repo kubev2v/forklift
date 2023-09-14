@@ -60,6 +60,7 @@ go_test(
         "forklift_test.go",
         "openstack_extended_test.go",
         "openstack_test.go",
+        "ova_test.go",
         "ovirt_test.go",
         "tests_suite_test.go",
         "vsphere_test.go",
