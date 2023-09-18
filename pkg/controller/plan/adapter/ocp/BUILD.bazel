@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "ocp",
@@ -35,4 +35,11 @@ go_library(
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client/config",
     ],
+)
+
+go_test(
+    name = "ocp_test",
+    srcs = ["validator_test.go"],
+    embed = [":ocp"],
+    deps = ["//pkg/apis/forklift/v1beta1/ref"],
 )
