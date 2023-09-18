@@ -161,15 +161,7 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 				return false, err
 			}
 		} else if net.Multus != nil {
-			var namespace, name string
-
-			if !strings.Contains(net.Multus.NetworkName, "/") {
-				namespace = vmRef.Namespace
-				name = net.Multus.NetworkName
-			} else {
-				splitName := strings.Split(net.Multus.NetworkName, "/")
-				namespace, name = splitName[0], splitName[1]
-			}
+			namespace, name := getNetworkNameAndNamespace(net.Multus.NetworkName, &vmRef)
 
 			_, found := r.plan.Referenced.Map.Network.FindNetworkByNameAndNamespace(namespace, name)
 			if !found {
@@ -185,4 +177,16 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 	}
 
 	return true, nil
+}
+
+func getNetworkNameAndNamespace(networkName string, vmRef *ref.Ref) (name, namespace string) {
+	if !strings.Contains(networkName, "/") {
+		namespace = vmRef.Namespace
+		name = networkName
+	} else {
+		splitName := strings.Split(networkName, "/")
+		namespace, name = splitName[0], splitName[1]
+	}
+
+	return
 }
