@@ -104,10 +104,6 @@ spec:
     * Must-gather-api, a service to generate targeted must-gather archives.
 
     ### Compatibility
-    Forklift 2.2 is supported on OpenShift 4.9
-
-    Forklift 2.3 is supported on OpenShift 4.10 and 4.11
-
     Forklift 2.4 is supported on OpenShift 4.11 and 4.12
     
     Forklift 2.5 is supported on OpenShift 4.12 and 4.13

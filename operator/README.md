@@ -15,10 +15,9 @@ Forklift Operator installs a suite of migration tools that facilitate the migrat
 OpenShift Virtualization/KubeVirt is required and must be installed prior attempting to deploy Forklift, see the table below for supported configurations:
 
 Forklift release | OpenShift Virtualization/KubeVirt | VMware | oVirt
----------------- | --------------------------------- | ------ | -----
-v2.2             | v4.9                              | 6.5+   | 4.4.9+
-v2.3             | v4.10-v4.11                       | 6.5+   | 4.4.9+
+---------------- |-----------------------------------| ------ | -----
 v2.4             | v4.11+                            | 6.5+   | 4.4.9+
+v2.5             | v4.12+                            | 6.5+   | 4.4.9+
 
 **Note:** Please keep in mind Forklift will not deploy in unsupported configurations.
 
