@@ -16,9 +16,9 @@ OpenShift Virtualization/KubeVirt is required and must be installed prior attemp
 
 Forklift release | OpenShift Virtualization/KubeVirt | VMware | oVirt
 ---------------- | --------------------------------- | ------ | -----
-v2.2             | v4.9                              | 6.5+   | 4.4.9+
 v2.3             | v4.10-v4.11                       | 6.5+   | 4.4.9+
 v2.4             | v4.11+                            | 6.5+   | 4.4.9+
+v2.5             | v4.12+                            | 6.5+   | 4.4.9+
 
 **Note:** Please keep in mind Forklift will not deploy in unsupported configurations.
 
