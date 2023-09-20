@@ -1,67 +1,8 @@
+# Do not add webhooks to this file
+# This configuration has been deprecated
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
   name: {{ api_deployment_name }}
   namespace: ""
-  annotations:
-{% if k8s_cluster|bool %}
-    cert-manager.io/inject-ca-from: {{ app_namespace }}/{{ api_certificate_name }}
-{% else %}
-    service.beta.openshift.io/inject-cabundle: "true"
-{% endif %}
-webhooks:
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: {{ api_service_name }}
-      namespace: {{ app_namespace }}
-      path: /secret-mutate
-      port: 443
-  failurePolicy: Fail
-  matchPolicy: Equivalent
-  name: ca-mutatur.forklift.konveyor
-  namespaceSelector: {}
-  objectSelector: 
-    matchExpressions:
-    - key: createdForProviderType
-      operator: Exists
-  rules:
-  - apiGroups:
-    - ''
-    apiVersions:
-    - v1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - secrets
-    scope: Namespaced
-  sideEffects: None
-  timeoutSeconds: 30
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: {{ api_service_name }}
-      namespace: {{ app_namespace }}
-      path: /plan-mutate
-      port: 443
-  failurePolicy: Fail
-  matchPolicy: Equivalent
-  name: plans.forklift.konveyor
-  namespaceSelector: {}
-  objectSelector: {}
-  rules:
-  - apiGroups:
-    - forklift.konveyor.io
-    resources:
-    - plans
-    apiVersions:
-    - v1beta1
-    operations:
-    - CREATE
-    - UPDATE
-  sideEffects: None
-  timeoutSeconds: 30
