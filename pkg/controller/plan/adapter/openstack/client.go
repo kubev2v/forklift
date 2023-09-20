@@ -549,6 +549,7 @@ func (r *Client) cleanup(vm *libclient.VM, originalVolumeID string) (err error) 
 		volume, err := r.getVolumeFromSnapshot(vm, snapshot.ID)
 		if err != nil {
 			if errors.Is(err, ResourceNotFoundError) {
+				r.Log.Info("volume not found, we are done")
 				done = true
 				err = nil
 				return
