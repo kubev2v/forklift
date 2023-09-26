@@ -8,7 +8,7 @@ import (
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
+	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -22,66 +22,93 @@ const (
 	pvSize              = "1Gi"
 )
 
-func (r *Reconciler) CreateOVAServerDeployment(provider *api.Provider, ctx context.Context) {
-
+func (r Reconciler) CreateOVAServerDeployment(provider *api.Provider, ctx context.Context) {
 	ownerReference := metav1.OwnerReference{
 		APIVersion: "forklift.konveyor.io/v1beta1",
 		Kind:       "Provider",
 		Name:       provider.Name,
 		UID:        provider.UID,
 	}
-
 	pvName := fmt.Sprintf("%s-pv-%s", ovaServerPrefix, provider.Name)
-	splitted := strings.Split(provider.Spec.URL, ":")
+	err := r.createPvForNfs(provider, ctx, ownerReference, pvName)
+	if err != nil {
+		r.Log.Error(err, "Failed to create NFS PV for the OVA server")
+		return
+	}
 
+	pvcName := fmt.Sprintf("%s-pvc-%s", ovaServerPrefix, provider.Name)
+	err = r.createPvcForNfs(provider, ctx, ownerReference, pvName, pvcName)
+	if err != nil {
+		r.Log.Error(err, "Failed to create NFS PVC for the OVA server")
+		return
+	}
+
+	labels := map[string]string{"providerName": provider.Name, "app": "forklift"}
+	err = r.createServerDeployment(provider, ctx, ownerReference, pvcName, labels)
+	if err != nil {
+		r.Log.Error(err, "Failed to create OVA server deployment")
+		return
+	}
+
+	err = r.createServerService(provider, ctx, ownerReference, labels)
+	if err != nil {
+		r.Log.Error(err, "Failed to create OVA server service")
+		return
+	}
+}
+
+func (r *Reconciler) createPvForNfs(provider *api.Provider, ctx context.Context, ownerReference metav1.OwnerReference, pvName string) (err error) {
+	splitted := strings.Split(provider.Spec.URL, ":")
 	if len(splitted) != 2 {
-		r.Log.Error(nil, "NFS server path doesn't contains :")
+		r.Log.Error(nil, "NFS server path doesn't contains: ", "provider", provider, "url", provider.Spec.URL)
+		return fmt.Errorf("wrong NFS server path")
 	}
 	nfsServer := splitted[0]
 	nfsPath := splitted[1]
 
-	pv := &v1.PersistentVolume{
+	pv := &core.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            pvName,
 			OwnerReferences: []metav1.OwnerReference{ownerReference},
 		},
-		Spec: v1.PersistentVolumeSpec{
-			Capacity: v1.ResourceList{
-				v1.ResourceStorage: resource.MustParse("1Gi"),
+		Spec: core.PersistentVolumeSpec{
+			Capacity: core.ResourceList{
+				core.ResourceStorage: resource.MustParse(pvSize),
 			},
-			AccessModes: []v1.PersistentVolumeAccessMode{
-				v1.ReadOnlyMany,
+			AccessModes: []core.PersistentVolumeAccessMode{
+				core.ReadOnlyMany,
 			},
-			PersistentVolumeSource: v1.PersistentVolumeSource{
-				NFS: &v1.NFSVolumeSource{
+			PersistentVolumeSource: core.PersistentVolumeSource{
+				NFS: &core.NFSVolumeSource{
 					Path:   nfsPath,
 					Server: nfsServer,
 				},
 			},
 		},
 	}
-	err := r.Create(ctx, pv)
+	err = r.Create(ctx, pv)
 	if err != nil {
-		r.Log.Error(err, "Failed to create OVA server PV")
 		return
 	}
+	return
+}
 
-	pvcName := fmt.Sprintf("%s-pvc-%s", ovaServerPrefix, provider.Name)
+func (r *Reconciler) createPvcForNfs(provider *api.Provider, ctx context.Context, ownerReference metav1.OwnerReference, pvName, pvcName string) (err error) {
 	sc := ""
-	pvc := &v1.PersistentVolumeClaim{
+	pvc := &core.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            pvcName,
 			Namespace:       provider.Namespace,
 			OwnerReferences: []metav1.OwnerReference{ownerReference},
 		},
-		Spec: v1.PersistentVolumeClaimSpec{
-			Resources: v1.ResourceRequirements{
-				Requests: v1.ResourceList{
-					v1.ResourceStorage: resource.MustParse("1Gi"),
+		Spec: core.PersistentVolumeClaimSpec{
+			Resources: core.ResourceRequirements{
+				Requests: core.ResourceList{
+					core.ResourceStorage: resource.MustParse(pvSize),
 				},
 			},
-			AccessModes: []v1.PersistentVolumeAccessMode{
-				v1.ReadOnlyMany,
+			AccessModes: []core.PersistentVolumeAccessMode{
+				core.ReadOnlyMany,
 			},
 			VolumeName:       pvName,
 			StorageClassName: &sc,
@@ -89,16 +116,16 @@ func (r *Reconciler) CreateOVAServerDeployment(provider *api.Provider, ctx conte
 	}
 	err = r.Create(ctx, pvc)
 	if err != nil {
-		r.Log.Error(err, "Failed to create OVA server PVC")
 		return
 	}
+	return
+}
 
+func (r *Reconciler) createServerDeployment(provider *api.Provider, ctx context.Context, ownerReference metav1.OwnerReference, pvcName string, labels map[string]string) (err error) {
 	deploymentName := fmt.Sprintf("%s-deployment-%s", ovaServerPrefix, provider.Name)
 	annotations := make(map[string]string)
-	labels := map[string]string{"providerName": provider.Name, "app": "forklift"}
 	var replicas int32 = 1
 
-	//OVA server deployment
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            deploymentName,
@@ -114,88 +141,80 @@ func (r *Reconciler) CreateOVAServerDeployment(provider *api.Provider, ctx conte
 					"app": "forklift",
 				},
 			},
-			Template: v1.PodTemplateSpec{
+			Template: core.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"providerName": provider.Name,
-						"app":          "forklift",
-					},
+					Labels: labels,
 				},
-				Spec: r.makeOvaProviderPodSpec(pvcName, string(provider.Name)),
+				Spec: r.makeOvaProviderPodSpec(pvcName, provider.Name),
 			},
 		},
 	}
 
 	err = r.Create(ctx, deployment)
 	if err != nil {
-		r.Log.Error(err, "Failed to create OVA server deployment")
 		return
 	}
+	return
+}
 
-	// OVA Server Service
+func (r *Reconciler) createServerService(provider *api.Provider, ctx context.Context, ownerReference metav1.OwnerReference, labels map[string]string) (err error) {
 	serviceName := fmt.Sprintf("ova-service-%s", provider.Name)
-	service := &v1.Service{
+	service := &core.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            serviceName,
 			Namespace:       provider.Namespace,
 			Labels:          labels,
 			OwnerReferences: []metav1.OwnerReference{ownerReference},
 		},
-		Spec: v1.ServiceSpec{
-			Selector: map[string]string{
-				"providerName": provider.Name,
-				"app":          "forklift",
-			},
-			Ports: []v1.ServicePort{
+		Spec: core.ServiceSpec{
+			Selector: labels,
+			Ports: []core.ServicePort{
 				{
 					Name:       "api-http",
-					Protocol:   v1.ProtocolTCP,
+					Protocol:   core.ProtocolTCP,
 					Port:       8080,
 					TargetPort: intstr.FromInt(8080),
 				},
 			},
-			Type: v1.ServiceTypeClusterIP,
+			Type: core.ServiceTypeClusterIP,
 		},
 	}
 
 	err = r.Create(ctx, service)
 	if err != nil {
-		r.Log.Error(err, "Failed to create OVA server service")
 		return
 	}
+	return
 }
 
-func (r *Reconciler) makeOvaProviderPodSpec(pvcName string, providerName string) v1.PodSpec {
-
+func (r *Reconciler) makeOvaProviderPodSpec(pvcName string, providerName string) core.PodSpec {
 	imageName, ok := os.LookupEnv(ovaImageVar)
 	if !ok {
 		r.Log.Error(nil, "Failed to find OVA server image")
 	}
 
 	nfsVolumeName := fmt.Sprintf("%s-%s", nfsVolumeNamePrefix, providerName)
-
 	ovaContainerName := fmt.Sprintf("%s-pod-%s", ovaServerPrefix, providerName)
 
-	return v1.PodSpec{
-
-		Containers: []v1.Container{
+	return core.PodSpec{
+		Containers: []core.Container{
 			{
 				Name:  ovaContainerName,
-				Ports: []v1.ContainerPort{{ContainerPort: 8080, Protocol: v1.ProtocolTCP}},
+				Ports: []core.ContainerPort{{ContainerPort: 8080, Protocol: core.ProtocolTCP}},
 				Image: imageName,
-				VolumeMounts: []v1.VolumeMount{
+				VolumeMounts: []core.VolumeMount{
 					{
 						Name:      nfsVolumeName,
-						MountPath: "/ova",
+						MountPath: mountPath,
 					},
 				},
 			},
 		},
-		Volumes: []v1.Volume{
+		Volumes: []core.Volume{
 			{
 				Name: nfsVolumeName,
-				VolumeSource: v1.VolumeSource{
-					PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+				VolumeSource: core.VolumeSource{
+					PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
 						ClaimName: pvcName,
 					},
 				},
