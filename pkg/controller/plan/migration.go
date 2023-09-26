@@ -337,7 +337,7 @@ func (r *Migration) Archive() {
 	}
 
 	for _, vm := range r.Plan.Status.Migration.VMs {
-		err = r.CleanUp(vm)
+		err = r.cleanup(vm)
 		if err != nil {
 			r.Log.Error(err,
 				"Couldn't clean up VM while archiving plan.",
@@ -384,7 +384,7 @@ func (r *Migration) Cancel() (err error) {
 
 	for _, vm := range r.Plan.Status.Migration.VMs {
 		if vm.HasCondition(Canceled) {
-			err = r.CleanUp(vm)
+			err = r.cleanup(vm)
 			if err != nil {
 				r.Log.Error(err,
 					"Couldn't clean up after canceled VM migration.",
@@ -415,7 +415,7 @@ func (r *Migration) Cancel() (err error) {
 }
 
 // Delete left over migration resources associated with a VM.
-func (r *Migration) CleanUp(vm *plan.VMStatus) (err error) {
+func (r *Migration) cleanup(vm *plan.VMStatus) (err error) {
 	if !vm.HasCondition(Succeeded) {
 		err = r.kubevirt.DeleteVM(vm)
 		if err != nil {
@@ -609,7 +609,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		vm.MarkStarted()
 		step.MarkStarted()
 		step.Phase = Running
-		err = r.CleanUp(vm)
+		err = r.cleanup(vm)
 		if err != nil {
 			step.AddError(err.Error())
 			err = nil

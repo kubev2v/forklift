@@ -1039,9 +1039,7 @@ func (r *Builder) getStorageClassName(workload *model.Workload, volumeTypeName s
 		return
 	}
 	for _, storageMap := range r.Context.Map.Storage.Spec.Map {
-		if storageMap.Source.ID == volumeTypeID {
-			storageClassName = storageMap.Destination.StorageClass
-		} else if storageMap.Source.Name == volumeTypeName {
+		if storageMap.Source.ID == volumeTypeID || storageMap.Source.Name == volumeTypeName {
 			storageClassName = storageMap.Destination.StorageClass
 		}
 	}
