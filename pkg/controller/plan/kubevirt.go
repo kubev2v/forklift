@@ -32,7 +32,6 @@ import (
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	core "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -1185,7 +1184,10 @@ func (r *KubeVirt) findTemplate(vm *plan.VMStatus) (tmpl *template.Template, err
 }
 
 func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, configMap *core.ConfigMap, pvcs *[]core.PersistentVolumeClaim, v2vSecret *core.Secret) (pod *core.Pod, err error) {
-	volumes, volumeMounts, volumeDevices := r.podVolumeMounts(vmVolumes, configMap, pvcs)
+	volumes, volumeMounts, volumeDevices, err := r.podVolumeMounts(vmVolumes, configMap, pvcs)
+	if err != nil {
+		return
+	}
 
 	// qemu group
 	fsGroup := qemuGroup
@@ -1291,7 +1293,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	return
 }
 
-func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.ConfigMap, pvcs *[]core.PersistentVolumeClaim) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice) {
+func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.ConfigMap, pvcs *[]core.PersistentVolumeClaim) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice, err error) {
 	pvcsByName := make(map[string]core.PersistentVolumeClaim)
 	for _, pvc := range *pvcs {
 		pvcsByName[pvc.Name] = pvc
@@ -1337,18 +1339,32 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 
 	switch r.Source.Provider.Type() {
 	case api.Ova:
-		pvcName := fmt.Sprintf("ova-server-pvc-%s-%s", r.Source.Provider.Name, r.Plan.Name)
-		// If the provider runs in a different namespace then the destination VM,
-		// we need to create the PV and PVC to access the NFS.
-		if r.Plan.Spec.TargetNamespace != r.Source.Provider.Namespace {
-			r.CreatePvcForNfs(pvcName)
+		pvcName := fmt.Sprintf("ova-nfs-pvc-%s-%s", r.Source.Provider.Name, r.Plan.Name)
+		/*
+			TODO: set ownerReferences the PV and PVC deleted once the plan is done.
+			cross namespaces are not possible to be used for plan/provider ownership.
+			optional: PV+PVC per VM, deleted via cleanup. ownership: importer pod? DV?
+			ownerReference := meta.OwnerReference{
+				APIVersion: "forklift.konveyor.io/v1beta1",
+				Kind:       "Plan",
+				Name:       r.Plan.Name,
+				UID:        r.Plan.UID,
+			}
+		*/
+		err = r.CreatePvForNfs()
+		if err != nil {
+			return
+		}
+		err = r.CreatePvcForNfs(pvcName)
+		if err != nil {
+			return
 		}
 
 		//path from disk
 		volumes = append(volumes, core.Volume{
-			Name: "nfs-pvc",
+			Name: "nfs-pv",
 			VolumeSource: core.VolumeSource{
-				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+				PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
 					ClaimName: pvcName,
 				},
 			},
@@ -1363,7 +1379,7 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 				MountPath: "/opt",
 			},
 			core.VolumeMount{
-				Name:      "nfs-pvc",
+				Name:      "nfs-pv",
 				MountPath: "/ova",
 			},
 		)
@@ -1832,70 +1848,129 @@ func (r *KubeVirt) EnsurePersistentVolume(vmRef ref.Ref, persistentVolumes []cor
 	return
 }
 
-func (r *KubeVirt) CreatePvcForNfs(pvcName string) (err error) {
-	//TODO: set ownerReferenceso the PV and PVC deleted once the plan is done.
-	// ownerReference := meta.OwnerReference{
-	// 	APIVersion: "forklift.konveyor.io/v1beta1",
-	// 	Kind:       "Plan",
-	// 	Name:       r.Plan.Name,
-	// 	UID:        r.Plan.UID,
-	// }
+func (r *KubeVirt) getOvaPvNfs() (found bool, err error) {
+	pv := &core.PersistentVolume{}
+	err = r.Destination.Client.Get(
+		context.TODO(),
+		types.NamespacedName{
+			Name: fmt.Sprintf("ova-nfs-pv-%s", r.Plan.Name),
+		},
+		pv,
+	)
 
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			return false, nil
+		}
+		err = liberr.Wrap(err)
+		return
+	}
+	return true, nil
+}
+
+func (r *KubeVirt) getOvaPvcNfs() (found bool, err error) {
+	pvc := &core.PersistentVolumeClaim{}
+	err = r.Destination.Client.Get(
+		context.TODO(),
+		types.NamespacedName{
+			Name:      fmt.Sprintf("ova-nfs-pvc-%s-%s", r.Source.Provider.Name, r.Plan.Name),
+			Namespace: r.Plan.Spec.TargetNamespace,
+		},
+		pvc,
+	)
+
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			return false, nil
+		}
+		err = liberr.Wrap(err)
+		return
+	}
+	return true, nil
+}
+
+// TODO if we use ownership get it to the method
+func (r *KubeVirt) CreatePvForNfs() (err error) {
 	sourceProvider := r.Source.Provider
-	pvName := fmt.Sprintf("ova-server-pv-%s", r.Plan.Name)
 	splitted := strings.Split(sourceProvider.Spec.URL, ":")
-
 	if len(splitted) != 2 {
-		r.Log.Error(nil, "NFS server path doesn't contains :")
+		r.Log.Error(nil, "NFS server path doesn't contains: ", "url", sourceProvider.Spec.URL)
+		return fmt.Errorf("bad source provider %s URL %s", sourceProvider.Name, sourceProvider.Spec.URL)
 	}
 	nfsServer := splitted[0]
 	nfsPath := splitted[1]
 
-	pv := &v1.PersistentVolume{
+	pvName := fmt.Sprintf("ova-nfs-pv-%s", r.Plan.Name)
+	found, err := r.getOvaPvNfs()
+	if err != nil {
+		return
+	}
+	if found {
+		r.Log.Info("The PV for OVA NFS exists", "PV", pvName)
+		return
+	}
+
+	pv := &core.PersistentVolume{
 		ObjectMeta: meta.ObjectMeta{
 			Name: pvName,
+			// OwnerReferences: []meta.OwnerReference{ownerReference},
 		},
-		Spec: v1.PersistentVolumeSpec{
-			Capacity: v1.ResourceList{
-				v1.ResourceStorage: resource.MustParse("1Gi"),
+		Spec: core.PersistentVolumeSpec{
+			Capacity: core.ResourceList{
+				core.ResourceStorage: resource.MustParse("1Gi"),
 			},
-			AccessModes: []v1.PersistentVolumeAccessMode{
-				v1.ReadOnlyMany,
+			AccessModes: []core.PersistentVolumeAccessMode{
+				core.ReadOnlyMany,
 			},
-			PersistentVolumeSource: v1.PersistentVolumeSource{
-				NFS: &v1.NFSVolumeSource{
+			PersistentVolumeSource: core.PersistentVolumeSource{
+				NFS: &core.NFSVolumeSource{
 					Path:   nfsPath,
 					Server: nfsServer,
 				},
 			},
 		},
 	}
-	err = r.Create(context.TODO(), pv)
+	err = r.Destination.Create(context.TODO(), pv)
 	if err != nil {
 		r.Log.Error(err, "Failed to create OVA plan PV")
 		return
 	}
+	return
+}
+
+// TODO if we use ownership get it to the method
+func (r *KubeVirt) CreatePvcForNfs(pvcName string) (err error) {
+	found, err := r.getOvaPvcNfs()
+	if err != nil {
+		return
+	}
+	if found {
+		r.Log.Info("The PVC for OVA NFS exists", "PVC", pvcName)
+		return
+	}
 
 	sc := ""
-	pvc := &v1.PersistentVolumeClaim{
+	pvName := fmt.Sprintf("ova-nfs-pv-%s", r.Plan.Name)
+	pvc := &core.PersistentVolumeClaim{
 		ObjectMeta: meta.ObjectMeta{
 			Name:      pvcName,
 			Namespace: r.Plan.Spec.TargetNamespace,
+			// OwnerReferences: []meta.OwnerReference{ownerReference},
 		},
-		Spec: v1.PersistentVolumeClaimSpec{
-			Resources: v1.ResourceRequirements{
-				Requests: v1.ResourceList{
-					v1.ResourceStorage: resource.MustParse("1Gi"),
+		Spec: core.PersistentVolumeClaimSpec{
+			Resources: core.ResourceRequirements{
+				Requests: core.ResourceList{
+					core.ResourceStorage: resource.MustParse("1Gi"),
 				},
 			},
-			AccessModes: []v1.PersistentVolumeAccessMode{
-				v1.ReadOnlyMany,
+			AccessModes: []core.PersistentVolumeAccessMode{
+				core.ReadOnlyMany,
 			},
 			VolumeName:       pvName,
 			StorageClassName: &sc,
 		},
 	}
-	err = r.Create(context.TODO(), pvc)
+	err = r.Destination.Create(context.TODO(), pvc)
 	if err != nil {
 		r.Log.Error(err, "Failed to create OVA plan PVC")
 		return
@@ -1913,15 +1988,13 @@ func (r *KubeVirt) CreatePvcForNfs(pvcName string) (err error) {
 		select {
 		case <-timeout:
 			r.Log.Error(err, "Timed out waiting for PVC to be bound")
-			return
+			return fmt.Errorf("timeout passed waiting for the OVA PVC %v", pvc)
 		case <-tick:
 			err = r.Get(context.TODO(), pvcNamespacedName, pvc)
-			fmt.Print("this is pvc: ", pvc)
 			if err != nil {
 				r.Log.Error(err, "Failed to bound OVA plan PVC")
 				return
 			}
-
 			if pvc.Status.Phase == "Bound" {
 				return
 			}
