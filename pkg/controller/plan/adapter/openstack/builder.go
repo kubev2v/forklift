@@ -1035,15 +1035,19 @@ func (r *Builder) getStorageClassName(workload *model.Workload, volumeTypeName s
 	}
 	if volumeTypeID == "" {
 		err = liberr.New("volume type not found", "volumeType", volumeTypeName)
+		r.Log.Error(err, "volume type not found")
 		return
 	}
 	for _, storageMap := range r.Context.Map.Storage.Spec.Map {
 		if storageMap.Source.ID == volumeTypeID {
 			storageClassName = storageMap.Destination.StorageClass
+		} else if storageMap.Source.Name == volumeTypeName {
+			storageClassName = storageMap.Destination.StorageClass
 		}
 	}
 	if storageClassName == "" {
 		err = liberr.New("no storage class map found for volume type", "volumeTypeID", volumeTypeID)
+		r.Log.Error(err, "storage class not found for volume type")
 		return
 	}
 	return
