@@ -158,19 +158,21 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 					"vm",
 					vmRef.String(),
 				)
+				r.log.Error(err, "Pod network not found.")
+
 				return false, err
 			}
 		} else if net.Multus != nil {
-			namespace, name := getNetworkNameAndNamespace(net.Multus.NetworkName, &vmRef)
-
+			name, namespace := getNetworkNameAndNamespace(net.Multus.NetworkName, &vmRef)
 			_, found := r.plan.Referenced.Map.Network.FindNetworkByNameAndNamespace(namespace, name)
 			if !found {
 				err = liberr.Wrap(
 					err,
 					"Multus network not found.",
-					"vm",
+					"network",
 					fmt.Sprintf("%s/%s", namespace, name),
 				)
+				r.log.Error(err, "Multus network not found.")
 				return false, err
 			}
 		}
