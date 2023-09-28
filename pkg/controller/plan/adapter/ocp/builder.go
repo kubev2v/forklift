@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
@@ -473,8 +472,7 @@ func (r *Builder) mapNetworks(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.Vi
 
 		switch {
 		case network.Multus != nil:
-			namespace := strings.Split(network.Multus.NetworkName, "/")[0]
-			name := strings.Split(network.Multus.NetworkName, "/")[1]
+			name, namespace := GetNetworkNameAndNamespace(network.Multus.NetworkName, &ref.Ref{Name: sourceVm.Name, Namespace: sourceVm.Namespace})
 			pair, found := r.Map.Network.FindNetworkByNameAndNamespace(namespace, name)
 			if !found {
 				r.Log.Info("Network not found", "namespace", namespace, "name", name)

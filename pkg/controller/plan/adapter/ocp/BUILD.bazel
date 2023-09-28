@@ -7,6 +7,7 @@ go_library(
         "builder.go",
         "client.go",
         "destinationclient.go",
+        "util.go",
         "validator.go",
     ],
     importpath = "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/ocp",
@@ -38,7 +39,7 @@ go_library(
 
 go_test(
     name = "ocp_test",
-    srcs = ["validator_test.go"],
+    srcs = ["util_test.go"],
     embed = [":ocp"],
     deps = ["//pkg/apis/forklift/v1beta1/ref"],
 )
