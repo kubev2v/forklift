@@ -15,6 +15,7 @@ go_library(
         "//pkg/forklift-api/webhooks/validating-webhook",
         "//pkg/forklift-api/webhooks/validating-webhook/admitters",
         "//pkg/lib/logging",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/manager",
     ],
 )
