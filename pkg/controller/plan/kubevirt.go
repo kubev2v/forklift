@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apimachinery/pkg/util/wait"
 	cnv "kubevirt.io/api/core/v1"
 	libvirtxml "libvirt.org/libvirt-go-xml"
 
@@ -1339,22 +1340,11 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 
 	switch r.Source.Provider.Type() {
 	case api.Ova:
-		pvcName := fmt.Sprintf("ova-nfs-pvc-%s-%s", r.Source.Provider.Name, r.Plan.Name)
-		/*
-			TODO: set ownerReferences the PV and PVC deleted once the plan is done.
-			cross namespaces are not possible to be used for plan/provider ownership.
-			optional: PV+PVC per VM, deleted via cleanup. ownership: importer pod? DV?
-			ownerReference := meta.OwnerReference{
-				APIVersion: "forklift.konveyor.io/v1beta1",
-				Kind:       "Plan",
-				Name:       r.Plan.Name,
-				UID:        r.Plan.UID,
-			}
-		*/
 		err = r.CreatePvForNfs()
 		if err != nil {
 			return
 		}
+		pvcName := getEntityName("pvc", r.Source.Provider.Name, r.Plan.Name)
 		err = r.CreatePvcForNfs(pvcName)
 		if err != nil {
 			return
@@ -1362,7 +1352,7 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 
 		//path from disk
 		volumes = append(volumes, core.Volume{
-			Name: "nfs-pv",
+			Name: "store-pv",
 			VolumeSource: core.VolumeSource{
 				PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
 					ClaimName: pvcName,
@@ -1379,7 +1369,7 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 				MountPath: "/opt",
 			},
 			core.VolumeMount{
-				Name:      "nfs-pv",
+				Name:      "store-pv",
 				MountPath: "/ova",
 			},
 		)
@@ -1848,72 +1838,69 @@ func (r *KubeVirt) EnsurePersistentVolume(vmRef ref.Ref, persistentVolumes []cor
 	return
 }
 
-func (r *KubeVirt) getOvaPvNfs() (found bool, err error) {
-	pv := &core.PersistentVolume{}
-	err = r.Destination.Client.Get(
+func GetOvaPvNfs(client client.Client, planName string, providerName string) (pv *core.PersistentVolume, found bool, err error) {
+	pv = &core.PersistentVolume{}
+	err = client.Get(
 		context.TODO(),
 		types.NamespacedName{
-			Name: fmt.Sprintf("ova-nfs-pv-%s", r.Plan.Name),
+			Name: getEntityName("pv", providerName, planName),
 		},
 		pv,
 	)
 
 	if err != nil {
 		if k8serr.IsNotFound(err) {
-			return false, nil
+			return nil, false, nil
 		}
 		err = liberr.Wrap(err)
 		return
 	}
-	return true, nil
+	return
 }
 
-func (r *KubeVirt) getOvaPvcNfs() (found bool, err error) {
-	pvc := &core.PersistentVolumeClaim{}
-	err = r.Destination.Client.Get(
+func GetOvaPvcNfs(client client.Client, planName string, planNamespace string, providerName string) (pvc *core.PersistentVolumeClaim, found bool, err error) {
+	pvc = &core.PersistentVolumeClaim{}
+	err = client.Get(
 		context.TODO(),
 		types.NamespacedName{
-			Name:      fmt.Sprintf("ova-nfs-pvc-%s-%s", r.Source.Provider.Name, r.Plan.Name),
-			Namespace: r.Plan.Spec.TargetNamespace,
+			Name:      getEntityName("pvc", providerName, planName),
+			Namespace: planNamespace,
 		},
 		pvc,
 	)
 
 	if err != nil {
 		if k8serr.IsNotFound(err) {
-			return false, nil
+			return nil, false, nil
 		}
 		err = liberr.Wrap(err)
 		return
 	}
-	return true, nil
+	return
 }
 
-// TODO if we use ownership get it to the method
 func (r *KubeVirt) CreatePvForNfs() (err error) {
 	sourceProvider := r.Source.Provider
 	splitted := strings.Split(sourceProvider.Spec.URL, ":")
-	if len(splitted) != 2 {
-		r.Log.Error(nil, "NFS server path doesn't contains: ", "url", sourceProvider.Spec.URL)
-		return fmt.Errorf("bad source provider %s URL %s", sourceProvider.Name, sourceProvider.Spec.URL)
-	}
 	nfsServer := splitted[0]
 	nfsPath := splitted[1]
 
-	pvName := fmt.Sprintf("ova-nfs-pv-%s", r.Plan.Name)
-	found, err := r.getOvaPvNfs()
+	_, found, err := GetOvaPvNfs(r.Destination.Client, r.Plan.Name, r.Plan.Provider.Source.Name)
 	if err != nil {
+		r.Log.Error(err, "Failed to get ova PV")
 		return
 	}
+	pvName := getEntityName("pv", r.Source.Provider.Name, r.Plan.Name)
 	if found {
 		r.Log.Info("The PV for OVA NFS exists", "PV", pvName)
 		return
 	}
 
+	labels := map[string]string{"provider": r.Plan.Provider.Source.Name, "app": "forklift", "migration": r.Migration.Name, "plan": r.Plan.Name}
 	pv := &core.PersistentVolume{
 		ObjectMeta: meta.ObjectMeta{
-			Name: pvName,
-			// OwnerReferences: []meta.OwnerReference{ownerReference},
+			Name:   pvName,
+			Labels: labels,
 		},
 		Spec: core.PersistentVolumeSpec{
 			Capacity: core.ResourceList{
@@ -1938,10 +1925,10 @@ func (r *KubeVirt) CreatePvForNfs() (err error) {
 	return
 }
 
-// TODO if we use ownership get it to the method
 func (r *KubeVirt) CreatePvcForNfs(pvcName string) (err error) {
-	found, err := r.getOvaPvcNfs()
+	_, found, err := GetOvaPvcNfs(r.Destination.Client, r.Plan.Name, r.Plan.Spec.TargetNamespace, r.Plan.Provider.Source.Name)
 	if err != nil {
+		r.Log.Error(err, "Failed to get ova PVC")
 		return
 	}
 	if found {
@@ -1950,12 +1937,13 @@ func (r *KubeVirt) CreatePvcForNfs(pvcName string) (err error) {
 	}
 
 	sc := ""
-	pvName := fmt.Sprintf("ova-nfs-pv-%s", r.Plan.Name)
+	pvName := getEntityName("pv", r.Source.Provider.Name, r.Plan.Name)
+	labels := map[string]string{"provider": r.Plan.Provider.Source.Name, "app": "forklift", "migration": r.Migration.Name, "plan": r.Plan.Name}
 	pvc := &core.PersistentVolumeClaim{
 		ObjectMeta: meta.ObjectMeta{
 			Name:      pvcName,
 			Namespace: r.Plan.Spec.TargetNamespace,
-			// OwnerReferences: []meta.OwnerReference{ownerReference},
+			Labels:    labels,
 		},
 		Spec: core.PersistentVolumeClaimSpec{
 			Resources: core.ResourceRequirements{
@@ -1976,30 +1964,29 @@ func (r *KubeVirt) CreatePvcForNfs(pvcName string) (err error) {
 		return
 	}
 
-	// wait until pvc and pv are bounded.
-	timeout := time.After(5 * time.Minute)
-	tick := time.Tick(5 * time.Second)
 	pvcNamespacedName := types.NamespacedName{
 		Namespace: r.Plan.Spec.TargetNamespace,
 		Name:      pvcName,
 	}
 
-	for {
-		select {
-		case <-timeout:
-			r.Log.Error(err, "Timed out waiting for PVC to be bound")
-			return fmt.Errorf("timeout passed waiting for the OVA PVC %v", pvc)
-		case <-tick:
-			err = r.Get(context.TODO(), pvcNamespacedName, pvc)
-			if err != nil {
-				r.Log.Error(err, "Failed to bound OVA plan PVC")
-				return
-			}
-			if pvc.Status.Phase == "Bound" {
-				return
-			}
+	if err = wait.PollUntilContextTimeout(context.TODO(), 5*time.Second, 45*time.Second, true, func(ctx context.Context) (done bool, err error) {
+		err = r.Get(context.TODO(), pvcNamespacedName, pvc)
+		if err != nil {
+			r.Log.Error(err, "Failed to get OVA plan PVC")
+			return false, err
 		}
+		return pvc.Status.Phase == "Bound", nil
+
+	}); err != nil {
+		r.Log.Error(err, "Failed to bind OVA PVC to PV ")
+		return
+
 	}
+	return nil
+}
+
+func getEntityName(resourceType, providerName, planName string) string {
+	return fmt.Sprintf("ova-store-%s-%s-%s", resourceType, providerName, planName)
 }
 
 // Ensure the PV exist on the destination.

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
@@ -336,6 +337,14 @@ func (r *Migration) Archive() {
 		return
 	}
 
+	if r.Plan.Provider.Source.Type() == v1beta1.Ova {
+		err = r.deletePvcPvForOva()
+		if err != nil {
+			r.Log.Error(err, "Failed to cleanup the PVC and PV for OVA plan")
+			return
+		}
+	}
+
 	for _, vm := range r.Plan.Status.Migration.VMs {
 		err = r.cleanup(vm)
 		if err != nil {
@@ -482,6 +491,41 @@ func (r *Migration) deleteImporterPods(vm *plan.VMStatus) (err error) {
 		if err != nil {
 			return
 		}
+	}
+	return
+}
+
+func (r *Migration) deletePvcPvForOva() (err error) {
+	pvc, _, err := GetOvaPvcNfs(r.Destination.Client, r.Plan.Name, r.Plan.Spec.TargetNamespace, r.Plan.Provider.Source.Name)
+	if err != nil {
+		r.Log.Error(err, "Failed to get the plan PVC")
+		return
+	}
+	// The PVC was already deleted
+	if pvc == nil {
+		return
+	}
+
+	err = r.Destination.Client.Delete(context.TODO(), pvc)
+	if err != nil {
+		r.Log.Error(err, "Failed to delete the plan PVC")
+		return
+	}
+
+	pv, _, err := GetOvaPvNfs(r.Destination.Client, r.Plan.Name, r.Plan.Provider.Source.Name)
+	if err != nil {
+		r.Log.Error(err, "Failed to get the plan PV")
+		return
+	}
+	// The PV was already deleted
+	if pv == nil {
+		return
+	}
+
+	err = r.Destination.Client.Delete(context.TODO(), pv)
+	if err != nil {
+		r.Log.Error(err, "Failed to delete the plan PV")
+		return
 	}
 	return
 }
