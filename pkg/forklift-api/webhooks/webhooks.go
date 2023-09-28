@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
@@ -28,25 +29,25 @@ func AddToManager(m manager.Manager) error {
 	return nil
 }
 
-func RegisterValidatingWebhooks(mux *http.ServeMux) {
+func RegisterValidatingWebhooks(mux *http.ServeMux, client client.Client) {
 	log.Info("register validation webhooks")
 	mux.HandleFunc(SecretValidatePath, func(w http.ResponseWriter, r *http.Request) {
-		ServeSecretCreate(w, r)
+		ServeSecretCreate(w, r, client)
 	})
 	mux.HandleFunc(PlanValidatePath, func(w http.ResponseWriter, r *http.Request) {
-		ServePlanCreate(w, r)
+		ServePlanCreate(w, r, client)
 	})
 	mux.HandleFunc(ProviderValidatePath, func(w http.ResponseWriter, r *http.Request) {
-		ServeProviderCreate(w, r)
+		ServeProviderCreate(w, r, client)
 	})
 }
 
-func RegisterMutatingWebhooks(mux *http.ServeMux) {
+func RegisterMutatingWebhooks(mux *http.ServeMux, client client.Client) {
 	log.Info("register mutation webhook")
 	mux.HandleFunc(SecretMutatorPath, func(w http.ResponseWriter, r *http.Request) {
 		ServeSecretMutator(w, r)
 	})
 	mux.HandleFunc(PlanMutatorPath, func(w http.ResponseWriter, r *http.Request) {
-		ServePlanMutator(w, r)
+		ServePlanMutator(w, r, client)
 	})
 }

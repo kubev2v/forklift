@@ -22,6 +22,7 @@ import (
 
 	webhooks "github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -42,13 +43,15 @@ type forkliftAPIApp struct {
 	Name        string
 	BindAddress string
 	Port        int
+	client      client.Client
 }
 
-func NewForkliftApi() ForkliftApi {
+func NewForkliftApi(client client.Client) ForkliftApi {
 
 	app := &forkliftAPIApp{}
 	app.BindAddress = defaultHost
 	app.Port = defaultPort
+	app.client = client
 
 	return app
 }
@@ -66,8 +69,8 @@ func (app *forkliftAPIApp) Execute() {
 	}
 
 	mux := http.NewServeMux()
-	webhooks.RegisterMutatingWebhooks(mux)
-	webhooks.RegisterValidatingWebhooks(mux)
+	webhooks.RegisterMutatingWebhooks(mux, app.client)
+	webhooks.RegisterValidatingWebhooks(mux, app.client)
 	server := http.Server{
 		Addr:    ":8443",
 		Handler: mux,

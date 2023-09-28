@@ -20,10 +20,15 @@ import (
 	"os"
 
 	"github.com/go-logr/logr"
+	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	"github.com/konveyor/forklift-controller/pkg/apis"
 	forklift_api "github.com/konveyor/forklift-controller/pkg/forklift-api"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+
+	"k8s.io/client-go/tools/clientcmd/api"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -37,7 +42,6 @@ func init() {
 
 func main() {
 	log.Info("start forklift-api")
-	app := forklift_api.NewForkliftApi()
 
 	err := apis.AddToScheme(scheme.Scheme)
 	if err != nil {
@@ -45,5 +49,30 @@ func main() {
 		os.Exit(1)
 	}
 
+	err = api.SchemeBuilder.AddToScheme(scheme.Scheme)
+	if err != nil {
+		log.Error(err, "Couldn't build the scheme")
+		os.Exit(1)
+	}
+
+	err = net.AddToScheme(scheme.Scheme)
+	if err != nil {
+		log.Error(err, "Couldn't add network-attachment-definition-client to the scheme")
+		os.Exit(1)
+	}
+
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		log.Error(err, "Couldn't get the cluster configuration")
+		os.Exit(1)
+	}
+
+	client, err := client.New(config, client.Options{Scheme: scheme.Scheme})
+	if err != nil {
+		log.Error(err, "Couldn't create a cluster client")
+		os.Exit(1)
+	}
+
+	app := forklift_api.NewForkliftApi(client)
 	app.Execute()
 }

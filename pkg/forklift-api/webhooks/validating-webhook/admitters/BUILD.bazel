@@ -10,7 +10,6 @@ go_library(
     importpath = "github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/validating-webhook/admitters",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis",
         "//pkg/apis/forklift/v1beta1",
         "//pkg/controller/plan/adapter/vsphere",
         "//pkg/controller/provider/container",
@@ -26,8 +25,6 @@ go_library(
         "//vendor/k8s.io/api/storage/v1:storage",
         "//vendor/k8s.io/apimachinery/pkg/api/errors",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:meta",
-        "//vendor/k8s.io/client-go/kubernetes/scheme",
-        "//vendor/k8s.io/client-go/rest",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
     ],
 )
