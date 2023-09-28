@@ -32,7 +32,7 @@ func TestGetNetworkNameAndNamespace(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actualName, actualNS := getNetworkNameAndNamespace(tt.networkName, &ref.Ref{Namespace: tt.vmRef.Namespace})
+			actualName, actualNS := GetNetworkNameAndNamespace(tt.networkName, &ref.Ref{Namespace: tt.vmRef.Namespace})
 			if actualName != tt.expectedName || actualNS != tt.expectedNS {
 				t.Errorf("got (%s, %s), want (%s, %s)", actualName, actualNS, tt.expectedName, tt.expectedNS)
 			}
