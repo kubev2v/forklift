@@ -21,8 +21,6 @@ import (
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -41,6 +39,7 @@ func init() {
 type SecretAdmitter struct {
 	ar     *admissionv1.AdmissionReview
 	secret core.Secret
+	Client client.Client
 }
 
 var resourceTypeToValidateFunc = map[string]func(*SecretAdmitter) *admissionv1.AdmissionResponse{
@@ -156,25 +155,13 @@ func (admitter *SecretAdmitter) buildProviderCollector(providerType *api.Provide
 }
 
 func (admitter *SecretAdmitter) testConnectionToHost(hostName string) (tested bool, err error) {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		log.Error(err, "Couldn't get the cluster configuration")
-		return
-	}
-
-	cl, err := client.New(config, client.Options{Scheme: scheme.Scheme})
-	if err != nil {
-		log.Error(err, "Couldn't create a cluster client")
-		return
-	}
-
 	provider := &api.Provider{}
 	providerName := string(admitter.secret.Data["provider"])
 	// there is an assumption that the provider resides within the same namespace as the secret
 	// which is reasonable as the hosts are also created on the same namespace as the provider
 	// but anyway, if that's not the case, we would likely pass the validation (due to IsNotFound check)
 	providerNamespace := admitter.secret.Namespace
-	err = cl.Get(context.TODO(), client.ObjectKey{Namespace: providerNamespace, Name: providerName}, provider)
+	err = admitter.Client.Get(context.TODO(), client.ObjectKey{Namespace: providerNamespace, Name: providerName}, provider)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
 			log.Info("Failed to find provider of host, passing")
@@ -231,20 +218,8 @@ func (admitter *SecretAdmitter) validateUpdateOfOVAProviderSecret() *admissionv1
 }
 
 func (admitter *SecretAdmitter) isOvaUrlChanged() (bool, error) {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		log.Error(err, "Couldn't get the cluster configuration")
-		return false, err
-	}
-
-	cl, err := client.New(config, client.Options{Scheme: scheme.Scheme})
-	if err != nil {
-		log.Error(err, "Couldn't create a cluster client")
-		return false, err
-	}
-
 	oldSecret := core.Secret{}
-	err = cl.Get(context.TODO(), client.ObjectKey{Namespace: admitter.secret.Namespace, Name: admitter.secret.Name}, &oldSecret)
+	err := admitter.Client.Get(context.TODO(), client.ObjectKey{Namespace: admitter.secret.Namespace, Name: admitter.secret.Name}, &oldSecret)
 	if err != nil {
 		log.Error(err, "Couldn't get the target provider secret")
 		return false, err
