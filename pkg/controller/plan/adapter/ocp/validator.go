@@ -3,7 +3,6 @@ package ocp
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
@@ -163,7 +162,7 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 				return false, err
 			}
 		} else if net.Multus != nil {
-			name, namespace := getNetworkNameAndNamespace(net.Multus.NetworkName, &vmRef)
+			name, namespace := GetNetworkNameAndNamespace(net.Multus.NetworkName, &vmRef)
 			_, found := r.plan.Referenced.Map.Network.FindNetworkByNameAndNamespace(namespace, name)
 			if !found {
 				err = liberr.Wrap(
@@ -179,16 +178,4 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 	}
 
 	return true, nil
-}
-
-func getNetworkNameAndNamespace(networkName string, vmRef *ref.Ref) (name, namespace string) {
-	if !strings.Contains(networkName, "/") {
-		namespace = vmRef.Namespace
-		name = networkName
-	} else {
-		splitName := strings.Split(networkName, "/")
-		namespace, name = splitName[0], splitName[1]
-	}
-
-	return
 }
