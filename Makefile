@@ -287,9 +287,13 @@ push-openstack-populator-image: build-openstack-populator-image
 	$(CONTAINER_CMD) push $(OPENSTACK_POPULATOR_IMAGE)
 
 build-ova-provider-server-image: check_container_runtime
-	$(CONTAINER_CMD) build -f hack/ova-provider-server/Containerfile -t $(OVA_PROVIDER_SERVER_IMAGE) .
+	export CONTAINER_CMD=$(CONTAINER_CMD); \
+	bazel run cmd/ova-provider-server:ova-provider-server-image \
+		$(BAZEL_OPTS) \
+		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
 
 push-ova-provider-server-image: build-ova-provider-server-image
+	$(CONTAINER_CMD) tag bazel/cmd/ova-provider-server:ova-provider-server-image $(OVA_PROVIDER_SERVER_IMAGE)
 	$(CONTAINER_CMD) push $(OVA_PROVIDER_SERVER_IMAGE)
 
 build-all-images: build-api-image \

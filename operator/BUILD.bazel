@@ -80,7 +80,7 @@ genrule(
     cmd = """
         cd operator;
         export DATE=$$(date +%Y-%m-%dT%H:%M:%SZ);
-        ../$(location :kustomize_bin) build config/manifests --load_restrictor LoadRestrictionsNone | envsubst | ../$(location @operator-sdk//file) generate bundle -q --overwrite --extra-service-accounts forklift-controller,forklift-api,forklift-populator-controller --version $${VERSION} --output-dir ../$(RULEDIR)/bundle --channels=$${CHANNELS} --default-channel=$${DEFAULT_CHANNEL}
+        ../$(location :kustomize_bin) build config/manifests --load-restrictor LoadRestrictionsNone | envsubst | ../$(location @operator-sdk//file) generate bundle -q --overwrite --extra-service-accounts forklift-controller,forklift-api,forklift-populator-controller --version $${VERSION} --output-dir ../$(RULEDIR)/bundle --channels=$${CHANNELS} --default-channel=$${DEFAULT_CHANNEL}
     """,
 )
 
@@ -129,7 +129,7 @@ container_image(
         # The channels need to be changed during release
         "operators.operatorframework.io.bundle.channels.v1": "development",
         "operators.operatorframework.io.bundle.channel.default.v1": "development",
-        "operators.operatorframework.io.metrics.builder": "operator-sdk-v1.22.0",
+        "operators.operatorframework.io.metrics.builder": "operator-sdk-v1.31.0",
         "operators.operatorframework.io.metrics.mediatype.v1": "metrics+v1",
         "operators.operatorframework.io.metrics.project_layout": "ansible.sdk.operatorframework.io/v1",
         # Labels for testing.

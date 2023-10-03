@@ -2,19 +2,19 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file"
 
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "ae013bf35bd23234d1dea46b079f1e05ba74ac0321423830119d3e787ec73483",
+    sha256 = "91585017debb61982f7054c9688857a2ad1fd823fc3f9cb05048b0025c47d023",
     urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.36.0/rules_go-v0.36.0.zip",
-        "https://github.com/bazelbuild/rules_go/releases/download/v0.36.0/rules_go-v0.36.0.zip",
+        "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.42.0/rules_go-v0.42.0.zip",
+        "https://github.com/bazelbuild/rules_go/releases/download/v0.42.0/rules_go-v0.42.0.zip",
     ],
 )
 
 http_archive(
     name = "bazel_gazelle",
-    sha256 = "448e37e0dbf61d6fa8f00aaa12d191745e14f07c31cabfa731f0c8e8a4f41b97",
+    sha256 = "d3fa66a39028e97d76f9e2db8f1b0c11c099e8e01bf363a923074784e451f809",
     urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-gazelle/releases/download/v0.28.0/bazel-gazelle-v0.28.0.tar.gz",
-        "https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.28.0/bazel-gazelle-v0.28.0.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-gazelle/releases/download/v0.33.0/bazel-gazelle-v0.33.0.tar.gz",
+        "https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.33.0/bazel-gazelle-v0.33.0.tar.gz",
     ],
 )
 
@@ -3383,7 +3383,7 @@ go_repository(
 go_rules_dependencies()
 
 # NOTE: Keep the version in sync with Go toolchain in GitHub action.
-go_register_toolchains(version = "1.19.3")
+go_register_toolchains(version = "1.20.8")
 
 # override rules_docker issue with this dependency
 # rules_docker 0.16 uses 0.1.4, bit since there the checksum changed, which is very weird, going with 0.1.4.1 to
@@ -3428,15 +3428,16 @@ container_pull(
 
 container_pull(
     name = "ansible-operator-image",
-    # v1.22.0
-    digest = "sha256:e07ba82127e76f282cb61fad6cfd990ab137533e5e996686576dec088d5e7e44",
+    # v1.32.0
+    digest = "sha256:03f33441842ad666329ea536d84a4788f993f94cb3daf960cd5c38a837cb4773",
     registry = "quay.io",
     repository = "operator-framework/ansible-operator",
 )
 
 container_pull(
     name = "opm-image",
-    digest = "sha256:601c62a5e3fea961665aad2ed2834f3f165a020051d355eb24af2125da8e158e",
+    # v1.29.0
+    digest = "sha256:fcb86c656f591f362db3b313f5e1a2754981e3f511ce72ca44ca5d11c5cdd673",
     registry = "quay.io",
     repository = "operator-framework/opm",
 )
@@ -3445,16 +3446,16 @@ http_file(
     name = "opa",
     downloaded_file_path = "opa",
     executable = True,
-    sha256 = "a3ff21f3b16632d3868e49bdb52f6affbd97ec382d5310d1bbbe7627e8e5c8f6",
-    urls = ["https://openpolicyagent.org/downloads/v0.52.0/opa_linux_amd64_static"],
+    sha256 = "b52c1d58d9c7ffe378d5bda0ab1aeed7eb6a662a466484c92dce0af803a13986",
+    urls = ["https://openpolicyagent.org/downloads/v0.57.0/opa_linux_amd64_static"],
 )
 
 http_file(
     name = "kustomize",
     downloaded_file_path = "kustomize.tar.gz",
-    sha256 = "4a3372d7bfdffe2eaf729e77f88bc94ce37dc84de55616bfe90aac089bf6fd02",
+    sha256 = "3b30477a7ff4fb6547fa77d8117e66d995c2bdd526de0dafbf8b7bcb9556c85d",
     urls = [
-        "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v3.8.7/kustomize_v3.8.7_linux_amd64.tar.gz",
+        "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v5.1.1/kustomize_v5.1.1_linux_amd64.tar.gz",
     ],
 )
 
@@ -3462,25 +3463,23 @@ http_file(
     name = "operator-sdk",
     downloaded_file_path = "operator-sdk",
     executable = True,
-    sha256 = "2fc68a50b94b7c477e804729365baa5de6d5afcfea9b7fcac9f93dd649c29e90",
-    urls = ["https://github.com/operator-framework/operator-sdk/releases/download/v1.22.0/operator-sdk_linux_amd64"],
+    sha256 = "fb4c386bca665695e31134cba192564b0b5015f9838fe34f5f2798708330df6a",
+    urls = ["https://github.com/operator-framework/operator-sdk/releases/download/v1.31.0/operator-sdk_linux_amd64"],
 )
 
 http_file(
     name = "opm",
     downloaded_file_path = "opm",
     executable = True,
-    sha256 = "dc0d4d287fef23f165c837b2e6cb68e2506ff295dc57110b9bfe3b553359eb36",
-    urls = ["https://github.com/operator-framework/operator-registry/releases/download/v1.23.0/linux-amd64-opm"],
+    sha256 = "994d48a265ab019a27bab4fb2ffa327e34f1e8b93bd604079a0d397f641608a1",
+    urls = ["https://github.com/operator-framework/operator-registry/releases/download/v1.29.0/linux-amd64-opm"],
 )
 
 http_archive(
     name = "bazeldnf",
-    sha256 = "404fc34e6bd3b568a7ca6fbcde70267d43830d0171d3192e3ecd83c14c320cfc",
-    strip_prefix = "bazeldnf-0.5.4",
+    sha256 = "de8ac0519db6c02bed2a976885379d97dc52f46d52b0338e03963def5c2b65fb",
     urls = [
-        "https://github.com/rmohr/bazeldnf/archive/v0.5.4.tar.gz",
-        "https://storage.googleapis.com/builddeps/404fc34e6bd3b568a7ca6fbcde70267d43830d0171d3192e3ecd83c14c320cfc",
+        "https://github.com/rmohr/bazeldnf/releases/download/v0.5.7-rc1/bazeldnf-v0.5.7-rc1.tar.gz",
     ],
 )
 
@@ -3495,11 +3494,10 @@ bazeldnf_dependencies()
 
 http_archive(
     name = "rules_proto",
-    sha256 = "bc12122a5ae4b517fa423ea03a8d82ea6352d5127ea48cb54bc324e8ab78493c",
-    strip_prefix = "rules_proto-af6481970a34554c6942d993e194a9aed7987780",
+    sha256 = "dc3fb206a2cb3441b485eb1e423165b231235a1ea9b031b4433cf7bc1fa460dd",
+    strip_prefix = "rules_proto-5.3.0-21.7",
     urls = [
-        "https://github.com/bazelbuild/rules_proto/archive/af6481970a34554c6942d993e194a9aed7987780.tar.gz",
-        "https://storage.googleapis.com/builddeps/bc12122a5ae4b517fa423ea03a8d82ea6352d5127ea48cb54bc324e8ab78493c",
+        "https://github.com/bazelbuild/rules_proto/archive/refs/tags/5.3.0-21.7.tar.gz",
     ],
 )
 

@@ -19,15 +19,18 @@ load(
     "container_image",
 )
 
-container_image(
-    name = "ova-provider-server-image",
-    base = "@ova-provider-server-image-dockerfile//image:dockerfile_image.tar",
-    visibility = ["//visibility:public"],
-)
-
 go_test(
     name = "ova-provider-server_test",
     srcs = ["nfs_test.go"],
     embed = [":ova-provider-server_lib"],
     deps = ["//vendor/github.com/onsi/gomega"],
+)
+
+container_image(
+    name = "ova-provider-server-image",
+    base = "@ubi9-minimal//image",
+    directory = "/usr/local/bin/",
+    entrypoint = ["/usr/local/bin/ova-provider-server"],
+    files = [":ova-provider-server"],
+    visibility = ["//visibility:public"],
 )
