@@ -5,16 +5,16 @@ import (
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 )
 
-type DestinsationClient struct {
+type DestinationClient struct {
 	*plancontext.Context
 }
 
 // DeletePopulatorDataSource implements base.DestinationClient
-func (*DestinsationClient) DeletePopulatorDataSource(vm *planapi.VMStatus) error {
+func (*DestinationClient) DeletePopulatorDataSource(vm *planapi.VMStatus) error {
 	return nil
 }
 
 // SetPopulatorCrOwnership implements base.DestinationClient
-func (*DestinsationClient) SetPopulatorCrOwnership() error {
+func (*DestinationClient) SetPopulatorCrOwnership() error {
 	return nil
 }
