@@ -14,7 +14,7 @@ galaxy_info:
   platforms:
   - name: EL
     versions:
-    - 8
+    - 9
 
   galaxy_tags:
   - forklift
@@ -28,4 +28,4 @@ galaxy_info:
 dependencies: []
 collections:
 - operator_sdk.util
-- community.kubernetes
+- kubernetes.core

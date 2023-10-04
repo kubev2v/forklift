@@ -83,7 +83,7 @@ ci: all tidy vendor bazel-generate generate-verify
 all: test forklift-controller
 
 # Run tests
-test: generate fmt vet manifests
+test: manifests generate fmt vet
 	go test ./pkg/... ./cmd/... -coverprofile cover.out
 
 # Experimental e2e target
@@ -108,15 +108,15 @@ e2e-sanity-openstack-extended:
 
 
 # Build forklift-controller binary
-forklift-controller: generate fmt vet
+forklift-controller: manifests generate fmt vet
 	go build -o bin/forklift-controller github.com/konveyor/forklift-controller/cmd/forklift-controller
 
 # Build manager binary with compiler optimizations disabled
-debug: generate fmt vet
+debug: manifests generate fmt vet
 	go build -o bin/forklift-controller -gcflags=all="-N -l" github.com/konveyor/forklift-controller/cmd/forklift-controller
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
-run: generate fmt vet
+run: manifests generate fmt vet
 	export METRICS_PORT=8888;\
 		KUBEVIRT_CLIENT_GO_SCHEME_REGISTRATION_VERSION=v1 go run ./cmd/forklift-controller/main.go
 
