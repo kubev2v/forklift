@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	ovaServerPrefix     = "ova-server"
+	ovaServer           = "ova-server"
 	ovaImageVar         = "OVA_PROVIDER_SERVER_IMAGE"
 	nfsVolumeNamePrefix = "nfs-volume"
 	mountPath           = "/ova"
@@ -29,21 +29,21 @@ func (r Reconciler) CreateOVAServerDeployment(provider *api.Provider, ctx contex
 		Name:       provider.Name,
 		UID:        provider.UID,
 	}
-	pvName := fmt.Sprintf("%s-pv-%s-%s", ovaServerPrefix, provider.Name, provider.Namespace)
+	pvName := fmt.Sprintf("%s-pv-%s-%s", ovaServer, provider.Name, provider.Namespace)
 	err := r.createPvForNfs(provider, ctx, ownerReference, pvName)
 	if err != nil {
 		r.Log.Error(err, "Failed to create PV for the OVA server")
 		return
 	}
 
-	pvcName := fmt.Sprintf("%s-pvc-%s", ovaServerPrefix, provider.Name)
+	pvcName := fmt.Sprintf("%s-pvc-%s", ovaServer, provider.Name)
 	err = r.createPvcForNfs(provider, ctx, ownerReference, pvName, pvcName)
 	if err != nil {
 		r.Log.Error(err, "Failed to create PVC for the OVA server")
 		return
 	}
 
-	labels := map[string]string{"provider": provider.Name, "app": "forklift", "subapp": "ova-server"}
+	labels := map[string]string{"provider": provider.Name, "app": "forklift", "subapp": ovaServer}
 	err = r.createServerDeployment(provider, ctx, ownerReference, pvcName, labels)
 	if err != nil {
 		r.Log.Error(err, "Failed to create OVA server deployment")
@@ -61,7 +61,7 @@ func (r *Reconciler) createPvForNfs(provider *api.Provider, ctx context.Context,
 	splitted := strings.Split(provider.Spec.URL, ":")
 	nfsServer := splitted[0]
 	nfsPath := splitted[1]
-	labels := map[string]string{"provider": provider.Name, "app": "forklift", "subapp": "ova-server"}
+	labels := map[string]string{"provider": provider.Name, "app": "forklift", "subapp": ovaServer}
 
 	pv := &core.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
@@ -93,7 +93,7 @@ func (r *Reconciler) createPvForNfs(provider *api.Provider, ctx context.Context,
 
 func (r *Reconciler) createPvcForNfs(provider *api.Provider, ctx context.Context, ownerReference metav1.OwnerReference, pvName, pvcName string) (err error) {
 	sc := ""
-	labels := map[string]string{"provider": provider.Name, "app": "forklift", "subapp": "ova-server"}
+	labels := map[string]string{"provider": provider.Name, "app": "forklift", "subapp": ovaServer}
 	pvc := &core.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            pvcName,
@@ -122,7 +122,7 @@ func (r *Reconciler) createPvcForNfs(provider *api.Provider, ctx context.Context
 }
 
 func (r *Reconciler) createServerDeployment(provider *api.Provider, ctx context.Context, ownerReference metav1.OwnerReference, pvcName string, labels map[string]string) (err error) {
-	deploymentName := fmt.Sprintf("%s-deployment-%s", ovaServerPrefix, provider.Name)
+	deploymentName := fmt.Sprintf("%s-deployment-%s", ovaServer, provider.Name)
 	annotations := make(map[string]string)
 	var replicas int32 = 1
 
@@ -192,7 +192,7 @@ func (r *Reconciler) makeOvaProviderPodSpec(pvcName string, providerName string)
 	}
 
 	nfsVolumeName := fmt.Sprintf("%s-%s", nfsVolumeNamePrefix, providerName)
-	ovaContainerName := fmt.Sprintf("%s-pod-%s", ovaServerPrefix, providerName)
+	ovaContainerName := fmt.Sprintf("%s-pod-%s", ovaServer, providerName)
 
 	return core.PodSpec{
 		Containers: []core.Container{

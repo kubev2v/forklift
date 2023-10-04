@@ -340,7 +340,7 @@ func (r *Migration) Archive() {
 	if r.Plan.Provider.Source.Type() == v1beta1.Ova {
 		err = r.deletePvcPvForOva()
 		if err != nil {
-			r.Log.Error(err, "Failed to cleanup the PVC and PV for OVA plan")
+			r.Log.Error(err, "Failed to clean up the PVC and PV for the OVA plan")
 			return
 		}
 	}
