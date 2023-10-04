@@ -1969,18 +1969,22 @@ func (r *KubeVirt) CreatePvcForNfs(pvcName string) (err error) {
 		Name:      pvcName,
 	}
 
-	if err = wait.PollUntilContextTimeout(context.TODO(), 5*time.Second, 45*time.Second, true, func(ctx context.Context) (done bool, err error) {
-		err = r.Get(context.TODO(), pvcNamespacedName, pvc)
+	timeout := 45 * time.Second
+	ctx, cancel := context.WithTimeout(context.TODO(), timeout)
+	defer cancel()
+
+	// wait until pvc and pv are bound.
+	err = wait.PollImmediateUntil(5*time.Second, func() (bool, error) {
+		err := r.Get(context.TODO(), pvcNamespacedName, pvc)
 		if err != nil {
 			r.Log.Error(err, "Failed to get OVA plan PVC")
 			return false, err
 		}
 		return pvc.Status.Phase == "Bound", nil
-
-	}); err != nil {
+	}, ctx.Done())
+	if err != nil {
 		r.Log.Error(err, "Failed to bind OVA PVC to PV ")
 		return
-
 	}
 	return nil
 }
