@@ -93,7 +93,7 @@ func (r *Reconciler) createPvForNfs(provider *api.Provider, ctx context.Context,
 
 func (r *Reconciler) createPvcForNfs(provider *api.Provider, ctx context.Context, ownerReference metav1.OwnerReference, pvName, pvcName string) (err error) {
 	sc := ""
-	labels := map[string]string{"providerName": provider.Name, "app": "forklift", "subapp": "ova-server"}
+	labels := map[string]string{"provider": provider.Name, "app": "forklift", "subapp": "ova-server"}
 	pvc := &core.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            pvcName,
@@ -137,11 +137,7 @@ func (r *Reconciler) createServerDeployment(provider *api.Provider, ctx context.
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"app":      "forklift",
-					"provider": provider.Name,
-					"subapp":   "ova-server",
-				},
+				MatchLabels: labels,
 			},
 			Template: core.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
