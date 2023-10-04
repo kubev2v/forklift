@@ -187,7 +187,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 
 	if provider.Type() == api.Ova {
 
-		deploymentName := fmt.Sprintf("%s-deployment-%s", ovaServerPrefix, provider.Name)
+		deploymentName := fmt.Sprintf("%s-deployment-%s", ovaServer, provider.Name)
 
 		deployment := &appsv1.Deployment{}
 		err = r.Get(context.TODO(), client.ObjectKey{
