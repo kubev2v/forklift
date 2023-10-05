@@ -1,8 +1,10 @@
 load(
     "@io_bazel_rules_docker//container:container.bzl",
     "container_image",
+    "container_layer",
     "container_push",
 )
+load("@io_bazel_rules_docker//docker/util:run.bzl", "container_run_and_commit_layer")
 
 genrule(
     name = "kustomize_bin",
@@ -17,9 +19,18 @@ genrule(
 container_image(
     name = "forklift-operator-requirements",
     base = "@ansible-operator-image//image",
-    cmd = "ansible-galaxy collection install -r /opt/ansible/requirements.yml && chmod -R ug+rwx /opt/ansible/.ansible",
+    #cmd = "ansible-galaxy collection install -r /opt/ansible/requirements.yml && chmod -R ug+rwx /opt/ansible/.ansible",
     directory = "/opt/ansible/",
     files = ["requirements.yml"],
+)
+
+container_run_and_commit_layer(
+    name = "ansible-operator-layer-run",
+    commands = [
+        "ansible-galaxy collection install -r /opt/ansible/requirements.yml",
+        "chmod -R ug+rwx /opt/ansible/.ansible",
+    ],
+    image = ":forklift-operator-requirements.tar",
 )
 
 container_image(
@@ -27,6 +38,9 @@ container_image(
     base = ":forklift-operator-requirements",
     directory = "/opt/ansible/",
     files = ["watches.yaml"],
+    layers = [
+        ":ansible-operator-layer-run",
+    ],
 )
 
 container_image(
