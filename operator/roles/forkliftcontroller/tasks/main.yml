@@ -23,7 +23,7 @@
 
   - name: "Load cluster API groups"
     set_fact:
-      api_groups: "{{ lookup('k8s', cluster_info='api_groups') }}"
+      api_groups: "{{ lookup('kubernetes.core.k8s', cluster_info='api_groups') }}"
 
   - when: "'route.openshift.io' not in api_groups"
     block:
@@ -33,13 +33,13 @@
 
     - name: "Obtain k8s cluster version"
       set_fact:
-        k8s_cluster_version: "{{ lookup('k8s', cluster_info='version').kubernetes.gitVersion }}"
+        k8s_cluster_version: "{{ lookup('kubernetes.core.k8s', cluster_info='version').kubernetes.gitVersion }}"
 
   - when: not k8s_cluster|bool
     block:
     - name: "Get cluster proxy object"
       set_fact:
-        proxy_cluster: "{{ lookup('k8s', api_version='config.openshift.io/v1', kind='Proxy', resource_name='cluster') }}"
+        proxy_cluster: "{{ lookup('kubernetes.core.k8s', api_version='config.openshift.io/v1', kind='Proxy', resource_name='cluster') }}"
 
     - when: proxy_cluster.spec.trustedCA.name|length > 0
       block:
