@@ -718,20 +718,6 @@ go_repository(
 )
 
 go_repository(
-    name = "com_github_elazarl_goproxy",
-    importpath = "github.com/elazarl/goproxy",
-    sum = "h1:yY9rWGoXv1U5pl4gxqlULARMQD7x0QG85lqEXTWysik=",
-    version = "v0.0.0-20190911111923-ecfe977594f1",
-)
-
-go_repository(
-    name = "com_github_elazarl_goproxy_ext",
-    importpath = "github.com/elazarl/goproxy/ext",
-    sum = "h1:dWB6v3RcOy03t/bUadywsbyrQwCqZeNIEX6M1OtSZOM=",
-    version = "v0.0.0-20190711103511-473e67f1d7d2",
-)
-
-go_repository(
     name = "com_github_emicklei_go_restful",
     importpath = "github.com/emicklei/go-restful",
     sum = "h1:l6Soi8WCOOVAeCo4W98iBFC6Og7/X8bpRt51oNLZ2C8=",
