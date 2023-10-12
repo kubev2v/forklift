@@ -12,9 +12,11 @@ go_library(
     importpath = "github.com/vmware/govmomi/find",
     visibility = ["//visibility:public"],
     deps = [
+        "//vendor/github.com/vmware/govmomi/internal",
         "//vendor/github.com/vmware/govmomi/list",
         "//vendor/github.com/vmware/govmomi/object",
         "//vendor/github.com/vmware/govmomi/property",
+        "//vendor/github.com/vmware/govmomi/view",
         "//vendor/github.com/vmware/govmomi/vim25",
         "//vendor/github.com/vmware/govmomi/vim25/mo",
         "//vendor/github.com/vmware/govmomi/vim25/types",

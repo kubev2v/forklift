@@ -25,6 +25,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -106,10 +107,21 @@ func (c *Client) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// isAPI returns true if path starts with "/api"
+// This hack allows helpers to support both endpoints:
+// "/rest" - value wrapped responses and structured error responses
+// "/api" - raw responses and no structured error responses
+func isAPI(path string) bool {
+	return strings.HasPrefix(path, "/api")
+}
+
 // Resource helper for the given path.
 func (c *Client) Resource(path string) *Resource {
 	r := &Resource{u: c.URL()}
-	r.u.Path = Path + path
+	if !isAPI(path) {
+		path = Path + path
+	}
+	r.u.Path = path
 	return r
 }
 
@@ -123,6 +135,18 @@ func (c *Client) WithSigner(ctx context.Context, s Signer) context.Context {
 	return context.WithValue(ctx, signerContext{}, s)
 }
 
+type headersContext struct{}
+
+// WithHeader returns a new Context populated with the provided headers map.
+// Calls to a VAPI REST client with this context will populate the HTTP headers
+// map using the provided headers.
+func (c *Client) WithHeader(
+	ctx context.Context,
+	headers http.Header) context.Context {
+
+	return context.WithValue(ctx, headersContext{}, headers)
+}
+
 type statusError struct {
 	res *http.Response
 }
@@ -131,10 +155,16 @@ func (e *statusError) Error() string {
 	return fmt.Sprintf("%s %s: %s", e.res.Request.Method, e.res.Request.URL, e.res.Status)
 }
 
+// RawResponse may be used with the Do method as the resBody argument in order
+// to capture the raw response data.
+type RawResponse struct {
+	bytes.Buffer
+}
+
 // Do sends the http.Request, decoding resBody if provided.
 func (c *Client) Do(ctx context.Context, req *http.Request, resBody interface{}) error {
 	switch req.Method {
-	case http.MethodPost, http.MethodPatch:
+	case http.MethodPost, http.MethodPatch, http.MethodPut:
 		req.Header.Set("Content-Type", "application/json")
 	}
 
@@ -150,9 +180,18 @@ func (c *Client) Do(ctx context.Context, req *http.Request, resBody interface{})
 		}
 	}
 
+	if headers, ok := ctx.Value(headersContext{}).(http.Header); ok {
+		for k, v := range headers {
+			for _, v := range v {
+				req.Header.Add(k, v)
+			}
+		}
+	}
+
 	return c.Client.Do(ctx, req, func(res *http.Response) error {
 		switch res.StatusCode {
 		case http.StatusOK:
+		case http.StatusCreated:
 		case http.StatusNoContent:
 		case http.StatusBadRequest:
 			// TODO: structured error types
@@ -170,16 +209,24 @@ func (c *Client) Do(ctx context.Context, req *http.Request, resBody interface{})
 		}
 
 		switch b := resBody.(type) {
+		case *RawResponse:
+			return res.Write(b)
 		case io.Writer:
 			_, err := io.Copy(b, res.Body)
 			return err
 		default:
+			d := json.NewDecoder(res.Body)
+			if isAPI(req.URL.Path) {
+				// Responses from the /api endpoint are not wrapped
+				return d.Decode(resBody)
+			}
+			// Responses from the /rest endpoint are wrapped in this structure
 			val := struct {
 				Value interface{} `json:"value,omitempty"`
 			}{
 				resBody,
 			}
-			return json.NewDecoder(res.Body).Decode(&val)
+			return d.Decode(&val)
 		}
 	})
 }

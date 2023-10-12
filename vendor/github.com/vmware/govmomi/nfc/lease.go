@@ -18,12 +18,12 @@ package nfc
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"path"
 
 	"github.com/vmware/govmomi/property"
+	"github.com/vmware/govmomi/task"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
@@ -71,17 +71,17 @@ func (l *Lease) Complete(ctx context.Context) error {
 }
 
 // GetManifest wraps methods.GetManifest
-func (l *Lease) GetManifest(ctx context.Context) error {
+func (l *Lease) GetManifest(ctx context.Context) ([]types.HttpNfcLeaseManifestEntry, error) {
 	req := types.HttpNfcLeaseGetManifest{
 		This: l.Reference(),
 	}
 
-	_, err := methods.HttpNfcLeaseGetManifest(ctx, l.c, &req)
+	res, err := methods.HttpNfcLeaseGetManifest(ctx, l.c, &req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return res.Returnval, nil
 }
 
 // Progress wraps methods.Progress
@@ -194,7 +194,7 @@ func (l *Lease) Wait(ctx context.Context, items []types.OvfFileItem) (*LeaseInfo
 	}
 
 	if lease.Error != nil {
-		return nil, errors.New(lease.Error.LocalizedMessage)
+		return nil, &task.Error{LocalizedMethodFault: lease.Error}
 	}
 
 	return nil, fmt.Errorf("unexpected nfc lease state: %s", lease.State)
