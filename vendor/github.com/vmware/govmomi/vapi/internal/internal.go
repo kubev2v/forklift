@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 VMware, Inc. All Rights Reserved.
+Copyright (c) 2018-2023 VMware, Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,13 +37,15 @@ const (
 	LibraryItemDownloadSessionFile = "/com/vmware/content/library/item/downloadsession/file"
 	LocalLibraryPath               = "/com/vmware/content/local-library"
 	SubscribedLibraryPath          = "/com/vmware/content/subscribed-library"
+	SecurityPoliciesPath           = "/api/content/security-policies"
 	SubscribedLibraryItem          = "/com/vmware/content/library/subscribed-item"
 	Subscriptions                  = "/com/vmware/content/library/subscriptions"
+	TrustedCertificatesPath        = "/api/content/trusted-certificates"
 	VCenterOVFLibraryItem          = "/com/vmware/vcenter/ovf/library-item"
 	VCenterVMTXLibraryItem         = "/vcenter/vm-template/library-items"
-	VCenterVM                      = "/vcenter/vm"
 	SessionCookieName              = "vmware-api-session-id"
 	UseHeaderAuthn                 = "vmware-use-header-authn"
+	DebugEcho                      = "/vc-sim/debug/echo"
 )
 
 // AssociatedObject is the same structure as types.ManagedObjectReference,
@@ -56,7 +58,10 @@ type AssociatedObject struct {
 
 // Reference implements mo.Reference
 func (o AssociatedObject) Reference() types.ManagedObjectReference {
-	return types.ManagedObjectReference(o)
+	return types.ManagedObjectReference{
+		Type:  o.Type,
+		Value: o.Value,
+	}
 }
 
 // Association for tag-association requests.
@@ -66,9 +71,11 @@ type Association struct {
 
 // NewAssociation returns an Association, converting ref to an AssociatedObject.
 func NewAssociation(ref mo.Reference) Association {
-	obj := AssociatedObject(ref.Reference())
 	return Association{
-		ObjectID: &obj,
+		ObjectID: &AssociatedObject{
+			Type:  ref.Reference().Type,
+			Value: ref.Reference().Value,
+		},
 	}
 }
 
