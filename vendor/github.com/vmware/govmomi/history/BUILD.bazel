@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "history",
+    srcs = ["collector.go"],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/vmware/govmomi/history",
+    importpath = "github.com/vmware/govmomi/history",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/vmware/govmomi/property",
+        "//vendor/github.com/vmware/govmomi/vim25",
+        "//vendor/github.com/vmware/govmomi/vim25/methods",
+        "//vendor/github.com/vmware/govmomi/vim25/types",
+    ],
+)

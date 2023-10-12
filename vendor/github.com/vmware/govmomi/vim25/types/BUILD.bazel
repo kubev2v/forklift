@@ -8,10 +8,13 @@ go_library(
         "fault.go",
         "helpers.go",
         "if.go",
+        "json.go",
         "registry.go",
         "types.go",
+        "unreleased.go",
     ],
     importmap = "github.com/konveyor/forklift-controller/vendor/github.com/vmware/govmomi/vim25/types",
     importpath = "github.com/vmware/govmomi/vim25/types",
     visibility = ["//visibility:public"],
+    deps = ["//vendor/github.com/vmware/govmomi/vim25/json"],
 )
