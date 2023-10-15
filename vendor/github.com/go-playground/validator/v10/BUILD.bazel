@@ -6,9 +6,11 @@ go_library(
         "baked_in.go",
         "cache.go",
         "country_codes.go",
+        "currency_codes.go",
         "doc.go",
         "errors.go",
         "field_level.go",
+        "postcode_regexes.go",
         "regexes.go",
         "struct_level.go",
         "translations.go",
@@ -20,8 +22,10 @@ go_library(
     importpath = "github.com/go-playground/validator/v10",
     visibility = ["//visibility:public"],
     deps = [
+        "//vendor/github.com/gabriel-vasile/mimetype",
         "//vendor/github.com/go-playground/universal-translator",
         "//vendor/github.com/leodido/go-urn",
         "//vendor/golang.org/x/crypto/sha3",
+        "//vendor/golang.org/x/text/language",
     ],
 )
