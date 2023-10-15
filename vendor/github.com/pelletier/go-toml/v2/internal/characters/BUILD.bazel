@@ -1,0 +1,12 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "characters",
+    srcs = [
+        "ascii.go",
+        "utf8.go",
+    ],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/pelletier/go-toml/v2/internal/characters",
+    importpath = "github.com/pelletier/go-toml/v2/internal/characters",
+    visibility = ["//vendor/github.com/pelletier/go-toml/v2:__subpackages__"],
+)
