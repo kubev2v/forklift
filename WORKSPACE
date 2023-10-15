@@ -410,62 +410,6 @@ go_repository(
 )
 
 go_repository(
-    name = "com_github_containerd_cgroups",
-    importpath = "github.com/containerd/cgroups",
-    sum = "h1:tSNMc+rJDfmYntojat8lljbt1mgKNpTxUZJsSzJ9Y1s=",
-    version = "v0.0.0-20190919134610-bf292b21730f",
-)
-
-go_repository(
-    name = "com_github_containerd_console",
-    importpath = "github.com/containerd/console",
-    sum = "h1:uict5mhHFTzKLUCufdSLym7z/J0CbBJT59lYbP9wtbg=",
-    version = "v0.0.0-20180822173158-c12b1e7919c1",
-)
-
-go_repository(
-    name = "com_github_containerd_containerd",
-    importpath = "github.com/containerd/containerd",
-    sum = "h1:ForxmXkA6tPIvffbrDAcPUIB32QgXkt2XFj+F0UxetA=",
-    version = "v1.3.2",
-)
-
-go_repository(
-    name = "com_github_containerd_continuity",
-    importpath = "github.com/containerd/continuity",
-    sum = "h1:NmTXa/uVnDyp0TY5MKi197+3HWcnYWfnHGyaFthlnGw=",
-    version = "v0.0.0-20190827140505-75bee3e2ccb6",
-)
-
-go_repository(
-    name = "com_github_containerd_fifo",
-    importpath = "github.com/containerd/fifo",
-    sum = "h1:PUD50EuOMkXVcpBIA/R95d56duJR9VxhwncsFbNnxW4=",
-    version = "v0.0.0-20190226154929-a9fb20d87448",
-)
-
-go_repository(
-    name = "com_github_containerd_go_runc",
-    importpath = "github.com/containerd/go-runc",
-    sum = "h1:esQOJREg8nw8aXj6uCN5dfW5cKUBiEJ/+nni1Q/D/sw=",
-    version = "v0.0.0-20180907222934-5a6d9f37cfa3",
-)
-
-go_repository(
-    name = "com_github_containerd_ttrpc",
-    importpath = "github.com/containerd/ttrpc",
-    sum = "h1:dlfGmNcE3jDAecLqwKPMNX6nk2qh1c1Vg1/YTzpOOF4=",
-    version = "v0.0.0-20190828154514-0e0f228740de",
-)
-
-go_repository(
-    name = "com_github_containerd_typeurl",
-    importpath = "github.com/containerd/typeurl",
-    sum = "h1:JNn81o/xG+8NEo3bC/vx9pbi/g2WI8mtP2/nXzu297Y=",
-    version = "v0.0.0-20180627222232-a93fcdb778cd",
-)
-
-go_repository(
     name = "com_github_containernetworking_cni",
     importpath = "github.com/containernetworking/cni",
     sum = "h1:fE3r16wpSEyaqY4Z4oFrLMmIGfBYIKpPrHK31EJ9FzE=",
