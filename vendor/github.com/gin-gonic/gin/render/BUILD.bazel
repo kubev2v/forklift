@@ -12,6 +12,7 @@ go_library(
         "redirect.go",
         "render.go",
         "text.go",
+        "toml.go",
         "xml.go",
         "yaml.go",
     ],
@@ -21,8 +22,9 @@ go_library(
     deps = [
         "//vendor/github.com/gin-gonic/gin/internal/bytesconv",
         "//vendor/github.com/gin-gonic/gin/internal/json",
-        "//vendor/github.com/golang/protobuf/proto",
+        "//vendor/github.com/pelletier/go-toml/v2:go-toml",
         "//vendor/github.com/ugorji/go/codec",
-        "//vendor/gopkg.in/yaml.v2:yaml_v2",
+        "//vendor/google.golang.org/protobuf/proto",
+        "//vendor/gopkg.in/yaml.v3:yaml_v3",
     ],
 )

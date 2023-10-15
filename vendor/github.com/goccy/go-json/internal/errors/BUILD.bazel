@@ -1,0 +1,9 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "errors",
+    srcs = ["error.go"],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/goccy/go-json/internal/errors",
+    importpath = "github.com/goccy/go-json/internal/errors",
+    visibility = ["//vendor/github.com/goccy/go-json:__subpackages__"],
+)

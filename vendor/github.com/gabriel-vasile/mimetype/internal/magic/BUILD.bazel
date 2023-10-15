@@ -1,0 +1,30 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "magic",
+    srcs = [
+        "archive.go",
+        "audio.go",
+        "binary.go",
+        "database.go",
+        "document.go",
+        "font.go",
+        "ftyp.go",
+        "geo.go",
+        "image.go",
+        "magic.go",
+        "ms_office.go",
+        "ogg.go",
+        "text.go",
+        "text_csv.go",
+        "video.go",
+        "zip.go",
+    ],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/gabriel-vasile/mimetype/internal/magic",
+    importpath = "github.com/gabriel-vasile/mimetype/internal/magic",
+    visibility = ["//vendor/github.com/gabriel-vasile/mimetype:__subpackages__"],
+    deps = [
+        "//vendor/github.com/gabriel-vasile/mimetype/internal/charset",
+        "//vendor/github.com/gabriel-vasile/mimetype/internal/json",
+    ],
+)

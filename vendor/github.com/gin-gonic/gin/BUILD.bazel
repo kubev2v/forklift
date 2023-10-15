@@ -32,5 +32,7 @@ go_library(
         "//vendor/github.com/gin-gonic/gin/internal/json",
         "//vendor/github.com/gin-gonic/gin/render",
         "//vendor/github.com/mattn/go-isatty",
+        "//vendor/golang.org/x/net/http2",
+        "//vendor/golang.org/x/net/http2/h2c",
     ],
 )

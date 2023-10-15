@@ -1,0 +1,17 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "base64x",
+    srcs = [
+        "base64x.go",
+        "cpuid.go",
+        "faststr.go",
+        "native_amd64.go",
+        "native_amd64.s",
+        "native_subr_amd64.go",
+    ],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/chenzhuoyu/base64x",
+    importpath = "github.com/chenzhuoyu/base64x",
+    visibility = ["//visibility:public"],
+    deps = ["//vendor/github.com/klauspost/cpuid/v2:cpuid"],
+)

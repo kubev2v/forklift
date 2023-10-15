@@ -1,0 +1,25 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "x86",
+    srcs = [
+        "a.out.go",
+        "aenum.go",
+        "anames.go",
+        "asm6.go",
+        "avx_optabs.go",
+        "evex.go",
+        "list6.go",
+        "obj6.go",
+        "ytab.go",
+    ],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/twitchyliquid64/golang-asm/obj/x86",
+    importpath = "github.com/twitchyliquid64/golang-asm/obj/x86",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/twitchyliquid64/golang-asm/obj",
+        "//vendor/github.com/twitchyliquid64/golang-asm/objabi",
+        "//vendor/github.com/twitchyliquid64/golang-asm/src",
+        "//vendor/github.com/twitchyliquid64/golang-asm/sys",
+    ],
+)
