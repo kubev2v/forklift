@@ -1,0 +1,13 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "h2c",
+    srcs = ["h2c.go"],
+    importmap = "github.com/konveyor/forklift-controller/vendor/golang.org/x/net/http2/h2c",
+    importpath = "golang.org/x/net/http2/h2c",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/golang.org/x/net/http/httpguts",
+        "//vendor/golang.org/x/net/http2",
+    ],
+)

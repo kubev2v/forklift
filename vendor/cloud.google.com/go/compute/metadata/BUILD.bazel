@@ -1,0 +1,9 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "metadata",
+    srcs = ["metadata.go"],
+    importmap = "github.com/konveyor/forklift-controller/vendor/cloud.google.com/go/compute/metadata",
+    importpath = "cloud.google.com/go/compute/metadata",
+    visibility = ["//visibility:public"],
+)
