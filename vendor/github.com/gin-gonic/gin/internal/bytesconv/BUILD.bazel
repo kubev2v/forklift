@@ -1,9 +1,0 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
-
-go_library(
-    name = "bytesconv",
-    srcs = ["bytesconv.go"],
-    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/gin-gonic/gin/internal/bytesconv",
-    importpath = "github.com/gin-gonic/gin/internal/bytesconv",
-    visibility = ["//vendor/github.com/gin-gonic/gin:__subpackages__"],
-)
