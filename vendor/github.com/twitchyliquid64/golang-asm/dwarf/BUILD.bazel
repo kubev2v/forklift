@@ -1,0 +1,13 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "dwarf",
+    srcs = [
+        "dwarf.go",
+        "dwarf_defs.go",
+    ],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/twitchyliquid64/golang-asm/dwarf",
+    importpath = "github.com/twitchyliquid64/golang-asm/dwarf",
+    visibility = ["//visibility:public"],
+    deps = ["//vendor/github.com/twitchyliquid64/golang-asm/objabi"],
+)

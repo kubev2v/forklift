@@ -1,0 +1,14 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "tracker",
+    srcs = [
+        "key.go",
+        "seen.go",
+        "tracker.go",
+    ],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/pelletier/go-toml/v2/internal/tracker",
+    importpath = "github.com/pelletier/go-toml/v2/internal/tracker",
+    visibility = ["//vendor/github.com/pelletier/go-toml/v2:__subpackages__"],
+    deps = ["//vendor/github.com/pelletier/go-toml/v2/unstable"],
+)

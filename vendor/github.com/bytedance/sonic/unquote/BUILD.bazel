@@ -1,0 +1,14 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "unquote",
+    srcs = ["unquote.go"],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/bytedance/sonic/unquote",
+    importpath = "github.com/bytedance/sonic/unquote",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/bytedance/sonic/internal/native",
+        "//vendor/github.com/bytedance/sonic/internal/native/types",
+        "//vendor/github.com/bytedance/sonic/internal/rt",
+    ],
+)
