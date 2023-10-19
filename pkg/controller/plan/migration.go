@@ -424,66 +424,61 @@ func (r *Migration) Cancel() (err error) {
 }
 
 func (r *Migration) cleanUpPopulatorPVCs(vm *plan.VMStatus) (err error) {
-	err = r.kubevirt.DeletePVCs(vm)
+	if r.builder.SupportsVolumePopulators() {
+		err = r.kubevirt.DeletePVCs(vm)
+	}
 	return
 }
 
 // Delete left over migration resources associated with a VM.
 func (r *Migration) cleanup(vm *plan.VMStatus) (err error) {
 	if !vm.HasCondition(Succeeded) {
-		err = r.kubevirt.DeleteVM(vm)
-		if err != nil {
+		if err = r.kubevirt.DeleteVM(vm); err != nil {
 			return
 		}
-		if r.builder.SupportsVolumePopulators() {
-			err = r.cleanUpPopulatorPVCs(vm)
-			if err != nil {
-				return
-			}
+		if err = r.cleanUpPopulatorPVCs(vm); err != nil {
+			return
 		}
 	}
-	err = r.deleteImporterPods(vm)
-	if err != nil {
+	if err = r.deleteImporterPods(vm); err != nil {
 		return
 	}
-	err = r.kubevirt.DeletePVCConsumerPod(vm)
-	if err != nil {
+	if err = r.kubevirt.DeletePVCConsumerPod(vm); err != nil {
 		return
 	}
-	err = r.kubevirt.DeleteGuestConversionPod(vm)
-	if err != nil {
+	if err = r.kubevirt.DeleteGuestConversionPod(vm); err != nil {
 		return
 	}
-	err = r.kubevirt.DeleteSecret(vm)
-	if err != nil {
+	if err = r.kubevirt.DeleteSecret(vm); err != nil {
 		return
 	}
-	err = r.kubevirt.DeleteConfigMap(vm)
-	if err != nil {
+	if err = r.kubevirt.DeleteConfigMap(vm); err != nil {
 		return
 	}
-	err = r.kubevirt.DeleteHookJobs(vm)
-	if err != nil {
+	if err = r.kubevirt.DeleteHookJobs(vm); err != nil {
 		return
 	}
-	err = r.destinationClient.DeletePopulatorDataSource(vm)
-	if err != nil {
+	if err = r.destinationClient.DeletePopulatorDataSource(vm); err != nil {
 		return
 	}
-	err = r.kubevirt.DeletePopulatorPods(vm)
-	if err != nil {
+	if err = r.kubevirt.DeletePopulatorPods(vm); err != nil {
 		return
 	}
-	if vm.Warm != nil {
-		if errLocal := r.provider.RemoveSnapshots(vm.Ref, vm.Warm.Precopies); errLocal != nil {
-			r.Log.Error(
-				errLocal,
-				"Failed to clean up warm migration snapshots.",
-				"vm", vm)
-		}
-	}
+	r.removeWarmSnapshots(vm)
 
 	return
+}
+
+func (r *Migration) removeWarmSnapshots(vm *plan.VMStatus) {
+	if vm.Warm == nil {
+		return
+	}
+	if err := r.provider.RemoveSnapshots(vm.Ref, vm.Warm.Precopies); err != nil {
+		r.Log.Error(
+			err,
+			"Failed to clean up warm migration snapshots.",
+			"vm", vm)
+	}
 }
 
 func (r *Migration) deleteImporterPods(vm *plan.VMStatus) (err error) {
