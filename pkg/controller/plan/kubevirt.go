@@ -932,38 +932,37 @@ func (r *KubeVirt) SetPopulatorPodOwnership(vm *plan.VMStatus) (err error) {
 }
 
 // DeletePVCs deletes PVCs associated with the VM, including prime PVCs (populator flows)
-func (r *KubeVirt) DeletePVCs(vm *plan.VMStatus) (err error) {
+func (r *KubeVirt) DeletePVCs(vm *plan.VMStatus) error {
 	pvcs, err := r.getPVCs(vm.Ref)
+	if err != nil {
+		return err
+	}
 	for _, pvc := range pvcs {
 		primePVC := core.PersistentVolumeClaim{}
 		err = r.Destination.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: fmt.Sprintf("prime-%s", string(pvc.UID))}, &primePVC)
-		if err != nil {
-			if k8serr.IsNotFound(err) {
-				err = nil
+		switch {
+		case err != nil && !k8serr.IsNotFound(err):
+			return err
+		case err == nil:
+			err = r.DeleteObject(&primePVC, vm, "Deleted prime PVC.", "pvc")
+			if err != nil && !k8serr.IsNotFound(err) {
+				return err
 			}
-			continue
 		}
-		// Best effort deletion
-		err = r.DeleteObject(&primePVC, vm, "Deleted prime PVC.", "pvc")
-		if err != nil && k8serr.IsNotFound(err) {
-			err = nil
-		}
-		if err != nil {
-			return
-		}
+
 		err = r.DeleteObject(&pvc, vm, "Deleted PVC.", "pvc")
-		if err != nil && k8serr.IsNotFound(err) {
-			err = nil
+		if err != nil && !k8serr.IsNotFound(err) {
+			return err
 		}
-		if err != nil {
-			return
-		}
+
 		pvcCopy := pvc.DeepCopy()
 		pvc.Finalizers = nil
 		patch := client.MergeFrom(pvcCopy)
-		err = r.Destination.Client.Patch(context.TODO(), &pvc, patch)
+		if err = r.Destination.Client.Patch(context.TODO(), &pvc, patch); err != nil {
+			return err
+		}
 	}
-	return
+	return nil
 }
 
 // Delete any populator pods that belong to a VM's migration.
