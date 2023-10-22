@@ -331,23 +331,20 @@ func (r *Migration) begin() (err error) {
 // Archive the plan.
 // Best effort to remove any retained migration resources.
 func (r *Migration) Archive() {
-	err := r.init()
-	if err != nil {
+	if err := r.init(); err != nil {
 		r.Log.Error(err, "Archive initialization failed.")
 		return
 	}
 
-	if r.Plan.Provider.Source.Type() == v1beta1.Ova {
-		err = r.deletePvcPvForOva()
-		if err != nil {
+	switch r.Plan.Provider.Source.Type() {
+	case v1beta1.Ova:
+		if err := r.deletePvcPvForOva(); err != nil {
 			r.Log.Error(err, "Failed to clean up the PVC and PV for the OVA plan")
-			return
 		}
 	}
 
 	for _, vm := range r.Plan.Status.Migration.VMs {
-		err = r.cleanup(vm)
-		if err != nil {
+		if err := r.cleanup(vm); err != nil {
 			r.Log.Error(err,
 				"Couldn't clean up VM while archiving plan.",
 				"vm",
@@ -384,31 +381,25 @@ func (r *Migration) SetPopulatorDataSourceLabels() {
 
 // Cancel the migration.
 // Delete resources associated with VMs that have been marked canceled.
-func (r *Migration) Cancel() (err error) {
-	err = r.init()
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
+func (r *Migration) Cancel() error {
+	if err := r.init(); err != nil {
+		return liberr.Wrap(err)
 	}
 
 	for _, vm := range r.Plan.Status.Migration.VMs {
 		if vm.HasCondition(Canceled) {
-			err = r.cleanup(vm)
-			if err != nil {
+			if err := r.cleanup(vm); err != nil {
 				r.Log.Error(err,
 					"Couldn't clean up after canceled VM migration.",
 					"vm",
 					vm.String())
-				err = nil
 			}
 			if vm.RestorePowerState == On {
-				err = r.provider.PowerOn(vm.Ref)
-				if err != nil {
+				if err := r.provider.PowerOn(vm.Ref); err != nil {
 					r.Log.Error(err,
 						"Couldn't restore the power state of the source VM.",
 						"vm",
 						vm.String())
-					err = nil
 				}
 			}
 			vm.MarkCompleted()
@@ -420,7 +411,7 @@ func (r *Migration) Cancel() (err error) {
 		}
 	}
 
-	return
+	return nil
 }
 
 func (r *Migration) cleanUpPopulatorPVCs(vm *plan.VMStatus) (err error) {
