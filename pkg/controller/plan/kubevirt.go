@@ -931,34 +931,48 @@ func (r *KubeVirt) SetPopulatorPodOwnership(vm *plan.VMStatus) (err error) {
 	return
 }
 
-// DeletePVCs deletes PVCs associated with the VM, including prime PVCs (populator flows)
-func (r *KubeVirt) DeletePVCs(vm *plan.VMStatus) error {
+// Deletes PVCs that were populated using a volume populator, including prime PVCs
+func (r *KubeVirt) DeletePopulatedPVCs(vm *plan.VMStatus) error {
 	pvcs, err := r.getPVCs(vm.Ref)
 	if err != nil {
 		return err
 	}
 	for _, pvc := range pvcs {
-		primePVC := core.PersistentVolumeClaim{}
-		err = r.Destination.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: fmt.Sprintf("prime-%s", string(pvc.UID))}, &primePVC)
-		switch {
-		case err != nil && !k8serr.IsNotFound(err):
+		if err = r.deleteCorrespondingPrimePVC(&pvc, vm); err != nil {
 			return err
-		case err == nil:
-			err = r.DeleteObject(&primePVC, vm, "Deleted prime PVC.", "pvc")
-			if err != nil && !k8serr.IsNotFound(err) {
-				return err
-			}
 		}
+		if err = r.deletePopulatedPVC(&pvc, vm); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
-		err = r.DeleteObject(&pvc, vm, "Deleted PVC.", "pvc")
+func (r *KubeVirt) deleteCorrespondingPrimePVC(pvc *core.PersistentVolumeClaim, vm *plan.VMStatus) error {
+	primePVC := core.PersistentVolumeClaim{}
+	err := r.Destination.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: fmt.Sprintf("prime-%s", string(pvc.UID))}, &primePVC)
+	switch {
+	case err != nil && !k8serr.IsNotFound(err):
+		return err
+	case err == nil:
+		err = r.DeleteObject(&primePVC, vm, "Deleted prime PVC.", "pvc")
 		if err != nil && !k8serr.IsNotFound(err) {
 			return err
 		}
+	}
+	return nil
+}
 
+func (r *KubeVirt) deletePopulatedPVC(pvc *core.PersistentVolumeClaim, vm *plan.VMStatus) error {
+	err := r.DeleteObject(pvc, vm, "Deleted PVC.", "pvc")
+	switch {
+	case err != nil && !k8serr.IsNotFound(err):
+		return err
+	case err == nil:
 		pvcCopy := pvc.DeepCopy()
 		pvc.Finalizers = nil
 		patch := client.MergeFrom(pvcCopy)
-		if err = r.Destination.Client.Patch(context.TODO(), &pvc, patch); err != nil {
+		if err = r.Destination.Client.Patch(context.TODO(), pvc, patch); err != nil {
 			return err
 		}
 	}

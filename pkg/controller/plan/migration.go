@@ -414,9 +414,9 @@ func (r *Migration) Cancel() error {
 	return nil
 }
 
-func (r *Migration) cleanUpPopulatorPVCs(vm *plan.VMStatus) (err error) {
+func (r *Migration) deletePopulatorPVCs(vm *plan.VMStatus) (err error) {
 	if r.builder.SupportsVolumePopulators() {
-		err = r.kubevirt.DeletePVCs(vm)
+		err = r.kubevirt.DeletePopulatedPVCs(vm)
 	}
 	return
 }
@@ -427,7 +427,7 @@ func (r *Migration) cleanup(vm *plan.VMStatus) (err error) {
 		if err = r.kubevirt.DeleteVM(vm); err != nil {
 			return
 		}
-		if err = r.cleanUpPopulatorPVCs(vm); err != nil {
+		if err = r.deletePopulatorPVCs(vm); err != nil {
 			return
 		}
 	}
