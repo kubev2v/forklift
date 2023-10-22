@@ -403,15 +403,19 @@ func (r *Migration) Cancel() error {
 				}
 			}
 			vm.MarkCompleted()
-			for _, step := range vm.Pipeline {
-				if step.MarkedStarted() {
-					step.MarkCompleted()
-				}
-			}
+			markStartedStepsCompleted(vm)
 		}
 	}
 
 	return nil
+}
+
+func markStartedStepsCompleted(vm *plan.VMStatus) {
+	for _, step := range vm.Pipeline {
+		if step.MarkedStarted() {
+			step.MarkCompleted()
+		}
+	}
 }
 
 func (r *Migration) deletePopulatorPVCs(vm *plan.VMStatus) (err error) {
