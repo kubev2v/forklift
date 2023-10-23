@@ -344,12 +344,16 @@ func (r *Migration) Archive() {
 	}
 
 	for _, vm := range r.Plan.Status.Migration.VMs {
-		if err := r.cleanup(vm); err != nil {
-			r.Log.Error(err,
-				"Couldn't clean up VM while archiving plan.",
-				"vm",
-				vm.String())
+		dontFailOnError := func(err error) bool {
+			if err != nil {
+				r.Log.Error(liberr.Wrap(err),
+					"Couldn't clean up VM while archiving plan.",
+					"vm",
+					vm.String())
+			}
+			return false
 		}
+		_ = r.cleanup(vm, dontFailOnError)
 	}
 	return
 }
@@ -388,12 +392,16 @@ func (r *Migration) Cancel() error {
 
 	for _, vm := range r.Plan.Status.Migration.VMs {
 		if vm.HasCondition(Canceled) {
-			if err := r.cleanup(vm); err != nil {
-				r.Log.Error(err,
-					"Couldn't clean up after canceled VM migration.",
-					"vm",
-					vm.String())
+			dontFailOnError := func(err error) bool {
+				if err != nil {
+					r.Log.Error(liberr.Wrap(err),
+						"Couldn't clean up after canceled VM migration.",
+						"vm",
+						vm.String())
+				}
+				return false
 			}
+			_ = r.cleanup(vm, dontFailOnError)
 			if vm.RestorePowerState == On {
 				if err := r.provider.PowerOn(vm.Ref); err != nil {
 					r.Log.Error(err,
@@ -426,42 +434,42 @@ func (r *Migration) deletePopulatorPVCs(vm *plan.VMStatus) (err error) {
 }
 
 // Delete left over migration resources associated with a VM.
-func (r *Migration) cleanup(vm *plan.VMStatus) (err error) {
+func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool) error {
 	if !vm.HasCondition(Succeeded) {
-		if err = r.kubevirt.DeleteVM(vm); err != nil {
-			return
+		if err := r.kubevirt.DeleteVM(vm); failOnErr(err) {
+			return err
 		}
-		if err = r.deletePopulatorPVCs(vm); err != nil {
-			return
+		if err := r.deletePopulatorPVCs(vm); failOnErr(err) {
+			return err
 		}
 	}
-	if err = r.deleteImporterPods(vm); err != nil {
-		return
+	if err := r.deleteImporterPods(vm); failOnErr(err) {
+		return err
 	}
-	if err = r.kubevirt.DeletePVCConsumerPod(vm); err != nil {
-		return
+	if err := r.kubevirt.DeletePVCConsumerPod(vm); failOnErr(err) {
+		return err
 	}
-	if err = r.kubevirt.DeleteGuestConversionPod(vm); err != nil {
-		return
+	if err := r.kubevirt.DeleteGuestConversionPod(vm); failOnErr(err) {
+		return err
 	}
-	if err = r.kubevirt.DeleteSecret(vm); err != nil {
-		return
+	if err := r.kubevirt.DeleteSecret(vm); failOnErr(err) {
+		return err
 	}
-	if err = r.kubevirt.DeleteConfigMap(vm); err != nil {
-		return
+	if err := r.kubevirt.DeleteConfigMap(vm); failOnErr(err) {
+		return err
 	}
-	if err = r.kubevirt.DeleteHookJobs(vm); err != nil {
-		return
+	if err := r.kubevirt.DeleteHookJobs(vm); failOnErr(err) {
+		return err
 	}
-	if err = r.destinationClient.DeletePopulatorDataSource(vm); err != nil {
-		return
+	if err := r.destinationClient.DeletePopulatorDataSource(vm); failOnErr(err) {
+		return err
 	}
-	if err = r.kubevirt.DeletePopulatorPods(vm); err != nil {
-		return
+	if err := r.kubevirt.DeletePopulatorPods(vm); failOnErr(err) {
+		return err
 	}
 	r.removeWarmSnapshots(vm)
 
-	return
+	return nil
 }
 
 func (r *Migration) removeWarmSnapshots(vm *plan.VMStatus) {
@@ -654,7 +662,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		vm.MarkStarted()
 		step.MarkStarted()
 		step.Phase = Running
-		err = r.cleanup(vm)
+		err = r.cleanup(vm, func(err error) bool { return err != nil })
 		if err != nil {
 			step.AddError(err.Error())
 			err = nil
