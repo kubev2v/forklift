@@ -701,7 +701,11 @@ func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) (er
 
 // Sets KVM requirement to the pod and container.
 func (r *KubeVirt) setKvmOnPodSpec(podSpec *core.PodSpec) {
-	if *r.Plan.Provider.Source.Spec.Type == v1beta1.VSphere && !Settings.VirtV2vDontRequestKVM {
+	if Settings.VirtV2vDontRequestKVM {
+		return
+	}
+	switch *r.Plan.Provider.Source.Spec.Type {
+	case v1beta1.VSphere, v1beta1.Ova:
 		if podSpec.NodeSelector == nil {
 			podSpec.NodeSelector = make(map[string]string)
 		}
