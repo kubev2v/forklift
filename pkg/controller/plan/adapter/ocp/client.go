@@ -75,14 +75,14 @@ func (r *Client) PowerOff(vmRef ref.Ref) error {
 // PowerOn implements base.Client
 func (r *Client) PowerOn(vmRef ref.Ref) error {
 	vm := cnv.VirtualMachine{}
-	err := r.Destination.Client.Get(context.TODO(), k8sclient.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, &vm)
+	err := r.sourceClient.Get(context.TODO(), k8sclient.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, &vm)
 	if err != nil {
 		return err
 	}
 
 	running := true
 	vm.Spec.Running = &running
-	err = r.Destination.Client.Update(context.Background(), &vm)
+	err = r.sourceClient.Update(context.Background(), &vm)
 	if err != nil {
 		return err
 	}
