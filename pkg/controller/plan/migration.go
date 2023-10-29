@@ -1052,15 +1052,6 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				Durable:  true,
 			})
 
-		// Power on the destination VM if the source VM was originally powered on.
-		err = r.setRunning(vm, vm.RestorePowerState == On)
-		if err != nil {
-			r.Log.Error(err,
-				"Could not power on destination VM.",
-				"vm",
-				vm.String())
-			err = nil
-		}
 	} else if vm.Error != nil {
 		vm.Phase = Completed
 		vm.SetCondition(
@@ -1314,38 +1305,6 @@ func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (err error) {
 	}
 
 	err = r.kubevirt.EnsureGuestConversionPod(vm, &vmCr, &pvcs)
-	return
-}
-
-// Set the running state of the kubevirt VM.
-func (r *Migration) setRunning(vm *plan.VMStatus, running bool) (err error) {
-	if r.vmMap == nil {
-		r.vmMap, err = r.kubevirt.VirtualMachineMap()
-		if err != nil {
-			return
-		}
-	}
-	var vmCr VirtualMachine
-	found := false
-	if vmCr, found = r.vmMap[vm.ID]; !found {
-		// Recreate the map and check again, the map may be stale
-		r.vmMap, err = r.kubevirt.VirtualMachineMap()
-		if err != nil {
-			return
-		}
-
-		if vmCr, found = r.vmMap[vm.ID]; !found {
-			msg := "VirtualMachine CR not found."
-			vm.AddError(msg)
-			return
-		}
-	}
-
-	if vmCr.Spec.Running != nil && *vmCr.Spec.Running == running {
-		return
-	}
-
-	err = r.kubevirt.SetRunning(&vmCr, running)
 	return
 }
 
