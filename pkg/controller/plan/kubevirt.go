@@ -427,18 +427,6 @@ func (r *KubeVirt) DeleteVM(vm *plan.VMStatus) (err error) {
 	return
 }
 
-// Set the Running state on a Kubevirt VirtualMachine.
-func (r *KubeVirt) SetRunning(vmCr *VirtualMachine, running bool) (err error) {
-	vmCopy := vmCr.VirtualMachine.DeepCopy()
-	vmCr.VirtualMachine.Spec.Running = &running
-	patch := client.MergeFrom(vmCopy)
-	err = r.Destination.Client.Patch(context.TODO(), vmCr.VirtualMachine, patch)
-	if err != nil {
-		err = liberr.Wrap(err)
-	}
-	return
-}
-
 func (r *KubeVirt) DataVolumes(vm *plan.VMStatus) (dataVolumes []cdi.DataVolume, err error) {
 	secret, err := r.ensureSecret(vm.Ref, r.secretDataSetterForCDI(vm.Ref))
 	if err != nil {
@@ -1006,7 +994,8 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 		object.ObjectMeta.Annotations = annotations
 	}
 
-	running := false
+	// Power on the destination VM if the source VM was originally powered on.
+	running := vm.RestorePowerState == On
 	object.Spec.Running = &running
 
 	err = r.Builder.VirtualMachine(vm.Ref, &object.Spec, pvcs)
