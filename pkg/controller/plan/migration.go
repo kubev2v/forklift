@@ -1601,14 +1601,9 @@ func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.St
 			continue
 		}
 
-		for _, pod := range populatorPods {
-			pvcId := strings.Split(pod.Name, "populate-")[1]
-			if string(pvc.UID) != pvcId {
-				continue
-			}
-			if pod.Status.Phase == core.PodFailed {
-				return fmt.Errorf("populator pod %s/%s failed for PVC %s. Please check the pod logs.", pod.Namespace, pod.Name, pvcId)
-			}
+		err = r.isPopulatorFailed(populatorPods, string(pvc.UID))
+		if err != nil {
+			return
 		}
 
 		if pvc.Status.Phase == core.ClaimBound {
@@ -1631,6 +1626,19 @@ func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.St
 
 	step.ReflectTasks()
 	return
+}
+
+func (r *Migration) isPopulatorFailed(populatorPods []core.Pod, givenPvcId string) error {
+	for _, pod := range populatorPods {
+		pvcId := strings.Split(pod.Name, "populate-")[1]
+		if givenPvcId != pvcId {
+			continue
+		}
+		if pod.Status.Phase == core.PodFailed {
+			return fmt.Errorf("populator pod %s/%s failed for PVC %s. Please check the pod logs.", pod.Namespace, pod.Name, pvcId)
+		}
+	}
+	return nil
 }
 
 func (r *Migration) setPopulatorPodsWithLabels(vm *plan.VMStatus, migrationID string) {
