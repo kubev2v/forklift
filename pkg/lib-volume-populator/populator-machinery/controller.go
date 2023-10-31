@@ -31,7 +31,6 @@ import (
 	"time"
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/controller/plan"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -698,13 +697,6 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 		if corev1.PodSucceeded != pod.Status.Phase {
 			if corev1.PodFailed == pod.Status.Phase {
 				c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPodFailed, "Populator failed: %s", pod.Status.Message)
-				// Delete failed pods so we can try again
-				if !plan.RestartLimitExceeded(pod) {
-					err = c.kubeClient.CoreV1().Pods(populatorNamespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
-					if err != nil {
-						return err
-					}
-				}
 			}
 			// We'll get called again later when the pod succeeds
 			return nil
