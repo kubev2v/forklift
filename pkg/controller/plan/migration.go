@@ -1448,7 +1448,7 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 				if r.Plan.Spec.Warm && len(importer.Status.ContainerStatuses) > 0 {
 					vm.Warm.Failures = int(importer.Status.ContainerStatuses[0].RestartCount)
 				}
-				if RestartLimitExceeded(importer) {
+				if restartLimitExceeded(importer) {
 					task.MarkedCompleted()
 					msg, _ := terminationMessage(importer)
 					task.AddError(msg)
@@ -1593,6 +1593,10 @@ func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.St
 	if err != nil {
 		return
 	}
+	populatorPods, err := r.kubevirt.getPopulatorPods()
+	if err != nil {
+		return
+	}
 
 	for _, pvc := range pvcs {
 		if _, ok := pvc.Annotations["lun"]; ok {
@@ -1609,6 +1613,16 @@ func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.St
 		found := false
 		if task, found = step.FindTask(taskName); !found {
 			continue
+		}
+
+		for _, pod := range populatorPods {
+			pvcId := strings.Split(pod.Name, "populate-")[1]
+			if string(pvc.UID) != pvcId {
+				continue
+			}
+			if pod.Status.Phase == core.PodFailed {
+				return fmt.Errorf("populator pod %s/%s failed for PVC %s. Please check the pod logs.", pod.Namespace, pod.Name, pvcId)
+			}
 		}
 
 		if pvc.Status.Phase == core.ClaimBound {
@@ -1696,7 +1710,7 @@ func terminationMessage(pod *core.Pod) (msg string, ok bool) {
 }
 
 // Return whether the pod has failed and restarted too many times.
-func RestartLimitExceeded(pod *core.Pod) (exceeded bool) {
+func restartLimitExceeded(pod *core.Pod) (exceeded bool) {
 	if len(pod.Status.ContainerStatuses) == 0 {
 		return
 	}
