@@ -391,10 +391,8 @@ func (r *Builder) mapFirmware(vm *model.Workload, object *cnv.VirtualMachineSpec
 	default:
 		bootloader = &cnv.Bootloader{BIOS: &cnv.BIOS{}}
 	}
-	features := &cnv.Features{}
 	firmware := &cnv.Firmware{}
 	firmware.Bootloader = bootloader
-	object.Template.Spec.Domain.Features = features
 	object.Template.Spec.Domain.Firmware = firmware
 }
 
