@@ -862,7 +862,7 @@ func (r *KubeVirt) SetPopulatorPodOwnership(vm *plan.VMStatus) (err error) {
 		return
 	}
 	for _, pod := range pods {
-		pvcId := strings.Split(pod.Name, "populate-")[1]
+		pvcId := pod.Name[len(PopulatorPodPrefix):]
 		for _, pvc := range pvcs {
 			if string(pvc.UID) != pvcId {
 				continue
@@ -898,7 +898,7 @@ func (r *KubeVirt) getPopulatorPods() (pods []core.Pod, err error) {
 		return nil, liberr.Wrap(err)
 	}
 	for _, pod := range migrationPods.Items {
-		if strings.HasPrefix(pod.Name, "populate-") {
+		if strings.HasPrefix(pod.Name, PopulatorPodPrefix) {
 			pods = append(pods, pod)
 		}
 	}
