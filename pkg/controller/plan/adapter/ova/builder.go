@@ -241,7 +241,6 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	r.mapDisks(vm, persistentVolumeClaims, object)
 	r.mapFirmware(vm, object)
 	r.mapCPU(vm, object)
-	r.mapClock(object)
 	r.mapInput(object)
 	err = r.mapMemory(vm, object)
 	if err != nil {
@@ -319,13 +318,6 @@ func (r *Builder) mapInput(object *cnv.VirtualMachineSpec) {
 	object.Template.Spec.Domain.Devices.Inputs = []cnv.Input{tablet}
 }
 
-func (r *Builder) mapClock(object *cnv.VirtualMachineSpec) {
-	clock := &cnv.Clock{
-		Timer: &cnv.Timer{},
-	}
-	object.Template.Spec.Domain.Clock = clock
-}
-
 func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec) error {
 	var memoryBytes int64
 	memoryBytes, err := getResourceCapacity(int64(vm.MemoryMB), vm.MemoryUnits)
@@ -353,7 +345,6 @@ func (r *Builder) mapCPU(vm *model.VM, object *cnv.VirtualMachineSpec) {
 }
 
 func (r *Builder) mapFirmware(vm *model.VM, object *cnv.VirtualMachineSpec) {
-	features := &cnv.Features{}
 	firmware := &cnv.Firmware{
 		Serial: vm.UUID,
 	}
@@ -372,7 +363,6 @@ func (r *Builder) mapFirmware(vm *model.VM, object *cnv.VirtualMachineSpec) {
 				SecureBoot: &secureBootEnabled,
 			}}
 	}
-	object.Template.Spec.Domain.Features = features
 	object.Template.Spec.Domain.Firmware = firmware
 }
 
