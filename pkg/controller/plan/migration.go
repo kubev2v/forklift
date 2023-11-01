@@ -84,7 +84,8 @@ const (
 )
 
 const (
-	TransferCompleted = "Transfer completed."
+	TransferCompleted  = "Transfer completed."
+	PopulatorPodPrefix = "populate-"
 )
 
 var (
@@ -1615,7 +1616,7 @@ func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.St
 			continue
 		}
 
-		err = r.isPopulatorFailed(populatorPods, string(pvc.UID))
+		_, err = r.isPopulatorFailed(populatorPods, string(pvc.UID))
 		if err != nil {
 			return
 		}
@@ -1642,17 +1643,18 @@ func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.St
 	return
 }
 
-func (r *Migration) isPopulatorFailed(populatorPods []core.Pod, givenPvcId string) error {
+func (r *Migration) isPopulatorFailed(populatorPods []core.Pod, givenPvcId string) (bool, error) {
 	for _, pod := range populatorPods {
-		pvcId := strings.Split(pod.Name, "populate-")[1]
+		pvcId := pod.Name[len(PopulatorPodPrefix):]
 		if givenPvcId != pvcId {
 			continue
 		}
 		if pod.Status.Phase == core.PodFailed {
-			return fmt.Errorf("populator pod %s/%s failed for PVC %s. Please check the pod logs.", pod.Namespace, pod.Name, pvcId)
+			return true, fmt.Errorf("populator pod %s/%s failed for PVC %s. Please check the pod logs.", pod.Namespace, pod.Name, pvcId)
 		}
+		break
 	}
-	return nil
+	return false, nil
 }
 
 func (r *Migration) setPopulatorPodsWithLabels(vm *plan.VMStatus, migrationID string) {
@@ -1661,7 +1663,7 @@ func (r *Migration) setPopulatorPodsWithLabels(vm *plan.VMStatus, migrationID st
 		return
 	}
 	for _, pod := range podList.Items {
-		if strings.HasPrefix(pod.Name, "populate-") {
+		if strings.HasPrefix(pod.Name, PopulatorPodPrefix) {
 			// it's populator pod
 			if _, ok := pod.Labels["migration"]; !ok {
 				// un-labeled pod, we need to set it
