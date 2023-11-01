@@ -542,14 +542,15 @@ func (r *Builder) mapInput(object *cnv.VirtualMachineSpec) {
 }
 
 func (r *Builder) mapClock(host *model.Host, object *cnv.VirtualMachineSpec) {
-	clock := &cnv.Clock{
-		Timer: &cnv.Timer{},
-	}
 	if host.Timezone != "" {
+		if object.Template.Spec.Domain.Clock == nil {
+			object.Template.Spec.Domain.Clock = &cnv.Clock{
+				Timer: &cnv.Timer{},
+			}
+		}
 		tz := cnv.ClockOffsetTimezone(host.Timezone)
-		clock.ClockOffset.Timezone = &tz
+		object.Template.Spec.Domain.Clock.ClockOffset.Timezone = &tz
 	}
-	object.Template.Spec.Domain.Clock = clock
 }
 
 func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec) {
@@ -571,7 +572,6 @@ func (r *Builder) mapCPU(vm *model.VM, object *cnv.VirtualMachineSpec) {
 }
 
 func (r *Builder) mapFirmware(vm *model.VM, object *cnv.VirtualMachineSpec) {
-	features := &cnv.Features{}
 	firmware := &cnv.Firmware{
 		Serial: vm.UUID,
 	}
@@ -590,7 +590,6 @@ func (r *Builder) mapFirmware(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	default:
 		firmware.Bootloader = &cnv.Bootloader{BIOS: &cnv.BIOS{}}
 	}
-	object.Template.Spec.Domain.Features = features
 	object.Template.Spec.Domain.Firmware = firmware
 }
 
