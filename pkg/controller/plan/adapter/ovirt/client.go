@@ -24,13 +24,6 @@ const (
 	snapshotDesc = "Forklift Operator warm migration precopy"
 )
 
-// VM power states
-const (
-	powerOn      = "On"
-	powerOff     = "Off"
-	powerUnknown = "Unknown"
-)
-
 // Snapshot event codes
 const (
 	SNAPSHOT_FINISHED_SUCCESS        int64 = 68
@@ -149,7 +142,7 @@ func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, data
 }
 
 // Get the power state of the VM.
-func (r *Client) PowerState(vmRef ref.Ref) (state string, err error) {
+func (r *Client) PowerState(vmRef ref.Ref) (state planapi.VMPowerState, err error) {
 	vm, _, err := r.getVM(vmRef)
 	if err != nil {
 		return
@@ -157,11 +150,11 @@ func (r *Client) PowerState(vmRef ref.Ref) (state string, err error) {
 	status, _ := vm.Status()
 	switch status {
 	case ovirtsdk.VMSTATUS_DOWN:
-		state = powerOff
+		state = planapi.VMPowerStateOff
 	case ovirtsdk.VMSTATUS_UP, ovirtsdk.VMSTATUS_POWERING_UP:
-		state = powerOn
+		state = planapi.VMPowerStateOn
 	default:
-		state = powerUnknown
+		state = planapi.VMPowerStateUnknown
 	}
 	return
 }
@@ -204,7 +197,7 @@ func (r *Client) PoweredOff(vmRef ref.Ref) (poweredOff bool, err error) {
 	if err != nil {
 		return
 	}
-	poweredOff = powerState == powerOff
+	poweredOff = powerState == planapi.VMPowerStateOff
 	return
 }
 

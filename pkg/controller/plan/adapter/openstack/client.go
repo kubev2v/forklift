@@ -76,10 +76,20 @@ func (r *Client) PowerOff(vmRef ref.Ref) (err error) {
 }
 
 // Return the source VM's power state.
-func (r *Client) PowerState(vmRef ref.Ref) (state string, err error) {
-	state, err = r.VMStatus(vmRef.ID)
+func (r *Client) PowerState(vmRef ref.Ref) (state planapi.VMPowerState, err error) {
+	status, err := r.VMStatus(vmRef.ID)
 	if err != nil {
 		err = liberr.Wrap(err)
+		state = planapi.VMPowerStateUnknown
+		return
+	}
+	switch status {
+	case libclient.VmStatusActive:
+		state = planapi.VMPowerStateOn
+	case libclient.VmStatusShutoff:
+		state = planapi.VMPowerStateOff
+	default:
+		state = planapi.VMPowerStateUnknown
 	}
 	return
 }
@@ -91,7 +101,7 @@ func (r *Client) PoweredOff(vmRef ref.Ref) (off bool, err error) {
 		err = liberr.Wrap(err)
 		return
 	}
-	off = state == libclient.VmStatusShutoff
+	off = state == planapi.VMPowerStateOff
 	return
 }
 
