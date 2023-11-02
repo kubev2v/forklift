@@ -2,11 +2,12 @@ package plan
 
 import (
 	"fmt"
+	"path"
+
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"path"
 )
 
 // Plan hook.
@@ -57,7 +58,7 @@ type VMStatus struct {
 	// Warm migration status
 	Warm *Warm `json:"warm,omitempty"`
 	// Source VM power state before migration.
-	RestorePowerState string `json:"restorePowerState,omitempty"`
+	RestorePowerState VMPowerState `json:"restorePowerState,omitempty"`
 
 	// Conditions.
 	libcnd.Conditions `json:",inline"`
@@ -71,6 +72,14 @@ type Warm struct {
 	NextPrecopyAt       *meta.Time `json:"nextPrecopyAt,omitempty"`
 	Precopies           []Precopy  `json:"precopies,omitempty"`
 }
+
+type VMPowerState string
+
+const (
+	VMPowerStateOn      VMPowerState = "On"
+	VMPowerStateOff     VMPowerState = "Off"
+	VMPowerStateUnknown VMPowerState = "Unknown"
+)
 
 // Precopy durations
 type Precopy struct {

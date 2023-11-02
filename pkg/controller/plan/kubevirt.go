@@ -1084,7 +1084,7 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 	}
 
 	// Power on the destination VM if the source VM was originally powered on.
-	running := vm.RestorePowerState == On
+	running := vm.RestorePowerState == plan.VMPowerStateOn
 	object.Spec.Running = &running
 
 	err = r.Builder.VirtualMachine(vm.Ref, &object.Spec, pvcs)

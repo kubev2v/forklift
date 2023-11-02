@@ -65,7 +65,7 @@ func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, data
 }
 
 // Get the power state of the VM.
-func (r *Client) PowerState(vmRef ref.Ref) (state string, err error) {
+func (r *Client) PowerState(vmRef ref.Ref) (state planapi.VMPowerState, err error) {
 	return
 }
 
