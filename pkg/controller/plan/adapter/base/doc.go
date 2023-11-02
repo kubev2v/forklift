@@ -80,7 +80,7 @@ type Client interface {
 	// Power off the source VM.
 	PowerOff(vmRef ref.Ref) error
 	// Return the source VM's power state.
-	PowerState(vmRef ref.Ref) (string, error)
+	PowerState(vmRef ref.Ref) (planapi.VMPowerState, error)
 	// Return whether the source VM is powered off.
 	PoweredOff(vmRef ref.Ref) (bool, error)
 	// Create a snapshot of the source VM.

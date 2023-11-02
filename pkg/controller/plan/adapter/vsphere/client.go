@@ -26,13 +26,6 @@ const (
 	snapshotDesc = "Forklift Operator warm migration precopy"
 )
 
-// VM power states
-const (
-	powerOn      = "On"
-	powerOff     = "Off"
-	powerUnknown = "Unknown"
-)
-
 // vSphere VM Client
 type Client struct {
 	*plancontext.Context
@@ -138,7 +131,7 @@ func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, data
 }
 
 // Get the power state of the VM.
-func (r *Client) PowerState(vmRef ref.Ref) (state string, err error) {
+func (r *Client) PowerState(vmRef ref.Ref) (state planapi.VMPowerState, err error) {
 	vm, err := r.getVM(vmRef)
 	if err != nil {
 		return
@@ -150,11 +143,11 @@ func (r *Client) PowerState(vmRef ref.Ref) (state string, err error) {
 	}
 	switch powerState {
 	case types.VirtualMachinePowerStatePoweredOn:
-		state = powerOn
+		state = planapi.VMPowerStateOn
 	case types.VirtualMachinePowerStatePoweredOff:
-		state = powerOff
+		state = planapi.VMPowerStateOff
 	default:
-		state = powerUnknown
+		state = planapi.VMPowerStateUnknown
 	}
 	return
 }
