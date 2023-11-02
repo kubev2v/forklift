@@ -91,19 +91,19 @@ func (r *Client) PowerOn(vmRef ref.Ref) error {
 }
 
 // PowerState implements base.Client
-func (r *Client) PowerState(vmRef ref.Ref) (string, error) {
+func (r *Client) PowerState(vmRef ref.Ref) (planapi.VMPowerState, error) {
 	vm := cnv.VirtualMachine{}
 	err := r.sourceClient.Get(context.TODO(), k8sclient.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, &vm)
 	if err != nil {
 		err = liberr.Wrap(err)
-		return "", err
+		return planapi.VMPowerStateUnknown, err
 	}
 
 	if vm.Spec.Running != nil && *vm.Spec.Running {
-		return "On", nil
+		return planapi.VMPowerStateOn, nil
 	}
 
-	return "Off", nil
+	return planapi.VMPowerStateOff, nil
 }
 
 // PoweredOff implements base.Client
