@@ -83,11 +83,6 @@ const (
 	Unknown         = "Unknown"
 )
 
-// Power states.
-const (
-	On = "On"
-)
-
 const (
 	TransferCompleted = "Transfer completed."
 )
@@ -401,7 +396,7 @@ func (r *Migration) Cancel() (err error) {
 					vm.String())
 				err = nil
 			}
-			if vm.RestorePowerState == On {
+			if vm.RestorePowerState == plan.VMPowerStateOn {
 				err = r.provider.PowerOn(vm.Ref)
 				if err != nil {
 					r.Log.Error(err,
@@ -905,7 +900,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
 			break
 		}
-		var state string
+		var state plan.VMPowerState
 		state, err = r.provider.PowerState(vm.Ref)
 		if err != nil {
 			if !errors.As(err, &web.ProviderNotReadyError{}) {
