@@ -12,6 +12,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 const (
@@ -20,6 +22,7 @@ const (
 	nfsVolumeNamePrefix = "nfs-volume"
 	mountPath           = "/ova"
 	pvSize              = "1Gi"
+	qemuGroup           = 107
 )
 
 func (r Reconciler) CreateOVAServerDeployment(provider *api.Provider, ctx context.Context) {
@@ -188,44 +191,92 @@ func (r *Reconciler) createServerService(provider *api.Provider, ctx context.Con
 func (r *Reconciler) makeOvaProviderPodSpec(pvcName string, providerName string) core.PodSpec {
 	imageName, ok := os.LookupEnv(ovaImageVar)
 	if !ok {
-		r.Log.Error(nil, "Failed to find OVA server image")
+		fmt.Println("Failed to find OVA server image")
+		return core.PodSpec{}
 	}
 
 	nfsVolumeName := fmt.Sprintf("%s-%s", nfsVolumeNamePrefix, providerName)
 	ovaContainerName := fmt.Sprintf("%s-pod-%s", ovaServer, providerName)
-	allowPrivilegeEscalation := false
 	nonRoot := true
+	user := int64(qemuGroup)
+	allowPrivilegeEscalation := false
 
-	return core.PodSpec{
-		Containers: []core.Container{
+	commonSecurityContext := &core.SecurityContext{
+		AllowPrivilegeEscalation: &allowPrivilegeEscalation,
+		RunAsNonRoot:             &nonRoot,
+		Capabilities: &core.Capabilities{
+			Drop: []core.Capability{"ALL"},
+		},
+	}
+
+	container := core.Container{
+		Name:  ovaContainerName,
+		Image: imageName,
+		Ports: []core.ContainerPort{{ContainerPort: 8080, Protocol: core.ProtocolTCP}},
+		VolumeMounts: []core.VolumeMount{
 			{
-				Name:  ovaContainerName,
-				Ports: []core.ContainerPort{{ContainerPort: 8080, Protocol: core.ProtocolTCP}},
-				Image: imageName,
-				VolumeMounts: []core.VolumeMount{
-					{
-						Name:      nfsVolumeName,
-						MountPath: mountPath,
-					},
-				},
-				SecurityContext: &core.SecurityContext{
-					AllowPrivilegeEscalation: &allowPrivilegeEscalation,
-					RunAsNonRoot:             &nonRoot,
-					Capabilities: &core.Capabilities{
-						Drop: []core.Capability{"ALL"},
-					},
-				},
+				Name:      nfsVolumeName,
+				MountPath: mountPath,
 			},
 		},
-		Volumes: []core.Volume{
-			{
-				Name: nfsVolumeName,
-				VolumeSource: core.VolumeSource{
-					PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
-						ClaimName: pvcName,
-					},
-				},
+		SecurityContext: commonSecurityContext,
+	}
+
+	isOpenShift := r.runningInOpenShift()
+	//Security settings for k8s
+	if !isOpenShift {
+		container.SecurityContext.RunAsUser = &user
+	}
+
+	volume := core.Volume{
+		Name: nfsVolumeName,
+		VolumeSource: core.VolumeSource{
+			PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
+				ClaimName: pvcName,
 			},
 		},
 	}
+
+	podSpec := core.PodSpec{
+		Containers: []core.Container{container},
+		Volumes:    []core.Volume{volume},
+	}
+
+	//Security pod settings for k8s
+	if !isOpenShift {
+		podSpec.SecurityContext = &core.PodSecurityContext{
+			FSGroup: &user,
+			SeccompProfile: &core.SeccompProfile{
+				Type: core.SeccompProfileTypeRuntimeDefault,
+			},
+		}
+	}
+	return podSpec
+}
+
+func (r *Reconciler) runningInOpenShift() bool {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		r.Log.Error(nil, "Failed to get cluster config")
+		return true
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		r.Log.Error(nil, "Failed create k8s clientSet")
+		return true
+	}
+
+	apiGroups, err := clientset.Discovery().ServerGroups()
+	if err != nil {
+		r.Log.Error(nil, "Failed to get server groups")
+		return true
+	}
+
+	for _, group := range apiGroups.Groups {
+		if group.Name == "route.openshift.io" {
+			return true
+		}
+	}
+	return false
 }
