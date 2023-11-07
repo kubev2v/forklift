@@ -76,6 +76,7 @@ const (
 	reasonPVCCreationError   = "PopulatorPVCCreationError"
 	reasonPopulatorProgress  = "PopulatorProgress"
 	AnnDefaultNetwork        = "v1.multus-cni.io/default-network"
+	AnnPopulatorReCreations  = "recreations"
 
 	qemuGroup = 107
 )
@@ -696,7 +697,18 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 
 		if corev1.PodSucceeded != pod.Status.Phase {
 			if corev1.PodFailed == pod.Status.Phase {
-				c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPodFailed, "Populator failed: %s", pod.Status.Message)
+				restarts, ok := pvc.Annotations[AnnPopulatorReCreations]
+				if !ok {
+					return c.retryFailedPopulator(ctx, pvc, populatorNamespace, pod.Name, 1)
+				}
+				restartsInteger, err := strconv.Atoi(restarts)
+				if err != nil {
+					return err
+				}
+				if restartsInteger < 3 {
+					return c.retryFailedPopulator(ctx, pvc, populatorNamespace, pod.Name, restartsInteger+1)
+				}
+				c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPodFailed, "Populator failed after few (3) attempts: Please check the logs of the populator pod, %s/%s", populatorNamespace, pod.Name)
 			}
 			// We'll get called again later when the pod succeeds
 			return nil
@@ -789,6 +801,24 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 	delete(monitoredPVCs, string(pvc.UID))
 
 	return nil
+}
+
+func (c *controller) retryFailedPopulator(ctx context.Context, pvc *corev1.PersistentVolumeClaim, namespace, podName string, counter int) error {
+	pvc.Annotations[AnnPopulatorReCreations] = strconv.Itoa(counter)
+	err := c.updatePvc(ctx, pvc, namespace)
+	if err != nil {
+		return err
+	}
+	err = c.kubeClient.CoreV1().Pods(namespace).Delete(ctx, podName, metav1.DeleteOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *controller) updatePvc(ctx context.Context, pvc *corev1.PersistentVolumeClaim, namespace string) (err error) {
+	_, err = c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Update(ctx, pvc, metav1.UpdateOptions{})
+	return err
 }
 
 func (c *controller) updateProgress(pvc *corev1.PersistentVolumeClaim, podIP string, cr *unstructured.Unstructured) error {
