@@ -1580,10 +1580,6 @@ func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.St
 	if err != nil {
 		return
 	}
-	populatorPods, err := r.kubevirt.getPopulatorPods()
-	if err != nil {
-		return
-	}
 
 	for _, pvc := range pvcs {
 		if _, ok := pvc.Annotations["lun"]; ok {
@@ -1602,11 +1598,6 @@ func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.St
 			continue
 		}
 
-		_, err = r.isPopulatorFailed(populatorPods, string(pvc.UID))
-		if err != nil {
-			return
-		}
-
 		if pvc.Status.Phase == core.ClaimBound {
 			task.Phase = Completed
 			task.Reason = TransferCompleted
@@ -1622,25 +1613,39 @@ func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.St
 		}
 
 		percent := float64(transferredBytes/0x100000) / float64(task.Progress.Total)
-		task.Progress.Completed = int64(percent * float64(task.Progress.Total))
+		newProgress := int64(percent * float64(task.Progress.Total))
+		if newProgress == task.Progress.Completed {
+			pvcId := string(pvc.UID)
+			populatorFailed := r.isPopulatorPodFailed(pvcId)
+			if populatorFailed {
+				return fmt.Errorf("populator pod failed for PVC %s. Please check the pod logs", pvcId)
+			}
+		}
+		task.Progress.Completed = newProgress
 	}
 
 	step.ReflectTasks()
 	return
 }
 
-func (r *Migration) isPopulatorFailed(populatorPods []core.Pod, givenPvcId string) (bool, error) {
+// Checks if the populator pod failed when the progress didn't change
+func (r *Migration) isPopulatorPodFailed(givenPvcId string) bool {
+	populatorPods, err := r.kubevirt.getPopulatorPods()
+	if err != nil {
+		r.Log.Error(err, "couldn't get the populator pods")
+		return false
+	}
 	for _, pod := range populatorPods {
 		pvcId := pod.Name[len(PopulatorPodPrefix):]
 		if givenPvcId != pvcId {
 			continue
 		}
 		if pod.Status.Phase == core.PodFailed {
-			return true, fmt.Errorf("populator pod %s/%s failed for PVC %s. Please check the pod logs.", pod.Namespace, pod.Name, pvcId)
+			return true
 		}
 		break
 	}
-	return false, nil
+	return false
 }
 
 func (r *Migration) setPopulatorPodsWithLabels(vm *plan.VMStatus, migrationID string) {
