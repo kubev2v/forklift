@@ -193,6 +193,8 @@ func (r *Reconciler) makeOvaProviderPodSpec(pvcName string, providerName string)
 
 	nfsVolumeName := fmt.Sprintf("%s-%s", nfsVolumeNamePrefix, providerName)
 	ovaContainerName := fmt.Sprintf("%s-pod-%s", ovaServer, providerName)
+	allowPrivilegeEscalation := false
+	nonRoot := true
 
 	return core.PodSpec{
 		Containers: []core.Container{
@@ -204,6 +206,13 @@ func (r *Reconciler) makeOvaProviderPodSpec(pvcName string, providerName string)
 					{
 						Name:      nfsVolumeName,
 						MountPath: mountPath,
+					},
+				},
+				SecurityContext: &core.SecurityContext{
+					AllowPrivilegeEscalation: &allowPrivilegeEscalation,
+					RunAsNonRoot:             &nonRoot,
+					Capabilities: &core.Capabilities{
+						Drop: []core.Capability{"ALL"},
 					},
 				},
 			},
