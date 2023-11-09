@@ -64,6 +64,8 @@ spec:
           value: ${SNAPSHOT_STATUS_CHECK_RATE}
         - name: CDI_EXPORT_TOKEN_TTL
           value: ${CDI_EXPORT_TOKEN_TTL}
+        - name: FILESYSTEM_OVERHEAD
+          value: ${FILESYSTEM_OVERHEAD}
         - name: POPULATOR_CONTROLLER_IMAGE
           value: ${POPULATOR_CONTROLLER_IMAGE}
         - name: OVIRT_POPULATOR_IMAGE

@@ -27,7 +27,7 @@ type Profiler struct {
 
 // Load settings.
 func (r *Profiler) Load() error {
-	minutes, _ := getEnvLimit(ProfileDuration, 0)
+	minutes, _ := getPositiveEnvLimit(ProfileDuration, 0)
 	r.Duration = time.Duration(minutes) * time.Minute
 	if s, found := os.LookupEnv(ProfilePath); found {
 		r.Path = s

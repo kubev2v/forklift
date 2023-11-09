@@ -783,6 +783,7 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(diskAttachment model.XDiskA
 	annotations map[string]string) (pvc *core.PersistentVolumeClaim, err error) {
 
 	// We add 10% overhead because of the fsOverhead in CDI, around 5% to ext4 and 5% for root partition.
+	// This value is configurable using `FILESYSTEM_OVERHEAD`
 	diskSize := diskAttachment.Disk.ProvisionedSize
 
 	var accessModes []core.PersistentVolumeAccessMode
@@ -796,7 +797,7 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(diskAttachment model.XDiskA
 	// Accounting for fsOverhead is only required for `volumeMode: Filesystem`, as we may not have enough space
 	// after creating a filesystem on an underlying block device
 	if *volumeMode == core.PersistentVolumeFilesystem {
-		diskSize = utils.CalculateSpaceWithOverhead(diskSize, 0.1)
+		diskSize = utils.CalculateSpaceWithOverhead(diskSize)
 	}
 
 	annotations[AnnImportDiskId] = diskAttachment.ID
