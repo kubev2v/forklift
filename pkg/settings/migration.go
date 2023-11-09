@@ -18,6 +18,7 @@ const (
 	SnapshotRemovalTimeout  = "SNAPSHOT_REMOVAL_TIMEOUT"
 	SnapshotStatusCheckRate = "SNAPSHOT_STATUS_CHECK_RATE"
 	CDIExportTokenTTL       = "CDI_EXPORT_TOKEN_TTL"
+	FileSystemOverhead      = "FILESYSTEM_OVERHEAD"
 )
 
 // Default virt-v2v image.
@@ -46,31 +47,33 @@ type Migration struct {
 	VirtV2vDontRequestKVM bool
 	// OCP Export token TTL minutes
 	CDIExportTokenTTL int
+	// FileSystem overhead in percantage
+	FileSystemOverhead int
 }
 
 // Load settings.
 func (r *Migration) Load() (err error) {
-	r.MaxInFlight, err = getEnvLimit(MaxVmInFlight, 20)
+	r.MaxInFlight, err = getPositiveEnvLimit(MaxVmInFlight, 20)
 	if err != nil {
 		err = liberr.Wrap(err)
 	}
-	r.HookRetry, err = getEnvLimit(HookRetry, 3)
+	r.HookRetry, err = getPositiveEnvLimit(HookRetry, 3)
 	if err != nil {
 		err = liberr.Wrap(err)
 	}
-	r.ImporterRetry, err = getEnvLimit(ImporterRetry, 3)
+	r.ImporterRetry, err = getPositiveEnvLimit(ImporterRetry, 3)
 	if err != nil {
 		err = liberr.Wrap(err)
 	}
-	r.PrecopyInterval, err = getEnvLimit(PrecopyInterval, 60)
+	r.PrecopyInterval, err = getPositiveEnvLimit(PrecopyInterval, 60)
 	if err != nil {
 		err = liberr.Wrap(err)
 	}
-	r.SnapshotRemovalTimeout, err = getEnvLimit(SnapshotRemovalTimeout, 120)
+	r.SnapshotRemovalTimeout, err = getPositiveEnvLimit(SnapshotRemovalTimeout, 120)
 	if err != nil {
 		err = liberr.Wrap(err)
 	}
-	r.SnapshotStatusCheckRate, err = getEnvLimit(SnapshotStatusCheckRate, 10)
+	r.SnapshotStatusCheckRate, err = getPositiveEnvLimit(SnapshotStatusCheckRate, 10)
 	if err != nil {
 		err = liberr.Wrap(err)
 	}
@@ -87,8 +90,11 @@ func (r *Migration) Load() (err error) {
 		r.VirtV2vImageWarm = DefaultVirtV2vImage
 	}
 	r.VirtV2vDontRequestKVM = getEnvBool(VirtV2vDontRequestKVM, false)
-
-	r.CDIExportTokenTTL, err = getEnvLimit(CDIExportTokenTTL, 0)
+	r.CDIExportTokenTTL, err = getPositiveEnvLimit(CDIExportTokenTTL, 0)
+	if err != nil {
+		err = liberr.Wrap(err)
+	}
+	r.FileSystemOverhead, err = getNonNegativeEnvLimit(FileSystemOverhead, 10)
 	if err != nil {
 		err = liberr.Wrap(err)
 	}

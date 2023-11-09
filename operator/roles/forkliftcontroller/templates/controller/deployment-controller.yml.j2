@@ -76,6 +76,10 @@ spec:
         - name: CDI_EXPORT_TOKEN_TTL
           value: "{{ CDI_EXPORT_TOKEN_TTL }}"
 {% endif %}
+{% if controller_filesystem_overhead is number %}
+        - name: FILESYSTEM_OVERHEAD
+          value: "{{ controller_filesystem_overhead }}"
+{% endif %}
 {% if controller_vsphere_incremental_backup|bool %}
         - name: FEATURE_VSPHERE_INCREMENTAL_BACKUP
           value: "true"
