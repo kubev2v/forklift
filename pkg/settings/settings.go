@@ -1,9 +1,11 @@
 package settings
 
 import (
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	"fmt"
 	"os"
 	"strconv"
+
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 )
 
 // Global
@@ -69,15 +71,27 @@ func (r *ControllerSettings) Load() error {
 
 // Get positive integer limit from the environment
 // using the specified variable name and default.
-func getEnvLimit(name string, def int) (int, error) {
+func getPositiveEnvLimit(name string, def int) (int, error) {
+	return getEnvLimit(name, def, 1)
+}
+
+// Get non-negative integer limit from the environment
+// using the specified variable name and default.
+func getNonNegativeEnvLimit(name string, def int) (int, error) {
+	return getEnvLimit(name, def, 0)
+}
+
+// Get an integer limit from the environment
+// using the specified variable name and default.
+func getEnvLimit(name string, def, minimum int) (int, error) {
 	limit := 0
 	if s, found := os.LookupEnv(name); found {
 		n, err := strconv.Atoi(s)
 		if err != nil {
 			return 0, liberr.New(name + " must be an integer")
 		}
-		if n < 1 {
-			return 0, liberr.New(name + " must be >= 1")
+		if n < minimum {
+			return 0, liberr.New(fmt.Sprintf(name+" must be >= %d", minimum))
 		}
 		limit = n
 	} else {
