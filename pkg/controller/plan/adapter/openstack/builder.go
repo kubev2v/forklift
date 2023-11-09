@@ -1102,7 +1102,7 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image, storageC
 	}
 
 	if *volumeMode == core.PersistentVolumeFilesystem {
-		virtualSize = utils.CalculateSpaceWithOverhead(virtualSize, 0.1)
+		virtualSize = utils.CalculateSpaceWithOverhead(virtualSize)
 	}
 
 	// The image might be a VM Snapshot Image and has no volume associated to it

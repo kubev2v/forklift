@@ -21,6 +21,6 @@ type Logging struct {
 // Load settings.
 func (r *Logging) Load() error {
 	r.Development = getEnvBool(LogDevelopment, false)
-	r.Level, _ = getEnvLimit(LogLevel, 0)
+	r.Level, _ = getPositiveEnvLimit(LogLevel, 0)
 	return nil
 }

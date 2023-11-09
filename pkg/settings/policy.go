@@ -41,11 +41,11 @@ func (r *PolicyAgent) Load() (err error) {
 	} else {
 		r.TLS.CA = ServiceCAFile
 	}
-	r.Limit.Worker, err = getEnvLimit(PolicyAgentWorkerLimit, 10)
+	r.Limit.Worker, err = getPositiveEnvLimit(PolicyAgentWorkerLimit, 10)
 	if err != nil {
 		return err
 	}
-	r.SearchInterval, err = getEnvLimit(PolicyAgentSearchInterval, 600)
+	r.SearchInterval, err = getPositiveEnvLimit(PolicyAgentSearchInterval, 600)
 	if err != nil {
 		return err
 	}

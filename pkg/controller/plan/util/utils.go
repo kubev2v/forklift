@@ -1,6 +1,10 @@
 package util
 
-import "math"
+import (
+	"math"
+
+	"github.com/konveyor/forklift-controller/pkg/settings"
+)
 
 // Disk alignment size used to align FS overhead,
 // its a multiple of all known hardware block sizes 512/4k/8k/32k/64k
@@ -16,8 +20,8 @@ func roundUp(requestedSpace, multiple int64) int64 {
 	return int64(partitions) * multiple
 }
 
-func CalculateSpaceWithOverhead(requestedSpace int64, filesystemOverhead float64) int64 {
+func CalculateSpaceWithOverhead(requestedSpace int64) int64 {
 	alignedSize := roundUp(requestedSpace, DefaultAlignBlockSize)
-	spaceWithOverhead := int64(math.Ceil(float64(alignedSize) / (1 - filesystemOverhead)))
+	spaceWithOverhead := int64(math.Ceil(float64(alignedSize) / (1 - float64(settings.Settings.FileSystemOverhead)/100)))
 	return spaceWithOverhead
 }
