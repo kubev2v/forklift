@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -19,11 +20,6 @@ const (
 	SnapshotStatusCheckRate = "SNAPSHOT_STATUS_CHECK_RATE"
 	CDIExportTokenTTL       = "CDI_EXPORT_TOKEN_TTL"
 	FileSystemOverhead      = "FILESYSTEM_OVERHEAD"
-)
-
-// Default virt-v2v image.
-const (
-	DefaultVirtV2vImage = "quay.io/kubev2v/forklift-virt-v2v:latest"
 )
 
 // Migration settings
@@ -79,9 +75,8 @@ func (r *Migration) Load() (err error) {
 			r.VirtV2vImageCold = virtV2vImage
 			r.VirtV2vImageWarm = virtV2vImage
 		}
-	} else {
-		r.VirtV2vImageCold = DefaultVirtV2vImage
-		r.VirtV2vImageWarm = DefaultVirtV2vImage
+	} else if Settings.Role.Has(MainRole) {
+		return liberr.Wrap(fmt.Errorf("failed to find environment variable %s", VirtV2vImage))
 	}
 	r.VirtV2vDontRequestKVM = getEnvBool(VirtV2vDontRequestKVM, false)
 	if r.CDIExportTokenTTL, err = getPositiveEnvLimit(CDIExportTokenTTL, 0); err != nil {
