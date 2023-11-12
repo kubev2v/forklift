@@ -53,28 +53,22 @@ type Migration struct {
 
 // Load settings.
 func (r *Migration) Load() (err error) {
-	r.MaxInFlight, err = getPositiveEnvLimit(MaxVmInFlight, 20)
-	if err != nil {
+	if r.MaxInFlight, err = getPositiveEnvLimit(MaxVmInFlight, 20); err != nil {
 		return liberr.Wrap(err)
 	}
-	r.HookRetry, err = getPositiveEnvLimit(HookRetry, 3)
-	if err != nil {
+	if r.HookRetry, err = getPositiveEnvLimit(HookRetry, 3); err != nil {
 		return liberr.Wrap(err)
 	}
-	r.ImporterRetry, err = getPositiveEnvLimit(ImporterRetry, 3)
-	if err != nil {
+	if r.ImporterRetry, err = getPositiveEnvLimit(ImporterRetry, 3); err != nil {
 		return liberr.Wrap(err)
 	}
-	r.PrecopyInterval, err = getPositiveEnvLimit(PrecopyInterval, 60)
-	if err != nil {
+	if r.PrecopyInterval, err = getPositiveEnvLimit(PrecopyInterval, 60); err != nil {
 		return liberr.Wrap(err)
 	}
-	r.SnapshotRemovalTimeout, err = getPositiveEnvLimit(SnapshotRemovalTimeout, 120)
-	if err != nil {
+	if r.SnapshotRemovalTimeout, err = getPositiveEnvLimit(SnapshotRemovalTimeout, 120); err != nil {
 		return liberr.Wrap(err)
 	}
-	r.SnapshotStatusCheckRate, err = getPositiveEnvLimit(SnapshotStatusCheckRate, 10)
-	if err != nil {
+	if r.SnapshotStatusCheckRate, err = getPositiveEnvLimit(SnapshotStatusCheckRate, 10); err != nil {
 		return liberr.Wrap(err)
 	}
 	if virtV2vImage, ok := os.LookupEnv(VirtV2vImage); ok {
@@ -90,12 +84,10 @@ func (r *Migration) Load() (err error) {
 		r.VirtV2vImageWarm = DefaultVirtV2vImage
 	}
 	r.VirtV2vDontRequestKVM = getEnvBool(VirtV2vDontRequestKVM, false)
-	r.CDIExportTokenTTL, err = getPositiveEnvLimit(CDIExportTokenTTL, 0)
-	if err != nil {
+	if r.CDIExportTokenTTL, err = getPositiveEnvLimit(CDIExportTokenTTL, 0); err != nil {
 		return liberr.Wrap(err)
 	}
-	r.FileSystemOverhead, err = getNonNegativeEnvLimit(FileSystemOverhead, 10)
-	if err != nil {
+	if r.FileSystemOverhead, err = getNonNegativeEnvLimit(FileSystemOverhead, 10); err != nil {
 		return liberr.Wrap(err)
 	}
 
