@@ -55,27 +55,27 @@ type Migration struct {
 func (r *Migration) Load() (err error) {
 	r.MaxInFlight, err = getPositiveEnvLimit(MaxVmInFlight, 20)
 	if err != nil {
-		err = liberr.Wrap(err)
+		return liberr.Wrap(err)
 	}
 	r.HookRetry, err = getPositiveEnvLimit(HookRetry, 3)
 	if err != nil {
-		err = liberr.Wrap(err)
+		return liberr.Wrap(err)
 	}
 	r.ImporterRetry, err = getPositiveEnvLimit(ImporterRetry, 3)
 	if err != nil {
-		err = liberr.Wrap(err)
+		return liberr.Wrap(err)
 	}
 	r.PrecopyInterval, err = getPositiveEnvLimit(PrecopyInterval, 60)
 	if err != nil {
-		err = liberr.Wrap(err)
+		return liberr.Wrap(err)
 	}
 	r.SnapshotRemovalTimeout, err = getPositiveEnvLimit(SnapshotRemovalTimeout, 120)
 	if err != nil {
-		err = liberr.Wrap(err)
+		return liberr.Wrap(err)
 	}
 	r.SnapshotStatusCheckRate, err = getPositiveEnvLimit(SnapshotStatusCheckRate, 10)
 	if err != nil {
-		err = liberr.Wrap(err)
+		return liberr.Wrap(err)
 	}
 	if virtV2vImage, ok := os.LookupEnv(VirtV2vImage); ok {
 		if cold, warm, found := strings.Cut(virtV2vImage, "|"); found {
@@ -92,11 +92,11 @@ func (r *Migration) Load() (err error) {
 	r.VirtV2vDontRequestKVM = getEnvBool(VirtV2vDontRequestKVM, false)
 	r.CDIExportTokenTTL, err = getPositiveEnvLimit(CDIExportTokenTTL, 0)
 	if err != nil {
-		err = liberr.Wrap(err)
+		return liberr.Wrap(err)
 	}
 	r.FileSystemOverhead, err = getNonNegativeEnvLimit(FileSystemOverhead, 10)
 	if err != nil {
-		err = liberr.Wrap(err)
+		return liberr.Wrap(err)
 	}
 
 	return
