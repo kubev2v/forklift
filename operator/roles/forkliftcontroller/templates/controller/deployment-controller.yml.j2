@@ -74,7 +74,7 @@ spec:
 {% endif %}
 {% if controller_cdi_export_token_ttl is number %}
         - name: CDI_EXPORT_TOKEN_TTL
-          value: "{{ CDI_EXPORT_TOKEN_TTL }}"
+          value: "{{ controller_cdi_export_token_ttl }}"
 {% endif %}
 {% if controller_filesystem_overhead is number %}
         - name: FILESYSTEM_OVERHEAD
