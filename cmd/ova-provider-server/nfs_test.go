@@ -52,10 +52,22 @@ func TestFindOVAFiles(t *testing.T) {
 			expectError:  false,
 		},
 		{
-			name: "incorrect depth",
+			name: "incorrect depth ova",
 			setup: func(directory string) {
 				os.MkdirAll(filepath.Join(directory, "subdir1", "subdir2"), 0755)
 				ioutil.WriteFile(filepath.Join(directory, "subdir1", "subdir2", "test3.ova"), []byte{}, 0644)
+			},
+			expectedOVAs: nil,
+			expectedOVFs: nil,
+			expectError:  false,
+		},
+		{
+			name: "incorrect depth ovf",
+			setup: func(directory string) {
+				//nolint:errcheck
+				os.MkdirAll(filepath.Join(directory, "subdir1", "subdir2", "subdir3"), 0755)
+				//nolint:errcheck
+				ioutil.WriteFile(filepath.Join(directory, "subdir1", "subdir2", "subdir3", "test3.ovf"), []byte{}, 0644)
 			},
 			expectedOVAs: nil,
 			expectedOVFs: nil,
