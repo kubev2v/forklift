@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
@@ -286,7 +287,7 @@ func (r *Collector) buildManager() (err error) {
 	r.manager, err = manager.New(
 		r.cluster.RestCfg(r.secret),
 		manager.Options{
-			MetricsBindAddress: "0",
+			Metrics: server.Options{BindAddress: "0"},
 		})
 	if err != nil {
 		err = liberr.Wrap(err)

@@ -22,6 +22,7 @@ go_library(
         "//vendor/sigs.k8s.io/controller-runtime/pkg/controller",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/handler",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/manager",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/metrics/server",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/predicate",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/reconcile",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/source",

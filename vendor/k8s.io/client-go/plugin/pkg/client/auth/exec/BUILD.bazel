@@ -10,11 +10,11 @@ go_library(
     importpath = "k8s.io/client-go/plugin/pkg/client/auth/exec",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/davecgh/go-spew/spew",
         "//vendor/golang.org/x/term",
         "//vendor/k8s.io/apimachinery/pkg/runtime",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer",
+        "//vendor/k8s.io/apimachinery/pkg/util/dump",
         "//vendor/k8s.io/apimachinery/pkg/util/net",
         "//vendor/k8s.io/client-go/pkg/apis/clientauthentication",
         "//vendor/k8s.io/client-go/pkg/apis/clientauthentication/install",

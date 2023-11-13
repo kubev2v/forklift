@@ -6,7 +6,6 @@ go_library(
         "cache_reader.go",
         "informers.go",
         "selector.go",
-        "transformers.go",
     ],
     importmap = "github.com/konveyor/forklift-controller/vendor/sigs.k8s.io/controller-runtime/pkg/cache/internal",
     importpath = "sigs.k8s.io/controller-runtime/pkg/cache/internal",

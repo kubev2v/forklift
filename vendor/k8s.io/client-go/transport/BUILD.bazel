@@ -19,6 +19,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/net",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime",
         "//vendor/k8s.io/apimachinery/pkg/util/wait",
+        "//vendor/k8s.io/client-go/tools/metrics",
         "//vendor/k8s.io/client-go/util/connrotation",
         "//vendor/k8s.io/client-go/util/workqueue",
         "//vendor/k8s.io/klog/v2:klog",
