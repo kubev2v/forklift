@@ -26,7 +26,6 @@ go_library(
         "networkpolicypeer.go",
         "networkpolicyport.go",
         "networkpolicyspec.go",
-        "networkpolicystatus.go",
         "servicebackendport.go",
     ],
     importmap = "github.com/konveyor/forklift-controller/vendor/k8s.io/client-go/applyconfigurations/networking/v1",

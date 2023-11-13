@@ -16,7 +16,6 @@ go_library(
         "//vendor/k8s.io/client-go/kubernetes/scheme",
         "//vendor/k8s.io/client-go/rest",
         "//vendor/k8s.io/client-go/tools/record",
-        "//vendor/k8s.io/utils/pointer",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/cache",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client/apiutil",

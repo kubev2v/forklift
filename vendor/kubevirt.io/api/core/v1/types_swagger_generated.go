@@ -38,6 +38,7 @@ func (VirtualMachineInstanceSpec) SwaggerDoc() map[string]string {
 		"dnsPolicy":                     "Set DNS policy for the pod.\nDefaults to \"ClusterFirst\".\nValid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default' or 'None'.\nDNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy.\nTo have DNS options set along with hostNetwork, you have to specify DNS policy\nexplicitly to 'ClusterFirstWithHostNet'.\n+optional",
 		"dnsConfig":                     "Specifies the DNS parameters of a pod.\nParameters specified here will be merged to the generated DNS\nconfiguration based on DNSPolicy.\n+optional",
 		"accessCredentials":             "Specifies a set of public keys to inject into the vm guest\n+listType=atomic\n+optional",
+		"architecture":                  "Specifies the architecture of the vm guest you are attempting to run. Defaults to the compiled architecture of the KubeVirt components",
 	}
 }
 
@@ -77,6 +78,9 @@ func (VirtualMachineInstanceStatus) SwaggerDoc() map[string]string {
 		"runtimeUser":                   "RuntimeUser is used to determine what user will be used in launcher\n+optional",
 		"VSOCKCID":                      "VSOCKCID is used to track the allocated VSOCK CID in the VM.\n+optional",
 		"selinuxContext":                "SELinuxContext is the actual SELinux context of the virt-launcher pod\n+optional",
+		"machine":                       "Machine shows the final resulting qemu machine type. This can be different\nthan the machine type selected in the spec, due to qemus machine type alias mechanism.\n+optional",
+		"currentCPUTopology":            "CurrentCPUTopology specifies the current CPU topology used by the VM workload.\nCurrent topology may differ from the desired topology in the spec while CPU hotplug\ntakes place.",
+		"memory":                        "Memory shows various informations about the VirtualMachine memory.\n+optional",
 	}
 }
 
@@ -146,7 +150,7 @@ func (VirtualMachineInstanceNetworkInterface) SwaggerDoc() map[string]string {
 		"name":          "Name of the interface, corresponds to name of the network assigned to the interface",
 		"ipAddresses":   "List of all IP addresses of a Virtual Machine interface",
 		"interfaceName": "The interface name inside the Virtual Machine",
-		"infoSource":    "Specifies the origin of the interface data collected. values: domain, guest-agent, or both",
+		"infoSource":    "Specifies the origin of the interface data collected. values: domain, guest-agent, multus-status.",
 		"queueCount":    "Specifies how many queues are allocated by MultiQueue",
 	}
 }
@@ -169,6 +173,7 @@ func (VirtualMachineInstanceMigrationState) SwaggerDoc() map[string]string {
 		"":                               "+k8s:openapi-gen=true",
 		"startTimestamp":                 "The time the migration action began\n+nullable",
 		"endTimestamp":                   "The time the migration action ended\n+nullable",
+		"targetNodeDomainReadyTimestamp": "The timestamp at which the target node detects the domain is active",
 		"targetNodeDomainDetected":       "The Target Node has seen the Domain Start Event",
 		"targetNodeAddress":              "The address of the target node to use for the migration",
 		"targetDirectMigrationNodePorts": "The list of ports opened for live migration on the destination node",
@@ -328,6 +333,7 @@ func (VirtualMachineSpec) SwaggerDoc() map[string]string {
 		"preference":          "PreferenceMatcher references a set of preference that is used to fill fields in Template",
 		"template":            "Template is the direct specification of VirtualMachineInstance",
 		"dataVolumeTemplates": "dataVolumeTemplates is a list of dataVolumes that the VirtualMachineInstance template can reference.\nDataVolumes in this list are dynamically created for the VirtualMachine and are tied to the VirtualMachine's life-cycle.",
+		"liveUpdateFeatures":  "LiveUpdateFeatures references a configuration of hotpluggable resources",
 	}
 }
 
@@ -351,6 +357,8 @@ func (VirtualMachineStatus) SwaggerDoc() map[string]string {
 		"volumeSnapshotStatuses": "VolumeSnapshotStatuses indicates a list of statuses whether snapshotting is\nsupported by each volume.",
 		"startFailure":           "StartFailure tracks consecutive VMI startup failures for the purposes of\ncrash loop backoffs\n+nullable\n+optional",
 		"memoryDumpRequest":      "MemoryDumpRequest tracks memory dump request phase and info of getting a memory\ndump to the given pvc\n+nullable\n+optional",
+		"observedGeneration":     "ObservedGeneration is the generation observed by the vmi when started.\n+optional",
+		"desiredGeneration":      "DesiredGeneration is the generation which is desired for the VMI.\nThis will be used in comparisons with ObservedGeneration to understand when\nthe VMI is out of sync. This will be changed at the same time as\nObservedGeneration to remove errors which could occur if Generation is\nupdated through an Update() before ObservedGeneration in Status.\n+optional",
 	}
 }
 
@@ -684,14 +692,36 @@ func (ReloadableComponentConfiguration) SwaggerDoc() map[string]string {
 func (KubeVirtConfiguration) SwaggerDoc() map[string]string {
 	return map[string]string{
 		"":                                   "KubeVirtConfiguration holds all kubevirt configurations",
+		"machineType":                        "Deprecated. Use architectureConfiguration instead.",
 		"evictionStrategy":                   "EvictionStrategy defines at the cluster level if the VirtualMachineInstance should be\nmigrated instead of shut-off in case of a node drain. If the VirtualMachineInstance specific\nfield is set it overrides the cluster level one.",
 		"additionalGuestMemoryOverheadRatio": "AdditionalGuestMemoryOverheadRatio can be used to increase the virtualization infrastructure\noverhead. This is useful, since the calculation of this overhead is not accurate and cannot\nbe entirely known in advance. The ratio that is being set determines by which factor to increase\nthe overhead calculated by Kubevirt. A higher ratio means that the VMs would be less compromised\nby node pressures, but would mean that fewer VMs could be scheduled to a node.\nIf not set, the default is 1.",
+		"supportContainerResources":          "+listType=map\n+listMapKey=type\nSupportContainerResources specifies the resource requirements for various types of supporting containers such as container disks/virtiofs/sidecars and hotplug attachment pods. If omitted a sensible default will be supplied.",
 		"supportedGuestAgentVersions":        "deprecated",
+		"vmStateStorageClass":                "VMStateStorageClass is the name of the storage class to use for the PVCs created to preserve VM state, like TPM.\nThe storage class must support RWX in filesystem mode.",
+		"ksmConfiguration":                   "KSMConfiguration holds the information regarding the enabling the KSM in the nodes (if available).",
+		"autoCPULimitNamespaceLabelSelector": "When set, AutoCPULimitNamespaceLabelSelector will set a CPU limit on virt-launcher for VMIs running inside\nnamespaces that match the label selector.\nThe CPU limit will equal the number of requested vCPUs.\nThis setting does not apply to VMIs with dedicated CPUs.",
+		"liveUpdateConfiguration":            "LiveUpdateConfiguration holds defaults for live update features",
+	}
+}
+
+func (ArchConfiguration) SwaggerDoc() map[string]string {
+	return map[string]string{}
+}
+
+func (ArchSpecificConfiguration) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"emulatedMachines": "+listType=atomic",
 	}
 }
 
 func (SMBiosConfiguration) SwaggerDoc() map[string]string {
 	return map[string]string{}
+}
+
+func (SupportContainerResources) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"": "SupportContainerResources are used to specify the cpu/memory request and limits for the containers that support various features of Virtual Machines. These containers are usually idle and don't require a lot of memory or cpu.",
+	}
 }
 
 func (CustomProfile) SwaggerDoc() map[string]string {
@@ -711,6 +741,22 @@ func (SeccompConfiguration) SwaggerDoc() map[string]string {
 	}
 }
 
+func (VirtualMachineOptions) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"":                         "VirtualMachineOptions holds the cluster level information regarding the virtual machine.",
+		"disableFreePageReporting": "DisableFreePageReporting disable the free page reporting of\nmemory balloon device https://libvirt.org/formatdomain.html#memory-balloon-device.\nThis will have effect only if AutoattachMemBalloon is not false and the vmi is not\nrequesting any high performance feature (dedicatedCPU/realtime/hugePages), in which free page reporting is always disabled.",
+		"disableSerialConsoleLog":  "DisableSerialConsoleLog disables logging the auto-attached default serial console.\nIf not set, serial console logs will be written to a file and then streamed from a container named `guest-console-log`.\nThe value can be individually overridden for each VM, not relevant if AutoattachSerialConsole is disabled.",
+	}
+}
+
+func (DisableFreePageReporting) SwaggerDoc() map[string]string {
+	return map[string]string{}
+}
+
+func (DisableSerialConsoleLog) SwaggerDoc() map[string]string {
+	return map[string]string{}
+}
+
 func (TLSConfiguration) SwaggerDoc() map[string]string {
 	return map[string]string{
 		"":              "TLSConfiguration holds TLS options",
@@ -726,13 +772,14 @@ func (MigrationConfiguration) SwaggerDoc() map[string]string {
 		"parallelOutboundMigrationsPerNode": "ParallelOutboundMigrationsPerNode is the maximum number of concurrent outgoing live migrations\nallowed per node. Defaults to 2",
 		"parallelMigrationsPerCluster":      "ParallelMigrationsPerCluster is the total number of concurrent live migrations\nallowed cluster-wide. Defaults to 5",
 		"allowAutoConverge":                 "AllowAutoConverge allows the platform to compromise performance/availability of VMIs to\nguarantee successful VMI live migrations. Defaults to false",
-		"bandwidthPerMigration":             "BandwidthPerMigration limits the amount of network bandwith live migrations are allowed to use.\nThe value is in quantity per second. Defaults to 0 (no limit)",
+		"bandwidthPerMigration":             "BandwidthPerMigration limits the amount of network bandwidth live migrations are allowed to use.\nThe value is in quantity per second. Defaults to 0 (no limit)",
 		"completionTimeoutPerGiB":           "CompletionTimeoutPerGiB is the maximum number of seconds per GiB a migration is allowed to take.\nIf a live-migration takes longer to migrate than this value multiplied by the size of the VMI,\nthe migration will be cancelled, unless AllowPostCopy is true. Defaults to 800",
 		"progressTimeout":                   "ProgressTimeout is the maximum number of seconds a live migration is allowed to make no progress.\nHitting this timeout means a migration transferred 0 data for that many seconds. The migration is\nthen considered stuck and therefore cancelled. Defaults to 150",
 		"unsafeMigrationOverride":           "UnsafeMigrationOverride allows live migrations to occur even if the compatibility check\nindicates the migration will be unsafe to the guest. Defaults to false",
 		"allowPostCopy":                     "AllowPostCopy enables post-copy live migrations. Such migrations allow even the busiest VMIs\nto successfully live-migrate. However, events like a network failure can cause a VMI crash.\nIf set to true, migrations will still start in pre-copy, but switch to post-copy when\nCompletionTimeoutPerGiB triggers. Defaults to false",
 		"disableTLS":                        "When set to true, DisableTLS will disable the additional layer of live migration encryption\nprovided by KubeVirt. This is usually a bad idea. Defaults to false",
 		"network":                           "Network is the name of the CNI network to use for live migrations. By default, migrations go\nthrough the pod network.",
+		"matchSELinuxLevelOnMigration":      "By default, the SELinux level of target virt-launcher pods is forced to the level of the source virt-launcher.\nWhen set to true, MatchSELinuxLevelOnMigration lets the CRI auto-assign a random level to the target.\nThat will ensure the target virt-launcher doesn't share categories with another pod on the node.\nHowever, migrations will fail when using RWX volumes that don't automatically deal with SELinux levels.",
 	}
 }
 
@@ -768,14 +815,27 @@ func (PermittedHostDevices) SwaggerDoc() map[string]string {
 		"":                "PermittedHostDevices holds information about devices allowed for passthrough",
 		"pciHostDevices":  "+listType=atomic",
 		"mediatedDevices": "+listType=atomic",
+		"usb":             "+listType=atomic",
 	}
+}
+
+func (USBHostDevice) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"resourceName":             "Identifies the list of USB host devices.\ne.g: kubevirt.io/storage, kubevirt.io/bootable-usb, etc",
+		"selectors":                "+listType=atomic",
+		"externalResourceProvider": "If true, KubeVirt will leave the allocation and monitoring to an\nexternal device plugin",
+	}
+}
+
+func (USBSelector) SwaggerDoc() map[string]string {
+	return map[string]string{}
 }
 
 func (PciHostDevice) SwaggerDoc() map[string]string {
 	return map[string]string{
 		"":                         "PciHostDevice represents a host PCI device allowed for passthrough",
 		"pciVendorSelector":        "The vendor_id:product_id tuple of the PCI device",
-		"resourceName":             "The name of the resource that is representing the device. Exposed by\na device plugin and requested by VMs. Typically of the form\nvendor.com/product_nameThe name of the resource that is representing\nthe device. Exposed by a device plugin and requested by VMs.\nTypically of the form vendor.com/product_name",
+		"resourceName":             "The name of the resource that is representing the device. Exposed by\na device plugin and requested by VMs. Typically of the form\nvendor.com/product_name",
 		"externalResourceProvider": "If true, KubeVirt will leave the allocation and monitoring to an\nexternal device plugin",
 	}
 }
@@ -797,16 +857,30 @@ func (MediatedDevicesConfiguration) SwaggerDoc() map[string]string {
 
 func (NodeMediatedDeviceTypesConfig) SwaggerDoc() map[string]string {
 	return map[string]string{
-		"":                     "NodeMediatedDeviceTypesConfig holds information about MDEV types to be defined in a specifc node that matches the NodeSelector field.\n+k8s:openapi-gen=true",
+		"":                     "NodeMediatedDeviceTypesConfig holds information about MDEV types to be defined in a specific node that matches the NodeSelector field.\n+k8s:openapi-gen=true",
 		"nodeSelector":         "NodeSelector is a selector which must be true for the vmi to fit on a node.\nSelector which must match a node's labels for the vmi to be scheduled on that node.\nMore info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/",
 		"mediatedDevicesTypes": "Deprecated. Use mediatedDeviceTypes instead.\n+optional\n+listType=atomic",
 		"mediatedDeviceTypes":  "+optional\n+listType=atomic",
 	}
 }
 
+func (KSMConfiguration) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"":                  "KSMConfiguration holds information about KSM.\n+k8s:openapi-gen=true",
+		"nodeLabelSelector": "NodeLabelSelector is a selector that filters in which nodes the KSM will be enabled.\nEmpty NodeLabelSelector will enable ksm for every node.\n+optional",
+	}
+}
+
 func (NetworkConfiguration) SwaggerDoc() map[string]string {
 	return map[string]string{
 		"": "NetworkConfiguration holds network options",
+	}
+}
+
+func (InterfaceBindingPlugin) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"sidecarImage":                "SidecarImage references a container image that runs in the virt-launcher pod.\nThe sidecar handles (libvirt) domain configuration and optional services.\nversion: 1alphav1",
+		"networkAttachmentDefinition": "NetworkAttachmentDefinition references to a NetworkAttachmentDefinition CR object.\nFormat: <name>, <namespace>/<name>.\nIf namespace is not specified, VMI namespace is assumed.\nversion: 1alphav1",
 	}
 }
 
@@ -830,20 +904,90 @@ func (ClusterProfilerRequest) SwaggerDoc() map[string]string {
 
 func (InstancetypeMatcher) SwaggerDoc() map[string]string {
 	return map[string]string{
-		"":                "InstancetypeMatcher references a instancetype that is used to fill fields in the VMI template.",
-		"name":            "Name is the name of the VirtualMachineInstancetype or VirtualMachineClusterInstancetype\n\n+optional",
-		"kind":            "Kind specifies which instancetype resource is referenced.\nAllowed values are: \"VirtualMachineInstancetype\" and \"VirtualMachineClusterInstancetype\".\nIf not specified, \"VirtualMachineClusterInstancetype\" is used by default.\n\n+optional",
-		"revisionName":    "RevisionName specifies a ControllerRevision containing a specific copy of the\nVirtualMachineInstancetype or VirtualMachineClusterInstancetype to be used. This is initially\ncaptured the first time the instancetype is applied to the VirtualMachineInstance.\n\n+optional",
-		"inferFromVolume": "InferFromVolume lists the name of a volume that should be used to infer or discover the instancetype\nto be used through known annotations on the underlying resource. Once applied to the InstancetypeMatcher\nthis field is removed.\n\n+optional",
+		"":                             "InstancetypeMatcher references a instancetype that is used to fill fields in the VMI template.",
+		"name":                         "Name is the name of the VirtualMachineInstancetype or VirtualMachineClusterInstancetype\n\n+optional",
+		"kind":                         "Kind specifies which instancetype resource is referenced.\nAllowed values are: \"VirtualMachineInstancetype\" and \"VirtualMachineClusterInstancetype\".\nIf not specified, \"VirtualMachineClusterInstancetype\" is used by default.\n\n+optional",
+		"revisionName":                 "RevisionName specifies a ControllerRevision containing a specific copy of the\nVirtualMachineInstancetype or VirtualMachineClusterInstancetype to be used. This is initially\ncaptured the first time the instancetype is applied to the VirtualMachineInstance.\n\n+optional",
+		"inferFromVolume":              "InferFromVolume lists the name of a volume that should be used to infer or discover the instancetype\nto be used through known annotations on the underlying resource. Once applied to the InstancetypeMatcher\nthis field is removed.\n\n+optional",
+		"inferFromVolumeFailurePolicy": "InferFromVolumeFailurePolicy controls what should happen on failure when inferring the instancetype.\nAllowed values are: \"RejectInferFromVolumeFailure\" and \"IgnoreInferFromVolumeFailure\".\nIf not specified, \"RejectInferFromVolumeFailure\" is used by default.\n\n+optional",
 	}
 }
 
 func (PreferenceMatcher) SwaggerDoc() map[string]string {
 	return map[string]string{
-		"":                "PreferenceMatcher references a set of preference that is used to fill fields in the VMI template.",
-		"name":            "Name is the name of the VirtualMachinePreference or VirtualMachineClusterPreference\n\n+optional",
-		"kind":            "Kind specifies which preference resource is referenced.\nAllowed values are: \"VirtualMachinePreference\" and \"VirtualMachineClusterPreference\".\nIf not specified, \"VirtualMachineClusterPreference\" is used by default.\n\n+optional",
-		"revisionName":    "RevisionName specifies a ControllerRevision containing a specific copy of the\nVirtualMachinePreference or VirtualMachineClusterPreference to be used. This is\ninitially captured the first time the instancetype is applied to the VirtualMachineInstance.\n\n+optional",
-		"inferFromVolume": "InferFromVolume lists the name of a volume that should be used to infer or discover the preference\nto be used through known annotations on the underlying resource. Once applied to the PreferenceMatcher\nthis field is removed.\n\n+optional",
+		"":                             "PreferenceMatcher references a set of preference that is used to fill fields in the VMI template.",
+		"name":                         "Name is the name of the VirtualMachinePreference or VirtualMachineClusterPreference\n\n+optional",
+		"kind":                         "Kind specifies which preference resource is referenced.\nAllowed values are: \"VirtualMachinePreference\" and \"VirtualMachineClusterPreference\".\nIf not specified, \"VirtualMachineClusterPreference\" is used by default.\n\n+optional",
+		"revisionName":                 "RevisionName specifies a ControllerRevision containing a specific copy of the\nVirtualMachinePreference or VirtualMachineClusterPreference to be used. This is\ninitially captured the first time the instancetype is applied to the VirtualMachineInstance.\n\n+optional",
+		"inferFromVolume":              "InferFromVolume lists the name of a volume that should be used to infer or discover the preference\nto be used through known annotations on the underlying resource. Once applied to the PreferenceMatcher\nthis field is removed.\n\n+optional",
+		"inferFromVolumeFailurePolicy": "InferFromVolumeFailurePolicy controls what should happen on failure when preference the instancetype.\nAllowed values are: \"RejectInferFromVolumeFailure\" and \"IgnoreInferFromVolumeFailure\".\nIf not specified, \"RejectInferFromVolumeFailure\" is used by default.\n\n+optional",
+	}
+}
+
+func (LiveUpdateFeatures) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"cpu":      "LiveUpdateCPU holds hotplug configuration for the CPU resource.\nEmpty struct indicates that default will be used for maxSockets.\nDefault is specified on cluster level.\nAbsence of the struct means opt-out from CPU hotplug functionality.",
+		"affinity": "Affinity allows live updating the virtual machines node affinity",
+		"memory":   "MemoryLiveUpdateConfiguration defines the live update memory features for the VirtualMachine\n+optional",
+	}
+}
+
+func (LiveUpdateAffinity) SwaggerDoc() map[string]string {
+	return map[string]string{}
+}
+
+func (LiveUpdateCPU) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"maxSockets": "The maximum amount of sockets that can be hot-plugged to the Virtual Machine",
+	}
+}
+
+func (LiveUpdateConfiguration) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"maxHotplugRatio": "MaxHotplugRatio is the ratio used to define the max amount\nof a hotplug resource that can be made available to a VM\nwhen the specific Max* setting is not defined (MaxCpuSockets, MaxGuest)\nExample: VM is configured with 512Mi of guest memory, if MaxGuest is not\ndefined and MaxHotplugRatio is 2 then MaxGuest = 1Gi\ndefaults to 4",
+		"maxCpuSockets":   "MaxCpuSockets holds the maximum amount of sockets that can be hotplugged",
+		"maxGuest":        "MaxGuest defines the maximum amount memory that can be allocated\nto the guest using hotplug.",
+	}
+}
+
+func (LiveUpdateMemory) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"maxGuest": "MaxGuest defines the maximum amount memory that can be allocated for the VM.\n+optional",
+	}
+}
+
+func (SEVPlatformInfo) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"":          "SEVPlatformInfo contains information about the AMD SEV features for the node.\n\n+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object",
+		"pdh":       "Base64 encoded platform Diffie-Hellman key.",
+		"certChain": "Base64 encoded SEV certificate chain.",
+	}
+}
+
+func (SEVMeasurementInfo) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"":            "SEVMeasurementInfo contains information about the guest launch measurement.\n\n+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object",
+		"measurement": "Base64 encoded launch measurement of the SEV guest.",
+		"apiMajor":    "API major version of the SEV host.",
+		"apiMinor":    "API minor version of the SEV host.",
+		"buildID":     "Build ID of the SEV host.",
+		"policy":      "Policy of the SEV guest.",
+		"loaderSHA":   "SHA256 of the loader binary",
+	}
+}
+
+func (SEVSessionOptions) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"":        "SEVSessionOptions is used to provide SEV session parameters.",
+		"session": "Base64 encoded session blob.",
+		"dhCert":  "Base64 encoded guest owner's Diffie-Hellman key.",
+	}
+}
+
+func (SEVSecretOptions) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"":       "SEVSecretOptions is used to provide a secret for a running guest.",
+		"header": "Base64 encoded header needed to decrypt the secret.",
+		"secret": "Base64 encoded encrypted launch secret.",
 	}
 }

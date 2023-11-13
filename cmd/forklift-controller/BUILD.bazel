@@ -49,5 +49,6 @@ go_library(
         "//vendor/sigs.k8s.io/controller-runtime/pkg/log",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/manager",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/manager/signals",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/metrics/server",
     ],
 )

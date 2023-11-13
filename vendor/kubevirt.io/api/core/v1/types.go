@@ -162,6 +162,8 @@ type VirtualMachineInstanceSpec struct {
 	// +listType=atomic
 	// +optional
 	AccessCredentials []AccessCredential `json:"accessCredentials,omitempty"`
+	// Specifies the architecture of the vm guest you are attempting to run. Defaults to the compiled architecture of the KubeVirt components
+	Architecture string `json:"architecture,omitempty"`
 }
 
 func (vmiSpec *VirtualMachineInstanceSpec) UnmarshalJSON(data []byte) error {
@@ -269,6 +271,19 @@ type VirtualMachineInstanceStatus struct {
 	// SELinuxContext is the actual SELinux context of the virt-launcher pod
 	// +optional
 	SelinuxContext string `json:"selinuxContext,omitempty"`
+
+	// Machine shows the final resulting qemu machine type. This can be different
+	// than the machine type selected in the spec, due to qemus machine type alias mechanism.
+	// +optional
+	Machine *Machine `json:"machine,omitempty"`
+	// CurrentCPUTopology specifies the current CPU topology used by the VM workload.
+	// Current topology may differ from the desired topology in the spec while CPU hotplug
+	// takes place.
+	CurrentCPUTopology *CPUTopology `json:"currentCPUTopology,omitempty"`
+
+	// Memory shows various informations about the VirtualMachine memory.
+	// +optional
+	Memory *MemoryStatus `json:"memory,omitempty"`
 }
 
 // PersistentVolumeClaimInfo contains the relavant information virt-handler needs cached about a PVC
@@ -437,6 +452,25 @@ func (v *VirtualMachineInstance) IsRealtimeEnabled() bool {
 	return v.Spec.Domain.CPU != nil && v.Spec.Domain.CPU.Realtime != nil
 }
 
+// IsHighPerformanceVMI returns true if the VMI is considered as high performance.
+// A VMI is considered as high performance if one of the following is true:
+// - the vmi requests a dedicated cpu
+// - the realtime flag is enabled
+// - the vmi requests hugepages
+func (v *VirtualMachineInstance) IsHighPerformanceVMI() bool {
+	if v.Spec.Domain.CPU != nil {
+		if v.Spec.Domain.CPU.DedicatedCPUPlacement || v.Spec.Domain.CPU.Realtime != nil {
+			return true
+		}
+	}
+
+	if v.Spec.Domain.Memory != nil && v.Spec.Domain.Memory.Hugepages != nil {
+		return true
+	}
+
+	return false
+}
+
 type VirtualMachineInstanceConditionType string
 
 // These are valid conditions of VMIs.
@@ -483,8 +517,12 @@ const (
 	VirtualMachineInstanceReasonSEVNotMigratable = "SEVNotLiveMigratable"
 	// Reason means that VMI is not live migratable because it uses HyperV Reenlightenment while TSC Frequency is not available
 	VirtualMachineInstanceReasonNoTSCFrequencyMigratable = "NoTSCFrequencyNotLiveMigratable"
-	// Reason means that VMI is not live migratable because it uses dedicated CPU and emulator thread isolation
-	VirtualMachineInstanceReasonDedicatedCPU = "DedicatedCPUNotLiveMigratable"
+	// Reason means that VMI is not live migratable because it requested SCSI persitent reservation
+	VirtualMachineInstanceReasonPRNotMigratable = "PersistentReservationNotLiveMigratable"
+	// Indicates that the VMI is in progress of Hot vCPU Plug/UnPlug
+	VirtualMachineInstanceVCPUChange = "HotVCPUChange"
+	// Indicates that the VMI is hot(un)plugging memory
+	VirtualMachineInstanceMemoryChange = "HotMemoryChange"
 )
 
 const (
@@ -506,7 +544,8 @@ type VirtualMachineInstanceMigrationConditionType string
 // These are valid conditions of VMIs.
 const (
 	// VirtualMachineInstanceMigrationAbortRequested indicates that live migration abort has been requested
-	VirtualMachineInstanceMigrationAbortRequested VirtualMachineInstanceMigrationConditionType = "migrationAbortRequested"
+	VirtualMachineInstanceMigrationAbortRequested          VirtualMachineInstanceMigrationConditionType = "migrationAbortRequested"
+	VirtualMachineInstanceMigrationRejectedByResourceQuota VirtualMachineInstanceMigrationConditionType = "migrationRejectedByResourceQuota"
 )
 
 type VirtualMachineInstanceCondition struct {
@@ -570,7 +609,7 @@ type VirtualMachineInstanceNetworkInterface struct {
 	IPs []string `json:"ipAddresses,omitempty"`
 	// The interface name inside the Virtual Machine
 	InterfaceName string `json:"interfaceName,omitempty"`
-	// Specifies the origin of the interface data collected. values: domain, guest-agent, or both
+	// Specifies the origin of the interface data collected. values: domain, guest-agent, multus-status.
 	InfoSource string `json:"infoSource,omitempty"`
 	// Specifies how many queues are allocated by MultiQueue
 	QueueCount int32 `json:"queueCount,omitempty"`
@@ -609,6 +648,8 @@ type VirtualMachineInstanceMigrationState struct {
 	// +nullable
 	EndTimestamp *metav1.Time `json:"endTimestamp,omitempty"`
 
+	// The timestamp at which the target node detects the domain is active
+	TargetNodeDomainReadyTimestamp *metav1.Time `json:"targetNodeDomainReadyTimestamp,omitempty"`
 	// The Target Node has seen the Domain Start Event
 	TargetNodeDomainDetected bool `json:"targetNodeDomainDetected,omitempty"`
 	// The address of the target node to use for the migration
@@ -879,6 +920,24 @@ const (
 	// SEVLabel marks the node as capable of running workloads with SEV
 	SEVLabel string = "kubevirt.io/sev"
 
+	// SEVESLabel marks the node as capable of running workloads with SEV-ES
+	SEVESLabel string = "kubevirt.io/sev-es"
+
+	// KSMEnabledLabel marks the node as KSM enabled
+	KSMEnabledLabel string = "kubevirt.io/ksm-enabled"
+
+	// KSMHandlerManagedAnnotation is an annotation used to mark the nodes where the virt-handler has enabled the ksm
+	KSMHandlerManagedAnnotation string = "kubevirt.io/ksm-handler-managed"
+
+	// KSM debug annotations to override default constants
+	KSMPagesBoostOverride      string = "kubevirt.io/ksm-pages-boost-override"
+	KSMPagesDecayOverride      string = "kubevirt.io/ksm-pages-decay-override"
+	KSMPagesMinOverride        string = "kubevirt.io/ksm-pages-min-override"
+	KSMPagesMaxOverride        string = "kubevirt.io/ksm-pages-max-override"
+	KSMPagesInitOverride       string = "kubevirt.io/ksm-pages-init-override"
+	KSMSleepMsBaselineOverride string = "kubevirt.io/ksm-sleep-ms-baseline-override"
+	KSMFreePercentOverride     string = "kubevirt.io/ksm-free-percent-override"
+
 	// InstancetypeAnnotation is the name of a VirtualMachineInstancetype
 	InstancetypeAnnotation string = "kubevirt.io/instancetype-name"
 
@@ -901,6 +960,40 @@ const (
 	// PVCMemoryDumpAnnotation is the name of the memory dump representing the vm name,
 	// pvc name and the timestamp the memory dump was collected
 	PVCMemoryDumpAnnotation string = "kubevirt.io/memory-dump"
+
+	// AllowPodBridgeNetworkLiveMigrationAnnotation allow to run live migration when the
+	// vm has the pod networking bind with a bridge
+	AllowPodBridgeNetworkLiveMigrationAnnotation string = "kubevirt.io/allow-pod-bridge-network-live-migration"
+
+	// VirtualMachineGenerationAnnotation is the generation of a Virtual Machine.
+	VirtualMachineGenerationAnnotation string = "kubevirt.io/vm-generation"
+
+	// MigrationTargetReadyTimestamp indicates the time at which the target node
+	// detected that the VMI became active on the target during live migration.
+	MigrationTargetReadyTimestamp string = "kubevirt.io/migration-target-ready-timestamp"
+
+	// FreePageReportingDisabledAnnotation indicates if the the vmi wants to explicitly disable
+	// the freePageReporting feature of the memballooning.
+	// This annotation only allows to opt-out from freePageReporting in those cases where it is
+	// enabled (no high performance vmis).
+	// This annotation does not allow to enable freePageReporting for high performance vmis,
+	// in which freePageReporting is always disabled.
+	FreePageReportingDisabledAnnotation string = "kubevirt.io/free-page-reporting-disabled"
+
+	// VirtualMachinePodCPULimitsLabel indicates VMI pod CPU resource limits
+	VirtualMachinePodCPULimitsLabel string = "kubevirt.io/vmi-pod-cpu-resource-limits"
+	// VirtualMachinePodMemoryRequestsLabel indicates VMI pod Memory resource requests
+	VirtualMachinePodMemoryRequestsLabel string = "kubevirt.io/vmi-pod-memory-resource-requests"
+	// MemoryHotplugOverheadRatioLabel indicates the guest memory overhead ratio required
+	// to correctly compute the target pod memory requests when doing memory hotplug.
+	// The label is used to store this value when memory hotplug is requested as it may change
+	// between the creation of the target pod and when the evaluation of `MemoryHotplugReadyLabel`
+	// happens.
+	MemoryHotplugOverheadRatioLabel string = "kubevirt.io/memory-hotplug-overhead-ratio"
+
+	// AutoMemoryLimitsRatioLabel allows to use a custom ratio for auto memory limits calculation.
+	// Must be a float >= 1.
+	AutoMemoryLimitsRatioLabel string = "alpha.kubevirt.io/auto-memory-limits-ratio"
 )
 
 func NewVMI(name string, uid types.UID) *VirtualMachineInstance {
@@ -1345,6 +1438,9 @@ type VirtualMachineSpec struct {
 	// dataVolumeTemplates is a list of dataVolumes that the VirtualMachineInstance template can reference.
 	// DataVolumes in this list are dynamically created for the VirtualMachine and are tied to the VirtualMachine's life-cycle.
 	DataVolumeTemplates []DataVolumeTemplateSpec `json:"dataVolumeTemplates,omitempty"`
+
+	// LiveUpdateFeatures references a configuration of hotpluggable resources
+	LiveUpdateFeatures *LiveUpdateFeatures `json:"liveUpdateFeatures,omitempty" optional:"true"`
 }
 
 // StateChangeRequestType represents the existing state change requests that are possible
@@ -1450,6 +1546,18 @@ type VirtualMachineStatus struct {
 	// +nullable
 	// +optional
 	MemoryDumpRequest *VirtualMachineMemoryDumpRequest `json:"memoryDumpRequest,omitempty" optional:"true"`
+
+	// ObservedGeneration is the generation observed by the vmi when started.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty" optional:"true"`
+
+	// DesiredGeneration is the generation which is desired for the VMI.
+	// This will be used in comparisons with ObservedGeneration to understand when
+	// the VMI is out of sync. This will be changed at the same time as
+	// ObservedGeneration to remove errors which could occur if Generation is
+	// updated through an Update() before ObservedGeneration in Status.
+	// +optional
+	DesiredGeneration int64 `json:"desiredGeneration,omitempty" optional:"true"`
 }
 
 type VolumeSnapshotStatus struct {
@@ -1844,6 +1952,7 @@ type KubeVirtStatus struct {
 	ObservedDeploymentID                    string              `json:"observedDeploymentID,omitempty" optional:"true"`
 	OutdatedVirtualMachineInstanceWorkloads *int                `json:"outdatedVirtualMachineInstanceWorkloads,omitempty" optional:"true"`
 	ObservedGeneration                      *int64              `json:"observedGeneration,omitempty"`
+	DefaultArchitecture                     string              `json:"defaultArchitecture,omitempty"`
 	// +listType=atomic
 	Generations []GenerationStatus `json:"generations,omitempty" optional:"true"`
 }
@@ -1896,9 +2005,10 @@ const (
 )
 
 const (
-	EvictionStrategyNone        EvictionStrategy = "None"
-	EvictionStrategyLiveMigrate EvictionStrategy = "LiveMigrate"
-	EvictionStrategyExternal    EvictionStrategy = "External"
+	EvictionStrategyNone                  EvictionStrategy = "None"
+	EvictionStrategyLiveMigrate           EvictionStrategy = "LiveMigrate"
+	EvictionStrategyLiveMigrateIfPossible EvictionStrategy = "LiveMigrateIfPossible"
+	EvictionStrategyExternal              EvictionStrategy = "External"
 )
 
 // RestartOptions may be provided when deleting an API object.
@@ -2197,13 +2307,14 @@ type KubeVirtConfiguration struct {
 	EmulatedMachines       []string                `json:"emulatedMachines,omitempty"`
 	ImagePullPolicy        k8sv1.PullPolicy        `json:"imagePullPolicy,omitempty"`
 	MigrationConfiguration *MigrationConfiguration `json:"migrations,omitempty"`
-	MachineType            string                  `json:"machineType,omitempty"`
-	NetworkConfiguration   *NetworkConfiguration   `json:"network,omitempty"`
-	OVMFPath               string                  `json:"ovmfPath,omitempty"`
-	SELinuxLauncherType    string                  `json:"selinuxLauncherType,omitempty"`
-	DefaultRuntimeClass    string                  `json:"defaultRuntimeClass,omitempty"`
-	SMBIOSConfig           *SMBiosConfiguration    `json:"smbios,omitempty"`
-
+	// Deprecated. Use architectureConfiguration instead.
+	MachineType               string                `json:"machineType,omitempty"`
+	NetworkConfiguration      *NetworkConfiguration `json:"network,omitempty"`
+	OVMFPath                  string                `json:"ovmfPath,omitempty"`
+	SELinuxLauncherType       string                `json:"selinuxLauncherType,omitempty"`
+	DefaultRuntimeClass       string                `json:"defaultRuntimeClass,omitempty"`
+	SMBIOSConfig              *SMBiosConfiguration  `json:"smbios,omitempty"`
+	ArchitectureConfiguration *ArchConfiguration    `json:"architectureConfiguration,omitempty"`
 	// EvictionStrategy defines at the cluster level if the VirtualMachineInstance should be
 	// migrated instead of shut-off in case of a node drain. If the VirtualMachineInstance specific
 	// field is set it overrides the cluster level one.
@@ -2216,6 +2327,11 @@ type KubeVirtConfiguration struct {
 	// by node pressures, but would mean that fewer VMs could be scheduled to a node.
 	// If not set, the default is 1.
 	AdditionalGuestMemoryOverheadRatio *string `json:"additionalGuestMemoryOverheadRatio,omitempty"`
+
+	// +listType=map
+	// +listMapKey=type
+	// SupportContainerResources specifies the resource requirements for various types of supporting containers such as container disks/virtiofs/sidecars and hotplug attachment pods. If omitted a sensible default will be supplied.
+	SupportContainerResources []SupportContainerResources `json:"supportContainerResources,omitempty"`
 
 	// deprecated
 	SupportedGuestAgentVersions    []string                          `json:"supportedGuestAgentVersions,omitempty"`
@@ -2231,6 +2347,36 @@ type KubeVirtConfiguration struct {
 	HandlerConfiguration           *ReloadableComponentConfiguration `json:"handlerConfiguration,omitempty"`
 	TLSConfiguration               *TLSConfiguration                 `json:"tlsConfiguration,omitempty"`
 	SeccompConfiguration           *SeccompConfiguration             `json:"seccompConfiguration,omitempty"`
+
+	// VMStateStorageClass is the name of the storage class to use for the PVCs created to preserve VM state, like TPM.
+	// The storage class must support RWX in filesystem mode.
+	VMStateStorageClass   string                 `json:"vmStateStorageClass,omitempty"`
+	VirtualMachineOptions *VirtualMachineOptions `json:"virtualMachineOptions,omitempty"`
+
+	// KSMConfiguration holds the information regarding the enabling the KSM in the nodes (if available).
+	KSMConfiguration *KSMConfiguration `json:"ksmConfiguration,omitempty"`
+
+	// When set, AutoCPULimitNamespaceLabelSelector will set a CPU limit on virt-launcher for VMIs running inside
+	// namespaces that match the label selector.
+	// The CPU limit will equal the number of requested vCPUs.
+	// This setting does not apply to VMIs with dedicated CPUs.
+	AutoCPULimitNamespaceLabelSelector *metav1.LabelSelector `json:"autoCPULimitNamespaceLabelSelector,omitempty"`
+	// LiveUpdateConfiguration holds defaults for live update features
+	LiveUpdateConfiguration *LiveUpdateConfiguration `json:"liveUpdateConfiguration,omitempty"`
+}
+
+type ArchConfiguration struct {
+	Amd64               *ArchSpecificConfiguration `json:"amd64,omitempty"`
+	Arm64               *ArchSpecificConfiguration `json:"arm64,omitempty"`
+	Ppc64le             *ArchSpecificConfiguration `json:"ppc64le,omitempty"`
+	DefaultArchitecture string                     `json:"defaultArchitecture,omitempty"`
+}
+
+type ArchSpecificConfiguration struct {
+	OVMFPath string `json:"ovmfPath,omitempty"`
+	// +listType=atomic
+	EmulatedMachines []string `json:"emulatedMachines,omitempty,flow"`
+	MachineType      string   `json:"machineType,omitempty"`
 }
 
 type SMBiosConfiguration struct {
@@ -2239,6 +2385,29 @@ type SMBiosConfiguration struct {
 	Version      string `json:"version,omitempty"`
 	Sku          string `json:"sku,omitempty"`
 	Family       string `json:"family,omitempty"`
+}
+
+type SupportContainerType string
+
+const (
+	// HotplugAttachment is the container resources of the hotplug attachment pod used to hotplug a disk
+	HotplugAttachment SupportContainerType = "hotplug-disk"
+	// ContainerDisk is the container resources used to attach a container disk to the Virtual Machine
+	ContainerDisk SupportContainerType = "container-disk"
+	// VirtioFS is the container resources used to attach a virtio-fs volume to the Virtual Machine
+	VirtioFS SupportContainerType = "virtiofs"
+	// SideCar is the container resources for a side car
+	SideCar SupportContainerType = "sidecar"
+	// VMExport is the container resources for a vm exporter pod
+	VMExport SupportContainerType = "vmexport"
+	// GuestConsoleLog is the container resources for a guest console log streaming container
+	GuestConsoleLog SupportContainerType = "guest-console-log"
+)
+
+// SupportContainerResources are used to specify the cpu/memory request and limits for the containers that support various features of Virtual Machines. These containers are usually idle and don't require a lot of memory or cpu.
+type SupportContainerResources struct {
+	Type      SupportContainerType       `json:"type"`
+	Resources k8sv1.ResourceRequirements `json:"resources"`
 }
 
 type TLSProtocolVersion string
@@ -2269,6 +2438,24 @@ type SeccompConfiguration struct {
 	// VirtualMachineInstanceProfile defines what profile should be used with virt-launcher. Defaults to none
 	VirtualMachineInstanceProfile *VirtualMachineInstanceProfile `json:"virtualMachineInstanceProfile,omitempty"`
 }
+
+// VirtualMachineOptions holds the cluster level information regarding the virtual machine.
+type VirtualMachineOptions struct {
+	// DisableFreePageReporting disable the free page reporting of
+	// memory balloon device https://libvirt.org/formatdomain.html#memory-balloon-device.
+	// This will have effect only if AutoattachMemBalloon is not false and the vmi is not
+	// requesting any high performance feature (dedicatedCPU/realtime/hugePages), in which free page reporting is always disabled.
+	DisableFreePageReporting *DisableFreePageReporting `json:"disableFreePageReporting,omitempty"`
+
+	// DisableSerialConsoleLog disables logging the auto-attached default serial console.
+	// If not set, serial console logs will be written to a file and then streamed from a container named `guest-console-log`.
+	// The value can be individually overridden for each VM, not relevant if AutoattachSerialConsole is disabled.
+	DisableSerialConsoleLog *DisableSerialConsoleLog `json:"disableSerialConsoleLog,omitempty"`
+}
+
+type DisableFreePageReporting struct{}
+
+type DisableSerialConsoleLog struct{}
 
 // TLSConfiguration holds TLS options
 type TLSConfiguration struct {
@@ -2301,7 +2488,7 @@ type MigrationConfiguration struct {
 	// AllowAutoConverge allows the platform to compromise performance/availability of VMIs to
 	// guarantee successful VMI live migrations. Defaults to false
 	AllowAutoConverge *bool `json:"allowAutoConverge,omitempty"`
-	// BandwidthPerMigration limits the amount of network bandwith live migrations are allowed to use.
+	// BandwidthPerMigration limits the amount of network bandwidth live migrations are allowed to use.
 	// The value is in quantity per second. Defaults to 0 (no limit)
 	BandwidthPerMigration *resource.Quantity `json:"bandwidthPerMigration,omitempty"`
 	// CompletionTimeoutPerGiB is the maximum number of seconds per GiB a migration is allowed to take.
@@ -2326,6 +2513,11 @@ type MigrationConfiguration struct {
 	// Network is the name of the CNI network to use for live migrations. By default, migrations go
 	// through the pod network.
 	Network *string `json:"network,omitempty"`
+	// By default, the SELinux level of target virt-launcher pods is forced to the level of the source virt-launcher.
+	// When set to true, MatchSELinuxLevelOnMigration lets the CRI auto-assign a random level to the target.
+	// That will ensure the target virt-launcher doesn't share categories with another pod on the node.
+	// However, migrations will fail when using RWX volumes that don't automatically deal with SELinux levels.
+	MatchSELinuxLevelOnMigration *bool `json:"matchSELinuxLevelOnMigration,omitempty"`
 }
 
 // DiskVerification holds container disks verification limits
@@ -2385,6 +2577,7 @@ type LogVerbosity struct {
 const (
 	PCIResourcePrefix  = "PCI_RESOURCE"
 	MDevResourcePrefix = "MDEV_PCI_RESOURCE"
+	USBResourcePrefix  = "USB_RESOURCE"
 )
 
 // PermittedHostDevices holds information about devices allowed for passthrough
@@ -2393,6 +2586,24 @@ type PermittedHostDevices struct {
 	PciHostDevices []PciHostDevice `json:"pciHostDevices,omitempty"`
 	// +listType=atomic
 	MediatedDevices []MediatedHostDevice `json:"mediatedDevices,omitempty"`
+	// +listType=atomic
+	USB []USBHostDevice `json:"usb,omitempty"`
+}
+
+type USBHostDevice struct {
+	// Identifies the list of USB host devices.
+	// e.g: kubevirt.io/storage, kubevirt.io/bootable-usb, etc
+	ResourceName string `json:"resourceName"`
+	// +listType=atomic
+	Selectors []USBSelector `json:"selectors,omitempty"`
+	// If true, KubeVirt will leave the allocation and monitoring to an
+	// external device plugin
+	ExternalResourceProvider bool `json:"externalResourceProvider,omitempty"`
+}
+
+type USBSelector struct {
+	Vendor  string `json:"vendor"`
+	Product string `json:"product"`
 }
 
 // PciHostDevice represents a host PCI device allowed for passthrough
@@ -2401,9 +2612,7 @@ type PciHostDevice struct {
 	PCIVendorSelector string `json:"pciVendorSelector"`
 	// The name of the resource that is representing the device. Exposed by
 	// a device plugin and requested by VMs. Typically of the form
-	// vendor.com/product_nameThe name of the resource that is representing
-	// the device. Exposed by a device plugin and requested by VMs.
-	// Typically of the form vendor.com/product_name
+	// vendor.com/product_name
 	ResourceName string `json:"resourceName"`
 	// If true, KubeVirt will leave the allocation and monitoring to an
 	// external device plugin
@@ -2431,7 +2640,7 @@ type MediatedDevicesConfiguration struct {
 	NodeMediatedDeviceTypes []NodeMediatedDeviceTypesConfig `json:"nodeMediatedDeviceTypes,omitempty"`
 }
 
-// NodeMediatedDeviceTypesConfig holds information about MDEV types to be defined in a specifc node that matches the NodeSelector field.
+// NodeMediatedDeviceTypesConfig holds information about MDEV types to be defined in a specific node that matches the NodeSelector field.
 // +k8s:openapi-gen=true
 type NodeMediatedDeviceTypesConfig struct {
 	// NodeSelector is a selector which must be true for the vmi to fit on a node.
@@ -2447,11 +2656,33 @@ type NodeMediatedDeviceTypesConfig struct {
 	MediatedDeviceTypes []string `json:"mediatedDeviceTypes"`
 }
 
+// KSMConfiguration holds information about KSM.
+// +k8s:openapi-gen=true
+type KSMConfiguration struct {
+	// NodeLabelSelector is a selector that filters in which nodes the KSM will be enabled.
+	// Empty NodeLabelSelector will enable ksm for every node.
+	// +optional
+	NodeLabelSelector *metav1.LabelSelector `json:"nodeLabelSelector,omitempty"`
+}
+
 // NetworkConfiguration holds network options
 type NetworkConfiguration struct {
-	NetworkInterface                  string `json:"defaultNetworkInterface,omitempty"`
-	PermitSlirpInterface              *bool  `json:"permitSlirpInterface,omitempty"`
-	PermitBridgeInterfaceOnPodNetwork *bool  `json:"permitBridgeInterfaceOnPodNetwork,omitempty"`
+	NetworkInterface                  string                            `json:"defaultNetworkInterface,omitempty"`
+	PermitSlirpInterface              *bool                             `json:"permitSlirpInterface,omitempty"`
+	PermitBridgeInterfaceOnPodNetwork *bool                             `json:"permitBridgeInterfaceOnPodNetwork,omitempty"`
+	Binding                           map[string]InterfaceBindingPlugin `json:"binding,omitempty"`
+}
+
+type InterfaceBindingPlugin struct {
+	// SidecarImage references a container image that runs in the virt-launcher pod.
+	// The sidecar handles (libvirt) domain configuration and optional services.
+	// version: 1alphav1
+	SidecarImage string `json:"sidecarImage,omitempty"`
+	// NetworkAttachmentDefinition references to a NetworkAttachmentDefinition CR object.
+	// Format: <name>, <namespace>/<name>.
+	// If namespace is not specified, VMI namespace is assumed.
+	// version: 1alphav1
+	NetworkAttachmentDefinition string `json:"networkAttachmentDefinition,omitempty"`
 }
 
 // GuestAgentPing configures the guest-agent based ping probe
@@ -2477,6 +2708,13 @@ type Matcher interface {
 	GetName() string
 	GetRevisionName() string
 }
+
+type InferFromVolumeFailurePolicy string
+
+const (
+	RejectInferFromVolumeFailure InferFromVolumeFailurePolicy = "Reject"
+	IgnoreInferFromVolumeFailure InferFromVolumeFailurePolicy = "Ignore"
+)
 
 // InstancetypeMatcher references a instancetype that is used to fill fields in the VMI template.
 type InstancetypeMatcher struct {
@@ -2505,6 +2743,13 @@ type InstancetypeMatcher struct {
 	//
 	// +optional
 	InferFromVolume string `json:"inferFromVolume,omitempty"`
+
+	// InferFromVolumeFailurePolicy controls what should happen on failure when inferring the instancetype.
+	// Allowed values are: "RejectInferFromVolumeFailure" and "IgnoreInferFromVolumeFailure".
+	// If not specified, "RejectInferFromVolumeFailure" is used by default.
+	//
+	// +optional
+	InferFromVolumeFailurePolicy *InferFromVolumeFailurePolicy `json:"inferFromVolumeFailurePolicy,omitempty"`
 }
 
 func (i InstancetypeMatcher) GetName() string {
@@ -2542,6 +2787,13 @@ type PreferenceMatcher struct {
 	//
 	// +optional
 	InferFromVolume string `json:"inferFromVolume,omitempty"`
+
+	// InferFromVolumeFailurePolicy controls what should happen on failure when preference the instancetype.
+	// Allowed values are: "RejectInferFromVolumeFailure" and "IgnoreInferFromVolumeFailure".
+	// If not specified, "RejectInferFromVolumeFailure" is used by default.
+	//
+	// +optional
+	InferFromVolumeFailurePolicy *InferFromVolumeFailurePolicy `json:"inferFromVolumeFailurePolicy,omitempty"`
 }
 
 func (p PreferenceMatcher) GetName() string {
@@ -2550,4 +2802,91 @@ func (p PreferenceMatcher) GetName() string {
 
 func (p PreferenceMatcher) GetRevisionName() string {
 	return p.RevisionName
+}
+
+type LiveUpdateFeatures struct {
+	// LiveUpdateCPU holds hotplug configuration for the CPU resource.
+	// Empty struct indicates that default will be used for maxSockets.
+	// Default is specified on cluster level.
+	// Absence of the struct means opt-out from CPU hotplug functionality.
+	CPU *LiveUpdateCPU `json:"cpu,omitempty" optional:"true"`
+	// Affinity allows live updating the virtual machines node affinity
+	Affinity *LiveUpdateAffinity `json:"affinity,omitempty" optional:"true"`
+	// MemoryLiveUpdateConfiguration defines the live update memory features for the VirtualMachine
+	// +optional
+	Memory *LiveUpdateMemory `json:"memory,omitempty"`
+}
+
+type LiveUpdateAffinity struct{}
+
+type LiveUpdateCPU struct {
+	// The maximum amount of sockets that can be hot-plugged to the Virtual Machine
+	MaxSockets *uint32 `json:"maxSockets,omitempty" optional:"true"`
+}
+
+type LiveUpdateConfiguration struct {
+	// MaxHotplugRatio is the ratio used to define the max amount
+	// of a hotplug resource that can be made available to a VM
+	// when the specific Max* setting is not defined (MaxCpuSockets, MaxGuest)
+	// Example: VM is configured with 512Mi of guest memory, if MaxGuest is not
+	// defined and MaxHotplugRatio is 2 then MaxGuest = 1Gi
+	// defaults to 4
+	MaxHotplugRatio uint32 `json:"maxHotplugRatio,omitempty"`
+	// MaxCpuSockets holds the maximum amount of sockets that can be hotplugged
+	MaxCpuSockets *uint32 `json:"maxCpuSockets,omitempty"`
+	// MaxGuest defines the maximum amount memory that can be allocated
+	// to the guest using hotplug.
+	MaxGuest *resource.Quantity `json:"maxGuest,omitempty"`
+}
+
+type LiveUpdateMemory struct {
+	// MaxGuest defines the maximum amount memory that can be allocated for the VM.
+	// +optional
+	MaxGuest *resource.Quantity `json:"maxGuest,omitempty"`
+}
+
+// SEVPlatformInfo contains information about the AMD SEV features for the node.
+//
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type SEVPlatformInfo struct {
+	metav1.TypeMeta `json:",inline"`
+	// Base64 encoded platform Diffie-Hellman key.
+	PDH string `json:"pdh,omitempty"`
+	// Base64 encoded SEV certificate chain.
+	CertChain string `json:"certChain,omitempty"`
+}
+
+// SEVMeasurementInfo contains information about the guest launch measurement.
+//
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type SEVMeasurementInfo struct {
+	metav1.TypeMeta `json:",inline"`
+	// Base64 encoded launch measurement of the SEV guest.
+	Measurement string `json:"measurement,omitempty"`
+	// API major version of the SEV host.
+	APIMajor uint `json:"apiMajor,omitempty"`
+	// API minor version of the SEV host.
+	APIMinor uint `json:"apiMinor,omitempty"`
+	// Build ID of the SEV host.
+	BuildID uint `json:"buildID,omitempty"`
+	// Policy of the SEV guest.
+	Policy uint `json:"policy,omitempty"`
+	// SHA256 of the loader binary
+	LoaderSHA string `json:"loaderSHA,omitempty"`
+}
+
+// SEVSessionOptions is used to provide SEV session parameters.
+type SEVSessionOptions struct {
+	// Base64 encoded session blob.
+	Session string `json:"session,omitempty"`
+	// Base64 encoded guest owner's Diffie-Hellman key.
+	DHCert string `json:"dhCert,omitempty"`
+}
+
+// SEVSecretOptions is used to provide a secret for a running guest.
+type SEVSecretOptions struct {
+	// Base64 encoded header needed to decrypt the secret.
+	Header string `json:"header,omitempty"`
+	// Base64 encoded encrypted launch secret.
+	Secret string `json:"secret,omitempty"`
 }

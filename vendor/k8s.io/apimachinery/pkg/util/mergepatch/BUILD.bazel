@@ -10,7 +10,7 @@ go_library(
     importpath = "k8s.io/apimachinery/pkg/util/mergepatch",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/davecgh/go-spew/spew",
+        "//vendor/k8s.io/apimachinery/pkg/util/dump",
         "//vendor/sigs.k8s.io/yaml",
     ],
 )

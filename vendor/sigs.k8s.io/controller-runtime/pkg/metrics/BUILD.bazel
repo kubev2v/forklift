@@ -6,7 +6,6 @@ go_library(
         "client_go_adapter.go",
         "doc.go",
         "leaderelection.go",
-        "listener.go",
         "registry.go",
         "workqueue.go",
     ],
@@ -18,6 +17,5 @@ go_library(
         "//vendor/k8s.io/client-go/tools/leaderelection",
         "//vendor/k8s.io/client-go/tools/metrics",
         "//vendor/k8s.io/client-go/util/workqueue",
-        "//vendor/sigs.k8s.io/controller-runtime/pkg/internal/log",
     ],
 )
