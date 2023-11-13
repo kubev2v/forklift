@@ -29,7 +29,7 @@ go_library(
     deps = [
         "//vendor/github.com/go-openapi/jsonreference",
         "//vendor/github.com/go-openapi/swag",
-        "//vendor/github.com/google/gnostic/openapiv2",
+        "//vendor/github.com/google/gnostic-models/openapiv2",
         "//vendor/github.com/google/go-cmp/cmp",
         "//vendor/github.com/google/gofuzz",
         "//vendor/k8s.io/kube-openapi/pkg/internal",

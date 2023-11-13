@@ -8,7 +8,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/protobuf/proto",
-        "//vendor/github.com/google/gnostic/openapiv3",
+        "//vendor/github.com/google/gnostic-models/openapiv3",
         "//vendor/github.com/google/uuid",
         "//vendor/github.com/munnerz/goautoneg",
         "//vendor/k8s.io/klog/v2:klog",

@@ -32,7 +32,6 @@ go_library(
         "networkpolicypeer.go",
         "networkpolicyport.go",
         "networkpolicyspec.go",
-        "networkpolicystatus.go",
         "replicaset.go",
         "replicasetcondition.go",
         "replicasetspec.go",

@@ -14,7 +14,7 @@ go_library(
     importpath = "github.com/prometheus/common/expfmt",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/matttproud/golang_protobuf_extensions/pbutil",
+        "//vendor/github.com/matttproud/golang_protobuf_extensions/v2/pbutil",
         "//vendor/github.com/prometheus/client_model/go",
         "//vendor/github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg",
         "//vendor/github.com/prometheus/common/model",

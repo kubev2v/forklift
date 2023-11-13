@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "v1beta2",
     srcs = [
+        "exemptprioritylevelconfiguration.go",
         "flowdistinguishermethod.go",
         "flowschema.go",
         "flowschemacondition.go",

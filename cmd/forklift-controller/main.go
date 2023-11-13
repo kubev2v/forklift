@@ -39,6 +39,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
 // Application settings.
@@ -80,7 +81,7 @@ func main() {
 	// Create a new Cmd to provide shared dependencies and start components
 	log.Info("setting up manager")
 	mgr, err := manager.New(cfg, manager.Options{
-		MetricsBindAddress: Settings.Metrics.Address(),
+		Metrics: server.Options{BindAddress: Settings.Metrics.Address()},
 	})
 	if err != nil {
 		log.Error(err, "unable to set up overall controller manager")

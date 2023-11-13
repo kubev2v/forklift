@@ -23,7 +23,7 @@ func (ConfigMapVolumeSource) SwaggerDoc() map[string]string {
 func (SecretVolumeSource) SwaggerDoc() map[string]string {
 	return map[string]string{
 		"":            "SecretVolumeSource adapts a Secret into a volume.",
-		"secretName":  "Name of the secret in the pod's namespace to use.\nMore info: https://kubernetes.io/docs/concepts/storage/volumes#secret\n+optional",
+		"secretName":  "Name of the secret in the pod's namespace to use.\nMore info: https://kubernetes.io/docs/concepts/storage/volumes#secret",
 		"optional":    "Specify whether the Secret or it's keys must be defined\n+optional",
 		"volumeLabel": "The volume label of the resulting disk inside the VMI.\nDifferent bootstrapping mechanisms require different values.\nTypical values are \"cidata\" (cloud-init), \"config-2\" (cloud-init) or \"OEMDRV\" (kickstart).\n+optional",
 	}
@@ -123,6 +123,7 @@ func (EFI) SwaggerDoc() map[string]string {
 	return map[string]string{
 		"":           "If set, EFI will be used instead of BIOS.",
 		"secureBoot": "If set, SecureBoot will be enabled and the OVMF roms will be swapped for\nSecureBoot-enabled ones.\nRequires SMM to be enabled.\nDefaults to true\n+optional",
+		"persistent": "If set to true, Persistent will persist the EFI NVRAM across reboots.\nDefaults to false\n+optional",
 	}
 }
 
@@ -158,6 +159,7 @@ func (CPU) SwaggerDoc() map[string]string {
 		"":                      "CPU allows specifying the CPU topology.",
 		"cores":                 "Cores specifies the number of cores inside the vmi.\nMust be a value greater or equal 1.",
 		"sockets":               "Sockets specifies the number of sockets inside the vmi.\nMust be a value greater or equal 1.",
+		"maxSockets":            "MaxSockets specifies the maximum amount of sockets that can\nbe hotplugged",
 		"threads":               "Threads specifies the number of threads inside the vmi.\nMust be a value greater or equal 1.",
 		"model":                 "Model specifies the CPU model inside the VMI.\nList of available models https://github.com/libvirt/libvirt/tree/master/src/cpu_map.\nIt is possible to specify special cases like \"host-passthrough\" to get the same CPU as the node\nand \"host-model\" to get CPU closest to the node one.\nDefaults to host-model.\n+optional",
 		"features":              "Features specifies the CPU features list inside the VMI.\n+optional",
@@ -200,6 +202,15 @@ func (Memory) SwaggerDoc() map[string]string {
 		"":          "Memory allows specifying the VirtualMachineInstance memory features.",
 		"hugepages": "Hugepages allow to use hugepages for the VirtualMachineInstance instead of regular memory.\n+optional",
 		"guest":     "Guest allows to specifying the amount of memory which is visible inside the Guest OS.\nThe Guest must lie between Requests and Limits from the resources section.\nDefaults to the requested memory in the resources section if not specified.\n+ optional",
+		"maxGuest":  "MaxGuest allows to specify the maximum amount of memory which is visible inside the Guest OS.\nThe delta between MaxGuest and Guest is the amount of memory that can be hot(un)plugged.",
+	}
+}
+
+func (MemoryStatus) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"guestAtBoot":    "GuestAtBoot specifies with how much memory the VirtualMachine intiallly booted with.\n+optional",
+		"guestCurrent":   "GuestCurrent specifies how much memory is currently available for the VirtualMachine.\n+optional",
+		"guestRequested": "GuestRequested specifies how much memory was requested (hotplug) for the VirtualMachine.\n+optional",
 	}
 }
 
@@ -235,7 +246,8 @@ func (Devices) SwaggerDoc() map[string]string {
 		"inputs":                     "Inputs describe input devices",
 		"autoattachPodInterface":     "Whether to attach a pod network interface. Defaults to true.",
 		"autoattachGraphicsDevice":   "Whether to attach the default graphics device or not.\nVNC will not be available if set to false. Defaults to true.",
-		"autoattachSerialConsole":    "Whether to attach the default serial console or not.\nSerial console access will not be available if set to false. Defaults to true.",
+		"autoattachSerialConsole":    "Whether to attach the default virtio-serial console or not.\nSerial console access will not be available if set to false. Defaults to true.",
+		"logSerialConsole":           "Whether to log the auto-attached default serial console or not.\nSerial console logs will be collect to a file and then streamed from a named `guest-console-log`.\nNot relevant if autoattachSerialConsole is disabled.\nDefaults to cluster wide setting on VirtualMachineOptions.",
 		"autoattachMemBalloon":       "Whether to attach the Memory balloon device with default period.\nPeriod can be adjusted in virt-config.\nDefaults to true.\n+optional",
 		"autoattachInputDevice":      "Whether to attach an Input Device.\nDefaults to false.\n+optional",
 		"autoattachVSOCK":            "Whether to attach the VSOCK CID to the VM or not.\nVSOCK access will be available if set to true. Defaults to false.",
@@ -243,6 +255,7 @@ func (Devices) SwaggerDoc() map[string]string {
 		"blockMultiQueue":            "Whether or not to enable virtio multi-queue for block devices.\nDefaults to false.\n+optional",
 		"networkInterfaceMultiqueue": "If specified, virtual network interfaces configured with a virtio bus will also enable the vhost multiqueue feature for network devices. The number of queues created depends on additional factors of the VirtualMachineInstance, like the number of guest CPUs.\n+optional",
 		"gpus":                       "Whether to attach a GPU device to the vmi.\n+optional\n+listType=atomic",
+		"downwardMetrics":            "DownwardMetrics creates a virtio serials for exposing the downward metrics to the vmi.\n+optional",
 		"filesystems":                "Filesystems describes filesystem which is connected to the vmi.\n+optional\n+listType=atomic",
 		"hostDevices":                "Whether to attach a host device to the vmi.\n+optional\n+listType=atomic",
 		"clientPassthrough":          "To configure and access client devices such as redirecting USB\n+optional",
@@ -266,7 +279,9 @@ func (SoundDevice) SwaggerDoc() map[string]string {
 }
 
 func (TPMDevice) SwaggerDoc() map[string]string {
-	return map[string]string{}
+	return map[string]string{
+		"persistent": "Persistent indicates the state of the TPM device should be kept accross reboots\nDefaults to false",
+	}
 }
 
 func (Input) SwaggerDoc() map[string]string {
@@ -285,6 +300,10 @@ func (Filesystem) SwaggerDoc() map[string]string {
 }
 
 func (FilesystemVirtiofs) SwaggerDoc() map[string]string {
+	return map[string]string{}
+}
+
+func (DownwardMetrics) SwaggerDoc() map[string]string {
 	return map[string]string{}
 }
 
@@ -324,6 +343,7 @@ func (Disk) SwaggerDoc() map[string]string {
 		"tag":               "If specified, disk address and its tag will be provided to the guest via config drive metadata\n+optional",
 		"blockSize":         "If specified, the virtual disk will be presented with the given block sizes.\n+optional",
 		"shareable":         "If specified the disk is made sharable and multiple write from different VMs are permitted\n+optional",
+		"errorPolicy":       "If specified, it can change the default error policy (stop) for the disk\n+optional",
 	}
 }
 
@@ -363,13 +383,29 @@ func (LaunchSecurity) SwaggerDoc() map[string]string {
 }
 
 func (SEV) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"policy":      "Guest policy flags as defined in AMD SEV API specification.\nNote: due to security reasons it is not allowed to enable guest debugging. Therefore NoDebug flag is not exposed to users and is always true.",
+		"attestation": "If specified, run the attestation process for a vmi.\n+opitonal",
+		"session":     "Base64 encoded session blob.",
+		"dhCert":      "Base64 encoded guest owner's Diffie-Hellman key.",
+	}
+}
+
+func (SEVPolicy) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"encryptedState": "SEV-ES is required.\nDefaults to false.\n+optional",
+	}
+}
+
+func (SEVAttestation) SwaggerDoc() map[string]string {
 	return map[string]string{}
 }
 
 func (LunTarget) SwaggerDoc() map[string]string {
 	return map[string]string{
-		"bus":      "Bus indicates the type of disk device to emulate.\nsupported values: virtio, sata, scsi.",
-		"readonly": "ReadOnly.\nDefaults to false.",
+		"bus":         "Bus indicates the type of disk device to emulate.\nsupported values: virtio, sata, scsi.",
+		"readonly":    "ReadOnly.\nDefaults to false.",
+		"reservation": "Reservation indicates if the disk needs to support the persistent reservation for the SCSI disk",
 	}
 }
 
@@ -619,6 +655,7 @@ func (Interface) SwaggerDoc() map[string]string {
 	return map[string]string{
 		"name":        "Logical name of the interface as well as a reference to the associated networks.\nMust match the Name of a Network.",
 		"model":       "Interface model.\nOne of: e1000, e1000e, ne2k_pci, pcnet, rtl8139, virtio.\nDefaults to virtio.",
+		"binding":     "Binding specifies the binding plugin that will be used to connect the interface to the guest.\nIt provides an alternative to InterfaceBindingMethod.\nversion: 1alphav1",
 		"ports":       "List of ports to be forwarded to the virtual machine.",
 		"macAddress":  "Interface MAC address. For example: de:ad:00:00:be:af or DE-AD-00-00-BE-AF.",
 		"bootOrder":   "BootOrder is an integer value > 0, used to determine ordering of boot devices.\nLower values take precedence.\nEach interface or disk that has a boot order must have a unique value.\nInterfaces without a boot order are not tried.\n+optional",
@@ -626,6 +663,7 @@ func (Interface) SwaggerDoc() map[string]string {
 		"dhcpOptions": "If specified the network interface will pass additional DHCP options to the VMI\n+optional",
 		"tag":         "If specified, the virtual network interface address and its tag will be provided to the guest via config drive\n+optional",
 		"acpiIndex":   "If specified, the ACPI index is used to provide network interface device naming, that is stable across changes\nin PCI addresses assigned to the device.\nThis value is required to be unique across all devices and be between 1 and (16*1024-1).\n+optional",
+		"state":       "State represents the requested operational state of the interface.\nThe (only) value supported is `absent`, expressing a request to remove the interface.\n+optional",
 	}
 }
 
@@ -689,6 +727,13 @@ func (InterfacePasst) SwaggerDoc() map[string]string {
 	}
 }
 
+func (PluginBinding) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"":     "PluginBinding represents a binding implemented in a plugin.",
+		"name": "Name references to the binding name as denined in the kubevirt CR.\nversion: 1alphav1",
+	}
+}
+
 func (Port) SwaggerDoc() map[string]string {
 	return map[string]string{
 		"":         "Port represents a port to expose from the virtual machine.\nDefault protocol TCP.\nThe port field is mandatory",
@@ -705,6 +750,10 @@ func (AccessCredentialSecretSource) SwaggerDoc() map[string]string {
 }
 
 func (ConfigDriveSSHPublicKeyAccessCredentialPropagation) SwaggerDoc() map[string]string {
+	return map[string]string{}
+}
+
+func (NoCloudSSHPublicKeyAccessCredentialPropagation) SwaggerDoc() map[string]string {
 	return map[string]string{}
 }
 
@@ -736,6 +785,7 @@ func (SSHPublicKeyAccessCredentialPropagationMethod) SwaggerDoc() map[string]str
 	return map[string]string{
 		"":               "SSHPublicKeyAccessCredentialPropagationMethod represents the method used to\ninject a ssh public key into the vm guest.\nOnly one of its members may be specified.",
 		"configDrive":    "ConfigDrivePropagation means that the ssh public keys are injected\ninto the VM using metadata using the configDrive cloud-init provider\n+optional",
+		"noCloud":        "NoCloudPropagation means that the ssh public keys are injected\ninto the VM using metadata using the noCloud cloud-init provider\n+optional",
 		"qemuGuestAgent": "QemuGuestAgentAccessCredentailPropagation means ssh public keys are\ndynamically injected into the vm at runtime via the qemu guest agent.\nThis feature requires the qemu guest agent to be running within the guest.\n+optional",
 	}
 }
@@ -810,5 +860,14 @@ func (MultusNetwork) SwaggerDoc() map[string]string {
 		"":            "Represents the multus cni network.",
 		"networkName": "References to a NetworkAttachmentDefinition CRD object. Format:\n<networkName>, <namespace>/<networkName>. If namespace is not\nspecified, VMI namespace is assumed.",
 		"default":     "Select the default network and add it to the\nmultus-cni.io/default-network annotation.",
+	}
+}
+
+func (CPUTopology) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"":        "CPUTopology allows specifying the amount of cores, sockets\nand threads.",
+		"cores":   "Cores specifies the number of cores inside the vmi.\nMust be a value greater or equal 1.",
+		"sockets": "Sockets specifies the number of sockets inside the vmi.\nMust be a value greater or equal 1.",
+		"threads": "Threads specifies the number of threads inside the vmi.\nMust be a value greater or equal 1.",
 	}
 }

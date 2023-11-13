@@ -12,8 +12,8 @@ go_library(
     importpath = "k8s.io/kube-openapi/pkg/util/proto",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/google/gnostic/openapiv2",
-        "//vendor/github.com/google/gnostic/openapiv3",
+        "//vendor/github.com/google/gnostic-models/openapiv2",
+        "//vendor/github.com/google/gnostic-models/openapiv3",
         "//vendor/gopkg.in/yaml.v2:yaml_v2",
         "//vendor/gopkg.in/yaml.v3:yaml_v3",
     ],
