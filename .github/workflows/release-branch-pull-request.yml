@@ -12,12 +12,12 @@ jobs:
         # Steps represent a sequence of tasks that will be executed as part of the job
         steps:
           - name: Checks-out repository under $GITHUB_WORKSPACE
-            uses: actions/checkout@v2
+            uses: actions/checkout@v4
             with:
               path: go/src/github.com/${{github.repository}}
     
           - name: Cache Go modules
-            uses: actions/cache@v2
+            uses: actions/cache@v3
             with:
               path: ${HOME}/go/pkg/mod
               key: ${{ runner.os }}-build-${{ hashFiles('**/go.sum') }}
@@ -27,10 +27,10 @@ jobs:
                 ${{ runner.OS }}
     
           - name: Setup Golang
-            uses: actions/setup-go@v2
+            uses: actions/setup-go@v4
             with:
               # NOTE: Keep the version in sync with Go toolchain in WORKSPACE.
-              go-version: '1.19.3'
+              go-version: '1.20.10'
     
           # Setup the run environment and run CI test suite
           - name: Go build

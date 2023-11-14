@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Get PR branch
-        uses: xt0rted/pull-request-comment-branch@v1
+        uses: xt0rted/pull-request-comment-branch@v2
         id: comment-branch
         if: github.event_name == 'issue_comment'
       - name: Set latest commit status as pending
@@ -36,7 +36,7 @@ jobs:
           status: pending
 
       - name: Checkout forklift
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: prepare the secrets
         uses: kubev2v/forkliftci/ci/prepare-ansible-secrets@v6.0
@@ -64,12 +64,12 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout forklift
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: forklift
 
       - name: Checkout forkliftci
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: kubev2v/forkliftci
           ref: v6.0
@@ -103,7 +103,7 @@ jobs:
 
       - name: Get PR branch
         if: always() && github.event_name == 'issue_comment'
-        uses: xt0rted/pull-request-comment-branch@v1
+        uses: xt0rted/pull-request-comment-branch@v2
         id: comment-branch
 
       - name: Set latest commit status as ${{ job.status }}
@@ -115,7 +115,7 @@ jobs:
           status: ${{ job.status }}
 
       - name: Add comment to PR
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         if: always() && github.event_name == 'issue_comment'
         with:
           script: |
