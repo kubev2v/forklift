@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	liburl "net/url"
+	"strconv"
 
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
@@ -330,7 +331,7 @@ func (r *Client) connect() error {
 	url.User = liburl.UserPassword(
 		r.user(),
 		r.password())
-	soapClient := soap.NewClient(url, false)
+	soapClient := soap.NewClient(url, r.getInsecureSkipVerifyFlag())
 	soapClient.SetThumbprint(url.Host, r.thumbprint())
 	vimClient, err := vim25.NewClient(context.TODO(), soapClient)
 	if err != nil {
@@ -367,6 +368,22 @@ func (r *Client) thumbprint() string {
 		return string(thumbprint)
 	}
 	return ""
+}
+
+// getInsecureSkipVerifyFlag gets the insecureSkipVerify boolean flag
+// value from the provider connection secret.
+func (r *Client) getInsecureSkipVerifyFlag() bool {
+	insecure, found := r.Source.Secret.Data["insecureSkipVerify"]
+	if !found {
+		return false
+	}
+
+	insecureSkipVerify, err := strconv.ParseBool(string(insecure))
+	if err != nil {
+		return false
+	}
+
+	return insecureSkipVerify
 }
 
 func (r *Client) DetachDisks(vmRef ref.Ref) (err error) {
