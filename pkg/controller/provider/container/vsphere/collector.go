@@ -486,7 +486,7 @@ func (r *Collector) connect(ctx context.Context) (status int, err error) {
 	url.User = liburl.UserPassword(
 		r.user(),
 		r.password())
-	soapClient := soap.NewClient(url, false)
+	soapClient := soap.NewClient(url, r.getInsecureSkipVerifyFlag())
 	soapClient.SetThumbprint(url.Host, r.thumbprint())
 	vimClient, err := vim25.NewClient(ctx, soapClient)
 	if err != nil {
@@ -543,6 +543,22 @@ func (r *Collector) thumbprint() string {
 	}
 
 	return ""
+}
+
+// getInsecureSkipVerifyFlag gets the insecureSkipVerify boolean flag
+// value from the provider connection secret.
+func (r *Collector) getInsecureSkipVerifyFlag() bool {
+	insecure, found := r.secret.Data["insecureSkipVerify"]
+	if !found {
+		return false
+	}
+
+	insecureSkipVerify, err := strconv.ParseBool(string(insecure))
+	if err != nil {
+		return false
+	}
+
+	return insecureSkipVerify
 }
 
 // Build the object Spec filter.
