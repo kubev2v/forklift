@@ -62,6 +62,8 @@ type Adapter interface {
 	List(ctx *Context, provider *api.Provider) (itr fb.Iterator, err error)
 	// Get object updates
 	GetUpdates(ctx *Context) (updater []Updater, err error)
+	// Clean unexisting objects within the database
+	DeleteUnexisting(ctx *Context) (deletions []Updater, err error)
 }
 
 // Base adapter.
@@ -123,6 +125,45 @@ func (r *NetworkAdapter) GetUpdates(ctx *Context) (updates []Updater, err error)
 	return
 }
 
+func (r *NetworkAdapter) DeleteUnexisting(ctx *Context) (deletions []Updater, err error) {
+	networkList := []model.Network{}
+	err = ctx.db.List(&networkList, libmodel.FilterOptions{})
+	if err != nil {
+		if errors.Is(err, libmodel.NotFound) {
+			err = nil
+		}
+		return
+	}
+	networkListServer := []Network{}
+	err = ctx.client.list("networks", &networkListServer)
+	if err != nil {
+		return
+	}
+
+	elementMap := make(map[string]bool)
+	for _, network := range networkListServer {
+		elementMap[network.ID] = true
+	}
+
+	networksToDelete := []string{}
+	for _, network := range networkList {
+		if _, found := elementMap[network.ID]; !found {
+			networksToDelete = append(networksToDelete, network.ID)
+		}
+	}
+	for _, networkId := range networksToDelete {
+		currentID := networkId
+		updater := func(tx *libmodel.Tx) (err error) {
+			m := &model.Network{
+				Base: model.Base{ID: currentID},
+			}
+			return tx.Delete(m)
+		}
+		deletions = append(deletions, updater)
+	}
+	return
+}
+
 // VM adapter.
 type VMAdapter struct {
 	BaseAdapter
@@ -173,6 +214,45 @@ func (r *VMAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 			return
 		}
 		updates = append(updates, updater)
+	}
+	return
+}
+
+func (r *VMAdapter) DeleteUnexisting(ctx *Context) (deletions []Updater, err error) {
+	vmList := []model.VM{}
+	err = ctx.db.List(&vmList, libmodel.FilterOptions{})
+	if err != nil {
+		if errors.Is(err, libmodel.NotFound) {
+			err = nil
+		}
+		return
+	}
+	vmListServer := []VM{}
+	err = ctx.client.list("vms", &vmListServer)
+	if err != nil {
+		return
+	}
+
+	elementMap := make(map[string]bool)
+	for _, vm := range vmListServer {
+		elementMap[vm.UUID] = true
+	}
+
+	vmsToDelete := []string{}
+	for _, vm := range vmList {
+		if _, found := elementMap[vm.ID]; !found {
+			vmsToDelete = append(vmsToDelete, vm.ID)
+		}
+	}
+	for _, vmId := range vmsToDelete {
+		currentID := vmId
+		updater := func(tx *libmodel.Tx) (err error) {
+			m := &model.VM{
+				Base: model.Base{ID: currentID},
+			}
+			return tx.Delete(m)
+		}
+		deletions = append(deletions, updater)
 	}
 	return
 }
@@ -232,6 +312,45 @@ func (r *DiskAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 	return
 }
 
+func (r *DiskAdapter) DeleteUnexisting(ctx *Context) (deletions []Updater, err error) {
+	diskList := []model.Disk{}
+	err = ctx.db.List(&diskList, libmodel.FilterOptions{})
+	if err != nil {
+		if errors.Is(err, libmodel.NotFound) {
+			err = nil
+		}
+		return
+	}
+	diskListServer := []Disk{}
+	err = ctx.client.list("disks", &diskListServer)
+	if err != nil {
+		return
+	}
+
+	elementMap := make(map[string]bool)
+	for _, disk := range diskListServer {
+		elementMap[disk.ID] = true
+	}
+
+	disksToDelete := []string{}
+	for _, disk := range diskList {
+		if _, found := elementMap[disk.ID]; !found {
+			disksToDelete = append(disksToDelete, disk.ID)
+		}
+	}
+	for _, diskId := range disksToDelete {
+		currentID := diskId
+		updater := func(tx *libmodel.Tx) (err error) {
+			m := &model.Disk{
+				Base: model.Base{ID: currentID},
+			}
+			return tx.Delete(m)
+		}
+		deletions = append(deletions, updater)
+	}
+	return
+}
+
 type StorageAdapter struct {
 	BaseAdapter
 }
@@ -259,5 +378,11 @@ func (r *StorageAdapter) List(ctx *Context, provider *api.Provider) (itr fb.Iter
 
 	itr = list.Iter()
 
+	return
+}
+
+func (r *StorageAdapter) DeleteUnexisting(ctx *Context) (deletions []Updater, err error) {
+	// Each provider have only one storage hence it can't be changed,
+	// Will be removed only if the provider deleted.
 	return
 }
