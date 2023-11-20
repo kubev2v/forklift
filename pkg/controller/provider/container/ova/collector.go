@@ -20,7 +20,7 @@ const (
 	// Retry interval.
 	RetryInterval = 5 * time.Second
 	// Refresh interval.
-	RefreshInterval = 5 * time.Minute
+	RefreshInterval = 1 * time.Minute
 )
 
 // Phases
@@ -303,10 +303,18 @@ func (r *Collector) endWatch() {
 // DB transaction while using the provider API which
 // can block or be slow.
 func (r *Collector) refresh(ctx *Context) (err error) {
-	var updates []Updater
+	var deletions, updates []Updater
 	mark := time.Now()
 	for _, adapter := range adapterList {
 		if ctx.canceled() {
+			return
+		}
+		deletions, err = adapter.DeleteUnexisting(ctx)
+		if err != nil {
+			return
+		}
+		err = r.apply(deletions)
+		if err != nil {
 			return
 		}
 		updates, err = adapter.GetUpdates(ctx)
