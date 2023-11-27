@@ -17,7 +17,7 @@ func (r *OvaClient) LoadSourceDetails() (vm *OvaVM, err error) {
 		r.storageClass = "nfs-csi"
 	}
 
-	r.vmData.testVMId = "21bf790bcdc4591ef01ec6fa7b4812e0d830"
+	r.vmData.testVMId = "c5686650854d1e69b4123f4bf2e70fe1ed2a"
 	r.vmData.testNetworkID = "ae1badc8c693926f492a01e2f357d6af321b"
 	r.vmData.testStorageName = "Dummy storage for source provider ova-provider"
 	return &r.vmData, nil
