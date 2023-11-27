@@ -229,6 +229,7 @@ type VM struct {
 	BalloonedMemory       int32          `json:"balloonedMemory"`
 	IpAddress             string         `json:"ipAddress"`
 	StorageUsed           int64          `json:"storageUsed"`
+	TpmEnabled            bool           `json:"tpmEnabled"`
 	NumaNodeAffinity      []string       `json:"numaNodeAffinity"`
 	Devices               []model.Device `json:"devices"`
 	NICs                  []model.NIC    `json:"nics"`
@@ -255,6 +256,7 @@ func (r *VM) With(m *model.VM) {
 	r.BalloonedMemory = m.BalloonedMemory
 	r.IpAddress = m.IpAddress
 	r.StorageUsed = m.StorageUsed
+	r.TpmEnabled = m.TpmEnabled
 	r.FaultToleranceEnabled = m.FaultToleranceEnabled
 	r.Devices = m.Devices
 	r.NumaNodeAffinity = m.NumaNodeAffinity
