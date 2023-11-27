@@ -570,6 +570,10 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				if s, cast := p.Val.(string); cast {
 					v.model.GuestName = s
 				}
+			case fTpmPresent:
+				if b, cast := p.Val.(bool); cast {
+					v.model.TpmEnabled = b
+				}
 			case fGuestID:
 				if s, cast := p.Val.(string); cast {
 					// When the VM isn't powered on, the guest tools don't report

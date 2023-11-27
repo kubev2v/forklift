@@ -110,6 +110,7 @@ const (
 	fChangeTracking      = "config.changeTrackingEnabled"
 	fGuestName           = "summary.config.guestFullName"
 	fGuestID             = "summary.guest.guestId"
+	fTpmPresent          = "summary.config.tpmPresent"
 	fBalloonedMemory     = "summary.quickStats.balloonedMemory"
 	fVmIpAddress         = "summary.guest.ipAddress"
 	fStorageUsed         = "summary.storage.committed"
@@ -714,6 +715,7 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 				fExtraConfig,
 				fGuestName,
 				fGuestID,
+				fTpmPresent,
 				fBalloonedMemory,
 				fVmIpAddress,
 				fStorageUsed,

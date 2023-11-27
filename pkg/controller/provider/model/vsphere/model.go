@@ -256,6 +256,7 @@ type VM struct {
 	Snapshot              Ref       `sql:""`
 	IsTemplate            bool      `sql:""`
 	ChangeTrackingEnabled bool      `sql:""`
+	TpmEnabled            bool      `sql:""`
 	Devices               []Device  `sql:""`
 	NICs                  []NIC     `sql:""`
 	Disks                 []Disk    `sql:""`
