@@ -462,6 +462,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	r.mapMemory(vm, object)
 	r.mapClock(host, object)
 	r.mapInput(object)
+	r.mapTpm(vm, object)
 	err = r.mapNetworks(vm, object)
 	if err != nil {
 		return
@@ -637,6 +638,13 @@ func (r *Builder) mapDisks(vm *model.VM, persistentVolumeClaims []core.Persisten
 	}
 	object.Template.Spec.Volumes = kVolumes
 	object.Template.Spec.Domain.Devices.Disks = kDisks
+}
+
+func (r *Builder) mapTpm(vm *model.VM, object *cnv.VirtualMachineSpec) {
+	if vm.TpmEnabled {
+		persistData := true
+		object.Template.Spec.Domain.Devices.TPM = &cnv.TPMDevice{Persistent: &persistData}
+	}
 }
 
 // Build tasks.
