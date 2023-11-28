@@ -704,6 +704,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			pvcNames, err = r.kubevirt.PopulatorVolumes(vm.Ref)
 			if err != nil {
 				if !errors.As(err, &web.ProviderNotReadyError{}) {
+					r.Log.Error(err, "error creating volumes", "vm", vm.Name)
 					step.AddError(err.Error())
 					err = nil
 					break
@@ -733,6 +734,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			dataVolumes, err = r.kubevirt.DataVolumes(vm)
 			if err != nil {
 				if !errors.As(err, &web.ProviderNotReadyError{}) {
+					r.Log.Error(err, "error creating volumes", "vm", vm.Name)
 					step.AddError(err.Error())
 					err = nil
 					break
