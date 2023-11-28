@@ -143,7 +143,6 @@ tidy:
 # Run go mod vendor against code
 vendor:
 	go mod vendor
-	./hack/post-vendor.sh
 
 # Generate code
 generate: controller-gen

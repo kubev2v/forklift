@@ -37,3 +37,6 @@ bazel-*
 
 # deploy env
 hack/deploy/**/deploy.env
+
+# unused Dockerfiles
+vendor/**/Dockerfile
