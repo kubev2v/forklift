@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/base"
@@ -52,7 +53,8 @@ import (
 
 const (
 	// Name.
-	Name = "provider"
+	Name       = "provider"
+	OvaTimeout = 10
 )
 
 // Package logger.
@@ -196,10 +198,45 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 			deployment)
 
 		// If the deployment does not exist
-		if k8serr.IsNotFound(err) {
-			r.CreateOVAServerDeployment(provider, ctx)
-		} else if err != nil {
+		if err != nil {
+			if k8serr.IsNotFound(err) {
+				r.CreateOVAServerDeployment(provider, ctx)
+				provider.Status.Phase = initializing
+				provider.Status.SetCondition(
+					libcnd.Condition{
+						Type:     initializing,
+						Status:   True,
+						Category: Required,
+						Message:  "The OVA server being inizialized.",
+					})
+				err = r.Status().Update(context.TODO(), provider.DeepCopy())
+				if err != nil {
+					return
+				}
+				result.RequeueAfter = 5 * time.Second
+				return
+			}
 			return
+		}
+
+		// The ova server pod is not running yet
+		if deployment.Status.AvailableReplicas == 0 {
+			if time.Since(provider.CreationTimestamp.Time).Minutes() <= OvaTimeout {
+				result.RequeueAfter = 5 * time.Second
+				return
+			} else {
+				// Timeout reached
+				provider.Status.Phase = ServerCreationFailed
+				provider.Status.SetCondition(
+					libcnd.Condition{
+						Type:     ServerCreationFailed,
+						Status:   True,
+						Category: Critical,
+						Message:  "The OVA provider server creation failed.",
+					})
+				err = r.Status().Update(context.TODO(), provider.DeepCopy())
+				return
+			}
 		}
 	}
 
