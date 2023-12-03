@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -60,17 +59,14 @@ func populate(fileName, identityEndpoint, secretName, imageID string) {
 		klog.Info("Prometheus progress counter registered.")
 	}
 
-	options, err := readOptions()
-	if err != nil {
-		klog.Fatal(err)
-	}
+	options := readOptions()
 
 	client := &libclient.Client{
 		URL:     identityEndpoint,
 		Options: options,
 	}
 
-	err = client.Connect()
+	err := client.Connect()
 	if err != nil {
 		klog.Fatal(err)
 	}
@@ -143,34 +139,30 @@ func writeData(reader io.ReadCloser, file *os.File, imageID string, progress *pr
 	return nil
 }
 
-func readOptions() (options map[string]string, err error) {
+func readOptions() (options map[string]string) {
 	options = map[string]string{}
-	secretDirPath := "/etc/secret-volume"
-	dirEntries, err := os.ReadDir(secretDirPath)
-	if err != nil {
-		return
-	}
-	klog.Info("Options:")
-	for _, dirEntry := range dirEntries {
-		if !dirEntry.Type().IsDir() {
-			option := dirEntry.Name()
-			if strings.HasPrefix(option, "..") {
-				continue
-			}
-			filePath := filepath.Join(secretDirPath, option)
-			var fileContent []byte
-			fileContent, err = os.ReadFile(filePath)
-			if err != nil {
-				return
-			}
-			value := string(fileContent)
-			options[option] = value
-			if option == "password" || option == "applicationCredentialSecret" || option == "token" {
-				value = strings.Repeat("*", len(value))
-			}
-			klog.Info(" - ", option, " = ", value)
 
-		}
+	// List of options to read from environment variables
+	envOptions := []string{
+		"regionName", "authType", "username", "userID", "password",
+		"applicationCredentialID", "applicationCredentialName", "applicationCredentialSecret",
+		"token", "systemScope", "projectName", "projectID", "userDomainName",
+		"userDomainID", "projectDomainName", "projectDomainID", "domainName",
+		"domainID", "defaultDomain", "insecureSkipVerify", "cacert", "availability",
 	}
+
+	klog.Info("Options:")
+	for _, option := range envOptions {
+		value := os.Getenv(option)
+		options[option] = value
+
+		// Mask sensitive information
+		if option == "password" || option == "applicationCredentialSecret" || option == "token" {
+			value = strings.Repeat("*", len(value))
+		}
+
+		klog.Info(" - ", option, " = ", value)
+	}
+
 	return
 }

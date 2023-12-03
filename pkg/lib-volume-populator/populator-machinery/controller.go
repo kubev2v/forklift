@@ -628,11 +628,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 					},
 				}
 			}
-			con.VolumeMounts = append(con.VolumeMounts, corev1.VolumeMount{
-				Name:      "secret-volume",
-				ReadOnly:  true,
-				MountPath: "/etc/secret-volume",
-			})
+
 			if waitForFirstConsumer {
 				pod.Spec.NodeName = nodeName
 			}
@@ -940,6 +936,15 @@ func makePopulatePodSpec(pvcPrimeName, secretName string) corev1.PodSpec {
 						Drop: []corev1.Capability{"ALL"},
 					},
 				},
+				EnvFrom: []corev1.EnvFromSource{
+					{
+						SecretRef: &corev1.SecretEnvSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: secretName,
+							},
+						},
+					},
+				},
 			},
 		},
 		SecurityContext: &corev1.PodSecurityContext{
@@ -955,14 +960,6 @@ func makePopulatePodSpec(pvcPrimeName, secretName string) corev1.PodSpec {
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 						ClaimName: pvcPrimeName,
-					},
-				},
-			},
-			{
-				Name: "secret-volume",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName: secretName,
 					},
 				},
 			},
