@@ -58,10 +58,12 @@ const (
 
 // Phases
 const (
-	ValidationFailed = "ValidationFailed"
-	ConnectionFailed = "ConnectionFailed"
-	Ready            = "Ready"
-	Staging          = "Staging"
+	ValidationFailed     = "ValidationFailed"
+	ConnectionFailed     = "ConnectionFailed"
+	Ready                = "Ready"
+	Staging              = "Staging"
+	initializing         = "initializing"
+	ServerCreationFailed = "ServerCreationFailed"
 )
 
 // Statuses
