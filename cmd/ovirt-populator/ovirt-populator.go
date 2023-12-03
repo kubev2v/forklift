@@ -159,7 +159,6 @@ func loadEngineConfig(engineURL string) engineConfig {
 	user := os.Getenv("user")
 	pass := os.Getenv("password")
 
-	var insecureSkipVerify string
 	insecureSkipVerify, found := os.LookupEnv("insecureSkipVerify")
 	if !found {
 		insecureSkipVerify = "false"
