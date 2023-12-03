@@ -156,50 +156,28 @@ func populate(engineURL, diskID, volPath string) {
 }
 
 func loadEngineConfig(engineURL string) engineConfig {
-	user, err := os.ReadFile("/etc/secret-volume/user")
-	if err != nil {
-		klog.Fatal(err.Error())
-	}
-	pass, err := os.ReadFile("/etc/secret-volume/password")
-	if err != nil {
-		klog.Fatal(err.Error())
-	}
+	user := os.Getenv("user")
+	pass := os.Getenv("password")
 
-	var insecureSkipVerify []byte
-	_, err = os.Stat("/etc/secret-volume/insecureSkipVerify")
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			insecureSkipVerify = []byte("false")
-		} else {
-			klog.Fatal(err.Error())
-		}
-	} else {
-		insecureSkipVerify, err = os.ReadFile("/etc/secret-volume/insecureSkipVerify")
-		if err != nil {
-			klog.Fatal(err.Error())
-		}
+	var insecureSkipVerify string
+	insecureSkipVerify, found := os.LookupEnv("insecureSkipVerify")
+	if !found {
+		insecureSkipVerify = "false"
 	}
 
 	insecure, err := strconv.ParseBool(string(insecureSkipVerify))
 	if err != nil {
 		klog.Fatal(err.Error())
 	}
+
 	//If the insecure option is set, the ca file field in the secret is not required.
-	var cacert []byte
-	if insecure {
-		cacert = []byte("")
-	} else {
-		cacert, err = os.ReadFile("/etc/secret-volume/cacert")
-		if err != nil {
-			klog.Error(err.Error())
-		}
-	}
+	cacert := os.Getenv("cacert")
 
 	return engineConfig{
 		URL:      engineURL,
-		username: string(user),
-		password: string(pass),
-		cacert:   string(cacert),
+		username: user,
+		password: pass,
+		cacert:   cacert,
 		insecure: insecure,
 	}
 }
