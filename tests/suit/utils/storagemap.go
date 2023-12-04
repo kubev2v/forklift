@@ -37,10 +37,11 @@ func NewStorageMap(namespace string, providerIdentifier forkliftv1.Provider, sto
 			},
 		}
 
-		if providerIdentifier.Type() != api.Ova {
-			pair.Source = ref.Ref{ID: sd}
-		} else {
+		switch providerIdentifier.Type() {
+		case api.Ova:
 			pair.Source = ref.Ref{Name: sd}
+		default:
+			pair.Source = ref.Ref{ID: sd}
 		}
 
 		sdPairs = append(sdPairs, pair)

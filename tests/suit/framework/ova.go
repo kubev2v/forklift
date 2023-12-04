@@ -2,6 +2,7 @@ package framework
 
 import (
 	"context"
+	"errors"
 	"os"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -10,7 +11,6 @@ import (
 
 // LoadSourceDetails - Load Source VM details from ova
 func (r *OvaClient) LoadSourceDetails() (vm *OvaVM, err error) {
-	r.storageClass = DefaultStorageClass
 	if sc := os.Getenv("STORAGE_CLASS"); sc != "" {
 		r.storageClass = sc
 	} else {
@@ -29,16 +29,21 @@ func (r *OvaClient) GetNfsServerForOva(k8sClient *kubernetes.Clientset) (string,
 		return "", err
 	}
 	var nfsShare string
+	var server, share string
 	for parm, val := range storageClass.Parameters {
 		if parm == "server" {
-			nfsShare = val
+			server = val
 		}
 		if parm == "share" {
-			nfsShare = nfsShare + ":" + val
+			share = val
 		}
 	}
+	nfsShare = server + ":" + share
+
 	if nfsShare != "" {
 		r.nfsPath = nfsShare
+	} else {
+		return "", errors.New("failed to fatch NFS settings")
 	}
 	return r.nfsPath, nil
 }
