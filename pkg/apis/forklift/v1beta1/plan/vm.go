@@ -30,6 +30,9 @@ type VM struct {
 	ref.Ref `json:",inline"`
 	// Enable hooks.
 	Hooks []HookRef `json:"hooks,omitempty"`
+	// Disk decryption LUKS keys
+	// +optional
+	LUKS core.ObjectReference `json:"luks" ref:"Secret"`
 }
 
 // Find a Hook for the specified step.
