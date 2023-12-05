@@ -28,7 +28,6 @@ func (r *OvaClient) GetNfsServerForOva(k8sClient *kubernetes.Clientset) (string,
 	if err != nil {
 		return "", err
 	}
-	var nfsShare string
 	var server, share string
 	for parm, val := range storageClass.Parameters {
 		if parm == "server" {
@@ -38,13 +37,12 @@ func (r *OvaClient) GetNfsServerForOva(k8sClient *kubernetes.Clientset) (string,
 			share = val
 		}
 	}
-	nfsShare = server + ":" + share
-
-	if nfsShare != "" {
-		r.nfsPath = nfsShare
-	} else {
+	nfsShare := server + ":" + share
+	if nfsShare == "" {
 		return "", errors.New("failed to fatch NFS settings")
 	}
+
+	r.nfsPath = nfsShare
 	return r.nfsPath, nil
 }
 
