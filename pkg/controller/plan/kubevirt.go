@@ -1311,10 +1311,17 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	if err != nil {
 		return
 	}
+	// pod annotations
+	annotations := map[string]string{}
+	if r.Plan.Spec.TransferNetwork != nil {
+		annotations[AnnDefaultNetwork] = path.Join(
+			r.Plan.Spec.TransferNetwork.Namespace, r.Plan.Spec.TransferNetwork.Name)
+	}
 	// pod
 	pod = &core.Pod{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace:    r.Plan.Spec.TargetNamespace,
+			Annotations:  annotations,
 			Labels:       r.conversionLabels(vm.Ref, false),
 			GenerateName: r.getGeneratedName(vm),
 		},
