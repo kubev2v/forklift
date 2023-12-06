@@ -26,20 +26,20 @@ const (
 	qemuGroup              = 107
 )
 
-func (r Reconciler) CreateOVAServerDeployment(provider *api.Provider, ctx context.Context) {
-	pvName := fmt.Sprintf("%s-pv-%s-%s", ovaServer, provider.Name, provider.Namespace)
-	err := r.createPvForNfs(provider, ctx, pvName)
-	if err != nil {
-		r.Log.Error(err, "Failed to create PV for the OVA server")
-		return
-	}
-
+func (r Reconciler) CreateOVAServerDeployment(provider *api.Provider, ctx context.Context) (err error) {
 	ownerReference := metav1.OwnerReference{
 		APIVersion: "forklift.konveyor.io/v1beta1",
 		Kind:       "Provider",
 		Name:       provider.Name,
 		UID:        provider.UID,
 	}
+	pvName := fmt.Sprintf("%s-pv-%s-%s", ovaServer, provider.Name, provider.Namespace)
+	err = r.createPvForNfs(provider, ctx, pvName)
+	if err != nil {
+		r.Log.Error(err, "Failed to create PV for the OVA server")
+		return
+	}
+
 	pvcName := fmt.Sprintf("%s-pvc-%s", ovaServer, provider.Name)
 	err = r.createPvcForNfs(provider, ctx, ownerReference, pvName, pvcName)
 	if err != nil {
@@ -59,6 +59,7 @@ func (r Reconciler) CreateOVAServerDeployment(provider *api.Provider, ctx contex
 		r.Log.Error(err, "Failed to create OVA server service")
 		return
 	}
+	return
 }
 
 func (r *Reconciler) createPvForNfs(provider *api.Provider, ctx context.Context, pvName string) (err error) {
