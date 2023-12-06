@@ -62,7 +62,7 @@ const (
 	ConnectionFailed     = "ConnectionFailed"
 	Ready                = "Ready"
 	Staging              = "Staging"
-	initializing         = "initializing"
+	Initializing         = "Initializing"
 	ServerCreationFailed = "ServerCreationFailed"
 )
 

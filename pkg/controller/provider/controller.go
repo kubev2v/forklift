@@ -200,11 +200,15 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		// If the deployment does not exist
 		if err != nil {
 			if k8serr.IsNotFound(err) {
-				r.CreateOVAServerDeployment(provider, ctx)
-				provider.Status.Phase = initializing
+				err = r.CreateOVAServerDeployment(provider, ctx)
+				if err != nil {
+					r.handleServerCreationFailure(provider, err)
+					return
+				}
+				provider.Status.Phase = Initializing
 				provider.Status.SetCondition(
 					libcnd.Condition{
-						Type:     initializing,
+						Type:     Initializing,
 						Status:   True,
 						Category: Required,
 						Message:  "The OVA server being inizialized.",
@@ -224,17 +228,9 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 			if time.Since(provider.CreationTimestamp.Time).Minutes() <= OvaTimeout {
 				result.RequeueAfter = 5 * time.Second
 				return
-			} else {
-				// Timeout reached
-				provider.Status.Phase = ServerCreationFailed
-				provider.Status.SetCondition(
-					libcnd.Condition{
-						Type:     ServerCreationFailed,
-						Status:   True,
-						Category: Critical,
-						Message:  "The OVA provider server creation failed.",
-					})
-				err = r.Status().Update(context.TODO(), provider.DeepCopy())
+			} else { // Timeout reached
+				err = fmt.Errorf("the server creation timed out. Please ensure that the NFS export is set correctly")
+				r.handleServerCreationFailure(provider, err)
 				return
 			}
 		}
@@ -389,6 +385,22 @@ func (r *Reconciler) getSecret(provider *api.Provider) (*v1.Secret, error) {
 	}
 
 	return secret, nil
+}
+
+func (r *Reconciler) handleServerCreationFailure(provider *api.Provider, errMsg error) {
+	provider.Status.Phase = ServerCreationFailed
+	msg := fmt.Sprint("The OVA provider server creation failed -", errMsg)
+	provider.Status.SetCondition(
+		libcnd.Condition{
+			Type:     ServerCreationFailed,
+			Status:   True,
+			Category: Critical,
+			Message:  msg,
+		})
+	err := r.Status().Update(context.TODO(), provider.DeepCopy())
+	if err != nil {
+		log.Error(err, "Failed to update provider status")
+	}
 }
 
 // Provider catalog.
