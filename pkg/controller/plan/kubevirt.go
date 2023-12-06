@@ -282,7 +282,7 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) (err error) {
 		return
 	}
 
-	virtualMachine := &cnv.VirtualMachine{}
+	var virtualMachine *cnv.VirtualMachine
 	if len(list.Items) == 0 {
 		virtualMachine = newVM
 		err = r.Destination.Client.Create(context.TODO(), virtualMachine)
@@ -986,6 +986,12 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 		object = r.emptyVm(vm)
 	}
 
+	if object.Spec.Template.ObjectMeta.Labels == nil {
+		object.Spec.Template.ObjectMeta.Labels = map[string]string{}
+	}
+	// Set the 'app' label for identification of the virtual machine instance(s)
+	object.Spec.Template.ObjectMeta.Labels["app"] = vm.Name
+
 	//Add the original name and ID info to the VM annotations
 	if len(originalName) > 0 {
 		annotations := make(map[string]string)
@@ -1075,7 +1081,9 @@ func (r *KubeVirt) emptyVm(vm *plan.VMStatus) (virtualMachine *cnv.VirtualMachin
 			Labels:    r.vmLabels(vm.Ref),
 			Name:      vm.Name,
 		},
-		Spec: cnv.VirtualMachineSpec{},
+		Spec: cnv.VirtualMachineSpec{
+			Template: &cnv.VirtualMachineInstanceTemplateSpec{},
+		},
 	}
 	return
 }
