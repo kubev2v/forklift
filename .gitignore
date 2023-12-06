@@ -41,3 +41,4 @@ hack/deploy/**/deploy.env
 # unused Dockerfiles
 vendor/**/Dockerfile
 vendor/**/Dockerfile.vcsim
+vendor/**/Dockerfile.govc
