@@ -298,34 +298,27 @@ func (r *KubeVirt) DeleteImporterPods(pvc core.PersistentVolumeClaim) (err error
 }
 
 // Ensure the kubevirt VirtualMachine exists on the destination.
-func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) (err error) {
-	newVM, err := r.virtualMachine(vm)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-
-	list := &cnv.VirtualMachineList{}
-	err = r.Destination.Client.List(
+func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) error {
+	vms := &cnv.VirtualMachineList{}
+	err := r.Destination.Client.List(
 		context.TODO(),
-		list,
+		vms,
 		&client.ListOptions{
 			LabelSelector: labels.SelectorFromSet(r.vmLabels(vm.Ref)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
 	if err != nil {
-		err = liberr.Wrap(err)
-		return
+		return liberr.Wrap(err)
 	}
 
 	var virtualMachine *cnv.VirtualMachine
-	if len(list.Items) == 0 {
-		virtualMachine = newVM
-		err = r.Destination.Client.Create(context.TODO(), virtualMachine)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
+	if len(vms.Items) == 0 {
+		if virtualMachine, err = r.virtualMachine(vm); err != nil {
+			return liberr.Wrap(err)
+		}
+		if err = r.Destination.Client.Create(context.TODO(), virtualMachine); err != nil {
+			return liberr.Wrap(err)
 		}
 		r.Log.Info(
 			"Created Kubevirt VM.",
@@ -336,7 +329,7 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) (err error) {
 			"source",
 			vm.String())
 	} else {
-		virtualMachine = &list.Items[0]
+		virtualMachine = &vms.Items[0]
 	}
 
 	// set DataVolume owner references so that they'll be cleaned up
@@ -350,13 +343,11 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) (err error) {
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		})
 	if err != nil {
-		err = liberr.Wrap(err)
-		return
+		return liberr.Wrap(err)
 	}
 	pvcs, err := r.getPVCs(vm.Ref)
 	if err != nil {
-		err = liberr.Wrap(err)
-		return
+		return liberr.Wrap(err)
 	}
 
 	for _, pvc := range pvcs {
@@ -366,12 +357,11 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) (err error) {
 		patch := client.MergeFrom(pvcCopy)
 		err = r.Destination.Client.Patch(context.TODO(), &pvc, patch)
 		if err != nil {
-			err = liberr.Wrap(err)
-			return
+			return liberr.Wrap(err)
 		}
 	}
 
-	return
+	return nil
 }
 
 // Delete the Secret that was created for this VM.
