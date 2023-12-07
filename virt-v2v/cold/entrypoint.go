@@ -20,6 +20,7 @@ const (
 	FS      = "/mnt/disks/disk[0-9]*"
 	Block   = "/dev/block[0-9]*"
 	VDDK    = "/opt/vmware-vix-disklib-distrib"
+	LUKSDIR = "/etc/luks"
 )
 
 var (
@@ -127,6 +128,23 @@ func buildCommand() []string {
 				virtV2vArgs = append(virtV2vArgs, "--mac", macToIp)
 			}
 		}
+		// Adds LUKS keys, if exist.
+		if _, err := os.Stat(LUKSDIR); os.IsNotExist(err) {
+			// do nothing
+		} else {
+			if err != nil {
+				fmt.Println("Error accessing the LUKS directory ", err)
+				os.Exit(1)
+			}
+			files, err := getFilesInPath(LUKSDIR)
+			if err != nil {
+				fmt.Println("Error reading files in LUKS directory ", err)
+				os.Exit(1)
+			}
+			for _, file := range files {
+				virtV2vArgs = append(virtV2vArgs, "--key", fmt.Sprintf("all:file:%s", file))
+			}
+		}
 
 		if info, err := os.Stat(VDDK); err == nil && info.IsDir() {
 			virtV2vArgs = append(virtV2vArgs,
@@ -147,6 +165,20 @@ func buildCommand() []string {
 		virtV2vArgs = append(virtV2vArgs, "--", os.Getenv("V2V_vmName"))
 	}
 	return virtV2vArgs
+}
+
+func getFilesInPath(rootPath string) (paths []string, err error) {
+	files, err := os.ReadDir(rootPath)
+	if err != nil {
+		fmt.Println("Error reading the files in the directory ", err)
+		return
+	}
+	for _, file := range files {
+		if !file.IsDir() && !strings.HasPrefix(file.Name(), "..") {
+			paths = append(paths, fmt.Sprintf("%s/%s", rootPath, file.Name()))
+		}
+	}
+	return
 }
 
 func checkEnvVariablesSet(envVars ...string) bool {
