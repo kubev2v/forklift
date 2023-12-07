@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	template "github.com/openshift/api/template/v1"
 	"github.com/openshift/library-go/pkg/template/generator"
 	"github.com/openshift/library-go/pkg/template/templateprocessing"
@@ -26,12 +25,14 @@ import (
 	libvirtxml "libvirt.org/libvirt-go-xml"
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1476,6 +1477,22 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 			EmptyDir: &core.EmptyDirVolumeSource{},
 		},
 	})
+	if libref.RefSet(&r.Plan.Spec.LUKS) {
+		volumes = append(volumes, core.Volume{
+			Name: "luks",
+			VolumeSource: core.VolumeSource{
+				Secret: &core.SecretVolumeSource{
+					SecretName: r.Plan.Spec.LUKS.Name,
+				},
+			},
+		})
+		mounts = append(mounts,
+			core.VolumeMount{
+				Name:      "luks",
+				MountPath: "/etc/luks",
+				ReadOnly:  true,
+			})
+	}
 
 	return
 }
