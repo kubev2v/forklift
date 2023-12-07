@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	template "github.com/openshift/api/template/v1"
 	"github.com/openshift/library-go/pkg/template/generator"
@@ -29,7 +28,7 @@ import (
 	instancetype "kubevirt.io/api/instancetype/v1beta1"
 	libvirtxml "libvirt.org/libvirt-go-xml"
 
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
@@ -754,7 +753,7 @@ func (r *KubeVirt) setKvmOnPodSpec(podSpec *core.PodSpec) {
 		return
 	}
 	switch *r.Plan.Provider.Source.Spec.Type {
-	case v1beta1.VSphere, v1beta1.Ova:
+	case api.VSphere, api.Ova:
 		if podSpec.NodeSelector == nil {
 			podSpec.NodeSelector = make(map[string]string)
 		}
@@ -1288,7 +1287,7 @@ func (r *KubeVirt) vmPreference(vm *plan.VMStatus) (virtualMachine *cnv.VirtualM
 	return
 }
 
-func (r *KubeVirt) getOsMapConfig(providerType v1beta1.ProviderType) (configMap *core.ConfigMap, err error) {
+func (r *KubeVirt) getOsMapConfig(providerType api.ProviderType) (configMap *core.ConfigMap, err error) {
 	configMap = &core.ConfigMap{}
 	var configMapName string
 	switch providerType {
@@ -1529,7 +1528,7 @@ func (r *KubeVirt) findTemplate(vm *plan.VMStatus) (tmpl *template.Template, err
 }
 
 func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, configMap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, v2vSecret *core.Secret) (pod *core.Pod, err error) {
-	volumes, volumeMounts, volumeDevices, err := r.podVolumeMounts(vmVolumes, configMap, pvcs, vm.ID)
+	volumes, volumeMounts, volumeDevices, err := r.podVolumeMounts(vmVolumes, configMap, pvcs, vm)
 	if err != nil {
 		return
 	}
@@ -1659,7 +1658,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	return
 }
 
-func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, vmID string) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice, err error) {
+func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, vm *plan.VMStatus) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice, err error) {
 	pvcsByName := make(map[string]*core.PersistentVolumeClaim)
 	for _, pvc := range pvcs {
 		pvcsByName[pvc.Name] = pvc
@@ -1712,7 +1711,7 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 		}
 		pvcNamePrefix := getEntityPrefixName("pvc", r.Source.Provider.Name, r.Plan.Name)
 		var pvcName string
-		pvcName, err = r.CreatePvcForNfs(pvcNamePrefix, pvName, vmID)
+		pvcName, err = r.CreatePvcForNfs(pvcNamePrefix, pvName, vm.ID)
 		if err != nil {
 			return
 		}
@@ -1760,7 +1759,22 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 			EmptyDir: &core.EmptyDirVolumeSource{},
 		},
 	})
-
+	if vm.LUKS.Name != "" {
+		volumes = append(volumes, core.Volume{
+			Name: "luks",
+			VolumeSource: core.VolumeSource{
+				Secret: &core.SecretVolumeSource{
+					SecretName: vm.LUKS.Name,
+				},
+			},
+		})
+		mounts = append(mounts,
+			core.VolumeMount{
+				Name:      "luks",
+				MountPath: "/etc/luks",
+				ReadOnly:  true,
+			})
+	}
 	return
 }
 
