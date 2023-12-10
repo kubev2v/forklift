@@ -53,8 +53,9 @@ import (
 
 const (
 	// Name.
-	Name       = "provider"
-	OvaTimeout = 10
+	Name               = "provider"
+	OvaTimeout         = 10
+	OvaReconcilerRetry = 5 * time.Second
 )
 
 // Package logger.
@@ -217,7 +218,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 				if err != nil {
 					return
 				}
-				result.RequeueAfter = 5 * time.Second
+				result.RequeueAfter = OvaReconcilerRetry
 				return
 			}
 			return
@@ -226,7 +227,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		// The ova server pod is not running yet
 		if deployment.Status.AvailableReplicas == 0 {
 			if time.Since(provider.CreationTimestamp.Time).Minutes() <= OvaTimeout {
-				result.RequeueAfter = 5 * time.Second
+				result.RequeueAfter = OvaReconcilerRetry
 				return
 			} else { // Timeout reached
 				err = fmt.Errorf("the server creation timed out. Please ensure that the NFS export is set correctly")
@@ -387,9 +388,9 @@ func (r *Reconciler) getSecret(provider *api.Provider) (*v1.Secret, error) {
 	return secret, nil
 }
 
-func (r *Reconciler) handleServerCreationFailure(provider *api.Provider, errMsg error) {
+func (r *Reconciler) handleServerCreationFailure(provider *api.Provider, err error) {
 	provider.Status.Phase = ServerCreationFailed
-	msg := fmt.Sprint("The OVA provider server creation failed -", errMsg)
+	msg := fmt.Sprint("The OVA provider server creation failed -", err)
 	provider.Status.SetCondition(
 		libcnd.Condition{
 			Type:     ServerCreationFailed,
@@ -397,9 +398,8 @@ func (r *Reconciler) handleServerCreationFailure(provider *api.Provider, errMsg 
 			Category: Critical,
 			Message:  msg,
 		})
-	err := r.Status().Update(context.TODO(), provider.DeepCopy())
-	if err != nil {
-		log.Error(err, "Failed to update provider status")
+	if updateErr := r.Status().Update(context.TODO(), provider.DeepCopy()); updateErr != nil {
+		log.Error(updateErr, "Failed to update provider status")
 	}
 }
 
