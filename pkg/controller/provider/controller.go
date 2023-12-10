@@ -21,7 +21,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
+	"time"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/base"
@@ -41,6 +43,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/storage/names"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -155,6 +158,28 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 				if r, found := r.container.Delete(deleted); found {
 					r.Shutdown()
 					_ = r.DB().Close(true)
+				}
+			}
+
+			// Wait for the PV to release
+			time.Sleep(5 * time.Second)
+
+			// List all PVs with a specific prefix and label
+			labelSelector := labels.SelectorFromSet(labels.Set{"subapp": "ova-server"})
+			pvList := &v1.PersistentVolumeList{}
+			err = r.Client.List(context.TODO(), pvList, &client.ListOptions{
+				LabelSelector: labelSelector,
+			})
+			if err != nil {
+				r.Log.Error(err, "Failed to list PVs")
+			} else {
+				for _, pv := range pvList.Items {
+					if strings.HasPrefix(pv.Name, "ova-server-pv-") && pv.Status.Phase == v1.VolumeReleased {
+						err = r.Client.Delete(context.TODO(), &pv)
+						if err != nil {
+							r.Log.Error(err, "Failed to delete PV", "PV Name", pv.Name)
+						}
+					}
 				}
 			}
 		}
