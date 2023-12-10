@@ -116,6 +116,38 @@ func (admitter *PlanAdmitter) validateWarmMigrations() error {
 	return nil
 }
 
+func (admitter *PlanAdmitter) validateLUKS() error {
+	hasLUKS := false
+	for _, vm := range admitter.plan.Spec.VMs {
+		if vm.LUKS.Name != "" {
+			hasLUKS = true
+			break
+		}
+	}
+	if !hasLUKS {
+		return nil
+	}
+
+	providerType := admitter.sourceProvider.Type()
+	if providerType != api.VSphere && providerType != api.Ova {
+		err := liberr.New(fmt.Sprintf("migration of encrypted disks from source provider of type %s is not supported", providerType))
+		log.Error(err, "Provider type (non-VSphere & non-OVA) does not support LUKS")
+		return err
+	}
+
+	el9, el9Err := admitter.plan.VSphereUsesEl9VirtV2v()
+	if el9Err != nil {
+		log.Error(el9Err, "Could not analyze plan, failing")
+		return el9Err
+	}
+	if !el9 {
+		err := liberr.New("migration of encrypted disks is not supported for warm migrations or migrations to remote providers")
+		log.Error(err, "Warm migration does not support LUKS")
+		return err
+	}
+	return nil
+}
+
 func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
 	log.Info("Plan admitter was called")
 	raw := ar.Request.Object.Raw
@@ -163,6 +195,11 @@ func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv
 	}
 
 	err = admitter.validateWarmMigrations()
+	if err != nil {
+		return util.ToAdmissionResponseError(err)
+	}
+
+	err = admitter.validateLUKS()
 	if err != nil {
 		return util.ToAdmissionResponseError(err)
 	}
