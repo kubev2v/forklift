@@ -116,6 +116,34 @@ func (admitter *PlanAdmitter) validateWarmMigrations() error {
 	return nil
 }
 
+func (admitter *PlanAdmitter) validateLuks() error {
+	providerType := admitter.sourceProvider.Type()
+	if providerType != api.VSphere && providerType != api.Ova {
+		log.Info("Provider type (non-VSphere & non-OVA) does not support LUKS, passing")
+		return nil
+	}
+
+	el9, el9Err := admitter.plan.VSphereUsesEl9VirtV2v()
+	if el9Err != nil {
+		log.Error(el9Err, "Could not analyze plan, failing")
+		return el9Err
+	}
+	if el9 {
+		// LUKS is optional when EL9 virt-v2v image is in use
+		log.Info("LUKS secret is optional when EL9 virt-v2v image is in use, passing")
+		return nil
+	}
+
+	luksRef := &admitter.plan.Spec.LUKS
+	if luksRef != nil {
+		err := liberr.New("LUKS encryption is forbidden for this type of migration")
+		log.Error(err, "LUKS encryption is forbidden for this type of migration")
+		return err
+	}
+
+	return nil
+}
+
 func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
 	log.Info("Plan admitter was called")
 	raw := ar.Request.Object.Raw
@@ -163,6 +191,11 @@ func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv
 	}
 
 	err = admitter.validateWarmMigrations()
+	if err != nil {
+		return util.ToAdmissionResponseError(err)
+	}
+
+	err = admitter.validateLuks()
 	if err != nil {
 		return util.ToAdmissionResponseError(err)
 	}
