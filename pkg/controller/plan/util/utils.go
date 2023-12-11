@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/konveyor/forklift-controller/pkg/settings"
+	core "k8s.io/api/core/v1"
 )
 
 // Disk alignment size used to align FS overhead,
@@ -20,8 +21,13 @@ func roundUp(requestedSpace, multiple int64) int64 {
 	return int64(partitions) * multiple
 }
 
-func CalculateSpaceWithOverhead(requestedSpace int64) int64 {
+func CalculateSpaceWithOverhead(requestedSpace int64, volumeMode *core.PersistentVolumeMode) int64 {
 	alignedSize := roundUp(requestedSpace, DefaultAlignBlockSize)
-	spaceWithOverhead := int64(math.Ceil(float64(alignedSize) / (1 - float64(settings.Settings.FileSystemOverhead)/100)))
+	var spaceWithOverhead int64
+	if *volumeMode == core.PersistentVolumeFilesystem {
+		spaceWithOverhead = int64(math.Ceil(float64(alignedSize) / (1 - float64(settings.Settings.FileSystemOverhead)/100)))
+	} else {
+		spaceWithOverhead = alignedSize + int64(settings.Settings.BlockOverhead)
+	}
 	return spaceWithOverhead
 }
