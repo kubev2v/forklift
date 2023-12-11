@@ -1098,10 +1098,7 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image, storageC
 		err = liberr.Wrap(err)
 		return
 	}
-
-	if *volumeMode == core.PersistentVolumeFilesystem {
-		virtualSize = utils.CalculateSpaceWithOverhead(virtualSize)
-	}
+	virtualSize = utils.CalculateSpaceWithOverhead(virtualSize, volumeMode)
 
 	// The image might be a VM Snapshot Image and has no volume associated to it
 	if originalVolumeDiskId, ok := image.Properties["forklift_original_volume_id"]; ok {
