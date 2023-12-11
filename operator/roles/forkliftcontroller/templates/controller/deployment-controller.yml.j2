@@ -80,6 +80,10 @@ spec:
         - name: FILESYSTEM_OVERHEAD
           value: "{{ controller_filesystem_overhead }}"
 {% endif %}
+{% if controller_block_overhead is number %}
+        - name: BLOCK_OVERHEAD
+          value: "{{ controller_block_overhead }}"
+{% endif %}
 {% if controller_vsphere_incremental_backup|bool %}
         - name: FEATURE_VSPHERE_INCREMENTAL_BACKUP
           value: "true"
