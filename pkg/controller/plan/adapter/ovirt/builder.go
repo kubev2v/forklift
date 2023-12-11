@@ -793,11 +793,7 @@ func (r *Builder) getDefaultVolumeAndAccessMode(storageClassName string) ([]core
 // Build a PersistentVolumeClaim with DataSourceRef for VolumePopulator
 func (r *Builder) persistentVolumeClaimWithSourceRef(diskAttachment model.XDiskAttachment, storageClassName string, populatorName string,
 	annotations map[string]string) (pvc *core.PersistentVolumeClaim, err error) {
-
-	// We add 10% overhead because of the fsOverhead in CDI, around 5% to ext4 and 5% for root partition.
-	// This value is configurable using `FILESYSTEM_OVERHEAD`
 	diskSize := diskAttachment.Disk.ProvisionedSize
-
 	var accessModes []core.PersistentVolumeAccessMode
 	var volumeMode *core.PersistentVolumeMode
 	accessModes, volumeMode, err = r.getDefaultVolumeAndAccessMode(storageClassName)
@@ -805,12 +801,11 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(diskAttachment model.XDiskA
 		err = liberr.Wrap(err)
 		return
 	}
-
-	// Accounting for fsOverhead is only required for `volumeMode: Filesystem`, as we may not have enough space
-	// after creating a filesystem on an underlying block device
-	if *volumeMode == core.PersistentVolumeFilesystem {
-		diskSize = utils.CalculateSpaceWithOverhead(diskSize)
-	}
+	// We add 10% overhead because of the fsOverhead in CDI, around 5% to ext4 and 5% for root partition.
+	// This value is configurable using `FILESYSTEM_OVERHEAD`
+	// Encrypted Ceph RBD makes the pod see less space, this possible overhead needs to be taken into account.
+	// For Block the value is configurable using `BLOCK_OVERHEAD`
+	diskSize = utils.CalculateSpaceWithOverhead(diskSize, volumeMode)
 
 	annotations[AnnImportDiskId] = diskAttachment.ID
 

@@ -20,6 +20,7 @@ const (
 	SnapshotStatusCheckRate = "SNAPSHOT_STATUS_CHECK_RATE"
 	CDIExportTokenTTL       = "CDI_EXPORT_TOKEN_TTL"
 	FileSystemOverhead      = "FILESYSTEM_OVERHEAD"
+	BlockOverhead           = "BLOCK_OVERHEAD"
 )
 
 // Migration settings
@@ -45,6 +46,8 @@ type Migration struct {
 	CDIExportTokenTTL int
 	// FileSystem overhead in percantage
 	FileSystemOverhead int
+	// Block fixed overhead size
+	BlockOverhead int
 }
 
 // Load settings.
@@ -83,6 +86,9 @@ func (r *Migration) Load() (err error) {
 		return liberr.Wrap(err)
 	}
 	if r.FileSystemOverhead, err = getNonNegativeEnvLimit(FileSystemOverhead, 10); err != nil {
+		return liberr.Wrap(err)
+	}
+	if r.BlockOverhead, err = getNonNegativeEnvLimit(BlockOverhead, 0); err != nil {
 		return liberr.Wrap(err)
 	}
 
