@@ -89,6 +89,7 @@ var osMap = map[string]string{
 	"rhel_7_s390x":         "rhel7.7",
 	"rhel_7x64":            "rhel7.7",
 	"rhel_8x64":            "rhel8.1",
+	"rhel_9x64":            "rhel9.1",
 	"sles_11_ppc64":        "opensuse15.0",
 	"sles_11":              "opensuse15.0",
 	"sles_12_s390x":        "opensuse15.0",
@@ -110,11 +111,13 @@ var osMap = map[string]string{
 	"windows_2012x64":      "win2k12r2",
 	"windows_2016x64":      "win2k16",
 	"windows_2019x64":      "win2k19",
+	"windows_2022":         "win2k22",
 	"windows_7":            "win10",
 	"windows_7x64":         "win10",
 	"windows_8":            "win10",
 	"windows_8x64":         "win10",
 	"windows_xp":           "win10",
+	"windows_11":           "win11",
 }
 
 // oVirt builder.
