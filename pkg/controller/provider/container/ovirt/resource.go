@@ -238,7 +238,8 @@ type VM struct {
 			Enabled string `json:"enabled"`
 		} `json:"boot_menu"`
 	} `json:"bios"`
-	Display struct {
+	CustomCpuModel string `json:"custom_cpu_model"`
+	Display        struct {
 		Type string `json:"type"`
 	} `json:"display"`
 	HasIllegalImages string `json:"has_illegal_images"`
@@ -358,6 +359,7 @@ func (r *VM) ApplyTo(m *model.VM) {
 	m.StorageErrorResumeBehaviour = r.StorageErrorResumeBehaviour
 	m.HaEnabled = r.bool(r.HA.Enabled)
 	m.IOThreads = r.int16(r.IO.Threads)
+	m.CustomCpuModel = r.CustomCpuModel
 	r.addCpuAffinity(m)
 	r.addNICs(m)
 	r.addDiskAttachment(m)

@@ -253,6 +253,7 @@ type VM struct {
 	Snapshots                   []Snapshot       `json:"snapshots"`
 	Guest                       Guest            `json:"guest"`
 	OSType                      string           `json:"osType"`
+	CustomCpuModel              string           `json:"customCpuModel"`
 }
 
 type VNIC = model.NIC
@@ -303,6 +304,7 @@ func (r *VM) With(m *model.VM) {
 	r.Snapshots = m.Snapshots
 	r.Guest = m.Guest
 	r.OSType = m.OSType
+	r.CustomCpuModel = m.CustomCpuModel
 }
 
 // Build self link (URI).

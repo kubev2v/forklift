@@ -155,6 +155,7 @@ type VM struct {
 	Concerns                    []Concern        `sql:"" eq:"-"`
 	Guest                       Guest            `sql:""`
 	OSType                      string           `sql:""`
+	CustomCpuModel              string           `sql:""`
 }
 
 // Determine if current revision has been validated.
