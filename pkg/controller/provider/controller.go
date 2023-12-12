@@ -206,10 +206,10 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 					r.handleServerCreationFailure(provider, err)
 					return
 				}
-				provider.Status.Phase = Initializing
+				provider.Status.Phase = Staging
 				provider.Status.SetCondition(
 					libcnd.Condition{
-						Type:     Initializing,
+						Type:     Staging,
 						Status:   True,
 						Category: Required,
 						Message:  "The OVA server being inizialized.",
@@ -386,21 +386,6 @@ func (r *Reconciler) getSecret(provider *api.Provider) (*v1.Secret, error) {
 	}
 
 	return secret, nil
-}
-
-func (r *Reconciler) handleServerCreationFailure(provider *api.Provider, err error) {
-	provider.Status.Phase = ServerCreationFailed
-	msg := fmt.Sprint("The OVA provider server creation failed -", err)
-	provider.Status.SetCondition(
-		libcnd.Condition{
-			Type:     ServerCreationFailed,
-			Status:   True,
-			Category: Critical,
-			Message:  msg,
-		})
-	if updateErr := r.Status().Update(context.TODO(), provider.DeepCopy()); updateErr != nil {
-		log.Error(updateErr, "Failed to update provider status")
-	}
 }
 
 // Provider catalog.
