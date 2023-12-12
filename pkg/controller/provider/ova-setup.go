@@ -3,8 +3,10 @@ package provider
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"os"
 	"strings"
+	"time"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -27,20 +29,21 @@ const (
 )
 
 func (r Reconciler) CreateOVAServerDeployment(provider *api.Provider, ctx context.Context) (err error) {
-	ownerReference := metav1.OwnerReference{
-		APIVersion: "forklift.konveyor.io/v1beta1",
-		Kind:       "Provider",
-		Name:       provider.Name,
-		UID:        provider.UID,
-	}
-	pvName := fmt.Sprintf("%s-pv-%s-%s", ovaServer, provider.Name, provider.Namespace)
+	pvName := fmt.Sprintf("%s-pv-%s-%s-%s", ovaServer, provider.Name, provider.Namespace, generateRandomSuffix())
 	err = r.createPvForNfs(provider, ctx, pvName)
 	if err != nil {
 		r.Log.Error(err, "Failed to create PV for the OVA server")
 		return
 	}
 
-	pvcName := fmt.Sprintf("%s-pvc-%s", ovaServer, provider.Name)
+	ownerReference := metav1.OwnerReference{
+		APIVersion: "forklift.konveyor.io/v1beta1",
+		Kind:       "Provider",
+		Name:       provider.Name,
+		UID:        provider.UID,
+	}
+
+	pvcName := fmt.Sprintf("%s-pvc-%s-%s", ovaServer, provider.Name, generateRandomSuffix())
 	err = r.createPvcForNfs(provider, ctx, ownerReference, pvName, pvcName)
 	if err != nil {
 		r.Log.Error(err, "Failed to create PVC for the OVA server")
@@ -261,4 +264,18 @@ func (r *Reconciler) isEnforcedRestrictionNamespace(namespaceName string) bool {
 	auditLabel, auditExists := ns.Labels[auditRestrictedLabel]
 
 	return enforceExists && enforceLabel == "restricted" && !(auditExists && auditLabel == "restricted")
+}
+
+func generateRandomSuffix() (randomSeed string) {
+	src := rand.NewSource(time.Now().UnixNano())
+	rnd := rand.New(src)
+
+	// Generate a 6-character random seed
+	var letters = []int32("abcdefghijklmnopqrstuvwxyz0123456789")
+	b := make([]int32, 6)
+	for i := range b {
+		b[i] = letters[rnd.Intn(len(letters))]
+	}
+	randomSeed = string(b)
+	return
 }
