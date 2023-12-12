@@ -58,12 +58,10 @@ const (
 
 // Phases
 const (
-	ValidationFailed     = "ValidationFailed"
-	ConnectionFailed     = "ConnectionFailed"
-	Ready                = "Ready"
-	Staging              = "Staging"
-	Initializing         = "Initializing"
-	ServerCreationFailed = "ServerCreationFailed"
+	ValidationFailed = "ValidationFailed"
+	ConnectionFailed = "ConnectionFailed"
+	Ready            = "Ready"
+	Staging          = "Staging"
 )
 
 // Statuses
@@ -360,6 +358,21 @@ func (r *Reconciler) inventoryCreated(provider *api.Provider) error {
 	}
 
 	return nil
+}
+
+func (r *Reconciler) handleServerCreationFailure(provider *api.Provider, err error) {
+	provider.Status.Phase = ConnectionAuthFailed
+	msg := fmt.Sprint("The OVA provider server creation failed -", err)
+	provider.Status.SetCondition(
+		libcnd.Condition{
+			Type:     ConnectionAuthFailed,
+			Status:   True,
+			Category: Critical,
+			Message:  msg,
+		})
+	if updateErr := r.Status().Update(context.TODO(), provider.DeepCopy()); updateErr != nil {
+		log.Error(updateErr, "Failed to update provider status")
+	}
 }
 
 func isValidNFSPath(nfsPath string) bool {
