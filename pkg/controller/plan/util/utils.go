@@ -27,7 +27,7 @@ func CalculateSpaceWithOverhead(requestedSpace int64, volumeMode *core.Persisten
 	if *volumeMode == core.PersistentVolumeFilesystem {
 		spaceWithOverhead = int64(math.Ceil(float64(alignedSize) / (1 - float64(settings.Settings.FileSystemOverhead)/100)))
 	} else {
-		spaceWithOverhead = alignedSize + int64(settings.Settings.BlockOverhead)
+		spaceWithOverhead = alignedSize + settings.Settings.BlockOverhead
 	}
 	return spaceWithOverhead
 }
