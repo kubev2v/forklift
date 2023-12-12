@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // Environment variables.
@@ -47,7 +48,7 @@ type Migration struct {
 	// FileSystem overhead in percantage
 	FileSystemOverhead int
 	// Block fixed overhead size
-	BlockOverhead int
+	BlockOverhead int64
 }
 
 // Load settings.
@@ -88,8 +89,12 @@ func (r *Migration) Load() (err error) {
 	if r.FileSystemOverhead, err = getNonNegativeEnvLimit(FileSystemOverhead, 10); err != nil {
 		return liberr.Wrap(err)
 	}
-	if r.BlockOverhead, err = getNonNegativeEnvLimit(BlockOverhead, 0); err != nil {
-		return liberr.Wrap(err)
+	if overhead, ok := os.LookupEnv(BlockOverhead); ok {
+		if quantity, err := resource.ParseQuantity(overhead); err != nil {
+			return liberr.Wrap(err)
+		} else if r.BlockOverhead, ok = quantity.AsInt64(); !ok {
+			return fmt.Errorf("Block overhead is invalid: %s", overhead)
+		}
 	}
 
 	return
