@@ -27,19 +27,19 @@ const (
 )
 
 func (r Reconciler) CreateOVAServerDeployment(provider *api.Provider, ctx context.Context) {
+	pvName := fmt.Sprintf("%s-pv-%s-%s", ovaServer, provider.Name, provider.Namespace)
+	err := r.createPvForNfs(provider, ctx, pvName)
+	if err != nil {
+		r.Log.Error(err, "Failed to create PV for the OVA server")
+		return
+	}
+
 	ownerReference := metav1.OwnerReference{
 		APIVersion: "forklift.konveyor.io/v1beta1",
 		Kind:       "Provider",
 		Name:       provider.Name,
 		UID:        provider.UID,
 	}
-	pvName := fmt.Sprintf("%s-pv-%s-%s", ovaServer, provider.Name, provider.Namespace)
-	err := r.createPvForNfs(provider, ctx, ownerReference, pvName)
-	if err != nil {
-		r.Log.Error(err, "Failed to create PV for the OVA server")
-		return
-	}
-
 	pvcName := fmt.Sprintf("%s-pvc-%s", ovaServer, provider.Name)
 	err = r.createPvcForNfs(provider, ctx, ownerReference, pvName, pvcName)
 	if err != nil {
@@ -61,7 +61,7 @@ func (r Reconciler) CreateOVAServerDeployment(provider *api.Provider, ctx contex
 	}
 }
 
-func (r *Reconciler) createPvForNfs(provider *api.Provider, ctx context.Context, ownerReference metav1.OwnerReference, pvName string) (err error) {
+func (r *Reconciler) createPvForNfs(provider *api.Provider, ctx context.Context, pvName string) (err error) {
 	splitted := strings.Split(provider.Spec.URL, ":")
 	nfsServer := splitted[0]
 	nfsPath := splitted[1]
@@ -69,9 +69,8 @@ func (r *Reconciler) createPvForNfs(provider *api.Provider, ctx context.Context,
 
 	pv := &core.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            pvName,
-			OwnerReferences: []metav1.OwnerReference{ownerReference},
-			Labels:          labels,
+			Name:   pvName,
+			Labels: labels,
 		},
 		Spec: core.PersistentVolumeSpec{
 			Capacity: core.ResourceList{
