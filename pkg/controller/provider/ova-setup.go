@@ -85,6 +85,7 @@ func (r *Reconciler) createPvForNfs(provider *api.Provider, ctx context.Context,
 					Server: nfsServer,
 				},
 			},
+			PersistentVolumeReclaimPolicy: core.PersistentVolumeReclaimDelete,
 		},
 	}
 	err = r.Create(ctx, pv)
