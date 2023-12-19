@@ -274,7 +274,13 @@ func (r *Client) PreTransferActions(vmRef ref.Ref) (ready bool, err error) {
 			r.Log.Info("the image properties are in sync, cleaning the image",
 				"vm", vm.Name, "image", inventoryImage.Name, "properties", inventoryImage.Properties)
 			originalVolumeID := inventoryImage.Properties[forkliftPropertyOriginalVolumeID].(string)
-			go r.cleanup(vm, originalVolumeID)
+			go func() {
+				err := r.cleanup(vm, originalVolumeID)
+				if err != nil {
+					r.Log.Error(err, "failed to cleanup")
+				}
+			}()
+
 		default:
 			err = liberr.New("unexpected image status")
 			r.Log.Error(err, "checking the image from volume",
