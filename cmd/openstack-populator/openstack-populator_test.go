@@ -19,7 +19,7 @@ func setupMockServer() (*httptest.Server, string, int, error) {
 	mux := http.NewServeMux()
 
 	port := listener.Addr().(*net.TCPAddr).Port
-	identityServerURL := fmt.Sprintf("http://localhost:%d", port)
+	baseURL := fmt.Sprintf("http://localhost:%d", port)
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -36,7 +36,7 @@ func setupMockServer() (*httptest.Server, string, int, error) {
                     }
                 ]
             }
-        }`, identityServerURL)
+        }`, baseURL)
 		fmt.Fprint(w, response)
 	})
 
@@ -48,11 +48,9 @@ func setupMockServer() (*httptest.Server, string, int, error) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Subject-Token", "MIIFvgY")
 		w.WriteHeader(http.StatusCreated)
-		identityPublicURL := fmt.Sprintf("http://localhost:%d/v3/", port)
-		identityAdminURL := fmt.Sprintf("http://localhost:%d/v3/", port)
-		identityInternalURL := fmt.Sprintf("http://localhost:%d/v3/", port)
-		imageServiceURL := fmt.Sprintf("http://localhost:%d/v2/images", port)
-
+		identityServer := fmt.Sprintf("%s/v3/", baseURL)
+		imageServiceURL := fmt.Sprintf("%s/v2/images", baseURL)
+		fmt.Println("identityServer ", identityServer)
 		response := fmt.Sprintf(`{
 			"token": {
 				"methods": ["password"],
@@ -113,9 +111,9 @@ func setupMockServer() (*httptest.Server, string, int, error) {
 				"issued_at": "201406-10T20:55:16.806027Z"
 			}
 		}`,
-			identityPublicURL,
-			identityAdminURL,
-			identityInternalURL,
+			identityServer,
+			identityServer,
+			identityServer,
 			imageServiceURL)
 
 		fmt.Fprint(w, response)
@@ -126,7 +124,7 @@ func setupMockServer() (*httptest.Server, string, int, error) {
 
 	server.Start()
 
-	return server, identityServerURL, port, nil
+	return server, baseURL, port, nil
 }
 
 func TestPopulate(t *testing.T) {
@@ -166,7 +164,7 @@ func TestPopulate(t *testing.T) {
 	}
 
 	if string(content) != "mock_data\n" {
-		t.Errorf("Expected %s, got %s", "mock_data\n", string(content))
+		t.Errorf("Expected %s, got %s", "mock_data", string(content))
 	}
 
 	os.Remove(fileName)
