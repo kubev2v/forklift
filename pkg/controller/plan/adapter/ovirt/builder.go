@@ -391,7 +391,23 @@ func (r *Builder) mapCPU(vm *model.Workload, object *cnv.VirtualMachineSpec) {
 	if vm.CpuPinningPolicy == model.Dedicated {
 		object.Template.Spec.Domain.CPU.DedicatedCPUPlacement = true
 	}
+	if vm.CustomCpuModel != "" {
+		r.setCpuFlags(vm.CustomCpuModel, object)
+	}
+}
 
+func (r *Builder) setCpuFlags(fullCpu string, object *cnv.VirtualMachineSpec) {
+	cpuTypeAndFlags := strings.Split(fullCpu, ",")
+	object.Template.Spec.Domain.CPU.Model = cpuTypeAndFlags[0]
+	for _, val := range cpuTypeAndFlags[1:] {
+		if flag, found := strings.CutPrefix(val, "+"); found {
+			object.Template.Spec.Domain.CPU.Features = append(object.Template.Spec.Domain.CPU.Features, cnv.CPUFeature{Name: flag, Policy: "require"})
+		} else if flag, found = strings.CutPrefix(val, "-"); found {
+			object.Template.Spec.Domain.CPU.Features = append(object.Template.Spec.Domain.CPU.Features, cnv.CPUFeature{Name: flag, Policy: "disable"})
+		} else {
+			object.Template.Spec.Domain.CPU.Features = append(object.Template.Spec.Domain.CPU.Features, cnv.CPUFeature{Name: flag})
+		}
+	}
 }
 
 func (r *Builder) mapFirmware(vm *model.Workload, cluster *model.Cluster, object *cnv.VirtualMachineSpec) {
