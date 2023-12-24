@@ -3,10 +3,8 @@ package provider
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"os"
 	"strings"
-	"time"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -29,8 +27,8 @@ const (
 )
 
 func (r Reconciler) CreateOVAServerDeployment(provider *api.Provider, ctx context.Context) (err error) {
-	pvName := fmt.Sprintf("%s-pv-%s-%s-%s", ovaServer, provider.Name, provider.Namespace, generateRandomSuffix())
-	err = r.createPvForNfs(provider, ctx, pvName)
+	pvNamePrefix := fmt.Sprintf("%s-pv-%s-%s", ovaServer, provider.Name, provider.Namespace)
+	pv, err := r.createPvForNfs(provider, ctx, pvNamePrefix)
 	if err != nil {
 		r.Log.Error(err, "Failed to create PV for the OVA server")
 		return
@@ -43,15 +41,15 @@ func (r Reconciler) CreateOVAServerDeployment(provider *api.Provider, ctx contex
 		UID:        provider.UID,
 	}
 
-	pvcName := fmt.Sprintf("%s-pvc-%s-%s", ovaServer, provider.Name, generateRandomSuffix())
-	err = r.createPvcForNfs(provider, ctx, ownerReference, pvName, pvcName)
+	pvcNamePrefix := fmt.Sprintf("%s-pvc-%s", ovaServer, provider.Name)
+	pvc, err := r.createPvcForNfs(provider, ctx, ownerReference, pv.Name, pvcNamePrefix)
 	if err != nil {
 		r.Log.Error(err, "Failed to create PVC for the OVA server")
 		return
 	}
 
 	labels := map[string]string{"provider": provider.Name, "app": "forklift", "subapp": ovaServer}
-	err = r.createServerDeployment(provider, ctx, ownerReference, pvcName, labels)
+	err = r.createServerDeployment(provider, ctx, ownerReference, pvc.Name, labels)
 	if err != nil {
 		r.Log.Error(err, "Failed to create OVA server deployment")
 		return
@@ -65,16 +63,16 @@ func (r Reconciler) CreateOVAServerDeployment(provider *api.Provider, ctx contex
 	return
 }
 
-func (r *Reconciler) createPvForNfs(provider *api.Provider, ctx context.Context, pvName string) (err error) {
+func (r *Reconciler) createPvForNfs(provider *api.Provider, ctx context.Context, pvNamePrefix string) (pv *core.PersistentVolume, err error) {
 	splitted := strings.Split(provider.Spec.URL, ":")
 	nfsServer := splitted[0]
 	nfsPath := splitted[1]
 	labels := map[string]string{"provider": provider.Name, "app": "forklift", "subapp": ovaServer}
 
-	pv := &core.PersistentVolume{
+	pv = &core.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   pvName,
-			Labels: labels,
+			GenerateName: pvNamePrefix,
+			Labels:       labels,
 		},
 		Spec: core.PersistentVolumeSpec{
 			Capacity: core.ResourceList{
@@ -99,12 +97,12 @@ func (r *Reconciler) createPvForNfs(provider *api.Provider, ctx context.Context,
 	return
 }
 
-func (r *Reconciler) createPvcForNfs(provider *api.Provider, ctx context.Context, ownerReference metav1.OwnerReference, pvName, pvcName string) (err error) {
+func (r *Reconciler) createPvcForNfs(provider *api.Provider, ctx context.Context, ownerReference metav1.OwnerReference, pvName, pvcNamePrefix string) (pvc *core.PersistentVolumeClaim, err error) {
 	sc := ""
 	labels := map[string]string{"provider": provider.Name, "app": "forklift", "subapp": ovaServer}
-	pvc := &core.PersistentVolumeClaim{
+	pvc = &core.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            pvcName,
+			GenerateName:    pvcNamePrefix,
 			Namespace:       provider.Namespace,
 			OwnerReferences: []metav1.OwnerReference{ownerReference},
 			Labels:          labels,
@@ -264,18 +262,4 @@ func (r *Reconciler) isEnforcedRestrictionNamespace(namespaceName string) bool {
 	auditLabel, auditExists := ns.Labels[auditRestrictedLabel]
 
 	return enforceExists && enforceLabel == "restricted" && !(auditExists && auditLabel == "restricted")
-}
-
-func generateRandomSuffix() (randomSeed string) {
-	src := rand.NewSource(time.Now().UnixNano())
-	rnd := rand.New(src)
-
-	// Generate a 6-character random seed
-	var letters = []int32("abcdefghijklmnopqrstuvwxyz0123456789")
-	b := make([]int32, 6)
-	for i := range b {
-		b[i] = letters[rnd.Intn(len(letters))]
-	}
-	randomSeed = string(b)
-	return
 }
