@@ -244,6 +244,8 @@ const (
 	Multus = "multus"
 )
 
+const VM_LOOKUP_FAILED = "VM lookup failed."
+
 // Default properties
 var DefaultProperties = map[string]string{
 	CpuPolicy:       CpuPolicyShared,
@@ -267,7 +269,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, vmSpec *cnv.VirtualMachineSpec, 
 	if err != nil {
 		err = liberr.Wrap(
 			err,
-			"VM lookup failed.",
+			VM_LOOKUP_FAILED,
 			"vm",
 			vmRef.String())
 		return
@@ -690,7 +692,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (tasks []*plan.Task, err error) {
 	if err != nil {
 		err = liberr.Wrap(
 			err,
-			"VM lookup failed.",
+			VM_LOOKUP_FAILED,
 			"vm",
 			vmRef.String())
 	}
@@ -745,7 +747,7 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 	if err != nil {
 		err = liberr.Wrap(
 			err,
-			"VM lookup failed.",
+			VM_LOOKUP_FAILED,
 			"vm",
 			vmRef.String())
 		return

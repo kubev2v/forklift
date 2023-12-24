@@ -8,6 +8,8 @@ import (
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 )
 
+const VM_NOT_FOUND_IN_INVENTORY = "VM not found in inventory."
+
 // Validator
 type Validator struct {
 	plan      *api.Plan
@@ -29,7 +31,7 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 	if err != nil {
 		err = liberr.Wrap(
 			err,
-			"VM not found in inventory.",
+			VM_NOT_FOUND_IN_INVENTORY,
 			"vm",
 			vmRef.String())
 		return
@@ -53,7 +55,7 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 	if err != nil {
 		err = liberr.Wrap(
 			err,
-			"VM not found in inventory.",
+			VM_NOT_FOUND_IN_INVENTORY,
 			"vm",
 			vmRef.String())
 		return
@@ -89,7 +91,7 @@ func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
 	if err != nil {
 		err = liberr.Wrap(
 			err,
-			"VM not found in inventory.",
+			VM_NOT_FOUND_IN_INVENTORY,
 			"vm",
 			vmRef.String())
 		return
