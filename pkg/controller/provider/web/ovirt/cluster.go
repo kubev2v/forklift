@@ -180,7 +180,10 @@ type Cluster struct {
 	HaReservation bool   `json:"haReservation"`
 	KsmEnabled    bool   `json:"ksmEnabled"`
 	BiosType      string `json:"biosType"`
+	CPU           CPU    `json:"cpu"`
 }
+
+type CPU = model.CPU
 
 // Build the resource using the model.
 func (r *Cluster) With(m *model.Cluster) {
@@ -189,6 +192,7 @@ func (r *Cluster) With(m *model.Cluster) {
 	r.HaReservation = m.HaReservation
 	r.KsmEnabled = m.KsmEnabled
 	r.BiosType = m.BiosType
+	r.CPU = m.CPU
 }
 
 // Build self link (URI).
