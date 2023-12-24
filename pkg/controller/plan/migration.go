@@ -1475,58 +1475,58 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 }
 
 // Wait for guest conversion to complete, and update the ImageConversion pipeline step.
-func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step) (err error) {
+func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step) error {
 	pod, err := r.kubevirt.GetGuestConversionPod(vm)
-	if err != nil {
-		return
-	}
-
-	if pod != nil {
-		switch pod.Status.Phase {
-		case core.PodSucceeded:
-			step.MarkCompleted()
-			step.Progress.Completed = step.Progress.Total
-		case core.PodFailed:
-			step.MarkCompleted()
-			step.AddError("Guest conversion failed. See pod logs for details.")
-		default:
-			el9, el9Err := r.Context.Plan.VSphereUsesEl9VirtV2v()
-			if el9Err != nil {
-				err = el9Err
-				return
-			}
-			if el9 {
-				err = r.updateConversionProgressEl9(pod, step)
-				if err != nil {
-					// Just log it. Missing progress is not fatal.
-					log.Error(err, "Failed to update conversion progress")
-					err = nil
-					return
-				}
-			}
-		}
-	} else {
+	switch {
+	case err != nil:
+		return liberr.Wrap(err)
+	case pod == nil:
 		step.MarkCompleted()
 		step.AddError("Guest conversion pod not found")
+		return nil
 	}
-	return
+
+	switch pod.Status.Phase {
+	case core.PodSucceeded:
+		step.MarkCompleted()
+		step.Progress.Completed = step.Progress.Total
+	case core.PodFailed:
+		step.MarkCompleted()
+		step.AddError("Guest conversion failed. See pod logs for details.")
+	default:
+		if pod.Status.PodIP == "" {
+			// we get the progress from the pod and we cannot connect to the pod without PodIP
+			break
+		}
+
+		el9, err := r.Context.Plan.VSphereUsesEl9VirtV2v()
+		switch {
+		case err != nil:
+			return liberr.Wrap(err)
+		case el9:
+			if err := r.updateConversionProgressEl9(pod, step); err != nil {
+				// Just log it. Missing progress is not fatal.
+				log.Error(err, "Failed to update conversion progress")
+			}
+		}
+	}
+
+	return nil
 }
 
 func (r *Migration) updateConversionProgressEl9(pod *core.Pod, step *plan.Step) (err error) {
-	if pod.Status.PodIP == "" {
-		return
-	}
-
 	var diskRegex = regexp.MustCompile(`v2v_disk_transfers\{disk_id="(\d+)"\} (\d{1,3}\.?\d*)`)
 	url := fmt.Sprintf("http://%s:2112/metrics", pod.Status.PodIP)
 	resp, err := http.Get(url)
-	if err != nil {
-		if strings.Contains(err.Error(), "connection refused") {
-			return nil
-		}
+	switch {
+	case err == nil:
+		defer resp.Body.Close()
+	case strings.Contains(err.Error(), "connection refused"):
+		return nil
+	default:
 		return
 	}
-	defer resp.Body.Close()
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return
