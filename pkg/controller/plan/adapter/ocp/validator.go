@@ -15,6 +15,8 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const VM_NOT_FOUND = "VM not found."
+
 // Validator
 type Validator struct {
 	plan         *api.Plan
@@ -39,7 +41,7 @@ func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
 	if err != nil {
 		err = liberr.Wrap(
 			err,
-			"VM not found.",
+			VM_NOT_FOUND,
 			"vm",
 			vmRef.String())
 		return
@@ -78,7 +80,7 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 	if err != nil {
 		err = liberr.Wrap(
 			err,
-			"VM not found.",
+			VM_NOT_FOUND,
 			"vm",
 			vmRef.String())
 		return
@@ -141,7 +143,7 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 	if err != nil {
 		err = liberr.Wrap(
 			err,
-			"VM not found.",
+			VM_NOT_FOUND,
 			"vm",
 			vmRef.String())
 		return

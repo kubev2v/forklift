@@ -214,7 +214,7 @@ func vmHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(errorProcessingOvfMsg, err)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	setContentTypeToJson(w)
 	json.NewEncoder(w).Encode(vmStruct)
 	fmt.Println("VM handeler was called")
 }
@@ -231,7 +231,7 @@ func diskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	setContentTypeToJson(w)
 	json.NewEncoder(w).Encode(diskStruct)
 	fmt.Println("Disk handeler was called")
 }
@@ -248,9 +248,13 @@ func networkHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	setContentTypeToJson(w)
 	json.NewEncoder(w).Encode(netStruct)
 	fmt.Println("Network handeler was called")
+}
+
+func setContentTypeToJson(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
 }
 
 func watchdHandler(w http.ResponseWriter, r *http.Request) {
