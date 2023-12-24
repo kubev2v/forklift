@@ -361,11 +361,11 @@ func (r *Reconciler) inventoryCreated(provider *api.Provider) error {
 }
 
 func (r *Reconciler) handleServerCreationFailure(provider *api.Provider, err error) {
-	provider.Status.Phase = ConnectionAuthFailed
-	msg := fmt.Sprint("The OVA provider server creation failed -", err)
+	provider.Status.Phase = ConnectionFailed
+	msg := fmt.Sprint("The OVA provider server creation failed: ", err)
 	provider.Status.SetCondition(
 		libcnd.Condition{
-			Type:     ConnectionAuthFailed,
+			Type:     ConnectionFailed,
 			Status:   True,
 			Category: Critical,
 			Message:  msg,

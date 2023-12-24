@@ -54,7 +54,7 @@ import (
 const (
 	// Name.
 	Name               = "provider"
-	OvaTimeout         = 10
+	OvaTimeout         = 10 * time.Minute
 	OvaReconcilerRetry = 5 * time.Second
 )
 
@@ -212,12 +212,9 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 						Type:     Staging,
 						Status:   True,
 						Category: Required,
-						Message:  "The OVA server being inizialized.",
+						Message:  "The OVA server is being inizialized.",
 					})
 				err = r.Status().Update(context.TODO(), provider.DeepCopy())
-				if err != nil {
-					return
-				}
 				result.RequeueAfter = OvaReconcilerRetry
 				return
 			}
@@ -226,11 +223,11 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 
 		// The ova server pod is not running yet
 		if deployment.Status.AvailableReplicas == 0 {
-			if time.Since(provider.CreationTimestamp.Time).Minutes() <= OvaTimeout {
+			if provider.CreationTimestamp.Add(OvaTimeout).After(time.Now()) {
 				result.RequeueAfter = OvaReconcilerRetry
 				return
 			} else { // Timeout reached
-				err = fmt.Errorf("the server creation timed out. Please ensure that the NFS export is set correctly")
+				err = fmt.Errorf("the OVA provider server creation timed out. Please ensure that the NFS export is set correctly")
 				r.handleServerCreationFailure(provider, err)
 				return
 			}
