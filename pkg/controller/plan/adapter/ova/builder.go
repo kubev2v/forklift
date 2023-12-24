@@ -200,15 +200,19 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 
 			dv := dvTemplate.DeepCopy()
 			dv.Spec = dvSpec
-			if dv.ObjectMeta.Annotations == nil {
-				dv.ObjectMeta.Annotations = make(map[string]string)
-			}
-			dv.ObjectMeta.Annotations[planbase.AnnDiskSource] = getDiskFullPath(disk)
+			updateDataVolumeAnnotations(dv, &disk)
 			dvs = append(dvs, *dv)
 		}
 	}
 
 	return
+}
+
+func updateDataVolumeAnnotations(dv *cdi.DataVolume, disk *ova.Disk) {
+	if dv.ObjectMeta.Annotations == nil {
+		dv.ObjectMeta.Annotations = make(map[string]string)
+	}
+	dv.ObjectMeta.Annotations[planbase.AnnDiskSource] = getDiskFullPath(disk)
 }
 
 // Create the destination Kubevirt VM.
@@ -379,7 +383,7 @@ func (r *Builder) mapDisks(vm *model.VM, persistentVolumeClaims []core.Persisten
 		}
 	}
 	for i, disk := range disks {
-		pvc := pvcMap[getDiskFullPath(disk)]
+		pvc := pvcMap[getDiskFullPath(&disk)]
 		volumeName := fmt.Sprintf("vol-%v", i)
 		volume := cnv.Volume{
 			Name: volumeName,
@@ -423,7 +427,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 		list = append(
 			list,
 			&plan.Task{
-				Name: getDiskFullPath(disk),
+				Name: getDiskFullPath(&disk),
 				Progress: libitr.Progress{
 					Total: mB,
 				},
@@ -476,7 +480,7 @@ func trimBackingFileName(fileName string) string {
 	return backingFilePattern.ReplaceAllString(fileName, ".vmdk")
 }
 
-func getDiskFullPath(disk ova.Disk) string {
+func getDiskFullPath(disk *ova.Disk) string {
 	return disk.FilePath + "::" + disk.Name
 }
 
