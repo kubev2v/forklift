@@ -52,6 +52,12 @@ type Cluster struct {
 	HaReservation bool   `sql:""`
 	KsmEnabled    bool   `sql:""`
 	BiosType      string `sql:""`
+	CPU           CPU    `sql:""`
+}
+
+type CPU struct {
+	Architecture string `json:"architecture"`
+	Type         string `json:"type"`
 }
 
 type Network struct {
