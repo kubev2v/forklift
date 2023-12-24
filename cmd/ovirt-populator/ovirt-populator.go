@@ -79,44 +79,7 @@ func populate(engineURL, diskID, volPath string) {
 		klog.Fatalf("Failed to write password to file: %v", err)
 	}
 
-	var args []string
-	//for secure connection use the ca cert
-	if !engineConfig.insecure {
-		cert, err := os.Create("/tmp/ca.pem")
-		if err != nil {
-			klog.Fatalf("Failed to create ca.pem %v", err)
-		}
-
-		defer cert.Close()
-		_, err = cert.Write([]byte(engineConfig.cacert))
-		if err != nil {
-			klog.Fatalf("Failed to write CA to file: %v", err)
-		}
-
-		args = []string{
-			"download-disk",
-			"--output", "json",
-			"--engine-url=" + engineConfig.URL,
-			"--username=" + engineConfig.username,
-			"--password-file=/tmp/ovirt.pass",
-			"--cafile=" + "/tmp/ca.pem",
-			"-f", "raw",
-			diskID,
-			volPath,
-		}
-	} else {
-		args = []string{
-			"download-disk",
-			"--output", "json",
-			"--engine-url=" + engineConfig.URL,
-			"--username=" + engineConfig.username,
-			"--password-file=/tmp/ovirt.pass",
-			"--insecure",
-			"-f", "raw",
-			diskID,
-			volPath,
-		}
-	}
+	args := createCommandArguments(&engineConfig, diskID, volPath)
 	cmd := exec.Command("/usr/local/bin/ovirt-img", args...)
 	r, _ := cmd.StdoutPipe()
 	cmd.Stderr = cmd.Stdout
@@ -152,6 +115,46 @@ func populate(engineURL, diskID, volPath string) {
 	err = cmd.Wait()
 	if err != nil {
 		klog.Fatal(err)
+	}
+}
+
+func createCommandArguments(config *engineConfig, diskID, volPath string) []string {
+	if config.insecure {
+		return []string{
+			"download-disk",
+			"--output", "json",
+			"--engine-url=" + config.URL,
+			"--username=" + config.username,
+			"--password-file=/tmp/ovirt.pass",
+			"--insecure",
+			"-f", "raw",
+			diskID,
+			volPath,
+		}
+	} else {
+		// for secure connection use the ca cert
+		cert, err := os.Create("/tmp/ca.pem")
+		if err != nil {
+			klog.Fatalf("Failed to create ca.pem %v", err)
+		}
+
+		defer cert.Close()
+		_, err = cert.Write([]byte(config.cacert))
+		if err != nil {
+			klog.Fatalf("Failed to write CA to file: %v", err)
+		}
+
+		return []string{
+			"download-disk",
+			"--output", "json",
+			"--engine-url=" + config.URL,
+			"--username=" + config.username,
+			"--password-file=/tmp/ovirt.pass",
+			"--cafile=" + "/tmp/ca.pem",
+			"-f", "raw",
+			diskID,
+			volPath,
+		}
 	}
 }
 
