@@ -881,13 +881,12 @@ func (r *Client) ensureImageUpToDate(vm *libclient.VM, image *libclient.Image) (
 	inventoryImage := &model.Image{}
 	err = r.Context.Source.Inventory.Find(inventoryImage, ref.Ref{ID: image.ID})
 	if err != nil {
-		if !errors.As(err, &model.NotFoundError{}) {
-			return
+		if errors.As(err, &model.NotFoundError{}) {
+			err = nil
+			r.Log.Info("the image does not exist in the inventory, waiting...",
+				"vm", vm.Name, "image", image.Name, "properties", image.Properties)
 		}
-		r.Log.Info("the image does not exist in the inventory, waiting...",
-			"vm", vm.Name, "image", image.Name, "properties", image.Properties)
-		upToDate = false
-		err = nil
+		return
 	}
 	upToDate = true
 	if _, ok := inventoryImage.Properties[forkliftPropertyOriginalVolumeID]; !ok {
