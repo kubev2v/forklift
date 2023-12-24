@@ -44,6 +44,8 @@ type PlanSpec struct {
 	TransferNetwork *core.ObjectReference `json:"transferNetwork,omitempty"`
 	// Whether this plan should be archived.
 	Archived bool `json:"archived,omitempty"`
+	// Preserve the CPU model and flags the VM runs with in its oVirt cluster.
+	PreserveClusterCPUModel bool `json:"preserveClusterCpuModel,omitempty"`
 }
 
 // Find a planned VM.
