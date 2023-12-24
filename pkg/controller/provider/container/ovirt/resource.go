@@ -77,6 +77,9 @@ type Cluster struct {
 		Enabled string `json:"enabled"`
 	} `json:"ksm"`
 	BiosType string `json:"bios_type"`
+	CPU      struct {
+		Type string `json:"type"`
+	} `json:"cpu"`
 }
 
 // Apply to (update) the model.
@@ -87,6 +90,7 @@ func (r *Cluster) ApplyTo(m *model.Cluster) {
 	m.HaReservation = r.bool(r.HaReservation)
 	m.KsmEnabled = r.bool(r.KSM.Enabled)
 	m.BiosType = r.BiosType
+	m.CPU.Type = r.CPU.Type
 }
 
 // Cluster (list).
