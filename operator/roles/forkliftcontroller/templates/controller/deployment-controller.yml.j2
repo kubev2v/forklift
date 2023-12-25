@@ -68,6 +68,10 @@ spec:
         - name: SNAPSHOT_STATUS_CHECK_RATE_SECONDS
           value: "{{ controller_snapshot_status_check_rate_seconds }}"
 {% endif %}
+{% if controller_cleanup_retries is number %}
+        - name: CLEANUP_RETRIES
+          value: "{{ controller_cleanup_retries }}"
+{% endif %}
 {% if controller_max_vm_inflight is number %}
         - name: MAX_VM_INFLIGHT
           value: "{{ controller_max_vm_inflight }}"

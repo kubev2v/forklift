@@ -62,6 +62,8 @@ spec:
           value: ${SNAPSHOT_REMOVAL_TIMEOUT}
         - name: SNAPSHOT_STATUS_CHECK_RATE
           value: ${SNAPSHOT_STATUS_CHECK_RATE}
+        - name: CLEANUP_RETRIES
+          value: ${CLEANUP_RETRIES}
         - name: CDI_EXPORT_TOKEN_TTL
           value: ${CDI_EXPORT_TOKEN_TTL}
         - name: FILESYSTEM_OVERHEAD
