@@ -700,9 +700,8 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		}
 
 		if r.builder.SupportsVolumePopulators() {
-			var pvcNames []string
-			pvcNames, err = r.kubevirt.PopulatorVolumes(vm.Ref)
-			if err != nil {
+			var pvcs []*core.PersistentVolumeClaim
+			if pvcs, err = r.kubevirt.PopulatorVolumes(vm.Ref); err != nil {
 				if !errors.As(err, &web.ProviderNotReadyError{}) {
 					r.Log.Error(err, "error creating volumes", "vm", vm.Name)
 					step.AddError(err.Error())
@@ -712,7 +711,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 					return
 				}
 			}
-			err = r.kubevirt.EnsurePopulatorVolumes(vm, pvcNames)
+			err = r.kubevirt.EnsurePopulatorVolumes(vm, pvcs)
 			if err != nil {
 				if !errors.As(err, &web.ProviderNotReadyError{}) {
 					step.AddError(err.Error())

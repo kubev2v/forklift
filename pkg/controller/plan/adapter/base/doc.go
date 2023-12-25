@@ -63,7 +63,7 @@ type Builder interface {
 	// check whether the builder supports Volume Populators
 	SupportsVolumePopulators() bool
 	// Build populator volumes
-	PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) (pvcNames []string, err error)
+	PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) ([]*core.PersistentVolumeClaim, error)
 	// Transferred bytes
 	PopulatorTransferredBytes(persistentVolumeClaim *core.PersistentVolumeClaim) (transferredBytes int64, err error)
 	// Set the populator PVC labels
