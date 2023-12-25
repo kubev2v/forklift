@@ -471,7 +471,7 @@ func (r *KubeVirt) DataVolumes(vm *plan.VMStatus) (dataVolumes []cdi.DataVolume,
 	return
 }
 
-func (r *KubeVirt) PopulatorVolumes(vmRef ref.Ref) (pvcNames []string, err error) {
+func (r *KubeVirt) PopulatorVolumes(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, err error) {
 	secret, err := r.ensureSecret(vmRef, r.copyDataFromProviderSecret)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -535,8 +535,14 @@ func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus, dataVolumes []cdi.DataVo
 	return
 }
 
-func (r *KubeVirt) EnsurePopulatorVolumes(vm *plan.VMStatus, pvcNames []string) (err error) {
-	err = r.createPodToBindPVCs(vm, pvcNames)
+func (r *KubeVirt) EnsurePopulatorVolumes(vm *plan.VMStatus, pvcs []*core.PersistentVolumeClaim) (err error) {
+	var pendingPvcNames []string
+	for _, pvc := range pvcs {
+		if pvc.Status.Phase == core.ClaimPending {
+			pendingPvcNames = append(pendingPvcNames, pvc.Name)
+		}
+	}
+	err = r.createPodToBindPVCs(vm, pendingPvcNames)
 	if err != nil {
 		err = liberr.Wrap(err)
 	}
@@ -2058,7 +2064,7 @@ func (r *KubeVirt) CreatePvcForNfs(pvcName string) (err error) {
 			r.Log.Error(err, "Failed to get OVA plan PVC")
 			return false, err
 		}
-		return pvc.Status.Phase == "Bound", nil
+		return pvc.Status.Phase == core.ClaimBound, nil
 
 	}); err != nil {
 		r.Log.Error(err, "Failed to bind OVA PVC to PV ")

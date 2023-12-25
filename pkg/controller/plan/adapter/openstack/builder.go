@@ -870,7 +870,7 @@ func (r *Builder) SupportsVolumePopulators() bool {
 	return true
 }
 
-func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) (pvcNames []string, err error) {
+func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) (pvcs []*core.PersistentVolumeClaim, err error) {
 	workload := &model.Workload{}
 	err = r.Source.Inventory.Find(workload, vmRef)
 	if err != nil {
@@ -897,9 +897,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 			continue
 		}
 		if pvc, pvcErr := r.getCorrespondingPvc(image, workload, vmRef, annotations, secretName); pvcErr == nil {
-			if pvc != nil {
-				pvcNames = append(pvcNames, pvc.Name)
-			}
+			pvcs = append(pvcs, pvc)
 		} else {
 			err = pvcErr
 			return
@@ -930,8 +928,7 @@ func (r *Builder) ensureVolumePopulator(workload *model.Workload, image *model.I
 }
 
 func (r *Builder) ensureVolumePopulatorPVC(workload *model.Workload, image *model.Image, annotations map[string]string, populatorName string) (pvc *core.PersistentVolumeClaim, err error) {
-	_, err = r.getVolumePopulatorPVC(image.ID)
-	if err != nil {
+	if pvc, err = r.getVolumePopulatorPVC(image.ID); err != nil {
 		if !k8serr.IsNotFound(err) {
 			err = liberr.Wrap(err)
 			return
@@ -1014,6 +1011,7 @@ func (r *Builder) createVolumePopulatorCR(image model.Image, secretName, vmId st
 	}
 	err = r.Context.Client.Create(context.TODO(), populatorCR, &client.CreateOptions{})
 	if err != nil {
+		err = liberr.Wrap(err)
 		return
 	}
 	name = populatorCR.Name
@@ -1144,6 +1142,9 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image, storageC
 	}
 
 	err = r.Client.Create(context.TODO(), pvc, &client.CreateOptions{})
+	if err != nil {
+		err = liberr.Wrap(err)
+	}
 	return
 }
 

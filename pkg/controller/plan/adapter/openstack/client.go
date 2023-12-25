@@ -817,34 +817,35 @@ func (r *Client) ensureImagesFromVolumesReady(vm *libclient.VM) (ready bool, err
 			"vm", vm.Name)
 		return
 	}
-	ready = true
-	for _, image := range imagesFromVolumes {
-		ready, err = r.ensureImageFromVolumeReady(vm, &image)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-		if !ready {
-			continue
-		}
-		originalVolumeID := image.Properties[forkliftPropertyOriginalVolumeID].(string)
-		go func() {
-			// executing this in a non-blocking mode
-			err := r.cleanup(vm, originalVolumeID)
-			if err != nil {
-				r.Log.Error(err, "failed to cleanup",
-					"vm", vm.Name, "image", image.Name)
-			}
-		}()
-	}
 	if len(vm.AttachedVolumes) != len(imagesFromVolumes) {
 		r.Log.Info("not all the images have been created",
 			"vm", vm.Name, "attachedVolumes", vm.AttachedVolumes, "imagesFromVolumes", imagesFromVolumes)
-		ready = false
+		return
 	}
-	if ready {
-		r.Log.Info("all steps finished!", "vm", vm.Name)
+	for _, image := range imagesFromVolumes {
+		imageReady, imageReadyErr := r.ensureImageFromVolumeReady(vm, &image)
+		switch {
+		case imageReadyErr != nil:
+			err = liberr.Wrap(imageReadyErr)
+			return
+		case !imageReady:
+			r.Log.Info("found an image that is not ready",
+				"vm", vm.Name, "image", image.Name)
+			return
+		case imageReady:
+			originalVolumeID := image.Properties[forkliftPropertyOriginalVolumeID].(string)
+			go func() {
+				// executing this in a non-blocking mode
+				err := r.cleanup(vm, originalVolumeID)
+				if err != nil {
+					r.Log.Error(err, "failed to cleanup snapshot and volume",
+						"vm", vm.Name, "volumeId", originalVolumeID)
+				}
+			}()
+		}
 	}
+	ready = true
+	r.Log.Info("all steps finished!", "vm", vm.Name)
 	return
 }
 

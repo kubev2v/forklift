@@ -701,7 +701,7 @@ func (r *Builder) SupportsVolumePopulators() bool {
 	return !r.Context.Plan.Spec.Warm && r.Context.Plan.Provider.Destination.IsHost()
 }
 
-func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) (pvcNames []string, err error) {
+func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) (pvcs []*core.PersistentVolumeClaim, err error) {
 	workload := &model.Workload{}
 	err = r.Source.Inventory.Find(workload, vmRef)
 	if err != nil {
@@ -737,7 +737,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				err = nil
 				continue
 			}
-			pvcNames = append(pvcNames, pvc.Name)
+			pvcs = append(pvcs, pvc)
 		}
 	}
 	return
