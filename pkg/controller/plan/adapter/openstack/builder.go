@@ -896,21 +896,24 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 			r.Log.Info("the image is not ready yet", "image", image.Name)
 			continue
 		}
-		var populatorName string
-		populatorName, err = r.ensureVolumePopulator(workload, &image, secretName)
-		if err != nil {
+		if pvc, pvcErr := r.getCorrespondingPvc(image, workload, vmRef, annotations, secretName); pvcErr == nil {
+			if pvc != nil {
+				pvcNames = append(pvcNames, pvc.Name)
+			}
+		} else {
+			err = pvcErr
 			return
-		}
-		var pvc *core.PersistentVolumeClaim
-		pvc, err = r.ensureVolumePopulatorPVC(workload, &image, annotations, populatorName)
-		if err != nil {
-			return
-		}
-		if pvc != nil {
-			pvcNames = append(pvcNames, pvc.Name)
 		}
 	}
 	return
+}
+
+func (r *Builder) getCorrespondingPvc(image model.Image, workload *model.Workload, vmRef ref.Ref, annotations map[string]string, secretName string) (*core.PersistentVolumeClaim, error) {
+	if populatorName, err := r.ensureVolumePopulator(workload, &image, secretName); err == nil {
+		return r.ensureVolumePopulatorPVC(workload, &image, annotations, populatorName)
+	} else {
+		return nil, err
+	}
 }
 
 func (r *Builder) ensureVolumePopulator(workload *model.Workload, image *model.Image, secretName string) (populatorName string, err error) {
@@ -938,15 +941,17 @@ func (r *Builder) ensureVolumePopulatorPVC(workload *model.Workload, image *mode
 			originalVolumeDiskId = imageProperty.(string)
 		}
 		storageClassName := r.Context.Map.Storage.Spec.Map[0].Destination.StorageClass
-		volumeType := r.getVolumeType(workload, originalVolumeDiskId)
-		if volumeType != "" {
+		if volumeType := r.getVolumeType(workload, originalVolumeDiskId); volumeType != "" {
 			storageClassName, err = r.getStorageClassName(workload, volumeType)
 			if err != nil {
 				err = liberr.Wrap(err)
 				return
 			}
 		}
-		pvc, err = r.persistentVolumeClaimWithSourceRef(*image, storageClassName, populatorName, annotations)
+		if pvc, err = r.persistentVolumeClaimWithSourceRef(*image, storageClassName, populatorName, annotations); err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
 	}
 	return
 }
@@ -1082,9 +1087,9 @@ func (r *Builder) getVolumePopulatorCR(name string) (populatorCr api.OpenstackVo
 	return
 }
 
-func (r *Builder) getVolumePopulatorPVC(name string) (populatorPvc core.PersistentVolumeClaim, err error) {
-	populatorPvc = core.PersistentVolumeClaim{}
-	err = r.Destination.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: name}, &populatorPvc)
+func (r *Builder) getVolumePopulatorPVC(name string) (populatorPvc *core.PersistentVolumeClaim, err error) {
+	populatorPvc = &core.PersistentVolumeClaim{}
+	err = r.Destination.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: name}, populatorPvc)
 	return
 }
 
