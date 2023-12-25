@@ -22,6 +22,7 @@ const (
 	CDIExportTokenTTL       = "CDI_EXPORT_TOKEN_TTL"
 	FileSystemOverhead      = "FILESYSTEM_OVERHEAD"
 	BlockOverhead           = "BLOCK_OVERHEAD"
+	CleanupRetries          = "CLEANUP_RETRIES"
 )
 
 // Migration settings
@@ -49,6 +50,8 @@ type Migration struct {
 	FileSystemOverhead int
 	// Block fixed overhead size
 	BlockOverhead int64
+	// Cleanup retries
+	CleanupRetries int
 }
 
 // Load settings.
@@ -69,6 +72,9 @@ func (r *Migration) Load() (err error) {
 		return liberr.Wrap(err)
 	}
 	if r.SnapshotStatusCheckRate, err = getPositiveEnvLimit(SnapshotStatusCheckRate, 10); err != nil {
+		return liberr.Wrap(err)
+	}
+	if r.CleanupRetries, err = getPositiveEnvLimit(CleanupRetries, 10); err != nil {
 		return liberr.Wrap(err)
 	}
 	if virtV2vImage, ok := os.LookupEnv(VirtV2vImage); ok {

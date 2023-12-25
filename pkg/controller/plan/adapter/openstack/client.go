@@ -11,6 +11,7 @@ import (
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
 	libclient "github.com/konveyor/forklift-controller/pkg/lib/client/openstack"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	"github.com/konveyor/forklift-controller/pkg/settings"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
@@ -555,7 +556,7 @@ func (r *Client) cleanup(vm *libclient.VM, originalVolumeID string) (err error) 
 		volume, err := r.getVolumeFromSnapshot(vm, snapshot.ID)
 		if err != nil {
 			if errors.Is(err, ResourceNotFoundError) {
-				r.Log.Info("volume not found, we are done")
+				r.Log.Info("volume doesn't exist, assuming we are done")
 				done = true
 				err = nil
 				return
@@ -578,11 +579,10 @@ func (r *Client) cleanup(vm *libclient.VM, originalVolumeID string) (err error) 
 		return
 	}
 
-	// TODO add config
 	backoff := wait.Backoff{
 		Duration: 3 * time.Second,
-		Factor:   1.1,
-		Steps:    100,
+		Factor:   1.5,
+		Steps:    settings.Settings.CleanupRetries,
 	}
 
 	err = wait.ExponentialBackoff(backoff, condition)
@@ -590,7 +590,6 @@ func (r *Client) cleanup(vm *libclient.VM, originalVolumeID string) (err error) 
 		err = liberr.Wrap(err)
 		r.Log.Error(err, "waiting for the volume to be removed",
 			"vm", vm.Name, "snapshotID", snapshot.ID)
-		err = nil
 		return
 	}
 
