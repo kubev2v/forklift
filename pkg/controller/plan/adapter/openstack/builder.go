@@ -906,15 +906,15 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 	return
 }
 
-func (r *Builder) getCorrespondingPvc(image model.Image, workload *model.Workload, vmRef ref.Ref, annotations map[string]string, secretName string) (*core.PersistentVolumeClaim, error) {
-	if populatorName, err := r.ensureVolumePopulator(workload, &image, secretName); err == nil {
-		return r.ensureVolumePopulatorPVC(workload, &image, annotations, populatorName)
-	} else {
-		return nil, err
+func (r *Builder) getCorrespondingPvc(image model.Image, workload *model.Workload, vmRef ref.Ref, annotations map[string]string, secretName string) (pvc *core.PersistentVolumeClaim, err error) {
+	populatorCR, err := r.ensureVolumePopulator(workload, &image, secretName)
+	if err != nil {
+		return
 	}
+	return r.ensureVolumePopulatorPVC(workload, &image, annotations, populatorCR.Name)
 }
 
-func (r *Builder) ensureVolumePopulator(workload *model.Workload, image *model.Image, secretName string) (populatorName string, err error) {
+func (r *Builder) ensureVolumePopulator(workload *model.Workload, image *model.Image, secretName string) (populatorCR *api.OpenstackVolumePopulator, err error) {
 	volumePopulatorCR, err := r.getVolumePopulatorCR(image.Name)
 	if err != nil {
 		if !k8serr.IsNotFound(err) {
@@ -923,7 +923,7 @@ func (r *Builder) ensureVolumePopulator(workload *model.Workload, image *model.I
 		}
 		return r.createVolumePopulatorCR(*image, secretName, workload.ID)
 	}
-	populatorName = volumePopulatorCR.Name
+	populatorCR = &volumePopulatorCR
 	return
 }
 
@@ -995,8 +995,8 @@ func (r *Builder) getImagesFromVolumes(workload *model.Workload) (images []model
 	return
 }
 
-func (r *Builder) createVolumePopulatorCR(image model.Image, secretName, vmId string) (name string, err error) {
-	populatorCR := &api.OpenstackVolumePopulator{
+func (r *Builder) createVolumePopulatorCR(image model.Image, secretName, vmId string) (populatorCR *api.OpenstackVolumePopulator, err error) {
+	populatorCR = &api.OpenstackVolumePopulator{
 		ObjectMeta: meta.ObjectMeta{
 			Name:      image.Name,
 			Namespace: r.Plan.Spec.TargetNamespace,
@@ -1014,7 +1014,6 @@ func (r *Builder) createVolumePopulatorCR(image model.Image, secretName, vmId st
 		err = liberr.Wrap(err)
 		return
 	}
-	name = populatorCR.Name
 	return
 }
 
