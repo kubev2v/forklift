@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	appsv1 "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -30,6 +31,7 @@ func (r Reconciler) CreateOVAServerDeployment(provider *api.Provider, ctx contex
 	pvNamePrefix := fmt.Sprintf("%s-pv-%s-%s", ovaServer, provider.Name, provider.Namespace)
 	pv, err := r.createPvForNfs(provider, ctx, pvNamePrefix)
 	if err != nil {
+		err = liberr.Wrap(err)
 		r.Log.Error(err, "Failed to create PV for the OVA server")
 		return
 	}
@@ -44,6 +46,7 @@ func (r Reconciler) CreateOVAServerDeployment(provider *api.Provider, ctx contex
 	pvcNamePrefix := fmt.Sprintf("%s-pvc-%s", ovaServer, provider.Name)
 	pvc, err := r.createPvcForNfs(provider, ctx, ownerReference, pv.Name, pvcNamePrefix)
 	if err != nil {
+		err = liberr.Wrap(err)
 		r.Log.Error(err, "Failed to create PVC for the OVA server")
 		return
 	}
@@ -51,12 +54,14 @@ func (r Reconciler) CreateOVAServerDeployment(provider *api.Provider, ctx contex
 	labels := map[string]string{"provider": provider.Name, "app": "forklift", "subapp": ovaServer}
 	err = r.createServerDeployment(provider, ctx, ownerReference, pvc.Name, labels)
 	if err != nil {
+		err = liberr.Wrap(err)
 		r.Log.Error(err, "Failed to create OVA server deployment")
 		return
 	}
 
 	err = r.createServerService(provider, ctx, ownerReference, labels)
 	if err != nil {
+		err = liberr.Wrap(err)
 		r.Log.Error(err, "Failed to create OVA server service")
 		return
 	}
@@ -91,9 +96,6 @@ func (r *Reconciler) createPvForNfs(provider *api.Provider, ctx context.Context,
 		},
 	}
 	err = r.Create(ctx, pv)
-	if err != nil {
-		return
-	}
 	return
 }
 
@@ -121,9 +123,6 @@ func (r *Reconciler) createPvcForNfs(provider *api.Provider, ctx context.Context
 		},
 	}
 	err = r.Create(ctx, pvc)
-	if err != nil {
-		return
-	}
 	return
 }
 
@@ -155,9 +154,6 @@ func (r *Reconciler) createServerDeployment(provider *api.Provider, ctx context.
 	}
 
 	err = r.Create(ctx, deployment)
-	if err != nil {
-		return
-	}
 	return
 }
 
@@ -185,9 +181,6 @@ func (r *Reconciler) createServerService(provider *api.Provider, ctx context.Con
 	}
 
 	err = r.Create(ctx, service)
-	if err != nil {
-		return
-	}
 	return
 }
 
