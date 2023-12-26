@@ -83,7 +83,7 @@ ci: all tidy vendor bazel-generate generate-verify
 all: test forklift-controller
 
 # Run tests
-test: generate fmt vet manifests
+test: generate fmt vet manifests validation-test
 	go test ./pkg/... ./cmd/... -coverprofile cover.out
 
 # Experimental e2e target
@@ -346,6 +346,22 @@ $(DEFAULT_CONTROLLER_GEN):
 kubectl: $(KUBECTL)
 $(DEFAULT_KUBECTL):
 	curl -L https://dl.k8s.io/release/v1.25.10/bin/linux/amd64/kubectl -o $(GOBIN)/kubectl && chmod +x $(GOBIN)/kubectl
+
+validation-test: opa-bin
+	ENVIRONMENT=test ${OPA} test validation/policies --explain fails
+
+opa-bin:
+ifeq (, $(shell command -v opa))
+	@{ \
+	set -e ;\
+	mkdir -p ${HOME}/.local/bin ; \
+	curl -sL -o ${HOME}/.local/bin/opa https://openpolicyagent.org/downloads/v0.57.1/opa_linux_amd64_static ; \
+	chmod 755 ${HOME}/.local/bin/opa ;\
+	}
+OPA=${HOME}/.local/bin/opa
+else
+OPA=$(shell which opa)
+endif
 
 # The directory where the 'crc' binary will be installed (this path
 # will be added to the PATH variable). (default: ${HOME}/.local/bin)
