@@ -1,0 +1,27 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "image-converter_lib",
+    srcs = ["image-converter.go"],
+    importpath = "github.com/konveyor/forklift-controller/cmd/image-converter",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//vendor/k8s.io/api/core/v1:core",
+        "//vendor/k8s.io/klog/v2:klog",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/client/config",
+    ],
+)
+
+go_binary(
+    name = "image-converter",
+    embed = [":image-converter_lib"],
+    visibility = ["//visibility:public"],
+)
+
+container_layer(
+    name = "base-layer",
+    tars = [
+        ":deps",
+    ],
+)
