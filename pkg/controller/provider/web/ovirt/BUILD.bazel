@@ -15,6 +15,7 @@ go_library(
         "nicprofile.go",
         "provider.go",
         "resource.go",
+        "servercpu.go",
         "storage.go",
         "tree.go",
         "vm.go",

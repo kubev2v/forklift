@@ -60,6 +60,11 @@ func Handlers(container *container.Container) []libweb.RequestHandler {
 				base.Handler{Container: container},
 			},
 		},
+		&ServerCpuHandler{
+			Handler: Handler{
+				base.Handler{Container: container},
+			},
+		},
 		&DiskHandler{
 			Handler: Handler{
 				base.Handler{Container: container},

@@ -10,6 +10,7 @@ func All() []interface{} {
 		&ocp.Provider{},
 		&DataCenter{},
 		&Cluster{},
+		&ServerCpu{},
 		&NICProfile{},
 		&DiskProfile{},
 		&Network{},
