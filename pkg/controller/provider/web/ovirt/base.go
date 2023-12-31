@@ -1,13 +1,14 @@
 package ovirt
 
 import (
+	pathlib "path"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	pathlib "path"
-	"strings"
 )
 
 // Package logger.
@@ -69,6 +70,9 @@ func (r *PathBuilder) Path(m model.Model) (path string) {
 		path = m.(*model.DataCenter).Name
 	case *model.Cluster:
 		object := m.(*model.Cluster)
+		path, err = r.forDataCenter(object.DataCenter, object.Name)
+	case *model.ServerCpu:
+		object := m.(*model.ServerCpu)
 		path, err = r.forDataCenter(object.DataCenter, object.Name)
 	case *model.Network:
 		object := m.(*model.Network)

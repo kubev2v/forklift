@@ -48,16 +48,33 @@ type DataCenter struct {
 
 type Cluster struct {
 	Base
-	DataCenter    string `sql:"d0,fk(dataCenter +cascade)"`
-	HaReservation bool   `sql:""`
-	KsmEnabled    bool   `sql:""`
-	BiosType      string `sql:""`
-	CPU           CPU    `sql:""`
+	DataCenter    string  `sql:"d0,fk(dataCenter +cascade)"`
+	HaReservation bool    `sql:""`
+	KsmEnabled    bool    `sql:""`
+	BiosType      string  `sql:""`
+	CPU           CPU     `sql:""`
+	Version       Version `sql:""`
+}
+
+type ServerCpu struct {
+	Base
+	DataCenter        string            `sql:"d0,fk(dataCenter +cascade)"`
+	SystemOptionValue SystemOptionValue `sql:""`
+}
+
+type SystemOptionValue struct {
+	Value   string `json:"value"`
+	Version string `json:"version"`
 }
 
 type CPU struct {
 	Architecture string `json:"architecture"`
 	Type         string `json:"type"`
+}
+
+type Version struct {
+	Minor string `json:"minor"`
+	Major string `json:"major"`
 }
 
 type Network struct {

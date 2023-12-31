@@ -80,6 +80,10 @@ type Cluster struct {
 	CPU      struct {
 		Type string `json:"type"`
 	} `json:"cpu"`
+	Version struct {
+		Minor string `json:"minor"`
+		Major string `json:"major"`
+	} `json:"version"`
 }
 
 // Apply to (update) the model.
@@ -91,11 +95,26 @@ func (r *Cluster) ApplyTo(m *model.Cluster) {
 	m.KsmEnabled = r.bool(r.KSM.Enabled)
 	m.BiosType = r.BiosType
 	m.CPU.Type = r.CPU.Type
+	m.Version.Minor = r.Version.Minor
+	m.Version.Major = r.Version.Major
 }
 
 // Cluster (list).
 type ClusterList struct {
 	Items []Cluster `json:"cluster"`
+}
+
+// ServerCpu.
+type ServerCpu struct {
+	Base
+	Values struct {
+		SystemOptionValues []SystemOptionValue `json:"system_option_value"`
+	} `json:"values"`
+}
+
+type SystemOptionValue struct {
+	Value   string `json:"value"`
+	Version string `json:"version"`
 }
 
 // Host.

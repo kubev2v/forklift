@@ -15,6 +15,7 @@ var (
 	StorageKind     = libref.ToKind(StorageDomain{})
 	DiskKind        = "Disk" // TODO: UPDATE WITH MODEL.
 	VmKind          = libref.ToKind(VM{})
+	ServerCPUKind   = libref.ToKind(ServerCpu{})
 )
 
 // Types.
