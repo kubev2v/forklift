@@ -98,7 +98,7 @@ func (r *Finder) With(client base.Client) base.Finder {
 //	NotFoundErr
 //	RefNotUniqueErr
 func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
-	switch resource.(type) {
+	switch res := resource.(type) {
 	case *Network:
 		id := ref.ID
 		if id != "" {
@@ -129,7 +129,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
 				break
 			}
-			*resource.(*Network) = list[0]
+			*res = list[0]
 		}
 	case *StorageDomain:
 		id := ref.ID
@@ -161,7 +161,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
 				break
 			}
-			*resource.(*StorageDomain) = list[0]
+			*res = list[0]
 		}
 	case *Host:
 		id := ref.ID
@@ -193,7 +193,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
 				break
 			}
-			*resource.(*Host) = list[0]
+			*res = list[0]
 		}
 	case *VM:
 		id := ref.ID
@@ -225,7 +225,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
 				break
 			}
-			*resource.(*VM) = list[0]
+			*res = list[0]
 		}
 	case *Cluster:
 		id := ref.ID
@@ -257,7 +257,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
 				break
 			}
-			*resource.(*Cluster) = list[0]
+			*res = list[0]
 		}
 	case *ServerCpu:
 		id := ref.ID
@@ -289,7 +289,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
 				break
 			}
-			*resource.(*ServerCpu) = list[0]
+			*res = list[0]
 		}
 	case *Workload:
 		id := ref.ID
@@ -321,7 +321,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
 				break
 			}
-			*resource.(*Workload) = list[0]
+			*res = list[0]
 		}
 	default:
 		err = liberr.Wrap(
