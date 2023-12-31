@@ -1,10 +1,11 @@
 package ovirt
 
 import (
+	"strings"
+
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	"strings"
 )
 
 // Errors.
@@ -48,6 +49,11 @@ func (r *Resolver) Path(resource interface{}, id string) (path string, err error
 		path = r.SelfLink
 	case *StorageDomain:
 		r := StorageDomain{}
+		r.ID = id
+		r.Link(provider)
+		path = r.SelfLink
+	case *ServerCpu:
+		r := ServerCpu{}
 		r.ID = id
 		r.Link(provider)
 		path = r.SelfLink
@@ -252,6 +258,38 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				break
 			}
 			*resource.(*Cluster) = list[0]
+		}
+	case *ServerCpu:
+		id := ref.ID
+		if id != "" {
+			err = r.Get(resource, id)
+			return
+		}
+		name := ref.Name
+		if name != "" {
+			list := []ServerCpu{}
+			err = r.List(
+				&list,
+				base.Param{
+					Key:   DetailParam,
+					Value: "all",
+				},
+				base.Param{
+					Key:   NameParam,
+					Value: name,
+				})
+			if err != nil {
+				break
+			}
+			if len(list) == 0 {
+				err = liberr.Wrap(NotFoundError{Ref: ref})
+				break
+			}
+			if len(list) > 1 {
+				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
+				break
+			}
+			*resource.(*ServerCpu) = list[0]
 		}
 	case *Workload:
 		id := ref.ID

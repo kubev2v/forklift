@@ -3,6 +3,7 @@ package ovirt
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
@@ -207,6 +208,7 @@ type Workload struct {
 	Host       *Host      `json:"host"`
 	Cluster    Cluster    `json:"cluster"`
 	DataCenter DataCenter `json:"dataCenter"`
+	ServerCpu  ServerCpu  `json:"serverCpu"`
 }
 
 // Build self link (URI).
@@ -220,6 +222,7 @@ func (r *Workload) Link(p *api.Provider) {
 	r.XVM.Link(p)
 	r.Cluster.Link(p)
 	r.DataCenter.Link(p)
+	r.ServerCpu.Link(p)
 	if r.Host != nil {
 		r.Host.Link(p)
 	}
@@ -262,6 +265,15 @@ func (r *Workload) Expand(db libmodel.DB) (err error) {
 		return err
 	}
 	r.DataCenter.With(dataCenter)
+	// Server CPU
+	serverCpu := &model.ServerCpu{
+		Base: model.Base{ID: strings.Join([]string{cluster.Version.Major, cluster.Version.Minor}, ".")},
+	}
+	err = db.Get(serverCpu)
+	if err != nil {
+		return err
+	}
+	r.ServerCpu.With(serverCpu)
 
 	return
 }

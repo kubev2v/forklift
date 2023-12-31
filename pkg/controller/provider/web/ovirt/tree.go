@@ -279,6 +279,17 @@ func (r *NodeBuilder) Node(parent *TreeNode, m model.Model) *TreeNode {
 			Kind:   kind,
 			Object: object,
 		}
+	case model.ServerCPUKind:
+		resource := &ServerCpu{}
+		resource.With(m.(*model.ServerCpu))
+		resource.Link(provider)
+		resource.Path = r.pathBuilder.Path(m)
+		object := resource.Content(r.withDetail(kind))
+		node = &TreeNode{
+			Parent: parent,
+			Kind:   kind,
+			Object: object,
+		}
 	}
 
 	return node

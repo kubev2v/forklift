@@ -14,31 +14,29 @@ import (
 
 // Routes.
 const (
-	ClusterParam      = "cluster"
-	ClusterCollection = "clusters"
-	ClustersRoot      = ProviderRoot + "/" + ClusterCollection
-	ClusterRoot       = ClustersRoot + "/:" + ClusterParam
+	ServerCpuParam      = "servercpu"
+	ServerCpuCollection = "servercpus"
+	ServerCpusRoot      = ProviderRoot + "/" + ServerCpuCollection
+	ServerCpuRoot       = ServerCpusRoot + "/:" + ServerCpuParam
 )
 
-// Cluster handler.
-type ClusterHandler struct {
+// ServerCpu handler.
+type ServerCpuHandler struct {
 	Handler
-	// Selected cluster.
-	cluster *model.Cluster
 }
 
 // Add routes to the `gin` router.
-func (h *ClusterHandler) AddRoutes(e *gin.Engine) {
-	e.GET(ClustersRoot, h.List)
-	e.GET(ClustersRoot+"/", h.List)
-	e.GET(ClusterRoot, h.Get)
+func (h *ServerCpuHandler) AddRoutes(e *gin.Engine) {
+	e.GET(ServerCpusRoot, h.List)
+	e.GET(ServerCpusRoot+"/", h.List)
+	e.GET(ServerCpuRoot, h.Get)
 }
 
 // List resources in a REST collection.
 // A GET onn the collection that includes the `X-Watch`
 // header will negotiate an upgrade of the connection
 // to a websocket and push watch events.
-func (h ClusterHandler) List(ctx *gin.Context) {
+func (h ServerCpuHandler) List(ctx *gin.Context) {
 	status, err := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
@@ -59,7 +57,7 @@ func (h ClusterHandler) List(ctx *gin.Context) {
 		}
 	}()
 	db := h.Collector.DB()
-	list := []model.Cluster{}
+	list := []model.ServerCpu{}
 	err = db.List(&list, h.ListOptions(ctx))
 	if err != nil {
 		return
@@ -71,7 +69,7 @@ func (h ClusterHandler) List(ctx *gin.Context) {
 	}
 	pb := PathBuilder{DB: db}
 	for _, m := range list {
-		r := &Cluster{}
+		r := &ServerCpu{}
 		r.With(&m)
 		r.Link(h.Provider)
 		r.Path = pb.Path(&m)
@@ -82,16 +80,16 @@ func (h ClusterHandler) List(ctx *gin.Context) {
 }
 
 // Get a specific REST resource.
-func (h ClusterHandler) Get(ctx *gin.Context) {
+func (h ServerCpuHandler) Get(ctx *gin.Context) {
 	status, err := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
 		base.SetForkliftError(ctx, err)
 		return
 	}
-	m := &model.Cluster{
+	m := &model.ServerCpu{
 		Base: model.Base{
-			ID: ctx.Param(ClusterParam),
+			ID: ctx.Param(ServerCpuParam),
 		},
 	}
 	db := h.Collector.DB()
@@ -109,7 +107,7 @@ func (h ClusterHandler) Get(ctx *gin.Context) {
 		return
 	}
 	pb := PathBuilder{DB: db}
-	r := &Cluster{}
+	r := &ServerCpu{}
 	r.With(m)
 	r.Link(h.Provider)
 	r.Path = pb.Path(m)
@@ -119,20 +117,20 @@ func (h ClusterHandler) Get(ctx *gin.Context) {
 }
 
 // Watch.
-func (h *ClusterHandler) watch(ctx *gin.Context) {
+func (h *ServerCpuHandler) watch(ctx *gin.Context) {
 	db := h.Collector.DB()
 	err := h.Watch(
 		ctx,
 		db,
-		&model.Cluster{},
+		&model.ServerCpu{},
 		func(in libmodel.Model) (r interface{}) {
 			pb := PathBuilder{DB: db}
-			m := in.(*model.Cluster)
-			cluster := &Cluster{}
-			cluster.With(m)
-			cluster.Link(h.Provider)
-			cluster.Path = pb.Path(m)
-			r = cluster
+			m := in.(*model.ServerCpu)
+			serverCpu := &ServerCpu{}
+			serverCpu.With(m)
+			serverCpu.Link(h.Provider)
+			serverCpu.Path = pb.Path(m)
+			r = serverCpu
 			return
 		})
 	if err != nil {
@@ -146,7 +144,7 @@ func (h *ClusterHandler) watch(ctx *gin.Context) {
 
 // Filter result set.
 // Filter by path for `name` query.
-func (h *ClusterHandler) filter(ctx *gin.Context, list *[]model.Cluster) (err error) {
+func (h *ServerCpuHandler) filter(ctx *gin.Context, list *[]model.ServerCpu) (err error) {
 	if len(*list) < 2 {
 		return
 	}
@@ -160,7 +158,7 @@ func (h *ClusterHandler) filter(ctx *gin.Context, list *[]model.Cluster) (err er
 	}
 	db := h.Collector.DB()
 	pb := PathBuilder{DB: db}
-	kept := []model.Cluster{}
+	kept := []model.ServerCpu{}
 	for _, m := range *list {
 		path := pb.Path(&m)
 		if h.PathMatchRoot(path, name) {
@@ -174,42 +172,31 @@ func (h *ClusterHandler) filter(ctx *gin.Context, list *[]model.Cluster) (err er
 }
 
 // REST Resource.
-type Cluster struct {
+type ServerCpu struct {
 	Resource
-	DataCenter    string  `json:"dataCenter"`
-	HaReservation bool    `json:"haReservation"`
-	KsmEnabled    bool    `json:"ksmEnabled"`
-	BiosType      string  `json:"biosType"`
-	CPU           CPU     `json:"cpu"`
-	Version       Version `json:"version"`
+	SystemOptionValue []SystemOptionValue `json:"systemOptionValue"`
 }
 
-type CPU = model.CPU
-type Version = model.Version
+type SystemOptionValue = model.SystemOptionValue
 
 // Build the resource using the model.
-func (r *Cluster) With(m *model.Cluster) {
+func (r *ServerCpu) With(m *model.ServerCpu) {
 	r.Resource.With(&m.Base)
-	r.DataCenter = m.DataCenter
-	r.HaReservation = m.HaReservation
-	r.KsmEnabled = m.KsmEnabled
-	r.BiosType = m.BiosType
-	r.CPU = m.CPU
-	r.Version = m.Version
+	r.SystemOptionValue = []SystemOptionValue{m.SystemOptionValue}
 }
 
 // Build self link (URI).
-func (r *Cluster) Link(p *api.Provider) {
+func (r *ServerCpu) Link(p *api.Provider) {
 	r.SelfLink = base.Link(
-		ClusterRoot,
+		ServerCpuRoot,
 		base.Params{
 			base.ProviderParam: string(p.UID),
-			ClusterParam:       r.ID,
+			ServerCpuParam:     r.ID,
 		})
 }
 
 // As content.
-func (r *Cluster) Content(detail int) interface{} {
+func (r *ServerCpu) Content(detail int) interface{} {
 	if detail == 0 {
 		return r.Resource
 	}

@@ -102,6 +102,7 @@ func init() {
 		&NetworkAdapter{},
 		&DiskAdapter{},
 		&ClusterAdapter{},
+		&ServerCPUAdapter{},
 		&HostAdapter{},
 		&VMAdapter{},
 	}
@@ -674,6 +675,57 @@ func (r *ClusterAdapter) Apply(ctx *Context, event *Event) (updater Updater, err
 		err = liberr.New("unknown event", "event", event)
 	}
 
+	return
+}
+
+// ServerCPUAdapter adapter.
+type ServerCPUAdapter struct {
+	BaseAdapter
+}
+
+// Handled events.
+func (r *ServerCPUAdapter) Event() []int {
+	return []int{}
+}
+
+// List the collection.
+func (r *ServerCPUAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
+	serverCpuList := ServerCpu{}
+	err = ctx.client.list("options/ServerCPUList", &serverCpuList)
+	if err != nil {
+		return
+	}
+	list := fb.NewList()
+	for _, object := range serverCpuList.Values.SystemOptionValues {
+		m := &model.ServerCpu{
+			Base: model.Base{ID: object.Version},
+			SystemOptionValue: model.SystemOptionValue{
+				Value:   object.Value,
+				Version: object.Version,
+			},
+		}
+		list.Append(m)
+	}
+
+	itr = list.Iter()
+
+	return
+}
+
+// Apply and event tot the inventory model.
+func (r *ServerCPUAdapter) Apply(ctx *Context, event *Event) (updater Updater, err error) {
+	defer func() {
+		if errors.Is(err, &NotFound{}) {
+			updater = func(tx *libmodel.Tx) (err error) {
+				ctx.log.V(3).Info(
+					"ServerCPU not found; event ignored.",
+					"event",
+					event)
+				return
+			}
+			err = nil
+		}
+	}()
 	return
 }
 
