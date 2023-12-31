@@ -394,7 +394,21 @@ func (r *Builder) mapCPU(vm *model.Workload, object *cnv.VirtualMachineSpec) {
 	}
 	if vm.CustomCpuModel != "" {
 		r.setCpuFlags(vm.CustomCpuModel, object)
+	} else if r.Plan.Spec.PreserveClusterCPUModel {
+		r.setCpuFlags(r.getClusterCpu(vm), object)
 	}
+}
+
+func (r *Builder) getClusterCpu(vm *model.Workload) string {
+	var cpuAndFlags string
+	cpus := strings.Split(vm.ServerCpu.SystemOptionValue[0].Value, ";")
+	for _, values := range cpus {
+		if strings.Contains(values, vm.Cluster.CPU.Type) {
+			cpuAndFlags = strings.Split(values, ":")[3]
+			break
+		}
+	}
+	return cpuAndFlags
 }
 
 func (r *Builder) setCpuFlags(fullCpu string, object *cnv.VirtualMachineSpec) {
