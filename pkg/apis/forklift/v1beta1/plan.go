@@ -44,6 +44,11 @@ type PlanSpec struct {
 	TransferNetwork *core.ObjectReference `json:"transferNetwork,omitempty"`
 	// Whether this plan should be archived.
 	Archived bool `json:"archived,omitempty"`
+	// LUKs keys for virt-v2v (https://www.libguestfs.org/virt-v2v.1.html)
+	// References a secret containing credentials and
+	// other confidential information.
+	// +optional
+	LUKS core.ObjectReference `json:"luks" ref:"Secret"`
 }
 
 // Find a planned VM.

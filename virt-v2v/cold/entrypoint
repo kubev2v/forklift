@@ -71,6 +71,14 @@ for disk in /dev/block[0-9]* ; do
 	ln -s "$disk" "$DIR/$V2V_vmName-sd$(gen_name "$((num+1))")"
 done
 
+# Adds LUKS keys, if exist.
+if [ -d "/etc/luks" ]; then
+    IFS=$'\n'
+    for line in $(cat /etc/luks/luks); do
+        args+=(--key "$line")
+    done
+fi
+
 if [ "$V2V_source" == "vCenter" ] ; then
   # Store password to file
   echo -n "$V2V_secretKey" > "$DIR/vmware.pw"
