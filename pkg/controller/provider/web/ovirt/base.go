@@ -65,26 +65,26 @@ func (r *PathBuilder) Path(m model.Model) (path string) {
 	if r.cache == nil {
 		r.cache = map[string]string{}
 	}
-	switch m.(type) {
+	switch obj := m.(type) {
 	case *model.DataCenter:
-		path = m.(*model.DataCenter).Name
+		path = obj.Name
 	case *model.Cluster:
-		object := m.(*model.Cluster)
+		object := obj
 		path, err = r.forDataCenter(object.DataCenter, object.Name)
 	case *model.ServerCpu:
-		object := m.(*model.ServerCpu)
+		object := obj
 		path, err = r.forDataCenter(object.DataCenter, object.Name)
 	case *model.Network:
-		object := m.(*model.Network)
+		object := obj
 		path, err = r.forDataCenter(object.DataCenter, object.Name)
 	case *model.StorageDomain:
-		object := m.(*model.StorageDomain)
+		object := obj
 		path, err = r.forDataCenter(object.DataCenter, object.Name)
 	case *model.Host:
-		object := m.(*model.Host)
+		object := obj
 		path, err = r.forCluster(object.Cluster, object.Name)
 	case *model.VM:
-		object := m.(*model.VM)
+		object := obj
 		path, err = r.forCluster(object.Cluster, object.Name)
 	}
 
