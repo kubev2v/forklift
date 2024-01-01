@@ -125,7 +125,7 @@ func (admitter *SecretAdmitter) validateHostSecret() *admissionv1.AdmissionRespo
 			}
 		case err != nil:
 			log.Info("Couldn't test connection to the host, yet passing", "error", err.Error())
-		default:
+		case tested:
 			log.Info("Test succeeded, passing")
 		}
 		return webhookutils.ToAdmissionResponseAllow()

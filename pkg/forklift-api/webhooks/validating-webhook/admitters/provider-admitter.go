@@ -17,8 +17,6 @@ type ProviderAdmitter struct {
 }
 
 func (admitter *ProviderAdmitter) validateVDDK() error {
-	log.Info("not sleeping for 10 seconds")
-	//time.Sleep(10 * time.Second)
 	if admitter.provider.Type() != api.VSphere {
 		log.Info("Provider of this type does not require VDDK, passing", "type", admitter.provider.Type())
 		return nil
@@ -86,17 +84,27 @@ func (admitter *ProviderAdmitter) validateVDDK() error {
 	return nil
 }
 
+func (admitter *ProviderAdmitter) validateSdkEndpointType() error {
+	endpoint, ok := admitter.provider.Spec.Settings[api.SDK]
+	if ok && admitter.provider.Type() == api.VSphere && endpoint != api.VCenter && endpoint != api.ESXI {
+		return liberr.New("vSphere provider is set with an invalid SDK endpoint type", "endpoint", endpoint)
+	}
+	return nil
+}
+
 func (admitter *ProviderAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
 	log.Info("Provider admitter was called")
 	raw := ar.Request.Object.Raw
 
-	err := json.Unmarshal(raw, &admitter.provider)
-	if err != nil {
+	if err := json.Unmarshal(raw, &admitter.provider); err != nil {
 		return util.ToAdmissionResponseError(err)
 	}
 
-	err = admitter.validateVDDK()
-	if err != nil {
+	if err := admitter.validateVDDK(); err != nil {
+		return util.ToAdmissionResponseError(err)
+	}
+
+	if err := admitter.validateSdkEndpointType(); err != nil {
 		return util.ToAdmissionResponseError(err)
 	}
 
