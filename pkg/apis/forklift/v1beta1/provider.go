@@ -63,7 +63,10 @@ const (
 
 // Provider settings.
 const (
-	VDDK = "vddkInitImage"
+	VDDK    = "vddkInitImage"
+	SDK     = "sdkEndpoint"
+	VCenter = "vcenter"
+	ESXI    = "esxi"
 )
 
 // Defines the desired state of Provider.
