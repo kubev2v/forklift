@@ -1113,9 +1113,9 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image, storageC
 	if originalVolumeDiskId, ok := image.Properties["forklift_original_volume_id"]; ok {
 		annotations[AnnImportDiskId] = originalVolumeDiskId.(string)
 		r.Log.Info("the image comes from a volume", "volumeID", originalVolumeDiskId)
-	} else {
-		annotations[AnnImportDiskId] = image.ID
-		r.Log.Info("the image comes from a vm snapshot", "imageID", image.ID)
+	} else if originalImageId, ok := image.Properties["forklift_original_image_id"]; ok {
+		annotations[AnnImportDiskId] = originalImageId.(string)
+		r.Log.Info("the image comes from a vm snapshot", "imageID", originalImageId)
 	}
 
 	pvc = &core.PersistentVolumeClaim{
