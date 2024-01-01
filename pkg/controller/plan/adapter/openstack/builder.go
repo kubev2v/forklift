@@ -11,6 +11,7 @@ import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
+	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	utils "github.com/konveyor/forklift-controller/pkg/controller/plan/util"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
@@ -18,11 +19,13 @@ import (
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
+	batchv1 "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -890,10 +893,14 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 			return
 		}
 		images = append(images, image)
+
+		// Add annotation to indicate the corresponding PVC would require conversion to RAW
+		annotations[planbase.AnnRequiresConversion] = "true"
 	}
+
 	for _, image := range images {
 		if image.Status != string(ImageStatusActive) {
-			r.Log.Info("the image is not ready yet", "image", image.Name)
+			r.Log.Info("the image is not ready yet", "image", image.Name, "status", image.Status)
 			continue
 		}
 		if pvc, pvcErr := r.getCorrespondingPvc(image, workload, vmRef, annotations, secretName); pvcErr == nil {
@@ -1249,4 +1256,228 @@ func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskNam
 	}
 	taskName = image.Name
 	return
+}
+
+func (r *Builder) ConvertPVCs(pvcs []core.PersistentVolumeClaim) (ready bool, err error) {
+	for _, pvc := range pvcs {
+		if pvc.Annotations[planbase.AnnRequiresConversion] != "true" {
+			continue
+		}
+		scratchPVC, err := r.ensureScratchPVC(&pvc)
+		if err != nil {
+			return false, err
+		}
+
+		if scratchPVC == nil {
+			r.Log.Info("Scratch PVC not ready", "pvc", getScratchPVCName(&pvc))
+			return false, nil
+		}
+
+		switch scratchPVC.Status.Phase {
+		case core.ClaimBound:
+			r.Log.Info("Scratch PVC bound", "pvc", scratchPVC.Name)
+		case core.ClaimPending:
+			r.Log.Info("Scratch PVC pending", "pvc", scratchPVC.Name)
+			return false, nil
+		case core.ClaimLost:
+			r.Log.Info("Scratch PVC lost", "pvc", scratchPVC.Name)
+			return false, nil
+		default:
+			r.Log.Info("Scratch PVC unknown", "pvc", scratchPVC.Name)
+			return false, nil
+		}
+
+		convertJob, err := r.ensureJob(&pvc, "convert", "qcow2", "raw")
+		if err != nil {
+			return false, err
+		}
+
+		if convertJob == nil {
+			r.Log.Info("convert job not ready for pvc", "pvc", pvc.Name)
+			return false, nil
+		}
+
+		r.Log.Info("Convert job status", "pvc", pvc.Name, "status", convertJob.Status)
+		for _, condition := range convertJob.Status.Conditions {
+			switch condition.Type {
+			case batchv1.JobComplete:
+				r.Log.Info("Convert job completed", "pvc", pvc.Name)
+				// remove job after completion
+				err = r.Destination.Client.Delete(context.Background(), convertJob, &client.DeleteOptions{})
+				if err != nil {
+					r.Log.Error(err, "error deleting convert job", "job", convertJob.Name)
+				}
+
+				// remove scratch pvc
+				err = r.Destination.Client.Delete(context.Background(), scratchPVC, &client.DeleteOptions{})
+				if err != nil {
+					r.Log.Error(err, "error deleting scratch pvc", "pvc", scratchPVC.Name)
+				}
+				return true, nil
+
+			case batchv1.JobFailed:
+				if convertJob.Status.Failed >= 3 {
+					return true, errors.New("convert job failed")
+				}
+			}
+		}
+	}
+
+	return false, nil
+}
+
+func (r *Builder) ensureJob(pvc *core.PersistentVolumeClaim, jobType, srcFormat, dstFormat string) (*batchv1.Job, error) {
+	jobName := getJobName(pvc, jobType)
+	job := &batchv1.Job{}
+	err := r.Client.Get(context.Background(), client.ObjectKey{Name: jobName, Namespace: pvc.Namespace}, job)
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			if jobType == "convert" {
+				job := createConvertJob(pvc, srcFormat, dstFormat)
+				err = r.Destination.Client.Create(context.Background(), job, &client.CreateOptions{})
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+		return nil, err
+	}
+
+	return job, err
+}
+
+func createConvertJob(pvc *core.PersistentVolumeClaim, srcFormat, dstFormat string) *batchv1.Job {
+	return &batchv1.Job{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      fmt.Sprintf("convert-%s", pvc.Name),
+			Namespace: pvc.Namespace,
+		},
+		Spec: batchv1.JobSpec{
+			BackoffLimit: pointer.Int32(3),
+			Completions:  pointer.Int32(1),
+			Template: core.PodTemplateSpec{
+				Spec: core.PodSpec{
+					SecurityContext: &core.PodSecurityContext{
+						SeccompProfile: &core.SeccompProfile{
+							Type: core.SeccompProfileTypeRuntimeDefault,
+						},
+						FSGroup: pointer.Int64(107),
+					},
+					RestartPolicy: core.RestartPolicyNever,
+					Containers: []core.Container{
+						makeConversionContainer(pvc, srcFormat, dstFormat, "quay.io/bzlotnik/image-converter:latest"), // TODO replace later
+					},
+					Volumes: []core.Volume{
+						{
+							Name: "source",
+							VolumeSource: core.VolumeSource{
+								PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
+									ClaimName: pvc.Name,
+								},
+							},
+						},
+						{
+							Name: "target",
+							VolumeSource: core.VolumeSource{
+								PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
+									ClaimName: getScratchPVCName(pvc),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func makeConversionContainer(pvc *core.PersistentVolumeClaim, srcFormat, dstFormat, image string) core.Container {
+	container := core.Container{
+		Name:  "convert",
+		Image: image,
+		SecurityContext: &core.SecurityContext{
+			AllowPrivilegeEscalation: pointer.Bool(false),
+			RunAsNonRoot:             pointer.Bool(true),
+			RunAsUser:                pointer.Int64(107),
+			Capabilities: &core.Capabilities{
+				Drop: []core.Capability{"ALL"},
+			},
+		},
+		Args: []string{
+			"-src-path", "/mnt/disk.img",
+			"-dst-path", "/output/disk.img",
+			"-src-format", srcFormat,
+			"-dst-format", dstFormat,
+		},
+	}
+
+	// Determine source path based on volumeMode
+	if pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == core.PersistentVolumeBlock {
+		container.VolumeDevices = []core.VolumeDevice{
+			{
+				Name:       "source",
+				DevicePath: "/dev/block",
+			},
+			{
+				Name:       "target",
+				DevicePath: "/dev/target",
+			},
+		}
+	} else {
+		container.VolumeMounts = []core.VolumeMount{
+			{
+				Name:      "source",
+				MountPath: "/mnt/",
+			},
+			{
+				Name:      "target",
+				MountPath: "/output/",
+			},
+		}
+	}
+
+	return container
+}
+
+func (r *Builder) ensureScratchPVC(sourcePVC *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
+	scratchPVC := &core.PersistentVolumeClaim{}
+	err := r.Destination.Client.Get(context.Background(), client.ObjectKey{Name: getScratchPVCName(sourcePVC), Namespace: sourcePVC.Namespace}, scratchPVC)
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			scratchPVC := makeScratchPVC(sourcePVC)
+			r.Log.Info("Scratch pvc doesn't exist, creating...", "pvc", sourcePVC.Name)
+			err = r.Destination.Client.Create(context.Background(), scratchPVC, &client.CreateOptions{})
+		}
+		return nil, err
+	}
+
+	return scratchPVC, nil
+}
+
+func getScratchPVCName(pvc *core.PersistentVolumeClaim) string {
+	return fmt.Sprintf("%s-scratch", pvc.Name)
+}
+
+func makeScratchPVC(pvc *core.PersistentVolumeClaim) *core.PersistentVolumeClaim {
+	size := pvc.Spec.Resources.Requests[core.ResourceStorage]
+	return &core.PersistentVolumeClaim{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      getScratchPVCName(pvc),
+			Namespace: pvc.Namespace,
+		},
+		Spec: core.PersistentVolumeClaimSpec{
+			AccessModes: pvc.Spec.AccessModes,
+			VolumeMode:  pvc.Spec.VolumeMode,
+			Resources: core.ResourceRequirements{
+				Requests: map[core.ResourceName]resource.Quantity{
+					core.ResourceStorage: size,
+				},
+			},
+			StorageClassName: pvc.Spec.StorageClassName,
+		},
+	}
+}
+
+func getJobName(pvc *core.PersistentVolumeClaim, jobName string) string {
+	return fmt.Sprintf("%s-%s", jobName, pvc.Name)
 }

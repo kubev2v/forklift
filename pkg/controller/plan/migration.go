@@ -36,11 +36,12 @@ const (
 
 // Predicates.
 var (
-	HasPreHook         libitr.Flag = 0x01
-	HasPostHook        libitr.Flag = 0x02
-	RequiresConversion libitr.Flag = 0x04
-	CDIDiskCopy        libitr.Flag = 0x08
-	VirtV2vDiskCopy    libitr.Flag = 0x10
+	HasPreHook              libitr.Flag = 0x01
+	HasPostHook             libitr.Flag = 0x02
+	RequiresConversion      libitr.Flag = 0x04
+	CDIDiskCopy             libitr.Flag = 0x08
+	VirtV2vDiskCopy         libitr.Flag = 0x10
+	OpenstackImageMigration libitr.Flag = 0x12
 )
 
 // Phases.
@@ -69,6 +70,7 @@ const (
 	WaitForSnapshot          = "WaitForSnapshot"
 	WaitForInitialSnapshot   = "WaitForInitialSnapshot"
 	WaitForFinalSnapshot     = "WaitForFinalSnapshot"
+	ConvertOpenstackSnapshot = "ConvertOpenstackSnapshot"
 )
 
 // Steps.
@@ -103,6 +105,7 @@ var (
 			{Name: CreateGuestConversionPod, All: RequiresConversion},
 			{Name: ConvertGuest, All: RequiresConversion},
 			{Name: CopyDisksVirtV2V, All: RequiresConversion},
+			{Name: ConvertOpenstackSnapshot, All: OpenstackImageMigration},
 			{Name: CreateVM},
 			{Name: PostHook, All: HasPostHook},
 			{Name: Completed},
@@ -587,7 +590,7 @@ func (r *Migration) step(vm *plan.VMStatus) (step string) {
 		step = Initialize
 	case AllocateDisks:
 		step = DiskAllocation
-	case CopyDisks, CopyingPaused, CreateSnapshot, WaitForSnapshot, AddCheckpoint:
+	case CopyDisks, CopyingPaused, CreateSnapshot, WaitForSnapshot, AddCheckpoint, ConvertOpenstackSnapshot:
 		step = DiskTransfer
 	case CreateFinalSnapshot, WaitForFinalSnapshot, AddFinalCheckpoint, Finalize:
 		step = Cutover
@@ -844,6 +847,38 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				vm.Warm.NextPrecopyAt = &next
 				vm.Warm.Successes++
 			}
+			step.Phase = Completed
+			vm.Phase = r.next(vm.Phase)
+		}
+	case ConvertOpenstackSnapshot:
+		step, found := vm.FindStep(r.step(vm))
+		if !found {
+			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
+			break
+		}
+		step.MarkStarted()
+		step.Phase = Running
+		pvcs, err := r.kubevirt.getPVCs(vm.Ref)
+		if err != nil {
+			r.Log.Error(err,
+				"Couldn't get VM's PVCs.",
+				"vm",
+				vm.String())
+		}
+
+		ready, err := r.builder.ConvertPVCs(pvcs)
+		if err != nil {
+			step.AddError(err.Error())
+			err = nil
+			break
+		}
+
+		if !ready {
+			r.Log.Info("Conversion isn't ready yet")
+			return err
+		}
+
+		if step.MarkedCompleted() && !step.HasError() {
 			step.Phase = Completed
 			vm.Phase = r.next(vm.Phase)
 		}
@@ -1115,7 +1150,7 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 						Phase:       Pending,
 					},
 				})
-		case AllocateDisks, CopyDisks, CopyDisksVirtV2V:
+		case AllocateDisks, CopyDisks, CopyDisksVirtV2V, ConvertOpenstackSnapshot:
 			tasks, pErr := r.builder.Tasks(vm.Ref)
 			if pErr != nil {
 				err = liberr.Wrap(pErr)
@@ -1136,6 +1171,9 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 			case CopyDisksVirtV2V:
 				task_name = DiskTransferV2v
 				task_description = "Copy disks."
+			case ConvertOpenstackSnapshot:
+				task_name = ConvertOpenstackSnapshot
+				task_description = "Convert OpenStack snapshot."
 			default:
 				err = liberr.New(fmt.Sprintf("Unknown step '%s'. Not implemented.", step.Name))
 				return
@@ -1698,6 +1736,7 @@ func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 		err = el9Err
 		return
 	}
+
 	switch flag {
 	case HasPreHook:
 		_, allowed = r.vm.FindHook(PreHook)
@@ -1709,6 +1748,8 @@ func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 		allowed = !el9
 	case VirtV2vDiskCopy:
 		allowed = el9
+	case OpenstackImageMigration:
+		allowed = r.context.Plan.IsSourceProviderOpenstack()
 	}
 
 	return

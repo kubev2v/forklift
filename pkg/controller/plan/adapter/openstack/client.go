@@ -531,6 +531,7 @@ func (r *Client) createVmSnapshotImage(vm *libclient.VM) (vmImage *libclient.Ima
 			}
 		}
 	}
+
 	return
 }
 
