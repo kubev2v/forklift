@@ -160,6 +160,12 @@
       state: present
       definition: "{{ lookup('template', 'api/mutatingwebhookconfiguration-plans.yml.j2') }}"
 
+
+  - name: "Setup providers mutating webhook configuration"
+    k8s:
+      state: present
+      definition: "{{ lookup('template', 'api/mutatingwebhookconfiguration-providers.yml.j2') }}"
+
   - name: "Setup default provider"
     k8s:
       state: present
