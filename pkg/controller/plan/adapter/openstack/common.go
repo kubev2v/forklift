@@ -2,11 +2,13 @@ package openstack
 
 import (
 	"fmt"
+
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 )
 
 const (
 	forkliftPropertyOriginalVolumeID = "forklift_original_volume_id"
+	forkliftPropertyOriginalImageID  = "forklift_original_image_id"
 )
 
 func getMigrationName(ctx *plancontext.Context) string {
