@@ -500,7 +500,15 @@ func (r *Client) createVmSnapshotImage(vm *libclient.VM) (vmImage *libclient.Ima
 	}
 	// The vm is image based and we need to create the snapsots of the
 	// volumes attached to it.
-	if _, ok := vm.Image["id"]; ok {
+	if imageID, ok := vm.Image["id"]; ok {
+		// Update property for image based
+		imageUpdateOpts := &libclient.ImageUpdateOpts{}
+		imageUpdateOpts.AddImageProperty(forkliftPropertyOriginalImageID, imageID.(string))
+		err = r.Update(vmImage, imageUpdateOpts)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
 		for _, attachedVolume := range vm.AttachedVolumes {
 			var volume *libclient.Volume
 			volume, err = r.getVolume(ref.Ref{ID: attachedVolume.ID})
@@ -796,6 +804,14 @@ func (r *Client) ensureVmSnapshot(vm *libclient.VM) (ready bool, err error) {
 		r.Log.Info("the VM snapshot image is ready!",
 			"vm", vm.Name, "image", vmSnapshotImage.Name, "imageID", vmSnapshotImage.ID)
 		ready = true
+		if _, ok := vm.Image["id"]; ok {
+			ready, err = r.ensureImageUpToDate(vm, vmSnapshotImage, vmTypeImageBased)
+			if err != nil {
+				r.Log.Error(err, "checking the VM snapshot image properties", "vm", vm.Name, "image", vmSnapshotImage.Name)
+				return
+			}
+		}
+		return
 	case ImageStatusImporting, ImageStatusQueued, ImageStatusUploading, ImageStatusSaving:
 		r.Log.Info("the VM snapshot image is not ready yet, skipping...",
 			"vm", vm.Name, "image", vmSnapshotImage.Name, "imageID", vmSnapshotImage.ID)
@@ -806,7 +822,6 @@ func (r *Client) ensureVmSnapshot(vm *libclient.VM) (ready bool, err error) {
 			"vm", vm.Name, "image", vmSnapshotImage.Name, "imageID", vmSnapshotImage.ID, "status", vmSnapshotImage.Status)
 		return
 	}
-	return
 }
 
 func (r *Client) ensureImagesFromVolumesReady(vm *libclient.VM) (ready bool, err error) {
@@ -862,7 +877,7 @@ func (r *Client) ensureImageFromVolumeReady(vm *libclient.VM, image *libclient.I
 		r.Log.Info("the image properties have been updated",
 			"vm", vm.Name, "image", image.Name, "properties", image.Properties)
 		var imageUpToDate bool
-		imageUpToDate, err = r.ensureImageUpToDate(vm, image)
+		imageUpToDate, err = r.ensureImageUpToDate(vm, image, vmTypeVolumeBased)
 		if err != nil || !imageUpToDate {
 			return
 		}
@@ -877,7 +892,12 @@ func (r *Client) ensureImageFromVolumeReady(vm *libclient.VM, image *libclient.I
 	return
 }
 
-func (r *Client) ensureImageUpToDate(vm *libclient.VM, image *libclient.Image) (upToDate bool, err error) {
+type vmType string
+
+var vmTypeImageBased vmType = "imageBased"
+var vmTypeVolumeBased vmType = "volumeBased"
+
+func (r *Client) ensureImageUpToDate(vm *libclient.VM, image *libclient.Image, vmType vmType) (upToDate bool, err error) {
 	inventoryImage := &model.Image{}
 	if err = r.Context.Source.Inventory.Find(inventoryImage, ref.Ref{ID: image.ID}); err != nil {
 		if errors.As(err, &model.NotFoundError{}) {
@@ -887,12 +907,20 @@ func (r *Client) ensureImageUpToDate(vm *libclient.VM, image *libclient.Image) (
 		}
 		return
 	}
-	if _, upToDate = inventoryImage.Properties[forkliftPropertyOriginalVolumeID]; !upToDate {
+
+	switch vmType {
+	case vmTypeImageBased:
+		_, upToDate = inventoryImage.Properties[forkliftPropertyOriginalImageID]
+	case vmTypeVolumeBased:
+		_, upToDate = inventoryImage.Properties[forkliftPropertyOriginalVolumeID]
+	}
+
+	if !upToDate {
 		r.Log.Info("image properties have not been synchronized, waiting...",
 			"vm", vm.Name, "image", inventoryImage.Name, "properties", inventoryImage.Properties)
 	}
-	return
 
+	return
 }
 
 func (r *Client) ensureSnapshotsFromVolumes(vm *libclient.VM) (err error) {
