@@ -96,7 +96,7 @@ func (admitter *PlanAdmitter) validateVDDK() error {
 		return nil
 	}
 
-	if _, found := admitter.sourceProvider.Spec.Settings["vddkInitImage"]; !found {
+	if _, found := admitter.sourceProvider.Spec.Settings[api.VDDK]; !found {
 		err := liberr.New("VDDK image is necessary for this type of migration")
 		log.Error(err, "VDDK image required for this type of migration")
 		return err

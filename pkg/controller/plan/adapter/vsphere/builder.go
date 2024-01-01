@@ -364,7 +364,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 							URL:          url,
 							SecretRef:    secret.Name,
 							Thumbprint:   thumbprint,
-							InitImageURL: r.Source.Provider.Spec.Settings["vddkInitImage"],
+							InitImageURL: r.Source.Provider.Spec.Settings[api.VDDK],
 						},
 					}
 				}

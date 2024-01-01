@@ -61,6 +61,11 @@ const (
 	Token = "token"
 )
 
+// Provider settings.
+const (
+	VDDK = "vddkInitImage"
+)
+
 // Defines the desired state of Provider.
 type ProviderSpec struct {
 	// Provider type.

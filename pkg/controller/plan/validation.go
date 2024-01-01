@@ -691,7 +691,7 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 		return nil
 	}
 
-	if _, found := source.Spec.Settings["vddkInitImage"]; !found {
+	if _, found := source.Spec.Settings[api.VDDK]; !found {
 		plan.Status.SetCondition(vddkNotConfigured)
 	}
 	return nil
