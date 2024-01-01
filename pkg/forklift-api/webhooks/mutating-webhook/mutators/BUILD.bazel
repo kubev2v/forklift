@@ -4,6 +4,7 @@ go_library(
     name = "mutators",
     srcs = [
         "plan-mutator.go",
+        "provider-mutator.go",
         "secret-mutator.go",
     ],
     importpath = "github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/mutating-webhook/mutators",

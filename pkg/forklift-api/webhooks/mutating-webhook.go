@@ -15,3 +15,7 @@ func ServeSecretMutator(resp http.ResponseWriter, req *http.Request) {
 func ServePlanMutator(resp http.ResponseWriter, req *http.Request, client client.Client) {
 	mutating_webhooks.Serve(resp, req, &mutators.PlanMutator{Client: client})
 }
+
+func ServeProviderMutator(resp http.ResponseWriter, req *http.Request, client client.Client) {
+	mutating_webhooks.Serve(resp, req, &mutators.ProviderMutator{Client: client})
+}
