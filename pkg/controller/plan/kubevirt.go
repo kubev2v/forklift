@@ -1291,7 +1291,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	}
 	// VDDK image
 	var initContainers []core.Container
-	if vddkImage, found := r.Source.Provider.Spec.Settings["vddkInitImage"]; found {
+	if vddkImage, found := r.Source.Provider.Spec.Settings[api.VDDK]; found {
 		initContainers = append(initContainers, core.Container{
 			Name:            "vddk-side-car",
 			Image:           vddkImage,

@@ -24,7 +24,7 @@ func (admitter *ProviderAdmitter) validateVDDK() error {
 		return nil
 	}
 
-	if _, found := admitter.provider.Spec.Settings["vddkInitImage"]; found {
+	if _, found := admitter.provider.Spec.Settings[api.VDDK]; found {
 		log.Info("VDDK image found, passing")
 		return nil
 	}
