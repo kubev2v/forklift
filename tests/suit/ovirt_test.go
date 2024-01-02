@@ -17,6 +17,7 @@ const (
 	ovirtProviderName         = "ovirt-provider"
 	ovirtInsecureProviderName = "ovirt-provider-insecure"
 	ovirtStorageClass         = "nfs-csi"
+	clusterCpuModel           = "Westmere"
 )
 
 var _ = Describe("[level:component]Migration tests for oVirt providers", func() {
@@ -90,6 +91,8 @@ var _ = Describe("[level:component]Migration tests for oVirt providers", func() 
 			})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(vm).ToNot(BeNil())
+			By("Verifying VM is created without the cluster CPU")
+			Expect(vm.Spec.Template.Spec.Domain.CPU.Model).To(BeEmpty())
 		})
 
 		It("[oVirt MTV] should create insecure provider", func() {
@@ -100,7 +103,7 @@ var _ = Describe("[level:component]Migration tests for oVirt providers", func() 
 			By("Reset fakeovirt")
 			pod, err := utils.FindPodByPrefix(f.K8sClient, "konveyor-forklift", "fakeovirt-", "")
 			Expect(err).ToNot(HaveOccurred())
-			utils.DeletePodByName(f.K8sClient, pod.Name, "konveyor-forklift", nil)
+			err = utils.DeletePodByName(f.K8sClient, pod.Name, "konveyor-forklift", nil)
 			Expect(err).ToNot(HaveOccurred())
 			pod, err = utils.FindPodByPrefix(f.K8sClient, "konveyor-forklift", "fakeovirt-", "")
 			Expect(err).ToNot(HaveOccurred())
@@ -154,6 +157,8 @@ var _ = Describe("[level:component]Migration tests for oVirt providers", func() 
 			Expect(err).ToNot(HaveOccurred())
 			By("Creating plan")
 			planDenf := utils.NewPlanWithVmId(*provider, namespace, test_plan_name_insecure, test_storage_map_name_insecure, test_network_map_name_insecure, targetNS.Name, []string{vmData.GetTestVMId()})
+			// Setting cluster CPU
+			planDenf.Spec.PreserveClusterCPUModel = true
 			err = utils.CreatePlanFromDefinition(f.CrClient, planDenf)
 			Expect(err).ToNot(HaveOccurred())
 			err, _ = utils.WaitForPlanReadyWithTimeout(f.CrClient, namespace, test_plan_name_insecure, 15*time.Second)
@@ -171,6 +176,8 @@ var _ = Describe("[level:component]Migration tests for oVirt providers", func() 
 			})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(vm).ToNot(BeNil())
+			By("Verifying VM is created with the cluster CPU")
+			Expect(vm.Spec.Template.Spec.Domain.CPU.Model).To(Equal(clusterCpuModel))
 		})
 	})
 })
