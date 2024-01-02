@@ -187,27 +187,44 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		return
 	}
 
+	libvirtURL, err := r.getLibvirtURL(vm, sourceSecret)
+	if err != nil {
+		return
+	}
+
+	env = append(
+		env,
+		core.EnvVar{
+			Name:  "V2V_vmName",
+			Value: vm.Name,
+		},
+		core.EnvVar{
+			Name:  "V2V_libvirtURL",
+			Value: libvirtURL.String(),
+		},
+		core.EnvVar{
+			Name:  "V2V_source",
+			Value: "vCenter",
+		},
+	)
+	return
+}
+
+func (r *Builder) getLibvirtURL(vm *model.VM, sourceSecret *core.Secret) (libvirtURL liburl.URL, err error) {
+	host, err := r.host(vm.Host)
+	if err != nil {
+		return
+	}
+
 	sslVerify := ""
 	if container.GetInsecureSkipVerifyFlag(sourceSecret) {
 		sslVerify = "no_verify=1"
 	}
 
-	host, err := r.host(vm.Host)
-	if err != nil {
-		err = liberr.Wrap(
-			err,
-			"Host lookup failed.",
-			"host",
-			vm.Host)
-		return
-	}
-
-	var libvirtURL liburl.URL
 	if hostDef, found := r.hosts[host.ID]; found {
 		// Connect through ESXi
-		hostSecret, nErr := r.hostSecret(hostDef)
-		if nErr != nil {
-			err = nErr
+		var hostSecret *core.Secret
+		if hostSecret, err = r.hostSecret(hostDef); err != nil {
 			return
 		}
 		libvirtURL = liburl.URL{
@@ -217,14 +234,21 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 			Path:     "",
 			RawQuery: sslVerify,
 		}
+	} else if r.Source.Provider.Spec.Settings[api.SDK] == api.ESXI {
+		libvirtURL = liburl.URL{
+			Scheme:   "esx",
+			Host:     host.Name,
+			User:     liburl.User(string(sourceSecret.Data["user"])),
+			Path:     "",
+			RawQuery: sslVerify,
+		}
 	} else {
 		// Connect through VCenter
 		path := host.Path
 		// Check parent resource
 		if host.Parent.Kind == "Cluster" {
 			parent := &model.Cluster{}
-			err = r.Source.Inventory.Get(parent, host.Parent.ID)
-			if err != nil {
+			if err = r.Source.Inventory.Get(parent, host.Parent.ID); err != nil {
 				err = liberr.Wrap(
 					err,
 					"Cluster lookup failed.",
@@ -247,21 +271,6 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		}
 	}
 
-	env = append(
-		env,
-		core.EnvVar{
-			Name:  "V2V_vmName",
-			Value: vm.Name,
-		},
-		core.EnvVar{
-			Name:  "V2V_libvirtURL",
-			Value: libvirtURL.String(),
-		},
-		core.EnvVar{
-			Name:  "V2V_source",
-			Value: "vCenter",
-		},
-	)
 	return
 }
 
