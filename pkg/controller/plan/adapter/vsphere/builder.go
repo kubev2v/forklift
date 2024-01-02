@@ -204,7 +204,7 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		},
 		core.EnvVar{
 			Name:  "V2V_source",
-			Value: "vCenter",
+			Value: "vSphere",
 		},
 	)
 	return

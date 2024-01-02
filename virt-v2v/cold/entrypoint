@@ -12,7 +12,7 @@ fi
 # This variable is used to build the command with args for virt-v2v.
 args=(virt-v2v -v -x)
 
-if [ "$V2V_source" == "vCenter" ] ; then
+if [ "$V2V_source" == "vSphere" ] ; then
   if [ -z "$V2V_libvirtURL" ] || \
       [ -z "$V2V_secretKey" ] || \
       [ -z "$V2V_vmName" ] ; then
@@ -71,7 +71,7 @@ for disk in /dev/block[0-9]* ; do
 	ln -s "$disk" "$DIR/$V2V_vmName-sd$(gen_name "$((num+1))")"
 done
 
-if [ "$V2V_source" == "vCenter" ] ; then
+if [ "$V2V_source" == "vSphere" ] ; then
   # Store password to file
   echo -n "$V2V_secretKey" > "$DIR/vmware.pw"
   args+=(-ip "$DIR/vmware.pw")
