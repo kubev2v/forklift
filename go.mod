@@ -23,7 +23,7 @@ require (
 	github.com/prometheus/client_golang v1.17.0
 	github.com/prometheus/client_model v0.5.0
 	github.com/prometheus/common v0.45.0
-	github.com/vmware/govmomi v0.33.1
+	github.com/vmware/govmomi v0.34.1
 	go.uber.org/zap v1.26.0
 	golang.org/x/net v0.17.0
 	gopkg.in/yaml.v2 v2.4.0
