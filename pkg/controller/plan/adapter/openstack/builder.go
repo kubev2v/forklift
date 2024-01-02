@@ -1101,8 +1101,7 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image, storageC
 	}
 
 	var accessModes []core.PersistentVolumeAccessMode
-	var volumeMode *core.PersistentVolumeMode
-	accessModes, volumeMode, err = r.getVolumeAndAccessMode(storageClassName)
+	accessModes, volumeMode, err := r.getVolumeAndAccessMode(storageClassName)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -1116,6 +1115,8 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image, storageC
 	} else if originalImageId, ok := image.Properties["forklift_original_image_id"]; ok {
 		annotations[AnnImportDiskId] = originalImageId.(string)
 		r.Log.Info("the image comes from a vm snapshot", "imageID", originalImageId)
+	} else {
+		r.Log.Error(nil, "the image has no volume or vm snapshot associated to it", "image", image.Name)
 	}
 
 	pvc = &core.PersistentVolumeClaim{

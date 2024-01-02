@@ -498,7 +498,7 @@ func (r *Client) createVmSnapshotImage(vm *libclient.VM) (vmImage *libclient.Ima
 		err = liberr.Wrap(err)
 		return
 	}
-	// The vm is image based and we need to create the snapsots of the
+	// The vm is image based and we need to create the snapshots of the
 	// volumes attached to it.
 	if imageID, ok := vm.Image["id"]; ok {
 		// Update property for image based
