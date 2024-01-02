@@ -715,7 +715,7 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 				fExtraConfig,
 				fGuestName,
 				fGuestID,
-				fTpmPresent,
+				//fTpmPresent,
 				fBalloonedMemory,
 				fVmIpAddress,
 				fStorageUsed,
