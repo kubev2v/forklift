@@ -155,12 +155,12 @@ func (r *EsxHost) thumbprint() string {
 func (r *EsxHost) getInsecureSkipVerifyFlag() bool {
 	insecure, found := r.Secret.Data["insecureSkipVerify"]
 	if !found {
-		return false
+		return true
 	}
 
 	insecureSkipVerify, err := strconv.ParseBool(string(insecure))
 	if err != nil {
-		return false
+		return true
 	}
 
 	return insecureSkipVerify
