@@ -41,7 +41,7 @@ var (
 	RequiresConversion      libitr.Flag = 0x04
 	CDIDiskCopy             libitr.Flag = 0x08
 	VirtV2vDiskCopy         libitr.Flag = 0x10
-	OpenstackImageMigration libitr.Flag = 0x12
+	OpenstackImageMigration libitr.Flag = 0x20
 )
 
 // Phases.

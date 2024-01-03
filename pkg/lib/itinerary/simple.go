@@ -2,6 +2,7 @@ package itinerary
 
 import (
 	"errors"
+
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 )
 
@@ -148,7 +149,7 @@ func (r *Itinerary) Progress(step string) (report Progress, err error) {
 
 // The step has satisfied ANY of the predicates.
 func (r *Itinerary) hasAny(step Step) (pTrue bool, err error) {
-	for i := 0; i < 16; i++ {
+	for i := 0; i < 24; i++ {
 		flag := Flag(1 << i)
 		if (step.Any & flag) == 0 {
 			continue
@@ -168,7 +169,7 @@ func (r *Itinerary) hasAny(step Step) (pTrue bool, err error) {
 
 // The step has satisfied ALL of the predicates.
 func (r *Itinerary) hasAll(step Step) (pTrue bool, err error) {
-	for i := 0; i < 16; i++ {
+	for i := 0; i < 24; i++ {
 		flag := Flag(1 << i)
 		if (step.All & flag) == 0 {
 			continue
