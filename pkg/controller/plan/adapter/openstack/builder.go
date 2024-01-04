@@ -1260,8 +1260,11 @@ func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskNam
 }
 
 func (r *Builder) ConvertPVCs(pvcs []core.PersistentVolumeClaim) (ready bool, err error) {
+	completedPVCs := 0
 	for _, pvc := range pvcs {
 		if pvc.Annotations[planbase.AnnRequiresConversion] != "true" {
+			r.Log.Info("PVC does not require conversion", "pvc", pvc.Name)
+			completedPVCs++
 			continue
 		}
 		scratchPVC, err := r.ensureScratchPVC(&pvc)
@@ -1309,14 +1312,17 @@ func (r *Builder) ConvertPVCs(pvcs []core.PersistentVolumeClaim) (ready bool, er
 				if err != nil {
 					r.Log.Error(err, "Failed to delete scratch PVC", "pvc", scratchPVC.Name)
 				}
-
-				return true, nil
 			case batchv1.JobFailed:
 				if convertJob.Status.Failed >= 3 {
 					return true, errors.New("convert job failed")
 				}
 			}
 		}
+	}
+
+	if completedPVCs == len(pvcs) {
+		r.Log.Info("All PVCs completed")
+		return true, nil
 	}
 
 	return false, nil
