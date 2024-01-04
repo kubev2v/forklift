@@ -944,6 +944,7 @@ func (r *Builder) ensureVolumePopulatorPVC(workload *model.Workload, image *mode
 		if imageProperty, ok := image.Properties[forkliftPropertyOriginalVolumeID]; ok {
 			originalVolumeDiskId = imageProperty.(string)
 		}
+
 		storageClassName := r.Context.Map.Storage.Spec.Map[0].Destination.StorageClass
 		if volumeType := r.getVolumeType(workload, originalVolumeDiskId); volumeType != "" {
 			storageClassName, err = r.getStorageClassName(workload, volumeType)
@@ -1281,7 +1282,7 @@ func (r *Builder) ConvertPVCs(pvcs []core.PersistentVolumeClaim) (ready bool, er
 			return false, nil
 		case core.ClaimLost:
 			r.Log.Info("Scratch PVC lost", "pvc", scratchPVC.Name)
-			return false, nil
+			return false, errors.New("scratch pvc lost")
 		default:
 			r.Log.Info("Scratch PVC unknown", "pvc", scratchPVC.Name)
 			return false, nil
@@ -1293,7 +1294,7 @@ func (r *Builder) ConvertPVCs(pvcs []core.PersistentVolumeClaim) (ready bool, er
 		}
 
 		if convertJob == nil {
-			r.Log.Info("convert job not ready for pvc", "pvc", pvc.Name)
+			r.Log.Info("Convert job not ready for pvc", "pvc", pvc.Name)
 			return false, nil
 		}
 
@@ -1302,19 +1303,14 @@ func (r *Builder) ConvertPVCs(pvcs []core.PersistentVolumeClaim) (ready bool, er
 			switch condition.Type {
 			case batchv1.JobComplete:
 				r.Log.Info("Convert job completed", "pvc", pvc.Name)
-				// remove job after completion
-				err = r.Destination.Client.Delete(context.Background(), convertJob, &client.DeleteOptions{})
-				if err != nil {
-					r.Log.Error(err, "error deleting convert job", "job", convertJob.Name)
-				}
 
-				// remove scratch pvc
+				// Delete scrach PVC
 				err = r.Destination.Client.Delete(context.Background(), scratchPVC, &client.DeleteOptions{})
 				if err != nil {
-					r.Log.Error(err, "error deleting scratch pvc", "pvc", scratchPVC.Name)
+					r.Log.Error(err, "Failed to delete scratch PVC", "pvc", scratchPVC.Name)
 				}
-				return true, nil
 
+				return true, nil
 			case batchv1.JobFailed:
 				if convertJob.Status.Failed >= 3 {
 					return true, errors.New("convert job failed")
@@ -1333,7 +1329,7 @@ func (r *Builder) ensureJob(pvc *core.PersistentVolumeClaim, jobType, srcFormat,
 	if err != nil {
 		if k8serr.IsNotFound(err) {
 			if jobType == "convert" {
-				job := createConvertJob(pvc, srcFormat, dstFormat)
+				job := createConvertJob(pvc, srcFormat, dstFormat, r.getLabels(pvc.Annotations["vmID"]))
 				err = r.Destination.Client.Create(context.Background(), job, &client.CreateOptions{})
 				if err != nil {
 					return nil, err
@@ -1346,11 +1342,12 @@ func (r *Builder) ensureJob(pvc *core.PersistentVolumeClaim, jobType, srcFormat,
 	return job, err
 }
 
-func createConvertJob(pvc *core.PersistentVolumeClaim, srcFormat, dstFormat string) *batchv1.Job {
+func createConvertJob(pvc *core.PersistentVolumeClaim, srcFormat, dstFormat string, labels map[string]string) *batchv1.Job {
 	return &batchv1.Job{
 		ObjectMeta: meta.ObjectMeta{
 			Name:      fmt.Sprintf("convert-%s", pvc.Name),
 			Namespace: pvc.Namespace,
+			Labels:    labels,
 		},
 		Spec: batchv1.JobSpec{
 			BackoffLimit: pointer.Int32(3),
@@ -1454,6 +1451,15 @@ func (r *Builder) ensureScratchPVC(sourcePVC *core.PersistentVolumeClaim) (*core
 	return scratchPVC, nil
 }
 
+func (r *Builder) getLabels(vmID string) map[string]string {
+	return map[string]string{
+		"plan":      string(r.Plan.GetUID()),
+		"migration": getMigrationID(r.Context),
+		"vmID":      vmID,
+		"app":       "forklift",
+	}
+}
+
 func getScratchPVCName(pvc *core.PersistentVolumeClaim) string {
 	return fmt.Sprintf("%s-scratch", pvc.Name)
 }
@@ -1464,6 +1470,7 @@ func makeScratchPVC(pvc *core.PersistentVolumeClaim) *core.PersistentVolumeClaim
 		ObjectMeta: meta.ObjectMeta{
 			Name:      getScratchPVCName(pvc),
 			Namespace: pvc.Namespace,
+			Labels:    pvc.Labels,
 		},
 		Spec: core.PersistentVolumeClaimSpec{
 			AccessModes: pvc.Spec.AccessModes,
