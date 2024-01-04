@@ -466,6 +466,10 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool) error
 	if err := r.kubevirt.DeletePopulatorPods(vm); failOnErr(err) {
 		return err
 	}
+	if err := r.kubevirt.DeleteJobs(vm); failOnErr(err) {
+		return err
+	}
+
 	r.removeWarmSnapshots(vm)
 
 	return nil

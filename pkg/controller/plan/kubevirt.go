@@ -297,6 +297,88 @@ func (r *KubeVirt) DeleteImporterPods(pvc core.PersistentVolumeClaim) (err error
 	return
 }
 
+func (r *KubeVirt) DeleteJobs(vm *plan.VMStatus) (err error) {
+	vmLabels := r.vmAllButMigrationLabels(vm.Ref)
+	list := &batch.JobList{}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: labels.SelectorFromSet(vmLabels),
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	jobNames := []string{}
+	for _, job := range list.Items {
+		err = r.Destination.Client.Delete(context.TODO(), &job, &client.DeleteOptions{})
+		if err != nil {
+			err = liberr.Wrap(err)
+			r.Log.Error(
+				err,
+				"Deleting job failed.",
+				"job",
+				path.Join(
+					job.Namespace,
+					job.Name))
+			continue
+		}
+
+		r.Log.Info(
+			"Deleted job.",
+			"job",
+			path.Join(
+				job.Namespace,
+				job.Name))
+
+		jobNames = append(jobNames, job.Name)
+	}
+
+	// Remove pods created by jobs
+	for _, job := range jobNames {
+		podList := &core.PodList{}
+		err = r.Destination.Client.List(
+			context.TODO(),
+			podList,
+			&client.ListOptions{
+				LabelSelector: labels.SelectorFromSet(map[string]string{"job-name": job}),
+				Namespace:     r.Plan.Spec.TargetNamespace,
+			},
+		)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+
+		for _, pod := range podList.Items {
+			err = r.Destination.Client.Delete(context.TODO(), &pod, &client.DeleteOptions{})
+			if err != nil {
+				err = liberr.Wrap(err)
+				r.Log.Error(
+					err,
+					"Deleting pod failed.",
+					"pod",
+					path.Join(
+						pod.Namespace,
+						pod.Name))
+				continue
+			}
+
+			r.Log.Info(
+				"Deleted pod.",
+				"pod",
+				path.Join(
+					pod.Namespace,
+					pod.Name))
+		}
+	}
+	return
+}
+
 // Ensure the kubevirt VirtualMachine exists on the destination.
 func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) error {
 	vms := &cnv.VirtualMachineList{}
