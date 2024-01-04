@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "vsphere",
@@ -30,5 +30,19 @@ go_library(
         "//vendor/github.com/vmware/govmomi/vim25/types",
         "//vendor/k8s.io/api/core/v1:core",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:meta",
+    ],
+)
+
+go_test(
+    name = "vsphere_test",
+    srcs = ["collector_test.go"],
+    embed = [":vsphere"],
+    deps = [
+        "//vendor/github.com/onsi/gomega",
+        "//vendor/github.com/vmware/govmomi",
+        "//vendor/github.com/vmware/govmomi/session",
+        "//vendor/github.com/vmware/govmomi/vim25",
+        "//vendor/github.com/vmware/govmomi/vim25/soap",
+        "//vendor/github.com/vmware/govmomi/vim25/types",
     ],
 )
