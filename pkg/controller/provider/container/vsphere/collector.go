@@ -697,39 +697,50 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 			},
 		},
 		{ // VM
-			Type: VirtualMachine,
-			PathSet: []string{
-				fName,
-				fParent,
-				fUUID,
-				fFirmware,
-				fFtInfo,
-				fCpuAffinity,
-				fCpuHotAddEnabled,
-				fCpuHotRemoveEnabled,
-				fMemoryHotAddEnabled,
-				fNumCpu,
-				fNumCoresPerSocket,
-				fMemorySize,
-				fDevices,
-				fExtraConfig,
-				fGuestName,
-				fGuestID,
-				//fTpmPresent,
-				fBalloonedMemory,
-				fVmIpAddress,
-				fStorageUsed,
-				fDatastore,
-				fNetwork,
-				fRuntimeHost,
-				fPowerState,
-				fConnectionState,
-				fIsTemplate,
-				fSnapshot,
-				fChangeTracking,
-			},
+			Type:    VirtualMachine,
+			PathSet: r.vmPathSet(),
 		},
 	}
+}
+
+func (r *Collector) vmPathSet() []string {
+	pathSet := []string{
+		fName,
+		fParent,
+		fUUID,
+		fFirmware,
+		fFtInfo,
+		fCpuAffinity,
+		fCpuHotAddEnabled,
+		fCpuHotRemoveEnabled,
+		fMemoryHotAddEnabled,
+		fNumCpu,
+		fNumCoresPerSocket,
+		fMemorySize,
+		fDevices,
+		fExtraConfig,
+		fGuestName,
+		fGuestID,
+		fBalloonedMemory,
+		fVmIpAddress,
+		fStorageUsed,
+		fDatastore,
+		fNetwork,
+		fRuntimeHost,
+		fPowerState,
+		fConnectionState,
+		fIsTemplate,
+		fSnapshot,
+		fChangeTracking,
+	}
+
+	apiVer := strings.Split(r.client.ServiceContent.About.ApiVersion, ".")
+	majorVal, _ := strconv.Atoi(apiVer[0])
+	minorVal, _ := strconv.Atoi(apiVer[1])
+	if majorVal > 6 || majorVal == 6 && minorVal >= 7 {
+		pathSet = append(pathSet, fTpmPresent)
+	}
+	return pathSet
 }
 
 // Apply updates.
