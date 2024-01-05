@@ -35,10 +35,16 @@ go_library(
 
 go_test(
     name = "vsphere_test",
-    srcs = ["collector_test.go"],
+    srcs = [
+        "collector_suite_test.go",
+        "collector_test.go",
+    ],
     embed = [":vsphere"],
     deps = [
+        "//vendor/github.com/onsi/ginkgo",
+        "//vendor/github.com/onsi/ginkgo/extensions/table",
         "//vendor/github.com/onsi/gomega",
+        "//vendor/github.com/onsi/gomega/types",
         "//vendor/github.com/vmware/govmomi",
         "//vendor/github.com/vmware/govmomi/session",
         "//vendor/github.com/vmware/govmomi/vim25",
