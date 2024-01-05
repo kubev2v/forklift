@@ -2,9 +2,11 @@ package vsphere
 
 import (
 	liburl "net/url"
-	"testing"
 
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/extensions/table"
+	. "github.com/onsi/gomega"
+	gtypes "github.com/onsi/gomega/types"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/session"
 	"github.com/vmware/govmomi/vim25"
@@ -12,11 +14,9 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 )
 
-func TestTpmCollector(t *testing.T) {
-	g := gomega.NewGomegaWithT(t)
+var _ = Describe("vSphere collector", func() {
 	collector := Collector{}
-	url, err := liburl.Parse("https://fake.com/sdk")
-	g.Expect(err).To(gomega.BeNil())
+	url, _ := liburl.Parse("https://fake.com/sdk")
 	vimClient := &vim25.Client{
 		Client:         soap.NewClient(url, false),
 		ServiceContent: types.ServiceContent{},
@@ -25,15 +25,13 @@ func TestTpmCollector(t *testing.T) {
 		SessionManager: session.NewManager(vimClient),
 		Client:         vimClient,
 	}
-	// Verify that we don't collect TPM for unsupported version
-	collector.client.ServiceContent.About.ApiVersion = "6.5"
-	g.Expect(collector.vmPathSet()).ShouldNot(gomega.ContainElement(fTpmPresent))
 
-	// Verify that we don't collect TPM for supported version
-	collector.client.ServiceContent.About.ApiVersion = "6.7"
-	g.Expect(collector.vmPathSet()).Should(gomega.ContainElement(fTpmPresent))
-
-	// Verify that we don't collect TPM for supported version
-	collector.client.ServiceContent.About.ApiVersion = "7.0"
-	g.Expect(collector.vmPathSet()).Should(gomega.ContainElement(fTpmPresent))
-}
+	table.DescribeTable("should", func(version string, matchTpm gtypes.GomegaMatcher) {
+		collector.client.ServiceContent.About.ApiVersion = version
+		Expect(collector.vmPathSet()).Should(matchTpm)
+	},
+		table.Entry("not collect TPM from vSphere < 6.7", "6.5", Not(ContainElements(fTpmPresent))),
+		table.Entry("collect TPM from vSphere 6.7", "6.7", ContainElements(fTpmPresent)),
+		table.Entry("collect TPM from vSphere > 6.7", "7.0", ContainElements(fTpmPresent)),
+	)
+})
