@@ -8,8 +8,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func ServeSecretMutator(resp http.ResponseWriter, req *http.Request) {
-	mutating_webhooks.Serve(resp, req, &mutators.SecretMutator{})
+func ServeSecretMutator(resp http.ResponseWriter, req *http.Request, client client.Client) {
+	mutating_webhooks.Serve(resp, req, &mutators.SecretMutator{Client: client})
 }
 
 func ServePlanMutator(resp http.ResponseWriter, req *http.Request, client client.Client) {
