@@ -523,11 +523,34 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 		bus = VirtioBus
 	}
 
+	var bootOrder *uint
+	var imagePVC *core.PersistentVolumeClaim
 	for _, pvc := range persistentVolumeClaims {
 		image, err := r.getImageFromPVC(&pvc)
 		if err != nil {
 			r.Log.Error(err, "image not found in inventory", "imageID", pvc.Name)
 			return
+		}
+
+		if imageID, ok := image.Properties[forkliftPropertyOriginalImageID]; ok && imageID != "" {
+			if imageID.(string) == vm.ImageID {
+				imagePVC = &pvc
+			}
+		}
+
+		// image is volume based, check if it's bootable
+		if volumeID, ok := image.Properties[forkliftPropertyOriginalVolumeID]; ok && volumeID != "" {
+			volume := &model.Volume{}
+			err = r.Source.Inventory.Get(volume, volumeID.(string))
+			if err != nil {
+				r.Log.Error(err, "volume not found in inventory", "volumeID", volumeID)
+				return
+			}
+
+			if volume.Bootable == "true" {
+				r.Log.Info("bootable volume found", "volumeID", volumeID)
+				bootOrder = pointer.Uint(1)
+			}
 		}
 
 		cnvVolumeName := fmt.Sprintf("vol-%v", pvc.Annotations[AnnImportDiskId])
@@ -549,7 +572,8 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 				bus = CDROMBus.(string)
 			}
 			disk = cnv.Disk{
-				Name: cnvVolumeName,
+				Name:      cnvVolumeName,
+				BootOrder: bootOrder,
 				DiskDevice: cnv.DiskDevice{
 					CDRom: &cnv.CDRomTarget{
 						Bus: cnv.DiskBus(bus),
@@ -558,7 +582,8 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 			}
 		case QCOW2, RAW:
 			disk = cnv.Disk{
-				Name: cnvVolumeName,
+				Name:      cnvVolumeName,
+				BootOrder: bootOrder,
 				DiskDevice: cnv.DiskDevice{
 					Disk: &cnv.DiskTarget{
 						Bus: cnv.DiskBus(bus),
@@ -570,6 +595,16 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 		}
 		kVolumes = append(kVolumes, cnvVolume)
 		kDisks = append(kDisks, disk)
+	}
+
+	// If bootOrder wasn't set by a bootable volume, set it to the image (if exists)
+	if bootOrder == nil && imagePVC != nil {
+		r.Log.Info("Not bootable volume found, falling back to image", "image", imagePVC.Name)
+		for disks := range kDisks {
+			if kDisks[disks].Name == fmt.Sprintf("vol-%v", imagePVC.Annotations[AnnImportDiskId]) {
+				kDisks[disks].BootOrder = pointer.Uint(1)
+			}
+		}
 	}
 
 	object.Template.Spec.Volumes = kVolumes
