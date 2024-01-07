@@ -18,7 +18,7 @@ const (
 	AnnDiskSource = "forklift.konveyor.io/disk-source"
 
 	// Set on a PVC to indicate it requires format conversion
-	AnnRequiresConversion = "forklift.konveyor.io/require-conversion"
+	AnnRequiresConversion = "forklift.konveyor.io/requires-conversion"
 )
 
 var VolumePopulatorNotSupportedError = liberr.New("provider does not support volume populators")
