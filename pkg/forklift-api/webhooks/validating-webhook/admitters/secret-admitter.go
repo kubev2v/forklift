@@ -112,6 +112,10 @@ func (admitter *SecretAdmitter) validateProviderSecret() *admissionv1.AdmissionR
 
 func (admitter *SecretAdmitter) validateHostSecret() *admissionv1.AdmissionResponse {
 	if hostName, ok := admitter.secret.GetLabels()["createdForResource"]; ok {
+		if _, ok := admitter.secret.Data["user"]; !ok {
+			err := errors.New("Missing credentials on Host secret")
+			return webhookutils.ToAdmissionResponseError(err)
+		}
 		tested, err := admitter.testConnectionToHost(hostName)
 		switch {
 		case tested && err != nil:
