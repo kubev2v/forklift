@@ -25,40 +25,55 @@ var log = logging.WithName("mutator")
 const NewLine = 0x0a
 
 type SecretMutator struct {
+	secret core.Secret
+}
+
+var resourceTypeToMutateFunc = map[string]func(*SecretMutator) *admissionv1.AdmissionResponse{
+	"providers": func(mutator *SecretMutator) *admissionv1.AdmissionResponse {
+		return mutator.mutateProviderSecret()
+	},
 }
 
 func (mutator *SecretMutator) Mutate(ar *admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
 	log.Info("secret mutator was called")
 	raw := ar.Request.Object.Raw
-	secret := &core.Secret{}
-	err := json.Unmarshal(raw, secret)
-	if err != nil {
+	if err := json.Unmarshal(raw, &mutator.secret); err != nil {
 		log.Error(err, "mutating webhook error, failed to unmarshel certificate")
 		return util.ToAdmissionResponseError(err)
 	}
 
+	// The label createdForResourceType must exist due to the configuration of the webhook
+	resourceType := mutator.secret.GetLabels()["createdForResourceType"]
+	if mutate, ok := resourceTypeToMutateFunc[resourceType]; ok {
+		return mutate(mutator)
+	}
+
+	return util.ToAdmissionResponseAllow()
+}
+
+func (mutator *SecretMutator) mutateProviderSecret() *admissionv1.AdmissionResponse {
 	var insecure, secretChanged bool
 	// Applies to all secrets with 'createdForProviderType' label.
-	if insecureSkipVerify, ok := secret.Data["insecureSkipVerify"]; ok {
-		insecure, err = strconv.ParseBool(string(insecureSkipVerify))
-		if err != nil {
+	if insecureSkipVerify, ok := mutator.secret.Data["insecureSkipVerify"]; ok {
+		var err error
+		if insecure, err = strconv.ParseBool(string(insecureSkipVerify)); err != nil {
 			log.Error(err, "Failed to parse insecure property from the secret")
 			return util.ToAdmissionResponseError(err)
 		}
 	} else {
-		secret.Data["insecureSkipVerify"] = []byte("false")
+		mutator.secret.Data["insecureSkipVerify"] = []byte("false")
 		secretChanged = true
 	}
 
-	if providerType := secret.GetLabels()["createdForProviderType"]; providerType == "ovirt" && !insecure {
-		url, err := url.Parse(string(secret.Data["url"]))
+	if providerType := mutator.secret.GetLabels()["createdForProviderType"]; providerType == "ovirt" && !insecure {
+		url, err := url.Parse(string(mutator.secret.Data["url"]))
 		if err != nil {
 			log.Error(err, "mutating webhook URL parsing error")
 			return util.ToAdmissionResponseError(err)
 		}
 
 		certPool := x509.NewCertPool()
-		ok := certPool.AppendCertsFromPEM(secret.Data["cacert"])
+		ok := certPool.AppendCertsFromPEM(mutator.secret.Data["cacert"])
 		if !ok {
 			err = liberr.Wrap(errors.New("failed to parse certificate"))
 			log.Error(err, "Certificate is not valid")
@@ -85,9 +100,9 @@ func (mutator *SecretMutator) Mutate(ar *admissionv1.AdmissionReview) *admission
 		}
 
 		//check if the CA included in the secrete provided by the user and update it if needed
-		if !contains(secret.Data["cacert"], cert) {
-			secret.Data["cacert"] = appendCerts(secret.Data["cacert"], cert)
-			secret.Labels["ca-cert-updated"] = "true"
+		if !contains(mutator.secret.Data["cacert"], cert) {
+			mutator.secret.Data["cacert"] = appendCerts(mutator.secret.Data["cacert"], cert)
+			mutator.secret.Labels["ca-cert-updated"] = "true"
 			secretChanged = true
 			log.Info("Engine CA certificate was missing, updating the secret")
 		}
@@ -99,12 +114,12 @@ func (mutator *SecretMutator) Mutate(ar *admissionv1.AdmissionReview) *admission
 			util.PatchOperation{
 				Op:    "replace",
 				Path:  "/data",
-				Value: secret.Data,
+				Value: mutator.secret.Data,
 			},
 			util.PatchOperation{
 				Op:    "replace",
 				Path:  "/metadata/labels",
-				Value: secret.Labels,
+				Value: mutator.secret.Labels,
 			},
 		)
 
