@@ -893,12 +893,12 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 			return
 		}
 		images = append(images, image)
-
-		// Add annotation to indicate the corresponding PVC would require conversion to RAW
-		annotations[planbase.AnnRequiresConversion] = "true"
 	}
 
 	for _, image := range images {
+		if imageID, ok := image.Properties[forkliftPropertyOriginalImageID]; ok && imageID == workload.ImageID {
+			annotations[planbase.AnnRequiresConversion] = "true"
+		}
 		if image.Status != string(ImageStatusActive) {
 			r.Log.Info("the image is not ready yet", "image", image.Name, "status", image.Status)
 			continue
@@ -1262,7 +1262,7 @@ func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskNam
 func (r *Builder) ConvertPVCs(pvcs []core.PersistentVolumeClaim) (ready bool, err error) {
 	completedPVCs := 0
 	for _, pvc := range pvcs {
-		if pvc.Annotations[planbase.AnnRequiresConversion] != "true" {
+		if _, ok := pvc.Annotations[planbase.AnnRequiresConversion]; !ok {
 			r.Log.Info("PVC does not require conversion", "pvc", pvc.Name)
 			completedPVCs++
 			continue
@@ -1306,6 +1306,7 @@ func (r *Builder) ConvertPVCs(pvcs []core.PersistentVolumeClaim) (ready bool, er
 			switch condition.Type {
 			case batchv1.JobComplete:
 				r.Log.Info("Convert job completed", "pvc", pvc.Name)
+				completedPVCs++
 
 				// Delete scrach PVC
 				err = r.Destination.Client.Delete(context.Background(), scratchPVC, &client.DeleteOptions{})
