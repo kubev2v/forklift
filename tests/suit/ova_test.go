@@ -32,6 +32,7 @@ var _ = Describe("[level:component]Migration tests for OVA provider", func() {
 		secret, err := utils.CreateSecretFromDefinition(f.K8sClient, utils.NewSecretDefinition(
 			map[string]string{
 				"createdForProviderType": "ova",
+				"createdForResourceType": "providers",
 			}, nil,
 			map[string][]byte{
 				"url": []byte(nfs),

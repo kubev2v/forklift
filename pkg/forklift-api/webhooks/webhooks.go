@@ -46,7 +46,7 @@ func RegisterValidatingWebhooks(mux *http.ServeMux, client client.Client) {
 func RegisterMutatingWebhooks(mux *http.ServeMux, client client.Client) {
 	log.Info("register mutation webhook")
 	mux.HandleFunc(SecretMutatorPath, func(w http.ResponseWriter, r *http.Request) {
-		ServeSecretMutator(w, r)
+		ServeSecretMutator(w, r, client)
 	})
 	mux.HandleFunc(PlanMutatorPath, func(w http.ResponseWriter, r *http.Request) {
 		ServePlanMutator(w, r, client)
