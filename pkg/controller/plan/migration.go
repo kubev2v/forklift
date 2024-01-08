@@ -868,6 +868,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				"Couldn't get VM's PVCs.",
 				"vm",
 				vm.String())
+			break
 		}
 
 		ready, err := r.builder.ConvertPVCs(pvcs)
