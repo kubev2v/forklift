@@ -535,19 +535,19 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 		if imageID, ok := image.Properties[forkliftPropertyOriginalImageID]; ok && imageID != "" {
 			if imageID.(string) == vm.ImageID {
 				imagePVC = &pvc
+				r.Log.Info("Image PVC found", "pvc", pvc.Name, "image", imagePVC.Annotations[AnnImportDiskId])
 			}
-		}
 
-		// image is volume based, check if it's bootable
-		if volumeID, ok := image.Properties[forkliftPropertyOriginalVolumeID]; ok && volumeID != "" {
+		} else if volumeID, ok := image.Properties[forkliftPropertyOriginalVolumeID]; ok && volumeID != "" {
+			// Image is volume based, check if it's bootable
 			volume := &model.Volume{}
 			err = r.Source.Inventory.Get(volume, volumeID.(string))
 			if err != nil {
-				r.Log.Error(err, "volume not found in inventory", "volumeID", volumeID)
+				r.Log.Error(err, "Failed to get volume from inventory", "volumeID", volumeID)
 				return
 			}
 
-			if volume.Bootable == "true" {
+			if bootable, err := strconv.ParseBool(volume.Bootable); err != nil && bootable {
 				r.Log.Info("bootable volume found", "volumeID", volumeID)
 				bootOrder = pointer.Uint(1)
 			}
@@ -599,10 +599,11 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 
 	// If bootOrder wasn't set by a bootable volume, set it to the image (if exists)
 	if bootOrder == nil && imagePVC != nil {
-		r.Log.Info("Not bootable volume found, falling back to image", "image", imagePVC.Name)
-		for disks := range kDisks {
-			if kDisks[disks].Name == fmt.Sprintf("vol-%v", imagePVC.Annotations[AnnImportDiskId]) {
-				kDisks[disks].BootOrder = pointer.Uint(1)
+		r.Log.Info("No bootable volume found, falling back to image", "image", imagePVC.Name)
+		for i, disk := range kDisks {
+			if disk.Name == fmt.Sprintf("vol-%s", imagePVC.Annotations[AnnImportDiskId]) {
+				kDisks[i].BootOrder = pointer.Uint(1)
+				break
 			}
 		}
 	}
@@ -1320,9 +1321,9 @@ func (r *Builder) ConvertPVCs(pvcs []core.PersistentVolumeClaim) (ready bool, er
 			return false, nil
 		case core.ClaimLost:
 			r.Log.Info("Scratch PVC lost", "pvc", scratchPVC.Name)
-			return false, errors.New("scratch pvc lost")
+			return false, liberr.New("scratch pvc lost")
 		default:
-			r.Log.Info("Scratch PVC unknown", "pvc", scratchPVC.Name)
+			r.Log.Info("Scratch PVC status is unknown", "pvc", scratchPVC.Name, "status", scratchPVC.Status.Phase)
 			return false, nil
 		}
 
@@ -1350,7 +1351,7 @@ func (r *Builder) ConvertPVCs(pvcs []core.PersistentVolumeClaim) (ready bool, er
 				}
 			case batchv1.JobFailed:
 				if convertJob.Status.Failed >= 3 {
-					return true, errors.New("convert job failed")
+					return true, liberr.New("convert job failed")
 				}
 			}
 		}

@@ -4,7 +4,7 @@ Convert the format of images. Since KubeVirt requires RAW images, we sometimes h
 
 ## Converting
 
-1. Create an empty PVC with the measured size
+1. Create an empty PVC
 
 ```yaml
 echo 'apiVersion: v1
