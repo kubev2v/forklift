@@ -315,7 +315,7 @@ func (r *KubeVirt) DeleteJobs(vm *plan.VMStatus) (err error) {
 
 	jobNames := []string{}
 	for _, job := range list.Items {
-		err = r.Destination.Client.Delete(context.TODO(), &job, &client.DeleteOptions{})
+		err = r.Destination.Client.Delete(context.TODO(), &job, client.PropagationPolicy(meta.DeletePropagationBackground))
 		if err != nil {
 			err = liberr.Wrap(err)
 			r.Log.Error(
@@ -334,11 +334,11 @@ func (r *KubeVirt) DeleteJobs(vm *plan.VMStatus) (err error) {
 			path.Join(
 				job.Namespace,
 				job.Name))
-
 		jobNames = append(jobNames, job.Name)
+
 	}
 
-	// Remove pods created by jobs
+	// One day we'll figure out why client.PropagationPolicy(meta.DeletePropagationBackground) doesn't remove the pods
 	for _, job := range jobNames {
 		podList := &core.PodList{}
 		err = r.Destination.Client.List(
@@ -376,6 +376,7 @@ func (r *KubeVirt) DeleteJobs(vm *plan.VMStatus) (err error) {
 					pod.Name))
 		}
 	}
+
 	return
 }
 
