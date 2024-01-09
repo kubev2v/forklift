@@ -603,6 +603,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 		for i, disk := range kDisks {
 			if disk.Name == fmt.Sprintf("vol-%s", imagePVC.Annotations[AnnImportDiskId]) {
 				kDisks[i].BootOrder = pointer.Uint(1)
+				r.Log.Info("Boot order set to 1 on", "disk", disk.Name)
 				break
 			}
 		}
@@ -1405,7 +1406,7 @@ func createConvertJob(pvc *core.PersistentVolumeClaim, srcFormat, dstFormat stri
 					},
 					RestartPolicy: core.RestartPolicyNever,
 					Containers: []core.Container{
-						makeConversionContainer(pvc, srcFormat, dstFormat, "quay.io/bzlotnik/image-converter:latest"), // TODO replace later
+						makeConversionContainer(pvc, srcFormat, dstFormat),
 					},
 					Volumes: []core.Volume{
 						{
@@ -1431,10 +1432,10 @@ func createConvertJob(pvc *core.PersistentVolumeClaim, srcFormat, dstFormat stri
 	}
 }
 
-func makeConversionContainer(pvc *core.PersistentVolumeClaim, srcFormat, dstFormat, image string) core.Container {
+func makeConversionContainer(pvc *core.PersistentVolumeClaim, srcFormat, dstFormat string) core.Container {
 	container := core.Container{
 		Name:  "convert",
-		Image: image,
+		Image: base.Settings.VirtV2vImageCold,
 		SecurityContext: &core.SecurityContext{
 			AllowPrivilegeEscalation: pointer.Bool(false),
 			RunAsNonRoot:             pointer.Bool(true),
@@ -1443,6 +1444,7 @@ func makeConversionContainer(pvc *core.PersistentVolumeClaim, srcFormat, dstForm
 				Drop: []core.Capability{"ALL"},
 			},
 		},
+		Command: []string{"/usr/local/bin/image-converter"},
 		Args: []string{
 			"-src-path", "/mnt/disk.img",
 			"-dst-path", "/output/disk.img",
