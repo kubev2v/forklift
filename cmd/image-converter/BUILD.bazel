@@ -13,10 +13,3 @@ go_binary(
     embed = [":image-converter_lib"],
     visibility = ["//visibility:public"],
 )
-
-container_layer(
-    name = "base-layer",
-    tars = [
-        ":deps",
-    ],
-)
