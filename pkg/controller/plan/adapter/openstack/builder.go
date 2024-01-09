@@ -526,6 +526,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 	var bootOrder *uint
 	var imagePVC *core.PersistentVolumeClaim
 	for _, pvc := range persistentVolumeClaims {
+		pvc := pvc
 		image, err := r.getImageFromPVC(&pvc)
 		if err != nil {
 			r.Log.Error(err, "image not found in inventory", "imageID", pvc.Name)
@@ -537,7 +538,6 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 				imagePVC = &pvc
 				r.Log.Info("Image PVC found", "pvc", pvc.Name, "image", imagePVC.Annotations[AnnImportDiskId])
 			}
-
 		} else if volumeID, ok := image.Properties[forkliftPropertyOriginalVolumeID]; ok && volumeID != "" {
 			// Image is volume based, check if it's bootable
 			volume := &model.Volume{}
@@ -603,7 +603,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 		for i, disk := range kDisks {
 			if disk.Name == fmt.Sprintf("vol-%s", imagePVC.Annotations[AnnImportDiskId]) {
 				kDisks[i].BootOrder = pointer.Uint(1)
-				r.Log.Info("Boot order set to 1 on", "disk", disk.Name)
+				r.Log.Info("Boot order set to 1 on", "disk", kDisks[i], "ann", imagePVC.Annotations[AnnImportDiskId])
 				break
 			}
 		}
