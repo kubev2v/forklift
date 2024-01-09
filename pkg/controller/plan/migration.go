@@ -41,6 +41,7 @@ var (
 	RequiresConversion libitr.Flag = 0x04
 	CDIDiskCopy        libitr.Flag = 0x08
 	VirtV2vDiskCopy    libitr.Flag = 0x10
+	VirtV2vConfig      libitr.Flag = 0x20
 )
 
 // Phases.
@@ -69,18 +70,20 @@ const (
 	WaitForSnapshot          = "WaitForSnapshot"
 	WaitForInitialSnapshot   = "WaitForInitialSnapshot"
 	WaitForFinalSnapshot     = "WaitForFinalSnapshot"
+	GetVirtV2VConfig         = "GetVirtV2VConfig"
 )
 
 // Steps.
 const (
-	Initialize      = "Initialize"
-	Cutover         = "Cutover"
-	DiskAllocation  = "DiskAllocation"
-	DiskTransfer    = "DiskTransfer"
-	ImageConversion = "ImageConversion"
-	DiskTransferV2v = "DiskTransferV2v"
-	VMCreation      = "VirtualMachineCreation"
-	Unknown         = "Unknown"
+	Initialize          = "Initialize"
+	Cutover             = "Cutover"
+	DiskAllocation      = "DiskAllocation"
+	DiskTransfer        = "DiskTransfer"
+	ImageConversion     = "ImageConversion"
+	DiskTransferV2v     = "DiskTransferV2v"
+	VMCreation          = "VirtualMachineCreation"
+	VirtV2vConfigSetter = "VirtV2vConfigSetter"
+	Unknown             = "Unknown"
 )
 
 const (
@@ -103,6 +106,7 @@ var (
 			{Name: CreateGuestConversionPod, All: RequiresConversion},
 			{Name: ConvertGuest, All: RequiresConversion},
 			{Name: CopyDisksVirtV2V, All: RequiresConversion},
+			{Name: GetVirtV2VConfig, All: VirtV2vConfig},
 			{Name: CreateVM},
 			{Name: PostHook, All: HasPostHook},
 			{Name: Completed},
@@ -595,6 +599,8 @@ func (r *Migration) step(vm *plan.VMStatus) (step string) {
 		step = ImageConversion
 	case CopyDisksVirtV2V:
 		step = DiskTransferV2v
+	case GetVirtV2VConfig:
+		step = VirtV2vConfigSetter
 	case CreateVM:
 		step = VMCreation
 	case PreHook, PostHook:
@@ -1014,6 +1020,31 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		step.MarkStarted()
 		step.Phase = Running
 		err = r.updateConversionProgress(vm, step)
+		if err != nil {
+			return
+		}
+		if step.MarkedCompleted() && !step.HasError() {
+			step.Phase = Completed
+			vm.Phase = r.next(vm.Phase)
+		}
+	case GetVirtV2VConfig:
+		step, found := vm.FindStep(r.step(vm))
+		if !found {
+			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
+			break
+		}
+		step.MarkStarted()
+		step.Phase = Running
+		pod, errPod := r.kubevirt.GetGuestConversionPod(vm)
+		switch {
+		case errPod != nil:
+			return liberr.Wrap(errPod)
+		case pod == nil:
+			step.MarkCompleted()
+			step.AddError("Guest conversion pod not found")
+			return nil
+		}
+		err = r.getVirtV2VDiskConfig(pod)
 		if err != nil {
 			return
 		}
@@ -1566,6 +1597,42 @@ func (r *Migration) updateConversionProgressEl9(pod *core.Pod, step *plan.Step) 
 	return
 }
 
+func (r *Migration) getVirtV2VDiskConfig(pod *core.Pod) (err error) {
+	url := fmt.Sprintf("http://%s:2112/xml_config", pod.Status.PodIP)
+	resp, err := http.Get(url)
+	switch {
+	case err == nil:
+		defer resp.Body.Close()
+	case strings.Contains(err.Error(), "connection refused"):
+		return nil
+	default:
+		return
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+
+	currentAnnotations := r.Migration.Annotations
+	if currentAnnotations == nil {
+		currentAnnotations = make(map[string]string)
+	}
+	var vmId string
+	labels := pod.GetLabels()
+	if val, ok := labels["vmID"]; ok {
+		vmId = val
+	}
+	currentAnnotations[vmId] = string(body)
+
+	r.Migration.SetAnnotations(currentAnnotations)
+	err = r.Destination.Client.Update(context.TODO(), r.Migration.DeepCopy())
+	if err != nil {
+		return
+	}
+	return nil
+}
+
 func (r *Migration) setDataVolumeCheckpoints(vm *plan.VMStatus) (err error) {
 	disks, err := r.kubevirt.getDVs(vm)
 	if err != nil {
@@ -1709,6 +1776,8 @@ func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 		allowed = !el9
 	case VirtV2vDiskCopy:
 		allowed = el9
+	case VirtV2vConfig:
+		allowed = el9 && r.context.Source.Provider.Type() == v1beta1.Ova
 	}
 
 	return

@@ -1,6 +1,7 @@
 package ova
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -67,6 +68,15 @@ const (
 // Regex which matches the snapshot identifier suffix of a
 // OVA disk backing file.
 var backingFilePattern = regexp.MustCompile("-\\d\\d\\d\\d\\d\\d.vmdk")
+
+type DiskVirtV2VInfo struct {
+	Dev string `json:"dev"`
+	Bus string `json:"bus"`
+}
+
+type AllDiskVirtV2VInfo struct {
+	Disks []DiskVirtV2VInfo `json:"disks"`
+}
 
 // OVA builder.
 type Builder struct {
@@ -374,6 +384,18 @@ func (r *Builder) mapDisks(vm *model.VM, persistentVolumeClaims []core.Persisten
 	var kVolumes []cnv.Volume
 	var kDisks []cnv.Disk
 
+	migrationAnnotations := r.Migration.GetAnnotations()
+	var disksConfig AllDiskVirtV2VInfo
+	if vmDiskConfig, ok := migrationAnnotations[vm.ID]; ok {
+		err := json.Unmarshal([]byte(vmDiskConfig), &disksConfig)
+		if err != nil {
+			err = liberr.Wrap(
+				err,
+				"Failed to unmarshel VM virt-v2v config",
+				vm.Name)
+		}
+	}
+
 	disks := vm.Disks
 	pvcMap := make(map[string]*core.PersistentVolumeClaim)
 	for i := range persistentVolumeClaims {
@@ -383,6 +405,13 @@ func (r *Builder) mapDisks(vm *model.VM, persistentVolumeClaims []core.Persisten
 		}
 	}
 	for i, disk := range disks {
+		//defult value
+		diskBus := Virtio
+		for _, diskconfig := range disksConfig.Disks {
+			if diskconfig.Dev == disk.Name {
+				diskBus = diskconfig.Bus
+			}
+		}
 		pvc := pvcMap[getDiskFullPath(&disk)]
 		volumeName := fmt.Sprintf("vol-%v", i)
 		volume := cnv.Volume{
@@ -399,7 +428,7 @@ func (r *Builder) mapDisks(vm *model.VM, persistentVolumeClaims []core.Persisten
 			Name: volumeName,
 			DiskDevice: cnv.DiskDevice{
 				Disk: &cnv.DiskTarget{
-					Bus: Virtio,
+					Bus: cnv.DiskBus(diskBus),
 				},
 			},
 		}

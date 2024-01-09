@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
+	"encoding/xml"
 	"flag"
 	"net/http"
 	"os"
@@ -17,6 +19,32 @@ import (
 var COPY_DISK_RE = regexp.MustCompile(`^.*Copying disk (\d+)/(\d+)`)
 var DISK_PROGRESS_RE = regexp.MustCompile(`^..\s*(\d+)% \[.*\]`)
 var FINISHED_RE = regexp.MustCompile(`^\[[ .0-9]*\] Finishing off`)
+var XML_RE = regexp.MustCompile(`(?s)resulting local libvirt XML:.*?<domain type='kvm'>.*?</domain>`)
+
+var latestXMLConfig *VirtV2vConfig
+
+type VirtV2vConfig struct {
+	XMLName xml.Name `xml:"domain"`
+	Devices struct {
+		Disks []Disk `xml:"disk"`
+	} `xml:"devices"`
+}
+
+type Disk struct {
+	Target struct {
+		Dev string `xml:"dev,attr"`
+		Bus string `xml:"bus,attr"`
+	} `xml:"target"`
+}
+
+type DiskInfo struct {
+	Dev string `json:"dev"`
+	Bus string `json:"bus"`
+}
+
+type AllDisksInfo struct {
+	Disks []DiskInfo `json:"disks"`
+}
 
 // Here is a scan function that imposes limit on returned line length. virt-v2v
 // writes some overly long lines that don't fit into the internal buffer of
@@ -57,6 +85,29 @@ func updateProgress(progressCounter *prometheus.CounterVec, disk, progress uint6
 	return
 }
 
+func xmlHandler(w http.ResponseWriter, r *http.Request) {
+	if latestXMLConfig != nil {
+		var disksInfo AllDisksInfo
+		for _, disk := range latestXMLConfig.Devices.Disks {
+			diskInfo := DiskInfo{
+				Dev: disk.Target.Dev,
+				Bus: disk.Target.Bus,
+			}
+			disksInfo.Disks = append(disksInfo.Disks, diskInfo)
+			klog.Infof("Extracted Target Dev: %v, Bus: %v", diskInfo.Dev, diskInfo.Bus)
+		}
+		jsonData, err := json.MarshalIndent(disksInfo, "", "  ")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(jsonData)
+	} else {
+		http.Error(w, "No Disk data available", http.StatusNotFound)
+	}
+}
+
 func main() {
 	klog.InitFlags(nil)
 	defer klog.Flush()
@@ -64,7 +115,10 @@ func main() {
 
 	// Start prometheus metrics HTTP handler
 	klog.Info("Setting up prometheus endpoint :2112/metrics")
+	klog.Info("Setting up prometheus endpoint :2112/xml_conf")
 	http.Handle("/metrics", promhttp.Handler())
+	http.HandleFunc("/xml_conf", xmlHandler)
+
 	go http.ListenAndServe(":2112", nil)
 
 	progressCounter := prometheus.NewCounterVec(
@@ -115,6 +169,13 @@ func main() {
 			for disk := uint64(0); disk < disks; disk++ {
 				err = updateProgress(progressCounter, disk, 100)
 			}
+		} else if match := XML_RE.FindSubmatch(line); match != nil {
+			var vmConf VirtV2vConfig
+			if err := xml.Unmarshal(match[0], &vmConf); err != nil {
+				klog.Error("Error parsing XML: ", err)
+				continue
+			}
+			latestXMLConfig = &vmConf
 		} else {
 			klog.V(1).Info("Ignoring line: ", string(line))
 		}
