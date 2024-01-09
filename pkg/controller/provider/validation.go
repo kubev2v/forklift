@@ -258,7 +258,6 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 	case api.Ova:
 		keyList = []string{
 			"url",
-			"insecureSkipVerify",
 		}
 	}
 	for _, key := range keyList {
