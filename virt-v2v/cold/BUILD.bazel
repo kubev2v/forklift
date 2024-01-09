@@ -88,6 +88,7 @@ container_image(
     env = {"LIBGUESTFS_BACKEND": "direct"},
     files = [
         "entrypoint",
+        "@forklift//cmd/image-converter",
         "@forklift//cmd/virt-v2v-monitor",
     ],
     user = "1001",
