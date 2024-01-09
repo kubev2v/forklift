@@ -526,7 +526,9 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 	var bootOrder *uint
 	var imagePVC *core.PersistentVolumeClaim
 	for _, pvc := range persistentVolumeClaims {
+		// Handle loopvar https://go.dev/wiki/LoopvarExperiment
 		pvc := pvc
+
 		image, err := r.getImageFromPVC(&pvc)
 		if err != nil {
 			r.Log.Error(err, "image not found in inventory", "imageID", pvc.Name)
@@ -546,8 +548,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 				r.Log.Error(err, "Failed to get volume from inventory", "volumeID", volumeID)
 				return
 			}
-
-			if bootable, err := strconv.ParseBool(volume.Bootable); err != nil && bootable {
+			if bootable, err := strconv.ParseBool(volume.Bootable); err == nil && bootable {
 				r.Log.Info("bootable volume found", "volumeID", volumeID)
 				bootOrder = pointer.Uint(1)
 			}
@@ -934,7 +935,10 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 
 	for _, image := range images {
 		if imageID, ok := image.Properties[forkliftPropertyOriginalImageID]; ok && imageID == workload.ImageID {
-			annotations[planbase.AnnRequiresConversion] = "true"
+			if image.DiskFormat != "raw" {
+				r.Log.Info("this image will require conversion as it's not raw", "image", image.Name, "diskFormat", image.DiskFormat)
+				annotations[planbase.AnnRequiresConversion] = "true"
+			}
 		}
 		if image.Status != string(ImageStatusActive) {
 			r.Log.Info("the image is not ready yet", "image", image.Name, "status", image.Status)
@@ -1328,7 +1332,18 @@ func (r *Builder) ConvertPVCs(pvcs []core.PersistentVolumeClaim) (ready bool, er
 			return false, nil
 		}
 
-		convertJob, err := r.ensureJob(&pvc, "convert", "qcow2", "raw")
+		// Get image format from inventory
+		image := &model.Image{}
+		if imageID, ok := pvc.Annotations[AnnImportDiskId]; ok {
+			err = r.Source.Inventory.Find(image, ref.Ref{ID: imageID})
+			if err != nil {
+				return false, err
+			}
+		} else {
+			return false, liberr.New("no image ID found in PVC annotations", "pvc", pvc.Name)
+		}
+
+		convertJob, err := r.ensureJob(&pvc, "convert", image.DiskFormat, "raw")
 		if err != nil {
 			return false, err
 		}

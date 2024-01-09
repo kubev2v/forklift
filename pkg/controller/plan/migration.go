@@ -880,7 +880,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 
 		if !ready {
 			r.Log.Info("Conversion isn't ready yet")
-			return err
+			return nil
 		}
 
 		if step.MarkedCompleted() && !step.HasError() {

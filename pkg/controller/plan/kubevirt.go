@@ -911,7 +911,7 @@ func (r *KubeVirt) GetPodsWithLabels(podLabels map[string]string) (pods *core.Po
 }
 
 // Deletes an object from destination cluster associated with the VM.
-func (r *KubeVirt) DeleteObject(object client.Object, vm *plan.VMStatus, message, objType string) (err error) {
+func (r *KubeVirt) DeleteObject(object client.Object, vm *plan.VMStatus, message, objType string, options ...client.DeleteOption) (err error) {
 	err = r.Destination.Client.Delete(context.TODO(), object)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
