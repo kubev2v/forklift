@@ -938,6 +938,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 			if image.DiskFormat != "raw" {
 				r.Log.Info("this image will require conversion as it's not raw", "image", image.Name, "diskFormat", image.DiskFormat)
 				annotations[planbase.AnnRequiresConversion] = "true"
+				annotations[planbase.AnnSnapshotFormat] = image.DiskFormat
 			}
 		}
 		if image.Status != string(ImageStatusActive) {
@@ -1332,18 +1333,12 @@ func (r *Builder) ConvertPVCs(pvcs []core.PersistentVolumeClaim) (ready bool, er
 			return false, nil
 		}
 
-		// Get image format from inventory
-		image := &model.Image{}
-		if imageID, ok := pvc.Annotations[AnnImportDiskId]; ok {
-			err = r.Source.Inventory.Find(image, ref.Ref{ID: imageID})
-			if err != nil {
-				return false, err
-			}
-		} else {
-			return false, liberr.New("no image ID found in PVC annotations", "pvc", pvc.Name)
+		sourceFormat, ok := pvc.Annotations[planbase.AnnSnapshotFormat]
+		if !ok {
+			return false, liberr.New("source format not found")
 		}
 
-		convertJob, err := r.ensureJob(&pvc, "convert", image.DiskFormat, "raw")
+		convertJob, err := r.ensureJob(&pvc, sourceFormat, "raw")
 		if err != nil {
 			return false, err
 		}
@@ -1381,18 +1376,17 @@ func (r *Builder) ConvertPVCs(pvcs []core.PersistentVolumeClaim) (ready bool, er
 	return false, nil
 }
 
-func (r *Builder) ensureJob(pvc *core.PersistentVolumeClaim, jobType, srcFormat, dstFormat string) (*batchv1.Job, error) {
-	jobName := getJobName(pvc, jobType)
+func (r *Builder) ensureJob(pvc *core.PersistentVolumeClaim, srcFormat, dstFormat string) (*batchv1.Job, error) {
+	jobName := getJobName(pvc, "convert")
 	job := &batchv1.Job{}
 	err := r.Client.Get(context.Background(), client.ObjectKey{Name: jobName, Namespace: pvc.Namespace}, job)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
-			if jobType == "convert" {
-				job := createConvertJob(pvc, srcFormat, dstFormat, r.getLabels(pvc.Annotations["vmID"]))
-				err = r.Destination.Client.Create(context.Background(), job, &client.CreateOptions{})
-				if err != nil {
-					return nil, err
-				}
+			r.Log.Info("Converting PVC format", "pvc", pvc.Name, "srcFormat", srcFormat, "dstFormat", dstFormat)
+			job := createConvertJob(pvc, srcFormat, dstFormat, r.getLabels(pvc.Annotations["vmID"]))
+			err = r.Destination.Client.Create(context.Background(), job, &client.CreateOptions{})
+			if err != nil {
+				return nil, err
 			}
 		}
 		return nil, err
