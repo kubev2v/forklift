@@ -34,7 +34,7 @@ spec:
     spec:
       containers:
       - name: convert-pvc
-        image: quay.io/bzlotnik/image-converter:latest
+        image: quay.io/kubev2v/forklift-virt-v2v:latest
         args:
           - "-src-path"
           - "/mnt/disk.img"
