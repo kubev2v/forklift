@@ -19,6 +19,9 @@ const (
 
 	// Set on a PVC to indicate it requires format conversion
 	AnnRequiresConversion = "forklift.konveyor.io/requires-conversion"
+
+	// Set the format of the snapshot for the conversion later
+	AnnSnapshotFormat = "forklift.konveyor.io/snapshot-format"
 )
 
 var VolumePopulatorNotSupportedError = liberr.New("provider does not support volume populators")
