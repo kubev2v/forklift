@@ -9,29 +9,55 @@ import (
 )
 
 func main() {
-	var srcVolPath, dstVolPath, srcFormat, dstFormat string
+	var srcVolPath, dstVolPath, srcFormat, dstFormat, volumeMode string
 
 	flag.StringVar(&srcVolPath, "src-path", "", "Source volume path")
 	flag.StringVar(&dstVolPath, "dst-path", "", "Target volume path")
 	flag.StringVar(&srcFormat, "src-format", "", "Format of the source volume")
 	flag.StringVar(&dstFormat, "dst-format", "", "Format of the target volume")
+	flag.StringVar(&volumeMode, "volume-mode", "", "Format of the target volume")
 
 	flag.Parse()
 
 	klog.Info("srcVolPath: ", srcVolPath, " dstVolPath: ", dstVolPath, " sourceFormat: ", srcFormat, " targetFormat: ", dstFormat)
-	err := convert(srcVolPath, dstVolPath, srcFormat, dstFormat)
+	err := convert(srcVolPath, dstVolPath, srcFormat, dstFormat, volumeMode)
 	if err != nil {
 		klog.Fatal(err)
 	}
 }
 
-func convert(srcVolPath, dstVolPath, sourceFormat, targetFormat string) error {
+func convert(srcVolPath, dstVolPath, srcFormat, dstFormat, volumeMode string) error {
+	err := qemuimgConvert(srcVolPath, dstVolPath, srcFormat, dstFormat)
+	if err != nil {
+		return err
+	}
+
+	// Copy dst over src
+	switch volumeMode {
+	case "Block":
+		err = qemuimgConvert(dstVolPath, srcVolPath, dstFormat, dstFormat)
+		if err != nil {
+			return err
+		}
+	case "Filesystem":
+		// Use mv for files as it's faster than qemu-img convert
+		cmd := exec.Command("mv", dstVolPath, srcVolPath)
+		err := cmd.Run()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func qemuimgConvert(srcVolPath, dstVolPath, srcFormat, dstFormat string) error {
 	cmd := exec.Command(
 		"qemu-img",
 		"convert",
 		"-p",
-		"-f", sourceFormat,
-		"-O", targetFormat,
+		"-f", srcFormat,
+		"-O", dstFormat,
 		srcVolPath,
 		dstVolPath,
 	)
@@ -50,22 +76,6 @@ func convert(srcVolPath, dstVolPath, sourceFormat, targetFormat string) error {
 	for scanner.Scan() {
 		line := scanner.Text()
 		klog.Info(line)
-	}
-
-	err = cmd.Wait()
-	if err != nil {
-		return err
-	}
-
-	// Replace /mnt/disk.img with /output/disk.img
-	cmd = exec.Command(
-		"mv",
-		dstVolPath,
-		srcVolPath,
-	)
-
-	if err := cmd.Start(); err != nil {
-		return err
 	}
 
 	err = cmd.Wait()

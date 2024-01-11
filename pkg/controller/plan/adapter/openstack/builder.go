@@ -1442,6 +1442,16 @@ func createConvertJob(pvc *core.PersistentVolumeClaim, srcFormat, dstFormat stri
 }
 
 func makeConversionContainer(pvc *core.PersistentVolumeClaim, srcFormat, dstFormat string) core.Container {
+	rawBlock := pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == core.PersistentVolumeBlock
+	var srcPath, dstPath string
+	if rawBlock {
+		srcPath = "/dev/block"
+		dstPath = "/dev/target"
+	} else {
+		srcPath = "/mnt/disk.img"
+		dstPath = "/output/disk.img"
+	}
+
 	container := core.Container{
 		Name:  "convert",
 		Image: base.Settings.VirtV2vImageCold,
@@ -1455,23 +1465,24 @@ func makeConversionContainer(pvc *core.PersistentVolumeClaim, srcFormat, dstForm
 		},
 		Command: []string{"/usr/local/bin/image-converter"},
 		Args: []string{
-			"-src-path", "/mnt/disk.img",
-			"-dst-path", "/output/disk.img",
+			"-src-path", srcPath,
+			"-dst-path", dstPath,
 			"-src-format", srcFormat,
 			"-dst-format", dstFormat,
+			"-volume-mode", string(*pvc.Spec.VolumeMode),
 		},
 	}
 
 	// Determine source path based on volumeMode
-	if pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == core.PersistentVolumeBlock {
+	if rawBlock {
 		container.VolumeDevices = []core.VolumeDevice{
 			{
 				Name:       "source",
-				DevicePath: "/dev/block",
+				DevicePath: srcPath,
 			},
 			{
 				Name:       "target",
-				DevicePath: "/dev/target",
+				DevicePath: dstPath,
 			},
 		}
 	} else {
