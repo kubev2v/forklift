@@ -8,7 +8,7 @@ go_library(
     deps = [
         "//pkg/forklift-api/webhooks/util",
         "//pkg/lib/logging",
-        "//vendor/k8s.io/api/admission/v1beta1",
+        "//vendor/k8s.io/api/admission/v1:admission",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:meta",
         "//vendor/k8s.io/apimachinery/pkg/runtime",
     ],

@@ -2,7 +2,7 @@
 - block:
 
   - name: "Get {{ resource_kind }} resources labeled {{ feature_label }}"
-    k8s_info:
+    kubernetes.core.k8s_info:
       namespace: "{{ app_namespace }}"
       kind: "{{ resource_kind }}"
       label_selectors:
@@ -10,7 +10,7 @@
     register: results
 
   - name: "Clean up {{ resource_kind }} resources labeled {{ feature_label }}"
-    k8s:
+    kubernetes.core.k8s:
       namespace: "{{ app_namespace }}"
       kind: "{{ results.resources[0].kind }}"
       name: "{{ results.resources[0].metadata.name }}"

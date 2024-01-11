@@ -3313,7 +3313,7 @@ go_repository(
 go_rules_dependencies()
 
 # NOTE: Keep the version in sync with Go toolchain in GitHub action.
-go_register_toolchains(version = "1.20.10")
+go_register_toolchains(version = "1.20.13")
 
 # override rules_docker issue with this dependency
 # rules_docker 0.16 uses 0.1.4, bit since there the checksum changed, which is very weird, going with 0.1.4.1 to
@@ -3358,15 +3358,16 @@ container_pull(
 
 container_pull(
     name = "ansible-operator-image",
-    # v1.22.0
-    digest = "sha256:e07ba82127e76f282cb61fad6cfd990ab137533e5e996686576dec088d5e7e44",
+    # v1.33.0
+    digest = "sha256:e738e15b78c97b629b282ff5fa53c999f27583225717011f742dba9a8708c0e3",
     registry = "quay.io",
     repository = "operator-framework/ansible-operator",
 )
 
 container_pull(
     name = "opm-image",
-    digest = "sha256:601c62a5e3fea961665aad2ed2834f3f165a020051d355eb24af2125da8e158e",
+    # v1.34.0
+    digest = "sha256:48acf103e8adb295ea1b08383cd7c5df4ba6b36d169a53c42234da7cf6ae7572",
     registry = "quay.io",
     repository = "operator-framework/opm",
 )
@@ -3382,9 +3383,9 @@ http_file(
 http_file(
     name = "kustomize",
     downloaded_file_path = "kustomize.tar.gz",
-    sha256 = "4a3372d7bfdffe2eaf729e77f88bc94ce37dc84de55616bfe90aac089bf6fd02",
+    sha256 = "3ab32f92360d752a2a53e56be073b649abc1e7351b912c0fb32b960d1def854c",
     urls = [
-        "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v3.8.7/kustomize_v3.8.7_linux_amd64.tar.gz",
+        "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v5.3.0/kustomize_v5.3.0_linux_amd64.tar.gz",
     ],
 )
 
@@ -3392,16 +3393,16 @@ http_file(
     name = "operator-sdk",
     downloaded_file_path = "operator-sdk",
     executable = True,
-    sha256 = "2fc68a50b94b7c477e804729365baa5de6d5afcfea9b7fcac9f93dd649c29e90",
-    urls = ["https://github.com/operator-framework/operator-sdk/releases/download/v1.22.0/operator-sdk_linux_amd64"],
+    sha256 = "5815115761ac79ebb5693363edb4d5d9656dc6290b0b9f07b057be259452ba89",
+    urls = ["https://github.com/operator-framework/operator-sdk/releases/download/v1.33.0/operator-sdk_linux_amd64"],
 )
 
 http_file(
     name = "opm",
     downloaded_file_path = "opm",
     executable = True,
-    sha256 = "dc0d4d287fef23f165c837b2e6cb68e2506ff295dc57110b9bfe3b553359eb36",
-    urls = ["https://github.com/operator-framework/operator-registry/releases/download/v1.23.0/linux-amd64-opm"],
+    sha256 = "c5d9a9cc35a6a3991f4801fee86ad4331e006b6d001b4b3cf9d9bda468fcde2d",
+    urls = ["https://github.com/operator-framework/operator-registry/releases/download/v1.34.0/linux-amd64-opm"],
 )
 
 http_archive(

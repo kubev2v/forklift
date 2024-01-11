@@ -12,7 +12,7 @@
         state: absent
 
     - name: Destroy Namespace
-      k8s:
+      kubernetes.core.k8s:
         api_version: v1
         kind: Namespace
         name: '{{ namespace }}'

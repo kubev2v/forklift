@@ -355,7 +355,7 @@ ifeq (, $(shell command -v opa))
 	@{ \
 	set -e ;\
 	mkdir -p ${HOME}/.local/bin ; \
-	curl -sL -o ${HOME}/.local/bin/opa https://openpolicyagent.org/downloads/v0.57.1/opa_linux_amd64_static ; \
+	curl -sL -o ${HOME}/.local/bin/opa https://openpolicyagent.org/downloads/v0.58.0/opa_linux_amd64_static ; \
 	chmod 755 ${HOME}/.local/bin/opa ;\
 	}
 OPA=${HOME}/.local/bin/opa
