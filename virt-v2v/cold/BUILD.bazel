@@ -70,11 +70,21 @@ container_run_and_commit_layer(
     image = ":virt-v2v-image.tar",
 )
 
+container_run_and_commit_layer(
+    name = "ca-certificate-from-secret",
+    commands = [
+        "mv /etc/pki/tls/certs/ca-bundle.crt /etc/pki/tls/certs/ca-bundle.crt.bak",
+        "ln -sf /opt/ca-bundle.crt /etc/pki/tls/certs/ca-bundle.crt",
+    ],
+    image = ":virt-v2v-image.tar",
+)
+
 container_image(
     name = "virt-v2v-layer",
     base = ":virt-v2v-image",
     layers = [
         ":no-ems-in-fips",
+        ":ca-certificate-from-secret",
     ],
     visibility = ["//visibility:public"],
 )
