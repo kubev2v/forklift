@@ -72,9 +72,16 @@ for disk in /dev/block[0-9]* ; do
 done
 
 if [ "$V2V_source" == "vSphere" ] ; then
-  # Store password to file
-  echo -n "$V2V_secretKey" > "$DIR/vmware.pw"
-  args+=(-ip "$DIR/vmware.pw")
+  if [ -e "/etc/secret/cacert" ]; then
+    # use the specified certificate
+    ln -sf /etc/secret/cacert /opt/ca-bundle.crt
+  else
+    # otherwise, keep system pool certificates
+    ln -sf /etc/pki/tls/certs/ca-bundle.crt.bak /opt/ca-bundle.crt
+  fi
+
+  # password
+  args+=(-ip "/etc/secret/secretKey")
 
   # Use VDDK if present
   if [ -d "/opt/vmware-vix-disklib-distrib" ]; then

@@ -1355,6 +1355,20 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	}
 	if el9 {
 		virtV2vImage = Settings.Migration.VirtV2vImageCold
+		// mount the secret for the password and CA certificate
+		volumes = append(volumes, core.Volume{
+			Name: "secret-volume",
+			VolumeSource: core.VolumeSource{
+				Secret: &core.SecretVolumeSource{
+					SecretName: v2vSecret.Name,
+				},
+			},
+		})
+		volumeMounts = append(volumeMounts, core.VolumeMount{
+			Name:      "secret-volume",
+			ReadOnly:  true,
+			MountPath: "/etc/secret",
+		})
 	} else {
 		virtV2vImage = Settings.Migration.VirtV2vImageWarm
 	}
