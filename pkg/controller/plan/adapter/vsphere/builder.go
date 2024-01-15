@@ -362,12 +362,14 @@ func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
 		thumbprint = h.Thumbprint
 	}
 
-	object.StringData = map[string]string{
-		"accessKeyId": string(in.Data["user"]),
-		"secretKey":   string(in.Data["password"]),
-		"thumbprint":  thumbprint,
+	object.Data = map[string][]byte{
+		"accessKeyId": in.Data["user"],
+		"secretKey":   in.Data["password"],
+		"thumbprint":  []byte(thumbprint),
 	}
-
+	if cacert, ok := in.Data["cacert"]; ok {
+		object.Data["cacert"] = cacert
+	}
 	return
 }
 
