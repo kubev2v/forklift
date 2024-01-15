@@ -1,9 +1,13 @@
 package vsphere
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha1"
+	"crypto/tls"
 	"errors"
 	"fmt"
+	"net/url"
 	liburl "net/url"
 	"path"
 	"regexp"
@@ -192,6 +196,35 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		return
 	}
 
+	// The fingerpint/thumbprint is not confidential since one can retrieve
+	// it from the server as we do, so we don't have to place it in a secret
+	var fingerprint string
+	if container.GetInsecureSkipVerifyFlag(r.Source.Secret) {
+		var dialUrl string
+		if providerUrl, _ := url.Parse(r.Source.Provider.Spec.URL); providerUrl.Port() != "" {
+			dialUrl = providerUrl.Host
+		} else {
+			dialUrl = providerUrl.Host + ":443"
+		}
+		cfg := &tls.Config{
+			InsecureSkipVerify: true,
+		}
+		if conn, dialErr := tls.Dial("tcp", dialUrl, cfg); dialErr == nil {
+			// Get the ConnectionState struct as that's the one which gives us x509.Certificate struct
+			cert := conn.ConnectionState().PeerCertificates[0]
+			sum := sha1.Sum(cert.Raw)
+			fingerprint = sumToFingerprint(sum)
+		} else {
+			err = liberr.Wrap(
+				dialErr,
+				"failed to retrieve fingerprint over insecure channel",
+				"url",
+				dialUrl,
+			)
+			return
+		}
+	}
+
 	env = append(
 		env,
 		core.EnvVar{
@@ -206,8 +239,23 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 			Name:  "V2V_source",
 			Value: "vSphere",
 		},
+		core.EnvVar{
+			Name:  "V2V_fingerprint",
+			Value: fingerprint,
+		},
 	)
 	return
+}
+
+func sumToFingerprint(sum [20]byte) string {
+	var buf bytes.Buffer
+	for i, f := range sum {
+		if i > 0 {
+			fmt.Fprintf(&buf, ":")
+		}
+		fmt.Fprintf(&buf, "%02X", f)
+	}
+	return buf.String()
 }
 
 func (r *Builder) getLibvirtURL(vm *model.VM, sourceSecret *core.Secret) (libvirtURL liburl.URL, err error) {
