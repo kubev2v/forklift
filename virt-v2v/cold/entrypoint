@@ -81,7 +81,7 @@ if [ "$V2V_source" == "vSphere" ] ; then
       args+=(
           -it vddk
           -io vddk-libdir=/opt/vmware-vix-disklib-distrib
-          -io "vddk-thumbprint=$V2V_thumbprint"
+          -io "vddk-thumbprint=$V2V_fingerprint"
       )
   fi
   args+=(-- "$V2V_vmName")
