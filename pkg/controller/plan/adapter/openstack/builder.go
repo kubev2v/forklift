@@ -1442,7 +1442,13 @@ func createConvertJob(pvc *core.PersistentVolumeClaim, srcFormat, dstFormat stri
 }
 
 func makeConversionContainer(pvc *core.PersistentVolumeClaim, srcFormat, dstFormat string) core.Container {
-	rawBlock := pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == core.PersistentVolumeBlock
+	var volumeMode core.PersistentVolumeMode
+	if pvc.Spec.VolumeMode == nil {
+		volumeMode = core.PersistentVolumeFilesystem
+	} else {
+		volumeMode = *pvc.Spec.VolumeMode
+	}
+	rawBlock := volumeMode == core.PersistentVolumeBlock
 	var srcPath, dstPath string
 	if rawBlock {
 		srcPath = "/dev/block"
@@ -1469,7 +1475,7 @@ func makeConversionContainer(pvc *core.PersistentVolumeClaim, srcFormat, dstForm
 			"-dst-path", dstPath,
 			"-src-format", srcFormat,
 			"-dst-format", dstFormat,
-			"-volume-mode", string(*pvc.Spec.VolumeMode),
+			"-volume-mode", string(volumeMode),
 		},
 	}
 
