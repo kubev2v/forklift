@@ -262,9 +262,14 @@ func (r *Builder) getLibvirtURL(vm *model.VM, sourceSecret *core.Secret) (libvir
 				path = parent.Path
 			}
 		}
+		var url *liburl.URL
+		if url, err = liburl.Parse(string(sourceSecret.Data["url"])); err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
 		libvirtURL = liburl.URL{
 			Scheme:   "vpx",
-			Host:     host.ManagementServerIp, // VCenter
+			Host:     url.Host,
 			User:     liburl.User(string(sourceSecret.Data["user"])),
 			Path:     path, // E.g.: /Datacenter/Cluster/host.example.com
 			RawQuery: sslVerify,
