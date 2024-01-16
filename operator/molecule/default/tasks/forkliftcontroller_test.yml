@@ -1,6 +1,6 @@
 ---
 - name: Create the forklift.konveyor.io/v1beta1.ForkliftController
-  k8s:
+  kubernetes.core.k8s:
     state: present
     namespace: '{{ namespace }}'
     definition: "{{ lookup('template', '/'.join([samples_dir, cr_file])) | from_yaml }}"

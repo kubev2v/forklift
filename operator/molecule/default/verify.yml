@@ -17,7 +17,7 @@
             - tasks/*_test.yml
       rescue:
         - name: Retrieve relevant resources
-          k8s_info:
+          kubernetes.core.k8s_info:
             api_version: '{{ item.api_version }}'
             kind: '{{ item.kind }}'
             namespace: '{{ namespace }}'
@@ -33,11 +33,11 @@
           register: debug_resources
 
         - name: Retrieve Pod logs
-          k8s_log:
+          kubernetes.core.k8s_log:
             name: '{{ item.metadata.name }}'
             namespace: '{{ namespace }}'
             container: manager
-          loop: "{{ q('k8s', api_version='v1', kind='Pod', namespace=namespace, label_selector=ctrl_label) }}"
+          loop: "{{ q('kubernetes.core.k8s', api_version='v1', kind='Pod', namespace=namespace, label_selector=ctrl_label) }}"
           register: debug_logs
 
         - name: Output gathered resources

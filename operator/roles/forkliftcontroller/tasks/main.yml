@@ -23,7 +23,7 @@
 
   - name: "Load cluster API groups"
     set_fact:
-      api_groups: "{{ lookup('k8s', cluster_info='api_groups') }}"
+      api_groups: "{{ lookup('kubernetes.core.k8s', cluster_info='api_groups') }}"
 
   - when: "'route.openshift.io' not in api_groups"
     block:
@@ -33,13 +33,13 @@
 
     - name: "Obtain k8s cluster version"
       set_fact:
-        k8s_cluster_version: "{{ lookup('k8s', cluster_info='version').kubernetes.gitVersion }}"
+        k8s_cluster_version: "{{ lookup('kubernetes.core.k8s', cluster_info='version').kubernetes.gitVersion }}"
 
   - when: not k8s_cluster|bool
     block:
     - name: "Get cluster proxy object"
       set_fact:
-        proxy_cluster: "{{ lookup('k8s', api_version='config.openshift.io/v1', kind='Proxy', resource_name='cluster') }}"
+        proxy_cluster: "{{ lookup('kubernetes.core.k8s', api_version='config.openshift.io/v1', kind='Proxy', resource_name='cluster') }}"
 
     - when: proxy_cluster.spec.trustedCA.name|length > 0
       block:
@@ -48,39 +48,39 @@
           trusted_ca_enabled: true
 
       - name: "Create an empty ConfigMap that will hold the trusted CA"
-        k8s:
+        kubernetes.core.k8s:
           state: present
           definition: "{{ lookup('template', 'configmap-trusted-ca.yml.j2') }}"
 
   - name: "Setup the webhook secret"
-    k8s:
+    kubernetes.core.k8s:
       state: present
       definition: "{{ lookup('template', 'secret-webhook-server-secret.yml.j2') }}"
 
   - name: "Setup controller config map"
-    k8s:
+    kubernetes.core.k8s:
       state : present
       definition: "{{ lookup('template', 'controller/configmap-controller.yml.j2') }}"
 
   - name: "Setup inventory service"
-    k8s:
+    kubernetes.core.k8s:
       state: present
       definition: "{{ lookup('template', 'controller/service-inventory.yml.j2') }}"
 
   - name: "Setup controller deployment"
-    k8s:
+    kubernetes.core.k8s:
       state : present
       definition: "{{ lookup('template', 'controller/deployment-controller.yml.j2') }}"
       merge_type: "merge"
 
   - name: "Setup inventory route"
-    k8s:
+    kubernetes.core.k8s:
       state: present
       definition: "{{ lookup('template', 'controller/route-inventory.yml.j2') }}"
     when: not k8s_cluster|bool
 
   - name: "Setup forklift-controller security context constraints"
-    k8s:
+    kubernetes.core.k8s:
       state: present
       definition: "{{ lookup('template', 'controller/controller-scc.yml.j2') }}"
     when: not k8s_cluster|bool
@@ -88,86 +88,86 @@
   - when: feature_volume_populator|bool
     block:
     - name: "Setup populator controller deployment"
-      k8s:
+      kubernetes.core.k8s:
         state: "{{ volume_populator_state }}"
         definition: "{{ lookup('template', 'populator/deployment-populator-controller.yml.j2') }}"
 
   - when: k8s_cluster|bool
     block:
     - name: "Create a trusted CA issuer"
-      k8s:
+      kubernetes.core.k8s:
         state: present
         definition: "{{ lookup('template', 'cert-manager-trusted-ca.yml.j2') }}"
     - name: "Configure webhook certificate on K8s"
-      k8s:
+      kubernetes.core.k8s:
         state: present
         definition: "{{ lookup('template', 'api/ca.yml.j2') }}"
     - name: "Configure validation certificate on K8s"
-      k8s:
+      kubernetes.core.k8s:
         state: present
         definition: "{{ lookup('template', 'validation/ca.yml.j2') }}"
     - name: "Configure inventory certificate on K8s"
-      k8s:
+      kubernetes.core.k8s:
         state: present
         definition: "{{ lookup('template', 'controller/ca.yml.j2') }}"
     - name: "Configure must-gather certificate on K8s"
-      k8s:
+      kubernetes.core.k8s:
         state: present
         definition: "{{ lookup('template', 'must-gather-api/ca.yml.j2') }}"
 
   - name: "Setup api service"
-    k8s:
+    kubernetes.core.k8s:
       state: present
       definition: "{{ lookup('template', 'api/service-forklift-api.yml.j2') }}"
 
   - name: "Setup api deployment"
-    k8s:
+    kubernetes.core.k8s:
       state: present
       definition: "{{ lookup('template', 'api/deployment-forklift-api.yml.j2') }}"
 
   - name: "Delete aggregated validation webhook configurations"
-    k8s:
+    kubernetes.core.k8s:
       state: absent
       definition: "{{ lookup('template', 'api/validatingwebhookconfiguration-forklift-api.yml.j2') }}"
 
   - name: "Setup secrets validating webhook configuration"
-    k8s:
+    kubernetes.core.k8s:
       state: present
       definition: "{{ lookup('template', 'api/validatingwebhookconfiguration-secrets.yml.j2') }}"
 
   - name: "Setup plans validating webhook configuration"
-    k8s:
+    kubernetes.core.k8s:
       state: present
       definition: "{{ lookup('template', 'api/validatingwebhookconfiguration-plans.yml.j2') }}"
 
   - name: "Setup providers validating webhook configuration"
-    k8s:
+    kubernetes.core.k8s:
       state: present
       definition: "{{ lookup('template', 'api/validatingwebhookconfiguration-providers.yml.j2') }}"
 
   - name: "Delete aggregated mutating webhook configurations"
-    k8s:
+    kubernetes.core.k8s:
       state: absent
       definition: "{{ lookup('template', 'api/mutatingwebhookconfiguration-forklift-api.yml.j2') }}"
 
   - name: "Setup secrets mutating webhook configuration"
-    k8s:
+    kubernetes.core.k8s:
       state: present
       definition: "{{ lookup('template', 'api/mutatingwebhookconfiguration-secrets.yml.j2') }}"
 
   - name: "Setup plans mutating webhook configuration"
-    k8s:
+    kubernetes.core.k8s:
       state: present
       definition: "{{ lookup('template', 'api/mutatingwebhookconfiguration-plans.yml.j2') }}"
 
 
   - name: "Setup providers mutating webhook configuration"
-    k8s:
+    kubernetes.core.k8s:
       state: present
       definition: "{{ lookup('template', 'api/mutatingwebhookconfiguration-providers.yml.j2') }}"
 
   - name: "Setup default provider"
-    k8s:
+    kubernetes.core.k8s:
       state: present
       definition: "{{ lookup('template', 'controller/provider-host.yml.j2') }}"
     when: "'kubevirt.io' in api_groups"
@@ -175,29 +175,29 @@
   - when: feature_validation|bool
     block:
     - name: "Setup validation service"
-      k8s:
+      kubernetes.core.k8s:
         state: "{{ validation_state }}"
         definition: "{{ lookup('template', 'validation/service-validation.yml.j2') }}"
 
     - name: "Setup validation config map"
-      k8s:
+      kubernetes.core.k8s:
         state: "{{ validation_state }}"
         definition: "{{ lookup('template', 'validation/configmap-validation.yml.j2') }}"
 
     - name: "Setup validation deployment"
-      k8s:
+      kubernetes.core.k8s:
         state: "{{ validation_state }}"
         definition: "{{ lookup('template', 'validation/deployment-validation.yml.j2') }}"
 
   - when: feature_must_gather_api|bool
     block:
     - name: "Setup must-gather-api service"
-      k8s:
+      kubernetes.core.k8s:
         state: "{{ must_gather_api_state }}"
         definition: "{{ lookup('template', 'must-gather-api/service-must-gather-api.yml.j2') }}"
 
     - name: "Setup must-gather-api deployment"
-      k8s:
+      kubernetes.core.k8s:
         state: "{{ must_gather_api_state }}"
         definition: "{{ lookup('template', 'must-gather-api/deployment-must-gather-api.yml.j2') }}"
 
@@ -205,27 +205,27 @@
     block:
 
     - name: "Setup UI plugin configmap"
-      k8s:
+      kubernetes.core.k8s:
         state: "{{ ui_plugin_state }}"
         definition: "{{ lookup('template', 'ui-plugin/configmap-ui-plugin.yml.j2') }}"
 
     - name: "Setup UI plugin service"
-      k8s:
+      kubernetes.core.k8s:
         state: "{{ ui_plugin_state }}"
         definition: "{{ lookup('template', 'ui-plugin/service-ui-plugin.yml.j2') }}"
 
     - name: "Setup UI plugin deployment"
-      k8s:
+      kubernetes.core.k8s:
         state: "{{ ui_plugin_state }}"
         definition: "{{ lookup('template', 'ui-plugin/deployment-ui-plugin.yml.j2') }}"
 
     - name: "Setup console plugin"
-      k8s:
+      kubernetes.core.k8s:
         state: "{{ ui_plugin_state }}"
         definition: "{{ lookup('template', 'ui-plugin/console-plugin.yml.j2') }}"
 
     - name: "Get cluster console information"
-      k8s_info:
+      kubernetes.core.k8s_info:
         api_version: operator.openshift.io/v1
         kind: console
         name: cluster
@@ -236,7 +236,7 @@
         console_plugins: "{{ console_operator['resources'][0]['spec']['plugins'] | default([]) }}"
 
     - name: "Enable console plugin"
-      k8s:
+      kubernetes.core.k8s:
         api_version: operator.openshift.io/v1
         kind: console
         name: cluster

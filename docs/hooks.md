@@ -123,7 +123,7 @@ The playbook encoded here does the following:
     environment:
       HOME: "{{ ansible_facts.getent_passwd[ansible_user_id][4] }}"
 
-  - k8s_info:
+  - kubernetes.core.k8s_info:
       api_version: v1
       kind: Secret
       name: ssh-credentials
