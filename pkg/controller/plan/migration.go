@@ -15,6 +15,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
+	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/scheduler"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
@@ -155,6 +156,8 @@ type Migration struct {
 	scheduler scheduler.Scheduler
 	// destination client.
 	destinationClient adapter.DestinationClient
+	// pvc converter
+	converter *adapter.Converter
 }
 
 // Type of migration.
@@ -860,6 +863,26 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
 			break
 		}
+
+		var filterFn func(pvc *core.PersistentVolumeClaim) bool
+		if r.converter == nil {
+			labels := map[string]string{
+				"plan":      string(r.Plan.GetUID()),
+				"migration": string(r.Context.Migration.UID),
+				"vmID":      vm.ID,
+				"app":       "forklift",
+			}
+			r.converter = adapter.NewConverter(&r.Context.Destination, r.Log.WithName("converter"), labels)
+			filterFn = func(pvc *core.PersistentVolumeClaim) bool {
+				if val, ok := pvc.Annotations[base.AnnRequiresConversion]; ok && val == "true" {
+					return true
+				}
+				return false
+			}
+
+			r.converter.FilterFn = filterFn
+		}
+
 		step.MarkStarted()
 		step.Phase = Running
 		pvcs, err := r.kubevirt.getPVCs(vm.Ref)
@@ -871,7 +894,11 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			break
 		}
 
-		ready, err := r.builder.ConvertPVCs(pvcs)
+		srcFormatFn := func(pvc *core.PersistentVolumeClaim) string {
+			return pvc.Annotations[base.AnnSourceFormat]
+		}
+
+		ready, err := r.converter.ConvertPVCs(pvcs, srcFormatFn, "raw")
 		if err != nil {
 			step.AddError(err.Error())
 			err = nil
