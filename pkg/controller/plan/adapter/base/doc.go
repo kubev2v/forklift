@@ -20,8 +20,8 @@ const (
 	// Set on a PVC to indicate it requires format conversion
 	AnnRequiresConversion = "forklift.konveyor.io/requires-conversion"
 
-	// Set the format of the snapshot for the conversion later
-	AnnSnapshotFormat = "forklift.konveyor.io/snapshot-format"
+	// Set the source format of the PVC for the conversion later
+	AnnSourceFormat = "forklift.konveyor.io/source-format"
 )
 
 var VolumePopulatorNotSupportedError = liberr.New("provider does not support volume populators")
@@ -76,8 +76,6 @@ type Builder interface {
 	SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) (err error)
 	// Get the populator task name associated to a PVC
 	GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error)
-	// Convert the PVC to a given format
-	ConvertPVCs(pvcs []*core.PersistentVolumeClaim) (ready bool, err error)
 }
 
 // Client API.

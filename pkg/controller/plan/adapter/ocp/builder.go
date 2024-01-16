@@ -635,8 +635,3 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 	// do nothing
 	return
 }
-
-func (r *Builder) ConvertPVCs(pvcs []*core.PersistentVolumeClaim) (ready bool, err error) {
-	// do nothing
-	return
-}
