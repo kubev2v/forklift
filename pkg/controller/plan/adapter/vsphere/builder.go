@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha1"
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"net/url"
@@ -198,31 +199,9 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 
 	// The fingerpint/thumbprint is not confidential since one can retrieve
 	// it from the server as we do, so we don't have to place it in a secret
-	var fingerprint string
-	if container.GetInsecureSkipVerifyFlag(r.Source.Secret) {
-		var dialUrl string
-		if providerUrl, _ := url.Parse(r.Source.Provider.Spec.URL); providerUrl.Port() != "" {
-			dialUrl = providerUrl.Host
-		} else {
-			dialUrl = providerUrl.Host + ":443"
-		}
-		cfg := &tls.Config{
-			InsecureSkipVerify: true,
-		}
-		if conn, dialErr := tls.Dial("tcp", dialUrl, cfg); dialErr == nil {
-			// Get the ConnectionState struct as that's the one which gives us x509.Certificate struct
-			cert := conn.ConnectionState().PeerCertificates[0]
-			sum := sha1.Sum(cert.Raw)
-			fingerprint = sumToFingerprint(sum)
-		} else {
-			err = liberr.Wrap(
-				dialErr,
-				"failed to retrieve fingerprint over insecure channel",
-				"url",
-				dialUrl,
-			)
-			return
-		}
+	fingerprint, err := r.getFingerprint(sourceSecret)
+	if err != nil {
+		return
 	}
 
 	env = append(
@@ -247,7 +226,40 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 	return
 }
 
-func sumToFingerprint(sum [20]byte) string {
+func (r *Builder) getFingerprint(sourceSecret *core.Secret) (fingerprint string, err error) {
+	var dialUrl string
+	if providerUrl, _ := url.Parse(r.Source.Provider.Spec.URL); providerUrl.Port() != "" {
+		dialUrl = providerUrl.Host
+	} else {
+		dialUrl = providerUrl.Host + ":443"
+	}
+	cfg := &tls.Config{}
+	if container.GetInsecureSkipVerifyFlag(r.Source.Secret) {
+		cfg.InsecureSkipVerify = true
+	} else {
+		cacert := r.Source.Secret.Data["cacert"]
+		cfg.RootCAs = x509.NewCertPool()
+		if ok := cfg.RootCAs.AppendCertsFromPEM(cacert); !ok {
+			err = liberr.New("failed to parse cacert")
+			return
+		}
+	}
+	if conn, dialErr := tls.Dial("tcp", dialUrl, cfg); dialErr == nil {
+		cert := conn.ConnectionState().PeerCertificates[0]
+		fingerprint = getFingerprint(cert)
+	} else {
+		err = liberr.Wrap(
+			dialErr,
+			"failed to retrieve fingerprint over insecure channel",
+			"url",
+			dialUrl,
+		)
+	}
+	return
+}
+
+func getFingerprint(cert *x509.Certificate) string {
+	sum := sha1.Sum(cert.Raw)
 	var buf bytes.Buffer
 	for i, f := range sum {
 		if i > 0 {
