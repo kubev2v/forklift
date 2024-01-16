@@ -1,3 +1,4 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_test")
 load("@bazel_gazelle//:def.bzl", "gazelle")
 load("@bazeldnf//:def.bzl", "bazeldnf")
 load("@bazel_tools//tools/python:toolchain.bzl", "py_runtime_pair")
@@ -137,4 +138,13 @@ container_push(
     registry = "$${REGISTRY:-quay.io}",
     repository = "$${REGISTRY_ORG:-}$${REGISTRY_ORG:+/}populator-controller",
     tag = "$${REGISTRY_TAG:-devel}",
+)
+
+go_test(
+    name = "forklift-controller_test",
+    srcs = ["forklift_suite_test.go"],
+    deps = [
+        "//vendor/github.com/onsi/ginkgo/v2:ginkgo",
+        "//vendor/github.com/onsi/gomega",
+    ],
 )
