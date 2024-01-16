@@ -84,7 +84,6 @@ func (c *Converter) ConvertPVCs(pvcs []*v1.PersistentVolumeClaim, srcFormat srcF
 		for _, condition := range convertJob.Status.Conditions {
 			switch condition.Type {
 			case batchv1.JobComplete:
-				completed++
 				c.Log.Info("Convert job completed", "pvc", pvc.Name)
 
 				// Delete scrach PVC
