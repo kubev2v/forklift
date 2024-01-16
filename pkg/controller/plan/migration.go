@@ -1345,7 +1345,7 @@ func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (err error) {
 		}
 	}
 	var vmCr VirtualMachine
-	var pvcs []core.PersistentVolumeClaim
+	var pvcs []*core.PersistentVolumeClaim
 	found := false
 	if vmCr, found = r.vmMap[vm.ID]; !found {
 		vmCr.VirtualMachine, err = r.kubevirt.virtualMachine(vm)
@@ -1358,7 +1358,7 @@ func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (err error) {
 		}
 	}
 
-	err = r.kubevirt.EnsureGuestConversionPod(vm, &vmCr, &pvcs)
+	err = r.kubevirt.EnsureGuestConversionPod(vm, &vmCr, pvcs)
 	return
 }
 
@@ -1368,7 +1368,7 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 	var pending int
 	var completed int
 	var running int
-	var pvcs []core.PersistentVolumeClaim
+	var pvcs []*core.PersistentVolumeClaim
 	dvs, err := r.kubevirt.getDVs(vm)
 	if err != nil {
 		return
@@ -1384,7 +1384,7 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 				continue
 			}
 			var task *plan.Task
-			name := r.builder.ResolvePersistentVolumeClaimIdentifier(&pvc)
+			name := r.builder.ResolvePersistentVolumeClaimIdentifier(pvc)
 			found := false
 			task, found = step.FindTask(name)
 			if !found {
@@ -1646,7 +1646,7 @@ func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.St
 		}
 		var task *plan.Task
 		var taskName string
-		taskName, err = r.builder.GetPopulatorTaskName(&pvc)
+		taskName, err = r.builder.GetPopulatorTaskName(pvc)
 		if err != nil {
 			return
 		}
@@ -1665,7 +1665,7 @@ func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.St
 		}
 
 		var transferredBytes int64
-		transferredBytes, err = r.builder.PopulatorTransferredBytes(&pvc)
+		transferredBytes, err = r.builder.PopulatorTransferredBytes(pvc)
 		if err != nil {
 			return
 		}

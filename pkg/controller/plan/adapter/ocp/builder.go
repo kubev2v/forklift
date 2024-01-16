@@ -238,7 +238,7 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 }
 
 // VirtualMachine implements base.Builder
-func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []core.PersistentVolumeClaim) error {
+func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim) error {
 	vmExport := &export.VirtualMachineExport{}
 	err := r.sourceClient.Get(context.Background(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vmExport)
 	if err != nil {
@@ -258,10 +258,10 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	return nil
 }
 
-func (r *Builder) mapDisks(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.VirtualMachineSpec, persistentVolumeClaims []core.PersistentVolumeClaim, vmRef ref.Ref) {
+func (r *Builder) mapDisks(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim, vmRef ref.Ref) {
 	pvcMap := make(map[string]*core.PersistentVolumeClaim)
 	for i := range persistentVolumeClaims {
-		pvc := &persistentVolumeClaims[i]
+		pvc := persistentVolumeClaims[i]
 		if source, ok := pvc.Annotations[planbase.AnnDiskSource]; ok {
 			pvcMap[source] = pvc
 		}
@@ -309,7 +309,7 @@ func createDiskMap(sourceVm *cnv.VirtualMachine, pvcMap map[string]*core.Persist
 	return diskMap
 }
 
-func (r *Builder) mapPVCsToTarget(targetVmSpec *cnv.VirtualMachineSpec, persistentVolumeClaims []core.PersistentVolumeClaim, diskMap map[string]*cnv.Disk) {
+func (r *Builder) mapPVCsToTarget(targetVmSpec *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim, diskMap map[string]*cnv.Disk) {
 	for _, volume := range persistentVolumeClaims {
 		if disk, ok := diskMap[volume.Annotations[planbase.AnnDiskSource]]; ok {
 			targetVolume := cnv.Volume{
@@ -614,7 +614,7 @@ func (r *Builder) PopulatorTransferredBytes(persistentVolumeClaim *core.Persiste
 	return
 }
 
-func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []core.PersistentVolumeClaim) (err error) {
+func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) (err error) {
 	err = planbase.VolumePopulatorNotSupportedError
 	return
 }
@@ -636,7 +636,7 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 	return
 }
 
-func (r *Builder) ConvertPVCs(pvcs []core.PersistentVolumeClaim) (ready bool, err error) {
+func (r *Builder) ConvertPVCs(pvcs []*core.PersistentVolumeClaim) (ready bool, err error) {
 	// do nothing
 	return
 }

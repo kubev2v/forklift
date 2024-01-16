@@ -77,7 +77,7 @@ type Builder interface {
 	// Get the populator task name associated to a PVC
 	GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error)
 	// Convert the PVC to a given format
-	ConvertPVCs(pvcs []core.PersistentVolumeClaim) (ready bool, err error)
+	ConvertPVCs(pvcs []*core.PersistentVolumeClaim) (ready bool, err error)
 }
 
 // Client API.
