@@ -11,7 +11,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -273,7 +272,7 @@ func makeScratchPVC(pvc *v1.PersistentVolumeClaim) *v1.PersistentVolumeClaim {
 			AccessModes: pvc.Spec.AccessModes,
 			VolumeMode:  pvc.Spec.VolumeMode,
 			Resources: v1.ResourceRequirements{
-				Requests: map[v1.ResourceName]resource.Quantity{
+				Requests: v1.ResourceList{
 					v1.ResourceStorage: size,
 				},
 			},
