@@ -563,8 +563,3 @@ func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskNam
 	err = planbase.VolumePopulatorNotSupportedError
 	return
 }
-
-func (r *Builder) ConvertPVCs(pvcs []*core.PersistentVolumeClaim) (ready bool, err error) {
-	// do nothing
-	return
-}

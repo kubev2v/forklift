@@ -950,8 +950,3 @@ func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskNam
 	taskName = pvc.Spec.DataSource.Name
 	return
 }
-
-func (r *Builder) ConvertPVCs(pvcs []*core.PersistentVolumeClaim) (ready bool, err error) {
-	// do nothing
-	return
-}
