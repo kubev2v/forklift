@@ -266,7 +266,7 @@ var DefaultProperties = map[string]string{
 }
 
 // Create the destination Kubevirt VM.
-func (r *Builder) VirtualMachine(vmRef ref.Ref, vmSpec *cnv.VirtualMachineSpec, persistentVolumeClaims []core.PersistentVolumeClaim) (err error) {
+func (r *Builder) VirtualMachine(vmRef ref.Ref, vmSpec *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim) (err error) {
 	vm := &model.Workload{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
@@ -495,7 +495,7 @@ func (r *Builder) getCpuCount(vm *model.Workload, imageCpuProperty string) (coun
 	return
 }
 
-func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.PersistentVolumeClaim, object *cnv.VirtualMachineSpec) {
+func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []*core.PersistentVolumeClaim, object *cnv.VirtualMachineSpec) {
 	var kVolumes []cnv.Volume
 	var kDisks []cnv.Disk
 
@@ -529,7 +529,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 		// Handle loopvar https://go.dev/wiki/LoopvarExperiment
 		pvc := pvc
 
-		image, err := r.getImageFromPVC(&pvc)
+		image, err := r.getImageFromPVC(pvc)
 		if err != nil {
 			r.Log.Error(err, "image not found in inventory", "imageID", pvc.Name)
 			return
@@ -537,7 +537,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 
 		if imageID, ok := image.Properties[forkliftPropertyOriginalImageID]; ok && imageID != "" {
 			if imageID.(string) == vm.ImageID {
-				imagePVC = &pvc
+				imagePVC = pvc
 				r.Log.Info("Image PVC found", "pvc", pvc.Name, "image", imagePVC.Annotations[AnnImportDiskId])
 			}
 		} else if volumeID, ok := image.Properties[forkliftPropertyOriginalVolumeID]; ok && volumeID != "" {
@@ -1230,7 +1230,7 @@ func (r *Builder) getImageFromPVC(pvc *core.PersistentVolumeClaim) (image *model
 	return
 }
 
-func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []core.PersistentVolumeClaim) (err error) {
+func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) (err error) {
 	workload := &model.Workload{}
 	err = r.Source.Inventory.Find(workload, vmRef)
 	if err != nil {
@@ -1249,7 +1249,7 @@ func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []core.Persis
 		// To be sure we have every disk based on what already migrated and what's not.
 		// e.g when initializing the plan and the PVC has not been created yet (but the populator CR is) or when the disks that are attached to the source VM change.
 		for _, pvc := range pvcs {
-			image, err := r.getImageFromPVC(&pvc)
+			image, err := r.getImageFromPVC(pvc)
 			if err != nil {
 				continue
 			}
@@ -1304,7 +1304,7 @@ func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskNam
 	return
 }
 
-func (r *Builder) ConvertPVCs(pvcs []core.PersistentVolumeClaim) (ready bool, err error) {
+func (r *Builder) ConvertPVCs(pvcs []*core.PersistentVolumeClaim) (ready bool, err error) {
 	completedPVCs := 0
 	for _, pvc := range pvcs {
 		if _, ok := pvc.Annotations[planbase.AnnRequiresConversion]; !ok {
@@ -1312,13 +1312,13 @@ func (r *Builder) ConvertPVCs(pvcs []core.PersistentVolumeClaim) (ready bool, er
 			completedPVCs++
 			continue
 		}
-		scratchPVC, err := r.ensureScratchPVC(&pvc)
+		scratchPVC, err := r.ensureScratchPVC(pvc)
 		if err != nil {
 			return false, err
 		}
 
 		if scratchPVC == nil {
-			r.Log.Info("Scratch PVC not ready", "pvc", getScratchPVCName(&pvc))
+			r.Log.Info("Scratch PVC not ready", "pvc", getScratchPVCName(pvc))
 			return false, nil
 		}
 
@@ -1341,7 +1341,7 @@ func (r *Builder) ConvertPVCs(pvcs []core.PersistentVolumeClaim) (ready bool, er
 			return false, liberr.New("source format not found")
 		}
 
-		convertJob, err := r.ensureJob(&pvc, sourceFormat, "raw")
+		convertJob, err := r.ensureJob(pvc, sourceFormat, "raw")
 		if err != nil {
 			return false, err
 		}
