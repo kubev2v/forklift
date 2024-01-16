@@ -1,0 +1,21 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "generators",
+    srcs = [
+        "boostrap_templates.go",
+        "bootstrap_command.go",
+        "generate_command.go",
+        "generate_templates.go",
+        "generators_common.go",
+    ],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/onsi/ginkgo/v2/ginkgo/generators",
+    importpath = "github.com/onsi/ginkgo/v2/ginkgo/generators",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/go-task/slim-sprig",
+        "//vendor/github.com/onsi/ginkgo/v2/ginkgo/command",
+        "//vendor/github.com/onsi/ginkgo/v2/ginkgo/internal",
+        "//vendor/github.com/onsi/ginkgo/v2/types",
+    ],
+)
