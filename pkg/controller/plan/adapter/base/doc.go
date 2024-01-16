@@ -49,7 +49,7 @@ type Builder interface {
 	// Build DataVolume config map.
 	ConfigMap(vmRef ref.Ref, secret *core.Secret, object *core.ConfigMap) error
 	// Build the Kubevirt VirtualMachine spec.
-	VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []core.PersistentVolumeClaim) error
+	VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim) error
 	// Build DataVolumes.
 	DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume) (dvs []cdi.DataVolume, err error)
 	// Build tasks.
@@ -73,7 +73,7 @@ type Builder interface {
 	// Transferred bytes
 	PopulatorTransferredBytes(persistentVolumeClaim *core.PersistentVolumeClaim) (transferredBytes int64, err error)
 	// Set the populator PVC labels
-	SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []core.PersistentVolumeClaim) (err error)
+	SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) (err error)
 	// Get the populator task name associated to a PVC
 	GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error)
 	// Convert the PVC to a given format
