@@ -1379,7 +1379,7 @@ func (r *Builder) ConvertPVCs(pvcs []core.PersistentVolumeClaim) (ready bool, er
 func (r *Builder) ensureJob(pvc *core.PersistentVolumeClaim, srcFormat, dstFormat string) (*batchv1.Job, error) {
 	jobName := getJobName(pvc, "convert")
 	job := &batchv1.Job{}
-	err := r.Client.Get(context.Background(), client.ObjectKey{Name: jobName, Namespace: pvc.Namespace}, job)
+	err := r.Destination.Client.Get(context.Background(), client.ObjectKey{Name: jobName, Namespace: pvc.Namespace}, job)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
 			r.Log.Info("Converting PVC format", "pvc", pvc.Name, "srcFormat", srcFormat, "dstFormat", dstFormat)
