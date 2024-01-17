@@ -42,6 +42,10 @@ spec:
               value: {{ inventory_service_name }}.{{ app_namespace }}.svc.cluster.local
             - name: API_PORT
               value: "8443"
+            - name: SERVICES_TLS_CERTIFICATE
+              value: "/var/run/secrets/{{ services_tls_secret_name }}/tls.crt"
+            - name: SERVICES_TLS_KEY
+              value: "/var/run/secrets/{{ services_tls_secret_name }}/tls.key"
           resources:
             limits:
               cpu: {{ api_container_limits_cpu }}
@@ -52,8 +56,14 @@ spec:
           volumeMounts:
             - name: {{ api_tls_secret_name }}
               mountPath: /var/run/secrets/{{ api_tls_secret_name }}
+            - name: {{ services_tls_secret_name }}
+              mountPath: /var/run/secrets/{{ services_tls_secret_name }}
       volumes:
         - name: {{ api_tls_secret_name }}
           secret:
             secretName: {{ api_tls_secret_name }}
+            defaultMode: 420
+        - name: {{ services_tls_secret_name }}
+          secret:
+            secretName: {{ services_tls_secret_name }}
             defaultMode: 420

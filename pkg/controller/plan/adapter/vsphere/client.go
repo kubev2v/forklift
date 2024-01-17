@@ -364,10 +364,7 @@ func (r *Client) password() string {
 }
 
 func (r *Client) thumbprint() string {
-	if thumbprint, found := r.Source.Secret.Data["thumbprint"]; found {
-		return string(thumbprint)
-	}
-	return ""
+	return r.Source.Provider.Status.Fingerprint
 }
 
 // getInsecureSkipVerifyFlag gets the insecureSkipVerify boolean flag
