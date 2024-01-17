@@ -51,6 +51,12 @@ inventory_tls_secret_name: "{{ inventory_service_name }}-serving-cert"
 inventory_issuer_name: "{{ inventory_service_name }}-issuer"
 inventory_certificate_name: "{{ inventory_service_name }}-certificate"
 
+services_service_name: "{{ app_name }}-services"
+services_route_name: "{{ services_service_name }}"
+services_tls_secret_name: "{{ services_service_name }}-serving-cert"
+services_issuer_name: "{{ services_service_name }}-issuer"
+services_certificate_name: "{{ services_service_name }}-certificate"
+
 validation_image_fqin: "{{ lookup( 'env', 'VALIDATION_IMAGE') or lookup( 'env', 'RELATED_IMAGE_VALIDATION') }}"
 validation_configmap_name: "{{ validation_service_name }}-config"
 validation_service_name: "{{ app_name }}-validation"

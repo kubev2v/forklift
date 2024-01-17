@@ -1,0 +1,20 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ services_certificate_name }}
+  namespace: {{ app_namespace }}
+spec:
+  isCA: true
+  dnsNames:
+  - {{ services_service_name }}.{{ app_namespace }}.svc
+  - {{ services_service_name }}.{{ app_namespace }}.svc.cluster.local
+  commonName: {{ services_certificate_name }}
+  secretName: {{ services_tls_secret_name }}
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: {{ app_name }}-issuer
+    kind: Issuer
+    group: cert-manager.io

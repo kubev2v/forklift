@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	forkliftv1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/tests/suit/framework"
 	"github.com/konveyor/forklift-controller/tests/suit/utils"
@@ -25,9 +26,9 @@ var _ = Describe("vSphere provider", func() {
 		By("Create Secret from Definition")
 		s, err := utils.CreateSecretFromDefinition(f.K8sClient, utils.NewSecretDefinition(nil, nil,
 			map[string][]byte{
-				"thumbprint": []byte("52:6C:4E:88:1D:78:AE:12:1C:F3:BB:6C:5B:F4:E2:82:86:A7:08:AF"),
-				"password":   []byte("MTIzNDU2Cg=="),
-				"user":       []byte("YWRtaW5pc3RyYXRvckB2c3BoZXJlLmxvY2Fs"),
+				v1beta1.Insecure: []byte("true"),
+				"password":       []byte("MTIzNDU2Cg=="),
+				"user":           []byte("YWRtaW5pc3RyYXRvckB2c3BoZXJlLmxvY2Fs"),
 			}, namespace, "provider-test-secret"))
 		Expect(err).ToNot(HaveOccurred())
 
@@ -84,9 +85,9 @@ var _ = Describe("vSphere provider", func() {
 			By("Create Secret from Definition")
 			s, err := utils.CreateSecretFromDefinition(f.K8sClient, utils.NewSecretDefinition(nil, nil,
 				map[string][]byte{
-					"thumbprint": []byte("52:6C:4E:88:1D:78:AE:12:1C:F3:BB:6C:5B:F4:E2:82:86:A7:08:AF"),
-					"password":   []byte("MTIzNDU2Cg=="),
-					"user":       []byte("YWRtaW5pc3RyYXRvckB2c3BoZXJlLmxvY2Fs"),
+					v1beta1.Insecure: []byte("true"),
+					"password":       []byte("MTIzNDU2Cg=="),
+					"user":           []byte("YWRtaW5pc3RyYXRvckB2c3BoZXJlLmxvY2Fs"),
 				}, namespace, "vcenter-provider-secret"))
 			Expect(err).ToNot(HaveOccurred())
 			By("Create vCenter provider")
@@ -123,9 +124,9 @@ var _ = Describe("vSphere provider", func() {
 			By("Create Secret from Definition")
 			s, err := utils.CreateSecretFromDefinition(f.K8sClient, utils.NewSecretDefinition(nil, nil,
 				map[string][]byte{
-					"thumbprint": []byte("52:6C:4E:88:1D:78:AE:12:1C:F3:BB:6C:5B:F4:E2:82:86:A7:08:AF"),
-					"password":   []byte("MTIzNDU2Cg=="),
-					"user":       []byte("YWRtaW5pc3RyYXRvckB2c3BoZXJlLmxvY2Fs"),
+					v1beta1.Insecure: []byte("true"),
+					"password":       []byte("MTIzNDU2Cg=="),
+					"user":           []byte("YWRtaW5pc3RyYXRvckB2c3BoZXJlLmxvY2Fs"),
 				}, namespace, "esxi-provider-secret"))
 			Expect(err).ToNot(HaveOccurred())
 			By("Create ESXi provider")

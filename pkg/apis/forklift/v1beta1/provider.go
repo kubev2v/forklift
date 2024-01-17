@@ -58,7 +58,8 @@ func (t ProviderType) String() string {
 
 // Secret fields.
 const (
-	Token = "token"
+	Token    = "token"
+	Insecure = "insecureSkipVerify"
 )
 
 // Provider settings.
@@ -93,6 +94,9 @@ type ProviderStatus struct {
 	// The most recent generation observed by the controller.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	// Fingerprint.
+	// +optional
+	Fingerprint string `json:"fingerprint,omitempty"`
 }
 
 // +genclient
