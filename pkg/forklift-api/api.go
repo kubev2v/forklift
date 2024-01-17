@@ -57,6 +57,10 @@ func NewForkliftApi(client client.Client) ForkliftApi {
 }
 
 func (app *forkliftAPIApp) Execute() {
+	app.serveWebhooks()
+}
+
+func (app *forkliftAPIApp) serveWebhooks() {
 	apiTlsCertificate, found := os.LookupEnv("API_TLS_CERTIFICATE")
 	if !found {
 		log.Info("Failed to find API_TLS_CERTIFICATE")
@@ -76,10 +80,10 @@ func (app *forkliftAPIApp) Execute() {
 		Handler: mux,
 	}
 
-	log.Info("start listening")
+	log.Info("start serving webhooks")
 	err := server.ListenAndServeTLS(apiTlsCertificate, apiTlsKey)
 	if err != nil {
-		log.Info("got error from server")
+		log.Error(err, "stop serving webhooks")
 	}
-	log.Info("stopped listening")
 }
+
