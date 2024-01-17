@@ -1,14 +1,9 @@
 package vsphere
 
 import (
-	"bytes"
 	"context"
-	"crypto/sha1"
-	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"fmt"
-	"net/url"
 	liburl "net/url"
 	"path"
 	"regexp"
@@ -192,14 +187,7 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		return
 	}
 
-	libvirtURL, err := r.getLibvirtURL(vm, sourceSecret)
-	if err != nil {
-		return
-	}
-
-	// The fingerpint/thumbprint is not confidential since one can retrieve
-	// it from the server as we do, so we don't have to place it in a secret
-	fingerprint, err := r.getFingerprint(sourceSecret)
+	libvirtURL, fingerprint, err := r.getSourceDetails(vm, sourceSecret)
 	if err != nil {
 		return
 	}
@@ -218,6 +206,8 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 			Name:  "V2V_source",
 			Value: "vSphere",
 		},
+		// The fingerpint/thumbprint is not confidential since one can retrieve
+		// it from the server as we do, so we don't have to place it in a secret
 		core.EnvVar{
 			Name:  "V2V_fingerprint",
 			Value: fingerprint,
@@ -226,51 +216,7 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 	return
 }
 
-func (r *Builder) getFingerprint(sourceSecret *core.Secret) (fingerprint string, err error) {
-	var dialUrl string
-	if providerUrl, _ := url.Parse(r.Source.Provider.Spec.URL); providerUrl.Port() != "" {
-		dialUrl = providerUrl.Host
-	} else {
-		dialUrl = providerUrl.Host + ":443"
-	}
-	cfg := &tls.Config{}
-	if container.GetInsecureSkipVerifyFlag(r.Source.Secret) {
-		cfg.InsecureSkipVerify = true
-	} else {
-		cacert := r.Source.Secret.Data["cacert"]
-		cfg.RootCAs = x509.NewCertPool()
-		if ok := cfg.RootCAs.AppendCertsFromPEM(cacert); !ok {
-			err = liberr.New("failed to parse cacert")
-			return
-		}
-	}
-	if conn, dialErr := tls.Dial("tcp", dialUrl, cfg); dialErr == nil {
-		cert := conn.ConnectionState().PeerCertificates[0]
-		fingerprint = getFingerprint(cert)
-	} else {
-		err = liberr.Wrap(
-			dialErr,
-			"failed to retrieve fingerprint over insecure channel",
-			"url",
-			dialUrl,
-		)
-	}
-	return
-}
-
-func getFingerprint(cert *x509.Certificate) string {
-	sum := sha1.Sum(cert.Raw)
-	var buf bytes.Buffer
-	for i, f := range sum {
-		if i > 0 {
-			fmt.Fprintf(&buf, ":")
-		}
-		fmt.Fprintf(&buf, "%02X", f)
-	}
-	return buf.String()
-}
-
-func (r *Builder) getLibvirtURL(vm *model.VM, sourceSecret *core.Secret) (libvirtURL liburl.URL, err error) {
+func (r *Builder) getSourceDetails(vm *model.VM, sourceSecret *core.Secret) (libvirtURL liburl.URL, fingerprint string, err error) {
 	host, err := r.host(vm.Host)
 	if err != nil {
 		return
@@ -294,6 +240,7 @@ func (r *Builder) getLibvirtURL(vm *model.VM, sourceSecret *core.Secret) (libvir
 			Path:     "",
 			RawQuery: sslVerify,
 		}
+		fingerprint = host.Thumbprint
 	} else if r.Source.Provider.Spec.Settings[api.SDK] == api.ESXI {
 		libvirtURL = liburl.URL{
 			Scheme:   "esx",
@@ -302,6 +249,7 @@ func (r *Builder) getLibvirtURL(vm *model.VM, sourceSecret *core.Secret) (libvir
 			Path:     "",
 			RawQuery: sslVerify,
 		}
+		fingerprint = r.Source.Provider.Status.Fingerprint
 	} else {
 		// Connect through VCenter
 		path := host.Path
@@ -334,6 +282,7 @@ func (r *Builder) getLibvirtURL(vm *model.VM, sourceSecret *core.Secret) (libvir
 			Path:     path, // E.g.: /Datacenter/Cluster/host.example.com
 			RawQuery: sslVerify,
 		}
+		fingerprint = r.Source.Provider.Status.Fingerprint
 	}
 
 	return
@@ -345,27 +294,20 @@ func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
 	if err != nil {
 		return
 	}
-	thumbprint := string(in.Data["thumbprint"])
 	if hostDef, found := r.hosts[hostID]; found {
-		hostSecret, nErr := r.hostSecret(hostDef)
-		if nErr != nil {
-			err = nErr
-			return
+		if in, err := r.hostSecret(hostDef); err == nil {
+			object.Data = map[string][]byte{
+				"accessKeyId": in.Data["user"],
+				"secretKey":   in.Data["password"],
+			}
+		} else {
+			return err
 		}
-		in = hostSecret
-		// Get host thumbprint
-		h, nErr := r.host(hostID)
-		if nErr != nil {
-			err = nErr
-			return
+	} else {
+		object.Data = map[string][]byte{
+			"accessKeyId": in.Data["user"],
+			"secretKey":   in.Data["password"],
 		}
-		thumbprint = h.Thumbprint
-	}
-
-	object.Data = map[string][]byte{
-		"accessKeyId": in.Data["user"],
-		"secretKey":   in.Data["password"],
-		"thumbprint":  []byte(thumbprint),
 	}
 	if cacert, ok := in.Data["cacert"]; ok {
 		object.Data["cacert"] = cacert
@@ -387,7 +329,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 	}
 
 	url := r.Source.Provider.Spec.URL
-	thumbprint := string(r.Source.Secret.Data["thumbprint"])
+	thumbprint := r.Source.Provider.Status.Fingerprint
 	hostID, err := r.hostID(vmRef)
 	if err != nil {
 		return

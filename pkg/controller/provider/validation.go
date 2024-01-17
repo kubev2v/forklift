@@ -218,6 +218,11 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 	case api.OpenShift:
 		keyList = []string{"token"}
 	case api.VSphere:
+		keyList = []string{
+			"user",
+			"password",
+		}
+
 		if vsphere.GetInsecureSkipVerifyFlag(secret) {
 			provider.Status.SetCondition(libcnd.Condition{
 				Type:     ConnectionInsecure,
@@ -228,12 +233,24 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 			})
 		}
 
+		if crt, err := container.GetTlsCertificate(provider.Spec.URL, secret); err == nil {
+			provider.Status.Fingerprint = container.Fingerprint(crt)
+		} else {
+			log.Error(err, "failed to get TLS certificate", "url", provider.Spec.URL)
+			provider.Status.SetCondition(libcnd.Condition{
+				Type:     ConnectionTestFailed,
+				Status:   True,
+				Reason:   Tested,
+				Category: Critical,
+				Message:  "TLS certificate cannot be retrieved",
+			})
+		}
+	case api.OVirt:
 		keyList = []string{
 			"user",
 			"password",
-			"thumbprint",
 		}
-	case api.OVirt:
+
 		if ovirt.GetInsecureSkipVerifyFlag(secret) {
 			provider.Status.SetCondition(libcnd.Condition{
 				Type:     ConnectionInsecure,
@@ -242,18 +259,8 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 				Category: Warn,
 				Message:  "TLS is susceptible to machine-in-the-middle attacks when certificate verification is skipped.",
 			})
-
-			keyList = []string{
-				"user",
-				"password",
-			}
-
 		} else {
-			keyList = []string{
-				"user",
-				"password",
-				"cacert",
-			}
+			keyList = append(keyList, "cacert")
 		}
 	case api.Ova:
 		keyList = []string{

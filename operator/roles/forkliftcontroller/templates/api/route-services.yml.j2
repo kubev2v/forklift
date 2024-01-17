@@ -1,0 +1,16 @@
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ services_route_name }}
+  namespace: {{ app_namespace }}
+  labels:
+    app: {{ app_name }}
+    service: {{ services_service_name }}
+spec:
+  to:
+    kind: Service
+    name: {{ services_service_name }}
+  tls:
+    termination: reencrypt
+    insecureEdgeTerminationPolicy: Redirect

@@ -543,11 +543,7 @@ func (r *Collector) password() string {
 
 // Thumbprint.
 func (r *Collector) thumbprint() string {
-	if password, found := r.secret.Data["thumbprint"]; found {
-		return string(password)
-	}
-
-	return ""
+	return r.provider.Status.Fingerprint
 }
 
 // getInsecureSkipVerifyFlag gets the insecureSkipVerify boolean flag

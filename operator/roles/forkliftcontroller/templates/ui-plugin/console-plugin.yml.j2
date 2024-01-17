@@ -21,6 +21,13 @@ spec:
         namespace: {{ app_namespace }}
         port: 8443
     - type: Service
+      alias: {{ services_service_name }}
+      authorize: true
+      service:
+        name: {{ services_service_name }}
+        namespace: {{ app_namespace }}
+        port: 8443
+    - type: Service
       alias: {{ must_gather_api_service_name }}
       authorize: true
       service:

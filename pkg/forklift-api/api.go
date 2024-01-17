@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/konveyor/forklift-controller/pkg/forklift-api/services"
 	webhooks "github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -57,7 +58,34 @@ func NewForkliftApi(client client.Client) ForkliftApi {
 }
 
 func (app *forkliftAPIApp) Execute() {
+	go app.serveServices()
 	app.serveWebhooks()
+}
+
+func (app *forkliftAPIApp) serveServices() {
+	servicesTlsCertificate, found := os.LookupEnv("SERVICES_TLS_CERTIFICATE")
+	if !found {
+		log.Info("Failed to find SERVICES_TLS_CERTIFICATE")
+		return
+	}
+	servicesTlsKey, found := os.LookupEnv("SERVICES_TLS_KEY")
+	if !found {
+		log.Info("Failed to find SERVICES_TLS_KEY")
+		return
+	}
+
+	mux := http.NewServeMux()
+	services.RegisterServices(mux, app.client)
+	server := http.Server{
+		Addr:    ":8444",
+		Handler: mux,
+	}
+
+	log.Info("start serving services")
+	err := server.ListenAndServeTLS(servicesTlsCertificate, servicesTlsKey)
+	if err != nil {
+		log.Error(err, "stop serving services")
+	}
 }
 
 func (app *forkliftAPIApp) serveWebhooks() {
@@ -86,4 +114,3 @@ func (app *forkliftAPIApp) serveWebhooks() {
 		log.Error(err, "stop serving webhooks")
 	}
 }
-
