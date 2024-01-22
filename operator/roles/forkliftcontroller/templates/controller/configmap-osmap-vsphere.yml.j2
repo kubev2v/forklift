@@ -1,0 +1,29 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ vsphere_osmap_configmap_name }}
+  namespace: {{ app_namespace }}
+  labels:
+    app: {{ app_name }}
+    service: {{ controller_service_name }}
+data:
+  centos7_64Guest: "centos.7"
+  centos7Guest: "centos.7"
+  centos8_64Guest: "centos.stream8"
+  centos8Guest: "centos.stream8"
+  fedora64Guest: "fedora"
+  fedoraGuest: "fedora"
+  rhel7_64Guest: "rhel.7"
+  rhel7Guest: "rhel.7"
+  rhel8_64Guest: "rhel.8"
+  rhel9_64Guest: "rhel.9"
+  ubuntu64Guest: "ubuntu"
+  ubuntuGuest: "ubuntu"
+  windows9_64Guest: "windows.10"
+  windows9Guest: "windows.10"
+  windows9Server64Guest: "windows.10"
+  windows11_64Guest: "windows.11"
+  windows2019srv_64Guest: "win2k19"
+  windows2019srvNext_64Guest: "win2k19"
+  windows2022srvNext_64Guest: "win2k22"

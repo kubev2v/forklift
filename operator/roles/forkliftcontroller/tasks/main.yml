@@ -57,6 +57,16 @@
       state : present
       definition: "{{ lookup('template', 'controller/configmap-controller.yml.j2') }}"
 
+  - name: "Setup operating systems config map for oVirt"
+    k8s:
+      state : present
+      definition: "{{ lookup('template', 'controller/configmap-osmap-ovirt.yml.j2') }}"
+
+  - name: "Setup operating systems config map for vSphere"
+    k8s:
+      state : present
+      definition: "{{ lookup('template', 'controller/configmap-osmap-vsphere.yml.j2') }}"
+
   - name: "Setup inventory service"
     k8s:
       state: present

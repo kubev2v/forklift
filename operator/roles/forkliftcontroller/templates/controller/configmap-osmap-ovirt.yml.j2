@@ -1,0 +1,26 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ ovirt_osmap_configmap_name }}
+  namespace: {{ app_namespace }}
+  labels:
+    app: {{ app_name }}
+    service: {{ controller_service_name }}
+data:
+  rhel_7x64: "rhel.7"
+  rhel_8x64: "rhel.8"
+  rhel_9x64: "rhel.9"
+  ubuntu_12_04: "ubuntu"
+  ubuntu_12_10: "ubuntu"
+  ubuntu_13_04: "ubuntu"
+  ubuntu_13_10: "ubuntu"
+  ubuntu_14_04: "ubuntu"
+  windows_10: "windows.10.virtio"
+  windows_10x64: "windows.10.virtio"
+  windows_2012R2x64: "win2k12.virtio"
+  windows_2012x64: "win2k12.virtio"
+  windows_2016x64: "win2k16.virtio"
+  windows_2019x64: "win2k19.virtio"
+  windows_2022: "win2k22.virtio"
+  windows_11: "windows.11.virtio"

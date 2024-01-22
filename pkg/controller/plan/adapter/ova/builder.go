@@ -440,6 +440,12 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 	return
 }
 
+func (r *Builder) PreferenceName(vmRef ref.Ref, configMap *core.ConfigMap) (name string, err error) {
+	// We currently set the operating systems for VMs from OVA to UNKNOWN so we cannot get the corresponding preference
+	err = liberr.New("preferences are not used by this provider")
+	return
+}
+
 func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err error) {
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
