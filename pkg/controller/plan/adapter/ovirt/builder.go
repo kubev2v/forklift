@@ -559,6 +559,26 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 	return
 }
 
+func (r *Builder) PreferenceName(vmRef ref.Ref, configMap *core.ConfigMap) (name string, err error) {
+	vm := &model.Workload{}
+	if err = r.Source.Inventory.Find(vm, vmRef); err != nil {
+		err = liberr.Wrap(
+			err,
+			"VM lookup failed.",
+			"vm",
+			vmRef.String())
+		return
+	}
+	name, ok := configMap.Data[vm.OSType]
+	if !ok {
+		err = liberr.Wrap(err,
+			"nothing fits the input OS",
+			"vm",
+			vmRef.String())
+	}
+	return
+}
+
 func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err error) {
 	vm := &model.Workload{}
 	err = r.Source.Inventory.Find(vm, vmRef)

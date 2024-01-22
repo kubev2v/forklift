@@ -135,3 +135,11 @@ rules:
   - update
   - patch
   - delete
+- apiGroups:
+  - instancetype.kubevirt.io
+  resources:
+  - virtualmachinepreferences
+  - virtualmachineclusterpreferences
+  verbs:
+  - get
+  - list
