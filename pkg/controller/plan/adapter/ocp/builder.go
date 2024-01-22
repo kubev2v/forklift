@@ -230,6 +230,12 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*planapi.Task, err error) {
 	return
 }
 
+func (r *Builder) PreferenceName(vmRef ref.Ref, configMap *core.ConfigMap) (name string, err error) {
+	// The VM is built from configuration, we don't need the preference
+	err = liberr.New("preferences are not used by this provider")
+	return
+}
+
 // TemplateLabels implements base.Builder
 func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err error) {
 	// The VM is build from configuration, we don't need the label

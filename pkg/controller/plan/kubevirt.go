@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"math/rand"
+	"os"
 	"path"
 	"sort"
 	"strconv"
@@ -23,6 +24,7 @@ import (
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cnv "kubevirt.io/api/core/v1"
+	instancetype "kubevirt.io/api/instancetype/v1beta1"
 	libvirtxml "libvirt.org/libvirt-go-xml"
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
@@ -83,6 +85,12 @@ const (
 	qemuUser = int64(107)
 	// Qemu group
 	qemuGroup = int64(107)
+)
+
+// Preference configmaps names
+const (
+	vsphereOsConfigMap = "forklift-vsphere-osmap"
+	ovirtOsConfigMap   = "forklift-ovirt-osmap"
 )
 
 // Map of VirtualMachines keyed by vmID.
@@ -1132,12 +1140,20 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 	}
 
 	var ok bool
-	object, ok = r.vmTemplate(vm)
-	if !ok {
-		r.Log.Info("Building VirtualMachine without template.",
+	object, err = r.vmPreference(vm)
+	if err != nil {
+		r.Log.Info("Building VirtualMachine without a VirtualMachinePreference.",
 			"vm",
-			vm.String())
-		object = r.emptyVm(vm)
+			vm.String(),
+			"err",
+			err)
+		object, ok = r.vmTemplate(vm)
+		if !ok {
+			r.Log.Info("Building VirtualMachine without template.",
+				"vm",
+				vm.String())
+			object = r.emptyVm(vm)
+		}
 	}
 
 	if object.Spec.Template.ObjectMeta.Labels == nil {
@@ -1164,6 +1180,97 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 	}
 
 	return
+}
+
+// Attempt to find a suitable preference.
+func (r *KubeVirt) vmPreference(vm *plan.VMStatus) (virtualMachine *cnv.VirtualMachine, err error) {
+	config, err := r.getOsMapConfig(r.Source.Provider.Type())
+	if err != nil {
+		return
+	}
+	preferenceName, err := r.Builder.PreferenceName(vm.Ref, config)
+	if err != nil {
+		return
+	}
+
+	preferenceName, kind, err := r.getPreference(vm, preferenceName)
+	if err != nil {
+		return
+	}
+
+	virtualMachine = r.emptyVm(vm)
+	virtualMachine.Spec.Preference = &cnv.PreferenceMatcher{Name: preferenceName, Kind: kind}
+	return
+}
+
+func (r *KubeVirt) getOsMapConfig(providerType v1beta1.ProviderType) (configMap *core.ConfigMap, err error) {
+	configMap = &core.ConfigMap{}
+	var configMapName string
+	switch providerType {
+	case api.VSphere:
+		configMapName = vsphereOsConfigMap
+	case api.OVirt:
+		configMapName = ovirtOsConfigMap
+	default:
+		return
+	}
+	err = r.Client.Get(
+		context.TODO(),
+		client.ObjectKey{Name: configMapName, Namespace: os.Getenv("POD_NAMESPACE")},
+		configMap,
+	)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	return
+}
+
+func (r *KubeVirt) getPreference(vm *plan.VMStatus, preferenceName string) (name, kind string, err error) {
+	name, kind, err = r.getVirtualMachinePreference(preferenceName)
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			r.Log.Info("could not find a local instance type preference for destination VM. trying cluster wide",
+				"vm",
+				vm.String())
+		} else {
+			return
+		}
+	}
+
+	name, kind, err = r.getVirtualMachineClusterPreference(vm, preferenceName)
+	return
+}
+
+func (r *KubeVirt) getVirtualMachinePreference(preferenceName string) (name, kind string, err error) {
+	virtualMachinePreference := &instancetype.VirtualMachinePreference{}
+	err = r.Destination.Client.Get(
+		context.TODO(),
+		client.ObjectKey{Name: preferenceName, Namespace: r.Plan.Spec.TargetNamespace},
+		virtualMachinePreference)
+	if err != nil {
+		return
+	}
+	return preferenceName, "VirtualMachinePreference", nil
+}
+
+func (r *KubeVirt) getVirtualMachineClusterPreference(vm *plan.VMStatus, preferenceName string) (name, kind string, err error) {
+	virtualMachineClusterPreference := &instancetype.VirtualMachineClusterPreference{}
+	err = r.Destination.Client.Get(
+		context.TODO(),
+		client.ObjectKey{Name: preferenceName},
+		virtualMachineClusterPreference)
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			r.Log.Info("could not find instance type preference for destination VM.",
+				"vm",
+				vm.String(),
+				"error",
+				err)
+		}
+		return
+	}
+	return preferenceName, "VirtualMachineClusterPreference", nil
 }
 
 // Attempt to find a suitable template and extract a VirtualMachine definition from it.

@@ -76,6 +76,8 @@ type Builder interface {
 	SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) (err error)
 	// Get the populator task name associated to a PVC
 	GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error)
+	// Get the virtual machine preference name
+	PreferenceName(vmRef ref.Ref, configMap *core.ConfigMap) (name string, err error)
 }
 
 // Client API.
