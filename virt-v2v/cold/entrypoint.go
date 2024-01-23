@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -120,14 +120,16 @@ func genName(diskNum int) string {
 func LinkDisks(diskKind string, num int) (err error) {
 	disks, err := filepath.Glob(diskKind)
 	if err != nil {
-		fmt.Println("Error getting disks ", err)
+		fmt.Printf("Error getting disks ", err)
+		//klog.Error("Error getting disks ", err)
 		return
 	}
 
 	for _, disk := range disks {
 		diskNum, err := strconv.Atoi(disk[num:])
 		if err != nil {
-			fmt.Println("Error geting disks names ", err)
+			fmt.Printf("Error geting disks names ", err)
+			//klog.Error("Error geting disks names ", err)
 			return err
 		}
 		diskLink := fmt.Sprintf("%s/%s-sd%s", DIR, os.Getenv("V2V_vmName"), genName(diskNum+1))
@@ -136,7 +138,8 @@ func LinkDisks(diskKind string, num int) (err error) {
 			diskImgPath = fmt.Sprintf("%s/disk.img", disk)
 		}
 		if err = os.Symlink(diskImgPath, diskLink); err != nil {
-			fmt.Println("Error creating disk link ", err)
+			fmt.Printf("Error creating disk link ", err)
+			//klog.Error("Error creating disk link ", err)
 			return err
 		}
 	}
@@ -144,44 +147,13 @@ func LinkDisks(diskKind string, num int) (err error) {
 }
 
 func executeVirtV2v(args []string) (err error) {
-	virtV2vCmd := exec.Command(args[0], args[1:]...)
-	virtV2vStdoutPipe, err := virtV2vCmd.StdoutPipe()
-	if err != nil {
-		fmt.Printf("Error setting up stdout pipe: %v\n", err)
-		return
-	}
-
-	tee := io.TeeReader(virtV2vStdoutPipe, os.Stdout)
+	virtV2vCmd := exec.Command("bash", "-c", strings.Join(args, " "), "|& /usr/local/bin/virt-v2v-monitor")
+	virtV2vCmd.Stdout = os.Stdout
 	virtV2vCmd.Stderr = os.Stderr
-
-	fmt.Println("exec ", virtV2vCmd)
-	if err = virtV2vCmd.Start(); err != nil {
+	if err = virtV2vCmd.Run(); err != nil {
 		fmt.Printf("Error executing command: %v\n", err)
-		return
-	}
-
-	virtV2vMonitorCmd := exec.Command("/usr/local/bin/virt-v2v-monitor")
-	virtV2vMonitorCmd.Stdin = tee
-	virtV2vMonitorCmd.Stdout = os.Stdout
-	virtV2vMonitorCmd.Stderr = os.Stderr
-
-	if err = virtV2vMonitorCmd.Start(); err != nil {
-		fmt.Printf("Error executing monitor command: %v\n", err)
-		return
-	}
-
-	if err = virtV2vCmd.Wait(); err != nil {
-		fmt.Printf("Error waiting for virt-v2v to finish: %v\n", err)
+		//klog.Errorf("Error executing command: %v\n", err)
 		return
 	}
 	return
-}
-
-func isValidSource(source string) bool {
-	switch source {
-	case OVA, vSphere:
-		return true
-	default:
-		return false
-	}
 }
