@@ -513,6 +513,10 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 		}
 	}
 
+	pvcSize := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
+	args = append(args, "--pvc-size="+strconv.FormatInt(pvcSize.Value(), 10))
+	args = append(args, "--owner-uid="+string(pvc.UID))
+
 	var waitForFirstConsumer bool
 	var nodeName string
 	if pvc.Spec.StorageClassName != nil {
@@ -819,16 +823,14 @@ func (c *controller) updatePvc(ctx context.Context, pvc *corev1.PersistentVolume
 
 func (c *controller) updateProgress(pvc *corev1.PersistentVolumeClaim, podIP string, cr *unstructured.Unstructured) error {
 	populatorKind := pvc.Spec.DataSourceRef.Kind
-	var diskRegex = regexp.MustCompile(fmt.Sprintf(`volume_populators_%s\{%s=\"([0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12})"\} (\d{1,3}.*)`,
-		populatorToResource[populatorKind].regexKey,
-		populatorToResource[populatorKind].storageResourceKey))
+	importRegExp := regexp.MustCompile("progress\\{ownerUID=\"" + string(pvc.UID) + "\"\\} (\\d+\\.?\\d*)")
 	url := fmt.Sprintf("http://%s:2112/metrics", podIP)
 	resp, err := http.Get(url)
 	if err != nil {
 		if strings.Contains(err.Error(), "connection refused") {
 			return nil
 		}
-		c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPopulatorProgress, "Failed to get url: %s, err: %w", url, err)
+		klog.Warning(err)
 		return nil
 	}
 
@@ -836,68 +838,67 @@ func (c *controller) updateProgress(pvc *corev1.PersistentVolumeClaim, podIP str
 	body, err := io.ReadAll(resp.Body)
 
 	if err != nil {
-		c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPopulatorProgress, "Failed to read response, error: %w", url, err)
+		klog.Warning(err)
 	}
 
-	matches := diskRegex.FindAllStringSubmatch(string(body), -1)
-	if matches == nil {
-		c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPopulatorProgress, "Failed to find matches, regex: %s", diskRegex)
+	match := importRegExp.FindStringSubmatch(string(body))
+	if match == nil {
+		klog.Warning(pvc.Name, "Failed to find matches, regex: ", importRegExp)
 		return nil
 	}
 
-	for _, match := range matches {
-		imageID := match[1]
-		progress, err := strconv.ParseFloat(string(match[2]), 64)
-		if err != nil {
-			c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPopulatorProgress, "Could not convert progress: %w", err)
-			break
-		}
-
-		gvr := schema.GroupVersionResource{
-			Group:    *pvc.Spec.DataSourceRef.APIGroup,
-			Version:  "v1beta1",
-			Resource: populatorToResource[populatorKind].resource,
-		}
-
-		latestPopulator, err := c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Get(context.TODO(), cr.GetName(), metav1.GetOptions{})
-		if err != nil {
-			c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPopulatorProgress, "Failed to get CR for kind: %s error: %w", populatorKind, err)
-			break
-		}
-
-		var updatedPopulator *unstructured.Unstructured
-		switch populatorKind {
-		case v1beta1.OpenstackVolumePopulatorKind:
-			updatedPopulator, err = createUpdatedOpenstackPopulatorProgress(int64(progress), latestPopulator)
-		case v1beta1.OvirtVolumePopulatorKind:
-			updatedPopulator, err = updateOvirtPopulatorProgress(int64(progress), latestPopulator)
-		default:
-			c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPopulatorProgress, "Unsupported populator kind: %s", populatorKind)
-		}
-		if err != nil {
-			c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPopulatorProgress, "Failed to updated CR for kind: %s error: %w", populatorKind, err)
-			break
-		}
-
-		_, err = c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Update(context.TODO(), updatedPopulator, metav1.UpdateOptions{})
-		if err != nil {
-			c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPopulatorProgress, "Failed to update CR: %w", err)
-			break
-		}
-
-		if err != nil {
-			c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPopulatorProgress, "Failed to update CR: %w", err)
-			break
-		}
-
-		c.recorder.Eventf(pvc, corev1.EventTypeNormal, reasonPopulatorProgress, "Updated progress for %s, disk: %s, progress: %d", populatorKind, imageID, int64(progress))
+	progress, err := strconv.ParseFloat(string(match[1]), 64)
+	if err != nil {
+		klog.Warning(pvc.Name, "Could not convert progress: ", err)
 	}
+	klog.Info("Benny progress: ", progress)
+
+	gvr := schema.GroupVersionResource{
+		Group:    *pvc.Spec.DataSourceRef.APIGroup,
+		Version:  "v1beta1",
+		Resource: populatorToResource[populatorKind].resource,
+	}
+
+	latestPopulator, err := c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Get(context.TODO(), cr.GetName(), metav1.GetOptions{})
+	if err != nil {
+		klog.Warning(pvc.Name, "Failed to get CR for kind: ", populatorKind, "error: ", err)
+	}
+
+	var updatedPopulator *unstructured.Unstructured
+	switch populatorKind {
+	case v1beta1.OpenstackVolumePopulatorKind:
+		updatedPopulator, err = createUpdatedOpenstackPopulatorProgress(int64(progress), latestPopulator)
+	case v1beta1.OvirtVolumePopulatorKind:
+		updatedPopulator, err = updateOvirtPopulatorProgress(int64(progress), latestPopulator)
+	default:
+		klog.Warning(pvc.Name, "Unsupported populator kind: ", populatorKind)
+	}
+
+	if err != nil {
+		klog.Warning(pvc.Name, "Failed to updated CR for kind: %s", populatorKind, "error: ", err)
+	}
+
+	_, err = c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Update(context.TODO(), updatedPopulator, metav1.UpdateOptions{})
+	if err != nil {
+		klog.Warning(pvc.Name, "Failed to update CR ", err)
+
+	}
+
+	if err != nil {
+		klog.Warning(pvc.Name, "Failed to update CR ", err)
+	}
+
+	klog.Info(pvc.Name, "Updated progress: ", progress)
 	return nil
 }
 
 func createUpdatedOpenstackPopulatorProgress(progress int64, cr *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	openstackPopulator := &v1beta1.OpenstackVolumePopulator{}
-	runtime.DefaultUnstructuredConverter.FromUnstructured(cr.UnstructuredContent(), openstackPopulator)
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(cr.UnstructuredContent(), openstackPopulator)
+	if err != nil {
+		return nil, err
+	}
+
 	openstackPopulator.Status.Transferred = fmt.Sprintf("%d", progress)
 	unstructuredPopulator, err := runtime.DefaultUnstructuredConverter.ToUnstructured(openstackPopulator)
 	if err != nil {
@@ -909,7 +910,11 @@ func createUpdatedOpenstackPopulatorProgress(progress int64, cr *unstructured.Un
 
 func updateOvirtPopulatorProgress(progress int64, cr *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	ovirtPopulator := &v1beta1.OvirtVolumePopulator{}
-	runtime.DefaultUnstructuredConverter.FromUnstructured(cr.UnstructuredContent(), ovirtPopulator)
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(cr.UnstructuredContent(), ovirtPopulator)
+	if err != nil {
+		return nil, err
+	}
+
 	ovirtPopulator.Status.Progress = fmt.Sprintf("%d", progress)
 	unstructuredPopulator, err := runtime.DefaultUnstructuredConverter.ToUnstructured(ovirtPopulator)
 	if err != nil {

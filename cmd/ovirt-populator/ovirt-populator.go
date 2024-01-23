@@ -13,7 +13,9 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	dto "github.com/prometheus/client_model/go"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 )
 
 type engineConfig struct {
@@ -32,34 +34,37 @@ type TransferProgress struct {
 }
 
 func main() {
-	var engineUrl, secretName, diskID, volPath, crName, crNamespace, namespace string
+	var engineUrl, secretName, diskID, volPath, crName, crNamespace, namespace, ownerUID string
+	var pvcSize *int64
+
 	// Populate args
 	flag.StringVar(&engineUrl, "engine-url", "", "ovirt-engine url (https//engine.fqdn)")
 	flag.StringVar(&secretName, "secret-name", "", "secret containing oVirt credentials")
 	flag.StringVar(&diskID, "disk-id", "", "ovirt-engine disk id")
 	flag.StringVar(&volPath, "volume-path", "", "Volume path to populate")
-	flag.StringVar(&crName, "cr-name", "", "Custom Resource instance name")
 	flag.StringVar(&crNamespace, "cr-namespace", "", "Custom Resource instance namespace")
+	flag.StringVar(&crName, "cr-name", "", "Custom Resource instance name")
+	flag.StringVar(&ownerUID, "owner-uid", "", "Owner UID (usually PVC UID)")
+	pvcSize = flag.Int64("pvc-size", 0, "Size of pvc (in bytes)")
 
 	// Other args
 	flag.StringVar(&namespace, "namespace", "konveyor-forklift", "Namespace to deploy controller")
 	flag.Parse()
 
-	populate(engineUrl, diskID, volPath)
+	populate(engineUrl, diskID, volPath, ownerUID, *pvcSize)
 }
 
-func populate(engineURL, diskID, volPath string) {
+func populate(engineURL, diskID, volPath, ownerUID string, pvcSize int64) {
 	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(":2112", nil)
-	progressGague := prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Subsystem: "volume_populators",
-			Name:      "ovirt_volume_populator",
-			Help:      "Amount of data transferred",
+	progressCounter := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "ovirt_progress",
+			Help: "Progress of volume population",
 		},
-		[]string{"disk_id"},
+		[]string{"ownerUID"},
 	)
-	if err := prometheus.Register(progressGague); err != nil {
+	if err := prometheus.Register(progressCounter); err != nil {
 		klog.Error("Prometheus progress gauge not registered:", err)
 	} else {
 		klog.Info("Prometheus progress gauge registered.")
@@ -88,6 +93,10 @@ func populate(engineURL, diskID, volPath string) {
 	klog.Info(fmt.Sprintf("Running command: %s", cmd.String()))
 
 	go func() {
+		var currentProgress float64
+		total := pvcSize
+		metric := &dto.Metric{}
+
 		for scanner.Scan() {
 			progressOutput := TransferProgress{}
 			text := scanner.Text()
@@ -99,9 +108,19 @@ func populate(engineURL, diskID, volPath string) {
 					klog.Error(err)
 				}
 			}
-
-			progressGague.WithLabelValues(diskID).Set(float64(progressOutput.Transferred))
+			if total > 0 {
+				currentProgress = (float64(progressOutput.Transferred) / float64(total)) * 100
+				err = progressCounter.WithLabelValues(ownerUID).Write(metric)
+				if err != nil {
+					klog.Error(err)
+				} else if currentProgress > metric.Counter.GetValue() {
+					progressCounter.WithLabelValues(ownerUID).Add(currentProgress - metric.Counter.GetValue())
+				}
+			}
 		}
+
+		metric.GetCounter().Value = ptr.To[float64](100)
+		err = progressCounter.WithLabelValues(ownerUID).Write(metric)
 
 		done <- struct{}{}
 	}()
