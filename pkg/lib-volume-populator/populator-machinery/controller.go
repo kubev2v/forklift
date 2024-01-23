@@ -843,15 +843,14 @@ func (c *controller) updateProgress(pvc *corev1.PersistentVolumeClaim, podIP str
 
 	match := importRegExp.FindStringSubmatch(string(body))
 	if match == nil {
-		klog.Warning(pvc.Name, "Failed to find matches, regex: ", importRegExp)
+		klog.Warning("Failed to find matches, regex: ", importRegExp)
 		return nil
 	}
 
 	progress, err := strconv.ParseFloat(string(match[1]), 64)
 	if err != nil {
-		klog.Warning(pvc.Name, "Could not convert progress: ", err)
+		klog.Warning("Could not convert progress: ", err)
 	}
-	klog.Info("Benny progress: ", progress)
 
 	gvr := schema.GroupVersionResource{
 		Group:    *pvc.Spec.DataSourceRef.APIGroup,
@@ -861,7 +860,7 @@ func (c *controller) updateProgress(pvc *corev1.PersistentVolumeClaim, podIP str
 
 	latestPopulator, err := c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Get(context.TODO(), cr.GetName(), metav1.GetOptions{})
 	if err != nil {
-		klog.Warning(pvc.Name, "Failed to get CR for kind: ", populatorKind, "error: ", err)
+		klog.Warning("Failed to get CR for kind: ", populatorKind, "error: ", err)
 	}
 
 	var updatedPopulator *unstructured.Unstructured
@@ -871,24 +870,24 @@ func (c *controller) updateProgress(pvc *corev1.PersistentVolumeClaim, podIP str
 	case v1beta1.OvirtVolumePopulatorKind:
 		updatedPopulator, err = updateOvirtPopulatorProgress(int64(progress), latestPopulator)
 	default:
-		klog.Warning(pvc.Name, "Unsupported populator kind: ", populatorKind)
+		klog.Warning("Unsupported populator kind: ", populatorKind)
 	}
 
 	if err != nil {
-		klog.Warning(pvc.Name, "Failed to updated CR for kind: %s", populatorKind, "error: ", err)
+		klog.Warning("Failed to updated CR for kind: %s", populatorKind, "error: ", err)
 	}
 
 	_, err = c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Update(context.TODO(), updatedPopulator, metav1.UpdateOptions{})
 	if err != nil {
-		klog.Warning(pvc.Name, "Failed to update CR ", err)
+		klog.Warning("Failed to update CR ", err)
 
 	}
 
 	if err != nil {
-		klog.Warning(pvc.Name, "Failed to update CR ", err)
+		klog.Warning("Failed to update CR ", err)
 	}
 
-	klog.Info(pvc.Name, "Updated progress: ", progress)
+	klog.Info("Updated progress: ", progress)
 	return nil
 }
 
