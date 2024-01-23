@@ -35,7 +35,7 @@ require (
 	k8s.io/component-base v0.28.3
 	k8s.io/component-helpers v0.28.3
 	k8s.io/klog/v2 v2.100.1
-	k8s.io/utils v0.0.0-20230505201702-9f6742963106
+	k8s.io/utils v0.0.0-20240102154912-e7106e64919e
 	kubevirt.io/api v1.1.0
 	kubevirt.io/containerized-data-importer-api v1.57.0-alpha1
 	libvirt.org/libvirt-go-xml v7.4.0+incompatible
