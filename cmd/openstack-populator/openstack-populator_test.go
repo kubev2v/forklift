@@ -148,9 +148,10 @@ func TestPopulate(t *testing.T) {
 	fileName := "disk.img"
 	secretName := "test-secret"
 	imageID := "test-image-id"
+	ownerUID := "test-uid"
 
 	fmt.Println("server ", identityServerURL)
-	populate(fileName, identityServerURL, secretName, imageID)
+	populate(fileName, identityServerURL, secretName, imageID, ownerUID, 100)
 
 	file, err := os.Open(fileName)
 	if err != nil {

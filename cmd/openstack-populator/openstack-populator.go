@@ -11,6 +11,7 @@ import (
 	libclient "github.com/konveyor/forklift-controller/pkg/lib/client/openstack"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	dto "github.com/prometheus/client_model/go"
 	"k8s.io/klog/v2"
 )
 
@@ -21,6 +22,8 @@ func main() {
 		crNamespace      string
 		crName           string
 		secretName       string
+		ownerUID         string
+		pvcSize          *int64
 
 		volumePath string
 	)
@@ -35,25 +38,26 @@ func main() {
 	flag.StringVar(&volumePath, "volume-path", "", "Path to populate")
 	flag.StringVar(&crName, "cr-name", "", "Custom Resource instance name")
 	flag.StringVar(&crNamespace, "cr-namespace", "", "Custom Resource instance namespace")
+	flag.StringVar(&ownerUID, "owner-uid", "", "Owner UID (usually PVC UID)")
+	pvcSize = flag.Int64("pvc-size", 0, "Size of pvc (in bytes)")
 
 	flag.Parse()
 
-	populate(volumePath, identityEndpoint, secretName, imageID)
+	populate(volumePath, identityEndpoint, secretName, imageID, ownerUID, *pvcSize)
 }
 
-func populate(fileName, identityEndpoint, secretName, imageID string) {
+func populate(fileName, identityEndpoint, secretName, imageID, ownerUID string, pvcSize int64) {
 	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(":2112", nil)
-	progressGague := prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Subsystem: "volume_populators",
-			Name:      "openstack_volume_populator",
-			Help:      "Amount of data transferred",
+	progressVec := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "openstack_populator_progress",
+			Help: "Progress of volume population",
 		},
-		[]string{"image_id"},
+		[]string{"ownerUID"},
 	)
 
-	if err := prometheus.Register(progressGague); err != nil {
+	if err := prometheus.Register(progressVec); err != nil {
 		klog.Error("Prometheus progress counter not registered:", err)
 	} else {
 		klog.Info("Prometheus progress counter registered.")
@@ -93,7 +97,7 @@ func populate(fileName, identityEndpoint, secretName, imageID string) {
 	}
 	defer file.Close()
 
-	err = writeData(imageReader, file, imageID, progressGague)
+	err = writeData(imageReader, file, imageID, ownerUID, progressVec, &pvcSize)
 	if err != nil {
 		klog.Fatal(err)
 	}
@@ -101,30 +105,46 @@ func populate(fileName, identityEndpoint, secretName, imageID string) {
 
 type CountingReader struct {
 	reader io.ReadCloser
-	total  *int64
+	read   *int64
 }
 
 func (cr *CountingReader) Read(p []byte) (int, error) {
 	n, err := cr.reader.Read(p)
-	*cr.total += int64(n)
+	*cr.read += int64(n)
 	return n, err
 }
 
-func writeData(reader io.ReadCloser, file *os.File, imageID string, progress *prometheus.GaugeVec) error {
-	total := new(int64)
+func writeData(reader io.ReadCloser, file *os.File, imageID, ownerUID string, progress *prometheus.CounterVec, total *int64) error {
 	countingReader := CountingReader{reader, total}
 
 	done := make(chan bool)
+
 	go func() {
+		metric := &dto.Metric{}
+		var currentProgress float64
+
 		for {
 			select {
 			case <-done:
+				if metric.Counter != nil {
+					progress.WithLabelValues(ownerUID).Add(100 - *metric.Counter.Value)
+				}
+
 				klog.Info("Total: ", *total)
 				klog.Info("Finished!")
 				return
 			default:
-				progress.WithLabelValues(imageID).Set(float64(*total))
-				klog.Info("Transferred: ", *total)
+				if *total > 0 {
+					currentProgress = (float64(*countingReader.read) / float64(*total)) * 100
+					if err := progress.WithLabelValues(ownerUID).Write(metric); err != nil {
+						klog.Error(err)
+					}
+					if currentProgress > *metric.Counter.Value {
+						progress.WithLabelValues(ownerUID).Add(currentProgress - *metric.Counter.Value)
+					}
+
+				}
+
 				time.Sleep(3 * time.Second)
 			}
 		}
@@ -134,7 +154,6 @@ func writeData(reader io.ReadCloser, file *os.File, imageID string, progress *pr
 		klog.Fatal(err)
 	}
 	done <- true
-	progress.WithLabelValues(imageID).Set(float64(*total))
 
 	return nil
 }
