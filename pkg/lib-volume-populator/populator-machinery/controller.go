@@ -513,9 +513,9 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 		}
 	}
 
-	pvcSize := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
-	args = append(args, "--pvc-size="+strconv.FormatInt(pvcSize.Value(), 10))
-	args = append(args, "--owner-uid="+string(pvc.UID))
+	pvcSize := pvc.Spec.Resources.Requests.Storage().Value()
+	args = append(args, fmt.Sprintf("--pvc-size=%d", pvcSize))
+	args = append(args, fmt.Sprintf("--owner-uid=%s", pvc.UID))
 
 	var waitForFirstConsumer bool
 	var nodeName string
