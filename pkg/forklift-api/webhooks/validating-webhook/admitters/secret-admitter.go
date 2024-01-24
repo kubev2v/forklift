@@ -72,6 +72,10 @@ func (admitter *SecretAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissio
 }
 
 func (admitter *SecretAdmitter) validateProviderSecret() *admissionv1.AdmissionResponse {
+	if _, ok := admitter.secret.Data["cacert"]; ok && container.InsecureProvider(&admitter.secret) {
+		return webhookutils.ToAdmissionResponseError(fmt.Errorf("received a request to add insecure provider with a CA certificate"))
+	}
+
 	if createdForProviderType, ok := admitter.secret.GetLabels()["createdForProviderType"]; ok {
 		providerType := api.ProviderType(createdForProviderType)
 
