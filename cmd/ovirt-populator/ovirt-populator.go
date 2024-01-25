@@ -61,25 +61,24 @@ func populate(engineURL, diskID, volPath, ownerUID string, pvcSize int64) {
 func setupPrometheusMetrics() {
 	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(":2112", nil)
-	// ... [rest of the Prometheus setup code] ...
 }
 
 func prepareCredentials(config *engineConfig) {
-	writeFile("/tmp/ovirt.pass", config.password, "ovirt.pass")
+	writeFile("/tmp/ovirt.pass", config.password)
 	if !config.insecure {
-		writeFile("/tmp/ca.pem", config.cacert, "ca.pem")
+		writeFile("/tmp/ca.pem", config.cacert)
 	}
 }
 
-func writeFile(filename, content, logName string) {
+func writeFile(filename, content string) {
 	file, err := os.Create(filename)
 	if err != nil {
-		klog.Fatalf("Failed to create %s: %v", logName, err)
+		klog.Fatalf("Failed to create %s: %v", filename, err)
 	}
 	defer file.Close()
 
 	if _, err := file.Write([]byte(content)); err != nil {
-		klog.Fatalf("Failed to write to %s: %v", logName, err)
+		klog.Fatalf("Failed to write to %s: %v", filename, err)
 	}
 }
 
