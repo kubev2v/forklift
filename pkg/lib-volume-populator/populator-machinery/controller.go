@@ -880,11 +880,6 @@ func (c *controller) updateProgress(pvc *corev1.PersistentVolumeClaim, podIP str
 	_, err = c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Update(context.TODO(), updatedPopulator, metav1.UpdateOptions{})
 	if err != nil {
 		klog.Warning("Failed to update CR ", err)
-
-	}
-
-	if err != nil {
-		klog.Warning("Failed to update CR ", err)
 	}
 
 	klog.Info("Updated progress: ", progress)
