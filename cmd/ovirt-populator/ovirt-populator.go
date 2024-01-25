@@ -15,7 +15,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	dto "github.com/prometheus/client_model/go"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/ptr"
 )
 
 type engineConfig struct {
@@ -104,14 +103,14 @@ func executePopulationProcess(config *engineConfig, diskID, volPath, ownerUID st
 }
 
 func monitorProgress(scanner *bufio.Scanner, ownerUID string, pvcSize int64, done chan struct{}) {
-	progressCounter := prometheus.NewCounterVec(
+	progress := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "ovirt_progress",
 			Help: "Progress of volume population",
 		},
 		[]string{"ownerUID"},
 	)
-	if err := prometheus.Register(progressCounter); err != nil {
+	if err := prometheus.Register(progress); err != nil {
 		klog.Error("Prometheus progress gauge not registered:", err)
 		return
 	} else {
@@ -134,16 +133,16 @@ func monitorProgress(scanner *bufio.Scanner, ownerUID string, pvcSize int64, don
 		}
 		if total > 0 {
 			currentProgress = (float64(progressOutput.Transferred) / float64(total)) * 100
-			if err := progressCounter.WithLabelValues(ownerUID).Write(metric); err != nil {
+			if err := progress.WithLabelValues(ownerUID).Write(metric); err != nil {
 				klog.Error(err)
 			} else if currentProgress > metric.Counter.GetValue() {
-				progressCounter.WithLabelValues(ownerUID).Add(currentProgress - metric.Counter.GetValue())
+				progress.WithLabelValues(ownerUID).Add(currentProgress - metric.Counter.GetValue())
 			}
 		}
 	}
 
-	metric.GetCounter().Value = ptr.To[float64](100)
-	if err := progressCounter.WithLabelValues(ownerUID).Write(metric); err != nil {
+	progress.WithLabelValues(ownerUID).Add(100 - *metric.Counter.Value)
+	if err := progress.WithLabelValues(ownerUID).Write(metric); err != nil {
 		klog.Error(err)
 	}
 
