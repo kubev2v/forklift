@@ -17,7 +17,6 @@ go_library(
         "//vendor/github.com/prometheus/client_golang/prometheus/promhttp",
         "//vendor/github.com/prometheus/client_model/go",
         "//vendor/k8s.io/klog/v2:klog",
-        "//vendor/k8s.io/utils/ptr",
     ],
 )
 

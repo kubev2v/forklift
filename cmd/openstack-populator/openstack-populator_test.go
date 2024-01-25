@@ -150,8 +150,17 @@ func TestPopulate(t *testing.T) {
 	imageID := "test-image-id"
 	ownerUID := "test-uid"
 
+	config := &AppConfig{
+		identityEndpoint: identityServerURL,
+		secretName:       secretName,
+		imageID:          imageID,
+		ownerUID:         ownerUID,
+		pvcSize:          100,
+		volumePath:       fileName,
+	}
+
 	fmt.Println("server ", identityServerURL)
-	populate(fileName, identityServerURL, secretName, imageID, ownerUID, 100)
+	populate(config)
 
 	file, err := os.Open(fileName)
 	if err != nil {
