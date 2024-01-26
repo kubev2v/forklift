@@ -23,5 +23,8 @@ func OpenstackVolumePopulator(image *openstack.Image, sourceUrl *url.URL, transf
 			ImageID:         image.ID,
 			TransferNetwork: transferNetwork,
 		},
+		Status: api.OpenstackVolumePopulatorStatus{
+			Progress: "0",
+		},
 	}
 }
