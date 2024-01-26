@@ -30,13 +30,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -688,7 +686,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 							}
 
 							// TODO make configurable?
-							time.Sleep(5 * time.Second)
+							time.Sleep(1 * time.Second)
 						}
 					}()
 				}
@@ -863,21 +861,12 @@ func (c *controller) updateProgress(pvc *corev1.PersistentVolumeClaim, podIP str
 		klog.Warning("Failed to get CR for kind: ", populatorKind, "error: ", err)
 	}
 
-	var updatedPopulator *unstructured.Unstructured
-	switch populatorKind {
-	case v1beta1.OpenstackVolumePopulatorKind:
-		updatedPopulator, err = createUpdatedOpenstackPopulatorProgress(int64(progress), latestPopulator)
-	case v1beta1.OvirtVolumePopulatorKind:
-		updatedPopulator, err = updateOvirtPopulatorProgress(int64(progress), latestPopulator)
-	default:
-		klog.Warning("Unsupported populator kind: ", populatorKind)
-	}
-
+	err = updatePopulatorProgress(int64(progress), latestPopulator)
 	if err != nil {
-		klog.Warning("Failed to updated CR for kind: %s", populatorKind, "error: ", err)
+		klog.Warning("Failed to update progress: ", err)
 	}
 
-	_, err = c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Update(context.TODO(), updatedPopulator, metav1.UpdateOptions{})
+	_, err = c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Update(context.TODO(), latestPopulator, metav1.UpdateOptions{})
 	if err != nil {
 		klog.Warning("Failed to update CR ", err)
 	}
@@ -886,36 +875,12 @@ func (c *controller) updateProgress(pvc *corev1.PersistentVolumeClaim, podIP str
 	return nil
 }
 
-func createUpdatedOpenstackPopulatorProgress(progress int64, cr *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	openstackPopulator := &v1beta1.OpenstackVolumePopulator{}
-	err := runtime.DefaultUnstructuredConverter.FromUnstructured(cr.UnstructuredContent(), openstackPopulator)
-	if err != nil {
-		return nil, err
+func updatePopulatorProgress(progress int64, cr *unstructured.Unstructured) error {
+	if err := unstructured.SetNestedField(cr.Object, fmt.Sprintf("%d", progress), "status", "progress"); err != nil {
+		return err
 	}
 
-	openstackPopulator.Status.Transferred = fmt.Sprintf("%d", progress)
-	unstructuredPopulator, err := runtime.DefaultUnstructuredConverter.ToUnstructured(openstackPopulator)
-	if err != nil {
-		return nil, err
-	}
-
-	return &unstructured.Unstructured{Object: unstructuredPopulator}, nil
-}
-
-func updateOvirtPopulatorProgress(progress int64, cr *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	ovirtPopulator := &v1beta1.OvirtVolumePopulator{}
-	err := runtime.DefaultUnstructuredConverter.FromUnstructured(cr.UnstructuredContent(), ovirtPopulator)
-	if err != nil {
-		return nil, err
-	}
-
-	ovirtPopulator.Status.Progress = fmt.Sprintf("%d", progress)
-	unstructuredPopulator, err := runtime.DefaultUnstructuredConverter.ToUnstructured(ovirtPopulator)
-	if err != nil {
-		return nil, err
-	}
-
-	return &unstructured.Unstructured{Object: unstructuredPopulator}, nil
+	return nil
 }
 
 func makePopulatePodSpec(pvcPrimeName, secretName string) corev1.PodSpec {

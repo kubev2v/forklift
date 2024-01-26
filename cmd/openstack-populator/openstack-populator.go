@@ -42,7 +42,7 @@ func parseFlags() *AppConfig {
 	flag.StringVar(&config.crName, "cr-name", "", "Custom Resource instance name")
 	flag.StringVar(&config.crNamespace, "cr-namespace", "", "Custom Resource instance namespace")
 	flag.StringVar(&config.ownerUID, "owner-uid", "", "Owner UID (usually PVC UID)")
-	config.pvcSize = *flag.Int64("pvc-size", 0, "Size of pvc (in bytes)")
+	flag.Int64Var(&config.pvcSize, "pvc-size", 0, "Size of pvc (in bytes)")
 	flag.Parse()
 
 	return config
@@ -115,7 +115,7 @@ func openFile(volumePath string) *os.File {
 }
 
 func writeData(reader io.ReadCloser, file *os.File, config *AppConfig, progress *prometheus.CounterVec) {
-	countingReader := &CountingReader{reader: reader, read: &config.pvcSize}
+	countingReader := &CountingReader{reader: reader, total: config.pvcSize, read: new(int64)}
 	done := make(chan bool)
 
 	go reportProgress(done, countingReader, progress, config)
@@ -127,37 +127,54 @@ func writeData(reader io.ReadCloser, file *os.File, config *AppConfig, progress 
 }
 
 func reportProgress(done chan bool, countingReader *CountingReader, progress *prometheus.CounterVec, config *AppConfig) {
-	metric := &dto.Metric{}
 	for {
 		select {
 		case <-done:
-			finalizeProgress(metric, progress, config.ownerUID)
+			finalizeProgress(progress, config.ownerUID)
 			return
 		default:
-			updateProgress(metric, countingReader, progress, config.ownerUID)
-			time.Sleep(3 * time.Second)
+			updateProgress(countingReader, progress, config.ownerUID)
+			time.Sleep(1 * time.Second)
 		}
 	}
 }
 
-func finalizeProgress(metric *dto.Metric, progress *prometheus.CounterVec, ownerUID string) {
+func finalizeProgress(progress *prometheus.CounterVec, ownerUID string) {
+	currentVal := progress.WithLabelValues(ownerUID)
+
+	var metric dto.Metric
+	if err := currentVal.Write(&metric); err != nil {
+		klog.Error("Error reading current progress:", err)
+		return
+	}
+
 	if metric.Counter != nil {
-		progress.WithLabelValues(ownerUID).Add(100 - *metric.Counter.Value)
-		if err := progress.WithLabelValues(ownerUID).Write(metric); err != nil {
-			klog.Error(err)
+		remainingProgress := 100 - *metric.Counter.Value
+		if remainingProgress > 0 {
+			currentVal.Add(remainingProgress)
 		}
 	}
-	klog.Info("Finished!")
+
+	klog.Info("Finished populating the volume. Progress: 100%")
 }
 
-func updateProgress(metric *dto.Metric, countingReader *CountingReader, progress *prometheus.CounterVec, ownerUID string) {
-	currentProgress := (float64(*countingReader.read) / float64(countingReader.total)) * 100
-	if err := progress.WithLabelValues(ownerUID).Write(metric); err != nil {
-		klog.Error(err)
+func updateProgress(countingReader *CountingReader, progress *prometheus.CounterVec, ownerUID string) {
+	if countingReader.total <= 0 {
+		return
 	}
+
+	metric := &dto.Metric{}
+	if err := progress.WithLabelValues(ownerUID).Write(metric); err != nil {
+		klog.Errorf("updateProgress: failed to write metric; %v", err)
+	}
+
+	currentProgress := (float64(*countingReader.read) / float64(countingReader.total)) * 100
+
 	if currentProgress > *metric.Counter.Value {
 		progress.WithLabelValues(ownerUID).Add(currentProgress - *metric.Counter.Value)
 	}
+
+	klog.Info("Progress: ", int64(currentProgress), "%")
 }
 
 func readOptions() map[string]string {

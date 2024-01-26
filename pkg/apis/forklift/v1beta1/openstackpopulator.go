@@ -30,7 +30,7 @@ type OpenstackVolumePopulatorSpec struct {
 
 type OpenstackVolumePopulatorStatus struct {
 	// +optional
-	Transferred string `json:"transferred"`
+	Progress string `json:"progress"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
