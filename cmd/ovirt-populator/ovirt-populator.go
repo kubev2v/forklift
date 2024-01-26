@@ -141,7 +141,14 @@ func monitorProgress(scanner *bufio.Scanner, ownerUID string, pvcSize int64, don
 		}
 	}
 
-	progress.WithLabelValues(ownerUID).Add(100 - *metric.Counter.Value)
+	if err := progress.WithLabelValues(ownerUID).Write(metric); err != nil {
+		klog.Error(err)
+	}
+	remaining := total - int64(metric.Counter.GetValue())
+	if remaining > 0 {
+		progress.WithLabelValues(ownerUID).Add(float64(remaining))
+	}
+
 	if err := progress.WithLabelValues(ownerUID).Write(metric); err != nil {
 		klog.Error(err)
 	}

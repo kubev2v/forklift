@@ -1207,12 +1207,15 @@ func (r *Builder) PopulatorTransferredBytes(persistentVolumeClaim *core.Persiste
 	if err != nil {
 		return
 	}
-	transferredBytes, err = strconv.ParseInt(populatorCr.Status.Transferred, 10, 64)
+	progressPercentage, err := strconv.ParseInt(populatorCr.Status.Progress, 10, 64)
 	if err != nil {
 		transferredBytes = 0
 		err = nil
 		return
 	}
+
+	pvcSize := persistentVolumeClaim.Spec.Resources.Requests["storage"]
+	transferredBytes = progressPercentage * pvcSize.Value()
 	return
 }
 
