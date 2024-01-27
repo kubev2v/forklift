@@ -63,3 +63,7 @@ func DeleteSecret(clientSet *kubernetes.Clientset, namespace string, secret v1.S
 	})
 	return e
 }
+
+func GetSecret(clientSet *kubernetes.Clientset, namespace, name string) (*v1.Secret, error) {
+	return clientSet.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+}
