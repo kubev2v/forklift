@@ -24,9 +24,11 @@ var _ = Describe("vSphere provider", func() {
 	It("Migrate VM", func() {
 		namespace := f.Namespace.Name
 		By("Create Secret from Definition")
+		simSecret, err := utils.GetSecret(f.K8sClient, "konveyor-forklift", "vcsim-certificate")
+		Expect(err).ToNot(HaveOccurred())
 		s, err := utils.CreateSecretFromDefinition(f.K8sClient, utils.NewSecretDefinition(nil, nil,
 			map[string][]byte{
-				v1beta1.Insecure: []byte("true"),
+				"cacert":         simSecret.Data["ca.crt"],
 				"password":       []byte("MTIzNDU2Cg=="),
 				"user":           []byte("YWRtaW5pc3RyYXRvckB2c3BoZXJlLmxvY2Fs"),
 			}, namespace, "provider-test-secret"))
