@@ -45,6 +45,10 @@ func parseFlags() *AppConfig {
 	flag.Int64Var(&config.pvcSize, "pvc-size", 0, "Size of pvc (in bytes)")
 	flag.Parse()
 
+	if config.pvcSize <= 0 {
+		klog.Fatal("pvc-size must be greater than 0")
+	}
+
 	return config
 }
 
