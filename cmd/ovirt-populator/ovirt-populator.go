@@ -47,6 +47,10 @@ func main() {
 
 	flag.Parse()
 
+	if pvcSize == nil || *pvcSize <= 0 {
+		klog.Fatal("pvc-size must be greater than 0")
+	}
+
 	populate(engineUrl, diskID, volPath, ownerUID, *pvcSize)
 }
 
@@ -144,13 +148,10 @@ func monitorProgress(scanner *bufio.Scanner, ownerUID string, pvcSize int64, don
 	if err := progress.WithLabelValues(ownerUID).Write(metric); err != nil {
 		klog.Error(err)
 	}
-	remaining := total - int64(metric.Counter.GetValue())
+
+	remaining := 100 - int64(metric.Counter.GetValue())
 	if remaining > 0 {
 		progress.WithLabelValues(ownerUID).Add(float64(remaining))
-	}
-
-	if err := progress.WithLabelValues(ownerUID).Write(metric); err != nil {
-		klog.Error(err)
 	}
 
 	done <- struct{}{}

@@ -676,7 +676,12 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 					go func() {
 						c.recorder.Eventf(pod, corev1.EventTypeWarning, reasonPopulatorProgress, "Starting to monitor progress for PVC %s", pvc.Name)
 						for {
-							c.updateProgress(pvc, pod.Status.PodIP, crInstance)
+							err = c.updateProgress(pvc, pod.Status.PodIP, crInstance)
+							if err != nil {
+								klog.Warning("Failed to update progress", err)
+								continue
+							}
+
 							pod, err = c.podLister.Pods(populatorNamespace).Get(pod.Name)
 							if err != nil {
 								break
@@ -686,7 +691,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 							}
 
 							// TODO make configurable?
-							time.Sleep(1 * time.Second)
+							time.Sleep(3 * time.Second)
 						}
 					}()
 				}
@@ -829,14 +834,14 @@ func (c *controller) updateProgress(pvc *corev1.PersistentVolumeClaim, podIP str
 			return nil
 		}
 		klog.Warning(err)
-		return nil
+		return err
 	}
 
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
-
 	if err != nil {
 		klog.Warning(err)
+		return err
 	}
 
 	match := importRegExp.FindStringSubmatch(string(body))
@@ -848,6 +853,7 @@ func (c *controller) updateProgress(pvc *corev1.PersistentVolumeClaim, podIP str
 	progress, err := strconv.ParseFloat(string(match[1]), 64)
 	if err != nil {
 		klog.Warning("Could not convert progress: ", err)
+		return err
 	}
 
 	gvr := schema.GroupVersionResource{
@@ -864,11 +870,13 @@ func (c *controller) updateProgress(pvc *corev1.PersistentVolumeClaim, podIP str
 	err = updatePopulatorProgress(int64(progress), latestPopulator)
 	if err != nil {
 		klog.Warning("Failed to update progress: ", err)
+		return err
 	}
 
 	_, err = c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Update(context.TODO(), latestPopulator, metav1.UpdateOptions{})
 	if err != nil {
 		klog.Warning("Failed to update CR ", err)
+		return err
 	}
 
 	klog.Info("Updated progress: ", progress)
