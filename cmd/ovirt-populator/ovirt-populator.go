@@ -80,7 +80,7 @@ func populate(engineURL, diskID, volPath string) {
 	}
 
 	args := createCommandArguments(&engineConfig, diskID, volPath)
-	cmd := exec.Command("/usr/local/bin/ovirt-img", args...)
+	cmd := exec.Command("ovirt-img", args...)
 	r, _ := cmd.StdoutPipe()
 	cmd.Stderr = cmd.Stdout
 	done := make(chan struct{})
