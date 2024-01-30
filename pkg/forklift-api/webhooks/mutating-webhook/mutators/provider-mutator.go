@@ -51,6 +51,9 @@ func (mutator *ProviderMutator) setSdkEndpointIfNeeded() bool {
 	if mutator.provider.Type() == api.VSphere {
 		if _, ok := mutator.provider.Spec.Settings[api.SDK]; !ok {
 			log.Info("SDK endpoint type was not specified for a vSphere provider, assuming vCenter")
+			if mutator.provider.Spec.Settings == nil {
+				mutator.provider.Spec.Settings = make(map[string]string)
+			}
 			mutator.provider.Spec.Settings[api.SDK] = api.VCenter
 			providerChanged = true
 		}
