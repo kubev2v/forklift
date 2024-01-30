@@ -1,6 +1,7 @@
 package ova
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -29,6 +30,10 @@ import (
 // BIOS types
 const (
 	BIOS = "bios"
+)
+
+const (
+	UEFI = "uefi"
 )
 
 // Bus types
@@ -332,12 +337,26 @@ func (r *Builder) mapCPU(vm *model.VM, object *cnv.VirtualMachineSpec) {
 }
 
 func (r *Builder) mapFirmware(vm *model.VM, object *cnv.VirtualMachineSpec) {
+	migrationAnnotations := r.Migration.GetAnnotations()
+	var vmFirmware string
+	if virtV2VFirmware, ok := migrationAnnotations[vm.ID]; ok {
+		err := json.Unmarshal([]byte(virtV2VFirmware), &vmFirmware)
+		if err != nil {
+			err = liberr.Wrap(
+				err,
+				"Failed to unmarshel VM virt-v2v fimware config",
+				vm.Name)
+		}
+	}
+
 	firmware := &cnv.Firmware{
 		Serial: vm.UUID,
 	}
-	switch vm.Firmware {
+	switch vmFirmware {
 	case BIOS:
 		firmware.Bootloader = &cnv.Bootloader{BIOS: &cnv.BIOS{}}
+	case UEFI:
+		firmware.Bootloader = &cnv.Bootloader{EFI: &cnv.EFI{}}
 	default:
 		// We don't distinguish between UEFI and UEFI with secure boot, but we anyway would have
 		// disabled secure boot, even if we knew it was enabled on the source, because the guest
