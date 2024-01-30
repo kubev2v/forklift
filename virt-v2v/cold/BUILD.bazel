@@ -38,7 +38,7 @@ container_run_and_extract(
         "( [ \\\"\\$(rpm -q glibc)\\\" == \\\"glibc-2.34-66.el9.x86_64\\\" ] && dnf -y downgrade glibc-2.34-65.el9.x86_64 || true )",
         "dnf -y install libguestfs libguestfs-appliance libguestfs-xfs libguestfs-winsupport qemu-img supermin",
         "depmod \\$(ls /lib/modules/ |tail -n1)",
-        "export LIBGUESTFS_BACKEND=direct",
+        "export LIBGUESTFS_BACKEND=direct LIBGUESTFS_PATH=/usr/lib64/guestfs",
         "export LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1",
         "mkdir -p /usr/lib64/guestfs/appliance",
         "cd /usr/lib64/guestfs/appliance",
@@ -87,6 +87,36 @@ container_image(
         ":no-ems-in-fips",
         ":ca-certificate-from-secret",
     ],
+    visibility = ["//visibility:public"],
+)
+
+go_library(
+    name = "cold_lib",
+    srcs = ["entrypoint.go"],
+    importpath = "github.com/konveyor/forklift-controller/virt-v2v/cold",
+    visibility = ["//visibility:private"],
+)
+
+go_binary(
+    name = "cold",
+    embed = [":cold_lib"],
+    visibility = ["//visibility:public"],
+)
+
+container_image(
+    name = "forklift-virt-v2v",
+    base = ":virt-v2v-layer",
+    directory = "/usr/local/bin/",
+    empty_dirs = ["/disks"],
+    entrypoint = ["/usr/local/bin/cold"],
+    env = {"LIBGUESTFS_BACKEND": "direct", 
+    "LIBGUESTFS_PATH": "/usr/lib64/guestfs/appliance"},
+    files = [
+        ":cold",
+        "@forklift//cmd/image-converter",
+        "@forklift//cmd/virt-v2v-monitor",
+    ],
+    user = "1001",
     visibility = ["//visibility:public"],
 )
 
@@ -443,34 +473,5 @@ rpmtree(
         "@zip-0__3.0-35.el9.x86_64//rpm",
         "@zlib-0__1.2.11-41.el9.x86_64//rpm",
     ],
-    visibility = ["//visibility:public"],
-)
-
-go_library(
-    name = "cold_lib",
-    srcs = ["entrypoint.go"],
-    importpath = "github.com/konveyor/forklift-controller/virt-v2v/cold",
-    visibility = ["//visibility:private"],
-)
-
-go_binary(
-    name = "cold",
-    embed = [":cold_lib"],
-    visibility = ["//visibility:public"],
-)
-
-container_image(
-    name = "forklift-virt-v2v",
-    base = ":virt-v2v-layer",
-    directory = "/usr/local/bin/",
-    empty_dirs = ["/disks"],
-    entrypoint = ["/usr/local/bin/cold"],
-    env = {"LIBGUESTFS_BACKEND": "direct"},
-    files = [
-        ":cold",
-        "@forklift//cmd/image-converter",
-        "@forklift//cmd/virt-v2v-monitor",
-    ],
-    user = "1001",
     visibility = ["//visibility:public"],
 )
