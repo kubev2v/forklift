@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/container"
+	"github.com/konveyor/forklift-controller/pkg/lib/util"
 	core "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -16,7 +16,7 @@ func serveTlsCertificate(resp http.ResponseWriter, req *http.Request, client cli
 		secret := &core.Secret{
 			Data: map[string][]byte{"insecureSkipVerify": []byte("true")},
 		}
-		if cacert, err := container.GetTlsCertificate(url, secret); err == nil {
+		if cacert, err := util.GetTlsCertificate(url, secret); err == nil {
 			encoded := pem.EncodeToMemory(&pem.Block{
 				Type:  "CERTIFICATE",
 				Bytes: cacert.Raw,

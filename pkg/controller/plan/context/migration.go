@@ -6,6 +6,7 @@ import (
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
+	ocp "github.com/konveyor/forklift-controller/pkg/lib/client/openshift"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
@@ -184,13 +185,13 @@ func (r *Destination) build(ctx *Context) (err error) {
 			err = liberr.Wrap(err)
 			return
 		}
-		r.Client, err = r.Provider.Client(secret)
+		r.Client, err = ocp.Client(r.Provider, secret)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
 		}
 	} else {
-		r.Client, err = r.Provider.Client(nil)
+		r.Client, err = ocp.Client(r.Provider, nil)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return

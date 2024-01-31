@@ -12,6 +12,7 @@ go_library(
     deps = [
         "//pkg/apis/forklift/v1beta1",
         "//pkg/forklift-api/webhooks/util",
+        "//pkg/lib/client/openshift",
         "//pkg/lib/error",
         "//pkg/lib/logging",
         "//vendor/github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1:k8s_cni_cncf_io",
