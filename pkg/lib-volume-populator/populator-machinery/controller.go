@@ -691,7 +691,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 							}
 
 							// TODO make configurable?
-							time.Sleep(3 * time.Second)
+							time.Sleep(5 * time.Second)
 						}
 					}()
 				}
@@ -865,6 +865,7 @@ func (c *controller) updateProgress(pvc *corev1.PersistentVolumeClaim, podIP str
 	latestPopulator, err := c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Get(context.TODO(), cr.GetName(), metav1.GetOptions{})
 	if err != nil {
 		klog.Warning("Failed to get CR for kind: ", populatorKind, "error: ", err)
+		return err
 	}
 
 	err = updatePopulatorProgress(int64(progress), latestPopulator)
