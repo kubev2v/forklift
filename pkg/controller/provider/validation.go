@@ -14,6 +14,7 @@ import (
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
+	"github.com/konveyor/forklift-controller/pkg/lib/util"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -233,8 +234,8 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 			})
 		}
 
-		if crt, err := container.GetTlsCertificate(provider.Spec.URL, secret); err == nil {
-			provider.Status.Fingerprint = container.Fingerprint(crt)
+		if crt, err := util.GetTlsCertificate(provider.Spec.URL, secret); err == nil {
+			provider.Status.Fingerprint = util.Fingerprint(crt)
 		} else {
 			log.Error(err, "failed to get TLS certificate", "url", provider.Spec.URL)
 			provider.Status.SetCondition(libcnd.Condition{

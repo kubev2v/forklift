@@ -8,6 +8,7 @@ import (
 	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/util"
+	ocp "github.com/konveyor/forklift-controller/pkg/lib/client/openshift"
 	admissionv1 "k8s.io/api/admission/v1beta1"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -99,7 +100,7 @@ func (mutator *PlanMutator) setTransferNetworkIfNotSet() (bool, error) {
 					log.Error(err, "Failed to get secret for target provider")
 					return false, err
 				}
-				tcl, err = targetProvider.Client(secret)
+				tcl, err = ocp.Client(&targetProvider, secret)
 			}
 			if err != nil {
 				log.Error(err, "Failed to initiate client to target cluster")

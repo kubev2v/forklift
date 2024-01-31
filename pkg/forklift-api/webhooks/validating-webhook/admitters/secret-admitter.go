@@ -16,6 +16,7 @@ import (
 	webhookutils "github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/util"
 	libcontainer "github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	"github.com/konveyor/forklift-controller/pkg/lib/util"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	admissionv1 "k8s.io/api/admission/v1beta1"
 	core "k8s.io/api/core/v1"
@@ -72,7 +73,7 @@ func (admitter *SecretAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissio
 }
 
 func (admitter *SecretAdmitter) validateProviderSecret() *admissionv1.AdmissionResponse {
-	if _, ok := admitter.secret.Data["cacert"]; ok && container.InsecureProvider(&admitter.secret) {
+	if _, ok := admitter.secret.Data["cacert"]; ok && util.InsecureProvider(&admitter.secret) {
 		return webhookutils.ToAdmissionResponseError(fmt.Errorf("received a request to add insecure provider with a CA certificate"))
 	}
 
