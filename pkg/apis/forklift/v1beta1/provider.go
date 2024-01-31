@@ -18,13 +18,8 @@ package v1beta1
 
 import (
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 type ProviderType string
@@ -58,8 +53,8 @@ func (t ProviderType) String() string {
 
 // Secret fields.
 const (
-	Token    = "token"
 	Insecure = "insecureSkipVerify"
+	Token    = "token"
 )
 
 // Provider settings.
@@ -126,37 +121,6 @@ type ProviderList struct {
 
 func init() {
 	SchemeBuilder.Register(&Provider{}, &ProviderList{})
-}
-
-// Build k8s REST configuration.
-func (p *Provider) RestCfg(secret *core.Secret) (cfg *rest.Config) {
-	if p.IsHost() {
-		cfg, _ = config.GetConfig()
-		return
-	}
-	cfg = &rest.Config{
-		Host:            p.Spec.URL,
-		BearerToken:     string(secret.Data[Token]),
-		TLSClientConfig: rest.TLSClientConfig{Insecure: true},
-	}
-	cfg.Burst = 1000
-	cfg.QPS = 100
-
-	return
-}
-
-// Build a k8s client.
-func (p *Provider) Client(secret *core.Secret) (c client.Client, err error) {
-	c, err = client.New(
-		p.RestCfg(secret),
-		client.Options{
-			Scheme: scheme.Scheme,
-		})
-	if err != nil {
-		err = liberr.Wrap(err)
-	}
-
-	return
 }
 
 // The provider type.

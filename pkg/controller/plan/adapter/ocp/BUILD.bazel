@@ -19,6 +19,7 @@ go_library(
         "//pkg/controller/plan/adapter/base",
         "//pkg/controller/plan/context",
         "//pkg/controller/provider/web",
+        "//pkg/lib/client/openshift",
         "//pkg/lib/error",
         "//pkg/lib/itinerary",
         "//pkg/lib/logging",

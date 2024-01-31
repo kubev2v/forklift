@@ -5,6 +5,8 @@ import (
 	"path"
 	"time"
 
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	ocp "github.com/konveyor/forklift-controller/pkg/lib/client/openshift"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
@@ -12,7 +14,6 @@ import (
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -29,9 +30,6 @@ const (
 // Cluster.
 type Cluster interface {
 	meta.Object
-	// Build the REST configuration
-	// for the remote cluster.
-	RestCfg(*core.Secret) *rest.Config
 }
 
 // An OpenShift collector.
@@ -284,8 +282,9 @@ func (r *Collector) Delete(m libmodel.Model) {
 
 // Build the k8s manager.
 func (r *Collector) buildManager() (err error) {
+	provider := r.cluster.(*api.Provider)
 	r.manager, err = manager.New(
-		r.cluster.RestCfg(r.secret),
+		ocp.RestCfg(provider, r.secret),
 		manager.Options{
 			Metrics: server.Options{BindAddress: "0"},
 		})
@@ -322,8 +321,9 @@ func (r *Collector) buildManager() (err error) {
 
 // Build non-cached client.
 func (r *Collector) buildClient() (err error) {
+	provider := r.cluster.(*api.Provider)
 	r.client, err = client.New(
-		r.cluster.RestCfg(r.secret),
+		ocp.RestCfg(provider, r.secret),
 		client.Options{
 			Scheme: scheme.Scheme,
 		})
