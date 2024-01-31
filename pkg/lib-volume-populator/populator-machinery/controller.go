@@ -55,6 +55,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -893,18 +894,15 @@ func updatePopulatorProgress(progress int64, cr *unstructured.Unstructured) erro
 }
 
 func makePopulatePodSpec(pvcPrimeName, secretName string) corev1.PodSpec {
-	nonRoot := true
-	allowPrivilageEscalation := false
-	user := int64(qemuGroup)
 	return corev1.PodSpec{
 		Containers: []corev1.Container{
 			{
 				Name:  populatorContainerName,
 				Ports: []corev1.ContainerPort{{Name: "metrics", ContainerPort: 2112}},
 				SecurityContext: &corev1.SecurityContext{
-					AllowPrivilegeEscalation: &allowPrivilageEscalation,
-					RunAsNonRoot:             &nonRoot,
-					RunAsUser:                &user,
+					AllowPrivilegeEscalation: ptr.To(false),
+					RunAsNonRoot:             ptr.To(true),
+					RunAsUser:                ptr.To[int64](qemuGroup),
 					Capabilities: &corev1.Capabilities{
 						Drop: []corev1.Capability{"ALL"},
 					},
@@ -921,7 +919,7 @@ func makePopulatePodSpec(pvcPrimeName, secretName string) corev1.PodSpec {
 			},
 		},
 		SecurityContext: &corev1.PodSecurityContext{
-			FSGroup: &user,
+			FSGroup: ptr.To[int64](qemuGroup),
 			SeccompProfile: &corev1.SeccompProfile{
 				Type: corev1.SeccompProfileTypeRuntimeDefault,
 			},
