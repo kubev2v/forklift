@@ -602,6 +602,16 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 			if found {
 				labels["migration"] = migration
 			}
+
+			_, err = c.kubeClient.Discovery().ServerResourcesForGroupVersion("route.openshift.io/v1")
+			if err == nil {
+				// Openshift
+				annotations["service.beta.openshift.io/inject-cabundle"] = "true"
+			} else {
+				// K8s
+				annotations["cert-manager.io/inject-ca-from"] = fmt.Sprintf("%s/%s", populatorNamespace, "populator-certs")
+			}
+
 			// Make the pod
 			pod = &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
