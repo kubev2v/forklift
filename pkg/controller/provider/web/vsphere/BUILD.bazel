@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "vsphere",
@@ -33,5 +33,15 @@ go_library(
         "//pkg/lib/logging",
         "//pkg/lib/ref",
         "//vendor/github.com/gin-gonic/gin",
+    ],
+)
+
+go_test(
+    name = "vsphere_test",
+    srcs = ["base_test.go"],
+    embed = [":vsphere"],
+    deps = [
+        "//pkg/controller/provider/model/vsphere",
+        "//vendor/github.com/onsi/gomega",
     ],
 )

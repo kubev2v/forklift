@@ -1,12 +1,13 @@
 package vsphere
 
 import (
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	"strings"
 )
 
 // Package logger.
@@ -81,6 +82,9 @@ Walk:
 				b = &m.Base
 				r.cache[parent] = b
 			}
+			if b.GetParent().Kind == "" {
+				break Walk
+			}
 			parts = append(parts, b.Name)
 			node = b
 		case model.DatacenterKind:
@@ -97,7 +101,6 @@ Walk:
 			}
 			parts = append(parts, b.Name)
 			node = b
-			break Walk
 		case model.ClusterKind:
 			b, cached := r.cache[parent]
 			if !cached {
