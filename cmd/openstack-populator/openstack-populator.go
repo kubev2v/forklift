@@ -3,14 +3,13 @@ package main
 import (
 	"flag"
 	"io"
-	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	libclient "github.com/konveyor/forklift-controller/pkg/lib/client/openstack"
+	"github.com/konveyor/forklift-controller/pkg/metrics"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	dto "github.com/prometheus/client_model/go"
 	"k8s.io/klog/v2"
 )
@@ -27,13 +26,6 @@ type AppConfig struct {
 }
 
 func main() {
-	config := parseFlags()
-	klog.InitFlags(nil)
-	initializeMetrics()
-	populate(config)
-}
-
-func parseFlags() *AppConfig {
 	config := &AppConfig{}
 	flag.StringVar(&config.identityEndpoint, "endpoint", "", "endpoint URL (https://openstack.example.com:5000/v2.0)")
 	flag.StringVar(&config.secretName, "secret-name", "", "secret containing OpenStack credentials")
@@ -49,12 +41,16 @@ func parseFlags() *AppConfig {
 		klog.Fatal("pvc-size must be greater than 0")
 	}
 
-	return config
-}
+	certsDirectory, err := os.MkdirTemp("", "certsdir")
+	if err != nil {
+		klog.Fatal(err)
+	}
 
-func initializeMetrics() {
-	http.Handle("/metrics", promhttp.Handler())
-	go http.ListenAndServe(":2112", nil)
+	defer os.RemoveAll(certsDirectory)
+
+	metrics.StartPrometheusEndpoint(certsDirectory)
+
+	populate(config)
 }
 
 func populate(config *AppConfig) {
@@ -68,10 +64,12 @@ func createClient(config *AppConfig) *libclient.Client {
 		URL:     config.identityEndpoint,
 		Options: options,
 	}
+
 	err := client.Connect()
 	if err != nil {
 		klog.Fatal(err)
 	}
+
 	return client
 }
 
@@ -81,6 +79,7 @@ func downloadAndSaveImage(client *libclient.Client, config *AppConfig) {
 	if err != nil {
 		klog.Fatal(err)
 	}
+
 	defer imageReader.Close()
 
 	file := openFile(config.volumePath)
@@ -98,11 +97,11 @@ func createProgressCounter() *prometheus.CounterVec {
 		},
 		[]string{"ownerUID"},
 	)
+
 	if err := prometheus.Register(progressVec); err != nil {
 		klog.Error("Prometheus progress counter not registered:", err)
-	} else {
-		klog.Info("Prometheus progress counter registered.")
 	}
+
 	return progressVec
 }
 
