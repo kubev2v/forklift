@@ -6,13 +6,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"net/http"
 	"os"
 	"os/exec"
 	"strconv"
 
+	"github.com/konveyor/forklift-controller/pkg/metrics"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	dto "github.com/prometheus/client_model/go"
 	"k8s.io/klog/v2"
 )
@@ -51,19 +50,22 @@ func main() {
 		klog.Fatal("pvc-size must be greater than 0")
 	}
 
+	certsDirectory, err := os.MkdirTemp("", "certsdir")
+	if err != nil {
+		klog.Fatal(err)
+	}
+
+	defer os.RemoveAll(certsDirectory)
+
+	metrics.StartPrometheusEndpoint(certsDirectory)
+
 	populate(engineUrl, diskID, volPath, ownerUID, *pvcSize)
 }
 
 func populate(engineURL, diskID, volPath, ownerUID string, pvcSize int64) {
-	setupPrometheusMetrics()
 	config := loadEngineConfig(engineURL)
 	prepareCredentials(config)
 	executePopulationProcess(config, diskID, volPath, ownerUID, pvcSize)
-}
-
-func setupPrometheusMetrics() {
-	http.Handle("/metrics", promhttp.Handler())
-	go http.ListenAndServe(":2112", nil)
 }
 
 func prepareCredentials(config *engineConfig) {
@@ -117,8 +119,6 @@ func monitorProgress(scanner *bufio.Scanner, ownerUID string, pvcSize int64, don
 	if err := prometheus.Register(progress); err != nil {
 		klog.Error("Prometheus progress gauge not registered:", err)
 		return
-	} else {
-		klog.Info("Prometheus progress gauge registered.")
 	}
 
 	var currentProgress float64
@@ -172,12 +172,11 @@ func createCommandArguments(config *engineConfig, diskID, volPath string) []stri
 }
 
 func loadEngineConfig(engineURL string) *engineConfig {
-	user, pass := os.Getenv("user"), os.Getenv("password")
 	insecure := getEnvAsBool("insecureSkipVerify", false)
 	return &engineConfig{
 		URL:      engineURL,
-		username: user,
-		password: pass,
+		username: os.Getenv("user"),
+		password: os.Getenv("password"),
 		cacert:   os.Getenv("cacert"),
 		insecure: insecure,
 	}

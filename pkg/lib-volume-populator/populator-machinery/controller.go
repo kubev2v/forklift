@@ -18,6 +18,7 @@ package populator_machinery
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
@@ -135,6 +136,7 @@ type controller struct {
 	gk                schema.GroupKind
 	metrics           *metricsManager
 	recorder          record.EventRecorder
+	httpClient        *http.Client
 }
 
 func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, prefix string,
@@ -603,15 +605,6 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 				labels["migration"] = migration
 			}
 
-			_, err = c.kubeClient.Discovery().ServerResourcesForGroupVersion("route.openshift.io/v1")
-			if err == nil {
-				// Openshift
-				annotations["service.beta.openshift.io/inject-cabundle"] = "true"
-			} else {
-				// K8s
-				annotations["cert-manager.io/inject-ca-from"] = fmt.Sprintf("%s/%s", populatorNamespace, "populator-certs")
-			}
-
 			// Make the pod
 			pod = &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -687,9 +680,9 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 					go func() {
 						c.recorder.Eventf(pod, corev1.EventTypeWarning, reasonPopulatorProgress, "Starting to monitor progress for PVC %s", pvc.Name)
 						for {
-							err = c.updateProgress(pvc, pod.Status.PodIP, crInstance)
+							err = c.updateProgress(pod, pvc, crInstance)
 							if err != nil {
-								klog.Warning("Failed to update progress", err)
+								klog.V(5).Info("Failed to update progress", err)
 								continue
 							}
 
@@ -835,35 +828,42 @@ func (c *controller) updatePvc(ctx context.Context, pvc *corev1.PersistentVolume
 	return err
 }
 
-func (c *controller) updateProgress(pvc *corev1.PersistentVolumeClaim, podIP string, cr *unstructured.Unstructured) error {
+func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolumeClaim, cr *unstructured.Unstructured) error {
 	populatorKind := pvc.Spec.DataSourceRef.Kind
 	importRegExp := regexp.MustCompile("progress\\{ownerUID=\"" + string(pvc.UID) + "\"\\} (\\d+\\.?\\d*)")
-	url := fmt.Sprintf("http://%s:2112/metrics", podIP)
-	resp, err := http.Get(url)
+
+	url, err := getMetricsURL(pod)
 	if err != nil {
-		if strings.Contains(err.Error(), "connection refused") {
-			return nil
-		}
-		klog.Warning(err)
+		klog.V(5).Info("Failed to get metrics URL: ", err)
+		return err
+	}
+
+	if c.httpClient == nil {
+		c.httpClient = buildHTTPClient()
+	}
+
+	resp, err := c.httpClient.Get(url)
+	if err != nil {
+		klog.V(5).Info("Failed to get metrics: ", err)
 		return err
 	}
 
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		klog.Warning(err)
+		klog.V(5).Info(err)
 		return err
 	}
 
 	match := importRegExp.FindStringSubmatch(string(body))
 	if match == nil {
-		klog.Warning("Failed to find matches, regex: ", importRegExp)
+		klog.V(5).Info("Failed to find matches, regex: ", importRegExp)
 		return nil
 	}
 
 	progress, err := strconv.ParseFloat(string(match[1]), 64)
 	if err != nil {
-		klog.Warning("Could not convert progress: ", err)
+		klog.V(5).Info("Could not convert progress: ", err)
 		return err
 	}
 
@@ -875,23 +875,26 @@ func (c *controller) updateProgress(pvc *corev1.PersistentVolumeClaim, podIP str
 
 	latestPopulator, err := c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Get(context.TODO(), cr.GetName(), metav1.GetOptions{})
 	if err != nil {
-		klog.Warning("Failed to get CR for kind: ", populatorKind, "error: ", err)
+		klog.V(5).Info("Failed to get CR for kind: ", populatorKind, "error: ", err)
 		return err
 	}
 
 	err = updatePopulatorProgress(int64(progress), latestPopulator)
 	if err != nil {
-		klog.Warning("Failed to update progress: ", err)
+		klog.V(5).Info("Failed to update progress: ", err)
 		return err
 	}
 
 	_, err = c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Update(context.TODO(), latestPopulator, metav1.UpdateOptions{})
 	if err != nil {
-		klog.Warning("Failed to update CR ", err)
+		klog.V(5).Info("Failed to update CR ", err)
 		return err
 	}
 
-	klog.Info("Updated progress: ", progress)
+	if progress != 0 {
+		klog.Info("Updated progress: ", progress)
+	}
+
 	return nil
 }
 
@@ -908,7 +911,7 @@ func makePopulatePodSpec(pvcPrimeName, secretName string) corev1.PodSpec {
 		Containers: []corev1.Container{
 			{
 				Name:  populatorContainerName,
-				Ports: []corev1.ContainerPort{{Name: "metrics", ContainerPort: 2112}},
+				Ports: []corev1.ContainerPort{{Name: "metrics", ContainerPort: 8443}},
 				SecurityContext: &corev1.SecurityContext{
 					AllowPrivilegeEscalation: ptr.To(false),
 					RunAsNonRoot:             ptr.To(true),
@@ -1030,4 +1033,44 @@ func (c *controller) checkIntreeStorageClass(pvc *corev1.PersistentVolumeClaim, 
 
 	// The SC is in-tree & PVC is not migrated
 	return fmt.Errorf("in-tree volume volume plugin %q cannot use volume populator", sc.Provisioner)
+}
+
+func buildHTTPClient() *http.Client {
+	defaultTransport := http.DefaultTransport.(*http.Transport)
+
+	transport := &http.Transport{
+		Proxy:                 defaultTransport.Proxy,
+		DialContext:           defaultTransport.DialContext,
+		MaxIdleConns:          defaultTransport.MaxIdleConns,
+		IdleConnTimeout:       defaultTransport.IdleConnTimeout,
+		ExpectContinueTimeout: defaultTransport.ExpectContinueTimeout,
+		TLSHandshakeTimeout:   defaultTransport.TLSHandshakeTimeout,
+
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
+	return &http.Client{Transport: transport}
+}
+
+func getMetricsURL(pod *corev1.Pod) (string, error) {
+	if pod == nil {
+		return "", nil
+	}
+	port, err := getPodMetricsPort(pod)
+	if err != nil || pod.Status.PodIP == "" {
+		return "", err
+	}
+	url := fmt.Sprintf("https://%s:%d/metrics", pod.Status.PodIP, port)
+	return url, nil
+}
+
+func getPodMetricsPort(pod *corev1.Pod) (int, error) {
+	for _, container := range pod.Spec.Containers {
+		for _, port := range container.Ports {
+			if port.Name == "metrics" {
+				return int(port.ContainerPort), nil
+			}
+		}
+	}
+	return 0, fmt.Errorf("failed to find metrics port")
 }
