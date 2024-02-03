@@ -22,15 +22,8 @@ func (admitter *ProviderAdmitter) validateVDDK() error {
 		return nil
 	}
 
-	if image, found := admitter.provider.Spec.Settings[api.VDDK]; found {
-		if image == "" {
-			err := liberr.New("The specified VDDK init image name is empty")
-			log.Error(err, "The specified VDDK init image cannot be empty, failing",
-				"provider", admitter.provider.Name,
-				"namespace", admitter.provider.Namespace)
-			return err
-		}
-		return nil
+	if err := admitter.validateVddkImage(); err != nil {
+		return err
 	}
 
 	plans := api.PlanList{}
@@ -84,6 +77,19 @@ func (admitter *ProviderAdmitter) validateVDDK() error {
 			log.Error(err, "Plans requiring VDDK are associated with this provider, failing",
 				"plan", plan.Name,
 				"namespace", plan.Namespace)
+			return err
+		}
+	}
+	return nil
+}
+
+func (admitter *ProviderAdmitter) validateVddkImage() error {
+	if image, found := admitter.provider.Spec.Settings[api.VDDK]; found {
+		if image == "" {
+			err := liberr.New("The specified VDDK init image name is empty")
+			log.Error(err, "The specified VDDK init image cannot be empty, failing",
+				"provider", admitter.provider.Name,
+				"namespace", admitter.provider.Namespace)
 			return err
 		}
 	}

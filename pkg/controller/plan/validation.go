@@ -2,6 +2,8 @@ package plan
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"path"
@@ -11,16 +13,22 @@ import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	refapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
+	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/controller/validation"
 	ocp "github.com/konveyor/forklift-controller/pkg/lib/client/openshift"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
+	batchv1 "k8s.io/api/batch/v1"
+	core "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -58,6 +66,7 @@ const (
 	Archived                     = "Archived"
 	VDDKNotConfigured            = "VDDKNotConfigured"
 	unsupportedVersion           = "UnsupportedVersion"
+	VDDKInvalid                  = "VDDKInvalid"
 )
 
 // Categories
@@ -706,34 +715,183 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 		Category: Critical,
 		Message:  "VDDK image is necessary for this type of migration",
 	}
+	vddkInvalid := libcnd.Condition{
+		Type:     VDDKInvalid,
+		Status:   True,
+		Reason:   NotSet,
+		Category: Critical,
+		Message:  "VDDK init image is invalid",
+	}
 
 	source := plan.Referenced.Provider.Source
 	if source == nil {
-		return nil
+		return
 	}
 	destination := plan.Referenced.Provider.Destination
 	if destination == nil {
-		return nil
+		return
 	}
 
 	if source.Type() != api.VSphere {
-		// VDDK is used for other provider types
-		return nil
+		// VDDK is not used for other provider types
+		return
 	}
 
-	el9, el9Err := plan.VSphereUsesEl9VirtV2v()
-	if el9Err != nil {
-		return el9Err
-	}
-	if el9 {
-		// VDDK image is optional when EL9 virt-v2v image is in use
-		return nil
+	el9, err := plan.VSphereUsesEl9VirtV2v()
+	if err != nil {
+		return
 	}
 
-	if _, found := source.Spec.Settings[api.VDDK]; !found {
+	image, found := source.Spec.Settings[api.VDDK]
+	switch {
+	case !el9 && !found:
+		// VDDK image is required when EL8 virt-v2v image is in use
 		plan.Status.SetCondition(vddkNotConfigured)
+	case found:
+		var job *batchv1.Job
+		if job, err = r.ensureVddkImageValidationJob(plan, el9, image); err != nil {
+			break
+		}
+		if len(job.Status.Conditions) == 0 {
+			err = liberr.New("validation of VDDK job is in progress")
+		}
+		for _, condition := range job.Status.Conditions {
+			switch condition.Type {
+			case batchv1.JobComplete:
+				r.Log.Info("validate VDDK job completed", "image", image)
+				err = nil
+				return
+			case batchv1.JobFailed:
+				plan.Status.SetCondition(vddkInvalid)
+				err = nil
+				return
+			default:
+				err = liberr.New("validation of VDDK job has an unexpected condition", "type", condition.Type)
+			}
+		}
 	}
-	return nil
+
+	return
+}
+
+func (r *Reconciler) ensureVddkImageValidationJob(plan *api.Plan, el9 bool, vddkImage string) (*batchv1.Job, error) {
+	jobLabels := getVddkImageValidationJobLabels(plan)
+	jobs := &batchv1.JobList{}
+	ctx, _ := plancontext.New(r, plan, r.Log)
+	err := ctx.Destination.Client.List(
+		context.TODO(),
+		jobs,
+		&client.ListOptions{
+			LabelSelector: labels.SelectorFromSet(jobLabels),
+			Namespace:     plan.Spec.TargetNamespace,
+		},
+	)
+	switch {
+	case err != nil:
+		return nil, err
+	case len(jobs.Items) == 0:
+		job := createVddkCheckJob(plan, jobLabels, el9, vddkImage)
+		err = ctx.Destination.Client.Create(context.Background(), job, &client.CreateOptions{})
+		if err != nil {
+			return nil, err
+		}
+		return job, nil
+	default:
+		return &jobs.Items[0], nil
+	}
+}
+
+func getVddkImageValidationJobLabels(plan *api.Plan) map[string]string {
+	image := plan.Referenced.Provider.Source.Spec.Settings[api.VDDK]
+	sum := md5.Sum([]byte(image))
+	return map[string]string{
+		"plan": string(plan.ObjectMeta.UID),
+		"vddk": hex.EncodeToString(sum[:]),
+	}
+}
+
+func createVddkCheckJob(plan *api.Plan, labels map[string]string, el9 bool, vddkImage string) *batchv1.Job {
+	// virt-v2v image
+	var virtV2vImage string
+	if el9 {
+		virtV2vImage = Settings.Migration.VirtV2vImageCold
+	} else {
+		virtV2vImage = Settings.Migration.VirtV2vImageWarm
+	}
+
+	mount := core.VolumeMount{
+		Name:      VddkVolumeName,
+		MountPath: "/opt",
+	}
+	initContainers := []core.Container{
+		{
+			Name:            "vddk-side-car",
+			Image:           vddkImage,
+			ImagePullPolicy: core.PullIfNotPresent,
+			VolumeMounts:    []core.VolumeMount{mount},
+			SecurityContext: &core.SecurityContext{
+				AllowPrivilegeEscalation: ptr.To(false),
+				Capabilities: &core.Capabilities{
+					Drop: []core.Capability{"ALL"},
+				},
+			},
+		},
+	}
+
+	volumes := []core.Volume{
+		{
+			Name: VddkVolumeName,
+			VolumeSource: core.VolumeSource{
+				EmptyDir: &core.EmptyDirVolumeSource{},
+			},
+		},
+	}
+	return &batchv1.Job{
+		ObjectMeta: meta.ObjectMeta{
+			GenerateName: fmt.Sprintf("vddk-validator-%s", plan.Name),
+			Namespace:    plan.Spec.TargetNamespace,
+			Labels:       labels,
+			Annotations: map[string]string{
+				"provider": plan.Referenced.Provider.Source.Name,
+				"vddk":     vddkImage,
+				"plan":     plan.Name,
+			},
+		},
+		Spec: batchv1.JobSpec{
+			ActiveDeadlineSeconds: ptr.To[int64](300),
+			BackoffLimit:          ptr.To[int32](2),
+			Completions:           ptr.To[int32](1),
+			Template: core.PodTemplateSpec{
+				Spec: core.PodSpec{
+					SecurityContext: &core.PodSecurityContext{
+						FSGroup:      ptr.To(qemuGroup),
+						RunAsUser:    ptr.To(qemuUser),
+						RunAsNonRoot: ptr.To(true),
+						SeccompProfile: &core.SeccompProfile{
+							Type: core.SeccompProfileTypeRuntimeDefault,
+						},
+					},
+					RestartPolicy:  core.RestartPolicyOnFailure,
+					InitContainers: initContainers,
+					Containers: []core.Container{
+						{
+							Name:  "validator",
+							Image: virtV2vImage,
+							SecurityContext: &core.SecurityContext{
+								AllowPrivilegeEscalation: ptr.To(false),
+								Capabilities: &core.Capabilities{
+									Drop: []core.Capability{"ALL"},
+								},
+							},
+							VolumeMounts: []core.VolumeMount{mount},
+							Command:      []string{"file", "-E", "/opt/vmware-vix-disklib-distrib/lib64/libvixDiskLib.so"},
+						},
+					},
+					Volumes: volumes,
+				},
+			},
+		},
+	}
 }
 
 func (r *Reconciler) setupSecret(plan *api.Plan) (err error) {

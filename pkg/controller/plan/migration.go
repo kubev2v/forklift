@@ -23,10 +23,13 @@ import (
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
 	"github.com/konveyor/forklift-controller/pkg/settings"
+	batchv1 "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Requeue
@@ -343,6 +346,10 @@ func (r *Migration) Archive() {
 		if err := r.deletePvcPvForOva(); err != nil {
 			r.Log.Error(err, "Failed to clean up the PVC and PV for the OVA plan")
 		}
+	case v1beta1.VSphere:
+		if err := r.deleteValidateVddkJob(); err != nil {
+			r.Log.Error(err, "Failed to clean up validate-VDDK job(s)")
+		}
 	}
 
 	for _, vm := range r.Plan.Status.Migration.VMs {
@@ -541,6 +548,31 @@ func (r *Migration) deletePvcPvForOva() (err error) {
 	if err != nil {
 		r.Log.Error(err, "Failed to delete the plan PV")
 		return
+	}
+	return
+}
+
+func (r *Migration) deleteValidateVddkJob() (err error) {
+	selector := labels.SelectorFromSet(map[string]string{"plan": string(r.Plan.UID)})
+	jobs := &batchv1.JobList{}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		jobs,
+		&client.ListOptions{
+			LabelSelector: selector,
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		return
+	}
+	for _, job := range jobs.Items {
+		background := meta.DeletePropagationBackground
+		opts := &client.DeleteOptions{PropagationPolicy: &background}
+		err = r.Destination.Client.Delete(context.TODO(), &job, opts)
+		if err != nil {
+			r.Log.Error(err, "Failed to delete validate-vddk job", "job", job)
+		}
 	}
 	return
 }
