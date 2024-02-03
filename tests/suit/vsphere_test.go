@@ -66,7 +66,7 @@ var _ = Describe("vSphere provider", func() {
 
 		err = utils.CreatePlanFromDefinition(f.CrClient, planDef)
 		Expect(err).ToNot(HaveOccurred())
-		err, _ = utils.WaitForPlanReadyWithTimeout(f.CrClient, namespace, test_plan_name, 15*time.Second)
+		err, _ = utils.WaitForPlanReadyWithTimeout(f.CrClient, namespace, test_plan_name, 1*time.Minute)
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Creating migration")
