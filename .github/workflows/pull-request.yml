@@ -117,9 +117,6 @@ jobs:
           cd ${GITHUB_WORKSPACE}/go/src/github.com/${GITHUB_REPOSITORY}
           GOPATH=${GITHUB_WORKSPACE}/go make ci
 
-      - name: cat cover.out
-        run: cat ./go/src/github.com/${{ github.repository }}/cover.out
-
       # Push code coverage using Codecov Action
       - name: Push code coverage to Codecov
         uses: codecov/codecov-action@v3
