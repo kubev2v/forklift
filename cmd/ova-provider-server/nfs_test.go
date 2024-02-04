@@ -1,7 +1,7 @@
+//nolint:errcheck
 package main
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -23,11 +23,11 @@ func TestFindOVAFiles(t *testing.T) {
 			name: "basic structure",
 			setup: func(directory string) {
 				os.MkdirAll(filepath.Join(directory, "subdir1", "subdir2"), 0755)
-				ioutil.WriteFile(filepath.Join(directory, "test.ova"), []byte{}, 0644)
-				ioutil.WriteFile(filepath.Join(directory, "test.ovf"), []byte{}, 0644)
-				ioutil.WriteFile(filepath.Join(directory, "subdir1", "test1.ova"), []byte{}, 0644)
-				ioutil.WriteFile(filepath.Join(directory, "subdir1", "test1.ovf"), []byte{}, 0644)
-				ioutil.WriteFile(filepath.Join(directory, "subdir1", "subdir2", "test2.ovf"), []byte{}, 0644)
+				os.WriteFile(filepath.Join(directory, "test.ova"), []byte{}, 0644)
+				os.WriteFile(filepath.Join(directory, "test.ovf"), []byte{}, 0644)
+				os.WriteFile(filepath.Join(directory, "subdir1", "test1.ova"), []byte{}, 0644)
+				os.WriteFile(filepath.Join(directory, "subdir1", "test1.ovf"), []byte{}, 0644)
+				os.WriteFile(filepath.Join(directory, "subdir1", "subdir2", "test2.ovf"), []byte{}, 0644)
 			},
 			expectedOVAs: []string{"test.ova", "subdir1/test1.ova"},
 			expectedOVFs: []string{"test.ovf", "subdir1/test1.ovf", "subdir1/subdir2/test2.ovf"},
@@ -45,7 +45,7 @@ func TestFindOVAFiles(t *testing.T) {
 		{
 			name: "non-ova/ovf files",
 			setup: func(directory string) {
-				ioutil.WriteFile(filepath.Join(directory, "test.txt"), []byte{}, 0644)
+				os.WriteFile(filepath.Join(directory, "test.txt"), []byte{}, 0644)
 			},
 			expectedOVAs: nil,
 			expectedOVFs: nil,
@@ -55,7 +55,7 @@ func TestFindOVAFiles(t *testing.T) {
 			name: "incorrect depth ova",
 			setup: func(directory string) {
 				os.MkdirAll(filepath.Join(directory, "subdir1", "subdir2"), 0755)
-				ioutil.WriteFile(filepath.Join(directory, "subdir1", "subdir2", "test3.ova"), []byte{}, 0644)
+				os.WriteFile(filepath.Join(directory, "subdir1", "subdir2", "test3.ova"), []byte{}, 0644)
 			},
 			expectedOVAs: nil,
 			expectedOVFs: nil,
@@ -64,10 +64,8 @@ func TestFindOVAFiles(t *testing.T) {
 		{
 			name: "incorrect depth ovf",
 			setup: func(directory string) {
-				//nolint:errcheck
 				os.MkdirAll(filepath.Join(directory, "subdir1", "subdir2", "subdir3"), 0755)
-				//nolint:errcheck
-				ioutil.WriteFile(filepath.Join(directory, "subdir1", "subdir2", "subdir3", "test3.ovf"), []byte{}, 0644)
+				os.WriteFile(filepath.Join(directory, "subdir1", "subdir2", "subdir3", "test3.ovf"), []byte{}, 0644)
 			},
 			expectedOVAs: nil,
 			expectedOVFs: nil,
@@ -88,8 +86,8 @@ func TestFindOVAFiles(t *testing.T) {
 			setup: func(directory string) {
 				os.MkdirAll(filepath.Join(directory, "subdir1.ova"), 0755)
 				os.MkdirAll(filepath.Join(directory, "subdir2.ovf"), 0755)
-				ioutil.WriteFile(filepath.Join(directory, "subdir1.ova", "test.ova"), []byte{}, 0644)
-				ioutil.WriteFile(filepath.Join(directory, "subdir2.ovf", "test.ovf"), []byte{}, 0644)
+				os.WriteFile(filepath.Join(directory, "subdir1.ova", "test.ova"), []byte{}, 0644)
+				os.WriteFile(filepath.Join(directory, "subdir2.ovf", "test.ovf"), []byte{}, 0644)
 			},
 			expectedOVAs: []string{"subdir1.ova/test.ova"},
 			expectedOVFs: []string{"subdir2.ovf/test.ovf"},
@@ -99,7 +97,7 @@ func TestFindOVAFiles(t *testing.T) {
 
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
-			testDir, err := ioutil.TempDir("", "ova_test")
+			testDir, err := os.MkdirTemp("", "ova_test")
 			g.Expect(err).NotTo(HaveOccurred())
 
 			testCase.setup(testDir)
@@ -115,7 +113,7 @@ func TestFindOVAFiles(t *testing.T) {
 			if testCase.expectError {
 				g.Expect(err).To(HaveOccurred())
 			} else {
-				g.Expect(err).To(BeNil())
+				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(ovaFiles).To(ConsistOf(testCase.expectedOVAs))
 				g.Expect(ovfFiles).To(ConsistOf(testCase.expectedOVFs))
 			}

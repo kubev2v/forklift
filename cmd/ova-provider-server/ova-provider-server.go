@@ -159,7 +159,9 @@ type Device struct {
 }
 
 type Conf struct {
-	key   string
+	//nolint:unused
+	key string
+
 	Value string
 }
 
@@ -193,13 +195,19 @@ func main() {
 	http.HandleFunc("/watch", watchdHandler)
 	http.HandleFunc("/test_connection", connHandler)
 
-	http.ListenAndServe(":8080", nil)
-
+	err := http.ListenAndServe(":8080", nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func connHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode("Test connection successful")
+	err := json.NewEncoder(w).Encode("Test connection successful")
+	if err != nil {
+		fmt.Println("Error encoding json: ", err)
+	}
+
 	fmt.Println("Test connection handeler was called")
 }
 
@@ -215,8 +223,14 @@ func vmHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	setContentTypeToJson(w)
-	json.NewEncoder(w).Encode(vmStruct)
-	fmt.Println("VM handeler was called")
+	err = json.NewEncoder(w).Encode(vmStruct)
+	if err != nil {
+		fmt.Println("Error encoding json: ", err)
+		http.Error(w, "Error encoding json", http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Println("VM handler was called")
 }
 
 func diskHandler(w http.ResponseWriter, r *http.Request) {
@@ -232,8 +246,14 @@ func diskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	setContentTypeToJson(w)
-	json.NewEncoder(w).Encode(diskStruct)
-	fmt.Println("Disk handeler was called")
+	err = json.NewEncoder(w).Encode(diskStruct)
+	if err != nil {
+		fmt.Println("Error encoding json: ", err)
+		http.Error(w, "Error encoding json", http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Println("Disk handler was called")
 }
 
 func networkHandler(w http.ResponseWriter, r *http.Request) {
@@ -249,8 +269,14 @@ func networkHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	setContentTypeToJson(w)
-	json.NewEncoder(w).Encode(netStruct)
-	fmt.Println("Network handeler was called")
+	err = json.NewEncoder(w).Encode(netStruct)
+	if err != nil {
+		fmt.Println("Error encoding json: ", err)
+		http.Error(w, "Error encoding json", http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Println("Network handler was called")
 }
 
 func setContentTypeToJson(w http.ResponseWriter) {
