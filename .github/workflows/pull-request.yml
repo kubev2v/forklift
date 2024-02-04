@@ -124,7 +124,8 @@ jobs:
       - name: Push code coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
-          file: ./go/src/github.com/${{ github.repository }}/cover.out
+          working-directory: ./go/src/github.com/${{ github.repository }}
+          file: ./cover.out
           flags: unittests
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
