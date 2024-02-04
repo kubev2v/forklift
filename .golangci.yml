@@ -1,0 +1,10 @@
+linters:
+  enable:
+  - ginkgolinter
+  - nilerr
+  - nilnil
+  - bodyclose
+  - gofmt
+linters-settings:
+  ginkgolinter:
+    forbid-focus-container: true
