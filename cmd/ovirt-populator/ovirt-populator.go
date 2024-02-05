@@ -55,8 +55,6 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	defer os.RemoveAll(certsDirectory)
-
 	metrics.StartPrometheusEndpoint(certsDirectory)
 
 	populate(engineUrl, diskID, volPath, ownerUID, *pvcSize)
