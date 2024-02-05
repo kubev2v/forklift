@@ -46,8 +46,6 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	defer os.RemoveAll(certsDirectory)
-
 	metrics.StartPrometheusEndpoint(certsDirectory)
 
 	populate(config)
