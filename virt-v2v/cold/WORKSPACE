@@ -1,4 +1,4 @@
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 
 local_repository(
     name = "forklift",
@@ -37,6 +37,16 @@ http_archive(
     strip_prefix = "rules_proto-5.3.0-21.7",
     urls = [
         "https://github.com/bazelbuild/rules_proto/archive/refs/tags/5.3.0-21.7.tar.gz",
+    ],
+)
+
+http_file(
+    name = "cirros",
+    downloaded_file_path = "cirros.raw",
+    sha256 = "cc704ab14342c1c8a8d91b66a7fc611d921c8b8f1aaf4695f9d6463d913fa8d1",
+    urls = [
+        "https://github.com/cirros-dev/cirros/releases/download/0.6.1/cirros-0.6.1-x86_64-disk.img",
+        "https://download.cirros-cloud.net/0.6.1/cirros-0.6.1-x86_64-disk.img",
     ],
 )
 
