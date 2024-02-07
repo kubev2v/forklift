@@ -403,6 +403,7 @@ func (c *Client) identityServiceAPI(object interface{}, opts interface{}) (err e
 	err = c.connectIdentityServiceAPI()
 	if err != nil {
 		err = liberr.Wrap(err)
+		return
 	}
 	switch object.(type) {
 	case *Region, *[]Region:
@@ -422,9 +423,8 @@ func (c *Client) regionAPI(object interface{}, opts interface{}) (err error) {
 	switch object.(type) {
 	case *[]Region:
 		object := object.(*[]Region)
-		switch opts.(type) {
+		switch opts := opts.(type) {
 		case *RegionListOpts:
-			opts := opts.(*RegionListOpts)
 			err = c.regionList(object, opts)
 		default:
 			err = c.unsupportedTypeError(object)
@@ -432,23 +432,20 @@ func (c *Client) regionAPI(object interface{}, opts interface{}) (err error) {
 	case *Region:
 		object := object.(*Region)
 		var region *regions.Region
-		switch opts.(type) {
+		switch opts := opts.(type) {
 		case *GetOpts:
-			opts := opts.(*GetOpts)
 			region, err = regions.Get(c.identityService, opts.ID).Extract()
 			if err != nil {
 				return
 			}
 			*object = Region{*region}
 		case *RegionCreateOpts:
-			opts := opts.(*RegionCreateOpts)
 			region, err = regions.Create(c.identityService, opts).Extract()
 			if err != nil {
 				return
 			}
 			*object = Region{*region}
 		case *RegionUpdateOpts:
-			opts := opts.(*RegionUpdateOpts)
 			region, err = regions.Update(c.identityService, object.ID, opts).Extract()
 			if err != nil {
 				return
@@ -491,9 +488,8 @@ func (c *Client) projectAPI(object interface{}, opts interface{}) (err error) {
 	switch object.(type) {
 	case *[]Project:
 		object := object.(*[]Project)
-		switch opts.(type) {
+		switch opts := opts.(type) {
 		case *ProjectListOpts:
-			opts := opts.(*ProjectListOpts)
 			err = c.projectList(object, opts)
 		default:
 			err = c.unsupportedTypeError(object)
@@ -501,9 +497,8 @@ func (c *Client) projectAPI(object interface{}, opts interface{}) (err error) {
 	case *Project:
 		object := object.(*Project)
 		var project *projects.Project
-		switch opts.(type) {
+		switch opts := opts.(type) {
 		case *GetOpts:
-			opts := opts.(*GetOpts)
 			ID := opts.ID
 			project, err = projects.Get(c.identityService, ID).Extract()
 			if err != nil {
@@ -511,14 +506,12 @@ func (c *Client) projectAPI(object interface{}, opts interface{}) (err error) {
 			}
 			*object = Project{*project}
 		case *ProjectCreateOpts:
-			opts := opts.(*ProjectCreateOpts)
 			project, err = projects.Create(c.identityService, opts).Extract()
 			if err != nil {
 				return
 			}
 			*object = Project{*project}
 		case *ProjectUpdateOpts:
-			opts := opts.(*ProjectUpdateOpts)
 			project, err = projects.Update(c.identityService, object.ID, opts).Extract()
 			if err != nil {
 				return
@@ -599,9 +592,8 @@ func (c *Client) vmAPI(object interface{}, opts interface{}) (err error) {
 	switch object.(type) {
 	case *[]VM:
 		object := object.(*[]VM)
-		switch opts.(type) {
+		switch opts := opts.(type) {
 		case *VMListOpts:
-			opts := opts.(*VMListOpts)
 			err = c.vmList(object, opts)
 		default:
 			err = c.unsupportedTypeError(object)
@@ -609,9 +601,8 @@ func (c *Client) vmAPI(object interface{}, opts interface{}) (err error) {
 	case *VM:
 		object := object.(*VM)
 		var server *servers.Server
-		switch opts.(type) {
+		switch opts := opts.(type) {
 		case *GetOpts:
-			opts := opts.(*GetOpts)
 			ID := opts.ID
 			server, err = servers.Get(c.computeService, ID).Extract()
 			if err != nil {
@@ -619,14 +610,12 @@ func (c *Client) vmAPI(object interface{}, opts interface{}) (err error) {
 			}
 			*object = VM{Server: *server}
 		case *VMCreateOpts:
-			opts := opts.(*VMCreateOpts)
 			server, err = servers.Create(c.computeService, opts).Extract()
 			if err != nil {
 				return
 			}
 			*object = VM{Server: *server}
 		case *VMUpdateOpts:
-			opts := opts.(*VMUpdateOpts)
 			server, err = servers.Update(c.computeService, object.ID, opts).Extract()
 			if err != nil {
 				return
@@ -669,9 +658,8 @@ func (c *Client) flavorAPI(object interface{}, opts interface{}) (err error) {
 	switch object.(type) {
 	case *[]Flavor:
 		object := object.(*[]Flavor)
-		switch opts.(type) {
+		switch opts := opts.(type) {
 		case *FlavorListOpts:
-			opts := opts.(*FlavorListOpts)
 			err = c.flavorList(object, opts)
 		default:
 			err = c.unsupportedTypeError(object)
@@ -679,9 +667,8 @@ func (c *Client) flavorAPI(object interface{}, opts interface{}) (err error) {
 	case *Flavor:
 		object := object.(*Flavor)
 		var flavor *flavors.Flavor
-		switch opts.(type) {
+		switch opts := opts.(type) {
 		case *GetOpts:
-			opts := opts.(*GetOpts)
 			ID := opts.ID
 			flavor, err = flavors.Get(c.computeService, ID).Extract()
 			if err != nil {
@@ -694,14 +681,12 @@ func (c *Client) flavorAPI(object interface{}, opts interface{}) (err error) {
 			}
 			*object = Flavor{Flavor: *flavor, ExtraSpecs: extraSpecs}
 		case *FlavorCreateOpts:
-			opts := opts.(*FlavorCreateOpts)
 			flavor, err = flavors.Create(c.computeService, opts).Extract()
 			if err != nil {
 				return
 			}
 			*object = Flavor{Flavor: *flavor}
 		case *FlavorUpdateOpts:
-			opts := opts.(*FlavorUpdateOpts)
 			flavor, err = flavors.Update(c.computeService, object.ID, opts).Extract()
 			if err != nil {
 				return
@@ -785,9 +770,8 @@ func (c *Client) imageAPI(object interface{}, opts interface{}) (err error) {
 	switch object.(type) {
 	case *[]Image:
 		object := object.(*[]Image)
-		switch opts.(type) {
+		switch opts := opts.(type) {
 		case *ImageListOpts:
-			opts := opts.(*ImageListOpts)
 			err = c.imageList(object, opts)
 		default:
 			err = c.unsupportedTypeError(object)
@@ -795,9 +779,8 @@ func (c *Client) imageAPI(object interface{}, opts interface{}) (err error) {
 	case *Image:
 		object := object.(*Image)
 		var image *images.Image
-		switch opts.(type) {
+		switch opts := opts.(type) {
 		case *GetOpts:
-			opts := opts.(*GetOpts)
 			ID := opts.ID
 			image, err = images.Get(c.imageService, ID).Extract()
 			if err != nil {
@@ -805,14 +788,12 @@ func (c *Client) imageAPI(object interface{}, opts interface{}) (err error) {
 			}
 			*object = Image{Image: *image}
 		case *ImageCreateOpts:
-			opts := opts.(*ImageCreateOpts)
 			image, err = images.Create(c.imageService, opts).Extract()
 			if err != nil {
 				return
 			}
 			*object = Image{Image: *image}
 		case *ImageUpdateOpts:
-			opts := opts.(*ImageUpdateOpts)
 			image, err = images.Update(c.imageService, object.ID, opts).Extract()
 			if err != nil {
 				return
@@ -895,9 +876,8 @@ func (c *Client) volumeAPI(object interface{}, opts interface{}) (err error) {
 	switch object.(type) {
 	case *[]Volume:
 		object := object.(*[]Volume)
-		switch opts.(type) {
+		switch opts := opts.(type) {
 		case *VolumeListOpts:
-			opts := opts.(*VolumeListOpts)
 			err = c.volumeList(object, opts)
 		default:
 			err = c.unsupportedTypeError(object)
@@ -905,9 +885,8 @@ func (c *Client) volumeAPI(object interface{}, opts interface{}) (err error) {
 	case *Volume:
 		object := object.(*Volume)
 		var volume *volumes.Volume
-		switch opts.(type) {
+		switch opts := opts.(type) {
 		case *GetOpts:
-			opts := opts.(*GetOpts)
 			ID := opts.ID
 			volume, err = volumes.Get(c.blockStorageService, ID).Extract()
 			if err != nil {
@@ -915,22 +894,19 @@ func (c *Client) volumeAPI(object interface{}, opts interface{}) (err error) {
 			}
 			*object = Volume{Volume: *volume}
 		case *VolumeCreateOpts:
-			opts := opts.(*VolumeCreateOpts)
 			volume, err = volumes.Create(c.blockStorageService, opts).Extract()
 			if err != nil {
 				return
 			}
 			*object = Volume{Volume: *volume}
 		case *VolumeUpdateOpts:
-			opts := opts.(*VolumeUpdateOpts)
 			volume, err = volumes.Update(c.blockStorageService, object.ID, opts).Extract()
 			if err != nil {
 				return
 			}
 			*object = Volume{Volume: *volume}
 		case *DeleteOpts:
-			opts := volumes.DeleteOpts{Cascade: true}
-			err = volumes.Delete(c.blockStorageService, object.ID, opts).ExtractErr()
+			err = volumes.Delete(c.blockStorageService, object.ID, volumes.DeleteOpts{Cascade: true}).ExtractErr()
 		default:
 			err = c.unsupportedTypeError(object)
 		}
@@ -966,9 +942,8 @@ func (c *Client) volumeTypeAPI(object interface{}, opts interface{}) (err error)
 	switch object.(type) {
 	case *[]VolumeType:
 		object := object.(*[]VolumeType)
-		switch opts.(type) {
+		switch opts := opts.(type) {
 		case *VolumeTypeListOpts:
-			opts := opts.(*VolumeTypeListOpts)
 			err = c.volumeTypeList(object, opts)
 		default:
 			err = c.unsupportedTypeError(object)
@@ -976,9 +951,8 @@ func (c *Client) volumeTypeAPI(object interface{}, opts interface{}) (err error)
 	case *VolumeType:
 		object := object.(*VolumeType)
 		var volumeType *volumetypes.VolumeType
-		switch opts.(type) {
+		switch opts := opts.(type) {
 		case *GetOpts:
-			opts := opts.(*GetOpts)
 			ID := opts.ID
 			volumeType, err = volumetypes.Get(c.blockStorageService, ID).Extract()
 			if err != nil {
@@ -986,14 +960,12 @@ func (c *Client) volumeTypeAPI(object interface{}, opts interface{}) (err error)
 			}
 			*object = VolumeType{VolumeType: *volumeType}
 		case *VolumeTypeCreateOpts:
-			opts := opts.(*VolumeTypeCreateOpts)
 			volumeType, err = volumetypes.Create(c.blockStorageService, opts).Extract()
 			if err != nil {
 				return
 			}
 			*object = VolumeType{VolumeType: *volumeType}
 		case *VolumeTypeUpdateOpts:
-			opts := opts.(*VolumeTypeUpdateOpts)
 			volumeType, err = volumetypes.Update(c.blockStorageService, object.ID, opts).Extract()
 			if err != nil {
 				return
@@ -1036,9 +1008,8 @@ func (c *Client) snapshotAPI(object interface{}, opts interface{}) (err error) {
 	switch object.(type) {
 	case *[]Snapshot:
 		object := object.(*[]Snapshot)
-		switch opts.(type) {
+		switch opts := opts.(type) {
 		case *SnapshotListOpts:
-			opts := opts.(*SnapshotListOpts)
 			err = c.snapshotList(object, opts)
 		default:
 			err = c.unsupportedTypeError(object)
@@ -1046,9 +1017,8 @@ func (c *Client) snapshotAPI(object interface{}, opts interface{}) (err error) {
 	case *Snapshot:
 		object := object.(*Snapshot)
 		var snapshot *snapshots.Snapshot
-		switch opts.(type) {
+		switch opts := opts.(type) {
 		case *GetOpts:
-			opts := opts.(*GetOpts)
 			ID := opts.ID
 			snapshot, err = snapshots.Get(c.blockStorageService, ID).Extract()
 			if err != nil {
@@ -1056,14 +1026,12 @@ func (c *Client) snapshotAPI(object interface{}, opts interface{}) (err error) {
 			}
 			*object = Snapshot{Snapshot: *snapshot}
 		case *SnapshotCreateOpts:
-			opts := opts.(*SnapshotCreateOpts)
 			snapshot, err = snapshots.Create(c.blockStorageService, opts).Extract()
 			if err != nil {
 				return
 			}
 			*object = Snapshot{Snapshot: *snapshot}
 		case *SnapshotUpdateOpts:
-			opts := opts.(*SnapshotUpdateOpts)
 			snapshot, err = snapshots.Update(c.blockStorageService, object.ID, opts).Extract()
 			if err != nil {
 				return
@@ -1144,9 +1112,8 @@ func (c *Client) networkAPI(object interface{}, opts interface{}) (err error) {
 	switch object.(type) {
 	case *[]Network:
 		object := object.(*[]Network)
-		switch opts.(type) {
+		switch opts := opts.(type) {
 		case *NetworkListOpts:
-			opts := opts.(*NetworkListOpts)
 			err = c.networkList(object, opts)
 		default:
 			err = c.unsupportedTypeError(object)
@@ -1154,9 +1121,8 @@ func (c *Client) networkAPI(object interface{}, opts interface{}) (err error) {
 	case *Network:
 		object := object.(*Network)
 		var network *networks.Network
-		switch opts.(type) {
+		switch opts := opts.(type) {
 		case *GetOpts:
-			opts := opts.(*GetOpts)
 			ID := opts.ID
 			network, err = networks.Get(c.networkService, ID).Extract()
 			if err != nil {
@@ -1164,14 +1130,12 @@ func (c *Client) networkAPI(object interface{}, opts interface{}) (err error) {
 			}
 			*object = Network{Network: *network}
 		case *NetworkCreateOpts:
-			opts := opts.(*NetworkCreateOpts)
 			network, err = networks.Create(c.networkService, opts).Extract()
 			if err != nil {
 				return
 			}
 			*object = Network{Network: *network}
 		case *NetworkUpdateOpts:
-			opts := opts.(*NetworkUpdateOpts)
 			network, err = networks.Update(c.networkService, object.ID, opts).Extract()
 			if err != nil {
 				return
@@ -1214,9 +1178,8 @@ func (c *Client) subnetAPI(object interface{}, opts interface{}) (err error) {
 	switch object.(type) {
 	case *[]Subnet:
 		object := object.(*[]Subnet)
-		switch opts.(type) {
+		switch opts := opts.(type) {
 		case *SubnetListOpts:
-			opts := opts.(*SubnetListOpts)
 			err = c.subnetList(object, opts)
 		default:
 			err = c.unsupportedTypeError(object)
@@ -1224,9 +1187,8 @@ func (c *Client) subnetAPI(object interface{}, opts interface{}) (err error) {
 	case *Subnet:
 		object := object.(*Subnet)
 		var subnet *subnets.Subnet
-		switch opts.(type) {
+		switch opts := opts.(type) {
 		case *GetOpts:
-			opts := opts.(*GetOpts)
 			ID := opts.ID
 			subnet, err = subnets.Get(c.networkService, ID).Extract()
 			if err != nil {
@@ -1234,14 +1196,12 @@ func (c *Client) subnetAPI(object interface{}, opts interface{}) (err error) {
 			}
 			*object = Subnet{Subnet: *subnet}
 		case *SubnetCreateOpts:
-			opts := opts.(*SubnetCreateOpts)
 			subnet, err = subnets.Create(c.networkService, opts).Extract()
 			if err != nil {
 				return
 			}
 			*object = Subnet{Subnet: *subnet}
 		case *SubnetUpdateOpts:
-			opts := opts.(*SubnetUpdateOpts)
 			subnet, err = subnets.Update(c.networkService, object.ID, opts).Extract()
 			if err != nil {
 				return
@@ -1286,6 +1246,7 @@ func (c *Client) GetUserProjects(userProjects *[]Project) (err error) {
 	err = c.connectIdentityServiceAPI()
 	if err != nil {
 		err = liberr.Wrap(err)
+		return
 	}
 	userID, err = c.getAuthenticatedUserID()
 	if err != nil {
@@ -1385,6 +1346,7 @@ func (c *Client) getProjectIDFromApplicationCredentials() (projectID string, err
 	err = c.connectIdentityServiceAPI()
 	if err != nil {
 		err = liberr.Wrap(err)
+		return
 	}
 	var userID string
 	userID, err = c.getAuthenticatedUserID()
