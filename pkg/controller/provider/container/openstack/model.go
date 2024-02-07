@@ -10,7 +10,6 @@ import (
 	fb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	"k8s.io/klog/v2"
 )
 
 // All adapters.
@@ -705,7 +704,7 @@ func (r *VolumeAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) 
 	}
 	for i := range volumeList {
 		volume := &Volume{volumeList[i]}
-		klog.Info("Getting update for volume", "volume", volume.ID)
+		ctx.log.Info("Getting update for volume", "volume", volume.ID)
 		switch volume.Status {
 		case VolumeStatusDeleting:
 			updater := func(tx *libmodel.Tx) (err error) {
@@ -744,7 +743,7 @@ func (r *VolumeAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) 
 				if err == nil {
 					// If an attached volume has changed, we have to update the relevant VM revision
 					// to make sure it is revalidated.
-					klog.Info("Volume changed, updating attached VMs", "volume", volume.ID)
+					ctx.log.Info("Volume changed, updating attached VMs", "volume", volume.ID)
 					for _, attachment := range volume.Attachments {
 						vmID := attachment.ServerID
 						vm := &model.VM{
@@ -752,13 +751,13 @@ func (r *VolumeAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) 
 						}
 						err = tx.Get(vm)
 						if err != nil {
-							klog.Info("VM not found, skipping", "vmID", vmID)
+							ctx.log.Info("VM not found, skipping", "vmID", vmID)
 							continue
 						}
 						vm.RevisionValidated = 0
 						err = tx.Update(vm)
 						if err != nil {
-							klog.Error("Could not update VM revision", "vmID", vmID, "err", err)
+							ctx.log.Error(err, "Could not update VM revision", "vmID", vmID)
 							continue
 						}
 					}
