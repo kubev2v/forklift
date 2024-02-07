@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	adapter "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/vsphere"
@@ -16,7 +17,6 @@ import (
 	webhookutils "github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/util"
 	libcontainer "github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	"github.com/konveyor/forklift-controller/pkg/lib/util"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	admissionv1 "k8s.io/api/admission/v1beta1"
 	core "k8s.io/api/core/v1"
@@ -73,7 +73,15 @@ func (admitter *SecretAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissio
 }
 
 func (admitter *SecretAdmitter) validateProviderSecret() *admissionv1.AdmissionResponse {
-	if _, ok := admitter.secret.Data["cacert"]; ok && util.InsecureProvider(&admitter.secret) {
+	var insecure bool
+	if val, ok := admitter.secret.Data["insecure"]; ok {
+		var err error
+		if insecure, err = strconv.ParseBool(string(val)); err != nil {
+			return webhookutils.ToAdmissionResponseError(fmt.Errorf("invalid value for 'insecure' field"))
+		}
+	}
+
+	if _, ok := admitter.secret.Data["cacert"]; ok && insecure {
 		return webhookutils.ToAdmissionResponseError(fmt.Errorf("received a request to add insecure provider with a CA certificate"))
 	}
 
