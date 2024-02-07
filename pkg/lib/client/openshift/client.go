@@ -25,11 +25,7 @@ func RestCfg(p *api.Provider, secret *core.Secret) *rest.Config {
 		return cfg
 	}
 
-	insecure, err := strconv.ParseBool(string(secret.Data[api.Insecure]))
-	if err != nil {
-		klog.Error("failed to parse insecure: ", err)
-		return nil
-	}
+	insecure, _ := strconv.ParseBool(string(secret.Data[api.Insecure]))
 
 	cacert, hasCACert := secret.Data["cacert"]
 	cfg = &rest.Config{
@@ -37,13 +33,11 @@ func RestCfg(p *api.Provider, secret *core.Secret) *rest.Config {
 		BearerToken: string(secret.Data[api.Token]),
 		TLSClientConfig: rest.TLSClientConfig{
 			Insecure: insecure,
-			CAData:   cacert,
 		},
 	}
+
 	if !insecure && hasCACert {
 		cfg.TLSClientConfig.CAData = cacert
-	} else {
-		cfg.TLSClientConfig.Insecure = true
 	}
 
 	cfg.Burst = 1000
