@@ -28,9 +28,9 @@ var _ = Describe("vSphere provider", func() {
 		Expect(err).ToNot(HaveOccurred())
 		s, err := utils.CreateSecretFromDefinition(f.K8sClient, utils.NewSecretDefinition(nil, nil,
 			map[string][]byte{
-				"cacert":         simSecret.Data["ca.crt"],
-				"password":       []byte("MTIzNDU2Cg=="),
-				"user":           []byte("YWRtaW5pc3RyYXRvckB2c3BoZXJlLmxvY2Fs"),
+				"cacert":   simSecret.Data["ca.crt"],
+				"password": []byte("MTIzNDU2Cg=="),
+				"user":     []byte("YWRtaW5pc3RyYXRvckB2c3BoZXJlLmxvY2Fs"),
 			}, namespace, "provider-test-secret"))
 		Expect(err).ToNot(HaveOccurred())
 

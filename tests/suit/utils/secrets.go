@@ -31,28 +31,15 @@ func NewSecretDefinition(labels, stringData map[string]string, data map[string][
 }
 
 // CreateSecretFromDefinition creates and returns a pointer ot a v1.Secret using a provided v1.Secret
-func CreateSecretFromDefinition(c *kubernetes.Clientset, secret *v1.Secret) (*v1.Secret, error) {
-	err := wait.PollImmediate(secretPollInterval, secretPollPeriod, func() (done bool, err error) {
-		secret, err = c.CoreV1().Secrets(secret.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
-		// success
-		if err == nil {
-			return true, nil
-		}
-		// fail if secret exists.
-		if apierrs.IsAlreadyExists(err) {
-			return true, err
-		}
-		// Log non-fatal errors
-		klog.Error(errors.Wrapf(err, "Encountered create error for secret \"%s/%s\"", secret.Namespace, secret.Name))
-		return false, nil
-	})
+func CreateSecretFromDefinition(c *kubernetes.Clientset, definition *v1.Secret) (secret *v1.Secret, err error) {
+	secret, err = c.CoreV1().Secrets(definition.Namespace).Create(context.TODO(), definition, metav1.CreateOptions{})
 	if err != nil {
-		return nil, err
+		klog.Error(errors.Wrapf(err, "Encountered create error for secret \"%s/%s\"", definition.Namespace, definition.GenerateName))
 	}
-	return secret, nil
+	return
 }
 
-//DeleteSecret ...
+// DeleteSecret ...
 func DeleteSecret(clientSet *kubernetes.Clientset, namespace string, secret v1.Secret) error {
 	e := wait.PollImmediate(secretPollInterval, secretPollPeriod, func() (bool, error) {
 		err := clientSet.CoreV1().Secrets(namespace).Delete(context.TODO(), secret.GetName(), metav1.DeleteOptions{})
