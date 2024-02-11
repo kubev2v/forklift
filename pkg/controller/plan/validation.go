@@ -20,6 +20,7 @@ import (
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
+	"github.com/konveyor/forklift-controller/pkg/settings"
 	batchv1 "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
@@ -858,7 +859,7 @@ func createVddkCheckJob(plan *api.Plan, labels map[string]string, el9 bool, vddk
 			},
 		},
 		Spec: batchv1.JobSpec{
-			ActiveDeadlineSeconds: ptr.To[int64](300),
+			ActiveDeadlineSeconds: ptr.To[int64](int64(settings.Settings.Migration.VddkJobActiveDeadline)),
 			BackoffLimit:          ptr.To[int32](2),
 			Completions:           ptr.To[int32](1),
 			Template: core.PodTemplateSpec{
