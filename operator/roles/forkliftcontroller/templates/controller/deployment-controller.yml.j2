@@ -50,8 +50,6 @@ spec:
         - name: API_TLS_CA
           value: /var/run/secrets/{{ inventory_tls_secret_name }}/ca.crt
 {% endif %}
-        - name: SECRET_NAME
-          value: webhook-server-secret
 {% if controller_log_level is defined and controller_log_level is number %}
         - name: LOG_LEVEL
           value: "{{ controller_log_level }}"
@@ -107,10 +105,6 @@ spec:
             name: {{ controller_configmap_name }}
         image: {{ controller_image_fqin }}
         imagePullPolicy: {{ image_pull_policy }}
-        ports:
-        - containerPort: 9876
-          name: webhook-server
-          protocol: TCP
         resources:
           limits:
             cpu: {{ controller_container_limits_cpu }}
@@ -119,9 +113,6 @@ spec:
             cpu: {{ controller_container_requests_cpu }}
             memory: {{ controller_container_requests_memory }}
         volumeMounts:
-        - mountPath: /tmp/cert
-          name: cert
-          readOnly: true
         - mountPath: {{ profiler_volume_path }}
           name: profiler
 {% if k8s_cluster|bool %}
@@ -150,8 +141,6 @@ spec:
           value: /var/run/secrets/{{ inventory_tls_secret_name }}/tls.key
         - name: METRICS_PORT
           value: '8082'
-        - name: SECRET_NAME
-          value: webhook-server-secret
         - name: OVA_PROVIDER_SERVER_IMAGE
           value: {{ ova_provider_server_fqin }}
 {% if feature_validation|bool %}
@@ -208,10 +197,6 @@ spec:
 {% endif %}
       terminationGracePeriodSeconds: 10
       volumes:
-      - name: cert
-        secret:
-          defaultMode: 420
-          secretName: webhook-server-secret
       - name: {{ inventory_tls_secret_name }}
         secret:
           defaultMode: 420
