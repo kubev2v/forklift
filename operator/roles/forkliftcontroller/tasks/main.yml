@@ -52,11 +52,6 @@
           state: present
           definition: "{{ lookup('template', 'configmap-trusted-ca.yml.j2') }}"
 
-  - name: "Setup the webhook secret"
-    k8s:
-      state: present
-      definition: "{{ lookup('template', 'secret-webhook-server-secret.yml.j2') }}"
-
   - name: "Setup controller config map"
     k8s:
       state : present
