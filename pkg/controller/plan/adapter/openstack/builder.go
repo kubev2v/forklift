@@ -791,7 +791,7 @@ func (r *Builder) PreferenceName(vmRef ref.Ref, configMap *core.ConfigMap) (name
 		return
 	}
 	os, version, distro := r.getOs(vm)
-	name = r.getPreferenceOs(vm, os, version, distro)
+	name = getPreferenceOs(os, version, distro)
 	return
 }
 
@@ -821,34 +821,34 @@ func (r *Builder) getOs(vm *model.Workload) (os, version, distro string) {
 	return
 }
 
-func (r *Builder) getPreferenceOs(vm *model.Workload, os, version, distro string) string {
+func getPreferenceOs(os, version, distro string) string {
 	if os != UnknownOS && version != "" {
-		os = fmt.Sprintf("%s%s", os, version)
 		if distro == CentOS && len(version) >= 1 && (version[:1] == "8" || version[:1] == "9") {
 			os = fmt.Sprintf("%s.stream%s", distro, version)
 		} else if os == Windows {
 			switch {
 			case strings.Contains(version, "2k12") || strings.Contains(version, "2012"):
-				os = fmt.Sprintf("%s.2k12", os)
+				os = fmt.Sprintf("%s.2k12.virtio", os)
 			case strings.Contains(version, "2k16") || strings.Contains(version, "2016"):
-				os = fmt.Sprintf("%s.2k16", os)
+				os = fmt.Sprintf("%s.2k16.virtio", os)
 			case strings.Contains(version, "2k19") || strings.Contains(version, "2019"):
-				os = fmt.Sprintf("%s.2k19", os)
+				os = fmt.Sprintf("%s.2k19.virtio", os)
 			case strings.Contains(version, "2k22") || strings.Contains(version, "2022"):
-				os = fmt.Sprintf("%s.2k22", os)
+				os = fmt.Sprintf("%s.2k22.virtio", os)
 			case len(version) >= 2 && (version[:2] == "10" || version[:2] == "11"):
-				os = fmt.Sprintf("%s.%s", os, version)
+				os = fmt.Sprintf("%s.%s.virtio", os, version)
 			default:
-				os = DefaultWindows
+				os = "windows.10.virtio"
 			}
+		} else if distro == RHEL {
+			os = fmt.Sprintf("%s.%s", os, version)
 		}
 	}
 	return os
 }
 
-func (r *Builder) getTemplateOs(vm *model.Workload, os, version, distro string) string {
+func getTemplateOs(os, version, distro string) string {
 	if os != UnknownOS && version != "" {
-		os = fmt.Sprintf("%s.%s", os, version)
 		if distro == CentOS && len(version) >= 1 && (version[:1] == "8" || version[:1] == "9") {
 			os = fmt.Sprintf("%s-stream%s", distro, version)
 		} else if os == Windows {
@@ -866,6 +866,8 @@ func (r *Builder) getTemplateOs(vm *model.Workload, os, version, distro string) 
 			default:
 				os = DefaultWindows
 			}
+		} else {
+			os = fmt.Sprintf("%s%s", os, version)
 		}
 	}
 	return os
@@ -884,7 +886,7 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 	}
 
 	tempOs, version, distro := r.getOs(vm)
-	os := r.getTemplateOs(vm, tempOs, version, distro)
+	os := getTemplateOs(tempOs, version, distro)
 
 	var flavor string
 
