@@ -25,6 +25,7 @@ const (
 	CleanupRetries          = "CLEANUP_RETRIES"
 	OvirtOsConfigMap        = "OVIRT_OS_MAP"
 	VsphereOsConfigMap      = "VSPHERE_OS_MAP"
+	VddkJobActiveDeadline   = "VDDK_JOB_ACTIVE_DEADLINE"
 )
 
 // Migration settings
@@ -58,6 +59,8 @@ type Migration struct {
 	OvirtOsConfigMap string
 	// vSphere OS config map name
 	VsphereOsConfigMap string
+	// Active deadline for VDDK validation job
+	VddkJobActiveDeadline int
 }
 
 // Load settings.
@@ -117,7 +120,9 @@ func (r *Migration) Load() (err error) {
 		r.VsphereOsConfigMap = val
 	} else if Settings.Role.Has(MainRole) {
 		return liberr.Wrap(fmt.Errorf("failed to find environment variable %s", VsphereOsConfigMap))
-
+	}
+	if r.VddkJobActiveDeadline, err = getPositiveEnvLimit(VddkJobActiveDeadline, 300); err != nil {
+		return liberr.Wrap(err)
 	}
 
 	return
