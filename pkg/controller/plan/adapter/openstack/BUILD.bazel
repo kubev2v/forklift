@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "openstack",
@@ -39,5 +39,16 @@ go_library(
         "//vendor/kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/controller/controllerutil",
+    ],
+)
+
+go_test(
+    name = "openstack_test",
+    srcs = ["builder_test.go"],
+    embed = [":openstack"],
+    deps = [
+        "//vendor/github.com/onsi/ginkgo",
+        "//vendor/github.com/onsi/ginkgo/extensions/table",
+        "//vendor/github.com/onsi/gomega",
     ],
 )
