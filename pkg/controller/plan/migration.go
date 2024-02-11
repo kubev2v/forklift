@@ -873,10 +873,8 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 			r.converter = adapter.NewConverter(&r.Context.Destination, r.Log.WithName("converter"), labels)
 			r.converter.FilterFn = func(pvc *core.PersistentVolumeClaim) bool {
-				if val, ok := pvc.Annotations[base.AnnRequiresConversion]; ok && val == "true" {
-					return true
-				}
-				return false
+				val, ok := pvc.Annotations[base.AnnRequiresConversion]
+				return ok && val == "true"
 			}
 		}
 
