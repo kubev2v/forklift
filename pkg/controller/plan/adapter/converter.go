@@ -51,11 +51,6 @@ func (c *Converter) ConvertPVCs(pvcs []*v1.PersistentVolumeClaim, srcFormat srcF
 			return false, err
 		}
 
-		if scratchPVC == nil {
-			c.Log.Info("Scratch PVC is not ready", "pvc", getScratchPVCName(pvc))
-			return false, nil
-		}
-
 		switch scratchPVC.Status.Phase {
 		case v1.ClaimBound:
 			c.Log.Info("Scratch PVC bound", "pvc", scratchPVC.Name)
@@ -73,11 +68,6 @@ func (c *Converter) ConvertPVCs(pvcs []*v1.PersistentVolumeClaim, srcFormat srcF
 		convertJob, err := c.ensureJob(pvc, srcFormat(pvc), dstFormat)
 		if err != nil {
 			return false, err
-		}
-
-		if convertJob == nil {
-			c.Log.Info("Convert job is not ready yet for pvc", "pvc", pvc.Name)
-			return false, nil
 		}
 
 		c.Log.Info("Convert job status", "pvc", pvc.Name, "status", convertJob.Status)

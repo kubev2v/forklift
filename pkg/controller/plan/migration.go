@@ -864,7 +864,6 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			break
 		}
 
-		var filterFn func(pvc *core.PersistentVolumeClaim) bool
 		if r.converter == nil {
 			labels := map[string]string{
 				"plan":      string(r.Plan.GetUID()),
@@ -873,14 +872,12 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				"app":       "forklift",
 			}
 			r.converter = adapter.NewConverter(&r.Context.Destination, r.Log.WithName("converter"), labels)
-			filterFn = func(pvc *core.PersistentVolumeClaim) bool {
+			r.converter.FilterFn = func(pvc *core.PersistentVolumeClaim) bool {
 				if val, ok := pvc.Annotations[base.AnnRequiresConversion]; ok && val == "true" {
 					return true
 				}
 				return false
 			}
-
-			r.converter.FilterFn = filterFn
 		}
 
 		step.MarkStarted()
