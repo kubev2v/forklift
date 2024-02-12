@@ -7,6 +7,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/util"
 	admissionv1 "k8s.io/api/admission/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	k8sutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 type ProviderMutator struct {
@@ -25,9 +26,25 @@ func (mutator *ProviderMutator) Mutate(ar *admissionv1.AdmissionReview) *admissi
 	}
 
 	specChanged := mutator.setSdkEndpointIfNeeded()
+	metadataChanged := mutator.ar.Request.Operation == admissionv1.Create && mutator.setFinalizers()
 
+	var patches []util.PatchOperation
 	if specChanged {
-		patches := mutator.patchPayload()
+		patches = append(patches, util.PatchOperation{
+			Op:    "replace",
+			Path:  "/spec",
+			Value: mutator.provider.Spec,
+		})
+	}
+	if metadataChanged {
+		patches = append(patches, util.PatchOperation{
+			Op:    "replace",
+			Path:  "/metadata",
+			Value: mutator.provider.ObjectMeta,
+		})
+	}
+
+	if len(patches) > 0 {
 		patchBytes, err := util.GeneratePatchPayload(patches...)
 		if err != nil {
 			log.Error(err, "mutating webhook error, failed to generate payload for patch request")
@@ -62,10 +79,10 @@ func (mutator *ProviderMutator) setSdkEndpointIfNeeded() bool {
 	return providerChanged
 }
 
-func (mutator *ProviderMutator) patchPayload() []util.PatchOperation {
-	return []util.PatchOperation{{
-		Op:    "replace",
-		Path:  "/spec",
-		Value: mutator.provider.Spec,
-	}}
+func (mutator *ProviderMutator) setFinalizers() bool {
+	var changed bool
+	if mutator.provider.Type() == api.Ova {
+		changed = k8sutil.AddFinalizer(&(mutator.provider), api.OvaProviderFinalizer)
+	}
+	return changed
 }

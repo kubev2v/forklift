@@ -42,9 +42,11 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/storage/names"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	k8sutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -230,6 +232,30 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 				err = fmt.Errorf("the OVA provider server creation timed out. Please ensure that the NFS export is set correctly")
 				r.handleServerCreationFailure(provider, err)
 				return
+			}
+		}
+	}
+
+	if provider.DeletionTimestamp != nil && k8sutil.ContainsFinalizer(provider, api.OvaProviderFinalizer) {
+		labelSelector := labels.SelectorFromSet(labels.Set{
+			"subapp":   "ova-server",
+			"app":      "forklift",
+			"provider": provider.Name,
+		})
+		pvList := &v1.PersistentVolumeList{}
+		if err = r.Client.List(context.TODO(), pvList, &client.ListOptions{LabelSelector: labelSelector}); err != nil {
+			r.Log.Error(err, "Failed to list PVs for OVA provider", "provider", provider)
+		} else {
+			for _, pv := range pvList.Items {
+				if err = r.Client.Delete(context.TODO(), &pv); err != nil {
+					r.Log.Error(err, "Failed to delete PV", "PV", pv)
+					return
+				}
+			}
+			clonedProvider := provider.DeepCopy()
+			k8sutil.RemoveFinalizer(provider, api.OvaProviderFinalizer)
+			if err := r.Patch(context.TODO(), provider, client.MergeFrom(clonedProvider)); err != nil {
+				r.Log.Error(err, "Failed to remove finalizer", "provider", provider)
 			}
 		}
 	}
