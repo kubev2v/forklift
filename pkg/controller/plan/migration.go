@@ -1113,9 +1113,16 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		}
 		// only for OVA, fetch config from the conversion pod
 		if r.Source.Provider.Type() == v1beta1.Ova {
-			err = r.getVirtV2VDiskConfig(vm, step)
+			pod, err := r.kubevirt.GetGuestConversionPod(vm)
 			if err != nil {
-				return
+				return err
+			}
+
+			if pod.Status.Phase != core.PodSucceeded {
+				err = r.kubevirt.GetVirtV2VConvertedVMConfig(vm, pod, step)
+				if err != nil {
+					return err
+				}
 			}
 		}
 		if step.MarkedCompleted() && !step.HasError() {
@@ -1785,49 +1792,6 @@ func (r *Migration) setPopulatorPodsWithLabels(vm *plan.VMStatus, migrationID st
 			}
 		}
 	}
-}
-
-func (r *Migration) getVirtV2VDiskConfig(vm *plan.VMStatus, step *plan.Step) (err error) {
-	pod, err := r.kubevirt.GetGuestConversionPod(vm)
-	switch {
-	case err != nil:
-		return liberr.Wrap(err)
-	case pod == nil:
-		step.MarkCompleted()
-		step.AddError("Guest conversion pod not found")
-		return nil
-	}
-
-	url := fmt.Sprintf("http://%s:2112/vm_config", pod.Status.PodIP)
-	resp, err := http.Get(url)
-	switch {
-	case err == nil:
-		defer resp.Body.Close()
-	case strings.Contains(err.Error(), "connection refused"):
-		return nil
-	default:
-		return
-	}
-	firmaware, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return
-	}
-	currentAnnotations := r.Migration.Annotations
-	if currentAnnotations == nil {
-		currentAnnotations = make(map[string]string)
-	}
-	var vmId string
-	labels := pod.GetLabels()
-	if val, ok := labels["vmID"]; ok {
-		vmId = val
-	}
-	currentAnnotations[vmId] = string(firmaware)
-	r.Migration.SetAnnotations(currentAnnotations)
-	err = r.Destination.Client.Update(context.TODO(), r.Migration.DeepCopy())
-	if err != nil {
-		return
-	}
-	return nil
 }
 
 // Step predicate.

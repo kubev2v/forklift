@@ -1,7 +1,6 @@
 package ova
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -23,16 +22,14 @@ import (
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/utils/ptr"
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
 
-// BIOS types
+// Firmware types
 const (
 	BIOS = "bios"
-)
-
-const (
 	UEFI = "uefi"
 )
 
@@ -338,35 +335,24 @@ func (r *Builder) mapCPU(vm *model.VM, object *cnv.VirtualMachineSpec) {
 
 func (r *Builder) mapFirmware(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	migrationAnnotations := r.Migration.GetAnnotations()
-	var vmFirmware string
-	if virtV2VFirmware, ok := migrationAnnotations[vm.ID]; ok {
-		err := json.Unmarshal([]byte(virtV2VFirmware), &vmFirmware)
-		if err != nil {
-			err = liberr.Wrap(
-				err,
-				"Failed to unmarshel VM virt-v2v fimware config",
-				vm.Name)
-		}
-	}
+	virtV2VFirmware := migrationAnnotations[vm.ID]
 
 	firmware := &cnv.Firmware{
 		Serial: vm.UUID,
 	}
-	switch vmFirmware {
+
+	switch virtV2VFirmware {
 	case BIOS:
 		firmware.Bootloader = &cnv.Bootloader{BIOS: &cnv.BIOS{}}
-	case UEFI:
-		firmware.Bootloader = &cnv.Bootloader{EFI: &cnv.EFI{}}
 	default:
 		// We don't distinguish between UEFI and UEFI with secure boot, but we anyway would have
 		// disabled secure boot, even if we knew it was enabled on the source, because the guest
 		// OS won't be able to boot without getting the NVRAM data. By starting the VM without
 		// secure boot we ease the procedure users need to do in order to make a guest OS that
 		// was previously configured with secure boot bootable.
-		secureBootEnabled := false
 		firmware.Bootloader = &cnv.Bootloader{
 			EFI: &cnv.EFI{
-				SecureBoot: &secureBootEnabled,
+				SecureBoot: ptr.To(false),
 			}}
 	}
 	object.Template.Spec.Domain.Firmware = firmware
