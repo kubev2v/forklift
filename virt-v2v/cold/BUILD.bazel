@@ -38,7 +38,7 @@ container_run_and_extract(
         "( [ \\\"\\$(rpm -q glibc)\\\" == \\\"glibc-2.34-66.el9.x86_64\\\" ] && dnf -y downgrade glibc-2.34-65.el9.x86_64 || true )",
         "dnf -y install libguestfs libguestfs-appliance libguestfs-xfs libguestfs-winsupport qemu-img supermin",
         "depmod \\$(ls /lib/modules/ |tail -n1)",
-        "export LIBGUESTFS_BACKEND=direct LIBGUESTFS_PATH=/usr/lib64/guestfs",
+        "export LIBGUESTFS_BACKEND=direct",
         "export LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1",
         "mkdir -p /usr/lib64/guestfs/appliance",
         "cd /usr/lib64/guestfs/appliance",
@@ -98,7 +98,7 @@ go_library(
 )
 
 go_binary(
-    name = "cold",
+    name = "virt-v2v-wrapper",
     embed = [":cold_lib"],
     visibility = ["//visibility:public"],
 )
@@ -108,11 +108,13 @@ container_image(
     base = ":virt-v2v-layer",
     directory = "/usr/local/bin/",
     empty_dirs = ["/disks"],
-    entrypoint = ["/usr/local/bin/cold"],
-    env = {"LIBGUESTFS_BACKEND": "direct", 
-    "LIBGUESTFS_PATH": "/usr/lib64/guestfs/appliance"},
+    entrypoint = ["/usr/local/bin/virt-v2v-wrapper"],
+    env = {
+        "LIBGUESTFS_BACKEND": "direct",
+        "LIBGUESTFS_PATH": "/usr/lib64/guestfs/appliance",
+    },
     files = [
-        ":cold",
+        ":virt-v2v-wrapper",
         "@forklift//cmd/image-converter",
         "@forklift//cmd/virt-v2v-monitor",
     ],
