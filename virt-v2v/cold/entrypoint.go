@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	"encoding/xml"
 	"fmt"
 	"net/http"
 	"os"
@@ -11,7 +9,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 )
 
 const (
@@ -23,44 +20,14 @@ const (
 	VDDK    = "/opt/vmware-vix-disklib-distrib"
 )
 
-type Domain struct {
-	XMLName xml.Name `xml:"domain"`
-	Name    string   `xml:"name"`
-	OS      OS       `xml:"os"`
-}
-
-type OS struct {
-	Type   OSType `xml:"type"`
-	Loader Loader `xml:"loader"`
-	Nvram  Nvram  `xml:"nvram"`
-}
-
-type OSType struct {
-	Arch    string `xml:"arch,attr"`
-	Machine string `xml:"machine,attr"`
-	Content string `xml:",chardata"`
-}
-
-type Loader struct {
-	Readonly string `xml:"readonly,attr"`
-	Type     string `xml:"type,attr"`
-	Secure   string `xml:"secure,attr"`
-	Path     string `xml:",chardata"`
-}
-
-type Nvram struct {
-	Template string `xml:"template,attr"`
-}
-
 var (
-	xmlFilePath      string
-	requestProcessed = make(chan bool)
+	xmlFilePath string
+	server      *http.Server
 )
 
 func main() {
 	virtV2vArgs := []string{"virt-v2v", "-v", "-x"}
 	source := os.Getenv("V2V_source")
-	//source := OVA
 
 	if !isValidSource(source) {
 		fmt.Printf("virt-v2v supports the following providers: {OVA, vSphere}. Provided: %s\n", source)
@@ -83,6 +50,21 @@ func main() {
 	switch source {
 	case vSphere:
 		virtV2vArgs = append(virtV2vArgs, "-i", "libvirt", "-ic", os.Getenv("V2V_libvirtURL"))
+		pwFilePath := fmt.Sprintf("%s/vmware.pw", DIR)
+		if err := os.WriteFile(pwFilePath, []byte(os.Getenv("V2V_secretKey")), 0600); err != nil {
+			fmt.Printf("Failed to write to disk: %v\n", err)
+			os.Exit(1)
+		}
+		virtV2vArgs = append(virtV2vArgs, "-ip", pwFilePath)
+
+		if _, err := os.Stat(VDDK); err == nil {
+			virtV2vArgs = append(virtV2vArgs,
+				"-it", "vddk",
+				"-io", fmt.Sprintf("vddk-libdir=%s", VDDK),
+				"-io", fmt.Sprintf("vddk-thumbprint=%s", os.Getenv("V2V_thumbprint")),
+			)
+		}
+		virtV2vArgs = append(virtV2vArgs, "--", os.Getenv("V2V_vmName"))
 	case OVA:
 		virtV2vArgs = append(virtV2vArgs, "-i", "ova", os.Getenv("V2V_diskPath"))
 	}
@@ -102,34 +84,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if source == vSphere {
-		if _, err := os.Stat("/etc/secret/cacert"); err == nil {
-			// use the specified certificate
-			err = os.Symlink("/etc/secret/cacert", "/opt/ca-bundle.crt")
-			if err != nil {
-				fmt.Println("Error creating ca cert link ", err)
-				os.Exit(1)
-			}
-		} else {
-			// otherwise, keep system pool certificates
-			err := os.Symlink("/etc/pki/tls/certs/ca-bundle.crt.bak", "/opt/ca-bundle.crt")
-			if err != nil {
-				fmt.Println("Error creating ca cert link ", err)
-				os.Exit(1)
-			}
-		}
-		virtV2vArgs = append(virtV2vArgs, "-ip", "/etc/secret/secretKey")
-
-		if info, err := os.Stat(VDDK); err == nil && info.IsDir() {
-			virtV2vArgs = append(virtV2vArgs,
-				"-it", "vddk",
-				"-io", fmt.Sprintf("vddk-libdir=%s", VDDK),
-				"-io", fmt.Sprintf("vddk-thumbprint=%s", os.Getenv("V2V_fingerprint")),
-			)
-		}
-		virtV2vArgs = append(virtV2vArgs, "--", os.Getenv("V2V_vmName"))
-	}
-
 	if err := executeVirtV2v(virtV2vArgs); err != nil {
 		fmt.Println("Error executing virt-v2v command ", err)
 		os.Exit(1)
@@ -137,30 +91,21 @@ func main() {
 
 	if source == OVA {
 		var err error
-		xmlFilePath, err = waitForXMLFile(DIR, "xml", 5, 60)
+		xmlFilePath, err = getXMLFile(DIR, "xml")
 		if err != nil {
-			fmt.Println("Error waiting for XML file:", err)
-			return
+			fmt.Println("Error gettin XML file:", err)
+			os.Exit(1)
 		}
 
-		http.HandleFunc("/firmware", firmwareHandler)
-		server := &http.Server{Addr: ":8080"}
-
-		go func() {
-			// Wait for the first request to be processed
-			<-requestProcessed
-			fmt.Println("Shutting down server.")
-			if err := server.Shutdown(context.Background()); err != nil {
-				fmt.Printf("Error shutting down server: %v\n", err)
-			}
-		}()
+		http.HandleFunc("/xml", xmlHandler)
+		http.HandleFunc("/shutdown", shutdownHandler)
+		server = &http.Server{Addr: ":8080"}
 
 		fmt.Println("Starting server on :8080")
 		if err := server.ListenAndServe(); err != http.ErrServerClosed {
 			fmt.Printf("Error starting server: %v\n", err)
+			os.Exit(1)
 		}
-
-		fmt.Println("Server stopped")
 	}
 }
 
@@ -222,73 +167,46 @@ func executeVirtV2v(args []string) (err error) {
 	return
 }
 
-func waitForXMLFile(dir, fileExtension string, timeoutMinutes, checkIntervalSeconds int) (string, error) {
-	deadline := time.Now().Add(time.Duration(timeoutMinutes) * time.Minute)
-	for time.Now().Before(deadline) {
-		files, err := filepath.Glob(filepath.Join(dir, "*."+fileExtension))
-		if err != nil {
-			return "", err
-		}
-		if len(files) > 0 {
-			return files[0], nil
-		}
-		time.Sleep(time.Duration(checkIntervalSeconds) * time.Second)
+func getXMLFile(dir, fileExtension string) (string, error) {
+	files, err := filepath.Glob(filepath.Join(dir, "*."+fileExtension))
+	if err != nil {
+		return "", err
 	}
-	return "", fmt.Errorf("timeout reached without finding an XML file")
+	if len(files) > 0 {
+		return files[0], nil
+	}
+	return "", fmt.Errorf("XML file was not found.")
 }
 
-func firmwareHandler(w http.ResponseWriter, r *http.Request) {
-
+func xmlHandler(w http.ResponseWriter, r *http.Request) {
 	if xmlFilePath == "" {
-		fmt.Println("Error XML file path is empty.")
+		fmt.Println("Error: XML file path is empty.")
+		http.Error(w, "XML file path is empty", http.StatusInternalServerError)
 		return
 	}
 
-	firmware, err := getFirmwareFromConfig(xmlFilePath)
+	xmlData, err := os.ReadFile(xmlFilePath)
 	if err != nil {
-		fmt.Println("Error getting firmware from XML file:", err)
+		fmt.Printf("Error reading XML file: %v\n", err)
+		http.Error(w, "Error reading XML file", http.StatusInternalServerError)
 		return
 	}
 
-	jsonData, err := json.Marshal(map[string]string{"firmware": firmware})
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Error marshaling JSON: %v", err), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/xml")
 	w.WriteHeader(http.StatusOK)
-	w.Write(jsonData)
-
-	requestProcessed <- true
+	_, err = w.Write(xmlData)
+	if err != nil {
+		fmt.Printf("Error writing response: %v\n", err)
+		http.Error(w, "Error writing response", http.StatusInternalServerError)
+	}
 }
 
-func readConfFromXML(xmlFilePath string) (*Domain, error) {
-	var domain Domain
-
-	xmlFile, err := os.Open(xmlFilePath)
+func shutdownHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Shutdown request received. Shutting down server.")
+	err := server.Shutdown(context.Background())
 	if err != nil {
-		return nil, err
+		fmt.Printf("Error shutting down server: %v\n", err)
+	} else {
+		fmt.Println("Server shut down successfully.")
 	}
-	defer xmlFile.Close()
-
-	decoder := xml.NewDecoder(xmlFile)
-
-	err = decoder.Decode(&domain)
-	if err != nil {
-		return &domain, err
-	}
-	return &domain, nil
-}
-
-func getFirmwareFromConfig(xmlFilePath string) (conf string, err error) {
-	xmlConf, err := readConfFromXML(xmlFilePath)
-	if err != nil {
-		return
-	}
-
-	path := xmlConf.OS.Loader.Path
-	if strings.Contains(path, "OVMF") {
-		return "uefi", nil
-	}
-	return "bios", nil
 }
