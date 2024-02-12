@@ -65,6 +65,8 @@ const (
 	ESXI    = "esxi"
 )
 
+const OvaProviderFinalizer = "forklift/ova-provider"
+
 // Defines the desired state of Provider.
 type ProviderSpec struct {
 	// Provider type.
