@@ -92,6 +92,14 @@ spec:
         - name: FEATURE_OVIRT_WARM_MIGRATION
           value: "true"
 {% endif %}
+{% if ovirt_osmap_configmap_name is defined %}
+        - name: OVIRT_OS_MAP
+          value: {{ ovirt_osmap_configmap_name }}
+{% endif %}
+{% if vsphere_osmap_configmap_name is defined %}
+        - name: VSPHERE_OS_MAP
+          value: {{ vsphere_osmap_configmap_name }}
+{% endif %}
 {% if controller_profile_kind is defined and controller_profile_path is defined and controller_profile_duration is defined %}
         - name: PROFILE_KIND
           value: "{{ controller_profile_kind }}"
