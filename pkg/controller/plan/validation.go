@@ -57,6 +57,7 @@ const (
 	Blocked                      = "Blocked"
 	Archived                     = "Archived"
 	VDDKNotConfigured            = "VDDKNotConfigured"
+	unsupportedVersion           = "UnsupportedVersion"
 )
 
 // Categories
@@ -90,7 +91,6 @@ const (
 // Validate the plan resource.
 func (r *Reconciler) validate(plan *api.Plan) error {
 	// Provider.
-	r.Log.Info("Validating plan.", "plan", plan.Name)
 	pv := validation.ProviderPair{Client: r}
 	conditions, err := pv.Validate(plan.Spec.Provider)
 	if err != nil {
@@ -147,10 +147,35 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 		return err
 	}
 
-	// Validate version only if target ocp-to-ocp
-	if plan.Provider.Destination.Type() == api.OpenShift {
-		err = r.validateOCPVersion(plan)
+	// Validate version only if migration is OCP to OCP
+	err = r.validateOCPVersion(plan)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *Reconciler) validateOCPVersion(plan *api.Plan) error {
+	if plan.IsSourceProviderOCP() && plan.Provider.Destination.Type() == api.OpenShift {
+		unsupportedVersion := libcnd.Condition{
+			Type:     unsupportedVersion,
+			Status:   True,
+			Reason:   NotSupported,
+			Category: Critical,
+			Message:  "Source version is not supported.",
+			Items:    []string{},
+		}
+
+		restCfg := ocp.RestCfg(plan.Referenced.Provider.Source, plan.Referenced.Secret)
+		clientset, err := kubernetes.NewForConfig(restCfg)
 		if err != nil {
+			return liberr.Wrap(err)
+		}
+
+		err = r.checkOCPVersion(clientset)
+		if err != nil {
+			plan.Status.SetCondition(unsupportedVersion)
 			return err
 		}
 	}
@@ -433,7 +458,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		if err != nil {
 			return err
 		}
-		if plan.Referenced.Secret == nil && plan.Referenced.Provider.Source.Type() != api.OpenShift {
+		if plan.Referenced.Secret == nil &&
+			// local cluster has no secret
+			!plan.Referenced.Provider.Source.IsHost() {
 			err = r.setupSecret(plan)
 			if err != nil {
 				return err
@@ -724,14 +751,9 @@ func (r *Reconciler) setupSecret(plan *api.Plan) (err error) {
 	return
 }
 
-func (r *Reconciler) validateOCPVersion(plan *api.Plan) error {
-	restCfg := ocp.RestCfg(plan.Referenced.Provider.Source, plan.Referenced.Secret)
-	clientset, err := kubernetes.NewForConfig(restCfg)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
-	version, err := clientset.ServerVersion()
+func (r *Reconciler) checkOCPVersion(clientset kubernetes.Interface) error {
+	discoveryClient := clientset.Discovery()
+	version, err := discoveryClient.ServerVersion()
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -746,8 +768,8 @@ func (r *Reconciler) validateOCPVersion(plan *api.Plan) error {
 		return liberr.Wrap(err)
 	}
 
-	if major < 1 && minor < 26 {
-		return liberr.New("OpenShift version is not supported")
+	if major < 1 || (major == 1 && minor < 26) {
+		return liberr.New("source provider version is not supported")
 	}
 
 	return nil

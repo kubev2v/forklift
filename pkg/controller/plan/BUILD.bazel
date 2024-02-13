@@ -74,7 +74,18 @@ go_library(
 
 go_test(
     name = "plan_test",
-    srcs = ["vm_name_handler_test.go"],
+    srcs = [
+        "plan_suite_test.go",
+        "validation_test.go",
+        "vm_name_handler_test.go",
+    ],
     embed = [":plan"],
-    deps = ["//vendor/github.com/onsi/gomega"],
+    deps = [
+        "//pkg/controller/base",
+        "//vendor/github.com/onsi/ginkgo/v2:ginkgo",
+        "//vendor/github.com/onsi/gomega",
+        "//vendor/k8s.io/apimachinery/pkg/version",
+        "//vendor/k8s.io/client-go/discovery/fake",
+        "//vendor/k8s.io/client-go/kubernetes/fake",
+    ],
 )
