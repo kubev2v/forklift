@@ -12,5 +12,6 @@ go_library(
     deps = [
         "//vendor/sigs.k8s.io/structured-merge-diff/v4/fieldpath",
         "//vendor/sigs.k8s.io/structured-merge-diff/v4/typed",
+        "//vendor/sigs.k8s.io/structured-merge-diff/v4/value",
     ],
 )
