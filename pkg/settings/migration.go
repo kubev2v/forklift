@@ -23,6 +23,8 @@ const (
 	FileSystemOverhead      = "FILESYSTEM_OVERHEAD"
 	BlockOverhead           = "BLOCK_OVERHEAD"
 	CleanupRetries          = "CLEANUP_RETRIES"
+	OvirtOsConfigMap        = "OVIRT_OS_MAP"
+	VsphereOsConfigMap      = "VSPHERE_OS_MAP"
 )
 
 // Migration settings
@@ -52,6 +54,10 @@ type Migration struct {
 	BlockOverhead int64
 	// Cleanup retries
 	CleanupRetries int
+	// oVirt OS config map name
+	OvirtOsConfigMap string
+	// vSphere OS config map name
+	VsphereOsConfigMap string
 }
 
 // Load settings.
@@ -101,6 +107,17 @@ func (r *Migration) Load() (err error) {
 		} else if r.BlockOverhead, ok = quantity.AsInt64(); !ok {
 			return fmt.Errorf("Block overhead is invalid: %s", overhead)
 		}
+	}
+	if val, found := os.LookupEnv(OvirtOsConfigMap); found {
+		r.OvirtOsConfigMap = val
+	} else if Settings.Role.Has(MainRole) {
+		return liberr.Wrap(fmt.Errorf("failed to find environment variable %s", OvirtOsConfigMap))
+	}
+	if val, found := os.LookupEnv(VsphereOsConfigMap); found {
+		r.VsphereOsConfigMap = val
+	} else if Settings.Role.Has(MainRole) {
+		return liberr.Wrap(fmt.Errorf("failed to find environment variable %s", VsphereOsConfigMap))
+
 	}
 
 	return
