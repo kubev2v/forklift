@@ -87,12 +87,6 @@ const (
 	qemuGroup = int64(107)
 )
 
-// Preference configmaps names
-const (
-	vsphereOsConfigMap = "forklift-vsphere-osmap"
-	ovirtOsConfigMap   = "forklift-ovirt-osmap"
-)
-
 // Map of VirtualMachines keyed by vmID.
 type VirtualMachineMap map[string]VirtualMachine
 
@@ -1208,9 +1202,9 @@ func (r *KubeVirt) getOsMapConfig(providerType v1beta1.ProviderType) (configMap 
 	var configMapName string
 	switch providerType {
 	case api.VSphere:
-		configMapName = vsphereOsConfigMap
+		configMapName = Settings.VsphereOsConfigMap
 	case api.OVirt:
-		configMapName = ovirtOsConfigMap
+		configMapName = Settings.OvirtOsConfigMap
 	default:
 		return
 	}
