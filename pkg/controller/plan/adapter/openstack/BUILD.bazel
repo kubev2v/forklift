@@ -44,7 +44,10 @@ go_library(
 
 go_test(
     name = "openstack_test",
-    srcs = ["builder_test.go"],
+    srcs = [
+        "adapter_suite_test.go",
+        "builder_test.go",
+    ],
     embed = [":openstack"],
     deps = [
         "//vendor/github.com/onsi/ginkgo/v2:ginkgo",
