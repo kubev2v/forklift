@@ -224,7 +224,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	}
 
 	// Ready condition.
-	if !plan.Status.HasBlockerCondition() && !plan.Status.HasCondition(Archived) {
+	if !plan.Status.HasBlockerCondition() && !plan.Status.HasCondition(Archived) && !plan.Status.HasCondition(ValidatingVDDK) {
 		plan.Status.SetCondition(libcnd.Condition{
 			Type:     libcnd.Ready,
 			Status:   True,
@@ -318,7 +318,11 @@ func (r *Reconciler) archive(plan *api.Plan) {
 //  5. If a new migration is being started, update the context and snapshot.
 //  6. Run the migration.
 func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
-	if plan.Status.HasBlockerCondition() || plan.Status.HasCondition(Archived) {
+	validatingVDDK := plan.Status.HasCondition(ValidatingVDDK)
+	if plan.Status.HasBlockerCondition() || plan.Status.HasCondition(Archived) || validatingVDDK {
+		if validatingVDDK {
+			reQ = base.SlowReQ
+		}
 		return
 	}
 	defer func() {

@@ -68,6 +68,7 @@ const (
 	VDDKNotConfigured            = "VDDKNotConfigured"
 	unsupportedVersion           = "UnsupportedVersion"
 	VDDKInvalid                  = "VDDKInvalid"
+	ValidatingVDDK               = "ValidatingVDDK"
 )
 
 // Categories
@@ -112,48 +113,36 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	}
 	plan.Referenced.Provider.Source = pv.Referenced.Source
 	plan.Referenced.Provider.Destination = pv.Referenced.Destination
-	//
-	// Target namespace
-	err = r.validateTargetNamespace(plan)
-	if err != nil {
+
+	if err := r.validateTargetNamespace(plan); err != nil {
 		return err
 	}
-	//
-	// Mapping
-	err = r.validateNetworkMap(plan)
-	if err != nil {
+
+	if err := r.validateNetworkMap(plan); err != nil {
 		return err
 	}
-	err = r.validateStorageMap(plan)
-	if err != nil {
+
+	if err := r.validateStorageMap(plan); err != nil {
 		return err
 	}
-	//
-	// Warm migration
-	err = r.validateWarmMigration(plan)
-	if err != nil {
+
+	if err := r.validateWarmMigration(plan); err != nil {
 		return err
 	}
-	//
-	// VM list.
-	err = r.validateVM(plan)
-	if err != nil {
+
+	if err := r.validateVM(plan); err != nil {
 		return err
 	}
-	//
-	// Transfer network
-	err = r.validateTransferNetwork(plan)
-	if err != nil {
+
+	if err := r.validateTransferNetwork(plan); err != nil {
 		return err
 	}
-	// VM Hooks.
-	err = r.validateHooks(plan)
-	if err != nil {
+
+	if err := r.validateHooks(plan); err != nil {
 		return err
 	}
-	// VDDK image
-	err = r.validateVddkImage(plan)
-	if err != nil {
+
+	if err := r.validateVddkImage(plan); err != nil {
 		return err
 	}
 
@@ -723,6 +712,13 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 		Category: Critical,
 		Message:  "VDDK init image is invalid",
 	}
+	vddkValidationInProgress := libcnd.Condition{
+		Type:     ValidatingVDDK,
+		Status:   True,
+		Reason:   Started,
+		Category: Advisory,
+		Message:  "Validating VDDK init image",
+	}
 
 	source := plan.Referenced.Provider.Source
 	if source == nil {
@@ -754,7 +750,8 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 			break
 		}
 		if len(job.Status.Conditions) == 0 {
-			err = liberr.New("validation of VDDK job is in progress")
+			r.Log.Info("validation of VDDK job is in progress", "image", image)
+			plan.Status.SetCondition(vddkValidationInProgress)
 		}
 		for _, condition := range job.Status.Conditions {
 			switch condition.Type {
@@ -865,8 +862,6 @@ func createVddkCheckJob(plan *api.Plan, labels map[string]string, el9 bool, vddk
 			Template: core.PodTemplateSpec{
 				Spec: core.PodSpec{
 					SecurityContext: &core.PodSecurityContext{
-						FSGroup:      ptr.To(qemuGroup),
-						RunAsUser:    ptr.To(qemuUser),
 						RunAsNonRoot: ptr.To(true),
 						SeccompProfile: &core.SeccompProfile{
 							Type: core.SeccompProfileTypeRuntimeDefault,
