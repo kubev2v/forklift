@@ -47,8 +47,7 @@ go_test(
     srcs = ["builder_test.go"],
     embed = [":openstack"],
     deps = [
-        "//vendor/github.com/onsi/ginkgo",
-        "//vendor/github.com/onsi/ginkgo/extensions/table",
+        "//vendor/github.com/onsi/ginkgo/v2:ginkgo",
         "//vendor/github.com/onsi/gomega",
     ],
 )
