@@ -3,7 +3,6 @@ package plan
 import (
 	"context"
 	"encoding/xml"
-	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -90,6 +89,11 @@ const (
 	qemuGroup = int64(107)
 )
 
+const (
+	BIOS = "bios"
+	UEFI = "uefi"
+)
+
 // Map of VirtualMachines keyed by vmID.
 type VirtualMachineMap map[string]VirtualMachine
 
@@ -100,7 +104,7 @@ type KubeVirt struct {
 	Builder adapter.Builder
 }
 
-type Domain struct {
+type OvaVmconfig struct {
 	XMLName xml.Name `xml:"domain"`
 	Name    string   `xml:"name"`
 	OS      OS       `xml:"os"`
@@ -903,7 +907,7 @@ func (r *KubeVirt) GetVirtV2VConvertedVMConfig(vm *plan.VMStatus, pod *core.Pod,
 				resp, err = http.Get(url)
 				if err != nil {
 					if i < maxRetries-1 {
-						fmt.Printf("Retrying... (%d/%d)\n", i+1, maxRetries)
+						r.Log.Info("Retrying to get virt-v2v vm configuration after conversion... (%d/%d), vmID:%v\n", i+1, maxRetries, vm.ID)
 						defer resp.Body.Close()
 						time.Sleep(retryInterval)
 						continue
@@ -934,7 +938,7 @@ func (r *KubeVirt) GetVirtV2VConvertedVMConfig(vm *plan.VMStatus, pod *core.Pod,
 	if val, ok := labels["vmID"]; ok {
 		vmId = val
 	} else {
-		return errors.New("failed to get virt-v2v pod labels")
+		return liberr.New("failed to get virt-v2v pod labels")
 	}
 
 	currentAnnotations[vmId] = firmware
@@ -954,18 +958,17 @@ func (r *KubeVirt) GetVirtV2VConvertedVMConfig(vm *plan.VMStatus, pod *core.Pod,
 	return nil
 }
 
-func readConfFromXML(xmlData string) (*Domain, error) {
-	var domain Domain
+func readConfFromXML(xmlData string) (*OvaVmconfig, error) {
+	var vmConfig OvaVmconfig
 
 	reader := strings.NewReader(xmlData)
 	decoder := xml.NewDecoder(reader)
 
-	err := decoder.Decode(&domain)
+	err := decoder.Decode(&vmConfig)
 	if err != nil {
-		return &domain, err
+		return &vmConfig, err
 	}
-	fmt.Printf("this is domain %v", domain)
-	return &domain, nil
+	return &vmConfig, nil
 }
 
 func getFirmwareFromConfig(xmlConfig string) (conf string, err error) {
@@ -976,9 +979,9 @@ func getFirmwareFromConfig(xmlConfig string) (conf string, err error) {
 
 	path := xmlConf.OS.Loader.Path
 	if strings.Contains(path, "OVMF") {
-		return "uefi", nil
+		return UEFI, nil
 	}
-	return "bios", nil
+	return BIOS, nil
 }
 
 // Delete the PVC consumer pod on the destination cluster.

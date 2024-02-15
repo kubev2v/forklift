@@ -3,12 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
 )
 
 const (
@@ -50,21 +50,6 @@ func main() {
 	switch source {
 	case vSphere:
 		virtV2vArgs = append(virtV2vArgs, "-i", "libvirt", "-ic", os.Getenv("V2V_libvirtURL"))
-		pwFilePath := fmt.Sprintf("%s/vmware.pw", DIR)
-		if err := os.WriteFile(pwFilePath, []byte(os.Getenv("V2V_secretKey")), 0600); err != nil {
-			fmt.Printf("Failed to write to disk: %v\n", err)
-			os.Exit(1)
-		}
-		virtV2vArgs = append(virtV2vArgs, "-ip", pwFilePath)
-
-		if _, err := os.Stat(VDDK); err == nil {
-			virtV2vArgs = append(virtV2vArgs,
-				"-it", "vddk",
-				"-io", fmt.Sprintf("vddk-libdir=%s", VDDK),
-				"-io", fmt.Sprintf("vddk-thumbprint=%s", os.Getenv("V2V_thumbprint")),
-			)
-		}
-		virtV2vArgs = append(virtV2vArgs, "--", os.Getenv("V2V_vmName"))
 	case OVA:
 		virtV2vArgs = append(virtV2vArgs, "-i", "ova", os.Getenv("V2V_diskPath"))
 	}
@@ -82,6 +67,34 @@ func main() {
 	//Disks on block storage.
 	if err := LinkDisks(Block, 10); err != nil {
 		os.Exit(1)
+	}
+
+	if source == vSphere {
+		if _, err := os.Stat("/etc/secret/cacert"); err == nil {
+			// use the specified certificate
+			err = os.Symlink("/etc/secret/cacert", "/opt/ca-bundle.crt")
+			if err != nil {
+				fmt.Println("Error creating ca cert link ", err)
+				os.Exit(1)
+			}
+		} else {
+			// otherwise, keep system pool certificates
+			err := os.Symlink("/etc/pki/tls/certs/ca-bundle.crt.bak", "/opt/ca-bundle.crt")
+			if err != nil {
+				fmt.Println("Error creating ca cert link ", err)
+				os.Exit(1)
+			}
+		}
+		virtV2vArgs = append(virtV2vArgs, "-ip", "/etc/secret/secretKey")
+
+		if info, err := os.Stat(VDDK); err == nil && info.IsDir() {
+			virtV2vArgs = append(virtV2vArgs,
+				"-it", "vddk",
+				"-io", fmt.Sprintf("vddk-libdir=%s", VDDK),
+				"-io", fmt.Sprintf("vddk-thumbprint=%s", os.Getenv("V2V_fingerprint")),
+			)
+		}
+		virtV2vArgs = append(virtV2vArgs, "--", os.Getenv("V2V_vmName"))
 	}
 
 	if err := executeVirtV2v(virtV2vArgs); err != nil {
@@ -157,11 +170,34 @@ func LinkDisks(diskKind string, num int) (err error) {
 }
 
 func executeVirtV2v(args []string) (err error) {
-	virtV2vCmd := exec.Command("bash", "-c", strings.Join(args, " "), "|& /usr/local/bin/virt-v2v-monitor")
-	virtV2vCmd.Stdout = os.Stdout
+	virtV2vCmd := exec.Command(args[0], args[1:]...)
+	virtV2vStdoutPipe, err := virtV2vCmd.StdoutPipe()
+	if err != nil {
+		fmt.Printf("Error setting up stdout pipe: %v\n", err)
+		return
+	}
+
+	tee := io.TeeReader(virtV2vStdoutPipe, os.Stdout)
 	virtV2vCmd.Stderr = os.Stderr
-	if err = virtV2vCmd.Run(); err != nil {
+
+	fmt.Println("exec ", virtV2vCmd)
+	if err = virtV2vCmd.Start(); err != nil {
 		fmt.Printf("Error executing command: %v\n", err)
+		return
+	}
+
+	virtV2vMonitorCmd := exec.Command("/usr/local/bin/virt-v2v-monitor")
+	virtV2vMonitorCmd.Stdin = tee
+	virtV2vMonitorCmd.Stdout = os.Stdout
+	virtV2vMonitorCmd.Stderr = os.Stderr
+
+	if err = virtV2vMonitorCmd.Start(); err != nil {
+		fmt.Printf("Error executing monitor command: %v\n", err)
+		return
+	}
+
+	if err = virtV2vCmd.Wait(); err != nil {
+		fmt.Printf("Error waiting for virt-v2v to finish: %v\n", err)
 		return
 	}
 	return
@@ -193,12 +229,14 @@ func xmlHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/xml")
-	w.WriteHeader(http.StatusOK)
 	_, err = w.Write(xmlData)
-	if err != nil {
+	if err == nil {
+		w.WriteHeader(http.StatusOK)
+	} else {
 		fmt.Printf("Error writing response: %v\n", err)
 		http.Error(w, "Error writing response", http.StatusInternalServerError)
 	}
+
 }
 
 func shutdownHandler(w http.ResponseWriter, r *http.Request) {
@@ -208,5 +246,14 @@ func shutdownHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("Error shutting down server: %v\n", err)
 	} else {
 		fmt.Println("Server shut down successfully.")
+	}
+}
+
+func isValidSource(source string) bool {
+	switch source {
+	case OVA, vSphere:
+		return true
+	default:
+		return false
 	}
 }
