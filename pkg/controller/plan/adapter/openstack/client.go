@@ -185,11 +185,7 @@ func (r *Client) DetachDisks(vmRef ref.Ref) (err error) {
 func (r *Client) PreTransferActions(vmRef ref.Ref) (ready bool, err error) {
 	vm, err := r.getVM(vmRef)
 	if err != nil {
-		err = liberr.Wrap(
-			err,
-			"VM lookup failed.",
-			"vm",
-			vmRef.String())
+		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
 	ready, err = r.ensureVmSnapshot(vm)
@@ -470,10 +466,7 @@ func (r *Client) createImageFromVolume(vm *libclient.VM, volumeID string) (image
 		if strings.HasPrefix(key, "os_glance") {
 			err = r.UnsetImageMetadata(volumeID, key)
 			if err != nil {
-				err = liberr.Wrap(
-					err,
-					"failed to remove reserved glance metadata from volume.",
-					"vm", vm.Name, "volumeID", volumeID, "key", key)
+				err = liberr.Wrap(err, "vm", vm.Name, "volumeID", volumeID, "key", key)
 				return
 			}
 		}
