@@ -279,11 +279,7 @@ func (r *Client) getVM(vmRef ref.Ref) (ovirtVm *ovirtsdk.Vm, vmService *ovirtsdk
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
-		err = liberr.Wrap(
-			err,
-			"VM lookup failed.",
-			"vm",
-			vmRef.String())
+		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
 
@@ -334,7 +330,7 @@ func (r *Client) getDiskSnapshot(diskID, targetSnapshotID string) (diskSnapshotI
 		}
 		snapshotsResponse, rErr := sdService.DiskSnapshotsService().List().Send()
 		if err != nil {
-			err = liberr.Wrap(rErr, "Error listing snapshots in storage domain.", "storageDomain", sdID)
+			err = liberr.Wrap(rErr, "storageDomain", sdID)
 			return
 		}
 		snapshots, ok := snapshotsResponse.Snapshots()
@@ -542,11 +538,7 @@ func (r *Client) DetachDisks(vmRef ref.Ref) (err error) {
 	vm := &model.Workload{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
-		err = liberr.Wrap(
-			err,
-			"VM lookup failed.",
-			"vm",
-			vmRef.String())
+		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
 	diskAttachments := vm.DiskAttachments
@@ -554,13 +546,7 @@ func (r *Client) DetachDisks(vmRef ref.Ref) (err error) {
 		if da.Disk.StorageType == "lun" {
 			_, err = vmService.DiskAttachmentsService().AttachmentService(da.ID).Remove().Send()
 			if err != nil {
-				err = liberr.Wrap(
-					err,
-					"failed to detach LUN disk.",
-					"vm",
-					vmRef.String(),
-					"disk",
-					da)
+				err = liberr.Wrap(err, "vm", vmRef.String(), "disk", da)
 				return
 			}
 		}

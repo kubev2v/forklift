@@ -59,11 +59,6 @@ const (
 	Unknown = "unknown"
 )
 
-// Error messages
-const (
-	ErrVMLookupFailed = "VM lookup failed."
-)
-
 // Regex which matches the snapshot identifier suffix of a
 // OVA disk backing file.
 var backingFilePattern = regexp.MustCompile("-\\d\\d\\d\\d\\d\\d.vmdk")
@@ -121,11 +116,7 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
-		err = liberr.Wrap(
-			err,
-			ErrVMLookupFailed,
-			"vm",
-			vmRef.String())
+		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
 
@@ -157,11 +148,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
-		err = liberr.Wrap(
-			err,
-			ErrVMLookupFailed,
-			"vm",
-			vmRef.String())
+		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
 
@@ -220,11 +207,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
-		err = liberr.Wrap(
-			err,
-			ErrVMLookupFailed,
-			"vm",
-			vmRef.String())
+		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
 
@@ -415,11 +398,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
-		err = liberr.Wrap(
-			err,
-			ErrVMLookupFailed,
-			"vm",
-			vmRef.String())
+		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
 	for _, disk := range vm.Disks {
@@ -450,11 +429,7 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
-		err = liberr.Wrap(
-			err,
-			ErrVMLookupFailed,
-			"vm",
-			vmRef.String())
+		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
 

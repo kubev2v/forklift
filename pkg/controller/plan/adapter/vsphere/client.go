@@ -243,12 +243,7 @@ func (r *Client) getChangeIds(vmRef ref.Ref, snapshotId string) (changeIdMapping
 		[]string{"config.hardware.device"},
 		&snapshot)
 	if err != nil {
-		err = liberr.Wrap(err,
-			"Unable to get snapshot properties.",
-			"vm",
-			vm.Reference().Value,
-			"snapshot",
-			snapshotId)
+		err = liberr.Wrap(err, "vm", vm.Reference().Value, "snapshot", snapshotId)
 		return
 	}
 
@@ -276,11 +271,7 @@ func (r *Client) getVM(vmRef ref.Ref) (vsphereVm *object.VirtualMachine, err err
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
-		err = liberr.Wrap(
-			err,
-			"VM lookup failed.",
-			"vm",
-			vmRef.String())
+		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
 

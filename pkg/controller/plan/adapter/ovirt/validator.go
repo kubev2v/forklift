@@ -38,11 +38,7 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 	vm := &model.Workload{}
 	err = r.inventory.Find(vm, vmRef)
 	if err != nil {
-		err = liberr.Wrap(
-			err,
-			"VM not found in inventory.",
-			"vm",
-			vmRef.String())
+		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
 
@@ -63,11 +59,7 @@ func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
 	vm := &model.Workload{}
 	err = r.inventory.Find(vm, vmRef)
 	if err != nil {
-		err = liberr.Wrap(
-			err,
-			"VM not found in inventory.",
-			"vm",
-			vmRef.String())
+		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
 
@@ -101,11 +93,7 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 	vm := &model.Workload{}
 	err = r.inventory.Find(vm, vmRef)
 	if err != nil {
-		err = liberr.Wrap(
-			err,
-			"VM not found in inventory.",
-			"vm",
-			vmRef.String())
+		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
 
@@ -123,11 +111,7 @@ func (r *Validator) DirectStorage(vmRef ref.Ref) (ok bool, err error) {
 	vm := &model.Workload{}
 	err = r.inventory.Find(vm, vmRef)
 	if err != nil {
-		err = liberr.Wrap(
-			err,
-			"VM not found in inventory.",
-			"vm",
-			vmRef.String())
+		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
 
