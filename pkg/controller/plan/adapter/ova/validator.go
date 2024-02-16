@@ -14,11 +14,6 @@ type Validator struct {
 	inventory web.Client
 }
 
-// Error messages
-const (
-	ErrVMNotFound = "VM not found in inventory."
-)
-
 // Load.
 func (r *Validator) Load() (err error) {
 	r.inventory, err = web.NewClient(r.plan.Referenced.Provider.Source)
@@ -39,11 +34,7 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 	vm := &model.VM{}
 	err = r.inventory.Find(vm, vmRef)
 	if err != nil {
-		err = liberr.Wrap(
-			err,
-			ErrVMNotFound,
-			"vm",
-			vmRef.String())
+		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
 
@@ -64,11 +55,7 @@ func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
 	vm := &model.Workload{}
 	err = r.inventory.Find(vm, vmRef)
 	if err != nil {
-		err = liberr.Wrap(
-			err,
-			ErrVMNotFound,
-			"vm",
-			vmRef.String())
+		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
 

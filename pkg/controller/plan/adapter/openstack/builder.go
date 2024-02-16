@@ -246,8 +246,6 @@ const (
 	Multus = "multus"
 )
 
-const VM_LOOKUP_FAILED = "VM lookup failed."
-
 // Default properties
 var DefaultProperties = map[string]string{
 	CpuPolicy:       CpuPolicyShared,
@@ -269,11 +267,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, vmSpec *cnv.VirtualMachineSpec, 
 	vm := &model.Workload{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
-		err = liberr.Wrap(
-			err,
-			VM_LOOKUP_FAILED,
-			"vm",
-			vmRef.String())
+		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
 
@@ -300,11 +294,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, vmSpec *cnv.VirtualMachineSpec, 
 	r.mapDisks(vm, persistentVolumeClaims, vmSpec)
 	err = r.mapNetworks(vm, vmSpec)
 	if err != nil {
-		err = liberr.Wrap(
-			err,
-			"network mapping failed",
-			"vm",
-			vmRef.String())
+		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
 
@@ -730,11 +720,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (tasks []*plan.Task, err error) {
 	workload := &model.Workload{}
 	err = r.Source.Inventory.Find(workload, vmRef)
 	if err != nil {
-		err = liberr.Wrap(
-			err,
-			VM_LOOKUP_FAILED,
-			"vm",
-			vmRef.String())
+		err = liberr.Wrap(err, "vm", vmRef.String())
 	}
 
 	taskMap := map[string]int64{}
@@ -783,11 +769,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 func (r *Builder) PreferenceName(vmRef ref.Ref, configMap *core.ConfigMap) (name string, err error) {
 	vm := &model.Workload{}
 	if err = r.Source.Inventory.Find(vm, vmRef); err != nil {
-		err = liberr.Wrap(
-			err,
-			VM_LOOKUP_FAILED,
-			"vm",
-			vmRef.String())
+		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
 	os, version, distro := r.getOs(vm)
@@ -877,11 +859,7 @@ func getTemplateOs(os, version, distro string) string {
 func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err error) {
 	vm := &model.Workload{}
 	if err = r.Source.Inventory.Find(vm, vmRef); err != nil {
-		err = liberr.Wrap(
-			err,
-			VM_LOOKUP_FAILED,
-			"vm",
-			vmRef.String())
+		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
 
@@ -1155,7 +1133,7 @@ func (r *Builder) getVolumeAndAccessMode(storageClassName string) ([]core.Persis
 	storageProfile := &cdi.StorageProfile{}
 	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: storageClassName}, storageProfile)
 	if err != nil {
-		return nil, nil, liberr.Wrap(err, "cannot get storage profile", "storageClassName", storageClassName)
+		return nil, nil, liberr.Wrap(err, "storageClassName", storageClassName)
 	}
 
 	if len(storageProfile.Status.ClaimPropertySets) > 0 &&

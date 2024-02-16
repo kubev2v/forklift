@@ -30,12 +30,7 @@ func GetTlsCertificate(url string, secret *core.Secret) (crt *x509.Certificate, 
 	if err == nil && len(conn.ConnectionState().PeerCertificates) > 0 {
 		crt = conn.ConnectionState().PeerCertificates[0]
 	} else {
-		err = liberr.Wrap(
-			err,
-			"failed to retrieve TLS certificate",
-			"url",
-			url,
-		)
+		err = liberr.Wrap(err, "url", url)
 	}
 	return
 }
@@ -51,7 +46,7 @@ func tlsConfig(secret *core.Secret) (cfg *tls.Config, err error) {
 		}
 	} else {
 		if cfg.RootCAs, err = x509.SystemCertPool(); err != nil {
-			err = liberr.Wrap(err, "failed to get system certificate pool")
+			err = liberr.Wrap(err)
 		}
 	}
 	return
