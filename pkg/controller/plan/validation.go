@@ -773,10 +773,18 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 }
 
 func (r *Reconciler) ensureVddkImageValidationJob(plan *api.Plan, el9 bool, vddkImage string) (*batchv1.Job, error) {
-	jobLabels := getVddkImageValidationJobLabels(plan)
+	ctx, err := plancontext.New(r, plan, r.Log)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = r.ensureNamespace(ctx); err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
+	jobLabels := getVddkImageValidationJobLabels(ctx.Plan)
 	jobs := &batchv1.JobList{}
-	ctx, _ := plancontext.New(r, plan, r.Log)
-	err := ctx.Destination.Client.List(
+	err = ctx.Destination.Client.List(
 		context.TODO(),
 		jobs,
 		&client.ListOptions{
@@ -788,7 +796,7 @@ func (r *Reconciler) ensureVddkImageValidationJob(plan *api.Plan, el9 bool, vddk
 	case err != nil:
 		return nil, err
 	case len(jobs.Items) == 0:
-		job := createVddkCheckJob(plan, jobLabels, el9, vddkImage)
+		job := createVddkCheckJob(ctx.Plan, jobLabels, el9, vddkImage)
 		err = ctx.Destination.Client.Create(context.Background(), job, &client.CreateOptions{})
 		if err != nil {
 			return nil, err
@@ -797,6 +805,17 @@ func (r *Reconciler) ensureVddkImageValidationJob(plan *api.Plan, el9 bool, vddk
 	default:
 		return &jobs.Items[0], nil
 	}
+}
+
+func (r *Reconciler) ensureNamespace(ctx *plancontext.Context) error {
+	err := ensureNamespace(ctx.Plan, ctx.Destination.Client)
+	if err == nil {
+		r.Log.Info(
+			"Created namespace.",
+			"import",
+			ctx.Plan.Spec.TargetNamespace)
+	}
+	return err
 }
 
 func getVddkImageValidationJobLabels(plan *api.Plan) map[string]string {

@@ -174,24 +174,15 @@ func (r *KubeVirt) ListVMs() ([]VirtualMachine, error) {
 }
 
 // Ensure the namespace exists on the destination.
-func (r *KubeVirt) EnsureNamespace() (err error) {
-	ns := &core.Namespace{
-		ObjectMeta: meta.ObjectMeta{
-			Name: r.Plan.Spec.TargetNamespace,
-		},
+func (r *KubeVirt) EnsureNamespace() error {
+	err := ensureNamespace(r.Plan, r.Destination.Client)
+	if err == nil {
+		r.Log.Info(
+			"Created namespace.",
+			"import",
+			r.Plan.Spec.TargetNamespace)
 	}
-	err = r.Destination.Client.Create(context.TODO(), ns)
-	if err != nil {
-		if k8serr.IsAlreadyExists(err) {
-			err = nil
-		}
-	}
-	r.Log.Info(
-		"Created namespace.",
-		"import",
-		ns.Name)
-
-	return
+	return err
 }
 
 // Get the importer pod for a PersistentVolumeClaim.

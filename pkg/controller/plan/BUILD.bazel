@@ -10,6 +10,7 @@ go_library(
         "metrics.go",
         "migration.go",
         "predicate.go",
+        "util.go",
         "validation.go",
         "vm_name_handler.go",
     ],
