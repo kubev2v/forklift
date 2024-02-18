@@ -3295,8 +3295,8 @@ go_repository(
 
 go_rules_dependencies()
 
-# NOTE: Keep the version in sync with Go toolchain in GitHub action.
-go_register_toolchains(version = "1.20.10")
+# NOTE: Go version is also set in GitHub action
+go_register_toolchains(version = "1.21.7")
 
 # override rules_docker issue with this dependency
 # rules_docker 0.16 uses 0.1.4, bit since there the checksum changed, which is very weird, going with 0.1.4.1 to
