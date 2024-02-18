@@ -22,7 +22,6 @@ go_library(
 go_binary(
     name = "forklift-api",
     embed = [":forklift-api-lib"],
-    static = "on",
     visibility = ["//visibility:public"],
 )
 
