@@ -13,18 +13,18 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	utils "github.com/konveyor/forklift-controller/pkg/controller/plan/util"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
 	core "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -1127,31 +1127,6 @@ func (r *Builder) getStorageClassName(workload *model.Workload, volumeTypeName s
 	return
 }
 
-// Using CDI logic to set the Volume mode and Access mode of the PVC - https://github.com/kubevirt/containerized-data-importer/blob/v1.56.0/pkg/controller/datavolume/util.go#L154
-func (r *Builder) getVolumeAndAccessMode(storageClassName string) ([]core.PersistentVolumeAccessMode, *core.PersistentVolumeMode, error) {
-	filesystemMode := core.PersistentVolumeFilesystem
-	storageProfile := &cdi.StorageProfile{}
-	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: storageClassName}, storageProfile)
-	if err != nil {
-		return nil, nil, liberr.Wrap(err, "storageClassName", storageClassName)
-	}
-
-	if len(storageProfile.Status.ClaimPropertySets) > 0 &&
-		len(storageProfile.Status.ClaimPropertySets[0].AccessModes) > 0 {
-		accessModes := storageProfile.Status.ClaimPropertySets[0].AccessModes
-		volumeMode := storageProfile.Status.ClaimPropertySets[0].VolumeMode
-		if volumeMode == nil {
-			// volumeMode is an optional API parameter. Filesystem is the default mode used when volumeMode parameter is omitted.
-			volumeMode = &filesystemMode
-		}
-		return accessModes, volumeMode, nil
-	}
-
-	// no accessMode configured on storageProfile
-	return nil, nil, liberr.New("no accessMode defined on StorageProfile for StorageClass", "storageClassName", storageClassName)
-
-}
-
 // Get the OpenstackVolumePopulator CustomResource based on the image name.
 func (r *Builder) getVolumePopulatorCR(name string) (populatorCr api.OpenstackVolumePopulator, err error) {
 	populatorCr = api.OpenstackVolumePopulator{}
@@ -1175,14 +1150,6 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image, storageC
 		virtualSize = image.SizeBytes
 	}
 
-	var accessModes []core.PersistentVolumeAccessMode
-	accessModes, volumeMode, err := r.getVolumeAndAccessMode(storageClassName)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	virtualSize = utils.CalculateSpaceWithOverhead(virtualSize, volumeMode)
-
 	// The image might be a VM Snapshot Image and has no volume associated to it
 	if originalVolumeDiskId, ok := image.Properties["forklift_original_volume_id"]; ok {
 		annotations[AnnImportDiskId] = originalVolumeDiskId.(string)
@@ -1194,20 +1161,26 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image, storageC
 		r.Log.Error(nil, "the image has no volume or vm snapshot associated to it", "image", image.Name)
 	}
 
+	labels := map[string]string{
+		"cdi.kubevirt.io/useStorageProfile": "true",
+	}
+
+	volumeMode := v1.PersistentVolumeMode("FromStorageProfile")
+
 	pvc = &core.PersistentVolumeClaim{
 		ObjectMeta: meta.ObjectMeta{
 			Name:        image.ID,
 			Namespace:   r.Plan.Spec.TargetNamespace,
 			Annotations: annotations,
+			Labels:      labels,
 		},
 		Spec: core.PersistentVolumeClaimSpec{
-			AccessModes: accessModes,
 			Resources: core.ResourceRequirements{
 				Requests: map[core.ResourceName]resource.Quantity{
 					core.ResourceStorage: *resource.NewQuantity(virtualSize, resource.BinarySI)},
 			},
 			StorageClassName: &storageClassName,
-			VolumeMode:       volumeMode,
+			VolumeMode:       ptr.To(volumeMode),
 			DataSourceRef: &core.TypedObjectReference{
 				APIGroup: &apiGroup,
 				Kind:     api.OpenstackVolumePopulatorKind,

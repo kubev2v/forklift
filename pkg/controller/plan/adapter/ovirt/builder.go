@@ -11,18 +11,19 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	utils "github.com/konveyor/forklift-controller/pkg/controller/plan/util"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
 	core "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
@@ -798,61 +799,32 @@ func (r *Builder) createVolumePopulatorCR(diskAttachment model.XDiskAttachment, 
 	return
 }
 
-func (r *Builder) getDefaultVolumeAndAccessMode(storageClassName string) ([]core.PersistentVolumeAccessMode, *core.PersistentVolumeMode, error) {
-	var filesystemMode = core.PersistentVolumeFilesystem
-	storageProfile := &cdi.StorageProfile{}
-	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: storageClassName}, storageProfile)
-	if err != nil {
-		return nil, nil, liberr.Wrap(err)
-	}
-
-	if len(storageProfile.Status.ClaimPropertySets) > 0 &&
-		len(storageProfile.Status.ClaimPropertySets[0].AccessModes) > 0 {
-		accessModes := storageProfile.Status.ClaimPropertySets[0].AccessModes
-		volumeMode := storageProfile.Status.ClaimPropertySets[0].VolumeMode
-		if volumeMode == nil {
-			// volumeMode is an optional API parameter. Filesystem is the default mode used when volumeMode parameter is omitted.
-			volumeMode = &filesystemMode
-		}
-		return accessModes, volumeMode, nil
-	}
-	// no accessMode configured on storageProfile
-	return nil, nil, liberr.New("no accessMode defined on StorageProfile for StorageClass", "storageName", storageClassName)
-}
-
 // Build a PersistentVolumeClaim with DataSourceRef for VolumePopulator
 func (r *Builder) persistentVolumeClaimWithSourceRef(diskAttachment model.XDiskAttachment, storageClassName string, populatorName string,
 	annotations map[string]string) (pvc *core.PersistentVolumeClaim, err error) {
 	diskSize := diskAttachment.Disk.ProvisionedSize
-	var accessModes []core.PersistentVolumeAccessMode
-	var volumeMode *core.PersistentVolumeMode
-	accessModes, volumeMode, err = r.getDefaultVolumeAndAccessMode(storageClassName)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	// We add 10% overhead because of the fsOverhead in CDI, around 5% to ext4 and 5% for root partition.
-	// This value is configurable using `FILESYSTEM_OVERHEAD`
-	// Encrypted Ceph RBD makes the pod see less space, this possible overhead needs to be taken into account.
-	// For Block the value is configurable using `BLOCK_OVERHEAD`
-	diskSize = utils.CalculateSpaceWithOverhead(diskSize, volumeMode)
-
 	annotations[AnnImportDiskId] = diskAttachment.ID
+
+	labels := map[string]string{
+		"cdi.kubevirt.io/useStorageProfile": "true",
+	}
+
+	volumeMode := v1.PersistentVolumeMode("FromStorageProfile")
 
 	pvc = &core.PersistentVolumeClaim{
 		ObjectMeta: meta.ObjectMeta{
 			Name:        diskAttachment.DiskAttachment.ID,
 			Namespace:   r.Plan.Spec.TargetNamespace,
 			Annotations: annotations,
+			Labels:      labels,
 		},
 		Spec: core.PersistentVolumeClaimSpec{
-			AccessModes: accessModes,
 			Resources: core.ResourceRequirements{
 				Requests: map[core.ResourceName]resource.Quantity{
 					core.ResourceStorage: *resource.NewQuantity(diskSize, resource.BinarySI)},
 			},
+			VolumeMode:       ptr.To(volumeMode),
 			StorageClassName: &storageClassName,
-			VolumeMode:       volumeMode,
 			DataSourceRef: &core.TypedObjectReference{
 				APIGroup: &api.SchemeGroupVersion.Group,
 				Kind:     v1beta1.OvirtVolumePopulatorKind,
