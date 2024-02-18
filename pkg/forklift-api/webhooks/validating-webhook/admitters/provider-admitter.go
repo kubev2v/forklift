@@ -26,6 +26,10 @@ func (admitter *ProviderAdmitter) validateVDDK() error {
 		return err
 	}
 
+	if _, found := admitter.provider.Spec.Settings[api.VDDK]; found {
+		return nil
+	}
+
 	plans := api.PlanList{}
 	err := admitter.Client.List(context.TODO(), &plans, &client.ListOptions{})
 	if err != nil {
