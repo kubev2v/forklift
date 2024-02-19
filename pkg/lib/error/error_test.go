@@ -2,9 +2,10 @@ package error
 
 import (
 	"errors"
+	"testing"
+
 	"github.com/onsi/gomega"
 	errors2 "github.com/pkg/errors"
-	"testing"
 )
 
 func TestError(t *testing.T) {
@@ -41,7 +42,7 @@ func TestError(t *testing.T) {
 	g.Expect(le4.(*Error).Error()).To(
 		gomega.Equal("Failed to create user. caused by: 'help: failed'"))
 	g.Expect(le4.(*Error).Context()).ToNot(gomega.BeNil())
-	g.Expect(len(le4.(*Error).Context())).To(gomega.Equal(4))
+	g.Expect(le4.(*Error).Context()).To(gomega.HaveLen(4))
 
 	le5 := Wrap(
 		le4, "Web POST failed.",
@@ -50,7 +51,7 @@ func TestError(t *testing.T) {
 	g.Expect(le5.(*Error).Error()).To(
 		gomega.Equal("Web POST failed. caused by: 'Failed to create user.' caused by: 'help: failed'"))
 	g.Expect(le5.(*Error).Context()).ToNot(gomega.BeNil())
-	g.Expect(len(le5.(*Error).Context())).To(gomega.Equal(8))
+	g.Expect(le5.(*Error).Context()).To(gomega.HaveLen(8))
 
 	println(le.Stack())
 }

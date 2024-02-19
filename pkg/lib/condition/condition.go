@@ -1,9 +1,10 @@
 package condition
 
 import (
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
 	"time"
+
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Types

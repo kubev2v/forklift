@@ -3,12 +3,13 @@ package model
 import (
 	"encoding/json"
 	"fmt"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	"github.com/pkg/errors"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
+
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -391,7 +392,7 @@ func (f *Field) AsValue(object interface{}) (value interface{}, err error) {
 			reflect.Int32,
 			reflect.Int64:
 			n := val.Int()
-			value = strconv.FormatInt(n, 0)
+			value = strconv.FormatInt(n, 10)
 		default:
 			err = liberr.Wrap(PredicateValueErr)
 		}

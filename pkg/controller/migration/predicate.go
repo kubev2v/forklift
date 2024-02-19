@@ -70,11 +70,7 @@ func (r PlanPredicate) Update(e event.UpdateEvent) bool {
 
 func (r PlanPredicate) Delete(e event.DeleteEvent) bool {
 	_, cast := e.Object.(*api.Plan)
-	if cast {
-		return true
-	}
-
-	return false
+	return cast
 }
 
 func (r PlanPredicate) Generic(e event.GenericEvent) bool {

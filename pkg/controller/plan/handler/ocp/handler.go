@@ -1,6 +1,8 @@
 package ocp
 
 import (
+	"path"
+
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/watch/handler"
@@ -8,7 +10,6 @@ import (
 	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	"golang.org/x/net/context"
-	"path"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
@@ -70,6 +71,7 @@ func (r *Handler) changed(vm *ocp.VM) {
 	err := r.List(context.TODO(), &list)
 	if err != nil {
 		err = liberr.Wrap(err)
+		log.Error(err, "failed to list Plan CRs")
 		return
 	}
 	for i := range list.Items {

@@ -125,9 +125,9 @@ type BranchNavigator struct {
 
 // Next (children) on the branch.
 func (n *BranchNavigator) Next(p libmodel.Model) (r []model.Model, err error) {
-	switch p.(type) {
+	switch p := p.(type) {
 	case *model.DataCenter:
-		list, nErr := n.listCluster(p.(*model.DataCenter))
+		list, nErr := n.listCluster(p)
 		if nErr == nil {
 			for i := range list {
 				m := &list[i]
@@ -137,8 +137,7 @@ func (n *BranchNavigator) Next(p libmodel.Model) (r []model.Model, err error) {
 			err = nErr
 		}
 	case *model.Cluster:
-		m := p.(*model.Cluster)
-		hostList, nErr := n.listHost(m)
+		hostList, nErr := n.listHost(p)
 		if nErr == nil {
 			for i := range hostList {
 				m := &hostList[i]
@@ -148,7 +147,7 @@ func (n *BranchNavigator) Next(p libmodel.Model) (r []model.Model, err error) {
 			err = nErr
 			return
 		}
-		vmList, nErr := n.listVM(m)
+		vmList, nErr := n.listVM(p)
 		if nErr == nil {
 			for i := range vmList {
 				m := &vmList[i]

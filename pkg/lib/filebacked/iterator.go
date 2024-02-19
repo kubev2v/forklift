@@ -85,7 +85,6 @@ func (*EmptyIterator) At(int) interface{} {
 
 // Object at index.
 func (*EmptyIterator) AtWith(int, interface{}) {
-	return
 }
 
 // Next object.

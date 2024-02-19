@@ -169,8 +169,6 @@ func (f *Framework) AfterEach() {
 	if ginkgo.CurrentGinkgoTestDescription().Failed {
 		f.reporter.FailureCount++
 	}
-
-	return
 }
 
 // CreateNamespace instantiates a new namespace object with a unique name and the passed-in label(s).
@@ -191,7 +189,7 @@ func (f *Framework) CreateNamespace(prefix string, labels map[string]string) (*v
 
 	var nsObj *v1.Namespace
 	c := f.K8sClient
-	err := wait.PollImmediate(2*time.Second, nsCreateTime, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.TODO(), 2*time.Second, nsCreateTime, true, func(context.Context) (bool, error) {
 		var err error
 		nsObj, err = c.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 		if err == nil || apierrs.IsAlreadyExists(err) {
@@ -374,7 +372,7 @@ func (f *Framework) CreateQuotaInSpecifiedNs(ns string, requestCPU, requestMemor
 	if err != nil {
 		ginkgo.Fail("Unable to set resource quota " + err.Error())
 	}
-	return wait.PollImmediate(2*time.Second, nsDeleteTime, func() (bool, error) {
+	return wait.PollUntilContextTimeout(context.TODO(), 2*time.Second, nsCreateTime, true, func(context.Context) (bool, error) {
 		quota, err := f.K8sClient.CoreV1().ResourceQuotas(ns).Get(context.TODO(), "test-quota", metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -425,7 +423,7 @@ func (f *Framework) CreateStorageQuota(numPVCs, requestStorage int64) error {
 	if err != nil {
 		ginkgo.Fail("Unable to set resource quota " + err.Error())
 	}
-	return wait.PollImmediate(2*time.Second, nsDeleteTime, func() (bool, error) {
+	return wait.PollUntilContextTimeout(context.TODO(), 2*time.Second, nsCreateTime, true, func(context.Context) (bool, error) {
 		quota, err := f.K8sClient.CoreV1().ResourceQuotas(ns).Get(context.TODO(), "test-storage-quota", metav1.GetOptions{})
 		if err != nil {
 			fmt.Fprintf(ginkgo.GinkgoWriter, "ERROR: GET ResourceQuota failed once, retrying: %v\n", err.Error())
@@ -453,7 +451,7 @@ func (f *Framework) UpdateStorageQuota(numPVCs, requestStorage int64) error {
 	if err != nil {
 		ginkgo.Fail("Unable to set resource quota " + err.Error())
 	}
-	return wait.PollImmediate(5*time.Second, nsDeleteTime, func() (bool, error) {
+	return wait.PollUntilContextTimeout(context.TODO(), 2*time.Second, nsCreateTime, true, func(context.Context) (bool, error) {
 		quota, err := f.K8sClient.CoreV1().ResourceQuotas(f.Namespace.GetName()).Get(context.TODO(), "test-storage-quota", metav1.GetOptions{})
 		if err != nil {
 			fmt.Fprintf(ginkgo.GinkgoWriter, "ERROR: GET ResourceQuota failed once, retrying: %v\n", err.Error())
@@ -467,7 +465,7 @@ func (f *Framework) UpdateStorageQuota(numPVCs, requestStorage int64) error {
 
 // DeleteStorageQuota an existing storage quota in the current test namespace.
 func (f *Framework) DeleteStorageQuota() error {
-	return wait.PollImmediate(3*time.Second, time.Minute, func() (bool, error) {
+	return wait.PollUntilContextTimeout(context.TODO(), 2*time.Second, nsCreateTime, true, func(context.Context) (bool, error) {
 		err := f.K8sClient.CoreV1().ResourceQuotas(f.Namespace.GetName()).Delete(context.TODO(), "test-storage-quota", metav1.DeleteOptions{})
 		if err != nil {
 			if apierrs.IsNotFound(err) {

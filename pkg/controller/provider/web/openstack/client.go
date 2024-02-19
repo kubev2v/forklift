@@ -21,57 +21,46 @@ type Resolver struct {
 // Build the URL path.
 func (r *Resolver) Path(resource interface{}, id string) (path string, err error) {
 	provider := r.Provider
-	switch resource.(type) {
+	switch r := resource.(type) {
 	case *Provider:
-		r := Provider{}
 		r.UID = id
 		r.Link()
 		path = r.SelfLink
 	case *Region:
-		r := Region{}
 		r.ID = id
 		r.Link(provider)
 		path = r.SelfLink
 	case *Project:
-		r := Project{}
 		r.ID = id
 		r.Link(provider)
 	case *Image:
-		r := Image{}
 		r.ID = id
 		r.Link(provider)
 		path = r.SelfLink
 	case *Flavor:
-		r := Flavor{}
 		r.ID = id
 		r.Link(provider)
 	case *VM:
-		r := VM{}
 		r.ID = id
 		r.Link(provider)
 		path = r.SelfLink
 	case *Snapshot:
-		r := Snapshot{}
 		r.ID = id
 		r.Link(provider)
 		path = r.SelfLink
 	case *Volume:
-		r := Volume{}
 		r.ID = id
 		r.Link(provider)
 		path = r.SelfLink
 	case *VolumeType:
-		r := VolumeType{}
 		r.ID = id
 		r.Link(provider)
 		path = r.SelfLink
 	case *Network:
-		r := Network{}
 		r.ID = id
 		r.Link(provider)
 		path = r.SelfLink
 	case *Workload:
-		r := Workload{}
 		r.ID = id
 		r.Link(provider)
 		path = r.SelfLink
@@ -107,7 +96,7 @@ func (r *Finder) With(client base.Client) base.Finder {
 //	NotFoundErr
 //	RefNotUniqueErr
 func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
-	switch resource.(type) {
+	switch res := resource.(type) {
 	case *VM:
 		id := ref.ID
 		if id != "" {
@@ -138,7 +127,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
 				break
 			}
-			*resource.(*VM) = list[0]
+			*res = list[0]
 		}
 	case *Workload:
 		id := ref.ID
@@ -170,7 +159,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
 				break
 			}
-			*resource.(*Workload) = list[0]
+			*res = list[0]
 		}
 	case *Network:
 		id := ref.ID
@@ -202,7 +191,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
 				break
 			}
-			*resource.(*Network) = list[0]
+			*res = list[0]
 		}
 	case *VolumeType:
 		id := ref.ID
@@ -234,7 +223,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
 				break
 			}
-			*resource.(*VolumeType) = list[0]
+			*res = list[0]
 		}
 	case *Snapshot:
 		id := ref.ID
@@ -266,7 +255,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
 				break
 			}
-			*resource.(*Snapshot) = list[0]
+			*res = list[0]
 		}
 	case *Volume:
 		id := ref.ID
@@ -298,7 +287,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
 				break
 			}
-			*resource.(*Volume) = list[0]
+			*res = list[0]
 		}
 	case *Image:
 		id := ref.ID
@@ -330,7 +319,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
 				break
 			}
-			*resource.(*Image) = list[0]
+			*res = list[0]
 		}
 	default:
 		err = liberr.Wrap(

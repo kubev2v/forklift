@@ -22,29 +22,24 @@ type Resolver struct {
 // Resolve the URL path.
 func (r *Resolver) Path(object interface{}, id string) (path string, err error) {
 	provider := r.Provider
-	switch object.(type) {
+	switch r := object.(type) {
 	case *Provider:
-		r := Provider{}
 		r.UID = id
 		r.Link()
 		path = r.SelfLink
 	case *Namespace:
-		r := Namespace{}
 		r.UID = id
 		r.Link(provider)
 		path = r.SelfLink
 	case *StorageClass:
-		r := StorageClass{}
 		r.UID = id
 		r.Link(provider)
 		path = r.SelfLink
 	case *NetworkAttachmentDefinition:
-		r := NetworkAttachmentDefinition{}
 		r.UID = id
 		r.Link(provider)
 		path = r.SelfLink
 	case *VM:
-		r := VM{}
 		r.UID = id
 		r.Link(provider)
 		path = r.SelfLink
@@ -79,7 +74,7 @@ func (r *Finder) With(client base.Client) base.Finder {
 //	NotFoundErr
 //	RefNotUniqueErr
 func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
-	switch resource.(type) {
+	switch res := resource.(type) {
 	case *NetworkAttachmentDefinition:
 		id := ref.ID
 		if id != "" {
@@ -116,7 +111,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
 				break
 			}
-			*resource.(*NetworkAttachmentDefinition) = list[0]
+			*res = list[0]
 		}
 	case *StorageClass:
 		id := ref.ID
@@ -148,7 +143,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
 				break
 			}
-			*resource.(*StorageClass) = list[0]
+			*res = list[0]
 		}
 	case *VM:
 		id := ref.ID
@@ -194,7 +189,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
 				break
 			}
-			*resource.(*VM) = list[0]
+			*res = list[0]
 		}
 	}
 

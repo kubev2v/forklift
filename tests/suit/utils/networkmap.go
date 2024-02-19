@@ -18,8 +18,7 @@ import (
 
 // CreateNetworkMapFromDefinition is used by tests to create a NetworkMap
 func CreateNetworkMapFromDefinition(cl crclient.Client, def *forkliftv1.NetworkMap) error {
-	var err error
-	err = cl.Create(context.TODO(), def, &crclient.CreateOptions{})
+	err := cl.Create(context.TODO(), def, &crclient.CreateOptions{})
 
 	if err == nil || apierrs.IsAlreadyExists(err) {
 		return nil
@@ -68,7 +67,7 @@ func WaitForNetworkMapReadyWithTimeout(cl crclient.Client, namespace, networkMap
 
 	returnedNetworkMap := &forkliftv1.NetworkMap{}
 
-	err := wait.PollImmediate(3*time.Second, timeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.TODO(), 3*time.Second, timeout, true, func(context.Context) (bool, error) {
 		err := cl.Get(context.TODO(), networkMapIdentifier, returnedNetworkMap)
 		if err != nil || !returnedNetworkMap.Status.Conditions.IsReady() {
 			return false, err

@@ -239,7 +239,9 @@ func (r *Collector) Shutdown() {
 // Terminate coroutines.
 func (r *Collector) terminate() {
 	defer func() {
-		recover()
+		if err := recover(); err != nil {
+			r.log.V(4).Info("recovered from panic: ", "err", err)
+		}
 	}()
 	close(r.eventChannel)
 }

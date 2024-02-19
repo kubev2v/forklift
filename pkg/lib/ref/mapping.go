@@ -1,8 +1,9 @@
 package ref
 
 import (
-	"k8s.io/api/core/v1"
 	"sync"
+
+	v1 "k8s.io/api/core/v1"
 )
 
 // A resource that contains an ObjectReference.
@@ -21,10 +22,8 @@ type RefMap struct {
 func (r *RefMap) Add(owner Owner, target Target) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	owners, found := r.Content[target]
-	if !found {
-		owners = map[Owner]bool{}
-		r.Content[target] = owners
+	if _, found := r.Content[target]; !found {
+		r.Content[target] = map[Owner]bool{}
 	}
 
 	r.Content[target][owner] = true

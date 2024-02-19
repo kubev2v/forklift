@@ -2,9 +2,10 @@ package filebacked
 
 import (
 	"fmt"
-	"github.com/onsi/gomega"
 	"testing"
 	"time"
+
+	"github.com/onsi/gomega"
 )
 
 func TestList(t *testing.T) {
@@ -192,7 +193,9 @@ func TestList(t *testing.T) {
 }
 
 // Disabled by default.
-func __TestListPerf(t *testing.T) {
+func TestListPerf(t *testing.T) {
+	t.Skip("Skipping performance test")
+
 	list := NewList()
 	defer list.Close()
 

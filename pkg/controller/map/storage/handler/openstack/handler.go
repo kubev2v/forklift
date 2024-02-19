@@ -78,6 +78,7 @@ func (r *Handler) changed(models ...*openstack.VolumeType) {
 	err := r.List(context.TODO(), storageMapList)
 	if err != nil {
 		err = liberr.Wrap(err)
+		log.Error(err, "failed to list StorageMap CRs")
 		return
 	}
 	for _, storageMap := range storageMapList.Items {

@@ -2,8 +2,9 @@ package itinerary
 
 import (
 	"errors"
-	"github.com/onsi/gomega"
 	"testing"
+
+	"github.com/onsi/gomega"
 )
 
 var (
@@ -41,7 +42,7 @@ func TestGet(t *testing.T) {
 	}
 
 	current, err := itinerary.Get("TWO")
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(current.Name).To(gomega.Equal("TWO"))
 }
 
@@ -59,17 +60,17 @@ func TestNext(t *testing.T) {
 
 	// ONE
 	next, done, err := itinerary.Next("ONE")
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(done).To(gomega.BeFalse())
 	g.Expect(next.Name).To(gomega.Equal("TWO"))
 	// TWO
 	next, done, err = itinerary.Next(next.Name)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(done).To(gomega.BeFalse())
 	g.Expect(next.Name).To(gomega.Equal("THREE"))
 	// THREE
 	next, done, err = itinerary.Next(next.Name)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(done).To(gomega.BeTrue())
 }
 
@@ -90,21 +91,21 @@ func TestNextWithPredicate(t *testing.T) {
 
 	// ONE
 	next, done, err := itinerary.Next("ONE")
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(done).To(gomega.BeFalse())
 	g.Expect(next.Name).To(gomega.Equal("TWO"))
 	// TWO
 	next, done, err = itinerary.Next(next.Name)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(done).To(gomega.BeFalse())
 	g.Expect(next.Name).To(gomega.Equal("THREE"))
 	// THREE
 	next, done, err = itinerary.Next(next.Name)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(done).To(gomega.BeTrue())
 
 	// Step Not Found
-	next, done, err = itinerary.Next("unknown")
+	next, _, err = itinerary.Next("unknown")
 	g.Expect(errors.Is(err, StepNotFound)).To(gomega.BeTrue())
 
 }
@@ -126,7 +127,7 @@ func TestFirst(t *testing.T) {
 
 	// First
 	step, err := itinerary.First()
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(step.Name).To(gomega.Equal("ONE"))
 }
 
@@ -146,7 +147,7 @@ func TestList(t *testing.T) {
 	itinerary.Predicate = &TestPredicate{}
 
 	list, err := itinerary.List()
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(len(list)).To(gomega.Equal(3))
 	g.Expect(list[0].Name).To(gomega.Equal("ONE"))
 	g.Expect(list[1].Name).To(gomega.Equal("TWO"))
@@ -170,10 +171,10 @@ func TestProgress(t *testing.T) {
 
 	// First
 	list, err := itinerary.List()
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	for i, step := range list {
 		report, err := itinerary.Progress(step.Name)
-		g.Expect(err).To(gomega.BeNil())
+		g.Expect(err).ToNot(gomega.HaveOccurred())
 		g.Expect(report.Total).To(gomega.Equal(int64(len(list))))
 		g.Expect(report.Completed).To(gomega.Equal(int64(i)))
 	}

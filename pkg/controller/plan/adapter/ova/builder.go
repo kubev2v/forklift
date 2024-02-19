@@ -63,7 +63,7 @@ const (
 
 // Regex which matches the snapshot identifier suffix of a
 // OVA disk backing file.
-var backingFilePattern = regexp.MustCompile("-\\d\\d\\d\\d\\d\\d.vmdk")
+var backingFilePattern = regexp.MustCompile(`-\d\d\d\d\d\d.vmdk`)
 
 // OVA builder.
 type Builder struct {
@@ -163,8 +163,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 				return nil, err
 			}
 			storageClass := mapped.Destination.StorageClass
-			var dvSource cdi.DataVolumeSource
-			dvSource = cdi.DataVolumeSource{
+			dvSource := cdi.DataVolumeSource{
 				Blank: &cdi.DataVolumeBlankImage{},
 			}
 			dvSpec := cdi.DataVolumeSpec{

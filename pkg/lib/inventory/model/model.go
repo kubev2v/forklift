@@ -2,9 +2,10 @@ package model
 
 import (
 	"database/sql"
+	"reflect"
+
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	"github.com/konveyor/forklift-controller/pkg/lib/ref"
-	"reflect"
 )
 
 // Package logger.

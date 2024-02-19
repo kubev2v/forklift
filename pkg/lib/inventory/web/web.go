@@ -2,12 +2,13 @@ package web
 
 import (
 	"fmt"
+	"regexp"
+	"time"
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	"regexp"
-	"time"
 )
 
 // Package logger.

@@ -22,8 +22,6 @@ const (
 // Folder handler.
 type FolderHandler struct {
 	Handler
-	// Selected folder.
-	folder *model.Folder
 }
 
 // Add routes to the `gin` router.

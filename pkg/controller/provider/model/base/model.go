@@ -2,6 +2,7 @@ package base
 
 import (
 	"fmt"
+
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 )
 

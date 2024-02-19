@@ -8,12 +8,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	fb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
-	"github.com/mattn/go-sqlite3"
 	"reflect"
 	"strings"
 	"text/template"
+
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	fb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
+	"github.com/mattn/go-sqlite3"
 )
 
 // DDL templates.
@@ -176,23 +177,20 @@ func (t Table) DDL(model interface{}, dm *DataModel) (list []string, err error) 
 	if err != nil {
 		return
 	}
-	for _, stmt := range ddl {
-		list = append(list, stmt)
-	}
+
+	list = append(list, ddl...)
 	ddl, err = t.KeyIndexDDL(md)
 	if err != nil {
 		return
 	}
-	for _, stmt := range ddl {
-		list = append(list, stmt)
-	}
+
+	list = append(list, ddl...)
 	ddl, err = t.IndexDDL(md)
 	if err != nil {
 		return
 	}
-	for _, stmt := range ddl {
-		list = append(list, stmt)
-	}
+
+	list = append(list, ddl...)
 
 	return
 }
@@ -669,7 +667,7 @@ func (t Table) EnsurePk(md *Definition) {
 	h := sha1.New()
 	for _, f := range md.Fields {
 		name := strings.ToLower(f.Name)
-		if matched, _ := withFields[name]; !matched {
+		if matched := withFields[name]; !matched {
 			continue
 		}
 		f.Pull()
@@ -683,7 +681,12 @@ func (t Table) EnsurePk(md *Definition) {
 			reflect.Int32,
 			reflect.Int64:
 			bfr := new(bytes.Buffer)
-			binary.Write(bfr, binary.BigEndian, f.int)
+			err := binary.Write(bfr, binary.BigEndian, f.int)
+			if err != nil {
+				log.Error(err, "binary.Write failed")
+				return
+			}
+
 			h.Write(bfr.Bytes())
 		}
 	}

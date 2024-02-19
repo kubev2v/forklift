@@ -131,7 +131,6 @@ func (l *Logger) Error(err error, message string, kvpair ...interface{}) {
 	}
 	le, wrapped := err.(*liberr.Error)
 	if wrapped {
-		err = le.Unwrap()
 		if context := le.Context(); context != nil {
 			context = append(
 				context,

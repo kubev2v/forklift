@@ -184,7 +184,7 @@ type Network struct {
 	ProjectID             string    `json:"projectID"`
 	Shared                bool      `json:"shared"`
 	AvailabilityZoneHints []string  `json:"availabilityZoneHints,omitempty"`
-	Tags                  []string  `json:"tags,omitEmpty"`
+	Tags                  []string  `json:"tags,omitempty"`
 	RevisionNumber        int       `json:"revisionNumber"`
 }
 

@@ -23,10 +23,13 @@ type DestinationClient struct {
 func (r *DestinationClient) DeletePopulatorDataSource(vm *plan.VMStatus) error {
 	populatorCrList, err := r.getPopulatorCrList()
 	if err != nil {
-		return err
+		return liberr.Wrap(err)
 	}
 	for _, populatorCr := range populatorCrList.Items {
 		err = r.DeleteObject(&populatorCr, vm, "Deleted OvirtPopulator CR.", "OvirtVolumePopulator")
+		if err != nil {
+			return liberr.Wrap(err)
+		}
 	}
 	return nil
 }

@@ -1,8 +1,9 @@
 package vsphere
 
 import (
-	"github.com/onsi/gomega"
 	"testing"
+
+	"github.com/onsi/gomega"
 )
 
 func TestScheduler(t *testing.T) {

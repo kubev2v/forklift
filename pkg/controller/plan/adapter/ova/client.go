@@ -96,7 +96,6 @@ func (r *Client) DetachDisks(vmRef ref.Ref) (err error) {
 }
 
 func (r Client) Finalize(vms []*planapi.VMStatus, planName string) {
-	return
 }
 
 func (r *Client) PreTransferActions(vmRef ref.Ref) (ready bool, err error) {

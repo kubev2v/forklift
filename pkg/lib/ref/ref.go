@@ -1,9 +1,10 @@
 package ref
 
 import (
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	"k8s.io/api/core/v1"
 	"reflect"
+
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	v1 "k8s.io/api/core/v1"
 )
 
 // Global

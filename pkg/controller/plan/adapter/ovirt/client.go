@@ -370,26 +370,6 @@ func (r *Client) getDiskSnapshot(diskID, targetSnapshotID string) (diskSnapshotI
 	return
 }
 
-func (r *Client) isDiskBeingTransferred(diskID string) (bool, error) {
-	transfers, err := r.connection.SystemService().ImageTransfersService().List().Send()
-	if err != nil {
-		err = liberr.Wrap(err)
-		return false, err
-	}
-
-	for _, transfer := range transfers.MustImageTransfer().Slice() {
-		phase, _ := transfer.Phase()
-		if phase != ovirtsdk.IMAGETRANSFERPHASE_FINISHED_FAILURE && phase != ovirtsdk.IMAGETRANSFERPHASE_FINISHED_SUCCESS {
-			transferDiskID, _ := transfer.MustImage().Id()
-			if transferDiskID == diskID {
-				return true, nil
-			}
-		}
-	}
-
-	return false, nil
-}
-
 // Connect to the oVirt API.
 func (r *Client) connect() (err error) {
 	URL := r.Source.Provider.Spec.URL
@@ -429,8 +409,8 @@ func (r *Client) cacert() []byte {
 
 func (r Client) Finalize(vms []*planapi.VMStatus, planName string) {
 	defer func() {
-		if p := recover(); p != nil {
-			r.Log.Info("Recovered from panic:", p)
+		if err := recover(); err != nil {
+			r.Log.Info("recovered from panic:", "err", err)
 		}
 	}()
 
@@ -439,7 +419,12 @@ func (r Client) Finalize(vms []*planapi.VMStatus, planName string) {
 		return
 	}
 
-	r.connect()
+	err := r.connect()
+	if err != nil {
+		r.Log.Error(err, "Failed to connect to oVirt API")
+		return
+	}
+
 	defer r.Close()
 	var wg sync.WaitGroup
 	wg.Add(len(vms))

@@ -8,8 +8,6 @@ import (
 
 	"github.com/onsi/ginkgo"
 	k8sv1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -41,7 +39,7 @@ func DeleteVerifierPod(clientSet *kubernetes.Clientset, namespace string) error 
 
 // CreatePod calls the Kubernetes API to create a Pod
 func CreatePod(clientSet *kubernetes.Clientset, namespace string, podDef *k8sv1.Pod) (*k8sv1.Pod, error) {
-	err := wait.PollImmediate(2*time.Second, podCreateTime, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.TODO(), 2*time.Second, podCreateTime, true, func(context.Context) (bool, error) {
 		var err error
 		_, err = clientSet.CoreV1().Pods(namespace).Create(context.TODO(), podDef, metav1.CreateOptions{})
 		if err != nil {
@@ -57,9 +55,9 @@ func DeletePodByName(clientSet *kubernetes.Clientset, podName, namespace string,
 	_ = clientSet.CoreV1().Pods(namespace).Delete(context.TODO(), podName, metav1.DeleteOptions{
 		GracePeriodSeconds: gracePeriod,
 	})
-	return wait.PollImmediate(2*time.Second, podDeleteTime, func() (bool, error) {
+	return wait.PollUntilContextTimeout(context.TODO(), 2*time.Second, podDeleteTime, true, func(context.Context) (bool, error) {
 		_, err := clientSet.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
+		if k8serrors.IsNotFound(err) {
 			return true, nil
 		}
 		return false, err
@@ -100,14 +98,17 @@ func FindPodByPrefixOnce(clientSet *kubernetes.Clientset, namespace, prefix, lab
 func findPodByCompFunc(clientSet *kubernetes.Clientset, namespace, prefix, labelSelector string, compFunc func(string, string) bool) (*k8sv1.Pod, error) {
 	var result *k8sv1.Pod
 	var err error
-	wait.PollImmediate(2*time.Second, podCreateTime, func() (bool, error) {
+
+	err = wait.PollUntilContextCancel(context.TODO(), 2*time.Second, true, func(ctx context.Context) (bool, error) {
 		result, err = findPodByCompFuncOnce(clientSet, namespace, prefix, labelSelector, compFunc)
 		if result != nil {
 			return true, err
 		}
+
 		// If no result yet, continue polling even if there is an error
 		return false, nil
 	})
+
 	return result, err
 }
 
@@ -126,12 +127,12 @@ func findPodByCompFuncOnce(clientSet *kubernetes.Clientset, namespace, prefix, l
 			} else {
 				fmt.Fprintf(ginkgo.GinkgoWriter, "INFO: First pod name %s in namespace %s\n", result.Name, result.Namespace)
 				fmt.Fprintf(ginkgo.GinkgoWriter, "INFO: Second pod name %s in namespace %s\n", pod.Name, pod.Namespace)
-				return result, fmt.Errorf("Multiple pods starting with prefix %q in namespace %q", prefix, namespace)
+				return result, fmt.Errorf("multiple pods starting with prefix %q in namespace %q", prefix, namespace)
 			}
 		}
 	}
 	if result == nil {
-		return nil, errors.NewNotFound(v1.Resource("pod"), prefix)
+		return nil, k8serrors.NewNotFound(k8sv1.Resource("pod"), prefix)
 	}
 	return result, nil
 }
@@ -158,16 +159,16 @@ func WaitTimeoutForPodFailed(clientSet *kubernetes.Clientset, podName, namespace
 
 // WaitTimeoutForPodStatus waits for the given pod to be created and have a expected status
 func WaitTimeoutForPodStatus(clientSet *kubernetes.Clientset, podName, namespace string, status k8sv1.PodPhase, timeout time.Duration) error {
-	return wait.PollImmediate(2*time.Second, timeout, podStatus(clientSet, podName, namespace, status))
+	return wait.PollUntilContextTimeout(context.TODO(), 2*time.Second, timeout, true, podStatus(clientSet, podName, namespace, status))
 }
 
 // WaitTimeoutForPodCondition waits for the given pod to be created and have an expected condition
 func WaitTimeoutForPodCondition(clientSet *kubernetes.Clientset, podName, namespace string, conditionType k8sv1.PodConditionType, pollperiod, timeout time.Duration) error {
-	return wait.PollImmediate(pollperiod, timeout, podCondition(clientSet, podName, namespace, conditionType))
+	return wait.PollUntilContextTimeout(context.TODO(), pollperiod, timeout, true, podCondition(clientSet, podName, namespace, conditionType))
 }
 
-func podStatus(clientSet *kubernetes.Clientset, podName, namespace string, status k8sv1.PodPhase) wait.ConditionFunc {
-	return func() (bool, error) {
+func podStatus(clientSet *kubernetes.Clientset, podName, namespace string, status k8sv1.PodPhase) wait.ConditionWithContextFunc {
+	return func(context.Context) (bool, error) {
 		pod, err := clientSet.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
@@ -184,8 +185,8 @@ func podStatus(clientSet *kubernetes.Clientset, podName, namespace string, statu
 	}
 }
 
-func podCondition(clientSet *kubernetes.Clientset, podName, namespace string, conditionType k8sv1.PodConditionType) wait.ConditionFunc {
-	return func() (bool, error) {
+func podCondition(clientSet *kubernetes.Clientset, podName, namespace string, conditionType k8sv1.PodConditionType) wait.ConditionWithContextFunc {
+	return func(context.Context) (bool, error) {
 		pod, err := clientSet.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
@@ -218,7 +219,7 @@ func PodGetNode(clientSet *kubernetes.Clientset, podName, namespace string) (str
 // returns whether the pod is deleted along with any error
 func WaitPodDeleted(clientSet *kubernetes.Clientset, podName, namespace string, timeout time.Duration) (bool, error) {
 	var result bool
-	err := wait.PollImmediate(2*time.Second, timeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.TODO(), 2*time.Second, timeout, true, func(context.Context) (bool, error) {
 		_, err := clientSet.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
@@ -234,12 +235,12 @@ func WaitPodDeleted(clientSet *kubernetes.Clientset, podName, namespace string, 
 
 // IsExpectedNode waits to check if the specified pod is schedule on the specified node
 func IsExpectedNode(clientSet *kubernetes.Clientset, nodeName, podName, namespace string, timeout time.Duration) error {
-	return wait.PollImmediate(2*time.Second, timeout, isExpectedNode(clientSet, nodeName, podName, namespace))
+	return wait.PollUntilContextTimeout(context.TODO(), 2*time.Second, timeout, true, isExpectedNode(clientSet, nodeName, podName, namespace))
 }
 
 // returns true is the specified pod running on the specified nodeName. Otherwise returns false
-func isExpectedNode(clientSet *kubernetes.Clientset, nodeName, podName, namespace string) wait.ConditionFunc {
-	return func() (bool, error) {
+func isExpectedNode(clientSet *kubernetes.Clientset, nodeName, podName, namespace string) wait.ConditionWithContextFunc {
+	return func(context.Context) (bool, error) {
 		pod, err := clientSet.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
@@ -256,7 +257,7 @@ func isExpectedNode(clientSet *kubernetes.Clientset, nodeName, podName, namespac
 }
 
 // GetSchedulableNode return a schedulable node from a nodes list
-func GetSchedulableNode(nodes *v1.NodeList) *string {
+func GetSchedulableNode(nodes *k8sv1.NodeList) *string {
 	for _, node := range nodes.Items {
 		if node.Spec.Taints == nil {
 			return &node.Name
