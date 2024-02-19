@@ -265,6 +265,9 @@ func (r *Client) Watch(url string, resource interface{}, h EventHandler) (status
 				return
 			}
 		}
+
+		defer response.Body.Close()
+
 		if pErr != nil {
 			pErr = liberr.Wrap(
 				pErr,

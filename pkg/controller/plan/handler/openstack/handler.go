@@ -80,6 +80,7 @@ func (r *Handler) changed(models ...*openstack.VM) {
 	err := r.List(context.TODO(), &list)
 	if err != nil {
 		err = liberr.Wrap(err)
+		log.Error(err, "failed to list Plan CRs")
 		return
 	}
 	for i := range list.Items {

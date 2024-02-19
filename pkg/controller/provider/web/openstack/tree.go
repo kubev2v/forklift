@@ -125,10 +125,9 @@ type BranchNavigator struct {
 
 // Next (children) on the branch.
 func (n *BranchNavigator) Next(p libmodel.Model) (r []model.Model, err error) {
-	switch p.(type) {
+	switch p := p.(type) {
 	case *model.Project:
-		m := p.(*model.Project)
-		vmList, nErr := n.listVM(m)
+		vmList, nErr := n.listVM(p)
 		if nErr == nil {
 			for i := range vmList {
 				m := &vmList[i]

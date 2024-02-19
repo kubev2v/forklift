@@ -383,7 +383,13 @@ func (r *Collector) getUpdates(ctx context.Context) error {
 		response, err := methods.WaitForUpdatesEx(ctx, r.client, &req)
 		if err != nil {
 			if ctx.Err() == context.Canceled {
-				pc.CancelWaitForUpdates(context.Background())
+				err = pc.CancelWaitForUpdates(context.Background())
+				if err != nil {
+					r.log.Error(
+						err,
+						"cancel wait for updates failed.")
+				}
+
 				break
 			}
 			return liberr.Wrap(err)

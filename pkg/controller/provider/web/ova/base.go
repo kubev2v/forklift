@@ -65,19 +65,15 @@ func (r *PathBuilder) Path(m model.Model) (path string) {
 	if r.cache == nil {
 		r.cache = map[string]string{}
 	}
-	switch m.(type) {
+	switch m := m.(type) {
 	case *model.VM:
-		vm := m.(*model.VM)
-		path = pathlib.Join(vm.UUID)
+		path = pathlib.Join(m.UUID)
 	case *model.Network:
-		net := m.(*model.Network)
-		path = pathlib.Join(net.ID)
+		path = pathlib.Join(m.ID)
 	case *model.Disk:
-		disk := m.(*model.Disk)
-		path = pathlib.Join(disk.ID)
+		path = pathlib.Join(m.ID)
 	case *model.Storage:
-		storage := m.(*model.Storage)
-		path = pathlib.Join(storage.ID)
+		path = pathlib.Join(m.ID)
 	}
 
 	if err != nil {

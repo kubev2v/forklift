@@ -276,7 +276,11 @@ func (r *Reconciler) setPopulatorDataSourceLabels(plan *api.Plan) {
 			}
 			plan.Annotations[AnnPopulatorLabels] = "True"
 			patch := client.MergeFrom(planCopy)
-			r.Client.Patch(context.TODO(), plan, patch)
+			err = r.Client.Patch(context.TODO(), plan, patch)
+			if err != nil {
+				r.Log.Error(err, "Couldn't patch plan with populator labels.")
+			}
+
 			// Restore Referenced data that is not returned back from the server
 			plan.Referenced = planCopy.Referenced
 			// Restore original status with staged conditions
@@ -387,8 +391,7 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	}
 	//
 	// Find pending migrations.
-	pending := []*api.Migration{}
-	pending, err = r.pendingMigrations(plan)
+	pending, err := r.pendingMigrations(plan)
 	if err != nil {
 		return
 	}

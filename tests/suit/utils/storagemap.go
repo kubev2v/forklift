@@ -77,7 +77,7 @@ func WaitForStorageMapReadyWithTimeout(cl crclient.Client, namespace string, sto
 
 	returnedStorageMap := &forkliftv1.StorageMap{}
 
-	err := wait.PollImmediate(3*time.Second, timeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.TODO(), 3*time.Second, timeout, true, func(context.Context) (bool, error) {
 		err := cl.Get(context.TODO(), storageMapIdentifier, returnedStorageMap)
 		if err != nil || !returnedStorageMap.Status.Conditions.IsReady() {
 			return false, err

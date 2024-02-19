@@ -3,12 +3,13 @@ package openstack
 import (
 	"strings"
 
+	pathlib "path"
+
 	"github.com/gin-gonic/gin"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/openstack"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	pathlib "path"
 )
 
 // Package logger.
@@ -65,9 +66,9 @@ func (r *PathBuilder) Path(m model.Model) (path string) {
 	if r.cache == nil {
 		r.cache = map[string]interface{}{}
 	}
-	switch m.(type) {
+	switch m := m.(type) {
 	case *model.Project:
-		project := m.(*model.Project)
+		project := m
 		path = project.Name
 		if project.IsDomain {
 			return
@@ -79,7 +80,7 @@ func (r *PathBuilder) Path(m model.Model) (path string) {
 		}
 
 	case *model.VM:
-		vm := m.(*model.VM)
+		vm := m
 		var project *model.Project
 		project, err = r.getProject(vm.TenantID)
 		if err != nil {

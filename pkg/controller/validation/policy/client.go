@@ -266,7 +266,9 @@ func (r *Task) String() string {
 // Notify result handler the task has completed.
 func (r *Task) notify() {
 	func() {
-		recover()
+		if err := recover(); err != nil {
+			log.Info("recovered from panic: ", "err", err)
+		}
 	}()
 	if !r.canceled() {
 		r.Result <- r

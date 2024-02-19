@@ -13,13 +13,14 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/gob"
-	"github.com/google/uuid"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	"io"
 	"os"
 	pathlib "path"
 	"runtime"
+
+	"github.com/google/uuid"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 )
 
 var log = logging.WithName("filebacked")
@@ -73,8 +74,6 @@ func (w *Writer) Append(object interface{}) {
 		w.path,
 		"kind",
 		kind)
-
-	return
 }
 
 // Build a reader.
@@ -156,8 +155,6 @@ func (w *Writer) open() {
 		"writer: opened.",
 		"path",
 		w.path)
-
-	return
 }
 
 // Write entry.
@@ -189,6 +186,7 @@ func (w *Writer) writeEntry(kind uint16, bfr bytes.Buffer) (offset int64) {
 	}
 	if n != nWrite {
 		err = liberr.New("Write failed.")
+		panic(err)
 	}
 	log.V(6).Info(
 		"writer: write entry.",
@@ -287,8 +285,6 @@ func (r *Reader) AtWith(index int, object interface{}) {
 		r.path,
 		"index",
 		index)
-
-	return
 }
 
 // Close the reader.
@@ -363,6 +359,4 @@ func (r *Reader) open() {
 		"reader: opened.",
 		"path",
 		r.path)
-
-	return
 }

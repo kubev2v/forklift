@@ -53,7 +53,7 @@ func WaitForProviderReadyWithTimeout(cl crclient.Client, namespace string, provi
 	providerIdentifier := types.NamespacedName{Namespace: namespace, Name: providerName}
 
 	returnedProvider := &forkliftv1.Provider{}
-	err := wait.PollImmediate(3*time.Second, timeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.TODO(), 3*time.Second, timeout, true, func(context.Context) (bool, error) {
 		err := cl.Get(context.TODO(), providerIdentifier, returnedProvider)
 		if err != nil || !returnedProvider.Status.Conditions.IsReady() {
 			return false, err
@@ -62,7 +62,7 @@ func WaitForProviderReadyWithTimeout(cl crclient.Client, namespace string, provi
 	})
 	if err != nil {
 		conditions := returnedProvider.Status.Conditions.List
-		return nil, fmt.Errorf("Provider %s not ready within %v - Phase/condition: %v/%v",
+		return nil, fmt.Errorf("provider %s not ready within %v - Phase/condition: %v/%v",
 			providerName, timeout, returnedProvider.Status.Phase, conditions[len(conditions)-1].Message)
 	}
 	return returnedProvider, nil

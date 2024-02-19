@@ -221,7 +221,6 @@ func (r *Client) Close() {
 }
 
 func (c *Client) Finalize(vms []*planapi.VMStatus, planName string) {
-	return
 }
 
 func (r *Client) PreTransferActions(vmRef ref.Ref) (ready bool, err error) {

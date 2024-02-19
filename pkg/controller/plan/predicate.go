@@ -146,11 +146,7 @@ func (r NetMapPredicate) Update(e event.UpdateEvent) bool {
 
 func (r NetMapPredicate) Delete(e event.DeleteEvent) bool {
 	_, cast := e.Object.(*api.NetworkMap)
-	if cast {
-		return true
-	}
-
-	return false
+	return cast
 }
 
 func (r NetMapPredicate) Generic(e event.GenericEvent) bool {
@@ -183,11 +179,7 @@ func (r DsMapPredicate) Update(e event.UpdateEvent) bool {
 
 func (r DsMapPredicate) Delete(e event.DeleteEvent) bool {
 	_, cast := e.Object.(*api.StorageMap)
-	if cast {
-		return true
-	}
-
-	return false
+	return cast
 }
 
 func (r DsMapPredicate) Generic(e event.GenericEvent) bool {
@@ -220,11 +212,7 @@ func (r HookPredicate) Update(e event.UpdateEvent) bool {
 
 func (r HookPredicate) Delete(e event.DeleteEvent) bool {
 	_, cast := e.Object.(*api.Hook)
-	if cast {
-		return true
-	}
-
-	return false
+	return cast
 }
 
 func (r HookPredicate) Generic(e event.GenericEvent) bool {

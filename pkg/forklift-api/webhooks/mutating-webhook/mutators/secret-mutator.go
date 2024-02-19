@@ -98,6 +98,7 @@ func (mutator *SecretMutator) mutateProviderSecret() *admissionv1.AdmissionRespo
 			log.Error(err, "mutating webhook error, failed to send request for CA certificate retrieval")
 			return util.ToAdmissionResponseError(err)
 		}
+		defer response.Body.Close()
 
 		cert, err := io.ReadAll(response.Body)
 		if err != nil {

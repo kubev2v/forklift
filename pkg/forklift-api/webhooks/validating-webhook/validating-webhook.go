@@ -10,10 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/util"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 )
-
-var log = logging.WithName("validating_webhooks")
 
 type Admitter interface {
 	Admit(*admissionv1.AdmissionReview) *admissionv1.AdmissionResponse
@@ -82,14 +79,11 @@ func Serve(resp http.ResponseWriter, req *http.Request, admitter Admitter) {
 
 	responseBytes, err := json.Marshal(response)
 	if err != nil {
-		//log.Log.Reason(err).Errorf("failed json encode webhook response")
 		resp.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	if _, err := resp.Write(responseBytes); err != nil {
-		//log.Log.Reason(err).Errorf("failed to write webhook response")
 		resp.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	return
 }

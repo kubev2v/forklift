@@ -153,7 +153,7 @@ func (r *Reconciler) validateURL(provider *api.Provider) error {
 					Status:   True,
 					Reason:   Malformed,
 					Category: Critical,
-					Message:  fmt.Sprintf("The NFS path is malformed"),
+					Message:  "The NFS path is malformed",
 				})
 		}
 		return nil

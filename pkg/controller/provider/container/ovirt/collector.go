@@ -432,20 +432,30 @@ func (r *Collector) refresh(ctx *Context) (err error) {
 			"event",
 			event)
 		var changeSet []Updater
-		changeSet, applyErr := r.changeSet(ctx, event)
-		if applyErr == nil {
-			applyErr = r.apply(changeSet)
-			r.log.V(3).Info(
-				"Event applied.",
-				"event",
-				event)
-		} else {
+		changeSet, err = r.changeSet(ctx, event)
+		if err != nil {
 			r.log.Error(
-				applyErr,
-				"Apply event failed.",
+				err,
+				"Getting the changeset failed",
 				"event",
 				event)
+			continue
 		}
+		err = r.apply(changeSet)
+		if err != nil {
+			r.log.Error(
+				err,
+				"Apply changeSet failed.",
+				"event",
+				event)
+
+			continue
+		}
+
+		r.log.V(3).Info(
+			"Event applied.",
+			"event",
+			event)
 	}
 
 	return
@@ -488,7 +498,7 @@ func (r *Collector) apply(changeSet []Updater) (err error) {
 func (r *Collector) listEvent() (list []Event, err error) {
 	eventList := EventList{}
 	codes := []string{}
-	for n, _ := range adapterMap {
+	for n := range adapterMap {
 		codes = append(codes, fmt.Sprintf("type=%d", n))
 	}
 	search := strings.Join(codes, " or ")

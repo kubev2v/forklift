@@ -21,42 +21,37 @@ type Resolver struct {
 // Build the URL path.
 func (r *Resolver) Path(resource interface{}, id string) (path string, err error) {
 	provider := r.Provider
-	switch resource.(type) {
+	switch res := resource.(type) {
 	case *Provider:
-		r := Provider{}
-		r.UID = id
-		r.Link()
-		path = r.SelfLink
+		res.UID = id
+		res.Link()
+		path = res.SelfLink
 	case *Network:
-		r := Network{}
-		r.ID = id
-		r.Link(provider)
-		path = r.SelfLink
+		res.ID = id
+		res.Link(provider)
+		path = res.SelfLink
 	case *VM:
-		r := VM{}
-		r.ID = id
-		r.Link(provider)
-		path = r.SelfLink
+		res.ID = id
+		res.Link(provider)
+		path = res.SelfLink
 	case *Disk:
-		r := Disk{}
-		r.ID = id
-		r.Link(provider)
-		path = r.SelfLink
+		res.ID = id
+		res.Link(provider)
+		path = res.SelfLink
 	case *Workload:
-		r := Workload{}
-		r.ID = id
-		r.Link(provider)
-		path = r.SelfLink
+		res.ID = id
+		res.Link(provider)
+		path = res.SelfLink
 	case *Storage:
-		r := Storage{}
-		r.ID = id
-		r.Link(provider)
-		path = r.SelfLink
+		res.ID = id
+		res.Link(provider)
+		path = res.SelfLink
 	default:
 		err = liberr.Wrap(
 			base.ResourceNotResolvedError{
 				Object: resource,
-			})
+			},
+		)
 	}
 
 	path = strings.TrimRight(path, "/")
@@ -83,7 +78,7 @@ func (r *Finder) With(client base.Client) base.Finder {
 //	NotFoundErr
 //	RefNotUniqueErr
 func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
-	switch resource.(type) {
+	switch res := resource.(type) {
 	case *Network:
 		id := ref.ID
 		if id != "" {
@@ -114,7 +109,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
 				break
 			}
-			*resource.(*Network) = list[0]
+			*res = list[0]
 		}
 	case *VM:
 		id := ref.ID
@@ -146,7 +141,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
 				break
 			}
-			*resource.(*VM) = list[0]
+			*res = list[0]
 		}
 	case *Disk:
 		id := ref.ID
@@ -178,7 +173,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
 				break
 			}
-			*resource.(*Disk) = list[0]
+			*res = list[0]
 		}
 	case *Workload:
 		id := ref.ID
@@ -210,7 +205,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
 				break
 			}
-			*resource.(*Workload) = list[0]
+			*res = list[0]
 		}
 	case *Storage:
 		id := ref.ID
@@ -242,7 +237,7 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
 				break
 			}
-			*resource.(*Storage) = list[0]
+			*res = list[0]
 		}
 	default:
 		err = liberr.Wrap(

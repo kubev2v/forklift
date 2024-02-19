@@ -191,7 +191,7 @@ func (r *Flavor) With(m *model.Flavor) {
 	r.Description = m.Description
 	r.Disk = m.Disk
 	r.RAM = m.RAM
-	r.RxTxFactor, _ = strconv.ParseFloat(m.RxTxFactor, 8)
+	r.RxTxFactor, _ = strconv.ParseFloat(m.RxTxFactor, 64)
 	r.Swap = m.Swap
 	r.VCPUs = m.VCPUs
 	r.IsPublic = m.IsPublic

@@ -2,11 +2,12 @@ package container
 
 import (
 	"errors"
+	"strconv"
+	"testing"
+
 	fb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
 	"github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	"github.com/onsi/gomega"
-	"strconv"
-	"testing"
 )
 
 type TestObject2 struct {
@@ -25,7 +26,7 @@ func TestCollection(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 	DB := model.New("/tmp/test2.db", &TestObject2{})
 	err = DB.Open(true)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 
 	desired := []TestObject2{}
 	for i := 0; i < 10; i++ {
@@ -35,9 +36,9 @@ func TestCollection(t *testing.T) {
 			Age:  i,
 		}
 		err = DB.Insert(&m)
-		g.Expect(err).To(gomega.BeNil())
+		g.Expect(err).ToNot(gomega.HaveOccurred())
 		desired = append(desired, m)
-		g.Expect(err).To(gomega.BeNil())
+		g.Expect(err).ToNot(gomega.HaveOccurred())
 	}
 
 	//
@@ -47,12 +48,12 @@ func TestCollection(t *testing.T) {
 		model.ListOptions{
 			Detail: model.MaxDetail,
 		})
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	collection := Collection{
 		Stored: stored,
 	}
 	err = collection.Reconcile(asIter(desired))
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(collection.Added).To(gomega.Equal(0))
 	g.Expect(collection.Updated).To(gomega.Equal(0))
 	g.Expect(collection.Deleted).To(gomega.Equal(0))
@@ -64,6 +65,7 @@ func TestCollection(t *testing.T) {
 		model.ListOptions{
 			Detail: model.MaxDetail,
 		})
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	for i := 11; i < 15; i++ {
 		desired = append(
 			desired, TestObject2{
@@ -81,6 +83,7 @@ func TestCollection(t *testing.T) {
 		Tx:     tx,
 	}
 	err = collection.Add(asIter(desired))
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	_ = tx.Commit()
 	g.Expect(collection.Added).To(gomega.Equal(4))
 	g.Expect(collection.Updated).To(gomega.Equal(0))
@@ -93,6 +96,7 @@ func TestCollection(t *testing.T) {
 		model.ListOptions{
 			Detail: model.MaxDetail,
 		})
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	desired[6].Name = "Larry"
 	desired[8].Age = 100
 	tx, _ = DB.Begin()
@@ -104,17 +108,18 @@ func TestCollection(t *testing.T) {
 		Tx:     tx,
 	}
 	err = collection.Update(asIter(desired))
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	_ = tx.Commit()
 	g.Expect(collection.Added).To(gomega.Equal(0))
 	g.Expect(collection.Updated).To(gomega.Equal(2))
 	g.Expect(collection.Deleted).To(gomega.Equal(0))
 	updated := &TestObject2{ID: 6}
 	err = DB.Get(updated)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(updated.Name).To(gomega.Equal("Larry"))
 	updated = &TestObject2{ID: 8}
 	err = DB.Get(updated)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(updated.Age).To(gomega.Equal(100))
 
 	//
@@ -124,6 +129,7 @@ func TestCollection(t *testing.T) {
 		model.ListOptions{
 			Detail: model.MaxDetail,
 		})
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	desired = desired[2:]
 	tx, _ = DB.Begin()
 	defer func() {
@@ -134,6 +140,7 @@ func TestCollection(t *testing.T) {
 		Tx:     tx,
 	}
 	err = collection.Delete(asIter(desired))
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	_ = tx.Commit()
 	g.Expect(collection.Added).To(gomega.Equal(0))
 	g.Expect(collection.Updated).To(gomega.Equal(0))
@@ -151,6 +158,7 @@ func TestCollection(t *testing.T) {
 		model.ListOptions{
 			Detail: model.MaxDetail,
 		})
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	// delete
 	desired = desired[2:]
 	// update
@@ -174,6 +182,7 @@ func TestCollection(t *testing.T) {
 		Tx:     tx,
 	}
 	err = collection.Reconcile(asIter(desired))
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	_ = tx.Commit()
 	g.Expect(collection.Added).To(gomega.Equal(5))
 	g.Expect(collection.Updated).To(gomega.Equal(2))

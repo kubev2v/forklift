@@ -102,7 +102,7 @@ func WaitForPlanReadyWithTimeout(cl crclient.Client, namespace, planName string,
 
 	returnedMap := &forkliftv1.Plan{}
 
-	err := wait.PollImmediate(3*time.Second, timeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.TODO(), 3*time.Second, timeout, true, func(context.Context) (bool, error) {
 		err := cl.Get(context.TODO(), planIdentifier, returnedMap)
 		if err != nil || !returnedMap.Status.Conditions.IsReady() {
 			return false, err

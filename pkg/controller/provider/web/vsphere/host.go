@@ -331,8 +331,6 @@ func (r AdapterBuilder) withPG(host *Host, vNIC *model.VNIC, adapter *NetworkAda
 			break
 		}
 	}
-
-	return
 }
 
 // Build with distributed virtual Switch & PortGroup.

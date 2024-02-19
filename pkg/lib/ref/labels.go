@@ -1,8 +1,9 @@
 package ref
 
 import (
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strings"
+
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Labels

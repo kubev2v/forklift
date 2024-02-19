@@ -3,8 +3,9 @@ package vsphere
 import (
 	"context"
 	"errors"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"sync"
+
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"

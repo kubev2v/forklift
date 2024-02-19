@@ -1,10 +1,11 @@
 package model
 
 import (
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	fb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
 	"reflect"
 	"strings"
+
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	fb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
 )
 
 func Inspect(model interface{}) (md *Definition, err error) {
@@ -105,7 +106,7 @@ func (r *Definition) Field(name string) *Field {
 
 // Match (case-insensitive) by kind.
 func (r *Definition) IsKind(kind string) bool {
-	return strings.ToLower(kind) == strings.ToLower(r.Kind)
+	return strings.EqualFold(kind, r.Kind)
 }
 
 // Get the table name for the model.
@@ -173,7 +174,7 @@ func (r *Definition) fields(model interface{}) (fields []*Field, err error) {
 			} else {
 				nested, nErr := r.fields(fv.Addr().Interface())
 				if nErr != nil {
-					return
+					return nil, nErr
 				}
 				fields = append(fields, nested...)
 			}
@@ -413,5 +414,4 @@ func (r *Definitions) Reverse() {
 		reversed = append(reversed, (*r)[i])
 	}
 	*r = reversed
-	return
 }

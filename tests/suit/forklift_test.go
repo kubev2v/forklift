@@ -15,7 +15,7 @@ const (
 	AnnPopulatorLabels = "populatorLabels"
 )
 
-var _ = FDescribe("Forklift", func() {
+var _ = Describe("Forklift", func() {
 	f := framework.NewFramework("migration-func-test")
 	var vmData *framework.OvirtVM
 	var secret *v1.Secret

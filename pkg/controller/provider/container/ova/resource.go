@@ -1,8 +1,6 @@
 package ova
 
 import (
-	"strconv"
-
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ova"
 )
 
@@ -10,22 +8,6 @@ type Base struct {
 	ID          string `json:"ID"`
 	Name        string `json:"Name"`
 	Description string `json:"Description"`
-}
-
-func (b *Base) bool(s string) (v bool) {
-	v, _ = strconv.ParseBool(s)
-	return
-}
-
-func (b *Base) int32(s string) (v int32) {
-	n, _ := strconv.ParseInt(s, 10, 32)
-	v = int32(n)
-	return
-}
-
-func (b *Base) int64(s string) (v int64) {
-	v, _ = strconv.ParseInt(s, 10, 64)
-	return
 }
 
 // VM.

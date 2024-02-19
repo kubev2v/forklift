@@ -1618,7 +1618,7 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 	}
 
 	for i, v := range vmVolumes {
-		pvc, _ := pvcsByName[v.PersistentVolumeClaim.ClaimName]
+		pvc := pvcsByName[v.PersistentVolumeClaim.ClaimName]
 		vol := core.Volume{
 			Name: pvc.Name,
 			VolumeSource: core.VolumeSource{

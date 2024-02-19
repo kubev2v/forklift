@@ -86,11 +86,10 @@ type List struct {
 
 // Append an object.
 func (l *List) Append(object interface{}) {
-	switch object.(type) {
+	switch o := object.(type) {
 	case Iterator:
-		itr := object.(Iterator)
 		for {
-			object, hasNext := itr.Next()
+			object, hasNext := o.Next()
 			if hasNext {
 				l.writer.Append(object)
 			} else {
@@ -119,7 +118,6 @@ func (l *List) At(index int) (object interface{}) {
 func (l *List) AtWith(index int, object interface{}) {
 	reader := l.writer.Reader(true)
 	reader.AtWith(index, object)
-	return
 }
 
 // Get an iterator.

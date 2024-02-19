@@ -2,6 +2,7 @@ package model
 
 import (
 	"database/sql"
+
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	_ "github.com/mattn/go-sqlite3"
 )

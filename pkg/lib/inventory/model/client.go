@@ -517,8 +517,7 @@ func (r *Tx) Insert(model Model) (err error) {
 // Update the model.
 func (r *Tx) Update(model Model, predicate ...Predicate) (err error) {
 	mark := time.Now()
-	current := model
-	current = Clone(model)
+	current := Clone(model)
 	err = Table{r.real}.Get(current)
 	if err != nil {
 		return
