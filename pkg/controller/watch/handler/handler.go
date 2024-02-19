@@ -46,7 +46,9 @@ func (r *Handler) Inventory() web.Client {
 // Enqueue reconcile request.
 func (r *Handler) Enqueue(event event.GenericEvent) {
 	defer func() {
-		recover()
+		if err := recover(); err != nil {
+			log.Info("recovered from panic: ", "err", err)
+		}
 	}()
 	r.channel <- event
 }

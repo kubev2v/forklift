@@ -80,6 +80,7 @@ func (r *Handler) changed(models ...*ova.Disk) {
 	err := r.List(context.TODO(), &list)
 	if err != nil {
 		err = liberr.Wrap(err)
+		log.Error(err, "failed to list StorageMap CRs")
 		return
 	}
 	for i := range list.Items {

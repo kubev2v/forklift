@@ -11,9 +11,6 @@ const (
 	forkliftPropertyOriginalImageID  = "forklift_original_image_id"
 )
 
-func getMigrationName(ctx *plancontext.Context) string {
-	return ctx.Migration.GetName()
-}
 func getMigrationID(ctx *plancontext.Context) string {
 	return string(ctx.Migration.GetUID())
 }

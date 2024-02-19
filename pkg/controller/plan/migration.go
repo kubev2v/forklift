@@ -364,7 +364,6 @@ func (r *Migration) Archive() {
 		}
 		_ = r.cleanup(vm, dontFailOnError)
 	}
-	return
 }
 
 func (r *Migration) SetPopulatorDataSourceLabels() {
@@ -1443,7 +1442,7 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 	if err != nil {
 		return
 	}
-	if dvs == nil || len(dvs) == 0 {
+	if len(dvs) == 0 {
 		pvcs, err = r.kubevirt.getPVCs(vm.Ref)
 		if err != nil {
 			return

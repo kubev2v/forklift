@@ -210,11 +210,11 @@ type HostNavigator struct {
 
 // Next (children) on the branch.
 func (n *HostNavigator) Next(p libmodel.Model) (r []libmodel.Model, err error) {
-	switch p.(type) {
+	switch p := p.(type) {
 	case *model.Datacenter:
 		m := &model.Folder{
 			Base: model.Base{
-				ID: p.(*model.Datacenter).Clusters.ID,
+				ID: p.Clusters.ID,
 			},
 		}
 		err = n.db.Get(m)
@@ -300,10 +300,10 @@ type VMNavigator struct {
 
 // Next (children) on the branch.
 func (n *VMNavigator) Next(p libmodel.Model) (r []libmodel.Model, err error) {
-	switch p.(type) {
+	switch p := p.(type) {
 	case *model.Datacenter:
 		m := &model.Folder{
-			Base: model.Base{ID: p.(*model.Datacenter).Clusters.ID},
+			Base: model.Base{ID: p.Clusters.ID},
 		}
 		err = n.db.Get(m)
 		if err == nil {

@@ -51,5 +51,4 @@ func Serve(resp http.ResponseWriter, req *http.Request, m mutator) {
 		log.Error(err, "mutating Serve error, failed to write response")
 		resp.WriteHeader(http.StatusBadRequest)
 	}
-	return
 }

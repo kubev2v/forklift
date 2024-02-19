@@ -1,14 +1,16 @@
+//nolint:errcheck
 package model
 
 import (
 	"errors"
 	"fmt"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	"github.com/konveyor/forklift-controller/pkg/lib/ref"
-	"github.com/onsi/gomega"
 	"math"
 	"testing"
 	"time"
+
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	"github.com/konveyor/forklift-controller/pkg/lib/ref"
+	"github.com/onsi/gomega"
 )
 
 // Adjust default.
@@ -110,7 +112,7 @@ type TestObject struct {
 }
 
 func (m *TestObject) Pk() string {
-	return fmt.Sprintf("%s", m.PK)
+	return m.PK
 }
 
 func (m *TestObject) String() string {
@@ -237,7 +239,6 @@ func (w *MutatingHandler) Deleted(e Event) {
 }
 
 func (w *MutatingHandler) Error(err error) {
-	return
 }
 
 func (w *MutatingHandler) End() {
@@ -259,7 +260,7 @@ func TestDefinition(t *testing.T) {
 	var err error
 	g := gomega.NewGomegaWithT(t)
 	md, err := Inspect(&TestObject{})
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	// ALL
 	g.Expect(fieldNames(md.Fields)).To(gomega.Equal(
 		[]string{
@@ -298,18 +299,17 @@ func TestCRUD(t *testing.T) {
 		&PlainObject{},
 		&TestObject{})
 	err = DB.Open(true)
-	g.Expect(err).To(gomega.BeNil())
-
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	plainA := &PlainObject{
 		ID:   18,
 		Name: "Ashley",
 		Age:  17,
 	}
 	err = DB.Insert(plainA)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	plainB := &PlainObject{ID: 18}
 	err = DB.Get(plainB)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(plainA.Pk()).To(gomega.Equal(plainB.Pk()))
 	g.Expect(plainA.ID).To(gomega.Equal(plainB.ID))
 	g.Expect(plainA.Name).To(gomega.Equal(plainB.Name))
@@ -360,35 +360,35 @@ func TestCRUD(t *testing.T) {
 	}
 	// Insert
 	err = DB.Insert(objA)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(objA.Rev).To(gomega.Equal(1))
 	objB := &TestObject{ID: objA.ID}
 	// Get
 	err = DB.Get(objB)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	assertEqual(objA, objB)
 	// Update
 	objA.Name = "Larry"
 	objA.Age = 21
 	objA.Bool = false
 	err = DB.Update(objA)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(objA.Rev).To(gomega.Equal(2))
 	// Update with predicate.
 	objA.Name = "Fred"
 	objA.Age = 14
 	err = DB.Update(objA, Eq("Age", 21))
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(objA.Rev).To(gomega.Equal(3))
 	// Get
 	objB = &TestObject{ID: objA.ID}
 	err = DB.Get(objB)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	assertEqual(objA, objB)
 	// Delete
 	objA = &TestObject{ID: objA.ID}
 	err = DB.Delete(objA)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	// Get (not found)
 	objB = &TestObject{ID: objA.ID}
 	err = DB.Get(objB)
@@ -406,7 +406,7 @@ func TestCascade(t *testing.T) {
 		&DetailB{},
 		&DetailA{})
 	err = DB.Open(true)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 
 	id := func() int {
 		return int(serial.next(-1))
@@ -420,28 +420,28 @@ func TestCascade(t *testing.T) {
 		Age:  18,
 	}
 	err = DB.Insert(treeA)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	for a := 0; a < 3; a++ {
 		detailA := &DetailA{
 			PK: id(),
 			FK: treeA.ID,
 		}
 		err = DB.Insert(detailA)
-		g.Expect(err).To(gomega.BeNil())
+		g.Expect(err).ToNot(gomega.HaveOccurred())
 		for b := 0; b < 3; b++ {
 			detailB := &DetailB{
 				PK: id(),
 				FK: detailA.PK,
 			}
 			err = DB.Insert(detailB)
-			g.Expect(err).To(gomega.BeNil())
+			g.Expect(err).ToNot(gomega.HaveOccurred())
 			for c := 0; c < 3; c++ {
 				detailC := &DetailC{
 					PK: id(),
 					FK: detailB.PK,
 				}
 				err = DB.Insert(detailC)
-				g.Expect(err).To(gomega.BeNil())
+				g.Expect(err).ToNot(gomega.HaveOccurred())
 			}
 		}
 	}
@@ -453,28 +453,28 @@ func TestCascade(t *testing.T) {
 		Age:  17,
 	}
 	err = DB.Insert(treeB)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	for a := 10; a < 13; a++ {
 		detailA := &DetailA{
 			PK: id(),
 			FK: treeB.ID,
 		}
 		err = DB.Insert(detailA)
-		g.Expect(err).To(gomega.BeNil())
+		g.Expect(err).ToNot(gomega.HaveOccurred())
 		for b := 10; b < 13; b++ {
 			detailB := &DetailB{
 				PK: id(),
 				FK: detailA.PK,
 			}
 			err = DB.Insert(detailB)
-			g.Expect(err).To(gomega.BeNil())
+			g.Expect(err).ToNot(gomega.HaveOccurred())
 			for c := 10; c < 13; c++ {
 				detailC := &DetailC{
 					PK: id(),
 					FK: detailB.PK,
 				}
 				err = DB.Insert(detailC)
-				g.Expect(err).To(gomega.BeNil())
+				g.Expect(err).ToNot(gomega.HaveOccurred())
 			}
 		}
 	}
@@ -497,7 +497,7 @@ func TestCascade(t *testing.T) {
 
 	// Delete tree A.
 	err = DB.Delete(treeA)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 
 	//
 	// Tree A gone.
@@ -526,18 +526,18 @@ func TestTransactions(t *testing.T) {
 		"/tmp/test-transactions.db",
 		&TestObject{})
 	err := DB.Open(true)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	for i := 0; i < 10; i++ {
 		// Begin
 		tx, err := DB.Begin()
 		defer tx.End()
-		g.Expect(err).To(gomega.BeNil())
+		g.Expect(err).ToNot(gomega.HaveOccurred())
 		object := &TestObject{
 			ID:   i,
 			Name: "Elmer",
 		}
 		err = tx.Insert(object)
-		g.Expect(err).To(gomega.BeNil())
+		g.Expect(err).ToNot(gomega.HaveOccurred())
 		// Get (not found)
 		object = &TestObject{ID: object.ID}
 		err = DB.Get(object)
@@ -546,7 +546,7 @@ func TestTransactions(t *testing.T) {
 		// Get (found)
 		object = &TestObject{ID: object.ID}
 		err = DB.Get(object)
-		g.Expect(err).To(gomega.BeNil())
+		g.Expect(err).ToNot(gomega.HaveOccurred())
 	}
 }
 
@@ -556,7 +556,7 @@ func TestWithTxSucceeded(t *testing.T) {
 		"/tmp/test-withtx-succeeded.db",
 		&TestObject{})
 	err := DB.Open(true)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	labels := []string{"A", "B"}
 	n := 10
 	//
@@ -569,7 +569,7 @@ func TestWithTxSucceeded(t *testing.T) {
 				Name: "Elmer",
 			}
 			err = tx.Insert(object)
-			g.Expect(err).To(gomega.BeNil())
+			g.Expect(err).ToNot(gomega.HaveOccurred())
 			object = &TestObject{ID: object.ID}
 		}
 		return
@@ -577,10 +577,12 @@ func TestWithTxSucceeded(t *testing.T) {
 	//
 	// Test committed.
 	err = DB.With(insert, labels...)
+	g.Expect(err).ToNot(gomega.HaveOccurred())
+
 	for i := 0; i < n; i++ {
 		object := &TestObject{ID: i}
 		err = DB.Get(object)
-		g.Expect(err).To(gomega.BeNil())
+		g.Expect(err).ToNot(gomega.HaveOccurred())
 	}
 }
 
@@ -590,14 +592,14 @@ func TestWithTxFailed(t *testing.T) {
 		"/tmp/test-withtx-failed.db",
 		&TestObject{})
 	err := DB.Open(true)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	//
 	// Insert in TX with duplicate key error.
 	fakeErr := liberr.New("Faked")
 	insert := func(tx *Tx) (err error) {
 		object := &TestObject{}
 		err = tx.Insert(object)
-		g.Expect(err).To(gomega.BeNil())
+		g.Expect(err).ToNot(gomega.HaveOccurred())
 		err = fakeErr
 		return
 	}
@@ -606,7 +608,7 @@ func TestWithTxFailed(t *testing.T) {
 	err = DB.With(insert)
 	g.Expect(errors.Is(err, fakeErr)).To(gomega.BeTrue())
 	n, err := DB.Count(&TestObject{}, nil)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(n).To(gomega.Equal(int64(0)))
 }
 
@@ -617,7 +619,7 @@ func TestList(t *testing.T) {
 		"/tmp/test-list.db",
 		&TestObject{})
 	err = DB.Open(true)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	N := 10
 	for i := 0; i < N; i++ {
 		object := &TestObject{
@@ -640,12 +642,12 @@ func TestList(t *testing.T) {
 			},
 		}
 		err = DB.Insert(object)
-		g.Expect(err).To(gomega.BeNil())
+		g.Expect(err).ToNot(gomega.HaveOccurred())
 	}
 	// List detail level=0
 	list := []TestObject{}
 	err = DB.List(&list, ListOptions{})
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(len(list)).To(gomega.Equal(10))
 	g.Expect(list[0].Name).To(gomega.Equal(""))
 	g.Expect(list[0].Slice).To(gomega.BeNil())
@@ -656,7 +658,7 @@ func TestList(t *testing.T) {
 	// List detail level=1
 	list = []TestObject{}
 	err = DB.List(&list, ListOptions{Detail: 1})
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(len(list)).To(gomega.Equal(10))
 	g.Expect(list[0].Name).To(gomega.Equal(""))
 	g.Expect(list[0].Slice).To(gomega.BeNil())
@@ -667,7 +669,7 @@ func TestList(t *testing.T) {
 	// List detail level=2
 	list = []TestObject{}
 	err = DB.List(&list, ListOptions{Detail: 2})
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(len(list)).To(gomega.Equal(10))
 	g.Expect(list[0].Name).To(gomega.Equal(""))
 	g.Expect(list[0].Slice).To(gomega.BeNil())
@@ -678,7 +680,7 @@ func TestList(t *testing.T) {
 	// List detail level=3
 	list = []TestObject{}
 	err = DB.List(&list, ListOptions{Detail: 3})
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(len(list)).To(gomega.Equal(10))
 	g.Expect(list[0].Name).To(gomega.Equal(""))
 	g.Expect(list[0].Slice).To(gomega.BeNil())
@@ -689,7 +691,7 @@ func TestList(t *testing.T) {
 	// List detail level=4
 	list = []TestObject{}
 	err = DB.List(&list, ListOptions{Detail: 4})
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(len(list)).To(gomega.Equal(10))
 	g.Expect(list[0].Name).To(gomega.Equal(""))
 	g.Expect(list[0].Slice).To(gomega.BeNil())
@@ -700,7 +702,7 @@ func TestList(t *testing.T) {
 	// List detail level=10
 	list = []TestObject{}
 	err = DB.List(&list, ListOptions{Detail: MaxDetail})
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(len(list)).To(gomega.Equal(10))
 	g.Expect(list[0].Name).To(gomega.Equal("Elmer"))
 	g.Expect(len(list[0].Slice)).To(gomega.Equal(2))
@@ -715,7 +717,7 @@ func TestList(t *testing.T) {
 		ListOptions{
 			Predicate: Eq("ID", 0),
 		})
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(len(list)).To(gomega.Equal(1))
 	g.Expect(list[0].ID).To(gomega.Equal(0))
 	// List = (multiple).
@@ -725,7 +727,7 @@ func TestList(t *testing.T) {
 		ListOptions{
 			Predicate: Eq("ID", []int{2, 4}),
 		})
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(len(list)).To(gomega.Equal(2))
 	g.Expect(list[0].ID).To(gomega.Equal(2))
 	g.Expect(list[1].ID).To(gomega.Equal(4))
@@ -742,7 +744,7 @@ func TestList(t *testing.T) {
 				Neq("ID", 7),
 				Neq("ID", 9)),
 		})
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(len(list)).To(gomega.Equal(5))
 	g.Expect(list[0].ID).To(gomega.Equal(0))
 	g.Expect(list[1].ID).To(gomega.Equal(2))
@@ -758,7 +760,7 @@ func TestList(t *testing.T) {
 				Eq("ID", 0),
 				Eq("ID", 6)),
 		})
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(len(list)).To(gomega.Equal(2))
 	g.Expect(list[0].ID).To(gomega.Equal(0))
 	g.Expect(list[1].ID).To(gomega.Equal(6))
@@ -769,7 +771,7 @@ func TestList(t *testing.T) {
 		ListOptions{
 			Predicate: Lt("ID", 2),
 		})
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(len(list)).To(gomega.Equal(2))
 	g.Expect(list[0].ID).To(gomega.Equal(0))
 	g.Expect(list[1].ID).To(gomega.Equal(1))
@@ -780,7 +782,7 @@ func TestList(t *testing.T) {
 		ListOptions{
 			Predicate: Gt("ID", 7),
 		})
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(len(list)).To(gomega.Equal(2))
 	g.Expect(list[0].ID).To(gomega.Equal(8))
 	g.Expect(list[1].ID).To(gomega.Equal(9))
@@ -792,7 +794,7 @@ func TestList(t *testing.T) {
 			Predicate: Gt("RowID", N/2),
 			Detail:    MaxDetail,
 		})
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(len(list)).To(gomega.Equal(N / 2))
 	g.Expect(list[0].RowID).To(gomega.Equal(int64(N/2) + 1))
 	// List (Eq) Field values.
@@ -803,7 +805,7 @@ func TestList(t *testing.T) {
 			Predicate: Eq("RowID", Field{Name: "int8"}),
 			Detail:    MaxDetail,
 		})
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(len(list)).To(gomega.Equal(1))
 	g.Expect(list[0].RowID).To(gomega.Equal(int64(8)))
 	// List (nEq) Field values.
@@ -813,7 +815,7 @@ func TestList(t *testing.T) {
 		ListOptions{
 			Predicate: Neq("RowID", Field{Name: "int8"}),
 		})
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(len(list)).To(gomega.Equal(N - 1))
 	// List (Lt) Field values.
 	list = []TestObject{}
@@ -822,7 +824,7 @@ func TestList(t *testing.T) {
 		ListOptions{
 			Predicate: Lt("int8", Field{Name: "int16"}),
 		})
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(len(list)).To(gomega.Equal(N))
 	// List (Gt) Field values.
 	list = []TestObject{}
@@ -831,7 +833,7 @@ func TestList(t *testing.T) {
 		ListOptions{
 			Predicate: Gt("RowID", Field{Name: "int8"}),
 		})
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(len(list)).To(gomega.Equal(2))
 	// By label.
 	list = []TestObject{}
@@ -843,17 +845,17 @@ func TestList(t *testing.T) {
 				Match(Labels{"id": "v4"}),
 				Eq("ID", 8)),
 		})
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(len(list)).To(gomega.Equal(2))
 	g.Expect(list[0].ID).To(gomega.Equal(4))
 	g.Expect(list[1].ID).To(gomega.Equal(8))
 	// Test count all.
 	count, err := DB.Count(&TestObject{}, nil)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(count).To(gomega.Equal(int64(10)))
 	// Test count with predicate.
 	count, err = DB.Count(&TestObject{}, Gt("ID", 0))
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(count).To(gomega.Equal(int64(9)))
 }
 
@@ -864,7 +866,7 @@ func TestFind(t *testing.T) {
 		"/tmp/test-iter.db",
 		&TestObject{})
 	err = DB.Open(true)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	N := 10
 	for i := 0; i < N; i++ {
 		object := &TestObject{
@@ -884,19 +886,19 @@ func TestFind(t *testing.T) {
 			},
 		}
 		err = DB.Insert(object)
-		g.Expect(err).To(gomega.BeNil())
+		g.Expect(err).ToNot(gomega.HaveOccurred())
 	}
 	// List all; detail level=0
 	itr, err := DB.Find(
 		&TestObject{},
 		ListOptions{})
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(itr.Len()).To(gomega.Equal(10))
 	var list []TestObject
 	for {
 		object := TestObject{}
 		if itr.NextWith(&object) {
-			g.Expect(err).To(gomega.BeNil())
+			g.Expect(err).ToNot(gomega.HaveOccurred())
 			list = append(list, object)
 		} else {
 			break
@@ -907,9 +909,9 @@ func TestFind(t *testing.T) {
 	itr, err = DB.Find(
 		&TestObject{},
 		ListOptions{})
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	for object, hasNext := itr.Next(); hasNext; object, hasNext = itr.Next() {
-		g.Expect(err).To(gomega.BeNil())
+		g.Expect(err).ToNot(gomega.HaveOccurred())
 		_, cast := object.(Model)
 		g.Expect(cast).To(gomega.BeTrue())
 	}
@@ -922,14 +924,14 @@ func TestWatch(t *testing.T) {
 	defer func() {
 		_ = DB.Close(false)
 	}()
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	// Handler A
 	handlerA := &TestHandler{
 		options: WatchOptions{Snapshot: true},
 		name:    "A",
 	}
 	watchA, err := DB.Watch(&TestObject{}, handlerA)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(watchA).ToNot(gomega.BeNil())
 	g.Expect(watchA.Alive()).To(gomega.BeTrue())
 	N := 10
@@ -940,7 +942,7 @@ func TestWatch(t *testing.T) {
 			Name: "Elmer",
 		}
 		err = DB.Insert(object)
-		g.Expect(err).To(gomega.BeNil())
+		g.Expect(err).ToNot(gomega.HaveOccurred())
 	}
 	// Handler B
 	handlerB := &TestHandler{
@@ -948,7 +950,7 @@ func TestWatch(t *testing.T) {
 		name:    "B",
 	}
 	watchB, err := DB.Watch(&TestObject{}, handlerB)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(watchB).ToNot(gomega.BeNil())
 	// Update
 	for i := 0; i < N; i++ {
@@ -968,7 +970,7 @@ func TestWatch(t *testing.T) {
 			"id": fmt.Sprintf("v%d", i),
 		}
 		err = DB.Update(object)
-		g.Expect(err).To(gomega.BeNil())
+		g.Expect(err).ToNot(gomega.HaveOccurred())
 	}
 	// Handler C
 	handlerC := &TestHandler{
@@ -976,12 +978,12 @@ func TestWatch(t *testing.T) {
 		name:    "C",
 	}
 	watchC, err := DB.Watch(&TestObject{}, handlerC)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(watchC).ToNot(gomega.BeNil())
 	// Handler D (no snapshot)
 	handlerD := &TestHandler{name: "D"}
 	watchD, err := DB.Watch(&TestObject{}, handlerD)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(watchC).ToNot(gomega.BeNil())
 	// Delete
 	for i := 0; i < N; i++ {
@@ -989,7 +991,7 @@ func TestWatch(t *testing.T) {
 			ID: i,
 		}
 		err = DB.Delete(object)
-		g.Expect(err).To(gomega.BeNil())
+		g.Expect(err).ToNot(gomega.HaveOccurred())
 	}
 	for i := 0; i < N; i++ {
 		time.Sleep(time.Millisecond * 10)
@@ -1151,6 +1153,7 @@ func TestWatch(t *testing.T) {
 	g.Expect(handlerD.done).To(gomega.BeTrue())
 }
 
+//nolint:errcheck
 func TestCloseDB(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 	DB := New("/tmp/test-close-db.db", &TestObject{})
@@ -1158,7 +1161,7 @@ func TestCloseDB(t *testing.T) {
 	defer func() {
 		_ = DB.Close(false)
 	}()
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	handler := &TestHandler{
 		options: WatchOptions{Snapshot: true},
 		name:    "A",
@@ -1193,7 +1196,7 @@ func TestMutatingWatch(t *testing.T) {
 	DB := New("/tmp/test-mutating-watch.db", &TestObject{})
 	err := DB.Open(true)
 
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 
 	// Handler A
 	handlerA := &MutatingHandler{
@@ -1202,7 +1205,7 @@ func TestMutatingWatch(t *testing.T) {
 		DB:      DB,
 	}
 	watchA, err := DB.Watch(&TestObject{}, handlerA)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(watchA).ToNot(gomega.BeNil())
 	// Handler B
 	handlerB := &MutatingHandler{
@@ -1211,7 +1214,7 @@ func TestMutatingWatch(t *testing.T) {
 		DB:      DB,
 	}
 	watchB, err := DB.Watch(&TestObject{}, handlerB)
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(watchB).ToNot(gomega.BeNil())
 	N := 10
 	// Insert
@@ -1221,7 +1224,7 @@ func TestMutatingWatch(t *testing.T) {
 			Name: "Elmer",
 		}
 		err = DB.Insert(object)
-		g.Expect(err).To(gomega.BeNil())
+		g.Expect(err).ToNot(gomega.HaveOccurred())
 	}
 
 	for {
@@ -1245,11 +1248,11 @@ func TestExecute(t *testing.T) {
 		_ = DB.Close(false)
 	}()
 
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 
 	result, err := DB.Execute(
 		"INSERT INTO Person (id, name) values (0, 'john');")
-	g.Expect(err).To(gomega.BeNil())
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(result.RowsAffected()).To(gomega.Equal(int64(1)))
 }
 
@@ -1271,8 +1274,8 @@ func TestSession(t *testing.T) {
 	}
 }
 
-// Remove leading __ to enable.
-func __TestDbLocked(t *testing.T) {
+func TestDbLocked(t *testing.T) {
+	t.Skip("Skipping DB locked test")
 	g := gomega.NewGomegaWithT(t)
 	DB := New("/tmp/test-db-locked.db", &TestObject{}, &PlainObject{})
 	err := DB.Open(true)
@@ -1305,19 +1308,16 @@ func __TestDbLocked(t *testing.T) {
 		defer close(endChan)
 		n := int64(0)
 		for err = range errChan {
-			g.Expect(err).To(gomega.BeNil())
+			g.Expect(err).ToNot(gomega.HaveOccurred())
 			n, err = DB.Count(&TestObject{}, nil)
-			g.Expect(err).To(gomega.BeNil())
+			g.Expect(err).ToNot(gomega.HaveOccurred())
 		}
 		fmt.Printf("Count:%d", n)
 	}()
-
-	for _ = range endChan {
-	}
 }
 
-// Remove leading __ to enable.
-func __TestConcurrency(t *testing.T) {
+func TestConcurrency(t *testing.T) {
+	t.Skip("Skipping Concurrency test")
 	var err error
 
 	DB := New("/tmp/test-concurrency.db", &TestObject{})

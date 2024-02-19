@@ -1,3 +1,4 @@
+//nolint:errcheck
 package suit_test
 
 import (
@@ -25,8 +26,9 @@ var _ = Describe("[level:component]Migration Extended tests for OpenStack provid
 		By("Load Source VM Details from OpenStack")
 
 		packstackCA, err := f.Clients.OpenStackClient.LoadCA(f, packstackNameSpace, "packstack")
-		err = utils.TestHttpsCA(keystoneSecureURL, packstackCA, false)
+		Expect(err).ToNot(HaveOccurred())
 
+		err = utils.TestHttpsCA(keystoneSecureURL, packstackCA, false)
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Create Secret from Definition")
@@ -86,6 +88,7 @@ var _ = Describe("[level:component]Migration Extended tests for OpenStack provid
 		By("Load Source VM Details from OpenStack")
 
 		packstackCA, err := f.Clients.OpenStackClient.LoadCA(f, packstackNameSpace, "packstack")
+		Expect(err).ToNot(HaveOccurred())
 
 		err = utils.UpdateLocalCA(packstackCA)
 		Expect(err).ToNot(HaveOccurred())
@@ -125,6 +128,7 @@ var _ = Describe("[level:component]Migration Extended tests for OpenStack provid
 		By("Load Source VM Details from OpenStack")
 
 		packstackCA, err := f.Clients.OpenStackClient.LoadCA(f, packstackNameSpace, "packstack")
+		Expect(err).ToNot(HaveOccurred())
 
 		err = utils.UpdateLocalCA(packstackCA)
 		Expect(err).ToNot(HaveOccurred())

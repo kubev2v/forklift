@@ -19,7 +19,7 @@ func New(m string, kvpair ...interface{}) error {
 // Returns `err` when err is `nil` or *Error.
 func Wrap(err error, kvpair ...interface{}) error {
 	if err == nil {
-		return err
+		return nil
 	}
 	if le, cast := err.(*Error); cast {
 		le.append(kvpair)

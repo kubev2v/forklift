@@ -4,6 +4,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+
 	"github.com/konveyor/forklift-controller/tests/suit/utils"
 )
 
@@ -17,6 +18,10 @@ func (r *OpenStackClient) SetupClient(vmName string, networkName string, volumeT
 // LoadCA - Load CA from openstack
 func (r *OpenStackClient) LoadCA(f *Framework, namespace string, contName string) (ca string, err error) {
 	pod, err := utils.FindPodByPrefix(f.K8sClient, namespace, contName, fmt.Sprintf("app=%s", contName))
+	if err != nil {
+		return "", fmt.Errorf("error finding pod for %s - %v", contName, err)
+	}
+
 	caCert, err := r.getFileContent(f, namespace, pod.Name, contName, "/etc/pki/ca-trust/source/anchors/packstack-ca.pem")
 	if err != nil {
 		return "", fmt.Errorf("error getting CA Certificate - %v", err)

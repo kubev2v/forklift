@@ -95,7 +95,6 @@ func (r *FkRelation) sort() {
 		}
 	}
 	r.sorted.Reverse()
-	return
 }
 
 // Find next model definition that references the

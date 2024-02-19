@@ -5,6 +5,7 @@ linters:
   - nilnil
   - bodyclose
   - gofmt
+  - goimports
 linters-settings:
   ginkgolinter:
     forbid-focus-container: true

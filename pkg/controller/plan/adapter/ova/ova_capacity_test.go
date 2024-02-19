@@ -37,7 +37,7 @@ func TestGetResourceCapacity(t *testing.T) {
 			if testCase.expectError {
 				g.Expect(err).To(gomega.HaveOccurred(), fmt.Sprintf("expected an error for input: %v", testCase.units))
 			} else {
-				g.Expect(err).To(gomega.BeNil(), fmt.Sprintf("did not expect an error for input: %v, but got: %v", testCase.units, err))
+				g.Expect(err).ToNot(gomega.HaveOccurred(), fmt.Sprintf("did not expect an error for input: %v, but got: %v", testCase.units, err))
 				g.Expect(result).To(gomega.Equal(testCase.expected), fmt.Sprintf("expected %v, but got %v", testCase.expected, result))
 			}
 		})

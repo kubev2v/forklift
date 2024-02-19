@@ -48,21 +48,6 @@ func GetDefaultStorageClass(client *kubernetes.Clientset) *storagev1.StorageClas
 	return nil
 }
 
-func getDefaultStorageClassCsiDriver(client *kubernetes.Clientset) *storagev1.CSIDriver {
-	if DefaultStorageClass != nil {
-		csidrivers, err := client.StorageV1().CSIDrivers().List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			ginkgo.Fail(fmt.Sprintf("Unable to get csi driver: %v", err))
-		}
-		for _, driver := range csidrivers.Items {
-			if driver.Name == DefaultStorageClass.Provisioner {
-				return &driver
-			}
-		}
-	}
-	return nil
-}
-
 // CacheTestsData fetch and cache data required for tests
 func CacheTestsData(client *kubernetes.Clientset, cdiNs string) {
 	if DefaultStorageClass == nil {

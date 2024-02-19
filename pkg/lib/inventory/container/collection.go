@@ -6,9 +6,10 @@ with the collection of desired models.
 package container
 
 import (
+	"reflect"
+
 	fb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
 	"github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
-	"reflect"
 )
 
 // Model shepherd.

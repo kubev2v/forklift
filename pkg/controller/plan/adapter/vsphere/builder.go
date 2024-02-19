@@ -122,7 +122,7 @@ var osMap = map[string]string{
 
 // Regex which matches the snapshot identifier suffix of a
 // vSphere disk backing file.
-var backingFilePattern = regexp.MustCompile("-\\d\\d\\d\\d\\d\\d.vmdk")
+var backingFilePattern = regexp.MustCompile(`-\d\d\d\d\d\d.vmdk`)
 
 // vSphere builder.
 type Builder struct {

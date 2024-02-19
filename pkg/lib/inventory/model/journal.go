@@ -202,7 +202,9 @@ func (w *Watch) Match(model Model) bool {
 // Queue event.
 func (w *Watch) notify(itr fb.Iterator) {
 	defer func() {
-		recover()
+		if err := recover(); err != nil {
+			w.log.Info("recovered from panic: ", "err", err)
+		}
 	}()
 	select {
 	case w.queue <- itr:

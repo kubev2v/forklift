@@ -2,6 +2,7 @@ package utils
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -17,8 +18,7 @@ import (
 
 // CreateMigrationFromDefinition is used by tests to create a Plan
 func CreateMigrationFromDefinition(cl crclient.Client, def *forkliftv1.Migration) error {
-	var err error
-	err = cl.Create(context.TODO(), def, &crclient.CreateOptions{})
+	err := cl.Create(context.TODO(), def, &crclient.CreateOptions{})
 
 	if err == nil || apierrs.IsAlreadyExists(err) {
 		return nil
@@ -52,7 +52,7 @@ func WaitForMigrationSucceededWithTimeout(cl crclient.Client, namespace string, 
 
 	returnedMap := &forkliftv1.Migration{}
 
-	err := wait.PollImmediate(3*time.Second, timeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.TODO(), 3*time.Second, timeout, true, func(context.Context) (bool, error) {
 		err := cl.Get(context.TODO(), migrationIdentifier, returnedMap)
 
 		//terminate the retry if migration failed
@@ -71,7 +71,7 @@ func WaitForMigrationSucceededWithTimeout(cl crclient.Client, namespace string, 
 		return true, nil
 	})
 	if err != nil {
-		return fmt.Errorf("Migrtation %s not ready within %v, error: %w", migrationName, timeout, err)
+		return fmt.Errorf("migrtation %s not ready within %v, error: %w", migrationName, timeout, err)
 	}
 	return nil
 }
@@ -86,5 +86,6 @@ func GetImportedVm(cl crclient.Client, namespace string, isImportedVm func(cnv.V
 			return &vm, nil
 		}
 	}
-	return nil, nil
+
+	return nil, errors.New("no imported VM found")
 }

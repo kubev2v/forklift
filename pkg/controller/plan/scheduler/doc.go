@@ -49,7 +49,7 @@ func New(ctx *plancontext.Context) (scheduler Scheduler, err error) {
 			MaxInFlight: settings.Settings.MaxInFlight,
 		}
 	default:
-		liberr.New("provider not supported.")
+		err = liberr.New("provider not supported.")
 	}
 
 	return

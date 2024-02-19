@@ -2,10 +2,11 @@ package model
 
 import (
 	"bytes"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"reflect"
 	"strings"
 	"text/template"
+
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 )
 
 // Label SQL.

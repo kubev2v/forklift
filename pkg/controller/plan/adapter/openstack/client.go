@@ -582,7 +582,9 @@ func (r *Client) getImageFromVolume(vm *libclient.VM, volumeID string) (image *l
 	volume, err := r.getVolume(volumeRef)
 	if err != nil {
 		err = liberr.Wrap(err)
+		return
 	}
+
 	originalVolumeID := volume.Metadata[forkliftPropertyOriginalVolumeID]
 	imageName := getImageFromVolumeName(r.Context, vm.ID, originalVolumeID)
 	images := []libclient.Image{}

@@ -38,8 +38,7 @@ const (
 
 type Builder struct {
 	*plancontext.Context
-	macConflictsMap map[string]string
-	sourceClient    client.Client
+	sourceClient client.Client
 }
 
 // ConfigMap implements base.Builder

@@ -80,6 +80,7 @@ func (r *Handler) changed(models ...*openstack.Network) {
 	err := r.List(context.TODO(), &list)
 	if err != nil {
 		err = liberr.Wrap(err)
+		log.Error(err, "failed to list NetworkMap CRs")
 		return
 	}
 	for i := range list.Items {

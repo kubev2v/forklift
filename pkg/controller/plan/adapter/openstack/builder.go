@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -539,7 +539,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []*core.Pe
 			}
 			if bootable, err := strconv.ParseBool(volume.Bootable); err == nil && bootable {
 				r.Log.Info("bootable volume found", "volumeID", volumeID)
-				bootOrder = pointer.Uint(1)
+				bootOrder = ptr.To[uint](1)
 			}
 		}
 
@@ -592,7 +592,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []*core.Pe
 		r.Log.Info("No bootable volume found, falling back to image", "image", imagePVC.Name)
 		for i, disk := range kDisks {
 			if disk.Name == fmt.Sprintf("vol-%s", imagePVC.Annotations[AnnImportDiskId]) {
-				kDisks[i].BootOrder = pointer.Uint(1)
+				kDisks[i].BootOrder = ptr.To[uint](1)
 				r.Log.Info("Boot order set to 1 on", "disk", kDisks[i], "ann", imagePVC.Annotations[AnnImportDiskId])
 				break
 			}
@@ -1236,6 +1236,7 @@ func (r *Builder) PopulatorTransferredBytes(persistentVolumeClaim *core.Persiste
 	if err != nil {
 		transferredBytes = 0
 		err = nil
+		//nolint:nilerr
 		return
 	}
 

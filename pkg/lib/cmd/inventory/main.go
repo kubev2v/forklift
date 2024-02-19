@@ -69,13 +69,13 @@ func (h *EventHandler) Started(wid uint64) {
 	h.wid = wid
 	h.started = true
 
-	fmt.Printf("[%d] Event (started)\n", wid)
+	log.Info(fmt.Sprintf("[%d] Event (started)\n", wid))
 }
 
 func (h *EventHandler) Parity() {
 	h.parity = true
 
-	fmt.Printf("[%d] Event (parity)\n", h.wid)
+	log.Info(fmt.Sprintf("[%d] Event (parity)\n", h.wid))
 }
 
 func (h *EventHandler) Created(e web.Event) {
@@ -83,7 +83,7 @@ func (h *EventHandler) Created(e web.Event) {
 		h.created = append(h.created, object.ID)
 	}
 
-	fmt.Printf("[%d] Event (created): %v\n", h.wid, e)
+	log.Info(fmt.Sprintf("[%d] Event (created): %v\n", h.wid, e))
 }
 
 func (h *EventHandler) Updated(e web.Event) {
@@ -91,27 +91,27 @@ func (h *EventHandler) Updated(e web.Event) {
 		h.updated = append(h.updated, object.ID)
 	}
 
-	fmt.Printf("[%d] Event (updated): %v\n", h.wid, e)
+	log.Info(fmt.Sprintf("[%d] Event (updated): %v\n", h.wid, e))
 }
 func (h *EventHandler) Deleted(e web.Event) {
 	if object, cast := e.Resource.(*Model); cast {
 		h.deleted = append(h.deleted, object.ID)
 	}
 
-	fmt.Printf("[%d] Event (deleted): %v\n", h.wid, e)
+	log.Info(fmt.Sprintf("[%d] Event (deleted): %v\n", h.wid, e))
 }
 
 func (h *EventHandler) Error(w *web.Watch, err error) {
 	h.err = append(h.err, err)
 	_ = w.Repair()
 
-	fmt.Printf("[%d] Event (error): %v\n", h.wid, err)
+	log.Info(fmt.Sprintf("[%d] Event (error): %v\n", h.wid, err))
 }
 
 func (h *EventHandler) End() {
 	h.done = true
 
-	fmt.Printf("[%d] Event (end)\n", h.wid)
+	log.Info(fmt.Sprintf("[%d] Event (end)\n", h.wid))
 }
 
 type Endpoint struct {
@@ -258,10 +258,10 @@ func list(client *web.Client) {
 		panic(liberr.New(http.StatusText(status)))
 	}
 
-	fmt.Println("List")
-	fmt.Println("___________________________")
+	log.Info("List")
+	log.Info("___________________________")
 	for _, m := range list {
-		fmt.Println(m)
+		log.Info("model: ", m)
 	}
 }
 
@@ -275,7 +275,7 @@ func get(client *web.Client) {
 		panic(liberr.New(http.StatusText(status)))
 	}
 
-	fmt.Printf("\nGet: %v\n", m)
+	log.Info("Get: ", "m", m)
 }
 
 func watch(client *web.Client, snapshot bool) (watch *web.Watch) {
@@ -294,13 +294,13 @@ func watch(client *web.Client, snapshot bool) (watch *web.Watch) {
 		panic(liberr.New(http.StatusText(status)))
 	}
 
-	fmt.Printf("\nWatch started: %d  (snapshot=%v)\n", watch.ID(), snapshot)
+	log.Info(fmt.Sprintf("Watch started: %d  (snapshot=%v)", watch.ID(), snapshot))
 
 	return
 }
 
 func endWatch(w *web.Watch) {
-	fmt.Printf("\nEnd watch: %d\n", w.ID())
+	log.Info(fmt.Sprintf("nEnd watch: %d", w.ID()))
 	w.End()
 	wait(500)
 }
@@ -331,7 +331,7 @@ func testB(client *web.Client, n int) {
 func testC(client *web.Client, n int) {
 	for i := 0; i < n; i++ {
 		w := watch(client, true)
-		fmt.Println(w.ID())
+		log.Info("Watch ID", "ID", w.ID())
 		wait(500)
 		w = nil
 		runtime.GC()
@@ -362,14 +362,14 @@ func testD(db model.DB, client *web.Client) {
 func testE(db model.DB, client *web.Client) {
 	w := watch(client, true)
 	wait(100)
-	fmt.Println(w.ID())
+	log.Info("Watch ID", "ID", w.ID())
 	_ = db.Close(false)
 }
 
 // Main.
 func main() {
 	db, _ := setup()
-	fmt.Println(db)
+	log.Info("DB", "db", db)
 	client := &web.Client{
 		Transport: http.DefaultTransport,
 	}

@@ -3,6 +3,9 @@ package plan
 import (
 	"context"
 	"encoding/base64"
+	"path"
+	"strings"
+
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
@@ -14,10 +17,8 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes/scheme"
-	"path"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"strings"
 )
 
 // Labels

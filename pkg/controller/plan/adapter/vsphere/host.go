@@ -40,27 +40,6 @@ func (r *EsxHost) TestConnection() (err error) {
 	return
 }
 
-// Translate network ID.
-func (r *EsxHost) networkID(network *model.Network) (id string, err error) {
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	err = r.connect(ctx)
-	if err != nil {
-		return
-	}
-	defer r.close()
-	object, fErr := r.finder.Network(ctx, network.Name)
-	if fErr != nil {
-		err = liberr.Wrap(fErr)
-		return
-	}
-
-	id = object.Reference().Value
-
-	return
-}
-
 // Translate datastore ID.
 func (r *EsxHost) DatastoreID(ds *model.Datastore) (id string, err error) {
 	ctx := context.Background()
