@@ -293,6 +293,9 @@ spec:
                       description: The VM Namespace Only relevant for an openshift
                         source.
                       type: string
+                    ovfConfig:
+                      description: virt-v2v ovf file
+                      type: string
                     phase:
                       description: Phase
                       type: string

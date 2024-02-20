@@ -7,6 +7,7 @@ go_library(
         "builder.go",
         "client.go",
         "destinationclient.go",
+        "ovfparser.go",
         "validator.go",
     ],
     importpath = "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/ova",
