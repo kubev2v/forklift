@@ -241,11 +241,9 @@ func xmlHandler(w http.ResponseWriter, r *http.Request) {
 
 func shutdownHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Shutdown request received. Shutting down server.")
-	err := server.Shutdown(context.Background())
-	if err != nil {
-		fmt.Printf("Error shutting down server: %v\n", err)
-	} else {
-		fmt.Println("Server shut down successfully.")
+	w.WriteHeader(http.StatusNoContent)
+	if err := server.Shutdown(context.Background()); err != nil {
+		fmt.Printf("error shutting down server: %v\n", err)
 	}
 }
 

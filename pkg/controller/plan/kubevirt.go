@@ -89,11 +89,6 @@ const (
 	qemuGroup = int64(107)
 )
 
-const (
-	BIOS = "bios"
-	UEFI = "uefi"
-)
-
 // Map of VirtualMachines keyed by vmID.
 type VirtualMachineMap map[string]VirtualMachine
 
@@ -102,35 +97,6 @@ type KubeVirt struct {
 	*plancontext.Context
 	// Builder
 	Builder adapter.Builder
-}
-
-type OvaVmconfig struct {
-	XMLName xml.Name `xml:"domain"`
-	Name    string   `xml:"name"`
-	OS      OS       `xml:"os"`
-}
-
-type OS struct {
-	Type   OSType `xml:"type"`
-	Loader Loader `xml:"loader"`
-	Nvram  Nvram  `xml:"nvram"`
-}
-
-type OSType struct {
-	Arch    string `xml:"arch,attr"`
-	Machine string `xml:"machine,attr"`
-	Content string `xml:",chardata"`
-}
-
-type Loader struct {
-	Readonly string `xml:"readonly,attr"`
-	Type     string `xml:"type,attr"`
-	Secure   string `xml:"secure,attr"`
-	Path     string `xml:",chardata"`
-}
-
-type Nvram struct {
-	Template string `xml:"template,attr"`
 }
 
 // Build a VirtualMachineMap.
@@ -888,100 +854,36 @@ func (r *KubeVirt) GetGuestConversionPod(vm *plan.VMStatus) (pod *core.Pod, err 
 
 func (r *KubeVirt) GetVirtV2VConvertedVMConfig(vm *plan.VMStatus, pod *core.Pod, step *plan.Step) (err error) {
 	if pod.Status.PodIP == "" {
-		//we need the IP for fetching the firmware info.
+		//we need the IP for fetching the configuration of the convered VM.
 		return
 	}
 
 	url := fmt.Sprintf("http://%s:8080/xml", pod.Status.PodIP)
-	maxRetries := 3
-	retryInterval := time.Second * 5
 
 	resp, err := http.Get(url)
-	if err == nil {
-		defer resp.Body.Close()
-	} else {
+	if err != nil {
 		if strings.Contains(err.Error(), "connection refused") {
 			return nil
 		} else {
-			for i := 0; i < maxRetries; i++ {
-				resp, err = http.Get(url)
-				if err != nil {
-					if i < maxRetries-1 {
-						r.Log.Info("Retrying to get virt-v2v vm configuration after conversion... (%d/%d), vmID:%v\n", i+1, maxRetries, vm.ID)
-						defer resp.Body.Close()
-						time.Sleep(retryInterval)
-						continue
-					}
-				}
-				defer resp.Body.Close()
-				break
-			}
-			// Handle the final error after retries
-			if err != nil {
-				return
-			}
+			return
 		}
 	}
+	defer resp.Body.Close()
 
-	vmConfigXML, errFirrmware := io.ReadAll(resp.Body)
-	if errFirrmware != nil {
-		return errFirrmware
-	}
-	firmware, err := getFirmwareFromConfig(string(vmConfigXML))
-
-	currentAnnotations := r.Migration.Annotations
-	if currentAnnotations == nil {
-		currentAnnotations = make(map[string]string)
-	}
-	var vmId string
-	labels := pod.GetLabels()
-	if val, ok := labels["vmID"]; ok {
-		vmId = val
-	} else {
-		return liberr.New("failed to get virt-v2v pod labels")
-	}
-
-	currentAnnotations[vmId] = firmware
-	r.Migration.SetAnnotations(currentAnnotations)
-	err = r.Destination.Client.Update(context.TODO(), r.Migration.DeepCopy())
+	vmConfigXML, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return
 	}
+	vm.OvfConfig = string(vmConfigXML)
 
 	shutdownURL := fmt.Sprintf("http://%s:8080/shutdown", pod.Status.PodIP)
-	resp, err = http.Get(shutdownURL)
-	if err != nil {
+	resp, err = http.Post(shutdownURL, "application/json", nil)
+	if err != nil && !strings.Contains(err.Error(), "EOF") {
 		return
 	}
 	defer resp.Body.Close()
 
-	return nil
-}
-
-func readConfFromXML(xmlData string) (*OvaVmconfig, error) {
-	var vmConfig OvaVmconfig
-
-	reader := strings.NewReader(xmlData)
-	decoder := xml.NewDecoder(reader)
-
-	err := decoder.Decode(&vmConfig)
-	if err != nil {
-		return &vmConfig, err
-	}
-	return &vmConfig, nil
-}
-
-func getFirmwareFromConfig(xmlConfig string) (conf string, err error) {
-	xmlConf, err := readConfFromXML(xmlConfig)
-	if err != nil {
-		return
-	}
-
-	path := xmlConf.OS.Loader.Path
-	if strings.Contains(path, "OVMF") {
-		return UEFI, nil
-	}
-	return BIOS, nil
+	return
 }
 
 // Delete the PVC consumer pod on the destination cluster.
