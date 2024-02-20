@@ -1657,12 +1657,14 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 
 	switch r.Source.Provider.Type() {
 	case api.Ova:
-		err = r.CreatePvForNfs()
+		var pvName string
+		pvName, err = r.CreatePvForNfs()
 		if err != nil {
 			return
 		}
-		pvcName := getEntityName("pvc", r.Source.Provider.Name, r.Plan.Name)
-		err = r.CreatePvcForNfs(pvcName)
+		pvcNamePrefix := getEntityPrefixName("pvc", r.Source.Provider.Name, r.Plan.Name)
+		var pvcName string
+		pvcName, err = r.CreatePvcForNfs(pvcNamePrefix, pvName)
 		if err != nil {
 			return
 		}
@@ -2160,7 +2162,7 @@ func GetOvaPvNfs(client client.Client, planName string, providerName string) (pv
 	err = client.Get(
 		context.TODO(),
 		types.NamespacedName{
-			Name: getEntityName("pv", providerName, planName),
+			Name: getEntityPrefixName("pv", providerName, planName),
 		},
 		pv,
 	)
@@ -2180,7 +2182,7 @@ func GetOvaPvcNfs(client client.Client, planName string, planNamespace string, p
 	err = client.Get(
 		context.TODO(),
 		types.NamespacedName{
-			Name:      getEntityName("pvc", providerName, planName),
+			Name:      getEntityPrefixName("pvc", providerName, planName),
 			Namespace: planNamespace,
 		},
 		pvc,
@@ -2196,28 +2198,18 @@ func GetOvaPvcNfs(client client.Client, planName string, planNamespace string, p
 	return
 }
 
-func (r *KubeVirt) CreatePvForNfs() (err error) {
+func (r *KubeVirt) CreatePvForNfs() (pvName string, err error) {
 	sourceProvider := r.Source.Provider
 	splitted := strings.Split(sourceProvider.Spec.URL, ":")
 	nfsServer := splitted[0]
 	nfsPath := splitted[1]
-
-	_, found, err := GetOvaPvNfs(r.Destination.Client, r.Plan.Name, r.Plan.Provider.Source.Name)
-	if err != nil {
-		r.Log.Error(err, "Failed to get ova PV")
-		return
-	}
-	pvName := getEntityName("pv", r.Source.Provider.Name, r.Plan.Name)
-	if found {
-		r.Log.Info("The PV for OVA NFS exists", "PV", pvName)
-		return
-	}
+	pvcNamePrefix := getEntityPrefixName("pv", r.Source.Provider.Name, r.Plan.Name)
 
 	labels := map[string]string{"provider": r.Plan.Provider.Source.Name, "app": "forklift", "migration": r.Migration.Name, "plan": r.Plan.Name}
 	pv := &core.PersistentVolume{
 		ObjectMeta: meta.ObjectMeta{
-			Name:   pvName,
-			Labels: labels,
+			GenerateName: pvcNamePrefix,
+			Labels:       labels,
 		},
 		Spec: core.PersistentVolumeSpec{
 			Capacity: core.ResourceList{
@@ -2239,28 +2231,18 @@ func (r *KubeVirt) CreatePvForNfs() (err error) {
 		r.Log.Error(err, "Failed to create OVA plan PV")
 		return
 	}
+	pvName = pv.Name
 	return
 }
 
-func (r *KubeVirt) CreatePvcForNfs(pvcName string) (err error) {
-	_, found, err := GetOvaPvcNfs(r.Destination.Client, r.Plan.Name, r.Plan.Spec.TargetNamespace, r.Plan.Provider.Source.Name)
-	if err != nil {
-		r.Log.Error(err, "Failed to get ova PVC")
-		return
-	}
-	if found {
-		r.Log.Info("The PVC for OVA NFS exists", "PVC", pvcName)
-		return
-	}
-
+func (r *KubeVirt) CreatePvcForNfs(pvcNamePrefix string, pvName string) (pvcName string, err error) {
 	sc := ""
-	pvName := getEntityName("pv", r.Source.Provider.Name, r.Plan.Name)
 	labels := map[string]string{"provider": r.Plan.Provider.Source.Name, "app": "forklift", "migration": r.Migration.Name, "plan": r.Plan.Name}
 	pvc := &core.PersistentVolumeClaim{
 		ObjectMeta: meta.ObjectMeta{
-			Name:      pvcName,
-			Namespace: r.Plan.Spec.TargetNamespace,
-			Labels:    labels,
+			GenerateName: pvcNamePrefix,
+			Namespace:    r.Plan.Spec.TargetNamespace,
+			Labels:       labels,
 		},
 		Spec: core.PersistentVolumeClaimSpec{
 			Resources: core.ResourceRequirements{
@@ -2283,7 +2265,7 @@ func (r *KubeVirt) CreatePvcForNfs(pvcName string) (err error) {
 
 	pvcNamespacedName := types.NamespacedName{
 		Namespace: r.Plan.Spec.TargetNamespace,
-		Name:      pvcName,
+		Name:      pvc.Name,
 	}
 
 	if err = wait.PollUntilContextTimeout(context.TODO(), 5*time.Second, 45*time.Second, true, func(ctx context.Context) (done bool, err error) {
@@ -2299,11 +2281,12 @@ func (r *KubeVirt) CreatePvcForNfs(pvcName string) (err error) {
 		return
 
 	}
-	return nil
+	pvcName = pvc.Name
+	return
 }
 
-func getEntityName(resourceType, providerName, planName string) string {
-	return fmt.Sprintf("ova-store-%s-%s-%s", resourceType, providerName, planName)
+func getEntityPrefixName(resourceType, providerName, planName string) string {
+	return fmt.Sprintf("ova-store-%s-%s-%s-", resourceType, providerName, planName)
 }
 
 // Ensure the PV exist on the destination.
