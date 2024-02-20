@@ -517,36 +517,40 @@ func (r *Migration) deleteImporterPods(vm *plan.VMStatus) (err error) {
 }
 
 func (r *Migration) deletePvcPvForOva() (err error) {
-	pvc, _, err := GetOvaPvcNfs(r.Destination.Client, r.Plan.Name, r.Plan.Spec.TargetNamespace, r.Plan.Provider.Source.Name)
+	pvcs, _, err := GetOvaPvcNfs(r.Destination.Client, r.Plan.Name, r.Plan.Spec.TargetNamespace)
 	if err != nil {
-		r.Log.Error(err, "Failed to get the plan PVC")
+		r.Log.Error(err, "Failed to get the plan PVCs")
 		return
 	}
-	// The PVC was already deleted
-	if pvc == nil {
+	// The PVCs was already deleted
+	if len(pvcs.Items) == 0 {
 		return
 	}
 
-	err = r.Destination.Client.Delete(context.TODO(), pvc)
+	for _, pvc := range pvcs.Items {
+		err = r.Destination.Client.Delete(context.TODO(), &pvc)
+		if err != nil {
+			r.Log.Error(err, "Failed to delete the plan PVC", pvc)
+			return
+		}
+	}
+
+	pvs, _, err := GetOvaPvNfs(r.Destination.Client, string(r.Plan.UID))
 	if err != nil {
-		r.Log.Error(err, "Failed to delete the plan PVC")
+		r.Log.Error(err, "Failed to get the plan PVs")
+		return
+	}
+	// The PVs was already deleted
+	if len(pvs.Items) == 0 {
 		return
 	}
 
-	pv, _, err := GetOvaPvNfs(r.Destination.Client, r.Plan.Name, r.Plan.Provider.Source.Name)
-	if err != nil {
-		r.Log.Error(err, "Failed to get the plan PV")
-		return
-	}
-	// The PV was already deleted
-	if pv == nil {
-		return
-	}
-
-	err = r.Destination.Client.Delete(context.TODO(), pv)
-	if err != nil {
-		r.Log.Error(err, "Failed to delete the plan PV")
-		return
+	for _, pv := range pvs.Items {
+		err = r.Destination.Client.Delete(context.TODO(), &pv)
+		if err != nil {
+			r.Log.Error(err, "Failed to delete the plan PV", pv)
+			return
+		}
 	}
 	return
 }
