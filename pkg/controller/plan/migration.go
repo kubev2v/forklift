@@ -1107,10 +1107,6 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		}
 		step.MarkStarted()
 		step.Phase = Running
-		err = r.updateConversionProgress(vm, step)
-		if err != nil {
-			return
-		}
 		// only for OVA, fetch config from the conversion pod
 		if r.Source.Provider.Type() == v1beta1.Ova {
 			pod, err := r.kubevirt.GetGuestConversionPod(vm)
@@ -1119,12 +1115,18 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 
 			if pod.Status.Phase != core.PodSucceeded {
-				err = r.kubevirt.GetVirtV2VConvertedVMConfig(vm, pod, step)
+				err := r.kubevirt.GetVirtV2VConvertedVMConfig(vm, pod, step)
 				if err != nil {
 					return err
 				}
 			}
 		}
+
+		err = r.updateConversionProgress(vm, step)
+		if err != nil {
+			return
+		}
+
 		if step.MarkedCompleted() && !step.HasError() {
 			step.Phase = Completed
 			vm.Phase = r.next(vm.Phase)
