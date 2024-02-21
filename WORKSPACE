@@ -3348,13 +3348,6 @@ container_pull(
 )
 
 container_pull(
-    name = "ansible-operator-image",
-    tag = "v1.34.1",
-    registry = "quay.io",
-    repository = "operator-framework/ansible-operator",
-)
-
-container_pull(
     name = "opm-image",
     digest = "sha256:601c62a5e3fea961665aad2ed2834f3f165a020051d355eb24af2125da8e158e",
     registry = "quay.io",
