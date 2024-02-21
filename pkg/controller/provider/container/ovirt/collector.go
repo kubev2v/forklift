@@ -3,6 +3,7 @@ package ovirt
 import (
 	"context"
 	"fmt"
+	"net/http"
 	liburl "net/url"
 	libpath "path"
 	"strconv"
@@ -130,6 +131,11 @@ func (r *Collector) HasParity() bool {
 // Test connect/logout.
 func (r *Collector) Test() (status int, err error) {
 	_, status, err = r.client.system()
+	if status != http.StatusOK {
+		err = liberr.New(
+			fmt.Sprintf("status: %d", status))
+	}
+
 	return
 }
 
