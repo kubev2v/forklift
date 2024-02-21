@@ -183,12 +183,9 @@ push-validation-image: build-validation-image
 
 build-operator-image: check_container_runtime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
-	bazel run operator:forklift-operator-image \
-		$(BAZEL_OPTS) \
-		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
+	$(CONTAINER_CMD) build -f operator/Containerfile -t $(OPERATOR_IMAGE) .
 
 push-operator-image: build-operator-image
-	$(CONTAINER_CMD) tag bazel/operator:forklift-operator-image $(OPERATOR_IMAGE)
 	$(CONTAINER_CMD) push $(OPERATOR_IMAGE)
 
 build-virt-v2v-image: check_container_runtime
