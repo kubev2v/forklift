@@ -3341,7 +3341,7 @@ container_pull(
 
 container_pull(
     name = "ansible-operator-image",
-    tag = "main",
+    tag = "v1.34.1",
     registry = "quay.io",
     repository = "operator-framework/ansible-operator",
 )
@@ -3364,9 +3364,9 @@ http_file(
 http_file(
     name = "kustomize",
     downloaded_file_path = "kustomize.tar.gz",
-    sha256 = "4a3372d7bfdffe2eaf729e77f88bc94ce37dc84de55616bfe90aac089bf6fd02",
+    sha256 = "3ab32f92360d752a2a53e56be073b649abc1e7351b912c0fb32b960d1def854c",
     urls = [
-        "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v3.8.7/kustomize_v3.8.7_linux_amd64.tar.gz",
+        "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v5.3.0/kustomize_v5.3.0_linux_amd64.tar.gz",
     ],
 )
 
