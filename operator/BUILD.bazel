@@ -1,7 +1,6 @@
 load(
     "@io_bazel_rules_docker//container:container.bzl",
     "container_image",
-    "container_push",
 )
 
 genrule(
@@ -9,38 +8,6 @@ genrule(
     srcs = ["@kustomize//file"],
     outs = ["kustomize"],
     cmd = "tar -C $(@D) -xf $(location @kustomize//file)",
-)
-
-# OPERATOR
-# 1. Build the oprator image with ansible dependencies and with roles.
-
-container_image(
-    name = "forklift-operator-requirements",
-    base = "@ansible-operator-image//image",
-    cmd = "ansible-galaxy collection install -r /opt/ansible/requirements.yml && chmod -R ug+rwx /opt/ansible/.ansible",
-    directory = "/opt/ansible/",
-    files = ["requirements.yml"],
-)
-
-container_image(
-    name = "forklift-operator-watches",
-    base = ":forklift-operator-requirements",
-    directory = "/opt/ansible/",
-    files = ["watches.yaml"],
-)
-
-container_image(
-    name = "forklift-operator-roles",
-    base = ":forklift-operator-watches",
-    directory = "/opt/ansible/",
-    files = ["roles"],
-)
-
-container_image(
-    name = "forklift-operator-image",
-    base = ":forklift-operator-roles",
-    user = "1001",
-    visibility = ["//visibility:public"],
 )
 
 # BUNDLE
