@@ -31,6 +31,14 @@ load(
     docker_toolchain_configure = "toolchain_configure",
 )
 
+
+load("@io_bazel_rules_docker//contrib:dockerfile_build.bzl", "dockerfile_image")
+
+dockerfile_image(
+    name = "forklift-operator-image-containerfile",
+    dockerfile = "//operator:Containerfile",
+)
+
 docker_toolchain_configure(
     name = "docker_config",
     docker_flags = [

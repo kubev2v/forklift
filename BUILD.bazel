@@ -113,15 +113,6 @@ container_push(
 )
 
 container_push(
-    name = "push-forklift-operator",
-    format = "Docker",
-    image = "//operator:forklift-operator-image",
-    registry = "$${REGISTRY:-quay.io}",
-    repository = "$${REGISTRY_ORG:-}$${REGISTRY_ORG:+/}forklift-operator",
-    tag = "$${REGISTRY_TAG:-devel}",
-)
-
-container_push(
     name = "push-forklift-validation",
     format = "Docker",
     image = "//validation:forklift-validation-image",
