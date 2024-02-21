@@ -10,6 +10,15 @@ genrule(
     cmd = "tar -C $(@D) -xf $(location @kustomize//file)",
 )
 
+# OPERATOR
+# 1. Build the oprator image with ansible dependencies and with roles.
+
+container_image(
+    name = "forklift-operator-image",
+    base = "@forklift-operator-image-containerfile//image:dockerfile_image.tar",
+    visibility = ["//visibility:public"],
+)
+
 # BUNDLE
 # 1. Change to the operator dir
 # 2. Get the current date with which the operator will be built
