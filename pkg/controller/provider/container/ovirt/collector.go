@@ -132,8 +132,7 @@ func (r *Collector) HasParity() bool {
 func (r *Collector) Test() (status int, err error) {
 	_, status, err = r.client.system()
 	if status != http.StatusOK {
-		err = liberr.New(
-			fmt.Sprintf("status: %d", status))
+		err = liberr.New("got status != 200 from oVirt", "status", status)
 	}
 
 	return
