@@ -110,7 +110,7 @@ spec:
 
     Forklift 2.4 is supported on OpenShift 4.11 and 4.12
     
-    Forklift 2.5 is supported on OpenShift 4.12 and 4.13
+    Forklift 2.5 is supported on OpenShift 4.12, 4.13 and 4.14
 
     Forklift 2.6 is supported on OpenShift 4.14 and 4.15
 
