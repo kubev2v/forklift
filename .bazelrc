@@ -14,7 +14,6 @@ build --action_env=CONTROLLER_IMAGE=quay.io/kubev2v/forklift-controller:latest
 build --action_env=API_IMAGE=quay.io/kubev2v/forklift-api:latest
 build --action_env=MUST_GATHER_IMAGE=quay.io/kubev2v/forklift-must-gather:latest
 build --action_env=MUST_GATHER_API_IMAGE=quay.io/kubev2v/forklift-must-gather-api:latest
-build --action_env=UI_IMAGE=quay.io/kubev2v/forklift-ui:latest
 build --action_env=UI_PLUGIN_IMAGE=quay.io/kubev2v/forklift-console-plugin:latest
 build --action_env=VALIDATION_IMAGE=quay.io/kubev2v/forklift-validation:latest
 build --action_env=VIRT_V2V_IMAGE=quay.io/kubev2v/forklift-virt-v2v:latest
