@@ -1101,6 +1101,19 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			err = nil
 			break
 		}
+		if r.Source.Provider.Type() == v1beta1.Ova {
+			ready, err := r.kubevirt.EnsureVirtV2VPVCStatus()
+			if err != nil {
+				step.AddError(err.Error())
+				err = nil
+				break
+			}
+
+			if !ready {
+				r.Log.Info("virt-v2v PVC isn't ready yet")
+				return nil
+			}
+		}
 		vm.Phase = r.next(vm.Phase)
 	case ConvertGuest, CopyDisksVirtV2V:
 		step, found := vm.FindStep(r.step(vm))
