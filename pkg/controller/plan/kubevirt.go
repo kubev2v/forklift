@@ -2157,7 +2157,7 @@ func (r *KubeVirt) EnsurePersistentVolume(vmRef ref.Ref, persistentVolumes []cor
 	return
 }
 
-func GetOvaPvNfs(dClient client.Client, planID string) (pvs *core.PersistentVolumeList, found bool, err error) {
+func GetOvaPvListNfs(dClient client.Client, planID string) (pvs *core.PersistentVolumeList, found bool, err error) {
 	pvs = &core.PersistentVolumeList{}
 	pvLabels := map[string]string{
 		"plan": planID,
@@ -2181,7 +2181,7 @@ func GetOvaPvNfs(dClient client.Client, planID string) (pvs *core.PersistentVolu
 	return
 }
 
-func GetOvaPvcNfs(dClient client.Client, planID string, planNamespace string) (pvcs *core.PersistentVolumeClaimList, found bool, err error) {
+func GetOvaPvcListNfs(dClient client.Client, planID string, planNamespace string) (pvcs *core.PersistentVolumeClaimList, found bool, err error) {
 	pvcs = &core.PersistentVolumeClaimList{}
 	pvcLabels := map[string]string{
 		"plan": planID,
