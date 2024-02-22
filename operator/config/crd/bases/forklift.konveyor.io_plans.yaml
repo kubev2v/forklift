@@ -664,6 +664,10 @@ spec:
                           - phase
                           - reasons
                           type: object
+                        firmware:
+                          description: The firmware type detected from the OVF file
+                            produced by virt-v2v.
+                          type: string
                         hooks:
                           description: Enable hooks.
                           items:
@@ -732,9 +736,6 @@ spec:
                         namespace:
                           description: The VM Namespace Only relevant for an openshift
                             source.
-                          type: string
-                        ovfConfig:
-                          description: virt-v2v ovf file
                           type: string
                         phase:
                           description: Phase

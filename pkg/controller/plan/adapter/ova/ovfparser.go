@@ -2,10 +2,7 @@ package ova
 
 import (
 	"encoding/xml"
-	"fmt"
 	"strings"
-
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ova"
 )
 
 type OvaVmconfig struct {
@@ -50,15 +47,9 @@ func readConfFromXML(xmlData string) (*OvaVmconfig, error) {
 	return &vmConfig, nil
 }
 
-func (r *Builder) GetFirmwareFromConfig(vm *model.VM) (conf string, err error) {
-	var xmlConfig string
-	for _, vmConf := range r.Migration.Status.VMs {
-		if vmConf.ID == vm.ID {
-			xmlConfig = vmConf.OvfConfig
-			fmt.Println("we are at the config here ", xmlConfig)
-		}
-	}
-	xmlConf, err := readConfFromXML(xmlConfig)
+func GetFirmwareFromConfig(vmConfigXML string) (firmware string, err error) {
+
+	xmlConf, err := readConfFromXML(vmConfigXML)
 	if err != nil {
 		return
 	}
