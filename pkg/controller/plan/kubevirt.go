@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
@@ -33,6 +34,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
+	ovfparser "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/ova"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
@@ -852,21 +854,27 @@ func (r *KubeVirt) GetGuestConversionPod(vm *plan.VMStatus) (pod *core.Pod, err 
 	return
 }
 
-func (r *KubeVirt) GetVirtV2VConvertedVMConfig(vm *plan.VMStatus, pod *core.Pod, step *plan.Step) (err error) {
+func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, step *plan.Step) (err error) {
 	if pod.Status.PodIP == "" {
 		//we need the IP for fetching the configuration of the convered VM.
 		return
 	}
 
-	url := fmt.Sprintf("http://%s:8080/xml", pod.Status.PodIP)
+	url := fmt.Sprintf("http://%s:8080/ovf", pod.Status.PodIP)
 
+	/* Due to the virt-v2v operation, the ovf file is only available after the command's execution,
+	meaning it appears following the copydisks phase.
+	The server will be accessible via virt-v2v only after the command has finished.
+	Until then, attempts to connect will result in a 'connection refused' error.
+	Once the VM server is running, we can make a single call to obtain the OVF configuration,
+	followed by a shutdown request. This will complete the pod process, allowing us to move to the next phase.
+	*/
 	resp, err := http.Get(url)
 	if err != nil {
-		if strings.Contains(err.Error(), "connection refused") {
-			return nil
-		} else {
-			return
+		if err == syscall.ECONNREFUSED {
+			err = nil
 		}
+		return
 	}
 	defer resp.Body.Close()
 
@@ -874,15 +882,24 @@ func (r *KubeVirt) GetVirtV2VConvertedVMConfig(vm *plan.VMStatus, pod *core.Pod,
 	if err != nil {
 		return
 	}
-	vm.OvfConfig = string(vmConfigXML)
+
+	firmware, err := ovfparser.GetFirmwareFromConfig(string(vmConfigXML))
+	if err != nil {
+		return
+	}
+
+	vm.Firmware = firmware
 
 	shutdownURL := fmt.Sprintf("http://%s:8080/shutdown", pod.Status.PodIP)
 	resp, err = http.Post(shutdownURL, "application/json", nil)
-	if err != nil && !strings.Contains(err.Error(), "EOF") {
-		return
+	if err == nil {
+		defer resp.Body.Close()
+	} else {
+		// This error indicates that the server was shut down
+		if strings.Contains(err.Error(), "EOF") {
+			err = nil
+		}
 	}
-	defer resp.Body.Close()
-
 	return
 }
 

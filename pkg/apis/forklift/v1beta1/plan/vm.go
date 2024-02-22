@@ -59,8 +59,8 @@ type VMStatus struct {
 	Warm *Warm `json:"warm,omitempty"`
 	// Source VM power state before migration.
 	RestorePowerState VMPowerState `json:"restorePowerState,omitempty"`
-	// virt-v2v ovf file
-	OvfConfig string `json:"ovfConfig,omitempty"`
+	// The firmware type detected from the OVF file produced by virt-v2v.
+	Firmware string `json:"firmware,omitempty"`
 
 	// Conditions.
 	libcnd.Conditions `json:",inline"`

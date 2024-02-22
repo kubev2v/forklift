@@ -334,7 +334,17 @@ func (r *Builder) mapCPU(vm *model.VM, object *cnv.VirtualMachineSpec) {
 }
 
 func (r *Builder) mapFirmware(vm *model.VM, object *cnv.VirtualMachineSpec) {
-	virtV2VFirmware, _ := r.GetFirmwareFromConfig(vm)
+	var virtV2VFirmware string
+	if vm.Firmware == "" {
+		for _, vmConf := range r.Migration.Status.VMs {
+			if vmConf.ID == vm.ID {
+				virtV2VFirmware = vmConf.Firmware
+				break
+			}
+		}
+	} else {
+		virtV2VFirmware = vm.Firmware
+	}
 
 	firmware := &cnv.Firmware{
 		Serial: vm.UUID,
