@@ -518,7 +518,7 @@ func (r *Migration) deleteImporterPods(vm *plan.VMStatus) (err error) {
 }
 
 func (r *Migration) deletePvcPvForOva() (err error) {
-	pvcs, _, err := GetOvaPvcNfs(r.Destination.Client, r.Plan.Name, r.Plan.Spec.TargetNamespace)
+	pvcs, _, err := GetOvaPvcListNfs(r.Destination.Client, r.Plan.Name, r.Plan.Spec.TargetNamespace)
 	if err != nil {
 		r.Log.Error(err, "Failed to get the plan PVCs")
 		return
@@ -536,7 +536,7 @@ func (r *Migration) deletePvcPvForOva() (err error) {
 		}
 	}
 
-	pvs, _, err := GetOvaPvNfs(r.Destination.Client, string(r.Plan.UID))
+	pvs, _, err := GetOvaPvListNfs(r.Destination.Client, string(r.Plan.UID))
 	if err != nil {
 		r.Log.Error(err, "Failed to get the plan PVs")
 		return
