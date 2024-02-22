@@ -45,7 +45,6 @@ Another option to override the default values can use `--action_env` as in the e
 | CONTROLLER_IMAGE           | quay.io/kubev2v/forklift-controller:latest      | The forklift controller image.                              |
 | MUST_GATHER_IMAGE          | quay.io/kubev2v/forklift-must-gather:latest     | The forklift must gather an image.                          |
 | MUST_GATHER_API_IMAGE      | quay.io/kubev2v/forklift-must-gather-api:latest | The forklift must gather image api.                         |
-| UI_IMAGE                   | quay.io/kubev2v/forklift-ui:latest              | The forklift UI image.                                      |
 | UI_PLUGIN_IMAGE            | quay.io/kubev2v/forklift-console-plugin:latest  | The forklift OKD/OpenShift UI plugin image.                 |
 | VALIDATION_IMAGE           | quay.io/kubev2v/forklift-validation:latest      | The forklift validation image.                              |
 | VIRT_V2V_IMAGE             | quay.io/kubev2v/forklift-virt-v2v:latest        | The forklift virt v2v image for cold migration.             |
