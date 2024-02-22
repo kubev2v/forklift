@@ -45,7 +45,6 @@
 ### External images
 # export MUST_GATHER_IMAGE="quay.io/kubev2v/forklift-must-gather:latest"
 # export MUST_GATHER_API_IMAGE="quay.io/kubev2v/forklift-must-gather-api:latest"
-# export UI_IMAGE="quay.io/kubev2v/forklift-ui:latest"
 # export UI_PLUGIN_IMAGE="quay.io/kubev2v/forklift-console-plugin:latest"
 ###################################################################
 
