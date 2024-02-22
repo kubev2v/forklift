@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/apimachinery/pkg/util/wait"
 	cnv "kubevirt.io/api/core/v1"
 	instancetype "kubevirt.io/api/instancetype/v1beta1"
 	libvirtxml "libvirt.org/libvirt-go-xml"
@@ -39,6 +38,7 @@ import (
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	core "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -832,6 +832,56 @@ func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, vmCr *VirtualMach
 	}
 
 	return
+}
+
+func (r *KubeVirt) EnsureVirtV2VPVCStatus() (ready bool, err error) {
+	pvcs := &core.PersistentVolumeClaimList{}
+	pvcLabels := map[string]string{
+		"migration": r.Migration.Name,
+		"ova":       "nfs-pvc",
+	}
+
+	err = r.Destination.Client.List(
+		context.TODO(),
+		pvcs,
+		&client.ListOptions{
+			LabelSelector: labels.SelectorFromSet(pvcLabels),
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		return false, err
+	}
+
+	if len(pvcs.Items) == 0 {
+		return
+	}
+
+	pvc := &core.PersistentVolumeClaim{}
+	if len(pvcs.Items) > 1 {
+		for _, pvcVirtV2v := range pvcs.Items {
+			if pvcVirtV2v.CreationTimestamp.Time.After(r.Migration.CreationTimestamp.Time) {
+				pvc = &pvcVirtV2v
+			}
+		}
+	} else {
+		pvc = &pvcs.Items[0]
+	}
+
+	switch pvc.Status.Phase {
+	case v1.ClaimBound:
+		r.Log.Info("virt-v2v PVC bound", "pvc", pvc.Name)
+	case v1.ClaimPending:
+		r.Log.Info("virt-v2v PVC pending", "pvc", pvc.Name)
+		return false, nil
+	case v1.ClaimLost:
+		r.Log.Info("virt-v2v PVC lost", "pvc", pvc.Name)
+		return false, liberr.New("virt-v2v pvc lost")
+	default:
+		r.Log.Info("virt-v2v PVC status is unknown", "pvc", pvc.Name, "status", pvc.Status.Phase)
+		return false, nil
+	}
+	return true, nil
 }
 
 // Get the guest conversion pod for the VM.
@@ -2271,24 +2321,6 @@ func (r *KubeVirt) CreatePvcForNfs(pvcNamePrefix string, pvName string) (pvcName
 		return
 	}
 
-	pvcNamespacedName := types.NamespacedName{
-		Namespace: r.Plan.Spec.TargetNamespace,
-		Name:      pvc.Name,
-	}
-
-	if err = wait.PollUntilContextTimeout(context.TODO(), 5*time.Second, 45*time.Second, true, func(ctx context.Context) (done bool, err error) {
-		err = r.Get(context.TODO(), pvcNamespacedName, pvc)
-		if err != nil {
-			r.Log.Error(err, "Failed to get OVA plan PVC")
-			return false, err
-		}
-		return pvc.Status.Phase == core.ClaimBound, nil
-
-	}); err != nil {
-		r.Log.Error(err, "Failed to bind OVA PVC to PV ")
-		return
-
-	}
 	pvcName = pvc.Name
 	return
 }
