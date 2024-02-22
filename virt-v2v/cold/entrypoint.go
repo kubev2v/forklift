@@ -110,7 +110,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		http.HandleFunc("/xml", xmlHandler)
+		http.HandleFunc("/ovf", ovfHandler)
 		http.HandleFunc("/shutdown", shutdownHandler)
 		server = &http.Server{Addr: ":8080"}
 
@@ -214,7 +214,7 @@ func getXMLFile(dir, fileExtension string) (string, error) {
 	return "", fmt.Errorf("XML file was not found.")
 }
 
-func xmlHandler(w http.ResponseWriter, r *http.Request) {
+func ovfHandler(w http.ResponseWriter, r *http.Request) {
 	if xmlFilePath == "" {
 		fmt.Println("Error: XML file path is empty.")
 		http.Error(w, "XML file path is empty", http.StatusInternalServerError)

@@ -1115,7 +1115,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 
 			if pod.Status.Phase != core.PodSucceeded {
-				err := r.kubevirt.GetVirtV2VConvertedVMConfig(vm, pod, step)
+				err := r.kubevirt.UpdateVmByConvertedConfig(vm, pod, step)
 				if err != nil {
 					return err
 				}
