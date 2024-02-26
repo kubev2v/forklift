@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"net/http"
 	"os"
 	"time"
 
@@ -26,11 +25,11 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis"
 	"github.com/konveyor/forklift-controller/pkg/controller"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	"github.com/konveyor/forklift-controller/pkg/metrics"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	"github.com/konveyor/forklift-controller/pkg/webhook"
 	template "github.com/openshift/api/template/v1"
 	"github.com/pkg/profile"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	cnv "kubevirt.io/api/core/v1"
 	export "kubevirt.io/api/export/v1alpha1"
@@ -66,10 +65,13 @@ func main() {
 		defer p.Stop()
 	}
 
-	// Start prometheus metrics HTTP handler
-	log.Info("setting up prometheus endpoint :2112/metrics")
-	http.Handle("/metrics", promhttp.Handler())
-	go http.ListenAndServe(":2112", nil)
+	certsDirectory, err := os.MkdirTemp("", "certsdir")
+	if err != nil {
+		log.Error(err, "unable to create temporary directory for certs")
+		return
+	}
+
+	metrics.StartPrometheusEndpoint("2112", os.Getenv("API_HOST"), certsDirectory)
 
 	// Get a config to talk to the apiserver
 	log.Info("setting up client for manager")

@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"path"
@@ -10,8 +11,8 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func StartPrometheusEndpoint(certsDirectory string) {
-	certBytes, keyBytes, err := cert.GenerateSelfSignedCertKey("", nil, nil)
+func StartPrometheusEndpoint(host, port, certsDirectory string) {
+	certBytes, keyBytes, err := cert.GenerateSelfSignedCertKey(host, nil, nil)
 	if err != nil {
 		klog.Error("Error generating cert for prometheus")
 		return
@@ -31,7 +32,7 @@ func StartPrometheusEndpoint(certsDirectory string) {
 
 	go func() {
 		http.Handle("/metrics", promhttp.Handler())
-		if err := http.ListenAndServeTLS(":8443", certFile, keyFile, nil); err != nil {
+		if err := http.ListenAndServeTLS(fmt.Sprintf(":%s", port), certFile, keyFile, nil); err != nil {
 			klog.Warning("Error starting prometheus endpoint: ", err)
 			return
 		}

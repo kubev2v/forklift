@@ -266,6 +266,7 @@ func (f *Field) WithFields() (withFields map[string]bool) {
 				}
 			}
 		}
+		//nolint:staticcheck
 		break
 	}
 
@@ -432,6 +433,7 @@ func (f *Field) AsValue(object interface{}) (value interface{}, err error) {
 			n, err := strconv.ParseInt(val.String(), 0, 64)
 			if err != nil {
 				err = liberr.Wrap(err)
+				return nil, err
 			}
 			value = n
 		case reflect.Bool:

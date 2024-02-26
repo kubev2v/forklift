@@ -209,7 +209,7 @@ func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, 
 	c.metrics.startListener(httpEndpoint, metricsPath)
 	defer c.metrics.stopListener()
 
-	pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: c.handlePVC,
 		UpdateFunc: func(old, new interface{}) {
 			newPvc := new.(*corev1.PersistentVolumeClaim)
@@ -221,8 +221,11 @@ func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, 
 		},
 		DeleteFunc: c.handlePVC,
 	})
+	if err != nil {
+		klog.Fatalf("Failed to add handler for PVC: %v", err)
+	}
 
-	pvInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = pvInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: c.handlePV,
 		UpdateFunc: func(old, new interface{}) {
 			newPv := new.(*corev1.PersistentVolume)
@@ -234,8 +237,11 @@ func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, 
 		},
 		DeleteFunc: c.handlePV,
 	})
+	if err != nil {
+		klog.Fatalf("Failed to add handler for PV: %v", err)
+	}
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: c.handlePod,
 		UpdateFunc: func(old, new interface{}) {
 			newPod := new.(*corev1.Pod)
@@ -247,8 +253,11 @@ func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, 
 		},
 		DeleteFunc: c.handlePod,
 	})
+	if err != nil {
+		klog.Fatalf("Failed to add handler for pod: %v", err)
+	}
 
-	scInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = scInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: c.handleSC,
 		UpdateFunc: func(old, new interface{}) {
 			newSc := new.(*storagev1.StorageClass)
@@ -260,8 +269,11 @@ func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, 
 		},
 		DeleteFunc: c.handleSC,
 	})
+	if err != nil {
+		klog.Fatalf("Failed to add handler for SC: %v", err)
+	}
 
-	unstInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = unstInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: c.handleUnstructured,
 		UpdateFunc: func(old, new interface{}) {
 			newUnstructured := new.(*unstructured.Unstructured)
@@ -273,6 +285,9 @@ func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, 
 		},
 		DeleteFunc: c.handleUnstructured,
 	})
+	if err != nil {
+		klog.Fatalf("Failed to add handler for unstructured: %v", err)
+	}
 
 	kubeInformerFactory.Start(stopCh)
 	dynInformerFactory.Start(stopCh)

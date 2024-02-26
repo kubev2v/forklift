@@ -61,7 +61,7 @@ func TestCondition_Update(t *testing.T) {
 	condB.staged = true
 
 	// Validation
-	g.Expect(LastTransitionTime).NotTo(gomega.Equal(nil))
+	g.Expect(LastTransitionTime).NotTo(gomega.BeNil())
 	g.Expect(condA.staged).To(gomega.BeTrue())
 	g.Expect(condA).To(gomega.Equal(condB))
 }
@@ -141,7 +141,7 @@ func TestConditions_SetCondition(t *testing.T) {
 	conditions.List[0].LastTransitionTime = now // for comparison in validation.
 
 	// Validation
-	g.Expect(LastTransitionTime).NotTo(gomega.Equal(nil))
+	g.Expect(LastTransitionTime).NotTo(gomega.BeNil())
 	g.Expect(conditions.List).To(
 		gomega.Equal([]Condition{
 			{
@@ -159,7 +159,7 @@ func TestConditions_SetCondition(t *testing.T) {
 	conditions.SetCondition(condition)
 
 	// Validation
-	g.Expect(len(conditions.List)).To(gomega.Equal(1))
+	g.Expect(conditions.List).To(gomega.HaveLen(1))
 	g.Expect(conditions.List).To(
 		gomega.Equal([]Condition{
 			{
@@ -264,12 +264,10 @@ func TestConditions_FindCondition(t *testing.T) {
 		},
 	}
 
-	var nil *Condition
-
 	// Test Found Status: True
 	g.Expect(conditions.FindCondition("A")).To(gomega.Equal(&conditions.List[0]))
 	// Test NotFound
-	g.Expect(conditions.FindCondition("X")).To(gomega.Equal(nil))
+	g.Expect(conditions.FindCondition("X")).To(gomega.BeNil())
 }
 
 func TestConditions_FindConditionStaging(t *testing.T) {
@@ -284,12 +282,10 @@ func TestConditions_FindConditionStaging(t *testing.T) {
 		},
 	}
 
-	var nil *Condition
-
 	// Test Found Status: True
 	g.Expect(conditions.FindCondition("A")).To(gomega.Equal(&conditions.List[0]))
 	// Test NotFound
-	g.Expect(conditions.FindCondition("B")).To(gomega.Equal(nil))
+	g.Expect(conditions.FindCondition("B")).To(gomega.BeNil())
 }
 
 func TestConditions_HasCondition(t *testing.T) {
@@ -407,10 +403,10 @@ func TestConditions_ChangeSet(t *testing.T) {
 	conditions.EndStagingConditions()
 	explain := conditions.Explain()
 
-	g.Expect(len(explain.Added)).To(gomega.Equal(1))
+	g.Expect(explain.Added).To(gomega.HaveLen(1))
 	g.Expect(explain.Added["E"].Type).To(gomega.Equal("E"))
-	g.Expect(len(explain.Updated)).To(gomega.Equal(1))
+	g.Expect(explain.Updated).To(gomega.HaveLen(1))
 	g.Expect(explain.Updated["A"].Type).To(gomega.Equal("A"))
-	g.Expect(len(explain.Deleted)).To(gomega.Equal(1))
+	g.Expect(explain.Deleted).To(gomega.HaveLen(1))
 	g.Expect(explain.Deleted["D"].Type).To(gomega.Equal("D"))
 }

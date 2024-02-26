@@ -368,18 +368,6 @@ func (r *Journal) Close() (err error) {
 	return
 }
 
-// Model is being watched.
-// Determine if there a watch interested in the model.
-func (r *Journal) hasWatch(model Model) bool {
-	for _, w := range r.watches {
-		if w.Match(model) {
-			return true
-		}
-	}
-
-	return false
-}
-
 // Stock event handler.
 // Provides default event methods.
 type StockEventHandler struct{}

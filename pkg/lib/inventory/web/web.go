@@ -55,9 +55,28 @@ func (w *WebServer) Start(middleware ...gin.HandlerFunc) {
 	w.buildOrigins()
 	w.addRoutes(router)
 	if w.TLS.Enabled {
-		go router.RunTLS(w.address(), w.TLS.Certificate, w.TLS.Key)
+		go func() {
+			err := router.RunTLS(w.address(), w.TLS.Certificate, w.TLS.Key)
+			if err != nil {
+				log.Error(
+					err,
+					"RunTLS failes",
+					"address",
+					w.address())
+			}
+
+		}()
 	} else {
-		go router.Run(w.address())
+		go func() {
+			err := router.Run(w.address())
+			if err != nil {
+				log.Error(
+					err,
+					"Run failed",
+					"address",
+					w.address())
+			}
+		}()
 	}
 
 	log.V(3).Info(

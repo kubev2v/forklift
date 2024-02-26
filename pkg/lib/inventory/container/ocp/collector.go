@@ -184,7 +184,16 @@ func (r *Collector) start(ctx context.Context) (err error) {
 	if err != nil {
 		return
 	}
-	go r.manager.Start(ctx)
+
+	go func() {
+		err = r.manager.Start(ctx)
+		if err != nil {
+			r.log.V(3).Error(
+				err,
+				"manager start failed.")
+		}
+	}()
+
 	err = r.reconcileCollections(ctx)
 	if err != nil {
 		return

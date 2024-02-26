@@ -356,7 +356,15 @@ func (r *Collector) getUpdates(ctx context.Context) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	defer pc.Destroy(context.Background())
+	defer func() {
+		err = pc.Destroy(context.Background())
+		if err != nil {
+			r.log.Error(
+				err,
+				"destroy property collector failed.")
+		}
+	}()
+
 	filter := r.filter(pc)
 	filter.Options.MaxObjectUpdates = MaxObjectUpdates
 	err = pc.CreateFilter(ctx, filter.CreateFilter)
@@ -376,7 +384,12 @@ func (r *Collector) getUpdates(ctx context.Context) error {
 			w.End()
 		}
 		if tx != nil {
-			tx.End()
+			err = tx.End()
+			if err != nil {
+				r.log.Error(
+					err,
+					"tx end failed.")
+			}
 		}
 	}()
 	for {
