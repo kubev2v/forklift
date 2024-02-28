@@ -137,9 +137,7 @@ func createConvertJob(pvc *v1.PersistentVolumeClaim, srcFormat, dstFormat string
 						SeccompProfile: &v1.SeccompProfile{
 							Type: v1.SeccompProfileTypeRuntimeDefault,
 						},
-						FSGroup:      ptr.To(int64(107)),
 						RunAsNonRoot: ptr.To(true),
-						RunAsUser:    ptr.To[int64](107),
 					},
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
@@ -192,7 +190,6 @@ func makeConversionContainer(pvc *v1.PersistentVolumeClaim, srcFormat, dstFormat
 		SecurityContext: &v1.SecurityContext{
 			AllowPrivilegeEscalation: ptr.To(false),
 			RunAsNonRoot:             ptr.To(true),
-			RunAsUser:                ptr.To(int64(107)),
 			Capabilities: &v1.Capabilities{
 				Drop: []v1.Capability{"ALL"},
 			},
