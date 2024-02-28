@@ -4,15 +4,16 @@ import (
 	"context"
 	"fmt"
 
+	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
-	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -46,26 +47,26 @@ func (c *Converter) ConvertPVCs(pvcs []*v1.PersistentVolumeClaim, srcFormat srcF
 			continue
 		}
 
-		scratchPVC, err := c.ensureScratchPVC(pvc)
+		scratchDV, err := c.ensureScratchDV(pvc)
 		if err != nil {
 			return false, err
 		}
 
-		switch scratchPVC.Status.Phase {
-		case v1.ClaimBound:
-			c.Log.Info("Scratch PVC bound", "pvc", scratchPVC.Name)
-		case v1.ClaimPending:
-			c.Log.Info("Scratch PVC pending", "pvc", scratchPVC.Name)
+		switch scratchDV.Status.Phase {
+		case cdi.ImportScheduled, cdi.Pending:
+			c.Log.Info("Scratch DV is not ready", "dv", scratchDV.Name, "status", scratchDV.Status.Phase)
 			return false, nil
-		case v1.ClaimLost:
-			c.Log.Info("Scratch PVC lost", "pvc", scratchPVC.Name)
-			return false, liberr.New("scratch pvc lost")
+		case cdi.ImportInProgress:
+			c.Log.Info("Scratch DV import in progress", "dv", scratchDV.Name)
+			return false, nil
+		case cdi.Succeeded:
+			c.Log.Info("Scratch DV is ready", "dv", scratchDV.Name)
 		default:
-			c.Log.Info("Scratch PVC status is unknown", "pvc", scratchPVC.Name, "status", scratchPVC.Status.Phase)
+			c.Log.Info("Scratch DV is not ready", "dv", scratchDV.Name, "status", scratchDV.Status.Phase)
 			return false, nil
 		}
 
-		convertJob, err := c.ensureJob(pvc, srcFormat(pvc), dstFormat)
+		convertJob, err := c.ensureJob(pvc, scratchDV, srcFormat(pvc), dstFormat)
 		if err != nil {
 			return false, err
 		}
@@ -75,17 +76,12 @@ func (c *Converter) ConvertPVCs(pvcs []*v1.PersistentVolumeClaim, srcFormat srcF
 			switch condition.Type {
 			case batchv1.JobComplete:
 				c.Log.Info("Convert job completed", "pvc", pvc.Name)
-
-				// Delete scrach PVC
-				err = c.Destination.Client.Delete(context.Background(), scratchPVC, &client.DeleteOptions{})
-				if err != nil {
-					c.Log.Error(err, "Failed to delete scratch PVC", "pvc", scratchPVC.Name)
-				}
-
+				c.deleteScratchDV(scratchDV)
 				return true, nil
 
 			case batchv1.JobFailed:
 				if convertJob.Status.Failed >= 3 {
+					c.deleteScratchDV(scratchDV)
 					return true, liberr.New("convert job failed")
 				}
 			}
@@ -99,31 +95,51 @@ func (c *Converter) ConvertPVCs(pvcs []*v1.PersistentVolumeClaim, srcFormat srcF
 	return false, nil
 }
 
-func (c *Converter) ensureJob(pvc *v1.PersistentVolumeClaim, srcFormat, dstFormat string) (*batchv1.Job, error) {
-	jobName := getJobName(pvc, "convert")
-	job := &batchv1.Job{}
-	err := c.Destination.Client.Get(context.Background(), client.ObjectKey{Name: jobName, Namespace: pvc.Namespace}, job)
+func (c *Converter) deleteScratchDV(scratchDV *cdi.DataVolume) {
+	err := c.Destination.Client.Delete(context.Background(), scratchDV)
 	if err != nil {
-		if k8serr.IsNotFound(err) {
-			c.Log.Info("Converting PVC format", "pvc", pvc.Name, "srcFormat", srcFormat, "dstFormat", dstFormat)
-			job := createConvertJob(pvc, srcFormat, dstFormat, c.Labels)
-			err = c.Destination.Client.Create(context.Background(), job, &client.CreateOptions{})
-			if err != nil {
-				return nil, err
-			}
-		}
+		c.Log.Error(err, "Failed to delete scratch DV", "DV", scratchDV.Name)
+	}
+}
+
+func (c *Converter) ensureJob(pvc *v1.PersistentVolumeClaim, dv *cdi.DataVolume, srcFormat, dstFormat string) (*batchv1.Job, error) {
+	// Find existing job by label
+	jobList := &batchv1.JobList{}
+	label := client.MatchingLabels{planbase.AnnConversionSourcePVC: pvc.Name}
+	err := c.Destination.Client.List(context.Background(), jobList, client.InNamespace(pvc.Namespace), label)
+	if err != nil {
 		return nil, err
 	}
 
-	return job, err
+	if len(jobList.Items) == 1 {
+		c.Log.Info("Found convert job", "job", jobList.Items[0].Name)
+		return &jobList.Items[0], nil
+	} else if len(jobList.Items) > 1 {
+		return nil, liberr.New("multiple convert jobs found for pvc", "pvc", pvc.Name)
+	}
+
+	// Job doesn't exist, create it
+	job := createConvertJob(pvc, dv, srcFormat, dstFormat, c.Labels)
+	c.Log.Info("Creating convert job", "pvc", pvc.Name, "srcFormat", srcFormat, "dstFormat", dstFormat)
+	err = c.Destination.Client.Create(context.Background(), job)
+	if err != nil {
+		return nil, err
+	}
+
+	return job, nil
 }
 
-func createConvertJob(pvc *v1.PersistentVolumeClaim, srcFormat, dstFormat string, labels map[string]string) *batchv1.Job {
+func createConvertJob(pvc *v1.PersistentVolumeClaim, dv *cdi.DataVolume, srcFormat, dstFormat string, labels map[string]string) *batchv1.Job {
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+
+	labels[planbase.AnnConversionSourcePVC] = pvc.Name
 	return &batchv1.Job{
 		ObjectMeta: meta.ObjectMeta{
-			Name:      fmt.Sprintf("convert-%s", pvc.Name),
-			Namespace: pvc.Namespace,
-			Labels:    labels,
+			GenerateName: fmt.Sprintf("convert-%s-", pvc.Name),
+			Namespace:    pvc.Namespace,
+			Labels:       labels,
 		},
 		Spec: batchv1.JobSpec{
 			BackoffLimit: ptr.To(int32(3)),
@@ -131,10 +147,12 @@ func createConvertJob(pvc *v1.PersistentVolumeClaim, srcFormat, dstFormat string
 			Template: v1.PodTemplateSpec{
 				Spec: v1.PodSpec{
 					SecurityContext: &v1.PodSecurityContext{
+						// Since we do not have RunAsUser and FSGroup, the pod will fail in the default namespace
+						// as it would not be assigned these automatically
+						RunAsNonRoot: ptr.To(true),
 						SeccompProfile: &v1.SeccompProfile{
 							Type: v1.SeccompProfileTypeRuntimeDefault,
 						},
-						FSGroup: ptr.To(int64(107)),
 					},
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
@@ -153,7 +171,7 @@ func createConvertJob(pvc *v1.PersistentVolumeClaim, srcFormat, dstFormat string
 							Name: "target",
 							VolumeSource: v1.VolumeSource{
 								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-									ClaimName: getScratchPVCName(pvc),
+									ClaimName: dv.Name,
 								},
 							},
 						},
@@ -186,8 +204,6 @@ func makeConversionContainer(pvc *v1.PersistentVolumeClaim, srcFormat, dstFormat
 		Image: base.Settings.VirtV2vImageCold,
 		SecurityContext: &v1.SecurityContext{
 			AllowPrivilegeEscalation: ptr.To(false),
-			RunAsNonRoot:             ptr.To(true),
-			RunAsUser:                ptr.To(int64(107)),
 			Capabilities: &v1.Capabilities{
 				Drop: []v1.Capability{"ALL"},
 			},
@@ -230,42 +246,67 @@ func makeConversionContainer(pvc *v1.PersistentVolumeClaim, srcFormat, dstFormat
 	return container
 }
 
-func (c *Converter) ensureScratchPVC(sourcePVC *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
-	scratchPVC := &v1.PersistentVolumeClaim{}
-	err := c.Destination.Client.Get(context.Background(), client.ObjectKey{Name: getScratchPVCName(sourcePVC), Namespace: sourcePVC.Namespace}, scratchPVC)
+func (c *Converter) ensureScratchDV(sourcePVC *v1.PersistentVolumeClaim) (*cdi.DataVolume, error) {
+	dvList := &cdi.DataVolumeList{}
+	label := client.MatchingLabels{planbase.AnnConversionSourcePVC: sourcePVC.Name}
+	err := c.Destination.Client.List(context.Background(), dvList, client.InNamespace(sourcePVC.Namespace), label)
 	if err != nil {
-		if k8serr.IsNotFound(err) {
-			scratchPVC := makeScratchPVC(sourcePVC)
-			c.Log.Info("Scratch pvc doesn't exist, creating...", "pvc", sourcePVC.Name)
-			err = c.Destination.Client.Create(context.Background(), scratchPVC, &client.CreateOptions{})
-		}
 		return nil, err
 	}
 
-	return scratchPVC, nil
+	if len(dvList.Items) == 1 {
+		c.Log.Info("Found DV", "dv", dvList.Items[0].Name)
+		return &dvList.Items[0], nil
+	} else if len(dvList.Items) > 1 {
+		return nil, liberr.New("multiple scratch DVs found for pvc", "pvc", sourcePVC.Name)
+	}
+
+	// DV doesn't exist, create it
+	scratchDV := makeScratchDV(sourcePVC)
+	c.Log.Info("DV doesn't exist, creating", "dv", scratchDV.Name)
+	err = c.Destination.Client.Create(context.Background(), scratchDV)
+	if err != nil {
+		return nil, err
+	}
+
+	return scratchDV, nil
 }
 
-func getScratchPVCName(pvc *v1.PersistentVolumeClaim) string {
-	return fmt.Sprintf("%s-scratch", pvc.Name)
-}
-
-func makeScratchPVC(pvc *v1.PersistentVolumeClaim) *v1.PersistentVolumeClaim {
+func makeScratchDV(pvc *v1.PersistentVolumeClaim) *cdi.DataVolume {
 	size := pvc.Spec.Resources.Requests[v1.ResourceStorage]
-	return &v1.PersistentVolumeClaim{
+	annotations := make(map[string]string)
+	annotations[planbase.AnnBindImmediate] = "true"
+	annotations["migration"] = pvc.Annotations["migration"]
+	annotations["vmID"] = pvc.Annotations["vmID"]
+
+	labels := pvc.Labels
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+
+	labels[planbase.AnnConversionSourcePVC] = pvc.Name
+
+	return &cdi.DataVolume{
 		ObjectMeta: meta.ObjectMeta{
-			Name:      getScratchPVCName(pvc),
-			Namespace: pvc.Namespace,
-			Labels:    pvc.Labels,
+			GenerateName: fmt.Sprintf("scratch-dv-%s-", pvc.Name),
+			Namespace:    pvc.Namespace,
+			Annotations:  annotations,
+			Labels:       labels,
 		},
-		Spec: v1.PersistentVolumeClaimSpec{
-			AccessModes: pvc.Spec.AccessModes,
-			VolumeMode:  pvc.Spec.VolumeMode,
-			Resources: v1.ResourceRequirements{
-				Requests: v1.ResourceList{
-					v1.ResourceStorage: size,
+		Spec: cdi.DataVolumeSpec{
+			Source: &cdi.DataVolumeSource{
+				Blank: &cdi.DataVolumeBlankImage{},
+			},
+			Storage: &cdi.StorageSpec{
+				VolumeMode:       pvc.Spec.VolumeMode,
+				AccessModes:      pvc.Spec.AccessModes,
+				StorageClassName: pvc.Spec.StorageClassName,
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceStorage: size,
+					},
 				},
 			},
-			StorageClassName: pvc.Spec.StorageClassName,
 		},
 	}
 }

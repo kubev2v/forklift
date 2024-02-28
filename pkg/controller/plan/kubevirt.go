@@ -16,6 +16,7 @@ import (
 	"time"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	template "github.com/openshift/api/template/v1"
 	"github.com/openshift/library-go/pkg/template/generator"
 	"github.com/openshift/library-go/pkg/template/templateprocessing"
@@ -50,8 +51,6 @@ import (
 const (
 	// Transfer network annotation (value=network-attachment-definition name)
 	AnnDefaultNetwork = "v1.multus-cni.io/default-network"
-	// Causes the importer pod to be retained after import.
-	AnnRetainAfterCompletion = "cdi.kubevirt.io/storage.pod.retainAfterCompletion"
 	// Contains validations for a Kubevirt VM. Needs to be removed when
 	// creating a VM from a template.
 	AnnKubevirtValidations = "vm.kubevirt.io/validations"
@@ -63,8 +62,6 @@ const (
 	AnnOriginalID = "original-ID"
 	// DV deletion on completion
 	AnnDeleteAfterCompletion = "cdi.kubevirt.io/storage.deleteAfterCompletion"
-	// DV immediate bind to WaitForFirstConsumer storage class
-	AnnBindImmediate = "cdi.kubevirt.io/storage.bind.immediate.requested"
 	// Max Length for vm name
 	NameMaxLength  = 63
 	VddkVolumeName = "vddk-vol-mount"
@@ -1170,14 +1167,14 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 
 	annotations := r.vmLabels(vm.Ref)
 	if !r.Plan.Spec.Warm || Settings.RetainPrecopyImporterPods {
-		annotations[AnnRetainAfterCompletion] = "true"
+		annotations[planbase.AnnRetainAfterCompletion] = "true"
 	}
 	if r.Plan.Spec.TransferNetwork != nil {
 		annotations[AnnDefaultNetwork] = path.Join(
 			r.Plan.Spec.TransferNetwork.Namespace, r.Plan.Spec.TransferNetwork.Name)
 	}
 	if r.Plan.Spec.Warm || !r.Destination.Provider.IsHost() || r.Plan.IsSourceProviderOCP() {
-		annotations[AnnBindImmediate] = "true"
+		annotations[planbase.AnnBindImmediate] = "true"
 	}
 	// Do not delete the DV when the import completes as we check the DV to get the current
 	// disk transfer status.

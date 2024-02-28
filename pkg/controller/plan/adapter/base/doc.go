@@ -22,6 +22,17 @@ const (
 
 	// Set the source format of the PVC for the conversion later
 	AnnSourceFormat = "forklift.konveyor.io/source-format"
+
+	// Set the source PVC of the conversion, used on the DV for filtering
+	AnnConversionSourcePVC = "forklift.konveyor.io/conversionSourcePVC"
+
+	// CDI
+
+	// Causes the importer pod to be retained after import.
+	AnnRetainAfterCompletion = "cdi.kubevirt.io/storage.pod.retainAfterCompletion"
+
+	// DV immediate bind to WaitForFirstConsumer storage class
+	AnnBindImmediate = "cdi.kubevirt.io/storage.bind.immediate.requested"
 )
 
 var VolumePopulatorNotSupportedError = liberr.New("provider does not support volume populators")
