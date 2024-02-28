@@ -111,7 +111,10 @@ func (c *Converter) ensureJob(pvc *v1.PersistentVolumeClaim, srcFormat, dstForma
 			if err != nil {
 				return nil, err
 			}
+
+			return job, nil
 		}
+		c.Log.Error(err, "Failed to get convert job", "pvc", pvc.Name)
 		return nil, err
 	}
 
@@ -134,7 +137,9 @@ func createConvertJob(pvc *v1.PersistentVolumeClaim, srcFormat, dstFormat string
 						SeccompProfile: &v1.SeccompProfile{
 							Type: v1.SeccompProfileTypeRuntimeDefault,
 						},
-						FSGroup: ptr.To(int64(107)),
+						FSGroup:      ptr.To(int64(107)),
+						RunAsNonRoot: ptr.To(true),
+						RunAsUser:    ptr.To[int64](107),
 					},
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
@@ -238,7 +243,12 @@ func (c *Converter) ensureScratchPVC(sourcePVC *v1.PersistentVolumeClaim) (*v1.P
 			scratchPVC := makeScratchPVC(sourcePVC)
 			c.Log.Info("Scratch pvc doesn't exist, creating...", "pvc", sourcePVC.Name)
 			err = c.Destination.Client.Create(context.Background(), scratchPVC, &client.CreateOptions{})
+			if err != nil {
+				return nil, err
+			}
+			return scratchPVC, nil
 		}
+
 		return nil, err
 	}
 
