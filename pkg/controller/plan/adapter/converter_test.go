@@ -74,6 +74,28 @@ var _ = Describe("Converter tests", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ready).To(BeTrue())
 		})
+
+		It("Should create job if it does not exist", func() {
+			converter = createFakeConverter(qcow2PVC, scratchPVC)
+			job, err := converter.ensureJob(qcow2PVC, srcFormatFn(qcow2PVC), "raw")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(job).ToNot(BeNil())
+		})
+
+		It("Should create scratch PVC if it does not exist", func() {
+			converter = createFakeConverter(qcow2PVC)
+			scratchPVC, err := converter.ensureScratchPVC(qcow2PVC)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(scratchPVC).ToNot(BeNil())
+		})
+
+		It("Should return error if PVC is lost", func() {
+			scratchPVC.Status.Phase = v1.ClaimLost
+			converter = createFakeConverter(qcow2PVC, scratchPVC)
+			ready, err := converter.ConvertPVCs([]*v1.PersistentVolumeClaim{qcow2PVC}, srcFormatFn, "raw")
+			Expect(err).To(HaveOccurred())
+			Expect(ready).To(BeFalse())
+		})
 	})
 })
 
