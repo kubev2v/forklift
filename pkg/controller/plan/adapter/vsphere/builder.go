@@ -263,7 +263,7 @@ func (r *Builder) getSourceDetails(vm *model.VM, sourceSecret *core.Secret) (lib
 			}
 		}
 		var url *liburl.URL
-		if url, err = liburl.Parse(string(sourceSecret.Data["url"])); err != nil {
+		if url, err = liburl.Parse(r.Source.Provider.Spec.URL); err != nil {
 			err = liberr.Wrap(err)
 			return
 		}
