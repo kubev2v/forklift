@@ -882,6 +882,7 @@ func createVddkCheckJob(plan *api.Plan, labels map[string]string, el9 bool, vddk
 				Spec: core.PodSpec{
 					SecurityContext: &core.PodSecurityContext{
 						RunAsNonRoot: ptr.To(true),
+						RunAsUser:    ptr.To(qemuUser),
 						SeccompProfile: &core.SeccompProfile{
 							Type: core.SeccompProfileTypeRuntimeDefault,
 						},
