@@ -39,14 +39,6 @@ var _ = Describe("Converter tests", func() {
 			},
 		}
 
-		scratchPVC := &v1.PersistentVolumeClaim{
-			ObjectMeta: meta.ObjectMeta{
-				Name:      getScratchPVCName(qcow2PVC),
-				Namespace: pvcNamespace,
-			},
-		}
-		scratchPVC.Status.Phase = v1.ClaimBound
-
 		convertJob := &batchv1.Job{
 			ObjectMeta: meta.ObjectMeta{
 				Name:      getJobName(qcow2PVC, "convert"),
@@ -59,7 +51,7 @@ var _ = Describe("Converter tests", func() {
 		}
 
 		It("Should not be ready if job is not ready", func() {
-			converter = createFakeConverter(qcow2PVC, scratchPVC, convertJob)
+			converter = createFakeConverter(qcow2PVC, convertJob)
 			ready, err := converter.ConvertPVCs([]*v1.PersistentVolumeClaim{qcow2PVC}, srcFormatFn, "raw")
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ready).To(BeFalse())
@@ -69,32 +61,24 @@ var _ = Describe("Converter tests", func() {
 			convertJob.Status.Conditions = append(convertJob.Status.Conditions, batchv1.JobCondition{
 				Type: batchv1.JobComplete,
 			})
-			converter = createFakeConverter(qcow2PVC, scratchPVC, convertJob)
+			converter = createFakeConverter(qcow2PVC, convertJob)
 			ready, err := converter.ConvertPVCs([]*v1.PersistentVolumeClaim{qcow2PVC}, srcFormatFn, "raw")
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ready).To(BeTrue())
 		})
 
 		It("Should create job if it does not exist", func() {
-			converter = createFakeConverter(qcow2PVC, scratchPVC)
+			converter = createFakeConverter(qcow2PVC)
 			job, err := converter.ensureJob(qcow2PVC, srcFormatFn(qcow2PVC), "raw")
 			Expect(err).ToNot(HaveOccurred())
 			Expect(job).ToNot(BeNil())
 		})
 
-		It("Should create scratch PVC if it does not exist", func() {
+		It("Should create scratch DV if it does not exist", func() {
 			converter = createFakeConverter(qcow2PVC)
-			scratchPVC, err := converter.ensureScratchPVC(qcow2PVC)
+			dv, err := converter.ensureScratchDV(qcow2PVC)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(scratchPVC).ToNot(BeNil())
-		})
-
-		It("Should return error if PVC is lost", func() {
-			scratchPVC.Status.Phase = v1.ClaimLost
-			converter = createFakeConverter(qcow2PVC, scratchPVC)
-			ready, err := converter.ConvertPVCs([]*v1.PersistentVolumeClaim{qcow2PVC}, srcFormatFn, "raw")
-			Expect(err).To(HaveOccurred())
-			Expect(ready).To(BeFalse())
+			Expect(dv).ToNot(BeNil())
 		})
 	})
 })
