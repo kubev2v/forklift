@@ -38,7 +38,6 @@ import (
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	core "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -89,6 +88,12 @@ const (
 	qemuUser = int64(107)
 	// Qemu group
 	qemuGroup = int64(107)
+)
+
+// Labels
+const (
+	OvaPVCLabel = "nfs-pvc"
+	OvaPVLabel  = "nfs-pv"
 )
 
 // Map of VirtualMachines keyed by vmID.
@@ -834,11 +839,12 @@ func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, vmCr *VirtualMach
 	return
 }
 
-func (r *KubeVirt) EnsureVirtV2VPVCStatus() (ready bool, err error) {
+func (r *KubeVirt) EnsureOVAVirtV2VPVCStatus(vmID string) (ready bool, err error) {
 	pvcs := &core.PersistentVolumeClaimList{}
 	pvcLabels := map[string]string{
-		"migration": r.Migration.Name,
-		"ova":       "nfs-pvc",
+		"migration": string(r.Migration.UID),
+		"ova":       OvaPVCLabel,
+		kVM:         vmID,
 	}
 
 	err = r.Destination.Client.List(
@@ -850,7 +856,7 @@ func (r *KubeVirt) EnsureVirtV2VPVCStatus() (ready bool, err error) {
 		},
 	)
 	if err != nil {
-		return false, err
+		return
 	}
 
 	if len(pvcs.Items) == 0 {
@@ -858,6 +864,8 @@ func (r *KubeVirt) EnsureVirtV2VPVCStatus() (ready bool, err error) {
 	}
 
 	pvc := &core.PersistentVolumeClaim{}
+	// In case we have leftovers for the PVCs from previous runs, and we get more than one PVC in the list,
+	// we will filter by the creation timestamp.
 	if len(pvcs.Items) > 1 {
 		for _, pvcVirtV2v := range pvcs.Items {
 			if pvcVirtV2v.CreationTimestamp.Time.After(r.Migration.CreationTimestamp.Time) {
@@ -869,12 +877,12 @@ func (r *KubeVirt) EnsureVirtV2VPVCStatus() (ready bool, err error) {
 	}
 
 	switch pvc.Status.Phase {
-	case v1.ClaimBound:
+	case core.ClaimBound:
 		r.Log.Info("virt-v2v PVC bound", "pvc", pvc.Name)
-	case v1.ClaimPending:
+	case core.ClaimPending:
 		r.Log.Info("virt-v2v PVC pending", "pvc", pvc.Name)
 		return false, nil
-	case v1.ClaimLost:
+	case core.ClaimLost:
 		r.Log.Info("virt-v2v PVC lost", "pvc", pvc.Name)
 		return false, liberr.New("virt-v2v pvc lost")
 	default:
@@ -1531,7 +1539,7 @@ func (r *KubeVirt) findTemplate(vm *plan.VMStatus) (tmpl *template.Template, err
 }
 
 func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, configMap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, v2vSecret *core.Secret) (pod *core.Pod, err error) {
-	volumes, volumeMounts, volumeDevices, err := r.podVolumeMounts(vmVolumes, configMap, pvcs)
+	volumes, volumeMounts, volumeDevices, err := r.podVolumeMounts(vmVolumes, configMap, pvcs, vm.ID)
 	if err != nil {
 		return
 	}
@@ -1661,7 +1669,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	return
 }
 
-func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice, err error) {
+func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, vmID string) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice, err error) {
 	pvcsByName := make(map[string]*core.PersistentVolumeClaim)
 	for _, pvc := range pvcs {
 		pvcsByName[pvc.Name] = pvc
@@ -1714,7 +1722,7 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 		}
 		pvcNamePrefix := getEntityPrefixName("pvc", r.Source.Provider.Name, r.Plan.Name)
 		var pvcName string
-		pvcName, err = r.CreatePvcForNfs(pvcNamePrefix, pvName)
+		pvcName, err = r.CreatePvcForNfs(pvcNamePrefix, pvName, vmID)
 		if err != nil {
 			return
 		}
@@ -2211,7 +2219,7 @@ func GetOvaPvListNfs(dClient client.Client, planID string) (pvs *core.Persistent
 	pvs = &core.PersistentVolumeList{}
 	pvLabels := map[string]string{
 		"plan": planID,
-		"ova":  "nfs-pv",
+		"ova":  OvaPVLabel,
 	}
 
 	err = dClient.List(
@@ -2235,7 +2243,7 @@ func GetOvaPvcListNfs(dClient client.Client, planID string, planNamespace string
 	pvcs = &core.PersistentVolumeClaimList{}
 	pvcLabels := map[string]string{
 		"plan": planID,
-		"ova":  "nfs-pvc",
+		"ova":  OvaPVCLabel,
 	}
 
 	err = dClient.List(
@@ -2263,7 +2271,7 @@ func (r *KubeVirt) CreatePvForNfs() (pvName string, err error) {
 	nfsPath := splitted[1]
 	pvcNamePrefix := getEntityPrefixName("pv", r.Source.Provider.Name, r.Plan.Name)
 
-	labels := map[string]string{"provider": r.Plan.Provider.Source.Name, "app": "forklift", "migration": r.Migration.Name, "plan": string(r.Plan.UID), "ova": "nfs-pv"}
+	labels := map[string]string{"provider": r.Plan.Provider.Source.Name, "app": "forklift", "migration": r.Migration.Name, "plan": string(r.Plan.UID), "ova": OvaPVLabel}
 	pv := &core.PersistentVolume{
 		ObjectMeta: meta.ObjectMeta{
 			GenerateName: pvcNamePrefix,
@@ -2293,9 +2301,9 @@ func (r *KubeVirt) CreatePvForNfs() (pvName string, err error) {
 	return
 }
 
-func (r *KubeVirt) CreatePvcForNfs(pvcNamePrefix string, pvName string) (pvcName string, err error) {
+func (r *KubeVirt) CreatePvcForNfs(pvcNamePrefix, pvName, vmID string) (pvcName string, err error) {
 	sc := ""
-	labels := map[string]string{"provider": r.Plan.Provider.Source.Name, "app": "forklift", "migration": r.Migration.Name, "plan": string(r.Plan.UID), "ova": "nfs-pvc"}
+	labels := map[string]string{"provider": r.Plan.Provider.Source.Name, "app": "forklift", "migration": string(r.Migration.UID), "plan": string(r.Plan.UID), "ova": OvaPVCLabel, "vmID": vmID}
 	pvc := &core.PersistentVolumeClaim{
 		ObjectMeta: meta.ObjectMeta{
 			GenerateName: pvcNamePrefix,

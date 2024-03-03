@@ -1095,24 +1095,15 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		}
 		step.MarkStarted()
 		step.Phase = Running
-		err = r.ensureGuestConversionPod(vm)
+		ready, err := r.ensureGuestConversionPod(vm)
 		if err != nil {
 			step.AddError(err.Error())
 			err = nil
 			break
 		}
-		if r.Source.Provider.Type() == v1beta1.Ova {
-			ready, err := r.kubevirt.EnsureVirtV2VPVCStatus()
-			if err != nil {
-				step.AddError(err.Error())
-				err = nil
-				break
-			}
-
-			if !ready {
-				r.Log.Info("virt-v2v PVC isn't ready yet")
-				return nil
-			}
+		if !ready {
+			r.Log.Info("virt-v2v pod isn't ready yet")
+			return nil
 		}
 		vm.Phase = r.next(vm.Phase)
 	case ConvertGuest, CopyDisksVirtV2V:
@@ -1423,7 +1414,7 @@ func (r *Migration) end() (completed bool, err error) {
 }
 
 // Ensure the guest conversion pod is present.
-func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (err error) {
+func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (ready bool, err error) {
 	if r.vmMap == nil {
 		r.vmMap, err = r.kubevirt.VirtualMachineMap()
 		if err != nil {
@@ -1445,7 +1436,18 @@ func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (err error) {
 	}
 
 	err = r.kubevirt.EnsureGuestConversionPod(vm, &vmCr, pvcs)
-	return
+	if err != nil {
+		return
+	}
+
+	if r.Source.Provider.Type() == v1beta1.Ova {
+		ready, err = r.kubevirt.EnsureOVAVirtV2VPVCStatus(vm.ID)
+		if err != nil {
+			return
+		}
+		return
+	}
+	return true, nil
 }
 
 // Update the progress of the appropriate disk copy step. (DiskTransfer, Cutover)
