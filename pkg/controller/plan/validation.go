@@ -147,15 +147,19 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	}
 
 	// Validate version only if migration is OCP to OCP
-	err = r.validateOCPVersion(plan)
-	if err != nil {
+	if err := r.validateOpenShiftVersion(plan); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (r *Reconciler) validateOCPVersion(plan *api.Plan) error {
+func (r *Reconciler) validateOpenShiftVersion(plan *api.Plan) error {
+	source := plan.Referenced.Provider.Source
+	if source == nil {
+		return nil
+	}
+
 	if plan.IsSourceProviderOCP() && plan.Provider.Destination.Type() == api.OpenShift {
 		unsupportedVersion := libcnd.Condition{
 			Type:     unsupportedVersion,
