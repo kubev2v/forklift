@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
@@ -229,7 +230,8 @@ func makeConversionContainer(pvc *v1.PersistentVolumeClaim, srcFormat, dstFormat
 func (c *Converter) ensureScratchDV(sourcePVC *v1.PersistentVolumeClaim) (*cdi.DataVolume, error) {
 	scratchDV := &cdi.DataVolume{}
 	dvList := &cdi.DataVolumeList{}
-	err := c.Destination.Client.List(context.Background(), dvList, client.InNamespace(sourcePVC.Namespace), client.MatchingLabels{"forklift.konveyor.io/conversionSourcePVC": sourcePVC.Name})
+	label := client.MatchingLabels{planbase.AnnConversionSourcePVC: sourcePVC.Name}
+	err := c.Destination.Client.List(context.Background(), dvList, client.InNamespace(sourcePVC.Namespace), label)
 	if err != nil {
 		return nil, err
 	}
@@ -255,8 +257,7 @@ func (c *Converter) ensureScratchDV(sourcePVC *v1.PersistentVolumeClaim) (*cdi.D
 func makeScratchDV(pvc *v1.PersistentVolumeClaim) *cdi.DataVolume {
 	size := pvc.Spec.Resources.Requests[v1.ResourceStorage]
 	annotations := make(map[string]string)
-	AnnBindImmediate := "cdi.kubevirt.io/storage.bind.immediate.requested"
-	annotations[AnnBindImmediate] = "true"
+	annotations[planbase.AnnBindImmediate] = "true"
 	annotations["migration"] = pvc.Annotations["migration"]
 	annotations["vmID"] = pvc.Annotations["vmID"]
 
@@ -265,7 +266,7 @@ func makeScratchDV(pvc *v1.PersistentVolumeClaim) *cdi.DataVolume {
 		labels = make(map[string]string)
 	}
 
-	labels["forklift.konveyor.io/conversionSourcePVC"] = pvc.Name
+	labels[planbase.AnnConversionSourcePVC] = pvc.Name
 
 	return &cdi.DataVolume{
 		ObjectMeta: meta.ObjectMeta{
