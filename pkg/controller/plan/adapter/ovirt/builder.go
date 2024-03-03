@@ -741,7 +741,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 			pvc, err = r.persistentVolumeClaimWithSourceRef(diskAttachment, storageClassName, populatorName, annotations)
 			if err != nil {
 				if !k8serr.IsAlreadyExists(err) {
-					err = liberr.New("couldn't build the PVC", "diskAttachmentID", diskAttachment.DiskAttachment.ID,
+					err = liberr.Wrap(err, "couldn't build the PVC", "diskAttachmentID", diskAttachment.DiskAttachment.ID,
 						"storageClassName", storageClassName, "populatorName", populatorName)
 					return
 				}
