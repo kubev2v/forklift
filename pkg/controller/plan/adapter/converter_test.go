@@ -1,6 +1,8 @@
 package adapter
 
 import (
+	"context"
+
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
@@ -8,9 +10,11 @@ import (
 	. "github.com/onsi/gomega"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -61,7 +65,20 @@ var _ = Describe("Converter tests", func() {
 			convertJob.Status.Conditions = append(convertJob.Status.Conditions, batchv1.JobCondition{
 				Type: batchv1.JobComplete,
 			})
-			converter = createFakeConverter(qcow2PVC, convertJob)
+
+			dv := &cdi.DataVolume{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-dv",
+					Namespace: pvcNamespace,
+					Labels: map[string]string{
+						base.AnnConversionSourcePVC: pvcName,
+					},
+				},
+			}
+
+			dv.Status.Phase = cdi.Succeeded
+
+			converter = createFakeConverter(qcow2PVC, convertJob, dv)
 			ready, err := converter.ConvertPVCs([]*v1.PersistentVolumeClaim{qcow2PVC}, srcFormatFn, "raw")
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ready).To(BeTrue())
@@ -69,7 +86,13 @@ var _ = Describe("Converter tests", func() {
 
 		It("Should create job if it does not exist", func() {
 			converter = createFakeConverter(qcow2PVC)
-			job, err := converter.ensureJob(qcow2PVC, srcFormatFn(qcow2PVC), "raw")
+			dv := &cdi.DataVolume{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-dv",
+					Namespace: pvcNamespace,
+				},
+			}
+			job, err := converter.ensureJob(qcow2PVC, dv, srcFormatFn(qcow2PVC), "raw")
 			Expect(err).ToNot(HaveOccurred())
 			Expect(job).ToNot(BeNil())
 		})
@@ -80,14 +103,52 @@ var _ = Describe("Converter tests", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(dv).ToNot(BeNil())
 		})
+
+		It("Should remove scratch DV if the job failed", func() {
+			dv := &cdi.DataVolume{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-dv",
+					Namespace: pvcNamespace,
+					Labels: map[string]string{
+						base.AnnConversionSourcePVC: pvcName,
+					},
+				},
+				Status: cdi.DataVolumeStatus{
+					Phase: cdi.Succeeded,
+				},
+			}
+			job := &batchv1.Job{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      getJobName(qcow2PVC, "convert"),
+					Namespace: pvcNamespace,
+				},
+			}
+
+			job.Status.Conditions = append(job.Status.Conditions, batchv1.JobCondition{Status: "False", Type: batchv1.JobFailed})
+			job.Status.Failed = 3
+
+			converter = createFakeConverter(qcow2PVC, job, dv)
+
+			converter.ConvertPVCs([]*v1.PersistentVolumeClaim{qcow2PVC}, srcFormatFn, "raw")
+
+			// Check if scratch DV is removed
+			err := converter.Destination.Client.Get(context.TODO(), types.NamespacedName{Name: dv.Name, Namespace: dv.Namespace}, dv)
+			Expect(err).To(HaveOccurred())
+		})
 	})
 })
 
 func createFakeConverter(objects ...runtime.Object) *Converter {
+	scheme := runtime.NewScheme()
+	_ = cdi.AddToScheme(scheme)
+	_ = v1.AddToScheme(scheme)
+	_ = batchv1.AddToScheme(scheme)
+
 	objs := []runtime.Object{}
 	objs = append(objs, objects...)
 
 	client := fake.NewClientBuilder().
+		WithScheme(scheme).
 		WithRuntimeObjects(objs...).
 		Build()
 
