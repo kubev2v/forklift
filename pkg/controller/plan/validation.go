@@ -160,7 +160,12 @@ func (r *Reconciler) validateOpenShiftVersion(plan *api.Plan) error {
 		return nil
 	}
 
-	if plan.IsSourceProviderOCP() && plan.Provider.Destination.Type() == api.OpenShift {
+	destination := plan.Referenced.Provider.Destination
+	if destination == nil {
+		return nil
+	}
+
+	if source.Type() == api.OpenShift && destination.Type() == api.OpenShift {
 		unsupportedVersion := libcnd.Condition{
 			Type:     unsupportedVersion,
 			Status:   True,
@@ -170,7 +175,7 @@ func (r *Reconciler) validateOpenShiftVersion(plan *api.Plan) error {
 			Items:    []string{},
 		}
 
-		restCfg := ocp.RestCfg(plan.Referenced.Provider.Source, plan.Referenced.Secret)
+		restCfg := ocp.RestCfg(source, plan.Referenced.Secret)
 		clientset, err := kubernetes.NewForConfig(restCfg)
 		if err != nil {
 			return liberr.Wrap(err)
