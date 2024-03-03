@@ -76,17 +76,12 @@ func (c *Converter) ConvertPVCs(pvcs []*v1.PersistentVolumeClaim, srcFormat srcF
 			switch condition.Type {
 			case batchv1.JobComplete:
 				c.Log.Info("Convert job completed", "pvc", pvc.Name)
-
-				// Delete scrach PVC
-				err = c.Destination.Client.Delete(context.Background(), scratchDV, &client.DeleteOptions{})
-				if err != nil {
-					c.Log.Error(err, "Failed to delete scratch DV", "dv", scratchDV.Name)
-				}
-
+				c.deleteScratchDV(scratchDV)
 				return true, nil
 
 			case batchv1.JobFailed:
 				if convertJob.Status.Failed >= 3 {
+					c.deleteScratchDV(scratchDV)
 					return true, liberr.New("convert job failed")
 				}
 			}
@@ -98,6 +93,13 @@ func (c *Converter) ConvertPVCs(pvcs []*v1.PersistentVolumeClaim, srcFormat srcF
 	}
 
 	return false, nil
+}
+
+func (c *Converter) deleteScratchDV(scratchDV *cdi.DataVolume) {
+	err := c.Destination.Client.Delete(context.Background(), scratchDV, &client.DeleteOptions{})
+	if err != nil {
+		c.Log.Error(err, "Failed to delete scratch DV", "DV", scratchDV.Name)
+	}
 }
 
 func (c *Converter) ensureJob(pvc *v1.PersistentVolumeClaim, dv *cdi.DataVolume, srcFormat, dstFormat string) (*batchv1.Job, error) {
@@ -138,13 +140,6 @@ func createConvertJob(pvc *v1.PersistentVolumeClaim, dv *cdi.DataVolume, srcForm
 						SeccompProfile: &v1.SeccompProfile{
 							Type: v1.SeccompProfileTypeRuntimeDefault,
 						},
-						RunAsNonRoot: ptr.To(true),
-						RunAsUser:    ptr.To[int64](107),
-						FSGroup:      ptr.To[int64](107),
-					},
-					RestartPolicy: v1.RestartPolicyNever,
-					Containers: []v1.Container{
-						makeConversionContainer(pvc, srcFormat, dstFormat),
 					},
 					Volumes: []v1.Volume{
 						{
@@ -192,10 +187,6 @@ func makeConversionContainer(pvc *v1.PersistentVolumeClaim, srcFormat, dstFormat
 		Image: base.Settings.VirtV2vImageCold,
 		SecurityContext: &v1.SecurityContext{
 			AllowPrivilegeEscalation: ptr.To(false),
-			RunAsNonRoot:             ptr.To(true),
-			Capabilities: &v1.Capabilities{
-				Drop: []v1.Capability{"ALL"},
-			},
 		},
 		Command: []string{"/usr/local/bin/image-converter"},
 		Args: []string{
