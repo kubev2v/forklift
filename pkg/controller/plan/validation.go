@@ -817,7 +817,7 @@ func (r *Reconciler) ensureVddkImageValidationJob(plan *api.Plan, el9 bool, vddk
 		return nil, err
 	case len(jobs.Items) == 0:
 		job := createVddkCheckJob(ctx.Plan, jobLabels, el9, vddkImage)
-		err = ctx.Destination.Client.Create(context.Background(), job, &client.CreateOptions{})
+		err = ctx.Destination.Client.Create(context.Background(), job)
 		if err != nil {
 			return nil, err
 		}
@@ -901,8 +901,6 @@ func createVddkCheckJob(plan *api.Plan, labels map[string]string, el9 bool, vddk
 			Template: core.PodTemplateSpec{
 				Spec: core.PodSpec{
 					SecurityContext: &core.PodSecurityContext{
-						RunAsNonRoot: ptr.To(true),
-						RunAsUser:    ptr.To(qemuUser),
 						SeccompProfile: &core.SeccompProfile{
 							Type: core.SeccompProfileTypeRuntimeDefault,
 						},
