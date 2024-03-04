@@ -11,6 +11,7 @@ import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
+	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	utils "github.com/konveyor/forklift-controller/pkg/controller/plan/util"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
@@ -47,11 +48,6 @@ const (
 	TemplateFlavorSmall             = "small"
 	TemplateFlavorMedium            = "medium"
 	TemplateFlavorLarge             = "large"
-)
-
-// Annotations
-const (
-	AnnImportDiskId = "cdi.kubevirt.io/storage.import.volumeId"
 )
 
 // OS types
@@ -525,7 +521,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []core.Per
 			return
 		}
 
-		cnvVolumeName := fmt.Sprintf("vol-%v", pvc.Annotations[AnnImportDiskId])
+		cnvVolumeName := fmt.Sprintf("vol-%v", pvc.Annotations[planbase.AnnDiskSource])
 		cnvVolume := cnv.Volume{
 			Name: cnvVolumeName,
 			VolumeSource: cnv.VolumeSource{
@@ -1104,10 +1100,10 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image, storageC
 
 	// The image might be a VM Snapshot Image and has no volume associated to it
 	if originalVolumeDiskId, ok := image.Properties["forklift_original_volume_id"]; ok {
-		annotations[AnnImportDiskId] = originalVolumeDiskId.(string)
+		annotations[planbase.AnnDiskSource] = originalVolumeDiskId.(string)
 		r.Log.Info("the image comes from a volume", "volumeID", originalVolumeDiskId)
 	} else {
-		annotations[AnnImportDiskId] = image.ID
+		annotations[planbase.AnnDiskSource] = image.ID
 		r.Log.Info("the image comes from a vm snapshot", "imageID", image.ID)
 	}
 
