@@ -860,9 +860,6 @@ func (r *Client) ensureImagesFromVolumesReady(vm *libclient.VM) (ready bool, err
 
 		// Check that the inventory is synchronized with the images
 		inventoryImage := &model.Image{}
-<<<<<<< Updated upstream
-		r.Context.Source.Inventory.Find(inventoryImage, ref.Ref{ID: imagesFromVolumes[0].ID})
-=======
 		err = r.Context.Source.Inventory.Find(inventoryImage, ref.Ref{ID: image.ID})
 		if err != nil {
 			if errors.As(err, &model.NotFoundError{}) {
@@ -877,7 +874,6 @@ func (r *Client) ensureImagesFromVolumesReady(vm *libclient.VM) (ready bool, err
 			return
 		}
 
->>>>>>> Stashed changes
 		if inventoryImage.Status != string(ImageStatusActive) {
 			r.Log.Info("the image is not ready in the inventory, waiting...",
 				"vm", vm.Name, "image", image.Name, "properties", image.Properties)
