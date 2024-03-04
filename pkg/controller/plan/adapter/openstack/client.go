@@ -192,14 +192,17 @@ func (r *Client) PreTransferActions(vmRef ref.Ref) (ready bool, err error) {
 	if err != nil || !ready {
 		return
 	}
+
 	ready, err = r.ensureImagesFromVolumesReady(vm)
 	if err != nil || ready {
 		return
 	}
+
 	err = r.ensureSnapshotsFromVolumes(vm)
 	if err != nil {
 		return
 	}
+
 	err = r.ensureVolumesFromSnapshots(vm)
 	return
 }
@@ -854,7 +857,34 @@ func (r *Client) ensureImagesFromVolumesReady(vm *libclient.VM) (ready bool, err
 				}
 			}()
 		}
+
+		// Check that the inventory is synchronized with the images
+		inventoryImage := &model.Image{}
+<<<<<<< Updated upstream
+		r.Context.Source.Inventory.Find(inventoryImage, ref.Ref{ID: imagesFromVolumes[0].ID})
+=======
+		err = r.Context.Source.Inventory.Find(inventoryImage, ref.Ref{ID: image.ID})
+		if err != nil {
+			if errors.As(err, &model.NotFoundError{}) {
+				err = nil
+				r.Log.Info("the image does not exist in the inventory, waiting...",
+					"vm", vm.Name, "image", image.Name, "properties", image.Properties)
+				return
+			}
+			err = liberr.Wrap(err)
+			r.Log.Error(err, "trying to find the image in the inventory",
+				"vm", vm.Name, "image", image.Name, "properties", image.Properties)
+			return
+		}
+
+>>>>>>> Stashed changes
+		if inventoryImage.Status != string(ImageStatusActive) {
+			r.Log.Info("the image is not ready in the inventory, waiting...",
+				"vm", vm.Name, "image", image.Name, "properties", image.Properties)
+			return
+		}
 	}
+
 	ready = true
 	r.Log.Info("all steps finished!", "vm", vm.Name)
 	return
