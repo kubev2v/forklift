@@ -142,6 +142,10 @@ func createConvertJob(pvc *v1.PersistentVolumeClaim, dv *cdi.DataVolume, srcForm
 							Type: v1.SeccompProfileTypeRuntimeDefault,
 						},
 					},
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						makeConversionContainer(pvc, srcFormat, dstFormat),
+					},
 					Volumes: []v1.Volume{
 						{
 							Name: "source",
