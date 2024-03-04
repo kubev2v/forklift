@@ -129,10 +129,11 @@ var _ = Describe("Converter tests", func() {
 
 			converter = createFakeConverter(qcow2PVC, job, dv)
 
-			converter.ConvertPVCs([]*v1.PersistentVolumeClaim{qcow2PVC}, srcFormatFn, "raw")
+			_, err := converter.ConvertPVCs([]*v1.PersistentVolumeClaim{qcow2PVC}, srcFormatFn, "raw")
+			Expect(err).To(HaveOccurred())
 
 			// Check if scratch DV is removed
-			err := converter.Destination.Client.Get(context.TODO(), types.NamespacedName{Name: dv.Name, Namespace: dv.Namespace}, dv)
+			err = converter.Destination.Client.Get(context.TODO(), types.NamespacedName{Name: dv.Name, Namespace: dv.Namespace}, dv)
 			Expect(err).To(HaveOccurred())
 		})
 	})
