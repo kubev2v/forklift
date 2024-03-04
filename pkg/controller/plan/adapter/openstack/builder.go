@@ -51,11 +51,6 @@ const (
 	TemplateFlavorLarge             = "large"
 )
 
-// Annotations
-const (
-	AnnImportDiskId = "cdi.kubevirt.io/storage.import.volumeId"
-)
-
 // OS types
 const (
 	Linux = "linux"
@@ -527,7 +522,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []*core.Pe
 		if imageID, ok := image.Properties[forkliftPropertyOriginalImageID]; ok && imageID != "" {
 			if imageID.(string) == vm.ImageID {
 				imagePVC = pvc
-				r.Log.Info("Image PVC found", "pvc", pvc.Name, "image", imagePVC.Annotations[AnnImportDiskId])
+				r.Log.Info("Image PVC found", "pvc", pvc.Name, "image", imagePVC.Annotations[planbase.AnnDiskSource])
 			}
 		} else if volumeID, ok := image.Properties[forkliftPropertyOriginalVolumeID]; ok && volumeID != "" {
 			// Image is volume based, check if it's bootable
@@ -543,7 +538,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []*core.Pe
 			}
 		}
 
-		cnvVolumeName := fmt.Sprintf("vol-%v", pvc.Annotations[AnnImportDiskId])
+		cnvVolumeName := fmt.Sprintf("vol-%v", pvc.Annotations[planbase.AnnDiskSource])
 		cnvVolume := cnv.Volume{
 			Name: cnvVolumeName,
 			VolumeSource: cnv.VolumeSource{
@@ -591,9 +586,9 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []*core.Pe
 	if bootOrder == nil && imagePVC != nil {
 		r.Log.Info("No bootable volume found, falling back to image", "image", imagePVC.Name)
 		for i, disk := range kDisks {
-			if disk.Name == fmt.Sprintf("vol-%s", imagePVC.Annotations[AnnImportDiskId]) {
+			if disk.Name == fmt.Sprintf("vol-%s", imagePVC.Annotations[planbase.AnnDiskSource]) {
 				kDisks[i].BootOrder = ptr.To[uint](1)
-				r.Log.Info("Boot order set to 1 on", "disk", kDisks[i], "ann", imagePVC.Annotations[AnnImportDiskId])
+				r.Log.Info("Boot order set to 1 on", "disk", kDisks[i], "ann", imagePVC.Annotations[planbase.AnnDiskSource])
 				break
 			}
 		}
@@ -1185,10 +1180,10 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image, storageC
 
 	// The image might be a VM Snapshot Image and has no volume associated to it
 	if originalVolumeDiskId, ok := image.Properties["forklift_original_volume_id"]; ok {
-		annotations[AnnImportDiskId] = originalVolumeDiskId.(string)
+		annotations[planbase.AnnDiskSource] = originalVolumeDiskId.(string)
 		r.Log.Info("the image comes from a volume", "volumeID", originalVolumeDiskId)
 	} else if originalImageId, ok := image.Properties["forklift_original_image_id"]; ok {
-		annotations[AnnImportDiskId] = originalImageId.(string)
+		annotations[planbase.AnnDiskSource] = originalImageId.(string)
 		r.Log.Info("the image comes from a vm snapshot", "imageID", originalImageId)
 	} else {
 		r.Log.Error(nil, "the image has no volume or vm snapshot associated to it", "image", image.Name)

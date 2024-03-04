@@ -72,12 +72,6 @@ const (
 	Unknown        = "unknown"
 )
 
-// Annotations
-const (
-	// CDI import disk ID annotation on PVC
-	AnnImportDiskId = "cdi.kubevirt.io/storage.import.diskId"
-)
-
 // Map of ovirt guest ids to osinfo ids.
 var osMap = map[string]string{
 	"rhel_6_10_plus_ppc64": "rhel6.10",
@@ -594,7 +588,7 @@ func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
 
 // Return a stable identifier for a PersistentDataVolume.
 func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string {
-	return pvc.Annotations[AnnImportDiskId]
+	return pvc.Annotations[planbase.AnnDiskSource]
 }
 
 // Create PVs specs for the VM LUNs.
@@ -634,10 +628,10 @@ func (r *Builder) LunPersistentVolumes(vmRef ref.Ref) (pvs []core.PersistentVolu
 					Name:      da.Disk.ID,
 					Namespace: r.Plan.Spec.TargetNamespace,
 					Annotations: map[string]string{
-						AnnImportDiskId: da.Disk.ID,
-						"vmID":          vm.ID,
-						"plan":          string(r.Plan.UID),
-						"lun":           "true",
+						planbase.AnnDiskSource: da.Disk.ID,
+						"vmID":                 vm.ID,
+						"plan":                 string(r.Plan.UID),
+						"lun":                  "true",
 					},
 					Labels: map[string]string{
 						"volume": fmt.Sprintf("%v-%v", vm.Name, da.ID),
@@ -677,10 +671,10 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 					Name:      da.Disk.ID,
 					Namespace: r.Plan.Spec.TargetNamespace,
 					Annotations: map[string]string{
-						AnnImportDiskId: da.Disk.ID,
-						"vmID":          vm.ID,
-						"plan":          string(r.Plan.UID),
-						"lun":           "true",
+						planbase.AnnDiskSource: da.Disk.ID,
+						"vmID":                 vm.ID,
+						"plan":                 string(r.Plan.UID),
+						"lun":                  "true",
 					},
 					Labels: map[string]string{"migration": r.Migration.Name},
 				},
@@ -837,7 +831,7 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(diskAttachment model.XDiskA
 	// For Block the value is configurable using `BLOCK_OVERHEAD`
 	diskSize = utils.CalculateSpaceWithOverhead(diskSize, volumeMode)
 
-	annotations[AnnImportDiskId] = diskAttachment.ID
+	annotations[planbase.AnnDiskSource] = diskAttachment.ID
 
 	pvc = &core.PersistentVolumeClaim{
 		ObjectMeta: meta.ObjectMeta{
