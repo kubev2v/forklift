@@ -227,7 +227,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 		object.Template = &cnv.VirtualMachineInstanceTemplateSpec{}
 	}
 	r.mapDisks(vm, persistentVolumeClaims, object)
-	r.mapFirmware(vm, object)
+	r.mapFirmware(vm, vmRef, object)
 	r.mapCPU(vm, object)
 	r.mapInput(object)
 	err = r.mapMemory(vm, object)
@@ -332,14 +332,17 @@ func (r *Builder) mapCPU(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	}
 }
 
-func (r *Builder) mapFirmware(vm *model.VM, object *cnv.VirtualMachineSpec) {
+func (r *Builder) mapFirmware(vm *model.VM, vmRef ref.Ref, object *cnv.VirtualMachineSpec) {
 	var virtV2VFirmware string
 	if vm.Firmware == "" {
 		for _, vmConf := range r.Migration.Status.VMs {
-			if vmConf.ID == vm.ID {
+			if vmConf.ID == vmRef.ID {
 				virtV2VFirmware = vmConf.Firmware
 				break
 			}
+		}
+		if virtV2VFirmware == "" {
+			r.Log.Info("failed to match the vm, model VMid is %s, vmRef ID is %s", vm.ID, vmRef.ID)
 		}
 	} else {
 		virtV2VFirmware = vm.Firmware
