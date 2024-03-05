@@ -11,6 +11,8 @@ import (
 // Global
 var Settings = ControllerSettings{}
 
+const OpenShift = "OpenShift"
+
 // Settings
 type ControllerSettings struct {
 	// Roles.
@@ -29,6 +31,7 @@ type ControllerSettings struct {
 	Profiler
 	// Feature gates.
 	Features
+	OpenShift bool
 }
 
 // Load settings.
@@ -65,6 +68,7 @@ func (r *ControllerSettings) Load() error {
 	if err != nil {
 		return err
 	}
+	r.OpenShift = getEnvBool(OpenShift, false)
 
 	return nil
 }
