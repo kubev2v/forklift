@@ -342,7 +342,7 @@ func (r *Builder) mapFirmware(vm *model.VM, vmRef ref.Ref, object *cnv.VirtualMa
 			}
 		}
 		if virtV2VFirmware == "" {
-			r.Log.Info("failed to match the vm, model VMid is %s, vmRef ID is %s", vm.ID, vmRef.ID)
+			r.Log.Info("failed to match the vm", "model ID", vm.ID, "vmRef ID", vmRef.ID)
 		}
 	} else {
 		virtV2VFirmware = vm.Firmware
