@@ -883,6 +883,15 @@ func createVddkCheckJob(plan *api.Plan, labels map[string]string, el9 bool, vddk
 			},
 		},
 	}
+	psc := &core.PodSecurityContext{
+		SeccompProfile: &core.SeccompProfile{
+			Type: core.SeccompProfileTypeRuntimeDefault,
+		},
+	}
+	if !Settings.OpenShift {
+		psc.RunAsNonRoot = ptr.To(true)
+		psc.RunAsUser = ptr.To(qemuUser)
+	}
 	return &batchv1.Job{
 		ObjectMeta: meta.ObjectMeta{
 			GenerateName: fmt.Sprintf("vddk-validator-%s", plan.Name),
@@ -900,13 +909,9 @@ func createVddkCheckJob(plan *api.Plan, labels map[string]string, el9 bool, vddk
 			Completions:           ptr.To[int32](1),
 			Template: core.PodTemplateSpec{
 				Spec: core.PodSpec{
-					SecurityContext: &core.PodSecurityContext{
-						SeccompProfile: &core.SeccompProfile{
-							Type: core.SeccompProfileTypeRuntimeDefault,
-						},
-					},
-					RestartPolicy:  core.RestartPolicyOnFailure,
-					InitContainers: initContainers,
+					SecurityContext: psc,
+					RestartPolicy:   core.RestartPolicyOnFailure,
+					InitContainers:  initContainers,
 					Containers: []core.Container{
 						{
 							Name:  "validator",
