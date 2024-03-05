@@ -863,7 +863,7 @@ func (r *KubeVirt) EnsureOVAVirtV2VPVCStatus(vmID string) (ready bool, err error
 		return
 	}
 
-	pvc := &core.PersistentVolumeClaim{}
+	var pvc *core.PersistentVolumeClaim
 	// In case we have leftovers for the PVCs from previous runs, and we get more than one PVC in the list,
 	// we will filter by the creation timestamp.
 	if len(pvcs.Items) > 1 {
@@ -872,6 +872,9 @@ func (r *KubeVirt) EnsureOVAVirtV2VPVCStatus(vmID string) (ready bool, err error
 				pvc = &pvcVirtV2v
 			}
 		}
+		if pvc == nil {
+			return
+		}
 	} else {
 		pvc = &pvcs.Items[0]
 	}
@@ -879,17 +882,17 @@ func (r *KubeVirt) EnsureOVAVirtV2VPVCStatus(vmID string) (ready bool, err error
 	switch pvc.Status.Phase {
 	case core.ClaimBound:
 		r.Log.Info("virt-v2v PVC bound", "pvc", pvc.Name)
+		ready = true
 	case core.ClaimPending:
 		r.Log.Info("virt-v2v PVC pending", "pvc", pvc.Name)
-		return false, nil
 	case core.ClaimLost:
 		r.Log.Info("virt-v2v PVC lost", "pvc", pvc.Name)
 		return false, liberr.New("virt-v2v pvc lost")
 	default:
 		r.Log.Info("virt-v2v PVC status is unknown", "pvc", pvc.Name, "status", pvc.Status.Phase)
-		return false, nil
+		return
 	}
-	return true, nil
+	return
 }
 
 // Get the guest conversion pod for the VM.
@@ -2303,7 +2306,7 @@ func (r *KubeVirt) CreatePvForNfs() (pvName string, err error) {
 
 func (r *KubeVirt) CreatePvcForNfs(pvcNamePrefix, pvName, vmID string) (pvcName string, err error) {
 	sc := ""
-	labels := map[string]string{"provider": r.Plan.Provider.Source.Name, "app": "forklift", "migration": string(r.Migration.UID), "plan": string(r.Plan.UID), "ova": OvaPVCLabel, "vmID": vmID}
+	labels := map[string]string{"provider": r.Plan.Provider.Source.Name, "app": "forklift", "migration": string(r.Migration.UID), "plan": string(r.Plan.UID), "ova": OvaPVCLabel, kVM: vmID}
 	pvc := &core.PersistentVolumeClaim{
 		ObjectMeta: meta.ObjectMeta{
 			GenerateName: pvcNamePrefix,
