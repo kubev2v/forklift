@@ -855,11 +855,7 @@ func (r *KubeVirt) EnsureOVAVirtV2VPVCStatus(vmID string) (ready bool, err error
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
-	if err != nil {
-		return
-	}
-
-	if len(pvcs.Items) == 0 {
+	if err != nil || len(pvcs.Items) == 0 {
 		return
 	}
 
@@ -887,10 +883,9 @@ func (r *KubeVirt) EnsureOVAVirtV2VPVCStatus(vmID string) (ready bool, err error
 		r.Log.Info("virt-v2v PVC pending", "pvc", pvc.Name)
 	case core.ClaimLost:
 		r.Log.Info("virt-v2v PVC lost", "pvc", pvc.Name)
-		return false, liberr.New("virt-v2v pvc lost")
+		err = liberr.New("virt-v2v pvc lost")
 	default:
 		r.Log.Info("virt-v2v PVC status is unknown", "pvc", pvc.Name, "status", pvc.Status.Phase)
-		return
 	}
 	return
 }
