@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 )
 
@@ -19,6 +21,9 @@ const (
 	Block   = "/dev/block[0-9]*"
 	VDDK    = "/opt/vmware-vix-disklib-distrib"
 )
+
+var UEFI_RE = regexp.MustCompile(`(?i)UEFI\s+bootloader?`)
+var firmware = "bios"
 
 var (
 	xmlFilePath string
@@ -97,7 +102,7 @@ func main() {
 		virtV2vArgs = append(virtV2vArgs, "--", os.Getenv("V2V_vmName"))
 	}
 
-	if err := executeVirtV2v(virtV2vArgs); err != nil {
+	if err := executeVirtV2v(virtV2vArgs, source); err != nil {
 		fmt.Println("Error executing virt-v2v command ", err)
 		os.Exit(1)
 	}
@@ -111,6 +116,7 @@ func main() {
 		}
 
 		http.HandleFunc("/ovf", ovfHandler)
+		http.HandleFunc("/firmware", firmwareHandler)
 		http.HandleFunc("/shutdown", shutdownHandler)
 		server = &http.Server{Addr: ":8080"}
 
@@ -169,16 +175,26 @@ func LinkDisks(diskKind string, num int) (err error) {
 	return
 }
 
-func executeVirtV2v(args []string) (err error) {
+func executeVirtV2v(args []string, source string) (err error) {
 	virtV2vCmd := exec.Command(args[0], args[1:]...)
 	virtV2vStdoutPipe, err := virtV2vCmd.StdoutPipe()
 	if err != nil {
 		fmt.Printf("Error setting up stdout pipe: %v\n", err)
 		return
 	}
+	teeOut := io.TeeReader(virtV2vStdoutPipe, os.Stdout)
 
-	tee := io.TeeReader(virtV2vStdoutPipe, os.Stdout)
-	virtV2vCmd.Stderr = os.Stderr
+	var teeErr io.Reader
+	if source == OVA {
+		virtV2vStderrPipe, err := virtV2vCmd.StderrPipe()
+		if err != nil {
+			fmt.Printf("Error setting up stdout pipe: %v\n", err)
+			return err
+		}
+		teeErr = io.TeeReader(virtV2vStderrPipe, os.Stderr)
+	} else {
+		virtV2vCmd.Stderr = os.Stderr
+	}
 
 	fmt.Println("exec ", virtV2vCmd)
 	if err = virtV2vCmd.Start(); err != nil {
@@ -187,13 +203,33 @@ func executeVirtV2v(args []string) (err error) {
 	}
 
 	virtV2vMonitorCmd := exec.Command("/usr/local/bin/virt-v2v-monitor")
-	virtV2vMonitorCmd.Stdin = tee
+	virtV2vMonitorCmd.Stdin = teeOut
 	virtV2vMonitorCmd.Stdout = os.Stdout
 	virtV2vMonitorCmd.Stderr = os.Stderr
 
 	if err = virtV2vMonitorCmd.Start(); err != nil {
 		fmt.Printf("Error executing monitor command: %v\n", err)
 		return
+	}
+
+	if source == OVA {
+		scanner := bufio.NewScanner(teeErr)
+		const maxCapacity = 1024 * 1024
+		buf := make([]byte, 0, 64*1024)
+		scanner.Buffer(buf, maxCapacity)
+
+		for scanner.Scan() {
+			line := scanner.Bytes()
+			if match := UEFI_RE.FindSubmatch(line); match != nil {
+				fmt.Println("UEFI firmware detected")
+				firmware = "uefi"
+			}
+		}
+
+		if err = scanner.Err(); err != nil {
+			fmt.Println("Output query failed:", err)
+			return err
+		}
 	}
 
 	if err = virtV2vCmd.Wait(); err != nil {
@@ -236,7 +272,15 @@ func ovfHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("Error writing response: %v\n", err)
 		http.Error(w, "Error writing response", http.StatusInternalServerError)
 	}
+}
 
+func firmwareHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain")
+	if _, err := w.Write([]byte(firmware)); err != nil {
+		fmt.Printf("Error writing response: %v\n", err)
+		http.Error(w, "Error writing response", http.StatusInternalServerError)
+		return
+	}
 }
 
 func shutdownHandler(w http.ResponseWriter, r *http.Request) {
