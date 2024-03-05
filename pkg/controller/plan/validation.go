@@ -116,14 +116,8 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	plan.Referenced.Provider.Source = pv.Referenced.Source
 	plan.Referenced.Provider.Destination = pv.Referenced.Destination
 
-	if plan.Referenced.Provider.Source != nil &&
-		plan.Referenced.Secret == nil &&
-		// local cluster has no secret
-		!plan.Referenced.Provider.Source.IsHost() {
-		err = r.setupSecret(plan)
-		if err != nil {
-			return err
-		}
+	if err := r.ensureSecretForProvider(plan); err != nil {
+		return err
 	}
 
 	if err := r.validateTargetNamespace(plan); err != nil {
@@ -196,6 +190,19 @@ func (r *Reconciler) validateOpenShiftVersion(plan *api.Plan) error {
 		err = r.checkOCPVersion(clientset)
 		if err != nil {
 			plan.Status.SetCondition(unsupportedVersion)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *Reconciler) ensureSecretForProvider(plan *api.Plan) error {
+	if plan.Referenced.Provider.Source != nil &&
+		plan.Referenced.Secret == nil &&
+		!plan.Referenced.Provider.Source.IsHost() {
+		err := r.setupSecret(plan)
+		if err != nil {
 			return err
 		}
 	}
@@ -478,7 +485,6 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		if err != nil {
 			return err
 		}
-
 		if plan.Referenced.Map.Network != nil {
 			ok, err := validator.NetworksMapped(*ref)
 			if err != nil {
