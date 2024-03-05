@@ -107,12 +107,24 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+
 	plan.Status.SetCondition(conditions.List...)
 	if plan.Status.HasCondition(validation.SourceProviderNotReady) {
 		return nil
 	}
+
 	plan.Referenced.Provider.Source = pv.Referenced.Source
 	plan.Referenced.Provider.Destination = pv.Referenced.Destination
+
+	if plan.Referenced.Provider.Source != nil &&
+		plan.Referenced.Secret == nil &&
+		// local cluster has no secret
+		!plan.Referenced.Provider.Source.IsHost() {
+		err = r.setupSecret(plan)
+		if err != nil {
+			return err
+		}
+	}
 
 	if err := r.validateTargetNamespace(plan); err != nil {
 		return err
@@ -466,14 +478,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		if err != nil {
 			return err
 		}
-		if plan.Referenced.Secret == nil &&
-			// local cluster has no secret
-			!plan.Referenced.Provider.Source.IsHost() {
-			err = r.setupSecret(plan)
-			if err != nil {
-				return err
-			}
-		}
+
 		if plan.Referenced.Map.Network != nil {
 			ok, err := validator.NetworksMapped(*ref)
 			if err != nil {
@@ -930,6 +935,7 @@ func (r *Reconciler) setupSecret(plan *api.Plan) (err error) {
 	if err != nil {
 		return
 	}
+
 	plan.Referenced.Secret = &secret
 	return
 }
