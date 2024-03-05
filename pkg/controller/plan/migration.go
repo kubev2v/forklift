@@ -1095,15 +1095,15 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		}
 		step.MarkStarted()
 		step.Phase = Running
-		ready, err := r.ensureGuestConversionPod(vm)
-		if err != nil {
+		var ready bool
+		if ready, err = r.ensureGuestConversionPod(vm); err != nil {
 			step.AddError(err.Error())
 			err = nil
 			break
 		}
 		if !ready {
 			r.Log.Info("virt-v2v pod isn't ready yet")
-			return nil
+			return
 		}
 		vm.Phase = r.next(vm.Phase)
 	case ConvertGuest, CopyDisksVirtV2V:
@@ -1442,12 +1442,11 @@ func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (ready bool, err
 
 	if r.Source.Provider.Type() == v1beta1.Ova {
 		ready, err = r.kubevirt.EnsureOVAVirtV2VPVCStatus(vm.ID)
-		if err != nil {
-			return
-		}
 		return
 	}
-	return true, nil
+	// For vSphere, we always return true if all other stages were successful.
+	ready = true
+	return
 }
 
 // Update the progress of the appropriate disk copy step. (DiskTransfer, Cutover)
