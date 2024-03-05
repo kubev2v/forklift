@@ -50,6 +50,12 @@ spec:
         - name: API_TLS_CA
           value: /var/run/secrets/{{ inventory_tls_secret_name }}/ca.crt
 {% endif %}
+        - name: OpenShift
+{% if k8s_cluster|bool %}
+          value: false
+{% else %}
+          value: true
+{% endif %}
 {% if controller_log_level is defined and controller_log_level is number %}
         - name: LOG_LEVEL
           value: "{{ controller_log_level }}"
