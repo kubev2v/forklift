@@ -1440,12 +1440,13 @@ func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (ready bool, err
 		return
 	}
 
-	if r.Source.Provider.Type() == v1beta1.Ova {
+	switch r.Source.Provider.Type() {
+	case v1beta1.Ova:
 		ready, err = r.kubevirt.EnsureOVAVirtV2VPVCStatus(vm.ID)
-		return
+	case v1beta1.VSphere:
+		ready = true
 	}
-	// For vSphere, we always return true if all other stages were successful.
-	ready = true
+
 	return
 }
 
