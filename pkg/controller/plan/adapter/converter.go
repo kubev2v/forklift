@@ -11,7 +11,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
-	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
@@ -104,33 +103,43 @@ func (c *Converter) deleteScratchDV(scratchDV *cdi.DataVolume) {
 }
 
 func (c *Converter) ensureJob(pvc *v1.PersistentVolumeClaim, dv *cdi.DataVolume, srcFormat, dstFormat string) (*batchv1.Job, error) {
-	jobName := getJobName(pvc, "convert")
-	job := &batchv1.Job{}
-	err := c.Destination.Client.Get(context.Background(), client.ObjectKey{Name: jobName, Namespace: pvc.Namespace}, job)
+	// Find existing job by label
+	jobList := &batchv1.JobList{}
+	label := client.MatchingLabels{planbase.AnnConversionSourcePVC: pvc.Name}
+	err := c.Destination.Client.List(context.Background(), jobList, client.InNamespace(pvc.Namespace), label)
 	if err != nil {
-		if k8serr.IsNotFound(err) {
-			c.Log.Info("Converting PVC format", "pvc", pvc.Name, "srcFormat", srcFormat, "dstFormat", dstFormat)
-			job := createConvertJob(pvc, dv, srcFormat, dstFormat, c.Labels)
-			err = c.Destination.Client.Create(context.Background(), job, &client.CreateOptions{})
-			if err != nil {
-				return nil, err
-			}
-
-			return job, nil
-		}
-		c.Log.Error(err, "Failed to get convert job", "pvc", pvc.Name)
 		return nil, err
 	}
 
-	return job, err
+	if len(jobList.Items) == 1 {
+		c.Log.Info("Found convert job", "job", jobList.Items[0].Name)
+		return &jobList.Items[0], nil
+	} else if len(jobList.Items) > 1 {
+		return nil, liberr.New("multiple convert jobs found for pvc", "pvc", pvc.Name)
+	}
+
+	// Job doesn't exist, create it
+	job := createConvertJob(pvc, dv, srcFormat, dstFormat, c.Labels)
+	c.Log.Info("Creating convert job", "pvc", pvc.Name, "srcFormat", srcFormat, "dstFormat", dstFormat)
+	err = c.Destination.Client.Create(context.Background(), job, &client.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	return job, nil
 }
 
 func createConvertJob(pvc *v1.PersistentVolumeClaim, dv *cdi.DataVolume, srcFormat, dstFormat string, labels map[string]string) *batchv1.Job {
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+
+	labels[planbase.AnnConversionSourcePVC] = pvc.Name
 	return &batchv1.Job{
 		ObjectMeta: meta.ObjectMeta{
-			Name:      fmt.Sprintf("convert-%s", pvc.Name),
-			Namespace: pvc.Namespace,
-			Labels:    labels,
+			GenerateName: fmt.Sprintf("convert-%s-", pvc.Name),
+			Namespace:    pvc.Namespace,
+			Labels:       labels,
 		},
 		Spec: batchv1.JobSpec{
 			BackoffLimit: ptr.To(int32(3)),
@@ -236,7 +245,6 @@ func makeConversionContainer(pvc *v1.PersistentVolumeClaim, srcFormat, dstFormat
 }
 
 func (c *Converter) ensureScratchDV(sourcePVC *v1.PersistentVolumeClaim) (*cdi.DataVolume, error) {
-	scratchDV := &cdi.DataVolume{}
 	dvList := &cdi.DataVolumeList{}
 	label := client.MatchingLabels{planbase.AnnConversionSourcePVC: sourcePVC.Name}
 	err := c.Destination.Client.List(context.Background(), dvList, client.InNamespace(sourcePVC.Namespace), label)
@@ -252,9 +260,9 @@ func (c *Converter) ensureScratchDV(sourcePVC *v1.PersistentVolumeClaim) (*cdi.D
 	}
 
 	// DV doesn't exist, create it
-	scratchDV = makeScratchDV(sourcePVC)
+	scratchDV := makeScratchDV(sourcePVC)
 	c.Log.Info("DV doesn't exist, creating", "dv", scratchDV.Name)
-	err = c.Destination.Client.Create(context.Background(), scratchDV, &client.CreateOptions{})
+	err = c.Destination.Client.Create(context.Background(), scratchDV)
 	if err != nil {
 		return nil, err
 	}
