@@ -51,10 +51,18 @@ type VirtualConfig struct {
 	Value    string   `xml:"value,attr"`
 }
 
+type ExtraVirtualConfig struct {
+	XMLName  xml.Name `xml:"http://www.vmware.com/schema/ovf ExtraConfig"`
+	Required string   `xml:"required,attr"`
+	Key      string   `xml:"key,attr"`
+	Value    string   `xml:"value,attr"`
+}
+
 type VirtualHardwareSection struct {
-	Info    string          `xml:"Info"`
-	Items   []Item          `xml:"Item"`
-	Configs []VirtualConfig `xml:"Config"`
+	Info        string               `xml:"Info"`
+	Items       []Item               `xml:"Item"`
+	Configs     []VirtualConfig      `xml:"Config"`
+	ExtraConfig []ExtraVirtualConfig `xml:"ExtraConfig"`
 }
 
 type References struct {
@@ -488,17 +496,8 @@ func convertToVmStruct(envelope []Envelope, ovaPath []string) ([]VM, error) {
 				})
 			}
 
-			for _, conf := range virtualSystem.HardwareSection.Configs {
-				if conf.Key == "firmware" {
-					newVM.Firmware = conf.Value
-				} else if conf.Key == "memoryHotAddEnabled" {
-					newVM.MemoryHotAddEnabled, _ = strconv.ParseBool(conf.Value)
-				} else if conf.Key == "cpuHotAddEnabled" {
-					newVM.CpuHotAddEnabled, _ = strconv.ParseBool(conf.Value)
-				} else if conf.Key == "cpuHotRemoveEnabled" {
-					newVM.CpuHotRemoveEnabled, _ = strconv.ParseBool(conf.Value)
-				}
-			}
+			applyConfiguration(&newVM, virtualSystem.HardwareSection.Configs)
+			applyExtraConfiguration(&newVM, virtualSystem.HardwareSection.ExtraConfig)
 
 			var id string
 			if isValidUUID(virtualSystem.ID) {
@@ -512,6 +511,36 @@ func convertToVmStruct(envelope []Envelope, ovaPath []string) ([]VM, error) {
 		}
 	}
 	return vms, nil
+}
+
+func applyConfiguration(newVM *VM, confs []VirtualConfig) {
+	for _, conf := range confs {
+		switch conf.Key {
+		case "firmware":
+			newVM.Firmware = conf.Value
+		case "memoryHotAddEnabled":
+			newVM.MemoryHotAddEnabled, _ = strconv.ParseBool(conf.Value)
+		case "cpuHotAddEnabled":
+			newVM.CpuHotAddEnabled, _ = strconv.ParseBool(conf.Value)
+		case "cpuHotRemoveEnabled":
+			newVM.CpuHotRemoveEnabled, _ = strconv.ParseBool(conf.Value)
+		}
+	}
+}
+
+func applyExtraConfiguration(newVM *VM, confs []ExtraVirtualConfig) {
+	for _, conf := range confs {
+		switch conf.Key {
+		case "firmware":
+			newVM.Firmware = conf.Value
+		case "memoryHotAddEnabled":
+			newVM.MemoryHotAddEnabled, _ = strconv.ParseBool(conf.Value)
+		case "cpuHotAddEnabled":
+			newVM.CpuHotAddEnabled, _ = strconv.ParseBool(conf.Value)
+		case "cpuHotRemoveEnabled":
+			newVM.CpuHotRemoveEnabled, _ = strconv.ParseBool(conf.Value)
+		}
+	}
 }
 
 func convertToNetworkStruct(envelope []Envelope) ([]VmNetwork, error) {
