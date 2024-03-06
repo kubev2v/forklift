@@ -138,6 +138,7 @@ func createConvertJob(pvc *v1.PersistentVolumeClaim, dv *cdi.DataVolume, srcForm
 			Template: v1.PodTemplateSpec{
 				Spec: v1.PodSpec{
 					SecurityContext: &v1.PodSecurityContext{
+						RunAsNonRoot: ptr.To(true),
 						SeccompProfile: &v1.SeccompProfile{
 							Type: v1.SeccompProfileTypeRuntimeDefault,
 						},
@@ -192,6 +193,9 @@ func makeConversionContainer(pvc *v1.PersistentVolumeClaim, srcFormat, dstFormat
 		Image: base.Settings.VirtV2vImageCold,
 		SecurityContext: &v1.SecurityContext{
 			AllowPrivilegeEscalation: ptr.To(false),
+			Capabilities: &v1.Capabilities{
+				Drop: []v1.Capability{"ALL"},
+			},
 		},
 		Command: []string{"/usr/local/bin/image-converter"},
 		Args: []string{
