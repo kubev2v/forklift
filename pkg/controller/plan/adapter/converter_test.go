@@ -47,6 +47,9 @@ var _ = Describe("Converter tests", func() {
 			ObjectMeta: meta.ObjectMeta{
 				Name:      getJobName(qcow2PVC, "convert"),
 				Namespace: pvcNamespace,
+				Labels: map[string]string{
+					base.AnnConversionSourcePVC: pvcName,
+				},
 			},
 		}
 
@@ -117,20 +120,14 @@ var _ = Describe("Converter tests", func() {
 					Phase: cdi.Succeeded,
 				},
 			}
-			job := &batchv1.Job{
-				ObjectMeta: meta.ObjectMeta{
-					Name:      getJobName(qcow2PVC, "convert"),
-					Namespace: pvcNamespace,
-				},
-			}
 
-			job.Status.Conditions = append(job.Status.Conditions, batchv1.JobCondition{Status: "False", Type: batchv1.JobFailed})
-			job.Status.Failed = 3
+			convertJob.Status.Conditions = append(convertJob.Status.Conditions, batchv1.JobCondition{Status: "False", Type: batchv1.JobFailed})
+			convertJob.Status.Failed = 3
 
-			converter = createFakeConverter(qcow2PVC, job, dv)
+			converter = createFakeConverter(qcow2PVC, convertJob, dv)
 
 			_, err := converter.ConvertPVCs([]*v1.PersistentVolumeClaim{qcow2PVC}, srcFormatFn, "raw")
-			Expect(err).To(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			// Check if scratch DV is removed
 			err = converter.Destination.Client.Get(context.TODO(), types.NamespacedName{Name: dv.Name, Namespace: dv.Namespace}, dv)
