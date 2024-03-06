@@ -11,7 +11,7 @@ import (
 // Global
 var Settings = ControllerSettings{}
 
-const OpenShift = "OpenShift"
+const OpenShift = "OPENSHIFT"
 
 // Settings
 type ControllerSettings struct {
