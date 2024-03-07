@@ -96,7 +96,7 @@ func (c *Converter) ConvertPVCs(pvcs []*v1.PersistentVolumeClaim, srcFormat srcF
 }
 
 func (c *Converter) deleteScratchDV(scratchDV *cdi.DataVolume) {
-	err := c.Destination.Client.Delete(context.Background(), scratchDV, &client.DeleteOptions{})
+	err := c.Destination.Client.Delete(context.Background(), scratchDV)
 	if err != nil {
 		c.Log.Error(err, "Failed to delete scratch DV", "DV", scratchDV.Name)
 	}
@@ -121,7 +121,7 @@ func (c *Converter) ensureJob(pvc *v1.PersistentVolumeClaim, dv *cdi.DataVolume,
 	// Job doesn't exist, create it
 	job := createConvertJob(pvc, dv, srcFormat, dstFormat, c.Labels)
 	c.Log.Info("Creating convert job", "pvc", pvc.Name, "srcFormat", srcFormat, "dstFormat", dstFormat)
-	err = c.Destination.Client.Create(context.Background(), job, &client.CreateOptions{})
+	err = c.Destination.Client.Create(context.Background(), job)
 	if err != nil {
 		return nil, err
 	}
@@ -147,6 +147,8 @@ func createConvertJob(pvc *v1.PersistentVolumeClaim, dv *cdi.DataVolume, srcForm
 			Template: v1.PodTemplateSpec{
 				Spec: v1.PodSpec{
 					SecurityContext: &v1.PodSecurityContext{
+						// Since we do not have RunAsUser and FSGroup, the pod will fail in the default namespace
+						// as it would not be assigned these automatically
 						RunAsNonRoot: ptr.To(true),
 						SeccompProfile: &v1.SeccompProfile{
 							Type: v1.SeccompProfileTypeRuntimeDefault,
