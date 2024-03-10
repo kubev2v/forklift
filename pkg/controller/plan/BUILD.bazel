@@ -22,6 +22,7 @@ go_library(
         "//pkg/controller/base",
         "//pkg/controller/plan/adapter",
         "//pkg/controller/plan/adapter/base",
+        "//pkg/controller/plan/adapter/ova",
         "//pkg/controller/plan/context",
         "//pkg/controller/plan/handler",
         "//pkg/controller/plan/scheduler",
