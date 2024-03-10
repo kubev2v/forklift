@@ -513,33 +513,28 @@ func convertToVmStruct(envelope []Envelope, ovaPath []string) ([]VM, error) {
 	return vms, nil
 }
 
-func applyConfiguration(newVM *VM, confs []VirtualConfig) {
-	for _, conf := range confs {
-		switch conf.Key {
-		case "firmware":
-			newVM.Firmware = conf.Value
-		case "memoryHotAddEnabled":
-			newVM.MemoryHotAddEnabled, _ = strconv.ParseBool(conf.Value)
-		case "cpuHotAddEnabled":
-			newVM.CpuHotAddEnabled, _ = strconv.ParseBool(conf.Value)
-		case "cpuHotRemoveEnabled":
-			newVM.CpuHotRemoveEnabled, _ = strconv.ParseBool(conf.Value)
-		}
+func applyConfiguration(vm *VM, configs []VirtualConfig) {
+	for _, config := range configs {
+		apply(vm, config.Key, config.Value)
 	}
 }
 
-func applyExtraConfiguration(newVM *VM, confs []ExtraVirtualConfig) {
-	for _, conf := range confs {
-		switch conf.Key {
-		case "firmware":
-			newVM.Firmware = conf.Value
-		case "memoryHotAddEnabled":
-			newVM.MemoryHotAddEnabled, _ = strconv.ParseBool(conf.Value)
-		case "cpuHotAddEnabled":
-			newVM.CpuHotAddEnabled, _ = strconv.ParseBool(conf.Value)
-		case "cpuHotRemoveEnabled":
-			newVM.CpuHotRemoveEnabled, _ = strconv.ParseBool(conf.Value)
-		}
+func applyExtraConfiguration(vm *VM, configs []ExtraVirtualConfig) {
+	for _, config := range configs {
+		apply(vm, config.Key, config.Value)
+	}
+}
+
+func apply(vm *VM, key, value string) {
+	switch key {
+	case "firmware":
+		vm.Firmware = value
+	case "memoryHotAddEnabled":
+		vm.MemoryHotAddEnabled, _ = strconv.ParseBool(value)
+	case "cpuHotAddEnabled":
+		vm.CpuHotAddEnabled, _ = strconv.ParseBool(value)
+	case "cpuHotRemoveEnabled":
+		vm.CpuHotRemoveEnabled, _ = strconv.ParseBool(value)
 	}
 }
 
