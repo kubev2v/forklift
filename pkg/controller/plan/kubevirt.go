@@ -34,6 +34,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
+	yamlparser "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/ova"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
@@ -859,7 +860,7 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 		return
 	}
 
-	url := fmt.Sprintf("http://%s:8080/firmware", pod.Status.PodIP)
+	url := fmt.Sprintf("http://%s:8080/vm", pod.Status.PodIP)
 
 	/* Due to the virt-v2v operation, the ovf file is only available after the command's execution,
 	meaning it appears following the copydisks phase.
@@ -877,13 +878,17 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 	}
 	defer resp.Body.Close()
 
-	vmFirmware, err := io.ReadAll(resp.Body)
+	vmConf, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return
 	}
 
-	vm.Firmware = string(vmFirmware)
-	r.Log.Info("Setting the vm fimware",
+	vm.Firmware, err = yamlparser.ReadConfFromYaml(vmConf)
+	if err != nil {
+		r.Log.Error(err, "failed to get firmware configuration")
+	}
+
+	r.Log.Info("Setting the vm firmware",
 		"vm",
 		vm.String())
 
