@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -26,8 +27,8 @@ var UEFI_RE = regexp.MustCompile(`(?i)UEFI\s+bootloader?`)
 var firmware = "bios"
 
 var (
-	xmlFilePath string
-	server      *http.Server
+	yamlFilePath string
+	server       *http.Server
 )
 
 func main() {
@@ -63,7 +64,7 @@ func main() {
 		fmt.Println("Error creating directory  ", err)
 		os.Exit(1)
 	}
-	virtV2vArgs = append(virtV2vArgs, "-o", "local", "-os", DIR)
+	virtV2vArgs = append(virtV2vArgs, "-o", "kubevirt", "-os", DIR)
 
 	//Disks on filesystem storage.
 	if err := LinkDisks(FS, 15); err != nil {
@@ -109,14 +110,13 @@ func main() {
 
 	if source == OVA {
 		var err error
-		xmlFilePath, err = getXMLFile(DIR, "xml")
+		yamlFilePath, err = getYamlFile(DIR, "yaml")
 		if err != nil {
-			fmt.Println("Error gettin XML file:", err)
+			fmt.Println("Error gettin YAML file:", err)
 			os.Exit(1)
 		}
 
-		http.HandleFunc("/ovf", ovfHandler)
-		http.HandleFunc("/firmware", firmwareHandler)
+		http.HandleFunc("/vm", vmHandler)
 		http.HandleFunc("/shutdown", shutdownHandler)
 		server = &http.Server{Addr: ":8080"}
 
@@ -222,7 +222,7 @@ func executeVirtV2v(args []string, source string) (err error) {
 			line := scanner.Bytes()
 			if match := UEFI_RE.FindSubmatch(line); match != nil {
 				fmt.Println("UEFI firmware detected")
-				firmware = "uefi"
+				firmware = "efi"
 			}
 		}
 
@@ -239,7 +239,7 @@ func executeVirtV2v(args []string, source string) (err error) {
 	return
 }
 
-func getXMLFile(dir, fileExtension string) (string, error) {
+func getYamlFile(dir, fileExtension string) (string, error) {
 	files, err := filepath.Glob(filepath.Join(dir, "*."+fileExtension))
 	if err != nil {
 		return "", err
@@ -247,39 +247,36 @@ func getXMLFile(dir, fileExtension string) (string, error) {
 	if len(files) > 0 {
 		return files[0], nil
 	}
-	return "", fmt.Errorf("XML file was not found.")
+	return "", fmt.Errorf("yaml file was not found")
 }
 
-func ovfHandler(w http.ResponseWriter, r *http.Request) {
-	if xmlFilePath == "" {
-		fmt.Println("Error: XML file path is empty.")
-		http.Error(w, "XML file path is empty", http.StatusInternalServerError)
+func vmHandler(w http.ResponseWriter, r *http.Request) {
+	if yamlFilePath == "" {
+		fmt.Println("Error: YAML file path is empty.")
+		http.Error(w, "YAML file path is empty", http.StatusInternalServerError)
 		return
 	}
 
-	xmlData, err := os.ReadFile(xmlFilePath)
+	err := addFirmwareToYaml(yamlFilePath)
 	if err != nil {
-		fmt.Printf("Error reading XML file: %v\n", err)
-		http.Error(w, "Error reading XML file", http.StatusInternalServerError)
+		fmt.Printf("Error setting yaml file: %v\n", err)
+		http.Error(w, "Error setting yaml file", http.StatusInternalServerError)
+	}
+
+	yamlData, err := os.ReadFile(yamlFilePath)
+	if err != nil {
+		fmt.Printf("Error reading yaml file: %v\n", err)
+		http.Error(w, "Error reading Yaml file", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/xml")
-	_, err = w.Write(xmlData)
+	w.Header().Set("Content-Type", "text/yaml")
+	_, err = w.Write(yamlData)
 	if err == nil {
 		w.WriteHeader(http.StatusOK)
 	} else {
 		fmt.Printf("Error writing response: %v\n", err)
 		http.Error(w, "Error writing response", http.StatusInternalServerError)
-	}
-}
-
-func firmwareHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/plain")
-	if _, err := w.Write([]byte(firmware)); err != nil {
-		fmt.Printf("Error writing response: %v\n", err)
-		http.Error(w, "Error writing response", http.StatusInternalServerError)
-		return
 	}
 }
 
@@ -298,4 +295,68 @@ func isValidSource(source string) bool {
 	default:
 		return false
 	}
+}
+
+func addFirmwareToYaml(filePath string) (err error) {
+	var newFirmwareData string
+	if firmware == "bios" {
+		newFirmwareData = (`    firmware:
+      bootloader:
+        bios: {}`)
+	} else {
+		newFirmwareData = (`    firmware:
+      bootloader:
+        efi: 
+          secureBoot: false`)
+	}
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	tempFilePath := filePath + ".tmp"
+
+	tempFile, err := os.Create(tempFilePath)
+	if err != nil {
+		return
+	}
+	defer tempFile.Close()
+
+	scanner := bufio.NewScanner(file)
+	domainFound := false
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if strings.Contains(line, "domain:") {
+			domainFound = true
+		}
+
+		_, err = tempFile.WriteString(line + "\n")
+		if err != nil {
+			return
+		}
+
+		if domainFound {
+			_, err = tempFile.WriteString(newFirmwareData + "\n")
+			if err != nil {
+				return
+			}
+			domainFound = false
+		}
+	}
+
+	if err = scanner.Err(); err != nil {
+		return
+	}
+
+	err = os.Rename(tempFilePath, filePath)
+	if err != nil {
+		return
+	}
+
+	fmt.Println("YAML file has been modified successfully.")
+	return
 }
