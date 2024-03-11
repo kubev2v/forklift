@@ -380,6 +380,9 @@ spec:
                     operatingSystem:
                       description: The Operating System detected by virt-v2v.
                       type: string
+                    newName:
+                      description: The new name of the VM after matching DNS1123 requirements.
+                      type: string
                     phase:
                       description: Phase
                       type: string

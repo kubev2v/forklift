@@ -30,6 +30,7 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -717,6 +718,13 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			step.AddError(err.Error())
 			err = nil
 			break
+		}
+		if errs := k8svalidation.IsDNS1123Label(vm.Name); len(errs) > 0 {
+			vm.NewName, err = r.kubevirt.changeVmNameDNS1123(vm.Name, r.Plan.Spec.TargetNamespace)
+			if err != nil {
+				r.Log.Error(err, "Failed to update the VM name to meet DNS1123 protocol requirements.")
+				return
+			}
 		}
 		vm.Phase = r.next(vm.Phase)
 	case PreHook, PostHook:
