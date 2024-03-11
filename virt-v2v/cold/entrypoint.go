@@ -194,8 +194,13 @@ func buildCommand() []string {
 		fmt.Println("Error creating directory  ", err)
 		os.Exit(1)
 	}
-	virtV2vArgs = append(virtV2vArgs, "-o", "kubevirt", "-os", DIR)
+	virtV2vArgs = append(virtV2vArgs, "-o", "kubevirt")
 
+	if checkEnvVariablesSet("V2V_NewName") {
+		virtV2vArgs = append(virtV2vArgs, "-on", os.Getenv("V2V_NewName"))
+	}
+
+	virtV2vArgs = append(virtV2vArgs, "-os", DIR)
 	//Disks on filesystem storage.
 	if err := LinkDisks(FS, 15); err != nil {
 		os.Exit(1)
