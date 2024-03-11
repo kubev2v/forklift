@@ -3,13 +3,12 @@ package main
 import (
 	"bufio"
 	"flag"
-	"net/http"
 	"os"
 	"regexp"
 	"strconv"
 
+	"github.com/konveyor/forklift-controller/pkg/metrics"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	dto "github.com/prometheus/client_model/go"
 	"k8s.io/klog/v2"
 )
@@ -62,11 +61,12 @@ func main() {
 	defer klog.Flush()
 	flag.Parse()
 
-	// Start prometheus metrics HTTP handler
-	klog.Info("Setting up prometheus endpoint :2112/metrics")
-	http.Handle("/metrics", promhttp.Handler())
-	go http.ListenAndServe(":2112", nil)
+	certsDirectory, err := os.MkdirTemp("", "certsdir")
+	if err != nil {
+		klog.Fatal(err)
+	}
 
+	metrics.StartPrometheusEndpoint("8443", "", certsDirectory)
 	progressCounter := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Subsystem: "v2v",
@@ -75,6 +75,7 @@ func main() {
 		},
 		[]string{"disk_id"},
 	)
+
 	if err := prometheus.Register(progressCounter); err != nil {
 		// Exit gracefully if we fail here. We don't need monitoring
 		// failures to hinder guest conversion.
@@ -85,7 +86,7 @@ func main() {
 
 	var diskNumber uint64 = 0
 	var disks uint64 = 0
-	var progress uint64 = 0
+	var progress uint64
 
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Split(LimitedScanLines)
@@ -121,10 +122,10 @@ func main() {
 		if err != nil {
 			// Don't make processing errors fatal.
 			klog.Error("Error updating progress: ", err)
-			err = nil
+			continue
 		}
 	}
-	err := scanner.Err()
+	err = scanner.Err()
 	if err != nil {
 		klog.Fatal("Output monitoring failed! ", err)
 	}

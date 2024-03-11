@@ -46,7 +46,7 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	metrics.StartPrometheusEndpoint(certsDirectory)
+	metrics.StartPrometheusEndpoint("8443", "", certsDirectory)
 
 	populate(config)
 }

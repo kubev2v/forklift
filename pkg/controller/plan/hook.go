@@ -33,8 +33,6 @@ type HookRunner struct {
 	// VM.
 	vm *planapi.VMStatus
 	// Hook.
-	hookRef *planapi.HookRef
-	// Hook.
 	hook *api.Hook
 }
 

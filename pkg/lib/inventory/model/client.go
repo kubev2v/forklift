@@ -197,7 +197,7 @@ func (r *Client) Count(model Model, predicate Predicate) (n int64, err error) {
 }
 
 // Begin a transaction.
-func (r *Client) Begin(labels ...string) (tx *Tx, error error) {
+func (r *Client) Begin(labels ...string) (tx *Tx, err error) {
 	mark := time.Now()
 	session := r.pool.Writer()
 	realTx, err := session.Begin()
