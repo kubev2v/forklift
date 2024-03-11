@@ -49,7 +49,7 @@ func main() {
 	fmt.Println("Preparing virt-v2v")
 	switch source {
 	case vSphere:
-		virtV2vArgs = append(virtV2vArgs, "-i", "libvirt", "-ic", os.Getenv("V2V_libvirtURL"))
+		virtV2vArgs = append(virtV2vArgs, "--root", "first", "-i", "libvirt", "-ic", os.Getenv("V2V_libvirtURL"))
 	case OVA:
 		virtV2vArgs = append(virtV2vArgs, "-i", "ova", os.Getenv("V2V_diskPath"))
 	}
