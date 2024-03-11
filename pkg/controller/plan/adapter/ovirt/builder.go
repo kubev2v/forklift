@@ -877,7 +877,7 @@ func (r *Builder) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (tr
 	}
 
 	pvcSize := pvc.Spec.Resources.Requests["storage"]
-	transferredBytes = progressPercentage * pvcSize.Value()
+	transferredBytes = (progressPercentage * pvcSize.Value()) / 100
 
 	return
 }
