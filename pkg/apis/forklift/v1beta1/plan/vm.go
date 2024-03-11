@@ -61,6 +61,8 @@ type VMStatus struct {
 	RestorePowerState VMPowerState `json:"restorePowerState,omitempty"`
 	// The firmware type detected from the OVF file produced by virt-v2v.
 	Firmware string `json:"firmware,omitempty"`
+	// The new name of the VM after matching DNS1123 requirements.
+	NewName string `json:"newName,omitempty"`
 
 	// Conditions.
 	libcnd.Conditions `json:",inline"`

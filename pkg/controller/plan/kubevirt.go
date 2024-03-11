@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cnv "kubevirt.io/api/core/v1"
 	instancetype "kubevirt.io/api/instancetype/v1beta1"
@@ -1168,13 +1167,9 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 	//convention it will be automatically changed.
 	var originalName string
 
-	if errs := k8svalidation.IsDNS1123Label(vm.Name); len(errs) > 0 {
+	if vm.NewName != "" {
 		originalName = vm.Name
-		vm.Name, err = r.changeVmNameDNS1123(vm.Name, r.Plan.Spec.TargetNamespace)
-		if err != nil {
-			r.Log.Error(err, "Failed to update the VM name to meet DNS1123 protocol requirements.")
-			return
-		}
+		vm.Name = vm.NewName
 		r.Log.Info("VM name is incompatible with DNS1123 RFC, renaming",
 			"originalName", originalName, "newName", vm.Name)
 	}
@@ -1545,6 +1540,12 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	if err != nil {
 		return
 	}
+	environment = append(environment,
+		core.EnvVar{
+			Name:  "V2V_NewName",
+			Value: vm.NewName,
+		})
+
 	// pod annotations
 	annotations := map[string]string{}
 	if r.Plan.Spec.TransferNetwork != nil {
