@@ -11,6 +11,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
@@ -732,7 +733,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 			}
 			var pvc *core.PersistentVolumeClaim
 			storageClassName := r.Context.Map.Storage.Spec.Map[0].Destination.StorageClass
-			pvc, err = r.persistentVolumeClaimWithSourceRef(diskAttachment, storageClassName, populatorName, annotations)
+			pvc, err = r.persistentVolumeClaimWithSourceRef(diskAttachment, storageClassName, populatorName, annotations, vmRef.ID)
 			if err != nil {
 				if !k8serr.IsAlreadyExists(err) {
 					err = liberr.Wrap(err, "disk attachment", diskAttachment.DiskAttachment.ID, "storage class", storageClassName, "populator", populatorName)
@@ -747,10 +748,32 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 	return
 }
 
-// Get the OvirtVolumePopulator CustomResource based on the PVC name.
-func (r *Builder) getVolumePopulator(name string) (populatorCr api.OvirtVolumePopulator, err error) {
-	populatorCr = api.OvirtVolumePopulator{}
-	err = r.Destination.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: name}, &populatorCr)
+// Get the OvirtVolumePopulator CustomResource based on the disk ID.
+func (r *Builder) getVolumePopulator(diskID string) (populatorCr api.OvirtVolumePopulator, err error) {
+	list := api.OvirtVolumePopulatorList{}
+	err = r.Destination.Client.List(context.TODO(), &list, &client.ListOptions{
+		Namespace: r.Plan.Spec.TargetNamespace,
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			"migration": string(r.Migration.UID),
+			"diskID":    diskID,
+		}),
+	})
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	if len(list.Items) == 0 {
+		err = k8serr.NewNotFound(api.SchemeGroupVersion.WithResource("OvirtVolumePopulator").GroupResource(), diskID)
+		return
+	}
+	if len(list.Items) > 1 {
+		err = liberr.New("Multiple OvirtVolumePopulator CRs found for the same disk", "diskID", diskID)
+		return
+	}
+
+	populatorCr = list.Items[0]
+
 	return
 }
 
@@ -767,9 +790,13 @@ func (r *Builder) createVolumePopulatorCR(diskAttachment model.XDiskAttachment, 
 	}
 	populatorCR := &api.OvirtVolumePopulator{
 		ObjectMeta: meta.ObjectMeta{
-			Name:      diskAttachment.DiskAttachment.ID,
-			Namespace: r.Plan.Spec.TargetNamespace,
-			Labels:    map[string]string{"vmID": vmId, "migration": migrationId},
+			GenerateName: fmt.Sprintf("%s-", diskAttachment.DiskAttachment.ID),
+			Namespace:    r.Plan.Spec.TargetNamespace,
+			Labels: map[string]string{
+				"vmID":      vmId,
+				"migration": migrationId,
+				"diskID":    diskAttachment.Disk.ID,
+			},
 		},
 		Spec: api.OvirtVolumePopulatorSpec{
 			EngineURL:        engineURL.String(),
@@ -780,13 +807,10 @@ func (r *Builder) createVolumePopulatorCR(diskAttachment model.XDiskAttachment, 
 	}
 	err = r.Context.Client.Create(context.TODO(), populatorCR, &client.CreateOptions{})
 	if err != nil {
-		if !k8serr.IsAlreadyExists(err) {
-			err = liberr.Wrap(err)
-			return
-		} else {
-			err = nil
-		}
+		err = liberr.Wrap(err)
+		return
 	}
+
 	name = populatorCR.Name
 	return
 }
@@ -814,8 +838,11 @@ func (r *Builder) getDefaultVolumeAndAccessMode(storageClassName string) ([]core
 }
 
 // Build a PersistentVolumeClaim with DataSourceRef for VolumePopulator
-func (r *Builder) persistentVolumeClaimWithSourceRef(diskAttachment model.XDiskAttachment, storageClassName string, populatorName string,
-	annotations map[string]string) (pvc *core.PersistentVolumeClaim, err error) {
+func (r *Builder) persistentVolumeClaimWithSourceRef(diskAttachment model.XDiskAttachment,
+	storageClassName string,
+	populatorName string,
+	annotations map[string]string,
+	vmID string) (pvc *core.PersistentVolumeClaim, err error) {
 	diskSize := diskAttachment.Disk.ProvisionedSize
 	var accessModes []core.PersistentVolumeAccessMode
 	var volumeMode *core.PersistentVolumeMode
@@ -834,9 +861,14 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(diskAttachment model.XDiskA
 
 	pvc = &core.PersistentVolumeClaim{
 		ObjectMeta: meta.ObjectMeta{
-			Name:        diskAttachment.DiskAttachment.ID,
-			Namespace:   r.Plan.Spec.TargetNamespace,
-			Annotations: annotations,
+			GenerateName: fmt.Sprintf("%s-", diskAttachment.DiskAttachment.ID),
+			Namespace:    r.Plan.Spec.TargetNamespace,
+			Annotations:  annotations,
+			Labels: map[string]string{
+				"migration": string(r.Migration.UID),
+				"vmID":      vmID,
+				"diskID":    diskAttachment.Disk.ID,
+			},
 		},
 		Spec: core.PersistentVolumeClaimSpec{
 			AccessModes: accessModes,
@@ -863,7 +895,10 @@ func (r *Builder) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (tr
 		// skip LUNs
 		return
 	}
-	populatorCr, err := r.getVolumePopulator(pvc.Name)
+
+	diskID := pvc.Annotations[planbase.AnnDiskSource]
+
+	populatorCr, err := r.getVolumePopulator(diskID)
 	if err != nil {
 		return
 	}
@@ -929,6 +964,6 @@ func (r *Builder) setOvirtPopulatorLabels(populatorCr api.OvirtVolumePopulator, 
 }
 
 func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error) {
-	taskName = pvc.Spec.DataSource.Name
+	taskName = pvc.Annotations[planbase.AnnDiskSource]
 	return
 }
