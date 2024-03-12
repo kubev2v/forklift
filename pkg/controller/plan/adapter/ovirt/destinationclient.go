@@ -40,14 +40,15 @@ func (r *DestinationClient) SetPopulatorCrOwnership() (err error) {
 	if err != nil {
 		return
 	}
+
 	for _, populatorCr := range populatorCrList.Items {
-		pvc := core.PersistentVolumeClaim{}
-		err = r.Destination.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: populatorCr.Spec.DiskID}, &pvc)
+		pvc, err := r.findPVCByCR(&populatorCr)
 		if err != nil {
 			continue
 		}
+
 		populatorCrCopy := populatorCr.DeepCopy()
-		err = k8sutil.SetOwnerReference(&pvc, &populatorCr, r.Scheme())
+		err = k8sutil.SetOwnerReference(pvc, &populatorCr, r.Scheme())
 		if err != nil {
 			continue
 		}
@@ -92,5 +93,35 @@ func (r *DestinationClient) DeleteObject(object client.Object, vm *plan.VMStatus
 			"vm",
 			vm.String())
 	}
+	return
+}
+
+func (r *DestinationClient) findPVCByCR(cr *v1beta1.OvirtVolumePopulator) (pvc *core.PersistentVolumeClaim, err error) {
+	pvcList := core.PersistentVolumeClaimList{}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		&pvcList,
+		&client.ListOptions{
+			Namespace: r.Plan.Spec.TargetNamespace,
+			LabelSelector: labels.SelectorFromSet(map[string]string{
+				"migration": string(r.Plan.Status.Migration.ActiveSnapshot().Migration.UID),
+				"diskID":    cr.Spec.DiskID,
+			}),
+		})
+
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	if len(pvcList.Items) == 0 {
+		err = liberr.New("PVC not found", "diskID", cr.Spec.DiskID)
+	}
+	if len(pvcList.Items) > 1 {
+		err = liberr.New("Multiple PVCs found", "diskID", cr.Spec.DiskID)
+	}
+
+	pvc = &pvcList.Items[0]
+
 	return
 }
