@@ -913,7 +913,7 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 		return
 	}
 
-	url := fmt.Sprintf("http://%s:8080/ovf", pod.Status.PodIP)
+	url := fmt.Sprintf("http://%s:8080/vm", pod.Status.PodIP)
 
 	/* Due to the virt-v2v operation, the ovf file is only available after the command's execution,
 	meaning it appears following the copydisks phase.
@@ -940,6 +940,8 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 	if err != nil {
 		return
 	}
+
+	r.Log.Info("setting the vm firmware to ", firmware, "vmId", vm.ID)
 
 	vm.Firmware = firmware
 
