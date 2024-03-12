@@ -300,16 +300,9 @@ func isValidSource(source string) bool {
 }
 
 func addFirmwareToXml(filePath string) (err error) {
-	var newFirmwareData string
-	if firmware == "bios" {
-		newFirmwareData = (`  <firmware>
-		<bootloader type='bios'/>
-	</firmware>`)
-	} else {
-		newFirmwareData = (`  <firmware>
-		<bootloader type='efi'/>
-	</firmware>`)
-	}
+	newFirmwareData := fmt.Sprintf(`  <firmware>
+		<bootloader type='%s'/>
+	</firmware>`, firmware)
 
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -330,8 +323,7 @@ func addFirmwareToXml(filePath string) (err error) {
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		_, err = tempFile.WriteString(line + "\n")
-		if err != nil {
+		if _, err = tempFile.WriteString(line + "\n"); err != nil {
 			return
 		}
 
