@@ -882,14 +882,12 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 		return
 	}
 
-	vm.Firmware, err = yamlparser.ReadConfFromYaml(vmConf)
+	vm.Firmware, err = yamlparser.GetFirmwareFromYaml(vmConf)
 	if err != nil {
 		r.Log.Error(err, "failed to get firmware configuration")
 	}
 
-	r.Log.Info("Setting the vm firmware",
-		"vm",
-		vm.String())
+	r.Log.Info("Setting the vm firmware ", vm.Firmware, "vmId", vm.ID)
 
 	shutdownURL := fmt.Sprintf("http://%s:8080/shutdown", pod.Status.PodIP)
 	resp, err = http.Post(shutdownURL, "application/json", nil)

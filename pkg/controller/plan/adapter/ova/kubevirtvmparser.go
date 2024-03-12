@@ -1,6 +1,7 @@
 package ova
 
 import (
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"gopkg.in/yaml.v2"
 )
 
@@ -38,7 +39,7 @@ type EFI struct {
 	SecureBoot bool `yaml:"secureBoot"`
 }
 
-func ReadConfFromYaml(yamlData []byte) (firmware string, err error) {
+func GetFirmwareFromYaml(yamlData []byte) (firmware string, err error) {
 	var vmi VirtualMachineInstance
 	if err = yaml.Unmarshal(yamlData, &vmi); err != nil {
 		return
@@ -52,5 +53,6 @@ func ReadConfFromYaml(yamlData []byte) (firmware string, err error) {
 		firmware = "efi"
 		return
 	}
+	err = liberr.New("Firmware type was not detected")
 	return
 }
