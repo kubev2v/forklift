@@ -21,7 +21,7 @@ if [ "$V2V_source" == "vCenter" ] ; then
       echo "    V2V_libvirtURL, V2V_secretKey, V2V_vmName"
       exit 1
   fi
-  args+=(-i libvirt -ic "$V2V_libvirtURL")
+  args+=(--root first -i libvirt -ic "$V2V_libvirtURL")
 fi
 
 if [ "$V2V_source" == "ova" ] ; then
