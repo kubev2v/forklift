@@ -975,6 +975,7 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 	switch r.Source.Provider.Type() {
 	case api.Ova:
 		if vm.Firmware, err = ovfparser.GetFirmwareFromConfig(vmConfigXML); err != nil {
@@ -992,15 +993,22 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 	r.Log.Info("Setting the vm fimware",
 =======
 	vm.Firmware, err = yamlparser.ReadConfFromYaml(vmConf)
+=======
+	vm.Firmware, err = yamlparser.GetFirmwareFromYaml(vmConf)
+>>>>>>> eaa8800f (minor changes)
 	if err != nil {
 		r.Log.Error(err, "failed to get firmware configuration")
 	}
 
+<<<<<<< HEAD
 	r.Log.Info("Setting the vm firmware",
 >>>>>>> 867f6944 (OVA: adjust the controller to use kubevirt yaml for firmware detection)
 		"vm",
 		vm.String())
 >>>>>>> ae0dd5b8 (OVA: workaround for virt-v2v firmware detection)
+=======
+	r.Log.Info("Setting the vm firmware ", vm.Firmware, "vmId", vm.ID)
+>>>>>>> eaa8800f (minor changes)
 
 	shutdownURL := fmt.Sprintf("http://%s:8080/shutdown", pod.Status.PodIP)
 	resp, err = http.Post(shutdownURL, "application/json", nil)
