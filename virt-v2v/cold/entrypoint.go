@@ -223,6 +223,7 @@ func executeVirtV2v(source string, args []string) (err error) {
 			if match := UEFI_RE.FindSubmatch(line); match != nil {
 				fmt.Println("UEFI firmware detected")
 				firmware = "efi"
+				break
 			}
 		}
 
@@ -325,26 +326,19 @@ func addFirmwareToXml(filePath string) (err error) {
 	defer tempFile.Close()
 
 	scanner := bufio.NewScanner(file)
-	domainFound := false
 
 	for scanner.Scan() {
 		line := scanner.Text()
-
-		if strings.Contains(line, "</os>") {
-			domainFound = true
-		}
 
 		_, err = tempFile.WriteString(line + "\n")
 		if err != nil {
 			return
 		}
 
-		if domainFound {
-			_, err = tempFile.WriteString(newFirmwareData + "\n")
-			if err != nil {
+		if strings.Contains(line, "</os>") {
+			if _, err = tempFile.WriteString(newFirmwareData + "\n"); err != nil {
 				return
 			}
-			domainFound = false
 		}
 	}
 
@@ -352,8 +346,7 @@ func addFirmwareToXml(filePath string) (err error) {
 		return
 	}
 
-	err = os.Rename(tempFilePath, filePath)
-	if err != nil {
+	if err = os.Rename(tempFilePath, filePath); err != nil {
 		return
 	}
 
