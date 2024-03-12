@@ -658,22 +658,20 @@ func (r *KubeVirt) getPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, e
 	err = r.Destination.Client.List(
 		context.TODO(),
 		pvcsList,
-		r.getListOptionsNamespaced(),
+		&client.ListOptions{
+			LabelSelector: labels.SelectorFromSet(map[string]string{
+				"migration": string(r.Migration.UID),
+				kVM:         vmRef.ID,
+			}),
+		},
 	)
-
 	if err != nil {
 		err = liberr.Wrap(err)
-		return
 	}
 
-	pvcs = []*core.PersistentVolumeClaim{}
-	vmLabels := r.vmLabels(vmRef)
-	for i := range pvcsList.Items {
-		pvc := &pvcsList.Items[i]
-		pvcAnn := pvc.GetAnnotations()
-		if pvcAnn[kVM] == vmLabels[kVM] && pvcAnn[kPlan] == vmLabels[kPlan] {
-			pvcs = append(pvcs, pvc)
-		}
+	pvcs = make([]*core.PersistentVolumeClaim, len(pvcsList.Items))
+	for i, pvc := range pvcsList.Items {
+		pvcs[i] = &pvc
 	}
 
 	return

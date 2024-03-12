@@ -23,6 +23,7 @@ import (
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	cnv "kubevirt.io/api/core/v1"
@@ -515,7 +516,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []*core.Pe
 
 		image, err := r.getImageFromPVC(pvc)
 		if err != nil {
-			r.Log.Error(err, "image not found in inventory", "imageID", pvc.Name)
+			r.Log.Error(err, "image not found in inventory", "imageID", pvc.Labels["imageID"])
 			return
 		}
 
@@ -538,7 +539,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []*core.Pe
 			}
 		}
 
-		cnvVolumeName := fmt.Sprintf("vol-%v", pvc.Annotations[planbase.AnnDiskSource])
+		cnvVolumeName := fmt.Sprintf("vol-%s", pvc.Annotations[planbase.AnnDiskSource])
 		cnvVolume := cnv.Volume{
 			Name: cnvVolumeName,
 			VolumeSource: cnv.VolumeSource{
@@ -965,7 +966,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 			r.Log.Info("the image is not ready yet", "image", image.Name, "status", image.Status)
 			continue
 		}
-		if pvc, pvcErr := r.getCorrespondingPvc(image, workload, vmRef, annotations, secretName); pvcErr == nil {
+		if pvc, pvcErr := r.getCorrespondingPvc(image, workload, annotations, secretName); pvcErr == nil {
 			pvcs = append(pvcs, pvc)
 		} else {
 			err = pvcErr
@@ -975,7 +976,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 	return
 }
 
-func (r *Builder) getCorrespondingPvc(image model.Image, workload *model.Workload, vmRef ref.Ref, annotations map[string]string, secretName string) (pvc *core.PersistentVolumeClaim, err error) {
+func (r *Builder) getCorrespondingPvc(image model.Image, workload *model.Workload, annotations map[string]string, secretName string) (pvc *core.PersistentVolumeClaim, err error) {
 	populatorCR, err := r.ensureVolumePopulator(workload, &image, secretName)
 	if err != nil {
 		return
@@ -984,7 +985,7 @@ func (r *Builder) getCorrespondingPvc(image model.Image, workload *model.Workloa
 }
 
 func (r *Builder) ensureVolumePopulator(workload *model.Workload, image *model.Image, secretName string) (populatorCR *api.OpenstackVolumePopulator, err error) {
-	volumePopulatorCR, err := r.getVolumePopulatorCR(image.Name)
+	volumePopulatorCR, err := r.getVolumePopulatorCR(image.ID)
 	if err != nil {
 		if !k8serr.IsNotFound(err) {
 			err = liberr.Wrap(err)
@@ -1015,7 +1016,7 @@ func (r *Builder) ensureVolumePopulatorPVC(workload *model.Workload, image *mode
 				return
 			}
 		}
-		if pvc, err = r.persistentVolumeClaimWithSourceRef(*image, storageClassName, populatorName, annotations); err != nil {
+		if pvc, err = r.persistentVolumeClaimWithSourceRef(*image, storageClassName, populatorName, annotations, workload.ID); err != nil {
 			err = liberr.Wrap(err)
 			return
 		}
@@ -1068,9 +1069,13 @@ func (r *Builder) getImagesFromVolumes(workload *model.Workload) (images []model
 func (r *Builder) createVolumePopulatorCR(image model.Image, secretName, vmId string) (populatorCR *api.OpenstackVolumePopulator, err error) {
 	populatorCR = &api.OpenstackVolumePopulator{
 		ObjectMeta: meta.ObjectMeta{
-			Name:      image.Name,
-			Namespace: r.Plan.Spec.TargetNamespace,
-			Labels:    map[string]string{"vmID": vmId, "migration": getMigrationID(r.Context)},
+			GenerateName: fmt.Sprintf("%s-", image.Name),
+			Namespace:    r.Plan.Spec.TargetNamespace,
+			Labels: map[string]string{
+				"vmID":      vmId,
+				"migration": getMigrationID(r.Context),
+				"imageID":   image.ID,
+			},
 		},
 		Spec: api.OpenstackVolumePopulatorSpec{
 			IdentityURL:     r.Source.Provider.Spec.URL,
@@ -1147,21 +1152,62 @@ func (r *Builder) getVolumeAndAccessMode(storageClassName string) ([]core.Persis
 
 }
 
-// Get the OpenstackVolumePopulator CustomResource based on the image name.
-func (r *Builder) getVolumePopulatorCR(name string) (populatorCr api.OpenstackVolumePopulator, err error) {
-	populatorCr = api.OpenstackVolumePopulator{}
-	err = r.Destination.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: name}, &populatorCr)
+// Get the OpenstackVolumePopulator CustomResource based on the image ID.
+func (r *Builder) getVolumePopulatorCR(imageID string) (populatorCr api.OpenstackVolumePopulator, err error) {
+	populatorCrList := &api.OpenstackVolumePopulatorList{}
+	err = r.Destination.Client.List(context.TODO(), populatorCrList, &client.ListOptions{
+		Namespace: r.Plan.Spec.TargetNamespace,
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			"migration": getMigrationID(r.Context),
+			"imageID":   imageID,
+		}),
+	})
+	if err != nil {
+		return
+	}
+	if len(populatorCrList.Items) == 0 {
+		err = k8serr.NewNotFound(api.SchemeGroupVersion.WithResource("OpenstackVolumePopulator").GroupResource(), imageID)
+		return
+	}
+	if len(populatorCrList.Items) > 1 {
+		err = liberr.New("multiple OpenstackVolumePopulator CRs found for image", "imageID", imageID)
+	}
+
+	populatorCr = populatorCrList.Items[0]
+
 	return
 }
 
-func (r *Builder) getVolumePopulatorPVC(name string) (populatorPvc *core.PersistentVolumeClaim, err error) {
-	populatorPvc = &core.PersistentVolumeClaim{}
-	err = r.Destination.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: name}, populatorPvc)
+func (r *Builder) getVolumePopulatorPVC(imageID string) (populatorPvc *core.PersistentVolumeClaim, err error) {
+	populatorPvcList := &core.PersistentVolumeClaimList{}
+	err = r.Destination.Client.List(context.TODO(), populatorPvcList, &client.ListOptions{
+		Namespace: r.Plan.Spec.TargetNamespace,
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			"migration": getMigrationID(r.Context),
+			"imageID":   imageID,
+		}),
+	})
+	if err != nil {
+		return
+	}
+
+	if len(populatorPvcList.Items) == 0 {
+		err = k8serr.NewNotFound(api.SchemeGroupVersion.WithResource("PersistentVolumeClaim").GroupResource(), imageID)
+		return
+	}
+	if len(populatorPvcList.Items) > 1 {
+		err = liberr.New("multiple PersistentVolumeClaims found for image", "imageID", imageID)
+	}
+
+	populatorPvc = &populatorPvcList.Items[0]
 	return
 }
 
-func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image, storageClassName string,
-	populatorName string, annotations map[string]string) (pvc *core.PersistentVolumeClaim, err error) {
+func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image,
+	storageClassName string,
+	populatorName string,
+	annotations map[string]string,
+	vmID string) (pvc *core.PersistentVolumeClaim, err error) {
 
 	apiGroup := "forklift.konveyor.io"
 	virtualSize := image.VirtualSize
@@ -1191,9 +1237,14 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image, storageC
 
 	pvc = &core.PersistentVolumeClaim{
 		ObjectMeta: meta.ObjectMeta{
-			Name:        image.ID,
-			Namespace:   r.Plan.Spec.TargetNamespace,
-			Annotations: annotations,
+			GenerateName: fmt.Sprintf("%s-", image.ID),
+			Namespace:    r.Plan.Spec.TargetNamespace,
+			Annotations:  annotations,
+			Labels: map[string]string{
+				"migration": getMigrationID(r.Context),
+				"imageID":   image.ID,
+				"vmID":      vmID,
+			},
 		},
 		Spec: core.PersistentVolumeClaimSpec{
 			AccessModes: accessModes,
@@ -1223,7 +1274,7 @@ func (r *Builder) PopulatorTransferredBytes(persistentVolumeClaim *core.Persiste
 	if err != nil {
 		return
 	}
-	populatorCr, err := r.getVolumePopulatorCR(image.Name)
+	populatorCr, err := r.getVolumePopulatorCR(image.ID)
 	if err != nil {
 		return
 	}
@@ -1243,7 +1294,7 @@ func (r *Builder) PopulatorTransferredBytes(persistentVolumeClaim *core.Persiste
 // Get the Openstack image from the inventory based on the PVC.
 func (r *Builder) getImageFromPVC(pvc *core.PersistentVolumeClaim) (image *model.Image, err error) {
 	image = &model.Image{}
-	err = r.Source.Inventory.Find(image, ref.Ref{ID: pvc.Name})
+	err = r.Source.Inventory.Find(image, ref.Ref{ID: pvc.Labels["imageID"]})
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -1279,7 +1330,7 @@ func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.Persi
 	}
 	migrationID := string(r.Plan.Status.Migration.ActiveSnapshot().Migration.UID)
 	for _, image := range images {
-		populatorCr, err := r.getVolumePopulatorCR(image.Name)
+		populatorCr, err := r.getVolumePopulatorCR(image.ID)
 		if err != nil {
 			continue
 		}
