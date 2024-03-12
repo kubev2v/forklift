@@ -27,6 +27,7 @@ const (
 
 var UEFI_RE = regexp.MustCompile(`(?i)UEFI\s+bootloader?`)
 var firmware = "bios"
+var nameChanged bool
 
 var (
 	yamlFilePath string
@@ -123,6 +124,7 @@ func buildCommand() []string {
 
 	if checkEnvVariablesSet("V2V_NewName") {
 		virtV2vArgs = append(virtV2vArgs, "-on", os.Getenv("V2V_NewName"))
+		nameChanged = true
 	}
 
 	virtV2vArgs = append(virtV2vArgs, "-os", DIR)
@@ -232,13 +234,20 @@ func LinkDisks(diskKind string, num int) (err error) {
 		return
 	}
 
+	var diskSuffix string
+	if nameChanged {
+		diskSuffix = os.Getenv("V2V_newName")
+	} else {
+		diskSuffix = os.Getenv("V2V_vmName")
+	}
+
 	for _, disk := range disks {
 		diskNum, err := strconv.Atoi(disk[num:])
 		if err != nil {
 			fmt.Println("Error geting disks names ", err)
 			return err
 		}
-		diskLink := fmt.Sprintf("%s/%s-sd%s", DIR, os.Getenv("V2V_vmName"), genName(diskNum+1))
+		diskLink := fmt.Sprintf("%s/%s-sd%s", DIR, diskSuffix, genName(diskNum+1))
 		diskImgPath := disk
 		if diskKind == FS {
 			diskImgPath = fmt.Sprintf("%s/disk.img", disk)
@@ -342,8 +351,8 @@ func vmHandler(w http.ResponseWriter, r *http.Request) {
 
 	err := addFirmwareToYaml(yamlFilePath)
 	if err != nil {
-		fmt.Printf("Error setting yaml file: %v\n", err)
-		http.Error(w, "Error setting yaml file", http.StatusInternalServerError)
+		fmt.Printf("Error modifying vm configuration: %v\n", err)
+		http.Error(w, "Error modifying vm configuration:", http.StatusInternalServerError)
 	}
 
 	yamlData, err := os.ReadFile(yamlFilePath)
