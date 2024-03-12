@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -8,7 +9,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -24,6 +27,9 @@ var (
 	xmlFilePath string
 	server      *http.Server
 )
+
+var UEFI_RE = regexp.MustCompile(`(?i)UEFI\s+bootloader?`)
+var firmware = "bios"
 
 func main() {
 	virtV2vArgs := []string{"virt-v2v", "-v", "-x"}
@@ -97,7 +103,7 @@ func main() {
 		virtV2vArgs = append(virtV2vArgs, "--", os.Getenv("V2V_vmName"))
 	}
 
-	if err := executeVirtV2v(virtV2vArgs); err != nil {
+	if err := executeVirtV2v(source, virtV2vArgs); err != nil {
 		fmt.Println("Error executing virt-v2v command ", err)
 		os.Exit(1)
 	}
@@ -110,7 +116,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		http.HandleFunc("/ovf", ovfHandler)
+		http.HandleFunc("/vm", vmHandler)
 		http.HandleFunc("/shutdown", shutdownHandler)
 		server = &http.Server{Addr: ":8080"}
 
@@ -169,16 +175,26 @@ func LinkDisks(diskKind string, num int) (err error) {
 	return
 }
 
-func executeVirtV2v(args []string) (err error) {
+func executeVirtV2v(source string, args []string) (err error) {
 	virtV2vCmd := exec.Command(args[0], args[1:]...)
 	virtV2vStdoutPipe, err := virtV2vCmd.StdoutPipe()
 	if err != nil {
 		fmt.Printf("Error setting up stdout pipe: %v\n", err)
 		return
 	}
+	teeOut := io.TeeReader(virtV2vStdoutPipe, os.Stdout)
 
-	tee := io.TeeReader(virtV2vStdoutPipe, os.Stdout)
-	virtV2vCmd.Stderr = os.Stderr
+	var teeErr io.Reader
+	if source == OVA {
+		virtV2vStderrPipe, err := virtV2vCmd.StderrPipe()
+		if err != nil {
+			fmt.Printf("Error setting up stdout pipe: %v\n", err)
+			return err
+		}
+		teeErr = io.TeeReader(virtV2vStderrPipe, os.Stderr)
+	} else {
+		virtV2vCmd.Stderr = os.Stderr
+	}
 
 	fmt.Println("exec ", virtV2vCmd)
 	if err = virtV2vCmd.Start(); err != nil {
@@ -187,13 +203,33 @@ func executeVirtV2v(args []string) (err error) {
 	}
 
 	virtV2vMonitorCmd := exec.Command("/usr/local/bin/virt-v2v-monitor")
-	virtV2vMonitorCmd.Stdin = tee
+	virtV2vMonitorCmd.Stdin = teeOut
 	virtV2vMonitorCmd.Stdout = os.Stdout
 	virtV2vMonitorCmd.Stderr = os.Stderr
 
 	if err = virtV2vMonitorCmd.Start(); err != nil {
 		fmt.Printf("Error executing monitor command: %v\n", err)
 		return
+	}
+
+	if source == OVA {
+		scanner := bufio.NewScanner(teeErr)
+		const maxCapacity = 1024 * 1024
+		buf := make([]byte, 0, 64*1024)
+		scanner.Buffer(buf, maxCapacity)
+
+		for scanner.Scan() {
+			line := scanner.Bytes()
+			if match := UEFI_RE.FindSubmatch(line); match != nil {
+				fmt.Println("UEFI firmware detected")
+				firmware = "efi"
+			}
+		}
+
+		if err = scanner.Err(); err != nil {
+			fmt.Println("Output query failed:", err)
+			return err
+		}
 	}
 
 	if err = virtV2vCmd.Wait(); err != nil {
@@ -214,10 +250,16 @@ func getXMLFile(dir, fileExtension string) (string, error) {
 	return "", fmt.Errorf("XML file was not found.")
 }
 
-func ovfHandler(w http.ResponseWriter, r *http.Request) {
+func vmHandler(w http.ResponseWriter, r *http.Request) {
 	if xmlFilePath == "" {
 		fmt.Println("Error: XML file path is empty.")
 		http.Error(w, "XML file path is empty", http.StatusInternalServerError)
+		return
+	}
+
+	if err := addFirmwareToXml(xmlFilePath); err != nil {
+		fmt.Println("Error setting the firmware configuration in the ovf ", err)
+		http.Error(w, "Error setting the firmware configuration in the ovf", http.StatusInternalServerError)
 		return
 	}
 
@@ -254,4 +296,67 @@ func isValidSource(source string) bool {
 	default:
 		return false
 	}
+}
+
+func addFirmwareToXml(filePath string) (err error) {
+	var newFirmwareData string
+	if firmware == "bios" {
+		newFirmwareData = (`  <firmware>
+		<bootloader type='bios'/>
+	</firmware>`)
+	} else {
+		newFirmwareData = (`  <firmware>
+		<bootloader type='efi'/>
+	</firmware>`)
+	}
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	tempFilePath := filePath + ".tmp"
+
+	tempFile, err := os.Create(tempFilePath)
+	if err != nil {
+		return
+	}
+	defer tempFile.Close()
+
+	scanner := bufio.NewScanner(file)
+	domainFound := false
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if strings.Contains(line, "</os>") {
+			domainFound = true
+		}
+
+		_, err = tempFile.WriteString(line + "\n")
+		if err != nil {
+			return
+		}
+
+		if domainFound {
+			_, err = tempFile.WriteString(newFirmwareData + "\n")
+			if err != nil {
+				return
+			}
+			domainFound = false
+		}
+	}
+
+	if err = scanner.Err(); err != nil {
+		return
+	}
+
+	err = os.Rename(tempFilePath, filePath)
+	if err != nil {
+		return
+	}
+
+	fmt.Println("XML file has been modified successfully.")
+	return
 }

@@ -3,35 +3,21 @@ package ova
 import (
 	"encoding/xml"
 	"strings"
+
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 )
 
 type OvaVmconfig struct {
-	XMLName xml.Name `xml:"domain"`
-	Name    string   `xml:"name"`
-	OS      OS       `xml:"os"`
+	XMLName  xml.Name `xml:"domain"`
+	Firmware Firmware `xml:"firmware"`
 }
 
-type OS struct {
-	Type   OSType `xml:"type"`
-	Loader Loader `xml:"loader"`
-	Nvram  Nvram  `xml:"nvram"`
+type Firmware struct {
+	Bootloader Bootloader `xml:"bootloader"`
 }
 
-type OSType struct {
-	Arch    string `xml:"arch,attr"`
-	Machine string `xml:"machine,attr"`
-	Content string `xml:",chardata"`
-}
-
-type Loader struct {
-	Readonly string `xml:"readonly,attr"`
-	Type     string `xml:"type,attr"`
-	Secure   string `xml:"secure,attr"`
-	Path     string `xml:",chardata"`
-}
-
-type Nvram struct {
-	Template string `xml:"template,attr"`
+type Bootloader struct {
+	Type string `xml:"type,attr"`
 }
 
 func readConfFromXML(xmlData string) (*OvaVmconfig, error) {
@@ -54,9 +40,9 @@ func GetFirmwareFromConfig(vmConfigXML string) (firmware string, err error) {
 		return
 	}
 
-	path := xmlConf.OS.Loader.Path
-	if strings.Contains(path, "OVMF") {
-		return UEFI, nil
+	firmware = xmlConf.Firmware.Bootloader.Type
+	if firmware == "" {
+		err = liberr.New("failed to get the firmware type from virt-v2v config")
 	}
-	return BIOS, nil
+	return
 }
