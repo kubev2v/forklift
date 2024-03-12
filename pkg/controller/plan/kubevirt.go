@@ -941,7 +941,7 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 		return
 	}
 
-	r.Log.Info("setting the vm firmware to ", firmware, "vmId", vm.ID)
+	r.Log.Info("setting vm firmware", "vmId", vm.ID, "firmware", firmware)
 
 	vm.Firmware = firmware
 
