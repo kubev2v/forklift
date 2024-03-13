@@ -656,6 +656,8 @@ func (r *KubeVirt) getPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, e
 
 	pvcs = make([]*core.PersistentVolumeClaim, len(pvcsList.Items))
 	for i, pvc := range pvcsList.Items {
+		// loopvar
+		pvc := pvc
 		pvcs[i] = &pvc
 	}
 
