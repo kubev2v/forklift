@@ -203,30 +203,30 @@ func (r *VM1) Content(detail int) interface{} {
 // VM full detail.
 type VM struct {
 	VM1
-	OvaPath               string
-	RevisionValidated     int64
-	PolicyVersion         int
-	UUID                  string
-	Firmware              string
-	CpuAffinity           []int32
-	CpuHotAddEnabled      bool
-	CpuHotRemoveEnabled   bool
-	MemoryHotAddEnabled   bool
-	FaultToleranceEnabled bool
-	CpuCount              int32
-	CoresPerSocket        int32
-	MemoryMB              int32
-	MemoryUnits           string
-	CpuUnits              string
-	BalloonedMemory       int32
-	IpAddress             string
-	NumaNodeAffinity      []string
-	StorageUsed           int64
-	ChangeTrackingEnabled bool
-	Devices               []model.Device
-	NICs                  []model.NIC
-	Disks                 []model.Disk
-	Networks              []model.Network
+	OvaPath               string          `json:"ovaPath"`
+	RevisionValidated     int64           `json:"revisionValidated"`
+	PolicyVersion         int             `json:"policyVersion"`
+	UUID                  string          `json:"uuid"`
+	Firmware              string          `json:"firmware"`
+	CpuAffinity           []int32         `json:"cpuAffinity"`
+	CpuHotAddEnabled      bool            `json:"cpuHotAddEnabled"`
+	CpuHotRemoveEnabled   bool            `json:"cpuHotRemoveEnabled"`
+	MemoryHotAddEnabled   bool            `json:"memoryHotAddEnabled"`
+	FaultToleranceEnabled bool            `json:"faultToleranceEnabled"`
+	CpuCount              int32           `json:"cpuCount"`
+	CoresPerSocket        int32           `json:"coresPerSocket"`
+	MemoryMB              int32           `json:"memoryMB"`
+	MemoryUnits           string          `json:"memoryUnits"`
+	CpuUnits              string          `json:"cpuUnits"`
+	BalloonedMemory       int32           `json:"balloonedMemory"`
+	IpAddress             string          `json:"ipAddress"`
+	NumaNodeAffinity      []string        `json:"numaNodeAffinity"`
+	StorageUsed           int64           `json:"storageUsed"`
+	ChangeTrackingEnabled bool            `json:"changeTrackingEnabled"`
+	Devices               []model.Device  `json:"devices"`
+	NICs                  []model.NIC     `json:"nics"`
+	Disks                 []model.Disk    `json:"disks"`
+	Networks              []model.Network `json:"networks"`
 }
 
 // Build the resource using the model.

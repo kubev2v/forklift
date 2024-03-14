@@ -8,6 +8,7 @@ import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ova"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
+	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 )
 
 // Routes.
@@ -25,6 +26,10 @@ type WorkloadHandler struct {
 // Add routes to the `gin` router.
 func (h *WorkloadHandler) AddRoutes(e *gin.Engine) {
 	e.GET(WorkloadRoot, h.Get)
+}
+
+// List resources in a REST collection.
+func (h WorkloadHandler) List(ctx *gin.Context) {
 }
 
 // Get a specific REST resource.
@@ -60,6 +65,10 @@ func (h WorkloadHandler) Get(ctx *gin.Context) {
 	}
 	r := Workload{}
 	r.With(m)
+	err = r.Expand(db)
+	if err != nil {
+		return
+	}
 	r.Link(h.Provider)
 	content := r
 
@@ -84,4 +93,16 @@ func (r *Workload) Link(p *api.Provider) {
 			base.ProviderParam: string(p.UID),
 			VMParam:            r.ID,
 		})
+}
+
+// Expand the resource.
+func (r *Workload) Expand(db libmodel.DB) (err error) {
+	vm := &model.VM{
+		Base: model.Base{ID: r.ID},
+	}
+	err = db.Get(vm)
+	if err != nil {
+		return
+	}
+	return
 }
