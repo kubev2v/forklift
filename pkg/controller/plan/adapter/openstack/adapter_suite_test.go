@@ -18,5 +18,5 @@ func forkliftFailHandler(message string, callerSkip ...int) {
 func TestTests(t *testing.T) {
 	defer GinkgoRecover()
 	RegisterFailHandler(forkliftFailHandler)
-	RunSpecs(t, "openstack builder")
+	RunSpecs(t, "OpenStack Suite")
 }

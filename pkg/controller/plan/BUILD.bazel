@@ -77,6 +77,7 @@ go_library(
 go_test(
     name = "plan_test",
     srcs = [
+        "kubevirt_test.go",
         "plan_suite_test.go",
         "validation_test.go",
         "vm_name_handler_test.go",
@@ -85,7 +86,9 @@ go_test(
     deps = [
         "//pkg/apis/forklift/v1beta1",
         "//pkg/apis/forklift/v1beta1/provider",
+        "//pkg/apis/forklift/v1beta1/ref",
         "//pkg/controller/base",
+        "//pkg/controller/plan/context",
         "//pkg/lib/condition",
         "//pkg/lib/logging",
         "//vendor/github.com/onsi/ginkgo/v2:ginkgo",

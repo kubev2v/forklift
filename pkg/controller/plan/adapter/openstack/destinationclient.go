@@ -119,6 +119,7 @@ func (r *DestinationClient) findPVCByCR(cr *v1beta1.OpenstackVolumePopulator) (p
 	}
 	if len(pvcList.Items) > 1 {
 		err = liberr.New("Multiple PVCs found", "imageID", cr.Spec.ImageID)
+		return
 	}
 
 	pvc = &pvcList.Items[0]

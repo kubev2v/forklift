@@ -667,6 +667,7 @@ func (r *KubeVirt) getPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, e
 	)
 	if err != nil {
 		err = liberr.Wrap(err)
+		return
 	}
 
 	pvcs = make([]*core.PersistentVolumeClaim, len(pvcsList.Items))
