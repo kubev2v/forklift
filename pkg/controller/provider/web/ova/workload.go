@@ -101,8 +101,5 @@ func (r *Workload) Expand(db libmodel.DB) (err error) {
 		Base: model.Base{ID: r.ID},
 	}
 	err = db.Get(vm)
-	if err != nil {
-		return
-	}
 	return
 }
