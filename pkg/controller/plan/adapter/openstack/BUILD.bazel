@@ -47,10 +47,20 @@ go_test(
     srcs = [
         "adapter_suite_test.go",
         "builder_test.go",
+        "destionationclient_test.go",
     ],
     embed = [":openstack"],
     deps = [
+        "//pkg/apis/forklift/v1beta1",
+        "//pkg/apis/forklift/v1beta1/plan",
+        "//pkg/controller/plan/context",
+        "//pkg/lib/logging",
         "//vendor/github.com/onsi/ginkgo/v2:ginkgo",
         "//vendor/github.com/onsi/gomega",
+        "//vendor/k8s.io/api/core/v1:core",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:meta",
+        "//vendor/k8s.io/apimachinery/pkg/runtime",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
+        "//vendor/sigs.k8s.io/controller-runtime/pkg/client/fake",
     ],
 )
