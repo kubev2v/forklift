@@ -1163,6 +1163,7 @@ func (r *Builder) getVolumePopulatorCR(imageID string) (populatorCr api.Openstac
 		}),
 	})
 	if err != nil {
+		err = liberr.Wrap(err)
 		return
 	}
 	if len(populatorCrList.Items) == 0 {
@@ -1171,6 +1172,7 @@ func (r *Builder) getVolumePopulatorCR(imageID string) (populatorCr api.Openstac
 	}
 	if len(populatorCrList.Items) > 1 {
 		err = liberr.New("multiple OpenstackVolumePopulator CRs found for image", "imageID", imageID)
+		return
 	}
 
 	populatorCr = populatorCrList.Items[0]
@@ -1188,6 +1190,7 @@ func (r *Builder) getVolumePopulatorPVC(imageID string) (populatorPvc *core.Pers
 		}),
 	})
 	if err != nil {
+		err = liberr.Wrap(err)
 		return
 	}
 
@@ -1197,6 +1200,7 @@ func (r *Builder) getVolumePopulatorPVC(imageID string) (populatorPvc *core.Pers
 	}
 	if len(populatorPvcList.Items) > 1 {
 		err = liberr.New("multiple PersistentVolumeClaims found for image", "imageID", imageID)
+		return
 	}
 
 	populatorPvc = &populatorPvcList.Items[0]
@@ -1272,10 +1276,12 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image,
 func (r *Builder) PopulatorTransferredBytes(persistentVolumeClaim *core.PersistentVolumeClaim) (transferredBytes int64, err error) {
 	image, err := r.getImageFromPVC(persistentVolumeClaim)
 	if err != nil {
+		err = liberr.Wrap(err)
 		return
 	}
 	populatorCr, err := r.getVolumePopulatorCR(image.ID)
 	if err != nil {
+		err = liberr.Wrap(err)
 		return
 	}
 	progressPercentage, err := strconv.ParseInt(populatorCr.Status.Progress, 10, 64)
@@ -1306,6 +1312,7 @@ func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.Persi
 	workload := &model.Workload{}
 	err = r.Source.Inventory.Find(workload, vmRef)
 	if err != nil {
+		err = liberr.Wrap(err)
 		return
 	}
 	var images []*model.Image
@@ -1313,6 +1320,7 @@ func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.Persi
 		lookupName := getImageFromVolumeName(r.Context, vmRef.ID, volume.ID)
 		image, err := r.getImageByName(lookupName)
 		if err != nil {
+			r.Log.Error(err, "Couldn't find the image from the volume.", "volume", volume.ID, "vmRef", vmRef)
 			continue
 		}
 		images = append(images, image)

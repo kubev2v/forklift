@@ -108,7 +108,6 @@ func (r *DestinationClient) findPVCByCR(cr *v1beta1.OvirtVolumePopulator) (pvc *
 				"diskID":    cr.Spec.DiskID,
 			}),
 		})
-
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -116,9 +115,12 @@ func (r *DestinationClient) findPVCByCR(cr *v1beta1.OvirtVolumePopulator) (pvc *
 
 	if len(pvcList.Items) == 0 {
 		err = liberr.New("PVC not found", "diskID", cr.Spec.DiskID)
+		return
 	}
+
 	if len(pvcList.Items) > 1 {
 		err = liberr.New("Multiple PVCs found", "diskID", cr.Spec.DiskID)
+		return
 	}
 
 	pvc = &pvcList.Items[0]
