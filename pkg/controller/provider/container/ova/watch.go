@@ -240,15 +240,14 @@ func (r *VMEventHandler) canceled() bool {
 // Analyze the VM.
 func (r *VMEventHandler) validate(VM *model.VM) (err error) {
 	task := &policy.Task{
-		Path:    ValidationEndpoint,
-		Context: r.context,
-		// Workload: r.workload,
+		Path:     ValidationEndpoint,
+		Context:  r.context,
+		Workload: r.workload,
 		Result:   r.taskResult,
 		Revision: VM.Revision,
 		Ref: refapi.Ref{
 			ID: VM.ID,
 		},
-		Workload: r.workload,
 	}
 	r.log.V(4).Info(
 		"Validate VM.",
@@ -295,7 +294,7 @@ func (r *VMEventHandler) validated(batch []*policy.Task) {
 			continue
 		}
 		latest.PolicyVersion = task.Version
-		latest.RevisionValidated = latest.Revision
+		latest.RevisionValidated = task.Revision
 		latest.Concerns = task.Concerns
 		latest.Revision--
 		err = tx.Update(latest, libmodel.Eq("Revision", task.Revision))
@@ -333,6 +332,7 @@ func (r *VMEventHandler) workload(vmID string) (object interface{}, err error) {
 	}
 	workload := web.Workload{}
 	workload.With(vm)
+	err = workload.Expand(r.DB)
 	if err != nil {
 		return
 	}
