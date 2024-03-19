@@ -716,6 +716,7 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 
 // Build tasks.
 func (r *Builder) Tasks(vmRef ref.Ref) (tasks []*plan.Task, err error) {
+	r.Log.Info("building tasks", "vm", vmRef.String())
 	workload := &model.Workload{}
 	err = r.Source.Inventory.Find(workload, vmRef)
 	if err != nil {
@@ -982,6 +983,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 func (r *Builder) getCorrespondingPvc(image model.Image, workload *model.Workload, annotations map[string]string, secretName string) (pvc *core.PersistentVolumeClaim, err error) {
 	populatorCR, err := r.ensureVolumePopulator(workload, &image, secretName)
 	if err != nil {
+		err = liberr.Wrap(err)
 		return
 	}
 	return r.ensureVolumePopulatorPVC(workload, &image, annotations, populatorCR.Name)
@@ -1406,4 +1408,8 @@ func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskNam
 	}
 	taskName = image.Name
 	return
+}
+
+func (r *Builder) GetConversionTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error) {
+	return fmt.Sprintf("%s-convert", pvc.Annotations[planbase.AnnDiskSource]), nil
 }

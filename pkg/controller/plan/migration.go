@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/konveyor/forklift-controller/pkg/controller/plan/util"
+
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
@@ -79,14 +81,15 @@ const (
 
 // Steps.
 const (
-	Initialize      = "Initialize"
-	Cutover         = "Cutover"
-	DiskAllocation  = "DiskAllocation"
-	DiskTransfer    = "DiskTransfer"
-	ImageConversion = "ImageConversion"
-	DiskTransferV2v = "DiskTransferV2v"
-	VMCreation      = "VirtualMachineCreation"
-	Unknown         = "Unknown"
+	Initialize                = "Initialize"
+	Cutover                   = "Cutover"
+	DiskAllocation            = "DiskAllocation"
+	DiskTransfer              = "DiskTransfer"
+	ImageConversion           = "ImageConversion"
+	DiskTransferV2v           = "DiskTransferV2v"
+	VMCreation                = "VirtualMachineCreation"
+	OpensStackImageConversion = "OpenstackImageConversion"
+	Unknown                   = "Unknown"
 )
 
 const (
@@ -632,8 +635,10 @@ func (r *Migration) step(vm *plan.VMStatus) (step string) {
 		step = Initialize
 	case AllocateDisks:
 		step = DiskAllocation
-	case CopyDisks, CopyingPaused, CreateSnapshot, WaitForSnapshot, AddCheckpoint, ConvertOpenstackSnapshot:
+	case CopyDisks, CopyingPaused, CreateSnapshot, WaitForSnapshot, AddCheckpoint:
 		step = DiskTransfer
+	case ConvertOpenstackSnapshot:
+		step = OpensStackImageConversion
 	case CreateFinalSnapshot, WaitForFinalSnapshot, AddFinalCheckpoint, Finalize:
 		step = Cutover
 	case CreateGuestConversionPod, ConvertGuest:
@@ -935,6 +940,29 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			break
 		}
 
+		// Update progress
+		for _, pvc := range pvcs {
+			if _, ok := pvc.Annotations[base.AnnRequiresConversion]; !ok {
+				continue
+			}
+
+			progress, err := r.converter.GetConversionProgressForPVC(pvc)
+			if err != nil {
+				r.Log.Error(err,
+					"Failed to get conversion progress for PVC",
+					"pvc",
+					pvc.Name,
+					"namespace",
+					pvc.Namespace)
+				continue
+			}
+			err = r.updateImageConversionProgress(pvc, step, progress)
+			if err != nil {
+				r.Log.Error(err, "Failed to update image conversion progress")
+				continue
+			}
+		}
+
 		if !ready {
 			r.Log.Info("Conversion isn't ready yet")
 			return nil
@@ -1232,7 +1260,33 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 						Phase:       Pending,
 					},
 				})
-		case AllocateDisks, CopyDisks, CopyDisksVirtV2V, ConvertOpenstackSnapshot:
+		case ConvertOpenstackSnapshot:
+			var taskErr error
+			task, taskErr := util.CreateConversionTask(r.Source.Inventory, vm.Ref)
+			if taskErr != nil {
+				return
+			}
+
+			if task == nil {
+				break
+			}
+
+			pipeline = append(
+				pipeline,
+				&plan.Step{
+					Task: plan.Task{
+						Name:        OpensStackImageConversion,
+						Description: "Convert OpenStack snapshot.",
+						Progress: libitr.Progress{
+							Completed: 0,
+							Total:     100,
+						},
+						Phase: Pending,
+					},
+					Tasks: []*plan.Task{task},
+				})
+
+		case AllocateDisks, CopyDisks, CopyDisksVirtV2V:
 			tasks, pErr := r.builder.Tasks(vm.Ref)
 			if pErr != nil {
 				err = liberr.Wrap(pErr)
@@ -1253,9 +1307,6 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 			case CopyDisksVirtV2V:
 				task_name = DiskTransferV2v
 				task_description = "Copy disks."
-			case ConvertOpenstackSnapshot:
-				task_name = ConvertOpenstackSnapshot
-				task_description = "Convert OpenStack snapshot."
 			default:
 				err = liberr.New(fmt.Sprintf("Unknown step '%s'. Not implemented.", step.Name))
 				return
@@ -1721,6 +1772,36 @@ func (r *Migration) setDataVolumeCheckpoints(vm *plan.VMStatus) (err error) {
 	return
 }
 
+func (r *Migration) updateImageConversionProgress(pvc *core.PersistentVolumeClaim, step *plan.Step, progress float64) (err error) {
+	r.Log.Info("Updating progress for PVC", "pvc", pvc.Name)
+	taskName, err := r.builder.GetConversionTaskName(pvc)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	var task *plan.Task
+	found := false
+	if task, found = step.FindTask(taskName); !found {
+		r.Log.Info("Task not found", "task", taskName)
+		return
+	}
+
+	r.Log.Info("Updating progress", "progress", progress, "task", taskName)
+
+	task.Progress.Completed = int64(progress)
+	if task.Progress.Completed >= task.Progress.Total {
+		task.Phase = Completed
+		task.Reason = TransferCompleted
+		task.Progress.Completed = task.Progress.Total
+		task.MarkCompleted()
+	}
+
+	step.ReflectTasks()
+
+	return nil
+}
+
 func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.Step) (err error) {
 	pvcs, err := r.kubevirt.getPVCs(vm.Ref)
 	if err != nil {
@@ -1757,7 +1838,6 @@ func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.St
 		if err != nil {
 			return
 		}
-
 		percent := float64(transferredBytes/0x100000) / float64(task.Progress.Total)
 		newProgress := int64(percent * float64(task.Progress.Total))
 		if newProgress == task.Progress.Completed {

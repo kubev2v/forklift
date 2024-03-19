@@ -984,3 +984,7 @@ func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskNam
 	taskName = pvc.Annotations[planbase.AnnDiskSource]
 	return
 }
+
+func (r *Builder) GetConversionTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error) {
+	return "", liberr.New("Conversion task is not supported for oVirt")
+}

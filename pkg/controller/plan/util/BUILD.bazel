@@ -11,8 +11,13 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/apis/forklift/v1beta1",
+        "//pkg/apis/forklift/v1beta1/plan",
+        "//pkg/apis/forklift/v1beta1/ref",
+        "//pkg/controller/provider/web",
         "//pkg/controller/provider/web/openstack",
         "//pkg/controller/provider/web/ovirt",
+        "//pkg/lib/error",
+        "//pkg/lib/itinerary",
         "//pkg/settings",
         "//vendor/k8s.io/api/core/v1:core",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:meta",

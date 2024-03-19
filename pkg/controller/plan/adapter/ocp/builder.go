@@ -640,3 +640,7 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 	// do nothing
 	return
 }
+
+func (r *Builder) GetConversionTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error) {
+	return "", liberr.New("conversion tasks are not supported for OCP")
+}
