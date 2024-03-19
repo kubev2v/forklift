@@ -569,7 +569,6 @@ func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus, dataVolumes []cdi.DataVo
 		return
 	}
 
-	var pvcNames []string
 	for _, dv := range dataVolumes {
 		if !r.isDataVolumeExistsInList(&dv, dataVolumeList) {
 			err = r.Destination.Client.Create(context.TODO(), &dv)
@@ -585,21 +584,7 @@ func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus, dataVolumes []cdi.DataVo
 				"vm",
 				vm.String())
 		}
-		// DataVolume and PVC names are the same
-		pvcNames = append(pvcNames, dv.Name)
 	}
-	el9, el9Err := r.Context.Plan.VSphereUsesEl9VirtV2v()
-	if el9Err != nil {
-		err = el9Err
-		return
-	}
-	if el9 {
-		err = r.createPodToBindPVCs(vm, pvcNames)
-		if err != nil {
-			return err
-		}
-	}
-
 	return
 }
 
@@ -1174,9 +1159,8 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 		annotations[AnnDefaultNetwork] = path.Join(
 			r.Plan.Spec.TransferNetwork.Namespace, r.Plan.Spec.TransferNetwork.Name)
 	}
-	if r.Plan.Spec.Warm || !r.Destination.Provider.IsHost() || r.Plan.IsSourceProviderOCP() {
-		annotations[planbase.AnnBindImmediate] = "true"
-	}
+	// Set annotation for WFFC storage classes
+	annotations[planbase.AnnBindImmediate] = "true"
 	// Do not delete the DV when the import completes as we check the DV to get the current
 	// disk transfer status.
 	annotations[AnnDeleteAfterCompletion] = "false"
