@@ -65,9 +65,7 @@ var _ = Describe("Converter tests", func() {
 		})
 
 		It("Should be ready if job is ready", func() {
-			convertJob.Status.Conditions = append(convertJob.Status.Conditions, batchv1.JobCondition{
-				Type: batchv1.JobComplete,
-			})
+			convertJob.Status.Succeeded = 1
 
 			dv := &cdi.DataVolume{
 				ObjectMeta: meta.ObjectMeta{
@@ -121,13 +119,13 @@ var _ = Describe("Converter tests", func() {
 				},
 			}
 
-			convertJob.Status.Conditions = append(convertJob.Status.Conditions, batchv1.JobCondition{Status: "False", Type: batchv1.JobFailed})
+			convertJob.Status.Succeeded = 0
 			convertJob.Status.Failed = 3
 
 			converter = createFakeConverter(qcow2PVC, convertJob, dv)
 
 			_, err := converter.ConvertPVCs([]*v1.PersistentVolumeClaim{qcow2PVC}, srcFormatFn, "raw")
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).To(HaveOccurred())
 
 			// Check if scratch DV is removed
 			err = converter.Destination.Client.Get(context.TODO(), types.NamespacedName{Name: dv.Name, Namespace: dv.Namespace}, dv)
