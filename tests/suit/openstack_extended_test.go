@@ -20,7 +20,7 @@ var _ = Describe("[level:component]Migration Extended tests for OpenStack provid
 	It("[extended] should connect to openstack using https/ssl with CA", func() {
 		namespace := f.Namespace.Name
 
-		err := f.Clients.OpenStackClient.SetupClient("cirros-volume", "net-int", "nfs")
+		err := f.Clients.OpenStackClient.SetupClient("cirros-server", "net-int", "nfs")
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Load Source VM Details from OpenStack")
@@ -54,7 +54,7 @@ var _ = Describe("[level:component]Migration Extended tests for OpenStack provid
 
 	It("[test] should connect to openstack using https/ssl insecure", func() {
 		namespace := f.Namespace.Name
-		err := f.Clients.OpenStackClient.SetupClient("cirros-volume", "net-int", "nfs")
+		err := f.Clients.OpenStackClient.SetupClient("cirros-server", "net-int", "nfs")
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Create Secret from Definition")
@@ -82,7 +82,7 @@ var _ = Describe("[level:component]Migration Extended tests for OpenStack provid
 	It("[test] should connect to openstack using https/ssl with system CA", func() {
 		namespace := f.Namespace.Name
 
-		err := f.Clients.OpenStackClient.SetupClient("cirros-volume", "net-int", "nfs")
+		err := f.Clients.OpenStackClient.SetupClient("cirros-server", "net-int", "nfs")
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Load Source VM Details from OpenStack")
@@ -122,7 +122,7 @@ var _ = Describe("[level:component]Migration Extended tests for OpenStack provid
 	It("[test] should not connect with invalid CA and not fallback to system", func() {
 		namespace := f.Namespace.Name
 
-		err := f.Clients.OpenStackClient.SetupClient("cirros-volume", "net-int", "nfs")
+		err := f.Clients.OpenStackClient.SetupClient("cirros-server", "net-int", "nfs")
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Load Source VM Details from OpenStack")
