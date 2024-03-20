@@ -1264,7 +1264,7 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 			var taskErr error
 			task, taskErr := util.CreateConversionTask(r.Source.Inventory, vm.Ref)
 			if taskErr != nil {
-				return
+				return nil, taskErr
 			}
 
 			if task == nil {

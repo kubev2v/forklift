@@ -46,6 +46,7 @@ func CreateConversionTask(inventory web.Client, vmRef ref.Ref) (*plan.Task, erro
 	}
 
 	if workload.ImageID == "" {
+		//nolint:nilnil
 		return nil, nil
 	}
 

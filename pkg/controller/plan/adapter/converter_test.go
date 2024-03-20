@@ -43,21 +43,12 @@ var _ = Describe("Converter tests", func() {
 			},
 		}
 
-		convertJob := &batchv1.Job{
-			ObjectMeta: meta.ObjectMeta{
-				Name:      getJobName(qcow2PVC, "convert"),
-				Namespace: pvcNamespace,
-				Labels: map[string]string{
-					base.AnnConversionSourcePVC: pvcName,
-				},
-			},
-		}
-
 		srcFormatFn := func(pvc *v1.PersistentVolumeClaim) string {
 			return pvc.Annotations[base.AnnSourceFormat]
 		}
 
 		It("Should not be ready if job is not ready", func() {
+			convertJob := createFakeConvertJob(qcow2PVC, pvcNamespace)
 			converter = createFakeConverter(qcow2PVC, convertJob)
 			ready, err := converter.ConvertPVCs([]*v1.PersistentVolumeClaim{qcow2PVC}, srcFormatFn, "raw")
 			Expect(err).ToNot(HaveOccurred())
@@ -65,6 +56,7 @@ var _ = Describe("Converter tests", func() {
 		})
 
 		It("Should be ready if job is ready", func() {
+			convertJob := createFakeConvertJob(qcow2PVC, pvcNamespace)
 			convertJob.Status.Succeeded = 1
 
 			dv := &cdi.DataVolume{
@@ -119,6 +111,8 @@ var _ = Describe("Converter tests", func() {
 				},
 			}
 
+			convertJob := createFakeConvertJob(qcow2PVC, pvcNamespace)
+
 			convertJob.Status.Succeeded = 0
 			convertJob.Status.Failed = 3
 
@@ -154,5 +148,17 @@ func createFakeConverter(objects ...runtime.Object) *Converter {
 		},
 		Log:    converterLog,
 		Labels: map[string]string{},
+	}
+}
+
+func createFakeConvertJob(pvc *v1.PersistentVolumeClaim, pvcNamespace string) *batchv1.Job {
+	return &batchv1.Job{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      getJobName(pvc, "convert"),
+			Namespace: pvcNamespace,
+			Labels: map[string]string{
+				base.AnnConversionSourcePVC: pvc.Name,
+			},
+		},
 	}
 }
