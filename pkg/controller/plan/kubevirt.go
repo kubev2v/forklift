@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/utils/ptr"
 	cnv "kubevirt.io/api/core/v1"
 	instancetype "kubevirt.io/api/instancetype/v1beta1"
 	libvirtxml "libvirt.org/libvirt-go-xml"
@@ -314,7 +315,7 @@ func (r *KubeVirt) DeleteJobs(vm *plan.VMStatus) (err error) {
 
 	jobNames := []string{}
 	for _, job := range list.Items {
-		err = r.DeleteObject(&job, vm, "Deleted job.", "job")
+		err = r.DeleteObject(&job, vm, "Deleted job.", "job", &client.DeleteOptions{PropagationPolicy: ptr.To(meta.DeletePropagationBackground)})
 		if err != nil {
 			err = liberr.Wrap(err)
 			r.Log.Error(

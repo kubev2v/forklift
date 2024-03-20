@@ -600,6 +600,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []*core.Pe
 
 	object.Template.Spec.Volumes = kVolumes
 	object.Template.Spec.Domain.Devices.Disks = kDisks
+	r.Log.Info("Benny was here", "kDisks", kDisks)
 }
 
 func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec) (err error) {
