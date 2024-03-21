@@ -21,7 +21,7 @@ var _ = Describe("[level:component]Migration tests for OpenStack provider", func
 
 	It("[test] should create provider with NetworkMap", func() {
 		namespace := f.Namespace.Name
-		err := f.Clients.OpenStackClient.SetupClient("cirros-volume", "net-int", "nfs")
+		err := f.Clients.OpenStackClient.SetupClient("cirros-server", "net-int", "nfs")
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Load Source VM Details from OpenStack")
