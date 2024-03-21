@@ -10,7 +10,7 @@ concerns[flag] {
     has_tpm_os
     flag := {
         "category": "Warning",
-        "label": "VM configured with a TPM device",
+        "label": "TPM detected",
         "assessment": "The VM is detected with an operation system that must have a TPM device. TPM data is not transferred during the migration."
     }
 }
