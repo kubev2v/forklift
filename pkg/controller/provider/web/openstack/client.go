@@ -396,6 +396,10 @@ func (r *Finder) Network(ref *base.Ref) (object interface{}, err error) {
 //	NotFoundErr
 //	RefNotUniqueErr
 func (r *Finder) Storage(ref *base.Ref) (object interface{}, err error) {
+	if ref.Name == api.GlanceSource {
+		return
+	}
+
 	volumeType := &VolumeType{}
 	err = r.ByRef(volumeType, *ref)
 	if err == nil {

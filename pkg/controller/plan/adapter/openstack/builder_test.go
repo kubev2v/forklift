@@ -1,11 +1,12 @@
 package openstack
 
 import (
+	v1beta1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("vSphere builder", func() {
+var _ = Describe("OpenStack builder", func() {
 	DescribeTable("should", func(os, version, distro, matchPreferenceName string) {
 		Expect(getPreferenceOs(os, version, distro)).Should(Equal(matchPreferenceName))
 	},
@@ -15,4 +16,10 @@ var _ = Describe("vSphere builder", func() {
 		Entry("windows2022", Windows, "2022", Windows, "windows.2k22.virtio"),
 		Entry("ubuntu 22", Ubuntu, "22.04.3", Ubuntu, "ubuntu"),
 	)
+})
+
+var _ = Describe("OpenStack Glance const test", func() {
+	It("GlanceSource should be glance, changing it may break the UI", func() {
+		Expect(v1beta1.GlanceSource).Should(Equal("glance"))
+	})
 })
