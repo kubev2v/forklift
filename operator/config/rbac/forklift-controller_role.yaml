@@ -140,6 +140,8 @@ rules:
   resources:
   - virtualmachinepreferences
   - virtualmachineclusterpreferences
+  - virtualmachineinstancetypes
+  - virtualmachineclusterinstancetypes
   verbs:
   - get
   - list
