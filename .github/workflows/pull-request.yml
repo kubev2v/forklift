@@ -53,12 +53,12 @@ jobs:
       - name: Checkout forkliftci
         uses: actions/checkout@v4
         with:
-          repository: kubev2v/forkliftci
-          ref: v15.0
+          repository: bennyz/forkliftci
+          ref: openstack-imagebased
 
       - name: Build and setup everything with bazel
         id: forkliftci
-        uses: kubev2v/forkliftci/ci/build-and-setup@v8.0
+        uses: bennyz/forkliftci/ci/build-and-setup@openstack-imagebased
         with:
           provider_name: ${{ matrix.source_provider }}
           gh_access_token: ${{ secrets.GITHUB_TOKEN }}
@@ -72,13 +72,13 @@ jobs:
           curl -k "${{ steps.forkliftci.outputs.cluster }}/apis/forklift.konveyor.io/v1beta1/namespaces/konveyor-forklift/providers" --header "Authorization: Bearer ${{ steps.forkliftci.outputs.token }}"
 
       - name: Run e2e sanity suite
-        uses: kubev2v/forkliftci/ci/run-suite@v8.0
+        uses: bennyz/forkliftci/ci/run-suite@openstack-imagebased
         with:
           suite_name: e2e-sanity-${{ matrix.source_provider }}
 
       - name: save k8s logs and upload-artifact
         if: ${{ always() }}
-        uses: kubev2v/forkliftci/ci/save-artifacts@v8.0
+        uses: bennyz/forkliftci/ci/save-artifacts@openstack-imagebased
         with:
           source_provider: ${{ matrix.source_provider }}
 
