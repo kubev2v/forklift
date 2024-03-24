@@ -31,6 +31,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// GlanceSource represents an image of which the source is Glance, to be used in storage mapping
+const GlanceSource = "glance"
+
 // Openstack builder.
 type Builder struct {
 	*plancontext.Context
@@ -1010,14 +1013,34 @@ func (r *Builder) ensureVolumePopulatorPVC(workload *model.Workload, image *mode
 			originalVolumeDiskId = imageProperty.(string)
 		}
 
-		storageClassName := r.Context.Map.Storage.Spec.Map[0].Destination.StorageClass
-		if volumeType := r.getVolumeType(workload, originalVolumeDiskId); volumeType != "" {
-			storageClassName, err = r.getStorageClassName(workload, volumeType)
-			if err != nil {
-				err = liberr.Wrap(err)
-				return
+		mapList := r.Context.Map.Storage.Spec.Map
+
+		// Check if there's a storage map available
+		if len(mapList) == 0 {
+			err = liberr.New("no storage map found in the migration plan")
+			return
+		}
+
+		var storageClassName string
+
+		// VM is image based, look for a glance key in the mapping
+		if workload.ImageID != "" {
+			for _, storageMap := range mapList {
+				if storageMap.Source.Name == "glance" {
+					storageClassName = storageMap.Destination.StorageClass
+				}
+			}
+		} else {
+			// VM is volume based, look for the volume type in the mapping
+			if volumeType := r.getVolumeType(workload, originalVolumeDiskId); volumeType != "" {
+				storageClassName, err = r.getStorageClassName(workload, volumeType)
+				if err != nil {
+					err = liberr.Wrap(err)
+					return
+				}
 			}
 		}
+
 		if pvc, err = r.persistentVolumeClaimWithSourceRef(*image, storageClassName, populatorName, annotations, workload.ID); err != nil {
 			err = liberr.Wrap(err)
 			return
