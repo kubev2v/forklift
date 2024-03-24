@@ -36,6 +36,9 @@ type VM struct {
 	// Choose the primary disk the VM boots from
 	// +optional
 	RootDisk string `json:"rootDisk,omitempty"`
+	// Selected InstanceType that will override the VM properties.
+	// +optional
+	InstanceType string `json:"instanceType,omitempty"`
 }
 
 // Find a Hook for the specified step.
