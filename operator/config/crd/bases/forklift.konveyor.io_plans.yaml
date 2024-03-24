@@ -373,6 +373,10 @@ spec:
                         vsphere:
                           The managed object ID.
                       type: string
+                    instanceType:
+                      description: Selected InstanceType that will override the VM
+                        properties.
+                      type: string
                     luks:
                       description: Disk decryption LUKS keys
                       properties:
@@ -824,6 +828,10 @@ spec:
                             The object ID.
                             vsphere:
                               The managed object ID.
+                          type: string
+                        instanceType:
+                          description: Selected InstanceType that will override the
+                            VM properties.
                           type: string
                         luks:
                           description: Disk decryption LUKS keys
