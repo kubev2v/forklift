@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	forkliftv1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/provider"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
@@ -38,7 +37,7 @@ func NewStorageMap(namespace string, providerIdentifier forkliftv1.Provider, sto
 		}
 
 		switch providerIdentifier.Type() {
-		case api.Ova:
+		case forkliftv1.Ova:
 			pair.Source = ref.Ref{Name: sd}
 		default:
 			pair.Source = ref.Ref{ID: sd}

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	forkliftv1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/tests/suit/framework"
 	"github.com/konveyor/forklift-controller/tests/suit/utils"
 	. "github.com/onsi/ginkgo"
@@ -62,6 +63,13 @@ var _ = Describe("[level:component]Migration tests for OpenStack provider", func
 
 		//TODO: Add storage-class  pass here
 		storageMapDef := utils.NewStorageMap(namespace, *provider, test_storage_map_name, []string{vmData.GetVolumeId()}, openstackStorageClass)
+		storageMapDef.Spec.Map = append(storageMapDef.Spec.Map,
+			forkliftv1.StoragePair{
+				Source: ref.Ref{Name: forkliftv1.GlanceSource},
+				Destination: forkliftv1.DestinationStorage{
+					StorageClass: openstackStorageClass,
+				},
+			})
 
 		err = utils.CreateStorageMapFromDefinition(f.CrClient, storageMapDef)
 		Expect(err).ToNot(HaveOccurred())
