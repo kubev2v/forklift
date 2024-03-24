@@ -456,7 +456,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 }
 
 // Create the destination Kubevirt VM.
-func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim) (err error) {
+func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim, usesInstanceType bool) (err error) {
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
@@ -507,8 +507,11 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	}
 	r.mapDisks(vm, vmRef, persistentVolumeClaims, object)
 	r.mapFirmware(vm, object)
-	r.mapCPU(vm, object)
-	r.mapMemory(vm, object)
+	r.setMachine(object)
+	if !usesInstanceType {
+		r.mapCPU(vm, object)
+		r.mapMemory(vm, object)
+	}
 	r.mapClock(host, object)
 	r.mapInput(object)
 	r.mapTpm(vm, object)
@@ -601,6 +604,10 @@ func (r *Builder) mapClock(host *model.Host, object *cnv.VirtualMachineSpec) {
 	}
 }
 
+func (r *Builder) setMachine(object *cnv.VirtualMachineSpec) {
+	object.Template.Spec.Domain.Machine = &cnv.Machine{Type: "q35"}
+}
+
 func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	memoryBytes := int64(vm.MemoryMB) * 1024 * 1024
 	reservation := resource.NewQuantity(memoryBytes, resource.BinarySI)
@@ -613,7 +620,6 @@ func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec) {
 }
 
 func (r *Builder) mapCPU(vm *model.VM, object *cnv.VirtualMachineSpec) {
-	object.Template.Spec.Domain.Machine = &cnv.Machine{Type: "q35"}
 	object.Template.Spec.Domain.CPU = &cnv.CPU{
 		Sockets: uint32(vm.CpuCount / vm.CoresPerSocket),
 		Cores:   uint32(vm.CoresPerSocket),

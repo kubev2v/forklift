@@ -61,7 +61,7 @@ type Builder interface {
 	// Build DataVolume config map.
 	ConfigMap(vmRef ref.Ref, secret *core.Secret, object *core.ConfigMap) error
 	// Build the Kubevirt VirtualMachine spec.
-	VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim) error
+	VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim, usesInstanceType bool) error
 	// Build DataVolumes.
 	DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume) (dvs []cdi.DataVolume, err error)
 	// Build tasks.

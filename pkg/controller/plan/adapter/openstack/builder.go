@@ -259,7 +259,7 @@ var DefaultProperties = map[string]string{
 }
 
 // Create the destination Kubevirt VM.
-func (r *Builder) VirtualMachine(vmRef ref.Ref, vmSpec *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim) (err error) {
+func (r *Builder) VirtualMachine(vmRef ref.Ref, vmSpec *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim, usesInstanceType bool) (err error) {
 	vm := &model.Workload{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
@@ -283,7 +283,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, vmSpec *cnv.VirtualMachineSpec, 
 	}
 
 	r.mapFirmware(vm, vmSpec)
-	r.mapResources(vm, vmSpec)
+	r.mapResources(vm, vmSpec, usesInstanceType)
 	r.mapHardwareRng(vm, vmSpec)
 	r.mapInput(vm, vmSpec)
 	r.mapVideo(vm, vmSpec)
@@ -406,10 +406,12 @@ func (r *Builder) mapInput(vm *model.Workload, object *cnv.VirtualMachineSpec) {
 	}
 }
 
-func (r *Builder) mapResources(vm *model.Workload, object *cnv.VirtualMachineSpec) {
-
+func (r *Builder) mapResources(vm *model.Workload, object *cnv.VirtualMachineSpec, usesInstanceType bool) {
 	// KubeVirt supports Q35 or PC-Q35 machine types only.
 	object.Template.Spec.Domain.Machine = &cnv.Machine{Type: Q35}
+	if usesInstanceType {
+		return
+	}
 	object.Template.Spec.Domain.CPU = &cnv.CPU{}
 
 	// Set CPU Policy
