@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	cnv "kubevirt.io/api/core/v1"
+	instancetypeapi "kubevirt.io/api/instancetype"
 	instancetype "kubevirt.io/api/instancetype/v1beta1"
 	libvirtxml "libvirt.org/libvirt-go-xml"
 
@@ -1253,6 +1254,11 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 		}
 	}
 
+	err = r.setInstanceType(vm, object)
+	if err != nil {
+		return
+	}
+
 	if object.Spec.Template.ObjectMeta.Labels == nil {
 		object.Spec.Template.ObjectMeta.Labels = map[string]string{}
 	}
@@ -1271,7 +1277,7 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 	running := vm.RestorePowerState == plan.VMPowerStateOn
 	object.Spec.Running = &running
 
-	err = r.Builder.VirtualMachine(vm.Ref, &object.Spec, pvcs)
+	err = r.Builder.VirtualMachine(vm.Ref, &object.Spec, pvcs, vm.InstanceType != "")
 	if err != nil {
 		return
 	}
@@ -1302,6 +1308,69 @@ func (r *KubeVirt) vmPreference(vm *plan.VMStatus) (virtualMachine *cnv.VirtualM
 	virtualMachine = r.emptyVm(vm)
 	virtualMachine.Spec.Preference = &cnv.PreferenceMatcher{Name: preferenceName, Kind: kind}
 	return
+}
+
+func (r *KubeVirt) setInstanceType(vm *plan.VMStatus, object *cnv.VirtualMachine) (err error) {
+	if vm.InstanceType == "" {
+		return
+	}
+	kind, err := r.getInstanceType(vm, vm.InstanceType)
+	if err != nil {
+		return
+	}
+	object.Spec.Instancetype = &cnv.InstancetypeMatcher{Name: vm.InstanceType, Kind: kind}
+	return
+}
+
+// Attempt to find a suitable instance type
+func (r *KubeVirt) getInstanceType(vm *plan.VMStatus, instanceTypeName string) (kind string, err error) {
+	kind, err = r.getVirtualMachineInstanceType(instanceTypeName)
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			r.Log.Info("could not find a namespaced instance type for destination VM. trying cluster wide",
+				"vm",
+				vm.String())
+		} else {
+			r.Log.Error(err, "could not fetch a namespaced instance type for destination VM. trying cluster wide",
+				"vm",
+				vm.String())
+		}
+		kind, err = r.getVirtualMachineClusterInstanceType(vm, instanceTypeName)
+	}
+
+	return
+}
+
+func (r *KubeVirt) getVirtualMachineInstanceType(instanceTypeName string) (kind string, err error) {
+	virtualMachineInstancetype := &instancetype.VirtualMachineInstancetype{}
+	err = r.Destination.Client.Get(
+		context.TODO(),
+		client.ObjectKey{Name: instanceTypeName, Namespace: r.Plan.Spec.TargetNamespace},
+		virtualMachineInstancetype)
+	if err != nil {
+		return
+	}
+
+	return instancetypeapi.SingularResourceName, nil
+}
+
+func (r *KubeVirt) getVirtualMachineClusterInstanceType(vm *plan.VMStatus, instanceTypeName string) (kind string, err error) {
+	virtualMachineClusterInstancetype := &instancetype.VirtualMachineClusterInstancetype{}
+	err = r.Destination.Client.Get(
+		context.TODO(),
+		client.ObjectKey{Name: instanceTypeName},
+		virtualMachineClusterInstancetype)
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			r.Log.Info("could not find instance type for destination VM.",
+				"vm",
+				vm.String(),
+				"error",
+				err)
+		}
+		return
+	}
+	return instancetypeapi.ClusterSingularResourceName, nil
 }
 
 func (r *KubeVirt) getOsMapConfig(providerType api.ProviderType) (configMap *core.ConfigMap, err error) {
@@ -1377,6 +1446,10 @@ func (r *KubeVirt) getVirtualMachineClusterPreference(vm *plan.VMStatus, prefere
 
 // Attempt to find a suitable template and extract a VirtualMachine definition from it.
 func (r *KubeVirt) vmTemplate(vm *plan.VMStatus) (virtualMachine *cnv.VirtualMachine, ok bool) {
+	if vm.InstanceType != "" {
+		r.Log.Info("InstanceType is set, not setting a template", "vm", vm.String())
+		return
+	}
 	tmpl, err := r.findTemplate(vm)
 	if err != nil {
 		r.Log.Error(err, "could not find template for destination VM.",
