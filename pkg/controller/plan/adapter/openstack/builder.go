@@ -508,12 +508,13 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []*core.Pe
 		bus = VirtioBus
 	}
 
-	var bootOrder *uint
+	var bootOrderSet bool
 	var imagePVC *core.PersistentVolumeClaim
 	for _, pvc := range persistentVolumeClaims {
 		// Handle loopvar https://go.dev/wiki/LoopvarExperiment
 		pvc := pvc
 
+		var bootOrder *uint
 		image, err := r.getImageFromPVC(pvc)
 		if err != nil {
 			r.Log.Error(err, "image not found in inventory", "imageID", pvc.Labels["imageID"])
@@ -536,6 +537,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []*core.Pe
 			if bootable, err := strconv.ParseBool(volume.Bootable); err == nil && bootable {
 				r.Log.Info("bootable volume found", "volumeID", volumeID)
 				bootOrder = ptr.To[uint](1)
+				bootOrderSet = true
 			}
 		}
 
@@ -584,7 +586,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []*core.Pe
 	}
 
 	// If bootOrder wasn't set by a bootable volume, set it to the image (if exists)
-	if bootOrder == nil && imagePVC != nil {
+	if !bootOrderSet && imagePVC != nil {
 		r.Log.Info("No bootable volume found, falling back to image", "image", imagePVC.Name)
 		for i, disk := range kDisks {
 			if disk.Name == fmt.Sprintf("vol-%s", imagePVC.Annotations[planbase.AnnDiskSource]) {
