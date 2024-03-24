@@ -26,7 +26,6 @@ go_library(
         "//vendor/k8s.io/utils/ptr",
         "//vendor/kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
-        "//vendor/sigs.k8s.io/controller-runtime/pkg/controller/controllerutil",
     ],
 )
 
