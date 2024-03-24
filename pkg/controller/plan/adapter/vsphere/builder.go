@@ -460,8 +460,11 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	}
 	r.mapDisks(vm, persistentVolumeClaims, object)
 	r.mapFirmware(vm, object)
-	r.mapCPU(vm, object)
-	r.mapMemory(vm, object)
+	r.mapMachine(object)
+	if r.Plan.Spec.InstanceType == "" {
+		r.mapCPU(vm, object)
+		r.mapMemory(vm, object)
+	}
 	r.mapClock(host, object)
 	r.mapInput(object)
 	r.mapTpm(vm, object)
@@ -556,6 +559,10 @@ func (r *Builder) mapClock(host *model.Host, object *cnv.VirtualMachineSpec) {
 	}
 }
 
+func (r *Builder) mapMachine(object *cnv.VirtualMachineSpec) {
+	object.Template.Spec.Domain.Machine = &cnv.Machine{Type: "q35"}
+}
+
 func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	memoryBytes := int64(vm.MemoryMB) * 1024 * 1024
 	reservation := resource.NewQuantity(memoryBytes, resource.BinarySI)
@@ -567,7 +574,6 @@ func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec) {
 }
 
 func (r *Builder) mapCPU(vm *model.VM, object *cnv.VirtualMachineSpec) {
-	object.Template.Spec.Domain.Machine = &cnv.Machine{Type: "q35"}
 	object.Template.Spec.Domain.CPU = &cnv.CPU{
 		Sockets: uint32(vm.CpuCount / vm.CoresPerSocket),
 		Cores:   uint32(vm.CoresPerSocket),
