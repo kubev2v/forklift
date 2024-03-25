@@ -365,7 +365,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 					// Let CDI do the copying
 					dvSource = cdi.DataVolumeSource{
 						VDDK: &cdi.DataVolumeSourceVDDK{
-							BackingFile:  trimBackingFileName(disk.File),
+							BackingFile:  r.baseVolume(disk.File),
 							UUID:         vm.UUID,
 							URL:          url,
 							SecretRef:    secret.Name,
@@ -399,7 +399,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 				if dv.ObjectMeta.Annotations == nil {
 					dv.ObjectMeta.Annotations = make(map[string]string)
 				}
-				dv.ObjectMeta.Annotations[planbase.AnnDiskSource] = trimBackingFileName(disk.File)
+				dv.ObjectMeta.Annotations[planbase.AnnDiskSource] = r.baseVolume(disk.File)
 				dvs = append(dvs, *dv)
 			}
 		}
@@ -615,7 +615,7 @@ func (r *Builder) mapDisks(vm *model.VM, persistentVolumeClaims []*core.Persiste
 		}
 	}
 	for i, disk := range disks {
-		pvc := pvcMap[trimBackingFileName(disk.File)]
+		pvc := pvcMap[r.baseVolume(disk.File)]
 		volumeName := fmt.Sprintf("vol-%v", i)
 		volume := cnv.Volume{
 			Name: volumeName,
@@ -662,7 +662,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 		list = append(
 			list,
 			&plan.Task{
-				Name: trimBackingFileName(disk.File),
+				Name: r.baseVolume(disk.File),
 				Progress: libitr.Progress{
 					Total: mB,
 				},
@@ -717,12 +717,12 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 
 // Return a stable identifier for a VDDK DataVolume.
 func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
-	return trimBackingFileName(dv.ObjectMeta.Annotations[planbase.AnnDiskSource])
+	return r.baseVolume(dv.ObjectMeta.Annotations[planbase.AnnDiskSource])
 }
 
 // Return a stable identifier for a PersistentDataVolume.
 func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string {
-	return trimBackingFileName(pvc.Annotations[AnnImportBackingFile])
+	return r.baseVolume(pvc.Annotations[AnnImportBackingFile])
 }
 
 // Load
@@ -824,6 +824,22 @@ func (r *Builder) host(hostID string) (host *model.Host, err error) {
 //	Output: [datastore13] my-vm/disk-name.vmdk
 func trimBackingFileName(fileName string) string {
 	return backingFilePattern.ReplaceAllString(fileName, ".vmdk")
+}
+
+func (r *Builder) baseVolume(fileName string) string {
+	if r.Plan.Spec.Warm {
+		// for warm migrations, we return the very first volume of the disk
+		// as the base volume and CBT will be used to transfer later changes
+		return trimBackingFileName(fileName)
+	} else {
+		// for cold migrations, we return the latest volume as the base,
+		// e.g., my-vm/disk-name-000015.vmdk, since we should transfer
+		// only its state
+		// note that this setting is insignificant when we use virt-v2v on
+		// el9 since virt-v2v doesn't receive the volume to transfer - we
+		// only need this to be consistent for correlating disks with PVCs
+		return fileName
+	}
 }
 
 // Build LUN PVs.
