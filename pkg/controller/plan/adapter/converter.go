@@ -2,7 +2,12 @@ package adapter
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
+	"io"
+	"net/http"
+	"regexp"
+	"strconv"
 
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
@@ -29,6 +34,7 @@ type Converter struct {
 	Log         logging.LevelLogger
 	Labels      map[string]string
 	FilterFn    filterFn
+	httpClient  *http.Client
 }
 
 func NewConverter(destination *plancontext.Destination, logger logging.LevelLogger, labels map[string]string) *Converter {
@@ -72,19 +78,15 @@ func (c *Converter) ConvertPVCs(pvcs []*v1.PersistentVolumeClaim, srcFormat srcF
 		}
 
 		c.Log.Info("Convert job status", "pvc", pvc.Name, "status", convertJob.Status)
-		for _, condition := range convertJob.Status.Conditions {
-			switch condition.Type {
-			case batchv1.JobComplete:
-				c.Log.Info("Convert job completed", "pvc", pvc.Name)
-				c.deleteScratchDV(scratchDV)
-				return true, nil
+		if convertJob.Status.Succeeded >= 1 {
+			completed++
+			continue
+		}
 
-			case batchv1.JobFailed:
-				if convertJob.Status.Failed >= 3 {
-					c.deleteScratchDV(scratchDV)
-					return true, liberr.New("convert job failed")
-				}
-			}
+		if convertJob.Status.Failed >= 3 {
+			c.Log.Info("Convert job failed", "pvc", pvc.Name, "job", convertJob.Name)
+			c.deleteScratchDV(scratchDV)
+			return false, liberr.New("convert job failed", "pvc", pvc.Name, "job", convertJob.Name)
 		}
 	}
 
@@ -208,6 +210,12 @@ func makeConversionContainer(pvc *v1.PersistentVolumeClaim, srcFormat, dstFormat
 				Drop: []v1.Capability{"ALL"},
 			},
 		},
+		Ports: []v1.ContainerPort{
+			{
+				Name:          "metrics",
+				ContainerPort: 2112,
+			},
+		},
 		Command: []string{"/usr/local/bin/image-converter"},
 		Args: []string{
 			"-src-path", srcPath,
@@ -215,6 +223,7 @@ func makeConversionContainer(pvc *v1.PersistentVolumeClaim, srcFormat, dstFormat
 			"-src-format", srcFormat,
 			"-dst-format", dstFormat,
 			"-volume-mode", string(volumeMode),
+			"-owner-uid", string(pvc.UID),
 		},
 	}
 
@@ -270,6 +279,109 @@ func (c *Converter) ensureScratchDV(sourcePVC *v1.PersistentVolumeClaim) (*cdi.D
 	}
 
 	return scratchDV, nil
+}
+
+func (c *Converter) GetConversionProgressForPVC(pvc *v1.PersistentVolumeClaim) (float64, error) {
+	// Find pod via pvc -> job -> pod
+	jobList := &batchv1.JobList{}
+	label := client.MatchingLabels{planbase.AnnConversionSourcePVC: pvc.Name}
+	err := c.Destination.Client.List(context.Background(), jobList, client.InNamespace(pvc.Namespace), label)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(jobList.Items) == 0 {
+		return 0, nil
+	}
+
+	job := &jobList.Items[0]
+	for _, condition := range job.Status.Conditions {
+		switch condition.Type {
+		case batchv1.JobComplete:
+			return 100, nil
+		}
+	}
+
+	podList := &v1.PodList{}
+	label = client.MatchingLabels{planbase.AnnConversionSourcePVC: pvc.Name}
+	err = c.Destination.Client.List(context.Background(), podList, client.InNamespace(pvc.Namespace), label)
+	if err != nil {
+		return 0, err
+	}
+
+	var pod *v1.Pod
+	for _, currentPod := range podList.Items {
+		// loop var
+		currentPod := currentPod
+		if currentPod.Status.Phase != v1.PodFailed {
+			if currentPod.Status.Phase == v1.PodRunning {
+				pod = &currentPod
+				break
+			}
+			continue
+		}
+	}
+
+	if pod == nil {
+		return 0, nil
+	}
+
+	// Get pod IP
+	podIP := pod.Status.PodIP
+	if podIP == "" {
+		return 0, liberr.New("pod IP not found")
+	}
+
+	// Get progress from pod
+	progressRegexp := regexp.MustCompile("progress\\{ownerUID=\"" + string(pvc.UID) + "\"\\} (\\d+\\.?\\d*)")
+	if c.httpClient == nil {
+		c.httpClient = buildHTTPClient()
+	}
+
+	resp, err := c.httpClient.Get(fmt.Sprintf("https://%s:2112/metrics", podIP))
+	if err != nil {
+		err = liberr.Wrap(err)
+		return 0, err
+	}
+
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return 0, err
+	}
+
+	match := progressRegexp.FindSubmatch(body)
+	if match == nil {
+		c.Log.Info("Failed to find matches", "regexp", progressRegexp, "body", string(body))
+		return 0, nil
+	}
+
+	progress, err := strconv.ParseFloat(string(match[1]), 64)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return 0, err
+	}
+
+	return progress, nil
+}
+
+func buildHTTPClient() *http.Client {
+	defaultTransport := http.DefaultTransport.(*http.Transport)
+
+	transport := &http.Transport{
+		Proxy:                 defaultTransport.Proxy,
+		DialContext:           defaultTransport.DialContext,
+		MaxIdleConns:          defaultTransport.MaxIdleConns,
+		IdleConnTimeout:       defaultTransport.IdleConnTimeout,
+		ExpectContinueTimeout: defaultTransport.ExpectContinueTimeout,
+		TLSHandshakeTimeout:   defaultTransport.TLSHandshakeTimeout,
+
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
+	return &http.Client{Transport: transport}
 }
 
 func makeScratchDV(pvc *v1.PersistentVolumeClaim) *cdi.DataVolume {
