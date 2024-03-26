@@ -144,8 +144,8 @@ func (r *ClusterInstanceType) Link(p *api.Provider) {
 	r.SelfLink = base.Link(
 		ClusterInstanceRoot,
 		base.Params{
-			base.ProviderParam: string(p.UID),
-			ClusterInstanceRoot:           r.UID,
+			base.ProviderParam:  string(p.UID),
+			ClusterInstanceRoot: r.UID,
 		})
 }
 

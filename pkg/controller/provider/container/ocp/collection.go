@@ -44,7 +44,12 @@ func (r *StorageClass) Reconcile(ctx context.Context) (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
-	defer tx.End()
+	defer func() {
+		err = tx.End()
+		if err != nil {
+			err = liberr.Wrap(err)
+		}
+	}()
 	for _, resource := range list.Items {
 		select {
 		case <-ctx.Done():
@@ -141,7 +146,12 @@ func (r *NetworkAttachmentDefinition) Reconcile(ctx context.Context) (err error)
 		err = liberr.Wrap(err)
 		return
 	}
-	defer tx.End()
+	defer func() {
+		err = tx.End()
+		if err != nil {
+			err = liberr.Wrap(err)
+		}
+	}()
 	for _, resource := range list.Items {
 		select {
 		case <-ctx.Done():
@@ -238,7 +248,12 @@ func (r *Namespace) Reconcile(ctx context.Context) (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
-	defer tx.End()
+	defer func() {
+		err = tx.End()
+		if err != nil {
+			err = liberr.Wrap(err)
+		}
+	}()
 	for _, resource := range list.Items {
 		select {
 		case <-ctx.Done():
@@ -335,7 +350,12 @@ func (r *VM) Reconcile(ctx context.Context) (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
-	defer tx.End()
+	defer func() {
+		err = tx.End()
+		if err != nil {
+			err = liberr.Wrap(err)
+		}
+	}()
 	for _, resource := range list.Items {
 		select {
 		case <-ctx.Done():
@@ -432,7 +452,12 @@ func (r *InstanceType) Reconcile(ctx context.Context) (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
-	defer tx.End()
+	defer func() {
+		err = tx.End()
+		if err != nil {
+			err = liberr.Wrap(err)
+		}
+	}()
 	for _, resource := range list.Items {
 		select {
 		case <-ctx.Done():
@@ -502,7 +527,6 @@ func (r *InstanceType) Generic(e event.GenericEvent) bool {
 	return false
 }
 
-
 // ClusterInstanceType
 type ClusterInstanceType struct {
 	libocp.BaseCollection
@@ -530,7 +554,12 @@ func (r *ClusterInstanceType) Reconcile(ctx context.Context) (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
-	defer tx.End()
+	defer func() {
+		err = tx.End()
+		if err != nil {
+			err = liberr.Wrap(err)
+		}
+	}()
 	for _, resource := range list.Items {
 		select {
 		case <-ctx.Done():
