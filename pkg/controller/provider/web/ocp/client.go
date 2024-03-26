@@ -39,6 +39,14 @@ func (r *Resolver) Path(object interface{}, id string) (path string, err error) 
 		r.UID = id
 		r.Link(provider)
 		path = r.SelfLink
+	case *InstanceType:
+		r.UID = id
+		r.Link(provider)
+		path = r.SelfLink
+	case *ClusterInstanceType:
+		r.UID = id
+		r.Link(provider)
+		path = r.SelfLink
 	case *VM:
 		r.UID = id
 		r.Link(provider)
@@ -122,6 +130,70 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 		name := ref.Name
 		if name != "" {
 			list := []StorageClass{}
+			err = r.List(
+				&list,
+				base.Param{
+					Key:   DetailParam,
+					Value: "all",
+				},
+				base.Param{
+					Key:   NameParam,
+					Value: name,
+				})
+			if err != nil {
+				break
+			}
+			if len(list) == 0 {
+				err = liberr.Wrap(NotFoundError{Ref: ref})
+				break
+			}
+			if len(list) > 1 {
+				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
+				break
+			}
+			*res = list[0]
+		}
+	case *InstanceType:
+		id := ref.ID
+		if id != "" {
+			err = r.Get(resource, id)
+			return
+		}
+		name := ref.Name
+		if name != "" {
+			list := []InstanceType{}
+			err = r.List(
+				&list,
+				base.Param{
+					Key:   DetailParam,
+					Value: "all",
+				},
+				base.Param{
+					Key:   NameParam,
+					Value: name,
+				})
+			if err != nil {
+				break
+			}
+			if len(list) == 0 {
+				err = liberr.Wrap(NotFoundError{Ref: ref})
+				break
+			}
+			if len(list) > 1 {
+				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
+				break
+			}
+			*res = list[0]
+		}
+	case *ClusterInstanceType:
+		id := ref.ID
+		if id != "" {
+			err = r.Get(resource, id)
+			return
+		}
+		name := ref.Name
+		if name != "" {
+			list := []ClusterInstanceType{}
 			err = r.List(
 				&list,
 				base.Param{
@@ -287,5 +359,43 @@ func (r *Finder) Host(ref *base.Ref) (object interface{}, err error) {
 	err = liberr.Wrap(&NotFoundError{
 		Ref: *ref,
 	})
+	return
+}
+
+// Find a InstanceType by ref.
+// Returns the matching resource and:
+//
+//	ProviderNotSupportedErr
+//	ProviderNotReadyErr
+//	NotFoundErr
+//	RefNotUniqueErr
+func (r *Finder) InstanceType(ref *base.Ref) (object interface{}, err error) {
+	it := &InstanceType{}
+	err = r.ByRef(it, *ref)
+	if err == nil {
+		ref.ID = it.UID
+		ref.Name = path.Join(it.Namespace, it.Name)
+		object = it
+	}
+
+	return
+}
+
+// Find a ClusterInstanceType by ref.
+// Returns the matching resource and:
+//
+//	ProviderNotSupportedErr
+//	ProviderNotReadyErr
+//	NotFoundErr
+//	RefNotUniqueErr
+func (r *Finder) ClusterInstanceType(ref *base.Ref) (object interface{}, err error) {
+	it := &ClusterInstanceType{}
+	err = r.ByRef(it, *ref)
+	if err == nil {
+		ref.ID = it.UID
+		ref.Name = it.Name
+		object = it
+	}
+
 	return
 }

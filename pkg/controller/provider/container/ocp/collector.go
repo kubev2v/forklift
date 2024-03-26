@@ -39,6 +39,20 @@ func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) libcontain
 						provider.GetNamespace(),
 						provider.GetName())),
 			},
+			&InstanceType{
+				log: logging.WithName("collection|instancetype").WithValues(
+					"provider",
+					path.Join(
+						provider.GetNamespace(),
+						provider.GetName())),
+			},
+			&ClusterInstanceType{
+				log: logging.WithName("collection|clusterinstancetype").WithValues(
+					"provider",
+					path.Join(
+						provider.GetNamespace(),
+						provider.GetName())),
+			},
 			&VM{
 				log: logging.WithName("collection|vm").WithValues(
 					"provider",
