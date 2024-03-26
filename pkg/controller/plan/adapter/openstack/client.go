@@ -804,9 +804,15 @@ func (r *Client) ensureVmSnapshot(vm *libclient.VM) (ready bool, err error) {
 			"vm", vm.Name, "image", vmSnapshotImage.Name, "imageID", vmSnapshotImage.ID)
 		ready = true
 		if _, ok := vm.Image["id"]; ok {
+			r.Log.Info("the VM is image based, checking the image properties", "vm", vm.Name, "snapshot", vmSnapshotImage.Name)
 			ready, err = r.ensureImageUpToDate(vm, vmSnapshotImage, vmTypeImageBased)
 			if err != nil {
 				r.Log.Error(err, "checking the VM snapshot image properties", "vm", vm.Name, "image", vmSnapshotImage.Name)
+				return
+			}
+
+			if !ready {
+				r.Log.Info("the VM snapshot image properties are not in sync, skipping...", "vm", vm.Name, "image", vmSnapshotImage.Name)
 				return
 			}
 		}
@@ -855,6 +861,8 @@ func (r *Client) ensureImagesFromVolumesReady(vm *libclient.VM) (ready bool, err
 			if !ready {
 				return false, nil
 			}
+			r.Log.Info("the image is ready in the inventory",
+				"vm", vm.Name, "image", image.Name, "properties", image.Properties)
 
 			go func() {
 				// executing this in a non-blocking mode
@@ -940,6 +948,12 @@ func (r *Client) ensureImageUpToDate(vm *libclient.VM, image *libclient.Image, v
 			r.Log.Info("the image does not exist in the inventory, waiting...",
 				"vm", vm.Name, "image", image.Name, "properties", image.Properties)
 		}
+		return
+	}
+
+	if inventoryImage.Status != string(image.Status) {
+		r.Log.Info("image status is not in sync, waiting...",
+			"vm", vm.Name, "image", inventoryImage.Name, "status", inventoryImage.Status)
 		return
 	}
 
