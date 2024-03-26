@@ -13,6 +13,7 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	cnv "kubevirt.io/api/core/v1"
+	instancetype "kubevirt.io/api/instancetype/v1beta1"
 )
 
 // Errors
