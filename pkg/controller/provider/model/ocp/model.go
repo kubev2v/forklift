@@ -121,6 +121,28 @@ func (m *NetworkAttachmentDefinition) With(n *net.NetworkAttachmentDefinition) {
 	m.Object = *n
 }
 
+// InstanceTypes
+type InstanceType struct {
+	Base
+	Object instancetype.VirtualMachineInstancetype `sql:""`
+}
+
+func (m *InstanceType) With(i *instancetype.VirtualMachineInstancetype) {
+	m.Base.With(i)
+	m.Object = *i
+}
+
+// ClusterInstanceTypes
+type ClusterInstanceType struct {
+	Base
+	Object instancetype.VirtualMachineClusterInstancetype `sql:""`
+}
+
+func (m *ClusterInstanceType) With(i *instancetype.VirtualMachineClusterInstancetype) {
+	m.Base.With(i)
+	m.Object = *i
+}
+
 // VM
 type VM struct {
 	Base
