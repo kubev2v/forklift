@@ -223,7 +223,6 @@ func executeVirtV2v(source string, args []string) (err error) {
 			if match := UEFI_RE.FindSubmatch(line); match != nil {
 				fmt.Println("UEFI firmware detected")
 				firmware = "efi"
-				break
 			}
 		}
 
