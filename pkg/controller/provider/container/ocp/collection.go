@@ -12,6 +12,7 @@ import (
 	core "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	cnv "kubevirt.io/api/core/v1"
+	instancetype "kubevirt.io/api/instancetype/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
@@ -401,5 +402,199 @@ func (r *VM) Delete(e event.DeleteEvent) bool {
 
 // Ignored.
 func (r *VM) Generic(e event.GenericEvent) bool {
+	return false
+}
+
+// InstanceType
+type InstanceType struct {
+	libocp.BaseCollection
+	log logging.LevelLogger
+}
+
+// Get the kubernetes object being collected.
+func (r *InstanceType) Object() client.Object {
+	return &instancetype.VirtualMachineInstancetype{}
+}
+
+// Reconcile.
+// Achieve initial consistency.
+func (r *InstanceType) Reconcile(ctx context.Context) (err error) {
+	pClient := r.Collector.Client()
+	list := &instancetype.VirtualMachineInstancetypeList{}
+	err = pClient.List(context.TODO(), list)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	db := r.Collector.DB()
+	tx, err := db.Begin()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	defer tx.End()
+	for _, resource := range list.Items {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			m := &model.InstanceType{}
+			m.With(&resource)
+			r.Collector.UpdateThreshold(m)
+			r.log.Info("Create", libref.ToKind(m), m.String())
+			err = tx.Insert(m)
+			if err != nil {
+				err = liberr.Wrap(err)
+				return
+			}
+		}
+	}
+	err = tx.Commit()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	return
+}
+
+// Resource created watch event.
+func (r *InstanceType) Create(e event.CreateEvent) bool {
+	object, cast := e.Object.(*instancetype.VirtualMachineInstancetype)
+	if !cast {
+		return false
+	}
+	m := &model.InstanceType{}
+	m.With(object)
+	r.Collector.Create(m)
+
+	return false
+}
+
+// Resource updated watch event.
+func (r *InstanceType) Update(e event.UpdateEvent) bool {
+	object, cast := e.ObjectNew.(*instancetype.VirtualMachineInstancetype)
+	if !cast {
+		return false
+	}
+	m := &model.InstanceType{}
+	m.With(object)
+	r.Collector.Update(m)
+
+	return false
+}
+
+// Resource deleted watch event.
+func (r *InstanceType) Delete(e event.DeleteEvent) bool {
+	object, cast := e.Object.(*instancetype.VirtualMachineInstancetype)
+	if !cast {
+		return false
+	}
+	m := &model.InstanceType{}
+	m.With(object)
+	r.Collector.Delete(m)
+
+	return false
+}
+
+// Ignored.
+func (r *InstanceType) Generic(e event.GenericEvent) bool {
+	return false
+}
+
+// ClusterInstanceType
+type ClusterInstanceType struct {
+	libocp.BaseCollection
+	log logging.LevelLogger
+}
+
+// Get the kubernetes object being collected.
+func (r *ClusterInstanceType) Object() client.Object {
+	return &instancetype.VirtualMachineClusterInstancetype{}
+}
+
+// Reconcile.
+// Achieve initial consistency.
+func (r *ClusterInstanceType) Reconcile(ctx context.Context) (err error) {
+	pClient := r.Collector.Client()
+	list := &instancetype.VirtualMachineClusterInstancetypeList{}
+	err = pClient.List(context.TODO(), list)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	db := r.Collector.DB()
+	tx, err := db.Begin()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	defer tx.End()
+	for _, resource := range list.Items {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			m := &model.ClusterInstanceType{}
+			m.With(&resource)
+			r.Collector.UpdateThreshold(m)
+			r.log.Info("Create", libref.ToKind(m), m.String())
+			err = tx.Insert(m)
+			if err != nil {
+				err = liberr.Wrap(err)
+				return
+			}
+		}
+	}
+	err = tx.Commit()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	return
+}
+
+// Resource created watch event.
+func (r *ClusterInstanceType) Create(e event.CreateEvent) bool {
+	object, cast := e.Object.(*instancetype.VirtualMachineClusterInstancetype)
+	if !cast {
+		return false
+	}
+	m := &model.ClusterInstanceType{}
+	m.With(object)
+	r.Collector.Create(m)
+
+	return false
+}
+
+// Resource updated watch event.
+func (r *ClusterInstanceType) Update(e event.UpdateEvent) bool {
+	object, cast := e.ObjectNew.(*instancetype.VirtualMachineClusterInstancetype)
+	if !cast {
+		return false
+	}
+	m := &model.ClusterInstanceType{}
+	m.With(object)
+	r.Collector.Update(m)
+
+	return false
+}
+
+// Resource deleted watch event.
+func (r *ClusterInstanceType) Delete(e event.DeleteEvent) bool {
+	object, cast := e.Object.(*instancetype.VirtualMachineClusterInstancetype)
+	if !cast {
+		return false
+	}
+	m := &model.ClusterInstanceType{}
+	m.With(object)
+	r.Collector.Delete(m)
+
+	return false
+}
+
+// Ignored.
+func (r *ClusterInstanceType) Generic(e event.GenericEvent) bool {
 	return false
 }

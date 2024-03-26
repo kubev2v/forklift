@@ -7,6 +7,8 @@ func All() []interface{} {
 		&NetworkAttachmentDefinition{},
 		&StorageClass{},
 		&Namespace{},
+		&InstanceType{},
+		&ClusterInstanceType{},
 		&VM{},
 	}
 }

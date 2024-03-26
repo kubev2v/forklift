@@ -5,7 +5,9 @@ go_library(
     srcs = [
         "base.go",
         "client.go",
+        "clusterinstancetype.go",
         "doc.go",
+        "instancetype.go",
         "namespace.go",
         "netattachdefinition.go",
         "provider.go",
@@ -31,5 +33,6 @@ go_library(
         "//vendor/k8s.io/api/core/v1:core",
         "//vendor/k8s.io/api/storage/v1:storage",
         "//vendor/kubevirt.io/api/core/v1:core",
+        "//vendor/kubevirt.io/api/instancetype/v1beta1",
     ],
 )
