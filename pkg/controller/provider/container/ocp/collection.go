@@ -7,6 +7,7 @@ import (
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libocp "github.com/konveyor/forklift-controller/pkg/lib/inventory/container/ocp"
+	m "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 	core "k8s.io/api/core/v1"
@@ -44,7 +45,9 @@ func (r *StorageClass) Reconcile(ctx context.Context) (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
-	defer tx.End()
+	defer func() {
+		err = endTransaction(tx)
+	}()
 	for _, resource := range list.Items {
 		select {
 		case <-ctx.Done():
@@ -141,7 +144,9 @@ func (r *NetworkAttachmentDefinition) Reconcile(ctx context.Context) (err error)
 		err = liberr.Wrap(err)
 		return
 	}
-	defer tx.End()
+	defer func() {
+		err = endTransaction(tx)
+	}()
 	for _, resource := range list.Items {
 		select {
 		case <-ctx.Done():
@@ -238,7 +243,9 @@ func (r *Namespace) Reconcile(ctx context.Context) (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
-	defer tx.End()
+	defer func() {
+		err = endTransaction(tx)
+	}()
 	for _, resource := range list.Items {
 		select {
 		case <-ctx.Done():
@@ -335,7 +342,9 @@ func (r *VM) Reconcile(ctx context.Context) (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
-	defer tx.End()
+	defer func() {
+		err = endTransaction(tx)
+	}()
 	for _, resource := range list.Items {
 		select {
 		case <-ctx.Done():
@@ -432,7 +441,9 @@ func (r *InstanceType) Reconcile(ctx context.Context) (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
-	defer tx.End()
+	defer func() {
+		err = endTransaction(tx)
+	}()
 	for _, resource := range list.Items {
 		select {
 		case <-ctx.Done():
@@ -529,7 +540,9 @@ func (r *ClusterInstanceType) Reconcile(ctx context.Context) (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
-	defer tx.End()
+	defer func() {
+		err = endTransaction(tx)
+	}()
 	for _, resource := range list.Items {
 		select {
 		case <-ctx.Done():
@@ -597,4 +610,12 @@ func (r *ClusterInstanceType) Delete(e event.DeleteEvent) bool {
 // Ignored.
 func (r *ClusterInstanceType) Generic(e event.GenericEvent) bool {
 	return false
+}
+
+func endTransaction(tx *m.Tx) error {
+	err := tx.End()
+	if err != nil {
+		err = liberr.Wrap(err)
+	}
+	return err
 }
