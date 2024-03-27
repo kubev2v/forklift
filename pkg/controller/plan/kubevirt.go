@@ -239,7 +239,7 @@ func (r *KubeVirt) getImporterPods(pvc *core.PersistentVolumeClaim) (pods []core
 		return
 	}
 	for _, pod := range podList.Items {
-		if strings.Contains(pod.Name, fmt.Sprintf("importer-%s-%s", r.Plan.Name, pvc.Annotations[kVM])) {
+		if strings.Contains(pod.Name, fmt.Sprintf("importer-%s", pvc.Name)) {
 			pods = append(pods, pod)
 		}
 	}
