@@ -53,8 +53,8 @@ jobs:
       - name: Checkout forkliftci
         uses: actions/checkout@v4
         with:
-          repository: kubev2v/forkliftci
-          ref: v14.0
+          repository: liranr23/forkliftci
+          ref: bump_kubevirt
 
       - name: Build and setup everything with bazel
         id: forkliftci
