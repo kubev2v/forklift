@@ -35,6 +35,14 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 			return
 		}
 	}
+
+	// If vm is image based, we need to see glance in the storage map
+	if vm.ImageID != "" {
+		if !r.plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{Name: "glance"}) {
+			return
+		}
+	}
+
 	ok = true
 	return
 }
