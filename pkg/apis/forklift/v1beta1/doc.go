@@ -21,3 +21,6 @@ limitations under the License.
 // +k8s:defaulter-gen=TypeMeta
 // +groupName=forklift.konveyor.io
 package v1beta1
+
+// GlanceSource represents an image of which the source is Glance, to be used in storage mapping
+const GlanceSource = "glance"

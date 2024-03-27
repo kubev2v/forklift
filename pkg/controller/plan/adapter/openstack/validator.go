@@ -37,10 +37,9 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 	}
 
 	// If vm is image based, we need to see glance in the storage map
-	if vm.ImageID != "" {
-		if !r.plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{Name: "glance"}) {
-			return
-		}
+	if vm.ImageID != "" && !r.plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{Name: api.GlanceSource}) {
+		err = liberr.New("glance storage not mapped", "vm", vmRef.String())
+		return
 	}
 
 	ok = true

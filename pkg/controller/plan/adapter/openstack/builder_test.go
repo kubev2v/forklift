@@ -1,6 +1,7 @@
 package openstack
 
 import (
+	v1beta1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -19,6 +20,6 @@ var _ = Describe("OpenStack builder", func() {
 
 var _ = Describe("OpenStack Glance const test", func() {
 	It("GlanceSource should be glance, changing it may break the UI", func() {
-		Expect(GlanceSource).Should(Equal("glance"))
+		Expect(v1beta1.GlanceSource).Should(Equal("glance"))
 	})
 })
