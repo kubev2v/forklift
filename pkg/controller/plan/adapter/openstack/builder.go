@@ -31,9 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// GlanceSource represents an image of which the source is Glance, to be used in storage mapping
-const GlanceSource = "glance"
-
 // Openstack builder.
 type Builder struct {
 	*plancontext.Context
@@ -1026,7 +1023,7 @@ func (r *Builder) ensureVolumePopulatorPVC(workload *model.Workload, image *mode
 		// VM is image based, look for a glance key in the mapping
 		if workload.ImageID != "" {
 			for _, storageMap := range mapList {
-				if storageMap.Source.Name == "glance" {
+				if storageMap.Source.Name == api.GlanceSource {
 					storageClassName = storageMap.Destination.StorageClass
 				}
 			}
