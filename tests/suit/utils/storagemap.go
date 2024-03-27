@@ -47,6 +47,15 @@ func NewStorageMap(namespace string, providerIdentifier forkliftv1.Provider, sto
 		sdPairs = append(sdPairs, pair)
 	}
 
+	if providerIdentifier.Type() == api.OpenStack {
+		sdPairs = append(sdPairs, forkliftv1.StoragePair{
+			Source: ref.Ref{Name: "glance"},
+			Destination: forkliftv1.DestinationStorage{
+				StorageClass: storageClass,
+			},
+		})
+	}
+
 	storageMap := &forkliftv1.StorageMap{
 		TypeMeta: v1.TypeMeta{
 			Kind:       "StorageMap",
