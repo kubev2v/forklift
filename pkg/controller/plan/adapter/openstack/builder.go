@@ -440,6 +440,7 @@ func (r *Builder) mapResources(vm *model.Workload, object *cnv.VirtualMachineSpe
 	memory := resource.NewQuantity(int64(vm.Flavor.RAM)*1024*1024, resource.BinarySI)
 	resourceRequests := map[core.ResourceName]resource.Quantity{}
 	resourceRequests[core.ResourceMemory] = *memory
+	object.Template.Spec.Domain.Memory = &cnv.Memory{Guest: memory}
 
 	object.Template.Spec.Domain.Resources.Requests = resourceRequests
 }

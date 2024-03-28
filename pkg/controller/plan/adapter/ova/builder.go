@@ -318,6 +318,7 @@ func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec) error 
 			core.ResourceMemory: *reservation,
 		},
 	}
+	object.Template.Spec.Domain.Memory = &cnv.Memory{Guest: reservation}
 	return nil
 }
 

@@ -564,6 +564,7 @@ func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec) {
 			core.ResourceMemory: *reservation,
 		},
 	}
+	object.Template.Spec.Domain.Memory = &cnv.Memory{Guest: reservation}
 }
 
 func (r *Builder) mapCPU(vm *model.VM, object *cnv.VirtualMachineSpec) {
