@@ -1022,13 +1022,14 @@ func (r *Builder) ensureVolumePopulatorPVC(workload *model.Workload, image *mode
 
 		// VM is image based, look for a glance key in the mapping
 		if workload.ImageID != "" {
+			// At this point the StorageMap has been validated, and the VM has to be fully mapped
 			for _, storageMap := range mapList {
 				if storageMap.Source.Name == api.GlanceSource {
 					storageClassName = storageMap.Destination.StorageClass
 				}
 			}
 		} else {
-			// VM is volume based, look for the volume type in the mapping
+			// VM has a volume, look for the volume type in the mapping
 			if volumeType := r.getVolumeType(workload, originalVolumeDiskId); volumeType != "" {
 				storageClassName, err = r.getStorageClassName(workload, volumeType)
 				if err != nil {
