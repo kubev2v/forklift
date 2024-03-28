@@ -190,7 +190,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		}
 	}
 
-	if provider.Type() == api.Ova {
+	if provider.Type() == api.Ova && provider.DeletionTimestamp == nil {
 
 		deploymentName := fmt.Sprintf("%s-deployment-%s", ovaServer, provider.Name)
 
