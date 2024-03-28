@@ -13,6 +13,7 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	cnv "kubevirt.io/api/core/v1"
+	instancetype "kubevirt.io/api/instancetype/v1beta1"
 )
 
 // Errors
@@ -119,6 +120,28 @@ type NetworkAttachmentDefinition struct {
 func (m *NetworkAttachmentDefinition) With(n *net.NetworkAttachmentDefinition) {
 	m.Base.With(n)
 	m.Object = *n
+}
+
+// InstanceTypes
+type InstanceType struct {
+	Base
+	Object instancetype.VirtualMachineInstancetype `sql:""`
+}
+
+func (m *InstanceType) With(i *instancetype.VirtualMachineInstancetype) {
+	m.Base.With(i)
+	m.Object = *i
+}
+
+// ClusterInstanceTypes
+type ClusterInstanceType struct {
+	Base
+	Object instancetype.VirtualMachineClusterInstancetype `sql:""`
+}
+
+func (m *ClusterInstanceType) With(i *instancetype.VirtualMachineClusterInstancetype) {
+	m.Base.With(i)
+	m.Object = *i
 }
 
 // VM

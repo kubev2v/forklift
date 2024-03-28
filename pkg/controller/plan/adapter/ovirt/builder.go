@@ -268,8 +268,11 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	}
 	r.mapDisks(vm, persistentVolumeClaims, object)
 	r.mapFirmware(vm, &vm.Cluster, object)
-	r.mapCPU(vm, object)
-	r.mapMemory(vm, object)
+	r.mapMachine(object)
+	if r.Plan.Spec.InstanceType == "" {
+		r.mapCPU(vm, object)
+		r.mapMemory(vm, object)
+	}
 	r.mapClock(vm, object)
 	r.mapInput(object)
 	r.mapTpm(vm, object)
@@ -368,13 +371,18 @@ func (r *Builder) mapMemory(vm *model.Workload, object *cnv.VirtualMachineSpec) 
 	}
 	object.Template.Spec.Domain.Memory = &cnv.Memory{Guest: reservation}
 }
-func (r *Builder) mapCPU(vm *model.Workload, object *cnv.VirtualMachineSpec) {
+
+func (r *Builder) mapMachine(object *cnv.VirtualMachineSpec) {
 	object.Template.Spec.Domain.Machine = &cnv.Machine{Type: "q35"}
+}
+
+func (r *Builder) mapCPU(vm *model.Workload, object *cnv.VirtualMachineSpec) {
 	object.Template.Spec.Domain.CPU = &cnv.CPU{
 		Sockets: uint32(vm.CpuSockets),
 		Cores:   uint32(vm.CpuCores),
 		Threads: uint32(vm.CpuThreads),
 	}
+
 	if vm.CpuPinningPolicy == model.Dedicated {
 		object.Template.Spec.Domain.CPU.DedicatedCPUPlacement = true
 	}

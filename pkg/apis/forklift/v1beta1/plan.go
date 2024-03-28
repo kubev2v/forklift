@@ -46,6 +46,8 @@ type PlanSpec struct {
 	Archived bool `json:"archived,omitempty"`
 	// Preserve the CPU model and flags the VM runs with in its oVirt cluster.
 	PreserveClusterCPUModel bool `json:"preserveClusterCpuModel,omitempty"`
+	// Selected InstanceType that will override the VM properties. (Optional)
+	InstanceType string `json:"instanceType,omitempty"`
 }
 
 // Find a planned VM.

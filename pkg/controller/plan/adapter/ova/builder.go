@@ -228,11 +228,14 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	}
 	r.mapDisks(vm, persistentVolumeClaims, object)
 	r.mapFirmware(vm, vmRef, object)
-	r.mapCPU(vm, object)
+	r.mapMachine(object)
 	r.mapInput(object)
-	err = r.mapMemory(vm, object)
-	if err != nil {
-		return
+	if r.Plan.Spec.InstanceType == "" {
+		r.mapCPU(vm, object)
+		err = r.mapMemory(vm, object)
+		if err != nil {
+			return
+		}
 	}
 	err = r.mapNetworks(vm, object)
 	if err != nil {
@@ -322,11 +325,15 @@ func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec) error 
 	return nil
 }
 
+func (r *Builder) mapMachine(object *cnv.VirtualMachineSpec) {
+	object.Template.Spec.Domain.Machine = &cnv.Machine{Type: "q35"}
+}
+
 func (r *Builder) mapCPU(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	if vm.CoresPerSocket == 0 {
 		vm.CoresPerSocket = 1
 	}
-	object.Template.Spec.Domain.Machine = &cnv.Machine{Type: "q35"}
+
 	object.Template.Spec.Domain.CPU = &cnv.CPU{
 		Sockets: uint32(vm.CpuCount / vm.CoresPerSocket),
 		Cores:   uint32(vm.CoresPerSocket),
