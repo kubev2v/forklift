@@ -67,6 +67,7 @@ go_test(
     ],
     deps = [
         "//pkg/apis/forklift/v1beta1",
+        "//pkg/apis/forklift/v1beta1/ref",
         "//pkg/lib/client/openstack",
         "//pkg/lib/logging",
         "//tests/suit/framework",
