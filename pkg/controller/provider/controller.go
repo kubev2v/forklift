@@ -421,20 +421,21 @@ func (r *Catalog) get(request reconcile.Request) (p *api.Provider, found bool) {
 	return
 }
 
-func (r *Reconciler) removeVolumeOfOVAServer(provider *api.Provider) (err error) {
+func (r *Reconciler) removeVolumeOfOVAServer(provider *api.Provider) error {
 	labelSelector := labels.SelectorFromSet(labels.Set{
 		"subapp":   "ova-server",
 		"app":      "forklift",
 		"provider": provider.Name,
 	})
 	pvList := &v1.PersistentVolumeList{}
-	if err = r.Client.List(context.TODO(), pvList, &client.ListOptions{LabelSelector: labelSelector}); err != nil {
+	if err := r.Client.List(context.TODO(), pvList, &client.ListOptions{LabelSelector: labelSelector}); err != nil {
 		r.Log.Error(err, "Failed to list PVs for OVA provider", "provider", provider)
+		return err
 	} else {
 		for _, pv := range pvList.Items {
 			if err = r.Client.Delete(context.TODO(), &pv); err != nil {
 				r.Log.Error(err, "Failed to delete PV", "PV", pv)
-				return
+				return err
 			}
 		}
 		clonedProvider := provider.DeepCopy()
@@ -443,5 +444,5 @@ func (r *Reconciler) removeVolumeOfOVAServer(provider *api.Provider) (err error)
 			r.Log.Error(err, "Failed to remove finalizer", "provider", provider)
 		}
 	}
-	return
+	return nil
 }
