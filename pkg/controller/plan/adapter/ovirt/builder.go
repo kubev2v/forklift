@@ -366,6 +366,7 @@ func (r *Builder) mapMemory(vm *model.Workload, object *cnv.VirtualMachineSpec) 
 			core.ResourceMemory: *reservation,
 		},
 	}
+	object.Template.Spec.Domain.Memory = &cnv.Memory{Guest: reservation}
 }
 func (r *Builder) mapCPU(vm *model.Workload, object *cnv.VirtualMachineSpec) {
 	object.Template.Spec.Domain.Machine = &cnv.Machine{Type: "q35"}
