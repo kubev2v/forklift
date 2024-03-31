@@ -54,7 +54,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: kubev2v/forkliftci
-          ref: v14.0
+          ref: v15.0
 
       - name: Build and setup everything with bazel
         id: forkliftci
