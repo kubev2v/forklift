@@ -1312,11 +1312,12 @@ func (r *KubeVirt) getPreference(vm *plan.VMStatus, preferenceName string) (name
 				"vm",
 				vm.String())
 		} else {
-			return
+			r.Log.Error(err, "could not fetch a local instance type preference for destination VM. trying cluster wide",
+				"vm",
+				vm.String())
 		}
+		name, kind, err = r.getVirtualMachineClusterPreference(vm, preferenceName)
 	}
-
-	name, kind, err = r.getVirtualMachineClusterPreference(vm, preferenceName)
 	return
 }
 
