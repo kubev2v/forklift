@@ -1355,7 +1355,7 @@ func (r *KubeVirt) getVirtualMachineClusterPreference(vm *plan.VMStatus, prefere
 func (r *KubeVirt) vmTemplate(vm *plan.VMStatus) (virtualMachine *cnv.VirtualMachine, ok bool) {
 	tmpl, err := r.findTemplate(vm)
 	if err != nil {
-		r.Log.Info("could not find template for destination VM.",
+		r.Log.Error(err, "could not find template for destination VM.",
 			"vm",
 			vm.String())
 		return
