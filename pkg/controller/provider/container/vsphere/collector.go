@@ -838,10 +838,17 @@ func (r *Collector) selectAdapter(u types.ObjectUpdate) (Adapter, bool) {
 			},
 		}
 	case Datastore:
+		// when we get datastores from the ESXi SDK, their identifier may be in the
+		// form of '10.11.12.13:/vol/virtv2v/function' which leads to invalid
+		// endpoints in the inventory so we sanitize such identifiers
+		datastoreId, changed := sanitize(u.Obj.Value)
+		if changed {
+			r.log.Info("sanitized datastore ID", "reported", u.Obj.Value, "sanitized", datastoreId)
+		}
 		adapter = &DatastoreAdapter{
 			model: model.Datastore{
 				Base: model.Base{
-					ID: u.Obj.Value,
+					ID: datastoreId,
 				},
 			},
 		}
@@ -932,9 +939,10 @@ func (r Collector) applyLeave(tx *libmodel.Tx, u types.ObjectUpdate) error {
 			},
 		}
 	case Datastore:
+		datastoreId, _ := sanitize(u.Obj.Value)
 		deleted = &model.Datastore{
 			Base: model.Base{
-				ID: u.Obj.Value,
+				ID: datastoreId,
 			},
 		}
 	case VirtualMachine:
