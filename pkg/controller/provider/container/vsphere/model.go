@@ -688,18 +688,20 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 			switch disk.Backing.(type) {
 			case *types.VirtualDiskFlatVer1BackingInfo:
 				backing := disk.Backing.(*types.VirtualDiskFlatVer1BackingInfo)
+				datastoreId, _ := sanitize(backing.Datastore.Value)
 				md := model.Disk{
 					Key:      disk.Key,
 					File:     backing.FileName,
 					Capacity: disk.CapacityInBytes,
 					Datastore: model.Ref{
 						Kind: model.DsKind,
-						ID:   backing.Datastore.Value,
+						ID:   datastoreId,
 					},
 				}
 				disks = append(disks, md)
 			case *types.VirtualDiskFlatVer2BackingInfo:
 				backing := disk.Backing.(*types.VirtualDiskFlatVer2BackingInfo)
+				datastoreId, _ := sanitize(backing.Datastore.Value)
 				md := model.Disk{
 					Key:      disk.Key,
 					File:     backing.FileName,
@@ -707,12 +709,13 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					Shared:   backing.Sharing != "sharingNone",
 					Datastore: model.Ref{
 						Kind: model.DsKind,
-						ID:   backing.Datastore.Value,
+						ID:   datastoreId,
 					},
 				}
 				disks = append(disks, md)
 			case *types.VirtualDiskRawDiskMappingVer1BackingInfo:
 				backing := disk.Backing.(*types.VirtualDiskRawDiskMappingVer1BackingInfo)
+				datastoreId, _ := sanitize(backing.Datastore.Value)
 				md := model.Disk{
 					Key:      disk.Key,
 					File:     backing.FileName,
@@ -720,7 +723,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					Shared:   backing.Sharing != "sharingNone",
 					Datastore: model.Ref{
 						Kind: model.DsKind,
-						ID:   backing.Datastore.Value,
+						ID:   datastoreId,
 					},
 					RDM: true,
 				}
