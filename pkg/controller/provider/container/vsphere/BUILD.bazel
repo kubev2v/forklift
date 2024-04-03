@@ -6,6 +6,7 @@ go_library(
         "collector.go",
         "doc.go",
         "model.go",
+        "utils.go",
         "watch.go",
     ],
     importpath = "github.com/konveyor/forklift-controller/pkg/controller/provider/container/vsphere",
