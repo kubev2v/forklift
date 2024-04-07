@@ -60,6 +60,7 @@ func CreateConversionTask(inventory web.Client, vmRef ref.Ref) (*plan.Task, erro
 		return nil, err
 	}
 	if image.DiskFormat == "raw" {
+		//nolint:nilnil
 		return nil, nil
 	}
 
