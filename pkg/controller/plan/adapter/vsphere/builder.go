@@ -547,9 +547,7 @@ func (r *Builder) mapInput(object *cnv.VirtualMachineSpec) {
 func (r *Builder) mapClock(host *model.Host, object *cnv.VirtualMachineSpec) {
 	if host.Timezone != "" {
 		if object.Template.Spec.Domain.Clock == nil {
-			object.Template.Spec.Domain.Clock = &cnv.Clock{
-				Timer: &cnv.Timer{},
-			}
+			object.Template.Spec.Domain.Clock = &cnv.Clock{}
 		}
 		tz := cnv.ClockOffsetTimezone(host.Timezone)
 		object.Template.Spec.Domain.Clock.ClockOffset.Timezone = &tz
