@@ -685,9 +685,8 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 		switch dev.(type) {
 		case *types.VirtualDisk:
 			disk := dev.(*types.VirtualDisk)
-			switch disk.Backing.(type) {
+			switch backing := disk.Backing.(type) {
 			case *types.VirtualDiskFlatVer1BackingInfo:
-				backing := disk.Backing.(*types.VirtualDiskFlatVer1BackingInfo)
 				md := model.Disk{
 					Key:      disk.Key,
 					File:     backing.FileName,
@@ -702,7 +701,6 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 				}
 				disks = append(disks, md)
 			case *types.VirtualDiskFlatVer2BackingInfo:
-				backing := disk.Backing.(*types.VirtualDiskFlatVer2BackingInfo)
 				md := model.Disk{
 					Key:      disk.Key,
 					File:     backing.FileName,
@@ -718,7 +716,6 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 				}
 				disks = append(disks, md)
 			case *types.VirtualDiskRawDiskMappingVer1BackingInfo:
-				backing := disk.Backing.(*types.VirtualDiskRawDiskMappingVer1BackingInfo)
 				md := model.Disk{
 					Key:      disk.Key,
 					File:     backing.FileName,
@@ -735,7 +732,6 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 				}
 				disks = append(disks, md)
 			case *types.VirtualDiskRawDiskVer2BackingInfo:
-				backing := disk.Backing.(*types.VirtualDiskRawDiskVer2BackingInfo)
 				md := model.Disk{
 					Key:      disk.Key,
 					File:     backing.DescriptorFileName,
