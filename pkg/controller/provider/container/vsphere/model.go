@@ -691,6 +691,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					Key:      disk.Key,
 					File:     backing.FileName,
 					Capacity: disk.CapacityInBytes,
+					Mode:     backing.DiskMode,
 				}
 				if backing.Datastore != nil {
 					datastoreId, _ := sanitize(backing.Datastore.Value)
@@ -706,6 +707,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					File:     backing.FileName,
 					Capacity: disk.CapacityInBytes,
 					Shared:   backing.Sharing != "sharingNone",
+					Mode:     backing.DiskMode,
 				}
 				if backing.Datastore != nil {
 					datastoreId, _ := sanitize(backing.Datastore.Value)
@@ -721,6 +723,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					File:     backing.FileName,
 					Capacity: disk.CapacityInBytes,
 					Shared:   backing.Sharing != "sharingNone",
+					Mode:     backing.DiskMode,
 					RDM:      true,
 				}
 				if backing.Datastore != nil {
