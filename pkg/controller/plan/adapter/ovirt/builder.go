@@ -350,9 +350,7 @@ func (r *Builder) mapInput(object *cnv.VirtualMachineSpec) {
 
 func (r *Builder) mapClock(vm *model.Workload, object *cnv.VirtualMachineSpec) {
 	if object.Template.Spec.Domain.Clock == nil {
-		object.Template.Spec.Domain.Clock = &cnv.Clock{
-			Timer: &cnv.Timer{},
-		}
+		object.Template.Spec.Domain.Clock = &cnv.Clock{}
 	}
 
 	timezone := cnv.ClockOffsetTimezone(vm.Timezone)
