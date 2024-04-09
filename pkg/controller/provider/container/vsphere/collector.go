@@ -119,6 +119,7 @@ const (
 	fConnectionState     = "runtime.connectionState"
 	fSnapshot            = "snapshot"
 	fIsTemplate          = "config.template"
+	fGuestNet            = "guest.net"
 )
 
 // Selections
@@ -720,6 +721,7 @@ func (r *Collector) vmPathSet() []string {
 		fNumCoresPerSocket,
 		fMemorySize,
 		fDevices,
+		fGuestNet,
 		fExtraConfig,
 		fGuestName,
 		fGuestID,
