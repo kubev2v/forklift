@@ -183,6 +183,8 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		return
 	}
 
+	macsToIps := r.mapMacStaticIps(vm)
+
 	libvirtURL, fingerprint, err := r.getSourceDetails(vm, sourceSecret)
 	if err != nil {
 		return
@@ -209,7 +211,23 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 			Value: fingerprint,
 		},
 	)
+	if macsToIps != "" {
+		env = append(env, core.EnvVar{
+			Name:  "V2V_staticIPs",
+			Value: macsToIps,
+		})
+	}
 	return
+}
+
+func (r *Builder) mapMacStaticIps(vm *model.VM) string {
+	configurations := []string{}
+	for _, guestNetwork := range vm.GuestNetworks {
+		if guestNetwork.Origin == string(types.NetIpConfigInfoIpAddressOriginManual) {
+			configurations = append(configurations, fmt.Sprintf("%s:ip:%s", guestNetwork.MAC, guestNetwork.IP))
+		}
+	}
+	return strings.Join(configurations, "_")
 }
 
 func (r *Builder) getSourceDetails(vm *model.VM, sourceSecret *core.Secret) (libvirtURL liburl.URL, fingerprint string, err error) {
