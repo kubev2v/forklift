@@ -210,29 +210,30 @@ func (r *VM1) Content(detail int) interface{} {
 // VM full detail.
 type VM struct {
 	VM1
-	PolicyVersion         int            `json:"policyVersion"`
-	UUID                  string         `json:"uuid"`
-	Firmware              string         `json:"firmware"`
-	ConnectionState       string         `json:"connectionState"`
-	Snapshot              model.Ref      `json:"snapshot"`
-	ChangeTrackingEnabled bool           `json:"changeTrackingEnabled"`
-	CpuAffinity           []int32        `json:"cpuAffinity"`
-	CpuHotAddEnabled      bool           `json:"cpuHotAddEnabled"`
-	CpuHotRemoveEnabled   bool           `json:"cpuHotRemoveEnabled"`
-	MemoryHotAddEnabled   bool           `json:"memoryHotAddEnabled"`
-	FaultToleranceEnabled bool           `json:"faultToleranceEnabled"`
-	CpuCount              int32          `json:"cpuCount"`
-	CoresPerSocket        int32          `json:"coresPerSocket"`
-	MemoryMB              int32          `json:"memoryMB"`
-	GuestName             string         `json:"guestName"`
-	GuestID               string         `json:"guestId"`
-	BalloonedMemory       int32          `json:"balloonedMemory"`
-	IpAddress             string         `json:"ipAddress"`
-	StorageUsed           int64          `json:"storageUsed"`
-	TpmEnabled            bool           `json:"tpmEnabled"`
-	NumaNodeAffinity      []string       `json:"numaNodeAffinity"`
-	Devices               []model.Device `json:"devices"`
-	NICs                  []model.NIC    `json:"nics"`
+	PolicyVersion         int                  `json:"policyVersion"`
+	UUID                  string               `json:"uuid"`
+	Firmware              string               `json:"firmware"`
+	ConnectionState       string               `json:"connectionState"`
+	Snapshot              model.Ref            `json:"snapshot"`
+	ChangeTrackingEnabled bool                 `json:"changeTrackingEnabled"`
+	CpuAffinity           []int32              `json:"cpuAffinity"`
+	CpuHotAddEnabled      bool                 `json:"cpuHotAddEnabled"`
+	CpuHotRemoveEnabled   bool                 `json:"cpuHotRemoveEnabled"`
+	MemoryHotAddEnabled   bool                 `json:"memoryHotAddEnabled"`
+	FaultToleranceEnabled bool                 `json:"faultToleranceEnabled"`
+	CpuCount              int32                `json:"cpuCount"`
+	CoresPerSocket        int32                `json:"coresPerSocket"`
+	MemoryMB              int32                `json:"memoryMB"`
+	GuestName             string               `json:"guestName"`
+	GuestID               string               `json:"guestId"`
+	BalloonedMemory       int32                `json:"balloonedMemory"`
+	IpAddress             string               `json:"ipAddress"`
+	StorageUsed           int64                `json:"storageUsed"`
+	TpmEnabled            bool                 `json:"tpmEnabled"`
+	NumaNodeAffinity      []string             `json:"numaNodeAffinity"`
+	Devices               []model.Device       `json:"devices"`
+	NICs                  []model.NIC          `json:"nics"`
+	GuestNetworks         []model.GuestNetwork `json:"guestNetworks"`
 }
 
 // Build the resource using the model.
@@ -261,6 +262,7 @@ func (r *VM) With(m *model.VM) {
 	r.Devices = m.Devices
 	r.NumaNodeAffinity = m.NumaNodeAffinity
 	r.NICs = m.NICs
+	r.GuestNetworks = m.GuestNetworks
 }
 
 // Build self link (URI).
