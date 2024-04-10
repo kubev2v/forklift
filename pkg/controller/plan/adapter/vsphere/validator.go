@@ -127,3 +127,30 @@ func (r *Validator) MaintenanceMode(vmRef ref.Ref) (ok bool, err error) {
 func (r *Validator) DirectStorage(vmRef ref.Ref) (bool, error) {
 	return true, nil
 }
+
+// Validate that we have information about static IPs for every virtual NIC
+func (r *Validator) StaticIPs(vmRef ref.Ref) (ok bool, err error) {
+	if !r.plan.Spec.PreserveStaticIPs {
+		return true, nil
+	}
+	vm := &model.Workload{}
+	err = r.inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vmRef)
+		return
+	}
+	for _, nic := range vm.NICs {
+		found := false
+		for _, guestNetwork := range vm.GuestNetworks {
+			if nic.MAC == guestNetwork.MAC {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return
+		}
+	}
+	ok = true
+	return
+}

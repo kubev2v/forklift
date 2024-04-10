@@ -49,6 +49,7 @@ const (
 	VMStorageNotMapped           = "VMStorageNotMapped"
 	VMStorageNotSupported        = "VMStorageNotSupported"
 	VMMultiplePodNetworkMappings = "VMMultiplePodNetworkMappings"
+	VMMissingGuestIPs            = "VMMissingGuestIPs"
 	HostNotReady                 = "HostNotReady"
 	DuplicateVM                  = "DuplicateVM"
 	NameNotValid                 = "TargetNameNotValid"
@@ -91,6 +92,7 @@ const (
 	Modified          = "Modified"
 	UserRequested     = "UserRequested"
 	InMaintenanceMode = "InMaintenanceMode"
+	MissingGuestInfo  = "MissingGuestInformation"
 )
 
 // Statuses
@@ -431,6 +433,14 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "VM has more than one interface mapped to the pod network.",
 		Items:    []string{},
 	}
+	missingStaticIPs := libcnd.Condition{
+		Type:     VMMissingGuestIPs,
+		Status:   True,
+		Reason:   MissingGuestInfo,
+		Category: Critical,
+		Message:  "Guest information on vNICs is missing, cannot preserve static IPs. Make sure VMware tools are installed and the VM is running.",
+		Items:    []string{},
+	}
 
 	setOf := map[string]bool{}
 	//
@@ -523,6 +533,13 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		if !ok {
 			maintenanceMode.Items = append(maintenanceMode.Items, ref.String())
 		}
+		ok, err = validator.StaticIPs(*ref)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			missingStaticIPs.Items = append(missingStaticIPs.Items, ref.String())
+		}
 		// Destination.
 		provider = plan.Referenced.Provider.Destination
 		if provider == nil {
@@ -579,6 +596,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(multiplePodNetworkMappings.Items) > 0 {
 		plan.Status.SetCondition(multiplePodNetworkMappings)
+	}
+	if len(missingStaticIPs.Items) > 0 {
+		plan.Status.SetCondition(missingStaticIPs)
 	}
 
 	return nil

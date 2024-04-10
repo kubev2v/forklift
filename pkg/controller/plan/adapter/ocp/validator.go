@@ -186,3 +186,8 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 func (r *Validator) DirectStorage(vmRef ref.Ref) (bool, error) {
 	return true, nil
 }
+
+// NO-OP
+func (r *Validator) StaticIPs(vmRef ref.Ref) (bool, error) {
+	return true, nil
+}
