@@ -165,3 +165,9 @@ func (r *Validator) MaintenanceMode(_ ref.Ref) (ok bool, err error) {
 	ok = true
 	return
 }
+
+// NO-OP
+func (r *Validator) StaticIPs(vmRef ref.Ref) (bool, error) {
+	// the guest operating system is not modified during the migration so static IPs should be preserved
+	return true, nil
+}

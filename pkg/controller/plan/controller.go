@@ -322,9 +322,9 @@ func (r *Reconciler) archive(plan *api.Plan) {
 //  5. If a new migration is being started, update the context and snapshot.
 //  6. Run the migration.
 func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
-	validatingVDDK := plan.Status.HasCondition(ValidatingVDDK)
-	if plan.Status.HasBlockerCondition() || plan.Status.HasCondition(Archived) || validatingVDDK {
-		if validatingVDDK {
+	conditionRequiresReQ := plan.Status.HasReQCondition()
+	if plan.Status.HasBlockerCondition() || plan.Status.HasCondition(Archived) || conditionRequiresReQ {
+		if conditionRequiresReQ {
 			reQ = base.SlowReQ
 		}
 		return
