@@ -183,7 +183,10 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		return
 	}
 
-	macsToIps := r.mapMacStaticIps(vm)
+	macsToIps := ""
+	if r.Plan.Spec.PreserveStaticIPs {
+		macsToIps = r.mapMacStaticIps(vm)
+	}
 
 	libvirtURL, fingerprint, err := r.getSourceDetails(vm, sourceSecret)
 	if err != nil {
