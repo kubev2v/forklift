@@ -16,6 +16,7 @@ import (
 	"time"
 
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
+	"github.com/konveyor/forklift-controller/pkg/controller/plan/util"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
@@ -37,7 +38,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
-	yamlparser "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/ova"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
@@ -958,57 +958,25 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 	}
 	defer resp.Body.Close()
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-	vmConfigBytes, err := io.ReadAll(resp.Body)
-=======
-	vmFirmware, err := io.ReadAll(resp.Body)
->>>>>>> ae0dd5b8 (OVA: workaround for virt-v2v firmware detection)
-=======
 	vmConf, err := io.ReadAll(resp.Body)
->>>>>>> 867f6944 (OVA: adjust the controller to use kubevirt yaml for firmware detection)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	vmConfigXML := string(vmConfigBytes)
-
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 	switch r.Source.Provider.Type() {
 	case api.Ova:
-		if vm.Firmware, err = ovfparser.GetFirmwareFromConfig(vmConfigXML); err != nil {
+		if vm.Firmware, err = util.GetFirmwareFromYaml(vmConf); err != nil {
 			err = liberr.Wrap(err)
 			return
 		}
+		r.Log.Info("Setting the vm firmware ", vm.Firmware, "vmId", vm.ID)
 	case api.VSphere:
-		if vm.OperatingSystem, err = ovfparser.GetOperationSystemFromConfig(vmConfigXML); err != nil {
+		if vm.OperatingSystem, err = util.GetOperationSystemFromYaml(vmConf); err != nil {
 			err = liberr.Wrap(err)
 			return
 		}
+		r.Log.Info("Setting the vm OS ", vm.OperatingSystem, "vmId", vm.ID)
 	}
-=======
-	vm.Firmware = string(vmFirmware)
-	r.Log.Info("Setting the vm fimware",
-=======
-	vm.Firmware, err = yamlparser.ReadConfFromYaml(vmConf)
-=======
-	vm.Firmware, err = yamlparser.GetFirmwareFromYaml(vmConf)
->>>>>>> eaa8800f (minor changes)
-	if err != nil {
-		r.Log.Error(err, "failed to get firmware configuration")
-	}
-
-<<<<<<< HEAD
-	r.Log.Info("Setting the vm firmware",
->>>>>>> 867f6944 (OVA: adjust the controller to use kubevirt yaml for firmware detection)
-		"vm",
-		vm.String())
->>>>>>> ae0dd5b8 (OVA: workaround for virt-v2v firmware detection)
-=======
-	r.Log.Info("Setting the vm firmware ", vm.Firmware, "vmId", vm.ID)
->>>>>>> eaa8800f (minor changes)
 
 	shutdownURL := fmt.Sprintf("http://%s:8080/shutdown", pod.Status.PodIP)
 	resp, err = http.Post(shutdownURL, "application/json", nil)
@@ -1294,6 +1262,7 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 	if vm.NewName != "" {
 		originalName = vm.Name
 		vm.Name = vm.NewName
+
 		r.Log.Info("VM name is incompatible with DNS1123 RFC, renaming",
 			"originalName", originalName, "newName", vm.Name)
 	}
@@ -1741,7 +1710,6 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	if err != nil {
 		return
 	}
-<<<<<<< HEAD
 
 	if vm.RootDisk != "" {
 		environment = append(environment,
@@ -1750,14 +1718,13 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 				Value: vm.RootDisk,
 			})
 	}
-=======
+
 	environment = append(environment,
 		core.EnvVar{
 			Name:  "V2V_NewName",
 			Value: vm.NewName,
 		})
 
->>>>>>> 7bc1382b (OVA, vSphere: move vm new name generation to the init phase to pass it to virt-v2v.)
 	// pod annotations
 	annotations := map[string]string{}
 	if r.Plan.Spec.TransferNetwork != nil {

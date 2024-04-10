@@ -19,24 +19,12 @@ type Metadata struct {
 type Spec struct {
 	Domain Domain `yaml:"domain"`
 }
-
 type Domain struct {
-	Firmware Firmware `yaml:"firmware,omitempty"`
+	OS OS `yaml:"os"`
 }
 
-type Firmware struct {
-	Bootloader Bootloader `yaml:"bootloader,omitempty"`
-}
-
-type Bootloader struct {
-	Bios *Bios `yaml:"bios,omitempty"`
-	EFI  *EFI  `yaml:"efi,omitempty"`
-}
-
-type Bios struct{}
-
-type EFI struct {
-	SecureBoot bool `yaml:"secureBoot"`
+type OS struct {
+	Firmware string `yaml:"firmware,omitempty"`
 }
 
 func GetFirmwareFromYaml(yamlData []byte) (firmware string, err error) {
@@ -45,14 +33,11 @@ func GetFirmwareFromYaml(yamlData []byte) (firmware string, err error) {
 		return
 	}
 
-	if vmi.Spec.Domain.Firmware.Bootloader.Bios != nil {
-		firmware = "bios"
+	if vmi.Spec.Domain.OS.Firmware != "" {
+		firmware = vmi.Spec.Domain.OS.Firmware
 		return
 	}
-	if vmi.Spec.Domain.Firmware.Bootloader.EFI != nil {
-		firmware = "efi"
-		return
-	}
+
 	err = liberr.New("Firmware type was not detected")
 	return
 }

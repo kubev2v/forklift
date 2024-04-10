@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
-	"strings"
 )
 
 const (
@@ -467,68 +466,4 @@ func isValidSource(source string) bool {
 	default:
 		return false
 	}
-}
-
-func addFirmwareToYaml(filePath string) (err error) {
-	var newFirmwareData string
-	if firmware == "bios" {
-		newFirmwareData = (`    firmware:
-      bootloader:
-        bios: {}`)
-	} else {
-		newFirmwareData = (`    firmware:
-      bootloader:
-        efi: 
-          secureBoot: false`)
-	}
-
-	file, err := os.Open(filePath)
-	if err != nil {
-		return
-	}
-	defer file.Close()
-
-	tempFilePath := filePath + ".tmp"
-
-	tempFile, err := os.Create(tempFilePath)
-	if err != nil {
-		return
-	}
-	defer tempFile.Close()
-
-	scanner := bufio.NewScanner(file)
-	domainFound := false
-
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		if strings.Contains(line, "domain:") {
-			domainFound = true
-		}
-
-		_, err = tempFile.WriteString(line + "\n")
-		if err != nil {
-			return
-		}
-
-		if domainFound {
-			_, err = tempFile.WriteString(newFirmwareData + "\n")
-			if err != nil {
-				return
-			}
-			domainFound = false
-		}
-	}
-
-	if err = scanner.Err(); err != nil {
-		return
-	}
-
-	err = os.Rename(tempFilePath, filePath)
-	if err != nil {
-		return
-	}
-
-	fmt.Println("YAML file has been modified successfully.")
-	return
 }
