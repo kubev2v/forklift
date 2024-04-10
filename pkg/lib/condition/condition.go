@@ -31,6 +31,10 @@ const (
 	Required = "Required"
 	// An advisory condition.
 	Advisory = "Advisory"
+	// VDDK pending condition
+	ValidatingVDDK = "ValidatingVDDK"
+	// Missing IPs on vm pending condition
+	VMMissingGuestIPs = "VMMissingGuestIPs"
 )
 
 // Condition
@@ -311,6 +315,11 @@ func (r *Conditions) HasWarnCondition(category ...string) bool {
 // The collection contains a `Ready` blocker condition.
 func (r *Conditions) HasBlockerCondition() bool {
 	return r.HasConditionCategory(Critical, Error)
+}
+
+// The collection contains blocker conditions that keep the plan reconciling.
+func (r *Conditions) HasReQCondition() bool {
+	return r.HasCondition(ValidatingVDDK) || r.HasCondition(VMMissingGuestIPs)
 }
 
 // The collection contains the `Ready` condition.
