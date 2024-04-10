@@ -46,6 +46,8 @@ type PlanSpec struct {
 	Archived bool `json:"archived,omitempty"`
 	// Preserve the CPU model and flags the VM runs with in its oVirt cluster.
 	PreserveClusterCPUModel bool `json:"preserveClusterCpuModel,omitempty"`
+	// Preserve static IPs of VMs in vSphere (Windows only)
+	PreserveStaticIPs bool `json:"preserveStaticIPs,omitempty"`
 }
 
 // Find a planned VM.
