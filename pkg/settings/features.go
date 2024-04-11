@@ -21,7 +21,7 @@ type Features struct {
 // Load settings.
 func (r *Features) Load() (err error) {
 	r.OvirtWarmMigration = getEnvBool(FeatureOvirtWarmMigration, false)
-	r.RetainPrecopyImporterPods = getEnvBool(FeatureRetainPrecopyImporterPods, true)
+	r.RetainPrecopyImporterPods = getEnvBool(FeatureRetainPrecopyImporterPods, false)
 	r.VsphereIncrementalBackup = getEnvBool(FeatureVsphereIncrementalBackup, false)
 	return
 }
