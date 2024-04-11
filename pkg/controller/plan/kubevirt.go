@@ -1152,7 +1152,7 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 	}
 
 	annotations := r.vmLabels(vm.Ref)
-	if !r.Plan.Spec.Warm || Settings.RetainPrecopyImporterPods {
+	if Settings.RetainPrecopyImporterPods {
 		annotations[planbase.AnnRetainAfterCompletion] = "true"
 	}
 	if r.Plan.Spec.TransferNetwork != nil {
