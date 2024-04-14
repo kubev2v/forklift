@@ -1159,8 +1159,12 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 		annotations[AnnDefaultNetwork] = path.Join(
 			r.Plan.Spec.TransferNetwork.Namespace, r.Plan.Spec.TransferNetwork.Name)
 	}
-	// Set annotation for WFFC storage classes
-	annotations[planbase.AnnBindImmediate] = "true"
+	if r.Plan.Spec.Warm || !r.Destination.Provider.IsHost() || r.Plan.IsSourceProviderOCP() {
+		// Set annotation for WFFC storage classes. Note that we create data volumes while
+		// running a cold migration to the local cluster only when the source is either OpenShift
+		// or vSphere, and in the latter case the conversion pod acts as the first-consumer
+		annotations[planbase.AnnBindImmediate] = "true"
+	}
 	// Do not delete the DV when the import completes as we check the DV to get the current
 	// disk transfer status.
 	annotations[AnnDeleteAfterCompletion] = "false"
