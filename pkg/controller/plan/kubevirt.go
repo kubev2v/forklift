@@ -1270,6 +1270,10 @@ func (r *KubeVirt) vmPreference(vm *plan.VMStatus) (virtualMachine *cnv.VirtualM
 	if err != nil {
 		return
 	}
+	if preferenceName == "" {
+		err = liberr.New("couldn't find a corresponding preference", "vm", vm)
+		return
+	}
 
 	preferenceName, kind, err := r.getPreference(vm, preferenceName)
 	if err != nil {
