@@ -98,7 +98,9 @@ func (r *Migration) Load() (err error) {
 		return liberr.Wrap(fmt.Errorf("failed to find environment variable %s", VirtV2vImage))
 	}
 	r.VirtV2vDontRequestKVM = getEnvBool(VirtV2vDontRequestKVM, false)
-	if r.CDIExportTokenTTL, err = getPositiveEnvLimit(CDIExportTokenTTL, 0); err != nil {
+
+	// Set timeout to 12 hours instead of the default 2
+	if r.CDIExportTokenTTL, err = getPositiveEnvLimit(CDIExportTokenTTL, 720); err != nil {
 		return liberr.Wrap(err)
 	}
 	if r.FileSystemOverhead, err = getNonNegativeEnvLimit(FileSystemOverhead, 10); err != nil {
