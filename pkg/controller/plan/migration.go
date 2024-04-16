@@ -469,8 +469,10 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool) error
 	if err := r.kubevirt.DeleteHookJobs(vm); failOnErr(err) {
 		return err
 	}
-	if err := r.destinationClient.DeletePopulatorDataSource(vm); failOnErr(err) {
-		return err
+	if r.Plan.Provider.Destination.IsHost() {
+		if err := r.destinationClient.DeletePopulatorDataSource(vm); failOnErr(err) {
+			return err
+		}
 	}
 	if err := r.kubevirt.DeletePopulatorPods(vm); failOnErr(err) {
 		return err
@@ -829,10 +831,12 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 		}
 		// set ownership to populator Crs
-		err = r.destinationClient.SetPopulatorCrOwnership()
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
+		if r.Plan.Provider.Destination.IsHost() {
+			err = r.destinationClient.SetPopulatorCrOwnership()
+			if err != nil {
+				err = liberr.Wrap(err)
+				return
+			}
 		}
 		// set ownership to populator pods
 		err = r.kubevirt.SetPopulatorPodOwnership(vm)
