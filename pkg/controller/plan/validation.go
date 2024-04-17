@@ -190,7 +190,6 @@ func (r *Reconciler) validateOpenShiftVersion(plan *api.Plan) error {
 		err = r.checkOCPVersion(clientset)
 		if err != nil {
 			plan.Status.SetCondition(unsupportedVersion)
-			return err
 		}
 	}
 
