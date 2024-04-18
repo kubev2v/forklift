@@ -60,7 +60,6 @@ OVA_PROVIDER_SERVER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-provider-s
 
 ### External images
 MUST_GATHER_IMAGE ?= quay.io/kubev2v/forklift-must-gather:latest
-MUST_GATHER_API_IMAGE ?= quay.io/kubev2v/forklift-must-gather-api:latest
 UI_PLUGIN_IMAGE ?= quay.io/kubev2v/forklift-console-plugin:latest
 
 BAZEL_OPTS ?= --verbose_failures
@@ -226,7 +225,6 @@ build-operator-bundle-image: check_container_runtime
 		--action_env DEFAULT_CHANNEL=$(DEFAULT_CHANNEL) \
 		--action_env OPERATOR_IMAGE=$(OPERATOR_IMAGE) \
 		--action_env MUST_GATHER_IMAGE=$(MUST_GATHER_IMAGE) \
-		--action_env MUST_GATHER_API_IMAGE=$(MUST_GATHER_API_IMAGE) \
 		--action_env UI_PLUGIN_IMAGE=$(UI_PLUGIN_IMAGE) \
 		--action_env VALIDATION_IMAGE=$(VALIDATION_IMAGE) \
 		--action_env VIRT_V2V_IMAGE=$(VIRT_V2V_IMAGE) \

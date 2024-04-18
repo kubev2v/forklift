@@ -20,7 +20,6 @@ metadata:
         "spec": {
           "feature_ui_plugin": "true",
           "feature_validation": "true",
-          "feature_must_gather_api": "true",
           "feature_volume_populator": "true"
         }
       }
@@ -101,14 +100,8 @@ spec:
     * Controller, to coordinate migration processes.
     * UI, the web console to manage migrations.
     * Validation, a service to validate migration workflows.
-    * Must-gather-api, a service to generate targeted must-gather archives.
 
     ### Compatibility
-    Forklift 2.2 is supported on OpenShift 4.9
-
-    Forklift 2.3 is supported on OpenShift 4.10 and 4.11
-
-    Forklift 2.4 is supported on OpenShift 4.11 and 4.12
     
     Forklift 2.5 is supported on OpenShift 4.12 to 4.15
 
