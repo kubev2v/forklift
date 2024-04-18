@@ -44,8 +44,6 @@ spec:
           value: ${API_IMAGE}
         - name: MUST_GATHER_IMAGE
           value: ${MUST_GATHER_IMAGE}
-        - name: MUST_GATHER_API_IMAGE
-          value: ${MUST_GATHER_API_IMAGE}
         - name: UI_PLUGIN_IMAGE
           value: ${UI_PLUGIN_IMAGE}
         - name: VALIDATION_IMAGE
