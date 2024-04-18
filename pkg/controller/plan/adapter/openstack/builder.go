@@ -1103,7 +1103,7 @@ func (r *Builder) createVolumePopulatorCR(image model.Image, secretName, vmId st
 		},
 		Spec: api.OpenstackVolumePopulatorSpec{
 			IdentityURL:     r.Source.Provider.Spec.URL,
-			SecretName:      secretName,
+			SecretRef:       secretName,
 			ImageID:         image.ID,
 			TransferNetwork: r.Plan.Spec.TransferNetwork,
 		},

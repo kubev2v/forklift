@@ -40,7 +40,7 @@ spec:
                 type: string
               imageId:
                 type: string
-              secretName:
+              secretRef:
                 type: string
               transferNetwork:
                 description: The network attachment definition that should be used
@@ -83,7 +83,7 @@ spec:
             required:
             - identityUrl
             - imageId
-            - secretName
+            - secretRef
             type: object
           status:
             properties:

@@ -814,10 +814,10 @@ func (r *Builder) createVolumePopulatorCR(diskAttachment model.XDiskAttachment, 
 			},
 		},
 		Spec: api.OvirtVolumePopulatorSpec{
-			EngineURL:        engineURL.String(),
-			EngineSecretName: secretName,
-			DiskID:           diskAttachment.Disk.ID,
-			TransferNetwork:  r.Plan.Spec.TransferNetwork,
+			EngineURL:       engineURL.String(),
+			SecretRef:       secretName,
+			DiskID:          diskAttachment.Disk.ID,
+			TransferNetwork: r.Plan.Spec.TransferNetwork,
 		},
 	}
 	err = r.Context.Client.Create(context.TODO(), populatorCR, &client.CreateOptions{})

@@ -98,7 +98,7 @@ func getOvirtPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured) ([]st
 
 	var args []string
 	args = append(args, "--volume-path="+getVolumePath(rawBlock))
-	args = append(args, "--secret-name="+ovirtVolumePopulator.Spec.EngineSecretName)
+	args = append(args, "--secret-name="+ovirtVolumePopulator.Spec.SecretRef)
 	args = append(args, "--disk-id="+ovirtVolumePopulator.Spec.DiskID)
 	args = append(args, "--engine-url="+ovirtVolumePopulator.Spec.EngineURL)
 	args = append(args, "--cr-name="+ovirtVolumePopulator.Name)
@@ -116,7 +116,7 @@ func getOpenstackPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured) (
 	args := []string{}
 	args = append(args, "--volume-path="+getVolumePath(rawBlock))
 	args = append(args, "--endpoint="+openstackPopulator.Spec.IdentityURL)
-	args = append(args, "--secret-name="+openstackPopulator.Spec.SecretName)
+	args = append(args, "--secret-name="+openstackPopulator.Spec.SecretRef)
 	args = append(args, "--image-id="+openstackPopulator.Spec.ImageID)
 	args = append(args, "--cr-name="+openstackPopulator.Name)
 	args = append(args, "--cr-namespace="+openstackPopulator.Namespace)
