@@ -5,7 +5,6 @@ app_namespace: "{{ lookup( 'env', 'WATCH_NAMESPACE') or 'konveyor-forklift' }}"
 # Feature defaults
 feature_ui_plugin: true
 feature_validation: true
-feature_must_gather_api: true
 feature_volume_populator: true
 
 k8s_cluster: false
@@ -106,22 +105,6 @@ populator_ovirt_image_fqin: "{{ lookup( 'env', 'OVIRT_POPULATOR_IMAGE') or looku
 populator_controller_deployment_name: "{{ app_name }}-volume-populator-controller"
 populator_controller_container_name: "{{ app_name }}-populator-controller"
 populator_openstack_image_fqin: "{{ lookup( 'env', 'OPENSTACK_POPULATOR_IMAGE') or lookup( 'env', 'RELATED_IMAGE_OPENSTACK_POPULATOR') }}"
-
-must_gather_api_image_fqin: "{{ lookup( 'env', 'MUST_GATHER_API_IMAGE') or lookup( 'env', 'RELATED_IMAGE_MUST_GATHER_API') }}"
-must_gather_api_service_name: "{{ app_name }}-must-gather-api"
-must_gather_api_deployment_name: "{{ must_gather_api_service_name }}"
-must_gather_api_container_name: "{{ app_name }}-must-gather-api"
-must_gather_api_container_limits_cpu: "1000m"
-must_gather_api_container_limits_memory: "1Gi"
-must_gather_api_container_requests_cpu: "100m"
-must_gather_api_container_requests_memory: "150Mi"
-must_gather_api_tls_secret_name: "{{ must_gather_api_service_name }}-serving-cert"
-must_gather_api_issuer_name: "{{ must_gather_api_service_name  }}-issuer"
-must_gather_api_certificate_name: "{{ must_gather_api_service_name }}-certificate"
-must_gather_api_db_path: "/tmp/gatherings.db"
-must_gather_api_cleanup_max_age: "-1"
-must_gather_api_debug: false
-must_gather_api_state: absent
 
 must_gather_image_fqin: "{{ lookup( 'env', 'MUST_GATHER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_MUST_GATHER') }}"
 virt_v2v_image_fqin: "{{ lookup( 'env', 'VIRT_V2V_IMAGE') or lookup( 'env', 'RELATED_IMAGE_VIRT_V2V') }}"
