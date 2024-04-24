@@ -83,7 +83,7 @@ all: test forklift-controller
 
 # Run tests
 test: generate fmt vet manifests validation-test
-	go test -coverprofile=cover.out ./pkg/... ./cmd/...
+	go test -coverprofile=cover.out ./pkg/... ./cmd/... ./virt-v2v/cold/...
 
 # Experimental e2e target
 e2e-sanity: e2e-sanity-ovirt e2e-sanity-vsphere
@@ -113,6 +113,7 @@ e2e-sanity-ova:
 # Build forklift-controller binary
 forklift-controller: generate fmt vet
 	go build -o bin/forklift-controller github.com/konveyor/forklift-controller/cmd/forklift-controller
+
 
 # Build manager binary with compiler optimizations disabled
 debug: generate fmt vet
