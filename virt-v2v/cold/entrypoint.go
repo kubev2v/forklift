@@ -136,11 +136,15 @@ func genName(diskNum int) string {
 		return ""
 	}
 
-	letters := []int32("abcdefghijklmnopqrstuvwxyz")
+	letters := "abcdefghijklmnopqrstuvwxyz"
 	index := (diskNum - 1) % len(letters)
-	cycels := (diskNum - 1) % len(letters)
+	cycles := (diskNum - 1) / len(letters)
 
-	return genName(cycels) + string(letters[index])
+	if cycles == 0 {
+		return string(letters[index])
+	} else {
+		return genName(cycles) + string(letters[index])
+	}
 }
 
 func LinkDisks(diskKind string, num int) (err error) {
