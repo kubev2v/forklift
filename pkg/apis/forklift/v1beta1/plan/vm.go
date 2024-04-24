@@ -30,6 +30,8 @@ type VM struct {
 	ref.Ref `json:",inline"`
 	// Enable hooks.
 	Hooks []HookRef `json:"hooks,omitempty"`
+	// Choose the bootable disk number for praimery
+	RootDisk string `json:"rootDisk,omitempty"`
 }
 
 // Find a Hook for the specified step.

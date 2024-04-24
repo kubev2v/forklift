@@ -331,6 +331,9 @@ spec:
                       description: The VM Namespace Only relevant for an openshift
                         source.
                       type: string
+                    rootDisk:
+                      description: Choose the bootable disk number for praimery
+                      type: string
                     type:
                       description: Type used to qualify the name.
                       type: string
@@ -868,6 +871,9 @@ spec:
                           type: array
                         restorePowerState:
                           description: Source VM power state before migration.
+                          type: string
+                        rootDisk:
+                          description: Choose the bootable disk number for praimery
                           type: string
                         started:
                           description: Started timestamp.

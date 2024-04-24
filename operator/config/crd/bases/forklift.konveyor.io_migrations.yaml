@@ -429,6 +429,9 @@ spec:
                     restorePowerState:
                       description: Source VM power state before migration.
                       type: string
+                    rootDisk:
+                      description: Choose the bootable disk number for praimery
+                      type: string
                     started:
                       description: Started timestamp.
                       format: date-time
