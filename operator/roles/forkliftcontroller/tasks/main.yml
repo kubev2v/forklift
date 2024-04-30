@@ -30,23 +30,6 @@
       set_fact:
         k8s_cluster_version: "{{ lookup('k8s', cluster_info='version').kubernetes.gitVersion }}"
 
-  - when: not k8s_cluster|bool
-    block:
-    - name: "Get cluster proxy object"
-      set_fact:
-        proxy_cluster: "{{ lookup('k8s', api_version='config.openshift.io/v1', kind='Proxy', resource_name='cluster') }}"
-
-    - when: proxy_cluster.spec.trustedCA.name|length > 0
-      block:
-      - name: "Enable trusted CA environment"
-        set_fact:
-          trusted_ca_enabled: true
-
-      - name: "Create an empty ConfigMap that will hold the trusted CA"
-        k8s:
-          state: present
-          definition: "{{ lookup('template', 'configmap-trusted-ca.yml.j2') }}"
-
   - name: "Setup controller config map"
     k8s:
       state : present
