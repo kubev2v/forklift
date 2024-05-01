@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
 load(
     "@io_bazel_rules_docker//container:container.bzl",
     "container_image",
@@ -477,4 +477,10 @@ rpmtree(
         "@zlib-0__1.2.11-41.el9.x86_64//rpm",
     ],
     visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "cold_test",
+    srcs = ["cold_test.go"],
+    embed = [":cold_lib"],
 )
