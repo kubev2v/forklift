@@ -25,6 +25,9 @@ var (
 	server      *http.Server
 )
 
+const LETTERS = "abcdefghijklmnopqrstuvwxyz"
+const LETTERS_LENGTH = len(LETTERS)
+
 func main() {
 	virtV2vArgs := []string{"virt-v2v", "-v", "-x"}
 	source := os.Getenv("V2V_source")
@@ -136,15 +139,10 @@ func genName(diskNum int) string {
 		return ""
 	}
 
-	letters := "abcdefghijklmnopqrstuvwxyz"
-	index := (diskNum - 1) % len(letters)
-	cycles := (diskNum - 1) / len(letters)
+	index := (diskNum - 1) % LETTERS_LENGTH
+	cycles := (diskNum - 1) / LETTERS_LENGTH
 
-	if cycles == 0 {
-		return string(letters[index])
-	} else {
-		return genName(cycles) + string(letters[index])
-	}
+	return genName(cycles) + string(LETTERS[index])
 }
 
 func LinkDisks(diskKind string, num int) (err error) {

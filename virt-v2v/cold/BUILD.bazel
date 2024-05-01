@@ -481,6 +481,6 @@ rpmtree(
 
 go_test(
     name = "cold_test",
-    srcs = ["colde_test.go"],
+    srcs = ["cold_test.go"],
     embed = [":cold_lib"],
 )
