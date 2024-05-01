@@ -84,7 +84,7 @@ all: test forklift-controller
 
 # Run tests
 test: generate fmt vet manifests validation-test
-	go test -coverprofile=cover.out ./pkg/... ./cmd/...
+	go test -coverprofile=cover.out ./pkg/... ./cmd/... ./virt-v2v/cold/...
 
 # Experimental e2e target
 e2e-sanity: e2e-sanity-ovirt e2e-sanity-vsphere
