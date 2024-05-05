@@ -1,3 +1,6 @@
+run:
+  skip-dirs:
+    - pkg/lib/gob
 linters:
   enable:
   - ginkgolinter
