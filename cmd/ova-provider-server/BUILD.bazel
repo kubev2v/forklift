@@ -5,7 +5,10 @@ go_library(
     srcs = ["ova-provider-server.go"],
     importpath = "github.com/konveyor/forklift-controller/cmd/ova-provider-server",
     visibility = ["//visibility:private"],
-    deps = ["//vendor/github.com/google/uuid"],
+    deps = [
+        "//pkg/lib/gob",
+        "//vendor/github.com/google/uuid",
+    ],
 )
 
 go_binary(
