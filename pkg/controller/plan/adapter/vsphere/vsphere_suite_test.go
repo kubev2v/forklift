@@ -1,4 +1,4 @@
-package vsphere_test
+package vsphere
 
 import (
 	"testing"
