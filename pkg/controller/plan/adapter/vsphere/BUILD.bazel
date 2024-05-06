@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "vsphere",
@@ -41,5 +41,25 @@ go_library(
         "//vendor/kubevirt.io/api/core/v1:core",
         "//vendor/kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
+    ],
+)
+
+go_test(
+    name = "vsphere_test",
+    srcs = [
+        "validator_test.go",
+        "vsphere_suite_test.go",
+    ],
+    embed = [":vsphere"],
+    deps = [
+        "//pkg/apis/forklift/v1beta1",
+        "//pkg/apis/forklift/v1beta1/plan",
+        "//pkg/apis/forklift/v1beta1/ref",
+        "//pkg/controller/provider/model/vsphere",
+        "//pkg/controller/provider/web",
+        "//pkg/controller/provider/web/vsphere",
+        "//vendor/github.com/onsi/ginkgo/v2:ginkgo",
+        "//vendor/github.com/onsi/gomega",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:meta",
     ],
 )
