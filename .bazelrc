@@ -3,7 +3,7 @@ build --action_env=CONTAINER_CMD
 build --action_env=XDG_RUNTIME_DIR
 # Operator
 ## Default operator config
-build --action_env=VERSION=2.6.1
+build --action_env=VERSION=2.6.2
 build --action_env=NAMESPACE=konveyor-forklift
 build --action_env=CHANNELS=development
 build --action_env=DEFAULT_CHANNEL=development
