@@ -20,7 +20,7 @@ REGISTRY ?= quay.io
 REGISTRY_ORG ?= kubev2v
 REGISTRY_TAG ?= devel
 
-VERSION ?= 2.5.6
+VERSION ?= 2.5.7
 NAMESPACE ?= konveyor-forklift
 OPERATOR_NAME ?= forklift-operator
 CHANNELS ?= development
