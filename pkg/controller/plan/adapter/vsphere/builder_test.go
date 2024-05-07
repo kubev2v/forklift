@@ -42,6 +42,7 @@ var _ = Describe("vSphere builder", func() {
 	)
 })
 
+//nolint:errcheck
 func createBuilder(objs ...runtime.Object) *Builder {
 	scheme := runtime.NewScheme()
 	_ = v1.AddToScheme(scheme)
