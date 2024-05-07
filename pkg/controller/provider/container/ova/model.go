@@ -15,9 +15,6 @@ import (
 // All adapters.
 var adapterList []Adapter
 
-// Event (type) mapped to adapter.
-var adapterMap = map[int][]Adapter{}
-
 func init() {
 	adapterList = []Adapter{
 		&NetworkAdapter{},

@@ -148,7 +148,7 @@ func TestList(t *testing.T) {
 
 	list, err := itinerary.List()
 	g.Expect(err).ToNot(gomega.HaveOccurred())
-	g.Expect(len(list)).To(gomega.Equal(3))
+	g.Expect(list).To(gomega.HaveLen(3))
 	g.Expect(list[0].Name).To(gomega.Equal("ONE"))
 	g.Expect(list[1].Name).To(gomega.Equal("TWO"))
 	g.Expect(list[2].Name).To(gomega.Equal("THREE"))
