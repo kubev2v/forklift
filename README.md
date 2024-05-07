@@ -37,7 +37,7 @@ Another option to override the default values can use `--action_env` as in the e
 | Name                       | Default value                                   | Description                                                 |
 |----------------------------|-------------------------------------------------|-------------------------------------------------------------|
 | CONTAINER_CMD              | autodetected                                    | The container runtime command (e.g.: /usr/bin/podman)       |
-| VERSION                    | 2.6.1                                           | The version with which the forklift should be built.        |
+| VERSION                    | 2.6.2                                           | The version with which the forklift should be built.        |
 | NAMESPACE                  | konveyor-forklift                               | The namespace in which the operator should be installed.    |
 | CHANNELS                   | development                                     | The olm channels.                                           |
 | DEFAULT_CHANNEL            | development                                     | The default olm channel.                                    |
