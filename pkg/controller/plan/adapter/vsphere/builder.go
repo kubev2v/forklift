@@ -67,6 +67,7 @@ const (
 	DefaultWindows = "win10"
 	DefaultLinux   = "rhel8.1"
 	Unknown        = "unknown"
+	WindowsPrefix  = "win"
 )
 
 // Annotations
@@ -229,6 +230,9 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 }
 
 func (r *Builder) mapMacStaticIps(vm *model.VM) string {
+	if !isWindows(vm) {
+		return ""
+	}
 	configurations := []string{}
 	for _, guestNetwork := range vm.GuestNetworks {
 		if guestNetwork.Origin == string(types.NetIpConfigInfoIpAddressOriginManual) {
@@ -236,6 +240,10 @@ func (r *Builder) mapMacStaticIps(vm *model.VM) string {
 		}
 	}
 	return strings.Join(configurations, "_")
+}
+
+func isWindows(vm *model.VM) bool {
+	return strings.Contains(vm.GuestID, WindowsPrefix) || strings.Contains(vm.GuestName, WindowsPrefix)
 }
 
 func (r *Builder) getSourceDetails(vm *model.VM, sourceSecret *core.Secret) (libvirtURL liburl.URL, fingerprint string, err error) {
@@ -726,7 +734,7 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 		os = osMap[vm.GuestID]
 	} else if strings.Contains(vm.GuestName, "linux") || strings.Contains(vm.GuestName, "rhel") {
 		os = DefaultLinux
-	} else if strings.Contains(vm.GuestName, "win") {
+	} else if strings.Contains(vm.GuestName, WindowsPrefix) {
 		os = DefaultWindows
 	} else {
 		os = Unknown
