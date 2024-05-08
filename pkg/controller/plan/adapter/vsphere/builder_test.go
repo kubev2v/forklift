@@ -23,9 +23,9 @@ var _ = Describe("vSphere builder", func() {
 	DescribeTable("should", func(vm *model.VM, outputMap string) {
 		Expect(builder.mapMacStaticIps(vm)).Should(Equal(outputMap))
 	},
-		Entry("no static ips", &model.VM{}, ""),
-		Entry("single static ip", &model.VM{GuestNetworks: []vsphere.GuestNetwork{{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin}}}, "00:50:56:83:25:47:ip:172.29.3.193"),
-		Entry("multiple static ips", &model.VM{GuestNetworks: []vsphere.GuestNetwork{
+		Entry("no static ips", &model.VM{GuestID: "windows9Guest"}, ""),
+		Entry("single static ip", &model.VM{GuestID: "windows9Guest", GuestNetworks: []vsphere.GuestNetwork{{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin}}}, "00:50:56:83:25:47:ip:172.29.3.193"),
+		Entry("multiple static ips", &model.VM{GuestID: "windows9Guest", GuestNetworks: []vsphere.GuestNetwork{
 			{
 				MAC:    "00:50:56:83:25:47",
 				IP:     "172.29.3.193",
@@ -38,7 +38,9 @@ var _ = Describe("vSphere builder", func() {
 			},
 		},
 		}, "00:50:56:83:25:47:ip:172.29.3.193_00:50:56:83:25:47:ip:fe80::5da:b7a5:e0a2:a097"),
-		Entry("non-static ip", &model.VM{GuestNetworks: []vsphere.GuestNetwork{{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: string(types.NetIpConfigInfoIpAddressOriginDhcp)}}}, ""),
+		Entry("non-static ip", &model.VM{GuestID: "windows9Guest", GuestNetworks: []vsphere.GuestNetwork{{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: string(types.NetIpConfigInfoIpAddressOriginDhcp)}}}, ""),
+		Entry("non windows vm", &model.VM{GuestID: "other", GuestNetworks: []vsphere.GuestNetwork{{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin}}}, ""),
+		Entry("no OS vm", &model.VM{GuestNetworks: []vsphere.GuestNetwork{{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin}}}, ""),
 	)
 })
 
