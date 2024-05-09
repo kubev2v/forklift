@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -97,6 +98,15 @@ func main() {
 				"-io", fmt.Sprintf("vddk-thumbprint=%s", os.Getenv("V2V_fingerprint")),
 			)
 		}
+		var extraArgs []string
+		if envExtraArgs := os.Getenv("V2V_extra_args"); envExtraArgs != "" {
+			if err := json.Unmarshal([]byte(envExtraArgs), &extraArgs); err != nil {
+				fmt.Println("Error parsing extra arguments ", err)
+				os.Exit(1)
+			}
+		}
+		virtV2vArgs = append(virtV2vArgs, extraArgs...)
+
 		virtV2vArgs = append(virtV2vArgs, "--", os.Getenv("V2V_vmName"))
 	}
 
