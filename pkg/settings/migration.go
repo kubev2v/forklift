@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -26,6 +27,7 @@ const (
 	OvirtOsConfigMap        = "OVIRT_OS_MAP"
 	VsphereOsConfigMap      = "VSPHERE_OS_MAP"
 	VddkJobActiveDeadline   = "VDDK_JOB_ACTIVE_DEADLINE"
+	VirtV2vExtraArgs        = "VIRT_V2V_EXTRA_ARGS"
 )
 
 // Migration settings
@@ -61,6 +63,8 @@ type Migration struct {
 	VsphereOsConfigMap string
 	// Active deadline for VDDK validation job
 	VddkJobActiveDeadline int
+	// Additional arguments for virt-v2v
+	VirtV2vExtraArgs string
 }
 
 // Load settings.
@@ -125,6 +129,14 @@ func (r *Migration) Load() (err error) {
 	}
 	if r.VddkJobActiveDeadline, err = getPositiveEnvLimit(VddkJobActiveDeadline, 300); err != nil {
 		return liberr.Wrap(err)
+	}
+	r.VirtV2vExtraArgs = "[]"
+	if val, found := os.LookupEnv(VirtV2vExtraArgs); found && len(val) > 0 {
+		if encoded, jsonErr := json.Marshal(strings.Fields(val)); jsonErr == nil {
+			r.VirtV2vExtraArgs = string(encoded)
+		} else {
+			return liberr.Wrap(err)
+		}
 	}
 
 	return
