@@ -24,6 +24,7 @@ import (
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
+	"github.com/konveyor/forklift-controller/pkg/settings"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
@@ -207,6 +208,10 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		core.EnvVar{
 			Name:  "V2V_fingerprint",
 			Value: fingerprint,
+		},
+		core.EnvVar{
+			Name:  "V2V_extra_args",
+			Value: settings.Settings.Migration.VirtV2vExtraArgs,
 		},
 	)
 	return

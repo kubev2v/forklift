@@ -122,6 +122,8 @@ spec:
         - name: VIRT_V2V_DONT_REQUEST_KVM
           value: "true"
 {% endif %}
+        - name: VIRT_V2V_EXTRA_ARGS
+          value: "{{ virt_v2v_extra_args }}"
         envFrom:
         - configMapRef:
             name: {{ controller_configmap_name }}
