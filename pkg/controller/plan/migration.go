@@ -1454,6 +1454,13 @@ func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (ready bool, err
 	return
 }
 
+func (r *Migration) setTaskCompleted(task *plan.Task) {
+	task.Phase = Completed
+	task.Reason = TransferCompleted
+	task.Progress.Completed = task.Progress.Total
+	task.MarkCompleted()
+}
+
 // Update the progress of the appropriate disk copy step. (DiskTransfer, Cutover)
 func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err error) {
 	var pendingReason string
@@ -1484,10 +1491,7 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 			}
 			if pvc.Status.Phase == core.ClaimBound {
 				completed++
-				task.Phase = Completed
-				task.Reason = TransferCompleted
-				task.Progress.Completed = task.Progress.Total
-				task.MarkCompleted()
+				r.setTaskCompleted(task)
 			}
 		}
 	} else {
@@ -1499,14 +1503,14 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 			if !found {
 				continue
 			}
+			if dv.Status.Phase == cdi.PendingPopulation && r.Source.Provider.Type() == v1beta1.VSphere {
+				dv.Status.Phase = cdi.Succeeded
+			}
 			conditions := dv.Conditions()
 			switch dv.Status.Phase {
 			case cdi.Succeeded, cdi.Paused:
 				completed++
-				task.Phase = Completed
-				task.Reason = TransferCompleted
-				task.Progress.Completed = task.Progress.Total
-				task.MarkCompleted()
+				r.setTaskCompleted(task)
 			case cdi.Pending, cdi.ImportScheduled:
 				pending++
 				task.Phase = Pending

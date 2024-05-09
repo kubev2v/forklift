@@ -106,6 +106,9 @@ type StorageSpec struct {
 	DataSourceRef *corev1.TypedObjectReference `json:"dataSourceRef,omitempty"`
 }
 
+// PersistentVolumeFromStorageProfile means the volume mode will be auto selected by CDI according to a matching StorageProfile
+const PersistentVolumeFromStorageProfile corev1.PersistentVolumeMode = "FromStorageProfile"
+
 // DataVolumeCheckpoint defines a stage in a warm migration.
 type DataVolumeCheckpoint struct {
 	// Previous is the identifier of the snapshot from the previous checkpoint.
@@ -379,6 +382,11 @@ const (
 	// Paused represents a DataVolumePhase of Paused
 	Paused DataVolumePhase = "Paused"
 
+	// PrepClaimInProgress represents a data volume with a current phase of PrepClaimInProgress
+	PrepClaimInProgress DataVolumePhase = "PrepClaimInProgress"
+	// RebindInProgress represents a data volume with a current phase of RebindInProgress
+	RebindInProgress DataVolumePhase = "RebindInProgress"
+
 	// DataVolumeReady is the condition that indicates if the data volume is ready to be consumed.
 	DataVolumeReady DataVolumeConditionType = "Ready"
 	// DataVolumeBound is the condition that indicates if the underlying PVC is bound or not.
@@ -413,7 +421,12 @@ type StorageProfileSpec struct {
 	// CloneStrategy defines the preferred method for performing a CDI clone
 	CloneStrategy *CDICloneStrategy `json:"cloneStrategy,omitempty"`
 	// ClaimPropertySets is a provided set of properties applicable to PVC
+	// +kubebuilder:validation:MaxItems=8
 	ClaimPropertySets []ClaimPropertySet `json:"claimPropertySets,omitempty"`
+	// DataImportCronSourceFormat defines the format of the DataImportCron-created disk image sources
+	DataImportCronSourceFormat *DataImportCronSourceFormat `json:"dataImportCronSourceFormat,omitempty"`
+	// SnapshotClass is optional specific VolumeSnapshotClass for CloneStrategySnapshot. If not set, a VolumeSnapshotClass is chosen according to the provisioner.
+	SnapshotClass *string `json:"snapshotClass,omitempty"`
 }
 
 // StorageProfileStatus provides the most recently observed status of the StorageProfile
@@ -425,19 +438,25 @@ type StorageProfileStatus struct {
 	// CloneStrategy defines the preferred method for performing a CDI clone
 	CloneStrategy *CDICloneStrategy `json:"cloneStrategy,omitempty"`
 	// ClaimPropertySets computed from the spec and detected in the system
+	// +kubebuilder:validation:MaxItems=8
 	ClaimPropertySets []ClaimPropertySet `json:"claimPropertySets,omitempty"`
+	// DataImportCronSourceFormat defines the format of the DataImportCron-created disk image sources
+	DataImportCronSourceFormat *DataImportCronSourceFormat `json:"dataImportCronSourceFormat,omitempty"`
+	// SnapshotClass is optional specific VolumeSnapshotClass for CloneStrategySnapshot. If not set, a VolumeSnapshotClass is chosen according to the provisioner.
+	SnapshotClass *string `json:"snapshotClass,omitempty"`
 }
 
 // ClaimPropertySet is a set of properties applicable to PVC
 type ClaimPropertySet struct {
 	// AccessModes contains the desired access modes the volume should have.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1
-	// +optional
-	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
+	// +kubebuilder:validation:MaxItems=4
+	// +kubebuilder:validation:XValidation:rule="self.all(am, am in ['ReadWriteOnce', 'ReadOnlyMany', 'ReadWriteMany', 'ReadWriteOncePod'])", message="Illegal AccessMode"
+	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes"`
 	// VolumeMode defines what type of volume is required by the claim.
 	// Value of Filesystem is implied when not included in claim spec.
-	// +optional
-	VolumeMode *corev1.PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,6,opt,name=volumeMode,casttype=PersistentVolumeMode"`
+	// +kubebuilder:validation:Enum="Block";"Filesystem"
+	VolumeMode *corev1.PersistentVolumeMode `json:"volumeMode"`
 }
 
 // StorageProfileList provides the needed parameters to request a list of StorageProfile from the system
@@ -524,6 +543,7 @@ type DataSourceList struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:storageversion
 // +kubebuilder:resource:shortName=dic;dics,categories=all
+// +kubebuilder:printcolumn:name="Format",type="string",JSONPath=".status.sourceFormat",description="The format in which created sources are saved"
 type DataImportCron struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -582,8 +602,10 @@ type DataImportCronStatus struct {
 	// LastExecutionTimestamp is the time of the last polling
 	LastExecutionTimestamp *metav1.Time `json:"lastExecutionTimestamp,omitempty"`
 	// LastImportTimestamp is the time of the last import
-	LastImportTimestamp *metav1.Time              `json:"lastImportTimestamp,omitempty"`
-	Conditions          []DataImportCronCondition `json:"conditions,omitempty" optional:"true"`
+	LastImportTimestamp *metav1.Time `json:"lastImportTimestamp,omitempty"`
+	// SourceFormat defines the format of the DataImportCron-created disk image sources
+	SourceFormat *DataImportCronSourceFormat `json:"sourceFormat,omitempty"`
+	Conditions   []DataImportCronCondition   `json:"conditions,omitempty" optional:"true"`
 }
 
 // ImportStatus of a currently in progress import
@@ -644,6 +666,12 @@ type VolumeImportSourceSpec struct {
 	Preallocation *bool `json:"preallocation,omitempty"`
 	// ContentType represents the type of the imported data (Kubevirt or archive)
 	ContentType DataVolumeContentType `json:"contentType,omitempty"`
+	// TargetClaim the name of the specific claim to be populated with a multistage import.
+	TargetClaim *string `json:"targetClaim,omitempty"`
+	// Checkpoints is a list of DataVolumeCheckpoints, representing stages in a multistage import.
+	Checkpoints []DataVolumeCheckpoint `json:"checkpoints,omitempty"`
+	// FinalCheckpoint indicates whether the current DataVolumeCheckpoint is the final checkpoint.
+	FinalCheckpoint *bool `json:"finalCheckpoint,omitempty"`
 }
 
 // ImportSourceType contains each one of the source types allowed in a VolumeImportSource
@@ -802,10 +830,11 @@ type CDISpec struct {
 	// +kubebuilder:validation:Enum=RemoveWorkloads;BlockUninstallIfWorkloadsExist
 	// CDIUninstallStrategy defines the state to leave CDI on uninstall
 	UninstallStrategy *CDIUninstallStrategy `json:"uninstallStrategy,omitempty"`
-	// Rules on which nodes CDI infrastructure pods will be scheduled
-	Infra sdkapi.NodePlacement `json:"infra,omitempty"`
+	// Selectors and tolerations that should apply to cdi infrastructure components
+	Infra ComponentConfig `json:"infra,omitempty"`
 	// Restrict on which nodes CDI workload pods will be scheduled
-	Workloads sdkapi.NodePlacement `json:"workload,omitempty"`
+	Workloads           sdkapi.NodePlacement `json:"workload,omitempty"`
+	CustomizeComponents CustomizeComponents  `json:"customizeComponents,omitempty"`
 	// Clone strategy override: should we use a host-assisted copy even if snapshots are available?
 	// +kubebuilder:validation:Enum="copy";"snapshot";"csi-clone"
 	CloneStrategyOverride *CDICloneStrategy `json:"cloneStrategyOverride,omitempty"`
@@ -815,6 +844,18 @@ type CDISpec struct {
 	CertConfig *CDICertConfig `json:"certConfig,omitempty"`
 	// PriorityClass of the CDI control plane
 	PriorityClass *CDIPriorityClass `json:"priorityClass,omitempty"`
+}
+
+// ComponentConfig defines the scheduling and replicas configuration for CDI components
+type ComponentConfig struct {
+	// NodePlacement describes scheduling configuration for specific CDI components
+	sdkapi.NodePlacement `json:",inline"`
+	// DeploymentReplicas set Replicas for cdi-deployment
+	DeploymentReplicas *int32 `json:"deploymentReplicas,omitempty"`
+	// ApiserverReplicas set Replicas for cdi-apiserver
+	APIServerReplicas *int32 `json:"apiServerReplicas,omitempty"`
+	// UploadproxyReplicas set Replicas for cdi-uploadproxy
+	UploadProxyReplicas *int32 `json:"uploadProxyReplicas,omitempty"`
 }
 
 // CDIPriorityClass defines the priority class of the CDI control plane.
@@ -832,6 +873,58 @@ const (
 
 	// CloneStrategyCsiClone specifies csi volume clone based cloning
 	CloneStrategyCsiClone CDICloneStrategy = "csi-clone"
+)
+
+// CustomizeComponents defines patches for components deployed by the CDI operator.
+type CustomizeComponents struct {
+	// +listType=atomic
+	Patches []CustomizeComponentsPatch `json:"patches,omitempty"`
+
+	// Configure the value used for deployment and daemonset resources
+	Flags *Flags `json:"flags,omitempty"`
+}
+
+// Flags will create a patch that will replace all flags for the container's
+// command field. The only flags that will be used are those define. There are no
+// guarantees around forward/backward compatibility.  If set incorrectly this will
+// cause the resource when rolled out to error until flags are updated.
+type Flags struct {
+	API         map[string]string `json:"api,omitempty"`
+	Controller  map[string]string `json:"controller,omitempty"`
+	UploadProxy map[string]string `json:"uploadProxy,omitempty"`
+}
+
+// CustomizeComponentsPatch defines a patch for some resource.
+type CustomizeComponentsPatch struct {
+	// +kubebuilder:validation:MinLength=1
+	ResourceName string `json:"resourceName"`
+	// +kubebuilder:validation:MinLength=1
+	ResourceType string    `json:"resourceType"`
+	Patch        string    `json:"patch"`
+	Type         PatchType `json:"type"`
+}
+
+// PatchType defines the patch type.
+type PatchType string
+
+const (
+	// JSONPatchType is a constant that represents the type of JSON patch.
+	JSONPatchType PatchType = "json"
+	// MergePatchType is a constant that represents the type of JSON Merge patch.
+	MergePatchType PatchType = "merge"
+	// StrategicMergePatchType is a constant that represents the type of Strategic Merge patch.
+	StrategicMergePatchType PatchType = "strategic"
+)
+
+// DataImportCronSourceFormat defines the format of the DataImportCron-created disk image sources
+type DataImportCronSourceFormat string
+
+const (
+	// DataImportCronSourceFormatSnapshot implies using a VolumeSnapshot as the resulting DataImportCron disk image source
+	DataImportCronSourceFormatSnapshot DataImportCronSourceFormat = "snapshot"
+
+	// DataImportCronSourceFormatPvc implies using a PVC as the resulting DataImportCron disk image source
+	DataImportCronSourceFormatPvc DataImportCronSourceFormat = "pvc"
 )
 
 // CDIUninstallStrategy defines the state to leave CDI on uninstall
@@ -913,13 +1006,16 @@ type CDIConfigSpec struct {
 	Preallocation *bool `json:"preallocation,omitempty"`
 	// InsecureRegistries is a list of TLS disabled registries
 	InsecureRegistries []string `json:"insecureRegistries,omitempty"`
-	// DataVolumeTTLSeconds is the time in seconds after DataVolume completion it can be garbage collected. The default is 0 sec. To disable GC use -1.
+	// DataVolumeTTLSeconds is the time in seconds after DataVolume completion it can be garbage collected. Disabled by default.
 	// +optional
 	DataVolumeTTLSeconds *int32 `json:"dataVolumeTTLSeconds,omitempty"`
 	// TLSSecurityProfile is used by operators to apply cluster-wide TLS security settings to operands.
 	TLSSecurityProfile *ocpconfigv1.TLSSecurityProfile `json:"tlsSecurityProfile,omitempty"`
 	// The imagePullSecrets used to pull the container images
 	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+	// LogVerbosity overrides the default verbosity level used to initialize loggers
+	// +optional
+	LogVerbosity *int32 `json:"logVerbosity,omitempty"`
 }
 
 // CDIConfigStatus provides the most recently observed status of the CDI Config resource
