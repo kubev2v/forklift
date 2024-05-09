@@ -1,6 +1,6 @@
 module github.com/konveyor/forklift-controller
 
-go 1.20
+go 1.21
 
 require (
 	github.com/gin-contrib/cors v1.3.1
@@ -38,7 +38,7 @@ require (
 	k8s.io/klog/v2 v2.110.1
 	k8s.io/utils v0.0.0-20240102154912-e7106e64919e
 	kubevirt.io/api v1.1.1
-	kubevirt.io/containerized-data-importer-api v1.57.0-alpha1
+	kubevirt.io/containerized-data-importer-api v1.59.0
 	libvirt.org/libvirt-go-xml v7.4.0+incompatible
 	sigs.k8s.io/controller-runtime v0.16.3
 )
