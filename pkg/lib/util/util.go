@@ -14,19 +14,18 @@ import (
 	core "k8s.io/api/core/v1"
 )
 
-func GetTlsCertificate(url string, secret *core.Secret) (crt *x509.Certificate, err error) {
+func GetTlsCertificate(url *liburl.URL, secret *core.Secret) (crt *x509.Certificate, err error) {
 	cfg, err := tlsConfig(secret)
 	if err != nil {
 		return
 	}
 
-	if parsedUrl, _ := liburl.Parse(url); parsedUrl.Port() == "" {
-		url = parsedUrl.Host + ":443"
-	} else {
-		url = parsedUrl.Host
+	host := url.Host
+	if url.Port() == "" {
+		host += ":443"
 	}
 
-	conn, err := tls.Dial("tcp", url, cfg)
+	conn, err := tls.Dial("tcp", host, cfg)
 	if err == nil && len(conn.ConnectionState().PeerCertificates) > 0 {
 		crt, err = x509.ParseCertificate(conn.ConnectionState().PeerCertificates[0].Raw)
 	} else {
