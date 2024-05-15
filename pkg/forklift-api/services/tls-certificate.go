@@ -4,6 +4,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/konveyor/forklift-controller/pkg/lib/util"
 	core "k8s.io/api/core/v1"
@@ -11,8 +12,8 @@ import (
 )
 
 func serveTlsCertificate(resp http.ResponseWriter, req *http.Request, client client.Client) {
-	if url := req.URL.Query().Get("URL"); url != "" {
-		log.Info("received a request to retrieve certificate", "url", url)
+	if url, err := url.Parse(req.URL.Query().Get("URL")); err == nil {
+		log.Info("received a request to retrieve certificate", "URL", url)
 		secret := &core.Secret{
 			Data: map[string][]byte{"insecureSkipVerify": []byte("true")},
 		}
@@ -31,6 +32,7 @@ func serveTlsCertificate(resp http.ResponseWriter, req *http.Request, client cli
 			http.Error(resp, err.Error(), http.StatusInternalServerError)
 		}
 	} else {
-		http.Error(resp, "Required parameter is missing: URL", http.StatusBadRequest)
+		log.Error(err, "received invalid URL", "URL", req.URL.Query().Get("URL"))
+		http.Error(resp, "Required parameter is invalid: URL", http.StatusBadRequest)
 	}
 }

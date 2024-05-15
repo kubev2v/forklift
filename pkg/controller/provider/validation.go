@@ -234,7 +234,8 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 			})
 		}
 
-		if crt, err := util.GetTlsCertificate(provider.Spec.URL, secret); err == nil {
+		url, _ := url.Parse(provider.Spec.URL)
+		if crt, err := util.GetTlsCertificate(url, secret); err == nil {
 			provider.Status.Fingerprint = util.Fingerprint(crt)
 		} else {
 			log.Error(err, "failed to get TLS certificate", "url", provider.Spec.URL)
