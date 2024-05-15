@@ -27,7 +27,7 @@ func GetTlsCertificate(url *liburl.URL, secret *core.Secret) (crt *x509.Certific
 
 	conn, err := tls.Dial("tcp", host, cfg)
 	if err == nil && len(conn.ConnectionState().PeerCertificates) > 0 {
-		crt, err = x509.ParseCertificate(conn.ConnectionState().PeerCertificates[0].Raw)
+		crt = conn.ConnectionState().PeerCertificates[0]
 	} else {
 		err = liberr.Wrap(err, "url", url)
 	}

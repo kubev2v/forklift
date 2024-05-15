@@ -23,6 +23,7 @@ func serveTlsCertificate(resp http.ResponseWriter, req *http.Request, client cli
 				Bytes: cacert.Raw,
 			})
 			if _, err := resp.Write(encoded); err == nil {
+				resp.Header().Set("Content-Type", "text/plain")
 				resp.WriteHeader(http.StatusOK)
 			} else {
 				msg := fmt.Sprintf("failed to write certificate: %s", string(encoded))
