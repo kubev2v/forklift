@@ -1,7 +1,6 @@
 package services
 
 import (
-	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"net/http"
@@ -18,11 +17,6 @@ func serveTlsCertificate(resp http.ResponseWriter, req *http.Request, client cli
 			Data: map[string][]byte{"insecureSkipVerify": []byte("true")},
 		}
 		if cacert, err := util.GetTlsCertificate(url, secret); err == nil {
-			cacert, err := x509.ParseCertificate(cacert.Raw)
-			if err != nil {
-				msg := fmt.Sprintf("failed to parse certificate: %v", err)
-				http.Error(resp, msg, http.StatusInternalServerError)
-			}
 			encoded := pem.EncodeToMemory(&pem.Block{
 				Type:  "CERTIFICATE",
 				Bytes: cacert.Raw,
