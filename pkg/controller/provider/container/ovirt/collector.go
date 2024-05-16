@@ -146,15 +146,16 @@ func (r *Collector) Version() (major, minor, build, revision string, err error) 
 	version := strings.Split(system.Product.Version.FullVersion, ".")
 	major = version[0]
 	minor = version[1]
-	build = version[2]
-	revision = "0"
-	if strings.Contains(build, "-") {
-		build = strings.Split(version[2], "-")[0]
-		revision = strings.Split(version[2], "-")[1]
-	} else {
-		if len(version) > 3 {
-			revision = strings.Split(version[3], "-")[0]
-		}
+
+	split := strings.SplitN(version[2], "-", 2)
+	build = split[0]
+	switch {
+	case len(split) > 1:
+		revision = split[1]
+	case len(version) > 3:
+		revision = strings.Split(version[3], "-")[0]
+	default:
+		revision = "0"
 	}
 
 	return
