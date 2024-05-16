@@ -627,12 +627,13 @@ func (r *Builder) LunPersistentVolumes(vmRef ref.Ref) (pvs []core.PersistentVolu
 					Namespace: r.Plan.Spec.TargetNamespace,
 					Annotations: map[string]string{
 						planbase.AnnDiskSource: da.Disk.ID,
-						"vmID":                 vm.ID,
-						"plan":                 string(r.Plan.UID),
 						"lun":                  "true",
 					},
 					Labels: map[string]string{
-						"volume": fmt.Sprintf("%v-%v", vm.Name, da.ID),
+						"volume":    fmt.Sprintf("%v-%v", vm.Name, da.ID),
+						"vmID":      vm.ID,
+						"plan":      string(r.Plan.UID),
+						"migration": string(r.Migration.UID),
 					},
 				},
 				Spec: core.PersistentVolumeSpec{
@@ -670,11 +671,13 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 					Namespace: r.Plan.Spec.TargetNamespace,
 					Annotations: map[string]string{
 						planbase.AnnDiskSource: da.Disk.ID,
-						"vmID":                 vm.ID,
-						"plan":                 string(r.Plan.UID),
 						"lun":                  "true",
 					},
-					Labels: map[string]string{"migration": r.Migration.Name},
+					Labels: map[string]string{
+						"vmID":      vm.ID,
+						"plan":      string(r.Plan.UID),
+						"migration": string(r.Migration.UID),
+					},
 				},
 				Spec: core.PersistentVolumeClaimSpec{
 					AccessModes: []core.PersistentVolumeAccessMode{
