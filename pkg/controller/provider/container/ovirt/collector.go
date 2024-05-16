@@ -148,9 +148,15 @@ func (r *Collector) Version() (major, minor, build, revision string, err error) 
 	minor = version[1]
 	build = version[2]
 	revision = "0"
-	if len(version) > 3 {
-		revision = strings.Split(version[3], "-")[0]
+	if strings.Contains(build, "-") {
+		build = strings.Split(version[2], "-")[0]
+		revision = strings.Split(version[2], "-")[1]
+	} else {
+		if len(version) > 3 {
+			revision = strings.Split(version[3], "-")[0]
+		}
 	}
+
 	return
 }
 
