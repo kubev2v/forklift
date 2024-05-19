@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"flag"
+	"fmt"
 	"net/http"
 	"os"
 	"regexp"
@@ -15,7 +16,7 @@ import (
 )
 
 var COPY_DISK_RE = regexp.MustCompile(`^.*Copying disk (\d+)/(\d+)`)
-var DISK_PROGRESS_RE = regexp.MustCompile(`^..\s*(\d+)% \[.*\]`)
+var DISK_PROGRESS_RE = regexp.MustCompile(`\s+\((\d+).*|.+ (\d+)% \[[*-]+\]`)
 var FINISHED_RE = regexp.MustCompile(`^\[[ .0-9]*\] Finishing off`)
 
 // Here is a scan function that imposes limit on returned line length. virt-v2v
@@ -28,7 +29,7 @@ func LimitedScanLines(data []byte, atEOF bool) (advance int, token []byte, err e
 	if token != nil || err != nil {
 		return
 	}
-	if len(data) == bufio.MaxScanTokenSize {
+	if len(data) == 1*1024*1024 {
 		// Line is too long for the buffer. Trim it.
 		advance = len(data)
 		token = data
@@ -57,6 +58,14 @@ func updateProgress(progressCounter *prometheus.CounterVec, disk, progress uint6
 	return
 }
 
+func NewBufferedScanner(r *bufio.Reader, bufferSize int) *bufio.Scanner {
+	scanner := bufio.NewScanner(r)
+	buf := make([]byte, bufferSize)
+	scanner.Buffer(buf, bufferSize)
+	scanner.Split(LimitedScanLines)
+	return scanner
+}
+
 func main() {
 	klog.InitFlags(nil)
 	defer klog.Flush()
@@ -64,6 +73,7 @@ func main() {
 
 	// Start prometheus metrics HTTP handler
 	klog.Info("Setting up prometheus endpoint :2112/metrics")
+	klog.Info("this is Bella test")
 	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(":2112", nil)
 
@@ -87,8 +97,9 @@ func main() {
 	var disks uint64 = 0
 	var progress uint64 = 0
 
-	scanner := bufio.NewScanner(os.Stdin)
-	scanner.Split(LimitedScanLines)
+	reader := bufio.NewReader(os.Stdin)
+	scanner := NewBufferedScanner(reader, 1*1024*1024)
+
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		os.Stdout.Write(line)
@@ -98,6 +109,8 @@ func main() {
 			klog.Fatal("Output monitoring failed! ", err)
 		}
 
+		fmt.Println("this is the line we scanning now ", string(line))
+
 		if match := COPY_DISK_RE.FindSubmatch(line); match != nil {
 			diskNumber, _ = strconv.ParseUint(string(match[1]), 10, 0)
 			disks, _ = strconv.ParseUint(string(match[2]), 10, 0)
@@ -105,6 +118,7 @@ func main() {
 			progress = 0
 			err = updateProgress(progressCounter, diskNumber, progress)
 		} else if match := DISK_PROGRESS_RE.FindSubmatch(line); match != nil {
+			klog.Info("we are here at progress ", line)
 			progress, _ = strconv.ParseUint(string(match[1]), 10, 0)
 			klog.Infof("Progress update, completed %d %%", progress)
 			err = updateProgress(progressCounter, diskNumber, progress)
@@ -116,7 +130,7 @@ func main() {
 				err = updateProgress(progressCounter, disk, 100)
 			}
 		} else {
-			klog.V(1).Info("Ignoring line: ", string(line))
+			klog.Infof("Ignoring line: ", string(line))
 		}
 		if err != nil {
 			// Don't make processing errors fatal.
