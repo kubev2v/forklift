@@ -77,7 +77,7 @@ func main() {
 }
 
 func buildCommand() []string {
-	virtV2vArgs := []string{"virt-v2v", "-v", "-x"}
+	virtV2vArgs := []string{"virt-v2v"}
 	source := os.Getenv("V2V_source")
 
 	if !isValidSource(source) {
@@ -194,33 +194,26 @@ func LinkDisks(diskKind string, num int) (err error) {
 
 func executeVirtV2v(source string, args []string) (err error) {
 	virtV2vCmd := exec.Command(args[0], args[1:]...)
-	virtV2vStdoutPipe, err := virtV2vCmd.StdoutPipe()
+	stdoutPipe, err := virtV2vCmd.StdoutPipe()
 	if err != nil {
 		fmt.Printf("Error setting up stdout pipe: %v\n", err)
 		return
 	}
-	teeOut := io.TeeReader(virtV2vStdoutPipe, os.Stdout)
 
-	var teeErr io.Reader
-	if source == OVA {
-		virtV2vStderrPipe, err := virtV2vCmd.StderrPipe()
-		if err != nil {
-			fmt.Printf("Error setting up stdout pipe: %v\n", err)
-			return err
-		}
-		teeErr = io.TeeReader(virtV2vStderrPipe, os.Stderr)
-	} else {
-		virtV2vCmd.Stderr = os.Stderr
+	stderrPipe, err := virtV2vCmd.StderrPipe()
+	if err != nil {
+		fmt.Printf("Error setting up stderr pipe: %v\n", err)
+		return
 	}
 
-	fmt.Println("exec ", virtV2vCmd)
 	if err = virtV2vCmd.Start(); err != nil {
 		fmt.Printf("Error executing command: %v\n", err)
 		return
 	}
 
+	combinedReader := io.MultiReader(stdoutPipe, stderrPipe)
 	virtV2vMonitorCmd := exec.Command("/usr/local/bin/virt-v2v-monitor")
-	virtV2vMonitorCmd.Stdin = teeOut
+	virtV2vMonitorCmd.Stdin = combinedReader
 	virtV2vMonitorCmd.Stdout = os.Stdout
 	virtV2vMonitorCmd.Stderr = os.Stderr
 
@@ -230,7 +223,7 @@ func executeVirtV2v(source string, args []string) (err error) {
 	}
 
 	if source == OVA {
-		scanner := bufio.NewScanner(teeErr)
+		scanner := bufio.NewScanner(stderrPipe)
 		const maxCapacity = 1024 * 1024
 		buf := make([]byte, 0, 64*1024)
 		scanner.Buffer(buf, maxCapacity)
