@@ -143,7 +143,12 @@ func (r *Collector) Version() (major, minor, build, revision string, err error) 
 	if err != nil {
 		return
 	}
-	version := strings.Split(system.Product.Version.FullVersion, ".")
+	major, minor, build, revision = parseVersion(system.Product.Version.FullVersion)
+	return
+}
+
+func parseVersion(fullVersion string) (major, minor, build, revision string) {
+	version := strings.Split(fullVersion, ".")
 	major = version[0]
 	minor = version[1]
 
@@ -157,7 +162,6 @@ func (r *Collector) Version() (major, minor, build, revision string, err error) 
 	default:
 		revision = "0"
 	}
-
 	return
 }
 
