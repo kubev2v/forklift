@@ -245,3 +245,11 @@
       loop_var: resource_kind
     vars:
       feature_label: "{{ validation_service_name }}"
+
+  - name: "Delete must-gather-api deployment"
+    k8s:
+      api_version: apps/v1
+      kind: deployment
+      namespace: "{{ app_namespace }}"
+      name: forklift-must-gather-api
+      state: absent
