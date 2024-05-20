@@ -197,6 +197,7 @@ func executeVirtV2v(source string, args []string) (err error) {
 	r, w := io.Pipe()
 	virtV2vCmd.Stdout = w
 	virtV2vCmd.Stderr = w
+	defer w.Close()
 
 	fmt.Println("exec ", virtV2vCmd)
 	if err = virtV2vCmd.Start(); err != nil {
@@ -224,6 +225,7 @@ func executeVirtV2v(source string, args []string) (err error) {
 	}
 
 	if source == OVA {
+		fmt.Println("we are in the ova scanner")
 		scanner := bufio.NewScanner(teeOut)
 		const maxCapacity = 1024 * 1024
 		buf := make([]byte, 0, 64*1024)
@@ -231,12 +233,14 @@ func executeVirtV2v(source string, args []string) (err error) {
 
 		for scanner.Scan() {
 			line := scanner.Bytes()
+			fmt.Println("this is the line", string(line))
 			if match := UEFI_RE.FindSubmatch(line); match != nil {
 				fmt.Println("UEFI firmware detected")
 				firmware = "efi"
 			}
 		}
 
+		fmt.Println("we are here - after the loop")
 		if err = scanner.Err(); err != nil {
 			fmt.Println("Output query failed:", err)
 			return
@@ -247,7 +251,6 @@ func executeVirtV2v(source string, args []string) (err error) {
 		fmt.Printf("Error waiting for virt-v2v to finish: %v\n", err)
 		return
 	}
-	w.Close()
 	return
 }
 
