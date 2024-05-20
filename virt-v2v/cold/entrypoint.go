@@ -197,14 +197,9 @@ func LinkDisks(diskKind string, num int) (err error) {
 
 func executeVirtV2v(args []string) (err error) {
 	virtV2vCmd := exec.Command(args[0], args[1:]...)
-	virtV2vStdoutPipe, err := virtV2vCmd.StdoutPipe()
-	if err != nil {
-		fmt.Printf("Error setting up stdout pipe: %v\n", err)
-		return
-	}
-
-	tee := io.TeeReader(virtV2vStdoutPipe, os.Stdout)
-	virtV2vCmd.Stderr = os.Stderr
+	r, w := io.Pipe()
+	virtV2vCmd.Stdout = w
+	virtV2vCmd.Stderr = w
 
 	fmt.Println("exec ", virtV2vCmd)
 	if err = virtV2vCmd.Start(); err != nil {
@@ -213,7 +208,7 @@ func executeVirtV2v(args []string) (err error) {
 	}
 
 	virtV2vMonitorCmd := exec.Command("/usr/local/bin/virt-v2v-monitor")
-	virtV2vMonitorCmd.Stdin = tee
+	virtV2vMonitorCmd.Stdin = r
 	virtV2vMonitorCmd.Stdout = os.Stdout
 	virtV2vMonitorCmd.Stderr = os.Stderr
 
