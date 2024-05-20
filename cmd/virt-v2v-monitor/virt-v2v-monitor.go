@@ -91,6 +91,7 @@ func main() {
 		err := scanner.Err()
 		if err != nil {
 			fmt.Println("virt-v2v monitoring: Output monitoring failed! ", err)
+			os.Exit(1)
 		}
 
 		if match := COPY_DISK_RE.FindSubmatch(line); match != nil {
@@ -120,5 +121,6 @@ func main() {
 	err := scanner.Err()
 	if err != nil {
 		fmt.Println("virt-v2v monitoring: Output monitoring failed! ", err)
+		os.Exit(1)
 	}
 }

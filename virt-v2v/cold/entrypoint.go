@@ -207,35 +207,46 @@ func executeVirtV2v(source string, args []string) (err error) {
 	virtV2vMonitorCmd := exec.Command("/usr/local/bin/virt-v2v-monitor")
 	virtV2vMonitorCmd.Stdin = r
 	virtV2vMonitorCmd.Stdout = os.Stdout
+	virtV2vMonitorCmd.Stderr = os.Stderr
 
 	if err = virtV2vMonitorCmd.Start(); err != nil {
 		fmt.Printf("Error executing monitor command: %v\n", err)
 		return
 	}
 
-	if source == OVA {
-		scanner := bufio.NewScanner(r)
-		const maxCapacity = 1024 * 1024
-		buf := make([]byte, 0, 64*1024)
-		scanner.Buffer(buf, maxCapacity)
+	done := make(chan error, 1)
+	go func() {
+		if source == OVA {
+			scanner := bufio.NewScanner(r)
+			const maxCapacity = 1024 * 1024
+			buf := make([]byte, 0, 64*1024)
+			scanner.Buffer(buf, maxCapacity)
 
-		for scanner.Scan() {
-			line := scanner.Bytes()
-			if match := UEFI_RE.FindSubmatch(line); match != nil {
-				fmt.Println("UEFI firmware detected")
-				firmware = "efi"
+			for scanner.Scan() {
+				line := scanner.Bytes()
+				if match := UEFI_RE.FindSubmatch(line); match != nil {
+					fmt.Println("UEFI firmware detected")
+					firmware = "efi"
+				}
+			}
+
+			if err := scanner.Err(); err != nil {
+				fmt.Println("Output query failed:", err)
+				done <- err
+				return
 			}
 		}
-
-		if err = scanner.Err(); err != nil {
-			fmt.Println("Output query failed:", err)
-			return err
-		}
-	}
+		done <- nil
+	}()
 
 	if err = virtV2vCmd.Wait(); err != nil {
 		fmt.Printf("Error waiting for virt-v2v to finish: %v\n", err)
 		return
+	}
+	w.Close()
+
+	if err = <-done; err != nil {
+		return err
 	}
 	return
 }
