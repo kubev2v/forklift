@@ -192,66 +192,73 @@ func LinkDisks(diskKind string, num int) (err error) {
 	return
 }
 
-func executeVirtV2v(source string, args []string) (err error) {
-	virtV2vCmd := exec.Command(args[0], args[1:]...)
-	r, w := io.Pipe()
-	virtV2vCmd.Stdout = w
-	virtV2vCmd.Stderr = w
-	defer w.Close()
+func executeVirtV2v(source string, args []string) error {
+	v2vCmd := exec.Command(args[0], args[1:]...)
+	monitorCmd := exec.Command("/usr/local/bin/virt-v2v-monitor")
+	monitorCmd.Stderr = os.Stderr
 
-	fmt.Println("exec ", virtV2vCmd)
-	if err = virtV2vCmd.Start(); err != nil {
-		fmt.Printf("Error executing command: %v\n", err)
-		return
-	}
+	var writer *io.PipeWriter
+	monitorCmd.Stdin, writer = io.Pipe()
+	v2vCmd.Stdout = writer
+	v2vCmd.Stderr = writer
+	defer writer.Close()
 
-	virtV2vMonitorCmd := exec.Command("/usr/local/bin/virt-v2v-monitor")
-	virtV2vMonitorCmd.Stdin = r
-	virtV2vMonitorCmd.Stderr = os.Stderr
-
-	var teeOut io.Reader
+	done := make(chan error, 1)
 	if source == OVA {
-		virtV2vStdoutPipe, err := virtV2vMonitorCmd.StdoutPipe()
+		monitorStdoutPipe, err := monitorCmd.StdoutPipe()
 		if err != nil {
 			fmt.Printf("Error setting up stdout pipe: %v\n", err)
 			return err
 		}
-		teeOut = io.TeeReader(virtV2vStdoutPipe, os.Stdout)
+		monitorOut := io.TeeReader(monitorStdoutPipe, os.Stdout)
+		go parseFirmware(monitorOut, done)
+	} else {
+		monitorCmd.Stdout = os.Stdout
+		done <- nil
 	}
 
-	if err = virtV2vMonitorCmd.Start(); err != nil {
+	if err := monitorCmd.Start(); err != nil {
 		fmt.Printf("Error executing monitor command: %v\n", err)
-		return
+		return err
 	}
 
-	if source == OVA {
-		fmt.Println("we are in the ova scanner")
-		scanner := bufio.NewScanner(teeOut)
-		const maxCapacity = 1024 * 1024
-		buf := make([]byte, 0, 64*1024)
-		scanner.Buffer(buf, maxCapacity)
-
-		for scanner.Scan() {
-			line := scanner.Bytes()
-			fmt.Println("this is the line", string(line))
-			if match := UEFI_RE.FindSubmatch(line); match != nil {
-				fmt.Println("UEFI firmware detected")
-				firmware = "efi"
-			}
-		}
-
-		fmt.Println("we are here - after the loop")
-		if err = scanner.Err(); err != nil {
-			fmt.Println("Output query failed:", err)
-			return
-		}
+	fmt.Println("exec:", v2vCmd)
+	if err := v2vCmd.Run(); err != nil {
+		fmt.Printf("Error executing command: %v\n", err)
+		return err
 	}
 
-	if err = virtV2vCmd.Wait(); err != nil {
+	// virt-v2v is done, we can close the pipe to virt-v2v-monitor
+	writer.Close()
+
+	if err := monitorCmd.Wait(); err != nil {
 		fmt.Printf("Error waiting for virt-v2v to finish: %v\n", err)
-		return
+		return err
 	}
-	return
+
+	if err := <-done; err != nil {
+		fmt.Printf("Error getting output from monitor command: %v\n", err)
+		return err
+	}
+
+	return nil
+}
+
+func parseFirmware(reader io.Reader, done chan error) {
+	scanner := bufio.NewScanner(reader)
+	const maxCapacity = 1024 * 1024
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, maxCapacity)
+
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if match := UEFI_RE.FindSubmatch(line); match != nil {
+			fmt.Println("UEFI firmware detected")
+			firmware = "efi"
+		}
+	}
+
+	done <- scanner.Err()
 }
 
 func getXMLFile(dir, fileExtension string) (string, error) {
