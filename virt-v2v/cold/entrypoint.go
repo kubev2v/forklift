@@ -198,6 +198,7 @@ func executeVirtV2v(source string, args []string) (err error) {
 	virtV2vCmd.Stdout = w
 	virtV2vCmd.Stderr = w
 
+	fmt.Println("exec ", virtV2vCmd)
 	if err = virtV2vCmd.Start(); err != nil {
 		fmt.Printf("Error executing command: %v\n", err)
 		return
@@ -205,8 +206,6 @@ func executeVirtV2v(source string, args []string) (err error) {
 
 	virtV2vMonitorCmd := exec.Command("/usr/local/bin/virt-v2v-monitor")
 	virtV2vMonitorCmd.Stdin = r
-	//k, _ := virtV2vMonitorCmd.StderrPipe()
-	//r2 := io.TeeReader(k, os.Stderr)
 	virtV2vMonitorCmd.Stdout = os.Stdout
 
 	if err = virtV2vMonitorCmd.Start(); err != nil {
@@ -215,7 +214,7 @@ func executeVirtV2v(source string, args []string) (err error) {
 	}
 
 	if source == OVA {
-		scanner := bufio.NewScanner(nil)
+		scanner := bufio.NewScanner(r)
 		const maxCapacity = 1024 * 1024
 		buf := make([]byte, 0, 64*1024)
 		scanner.Buffer(buf, maxCapacity)
