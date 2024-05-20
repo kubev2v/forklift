@@ -58,7 +58,7 @@ func updateProgress(progressCounter *prometheus.CounterVec, disk, progress uint6
 
 func main() {
 	// Start prometheus metrics HTTP handler
-	fmt.Println("virt-v2v monitoring: Setting up prometheus endpoint :2112/metrics")
+	fmt.Println("virt-v2v monitoring: Bella Setting up prometheus endpoint :2112/metrics")
 	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(":2112", nil)
 
