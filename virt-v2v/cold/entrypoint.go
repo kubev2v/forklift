@@ -203,7 +203,6 @@ func executeVirtV2v(source string, args []string) error {
 	v2vCmd.Stderr = writer
 	defer writer.Close()
 
-	done := make(chan error, 1)
 	if source == OVA {
 		monitorStdoutPipe, err := monitorCmd.StdoutPipe()
 		if err != nil {
@@ -211,10 +210,9 @@ func executeVirtV2v(source string, args []string) error {
 			return err
 		}
 		monitorOut := io.TeeReader(monitorStdoutPipe, os.Stdout)
-		go parseFirmware(monitorOut, done)
+		go parseFirmware(monitorOut)
 	} else {
 		monitorCmd.Stdout = os.Stdout
-		done <- nil
 	}
 
 	if err := monitorCmd.Start(); err != nil {
@@ -236,15 +234,10 @@ func executeVirtV2v(source string, args []string) error {
 		return err
 	}
 
-	if err := <-done; err != nil {
-		fmt.Printf("Error getting output from monitor command: %v\n", err)
-		return err
-	}
-
 	return nil
 }
 
-func parseFirmware(reader io.Reader, done chan error) {
+func parseFirmware(reader io.Reader) {
 	scanner := bufio.NewScanner(reader)
 	const maxCapacity = 1024 * 1024
 	buf := make([]byte, 0, 64*1024)
@@ -257,8 +250,6 @@ func parseFirmware(reader io.Reader, done chan error) {
 			firmware = "efi"
 		}
 	}
-
-	done <- scanner.Err()
 }
 
 func getXMLFile(dir, fileExtension string) (string, error) {
