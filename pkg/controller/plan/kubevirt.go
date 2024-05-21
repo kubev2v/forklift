@@ -12,7 +12,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
@@ -910,7 +909,7 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 	*/
 	resp, err := http.Get(url)
 	if err != nil {
-		if err == syscall.ECONNREFUSED {
+		if strings.Contains(err.Error(), "connection refused") {
 			err = nil
 		}
 		return
@@ -941,6 +940,8 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 			err = nil
 		}
 	}
+	step.MarkCompleted()
+	step.Progress.Completed = step.Progress.Total
 	return
 }
 
