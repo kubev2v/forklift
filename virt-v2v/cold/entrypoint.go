@@ -195,33 +195,38 @@ func LinkDisks(diskKind string, num int) (err error) {
 	return
 }
 
-func executeVirtV2v(args []string) (err error) {
-	virtV2vCmd := exec.Command(args[0], args[1:]...)
-	r, w := io.Pipe()
-	virtV2vCmd.Stdout = w
-	virtV2vCmd.Stderr = w
+func executeVirtV2v(args []string) error {
+	v2vCmd := exec.Command(args[0], args[1:]...)
+	monitorCmd := exec.Command("/usr/local/bin/virt-v2v-monitor")
+	monitorCmd.Stdout = os.Stdout
+	monitorCmd.Stderr = os.Stderr
 
-	fmt.Println("exec ", virtV2vCmd)
-	if err = virtV2vCmd.Start(); err != nil {
-		fmt.Printf("Error executing command: %v\n", err)
-		return
-	}
+	var writer *io.PipeWriter
+	monitorCmd.Stdin, writer = io.Pipe()
+	v2vCmd.Stdout = writer
+	v2vCmd.Stderr = writer
+	defer writer.Close()
 
-	virtV2vMonitorCmd := exec.Command("/usr/local/bin/virt-v2v-monitor")
-	virtV2vMonitorCmd.Stdin = r
-	virtV2vMonitorCmd.Stdout = os.Stdout
-	virtV2vMonitorCmd.Stderr = os.Stderr
-
-	if err = virtV2vMonitorCmd.Start(); err != nil {
+	if err := monitorCmd.Start(); err != nil {
 		fmt.Printf("Error executing monitor command: %v\n", err)
-		return
+		return err
 	}
 
-	if err = virtV2vCmd.Wait(); err != nil {
-		fmt.Printf("Error waiting for virt-v2v to finish: %v\n", err)
-		return
+	fmt.Println("exec:", v2vCmd)
+	if err := v2vCmd.Run(); err != nil {
+		fmt.Printf("Error executing v2v command: %v\n", err)
+		return err
 	}
-	return
+
+	// virt-v2v is done, we can close the pipe to virt-v2v-monitor
+	writer.Close()
+
+	if err := monitorCmd.Wait(); err != nil {
+		fmt.Printf("Error waiting for virt-v2v-monitor to finish: %v\n", err)
+		return err
+	}
+
+	return nil
 }
 
 func getXMLFile(dir, fileExtension string) (string, error) {
