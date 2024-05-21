@@ -1118,6 +1118,12 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		}
 		step.MarkStarted()
 		step.Phase = Running
+
+		err = r.updateConversionProgress(vm, step)
+		if err != nil {
+			return
+		}
+
 		// only for OVA, fetch config from the conversion pod
 		if r.Source.Provider.Type() == v1beta1.Ova {
 			pod, err := r.kubevirt.GetGuestConversionPod(vm)
@@ -1131,11 +1137,6 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 					return err
 				}
 			}
-		}
-
-		err = r.updateConversionProgress(vm, step)
-		if err != nil {
-			return
 		}
 
 		if step.MarkedCompleted() && !step.HasError() {
@@ -1695,7 +1696,7 @@ func (r *Migration) updateConversionProgressEl9(pod *core.Pod, step *plan.Step) 
 		}
 	}
 	step.ReflectTasks()
-	if step.Name == ImageConversion && someProgress {
+	if step.Name == ImageConversion && someProgress && r.Source.Provider.Type() != v1beta1.Ova {
 		// Disk copying has already started. Transition from
 		// ConvertGuest to CopyDisksVirtV2V .
 		step.MarkCompleted()
