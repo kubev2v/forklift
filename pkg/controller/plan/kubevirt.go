@@ -1422,7 +1422,7 @@ func (r *KubeVirt) getVirtualMachinePreference(preferenceName string) (name, kin
 	if err != nil {
 		return
 	}
-	return preferenceName, "VirtualMachinePreference", nil
+	return preferenceName, instancetypeapi.SingularPreferenceResourceName, nil
 }
 
 func (r *KubeVirt) getVirtualMachineClusterPreference(vm *plan.VMStatus, preferenceName string) (name, kind string, err error) {
@@ -1441,7 +1441,7 @@ func (r *KubeVirt) getVirtualMachineClusterPreference(vm *plan.VMStatus, prefere
 		}
 		return
 	}
-	return preferenceName, "VirtualMachineClusterPreference", nil
+	return preferenceName, instancetypeapi.ClusterSingularPreferenceResourceName, nil
 }
 
 // Attempt to find a suitable template and extract a VirtualMachine definition from it.
