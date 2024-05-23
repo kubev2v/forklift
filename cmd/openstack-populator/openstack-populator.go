@@ -90,7 +90,7 @@ func downloadAndSaveImage(client *libclient.Client, config *AppConfig) {
 func createProgressCounter() *prometheus.CounterVec {
 	progressVec := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "openstack_populator_progress",
+			Name: "openstack_populator_progress_total",
 			Help: "Progress of volume population",
 		},
 		[]string{"ownerUID"},

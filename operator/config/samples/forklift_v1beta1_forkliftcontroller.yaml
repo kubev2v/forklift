@@ -8,3 +8,4 @@ spec:
   feature_ui_plugin: 'true'
   feature_validation: 'true'
   feature_volume_populator: 'true'
+  populator_replicas: 0
