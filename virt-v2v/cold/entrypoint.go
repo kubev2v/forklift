@@ -32,51 +32,6 @@ var UEFI_RE = regexp.MustCompile(`(?i)UEFI\s+bootloader?`)
 var firmware = "bios"
 
 func main() {
-	source := os.Getenv("V2V_source")
-	if source == vSphere {
-		if _, err := os.Stat("/etc/secret/cacert"); err == nil {
-			// use the specified certificate
-			err = os.Symlink("/etc/secret/cacert", "/opt/ca-bundle.crt")
-			if err != nil {
-				fmt.Println("Error creating ca cert link ", err)
-				os.Exit(1)
-			}
-		} else {
-			// otherwise, keep system pool certificates
-			err := os.Symlink("/etc/pki/tls/certs/ca-bundle.crt.bak", "/opt/ca-bundle.crt")
-			if err != nil {
-				fmt.Println("Error creating ca cert link ", err)
-				os.Exit(1)
-			}
-		}
-	}
-
-	if err := executeVirtV2v(source, buildCommand()); err != nil {
-		fmt.Println("Error executing virt-v2v command ", err)
-		os.Exit(1)
-	}
-
-	if source == OVA {
-		var err error
-		xmlFilePath, err = getXMLFile(DIR, "xml")
-		if err != nil {
-			fmt.Println("Error gettin XML file:", err)
-			os.Exit(1)
-		}
-
-		http.HandleFunc("/vm", vmHandler)
-		http.HandleFunc("/shutdown", shutdownHandler)
-		server = &http.Server{Addr: ":8080"}
-
-		fmt.Println("Starting server on :8080")
-		if err := server.ListenAndServe(); err != http.ErrServerClosed {
-			fmt.Printf("Error starting server: %v\n", err)
-			os.Exit(1)
-		}
-	}
-}
-
-func buildCommand() []string {
 	virtV2vArgs := []string{"virt-v2v", "-v", "-x"}
 	source := os.Getenv("V2V_source")
 
@@ -121,6 +76,21 @@ func buildCommand() []string {
 	}
 
 	if source == vSphere {
+		if _, err := os.Stat("/etc/secret/cacert"); err == nil {
+			// use the specified certificate
+			err = os.Symlink("/etc/secret/cacert", "/opt/ca-bundle.crt")
+			if err != nil {
+				fmt.Println("Error creating ca cert link ", err)
+				os.Exit(1)
+			}
+		} else {
+			// otherwise, keep system pool certificates
+			err := os.Symlink("/etc/pki/tls/certs/ca-bundle.crt.bak", "/opt/ca-bundle.crt")
+			if err != nil {
+				fmt.Println("Error creating ca cert link ", err)
+				os.Exit(1)
+			}
+		}
 		virtV2vArgs = append(virtV2vArgs, "-ip", "/etc/secret/secretKey")
 
 		if envStaticIPs := os.Getenv("V2V_staticIPs"); envStaticIPs != "" {
@@ -138,7 +108,30 @@ func buildCommand() []string {
 		}
 		virtV2vArgs = append(virtV2vArgs, "--", os.Getenv("V2V_vmName"))
 	}
-	return virtV2vArgs
+
+	if err := executeVirtV2v(source, virtV2vArgs); err != nil {
+		fmt.Println("Error executing virt-v2v command ", err)
+		os.Exit(1)
+	}
+
+	if source == OVA {
+		var err error
+		xmlFilePath, err = getXMLFile(DIR, "xml")
+		if err != nil {
+			fmt.Println("Error gettin XML file:", err)
+			os.Exit(1)
+		}
+
+		http.HandleFunc("/vm", vmHandler)
+		http.HandleFunc("/shutdown", shutdownHandler)
+		server = &http.Server{Addr: ":8080"}
+
+		fmt.Println("Starting server on :8080")
+		if err := server.ListenAndServe(); err != http.ErrServerClosed {
+			fmt.Printf("Error starting server: %v\n", err)
+			os.Exit(1)
+		}
+	}
 }
 
 func checkEnvVariablesSet(envVars ...string) bool {
