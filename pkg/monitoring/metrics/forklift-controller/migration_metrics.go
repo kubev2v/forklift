@@ -23,7 +23,7 @@ var (
 )
 
 // Calculate Migrations metrics every 10 seconds
-func recordMigrationMetrics(client client.Client) {
+func RecordMigrationMetrics(client client.Client) {
 	go func() {
 		for {
 			time.Sleep(10 * time.Second)

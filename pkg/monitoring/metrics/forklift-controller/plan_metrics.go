@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/machadovilaca/operator-observability/pkg/operatormetrics"
-
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -14,9 +12,6 @@ import (
 )
 
 var (
-	migrationMetrics = []operatormetrics.Metric{
-		planGauge,
-	}
 	planGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "mtv_workload_plans",
 		Help: "VM migration Plans sorted by status and provider type",
@@ -31,7 +26,7 @@ var (
 )
 
 // Calculate Plans metrics every 10 seconds
-func recordPlanMetrics(client client.Client) {
+func RecordPlanMetrics(client client.Client) {
 	go func() {
 		for {
 			time.Sleep(10 * time.Second)
