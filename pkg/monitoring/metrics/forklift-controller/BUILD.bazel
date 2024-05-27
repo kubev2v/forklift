@@ -14,6 +14,5 @@ go_library(
         "//vendor/github.com/prometheus/client_golang/prometheus",
         "//vendor/github.com/prometheus/client_golang/prometheus/promauto",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
-        "@com_github_machadovilaca_operator_observability//pkg/operatormetrics:go_default_library",
     ],
 )

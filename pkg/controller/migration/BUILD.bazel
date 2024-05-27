@@ -5,7 +5,6 @@ go_library(
     srcs = [
         "controller.go",
         "doc.go",
-        "metrics.go",
         "predicate.go",
         "validation.go",
     ],
@@ -20,9 +19,8 @@ go_library(
         "//pkg/lib/error",
         "//pkg/lib/logging",
         "//pkg/lib/ref",
+        "//pkg/monitoring/metrics/forklift-controller",
         "//pkg/settings",
-        "//vendor/github.com/prometheus/client_golang/prometheus",
-        "//vendor/github.com/prometheus/client_golang/prometheus/promauto",
         "//vendor/k8s.io/apimachinery/pkg/api/errors",
         "//vendor/k8s.io/apiserver/pkg/storage/names",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
