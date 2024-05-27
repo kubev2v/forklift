@@ -24,6 +24,7 @@ import (
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
+	metrics "github.com/konveyor/forklift-controller/pkg/monitoring/metrics/forklift-controller"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -84,7 +85,7 @@ func Add(mgr manager.Manager) error {
 	}
 
 	// Gather migration metrics
-	recordMetrics(mgr.GetClient())
+	metrics.RecordMigrationMetrics(mgr.GetClient())
 
 	return nil
 }
