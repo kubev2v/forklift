@@ -613,26 +613,6 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 						}
 					}
 				}
-			case fGuestNet:
-				if nics, cast := p.Val.(types.ArrayOfGuestNicInfo); cast {
-					guestNetworksList := []model.GuestNetwork{}
-					for _, info := range nics.GuestNicInfo {
-						if info.IpConfig == nil {
-							continue
-						}
-						for _, ip := range info.IpConfig.IpAddress {
-							guestNetworksList = append(guestNetworksList, model.GuestNetwork{
-								MAC:    info.MacAddress,
-								IP:     ip.IpAddress,
-								Origin: ip.Origin,
-							})
-						}
-					}
-					// when the vm goes down, we get an update with empty values - the following check keeps the previously reported data.
-					if len(guestNetworksList) > 0 {
-						v.model.GuestNetworks = guestNetworksList
-					}
-				}
 			case fDevices:
 				if devArray, cast := p.Val.(types.ArrayOfVirtualDevice); cast {
 					devList := []model.Device{}
