@@ -135,8 +135,6 @@ type Validator interface {
 	WarmMigration() bool
 	// Validate that no more than one of a VM's networks is mapped to the pod network.
 	PodNetwork(vmRef ref.Ref) (bool, error)
-	// Validate that we have information about static IPs for every virtual NIC
-	StaticIPs(vmRef ref.Ref) (bool, error)
 }
 
 // DestinationClient API.
