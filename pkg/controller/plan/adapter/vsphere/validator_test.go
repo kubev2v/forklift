@@ -1,4 +1,4 @@
-//nolint:nilnil
+//nolint:errcheck
 package vsphere
 
 import (
