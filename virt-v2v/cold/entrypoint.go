@@ -93,12 +93,6 @@ func main() {
 		}
 		virtV2vArgs = append(virtV2vArgs, "-ip", "/etc/secret/secretKey")
 
-		if envStaticIPs := os.Getenv("V2V_staticIPs"); envStaticIPs != "" {
-			for _, macToIp := range strings.Split(envStaticIPs, "_") {
-				virtV2vArgs = append(virtV2vArgs, "--mac", macToIp)
-			}
-		}
-
 		if info, err := os.Stat(VDDK); err == nil && info.IsDir() {
 			virtV2vArgs = append(virtV2vArgs,
 				"-it", "vddk",
