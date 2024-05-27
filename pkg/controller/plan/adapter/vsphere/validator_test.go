@@ -27,14 +27,10 @@ func (m *mockInventory) Find(resource interface{}, ref ref.Ref) error {
 				},
 				GuestNetworks: []vsphere.GuestNetwork{
 					{MAC: "mac1"},
-				},
-				GuestID: "windows7Guest"},
+				}},
 		}
 		if ref.Name == "full_guest_network" {
 			res.VM.GuestNetworks = append(res.VM.GuestNetworks, vsphere.GuestNetwork{MAC: "mac2"})
-		}
-		if ref.Name == "not_windows_guest" {
-			res.VM.GuestID = "rhel8_64Guest"
 		}
 	}
 	return nil
@@ -101,7 +97,6 @@ var _ = Describe("vsphere validation tests", func() {
 			Entry("when the vm doesn't have static ips, and the plan set without static ip", "test", false, false),
 			Entry("when the vm have static ips, and the plan set with static ip", "full_guest_network", true, false),
 			Entry("when the vm have static ips, and the plan set without static ip", "test", false, false),
-			Entry("when the vm doesn't have static ips, and the plan set without static ip, vm is non-windows", "not_windows_guest", true, false),
 		)
 	})
 })
