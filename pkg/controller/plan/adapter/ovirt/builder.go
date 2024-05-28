@@ -10,8 +10,11 @@ import (
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	ocpclient "github.com/konveyor/forklift-controller/pkg/lib/client/openshift"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes"
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
@@ -712,6 +715,8 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 		return
 	}
 
+	r.Log.Info("Benny PopulatorVolumes", "workload", workload)
+
 	var sdToStorageClass map[string]string
 	for _, diskAttachment := range workload.DiskAttachments {
 		if diskAttachment.Disk.StorageType == "lun" {
@@ -765,6 +770,19 @@ func (r *Builder) mapStorageDomainToStorageClass() (map[string]string, error) {
 
 // Get the OvirtVolumePopulator CustomResource based on the disk ID.
 func (r *Builder) getVolumePopulator(diskID string) (populatorCr api.OvirtVolumePopulator, err error) {
+	apiGroup, err := r.calculateAPIGroup()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	gvk := schema.GroupVersionKind{
+		Group:   apiGroup,
+		Version: "v1", // Adjust the version if necessary
+		Kind:    "OvirtVolumePopulatorList",
+	}
+
+	r.Log.Info("Benny OvirtVolumePopulatorList", "apiGroup", apiGroup, "gvk", gvk)
 	list := api.OvirtVolumePopulatorList{}
 	err = r.Destination.Client.List(context.TODO(), &list, &client.ListOptions{
 		Namespace: r.Plan.Spec.TargetNamespace,
@@ -772,11 +790,18 @@ func (r *Builder) getVolumePopulator(diskID string) (populatorCr api.OvirtVolume
 			"migration": string(r.Migration.UID),
 			"diskID":    diskID,
 		}),
+		Raw: &meta.ListOptions{
+			TypeMeta: meta.TypeMeta{
+				APIVersion: gvk.GroupVersion().String(),
+				Kind:       gvk.Kind,
+			},
+		},
 	})
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
+	r.Log.Info("using API group", "apiGroup", apiGroup)
 
 	if len(list.Items) == 0 {
 		err = k8serr.NewNotFound(api.SchemeGroupVersion.WithResource("OvirtVolumePopulator").GroupResource(), diskID)
@@ -803,7 +828,19 @@ func (r *Builder) createVolumePopulatorCR(diskAttachment model.XDiskAttachment, 
 		Scheme: providerURL.Scheme,
 		Host:   providerURL.Host,
 	}
+
+	apiGroup, err := r.calculateAPIGroup()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	r.Log.Info("using API group", "apiGroup", apiGroup)
+
 	populatorCR := &api.OvirtVolumePopulator{
+		TypeMeta: meta.TypeMeta{
+			Kind:       api.OvirtVolumePopulatorKind,
+			APIVersion: apiGroup,
+		},
 		ObjectMeta: meta.ObjectMeta{
 			GenerateName: fmt.Sprintf("%s-", diskAttachment.DiskAttachment.ID),
 			Namespace:    r.Plan.Spec.TargetNamespace,
@@ -874,6 +911,14 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(diskAttachment model.XDiskA
 
 	annotations[planbase.AnnDiskSource] = diskAttachment.ID
 
+	apiGroup, err := r.calculateAPIGroup()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	r.Log.Info("using API group", "apiGroup", apiGroup)
+
 	pvc = &core.PersistentVolumeClaim{
 		ObjectMeta: meta.ObjectMeta{
 			GenerateName: fmt.Sprintf("%s-", diskAttachment.DiskAttachment.ID),
@@ -894,7 +939,7 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(diskAttachment model.XDiskA
 			StorageClassName: &storageClassName,
 			VolumeMode:       volumeMode,
 			DataSourceRef: &core.TypedObjectReference{
-				APIGroup: &api.SchemeGroupVersion.Group,
+				APIGroup: &apiGroup,
 				Kind:     v1beta1.OvirtVolumePopulatorKind,
 				Name:     populatorName,
 			},
@@ -903,6 +948,38 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(diskAttachment model.XDiskA
 
 	err = r.Client.Create(context.TODO(), pvc, &client.CreateOptions{})
 	return
+}
+
+func (r *Builder) calculateAPIGroup() (string, error) {
+	// If OCP version is >= 4.16 use forklift.cdi.konveyor.io
+	// Otherwise use forklift.konveyor.io
+	restCfg := ocpclient.RestCfg(r.Source.Provider, r.Plan.Referenced.Secret)
+	clientset, err := kubernetes.NewForConfig(restCfg)
+	if err != nil {
+		return "", liberr.Wrap(err)
+	}
+
+	discoveryClient := clientset.Discovery()
+	version, err := discoveryClient.ServerVersion()
+	if err != nil {
+		return "", liberr.Wrap(err)
+	}
+
+	major, err := strconv.Atoi(version.Major)
+	if err != nil {
+		return "", liberr.Wrap(err)
+	}
+
+	minor, err := strconv.Atoi(version.Minor)
+	if err != nil {
+		return "", liberr.Wrap(err)
+	}
+
+	if major < 1 || (major == 1 && minor <= 28) {
+		return "forklift.konveyor.io", nil
+	}
+
+	return "forklift.cdi.konveyor.io", nil
 }
 
 func (r *Builder) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (transferredBytes int64, err error) {

@@ -443,6 +443,7 @@ func (r *Migration) deletePopulatorPVCs(vm *plan.VMStatus) (err error) {
 
 // Delete left over migration resources associated with a VM.
 func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool) error {
+	r.Log.Info("Benny cleanup")
 	if !vm.HasCondition(Succeeded) {
 		if err := r.kubevirt.DeleteVM(vm); failOnErr(err) {
 			return err
@@ -451,12 +452,15 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool) error
 			return err
 		}
 	}
+	r.Log.Info("Benny cleanup deleteImporterPods")
 	if err := r.deleteImporterPods(vm); failOnErr(err) {
 		return err
 	}
+	r.Log.Info("Benny cleanup DeletePVCConsumerPod")
 	if err := r.kubevirt.DeletePVCConsumerPod(vm); failOnErr(err) {
 		return err
 	}
+
 	if err := r.kubevirt.DeleteGuestConversionPod(vm); failOnErr(err) {
 		return err
 	}
@@ -470,10 +474,12 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool) error
 		return err
 	}
 	if r.Plan.Provider.Destination.IsHost() {
+		r.Log.Info("Benny cleanup DeletePopulatorDataSource")
 		if err := r.destinationClient.DeletePopulatorDataSource(vm); failOnErr(err) {
 			return err
 		}
 	}
+	r.Log.Info("Benny cleanup DeletePopulatorPods")
 	if err := r.kubevirt.DeletePopulatorPods(vm); failOnErr(err) {
 		return err
 	}
@@ -697,6 +703,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 
 	switch vm.Phase {
 	case Started:
+		r.Log.Info("Benny before Started")
 		step, found := vm.FindStep(r.step(vm))
 		if !found {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
@@ -712,6 +719,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			break
 		}
 		vm.Phase = r.next(vm.Phase)
+		r.Log.Info("Benny after Started")
 	case PreHook, PostHook:
 		runner := HookRunner{Context: r.Context}
 		err = runner.Run(vm)
@@ -735,6 +743,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		}
 
 		var ready bool
+		r.Log.Info("Benny before PreTransferActions")
 		ready, err = r.provider.PreTransferActions(vm.Ref)
 		if err != nil {
 			if !errors.As(err, &web.ProviderNotReadyError{}) {
@@ -746,6 +755,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 		}
 
+		r.Log.Info("Benny before SupportsVolumePopulators")
 		if r.builder.SupportsVolumePopulators() {
 			var pvcs []*core.PersistentVolumeClaim
 			if pvcs, err = r.kubevirt.PopulatorVolumes(vm.Ref); err != nil {
