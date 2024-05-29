@@ -1,23 +1,9 @@
-/*
- * This file is part of the KubeVirt project
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- * Copyright the KubeVirt Authors.
- *
- */
-
 package forklift_controller
+
+import (
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+)
 
 const (
 	Succeeded = "Succeeded"
@@ -28,96 +14,47 @@ const (
 	Remote    = "Remote"
 )
 
-// var (
-// 	metrics = [][]operatormetrics.Metric{
-// 		componentMetrics,
-// 		migrationMetrics,
-// 		perfscaleMetrics,
-// 	}
+var (
+	// 'status' - [ succeeded, failed ]
+	// 'provider' - [oVirt, vSphere, Openstack, OVA, openshift]
+	migrationGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "mtv_workload_migrations",
+		Help: "VM Migrations sorted by status and provider type",
+	},
+		[]string{"status", "provider"},
+	)
+)
 
-// 	vmInformer                  cache.SharedIndexInformer
-// 	vmiInformer                 cache.SharedIndexInformer
-// 	clusterInstanceTypeInformer cache.SharedIndexInformer
-// 	instanceTypeInformer        cache.SharedIndexInformer
-// 	clusterPreferenceInformer   cache.SharedIndexInformer
-// 	preferenceInformer          cache.SharedIndexInformer
-// 	vmiMigrationInformer        cache.SharedIndexInformer
-// 	clusterConfig               *virtconfig.ClusterConfig
-// )
+var (
+	// 'status' - [ succeeded, failed ]
+	// 'provider' - [oVirt, vSphere, Openstack, OVA, openshift]
+	planStatusGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "mtv_workload_plans",
+		Help: "VM migration Plans sorted by status and provider type",
+	},
+		[]string{
+			"status",
+			"provider",
+		},
+	)
 
-// func SetupMetrics(
-// 	vm cache.SharedIndexInformer,
-// 	vmi cache.SharedIndexInformer,
-// 	clusterInstanceType cache.SharedIndexInformer,
-// 	instanceType cache.SharedIndexInformer,
-// 	clusterPreference cache.SharedIndexInformer,
-// 	preference cache.SharedIndexInformer,
-// 	vmiMigration cache.SharedIndexInformer,
-// 	virtClusterConfig *virtconfig.ClusterConfig,
-// ) error {
-// 	vmInformer = vm
-// 	vmiInformer = vmi
-// 	clusterInstanceTypeInformer = clusterInstanceType
-// 	instanceTypeInformer = instanceType
-// 	clusterPreferenceInformer = clusterPreference
-// 	preferenceInformer = preference
-// 	vmiMigrationInformer = vmiMigration
-// 	clusterConfig = virtClusterConfig
+	// 'type' - [ cold, warm ]
+	planTypeGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "mtv_workload_plans_type",
+		Help: "VM migration Plans type",
+	},
+		[]string{
+			"type",
+		},
+	)
 
-// 	if err := operatormetrics.RegisterMetrics(metrics...); err != nil {
-// 		return err
-// 	}
-
-// 	return operatormetrics.RegisterCollector(
-// 		migrationStatsCollector,
-// 		vmiStatsCollector,
-// 		vmStatsCollector,
-// 	)
-// }
-
-// func UpdateVMIMigrationInformer(informer cache.SharedIndexInformer) {
-// 	vmiMigrationInformer = informer
-// }
-
-// func ListMetrics() []operatormetrics.Metric {
-// 	return operatormetrics.ListMetrics()
-// }
-
-// func phaseTransitionTimeBuckets() []float64 {
-// 	return []float64{
-// 		(0.5 * time.Second.Seconds()),
-// 		(1 * time.Second.Seconds()),
-// 		(2 * time.Second.Seconds()),
-// 		(5 * time.Second.Seconds()),
-// 		(10 * time.Second.Seconds()),
-// 		(20 * time.Second.Seconds()),
-// 		(30 * time.Second.Seconds()),
-// 		(40 * time.Second.Seconds()),
-// 		(50 * time.Second.Seconds()),
-// 		(60 * time.Second).Seconds(),
-// 		(90 * time.Second).Seconds(),
-// 		(2 * time.Minute).Seconds(),
-// 		(3 * time.Minute).Seconds(),
-// 		(5 * time.Minute).Seconds(),
-// 		(10 * time.Minute).Seconds(),
-// 		(20 * time.Minute).Seconds(),
-// 		(30 * time.Minute).Seconds(),
-// 		(1 * time.Hour).Seconds(),
-// 	}
-// }
-
-// func getTransitionTimeSeconds(oldTime *metav1.Time, newTime *metav1.Time) (float64, error) {
-// 	if newTime == nil || oldTime == nil {
-// 		// no phase transition timestamp found
-// 		return 0.0, fmt.Errorf("missing phase transition timestamp, newTime: %v, oldTime: %v", newTime, oldTime)
-// 	}
-
-// 	diffSeconds := newTime.Time.Sub(oldTime.Time).Seconds()
-
-// 	// when transitions are very fast, we can encounter time skew. Make 0 the floor
-// 	if diffSeconds < 0 {
-// 		diffSeconds = 0.0
-// 	}
-
-// 	return diffSeconds, nil
-// }
+	// 'destination' - [remote, local]
+	planDestinationGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "mtv_operator_destination",
+		Help: "MTV operator destination",
+	},
+		[]string{
+			"destination",
+		},
+	)
+)
