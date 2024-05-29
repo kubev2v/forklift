@@ -75,6 +75,8 @@ const (
 	kVM = "vmID"
 	// App label
 	kApp = "forklift.app"
+	// LUKS
+	kLUKS = "isLUKS"
 )
 
 // User
@@ -521,7 +523,7 @@ func (r *KubeVirt) DeleteVM(vm *plan.VMStatus) (err error) {
 }
 
 func (r *KubeVirt) DataVolumes(vm *plan.VMStatus) (dataVolumes []cdi.DataVolume, err error) {
-	secret, err := r.ensureSecret(vm.Ref, r.secretDataSetterForCDI(vm.Ref))
+	secret, err := r.ensureSecret(vm.Ref, r.secretDataSetterForCDI(vm.Ref), false)
 	if err != nil {
 		return
 	}
@@ -538,7 +540,7 @@ func (r *KubeVirt) DataVolumes(vm *plan.VMStatus) (dataVolumes []cdi.DataVolume,
 }
 
 func (r *KubeVirt) PopulatorVolumes(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, err error) {
-	secret, err := r.ensureSecret(vmRef, r.copyDataFromProviderSecret)
+	secret, err := r.ensureSecret(vmRef, r.copyDataFromProviderSecret, false)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -779,7 +781,7 @@ func (r *KubeVirt) getListOptionsNamespaced() (listOptions *client.ListOptions) 
 
 // Ensure the guest conversion (virt-v2v) pod exists on the destination.
 func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, vmCr *VirtualMachine, pvcs []*core.PersistentVolumeClaim) (err error) {
-	v2vSecret, err := r.ensureSecret(vm.Ref, r.secretDataSetterForCDI(vm.Ref))
+	v2vSecret, err := r.ensureSecret(vm.Ref, r.secretDataSetterForCDI(vm.Ref), false)
 	if err != nil {
 		return
 	}
@@ -1760,11 +1762,16 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 		},
 	})
 	if vm.LUKS.Name != "" {
+		secret, erro := r.ensureSecret(vm.Ref, r.secretLUKS(vm.LUKS.Name, r.Plan.Namespace), true)
+		if erro != nil {
+			err = liberr.Wrap(erro)
+			return
+		}
 		volumes = append(volumes, core.Volume{
 			Name: "luks",
 			VolumeSource: core.VolumeSource{
 				Secret: &core.SecretVolumeSource{
-					SecretName: vm.LUKS.Name,
+					SecretName: secret.Name,
 				},
 			},
 		})
@@ -1956,24 +1963,40 @@ func (r *KubeVirt) secretDataSetterForCDI(vmRef ref.Ref) func(*core.Secret) erro
 	}
 }
 
+func (r *KubeVirt) secretLUKS(name, namespace string) func(*core.Secret) error {
+	return func(secret *core.Secret) error {
+		sourceSecret := &core.Secret{}
+		err := r.Client.Get(context.TODO(), client.ObjectKey{Name: name, Namespace: namespace}, sourceSecret)
+		if err != nil {
+			return err
+		}
+		secret.Data = sourceSecret.Data
+		return nil
+	}
+}
+
 // Ensure the credential secret for the data transfer exists on the destination.
-func (r *KubeVirt) ensureSecret(vmRef ref.Ref, setSecretData func(*core.Secret) error) (secret *core.Secret, err error) {
+func (r *KubeVirt) ensureSecret(vmRef ref.Ref, setSecretData func(*core.Secret) error, isLUKS bool) (secret *core.Secret, err error) {
 	_, err = r.Source.Inventory.VM(&vmRef)
 	if err != nil {
 		return
 	}
 
-	newSecret, err := r.secret(vmRef, setSecretData)
+	newSecret, err := r.secret(vmRef, setSecretData, isLUKS)
 	if err != nil {
 		return
 	}
 
 	list := &core.SecretList{}
+	secretLabels := r.vmLabels(vmRef)
+	if isLUKS {
+		secretLabels[kLUKS] = "true"
+	}
 	err = r.Destination.Client.List(
 		context.TODO(),
 		list,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(r.vmLabels(vmRef)),
+			LabelSelector: labels.SelectorFromSet(secretLabels),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
@@ -2018,10 +2041,14 @@ func (r *KubeVirt) ensureSecret(vmRef ref.Ref, setSecretData func(*core.Secret) 
 }
 
 // Build the credential secret for the data transfer (CDI importer / popoulator pod).
-func (r *KubeVirt) secret(vmRef ref.Ref, setSecretData func(*core.Secret) error) (secret *core.Secret, err error) {
+func (r *KubeVirt) secret(vmRef ref.Ref, setSecretData func(*core.Secret) error, isLUKS bool) (secret *core.Secret, err error) {
+	labels := r.vmLabels(vmRef)
+	if isLUKS {
+		labels[kLUKS] = "true"
+	}
 	secret = &core.Secret{
 		ObjectMeta: meta.ObjectMeta{
-			Labels:    r.vmLabels(vmRef),
+			Labels:    labels,
 			Namespace: r.Plan.Spec.TargetNamespace,
 			GenerateName: strings.Join(
 				[]string{
