@@ -78,7 +78,7 @@ func main() {
 }
 
 func buildCommand() []string {
-	virtV2vArgs := []string{"virt-v2v", "-v", "-x"}
+	virtV2vArgs := []string{"-v", "-x"}
 	source := os.Getenv("V2V_source")
 
 	if !isValidSource(source) {
@@ -225,7 +225,7 @@ func LinkDisks(diskKind string, num int) (err error) {
 }
 
 func executeVirtV2v(source string, args []string) error {
-	v2vCmd := exec.Command(args[0], args[1:]...)
+	v2vCmd := exec.Command("virt-v2v", args...)
 	monitorCmd := exec.Command("/usr/local/bin/virt-v2v-monitor")
 	monitorCmd.Stderr = os.Stderr
 
