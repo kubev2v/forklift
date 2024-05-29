@@ -337,7 +337,7 @@ bazel-generate:
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN)
 $(DEFAULT_CONTROLLER_GEN):
-	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.10.0
+	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.15.0
 
 .PHONY: kubectl
 kubectl: $(KUBECTL)
