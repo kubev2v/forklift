@@ -3,11 +3,11 @@ package ovirt
 import (
 	"context"
 	"path"
-	"strconv"
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	utils "github.com/konveyor/forklift-controller/pkg/controller/plan/util"
 	ocpclient "github.com/konveyor/forklift-controller/pkg/lib/client/openshift"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	core "k8s.io/api/core/v1"
@@ -17,7 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -70,56 +69,14 @@ func (r *DestinationClient) SetPopulatorCrOwnership() (err error) {
 	return
 }
 
-func (r *DestinationClient) calculateAPIGroup(kind string) (*schema.GroupVersionKind, error) {
-	// If OCP version is >= 4.16 use forklift.cdi.konveyor.io
-	// Otherwise use forklift.konveyor.io
-	r.Log.Info("Benny calculateAPIGroup")
-	restCfg := ocpclient.RestCfg(r.Destination.Provider, r.Plan.Referenced.Secret)
-	r.Log.Info("Benny Rest", "restCfg", restCfg)
-	clientset, err := kubernetes.NewForConfig(restCfg)
-	if err != nil {
-		return nil, liberr.Wrap(err)
-	}
-
-	r.Log.Info("Benny Before discoveryClient.ServerVersion()")
-
-	discoveryClient := clientset.Discovery()
-	version, err := discoveryClient.ServerVersion()
-	if err != nil {
-		r.Log.Info("Benny ServerVersion() error", "error", err)
-
-		return nil, liberr.Wrap(err)
-	}
-
-	r.Log.Info("Benny calculateAPIGroup after discoveryClient.ServerVersion()")
-
-	major, err := strconv.Atoi(version.Major)
-	if err != nil {
-		return nil, liberr.Wrap(err)
-	}
-
-	minor, err := strconv.Atoi(version.Minor)
-	if err != nil {
-		return nil, liberr.Wrap(err)
-	}
-
-	r.Log.Info("Benny calculateAPIGroup before return")
-
-	if major < 1 || (major == 1 && minor <= 28) {
-		return &schema.GroupVersionKind{Group: "forklift.konveyor.io", Version: "v1beta1", Kind: kind}, nil
-	}
-
-	return &schema.GroupVersionKind{Group: "forklift.cdi.konveyor.io", Version: "v1beta1", Kind: kind}, nil
-}
-
 // Get the OvirtVolumePopulator CustomResource List.
 // Get the OvirtVolumePopulator CustomResource List.
 func (r *DestinationClient) getPopulatorCrList() (populatorCrList v1beta1.OvirtVolumePopulatorList, err error) {
 	r.Log.Info("Getting OvirtVolumePopulatorList")
 	populatorCrList = v1beta1.OvirtVolumePopulatorList{}
-	gvk, err := r.calculateAPIGroup("OvirtVolumePopulator")
+	gvk, err := utils.CalculateAPIGroup("OvirtVolumePopulator", r.Destination.Provider, r.Plan.Referenced.Secret)
 	if err != nil {
-		r.Log.Info("Error calculating API group", "error", err)
+		r.Log.Error(err, "Error calculating API group")
 		return
 	}
 	r.Log.Info("API Group", "apiGroup", gvk)
@@ -127,14 +84,14 @@ func (r *DestinationClient) getPopulatorCrList() (populatorCrList v1beta1.OvirtV
 	// Create a dynamic client using the correct GVK
 	dynamicClient, err := dynamic.NewForConfig(ocpclient.RestCfg(r.Destination.Provider, r.Plan.Referenced.Secret))
 	if err != nil {
-		r.Log.Info("Error creating dynamic client", "error", err)
+		r.Log.Error(err, "Error creating dynamic client")
 		return
 	}
 
 	resource := schema.GroupVersionResource{
 		Group:    gvk.Group,
 		Version:  gvk.Version,
-		Resource: "ovirtvolumepopulators", // Use the plural form of the resource
+		Resource: "ovirtvolumepopulators",
 	}
 
 	unstructuredList, err := dynamicClient.Resource(resource).Namespace(r.Plan.Spec.TargetNamespace).List(context.TODO(), meta.ListOptions{
@@ -152,7 +109,6 @@ func (r *DestinationClient) getPopulatorCrList() (populatorCrList v1beta1.OvirtV
 		return
 	}
 
-	r.Log.Info("Successfully retrieved OvirtVolumePopulator list")
 	return
 }
 
