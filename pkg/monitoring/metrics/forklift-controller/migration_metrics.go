@@ -23,14 +23,14 @@ var (
 )
 
 // Calculate Migrations metrics every 10 seconds
-func RecordMigrationMetrics(client client.Client) {
+func RecordMigrationMetrics(c client.Client) {
 	go func() {
 		for {
 			time.Sleep(10 * time.Second)
 
 			// get all migration objects
 			migrations := api.MigrationList{}
-			err := client.List(context.TODO(), &migrations)
+			err := c.List(context.TODO(), &migrations)
 
 			// if error occurs, retry 10 seconds later
 			if err != nil {
@@ -44,40 +44,53 @@ func RecordMigrationMetrics(client client.Client) {
 
 			// for all migrations, count # in executing, succeeded, failed, canceled
 			for _, m := range migrations.Items {
+
+				plan := api.Plan{}
+				err := c.Get(context.TODO(), client.ObjectKey{Namespace: m.Spec.Plan.Namespace, Name: m.Spec.Plan.Name}, &plan)
+				if err != nil {
+					continue
+				}
+
+				provider := api.Provider{}
+				err = c.Get(context.TODO(), client.ObjectKey{Namespace: plan.Spec.Provider.Source.Namespace, Name: plan.Spec.Provider.Source.Name}, &provider)
+				if err != nil {
+					continue
+				}
+
 				if m.Status.HasCondition(Succeeded) {
-					switch m.Spec.Plan.Name {
-					case api.Ova.String():
+					switch provider.Type() {
+					case api.Ova:
 						succeededOVA++
 						continue
-					case api.OVirt.String():
+					case api.OVirt:
 						succeededRHV++
 						continue
-					case api.VSphere.String():
+					case api.VSphere:
 						succeededVsphere++
 						continue
-					case api.OpenShift.String():
+					case api.OpenShift:
 						succeededOCP++
 						continue
-					case api.OpenStack.String():
+					case api.OpenStack:
 						succeededOpenstack++
 						continue
 					}
 				}
 				if m.Status.HasCondition(Failed) {
-					switch m.Spec.Plan.Name {
-					case api.Ova.String():
+					switch provider.Type() {
+					case api.Ova:
 						failedOVA++
 						continue
-					case api.OVirt.String():
+					case api.OVirt:
 						failedRHV++
 						continue
-					case api.VSphere.String():
+					case api.VSphere:
 						failedVsphere++
 						continue
-					case api.OpenShift.String():
+					case api.OpenShift:
 						failedOCP++
 						continue
-					case api.OpenStack.String():
+					case api.OpenStack:
 						failedOpenstack++
 						continue
 					}
@@ -85,25 +98,25 @@ func RecordMigrationMetrics(client client.Client) {
 			}
 
 			migrationGauge.With(
-				prometheus.Labels{"status": Succeeded, "provider": "oVirt"}).Set(succeededRHV)
+				prometheus.Labels{"status": Succeeded, "provider": api.OVirt.String()}).Set(succeededRHV)
 			migrationGauge.With(
-				prometheus.Labels{"status": Succeeded, "provider": "OpenShift"}).Set(succeededOCP)
+				prometheus.Labels{"status": Succeeded, "provider": api.OpenShift.String()}).Set(succeededOCP)
 			migrationGauge.With(
-				prometheus.Labels{"status": Succeeded, "provider": "OpenStack"}).Set(succeededOpenstack)
+				prometheus.Labels{"status": Succeeded, "provider": api.OpenStack.String()}).Set(succeededOpenstack)
 			migrationGauge.With(
-				prometheus.Labels{"status": Succeeded, "provider": "OVA"}).Set(succeededOVA)
+				prometheus.Labels{"status": Succeeded, "provider": api.Ova.String()}).Set(succeededOVA)
 			migrationGauge.With(
-				prometheus.Labels{"status": Succeeded, "provider": "vSphere"}).Set(succeededVsphere)
+				prometheus.Labels{"status": Succeeded, "provider": api.VSphere.String()}).Set(succeededVsphere)
 			migrationGauge.With(
-				prometheus.Labels{"status": Failed, "provider": "oVirt"}).Set(failedRHV)
+				prometheus.Labels{"status": Failed, "provider": api.OVirt.String()}).Set(failedRHV)
 			migrationGauge.With(
-				prometheus.Labels{"status": Failed, "provider": "OpenShift"}).Set(failedOCP)
+				prometheus.Labels{"status": Failed, "provider": api.OpenShift.String()}).Set(failedOCP)
 			migrationGauge.With(
-				prometheus.Labels{"status": Failed, "provider": "OpenStack"}).Set(succeededOpenstack)
+				prometheus.Labels{"status": Failed, "provider": api.OpenStack.String()}).Set(failedOpenstack)
 			migrationGauge.With(
-				prometheus.Labels{"status": Failed, "provider": "OVA"}).Set(succeededOVA)
+				prometheus.Labels{"status": Failed, "provider": api.Ova.String()}).Set(failedOVA)
 			migrationGauge.With(
-				prometheus.Labels{"status": Failed, "provider": "vSphere"}).Set(succeededVsphere)
+				prometheus.Labels{"status": Failed, "provider": api.VSphere.String()}).Set(failedVsphere)
 		}
 	}()
 }
