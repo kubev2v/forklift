@@ -105,7 +105,7 @@ container_image(
         # The channels need to be changed during release
         "operators.operatorframework.io.bundle.channels.v1": "development",
         "operators.operatorframework.io.bundle.channel.default.v1": "development",
-        "operators.operatorframework.io.metrics.builder": "operator-sdk-v1.22.0",
+        "operators.operatorframework.io.metrics.builder": "operator-sdk-v1.43.1",
         "operators.operatorframework.io.metrics.mediatype.v1": "metrics+v1",
         "operators.operatorframework.io.metrics.project_layout": "ansible.sdk.operatorframework.io/v1",
         # Labels for testing.
