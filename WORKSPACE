@@ -3347,7 +3347,8 @@ container_pull(
 
 container_pull(
     name = "opm-image",
-    digest = "sha256:601c62a5e3fea961665aad2ed2834f3f165a020051d355eb24af2125da8e158e",
+    # v1.43.1
+    digest = "sha256:dbeedc2489e6a971bcc2640b582482059938f6c1e14446db5fdb6f6c02aa01d5",
     registry = "quay.io",
     repository = "operator-framework/opm",
 )
@@ -3373,16 +3374,16 @@ http_file(
     name = "operator-sdk",
     downloaded_file_path = "operator-sdk",
     executable = True,
-    sha256 = "2fc68a50b94b7c477e804729365baa5de6d5afcfea9b7fcac9f93dd649c29e90",
-    urls = ["https://github.com/operator-framework/operator-sdk/releases/download/v1.22.0/operator-sdk_linux_amd64"],
+    sha256 = "90ac1ed961585f16ff60d5187fd29592e5af6db8d074e1db3fde02d4145ff3fd",
+    urls = ["https://github.com/operator-framework/operator-sdk/releases/download/v1.34.2/operator-sdk_linux_amd64"],
 )
 
 http_file(
     name = "opm",
     downloaded_file_path = "opm",
     executable = True,
-    sha256 = "dc0d4d287fef23f165c837b2e6cb68e2506ff295dc57110b9bfe3b553359eb36",
-    urls = ["https://github.com/operator-framework/operator-registry/releases/download/v1.23.0/linux-amd64-opm"],
+    sha256 = "2afbcd0728f61d07502c67b0bd36ff6f7521f1a629ff4e23ff13a59dec93eeb0",
+    urls = ["https://github.com/operator-framework/operator-registry/releases/download/v1.43.1/linux-amd64-opm"],
 )
 
 http_archive(
