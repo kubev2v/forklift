@@ -7,19 +7,7 @@ import (
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-)
-
-var (
-	// 'status' - [ executing, succeeded, failed, canceled ]
-	// 'provider' - [oVirt, vSphere, Openstack, OVA, openshift]
-	migrationGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "mtv_workload_migrations",
-		Help: "VM Migrations sorted by status and provider type",
-	},
-		[]string{"status", "provider"},
-	)
 )
 
 // Calculate Migrations metrics every 10 seconds

@@ -7,38 +7,7 @@ import (
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-)
-
-var (
-	planStatusGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "mtv_workload_plans",
-		Help: "VM migration Plans sorted by status and provider type",
-	},
-		[]string{
-			"status",
-			"provider",
-		},
-	)
-
-	planTypeGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "mtv_workload_plans_type",
-		Help: "VM migration Plans type",
-	},
-		[]string{
-			"type",
-		},
-	)
-
-	planDestinationGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "mtv_operator_destination",
-		Help: "MTV operator destination",
-	},
-		[]string{
-			"destination",
-		},
-	)
 )
 
 // Calculate Plans metrics every 10 seconds
