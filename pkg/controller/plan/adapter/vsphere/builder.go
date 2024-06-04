@@ -270,7 +270,13 @@ func (r *Builder) getSourceDetails(vm *model.VM, sourceSecret *core.Secret) (lib
 			Path:     "",
 			RawQuery: sslVerify,
 		}
-		fingerprint = host.Thumbprint
+		if r.Source.Provider.Spec.Settings[api.SDK] == api.ESXI {
+			// the SDK of ESXi doesn't return a fingerprint/thumbprint for the host
+			// so we take it from the provider instead
+			fingerprint = r.Source.Provider.Status.Fingerprint
+		} else {
+			fingerprint = host.Thumbprint
+		}
 	} else if r.Source.Provider.Spec.Settings[api.SDK] == api.ESXI {
 		libvirtURL = liburl.URL{
 			Scheme:   "esx",
