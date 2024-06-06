@@ -1,0 +1,13 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "rules",
+    srcs = ["rules.go"],
+    importpath = "github.com/konveyor/forklift-controller/pkg/monitoring/rules",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/monitoring/rules/recordingrules",
+        "@com_github_machadovilaca_operator_observability//pkg/operatorrules:go_default_library",
+        "@com_github_prometheus_operator_prometheus_operator_pkg_apis_monitoring//v1:go_default_library",
+    ],
+)
