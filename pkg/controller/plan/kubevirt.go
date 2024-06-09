@@ -39,7 +39,7 @@ import (
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
+	k8slabels "k8s.io/apimachinery/pkg/labels"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -127,7 +127,7 @@ func (r *KubeVirt) ListVMs() ([]VirtualMachine, error) {
 		context.TODO(),
 		vList,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(planLabels),
+			LabelSelector: k8slabels.SelectorFromSet(planLabels),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
@@ -231,7 +231,7 @@ func (r *KubeVirt) getImporterPods(pvc *core.PersistentVolumeClaim) (pods []core
 		podList,
 		&client.ListOptions{
 			Namespace:     r.Plan.Spec.TargetNamespace,
-			LabelSelector: labels.SelectorFromSet(map[string]string{"app": "containerized-data-importer"}),
+			LabelSelector: k8slabels.SelectorFromSet(map[string]string{"app": "containerized-data-importer"}),
 		},
 	)
 	if err != nil {
@@ -303,7 +303,7 @@ func (r *KubeVirt) DeleteJobs(vm *plan.VMStatus) (err error) {
 		context.TODO(),
 		list,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(vmLabels),
+			LabelSelector: k8slabels.SelectorFromSet(vmLabels),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
@@ -337,7 +337,7 @@ func (r *KubeVirt) DeleteJobs(vm *plan.VMStatus) (err error) {
 			context.TODO(),
 			podList,
 			&client.ListOptions{
-				LabelSelector: labels.SelectorFromSet(map[string]string{"job-name": job}),
+				LabelSelector: k8slabels.SelectorFromSet(map[string]string{"job-name": job}),
 				Namespace:     r.Plan.Spec.TargetNamespace,
 			},
 		)
@@ -372,7 +372,7 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) error {
 		context.TODO(),
 		vms,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(r.vmLabels(vm.Ref)),
+			LabelSelector: k8slabels.SelectorFromSet(r.vmLabels(vm.Ref)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
@@ -407,7 +407,7 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) error {
 		context.TODO(),
 		dvs,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(r.vmLabels(vm.Ref)),
+			LabelSelector: k8slabels.SelectorFromSet(r.vmLabels(vm.Ref)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		})
 	if err != nil {
@@ -440,7 +440,7 @@ func (r *KubeVirt) DeleteSecret(vm *plan.VMStatus) (err error) {
 		context.TODO(),
 		list,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(vmLabels),
+			LabelSelector: k8slabels.SelectorFromSet(vmLabels),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
@@ -465,7 +465,7 @@ func (r *KubeVirt) DeleteConfigMap(vm *plan.VMStatus) (err error) {
 		context.TODO(),
 		list,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(vmLabels),
+			LabelSelector: k8slabels.SelectorFromSet(vmLabels),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
@@ -490,7 +490,7 @@ func (r *KubeVirt) DeleteVM(vm *plan.VMStatus) (err error) {
 		context.TODO(),
 		list,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(vmLabels),
+			LabelSelector: k8slabels.SelectorFromSet(vmLabels),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
@@ -523,7 +523,8 @@ func (r *KubeVirt) DeleteVM(vm *plan.VMStatus) (err error) {
 }
 
 func (r *KubeVirt) DataVolumes(vm *plan.VMStatus) (dataVolumes []cdi.DataVolume, err error) {
-	secret, err := r.ensureSecret(vm.Ref, r.secretDataSetterForCDI(vm.Ref), false)
+	labels := r.vmLabels(vm.Ref)
+	secret, err := r.ensureSecret(vm.Ref, r.secretDataSetterForCDI(vm.Ref), labels)
 	if err != nil {
 		return
 	}
@@ -540,7 +541,8 @@ func (r *KubeVirt) DataVolumes(vm *plan.VMStatus) (dataVolumes []cdi.DataVolume,
 }
 
 func (r *KubeVirt) PopulatorVolumes(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, err error) {
-	secret, err := r.ensureSecret(vmRef, r.copyDataFromProviderSecret, false)
+	labels := r.vmLabels(vmRef)
+	secret, err := r.ensureSecret(vmRef, r.copyDataFromProviderSecret, labels)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -561,7 +563,7 @@ func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus, dataVolumes []cdi.DataVo
 		context.TODO(),
 		dataVolumeList,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(r.vmLabels(vm.Ref)),
+			LabelSelector: k8slabels.SelectorFromSet(r.vmLabels(vm.Ref)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		})
 	if err != nil {
@@ -618,7 +620,7 @@ func (r *KubeVirt) getDVs(vm *plan.VMStatus) (edvs []ExtendedDataVolume, err err
 		context.TODO(),
 		dvsList,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(r.vmLabels(vm.Ref)),
+			LabelSelector: k8slabels.SelectorFromSet(r.vmLabels(vm.Ref)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		})
 
@@ -644,7 +646,7 @@ func (r *KubeVirt) getPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, e
 		context.TODO(),
 		pvcsList,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(map[string]string{
+			LabelSelector: k8slabels.SelectorFromSet(map[string]string{
 				"migration": string(r.Migration.UID),
 				kVM:         vmRef.ID,
 			}),
@@ -781,7 +783,8 @@ func (r *KubeVirt) getListOptionsNamespaced() (listOptions *client.ListOptions) 
 
 // Ensure the guest conversion (virt-v2v) pod exists on the destination.
 func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, vmCr *VirtualMachine, pvcs []*core.PersistentVolumeClaim) (err error) {
-	v2vSecret, err := r.ensureSecret(vm.Ref, r.secretDataSetterForCDI(vm.Ref), false)
+	labels := r.vmLabels(vm.Ref)
+	v2vSecret, err := r.ensureSecret(vm.Ref, r.secretDataSetterForCDI(vm.Ref), labels)
 	if err != nil {
 		return
 	}
@@ -834,7 +837,7 @@ func (r *KubeVirt) EnsureOVAVirtV2VPVCStatus(vmID string) (ready bool, err error
 		context.TODO(),
 		pvcs,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(pvcLabels),
+			LabelSelector: k8slabels.SelectorFromSet(pvcLabels),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
@@ -880,7 +883,7 @@ func (r *KubeVirt) GetGuestConversionPod(vm *plan.VMStatus) (pod *core.Pod, err 
 		context.TODO(),
 		list,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(r.conversionLabels(vm.Ref, false)),
+			LabelSelector: k8slabels.SelectorFromSet(r.conversionLabels(vm.Ref, false)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		})
 	if err != nil {
@@ -986,7 +989,7 @@ func (r *KubeVirt) GetPodsWithLabels(podLabels map[string]string) (pods *core.Po
 		context.TODO(),
 		pods,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(podLabels),
+			LabelSelector: k8slabels.SelectorFromSet(podLabels),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
@@ -1027,7 +1030,7 @@ func (r *KubeVirt) DeleteHookJobs(vm *plan.VMStatus) (err error) {
 		context.TODO(),
 		list,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(vmLabels),
+			LabelSelector: k8slabels.SelectorFromSet(vmLabels),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
@@ -1507,7 +1510,7 @@ func (r *KubeVirt) findTemplate(vm *plan.VMStatus) (tmpl *template.Template, err
 		context.TODO(),
 		templateList,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(templateLabels),
+			LabelSelector: k8slabels.SelectorFromSet(templateLabels),
 			Namespace:     "openshift",
 		})
 	if err != nil {
@@ -1762,9 +1765,11 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 		},
 	})
 	if vm.LUKS.Name != "" {
-		secret, erro := r.ensureSecret(vm.Ref, r.secretLUKS(vm.LUKS.Name, r.Plan.Namespace), true)
-		if erro != nil {
-			err = liberr.Wrap(erro)
+		labels := r.vmLabels(vm.Ref)
+		labels[kLUKS] = "true"
+		var secret *core.Secret
+		if secret, err = r.ensureSecret(vm.Ref, r.secretLUKS(vm.LUKS.Name, r.Plan.Namespace), labels); err != nil {
+			err = liberr.Wrap(err)
 			return
 		}
 		volumes = append(volumes, core.Volume{
@@ -1867,7 +1872,7 @@ func (r *KubeVirt) ensureConfigMap(vmRef ref.Ref) (configMap *core.ConfigMap, er
 		context.TODO(),
 		list,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(r.vmLabels(vmRef)),
+			LabelSelector: k8slabels.SelectorFromSet(r.vmLabels(vmRef)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
@@ -1976,27 +1981,23 @@ func (r *KubeVirt) secretLUKS(name, namespace string) func(*core.Secret) error {
 }
 
 // Ensure the credential secret for the data transfer exists on the destination.
-func (r *KubeVirt) ensureSecret(vmRef ref.Ref, setSecretData func(*core.Secret) error, isLUKS bool) (secret *core.Secret, err error) {
+func (r *KubeVirt) ensureSecret(vmRef ref.Ref, setSecretData func(*core.Secret) error, labels map[string]string) (secret *core.Secret, err error) {
 	_, err = r.Source.Inventory.VM(&vmRef)
 	if err != nil {
 		return
 	}
 
-	newSecret, err := r.secret(vmRef, setSecretData, isLUKS)
+	newSecret, err := r.secret(vmRef, setSecretData, labels)
 	if err != nil {
 		return
 	}
 
 	list := &core.SecretList{}
-	secretLabels := r.vmLabels(vmRef)
-	if isLUKS {
-		secretLabels[kLUKS] = "true"
-	}
 	err = r.Destination.Client.List(
 		context.TODO(),
 		list,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(secretLabels),
+			LabelSelector: k8slabels.SelectorFromSet(labels),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
@@ -2041,11 +2042,7 @@ func (r *KubeVirt) ensureSecret(vmRef ref.Ref, setSecretData func(*core.Secret) 
 }
 
 // Build the credential secret for the data transfer (CDI importer / popoulator pod).
-func (r *KubeVirt) secret(vmRef ref.Ref, setSecretData func(*core.Secret) error, isLUKS bool) (secret *core.Secret, err error) {
-	labels := r.vmLabels(vmRef)
-	if isLUKS {
-		labels[kLUKS] = "true"
-	}
+func (r *KubeVirt) secret(vmRef ref.Ref, setSecretData func(*core.Secret) error, labels map[string]string) (secret *core.Secret, err error) {
 	secret = &core.Secret{
 		ObjectMeta: meta.ObjectMeta{
 			Labels:    labels,
@@ -2210,7 +2207,7 @@ func (r *KubeVirt) EnsurePersistentVolume(vmRef ref.Ref, persistentVolumes []cor
 		context.TODO(),
 		list,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(r.vmLabels(vmRef)),
+			LabelSelector: k8slabels.SelectorFromSet(r.vmLabels(vmRef)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		})
 	if err != nil {
@@ -2257,7 +2254,7 @@ func GetOvaPvListNfs(dClient client.Client, planID string) (pvs *core.Persistent
 		context.TODO(),
 		pvs,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(pvLabels),
+			LabelSelector: k8slabels.SelectorFromSet(pvLabels),
 		},
 	)
 	if err != nil {
@@ -2281,7 +2278,7 @@ func GetOvaPvcListNfs(dClient client.Client, planID string, planNamespace string
 		context.TODO(),
 		pvcs,
 		&client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(pvcLabels),
+			LabelSelector: k8slabels.SelectorFromSet(pvcLabels),
 			Namespace:     planNamespace,
 		},
 	)
