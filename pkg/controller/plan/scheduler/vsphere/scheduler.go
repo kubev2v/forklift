@@ -107,7 +107,7 @@ func (r *Scheduler) buildInFlight() (err error) {
 			return
 		}
 		if vmStatus.Running() {
-			r.inFlight[vm.Host] += len(vm.Disks)
+			r.inFlight[vm.Host] += r.cost(vm)
 		}
 	}
 
@@ -148,7 +148,7 @@ func (r *Scheduler) buildInFlight() (err error) {
 				}
 				return err
 			}
-			r.inFlight[vm.Host] += len(vm.Disks)
+			r.inFlight[vm.Host] += r.cost(vm)
 		}
 	}
 
@@ -169,12 +169,22 @@ func (r *Scheduler) buildPending() (err error) {
 		if !vmStatus.MarkedStarted() && !vmStatus.MarkedCompleted() {
 			pending := &pendingVM{
 				status: vmStatus,
-				cost:   len(vm.Disks),
+				cost:   r.cost(vm),
 			}
 			r.pending[vm.Host] = append(r.pending[vm.Host], pending)
 		}
 	}
 	return
+}
+
+func (r *Scheduler) cost(vm *model.VM) int {
+	if el9, _ := r.Plan.VSphereUsesEl9VirtV2v(); el9 {
+		/// virt-v2v transfers one disk at a time
+		return 1
+	} else {
+		// CDI transfers the disks in parallel by different pods
+		return len(vm.Disks)
+	}
 }
 
 // Return a map of all the VMs that could be scheduled
