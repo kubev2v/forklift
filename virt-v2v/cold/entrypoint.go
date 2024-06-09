@@ -129,13 +129,7 @@ func buildCommand() []string {
 			}
 		}
 		// Adds LUKS keys, if exist.
-		if _, err := os.Stat(LUKSDIR); os.IsNotExist(err) {
-			// do nothing
-		} else {
-			if err != nil {
-				fmt.Println("Error accessing the LUKS directory ", err)
-				os.Exit(1)
-			}
+		if _, err := os.Stat(LUKSDIR); err == nil {
 			files, err := getFilesInPath(LUKSDIR)
 			if err != nil {
 				fmt.Println("Error reading files in LUKS directory ", err)
@@ -144,6 +138,9 @@ func buildCommand() []string {
 			for _, file := range files {
 				virtV2vArgs = append(virtV2vArgs, "--key", fmt.Sprintf("all:file:%s", file))
 			}
+		} else if !os.IsNotExist(err) {
+			fmt.Println("Error accessing the LUKS directory ", err)
+			os.Exit(1)
 		}
 
 		if info, err := os.Stat(VDDK); err == nil && info.IsDir() {
