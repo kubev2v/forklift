@@ -10,8 +10,8 @@ go_library(
     importpath = "github.com/konveyor/forklift-controller/pkg/monitoring/rules/recordingrules",
     visibility = ["//visibility:public"],
     deps = [
+        "//vendor/github.com/machadovilaca/operator-observability/pkg/operatormetrics",
+        "//vendor/github.com/machadovilaca/operator-observability/pkg/operatorrules",
         "//vendor/k8s.io/apimachinery/pkg/util/intstr",
-        "@com_github_machadovilaca_operator_observability//pkg/operatormetrics:go_default_library",
-        "@com_github_machadovilaca_operator_observability//pkg/operatorrules:go_default_library",
     ],
 )

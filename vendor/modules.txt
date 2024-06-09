@@ -33,7 +33,7 @@ github.com/cespare/xxhash/v2
 # github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311
 ## explicit; go 1.15
 github.com/chenzhuoyu/base64x
-# github.com/davecgh/go-spew v1.1.1
+# github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 ## explicit
 github.com/davecgh/go-spew/spew
 # github.com/emicklei/go-restful/v3 v3.11.0
@@ -211,6 +211,10 @@ github.com/klauspost/cpuid/v2
 # github.com/leodido/go-urn v1.2.4
 ## explicit; go 1.16
 github.com/leodido/go-urn
+# github.com/machadovilaca/operator-observability v0.0.20
+## explicit; go 1.21
+github.com/machadovilaca/operator-observability/pkg/operatormetrics
+github.com/machadovilaca/operator-observability/pkg/operatorrules
 # github.com/mailru/easyjson v0.7.7
 ## explicit; go 1.12
 github.com/mailru/easyjson/buffer
@@ -350,6 +354,10 @@ github.com/pkg/errors
 # github.com/pkg/profile v1.7.0
 ## explicit; go 1.13
 github.com/pkg/profile
+# github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.68.0
+## explicit; go 1.17
+github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring
+github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1
 # github.com/prometheus/client_golang v1.17.0
 ## explicit; go 1.19
 github.com/prometheus/client_golang/prometheus
