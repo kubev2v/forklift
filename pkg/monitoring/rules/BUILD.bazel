@@ -7,7 +7,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/monitoring/rules/recordingrules",
-        "@com_github_machadovilaca_operator_observability//pkg/operatorrules:go_default_library",
-        "@com_github_prometheus_operator_prometheus_operator_pkg_apis_monitoring//v1:go_default_library",
+        "//vendor/github.com/machadovilaca/operator-observability/pkg/operatorrules",
+        "//vendor/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1:monitoring",
     ],
 )
