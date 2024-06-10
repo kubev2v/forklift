@@ -127,6 +127,11 @@ func (r *Scheduler) buildInFlight() (err error) {
 			continue
 		}
 
+		// skip archived plans
+		if p.Spec.Archived {
+			continue
+		}
+
 		// skip plans that aren't being executed
 		snapshot := p.Status.Migration.ActiveSnapshot()
 		if !snapshot.HasCondition("Executing") {
