@@ -19,6 +19,7 @@ import (
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
+	"k8s.io/utils/ptr"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
 
@@ -275,8 +276,7 @@ func (r *Client) getVM(vmRef ref.Ref) (vsphereVm *object.VirtualMachine, err err
 	}
 
 	searchIndex := object.NewSearchIndex(r.client.Client)
-	instanceUUID := false
-	vsphereRef, err := searchIndex.FindByUuid(context.TODO(), nil, vm.UUID, true, &instanceUUID)
+	vsphereRef, err := searchIndex.FindByUuid(context.TODO(), nil, vm.UUID, true, ptr.To(false))
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -318,9 +318,7 @@ func (r *Client) connect() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	url.User = liburl.UserPassword(
-		r.user(),
-		r.password())
+	url.User = liburl.UserPassword(r.user(), r.password())
 	soapClient := soap.NewClient(url, r.getInsecureSkipVerifyFlag())
 	soapClient.SetThumbprint(url.Host, r.thumbprint())
 	vimClient, err := vim25.NewClient(context.TODO(), soapClient)
