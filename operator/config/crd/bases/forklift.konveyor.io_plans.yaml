@@ -1012,6 +1012,10 @@ spec:
                         restorePowerState:
                           description: Source VM power state before migration.
                           type: string
+                        rootDisk:
+                          description: Choose the primary disk the VM boots from
+                          format: int32
+                          type: integer
                         started:
                           description: Started timestamp.
                           format: date-time
