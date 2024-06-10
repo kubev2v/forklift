@@ -24,6 +24,7 @@ import (
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
+	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
@@ -787,6 +788,10 @@ func (r *Builder) loadHosts() (err error) {
 	for i := range list.Items {
 		host := &list.Items[i]
 		ref := host.Spec.Ref
+		if !libref.Equals(&host.Spec.Provider, &r.Plan.Spec.Provider.Source) {
+			continue
+		}
+
 		if !host.Status.HasCondition(libcnd.Ready) {
 			continue
 		}

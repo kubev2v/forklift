@@ -33,10 +33,19 @@ func RefSet(ref *v1.ObjectReference) bool {
 
 // Equals comparison.
 // May be used with `nil` pointers.
-func Equals(refA, refB *v1.ObjectReference) bool {
+func DeepEquals(refA, refB *v1.ObjectReference) bool {
 	if refA == nil || refB == nil {
 		return false
 	}
 
 	return reflect.DeepEqual(refA, refB)
+}
+
+// Determind if both refs have the same name and namespace
+func Equals(refA, refB *v1.ObjectReference) bool {
+	if refA == nil || refB == nil {
+		return refA == refB
+	}
+
+	return refA.Name == refB.Name && refA.Namespace == refB.Namespace
 }
