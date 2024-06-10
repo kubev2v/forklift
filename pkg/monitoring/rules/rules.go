@@ -10,7 +10,7 @@ import (
 const (
 	forkliftPrometheusRuleName = "prometheus-forklift-rules"
 
-	prometheusLabelKey   = "prometheus.forklift.io"
+	prometheusLabelKey   = "prometheus.forklift.konveyor.io"
 	prometheusLabelValue = "true"
 
 	k8sAppLabelKey     = "k8s-app"
@@ -42,10 +42,6 @@ func BuildPrometheusRule(namespace string) (*promv1.PrometheusRule, error) {
 	return rules, nil
 }
 
-func ListRecordingRules() []operatorrules.RecordingRule {
-	return operatorrules.ListRecordingRules()
-}
-
-func ListAlerts() []promv1.Rule {
-	return operatorrules.ListAlerts()
-}
+// func ListRecordingRules() []operatorrules.RecordingRule {
+// 	return operatorrules.ListRecordingRules()
+// }
