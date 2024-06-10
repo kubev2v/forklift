@@ -99,7 +99,12 @@ func buildCommand() []string {
 	fmt.Println("Preparing virt-v2v")
 	switch source {
 	case vSphere:
-		virtV2vArgs = append(virtV2vArgs, "--root", "first", "-i", "libvirt", "-ic", os.Getenv("V2V_libvirtURL"))
+		if checkEnvVariablesSet("V2V_RootDisk") {
+			virtV2vArgs = append(virtV2vArgs, "--root", os.Getenv("V2V_RootDisk"))
+		} else {
+			virtV2vArgs = append(virtV2vArgs, "--root", "first")
+		}
+		virtV2vArgs = append(virtV2vArgs, "-i", "libvirt", "-ic", os.Getenv("V2V_libvirtURL"))
 	case OVA:
 		virtV2vArgs = append(virtV2vArgs, "-i", "ova", os.Getenv("V2V_diskPath"))
 	}
