@@ -279,6 +279,7 @@ type Disk struct {
 	Shared    bool   `json:"shared"`
 	RDM       bool   `json:"rdm"`
 	Mode      string `json:"mode,omitempty"`
+	Number    int32  `json:"number,omitempty"`
 }
 
 // Virtual Device.
