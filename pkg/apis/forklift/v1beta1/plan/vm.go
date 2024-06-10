@@ -66,7 +66,8 @@ type VMStatus struct {
 	Firmware string `json:"firmware,omitempty"`
 	// The Operating System detected by virt-v2v.
 	OperatingSystem string `json:"operatingSystem,omitempty"`
-
+	//Choose the primary disk the VM boots from
+	RootDisk int32 `json:"rootDisk,omitempty"`
 	// Conditions.
 	libcnd.Conditions `json:",inline"`
 }

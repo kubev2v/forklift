@@ -701,6 +701,7 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 // Update virtual disk devices.
 func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 	disks := []model.Disk{}
+	var diskNum int32 = 1
 	for _, dev := range devArray.VirtualDevice {
 		switch dev.(type) {
 		case *types.VirtualDisk:
@@ -712,6 +713,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					File:     backing.FileName,
 					Capacity: disk.CapacityInBytes,
 					Mode:     backing.DiskMode,
+					Number:   diskNum,
 				}
 				if backing.Datastore != nil {
 					datastoreId, _ := sanitize(backing.Datastore.Value)
@@ -721,6 +723,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					}
 				}
 				disks = append(disks, md)
+				diskNum++
 			case *types.VirtualDiskFlatVer2BackingInfo:
 				md := model.Disk{
 					Key:      disk.Key,
@@ -728,6 +731,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					Capacity: disk.CapacityInBytes,
 					Shared:   backing.Sharing != "sharingNone",
 					Mode:     backing.DiskMode,
+					Number:   diskNum,
 				}
 				if backing.Datastore != nil {
 					datastoreId, _ := sanitize(backing.Datastore.Value)
@@ -737,6 +741,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					}
 				}
 				disks = append(disks, md)
+				diskNum++
 			case *types.VirtualDiskRawDiskMappingVer1BackingInfo:
 				md := model.Disk{
 					Key:      disk.Key,
@@ -745,6 +750,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					Shared:   backing.Sharing != "sharingNone",
 					Mode:     backing.DiskMode,
 					RDM:      true,
+					Number:   diskNum,
 				}
 				if backing.Datastore != nil {
 					datastoreId, _ := sanitize(backing.Datastore.Value)
@@ -754,6 +760,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					}
 				}
 				disks = append(disks, md)
+				diskNum++
 			case *types.VirtualDiskRawDiskVer2BackingInfo:
 				md := model.Disk{
 					Key:      disk.Key,
@@ -761,8 +768,10 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					Capacity: disk.CapacityInBytes,
 					Shared:   backing.Sharing != "sharingNone",
 					RDM:      true,
+					Number:   diskNum,
 				}
 				disks = append(disks, md)
+				diskNum++
 			}
 		}
 	}
