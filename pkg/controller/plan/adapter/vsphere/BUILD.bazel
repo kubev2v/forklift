@@ -27,6 +27,7 @@ go_library(
         "//pkg/lib/condition",
         "//pkg/lib/error",
         "//pkg/lib/itinerary",
+        "//pkg/lib/ref",
         "//pkg/settings",
         "//vendor/github.com/vmware/govmomi",
         "//vendor/github.com/vmware/govmomi/find",
