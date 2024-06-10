@@ -3,8 +3,8 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "recordingrules",
     srcs = [
-        "migration.go",
-        "plan.go",
+        "migration_rules.go",
+        "plan_rules.go",
         "recording-rules.go",
     ],
     importpath = "github.com/konveyor/forklift-controller/pkg/monitoring/rules/recordingrules",

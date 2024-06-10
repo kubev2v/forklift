@@ -143,3 +143,10 @@ rules:
   verbs:
   - get
   - list
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - prometheusrules
+  verbs:
+  - get
+  - list
