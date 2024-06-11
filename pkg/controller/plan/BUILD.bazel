@@ -28,6 +28,7 @@ go_library(
         "//pkg/controller/plan/handler",
         "//pkg/controller/plan/scheduler",
         "//pkg/controller/provider/web",
+        "//pkg/controller/provider/web/vsphere",
         "//pkg/controller/validation",
         "//pkg/lib/client/openshift",
         "//pkg/lib/condition",

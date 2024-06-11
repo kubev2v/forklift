@@ -9,6 +9,7 @@ import (
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	"github.com/konveyor/forklift-controller/pkg/controller/plan/util"
 	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
 	core "k8s.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
@@ -45,12 +46,12 @@ func (r *Client) connect() (err error) {
 }
 
 // Create a VM snapshot and return its ID.
-func (r *Client) CreateSnapshot(vmRef ref.Ref) (snapshot string, err error) {
+func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (snapshot string, err error) {
 	return
 }
 
 // Remove all warm migration snapshots.
-func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy) (err error) {
+func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy, hostsFunc util.HostsFunc) (err error) {
 	return
 }
 
@@ -60,7 +61,7 @@ func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool,
 }
 
 // Set DataVolume checkpoints.
-func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []cdi.DataVolume, final bool) (err error) {
+func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []cdi.DataVolume, final bool, hostsFunc util.HostsFunc) (err error) {
 	return
 }
 

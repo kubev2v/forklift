@@ -5,6 +5,7 @@ import (
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	"github.com/konveyor/forklift-controller/pkg/controller/plan/util"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	core "k8s.io/api/core/v1"
 	cnv "kubevirt.io/api/core/v1"
@@ -103,13 +104,13 @@ type Client interface {
 	// Return whether the source VM is powered off.
 	PoweredOff(vmRef ref.Ref) (bool, error)
 	// Create a snapshot of the source VM.
-	CreateSnapshot(vmRef ref.Ref) (string, error)
+	CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (string, error)
 	// Remove all warm migration snapshots.
-	RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy) error
+	RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy, hostsFunc util.HostsFunc) error
 	// Check if a snapshot is ready to transfer.
 	CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool, err error)
 	// Set DataVolume checkpoints.
-	SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []cdi.DataVolume, final bool) (err error)
+	SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []cdi.DataVolume, final bool, hostsFunc util.HostsFunc) (err error)
 	// Close connections to the provider API.
 	Close()
 	// Finalize migrations
