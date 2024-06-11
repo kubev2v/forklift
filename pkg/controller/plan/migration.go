@@ -19,9 +19,11 @@ import (
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/scheduler"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
+	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
+	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	batchv1 "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
@@ -490,7 +492,7 @@ func (r *Migration) removeWarmSnapshots(vm *plan.VMStatus) {
 	if vm.Warm == nil {
 		return
 	}
-	if err := r.provider.RemoveSnapshots(vm.Ref, vm.Warm.Precopies); err != nil {
+	if err := r.provider.RemoveSnapshots(vm.Ref, vm.Warm.Precopies, r.loadHosts); err != nil {
 		r.Log.Error(
 			err,
 			"Failed to clean up warm migration snapshots.",
@@ -789,7 +791,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				}
 			}
 			if vm.Warm != nil {
-				err = r.provider.SetCheckpoints(vm.Ref, vm.Warm.Precopies, dataVolumes, false)
+				err = r.provider.SetCheckpoints(vm.Ref, vm.Warm.Precopies, dataVolumes, false, r.loadHosts)
 				if err != nil {
 					step.AddError(err.Error())
 					err = nil
@@ -961,8 +963,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			break
 		}
 		var snapshot string
-		snapshot, err = r.provider.CreateSnapshot(vm.Ref)
-		if err != nil {
+		if snapshot, err = r.provider.CreateSnapshot(vm.Ref, r.loadHosts); err != nil {
 			if errors.As(err, &web.ProviderNotReadyError{}) || errors.As(err, &web.ConflictError{}) {
 				return
 			}
@@ -1078,7 +1079,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			return
 		}
 		if step.MarkedCompleted() {
-			err = r.provider.RemoveSnapshots(vm.Ref, vm.Warm.Precopies)
+			err = r.provider.RemoveSnapshots(vm.Ref, vm.Warm.Precopies, r.loadHosts)
 			if err != nil {
 				r.Log.Info(
 					"Failed to clean up warm migration snapshots.",
@@ -1197,6 +1198,53 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				Durable:  true,
 			})
 	}
+
+	return
+}
+
+// Load host CRs.
+func (r *Migration) loadHosts() (hosts map[string]*v1beta1.Host, err error) {
+	list := &v1beta1.HostList{}
+	err = r.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			Namespace: r.Source.Provider.Namespace,
+		},
+	)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	hostMap := map[string]*v1beta1.Host{}
+	for i := range list.Items {
+		host := &list.Items[i]
+		ref := host.Spec.Ref
+		if !libref.Equals(&host.Spec.Provider, &r.Plan.Spec.Provider.Source) {
+			continue
+		}
+
+		if !host.Status.HasCondition(libcnd.Ready) {
+			continue
+		}
+		// it's not that great to have a vSphere-specific entity here but as we don't
+		// intend to do the same for other providers, doing it here for simplicity
+		m := &model.Host{}
+		pErr := r.Source.Inventory.Find(m, ref)
+		if pErr != nil {
+			if errors.As(pErr, &web.NotFoundError{}) {
+				continue
+			} else {
+				err = pErr
+				return
+			}
+		}
+		ref.ID = m.ID
+		ref.Name = m.Name
+		hostMap[ref.ID] = host
+	}
+
+	hosts = hostMap
 
 	return
 }
@@ -1716,7 +1764,7 @@ func (r *Migration) setDataVolumeCheckpoints(vm *plan.VMStatus) (err error) {
 	for _, disk := range disks {
 		dvs = append(dvs, *disk.DataVolume)
 	}
-	err = r.provider.SetCheckpoints(vm.Ref, vm.Warm.Precopies, dvs, vm.Phase == AddFinalCheckpoint)
+	err = r.provider.SetCheckpoints(vm.Ref, vm.Warm.Precopies, dvs, vm.Phase == AddFinalCheckpoint, r.loadHosts)
 	if err != nil {
 		return
 	}

@@ -11,6 +11,7 @@ import (
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	"github.com/konveyor/forklift-controller/pkg/controller/plan/util"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
@@ -39,7 +40,7 @@ type Client struct {
 }
 
 // Create a VM snapshot and return its ID.
-func (r *Client) CreateSnapshot(vmRef ref.Ref) (snapshot string, err error) {
+func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (snapshot string, err error) {
 	_, vmService, err := r.getVM(vmRef)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -74,7 +75,7 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref) (snapshot string, err error) {
 }
 
 // Remove all warm migration snapshots.
-func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy) (err error) {
+func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy, hostsFunc util.HostsFunc) (err error) {
 	// Snapshot removal is done in Finalize to avoid race conditions
 	return
 }
@@ -110,7 +111,7 @@ func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool,
 }
 
 // Set DataVolume checkpoints.
-func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []cdi.DataVolume, final bool) (err error) {
+func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []cdi.DataVolume, final bool, hostsFunc util.HostsFunc) (err error) {
 	n := len(precopies)
 	previous := ""
 	current := precopies[n-1].Snapshot
