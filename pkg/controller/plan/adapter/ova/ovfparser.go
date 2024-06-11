@@ -6,15 +6,28 @@ import (
 )
 
 type OvaVmconfig struct {
-	XMLName xml.Name `xml:"domain"`
-	Name    string   `xml:"name"`
-	OS      OS       `xml:"os"`
+	XMLName  xml.Name `xml:"domain"`
+	Name     string   `xml:"name"`
+	OS       OS       `xml:"os"`
+	Metadata Metadata `xml:"metadata"`
 }
 
 type OS struct {
 	Type   OSType `xml:"type"`
 	Loader Loader `xml:"loader"`
 	Nvram  Nvram  `xml:"nvram"`
+}
+
+type Metadata struct {
+	LibOsInfo LibOsInfo `xml:"libosinfo"`
+}
+
+type LibOsInfo struct {
+	V2VOS V2VOS `xml:"os"`
+}
+
+type V2VOS struct {
+	ID string `xml:"id,attr"`
 }
 
 type OSType struct {
@@ -48,7 +61,6 @@ func readConfFromXML(xmlData string) (*OvaVmconfig, error) {
 }
 
 func GetFirmwareFromConfig(vmConfigXML string) (firmware string, err error) {
-
 	xmlConf, err := readConfFromXML(vmConfigXML)
 	if err != nil {
 		return
@@ -59,4 +71,12 @@ func GetFirmwareFromConfig(vmConfigXML string) (firmware string, err error) {
 		return UEFI, nil
 	}
 	return BIOS, nil
+}
+
+func GetOperationSystemFromConfig(vmConfigXML string) (os string, err error) {
+	xmlConf, err := readConfFromXML(vmConfigXML)
+	if err != nil {
+		return
+	}
+	return xmlConf.Metadata.LibOsInfo.V2VOS.ID, nil
 }
