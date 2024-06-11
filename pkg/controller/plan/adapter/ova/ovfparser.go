@@ -10,6 +10,19 @@ import (
 type OvaVmconfig struct {
 	XMLName  xml.Name `xml:"domain"`
 	Firmware Firmware `xml:"firmware"`
+	Metadata Metadata `xml:"metadata"`
+}
+
+type Metadata struct {
+	LibOsInfo LibOsInfo `xml:"libosinfo"`
+}
+
+type LibOsInfo struct {
+	V2VOS V2VOS `xml:"os"`
+}
+
+type V2VOS struct {
+	ID string `xml:"id,attr"`
 }
 
 type Firmware struct {
@@ -34,7 +47,6 @@ func readConfFromXML(xmlData string) (*OvaVmconfig, error) {
 }
 
 func GetFirmwareFromConfig(vmConfigXML string) (firmware string, err error) {
-
 	xmlConf, err := readConfFromXML(vmConfigXML)
 	if err != nil {
 		return
@@ -45,4 +57,12 @@ func GetFirmwareFromConfig(vmConfigXML string) (firmware string, err error) {
 		err = liberr.New("failed to get the firmware type from virt-v2v config")
 	}
 	return
+}
+
+func GetOperationSystemFromConfig(vmConfigXML string) (os string, err error) {
+	xmlConf, err := readConfFromXML(vmConfigXML)
+	if err != nil {
+		return
+	}
+	return xmlConf.Metadata.LibOsInfo.V2VOS.ID, nil
 }
