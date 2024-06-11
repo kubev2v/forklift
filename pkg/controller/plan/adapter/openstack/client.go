@@ -8,6 +8,7 @@ import (
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	"github.com/konveyor/forklift-controller/pkg/controller/plan/util"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
 	libclient "github.com/konveyor/forklift-controller/pkg/lib/client/openstack"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
@@ -109,12 +110,12 @@ func (r *Client) PoweredOff(vmRef ref.Ref) (off bool, err error) {
 }
 
 // Create a snapshot of the source VM.
-func (r *Client) CreateSnapshot(vmRef ref.Ref) (imageID string, err error) {
+func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (imageID string, err error) {
 	return
 }
 
 // Remove all warm migration snapshots.
-func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy) (err error) {
+func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy, hostsFunc util.HostsFunc) (err error) {
 	return
 }
 
@@ -124,7 +125,7 @@ func (r *Client) CheckSnapshotReady(vmRef ref.Ref, imageID string) (ready bool, 
 }
 
 // Set DataVolume checkpoints.
-func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []cdi.DataVolume, final bool) error {
+func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []cdi.DataVolume, final bool, hostsFunc util.HostsFunc) error {
 	return nil
 }
 

@@ -18,6 +18,7 @@ go_library(
         "//pkg/apis/forklift/v1beta1/ref",
         "//pkg/controller/plan/adapter/base",
         "//pkg/controller/plan/context",
+        "//pkg/controller/plan/util",
         "//pkg/controller/provider/container/vsphere",
         "//pkg/controller/provider/model/vsphere",
         "//pkg/controller/provider/web",
