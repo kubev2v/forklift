@@ -7,6 +7,7 @@ import (
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	"github.com/konveyor/forklift-controller/pkg/controller/plan/util"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	core "k8s.io/api/core/v1"
@@ -34,7 +35,7 @@ func (r *Client) Close() {
 }
 
 // CreateSnapshot implements base.Client
-func (r *Client) CreateSnapshot(vmRef ref.Ref) (string, error) {
+func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (string, error) {
 	return "", nil
 }
 
@@ -123,12 +124,12 @@ func (r *Client) PoweredOff(vmRef ref.Ref) (bool, error) {
 }
 
 // RemoveSnapshots implements base.Client
-func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy) error {
+func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy, hostsFunc util.HostsFunc) error {
 	return nil
 }
 
 // SetCheckpoints implements base.Client
-func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []cdi.DataVolume, final bool) (err error) {
+func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []cdi.DataVolume, final bool, hostsFunc util.HostsFunc) (err error) {
 	return nil
 }
 
