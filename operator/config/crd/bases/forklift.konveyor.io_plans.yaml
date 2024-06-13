@@ -428,6 +428,9 @@ spec:
                         The VM Namespace
                         Only relevant for an openshift source.
                       type: string
+                    rootDisk:
+                      description: Choose the primary disk the VM boots from
+                      type: string
                     type:
                       description: Type used to qualify the name.
                       type: string

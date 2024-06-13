@@ -9,14 +9,13 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"strconv"
-
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	utils "github.com/konveyor/forklift-controller/pkg/controller/plan/util"
 	container "github.com/konveyor/forklift-controller/pkg/controller/provider/container/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
@@ -31,6 +30,7 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/utils/ptr"
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -657,17 +657,12 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 	}
 
 	var bootDisk int
-	for _, vmConf := range r.Migration.Status.VMs {
+	for _, vmConf := range r.Plan.Spec.VMs {
 		if vmConf.ID == vmRef.ID {
-			var err error
-			bootDisk, err = strconv.Atoi(vmConf.RootDisk)
-			if err != nil {
-				bootDisk = 1
-			}
+			bootDisk = utils.GetDeviceNumber(vmConf.RootDisk)
 			break
 		}
 	}
-	bootOrder := func(order uint) *uint { return &order }
 
 	for i, disk := range disks {
 		pvc := pvcMap[r.baseVolume(disk.File)]
@@ -690,9 +685,11 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 				},
 			},
 		}
+		// For multiboot VMs, if the selected boot device is the current disk,
+		// set it as the first in the boot order.
 		if bootDisk == i+1 {
-				kubevirtDisk.BootOrder = bootOrder(1)
-			}
+			kubevirtDisk.BootOrder = ptr.To(uint(1))
+		}
 		kVolumes = append(kVolumes, volume)
 		kDisks = append(kDisks, kubevirtDisk)
 	}
