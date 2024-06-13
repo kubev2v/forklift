@@ -1609,19 +1609,11 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	}
 
 	if vm.RootDisk != "" {
-		diskNum, errDisk := strconv.Atoi(vm.RootDisk)
-		if errDisk != nil {
-			return
-		}
-
-		if diskNum > 0 {
-
-			environment = append(environment,
-				core.EnvVar{
-					Name:  "V2V_RootDisk",
-					Value: vm.RootDisk,
-				})
-		}
+		environment = append(environment,
+			core.EnvVar{
+				Name:  "V2V_RootDisk",
+				Value: vm.RootDisk,
+			})
 	}
 	// pod annotations
 	annotations := map[string]string{}

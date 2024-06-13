@@ -33,6 +33,9 @@ type VM struct {
 	// Disk decryption LUKS keys
 	// +optional
 	LUKS core.ObjectReference `json:"luks" ref:"Secret"`
+	// Choose the primary disk the VM boots from
+	// +optional
+	RootDisk string `json:"rootDisk,omitempty"`
 }
 
 // Find a Hook for the specified step.
@@ -66,8 +69,7 @@ type VMStatus struct {
 	Firmware string `json:"firmware,omitempty"`
 	// The Operating System detected by virt-v2v.
 	OperatingSystem string `json:"operatingSystem,omitempty"`
-	//Choose the primary disk the VM boots from
-	RootDisk string `json:"rootDisk,omitempty"`
+
 	// Conditions.
 	libcnd.Conditions `json:",inline"`
 }
