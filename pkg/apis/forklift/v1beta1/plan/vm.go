@@ -64,6 +64,8 @@ type VMStatus struct {
 	RestorePowerState VMPowerState `json:"restorePowerState,omitempty"`
 	// The firmware type detected from the OVF file produced by virt-v2v.
 	Firmware string `json:"firmware,omitempty"`
+	// The Operating System detected by virt-v2v.
+	OperatingSystem string `json:"operatingSystem,omitempty"`
 
 	// Conditions.
 	libcnd.Conditions `json:",inline"`
