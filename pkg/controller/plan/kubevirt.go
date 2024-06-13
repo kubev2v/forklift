@@ -38,7 +38,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
 	ovfparser "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/ova"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	core "k8s.io/api/core/v1"
@@ -1610,26 +1609,18 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 		return
 	}
 
-	if vm.RootDisk > 0 {
-		vmInventory := &model.VM{}
-		err = r.Source.Inventory.Find(vmInventory, vm.Ref)
-		if err != nil {
-			err = liberr.Wrap(err, "vm", vm.Ref.String())
+	if vm.RootDisk != "" {
+		diskNum, errDisk := strconv.Atoi(vm.RootDisk)
+		if errDisk != nil {
 			return
 		}
 
-		var rootDisk string
-		for diskNum, disk := range vmInventory.Disks {
-			if disk.Number == vm.RootDisk {
-				rootDisk = fmt.Sprintf("/dev/sd%c", 'a'+(diskNum)%26)
-			}
-		}
+		if diskNum > 0 {
 
-		if rootDisk != "" {
 			environment = append(environment,
 				core.EnvVar{
 					Name:  "V2V_RootDisk",
-					Value: rootDisk,
+					Value: vm.RootDisk,
 				})
 		}
 	}

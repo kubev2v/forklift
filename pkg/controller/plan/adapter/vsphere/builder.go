@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"strconv"
+
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
@@ -498,7 +500,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	if object.Template == nil {
 		object.Template = &cnv.VirtualMachineInstanceTemplateSpec{}
 	}
-	r.mapDisks(vm, persistentVolumeClaims, object)
+	r.mapDisks(vm, vmRef, persistentVolumeClaims, object)
 	r.mapFirmware(vm, object)
 	r.mapCPU(vm, object)
 	r.mapMemory(vm, object)
@@ -635,7 +637,7 @@ func (r *Builder) mapFirmware(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	object.Template.Spec.Domain.Firmware = firmware
 }
 
-func (r *Builder) mapDisks(vm *model.VM, persistentVolumeClaims []*core.PersistentVolumeClaim, object *cnv.VirtualMachineSpec) {
+func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims []*core.PersistentVolumeClaim, object *cnv.VirtualMachineSpec) {
 	var kVolumes []cnv.Volume
 	var kDisks []cnv.Disk
 
@@ -653,6 +655,20 @@ func (r *Builder) mapDisks(vm *model.VM, persistentVolumeClaims []*core.Persiste
 			pvcMap[pvc.Annotations[AnnImportBackingFile]] = pvc
 		}
 	}
+
+	var bootDisk int
+	for _, vmConf := range r.Migration.Status.VMs {
+		if vmConf.ID == vmRef.ID {
+			var err error
+			bootDisk, err = strconv.Atoi(vmConf.RootDisk)
+			if err != nil {
+				bootDisk = 1
+			}
+			break
+		}
+	}
+	bootOrder := func(order uint) *uint { return &order }
+
 	for i, disk := range disks {
 		pvc := pvcMap[r.baseVolume(disk.File)]
 		volumeName := fmt.Sprintf("vol-%v", i)
@@ -674,6 +690,9 @@ func (r *Builder) mapDisks(vm *model.VM, persistentVolumeClaims []*core.Persiste
 				},
 			},
 		}
+		if bootDisk == i+1 {
+				kubevirtDisk.BootOrder = bootOrder(1)
+			}
 		kVolumes = append(kVolumes, volume)
 		kDisks = append(kDisks, kubevirtDisk)
 	}
