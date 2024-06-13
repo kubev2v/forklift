@@ -1124,8 +1124,9 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			return
 		}
 
-		// only for OVA, fetch config from the conversion pod
-		if r.Source.Provider.Type() == v1beta1.Ova {
+		switch r.Source.Provider.Type() {
+		case v1beta1.Ova, v1beta1.VSphere:
+			// fetch config from the conversion pod
 			pod, err := r.kubevirt.GetGuestConversionPod(vm)
 			if err != nil {
 				return err

@@ -925,14 +925,23 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 		return
 	}
 
-	firmware, err := ovfparser.GetFirmwareFromConfig(string(vmConfigXML))
-	if err != nil {
-		return
+	switch r.Source.Provider.Type() {
+	case api.Ova:
+		firmware, erro := ovfparser.GetFirmwareFromConfig(string(vmConfigXML))
+		if erro != nil {
+			err = erro
+			return
+		}
+		r.Log.Info("setting vm firmware", "vmId", vm.ID, "firmware", firmware)
+		vm.Firmware = firmware
+	case api.VSphere:
+		os, erro := ovfparser.GetOperationSystemFromConfig(string(vmConfigXML))
+		if erro != nil {
+			err = erro
+			return
+		}
+		vm.OperatingSystem = os
 	}
-
-	r.Log.Info("setting vm firmware", "vmId", vm.ID, "firmware", firmware)
-
-	vm.Firmware = firmware
 
 	shutdownURL := fmt.Sprintf("http://%s:8080/shutdown", pod.Status.PodIP)
 	resp, err = http.Post(shutdownURL, "application/json", nil)
