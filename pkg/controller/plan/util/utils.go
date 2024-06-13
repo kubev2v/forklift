@@ -2,6 +2,8 @@ package util
 
 import (
 	"math"
+	"strings"
+	"unicode"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/settings"
@@ -12,6 +14,11 @@ import (
 // its a multiple of all known hardware block sizes 512/4k/8k/32k/64k
 const (
 	DefaultAlignBlockSize = 1024 * 1024
+)
+
+// RootDisk prefix for boot order.
+const (
+	diskPrefix = "/dev/sd"
 )
 
 func roundUp(requestedSpace, multiple int64) int64 {
@@ -31,6 +38,21 @@ func CalculateSpaceWithOverhead(requestedSpace int64, volumeMode *core.Persisten
 		spaceWithOverhead = alignedSize + settings.Settings.BlockOverhead
 	}
 	return spaceWithOverhead
+}
+
+func GetDeviceNumber(deviceString string) int {
+	if !(strings.HasPrefix(deviceString, diskPrefix) && len(deviceString) > len(diskPrefix)) {
+		// In case we encounter an issue detecting the root disk order,
+		// we will return zero to avoid failing the migration due to boot orde
+		return 0
+	}
+
+	for i := len(diskPrefix); i < len(deviceString); i++ {
+		if unicode.IsLetter(rune(deviceString[i])) {
+			return int(deviceString[i] - 'a' + 1)
+		}
+	}
+	return 0
 }
 
 type HostsFunc func() (map[string]*api.Host, error)
