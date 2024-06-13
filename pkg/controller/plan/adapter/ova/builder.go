@@ -561,3 +561,7 @@ func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskNam
 	err = planbase.VolumePopulatorNotSupportedError
 	return
 }
+
+func (r *Builder) GetConversionTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error) {
+	return "", liberr.New("conversion tasks are not supported for OVA")
+}

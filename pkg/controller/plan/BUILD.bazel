@@ -27,6 +27,7 @@ go_library(
         "//pkg/controller/plan/context",
         "//pkg/controller/plan/handler",
         "//pkg/controller/plan/scheduler",
+        "//pkg/controller/plan/util",
         "//pkg/controller/provider/web",
         "//pkg/controller/validation",
         "//pkg/lib/client/openshift",
