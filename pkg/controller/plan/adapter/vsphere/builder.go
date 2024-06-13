@@ -715,12 +715,14 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 }
 
 func (r *Builder) PreferenceName(vmRef ref.Ref, configMap *core.ConfigMap) (name string, err error) {
-	vm := &model.Workload{}
-	if err = r.Source.Inventory.Find(vm, vmRef); err != nil {
-		err = liberr.Wrap(err, "vm", vmRef.String())
-		return
+	var os string
+	for _, vmConf := range r.Migration.Status.VMs {
+		if vmConf.ID == vmRef.ID {
+			os = vmConf.OperatingSystem
+			break
+		}
 	}
-	name, ok := configMap.Data[vm.GuestID]
+	name, ok := configMap.Data[os]
 	if !ok {
 		err = liberr.Wrap(err, "vm", vmRef.String())
 	}
@@ -728,19 +730,19 @@ func (r *Builder) PreferenceName(vmRef ref.Ref, configMap *core.ConfigMap) (name
 }
 
 func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err error) {
-	vm := &model.VM{}
-	err = r.Source.Inventory.Find(vm, vmRef)
-	if err != nil {
-		err = liberr.Wrap(err, "vm", vmRef.String())
-		return
+	var os string
+	for _, vmConf := range r.Migration.Status.VMs {
+		if vmConf.ID == vmRef.ID {
+			os = vmConf.OperatingSystem
+			break
+		}
 	}
 
-	var os string
-	if vm.GuestID != "" {
-		os = osMap[vm.GuestID]
-	} else if strings.Contains(vm.GuestName, "linux") || strings.Contains(vm.GuestName, "rhel") {
+	if os != "" {
+		os = osMap[os]
+	} else if strings.Contains(os, "linux") || strings.Contains(os, "rhel") {
 		os = DefaultLinux
-	} else if strings.Contains(vm.GuestName, WindowsPrefix) {
+	} else if strings.Contains(os, WindowsPrefix) {
 		os = DefaultWindows
 	} else {
 		os = Unknown
