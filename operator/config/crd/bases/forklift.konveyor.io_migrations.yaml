@@ -510,8 +510,7 @@ spec:
                       type: string
                     rootDisk:
                       description: Choose the primary disk the VM boots from
-                      format: int32
-                      type: integer
+                      type: string
                     started:
                       description: Started timestamp.
                       format: date-time
