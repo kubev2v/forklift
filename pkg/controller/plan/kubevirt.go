@@ -3,6 +3,7 @@ package plan
 import (
 	"context"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -15,6 +16,9 @@ import (
 	"time"
 
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
+	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
+	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 	template "github.com/openshift/api/template/v1"
 	"github.com/openshift/library-go/pkg/template/generator"
 	"github.com/openshift/library-go/pkg/template/templateprocessing"
@@ -2398,5 +2402,52 @@ func (r *KubeVirt) EnsurePersistentVolumeClaim(vmRef ref.Ref, persistentVolumeCl
 				vmRef.String())
 		}
 	}
+	return
+}
+
+// Load host CRs.
+func (r *KubeVirt) loadHosts() (hosts map[string]*api.Host, err error) {
+	list := &api.HostList{}
+	err = r.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			Namespace: r.Source.Provider.Namespace,
+		},
+	)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	hostMap := map[string]*api.Host{}
+	for i := range list.Items {
+		host := &list.Items[i]
+		ref := host.Spec.Ref
+		if !libref.Equals(&host.Spec.Provider, &r.Plan.Spec.Provider.Source) {
+			continue
+		}
+
+		if !host.Status.HasCondition(libcnd.Ready) {
+			continue
+		}
+		// it's not that great to have a vSphere-specific entity here but as we don't
+		// intend to do the same for other providers, doing it here for simplicity
+		m := &model.Host{}
+		pErr := r.Source.Inventory.Find(m, ref)
+		if pErr != nil {
+			if errors.As(pErr, &web.NotFoundError{}) {
+				continue
+			} else {
+				err = pErr
+				return
+			}
+		}
+		ref.ID = m.ID
+		ref.Name = m.Name
+		hostMap[ref.ID] = host
+	}
+
+	hosts = hostMap
+
 	return
 }
