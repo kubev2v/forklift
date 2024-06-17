@@ -6,12 +6,18 @@ import (
 )
 
 const (
-	Succeeded = "Succeeded"
-	Failed    = "Failed"
-	Warm      = "Warm"
-	Cold      = "Cold"
-	Local     = "Local"
-	Remote    = "Remote"
+	Succeeded = "succeeded"
+	Failed    = "failed"
+	Executing = "executing"
+	Running   = "running"
+	Pending   = "pending"
+	Canceled  = "canceled"
+	Blocked   = "blocked"
+	Ready     = "ready"
+	Warm      = "warm"
+	Cold      = "cold"
+	Local     = "local"
+	Remote    = "remote"
 )
 
 var (
@@ -21,40 +27,25 @@ var (
 		Name: "mtv_workload_migrations",
 		Help: "VM Migrations sorted by status and provider type",
 	},
-		[]string{"status", "provider"},
-	)
-)
-
-var (
-	// 'status' - [ succeeded, failed ]
-	// 'provider' - [oVirt, vSphere, Openstack, OVA, openshift]
-	planStatusGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "mtv_workload_plans",
-		Help: "VM migration Plans sorted by status and provider type",
-	},
 		[]string{
 			"status",
 			"provider",
 		},
 	)
 
-	// 'type' - [ cold, warm ]
-	planTypeGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "mtv_workload_plans_type",
-		Help: "VM migration Plans type",
+	// 'status' - [ succeeded, failed, Executing, Running, Pending, Canceled, Blocked]
+	// 'provider' - [oVirt, vSphere, Openstack, OVA, openshift]
+	// 'mode' - [Cold, Warm]
+	// 'target' - [Local, Remote]
+	planStatusCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "mtv_workload_plans_status_total",
+		Help: "VM migration Plans sorted by status and provider type",
 	},
 		[]string{
-			"type",
-		},
-	)
-
-	// 'destination' - [remote, local]
-	planDestinationGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "mtv_operator_destination",
-		Help: "MTV operator destination",
-	},
-		[]string{
-			"destination",
+			"status",
+			"provider",
+			"mode",
+			"target",
 		},
 	)
 )
