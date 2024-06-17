@@ -57,23 +57,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	if source == OVA {
-		var err error
-		xmlFilePath, err = getXMLFile(DIR, "xml")
-		if err != nil {
-			fmt.Println("Error gettin XML file:", err)
-			os.Exit(1)
-		}
+	var err error
+	xmlFilePath, err = getXMLFile(DIR, "xml")
+	if err != nil {
+		fmt.Println("Error getting XML file:", err)
+		os.Exit(1)
+	}
 
-		http.HandleFunc("/vm", vmHandler)
-		http.HandleFunc("/shutdown", shutdownHandler)
-		server = &http.Server{Addr: ":8080"}
+	http.HandleFunc("/vm", vmHandler)
+	http.HandleFunc("/shutdown", shutdownHandler)
+	server = &http.Server{Addr: ":8080"}
 
-		fmt.Println("Starting server on :8080")
-		if err := server.ListenAndServe(); err != http.ErrServerClosed {
-			fmt.Printf("Error starting server: %v\n", err)
-			os.Exit(1)
-		}
+	fmt.Println("Starting server on :8080")
+	if err := server.ListenAndServe(); err != http.ErrServerClosed {
+		fmt.Printf("Error starting server: %v\n", err)
+		os.Exit(1)
 	}
 }
 
