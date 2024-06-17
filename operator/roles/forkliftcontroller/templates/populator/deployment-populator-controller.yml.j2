@@ -5,6 +5,7 @@ metadata:
   name: {{ populator_controller_deployment_name }}
   namespace: {{ app_namespace }}
 spec:
+  replicas: {{ populator_replicas }}
   selector:
     matchLabels:
       app: {{ app_name }}

@@ -11,7 +11,11 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
@@ -21,6 +25,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
+	ocpclient "github.com/konveyor/forklift-controller/pkg/lib/client/openshift"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
 	core "k8s.io/api/core/v1"
@@ -715,6 +720,8 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 		return
 	}
 
+	r.Log.Info("Benny PopulatorVolumes", "workload", workload)
+
 	var sdToStorageClass map[string]string
 	for _, diskAttachment := range workload.DiskAttachments {
 		if diskAttachment.Disk.StorageType == "lun" {
@@ -767,30 +774,55 @@ func (r *Builder) mapStorageDomainToStorageClass() (map[string]string, error) {
 }
 
 // Get the OvirtVolumePopulator CustomResource based on the disk ID.
+// Get the OvirtVolumePopulator CustomResource based on the disk ID.
 func (r *Builder) getVolumePopulator(diskID string) (populatorCr api.OvirtVolumePopulator, err error) {
-	list := api.OvirtVolumePopulatorList{}
-	err = r.Destination.Client.List(context.TODO(), &list, &client.ListOptions{
-		Namespace: r.Plan.Spec.TargetNamespace,
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			"migration": string(r.Migration.UID),
-			"diskID":    diskID,
-		}),
-	})
+	gvk, err := utils.CalculateAPIGroup(v1beta1.OvirtVolumePopulatorKind, r.Destination.Provider, r.Plan.Secret)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
 
-	if len(list.Items) == 0 {
-		err = k8serr.NewNotFound(api.SchemeGroupVersion.WithResource("OvirtVolumePopulator").GroupResource(), diskID)
+	dynamicClient, err := dynamic.NewForConfig(ocpclient.RestCfg(r.Destination.Provider, r.Plan.Secret))
+	if err != nil {
+		err = liberr.Wrap(err)
 		return
 	}
-	if len(list.Items) > 1 {
+
+	resource := schema.GroupVersionResource{
+		Group:    gvk.Group,
+		Version:  gvk.Version,
+		Resource: "ovirtvolumepopulators",
+	}
+
+	listOptions := meta.ListOptions{
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			"migration": string(r.Migration.UID),
+			"diskID":    diskID,
+		}).String(),
+	}
+
+	unstructuredList, err := dynamicClient.Resource(resource).Namespace(r.Plan.Spec.TargetNamespace).List(context.TODO(), listOptions)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	if len(unstructuredList.Items) == 0 {
+		err = k8serr.NewNotFound(api.SchemeGroupVersion.WithResource(v1beta1.OvirtVolumePopulatorKind).GroupResource(), diskID)
+		return
+	}
+	if len(unstructuredList.Items) > 1 {
 		err = liberr.New("Multiple OvirtVolumePopulator CRs found for the same disk", "diskID", diskID)
 		return
 	}
 
-	populatorCr = list.Items[0]
+	// Convert the unstructured object to the structured type
+	populatorCr = api.OvirtVolumePopulator{}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredList.Items[0].UnstructuredContent(), &populatorCr)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
 
 	return
 }
@@ -806,7 +838,18 @@ func (r *Builder) createVolumePopulatorCR(diskAttachment model.XDiskAttachment, 
 		Scheme: providerURL.Scheme,
 		Host:   providerURL.Host,
 	}
+
+	gvk, err := utils.CalculateAPIGroup(v1beta1.OvirtVolumePopulatorKind, r.Destination.Provider, r.Plan.Secret)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
 	populatorCR := &api.OvirtVolumePopulator{
+		TypeMeta: meta.TypeMeta{
+			Kind:       gvk.Kind,
+			APIVersion: gvk.GroupVersion().String(),
+		},
 		ObjectMeta: meta.ObjectMeta{
 			GenerateName: fmt.Sprintf("%s-", diskAttachment.DiskAttachment.ID),
 			Namespace:    r.Plan.Spec.TargetNamespace,
@@ -817,19 +860,43 @@ func (r *Builder) createVolumePopulatorCR(diskAttachment model.XDiskAttachment, 
 			},
 		},
 		Spec: api.OvirtVolumePopulatorSpec{
-			EngineURL:        engineURL.String(),
-			EngineSecretName: secretName,
-			DiskID:           diskAttachment.Disk.ID,
-			TransferNetwork:  r.Plan.Spec.TransferNetwork,
+			EngineURL:       engineURL.String(),
+			SecretRef:       secretName,
+			DiskID:          diskAttachment.Disk.ID,
+			TransferNetwork: r.Plan.Spec.TransferNetwork,
 		},
 	}
-	err = r.Context.Client.Create(context.TODO(), populatorCR, &client.CreateOptions{})
+
+	// Convert the structured object to an unstructured object
+	unstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(populatorCR)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	unstructuredObj := &unstructured.Unstructured{
+		Object: unstructuredMap,
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(ocpclient.RestCfg(r.Destination.Provider, r.Plan.Secret))
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
 
-	name = populatorCR.Name
+	resource := schema.GroupVersionResource{
+		Group:    gvk.Group,
+		Version:  gvk.Version,
+		Resource: "ovirtvolumepopulators", // Use the plural form of the resource
+	}
+
+	r.Log.Info("Creating OvirtVolumePopulator", "populatorCR", populatorCR)
+	unstructuredResult, err := dynamicClient.Resource(resource).Namespace(r.Plan.Spec.TargetNamespace).Create(context.TODO(), unstructuredObj, meta.CreateOptions{})
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	name = unstructuredResult.GetName()
 	return
 }
 
@@ -877,6 +944,12 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(diskAttachment model.XDiskA
 
 	annotations[planbase.AnnDiskSource] = diskAttachment.ID
 
+	gvk, err := utils.CalculateAPIGroup(v1beta1.OvirtVolumePopulatorKind, r.Destination.Provider, r.Plan.Secret)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
 	pvc = &core.PersistentVolumeClaim{
 		ObjectMeta: meta.ObjectMeta{
 			GenerateName: fmt.Sprintf("%s-", diskAttachment.DiskAttachment.ID),
@@ -897,7 +970,7 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(diskAttachment model.XDiskA
 			StorageClassName: &storageClassName,
 			VolumeMode:       volumeMode,
 			DataSourceRef: &core.TypedObjectReference{
-				APIGroup: &api.SchemeGroupVersion.Group,
+				APIGroup: &gvk.Group,
 				Kind:     v1beta1.OvirtVolumePopulatorKind,
 				Name:     populatorName,
 			},

@@ -109,7 +109,7 @@ func executePopulationProcess(config *engineConfig, diskID, volPath, ownerUID st
 func monitorProgress(scanner *bufio.Scanner, ownerUID string, pvcSize int64, done chan struct{}) {
 	progress := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "ovirt_progress",
+			Name: "ovirt_populator_progress_total",
 			Help: "Progress of volume population",
 		},
 		[]string{"ownerUID"},

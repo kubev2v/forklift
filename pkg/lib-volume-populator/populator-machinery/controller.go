@@ -830,7 +830,7 @@ func (c *controller) updatePvc(ctx context.Context, pvc *corev1.PersistentVolume
 
 func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolumeClaim, cr *unstructured.Unstructured) error {
 	populatorKind := pvc.Spec.DataSourceRef.Kind
-	importRegExp := regexp.MustCompile("progress\\{ownerUID=\"" + string(pvc.UID) + "\"\\} (\\d+\\.?\\d*)")
+	importRegExp := regexp.MustCompile("progress_total\\{ownerUID=\"" + string(pvc.UID) + "\"\\} (\\d+\\.?\\d*)")
 
 	url, err := getMetricsURL(pod)
 	if err != nil {

@@ -21,9 +21,9 @@ type OvirtVolumePopulator struct {
 }
 
 type OvirtVolumePopulatorSpec struct {
-	EngineURL        string `json:"engineUrl"`
-	EngineSecretName string `json:"engineSecretName"`
-	DiskID           string `json:"diskId"`
+	EngineURL string `json:"engineUrl"`
+	SecretRef string `json:"secretRef"`
+	DiskID    string `json:"diskId"`
 	// The network attachment definition that should be used for disk transfer.
 	TransferNetwork *core.ObjectReference `json:"transferNetwork,omitempty"`
 }

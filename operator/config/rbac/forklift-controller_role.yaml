@@ -6,6 +6,7 @@ metadata:
 rules:
 - apiGroups:
   - forklift.konveyor.io
+  - forklift.cdi.konveyor.io
   resources:
   - '*'
   verbs:

@@ -7,10 +7,16 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	utils "github.com/konveyor/forklift-controller/pkg/controller/plan/util"
+	ocpclient "github.com/konveyor/forklift-controller/pkg/lib/client/openshift"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -21,10 +27,12 @@ type DestinationClient struct {
 
 // Delete OvirtVolumePopulator CustomResource list.
 func (r *DestinationClient) DeletePopulatorDataSource(vm *plan.VMStatus) error {
+	r.Log.Info("Benny - DeletePopulatorDataSource")
 	populatorCrList, err := r.getPopulatorCrList()
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	r.Log.Info("Benny - DeletePopulatorDataSource", "populatorCrList", populatorCrList)
 	for _, populatorCr := range populatorCrList.Items {
 		err = r.DeleteObject(&populatorCr, vm, "Deleted OvirtPopulator CR.", "OvirtVolumePopulator")
 		if err != nil {
@@ -62,15 +70,45 @@ func (r *DestinationClient) SetPopulatorCrOwnership() (err error) {
 }
 
 // Get the OvirtVolumePopulator CustomResource List.
+// Get the OvirtVolumePopulator CustomResource List.
 func (r *DestinationClient) getPopulatorCrList() (populatorCrList v1beta1.OvirtVolumePopulatorList, err error) {
+	r.Log.Info("Getting OvirtVolumePopulatorList")
 	populatorCrList = v1beta1.OvirtVolumePopulatorList{}
-	err = r.Destination.Client.List(
-		context.TODO(),
-		&populatorCrList,
-		&client.ListOptions{
-			Namespace:     r.Plan.Spec.TargetNamespace,
-			LabelSelector: labels.SelectorFromSet(map[string]string{"migration": string(r.Plan.Status.Migration.ActiveSnapshot().Migration.UID)}),
-		})
+	gvk, err := utils.CalculateAPIGroup("OvirtVolumePopulator", r.Destination.Provider, r.Plan.Referenced.Secret)
+	if err != nil {
+		r.Log.Error(err, "Error calculating API group")
+		return
+	}
+	r.Log.Info("API Group", "apiGroup", gvk)
+
+	// Create a dynamic client using the correct GVK
+	dynamicClient, err := dynamic.NewForConfig(ocpclient.RestCfg(r.Destination.Provider, r.Plan.Referenced.Secret))
+	if err != nil {
+		r.Log.Error(err, "Error creating dynamic client")
+		return
+	}
+
+	resource := schema.GroupVersionResource{
+		Group:    gvk.Group,
+		Version:  gvk.Version,
+		Resource: "ovirtvolumepopulators",
+	}
+
+	unstructuredList, err := dynamicClient.Resource(resource).Namespace(r.Plan.Spec.TargetNamespace).List(context.TODO(), meta.ListOptions{
+		LabelSelector: labels.SelectorFromSet(map[string]string{"migration": string(r.Plan.Status.Migration.ActiveSnapshot().Migration.UID)}).String(),
+	})
+	if err != nil {
+		r.Log.Info("Error listing OvirtVolumePopulator", "error", err)
+		return
+	}
+
+	// Convert the unstructured list to the structured list
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredList.UnstructuredContent(), &populatorCrList)
+	if err != nil {
+		r.Log.Info("Error converting unstructured list", "error", err)
+		return
+	}
+
 	return
 }
 

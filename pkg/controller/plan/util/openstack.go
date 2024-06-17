@@ -19,7 +19,7 @@ func OpenstackVolumePopulator(image *openstack.Image, sourceUrl *url.URL, transf
 		},
 		Spec: api.OpenstackVolumePopulatorSpec{
 			IdentityURL:     sourceUrl.String(),
-			SecretName:      secretName,
+			SecretRef:       secretName,
 			ImageID:         image.ID,
 			TransferNetwork: transferNetwork,
 		},

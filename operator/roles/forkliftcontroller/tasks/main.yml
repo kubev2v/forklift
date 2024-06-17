@@ -20,6 +20,48 @@
     set_fact:
       api_groups: "{{ lookup('k8s', cluster_info='api_groups') }}"
 
+  - name: Read the service account token
+    slurp:
+      src: /var/run/secrets/kubernetes.io/serviceaccount/token
+    register: sa_token
+
+  - name: Decode the service account token
+    set_fact:
+      k8s_auth_token: "{{ sa_token['content'] | b64decode }}"
+
+  - name: Get Kubernetes version information
+    uri:
+      url: https://kubernetes.default.svc/version
+      method: GET
+      headers:
+        Authorization: "Bearer {{ k8s_auth_token }}"
+      validate_certs: no
+    register: version_info
+
+  - name: Print Kubernetes version information for debugging
+    debug:
+      msg: "Kubernetes version: {{ version_info.json }}"
+
+  - name: Extract major version
+    set_fact:
+      major_version: "{{ version_info.json.major | int }}"
+
+  - name: Extract and clean minor version
+    set_fact:
+      minor_version: "{{ version_info.json.minor | regex_replace('[^0-9]', '') | int }}"
+
+  - name: Check Kubernetes version and set replicas
+    set_fact:
+      populator_replicas: >-
+        {{
+          0 if (major_version | int > 1) or (major_version | int == 1 and minor_version | int >= 28)
+          else 1
+        }}
+
+  - name: Print the number of replicas for debugging
+    debug:
+      msg: "Populator replicas: {{ populator_replicas }}"
+
   - when: "'route.openshift.io' not in api_groups"
     block:
     - name: "Enable k8s cluster environment"
@@ -84,7 +126,19 @@
     - name: "Setup populator controller deployment"
       k8s:
         state: "{{ volume_populator_state }}"
-        definition: "{{ lookup('template', 'populator/deployment-populator-controller.yml.j2') }}"
+        definition: "{{ lookup('template', 'populator/deployment-populator-controller.yml.j2', populator_replicas=populator_replicas) }}"
+
+
+    - name: Render the deployment template for debugging
+      template:
+        src: populator/deployment-populator-controller.yml.j2
+        dest: /tmp/deployment-populator-controller.yml
+      vars:
+        populator_replicas: "{{ populator_replicas }}"
+
+    - name: Print the rendered deployment template
+      shell: cat /tmp/deployment-populator-controller.yml
+      register: rendered_template
 
   - when: k8s_cluster|bool
     block:

@@ -72,16 +72,6 @@ spec:
       kind: Hook
       name: hooks.forklift.konveyor.io
       version: v1beta1
-    - description: oVirt Volume Populator
-      displayName: OvirtVolumePopulator
-      kind: OvirtVolumePopulator
-      name: ovirtvolumepopulators.forklift.konveyor.io
-      version: v1beta1
-    - description: OpenStack Volume Populator
-      displayName: OpenstackVolumePopulator
-      kind: OpenstackVolumePopulator
-      name: openstackvolumepopulators.forklift.konveyor.io
-      version: v1beta1
   description: |
     The Forklift Operator fully manages the deployment and life cycle of Forklift on [OpenShift](https://www.openshift.com/).
 

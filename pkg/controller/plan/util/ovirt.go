@@ -21,10 +21,10 @@ func OvirtVolumePopulator(da ovirt.XDiskAttachment, sourceUrl *url.URL, transfer
 			Labels:    map[string]string{"vmID": vmId, "migration": migrationId},
 		},
 		Spec: api.OvirtVolumePopulatorSpec{
-			EngineURL:        fmt.Sprintf("https://%s", sourceUrl.Host),
-			EngineSecretName: secretName,
-			DiskID:           da.Disk.ID,
-			TransferNetwork:  transferNetwork,
+			EngineURL:       fmt.Sprintf("https://%s", sourceUrl.Host),
+			SecretRef:       secretName,
+			DiskID:          da.Disk.ID,
+			TransferNetwork: transferNetwork,
 		},
 		Status: api.OvirtVolumePopulatorStatus{
 			Progress: "0",
