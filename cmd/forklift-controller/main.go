@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -34,13 +35,12 @@ import (
 	"github.com/pkg/profile"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	cnv "kubevirt.io/api/core/v1"
 	export "kubevirt.io/api/export/v1alpha1"
 	instancetype "kubevirt.io/api/instancetype/v1beta1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -129,50 +129,79 @@ func main() {
 		log.Error(err, "proceeding without optional kubevirt instance type APIs")
 	}
 
-	mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
-		// Setup Prometheus recording rules
-		log.Info("Setting up Prometheus recording rules")
-		namespace := "konveyor-forklift" // Replace with the appropriate namespace
-		err = rules.SetupRules(namespace)
-		if err != nil {
-			log.Error(err, "unable to set up Prometheus recording rules")
-			return err
-		}
-
-		// Build the PrometheusRule
-		promRule, err := rules.BuildPrometheusRule(namespace)
-		if err != nil {
-			log.Error(err, "unable to build PrometheusRule")
-			return err
-		}
-
-		// Create or Update the PrometheusRule in the Kubernetes cluster
-		existingPromRule := &promv1.PrometheusRule{}
-		err = mgr.GetClient().Get(context.TODO(), client.ObjectKey{
-			Namespace: namespace,
-			Name:      promRule.Name,
-		}, existingPromRule)
-		if err != nil {
-			if errors.IsNotFound(err) {
-				err = mgr.GetClient().Create(context.TODO(), promRule)
-				if err != nil {
-					log.Error(err, "unable to create PrometheusRule")
-					return err
-				}
-			} else {
-				log.Error(err, "unable to get PrometheusRule")
-				return err
+	openshift := os.Getenv("OPENSHIFT")
+	if openshift == "" {
+		openshift = "false"
+	}
+	// Clusters without OpenShift do not run OpenShift monitoring out of the box,
+	// and hence are not able to be registered to the monitoring services.
+	if openshift == "true" {
+		err = mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
+			log.Info("waiting for cache to sync")
+			if !mgr.GetCache().WaitForCacheSync(ctx) {
+				log.Error(fmt.Errorf("failed to wait for cache sync"), "cache sync failed")
+				return fmt.Errorf("failed to wait for cache sync")
 			}
-		} else {
-			promRule.ResourceVersion = existingPromRule.ResourceVersion
-			err = mgr.GetClient().Update(context.TODO(), promRule)
+
+			clientset, err := kubernetes.NewForConfig(cfg)
 			if err != nil {
-				log.Error(err, "unable to update PrometheusRule")
+				log.Error(err, "unable to create Kubernetes client")
+				os.Exit(1)
+			}
+
+			log.Info("Setting up Prometheus recording rules")
+
+			namespace := os.Getenv("POD_NAMESPACE")
+			if namespace == "" {
+				namespace = "openshift-mtv"
+			}
+			err = rules.SetupRules(namespace)
+			if err != nil {
+				log.Error(err, "unable to set up Prometheus recording rules")
 				return err
 			}
+
+			ownerRef, err := rules.GetDeploymentInfo(clientset, namespace, "forklift-controller")
+			if err != nil {
+				log.Error(err, "Failed to get owner refernce")
+			}
+
+			err = rules.PatchMonitorinLable(namespace, clientset)
+			if err != nil {
+				log.Error(err, "unable to patch monitor label")
+				return err
+			}
+
+			err = rules.CreateMetricsService(clientset, namespace, ownerRef)
+			if err != nil {
+				log.Error(err, "unable to create metrics Service")
+				return err
+			}
+
+			err = rules.CreateServiceMonitor(mgr.GetClient(), namespace, ownerRef)
+			if err != nil {
+				log.Error(err, "unable to create ServiceMonitor")
+				return err
+			}
+
+			promRule, err := rules.BuildPrometheusRule(namespace, ownerRef)
+			if err != nil {
+				log.Error(err, "unable to build PrometheusRule")
+				return err
+			}
+
+			err = rules.CreateOrUpdatePrometheusRule(mgr.GetClient(), namespace, promRule)
+			if err != nil {
+				log.Error(err, "unable to create PrometheusRule")
+				return err
+			}
+			return nil
+		}))
+		if err != nil {
+			log.Error(err, "unable to set monitoring services for telemetry")
+			os.Exit(1)
 		}
-		return nil
-	}))
+	}
 
 	// Setup all Controllers
 	log.Info("Setting up controller")
