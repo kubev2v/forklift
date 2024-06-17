@@ -43,6 +43,7 @@ go_library(
         "//vendor/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1:monitoring",
         "//vendor/github.com/prometheus/client_golang/prometheus/promhttp",
         "//vendor/k8s.io/apimachinery/pkg/api/errors",
+        "//vendor/k8s.io/client-go/kubernetes",
         "//vendor/k8s.io/client-go/plugin/pkg/client/auth/gcp",
         "//vendor/kubevirt.io/api/core/v1:core",
         "//vendor/kubevirt.io/api/export/v1alpha1",

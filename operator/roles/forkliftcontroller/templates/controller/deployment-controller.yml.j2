@@ -21,6 +21,7 @@ spec:
         app: {{ app_name }}
         control-plane: controller-manager
         controller-tools.k8s.io: "1.0"
+        prometheus.forklift.konveyor.io: "true" 
       annotations:
         configHash: "{{ (inventory_volume_path | string) }}"
     spec:
