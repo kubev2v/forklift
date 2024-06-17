@@ -10,6 +10,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+var processedPlans = make(map[string]struct{})
+
 // Calculate Plans metrics every 10 seconds
 func RecordPlanMetrics(c client.Client) {
 	go func() {
@@ -26,108 +28,73 @@ func RecordPlanMetrics(c client.Client) {
 				continue
 			}
 
-			// Holding counter vars used to make gauge update "atomic"
-			var (
-				succeededRHV, succeededOCP, succeededOVA, succeededVsphere, succeededOpenstack float64
-				failedRHV, failedOCP, failedOVA, failedVsphere, failedOpenstack                float64
-				localCluster, remoteCluster                                                    float64
-				warmMigration, coldMigration                                                   float64
-			)
-
 			for _, m := range plans.Items {
+				// save plans ID to not proccess the same plan more than once
+				if _, exists := processedPlans[string(m.UID)]; exists {
+					continue
+				} else {
+					processedPlans[string(m.UID)] = struct{}{}
+				}
+				sourceProvider := api.Provider{}
+				err = c.Get(context.TODO(), client.ObjectKey{Namespace: m.Spec.Provider.Source.Namespace, Name: m.Spec.Provider.Source.Name}, &sourceProvider)
+				if err != nil {
+					continue
+				}
 
 				destProvider := api.Provider{}
 				err := c.Get(context.TODO(), client.ObjectKey{Namespace: m.Spec.Provider.Destination.Namespace, Name: m.Spec.Provider.Destination.Name}, &destProvider)
 				if err != nil {
 					continue
 				}
-				fmt.Println("this is provider ", destProvider)
-				if destProvider.Spec.URL == "" {
-					localCluster++
+
+				isLocal := destProvider.Spec.URL == ""
+				isWarm := m.Spec.Warm
+
+				var target, mode string
+				if isLocal {
+					target = Local
 				} else {
-					remoteCluster++
+					target = Remote
+				}
+				if isWarm {
+					mode = Warm
+				} else {
+					mode = Cold
 				}
 
-				if m.Spec.Warm {
-					warmMigration++
-				} else {
-					coldMigration++
-				}
-
-				sourceProvider := api.Provider{}
-				err = c.Get(context.TODO(), client.ObjectKey{Namespace: m.Spec.Provider.Source.Namespace, Name: m.Spec.Provider.Source.Name}, &sourceProvider)
-				if err != nil {
+				if m.Status.HasCondition(Succeeded) {
+					planStatusCounter.With(prometheus.Labels{"status": Succeeded, "provider": sourceProvider.Type().String(), "mode": mode, "target": target}).Inc()
 					continue
 				}
-				if m.Status.HasCondition(Succeeded) {
-					switch sourceProvider.Type() {
-					case api.Ova:
-						succeededOVA++
-						continue
-					case api.OVirt:
-						succeededRHV++
-						continue
-					case api.VSphere:
-						succeededVsphere++
-						continue
-					case api.OpenShift:
-						succeededOCP++
-						continue
-					case api.OpenStack:
-						succeededOpenstack++
-						continue
-					}
-				}
 				if m.Status.HasCondition(Failed) {
-					switch sourceProvider.Type() {
-					case api.Ova:
-						failedOVA++
-						continue
-					case api.OVirt:
-						failedRHV++
-						continue
-					case api.VSphere:
-						failedVsphere++
-						continue
-					case api.OpenShift:
-						failedOCP++
-						continue
-					case api.OpenStack:
-						failedOpenstack++
-						continue
-					}
+					planStatusCounter.With(prometheus.Labels{"status": Failed, "provider": sourceProvider.Type().String(), "mode": mode, "target": target}).Inc()
+					continue
+				}
+				if m.Status.HasCondition(Executing) {
+					planStatusCounter.With(prometheus.Labels{"status": Executing, "provider": sourceProvider.Type().String(), "mode": mode, "target": target}).Inc()
+					continue
+				}
+				if m.Status.HasCondition(Running) {
+					planStatusCounter.With(prometheus.Labels{"status": Running, "provider": sourceProvider.Type().String(), "mode": mode, "target": target}).Inc()
+					continue
+				}
+				if m.Status.HasCondition(Pending) {
+					planStatusCounter.With(prometheus.Labels{"status": Pending, "provider": sourceProvider.Type().String(), "mode": mode, "target": target}).Inc()
+					continue
+				}
+				if m.Status.HasCondition(Canceled) {
+					planStatusCounter.With(prometheus.Labels{"status": Canceled, "provider": sourceProvider.Type().String(), "mode": mode, "target": target}).Inc()
+					continue
+				}
+				if m.Status.HasCondition(Blocked) {
+					planStatusCounter.With(prometheus.Labels{"status": Blocked, "provider": sourceProvider.Type().String(), "mode": mode, "target": target}).Inc()
+					continue
+				}
+				if m.Status.HasCondition(Ready) {
+					planStatusCounter.With(prometheus.Labels{"status": Ready, "provider": sourceProvider.Type().String(), "mode": mode, "target": target}).Inc()
+					continue
 				}
 			}
-			planTypeGauge.With(
-				prometheus.Labels{"type": Cold}).Set(coldMigration)
-			planTypeGauge.With(
-				prometheus.Labels{"type": Warm}).Set(warmMigration)
-
-			planDestinationGauge.With(
-				prometheus.Labels{"destination": Local}).Set(localCluster)
-			planDestinationGauge.With(
-				prometheus.Labels{"destination": Remote}).Set(remoteCluster)
-
-			planStatusGauge.With(
-				prometheus.Labels{"status": Succeeded, "provider": api.OVirt.String()}).Set(succeededRHV)
-			planStatusGauge.With(
-				prometheus.Labels{"status": Succeeded, "provider": api.OpenShift.String()}).Set(succeededOCP)
-			planStatusGauge.With(
-				prometheus.Labels{"status": Succeeded, "provider": api.OpenStack.String()}).Set(succeededOpenstack)
-			planStatusGauge.With(
-				prometheus.Labels{"status": Succeeded, "provider": api.Ova.String()}).Set(succeededOVA)
-			planStatusGauge.With(
-				prometheus.Labels{"status": Succeeded, "provider": api.VSphere.String()}).Set(succeededVsphere)
-			planStatusGauge.With(
-				prometheus.Labels{"status": Failed, "provider": api.OVirt.String()}).Set(failedRHV)
-			planStatusGauge.With(
-				prometheus.Labels{"status": Failed, "provider": api.OpenShift.String()}).Set(failedOCP)
-			planStatusGauge.With(
-				prometheus.Labels{"status": Failed, "provider": api.OpenStack.String()}).Set(failedOpenstack)
-			planStatusGauge.With(
-				prometheus.Labels{"status": Failed, "provider": api.Ova.String()}).Set(failedOVA)
-			planStatusGauge.With(
-				prometheus.Labels{"status": Failed, "provider": api.VSphere.String()}).Set(failedVsphere)
 		}
 	}()
 }
