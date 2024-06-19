@@ -955,10 +955,10 @@ rpm(
 )
 
 rpm(
-    name = "kernel-core-0__4.18.0-553.5.1.el8.x86_64",
-    sha256 = "a54a00fbf339b93749cc683526707f429e8800b2bedcf51b9b53fc56d95b8e5f",
+    name = "kernel-core-0__4.18.0-553.6.1.el8.x86_64",
+    sha256 = "5606355733a4fbfdf7e9e646a8fd3f796a56b2cf6e1ab72829d45dfa97d927cf",
     urls = [
-        "http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/kernel-core-4.18.0-553.5.1.el8.x86_64.rpm",
+        "http://vault.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/kernel-core-4.18.0-553.6.1.el8.x86_64.rpm",
     ],
 )
 

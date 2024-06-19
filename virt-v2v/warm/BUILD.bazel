@@ -188,7 +188,7 @@ rpmtree(
         "@jansson-0__2.14-1.el8.x86_64//rpm",
         "@json-c-0__0.13.1-3.el8.x86_64//rpm",
         "@json-glib-0__1.4.4-1.el8.x86_64//rpm",
-        "@kernel-core-0__4.18.0-553.5.1.el8.x86_64//rpm",
+        "@kernel-core-0__4.18.0-553.6.1.el8.x86_64//rpm",
         "@keyutils-0__1.5.10-9.el8.x86_64//rpm",
         "@keyutils-libs-0__1.5.10-9.el8.x86_64//rpm",
         "@kmod-0__25-20.el8.x86_64//rpm",
