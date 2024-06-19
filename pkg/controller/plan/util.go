@@ -23,3 +23,16 @@ func ensureNamespace(plan *api.Plan, client client.Client) error {
 	}
 	return err
 }
+
+// Ensure the config map exists on the destination
+func ensureConfigMap(cm *core.ConfigMap, name func(plan *api.Plan) string, plan *api.Plan, client client.Client) error {
+	cm.ObjectMeta = meta.ObjectMeta{
+		Name:      name(plan),
+		Namespace: plan.Spec.TargetNamespace,
+	}
+	err := client.Create(context.TODO(), cm)
+	if err != nil && k8serr.IsAlreadyExists(err) {
+		err = nil
+	}
+	return err
+}

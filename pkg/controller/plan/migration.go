@@ -269,6 +269,11 @@ func (r *Migration) begin() (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
+	err = r.kubevirt.EnsureExtraV2vConfConfigMap()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
 	//
 	// Delete
 	kept := []*plan.VMStatus{}
