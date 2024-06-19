@@ -3,14 +3,13 @@ package forklift_controller
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/prometheus/client_golang/prometheus"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-var processedPlans = make(map[string]struct{})
 
 // Calculate Plans metrics every 10 seconds
 func RecordPlanMetrics(c client.Client) {
@@ -28,13 +27,10 @@ func RecordPlanMetrics(c client.Client) {
 				continue
 			}
 
+			// Initialize or reset the counter map at the beginning of each iteration
+			plansCounterMap := make(map[string]float64)
+
 			for _, m := range plans.Items {
-				// save plans ID to not proccess the same plan more than once
-				if _, exists := processedPlans[string(m.UID)]; exists {
-					continue
-				} else {
-					processedPlans[string(m.UID)] = struct{}{}
-				}
 				sourceProvider := api.Provider{}
 				err = c.Get(context.TODO(), client.ObjectKey{Namespace: m.Spec.Provider.Source.Namespace, Name: m.Spec.Provider.Source.Name}, &sourceProvider)
 				if err != nil {
@@ -50,7 +46,7 @@ func RecordPlanMetrics(c client.Client) {
 				isLocal := destProvider.Spec.URL == ""
 				isWarm := m.Spec.Warm
 
-				var target, mode string
+				var target, mode, key string
 				if isLocal {
 					target = Local
 				} else {
@@ -62,38 +58,45 @@ func RecordPlanMetrics(c client.Client) {
 					mode = Cold
 				}
 
+				provider := sourceProvider.Type().String()
+
 				if m.Status.HasCondition(Succeeded) {
-					planStatusCounter.With(prometheus.Labels{"status": Succeeded, "provider": sourceProvider.Type().String(), "mode": mode, "target": target}).Inc()
-					continue
+					key = fmt.Sprintf("%s|%s|%s|%s", Succeeded, provider, mode, target)
+					plansCounterMap[key]++
 				}
 				if m.Status.HasCondition(Failed) {
-					planStatusCounter.With(prometheus.Labels{"status": Failed, "provider": sourceProvider.Type().String(), "mode": mode, "target": target}).Inc()
-					continue
+					key = fmt.Sprintf("%s|%s|%s|%s", Failed, provider, mode, target)
+					plansCounterMap[key]++
 				}
 				if m.Status.HasCondition(Executing) {
-					planStatusCounter.With(prometheus.Labels{"status": Executing, "provider": sourceProvider.Type().String(), "mode": mode, "target": target}).Inc()
-					continue
+					key = fmt.Sprintf("%s|%s|%s|%s", Executing, provider, mode, target)
+					plansCounterMap[key]++
 				}
 				if m.Status.HasCondition(Running) {
-					planStatusCounter.With(prometheus.Labels{"status": Running, "provider": sourceProvider.Type().String(), "mode": mode, "target": target}).Inc()
-					continue
+					key = fmt.Sprintf("%s|%s|%s|%s", Running, provider, mode, target)
+					plansCounterMap[key]++
 				}
 				if m.Status.HasCondition(Pending) {
-					planStatusCounter.With(prometheus.Labels{"status": Pending, "provider": sourceProvider.Type().String(), "mode": mode, "target": target}).Inc()
-					continue
+					key = fmt.Sprintf("%s|%s|%s|%s", Pending, provider, mode, target)
+					plansCounterMap[key]++
 				}
 				if m.Status.HasCondition(Canceled) {
-					planStatusCounter.With(prometheus.Labels{"status": Canceled, "provider": sourceProvider.Type().String(), "mode": mode, "target": target}).Inc()
-					continue
+					key = fmt.Sprintf("%s|%s|%s|%s", Canceled, provider, mode, target)
+					plansCounterMap[key]++
 				}
 				if m.Status.HasCondition(Blocked) {
-					planStatusCounter.With(prometheus.Labels{"status": Blocked, "provider": sourceProvider.Type().String(), "mode": mode, "target": target}).Inc()
-					continue
+					key = fmt.Sprintf("%s|%s|%s|%s", Blocked, provider, mode, target)
+					plansCounterMap[key]++
 				}
-				if m.Status.HasCondition(Ready) {
-					planStatusCounter.With(prometheus.Labels{"status": Ready, "provider": sourceProvider.Type().String(), "mode": mode, "target": target}).Inc()
-					continue
+				if m.Status.HasCondition(Deleted) {
+					key = fmt.Sprintf("%s|%s|%s|%s", Deleted, provider, mode, target)
+					plansCounterMap[key]++
 				}
+			}
+
+			for key, value := range plansCounterMap {
+				parts := strings.Split(key, "|")
+				planStatusCounter.With(prometheus.Labels{"status": parts[0], "provider": parts[1], "mode": parts[2], "target": parts[3]}).Set(value)
 			}
 		}
 	}()
