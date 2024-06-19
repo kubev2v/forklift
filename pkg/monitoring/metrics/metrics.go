@@ -1,11 +1,10 @@
-package rules
+package metrics
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 
-	"github.com/machadovilaca/operator-observability/pkg/operatorrules"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -14,45 +13,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/konveyor/forklift-controller/pkg/monitoring/rules/recordingrules"
 )
 
 const (
-	forkliftPrometheusRuleName = "prometheus-forklift-rules"
-
 	prometheusLabelKey   = "prometheus.forklift.konveyor.io"
 	prometheusLabelValue = "true"
 
 	k8sAppLabelKey     = "app"
 	forkliftLabelValue = "forklift"
 )
-
-func SetupRules(namespace string) error {
-	err := recordingrules.Register(namespace)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func BuildPrometheusRule(namespace string, ownerRef *metav1.OwnerReference) (*promv1.PrometheusRule, error) {
-	rules, err := operatorrules.BuildPrometheusRule(
-		forkliftPrometheusRuleName,
-		namespace,
-		map[string]string{
-			prometheusLabelKey: prometheusLabelValue,
-			k8sAppLabelKey:     forkliftLabelValue,
-		},
-	)
-	rules.OwnerReferences = []metav1.OwnerReference{*ownerRef}
-	if err != nil {
-		return nil, err
-	}
-
-	return rules, nil
-}
 
 func PatchMonitorinLable(namespace string, clientset *kubernetes.Clientset) (err error) {
 	labelKey := "openshift.io/cluster-monitoring"
@@ -126,7 +95,7 @@ func CreateMetricsService(clientset *kubernetes.Clientset, namespace string, own
 func CreateServiceMonitor(client client.Client, namespace string, ownerRef *metav1.OwnerReference) error {
 	serviceMonitor := &promv1.ServiceMonitor{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "forklift-servicemonitor",
+			Name:      "forklift-metrics",
 			Namespace: namespace,
 			Labels: map[string]string{
 				k8sAppLabelKey:     forkliftLabelValue,
@@ -177,32 +146,4 @@ func GetDeploymentInfo(clientset *kubernetes.Clientset, namespace, deploymentNam
 	}
 
 	return ownerRef, nil
-}
-
-func CreateOrUpdatePrometheusRule(mgr client.Client, namespace string, promRule *promv1.PrometheusRule) error {
-	existingPromRule := &promv1.PrometheusRule{}
-	err := mgr.Get(context.TODO(), client.ObjectKey{
-		Namespace: namespace,
-		Name:      promRule.Name,
-	}, existingPromRule)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			err = mgr.Create(context.TODO(), promRule)
-			if err != nil {
-				fmt.Printf("unable to create PrometheusRule: %v", err)
-				return err
-			}
-		} else {
-			fmt.Printf("unable to get PrometheusRule: %v", err)
-			return err
-		}
-	} else {
-		promRule.ResourceVersion = existingPromRule.ResourceVersion
-		err = mgr.Update(context.TODO(), promRule)
-		if err != nil {
-			fmt.Printf("unable to update PrometheusRule: %v", err)
-			return err
-		}
-	}
-	return nil
 }
