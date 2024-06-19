@@ -60,7 +60,6 @@ go_test(
         "//pkg/apis/forklift/v1beta1/plan",
         "//pkg/apis/forklift/v1beta1/ref",
         "//pkg/controller/plan/context",
-        "//pkg/controller/plan/util",
         "//pkg/controller/provider/model/vsphere",
         "//pkg/controller/provider/web",
         "//pkg/controller/provider/web/vsphere",
