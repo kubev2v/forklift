@@ -28,6 +28,7 @@ container_run_and_extract(
     name = "appliance",
     commands = [
         "set -x",
+        "sed -i 's|^#baseurl=http://mirror.centos.org/\\(.*\\)$|baseurl=http://vault.centos.org/\001|' /etc/yum.repos.d/*",
         "dnf -y update",
         "dnf -y install libguestfs-devel libguestfs-appliance libguestfs-xfs libguestfs-winsupport supermin",
         "depmod \\$(ls /lib/modules/ |tail -n1)",
