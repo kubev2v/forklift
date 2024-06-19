@@ -196,6 +196,37 @@ func (r *KubeVirt) EnsureNamespace() error {
 	return err
 }
 
+// Ensure the config map that contains extra configuration for virt-v2v exists on the destination.
+func (r *KubeVirt) EnsureExtraV2vConfConfigMap() error {
+	if len(Settings.Migration.VirtV2vExtraConfConfigMap) == 0 {
+		return nil
+	}
+	configMap := &core.ConfigMap{}
+	err := r.Client.Get(
+		context.TODO(),
+		client.ObjectKey{
+			Name:      Settings.Migration.VirtV2vExtraConfConfigMap,
+			Namespace: r.Plan.Namespace,
+		},
+		configMap,
+	)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	err = ensureConfigMap(configMap, genExtraV2vConfConfigMapName, r.Plan, r.Destination.Client)
+	if err == nil {
+		r.Log.Info(
+			"Created config map for extra configuration for virt-v2v.",
+			"target namespace",
+			r.Plan.Spec.TargetNamespace)
+	}
+	return err
+}
+
+func genExtraV2vConfConfigMapName(plan *api.Plan) string {
+	return fmt.Sprintf("%s-extra-v2v-conf", plan.Name)
+}
+
 // Get the importer pod for a PersistentVolumeClaim.
 func (r *KubeVirt) GetImporterPod(pvc core.PersistentVolumeClaim) (pod *core.Pod, found bool, err error) {
 	pod = &core.Pod{}
@@ -1800,6 +1831,20 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 		},
 	})
 
+	extraConfigMapExists := len(Settings.Migration.VirtV2vExtraConfConfigMap) > 0
+	if extraConfigMapExists {
+		volumes = append(volumes, core.Volume{
+			Name: "extra-v2v-conf",
+			VolumeSource: core.VolumeSource{
+				ConfigMap: &core.ConfigMapVolumeSource{
+					LocalObjectReference: core.LocalObjectReference{
+						Name: genExtraV2vConfConfigMapName(r.Plan),
+					},
+				},
+			},
+		})
+	}
+
 	switch r.Source.Provider.Type() {
 	case api.Ova:
 		var pvName string
@@ -1848,6 +1893,14 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 				MountPath: "/opt",
 			},
 		)
+		if extraConfigMapExists {
+			mounts = append(mounts,
+				core.VolumeMount{
+					Name:      "extra-v2v-conf",
+					MountPath: "/mnt/extra-v2v-conf",
+				},
+			)
+		}
 	}
 
 	// Temporary space for VDDK library
