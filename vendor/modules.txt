@@ -211,10 +211,6 @@ github.com/klauspost/cpuid/v2
 # github.com/leodido/go-urn v1.2.4
 ## explicit; go 1.16
 github.com/leodido/go-urn
-# github.com/machadovilaca/operator-observability v0.0.20
-## explicit; go 1.21
-github.com/machadovilaca/operator-observability/pkg/operatormetrics
-github.com/machadovilaca/operator-observability/pkg/operatorrules
 # github.com/mailru/easyjson v0.7.7
 ## explicit; go 1.12
 github.com/mailru/easyjson/buffer
@@ -354,6 +350,8 @@ github.com/pkg/errors
 # github.com/pkg/profile v1.7.0
 ## explicit; go 1.13
 github.com/pkg/profile
+# github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
+## explicit
 # github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.68.0
 ## explicit; go 1.17
 github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring
