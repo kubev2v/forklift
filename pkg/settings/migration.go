@@ -12,22 +12,23 @@ import (
 
 // Environment variables.
 const (
-	MaxVmInFlight           = "MAX_VM_INFLIGHT"
-	HookRetry               = "HOOK_RETRY"
-	ImporterRetry           = "IMPORTER_RETRY"
-	VirtV2vImage            = "VIRT_V2V_IMAGE"
-	PrecopyInterval         = "PRECOPY_INTERVAL"
-	VirtV2vDontRequestKVM   = "VIRT_V2V_DONT_REQUEST_KVM"
-	SnapshotRemovalTimeout  = "SNAPSHOT_REMOVAL_TIMEOUT"
-	SnapshotStatusCheckRate = "SNAPSHOT_STATUS_CHECK_RATE"
-	CDIExportTokenTTL       = "CDI_EXPORT_TOKEN_TTL"
-	FileSystemOverhead      = "FILESYSTEM_OVERHEAD"
-	BlockOverhead           = "BLOCK_OVERHEAD"
-	CleanupRetries          = "CLEANUP_RETRIES"
-	OvirtOsConfigMap        = "OVIRT_OS_MAP"
-	VsphereOsConfigMap      = "VSPHERE_OS_MAP"
-	VddkJobActiveDeadline   = "VDDK_JOB_ACTIVE_DEADLINE"
-	VirtV2vExtraArgs        = "VIRT_V2V_EXTRA_ARGS"
+	MaxVmInFlight             = "MAX_VM_INFLIGHT"
+	HookRetry                 = "HOOK_RETRY"
+	ImporterRetry             = "IMPORTER_RETRY"
+	VirtV2vImage              = "VIRT_V2V_IMAGE"
+	PrecopyInterval           = "PRECOPY_INTERVAL"
+	VirtV2vDontRequestKVM     = "VIRT_V2V_DONT_REQUEST_KVM"
+	SnapshotRemovalTimeout    = "SNAPSHOT_REMOVAL_TIMEOUT"
+	SnapshotStatusCheckRate   = "SNAPSHOT_STATUS_CHECK_RATE"
+	CDIExportTokenTTL         = "CDI_EXPORT_TOKEN_TTL"
+	FileSystemOverhead        = "FILESYSTEM_OVERHEAD"
+	BlockOverhead             = "BLOCK_OVERHEAD"
+	CleanupRetries            = "CLEANUP_RETRIES"
+	OvirtOsConfigMap          = "OVIRT_OS_MAP"
+	VsphereOsConfigMap        = "VSPHERE_OS_MAP"
+	VddkJobActiveDeadline     = "VDDK_JOB_ACTIVE_DEADLINE"
+	VirtV2vExtraArgs          = "VIRT_V2V_EXTRA_ARGS"
+	VirtV2vExtraConfConfigMap = "VIRT_V2V_EXTRA_CONF_CONFIG_MAP"
 )
 
 // Migration settings
@@ -65,6 +66,8 @@ type Migration struct {
 	VddkJobActiveDeadline int
 	// Additional arguments for virt-v2v
 	VirtV2vExtraArgs string
+	// Additional configuration for virt-v2v
+	VirtV2vExtraConfConfigMap string
 }
 
 // Load settings.
@@ -138,6 +141,8 @@ func (r *Migration) Load() (err error) {
 			return liberr.Wrap(err)
 		}
 	}
-
+	if val, found := os.LookupEnv(VirtV2vExtraConfConfigMap); found {
+		r.VirtV2vExtraConfConfigMap = val
+	}
 	return
 }
