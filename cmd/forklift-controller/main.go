@@ -28,7 +28,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis"
 	"github.com/konveyor/forklift-controller/pkg/controller"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	"github.com/konveyor/forklift-controller/pkg/monitoring/rules"
+	"github.com/konveyor/forklift-controller/pkg/monitoring/metrics"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	"github.com/konveyor/forklift-controller/pkg/webhook"
 	template "github.com/openshift/api/template/v1"
@@ -155,46 +155,30 @@ func main() {
 			if namespace == "" {
 				namespace = "openshift-mtv"
 			}
-			err = rules.SetupRules(namespace)
-			if err != nil {
-				log.Error(err, "unable to set up Prometheus recording rules")
-				return err
-			}
 
-			ownerRef, err := rules.GetDeploymentInfo(clientset, namespace, "forklift-controller")
+			ownerRef, err := metrics.GetDeploymentInfo(clientset, namespace, "forklift-controller")
 			if err != nil {
 				log.Error(err, "Failed to get owner refernce")
 			}
 
-			err = rules.PatchMonitorinLable(namespace, clientset)
+			err = metrics.PatchMonitorinLable(namespace, clientset)
 			if err != nil {
 				log.Error(err, "unable to patch monitor label")
 				return err
 			}
 
-			err = rules.CreateMetricsService(clientset, namespace, ownerRef)
+			err = metrics.CreateMetricsService(clientset, namespace, ownerRef)
 			if err != nil {
 				log.Error(err, "unable to create metrics Service")
 				return err
 			}
 
-			err = rules.CreateServiceMonitor(mgr.GetClient(), namespace, ownerRef)
+			err = metrics.CreateServiceMonitor(mgr.GetClient(), namespace, ownerRef)
 			if err != nil {
 				log.Error(err, "unable to create ServiceMonitor")
 				return err
 			}
 
-			promRule, err := rules.BuildPrometheusRule(namespace, ownerRef)
-			if err != nil {
-				log.Error(err, "unable to build PrometheusRule")
-				return err
-			}
-
-			err = rules.CreateOrUpdatePrometheusRule(mgr.GetClient(), namespace, promRule)
-			if err != nil {
-				log.Error(err, "unable to create PrometheusRule")
-				return err
-			}
 			return nil
 		}))
 		if err != nil {
