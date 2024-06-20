@@ -33,3 +33,5 @@ build --strategy_regexp="RunAndCommitLayer ca-certificate-from-secret-layer.tar"
 
 # For populator images, we need to use processwrapper sandbox as well
 build --strategy_regexp="RunAndCommitLayer cmd/ovirt-populator/ovirt-imageio-layer-run-layer.tar"=processwrapper-sandbox
+
+build --strategy_regexp="RunAndCommitLayer operator/forklift-operator-image-layer-run-layer.tar"=processwrapper-sandbox
