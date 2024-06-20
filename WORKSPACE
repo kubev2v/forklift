@@ -30,12 +30,6 @@ load(
     "@io_bazel_rules_docker//toolchains/docker:toolchain.bzl",
     docker_toolchain_configure = "toolchain_configure",
 )
-load("@io_bazel_rules_docker//contrib:dockerfile_build.bzl", "dockerfile_image")
-
-dockerfile_image(
-    name = "forklift-operator-image-containerfile",
-    dockerfile = "//operator:Containerfile",
-)
 
 docker_toolchain_configure(
     name = "docker_config",
@@ -3343,6 +3337,13 @@ container_pull(
     registry = "registry.access.redhat.com",
     repository = "ubi9/ubi-minimal",
     tag = "latest",
+)
+
+container_pull(
+    name = "ansible-operator",
+    registry = "quay.io",
+    repository = "operator-framework/ansible-operator",
+    tag = "main",
 )
 
 container_pull(
