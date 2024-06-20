@@ -2,6 +2,7 @@ load(
     "@io_bazel_rules_docker//container:container.bzl",
     "container_image",
 )
+load("@io_bazel_rules_docker//docker/util:run.bzl", "container_run_and_commit_layer")
 
 genrule(
     name = "kustomize_bin",
@@ -14,8 +15,33 @@ genrule(
 # 1. Build the oprator image with ansible dependencies and with roles.
 
 container_image(
+    name = "forklift-operator-base-image",
+    base = "@ansible-operator//image",
+    directory = "/opt/ansible",
+    files = [
+        "requirements.yml",
+        "roles",
+        "watches.yaml",
+    ],
+)
+
+container_run_and_commit_layer(
+    name = "forklift-operator-image-layer-run",
+    commands = [
+        "ansible-galaxy collection install -r /opt/ansible/requirements.yml && chmod -R ug+rwx /opt/ansible/.ansible",
+    ],
+    docker_run_flags = ["--entrypoint=''"],
+    image = ":forklift-operator-base-image.tar",
+)
+
+container_image(
     name = "forklift-operator-image",
-    base = "@forklift-operator-image-containerfile//image:dockerfile_image.tar",
+    base = ":forklift-operator-base-image",
+    directory = "/opt/ansible",
+    layers = [
+        ":forklift-operator-image-layer-run",
+    ],
+    user = "1001",
     visibility = ["//visibility:public"],
 )
 
