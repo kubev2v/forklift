@@ -1727,6 +1727,27 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 		},
 	})
 
+	configMap = &core.ConfigMap{}
+	cmerr := r.Client.Get(
+		context.TODO(),
+		client.ObjectKey{Name: "perf", Namespace: r.Plan.Spec.TargetNamespace},
+		configMap,
+	)
+	perfExists := cmerr == nil
+
+	if perfExists {
+		volumes = append(volumes, core.Volume{
+			Name: "perf",
+			VolumeSource: core.VolumeSource{
+				ConfigMap: &core.ConfigMapVolumeSource{
+					LocalObjectReference: core.LocalObjectReference{
+						Name: "perf",
+					},
+				},
+			},
+		})
+	}
+
 	switch r.Source.Provider.Type() {
 	case api.Ova:
 		var pvName string
@@ -1775,6 +1796,14 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 				MountPath: "/opt",
 			},
 		)
+		if perfExists {
+			mounts = append(mounts,
+				core.VolumeMount{
+					Name:      "perf",
+					MountPath: "/mnt/perf",
+				},
+			)
+		}
 	}
 
 	// Temporary space for VDDK library
