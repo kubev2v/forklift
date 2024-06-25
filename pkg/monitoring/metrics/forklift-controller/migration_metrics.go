@@ -111,8 +111,8 @@ func RecordMigrationMetrics(c client.Client) {
 
 			for key, value := range counterMap {
 				parts := strings.Split(key, "|")
-				migratioStatusCounter.With(prometheus.Labels{"status": parts[0], "provider": parts[1], "mode": parts[2], "target": parts[3]}).Set(value)
-				migratioPlanCorolationStatusnCounter.With(prometheus.Labels{"status": parts[0], "provider": parts[1], "mode": parts[2], "target": parts[3], "plan": parts[4]}).Set(value)
+				migrationStatusGauge.With(prometheus.Labels{"status": parts[0], "provider": parts[1], "mode": parts[2], "target": parts[3]}).Set(value)
+				migrationPlanCorrelationStatusGauge.With(prometheus.Labels{"status": parts[0], "provider": parts[1], "mode": parts[2], "target": parts[3], "plan": parts[4]}).Set(value)
 			}
 		}
 	}()
