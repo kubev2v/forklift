@@ -17,7 +17,7 @@ func RecordPlanMetrics(c client.Client) {
 		for {
 			time.Sleep(10 * time.Second)
 
-			// get all migration objects
+			// get all plans objects
 			plans := api.PlanList{}
 			err := c.List(context.TODO(), &plans)
 
@@ -96,7 +96,7 @@ func RecordPlanMetrics(c client.Client) {
 
 			for key, value := range plansCounterMap {
 				parts := strings.Split(key, "|")
-				planStatusCounter.With(prometheus.Labels{"status": parts[0], "provider": parts[1], "mode": parts[2], "target": parts[3]}).Set(value)
+				planStatusGauge.With(prometheus.Labels{"status": parts[0], "provider": parts[1], "mode": parts[2], "target": parts[3]}).Set(value)
 			}
 		}
 	}()
