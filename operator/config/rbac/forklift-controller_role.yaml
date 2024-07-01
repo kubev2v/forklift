@@ -143,16 +143,3 @@ rules:
   verbs:
   - get
   - list
-- apiGroups:
-  - monitoring.coreos.com
-  resources:
-  - prometheusrules
-  - servicemonitors
-  verbs:
-  - get
-  - list
-  - create
-  - update
-  - patch
-  - delete
-

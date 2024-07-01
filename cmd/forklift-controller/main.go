@@ -17,8 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"context"
-	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -28,14 +26,11 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis"
 	"github.com/konveyor/forklift-controller/pkg/controller"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	"github.com/konveyor/forklift-controller/pkg/monitoring/metrics"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	"github.com/konveyor/forklift-controller/pkg/webhook"
 	template "github.com/openshift/api/template/v1"
 	"github.com/pkg/profile"
-	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	cnv "kubevirt.io/api/core/v1"
 	export "kubevirt.io/api/export/v1alpha1"
@@ -118,75 +113,12 @@ func main() {
 		log.Error(err, "unable to add kubevirt export APIs to scheme")
 		os.Exit(1)
 	}
-	if err := promv1.AddToScheme(mgr.GetScheme()); err != nil {
-		log.Error(err, "unable to add Prometheus APIs to scheme")
-		os.Exit(1)
-	}
 	if err := template.Install(mgr.GetScheme()); err != nil {
 		log.Error(err, "proceeding without optional OpenShift template APIs")
 	}
 	if err := instancetype.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Error(err, "proceeding without optional kubevirt instance type APIs")
 	}
-
-	openshift := os.Getenv("OPENSHIFT")
-	if openshift == "" {
-		openshift = "false"
-	}
-	// Clusters without OpenShift do not run OpenShift monitoring out of the box,
-	// and hence are not able to be registered to the monitoring services.
-	if openshift == "true" {
-		err = mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
-			log.Info("waiting for cache to sync")
-			if !mgr.GetCache().WaitForCacheSync(ctx) {
-				log.Error(fmt.Errorf("failed to wait for cache sync"), "cache sync failed")
-				return fmt.Errorf("failed to wait for cache sync")
-			}
-
-			clientset, err := kubernetes.NewForConfig(cfg)
-			if err != nil {
-				log.Error(err, "unable to create Kubernetes client")
-				os.Exit(1)
-			}
-
-			log.Info("Setting up Prometheus recording rules")
-
-			namespace := os.Getenv("POD_NAMESPACE")
-			if namespace == "" {
-				namespace = "openshift-mtv"
-			}
-
-			ownerRef, err := metrics.GetDeploymentInfo(clientset, namespace, "forklift-controller")
-			if err != nil {
-				log.Error(err, "Failed to get owner refernce")
-			}
-
-			err = metrics.PatchMonitorinLable(namespace, clientset)
-			if err != nil {
-				log.Error(err, "unable to patch monitor label")
-				return err
-			}
-
-			err = metrics.CreateMetricsService(clientset, namespace, ownerRef)
-			if err != nil {
-				log.Error(err, "unable to create metrics Service")
-				return err
-			}
-
-			err = metrics.CreateServiceMonitor(mgr.GetClient(), namespace, ownerRef)
-			if err != nil {
-				log.Error(err, "unable to create ServiceMonitor")
-				return err
-			}
-
-			return nil
-		}))
-		if err != nil {
-			log.Error(err, "unable to set monitoring services for telemetry")
-			os.Exit(1)
-		}
-	}
-
 	// Setup all Controllers
 	log.Info("Setting up controller")
 	if err := controller.AddToManager(mgr); err != nil {

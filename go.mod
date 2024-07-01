@@ -21,7 +21,6 @@ require (
 	github.com/ovirt/go-ovirt v0.0.0-20230808190322-9fd1992199b2
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/profile v1.7.0
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.68.0
 	github.com/prometheus/client_golang v1.17.0
 	github.com/prometheus/client_model v0.5.0
 	github.com/prometheus/common v0.45.0
