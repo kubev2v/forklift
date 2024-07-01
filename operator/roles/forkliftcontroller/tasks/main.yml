@@ -79,6 +79,29 @@
       definition: "{{ lookup('template', 'controller/controller-scc.yml.j2') }}"
     when: not k8s_cluster|bool
 
+  - when: not k8s_cluster|bool
+    block:
+    - name: "Setup metrics service"
+      k8s:
+        state: present
+        definition: "{{ lookup('template', 'monitor/service-metrics.yml.j2') }}"
+      
+    - name: "Setup metrics service monitor"
+      k8s:
+        state: present
+        definition: "{{ lookup('template', 'monitor/servicemonitor-metrics.yml.j2') }}"
+    
+    - name: "Add monitoring label to namespace"
+      k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: "{{ app_namespace }}"
+            labels:
+              openshift.io/cluster-monitoring: "true"
+
   - when: feature_volume_populator|bool
     block:
     - name: "Setup populator controller deployment"
