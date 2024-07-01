@@ -112,3 +112,8 @@ virt_v2v_warm_image_fqin: "{{ lookup( 'env', 'VIRT_V2V_WARM_IMAGE') or lookup( '
 virt_v2v_dont_request_kvm: "{{ lookup( 'env', 'VIRT_V2V_DONT_REQUEST_KVM') }}"
 
 ova_provider_server_fqin: "{{ lookup( 'env', 'OVA_PROVIDER_SERVER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_OVA_PROVIDER_SERVER') }}"
+
+metric_service_name: "{{ app_name }}-metrics"
+metric_servicemonitor_name: "{{ app_name }}-metrics"
+metric_interval: "30s"
+metric_port_name: "metrics"

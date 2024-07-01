@@ -15,6 +15,7 @@ rules:
   - events
   - configmaps
   - secrets
+  - namespaces
   verbs:
   - '*'
 - apiGroups:
@@ -39,6 +40,10 @@ rules:
   verbs:
   - get
   - create
+  - update
+  - patch
+  - list
+  - watch
 - apiGroups:
   - apps.openshift.io
   resources:
