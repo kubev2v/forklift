@@ -1,0 +1,22 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: {{ app_name }}
+    service: {{ metric_service_name }}
+    prometheus.forklift.konveyor.io: "true"
+    control-plane: controller-manager
+    controller-tools.k8s.io: "1.0"
+  name: {{ metric_service_name }}
+  namespace: {{ app_namespace }}
+spec:
+  ports:
+  - name: {{ metric_port_name }}
+    port: 2112
+    targetPort: 2112
+    protocol: TCP
+  selector:
+    app: {{ app_name }}
+    prometheus.forklift.konveyor.io: "true"
+    controller-tools.k8s.io: "1.0"

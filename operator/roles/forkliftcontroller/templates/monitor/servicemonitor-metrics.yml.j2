@@ -1,0 +1,21 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ metric_servicemonitor_name }}
+  namespace: {{ app_namespace }}
+  labels:
+    app: {{ app_name }}
+    prometheus.forklift.konveyor.io: "true"
+    control-plane: controller-manager
+spec:
+  endpoints:
+    - interval: {{ metric_interval }}
+      port: {{ metric_port_name }}
+  namespaceSelector:
+    matchNames:
+      - {{ app_namespace }}
+  selector:
+    matchLabels:
+      app: {{ app_name }}
+      prometheus.forklift.konveyor.io: "true"
