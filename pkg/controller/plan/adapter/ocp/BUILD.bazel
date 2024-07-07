@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "ocp",
@@ -7,7 +7,6 @@ go_library(
         "builder.go",
         "client.go",
         "destinationclient.go",
-        "util.go",
         "validator.go",
     ],
     importpath = "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/ocp",
@@ -37,11 +36,4 @@ go_library(
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client/config",
     ],
-)
-
-go_test(
-    name = "ocp_test",
-    srcs = ["util_test.go"],
-    embed = [":ocp"],
-    deps = ["//pkg/apis/forklift/v1beta1/ref"],
 )
