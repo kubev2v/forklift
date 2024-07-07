@@ -7,8 +7,10 @@ import (
 
 	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/util"
 	ocp "github.com/konveyor/forklift-controller/pkg/lib/client/openshift"
+	ocpclient "github.com/konveyor/forklift-controller/pkg/lib/client/openshift"
 	admissionv1 "k8s.io/api/admission/v1beta1"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -78,9 +80,10 @@ func (mutator *PlanMutator) setTransferNetworkIfNotSet() (bool, error) {
 		}
 
 		if network := targetProvider.Annotations["forklift.konveyor.io/defaultTransferNetwork"]; network != "" {
+			name, namespace := ocpclient.GetNetworkNameAndNamespace(network, &ref.Ref{Name: network, Namespace: mutator.plan.Spec.TargetNamespace})
 			key := client.ObjectKey{
-				Namespace: mutator.plan.Spec.TargetNamespace,
-				Name:      network,
+				Namespace: namespace,
+				Name:      name,
 			}
 
 			var tcl client.Client // target client, i.e., client to a possibly remote cluster
@@ -111,8 +114,8 @@ func (mutator *PlanMutator) setTransferNetworkIfNotSet() (bool, error) {
 			if err = tcl.Get(context.TODO(), key, netAttachDef); err == nil {
 				log.Info("Patching the plan's transfer network")
 				mutator.plan.Spec.TransferNetwork = &core.ObjectReference{
-					Name:      network,
-					Namespace: mutator.plan.Spec.TargetNamespace,
+					Namespace: key.Namespace,
+					Name:      key.Name,
 				}
 				planChanged = true
 			} else if !k8serr.IsNotFound(err) { // TODO: else if !NotFound ...
