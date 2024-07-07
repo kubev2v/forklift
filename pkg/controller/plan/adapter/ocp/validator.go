@@ -10,6 +10,7 @@ import (
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
+	ocpclient "github.com/konveyor/forklift-controller/pkg/lib/client/openshift"
 	core "k8s.io/api/core/v1"
 	cnv "kubevirt.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -164,7 +165,7 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 				return false, err
 			}
 		} else if net.Multus != nil {
-			name, namespace := GetNetworkNameAndNamespace(net.Multus.NetworkName, &vmRef)
+			name, namespace := ocpclient.GetNetworkNameAndNamespace(net.Multus.NetworkName, &vmRef)
 			_, found := r.plan.Referenced.Map.Network.FindNetworkByNameAndNamespace(namespace, name)
 			if !found {
 				err = liberr.Wrap(
