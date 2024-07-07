@@ -11,6 +11,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/apis/forklift/v1beta1",
+        "//pkg/apis/forklift/v1beta1/ref",
         "//pkg/forklift-api/webhooks/util",
         "//pkg/lib/client/openshift",
         "//pkg/lib/error",
