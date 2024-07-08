@@ -98,6 +98,8 @@ const (
 	OvaPVLabel  = "nfs-pv"
 )
 
+const ExtraV2vConf = "extra-v2v-conf"
+
 // Map of VirtualMachines keyed by vmID.
 type VirtualMachineMap map[string]VirtualMachine
 
@@ -224,7 +226,7 @@ func (r *KubeVirt) EnsureExtraV2vConfConfigMap() error {
 }
 
 func genExtraV2vConfConfigMapName(plan *api.Plan) string {
-	return fmt.Sprintf("%s-extra-v2v-conf", plan.Name)
+	return fmt.Sprintf("%s-%s", plan.Name, ExtraV2vConf)
 }
 
 // Get the importer pod for a PersistentVolumeClaim.
@@ -1834,7 +1836,7 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 	extraConfigMapExists := len(Settings.Migration.VirtV2vExtraConfConfigMap) > 0
 	if extraConfigMapExists {
 		volumes = append(volumes, core.Volume{
-			Name: "extra-v2v-conf",
+			Name: ExtraV2vConf,
 			VolumeSource: core.VolumeSource{
 				ConfigMap: &core.ConfigMapVolumeSource{
 					LocalObjectReference: core.LocalObjectReference{
@@ -1896,8 +1898,8 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 		if extraConfigMapExists {
 			mounts = append(mounts,
 				core.VolumeMount{
-					Name:      "extra-v2v-conf",
-					MountPath: "/mnt/extra-v2v-conf",
+					Name:      ExtraV2vConf,
+					MountPath: fmt.Sprintf("/mnt/%s", ExtraV2vConf),
 				},
 			)
 		}
