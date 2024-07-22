@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	_ "embed"
 	"encoding/json"
@@ -11,8 +10,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -25,10 +24,6 @@ const (
 	LUKSDIR = "/etc/luks"
 )
 
-var UEFI_RE = regexp.MustCompile(`(?i)UEFI\s+bootloader?`)
-var firmware = "bios"
-var nameChanged bool
-
 var (
 	yamlFilePath string
 	server       *http.Server
@@ -36,6 +31,9 @@ var (
 
 const LETTERS = "abcdefghijklmnopqrstuvwxyz"
 const LETTERS_LENGTH = len(LETTERS)
+
+var firmware = "bios"
+var nameChanged bool
 
 func main() {
 	source := os.Getenv("V2V_source")
@@ -63,18 +61,18 @@ func main() {
 	}
 
 	var err error
-	xmlFilePath, err = getXMLFile(DIR, "xml")
+	yamlFilePath, err = getYamlFile(DIR, "yaml")
 	if err != nil {
-		fmt.Println("Error getting XML file:", err)
+		fmt.Println("Error getting YAML file:", err)
 		os.Exit(1)
 	}
 
-	err = customizeVM(source, xmlFilePath)
+	err = customizeVM(source, yamlFilePath)
 	if err != nil {
 		fmt.Println("Warning customizing the VM failed:", err)
 	}
 
-	http.HandleFunc("/ovf", ovfHandler)
+	http.HandleFunc("/vm", vmHandler)
 	http.HandleFunc("/shutdown", shutdownHandler)
 	server = &http.Server{Addr: ":8080"}
 
@@ -202,6 +200,7 @@ func buildCommand() []string {
 	}
 
 	virtV2vArgs = append(virtV2vArgs, "-os", DIR)
+
 	//Disks on filesystem storage.
 	if err := LinkDisks(FS, 15); err != nil {
 		os.Exit(1)
@@ -345,71 +344,33 @@ func LinkDisks(diskKind string, num int) (err error) {
 	return
 }
 
-func executeVirtV2v(args []string, source string) (err error) {
-	virtV2vCmd := exec.Command(args[0], args[1:]...)
-	virtV2vStdoutPipe, err := virtV2vCmd.StdoutPipe()
-	if err != nil {
-		fmt.Printf("Error setting up stdout pipe: %v\n", err)
-		return
-	}
-	teeOut := io.TeeReader(virtV2vStdoutPipe, os.Stdout)
+func executeVirtV2v(args []string) error {
+	v2vCmd := exec.Command("virt-v2v", args...)
+	monitorCmd := exec.Command("/usr/local/bin/virt-v2v-monitor")
+	monitorCmd.Stdout = os.Stdout
+	monitorCmd.Stderr = os.Stderr
 
-	var teeErr io.Reader
-	if source == OVA {
-		virtV2vStderrPipe, err := virtV2vCmd.StderrPipe()
-		if err != nil {
-			fmt.Printf("Error setting up stdout pipe: %v\n", err)
-			return err
-		}
-		teeErr = io.TeeReader(virtV2vStderrPipe, os.Stderr)
-	} else {
-		virtV2vCmd.Stderr = os.Stderr
-	}
+	var writer *io.PipeWriter
+	monitorCmd.Stdin, writer = io.Pipe()
+	v2vCmd.Stdout = writer
+	v2vCmd.Stderr = writer
+	defer writer.Close()
 
-	fmt.Println("exec ", virtV2vCmd)
-	if err = virtV2vCmd.Start(); err != nil {
-		fmt.Printf("Error executing command: %v\n", err)
-		return
-	}
-
-	virtV2vMonitorCmd := exec.Command("/usr/local/bin/virt-v2v-monitor")
-	virtV2vMonitorCmd.Stdin = teeOut
-	virtV2vMonitorCmd.Stdout = os.Stdout
-	virtV2vMonitorCmd.Stderr = os.Stderr
-
-	if err = virtV2vMonitorCmd.Start(); err != nil {
+	if err := monitorCmd.Start(); err != nil {
 		fmt.Printf("Error executing monitor command: %v\n", err)
 		return err
 	}
 
-	if source == OVA {
-		scanner := bufio.NewScanner(teeErr)
-		const maxCapacity = 1024 * 1024
-		buf := make([]byte, 0, 64*1024)
-		scanner.Buffer(buf, maxCapacity)
-
-		for scanner.Scan() {
-			line := scanner.Bytes()
-			if match := UEFI_RE.FindSubmatch(line); match != nil {
-				fmt.Println("UEFI firmware detected")
-				firmware = "efi"
-			}
-		}
-
-		if err = scanner.Err(); err != nil {
-			fmt.Println("Output query failed:", err)
-			return err
-		}
-	}
-
-	if err = virtV2vCmd.Wait(); err != nil {
-		fmt.Printf("Error waiting for virt-v2v to finish: %v\n", err)
-		return
+	fmt.Println("exec:", v2vCmd)
+	if err := v2vCmd.Run(); err != nil {
+		fmt.Printf("Error executing v2v command: %v\n", err)
+		return err
 	}
 
 	// virt-v2v is done, we can close the pipe to virt-v2v-monitor
 	writer.Close()
 
+	if err := monitorCmd.Wait(); err != nil {
 		fmt.Printf("Error waiting for virt-v2v-monitor to finish: %v\n", err)
 		return err
 	}
@@ -449,7 +410,6 @@ func vmHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error writing response", http.StatusInternalServerError)
 	}
 }
-
 
 func shutdownHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Shutdown request received. Shutting down server.")
