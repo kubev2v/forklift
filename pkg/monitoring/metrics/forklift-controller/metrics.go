@@ -87,7 +87,7 @@ var (
 	// 'mode' - [Cold, Warm]
 	// 'target' - [Local, Remote]
 	// 'plan' - [Id]
-	migrationPlanCorrelationStatuCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+	migrationPlanCorrelationStatusCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "mtv_workload_migrations_status_total",
 		Help: "VM Migrations status by provider, mode, destination and plan",
 	},
