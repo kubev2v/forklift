@@ -72,8 +72,7 @@ func RecordMigrationMetrics(c client.Client) {
 						switch status {
 						case Succeeded:
 							if _, exists := processedSucceededMigrations[string(m.UID)]; !exists {
-								migrationStatusCounter.With(prometheus.Labels{"status": Succeeded, "provider": provider, "mode": mode, "target": target}).Inc()
-								migrationPlanCorrelationStatuCounter.With(prometheus.Labels{"status": Succeeded, "provider": provider, "mode": mode, "target": target, "plan": string(plan.UID)}).Inc()
+								updateMetricsCount(status, provider, mode, target, string(plan.UID))
 
 								startTime := m.Status.Started.Time
 								endTime := m.Status.Completed.Time
@@ -98,14 +97,12 @@ func RecordMigrationMetrics(c client.Client) {
 							}
 						case Failed:
 							if _, exists := processedFailedMigrations[string(m.UID)]; !exists {
-								migrationStatusCounter.With(prometheus.Labels{"status": Failed, "provider": provider, "mode": mode, "target": target}).Inc()
-								migrationPlanCorrelationStatuCounter.With(prometheus.Labels{"status": Failed, "provider": provider, "mode": mode, "target": target, "plan": string(plan.UID)}).Inc()
+								updateMetricsCount(status, provider, mode, target, string(plan.UID))
 								processedFailedMigrations[string(m.UID)] = struct{}{}
 							}
 						case Canceled:
 							if _, exists := processedCanceledMigrations[string(m.UID)]; !exists {
-								migrationStatusCounter.With(prometheus.Labels{"status": Canceled, "provider": provider, "mode": mode, "target": target}).Inc()
-								migrationPlanCorrelationStatuCounter.With(prometheus.Labels{"status": Canceled, "provider": provider, "mode": mode, "target": target, "plan": string(plan.UID)}).Inc()
+								updateMetricsCount(status, provider, mode, target, string(plan.UID))
 								processedCanceledMigrations[string(m.UID)] = struct{}{}
 							}
 						}
@@ -114,4 +111,9 @@ func RecordMigrationMetrics(c client.Client) {
 			}
 		}
 	}()
+}
+
+func updateMetricsCount(status, provider, mode, target, plan string) {
+	migrationStatusCounter.With(prometheus.Labels{"status": status, "provider": provider, "mode": mode, "target": target}).Inc()
+	migrationPlanCorrelationStatusCounter.With(prometheus.Labels{"status": status, "provider": provider, "mode": mode, "target": target, "plan": plan}).Inc()
 }
