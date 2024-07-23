@@ -70,6 +70,8 @@ const (
 	unsupportedVersion            = "UnsupportedVersion"
 	VDDKInvalid                   = "VDDKInvalid"
 	ValidatingVDDK                = "ValidatingVDDK"
+	VDDKInitImageNotReady         = "VDDKInitImageNotReady"
+	VDDKInitImageUnavailable      = "VDDKInitImageUnavailable"
 )
 
 // Categories
@@ -784,6 +786,15 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 	return
 }
 
+func jobExceedsDeadline(job *batchv1.Job) bool {
+	ActiveDeadlineSeconds := settings.Settings.Migration.VddkJobActiveDeadline
+
+	if job.Status.StartTime == nil {
+		return false
+	}
+	return meta.Now().Sub(job.Status.StartTime.Time).Seconds() > float64(ActiveDeadlineSeconds)
+}
+
 func (r *Reconciler) validateVddkImageJob(job *batchv1.Job, plan *api.Plan) (err error) {
 	image := plan.Referenced.Provider.Source.Spec.Settings[api.VDDK]
 	vddkInvalid := libcnd.Condition{
@@ -805,6 +816,51 @@ func (r *Reconciler) validateVddkImageJob(job *batchv1.Job, plan *api.Plan) (err
 		r.Log.Info("validation of VDDK job is in progress", "image", image)
 		plan.Status.SetCondition(vddkValidationInProgress)
 	}
+	var ctx *plancontext.Context
+	ctx, err = plancontext.New(r, plan, r.Log)
+	if err != nil {
+		return
+	}
+	// check if a pod exists for the job
+	pods := &core.PodList{}
+	if err = ctx.Destination.Client.List(context.TODO(), pods, &client.ListOptions{
+		Namespace:     plan.Spec.TargetNamespace,
+		LabelSelector: labels.SelectorFromSet(map[string]string{"job-name": job.Name}),
+	}); err != nil {
+		return
+	}
+	if len(pods.Items) > 0 {
+		pod := pods.Items[0]
+		if len(pod.Status.InitContainerStatuses) == 0 {
+			return liberr.New("Validation pod doesn't contain expected init container", "pod", pod)
+		}
+		waiting := pod.Status.InitContainerStatuses[0].State.Waiting
+		if waiting != nil {
+			if jobExceedsDeadline(job) {
+				// If we've exceeded the deadline, set a `warning` condition to increase
+				// severity. Don't set it as `critical` because the job will continue retrying
+				// indefinitely until the pull succeeds or the provider's vddk init image URL is
+				// updated.
+				plan.Status.SetCondition(libcnd.Condition{
+					Type:     VDDKInitImageUnavailable,
+					Status:   True,
+					Reason:   waiting.Reason,
+					Category: Critical,
+					Message:  "Unable to Pull VDDK init image. Check that the image URL is correct.",
+				})
+			} else {
+				plan.Status.SetCondition(libcnd.Condition{
+					Type:     VDDKInitImageNotReady,
+					Status:   True,
+					Reason:   waiting.Reason,
+					Category: Advisory,
+					Message:  waiting.Message,
+				})
+			}
+		} else {
+			plan.Status.DeleteCondition(VDDKInitImageNotReady)
+		}
+	}
 	for _, condition := range job.Status.Conditions {
 		switch condition.Type {
 		case batchv1.JobComplete:
@@ -819,7 +875,52 @@ func (r *Reconciler) validateVddkImageJob(job *batchv1.Job, plan *api.Plan) (err
 			err = liberr.New("validation of VDDK job has an unexpected condition", "type", condition.Type)
 		}
 	}
+
 	return
+}
+
+// Cancel all other vddk validation jobs that are currently running for the
+// plan. This is necessary because validation jobs do not have a deadline,
+// so they will keep trying indefinitely if they can't pull the image. If the
+// VDDK URL is later changed, we will launch a new validation job, and the old
+// validation job is no longer relevant, so we can just kill it.
+func (r *Reconciler) cancelOtherActiveVddkCheckJobs(plan *api.Plan) (err error) {
+	ctx, err := plancontext.New(r, plan, r.Log)
+	if err != nil {
+		return
+	}
+	jobLabels := getVddkImageValidationJobLabels(ctx.Plan)
+
+	queryLabels := make(map[string]string, 1)
+	queryLabels["plan"] = jobLabels["plan"]
+	delete(queryLabels, "vddk")
+
+	jobs := &batchv1.JobList{}
+	if err = ctx.Destination.Client.List(
+		context.TODO(),
+		jobs,
+		&client.ListOptions{
+			LabelSelector: labels.SelectorFromSet(queryLabels),
+			Namespace:     plan.Spec.TargetNamespace,
+		},
+	); err != nil {
+		return
+	}
+
+	for _, job := range jobs.Items {
+		if job.Status.Active > 0 && job.Labels["vddk"] != jobLabels["vddk"] {
+			r.Log.Info("Another validation job is active for this plan. Stopping...", "job", job)
+			// make sure to delete the pod associated with this job so that it doesn't
+			// become orphaned while trying to pull its image indefinitely
+			fg := meta.DeletePropagationForeground
+			opts := &client.DeleteOptions{PropagationPolicy: &fg}
+			if err = ctx.Destination.Client.Delete(context.TODO(), &job, opts); err != nil {
+				return
+			}
+		}
+	}
+
+	return nil
 }
 
 func (r *Reconciler) ensureVddkImageValidationJob(plan *api.Plan) (*batchv1.Job, error) {
@@ -831,6 +932,8 @@ func (r *Reconciler) ensureVddkImageValidationJob(plan *api.Plan) (*batchv1.Job,
 	if err = r.ensureNamespace(ctx); err != nil {
 		return nil, liberr.Wrap(err)
 	}
+
+	r.cancelOtherActiveVddkCheckJobs(ctx.Plan)
 
 	jobLabels := getVddkImageValidationJobLabels(ctx.Plan)
 	jobs := &batchv1.JobList{}
@@ -928,9 +1031,8 @@ func createVddkCheckJob(plan *api.Plan) *batchv1.Job {
 			},
 		},
 		Spec: batchv1.JobSpec{
-			ActiveDeadlineSeconds: ptr.To[int64](int64(settings.Settings.Migration.VddkJobActiveDeadline)),
-			BackoffLimit:          ptr.To[int32](2),
-			Completions:           ptr.To[int32](1),
+			BackoffLimit: ptr.To[int32](2),
+			Completions:  ptr.To[int32](1),
 			Template: core.PodTemplateSpec{
 				Spec: core.PodSpec{
 					SecurityContext: psc,
