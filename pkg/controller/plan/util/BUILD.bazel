@@ -14,7 +14,6 @@ go_library(
         "//pkg/apis/forklift/v1beta1",
         "//pkg/controller/provider/web/openstack",
         "//pkg/controller/provider/web/ovirt",
-        "//pkg/lib/error",
         "//pkg/lib/logging",
         "//pkg/settings",
         "//vendor/gopkg.in/yaml.v2:yaml_v2",

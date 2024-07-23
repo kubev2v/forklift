@@ -31,7 +31,6 @@ var (
 const LETTERS = "abcdefghijklmnopqrstuvwxyz"
 const LETTERS_LENGTH = len(LETTERS)
 
-var firmware = "bios"
 var nameChanged bool
 
 func main() {
@@ -119,6 +118,8 @@ func buildCommand() []string {
 	}
 	virtV2vArgs = append(virtV2vArgs, "-o", "kubevirt")
 
+	// When converting VM with name that do not meet DNS1123 RFC requirements,
+	// it should be changed to supported one to ensure the conversion does not fail.
 	if checkEnvVariablesSet("V2V_NewName") {
 		virtV2vArgs = append(virtV2vArgs, "-on", os.Getenv("V2V_NewName"))
 		nameChanged = true
@@ -307,9 +308,7 @@ func vmHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/yaml")
 	_, err = w.Write(yamlData)
-	if err == nil {
-		w.WriteHeader(http.StatusOK)
-	} else {
+	if err != nil {
 		fmt.Printf("Error writing response: %v\n", err)
 		http.Error(w, "Error writing response", http.StatusInternalServerError)
 	}
