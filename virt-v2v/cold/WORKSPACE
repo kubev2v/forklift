@@ -651,26 +651,26 @@ rpm(
 )
 
 rpm(
-    name = "glibc-0__2.34-115.el9.x86_64",
-    sha256 = "7729d6c0a8d422731712091f14b515e71238a310e94539350c0509b515c16bdf",
+    name = "glibc-0__2.34-116.el9.x86_64",
+    sha256 = "fe21b4b0926c8bb506e9329c45939c1bc7d6f69e3c159ed897b8d8c6b6932128",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/glibc-2.34-115.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/glibc-2.34-116.el9.x86_64.rpm",
     ],
 )
 
 rpm(
-    name = "glibc-common-0__2.34-115.el9.x86_64",
-    sha256 = "8db9252343c6776047ca4fc02738825c6ccf0e4c1857bc102498e51e2bd9b7b3",
+    name = "glibc-common-0__2.34-116.el9.x86_64",
+    sha256 = "81300110c7caa14cb187b563d0d8413ad33e40079c3c55055caa3e80c9649650",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/glibc-common-2.34-115.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/glibc-common-2.34-116.el9.x86_64.rpm",
     ],
 )
 
 rpm(
-    name = "glibc-langpack-en-0__2.34-115.el9.x86_64",
-    sha256 = "3dc902d953b6771b3aaa370711dcce558ea925440a6a2ff1116f11731eda248f",
+    name = "glibc-langpack-en-0__2.34-116.el9.x86_64",
+    sha256 = "e3d263948bf6100ce84db960969c6f43dd62731b1a26fddc85e20489f8528790",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/glibc-langpack-en-2.34-115.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/glibc-langpack-en-2.34-116.el9.x86_64.rpm",
     ],
 )
 
@@ -1283,10 +1283,10 @@ rpm(
 )
 
 rpm(
-    name = "libnbd-0__1.20.0-1.el9.x86_64",
-    sha256 = "add3185cf7660031c23a215c5aa46612a28b62b29b85b232aa9511fa962581bb",
+    name = "libnbd-0__1.20.2-1.el9.x86_64",
+    sha256 = "cfe488ba63cd15a58ef36c30335ded58e8a42ba95067eaa0e409315225c15e09",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/libnbd-1.20.0-1.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/libnbd-1.20.2-1.el9.x86_64.rpm",
     ],
 )
 
@@ -2651,10 +2651,10 @@ rpm(
 )
 
 rpm(
-    name = "redhat-rpm-config-0__207-1.el9.x86_64",
-    sha256 = "dad980d587dfcb058fcf23a4ee856e04cd85b5afc18e178eee535f45ad5e7bbf",
+    name = "redhat-rpm-config-0__208-1.el9.x86_64",
+    sha256 = "31f6515d4960d4a8bef3348973916515665f6cf0970bbfdbd366ea96f7d04abd",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/redhat-rpm-config-207-1.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/redhat-rpm-config-208-1.el9.noarch.rpm",
     ],
 )
 
@@ -2731,18 +2731,18 @@ rpm(
 )
 
 rpm(
-    name = "selinux-policy-0__38.1.41-1.el9.x86_64",
-    sha256 = "b8aca2d08078d9fa0f3d76e875faa9f4d4daac2dc1e6e21b4927c4b101711313",
+    name = "selinux-policy-0__38.1.42-1.el9.x86_64",
+    sha256 = "3a3ae4ece8b3ce87a7a5a394baf3ac24164ed5cc41b8ee03bbefb1389361bf18",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/selinux-policy-38.1.41-1.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/selinux-policy-38.1.42-1.el9.noarch.rpm",
     ],
 )
 
 rpm(
-    name = "selinux-policy-targeted-0__38.1.41-1.el9.x86_64",
-    sha256 = "035515baf545aad09de08521001aecb4701500bef63ca693834804572cbcfe8a",
+    name = "selinux-policy-targeted-0__38.1.42-1.el9.x86_64",
+    sha256 = "5d2a710c7b1da351e4b9fe23688adfa18cc914a60264bb7f9a9d4b625c9b0560",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/selinux-policy-targeted-38.1.41-1.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/selinux-policy-targeted-38.1.42-1.el9.noarch.rpm",
     ],
 )
 
