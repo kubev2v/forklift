@@ -1511,7 +1511,9 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 			if !found {
 				continue
 			}
-			if dv.Status.Phase == cdi.PendingPopulation && r.Source.Provider.Type() == v1beta1.VSphere {
+			if dv.Status.Phase == cdi.PendingPopulation && r.Source.Provider.RequiresConversion() {
+				// in migrations that involve conversion, the conversion pod serves as the
+				// first consumer of the PVCs so we can treat PendingPopulation as Succeeded
 				dv.Status.Phase = cdi.Succeeded
 			}
 			conditions := dv.Conditions()
