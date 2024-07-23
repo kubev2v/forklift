@@ -32,7 +32,6 @@ var (
 const LETTERS = "abcdefghijklmnopqrstuvwxyz"
 const LETTERS_LENGTH = len(LETTERS)
 
-var firmware = "bios"
 var nameChanged bool
 
 func main() {
@@ -194,6 +193,8 @@ func buildCommand() []string {
 	}
 	virtV2vArgs = append(virtV2vArgs, "-o", "kubevirt")
 
+	// When converting VM with name that do not meet DNS1123 RFC requirements,
+	// it should be changed to supported one to ensure the conversion does not fail.
 	if checkEnvVariablesSet("V2V_NewName") {
 		virtV2vArgs = append(virtV2vArgs, "-on", os.Getenv("V2V_NewName"))
 		nameChanged = true

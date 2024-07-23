@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	"gopkg.in/yaml.v2"
 )
@@ -53,11 +52,31 @@ var osV2VMap = map[string]string{
 	"win2k22":  "windows2022srvNext_64Guest",
 }
 
+type OS struct {
+	Firmware string `yaml:"firmware"`
+}
+
+type Domain struct {
+	OS OS `yaml:"os"`
+}
+
+type TemplateSpec struct {
+	Domain Domain `yaml:"domain"`
+}
+
+type Template struct {
+	Spec TemplateSpec `yaml:"spec"`
+}
+
+type VirtualMachineSpec struct {
+	Template Template `yaml:"template"`
+}
+
 type VirtualMachine struct {
-	ApiVersion string   `yaml:"apiVersion"`
-	Kind       string   `yaml:"kind"`
-	Metadata   Metadata `yaml:"metadata"`
-	Spec       Spec     `yaml:"spec"`
+	APIVersion string             `yaml:"apiVersion"`
+	Kind       string             `yaml:"kind"`
+	Metadata   Metadata           `yaml:"metadata"`
+	Spec       VirtualMachineSpec `yaml:"spec"`
 }
 
 type Metadata struct {
@@ -65,35 +84,18 @@ type Metadata struct {
 	Labels map[string]string `yaml:"labels"`
 }
 
-type Spec struct {
-	Domain Domain `yaml:"domain"`
-}
-
-type Domain struct {
-	OS OS `yaml:"os"`
-}
-
-type OS struct {
-	Firmware string `yaml:"firmware"`
-}
-
-type Bios struct{}
-
-type EFI struct {
-	SecureBoot bool `yaml:"secureBoot"`
-}
-
-func GetFirmwareFromYaml(yamlData []byte) (firmware string, err error) {
+func GetFirmwareFromYaml(yamlData []byte) (string, error) {
 	var vm VirtualMachine
-	if err = yaml.Unmarshal(yamlData, &vm); err != nil {
-		return
+	if err := yaml.Unmarshal(yamlData, &vm); err != nil {
+		return "", err
 	}
 
-	if vm.Spec.Domain.OS.Firmware != "" {
-		return
+	firmware := vm.Spec.Template.Spec.Domain.OS.Firmware
+	if firmware == "" {
+		log.Info("Firmware type was not detected")
 	}
-	err = liberr.New("Firmware type was not detected")
-	return
+
+	return firmware, nil
 }
 
 func GetOperationSystemFromYaml(yamlData []byte) (os string, err error) {
@@ -124,7 +126,7 @@ func mapOs(labelOS string) (os string) {
 		distro = "fedora"
 	}
 
-	os, ok := osV2VMap[os]
+	os, ok := osV2VMap[distro]
 	if !ok {
 		log.Info(fmt.Sprintf("Received %s, mapped to: %s", labelOS, os))
 		os = "otherGuest64"
