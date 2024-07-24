@@ -294,7 +294,8 @@ type NIC struct {
 
 // Guest network.
 type GuestNetwork struct {
-	MAC    string `json:"mac"`
-	IP     string `json:"ip"`
-	Origin string `json:"origin"`
+	MAC          string `json:"mac"`
+	IP           string `json:"ip"`
+	Origin       string `json:"origin"`
+	PrefixLength int32  `json:"prefix"`
 }
