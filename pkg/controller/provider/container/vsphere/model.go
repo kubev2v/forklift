@@ -1,6 +1,7 @@
 package vsphere
 
 import (
+	"fmt"
 	"net/url"
 	"sort"
 	"strings"
@@ -621,18 +622,22 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 							continue
 						}
 						for _, ip := range info.IpConfig.IpAddress {
+							//info.DnsConfig
 							guestNetworksList = append(guestNetworksList, model.GuestNetwork{
-								MAC:    info.MacAddress,
-								IP:     ip.IpAddress,
-								Origin: ip.Origin,
+								MAC:          info.MacAddress,
+								IP:           ip.IpAddress,
+								Origin:       ip.Origin,
+								PrefixLength: ip.PrefixLength,
 							})
 						}
 					}
 					// when the vm goes down, we get an update with empty values - the following check keeps the previously reported data.
 					if len(guestNetworksList) > 0 {
 						v.model.GuestNetworks = guestNetworksList
+						fmt.Println(fmt.Sprintf("guest networks: %v", guestNetworksList))
 					}
 				}
+			//case fGuestIpAddress:
 			case fDevices:
 				if devArray, cast := p.Val.(types.ArrayOfVirtualDevice); cast {
 					devList := []model.Device{}

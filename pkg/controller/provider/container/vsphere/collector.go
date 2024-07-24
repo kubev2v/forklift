@@ -120,6 +120,7 @@ const (
 	fSnapshot            = "snapshot"
 	fIsTemplate          = "config.template"
 	fGuestNet            = "guest.net"
+	//fGuestIpAddress      = "guest.ipAddress"
 )
 
 // Selections

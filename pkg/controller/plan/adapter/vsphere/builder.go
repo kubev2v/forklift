@@ -243,7 +243,7 @@ func (r *Builder) mapMacStaticIps(vm *model.VM) string {
 	configurations := []string{}
 	for _, guestNetwork := range vm.GuestNetworks {
 		if guestNetwork.Origin == string(types.NetIpConfigInfoIpAddressOriginManual) {
-			configurations = append(configurations, fmt.Sprintf("%s:ip:%s", guestNetwork.MAC, guestNetwork.IP))
+			configurations = append(configurations, fmt.Sprintf("%s:ip:%s,,%d", guestNetwork.MAC, guestNetwork.IP, guestNetwork.PrefixLength))
 		}
 	}
 	return strings.Join(configurations, "_")
