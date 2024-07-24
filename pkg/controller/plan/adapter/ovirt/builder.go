@@ -479,6 +479,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []*core.Pe
 						Bus: cnv.DiskBus(bus),
 					},
 				},
+				Serial: da.Disk.ID,
 			}
 		}
 		volume := cnv.Volume{
