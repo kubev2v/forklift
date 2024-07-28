@@ -22,12 +22,12 @@ const (
 )
 
 var (
-	// 'status' - [ Succeeded, Failed, Executing, Canceled]
+	// 'status' - [ Succeeded, Failed, Canceled]
 	// 'provider' - [oVirt, VSphere, Openstack, OVA, Openshift]
 	// 'mode' - [Cold, Warm]
 	// 'target' - [Local, Remote]
-	migrationStatusGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "mtv_migrations_status",
+	migrationStatusCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "mtv_migrations_status_total",
 		Help: "VM Migrations sorted by status, provider, mode and destination",
 	},
 		[]string{
@@ -82,13 +82,13 @@ var (
 		},
 	)
 
-	// 'status' - [ Succeeded, Failed, Executing, Canceled]
+	// 'status' - [ Succeeded, Failed, Canceled]
 	// 'provider' - [oVirt, VSphere, Openstack, OVA, Openshift]
 	// 'mode' - [Cold, Warm]
 	// 'target' - [Local, Remote]
 	// 'plan' - [Id]
-	migrationPlanCorrelationStatusGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "mtv_workload_migrations_status",
+	migrationPlanCorrelationStatusCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "mtv_workload_migrations_status_total",
 		Help: "VM Migrations status by provider, mode, destination and plan",
 	},
 		[]string{
