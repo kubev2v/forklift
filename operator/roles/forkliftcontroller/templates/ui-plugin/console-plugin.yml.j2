@@ -1,29 +1,35 @@
 ---
-apiVersion: console.openshift.io/v1alpha1
+apiVersion: console.openshift.io/v1
 kind: ConsolePlugin
 metadata:
   name: {{ ui_plugin_console_name }}
   annotations:
     console.openshift.io/use-i18n: "true" 
 spec:
+  backend:
+    service:
+      name: {{ ui_plugin_service_name }}
+      port: 9443
+      basePath: '/'
+      namespace: {{ app_namespace }}
+    type: Service
   displayName: {{ ui_plugin_display_name }}
-  service:
-    name: {{ ui_plugin_service_name }}
-    port: 9443
-    basePath: '/'
-    namespace: {{ app_namespace }}
+  i18n:
+    loadType: Preload
   proxy:
-    - type: Service
-      alias: {{ inventory_service_name }}
-      authorize: true
-      service:
-        name: {{ inventory_service_name }}
-        namespace: {{ app_namespace }}
-        port: 8443
-    - type: Service
-      alias: {{ services_service_name }}
-      authorize: true
-      service:
-        name: {{ services_service_name }}
-        namespace: {{ app_namespace }}
-        port: 8443
+    - alias: {{ inventory_service_name }}
+      authorization: UserToken
+      type: Service
+      endpoint:
+        service:
+          name: {{ inventory_service_name }}
+          namespace: {{ app_namespace }}
+          port: 8443
+    - alias: {{ services_service_name }}
+      authorization: UserToken
+      endpoint:
+        type: Service
+        service:
+          name: {{ services_service_name }}
+          namespace: {{ app_namespace }}
+          port: 8443
