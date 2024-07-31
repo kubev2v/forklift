@@ -759,21 +759,6 @@ func (r *Reconciler) validateHooks(plan *api.Plan) (err error) {
 }
 
 func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
-	vddkInvalid := libcnd.Condition{
-		Type:     VDDKInvalid,
-		Status:   True,
-		Reason:   NotSet,
-		Category: Critical,
-		Message:  "VDDK init image is invalid",
-	}
-	vddkValidationInProgress := libcnd.Condition{
-		Type:     ValidatingVDDK,
-		Status:   True,
-		Reason:   Started,
-		Category: Advisory,
-		Message:  "Validating VDDK init image",
-	}
-
 	source := plan.Referenced.Provider.Source
 	if source == nil {
 		return
@@ -793,27 +778,47 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 		if job, err = r.ensureVddkImageValidationJob(plan); err != nil {
 			return
 		}
-		image := plan.Referenced.Provider.Source.Spec.Settings[api.VDDK]
-		if len(job.Status.Conditions) == 0 {
-			r.Log.Info("validation of VDDK job is in progress", "image", image)
-			plan.Status.SetCondition(vddkValidationInProgress)
-		}
-		for _, condition := range job.Status.Conditions {
-			switch condition.Type {
-			case batchv1.JobComplete:
-				r.Log.Info("validate VDDK job completed", "image", image)
-				err = nil
-				return
-			case batchv1.JobFailed:
-				plan.Status.SetCondition(vddkInvalid)
-				err = nil
-				return
-			default:
-				err = liberr.New("validation of VDDK job has an unexpected condition", "type", condition.Type)
-			}
-		}
+		err = r.validateVddkImageJob(job, plan)
 	}
 
+	return
+}
+
+func (r *Reconciler) validateVddkImageJob(job *batchv1.Job, plan *api.Plan) (err error) {
+	image := plan.Referenced.Provider.Source.Spec.Settings[api.VDDK]
+	vddkInvalid := libcnd.Condition{
+		Type:     VDDKInvalid,
+		Status:   True,
+		Reason:   NotSet,
+		Category: Critical,
+		Message:  "VDDK init image is invalid",
+	}
+	vddkValidationInProgress := libcnd.Condition{
+		Type:     ValidatingVDDK,
+		Status:   True,
+		Reason:   Started,
+		Category: Advisory,
+		Message:  "Validating VDDK init image",
+	}
+
+	if len(job.Status.Conditions) == 0 {
+		r.Log.Info("validation of VDDK job is in progress", "image", image)
+		plan.Status.SetCondition(vddkValidationInProgress)
+	}
+	for _, condition := range job.Status.Conditions {
+		switch condition.Type {
+		case batchv1.JobComplete:
+			r.Log.Info("validate VDDK job completed", "image", image)
+			err = nil
+			return
+		case batchv1.JobFailed:
+			plan.Status.SetCondition(vddkInvalid)
+			err = nil
+			return
+		default:
+			err = liberr.New("validation of VDDK job has an unexpected condition", "type", condition.Type)
+		}
+	}
 	return
 }
 
