@@ -263,6 +263,7 @@ type VM struct {
 	Networks              []Ref          `sql:""`
 	Concerns              []Concern      `sql:""`
 	GuestNetworks         []GuestNetwork `sql:""`
+	GuestIpStacks         []GuestIpStack `sql:""`
 }
 
 // Determine if current revision has been validated.
@@ -294,8 +295,17 @@ type NIC struct {
 
 // Guest network.
 type GuestNetwork struct {
-	MAC          string `json:"mac"`
-	IP           string `json:"ip"`
-	Origin       string `json:"origin"`
-	PrefixLength int32  `json:"prefix"`
+	MAC          string   `json:"mac"`
+	IP           string   `json:"ip"`
+	Origin       string   `json:"origin"`
+	PrefixLength int32    `json:"prefix"`
+	DNS          []string `json:"dns"`
+	DeviceId     int32    `json:"id"`
+}
+
+// Guest ipStack
+type GuestIpStack struct {
+	DeviceId string   `json:"id"`
+	Gateway  string   `json:"gateway"`
+	DNS      []string `json:"dns"`
 }
