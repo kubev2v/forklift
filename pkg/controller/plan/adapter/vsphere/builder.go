@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	liburl "net/url"
 	"path"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
@@ -196,7 +196,10 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 
 	macsToIps := ""
 	if r.Plan.Spec.PreserveStaticIPs {
-		macsToIps = r.mapMacStaticIps(vm)
+		macsToIps, err = r.mapMacStaticIps(vm)
+		if err != nil {
+			return
+		}
 	}
 
 	libvirtURL, fingerprint, err := r.getSourceDetails(vm, sourceSecret)
@@ -238,42 +241,43 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 	return
 }
 
-func (r *Builder) mapMacStaticIps(vm *model.VM) string {
+func (r *Builder) mapMacStaticIps(vm *model.VM) (ipMap string, err error) {
 	if !isWindows(vm) {
-		return ""
-	}
-	if vm.GuestNetworks == nil || len(vm.GuestNetworks) < 1 {
-		return ""
+		return "", nil
 	}
 	configurations := []string{}
-	sort.Slice(vm.GuestNetworks, func(i, j int) bool { return vm.GuestNetworks[i].DeviceId < vm.GuestNetworks[j].DeviceId })
-	firstId := vm.GuestNetworks[0].DeviceId
+	gatewaySet := false
 	for _, guestNetwork := range vm.GuestNetworks {
 		if guestNetwork.Origin == string(types.NetIpConfigInfoIpAddressOriginManual) {
-			isIpv4 := false
-			if net.IP.To4(net.ParseIP(guestNetwork.IP)) != nil {
-				isIpv4 = true
+			gateway := ""
+			if !gatewaySet {
+				isIpv4 := net.IP.To4(net.ParseIP(guestNetwork.IP)) != nil
+				for _, ipStack := range vm.GuestIpStacks {
+					gwIpv4 := net.IP.To4(net.ParseIP(ipStack.Gateway)) != nil
+					if gwIpv4 && !isIpv4 || !gwIpv4 && isIpv4 {
+						// not the right IPv4 / IPv6 correlation
+						continue
+					}
+					network, err := netip.ParsePrefix(fmt.Sprintf("%s/%d", guestNetwork.IP, guestNetwork.PrefixLength))
+					if err != nil {
+						return "", err
+					}
+					gw, err := netip.ParseAddr(ipStack.Gateway)
+					if err != nil {
+						return "", err
+					}
+					if network.Contains(gw) {
+						// checks if the gateway in the right network subnet. we set gateway only once as it is suppose to be system wide.
+						gateway = ipStack.Gateway
+						gatewaySet = true
+					}
+				}
 			}
-			devCounter := guestNetwork.DeviceId - firstId
-			for _, ipStack := range vm.GuestIpStacks {
-				devId, err := strconv.Atoi(ipStack.DeviceId)
-				if err != nil {
-					return ""
-				}
-				if devCounter != int32(devId) {
-					// not the same device
-					continue
-				}
-				if net.IP.To4(net.ParseIP(ipStack.Gateway)) != nil && !isIpv4 || net.IP.To4(net.ParseIP(ipStack.Gateway)) == nil && isIpv4 {
-					// not the right IPv4 / IPv6 correlation
-					continue
-				}
-				dnsString := strings.Join(guestNetwork.DNS, ",")
-				configurations = append(configurations, fmt.Sprintf("%s:ip:%s,%s,%d,%s", guestNetwork.MAC, guestNetwork.IP, ipStack.Gateway, guestNetwork.PrefixLength, dnsString))
-			}
+			dnsString := strings.Join(guestNetwork.DNS, ",")
+			configurations = append(configurations, fmt.Sprintf("%s:ip:%s,%s,%d,%s", guestNetwork.MAC, guestNetwork.IP, gateway, guestNetwork.PrefixLength, dnsString))
 		}
 	}
-	return strings.Join(configurations, "_")
+	return strings.Join(configurations, "_"), nil
 }
 
 func isWindows(vm *model.VM) bool {
