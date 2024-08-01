@@ -28,7 +28,7 @@ var (
 	// 'target' - [Local, Remote]
 	migrationStatusCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "mtv_migrations_status_total",
-		Help: "VM Migrations sorted by status, provider, mode and destination",
+		Help: "VM Migrations sorted by status, provider, mode and target",
 	},
 		[]string{
 			"status",
@@ -44,7 +44,7 @@ var (
 	// 'target' - [Local, Remote]
 	planStatusGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "mtv_plans_status",
-		Help: "VM migration Plans sorted by status, provider, mode and destination",
+		Help: "VM migration Plans sorted by status, provider, mode and target",
 	},
 		[]string{
 			"status",
@@ -89,7 +89,7 @@ var (
 	// 'plan' - [Id]
 	migrationPlanCorrelationStatusCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "mtv_workload_migrations_status_total",
-		Help: "VM Migrations status by provider, mode, destination and plan",
+		Help: "VM Migrations status by provider, mode, target and plan",
 	},
 		[]string{
 			"status",
