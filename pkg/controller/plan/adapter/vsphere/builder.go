@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	liburl "net/url"
 	"path"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
@@ -241,9 +243,31 @@ func (r *Builder) mapMacStaticIps(vm *model.VM) string {
 		return ""
 	}
 	configurations := []string{}
+	sort.Slice(vm.GuestNetworks, func(i, j int) bool { return vm.GuestNetworks[i].DeviceId < vm.GuestNetworks[j].DeviceId })
+	firstId := vm.GuestNetworks[0].DeviceId
 	for _, guestNetwork := range vm.GuestNetworks {
 		if guestNetwork.Origin == string(types.NetIpConfigInfoIpAddressOriginManual) {
-			configurations = append(configurations, fmt.Sprintf("%s:ip:%s,,%d", guestNetwork.MAC, guestNetwork.IP, guestNetwork.PrefixLength))
+			isIpv4 := false
+			if net.IP.To4(net.ParseIP(guestNetwork.IP)) != nil {
+				isIpv4 = true
+			}
+			devCounter := guestNetwork.DeviceId - firstId
+			for _, ipStack := range vm.GuestIpStacks {
+				devId, err := strconv.Atoi(ipStack.DeviceId)
+				if err != nil {
+					return ""
+				}
+				if devCounter != int32(devId) {
+					// not the same device
+					continue
+				}
+				if net.IP.To4(net.ParseIP(ipStack.Gateway)) != nil && !isIpv4 || net.IP.To4(net.ParseIP(ipStack.Gateway)) == nil && isIpv4 {
+					// not the right IPv4 / IPv6 correlation
+					continue
+				}
+				dnsString := strings.Join(guestNetwork.DNS, ",")
+				configurations = append(configurations, fmt.Sprintf("%s:ip:%s,%s,%d,%s", guestNetwork.MAC, guestNetwork.IP, ipStack.Gateway, guestNetwork.PrefixLength, dnsString))
+			}
 		}
 	}
 	return strings.Join(configurations, "_")

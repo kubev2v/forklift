@@ -234,6 +234,7 @@ type VM struct {
 	Devices               []model.Device       `json:"devices"`
 	NICs                  []model.NIC          `json:"nics"`
 	GuestNetworks         []model.GuestNetwork `json:"guestNetworks"`
+	GuestIpStacks         []model.GuestIpStack `json:"guestIpStacks"`
 }
 
 // Build the resource using the model.
@@ -263,6 +264,7 @@ func (r *VM) With(m *model.VM) {
 	r.NumaNodeAffinity = m.NumaNodeAffinity
 	r.NICs = m.NICs
 	r.GuestNetworks = m.GuestNetworks
+	r.GuestIpStacks = m.GuestIpStacks
 }
 
 // Build self link (URI).

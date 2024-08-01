@@ -120,7 +120,7 @@ const (
 	fSnapshot            = "snapshot"
 	fIsTemplate          = "config.template"
 	fGuestNet            = "guest.net"
-	//fGuestIpAddress      = "guest.ipAddress"
+	fGuestIpStack        = "guest.ipStack"
 )
 
 // Selections
@@ -737,6 +737,7 @@ func (r *Collector) vmPathSet() []string {
 		fIsTemplate,
 		fSnapshot,
 		fChangeTracking,
+		fGuestIpStack,
 	}
 
 	apiVer := strings.Split(r.client.ServiceContent.About.ApiVersion, ".")
