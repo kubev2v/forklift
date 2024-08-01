@@ -24,23 +24,112 @@ var _ = Describe("vSphere builder", func() {
 		Expect(builder.mapMacStaticIps(vm)).Should(Equal(outputMap))
 	},
 		Entry("no static ips", &model.VM{GuestID: "windows9Guest"}, ""),
-		Entry("single static ip", &model.VM{GuestID: "windows9Guest", GuestNetworks: []vsphere.GuestNetwork{{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin}}}, "00:50:56:83:25:47:ip:172.29.3.193"),
-		Entry("multiple static ips", &model.VM{GuestID: "windows9Guest", GuestNetworks: []vsphere.GuestNetwork{
-			{
-				MAC:    "00:50:56:83:25:47",
-				IP:     "172.29.3.193",
-				Origin: ManualOrigin,
+		Entry("single static ip", &model.VM{
+			GuestID: "windows9Guest",
+			GuestNetworks: []vsphere.GuestNetwork{
+				{
+					MAC:          "00:50:56:83:25:47",
+					IP:           "172.29.3.193",
+					Origin:       ManualOrigin,
+					PrefixLength: 16,
+					DNS:          []string{"8.8.8.8"},
+					DeviceId:     4000,
+				}},
+			GuestIpStacks: []vsphere.GuestIpStack{
+				{
+					DeviceId: "0",
+					Gateway:  "172.29.3.1",
+				}},
+		}, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,16,8.8.8.8"),
+		Entry("multiple static ips", &model.VM{
+			GuestID: "windows9Guest",
+			GuestNetworks: []vsphere.GuestNetwork{
+				{
+					MAC:          "00:50:56:83:25:47",
+					IP:           "172.29.3.193",
+					Origin:       ManualOrigin,
+					PrefixLength: 16,
+					DNS:          []string{"8.8.8.8"},
+					DeviceId:     4001,
+				},
+				{
+					MAC:          "00:50:56:83:25:47",
+					IP:           "fe80::5da:b7a5:e0a2:a097",
+					Origin:       ManualOrigin,
+					PrefixLength: 64,
+					DNS:          []string{"fec0:0:0:ffff::1", "fec0:0:0:ffff::2", "fec0:0:0:ffff::3"},
+					DeviceId:     4001,
+				},
 			},
-			{
-				MAC:    "00:50:56:83:25:47",
-				IP:     "fe80::5da:b7a5:e0a2:a097",
-				Origin: ManualOrigin,
+			GuestIpStacks: []vsphere.GuestIpStack{
+				{
+					DeviceId: "0",
+					Gateway:  "172.29.3.1",
+				},
+				{
+					DeviceId: "0",
+					Gateway:  "fe80::5da:b7a5:e0a2:a095",
+				},
 			},
-		},
-		}, "00:50:56:83:25:47:ip:172.29.3.193_00:50:56:83:25:47:ip:fe80::5da:b7a5:e0a2:a097"),
+		}, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,16,8.8.8.8_00:50:56:83:25:47:ip:fe80::5da:b7a5:e0a2:a097,fe80::5da:b7a5:e0a2:a095,64,fec0:0:0:ffff::1,fec0:0:0:ffff::2,fec0:0:0:ffff::3"),
 		Entry("non-static ip", &model.VM{GuestID: "windows9Guest", GuestNetworks: []vsphere.GuestNetwork{{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: string(types.NetIpConfigInfoIpAddressOriginDhcp)}}}, ""),
 		Entry("non windows vm", &model.VM{GuestID: "other", GuestNetworks: []vsphere.GuestNetwork{{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin}}}, ""),
 		Entry("no OS vm", &model.VM{GuestNetworks: []vsphere.GuestNetwork{{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin}}}, ""),
+		Entry("multiple nics static ips", &model.VM{
+			GuestID: "windows9Guest",
+			GuestNetworks: []vsphere.GuestNetwork{
+				{
+					MAC:          "00:50:56:83:25:47",
+					IP:           "172.29.3.193",
+					Origin:       ManualOrigin,
+					PrefixLength: 16,
+					DNS:          []string{"8.8.8.8"},
+					DeviceId:     4001,
+				},
+				{
+					MAC:          "00:50:56:83:25:47",
+					IP:           "fe80::5da:b7a5:e0a2:a097",
+					Origin:       ManualOrigin,
+					PrefixLength: 64,
+					DNS:          []string{"fec0:0:0:ffff::1", "fec0:0:0:ffff::2", "fec0:0:0:ffff::3"},
+					DeviceId:     4001,
+				},
+				{
+					MAC:          "00:50:56:83:25:48",
+					IP:           "172.29.3.192",
+					Origin:       ManualOrigin,
+					PrefixLength: 24,
+					DNS:          []string{"4.4.4.4"},
+					DeviceId:     4002,
+				},
+				{
+					MAC:          "00:50:56:83:25:48",
+					IP:           "fe80::5da:b7a5:e0a2:a090",
+					Origin:       ManualOrigin,
+					PrefixLength: 32,
+					DNS:          []string{"fec0:0:0:ffff::4", "fec0:0:0:ffff::5", "fec0:0:0:ffff::6"},
+					DeviceId:     4002,
+				},
+			},
+			GuestIpStacks: []vsphere.GuestIpStack{
+				{
+					DeviceId: "1",
+					Gateway:  "172.29.3.2",
+				},
+				{
+					DeviceId: "1",
+					Gateway:  "fe80::5da:b7a5:e0a2:a098",
+				},
+				{
+					DeviceId: "0",
+					Gateway:  "172.29.3.1",
+				},
+				{
+					DeviceId: "0",
+					Gateway:  "fe80::5da:b7a5:e0a2:a095",
+				},
+			},
+		}, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,16,8.8.8.8_00:50:56:83:25:47:ip:fe80::5da:b7a5:e0a2:a097,fe80::5da:b7a5:e0a2:a095,64,fec0:0:0:ffff::1,fec0:0:0:ffff::2,fec0:0:0:ffff::3_00:50:56:83:25:48:ip:172.29.3.192,172.29.3.2,24,4.4.4.4_00:50:56:83:25:48:ip:fe80::5da:b7a5:e0a2:a090,fe80::5da:b7a5:e0a2:a098,32,fec0:0:0:ffff::4,fec0:0:0:ffff::5,fec0:0:0:ffff::6"),
 	)
 })
 
