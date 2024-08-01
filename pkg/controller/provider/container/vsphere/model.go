@@ -630,7 +630,6 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 								IP:           ip.IpAddress,
 								Origin:       ip.Origin,
 								PrefixLength: ip.PrefixLength,
-								DeviceId:     info.DeviceConfigId,
 								DNS:          dnsList,
 							})
 						}
@@ -648,9 +647,8 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 						for _, route := range routes {
 							if len(route.Gateway.IpAddress) > 0 {
 								guestIpStackList = append(guestIpStackList, model.GuestIpStack{
-									DeviceId: route.Gateway.Device,
-									Gateway:  route.Gateway.IpAddress,
-									DNS:      ipa.DnsConfig.IpAddress,
+									Gateway: route.Gateway.IpAddress,
+									DNS:     ipa.DnsConfig.IpAddress,
 								})
 							}
 						}
