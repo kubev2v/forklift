@@ -242,6 +242,9 @@ func (r *Builder) mapMacStaticIps(vm *model.VM) string {
 	if !isWindows(vm) {
 		return ""
 	}
+	if vm.GuestNetworks == nil || len(vm.GuestNetworks) < 1 {
+		return ""
+	}
 	configurations := []string{}
 	sort.Slice(vm.GuestNetworks, func(i, j int) bool { return vm.GuestNetworks[i].DeviceId < vm.GuestNetworks[j].DeviceId })
 	firstId := vm.GuestNetworks[0].DeviceId
