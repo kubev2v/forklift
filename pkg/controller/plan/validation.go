@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"path"
 	"strconv"
+	"strings"
 
 	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
@@ -27,6 +28,7 @@ import (
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	k8slabels "k8s.io/apimachinery/pkg/labels"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
@@ -69,6 +71,8 @@ const (
 	VDDKNotConfigured            = "VDDKNotConfigured"
 	unsupportedVersion           = "UnsupportedVersion"
 	VDDKInvalid                  = "VDDKInvalid"
+	VDDKImageNotReady            = "VDDKImageNotReady"
+	VDDKImageNotFound            = "VDDKImageNotFound"
 	ValidatingVDDK               = "ValidatingVDDK"
 )
 
@@ -744,6 +748,24 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 		Category: Critical,
 		Message:  "VDDK image is necessary for this type of migration",
 	}
+	vddkImageNotReady := libcnd.Condition{
+		Type:     VDDKImageNotReady,
+		Status:   True,
+		Reason:   NotSet,
+		Category: Advisory,
+		Message:  "Waiting for VDDK init image to be be pulled",
+		// make the condition durable because if the image pull times out,
+		// the pod will no longer exist to check for the 'waiting' status.
+		// We will remove the condition manually if it succeeds.
+		Durable: true,
+	}
+	vddkImageNotFound := libcnd.Condition{
+		Type:     VDDKImageNotFound,
+		Status:   True,
+		Reason:   NotSet,
+		Category: Critical,
+		Message:  "Failed to pull VDDK init image",
+	}
 	vddkInvalid := libcnd.Condition{
 		Type:     VDDKInvalid,
 		Status:   True,
@@ -792,6 +814,30 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 			r.Log.Info("validation of VDDK job is in progress", "image", image)
 			plan.Status.SetCondition(vddkValidationInProgress)
 		}
+		var ctx *plancontext.Context
+		ctx, err = plancontext.New(r, plan, r.Log)
+		if err != nil {
+			break
+		}
+		pods := &core.PodList{}
+		if err = ctx.Destination.Client.List(context.TODO(), pods, &client.ListOptions{
+			Namespace:     plan.Spec.TargetNamespace,
+			LabelSelector: k8slabels.SelectorFromSet(map[string]string{"job-name": job.Name}),
+		}); err != nil {
+			break
+		}
+		for _, pod := range pods.Items {
+			if strings.Contains(pod.Name, job.Name) {
+				// there should only be a single init container
+				initStatus := pod.Status.InitContainerStatuses[0]
+				if initStatus.State.Waiting != nil {
+					plan.Status.SetCondition(vddkImageNotReady)
+					r.Log.Info("Waiting for init container", "state", initStatus.State.Waiting)
+				} else {
+					plan.Status.DeleteCondition(VDDKImageNotReady)
+				}
+			}
+		}
 		for _, condition := range job.Status.Conditions {
 			switch condition.Type {
 			case batchv1.JobComplete:
@@ -799,7 +845,13 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 				err = nil
 				return
 			case batchv1.JobFailed:
-				plan.Status.SetCondition(vddkInvalid)
+				if plan.Status.FindCondition(VDDKImageNotReady) != nil {
+					r.Log.Info("Failed to get VDDK init image", "image", image)
+					plan.Status.DeleteCondition(VDDKImageNotReady)
+					plan.Status.SetCondition(vddkImageNotFound)
+				} else {
+					plan.Status.SetCondition(vddkInvalid)
+				}
 				err = nil
 				return
 			default:
