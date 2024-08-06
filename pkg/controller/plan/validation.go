@@ -789,11 +789,12 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 		return
 	}
 
-	if image, found := source.Spec.Settings[api.VDDK]; found {
+	if _, found := source.Spec.Settings[api.VDDK]; found {
 		var job *batchv1.Job
-		if job, err = r.ensureVddkImageValidationJob(plan, image); err != nil {
+		if job, err = r.ensureVddkImageValidationJob(plan); err != nil {
 			return
 		}
+		image := plan.Referenced.Provider.Source.Spec.Settings[api.VDDK]
 		if len(job.Status.Conditions) == 0 {
 			r.Log.Info("validation of VDDK job is in progress", "image", image)
 			plan.Status.SetCondition(vddkValidationInProgress)
@@ -817,7 +818,7 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 	return
 }
 
-func (r *Reconciler) ensureVddkImageValidationJob(plan *api.Plan, vddkImage string) (*batchv1.Job, error) {
+func (r *Reconciler) ensureVddkImageValidationJob(plan *api.Plan) (*batchv1.Job, error) {
 	ctx, err := plancontext.New(r, plan, r.Log)
 	if err != nil {
 		return nil, err
@@ -841,7 +842,7 @@ func (r *Reconciler) ensureVddkImageValidationJob(plan *api.Plan, vddkImage stri
 	case err != nil:
 		return nil, err
 	case len(jobs.Items) == 0:
-		job := createVddkCheckJob(ctx.Plan, jobLabels, vddkImage)
+		job := createVddkCheckJob(ctx.Plan, jobLabels)
 		err = ctx.Destination.Client.Create(context.Background(), job)
 		if err != nil {
 			return nil, err
@@ -872,7 +873,9 @@ func getVddkImageValidationJobLabels(plan *api.Plan) map[string]string {
 	}
 }
 
-func createVddkCheckJob(plan *api.Plan, labels map[string]string, vddkImage string) *batchv1.Job {
+func createVddkCheckJob(plan *api.Plan, labels map[string]string) *batchv1.Job {
+	vddkImage := plan.Referenced.Provider.Source.Spec.Settings[api.VDDK]
+
 	mount := core.VolumeMount{
 		Name:      VddkVolumeName,
 		MountPath: "/opt",
