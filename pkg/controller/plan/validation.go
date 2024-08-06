@@ -846,7 +846,7 @@ func (r *Reconciler) ensureVddkImageValidationJob(plan *api.Plan) (*batchv1.Job,
 	case err != nil:
 		return nil, err
 	case len(jobs.Items) == 0:
-		job := createVddkCheckJob(ctx.Plan, jobLabels)
+		job := createVddkCheckJob(ctx.Plan)
 		err = ctx.Destination.Client.Create(context.Background(), job)
 		if err != nil {
 			return nil, err
@@ -877,7 +877,7 @@ func getVddkImageValidationJobLabels(plan *api.Plan) map[string]string {
 	}
 }
 
-func createVddkCheckJob(plan *api.Plan, labels map[string]string) *batchv1.Job {
+func createVddkCheckJob(plan *api.Plan) *batchv1.Job {
 	vddkImage := plan.Referenced.Provider.Source.Spec.Settings[api.VDDK]
 
 	mount := core.VolumeMount{
@@ -920,7 +920,7 @@ func createVddkCheckJob(plan *api.Plan, labels map[string]string) *batchv1.Job {
 		ObjectMeta: meta.ObjectMeta{
 			GenerateName: fmt.Sprintf("vddk-validator-%s", plan.Name),
 			Namespace:    plan.Spec.TargetNamespace,
-			Labels:       labels,
+			Labels:       getVddkImageValidationJobLabels(plan),
 			Annotations: map[string]string{
 				"provider": plan.Referenced.Provider.Source.Name,
 				"vddk":     vddkImage,
