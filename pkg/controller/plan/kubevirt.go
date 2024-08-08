@@ -16,6 +16,7 @@ import (
 	"time"
 
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
+	"github.com/konveyor/forklift-controller/pkg/controller/plan/util"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
@@ -27,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	cnv "kubevirt.io/api/core/v1"
 	instancetypeapi "kubevirt.io/api/instancetype"
 	instancetype "kubevirt.io/api/instancetype/v1beta1"
@@ -37,7 +37,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
-	ovfparser "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/ova"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
@@ -940,7 +939,7 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 		return
 	}
 
-	url := fmt.Sprintf("http://%s:8080/ovf", pod.Status.PodIP)
+	url := fmt.Sprintf("http://%s:8080/vm", pod.Status.PodIP)
 
 	/* Due to the virt-v2v operation, the ovf file is only available after the command's execution,
 	meaning it appears following the copydisks phase.
@@ -958,24 +957,24 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 	}
 	defer resp.Body.Close()
 
-	vmConfigBytes, err := io.ReadAll(resp.Body)
+	vmConf, err := io.ReadAll(resp.Body)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	vmConfigXML := string(vmConfigBytes)
-
 	switch r.Source.Provider.Type() {
 	case api.Ova:
-		if vm.Firmware, err = ovfparser.GetFirmwareFromConfig(vmConfigXML); err != nil {
+		if vm.Firmware, err = util.GetFirmwareFromYaml(vmConf); err != nil {
 			err = liberr.Wrap(err)
 			return
 		}
+		r.Log.Info("Setting the vm firmware ", vm.Firmware, "vmId", vm.ID)
 	case api.VSphere:
-		if vm.OperatingSystem, err = ovfparser.GetOperationSystemFromConfig(vmConfigXML); err != nil {
+		if vm.OperatingSystem, err = util.GetOperationSystemFromYaml(vmConf); err != nil {
 			err = liberr.Wrap(err)
 			return
 		}
+		r.Log.Info("Setting the vm OS ", vm.OperatingSystem, "vmId", vm.ID)
 	}
 
 	shutdownURL := fmt.Sprintf("http://%s:8080/shutdown", pod.Status.PodIP)
@@ -1259,13 +1258,10 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 	//convention it will be automatically changed.
 	var originalName string
 
-	if errs := k8svalidation.IsDNS1123Label(vm.Name); len(errs) > 0 {
+	if vm.NewName != "" {
 		originalName = vm.Name
-		vm.Name, err = r.changeVmNameDNS1123(vm.Name, r.Plan.Spec.TargetNamespace)
-		if err != nil {
-			r.Log.Error(err, "Failed to update the VM name to meet DNS1123 protocol requirements.")
-			return
-		}
+		vm.Name = vm.NewName
+
 		r.Log.Info("VM name is incompatible with DNS1123 RFC, renaming",
 			"originalName", originalName, "newName", vm.Name)
 	}
@@ -1721,6 +1717,13 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 				Value: vm.RootDisk,
 			})
 	}
+
+	environment = append(environment,
+		core.EnvVar{
+			Name:  "V2V_NewName",
+			Value: vm.NewName,
+		})
+
 	// pod annotations
 	annotations := map[string]string{}
 	if r.Plan.Spec.TransferNetwork != nil {

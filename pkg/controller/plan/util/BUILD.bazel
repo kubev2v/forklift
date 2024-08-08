@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "util",
     srcs = [
+        "kubevirtvmparser.go",
         "openstack.go",
         "ovirt.go",
         "utils.go",
@@ -13,7 +14,9 @@ go_library(
         "//pkg/apis/forklift/v1beta1",
         "//pkg/controller/provider/web/openstack",
         "//pkg/controller/provider/web/ovirt",
+        "//pkg/lib/logging",
         "//pkg/settings",
+        "//vendor/gopkg.in/yaml.v2:yaml_v2",
         "//vendor/k8s.io/api/core/v1:core",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:meta",
     ],

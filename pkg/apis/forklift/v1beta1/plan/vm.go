@@ -72,6 +72,8 @@ type VMStatus struct {
 	Firmware string `json:"firmware,omitempty"`
 	// The Operating System detected by virt-v2v.
 	OperatingSystem string `json:"operatingSystem,omitempty"`
+	// The new name of the VM after matching DNS1123 requirements.
+	NewName string `json:"newName,omitempty"`
 
 	// Conditions.
 	libcnd.Conditions `json:",inline"`
