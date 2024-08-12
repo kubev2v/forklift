@@ -153,11 +153,6 @@ func buildCommand() []string {
 	virtV2vArgs := []string{"-v", "-x"}
 	source := os.Getenv("V2V_source")
 
-	if !isValidSource(source) {
-		fmt.Printf("virt-v2v supports the following providers: {OVA, vSphere}. Provided: %s\n", source)
-		os.Exit(1)
-	}
-
 	requiredEnvVars := map[string][]string{
 		vSphere: {"V2V_libvirtURL", "V2V_secretKey", "V2V_vmName"},
 		OVA:     {"V2V_diskPath", "V2V_vmName"},
@@ -168,8 +163,14 @@ func buildCommand() []string {
 			fmt.Printf("Following environment variables need to be defined: %v\n", envVars)
 			os.Exit(1)
 		}
+	} else {
+		providers := make([]string, len(requiredEnvVars))
+		for key := range requiredEnvVars {
+			providers = append(providers, key)
+		}
+		fmt.Printf("virt-v2v supports the following providers: {%v}. Provided: %s\n", strings.Join(providers, ", "), source)
+		os.Exit(1)
 	}
-
 	fmt.Println("Preparing virt-v2v")
 
 	switch source {
@@ -396,14 +397,5 @@ func shutdownHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 	if err := server.Shutdown(context.Background()); err != nil {
 		fmt.Printf("error shutting down server: %v\n", err)
-	}
-}
-
-func isValidSource(source string) bool {
-	switch source {
-	case OVA, vSphere:
-		return true
-	default:
-		return false
 	}
 }
