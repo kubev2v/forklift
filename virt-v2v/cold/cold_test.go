@@ -48,7 +48,7 @@ func TestStaticIPs(t *testing.T) {
 		if c.inputConfig != "" {
 			t.Setenv("V2V_staticIPs", c.inputConfig)
 		}
-		command := strings.Join(buildCommand(), " ")
+		command := strings.Join(virtV2vBuildCommand(), " ")
 		for _, outputArg := range c.outputArgs {
 			if !strings.Contains(command, outputArg) {
 				t.Errorf("The command is: %s. Excpected to contain '%s'", command, outputArg)
