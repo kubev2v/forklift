@@ -33,49 +33,14 @@ const LETTERS = "abcdefghijklmnopqrstuvwxyz"
 const LETTERS_LENGTH = len(LETTERS)
 
 func main() {
-	source := os.Getenv("V2V_source")
-	if source == VSPHERE {
-		if _, err := os.Stat("/etc/secret/cacert"); err == nil {
-			// use the specified certificate
-			err = os.Symlink("/etc/secret/cacert", "/opt/ca-bundle.crt")
-			if err != nil {
-				fmt.Println("Error creating ca cert link ", err)
-				os.Exit(1)
-			}
-		} else {
-			// otherwise, keep system pool certificates
-			err := os.Symlink("/etc/pki/tls/certs/ca-bundle.crt.bak", "/opt/ca-bundle.crt")
-			if err != nil {
-				fmt.Println("Error creating ca cert link ", err)
-				os.Exit(1)
-			}
-		}
-	}
-
-	if err := executeVirtV2v(buildCommand()); err != nil {
-		fmt.Println("Error executing virt-v2v command ", err)
-		os.Exit(1)
-	}
-
 	var err error
-	xmlFilePath, err = getXMLFile(DIR, "xml")
-	if err != nil {
-		fmt.Println("Error getting XML file:", err)
-		os.Exit(1)
+	if _, found := os.LookupEnv("V2V_inPlace"); found {
+		err = convertVirtV2vInPlace()
+	} else {
+		err = convertVirtV2v()
 	}
-
-	err = customizeVM(source, xmlFilePath)
 	if err != nil {
-		fmt.Println("Warning customizing the VM failed:", err)
-	}
-
-	http.HandleFunc("/ovf", ovfHandler)
-	http.HandleFunc("/shutdown", shutdownHandler)
-	server = &http.Server{Addr: ":8080"}
-
-	fmt.Println("Starting server on :8080")
-	if err := server.ListenAndServe(); err != http.ErrServerClosed {
-		fmt.Printf("Error starting server: %v\n", err)
+		fmt.Println("Error executing virt-v2v command ", err)
 		os.Exit(1)
 	}
 }
@@ -149,7 +114,19 @@ func customizeVM(source string, xmlFilePath string) error {
 	return nil
 }
 
-func buildCommand() []string {
+func convertVirtV2vInPlace() error {
+	args := []string{"-v", "-x", "-i", "libvirtxml"}
+	args = append(args, "--root")
+	if val, found := os.LookupEnv("V2V_RootDisk"); found {
+		args = append(args, val)
+	} else {
+		args = append(args, "first")
+	}
+	args = append(args, "/mnt/v2v/input.xml")
+	return executeVirtV2v("/usr/libexec/virt-v2v-in-place", args)
+}
+
+func virtV2vBuildCommand() []string {
 	virtV2vArgs := []string{"-v", "-x"}
 	source := os.Getenv("V2V_source")
 
@@ -268,6 +245,54 @@ func addLUKSKeys() ([]string, error) {
 	return luksArgs, nil
 }
 
+func convertVirtV2v() (err error) {
+	source := os.Getenv("V2V_source")
+	if source == VSPHERE {
+		if _, err := os.Stat("/etc/secret/cacert"); err == nil {
+			// use the specified certificate
+			err = os.Symlink("/etc/secret/cacert", "/opt/ca-bundle.crt")
+			if err != nil {
+				fmt.Println("Error creating ca cert link ", err)
+				os.Exit(1)
+			}
+		} else {
+			// otherwise, keep system pool certificates
+			err := os.Symlink("/etc/pki/tls/certs/ca-bundle.crt.bak", "/opt/ca-bundle.crt")
+			if err != nil {
+				fmt.Println("Error creating ca cert link ", err)
+				os.Exit(1)
+			}
+		}
+	}
+
+	if err = executeVirtV2v("virt-v2v", virtV2vBuildCommand()); err != nil {
+		return err
+	}
+
+	if xmlFilePath, err = getXMLFile(DIR, "xml"); err != nil {
+		fmt.Println("Error getting XML file:", err)
+		return err
+	}
+
+	err = customizeVM(source, xmlFilePath)
+	if err != nil {
+		fmt.Println("Error customizing the VM:", err)
+		return err
+	}
+
+	http.HandleFunc("/ovf", ovfHandler)
+	http.HandleFunc("/shutdown", shutdownHandler)
+	server = &http.Server{Addr: ":8080"}
+
+	fmt.Println("Starting server on :8080")
+	if err := server.ListenAndServe(); err != http.ErrServerClosed {
+		fmt.Printf("Error starting server: %v\n", err)
+		return err
+	}
+
+	return
+}
+
 func getFilesInPath(rootPath string) (paths []string, err error) {
 	files, err := os.ReadDir(rootPath)
 	if err != nil {
@@ -328,8 +353,8 @@ func LinkDisks(diskKind string, num int) (err error) {
 	return
 }
 
-func executeVirtV2v(args []string) error {
-	v2vCmd := exec.Command("virt-v2v", args...)
+func executeVirtV2v(command string, args []string) error {
+	v2vCmd := exec.Command(command, args...)
 	monitorCmd := exec.Command("/usr/local/bin/virt-v2v-monitor")
 	monitorCmd.Stdout = os.Stdout
 	monitorCmd.Stderr = os.Stderr
