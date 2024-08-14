@@ -92,7 +92,13 @@ container_image(
 
 go_library(
     name = "cold_lib",
-    srcs = ["entrypoint.go"],
+    srcs = [
+        "constants.go",
+        "customize-image.go",
+        "entrypoint.go",
+        "write-bash-script.go",
+        "xml-reader.go",
+    ],
     importpath = "github.com/konveyor/forklift-controller/virt-v2v/cold",
     visibility = ["//visibility:private"],
 )

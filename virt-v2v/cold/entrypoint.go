@@ -63,6 +63,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	// If needed, customize root disk image
+	err = customizeRootDiskImage(source)
+	if err != nil {
+		fmt.Println("Error customizing root disk:", err)
+		os.Exit(1)
+	}
+
 	http.HandleFunc("/ovf", ovfHandler)
 	http.HandleFunc("/shutdown", shutdownHandler)
 	server = &http.Server{Addr: ":8080"}
@@ -72,6 +79,43 @@ func main() {
 		fmt.Printf("Error starting server: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func customizeRootDiskImage(source string) error {
+	xmlData, err := ReadXMLFile(xmlFilePath)
+	if err != nil {
+		fmt.Printf("Error read XML: %v\n", err)
+		return err
+	}
+
+	operatingSystem, err := GetOperationSystemFromConfig(xmlData)
+	if err != nil {
+		fmt.Printf("Error getting OS ID: %v\n", err)
+	} else {
+		fmt.Printf("Operating System ID: %s\n", operatingSystem)
+	}
+
+	// If user selected 'preserveStaticIPs' and it's a RHEL machine, customize root disk image
+	// and add a first boot script to copy ipv4 and ipv6 settings to new network device.
+	preserveStaticIPs := os.Getenv("V2V_preserveStaticIPs")
+	shouldCustomizeImage := preserveStaticIPs == "true" && source == vSphere && strings.Contains(operatingSystem, "rhel")
+	if shouldCustomizeImage {
+		rootDiskPath, err := FindRootDiskImage(DIR)
+		if err != nil {
+			fmt.Println("Error looking for root disk path:", err)
+			os.Exit(1)
+		} else {
+			fmt.Printf("Root disk path: %s\n", rootDiskPath)
+		}
+
+		err = CustomizeImage(DIR, rootDiskPath)
+		if err != nil {
+			fmt.Println("Error customizing disk image:", err)
+			return err
+		}
+	}
+
+	return nil
 }
 
 func buildCommand() []string {
@@ -271,20 +315,14 @@ func getXMLFile(dir, fileExtension string) (string, error) {
 	if len(files) > 0 {
 		return files[0], nil
 	}
-	return "", fmt.Errorf("XML file was not found.")
+	return "", fmt.Errorf("XML file was not found")
 }
 
 func ovfHandler(w http.ResponseWriter, r *http.Request) {
-	if xmlFilePath == "" {
-		fmt.Println("Error: XML file path is empty.")
-		http.Error(w, "XML file path is empty", http.StatusInternalServerError)
-		return
-	}
-
-	xmlData, err := os.ReadFile(xmlFilePath)
+	xmlData, err := ReadXMLFile(xmlFilePath)
 	if err != nil {
-		fmt.Printf("Error reading XML file: %v\n", err)
-		http.Error(w, "Error reading XML file", http.StatusInternalServerError)
+		fmt.Printf("Error: %v\n", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
