@@ -11,10 +11,6 @@ import (
 
 // CustomizeImage customizes a disk image by uploading and setting firstboot bash scripts.
 //
-// This function takes two arguments:
-// - `dir`: The directory where the bash scripts will be temporarily saved locally
-// - `diskPath`: The path to the disk image that will be customized.
-//
 // The function writes two bash scripts to the specified local tmp directory,
 // uploads them to the disk image using `virt-customize`, and sets them to run on the first boot
 // of the image. If any errors occur during these operations, the function returns an error.

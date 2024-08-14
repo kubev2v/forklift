@@ -130,7 +130,12 @@ container_image(
 
 go_test(
     name = "cold_test",
-    srcs = ["cold_test.go"],
+    srcs = [
+        "cold_test.go",
+        "write-bash-script_test.go",
+        "xml-reader_test.go",
+    ],
+    data = glob(["testdata/**"]),
     embed = [":cold_lib"],
 )
 
