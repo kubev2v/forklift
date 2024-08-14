@@ -1657,20 +1657,24 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 		return
 	}
 
+	// pod environment
+	environment, err := r.Builder.PodEnvironment(vm.Ref, r.Source.Secret)
+	if err != nil {
+		return
+	}
+
 	// qemu group
 	fsGroup := qemuGroup
 	user := qemuUser
 	nonRoot := true
 	allowPrivilageEscalation := false
 	// virt-v2v image
-	var virtV2vImage string
 	el9, el9Err := r.Context.Plan.VSphereUsesEl9VirtV2v()
 	if el9Err != nil {
 		err = el9Err
 		return
 	}
 	if el9 {
-		virtV2vImage = Settings.Migration.VirtV2vImageCold
 		// mount the secret for the password and CA certificate
 		volumes = append(volumes, core.Volume{
 			Name: "secret-volume",
@@ -1686,7 +1690,11 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 			MountPath: "/etc/secret",
 		})
 	} else {
-		virtV2vImage = Settings.Migration.VirtV2vImageWarm
+		environment = append(environment,
+			core.EnvVar{
+				Name:  "V2V_inPlace",
+				Value: "1",
+			})
 	}
 	// VDDK image
 	var initContainers []core.Container
@@ -1709,12 +1717,6 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 			},
 		})
 	}
-	// pod environment
-	environment, err := r.Builder.PodEnvironment(vm.Ref, r.Source.Secret)
-	if err != nil {
-		return
-	}
-
 	if vm.RootDisk != "" {
 		environment = append(environment,
 			core.EnvVar{
@@ -1785,7 +1787,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 							},
 						},
 					},
-					Image:         virtV2vImage,
+					Image:         Settings.Migration.VirtV2vImageCold,
 					VolumeMounts:  volumeMounts,
 					VolumeDevices: volumeDevices,
 					Ports: []core.ContainerPort{

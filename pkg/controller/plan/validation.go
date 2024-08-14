@@ -785,8 +785,8 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 		plan.Status.SetCondition(vddkNotConfigured)
 	case found:
 		var job *batchv1.Job
-		if job, err = r.ensureVddkImageValidationJob(plan, el9, image); err != nil {
-			break
+		if job, err = r.ensureVddkImageValidationJob(plan, image); err != nil {
+			return
 		}
 		if len(job.Status.Conditions) == 0 {
 			r.Log.Info("validation of VDDK job is in progress", "image", image)
@@ -811,7 +811,7 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 	return
 }
 
-func (r *Reconciler) ensureVddkImageValidationJob(plan *api.Plan, el9 bool, vddkImage string) (*batchv1.Job, error) {
+func (r *Reconciler) ensureVddkImageValidationJob(plan *api.Plan, vddkImage string) (*batchv1.Job, error) {
 	ctx, err := plancontext.New(r, plan, r.Log)
 	if err != nil {
 		return nil, err
@@ -835,7 +835,7 @@ func (r *Reconciler) ensureVddkImageValidationJob(plan *api.Plan, el9 bool, vddk
 	case err != nil:
 		return nil, err
 	case len(jobs.Items) == 0:
-		job := createVddkCheckJob(ctx.Plan, jobLabels, el9, vddkImage)
+		job := createVddkCheckJob(ctx.Plan, jobLabels, vddkImage)
 		err = ctx.Destination.Client.Create(context.Background(), job)
 		if err != nil {
 			return nil, err
@@ -866,15 +866,7 @@ func getVddkImageValidationJobLabels(plan *api.Plan) map[string]string {
 	}
 }
 
-func createVddkCheckJob(plan *api.Plan, labels map[string]string, el9 bool, vddkImage string) *batchv1.Job {
-	// virt-v2v image
-	var virtV2vImage string
-	if el9 {
-		virtV2vImage = Settings.Migration.VirtV2vImageCold
-	} else {
-		virtV2vImage = Settings.Migration.VirtV2vImageWarm
-	}
-
+func createVddkCheckJob(plan *api.Plan, labels map[string]string, vddkImage string) *batchv1.Job {
 	mount := core.VolumeMount{
 		Name:      VddkVolumeName,
 		MountPath: "/opt",
@@ -934,7 +926,7 @@ func createVddkCheckJob(plan *api.Plan, labels map[string]string, el9 bool, vddk
 					Containers: []core.Container{
 						{
 							Name:  "validator",
-							Image: virtV2vImage,
+							Image: Settings.Migration.VirtV2vImageCold,
 							SecurityContext: &core.SecurityContext{
 								AllowPrivilegeEscalation: ptr.To(false),
 								Capabilities: &core.Capabilities{
