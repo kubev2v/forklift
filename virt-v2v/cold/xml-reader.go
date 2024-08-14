@@ -89,5 +89,11 @@ func GetOperationSystemFromConfig(xmlData []byte) (string, error) {
 		return "", err
 	}
 
-	return xmlConf.Metadata.LibOsInfo.V2VOS.ID, nil
+	operatingSystem := xmlConf.Metadata.LibOsInfo.V2VOS.ID
+	if operatingSystem == "" {
+		fmt.Print("Error unmarshalling XML: missing OS ID")
+		return "", fmt.Errorf("missing OS ID")
+	}
+
+	return operatingSystem, nil
 }
