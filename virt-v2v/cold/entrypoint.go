@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	_ "embed"
 	"fmt"
 	"io"
 	"net/http"
@@ -95,10 +96,7 @@ func customizeRootDiskImage(source string) error {
 		fmt.Printf("Operating System ID: %s\n", operatingSystem)
 	}
 
-	// If user selected 'preserveStaticIPs' and it's a RHEL machine, customize root disk image
-	// and add a first boot script to copy ipv4 and ipv6 settings to new network device.
-	preserveStaticIPs := os.Getenv("V2V_preserveStaticIPs")
-	shouldCustomizeImage := preserveStaticIPs == "true" && source == vSphere && strings.Contains(operatingSystem, "rhel")
+	shouldCustomizeImage := source == vSphere && strings.Contains(operatingSystem, "win")
 	if shouldCustomizeImage {
 		rootDiskPath, err := FindRootDiskImage(DIR)
 		if err != nil {
@@ -108,13 +106,12 @@ func customizeRootDiskImage(source string) error {
 			fmt.Printf("Root disk path: %s\n", rootDiskPath)
 		}
 
-		err = CustomizeImage(DIR, rootDiskPath)
+		err = CustomizeWindowsImage(DIR, rootDiskPath)
 		if err != nil {
 			fmt.Println("Error customizing disk image:", err)
 			return err
 		}
 	}
-
 	return nil
 }
 
