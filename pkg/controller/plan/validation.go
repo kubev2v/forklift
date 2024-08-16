@@ -66,7 +66,6 @@ const (
 	Running                      = "Running"
 	Blocked                      = "Blocked"
 	Archived                     = "Archived"
-	VDDKNotConfigured            = "VDDKNotConfigured"
 	unsupportedVersion           = "UnsupportedVersion"
 	VDDKInvalid                  = "VDDKInvalid"
 	ValidatingVDDK               = "ValidatingVDDK"
@@ -737,13 +736,6 @@ func (r *Reconciler) validateHooks(plan *api.Plan) (err error) {
 }
 
 func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
-	vddkNotConfigured := libcnd.Condition{
-		Type:     VDDKNotConfigured,
-		Status:   True,
-		Reason:   NotSet,
-		Category: Critical,
-		Message:  "VDDK image is necessary for this type of migration",
-	}
 	vddkInvalid := libcnd.Condition{
 		Type:     VDDKInvalid,
 		Status:   True,
@@ -773,17 +765,7 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 		return
 	}
 
-	el9, err := plan.VSphereUsesEl9VirtV2v()
-	if err != nil {
-		return
-	}
-
-	image, found := source.Spec.Settings[api.VDDK]
-	switch {
-	case !el9 && !found:
-		// VDDK image is required when EL8 virt-v2v image is in use
-		plan.Status.SetCondition(vddkNotConfigured)
-	case found:
+	if image, found := source.Spec.Settings[api.VDDK]; found {
 		var job *batchv1.Job
 		if job, err = r.ensureVddkImageValidationJob(plan, image); err != nil {
 			return

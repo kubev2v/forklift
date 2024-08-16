@@ -79,32 +79,6 @@ func (admitter *PlanAdmitter) validateStorage() error {
 	return nil
 }
 
-func (admitter *PlanAdmitter) validateVDDK() error {
-	if admitter.sourceProvider.Type() != api.VSphere {
-		log.Info("Provider type (non-VSphere) does not require VDDK, passing")
-		return nil
-	}
-
-	el9, el9Err := admitter.plan.VSphereUsesEl9VirtV2v()
-	if el9Err != nil {
-		log.Error(el9Err, "Could not analyze plan, failing")
-		return el9Err
-	}
-	if el9 {
-		// VDDK image is optional when EL9 virt-v2v image is in use
-		log.Info("VDDK image is optional when EL9 virt-v2v image is in use, passing")
-		return nil
-	}
-
-	if _, found := admitter.sourceProvider.Spec.Settings[api.VDDK]; !found {
-		err := liberr.New("VDDK image is necessary for this type of migration")
-		log.Error(err, "VDDK image required for this type of migration")
-		return err
-	}
-
-	return nil
-}
-
 func (admitter *PlanAdmitter) validateWarmMigrations() error {
 	providerType := admitter.sourceProvider.Type()
 	isWarmMigration := admitter.plan.Spec.Warm
@@ -185,11 +159,6 @@ func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv
 	admitter.plan.Referenced.Provider.Destination = &admitter.destinationProvider
 
 	err = admitter.validateStorage()
-	if err != nil {
-		return util.ToAdmissionResponseError(err)
-	}
-
-	err = admitter.validateVDDK()
 	if err != nil {
 		return util.ToAdmissionResponseError(err)
 	}
