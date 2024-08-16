@@ -95,21 +95,20 @@ func customizeRootDiskImage(source string) error {
 	} else {
 		fmt.Printf("Operating System ID: %s\n", operatingSystem)
 	}
-
-	shouldCustomizeImage := source == vSphere && strings.Contains(operatingSystem, "win")
-	if shouldCustomizeImage {
-		rootDiskPath, err := FindRootDiskImage(DIR)
-		if err != nil {
-			fmt.Println("Error looking for root disk path:", err)
-			os.Exit(1)
-		} else {
-			fmt.Printf("Root disk path: %s\n", rootDiskPath)
-		}
-
-		err = CustomizeWindowsImage(DIR, rootDiskPath)
-		if err != nil {
-			fmt.Println("Error customizing disk image:", err)
-			return err
+	if source == vSphere {
+		if strings.Contains(operatingSystem, "win") {
+			rootDiskPath, err := FindRootDiskImage(DIR)
+			if err != nil {
+				fmt.Println("Error looking for root disk path:", err)
+				os.Exit(1)
+			} else {
+				fmt.Printf("Root disk path: %s\n", rootDiskPath)
+			}
+			err = CustomizeWindowsImage(rootDiskPath)
+			if err != nil {
+				fmt.Println("Error customizing disk image:", err)
+				return err
+			}
 		}
 	}
 	return nil
@@ -254,7 +253,7 @@ func LinkDisks(diskKind string, num int) (err error) {
 	for _, disk := range disks {
 		diskNum, err := strconv.Atoi(disk[num:])
 		if err != nil {
-			fmt.Println("Error geting disks names ", err)
+			fmt.Println("Error getting disks names ", err)
 			return err
 		}
 		diskLink := fmt.Sprintf("%s/%s-sd%s", DIR, os.Getenv("V2V_vmName"), genName(diskNum+1))

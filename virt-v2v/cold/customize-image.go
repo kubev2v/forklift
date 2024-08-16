@@ -1,7 +1,7 @@
 package main
 
 import (
-	_ "embed"
+	"embed"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,41 +10,78 @@ import (
 	"strings"
 )
 
-//go:embed scripts/windows/restore.ps1
-var windowsRestore string
+//go:embed scripts
+var scriptFS embed.FS
 
-func CustomizeWindowsImage(dir string, diskPath string) error {
-	windowsRestorePowershellFilePath := filepath.Join(dir, "restore.ps1")
-	err := WriteBashScript(windowsRestore, windowsRestorePowershellFilePath)
+const (
+	WIN_FIRSTBOOT_SCRIPTS_PATH = "/Program\\ Files/Guestfs/Firstboot/scripts"
+)
+
+// CustomizeWindowsImage customizes a windows disk image by uploading and setting firstboot batch scripts.
+//
+// The function writes two bash scripts to the specified local tmp directory,
+// uploads them to the disk image using `virt-customize`, and sets the `init.bat` to run on the first boot
+// of the image. The `virt-customize` currently supports only batch scripts for windows, so we execute our powershell
+// scripts inside the bash scripts. If any errors occur during these operations, the function returns an error.
+//
+// Arguments:
+//   - diskPath (string): The path to the XML file.
+//
+// Returns:
+//   - error: An error if the file cannot be read, or nil if successful.
+func CustomizeWindowsImage(diskPath string) error {
+	t := EmbedTool{filesystem: &scriptFS}
+	err := t.CreateFilesFromFS(DIR)
 	if err != nil {
-		return fmt.Errorf("failed to write windows powershell file path: %w", err)
+		return err
 	}
-	err = CustomizeImage(diskPath, windowsRestorePowershellFilePath)
+	windowsScriptsPath := filepath.Join(DIR, "scripts", "windows")
+	initPath := filepath.Join(windowsScriptsPath, "init.bat")
+	restoreScriptPath := filepath.Join(windowsScriptsPath, "restore_config.ps1")
+
+	uploadPath := fmt.Sprintf("%s:%s", restoreScriptPath, WIN_FIRSTBOOT_SCRIPTS_PATH)
+
+	var extraArgs []string
+	extraArgs = append(extraArgs, getScriptArgs("firstboot", initPath)...)
+	extraArgs = append(extraArgs, getScriptArgs("upload", uploadPath)...)
+
+	err = CustomizeImage(diskPath, extraArgs...)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// CustomizeImage customizes a disk image by uploading and setting firstboot bash scripts.
-//
-// The function writes two bash scripts to the specified local tmp directory,
-// uploads them to the disk image using `virt-customize`, and sets them to run on the first boot
-// of the image. If any errors occur during these operations, the function returns an error.
+// getScriptArgs generates a list of arguments.
 //
 // Arguments:
-//   - dir (string): The directory where the bash scripts will be stored locally.
+//   - argName (string): Argument name which should be used for all the values
+//   - values (...string): The list of values which should be joined with argument names.
+//
+// Returns:
+//   - []string: List of arguments
+//
+// Example:
+//   - getScriptArgs("firstboot", boot1, boot2) => ["--firstboot", boot1, "--firstboot", boot2]
+func getScriptArgs(argName string, values ...string) []string {
+	var args []string
+	for _, val := range values {
+		args = append(args, fmt.Sprintf("--%s", argName), val)
+	}
+	return args
+}
+
+// CustomizeImage executes `virt-customize` to customize the image.
+//
+// Arguments:
 //   - diskPath (string): The path to the disk image that is being customized.
+//   - extraArgs (...string): The additional arguments which will be appended to the `virt-customize` arguments.
 //
 // Returns:
 //   - error: An error if something goes wrong during the process, or nil if successful.
-func CustomizeImage(diskPath string, bootScripts ...string) error {
+func CustomizeImage(diskPath string, extraArgs ...string) error {
 	args := []string{"--verbose", "-a", diskPath}
-
-	for _, script := range bootScripts {
-		args = append(args, "--firstboot", script)
-	}
-
+	args = append(args, extraArgs...)
 	customizeCmd := exec.Command("virt-customize", args...)
 
 	fmt.Println("exec:", customizeCmd)
