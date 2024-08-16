@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
 	"os/exec"
@@ -8,6 +9,22 @@ import (
 	"regexp"
 	"strings"
 )
+
+//go:embed scripts/windows/restore.ps1
+var windowsRestore string
+
+func CustomizeWindowsImage(dir string, diskPath string) error {
+	windowsRestorePowershellFilePath := filepath.Join(dir, "restore.ps1")
+	err := WriteBashScript(windowsRestore, windowsRestorePowershellFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to write windows powershell file path: %w", err)
+	}
+	err = CustomizeImage(diskPath, windowsRestorePowershellFilePath)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
 // CustomizeImage customizes a disk image by uploading and setting firstboot bash scripts.
 //
@@ -21,29 +38,19 @@ import (
 //
 // Returns:
 //   - error: An error if something goes wrong during the process, or nil if successful.
-func CustomizeImage(dir string, diskPath string) error {
-	checkConnectionBashFilePath := filepath.Join(dir, "check-connection.sh")
-	err := WriteBashScript(CheckConnectivityBash, checkConnectionBashFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to write check-connection bash script: %w", err)
+func CustomizeImage(diskPath string, bootScripts ...string) error {
+	args := []string{"--verbose", "-a", diskPath}
+
+	for _, script := range bootScripts {
+		args = append(args, "--firstboot", script)
 	}
 
-	copyConnectionsBashFilePath := filepath.Join(dir, "copy-connections.sh")
-	err = WriteBashScript(CopyConnectionsBash, copyConnectionsBashFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to write copy-connections bash script: %w", err)
-	}
-
-	customizeCmd := exec.Command("virt-customize", "--verbose",
-		"-a", diskPath,
-		"--firstboot", checkConnectionBashFilePath,
-		"--firstboot", copyConnectionsBashFilePath)
+	customizeCmd := exec.Command("virt-customize", args...)
 
 	fmt.Println("exec:", customizeCmd)
 	if err := customizeCmd.Run(); err != nil {
 		return fmt.Errorf("error executing virt-customize command: %w", err)
 	}
-
 	return nil
 }
 
