@@ -48,7 +48,7 @@ type Nvram struct {
 	Template string `xml:"template,attr"`
 }
 
-// readXMLFile reads the content of an XML []byte from the given file path.
+// ReadXMLFile reads the content of an XML []byte from the given file path.
 //
 // Arguments:
 //   - filePath (string): The path to the XML file.
@@ -91,7 +91,7 @@ func GetOperationSystemFromConfig(xmlData []byte) (string, error) {
 
 	operatingSystem := xmlConf.Metadata.LibOsInfo.V2VOS.ID
 	if operatingSystem == "" {
-		fmt.Print("Error unmarshalling XML: missing OS ID")
+		fmt.Println("Error unmarshalling XML: missing OS ID")
 		return "", fmt.Errorf("missing OS ID")
 	}
 
