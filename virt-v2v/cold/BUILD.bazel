@@ -93,7 +93,6 @@ container_image(
 go_library(
     name = "cold_lib",
     srcs = [
-        "constants.go",
         "customize-image.go",
         "entrypoint.go",
         "write-bash-script.go",
@@ -106,6 +105,7 @@ go_library(
 go_binary(
     name = "virt-v2v-wrapper",
     embed = [":cold_lib"],
+    embedsrcs = ["scripts"],
     visibility = ["//visibility:public"],
 )
 
