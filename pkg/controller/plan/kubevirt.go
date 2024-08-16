@@ -1971,8 +1971,13 @@ func (r *KubeVirt) libvirtDomain(vmCr *VirtualMachine, pvcs []*core.PersistentVo
 		pvcsByName[pvc.Name] = pvc
 	}
 
-	// virt-v2v needs a very minimal libvirt domain XML file to be provided
-	// with the locations of each of the disks on the VM that is to be converted.
+	// FIXME: this should really be as complete an XML domain definition as possible
+	// to give virt-v2v the best chance of converting the disk correctly. Things
+	// like block device name translation and network translation may not work properly
+	// without the full metadata, so we may see weird things happening in some
+	// conversions. For now, this xml definition is just a minimal domain XML file
+	// with the locations of each disk on the VM that is to be converted, but it
+	// should be fixed properly in the future.
 	libvirtDisks := make([]libvirtxml.DomainDisk, 0)
 	for i, vol := range vmCr.Spec.Template.Spec.Volumes {
 		diskSource := libvirtxml.DomainDiskSource{}
