@@ -200,6 +200,11 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		if err != nil {
 			return
 		}
+
+		env = append(env, core.EnvVar{
+			Name:  "V2V_preserveStaticIPs",
+			Value: "true",
+		})
 	}
 
 	libvirtURL, fingerprint, err := r.getSourceDetails(vm, sourceSecret)
