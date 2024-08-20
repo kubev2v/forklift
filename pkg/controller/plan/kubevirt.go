@@ -970,7 +970,7 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 			return
 		}
 		r.Log.Info("Setting the vm firmware ", vm.Firmware, "vmId", vm.ID)
-	case api.VSphere:
+
 		if vm.OperatingSystem, err = util.GetOperationSystemFromYaml(vmConf); err != nil {
 			err = liberr.Wrap(err)
 			return
@@ -1719,11 +1719,13 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 			})
 	}
 
-	environment = append(environment,
-		core.EnvVar{
-			Name:  "V2V_NewName",
-			Value: vm.NewName,
-		})
+	if vm.NewName != "" {
+		environment = append(environment,
+			core.EnvVar{
+				Name:  "V2V_NewName",
+				Value: vm.NewName,
+			})
+	}
 
 	// pod annotations
 	annotations := map[string]string{}

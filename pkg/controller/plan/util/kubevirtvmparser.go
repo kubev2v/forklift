@@ -10,7 +10,7 @@ import (
 
 const (
 	// Name.
-	Name = "virt-v2v-parser"
+	Name = "kubevirt-vm-parser"
 )
 
 // Package logger.
