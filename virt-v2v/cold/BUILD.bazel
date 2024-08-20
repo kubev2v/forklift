@@ -100,9 +100,9 @@ go_library(
         "xml-reader.go",
     ],
     embedsrcs = [
-        "scripts/windows/restore_config.ps1",
-        "scripts/windows/restore_config_init.bat",
-        "scripts/windows/task.reg",
+        "scripts/windows/9999-restore_config.ps1",
+        "scripts/windows/9999-restore_config_init.bat",
+        "scripts/windows/firstboot.bat",
     ],
     importpath = "github.com/konveyor/forklift-controller/virt-v2v/cold",
     visibility = ["//visibility:private"],
