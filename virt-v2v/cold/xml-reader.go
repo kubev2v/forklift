@@ -11,6 +11,7 @@ type OvaVmconfig struct {
 	Name     string   `xml:"name"`
 	OS       OS       `xml:"os"`
 	Metadata Metadata `xml:"metadata"`
+	Devices  Devices  `xml:"devices"`
 }
 
 type OS struct {
@@ -21,6 +22,16 @@ type OS struct {
 
 type Metadata struct {
 	LibOsInfo LibOsInfo `xml:"libosinfo"`
+}
+
+type Devices struct {
+	Disks []Disk `xml:"disk"`
+}
+type Disk struct {
+	Source Source `xml:"source"`
+}
+type Source struct {
+	File string `xml:"file,attr"`
 }
 
 type LibOsInfo struct {

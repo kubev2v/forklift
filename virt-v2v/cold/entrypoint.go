@@ -83,26 +83,22 @@ func main() {
 	}
 }
 
+func getVmDiskPaths(domain *OvaVmconfig) []string {
+	var resp []string
+	for _, disk := range domain.Devices.Disks {
+		if disk.Source.File != "" {
+			resp = append(resp, disk.Source.File)
+		}
+	}
+	return resp
+}
+
 func customizeVM(source string, xmlFilePath string) error {
 	domain, err := GetDomainFromXml(xmlFilePath)
+	disks := getVmDiskPaths(domain)
 	if err != nil {
 		fmt.Printf("Error mapping xml to ova: %v\n", err)
 	}
-
-	// Define the domain from xmlFilePath
-	err = defineVmExec(xmlFilePath)
-	if err != nil {
-		fmt.Println("Error defining vm:", err)
-		os.Exit(1)
-	}
-	defer func() {
-		// After the customization is finished remove the domain
-		err = undefineVmExec(domain.Name)
-		if err != nil {
-			fmt.Println("Error undefined vm", err)
-			os.Exit(1)
-		}
-	}()
 
 	operatingSystem := domain.Metadata.LibOsInfo.V2VOS.ID
 	if operatingSystem == "" {
@@ -112,7 +108,7 @@ func customizeVM(source string, xmlFilePath string) error {
 	}
 	if source == vSphere {
 		if strings.Contains(operatingSystem, "win") {
-			err = CustomizeWindows(domain.Name)
+			err = CustomizeWindows(disks)
 			if err != nil {
 				fmt.Println("Error customizing disk image:", err)
 				return err
