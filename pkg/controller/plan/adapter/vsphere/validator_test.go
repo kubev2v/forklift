@@ -7,6 +7,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -35,6 +36,9 @@ func (m *mockInventory) Find(resource interface{}, ref ref.Ref) error {
 		}
 		if ref.Name == "not_windows_guest" {
 			res.VM.GuestID = "rhel8_64Guest"
+		}
+		if ref.Name == "missing_from_invetory" {
+			return base.NotFoundError{}
 		}
 	}
 	return nil
@@ -88,7 +92,6 @@ var _ = Describe("vsphere validation tests", func() {
 				}
 				ok, err := validator.StaticIPs(ref.Ref{Name: vmName})
 				if shouldError {
-					Expect(err).NotTo(HaveOccurred())
 					Expect(ok).To(BeFalse())
 				} else {
 					Expect(err).NotTo(HaveOccurred())
@@ -101,7 +104,9 @@ var _ = Describe("vsphere validation tests", func() {
 			Entry("when the vm doesn't have static ips, and the plan set without static ip", "test", false, false),
 			Entry("when the vm have static ips, and the plan set with static ip", "full_guest_network", true, false),
 			Entry("when the vm have static ips, and the plan set without static ip", "test", false, false),
-			Entry("when the vm doesn't have static ips, and the plan set without static ip, vm is non-windows", "not_windows_guest", true, false),
+			Entry("when the vm doesn't have static ips, and the plan set without static ip, vm is non-windows", "not_windows_guest", false, false),
+			Entry("when the vm doesn't have static ips, and the plan set with static ip, vm is non-windows", "not_windows_guest", true, true),
+			Entry("when the vm doesn't exist", "missing_from_invetory", true, true),
 		)
 	})
 })
