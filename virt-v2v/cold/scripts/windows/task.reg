@@ -1,2 +1,0 @@
-[HKLM\Software\Microsoft\Windows\CurrentVersion\RunOnce]
-"MTV"="C:\\Program Files\\Guestfs\\Firstboot\\restore_config_init.bat"
