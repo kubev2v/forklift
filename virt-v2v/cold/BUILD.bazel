@@ -96,7 +96,6 @@ go_library(
         "customize-image.go",
         "embed-tool.go",
         "entrypoint.go",
-        "utils.go",
         "xml-reader.go",
     ],
     embedsrcs = [
