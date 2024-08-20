@@ -50,8 +50,6 @@ spec:
           value: ${VALIDATION_IMAGE}
         - name: VIRT_V2V_IMAGE
           value: ${VIRT_V2V_IMAGE}
-        - name: VIRT_V2V_WARM_IMAGE
-          value: ${VIRT_V2V_WARM_IMAGE}
         - name: VIRT_V2V_DONT_REQUEST_KVM
           value: ${VIRT_V2V_DONT_REQUEST_KVM}
         - name: SNAPSHOT_REMOVAL_TIMEOUT

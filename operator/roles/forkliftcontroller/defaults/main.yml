@@ -108,7 +108,6 @@ populator_openstack_image_fqin: "{{ lookup( 'env', 'OPENSTACK_POPULATOR_IMAGE') 
 
 must_gather_image_fqin: "{{ lookup( 'env', 'MUST_GATHER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_MUST_GATHER') }}"
 virt_v2v_image_fqin: "{{ lookup( 'env', 'VIRT_V2V_IMAGE') or lookup( 'env', 'RELATED_IMAGE_VIRT_V2V') }}"
-virt_v2v_warm_image_fqin: "{{ lookup( 'env', 'VIRT_V2V_WARM_IMAGE') or lookup( 'env', 'RELATED_IMAGE_VIRT_V2V_WARM') }}"
 virt_v2v_dont_request_kvm: "{{ lookup( 'env', 'VIRT_V2V_DONT_REQUEST_KVM') }}"
 virt_v2v_extra_args: "{{ lookup( 'env', 'VIRT_V2V_EXTRA_ARGS') }}"
 virt_v2v_extra_conf_config_map: "{{ lookup( 'env', 'VIRT_V2V_EXTRA_CONF_CONFIG_MAP') }}"
