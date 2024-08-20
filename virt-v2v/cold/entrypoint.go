@@ -126,8 +126,8 @@ func convertVirtV2vInPlace() error {
 	return executeVirtV2v("/usr/libexec/virt-v2v-in-place", args)
 }
 
-func virtV2vBuildCommand() []string {
-	virtV2vArgs := []string{"-v", "-x"}
+func virtV2vBuildCommand() (args []string, err error) {
+	args = []string{"-v", "-x"}
 	source := os.Getenv("V2V_source")
 
 	requiredEnvVars := map[string][]string{
@@ -137,66 +137,62 @@ func virtV2vBuildCommand() []string {
 
 	if envVars, ok := requiredEnvVars[source]; ok {
 		if !checkEnvVariablesSet(envVars...) {
-			fmt.Printf("Following environment variables need to be defined: %v\n", envVars)
-			os.Exit(1)
+			return nil, fmt.Errorf("Following environment variables need to be defined: %v\n", envVars)
 		}
 	} else {
 		providers := make([]string, len(requiredEnvVars))
 		for key := range requiredEnvVars {
 			providers = append(providers, key)
 		}
-		fmt.Printf("virt-v2v supports the following providers: {%v}. Provided: %s\n", strings.Join(providers, ", "), source)
-		os.Exit(1)
+		return nil, fmt.Errorf("virt-v2v supports the following providers: {%v}. Provided: %s\n", strings.Join(providers, ", "), source)
 	}
 	fmt.Println("Preparing virt-v2v")
 
 	switch source {
 	case VSPHERE:
-		virtV2vArgs = append(virtV2vArgs, "--root")
+		args = append(args, "--root")
 		if checkEnvVariablesSet("V2V_RootDisk") {
-			virtV2vArgs = append(virtV2vArgs, os.Getenv("V2V_RootDisk"))
+			args = append(args, os.Getenv("V2V_RootDisk"))
 		} else {
-			virtV2vArgs = append(virtV2vArgs, "first")
+			args = append(args, "first")
 		}
-		virtV2vArgs = append(virtV2vArgs, "-i", "libvirt", "-ic", os.Getenv("V2V_libvirtURL"))
+		args = append(args, "-i", "libvirt", "-ic", os.Getenv("V2V_libvirtURL"))
 	case OVA:
-		virtV2vArgs = append(virtV2vArgs, "-i", "ova", os.Getenv("V2V_diskPath"))
+		args = append(args, "-i", "ova", os.Getenv("V2V_diskPath"))
 	}
 
 	if err := os.MkdirAll(DIR, os.ModePerm); err != nil {
-		fmt.Println("Error creating directory  ", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("Error creating directory: %v", err)
 	}
-	virtV2vArgs = append(virtV2vArgs, "-o", "local", "-os", DIR)
+	args = append(args, "-o", "local", "-os", DIR)
 
 	//Disks on filesystem storage.
-	if err := LinkDisks(FS, 15); err != nil {
-		os.Exit(1)
+	if err = LinkDisks(FS, 15); err != nil {
+		return
 	}
 	//Disks on block storage.
-	if err := LinkDisks(BLOCK, 10); err != nil {
-		os.Exit(1)
+	if err = LinkDisks(BLOCK, 10); err != nil {
+		return
 	}
 
 	if source == VSPHERE {
-		virtV2vArgs = append(virtV2vArgs, "-ip", "/etc/secret/secretKey")
+		args = append(args, "-ip", "/etc/secret/secretKey")
 
 		if envStaticIPs := os.Getenv("V2V_staticIPs"); envStaticIPs != "" {
 			for _, macToIp := range strings.Split(envStaticIPs, "_") {
-				virtV2vArgs = append(virtV2vArgs, "--mac", macToIp)
+				args = append(args, "--mac", macToIp)
 			}
 		}
 
 		// Adds LUKS keys, if they exist
 		luksArgs, err := addLUKSKeys()
 		if err != nil {
-			fmt.Println("Error adding LUKS kyes ", err)
-			os.Exit(1)
+			return nil, fmt.Errorf("Error adding LUKS keys: %v", err)
 		}
-		virtV2vArgs = append(virtV2vArgs, luksArgs...)
+		args = append(args, luksArgs...)
 
 		if info, err := os.Stat(VDDK); err == nil && info.IsDir() {
-			virtV2vArgs = append(virtV2vArgs,
+			args = append(args,
 				"-it", "vddk",
 				"-io", fmt.Sprintf("vddk-libdir=%s", VDDK),
 				"-io", fmt.Sprintf("vddk-thumbprint=%s", os.Getenv("V2V_fingerprint")),
@@ -205,15 +201,14 @@ func virtV2vBuildCommand() []string {
 		var extraArgs []string
 		if envExtraArgs := os.Getenv("V2V_extra_args"); envExtraArgs != "" {
 			if err := json.Unmarshal([]byte(envExtraArgs), &extraArgs); err != nil {
-				fmt.Println("Error parsing extra arguments ", err)
-				os.Exit(1)
+				return nil, fmt.Errorf("Error parsing extra arguments %v", err)
 			}
 		}
-		virtV2vArgs = append(virtV2vArgs, extraArgs...)
+		args = append(args, extraArgs...)
 
-		virtV2vArgs = append(virtV2vArgs, "--", os.Getenv("V2V_vmName"))
+		args = append(args, "--", os.Getenv("V2V_vmName"))
 	}
-	return virtV2vArgs
+	return args, nil
 }
 
 // addLUKSKeys checks the LUKS directory for key files and returns the appropriate
@@ -227,8 +222,7 @@ func addLUKSKeys() ([]string, error) {
 	if _, err := os.Stat(LUKSDIR); err == nil {
 		files, err := getFilesInPath(LUKSDIR)
 		if err != nil {
-			fmt.Println("Error reading files in LUKS directory", err)
-			os.Exit(1)
+			return nil, fmt.Errorf("Error reading files in LUKS directory: %v", err)
 		}
 
 		var luksFiles []string
@@ -238,8 +232,7 @@ func addLUKSKeys() ([]string, error) {
 
 		luksArgs = append(luksArgs, getScriptArgs("key", luksFiles...)...)
 	} else if !os.IsNotExist(err) {
-		fmt.Println("Error accessing the LUKS directory", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("Error accessing the LUKS directory: %v", err)
 	}
 
 	return luksArgs, nil
@@ -265,8 +258,12 @@ func convertVirtV2v() (err error) {
 		}
 	}
 
-	if err = executeVirtV2v("virt-v2v", virtV2vBuildCommand()); err != nil {
-		return err
+	args, err := virtV2vBuildCommand()
+	if err != nil {
+		return
+	}
+	if err = executeVirtV2v("virt-v2v", args); err != nil {
+		return
 	}
 
 	if xmlFilePath, err = getXMLFile(DIR, "xml"); err != nil {
