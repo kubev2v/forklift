@@ -45,9 +45,8 @@ type Migration struct {
 	SnapshotRemovalTimeout int
 	// Snapshot status check rate in seconds
 	SnapshotStatusCheckRate int
-	// Virt-v2v images for guest conversion
-	VirtV2vImageCold string
-	VirtV2vImageWarm string
+	// Virt-v2v image for guest conversion
+	VirtV2vImage string
 	// Virt-v2v require KVM flags for guest conversion
 	VirtV2vDontRequestKVM bool
 	// OCP Export token TTL minutes
@@ -94,13 +93,7 @@ func (r *Migration) Load() (err error) {
 		return liberr.Wrap(err)
 	}
 	if virtV2vImage, ok := os.LookupEnv(VirtV2vImage); ok {
-		if cold, warm, found := strings.Cut(virtV2vImage, "|"); found {
-			r.VirtV2vImageCold = cold
-			r.VirtV2vImageWarm = warm
-		} else {
-			r.VirtV2vImageCold = virtV2vImage
-			r.VirtV2vImageWarm = virtV2vImage
-		}
+		r.VirtV2vImage = virtV2vImage
 	} else if Settings.Role.Has(MainRole) {
 		return liberr.Wrap(fmt.Errorf("failed to find environment variable %s", VirtV2vImage))
 	}
