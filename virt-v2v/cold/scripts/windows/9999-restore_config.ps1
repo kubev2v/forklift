@@ -1,7 +1,7 @@
 # Migration - Reconfigure disks
 # Initialize the log file created by the generated script
 $logFile = $env:SystemDrive + '\Program Files\Guestfs\Firstboot\scripts-done\9999-restore_config.txt'
-Write-Output ('Starting restore_config.ps1 script') > $logFile
+Write-Output ('Starting 9999-restore_config.ps1 script') > $logFile
 Write-Output ('') >> $logFile
 
 # script section to re-enable all offline drives

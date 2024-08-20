@@ -12,17 +12,14 @@ import (
 var scriptFS embed.FS
 
 const (
-	WIN_FIRSTBOOT_PATH = "/Program Files/Guestfs/Firstboot/"
+	WIN_FIRSTBOOT_PATH         = "/Program Files/Guestfs/Firstboot"
+	WIN_FIRSTBOOT_SCRIPTS_PATH = "/Program Files/Guestfs/Firstboot/scripts"
 )
 
-// CustomizeWindows customizes a windows disk image by uploading scripts and configuring new RunOnce task to execute it.
+// CustomizeWindows customizes a windows disk image by uploading scripts.
 //
 // The function writes two bash scripts to the specified local tmp directory,
 // uploads them to the disk image using `virt-customize`.
-//
-// NOTE: We can't use the firstboot commands as the system is not ready to run all commands.
-// Some commands for example `Get-Disk` returns empty list. So we need to set the registry with `RunOnce` task,
-// which will be run by the Winodws once the system is ready.
 //
 // Arguments:
 //   - domain (string): The VM which should be customized.
@@ -37,22 +34,18 @@ func CustomizeWindows(domain string) error {
 		return err
 	}
 	windowsScriptsPath := filepath.Join(DIR, "scripts", "windows")
-	initPath := filepath.Join(windowsScriptsPath, "restore_config_init.bat")
-	restoreScriptPath := filepath.Join(windowsScriptsPath, "restore_config.ps1")
+	initPath := filepath.Join(windowsScriptsPath, "9999-restore_config_init.bat")
+	restoreScriptPath := filepath.Join(windowsScriptsPath, "9999-restore_config.ps1")
+	firstbootPath := filepath.Join(windowsScriptsPath, "firstboot.bat")
 
 	// Upload scripts to the windows
-	uploadScriptPath := fmt.Sprintf("%s:%s", restoreScriptPath, WIN_FIRSTBOOT_PATH)
-	uploadInitPath := fmt.Sprintf("%s:%s", initPath, WIN_FIRSTBOOT_PATH)
+	uploadScriptPath := fmt.Sprintf("%s:%s", restoreScriptPath, WIN_FIRSTBOOT_SCRIPTS_PATH)
+	uploadInitPath := fmt.Sprintf("%s:%s", initPath, WIN_FIRSTBOOT_SCRIPTS_PATH)
+	uploadFirstbootPath := fmt.Sprintf("%s:%s", firstbootPath, WIN_FIRSTBOOT_PATH)
 
 	var extraArgs []string
-	extraArgs = append(extraArgs, getScriptArgs("upload", uploadScriptPath, uploadInitPath)...)
+	extraArgs = append(extraArgs, getScriptArgs("upload", uploadScriptPath, uploadInitPath, uploadFirstbootPath)...)
 	err = CustomizeDomainExec(domain, extraArgs...)
-	if err != nil {
-		return err
-	}
-	// Run the virt-win-reg to update the Windows registry with our new RunOnce tas
-	taskPath := filepath.Join(windowsScriptsPath, "task.reg")
-	err = VirtWinRegExec(domain, taskPath)
 	if err != nil {
 		return err
 	}
@@ -76,26 +69,6 @@ func getScriptArgs(argName string, values ...string) []string {
 		args = append(args, fmt.Sprintf("--%s", argName), val)
 	}
 	return args
-}
-
-// VirtWinRegExec executes `virt-win-reg` to edit the windows registries.
-//
-// Arguments:
-//   - domain (string): The VM domain in which should be the registries changed.
-//   - taskPath (...string): The path to the task registry which should be merged with the Windows registry.
-//
-// Returns:
-//   - error: An error if something goes wrong during the process, or nil if successful.
-func VirtWinRegExec(domain string, taskPath string) error {
-	customizeCmd := exec.Command("virt-win-reg", "--merge", domain, taskPath)
-	customizeCmd.Stdout = os.Stdout
-	customizeCmd.Stderr = os.Stderr
-
-	fmt.Println("exec:", customizeCmd)
-	if err := customizeCmd.Run(); err != nil {
-		return fmt.Errorf("error executing virt-win-reg command: %w", err)
-	}
-	return nil
 }
 
 // CustomizeDomainExec executes `virt-customize` to customize the image.
