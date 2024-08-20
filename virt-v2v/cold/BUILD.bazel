@@ -94,11 +94,16 @@ go_library(
     name = "cold_lib",
     srcs = [
         "customize-image.go",
-        "entrypoint.go",
         "embed-tool.go",
+        "entrypoint.go",
+        "utils.go",
         "xml-reader.go",
     ],
-    embedsrcs = ["scripts"],
+    embedsrcs = [
+        "scripts/windows/restore_config.ps1",
+        "scripts/windows/restore_config_init.bat",
+        "scripts/windows/task.reg",
+    ],
     importpath = "github.com/konveyor/forklift-controller/virt-v2v/cold",
     visibility = ["//visibility:private"],
 )
@@ -130,11 +135,7 @@ container_image(
 
 go_test(
     name = "cold_test",
-    srcs = [
-        "cold_test.go",
-        "write-bash-script_test.go",
-        "xml-reader_test.go",
-    ],
+    srcs = ["cold_test.go"],
     data = glob(["testdata/**"]),
     embed = [":cold_lib"],
 )
