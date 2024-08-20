@@ -201,7 +201,7 @@ func makeConversionContainer(pvc *v1.PersistentVolumeClaim, srcFormat, dstFormat
 
 	container := v1.Container{
 		Name:  "convert",
-		Image: base.Settings.VirtV2vImageCold,
+		Image: base.Settings.VirtV2vImage,
 		SecurityContext: &v1.SecurityContext{
 			AllowPrivilegeEscalation: ptr.To(false),
 			Capabilities: &v1.Capabilities{

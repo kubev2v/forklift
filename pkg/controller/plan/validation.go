@@ -908,7 +908,7 @@ func createVddkCheckJob(plan *api.Plan, labels map[string]string, vddkImage stri
 					Containers: []core.Container{
 						{
 							Name:  "validator",
-							Image: Settings.Migration.VirtV2vImageCold,
+							Image: Settings.Migration.VirtV2vImage,
 							SecurityContext: &core.SecurityContext{
 								AllowPrivilegeEscalation: ptr.To(false),
 								Capabilities: &core.Capabilities{
