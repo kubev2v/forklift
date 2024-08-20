@@ -243,10 +243,10 @@ rpm(
 )
 
 rpm(
-    name = "augeas-libs-0__1.13.0-5.el9.x86_64",
-    sha256 = "548e88d792c8a0e2f824f350fb75f6a99ce57b5ccdefa5f06c2ff97168b613d6",
+    name = "augeas-libs-0__1.13.0-6.el9.x86_64",
+    sha256 = "919e5c4d0cbb8876a141d844856d53e6f461086178a54bcaea67377d7bef2fd4",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/augeas-libs-1.13.0-5.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/augeas-libs-1.13.0-6.el9.x86_64.rpm",
     ],
 )
 
@@ -283,10 +283,10 @@ rpm(
 )
 
 rpm(
-    name = "ca-certificates-0__2023.2.60_v7.0.306-90.1.el9.x86_64",
-    sha256 = "a2b75818778e0303caeed35c5763ac4a7ed55e6ac877d1f9771c4f42f257a7b2",
+    name = "ca-certificates-0__2024.2.69_v8.0.303-91.3.el9.x86_64",
+    sha256 = "b465bbf264432808f2843ee4c155ea5b3da91dd4334d0101e3724d502baef529",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/ca-certificates-2023.2.60_v7.0.306-90.1.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/ca-certificates-2024.2.69_v8.0.303-91.3.el9.noarch.rpm",
     ],
 )
 
@@ -331,10 +331,10 @@ rpm(
 )
 
 rpm(
-    name = "coreutils-single-0__8.32-35.el9.x86_64",
-    sha256 = "60ba031557a43abad3958a5be2011e89f8dbd079a2d8a69e4e0812ae3b4cb02c",
+    name = "coreutils-single-0__8.32-36.el9.x86_64",
+    sha256 = "e157ec6ce92a0aa08f97b0de6908da195088a87f7e61366038e34a52a5c17577",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/coreutils-single-8.32-35.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/coreutils-single-8.32-36.el9.x86_64.rpm",
     ],
 )
 
@@ -363,10 +363,10 @@ rpm(
 )
 
 rpm(
-    name = "crypto-policies-0__20240304-1.gitb1c706d.el9.x86_64",
-    sha256 = "4b3880fb8b00fd3656d061a08600fcca571fb5bcc8c05ad96cfe205903610ff3",
+    name = "crypto-policies-0__20240815-1.gite217f03.el9.x86_64",
+    sha256 = "fa65498af3120f1b07d340803f033e823f279a06b0976b78ade45a3a065598de",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/crypto-policies-20240304-1.gitb1c706d.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/crypto-policies-20240815-1.gite217f03.el9.noarch.rpm",
     ],
 )
 
@@ -467,10 +467,10 @@ rpm(
 )
 
 rpm(
-    name = "dracut-0__057-53.git20240104.el9.x86_64",
-    sha256 = "9284d47b5c0b61f876413aed063a8166f3758502b4e7aa47da8d27772e50f7de",
+    name = "dracut-0__057-67.git20240812.el9.x86_64",
+    sha256 = "a95fa64575dd6a5499c9776ef5d781cf9c74ccdc7a292a71fdc441df39da4792",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/dracut-057-53.git20240104.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/dracut-057-67.git20240812.el9.x86_64.rpm",
     ],
 )
 
@@ -651,26 +651,26 @@ rpm(
 )
 
 rpm(
-    name = "glibc-0__2.34-119.el9.x86_64",
-    sha256 = "055a6345b0b6f5b6d302461ca4af07cd39df08e067a12f37beb7fab7552c028f",
+    name = "glibc-0__2.34-120.el9.x86_64",
+    sha256 = "d10f1b9ff7ce56fb114bda9bcd90aebd16826c348a7e5c74eda6186630daa252",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/glibc-2.34-119.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/glibc-2.34-120.el9.x86_64.rpm",
     ],
 )
 
 rpm(
-    name = "glibc-common-0__2.34-119.el9.x86_64",
-    sha256 = "7736d553ddc35f003afbcb66e0b3e64c12f601fe7bc4b2948eef4f075f893fa7",
+    name = "glibc-common-0__2.34-120.el9.x86_64",
+    sha256 = "562593e8052f32bb08217686d55624c7176d9994f248bb42843a1ca491a50a11",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/glibc-common-2.34-119.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/glibc-common-2.34-120.el9.x86_64.rpm",
     ],
 )
 
 rpm(
-    name = "glibc-langpack-en-0__2.34-119.el9.x86_64",
-    sha256 = "5e340d80c237b49d9252471af18ae4278e0c92e73577c5393b366fb09dfcade8",
+    name = "glibc-langpack-en-0__2.34-120.el9.x86_64",
+    sha256 = "c7cfb038d1e7f6cfc0d216e2bf1c4a895511b2ae11ddfd85f1f0e6bc2b0b5db1",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/glibc-langpack-en-2.34-119.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/glibc-langpack-en-2.34-120.el9.x86_64.rpm",
     ],
 )
 
@@ -883,18 +883,18 @@ rpm(
 )
 
 rpm(
-    name = "kernel-core-0__5.14.0-494.el9.x86_64",
-    sha256 = "c5c24bd218c33597b4fa17fa0760be76c6d00810e80c0a08184fbbd42aa38c61",
+    name = "kernel-core-0__5.14.0-495.el9.x86_64",
+    sha256 = "fc3030325597a20cd5f909c84fdc0d1cd8d7ed4fed4e6c720f8a17c3bf0e2f21",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/kernel-core-5.14.0-494.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/kernel-core-5.14.0-495.el9.x86_64.rpm",
     ],
 )
 
 rpm(
-    name = "kernel-modules-core-0__5.14.0-494.el9.x86_64",
-    sha256 = "fc6317158fffb98aaf4826ecc08c8de298cf3382b4bb45c4d5f1c7fa57d99d1b",
+    name = "kernel-modules-core-0__5.14.0-495.el9.x86_64",
+    sha256 = "7af993d593f0eac0076dde38714f5a3f5c1b87c2c510c190216a62817695f1b8",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/kernel-modules-core-5.14.0-494.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/kernel-modules-core-5.14.0-495.el9.x86_64.rpm",
     ],
 )
 
@@ -923,18 +923,18 @@ rpm(
 )
 
 rpm(
-    name = "kmod-0__28-9.el9.x86_64",
-    sha256 = "11350b4b29ff5780e6903ce2674a995b50f7eccd7ac9722c99f0448ca272edb3",
+    name = "kmod-0__28-10.el9.x86_64",
+    sha256 = "8b88204ae7e7493a5da5e9e055e348b57e2809f72bdaceadb9b61b05f6e4c555",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/kmod-28-9.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/kmod-28-10.el9.x86_64.rpm",
     ],
 )
 
 rpm(
-    name = "kmod-libs-0__28-9.el9.x86_64",
-    sha256 = "c60acdee9f83607265639a0c1dc2c25e948798dc7eed301de908a13e4aaaab75",
+    name = "kmod-libs-0__28-10.el9.x86_64",
+    sha256 = "31f90047fc0266d38b8b08799381bb5f286774a8171e4c9fe73a2a0e7c4570ea",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/kmod-libs-28-9.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/kmod-libs-28-10.el9.x86_64.rpm",
     ],
 )
 
@@ -955,10 +955,10 @@ rpm(
 )
 
 rpm(
-    name = "less-0__590-4.el9.x86_64",
-    sha256 = "e30eea08caa94e6f75b55411bc60a9b103226cc3bb76f57d23bd1dc4e518d84e",
+    name = "less-0__590-5.el9.x86_64",
+    sha256 = "d6910f7c92871082eab20c89fd7793e107d75a673aa772ccee5efbf38c106cf2",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/less-590-4.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/less-590-5.el9.x86_64.rpm",
     ],
 )
 
@@ -1595,58 +1595,58 @@ rpm(
 )
 
 rpm(
-    name = "libvirt-client-0__10.5.0-4.el9.x86_64",
-    sha256 = "5d8ad0fb3edf64332ebc613c5586f2573d3f7d8292def51ce7c1dad5414e93ba",
+    name = "libvirt-client-0__10.5.0-5.el9.x86_64",
+    sha256 = "1d219e1c9419178e65800ac8f1ca8e995d1d21d989fd4dbfc5874bb3242f704b",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/libvirt-client-10.5.0-4.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/libvirt-client-10.5.0-5.el9.x86_64.rpm",
     ],
 )
 
 rpm(
-    name = "libvirt-daemon-common-0__10.5.0-4.el9.x86_64",
-    sha256 = "3bf5e358ace98fc7d34de2507e93a8a65eea96ae05435d9fd21e12812748e69f",
+    name = "libvirt-daemon-common-0__10.5.0-5.el9.x86_64",
+    sha256 = "124272a010c4e255e3c72778c07c5d8cb9f2e871eeab8783c7a31f390c0b096a",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/libvirt-daemon-common-10.5.0-4.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/libvirt-daemon-common-10.5.0-5.el9.x86_64.rpm",
     ],
 )
 
 rpm(
-    name = "libvirt-daemon-driver-qemu-0__10.5.0-4.el9.x86_64",
-    sha256 = "a5995a8bfe4ea4680d5f7d88c8288b3d6acbfc7fa15558c230f20f498206a710",
+    name = "libvirt-daemon-driver-qemu-0__10.5.0-5.el9.x86_64",
+    sha256 = "efa4c5abdbf153e599cf71f40bbb3a210e9f0fcdbfb02e573d8bce104e026621",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/libvirt-daemon-driver-qemu-10.5.0-4.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/libvirt-daemon-driver-qemu-10.5.0-5.el9.x86_64.rpm",
     ],
 )
 
 rpm(
-    name = "libvirt-daemon-driver-secret-0__10.5.0-4.el9.x86_64",
-    sha256 = "980c45465324a210ebf96138d384cb91473e6285e9a6af5f33e2447c2b0dbe4c",
+    name = "libvirt-daemon-driver-secret-0__10.5.0-5.el9.x86_64",
+    sha256 = "429e77762c41e6ce1b755488942851a999bc0647dbf6a21dc3782d7f77439765",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/libvirt-daemon-driver-secret-10.5.0-4.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/libvirt-daemon-driver-secret-10.5.0-5.el9.x86_64.rpm",
     ],
 )
 
 rpm(
-    name = "libvirt-daemon-driver-storage-core-0__10.5.0-4.el9.x86_64",
-    sha256 = "3957dde5653635a0f7e7a0fc39256ab706ec8c40c12c7b0fbee2998132c2ae0c",
+    name = "libvirt-daemon-driver-storage-core-0__10.5.0-5.el9.x86_64",
+    sha256 = "f2fd1b0f4f1baa6cfad29b0fb6e579221417759058d4a0d1d7fc3e0522f27021",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/libvirt-daemon-driver-storage-core-10.5.0-4.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/libvirt-daemon-driver-storage-core-10.5.0-5.el9.x86_64.rpm",
     ],
 )
 
 rpm(
-    name = "libvirt-daemon-log-0__10.5.0-4.el9.x86_64",
-    sha256 = "7faec91a1a6253ca08d65f3f686e324c05cf5dc7b0aac80489b3c8260dcc9ec5",
+    name = "libvirt-daemon-log-0__10.5.0-5.el9.x86_64",
+    sha256 = "e46c6dc8ba9b37c891651c71174dd6761449c996d125a4c9a1db53e1f54f040a",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/libvirt-daemon-log-10.5.0-4.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/libvirt-daemon-log-10.5.0-5.el9.x86_64.rpm",
     ],
 )
 
 rpm(
-    name = "libvirt-libs-0__10.5.0-4.el9.x86_64",
-    sha256 = "078899c1b295409b0e5d7269e8b53b4df6b996cf56bfe32f78927548f789e143",
+    name = "libvirt-libs-0__10.5.0-5.el9.x86_64",
+    sha256 = "cdb0dee38d03b88e2fff93d062b1ee4882185e2d0fa4d2211a898827223f18a4",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/libvirt-libs-10.5.0-4.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/libvirt-libs-10.5.0-5.el9.x86_64.rpm",
     ],
 )
 
@@ -2595,26 +2595,26 @@ rpm(
 )
 
 rpm(
-    name = "qemu-img-17__9.0.0-7.el9.x86_64",
-    sha256 = "46e87b49edd4dce1123d9ec875e403b537cf77518c98c0e02204c54092deb24f",
+    name = "qemu-img-17__9.0.0-8.el9.x86_64",
+    sha256 = "fc519f57f16c15acc83acf771218c3382a02632c3f0ec1356f45d888bce9e89b",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/qemu-img-9.0.0-7.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/qemu-img-9.0.0-8.el9.x86_64.rpm",
     ],
 )
 
 rpm(
-    name = "qemu-kvm-common-17__9.0.0-7.el9.x86_64",
-    sha256 = "e53340321e64598ffd6512dbe3d9d05d7deb2c9774bb24040db31a2d7798823e",
+    name = "qemu-kvm-common-17__9.0.0-8.el9.x86_64",
+    sha256 = "31128c38d0d9f410b6ac825ae4cd29d7e41c9b69367e48a48429bec7eb6e2dc2",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/qemu-kvm-common-9.0.0-7.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/qemu-kvm-common-9.0.0-8.el9.x86_64.rpm",
     ],
 )
 
 rpm(
-    name = "qemu-kvm-core-17__9.0.0-7.el9.x86_64",
-    sha256 = "2df1b260f2138e47438de9c3b54d9a58bf418384522842ec7f7208130af7858a",
+    name = "qemu-kvm-core-17__9.0.0-8.el9.x86_64",
+    sha256 = "27c203bc3f8d0abc965d92b4f9859ca074be3fe18ab49210798b6be2164c4f9d",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/qemu-kvm-core-9.0.0-7.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/qemu-kvm-core-9.0.0-8.el9.x86_64.rpm",
     ],
 )
 
@@ -2667,26 +2667,26 @@ rpm(
 )
 
 rpm(
-    name = "rpm-0__4.16.1.3-33.el9.x86_64",
-    sha256 = "2d24b1e921d3d4b4b5aadd83693101cd6090356831fc4f0c4581c7fd8ebc5b69",
+    name = "rpm-0__4.16.1.3-34.el9.x86_64",
+    sha256 = "2402764f0a9efca685e3fd3a650b18da2f2095475f846b84afd1c47f44907ab6",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/rpm-4.16.1.3-33.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/rpm-4.16.1.3-34.el9.x86_64.rpm",
     ],
 )
 
 rpm(
-    name = "rpm-libs-0__4.16.1.3-33.el9.x86_64",
-    sha256 = "64bd493facc227bffe47f285deda30299cf87a7b6de54bb45ce8c87a2e868006",
+    name = "rpm-libs-0__4.16.1.3-34.el9.x86_64",
+    sha256 = "a0e02abbbf25aee35faa7363c389f882e54a65b50745ddbbb83971e215479825",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/rpm-libs-4.16.1.3-33.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/rpm-libs-4.16.1.3-34.el9.x86_64.rpm",
     ],
 )
 
 rpm(
-    name = "rpm-plugin-selinux-0__4.16.1.3-33.el9.x86_64",
-    sha256 = "760fa38ca5cb20b167bf43c88dbc7f76101d948ee1d7645ea2282b284cd8fa4c",
+    name = "rpm-plugin-selinux-0__4.16.1.3-34.el9.x86_64",
+    sha256 = "da0d7ccdcfe583fed418a8f9498ea73dd6e4d11d9bc605859de8ea799320ef8b",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/rpm-plugin-selinux-4.16.1.3-33.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/rpm-plugin-selinux-4.16.1.3-34.el9.x86_64.rpm",
     ],
 )
 
@@ -2731,18 +2731,18 @@ rpm(
 )
 
 rpm(
-    name = "selinux-policy-0__38.1.43-1.el9.x86_64",
-    sha256 = "544d4e515b94dbefeca9faf5249257bd562b37368f1150030531bdabf03e305e",
+    name = "selinux-policy-0__38.1.44-1.el9.x86_64",
+    sha256 = "28af6922e8e8ca7a9f82a92d752cdcb3eb859b77d5d305b31d55d2f29fd4e737",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/selinux-policy-38.1.43-1.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/selinux-policy-38.1.44-1.el9.noarch.rpm",
     ],
 )
 
 rpm(
-    name = "selinux-policy-targeted-0__38.1.43-1.el9.x86_64",
-    sha256 = "842786b99c64d5689521b7f844b069b816e3f465b819242c2f717449719b3ab2",
+    name = "selinux-policy-targeted-0__38.1.44-1.el9.x86_64",
+    sha256 = "9c58fda93602ae72d175254ac7f9d5a324ea3f28acb1864fd534344c93db1c15",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/selinux-policy-targeted-38.1.43-1.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/selinux-policy-targeted-38.1.44-1.el9.noarch.rpm",
     ],
 )
 
@@ -2851,10 +2851,10 @@ rpm(
 )
 
 rpm(
-    name = "tar-2__1.34-6.el9.x86_64",
-    sha256 = "b348d19fc291873af5fd0a024de52c809fd956e053a2cea54645a29b849511dd",
+    name = "tar-2__1.34-7.el9.x86_64",
+    sha256 = "3bad93a512f59beadcbad168fcff07785d669099f6c9d3ff4abf429328c8904e",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/tar-1.34-6.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/tar-1.34-7.el9.x86_64.rpm",
     ],
 )
 
@@ -2947,10 +2947,10 @@ rpm(
 )
 
 rpm(
-    name = "xfsprogs-0__6.4.0-3.el9.x86_64",
-    sha256 = "26eee80d4ffc05acfd7f5e334d34f14e0bc43790fd98ea37a2f9136f8ccb78b1",
+    name = "xfsprogs-0__6.4.0-4.el9.x86_64",
+    sha256 = "58b706149151ea14d9aa3fdb8953bbd1f9f7cb8ed4cefb89d566a4e56f31a926",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/xfsprogs-6.4.0-3.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/xfsprogs-6.4.0-4.el9.x86_64.rpm",
     ],
 )
 
