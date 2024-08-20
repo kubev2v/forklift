@@ -63,11 +63,10 @@ func main() {
 		fmt.Println("Error getting XML file:", err)
 		os.Exit(1)
 	}
-
-	// If needed, customize root disk image
-	err = customizeRootDiskImage(source)
+	// If needed, customize the VM
+	err = customizeVM(source, xmlFilePath)
 	if err != nil {
-		fmt.Println("Error customizing root disk:", err)
+		fmt.Println("Error customizing the VM:", err)
 		os.Exit(1)
 	}
 
@@ -82,29 +81,36 @@ func main() {
 	}
 }
 
-func customizeRootDiskImage(source string) error {
-	xmlData, err := ReadXMLFile(xmlFilePath)
+func customizeVM(source string, xmlFilePath string) error {
+	domain, err := GetDomainFromXml(xmlFilePath)
 	if err != nil {
-		fmt.Printf("Error read XML: %v\n", err)
-		return err
+		fmt.Printf("Error mapping xml to ova: %v\n", err)
 	}
 
-	operatingSystem, err := GetOperationSystemFromConfig(xmlData)
+	// Define the domain from xmlFilePath
+	err = defineVmExec(xmlFilePath)
 	if err != nil {
-		fmt.Printf("Error getting OS ID: %v\n", err)
+		fmt.Println("Error defining vm:", err)
+		os.Exit(1)
+	}
+	defer func() {
+		// After the customization is finished remove the domain
+		err = undefineVmExec(domain.Name)
+		if err != nil {
+			fmt.Println("Error undefined vm", err)
+			os.Exit(1)
+		}
+	}()
+
+	operatingSystem := domain.Metadata.LibOsInfo.V2VOS.ID
+	if operatingSystem == "" {
+		fmt.Printf("No operating system found")
 	} else {
 		fmt.Printf("Operating System ID: %s\n", operatingSystem)
 	}
 	if source == vSphere {
 		if strings.Contains(operatingSystem, "win") {
-			rootDiskPath, err := FindRootDiskImage(DIR)
-			if err != nil {
-				fmt.Println("Error looking for root disk path:", err)
-				os.Exit(1)
-			} else {
-				fmt.Printf("Root disk path: %s\n", rootDiskPath)
-			}
-			err = CustomizeWindowsImage(rootDiskPath)
+			err = CustomizeWindows(domain.Name)
 			if err != nil {
 				fmt.Println("Error customizing disk image:", err)
 				return err
