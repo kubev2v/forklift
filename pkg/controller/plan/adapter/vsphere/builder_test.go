@@ -67,8 +67,8 @@ var _ = Describe("vSphere builder", func() {
 			},
 		}, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,16,8.8.8.8_00:50:56:83:25:47:ip:fe80::5da:b7a5:e0a2:a097,,64,fec0:0:0:ffff::1,fec0:0:0:ffff::2,fec0:0:0:ffff::3"),
 		Entry("non-static ip", &model.VM{GuestID: "windows9Guest", GuestNetworks: []vsphere.GuestNetwork{{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: string(types.NetIpConfigInfoIpAddressOriginDhcp)}}}, ""),
-		Entry("non windows vm", &model.VM{GuestID: "other", GuestNetworks: []vsphere.GuestNetwork{{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin}}}, ""),
-		Entry("no OS vm", &model.VM{GuestNetworks: []vsphere.GuestNetwork{{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin}}}, ""),
+		Entry("non windows vm", &model.VM{GuestID: "other", GuestNetworks: []vsphere.GuestNetwork{{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin}}}, "00:50:56:83:25:47:ip:172.29.3.193,,0"),
+		Entry("no OS vm", &model.VM{GuestNetworks: []vsphere.GuestNetwork{{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin}}}, "00:50:56:83:25:47:ip:172.29.3.193,,0"),
 		Entry("multiple nics static ips", &model.VM{
 			GuestID: "windows9Guest",
 			GuestNetworks: []vsphere.GuestNetwork{
@@ -116,6 +116,20 @@ var _ = Describe("vSphere builder", func() {
 				},
 			},
 		}, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,16,8.8.8.8_00:50:56:83:25:47:ip:fe80::5da:b7a5:e0a2:a097,,64,fec0:0:0:ffff::1,fec0:0:0:ffff::2,fec0:0:0:ffff::3_00:50:56:83:25:48:ip:172.29.3.192,,24,4.4.4.4_00:50:56:83:25:48:ip:fe80::5da:b7a5:e0a2:a090,,32,fec0:0:0:ffff::4,fec0:0:0:ffff::5,fec0:0:0:ffff::6"),
+		Entry("single static ip without DNS", &model.VM{
+			GuestID: "windows9Guest",
+			GuestNetworks: []vsphere.GuestNetwork{
+				{
+					MAC:          "00:50:56:83:25:47",
+					IP:           "172.29.3.193",
+					Origin:       ManualOrigin,
+					PrefixLength: 16,
+				}},
+			GuestIpStacks: []vsphere.GuestIpStack{
+				{
+					Gateway: "172.29.3.1",
+				}},
+		}, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,16"),
 	)
 })
 

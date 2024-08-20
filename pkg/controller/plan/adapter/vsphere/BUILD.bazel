@@ -63,6 +63,7 @@ go_test(
         "//pkg/controller/plan/util",
         "//pkg/controller/provider/model/vsphere",
         "//pkg/controller/provider/web",
+        "//pkg/controller/provider/web/base",
         "//pkg/controller/provider/web/vsphere",
         "//pkg/lib/logging",
         "//vendor/github.com/onsi/ginkgo/v2:ginkgo",
