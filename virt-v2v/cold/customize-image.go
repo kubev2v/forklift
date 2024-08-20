@@ -6,46 +6,53 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
-	"strings"
 )
 
 //go:embed scripts
 var scriptFS embed.FS
 
 const (
-	WIN_FIRSTBOOT_SCRIPTS_PATH = "/Program\\ Files/Guestfs/Firstboot/scripts"
+	WIN_FIRSTBOOT_PATH = "/Program Files/Guestfs/Firstboot/"
 )
 
-// CustomizeWindowsImage customizes a windows disk image by uploading and setting firstboot batch scripts.
+// CustomizeWindows customizes a windows disk image by uploading scripts and configuring new RunOnce task to execute it.
 //
 // The function writes two bash scripts to the specified local tmp directory,
-// uploads them to the disk image using `virt-customize`, and sets the `init.bat` to run on the first boot
-// of the image. The `virt-customize` currently supports only batch scripts for windows, so we execute our powershell
-// scripts inside the bash scripts. If any errors occur during these operations, the function returns an error.
+// uploads them to the disk image using `virt-customize`.
+//
+// NOTE: We can't use the firstboot commands as the system is not ready to run all commands.
+// Some commands for example `Get-Disk` returns empty list. So we need to set the registry with `RunOnce` task,
+// which will be run by the Winodws once the system is ready.
 //
 // Arguments:
-//   - diskPath (string): The path to the XML file.
+//   - domain (string): The VM which should be customized.
 //
 // Returns:
-//   - error: An error if the file cannot be read, or nil if successful.
-func CustomizeWindowsImage(diskPath string) error {
+//   - error: An error if something goes wrong during the process, or nil if successful.
+func CustomizeWindows(domain string) error {
+	fmt.Printf("Customizing domain '%s'", domain)
 	t := EmbedTool{filesystem: &scriptFS}
 	err := t.CreateFilesFromFS(DIR)
 	if err != nil {
 		return err
 	}
 	windowsScriptsPath := filepath.Join(DIR, "scripts", "windows")
-	initPath := filepath.Join(windowsScriptsPath, "init.bat")
+	initPath := filepath.Join(windowsScriptsPath, "restore_config_init.bat")
 	restoreScriptPath := filepath.Join(windowsScriptsPath, "restore_config.ps1")
 
-	uploadPath := fmt.Sprintf("%s:%s", restoreScriptPath, WIN_FIRSTBOOT_SCRIPTS_PATH)
+	// Upload scripts to the windows
+	uploadScriptPath := fmt.Sprintf("%s:%s", restoreScriptPath, WIN_FIRSTBOOT_PATH)
+	uploadInitPath := fmt.Sprintf("%s:%s", initPath, WIN_FIRSTBOOT_PATH)
 
 	var extraArgs []string
-	extraArgs = append(extraArgs, getScriptArgs("firstboot", initPath)...)
-	extraArgs = append(extraArgs, getScriptArgs("upload", uploadPath)...)
-
-	err = CustomizeImage(diskPath, extraArgs...)
+	extraArgs = append(extraArgs, getScriptArgs("upload", uploadScriptPath, uploadInitPath)...)
+	err = CustomizeDomainExec(domain, extraArgs...)
+	if err != nil {
+		return err
+	}
+	// Run the virt-win-reg to update the Windows registry with our new RunOnce tas
+	taskPath := filepath.Join(windowsScriptsPath, "task.reg")
+	err = VirtWinRegExec(domain, taskPath)
 	if err != nil {
 		return err
 	}
@@ -71,75 +78,44 @@ func getScriptArgs(argName string, values ...string) []string {
 	return args
 }
 
-// CustomizeImage executes `virt-customize` to customize the image.
+// VirtWinRegExec executes `virt-win-reg` to edit the windows registries.
 //
 // Arguments:
-//   - diskPath (string): The path to the disk image that is being customized.
+//   - domain (string): The VM domain in which should be the registries changed.
+//   - taskPath (...string): The path to the task registry which should be merged with the Windows registry.
+//
+// Returns:
+//   - error: An error if something goes wrong during the process, or nil if successful.
+func VirtWinRegExec(domain string, taskPath string) error {
+	customizeCmd := exec.Command("virt-win-reg", "--merge", domain, taskPath)
+	customizeCmd.Stdout = os.Stdout
+	customizeCmd.Stderr = os.Stderr
+
+	fmt.Println("exec:", customizeCmd)
+	if err := customizeCmd.Run(); err != nil {
+		return fmt.Errorf("error executing virt-win-reg command: %w", err)
+	}
+	return nil
+}
+
+// CustomizeDomainExec executes `virt-customize` to customize the image.
+//
+// Arguments:
+//   - domain (string): The VM domain which should be customized.
 //   - extraArgs (...string): The additional arguments which will be appended to the `virt-customize` arguments.
 //
 // Returns:
 //   - error: An error if something goes wrong during the process, or nil if successful.
-func CustomizeImage(diskPath string, extraArgs ...string) error {
-	args := []string{"--verbose", "-a", diskPath}
+func CustomizeDomainExec(domain string, extraArgs ...string) error {
+	args := []string{"--verbose", "--domain", domain}
 	args = append(args, extraArgs...)
 	customizeCmd := exec.Command("virt-customize", args...)
+	customizeCmd.Stdout = os.Stdout
+	customizeCmd.Stderr = os.Stderr
 
 	fmt.Println("exec:", customizeCmd)
 	if err := customizeCmd.Run(); err != nil {
 		return fmt.Errorf("error executing virt-customize command: %w", err)
 	}
 	return nil
-}
-
-// FindRootDiskImage locates the root disk image in the specified directory based on the disk name pattern.
-//
-// This function looks for disk files in the `dir` directory that match the pattern `*-sd*`. It uses the `V2V_RootDisk`
-// environment variable to determine the disk name, falling back to the default disk name "sda" if the environment variable is not set or invalid.
-//
-// Arguments:
-//   - dir (string): The directory containing the disk files.
-//
-// Returns:
-//   - string: The full path to the root disk image.
-//   - error: An error if the root disk image is not found or if there is an issue reading the disk directory.
-func FindRootDiskImage(dir string) (string, error) {
-	var err error
-
-	// Get all disk files matching the pattern
-	disks, err := filepath.Glob(filepath.Join(dir, "*-sd*"))
-	if err != nil {
-		return "", fmt.Errorf("error getting disks: %w", err)
-	}
-
-	// Default disk name
-	diskName := "sda"
-
-	// Check if V2V_RootDisk environment variable is set
-	if v2vRootDisk := os.Getenv("V2V_RootDisk"); v2vRootDisk != "" {
-		// Extract just the disk name, ignoring partition numbers if present
-		trimmedDiskName := strings.TrimLeft(v2vRootDisk, "0123456789")
-
-		// Ensure the disk name is of the form "sd[letter]"
-		matched, _ := regexp.MatchString(`^sd[a-z]$`, trimmedDiskName)
-		if matched {
-			diskName = trimmedDiskName
-		} else {
-			fmt.Printf("Warning: Invalid disk name format '%s' in V2V_RootDisk. Using default 'sda'.\n", v2vRootDisk)
-		}
-	}
-
-	// Search for a matching disk path
-	var rootDiskPath string
-	for _, disk := range disks {
-		if strings.HasSuffix(disk, "-"+diskName) {
-			rootDiskPath = disk
-			break
-		}
-	}
-
-	if rootDiskPath == "" {
-		return "", fmt.Errorf("root disk not found for disk name: %s", diskName)
-	}
-
-	return rootDiskPath, nil
 }
