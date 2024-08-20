@@ -69,31 +69,18 @@ func ReadXMLFile(filePath string) ([]byte, error) {
 	return xmlData, nil
 }
 
-// GetOperationSystemFromConfig extracts the operating system string from the given XML configuration.
-//
-// This function takes an XML string that represents a virtual machine's configuration
-// and extracts the operating system identifier from it.
-//
-// Arguments:
-//   - xmlData ([]byte): The XML []byte representing the VM configuration.
-//
-// Returns:
-//   - string: The operating system ID extracted from the XML configuration.
-//   - error: An error if the xml string cannot be parsed, or nil if successful.
-func GetOperationSystemFromConfig(xmlData []byte) (string, error) {
-	var xmlConf OvaVmconfig
+func GetDomainFromXml(xmlFilePath string) (*OvaVmconfig, error) {
+	xmlData, err := ReadXMLFile(xmlFilePath)
+	if err != nil {
+		fmt.Printf("Error read XML: %v\n", err)
+		return nil, err
+	}
 
-	err := xml.Unmarshal([]byte(xmlData), &xmlConf)
+	var xmlConf OvaVmconfig
+	err = xml.Unmarshal(xmlData, &xmlConf)
 	if err != nil {
 		fmt.Printf("Error unmarshalling XML: %v\n", err)
-		return "", err
+		return nil, err
 	}
-
-	operatingSystem := xmlConf.Metadata.LibOsInfo.V2VOS.ID
-	if operatingSystem == "" {
-		fmt.Println("Error unmarshalling XML: missing OS ID")
-		return "", fmt.Errorf("missing OS ID")
-	}
-
-	return operatingSystem, nil
+	return &xmlConf, nil
 }

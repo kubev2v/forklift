@@ -3508,18 +3508,10 @@ rpm(
 )
 
 rpm(
-    name = "coreutils-0__8.32-36.el9.x86_64",
-    sha256 = "daabf1cacf6239db5c7c1198ac7e9c30bae7a3755bc0cc91b57980ab4b1afb50",
+    name = "coreutils-single-0__8.32-36.el9.x86_64",
+    sha256 = "e157ec6ce92a0aa08f97b0de6908da195088a87f7e61366038e34a52a5c17577",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/coreutils-8.32-36.el9.x86_64.rpm",
-    ],
-)
-
-rpm(
-    name = "coreutils-common-0__8.32-36.el9.x86_64",
-    sha256 = "1c0b043e558967fd6680affe4084dcff1b10ef8b62f6ce9b5bd7edfc73a23278",
-    urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/coreutils-common-8.32-36.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/coreutils-single-8.32-36.el9.x86_64.rpm",
     ],
 )
 
@@ -3652,10 +3644,10 @@ rpm(
 )
 
 rpm(
-    name = "glibc-langpack-tr-0__2.34-120.el9.x86_64",
-    sha256 = "8c1c92d8647eeb967bd00f26a873c98433b92b9bb40d5c00fa10065ccc479d15",
+    name = "glibc-langpack-bi-0__2.34-120.el9.x86_64",
+    sha256 = "a58ececedcf6eb4fcad5ecf2faab8251f6848737e6cd26a3c06c40ec0a312777",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/glibc-langpack-tr-2.34-120.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/glibc-langpack-bi-2.34-120.el9.x86_64.rpm",
     ],
 )
 
