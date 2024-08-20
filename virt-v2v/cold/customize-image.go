@@ -22,12 +22,12 @@ const (
 // uploads them to the disk image using `virt-customize`.
 //
 // Arguments:
-//   - domain (string): The VM which should be customized.
+//   - disks ([]string): The list of disk paths which should be customized
 //
 // Returns:
 //   - error: An error if something goes wrong during the process, or nil if successful.
-func CustomizeWindows(domain string) error {
-	fmt.Printf("Customizing domain '%s'", domain)
+func CustomizeWindows(disks []string) error {
+	fmt.Printf("Customizing disks '%s'", disks)
 	t := EmbedTool{filesystem: &scriptFS}
 	err := t.CreateFilesFromFS(DIR)
 	if err != nil {
@@ -45,7 +45,8 @@ func CustomizeWindows(domain string) error {
 
 	var extraArgs []string
 	extraArgs = append(extraArgs, getScriptArgs("upload", uploadScriptPath, uploadInitPath, uploadFirstbootPath)...)
-	err = CustomizeDomainExec(domain, extraArgs...)
+	extraArgs = append(extraArgs, getScriptArgs("add", disks...)...)
+	err = CustomizeDomainExec(extraArgs...)
 	if err != nil {
 		return err
 	}
@@ -74,13 +75,12 @@ func getScriptArgs(argName string, values ...string) []string {
 // CustomizeDomainExec executes `virt-customize` to customize the image.
 //
 // Arguments:
-//   - domain (string): The VM domain which should be customized.
 //   - extraArgs (...string): The additional arguments which will be appended to the `virt-customize` arguments.
 //
 // Returns:
 //   - error: An error if something goes wrong during the process, or nil if successful.
-func CustomizeDomainExec(domain string, extraArgs ...string) error {
-	args := []string{"--verbose", "--domain", domain}
+func CustomizeDomainExec(extraArgs ...string) error {
+	args := []string{"--verbose"}
 	args = append(args, extraArgs...)
 	customizeCmd := exec.Command("virt-customize", args...)
 	customizeCmd.Stdout = os.Stdout
