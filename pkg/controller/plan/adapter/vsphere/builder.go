@@ -438,12 +438,12 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 			if disk.Datastore.ID == ds.ID {
 				storageClass := mapped.Destination.StorageClass
 				var dvSource cdi.DataVolumeSource
-				el9, el9Err := r.Context.Plan.VSphereUsesEl9VirtV2v()
-				if el9Err != nil {
-					err = el9Err
+				coldLocal, vErr := r.Context.Plan.VSphereColdLocal()
+				if vErr != nil {
+					err = vErr
 					return
 				}
-				if el9 {
+				if coldLocal {
 					// Let virt-v2v do the copying
 					dvSource = cdi.DataVolumeSource{
 						Blank: &cdi.DataVolumeBlankImage{},
