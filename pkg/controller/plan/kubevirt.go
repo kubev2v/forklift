@@ -1669,12 +1669,12 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	nonRoot := true
 	allowPrivilageEscalation := false
 	// virt-v2v image
-	el9, el9Err := r.Context.Plan.VSphereUsesEl9VirtV2v()
-	if el9Err != nil {
-		err = el9Err
+	coldLocal, vErr := r.Context.Plan.VSphereColdLocal()
+	if vErr != nil {
+		err = vErr
 		return
 	}
-	if el9 {
+	if coldLocal {
 		// mount the secret for the password and CA certificate
 		volumes = append(volumes, core.Volume{
 			Name: "secret-volume",

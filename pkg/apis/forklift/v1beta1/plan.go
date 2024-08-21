@@ -93,9 +93,11 @@ type Plan struct {
 	Referenced `json:"-"`
 }
 
-// Decide if the plan should use EL9 image for virt-v2v conversion.
-// in combination with specified destination provider.
-func (p *Plan) VSphereUsesEl9VirtV2v() (bool, error) {
+// If the plan calls for the vm to be cold migrated to the local cluster, we can
+// just use virt-v2v directly to convert the vm while copying data over. In other
+// cases, we use CDI to transfer disks to the destination cluster and then use
+// virt-v2v-in-place to convert these disks after cutover.
+func (p *Plan) VSphereColdLocal() (bool, error) {
 	source := p.Referenced.Provider.Source
 	if source == nil {
 		return false, liberr.New("Cannot analyze plan, source provider is missing.")
