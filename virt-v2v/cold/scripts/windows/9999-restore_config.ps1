@@ -6,10 +6,28 @@ Write-Output ('') >> $logFile
 
 # script section to re-enable all offline drives
 # Re-enable all offline drives
-Write-Output ('Re-enabling all offline drives') >> $logFile
-Get-Disk | Where { $_.FriendlyName -like '*VirtIO*' } | % {
-     Write-Output ('  - ' + $_.Number + ': ' + $_.FriendlyName + '(' + [math]::Round($_.Size/1GB,2) + 'GB)') >> $logFile
-    $_ | Set-Disk -IsOffline $false
-    $_ | Set-Disk -IsReadOnly $false
+
+# Get all disks that match the filter using Win32_DiskDrive
+$disks = Get-WmiObject -Query "SELECT * FROM Win32_DiskDrive WHERE Model LIKE '%VirtIO%'"
+
+# Check if any disks were found
+if ($disks.Count -eq 0) {
+    Write-Output ("No disks found matching the filter 'VirtIO'.") >> $logFile
+} else {
+    # Iterate through each matching disk
+    foreach ($disk in $disks) {
+        $diskNumber = $disk.Index  # Get the disk index which corresponds to the disk number
+
+        # Create a diskpart script to set the disk online
+        $diskpartScript = @"
+select disk $diskNumber
+online disk
+attributes disk clear readonly
+"@
+
+        # Execute the diskpart script
+        $diskpartScript | diskpart
+
+        Write-Output ("Disk $($disk.Model) (Disk Number: $diskNumber) is now online.") >> $logFile
+    }
 }
-Write-Output ('') >> $logFile
