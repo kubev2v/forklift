@@ -247,13 +247,14 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 }
 
 func (r *Builder) mapMacStaticIps(vm *model.VM) (ipMap string, err error) {
-	if !isWindows(vm) {
-		return "", nil
-	}
+	// on windows machines we check if the interface origin is manual
+	// on linux we collect all networks.
+	isWindowsFlag := isWindows(vm)
+
 	configurations := []string{}
 	gatewaySet := false
 	for _, guestNetwork := range vm.GuestNetworks {
-		if guestNetwork.Origin == string(types.NetIpConfigInfoIpAddressOriginManual) {
+		if !isWindowsFlag || guestNetwork.Origin == string(types.NetIpConfigInfoIpAddressOriginManual) {
 			gateway := ""
 			if !gatewaySet {
 				isIpv4 := net.IP.To4(net.ParseIP(guestNetwork.IP)) != nil
@@ -279,7 +280,10 @@ func (r *Builder) mapMacStaticIps(vm *model.VM) (ipMap string, err error) {
 				}
 			}
 			dnsString := strings.Join(guestNetwork.DNS, ",")
-			configurations = append(configurations, fmt.Sprintf("%s:ip:%s,%s,%d,%s", guestNetwork.MAC, guestNetwork.IP, gateway, guestNetwork.PrefixLength, dnsString))
+			configurationString := fmt.Sprintf("%s:ip:%s,%s,%d,%s", guestNetwork.MAC, guestNetwork.IP, gateway, guestNetwork.PrefixLength, dnsString)
+
+			// if DNS is "", we get configurationString with trailing comma, use TrimSuffix to remove it.
+			configurations = append(configurations, strings.TrimSuffix(configurationString, ","))
 		}
 	}
 	return strings.Join(configurations, "_"), nil
