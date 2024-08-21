@@ -183,7 +183,7 @@ func (r *Scheduler) buildPending() (err error) {
 }
 
 func (r *Scheduler) cost(vm *model.VM) int {
-	if el9, _ := r.Plan.VSphereUsesEl9VirtV2v(); el9 {
+	if coldLocal, _ := r.Plan.VSphereColdLocal(); coldLocal {
 		/// virt-v2v transfers one disk at a time
 		return 1
 	} else {

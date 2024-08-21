@@ -1647,12 +1647,14 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 			break
 		}
 
-		el9, err := r.Context.Plan.VSphereUsesEl9VirtV2v()
+		coldLocal, err := r.Context.Plan.VSphereColdLocal()
 		switch {
 		case err != nil:
 			return liberr.Wrap(err)
-		case el9:
-			if err := r.updateConversionProgressEl9(pod, step); err != nil {
+		case coldLocal:
+			// FIXME: will this work for in-place conversions now that it also uses
+			// virt-v2v-monitor when executing virt-v2v-in-place?
+			if err := r.updateConversionProgressV2vMonitor(pod, step); err != nil {
 				// Just log it. Missing progress is not fatal.
 				log.Error(err, "Failed to update conversion progress")
 			}
@@ -1662,7 +1664,7 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 	return nil
 }
 
-func (r *Migration) updateConversionProgressEl9(pod *core.Pod, step *plan.Step) (err error) {
+func (r *Migration) updateConversionProgressV2vMonitor(pod *core.Pod, step *plan.Step) (err error) {
 	var diskRegex = regexp.MustCompile(`v2v_disk_transfers\{disk_id="(\d+)"\} (\d{1,3}\.?\d*)`)
 	url := fmt.Sprintf("http://%s:2112/metrics", pod.Status.PodIP)
 	resp, err := http.Get(url)
@@ -1842,9 +1844,9 @@ type Predicate struct {
 
 // Evaluate predicate flags.
 func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
-	el9, el9Err := r.context.Plan.VSphereUsesEl9VirtV2v()
-	if el9Err != nil {
-		err = el9Err
+	coldLocal, vErr := r.context.Plan.VSphereColdLocal()
+	if vErr != nil {
+		err = vErr
 		return
 	}
 
@@ -1856,9 +1858,9 @@ func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 	case RequiresConversion:
 		allowed = r.context.Source.Provider.RequiresConversion()
 	case CDIDiskCopy:
-		allowed = !el9
+		allowed = !coldLocal
 	case VirtV2vDiskCopy:
-		allowed = el9
+		allowed = coldLocal
 	case OpenstackImageMigration:
 		allowed = r.context.Plan.IsSourceProviderOpenstack()
 	}

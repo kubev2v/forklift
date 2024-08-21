@@ -109,12 +109,12 @@ func (admitter *PlanAdmitter) validateLUKS() error {
 		return err
 	}
 
-	el9, el9Err := admitter.plan.VSphereUsesEl9VirtV2v()
-	if el9Err != nil {
-		log.Error(el9Err, "Could not analyze plan, failing")
-		return el9Err
+	coldLocal, vErr := admitter.plan.VSphereColdLocal()
+	if vErr != nil {
+		log.Error(vErr, "Could not analyze plan, failing")
+		return vErr
 	}
-	if !el9 {
+	if !coldLocal {
 		err := liberr.New("migration of encrypted disks is not supported for warm migrations or migrations to remote providers")
 		log.Error(err, "Warm migration does not support LUKS")
 		return err
