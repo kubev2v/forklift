@@ -63,7 +63,7 @@ func main() {
 		fmt.Println("Error getting XML file:", err)
 		os.Exit(1)
 	}
-	// If needed, customize the VM
+
 	err = customizeVM(source, xmlFilePath)
 	if err != nil {
 		fmt.Println("Error customizing the VM:", err)
@@ -93,18 +93,38 @@ func getVmDiskPaths(domain *OvaVmconfig) []string {
 
 func customizeVM(source string, xmlFilePath string) error {
 	domain, err := GetDomainFromXml(xmlFilePath)
-	disks := getVmDiskPaths(domain)
 	if err != nil {
-		fmt.Printf("Error mapping xml to ova: %v\n", err)
+		fmt.Printf("Error mapping xml to domain: %v\n", err)
+
+		// No customization if we can't parse virt-v2v output.
+		return err
 	}
 
+	// Get operating system.
 	operatingSystem := domain.Metadata.LibOsInfo.V2VOS.ID
 	if operatingSystem == "" {
-		fmt.Printf("No operating system found")
+		fmt.Printf("Warning: no operating system found")
+
+		// No customization when no known OS detected.
+		return nil
 	} else {
 		fmt.Printf("Operating System ID: %s\n", operatingSystem)
 	}
+
+	// Get domain disks.
+	disks := getVmDiskPaths(domain)
+	if len(disks) == 0 {
+		fmt.Printf("Warning: no V2V domain disks found")
+
+		// No customization when no disks found.
+		return nil
+	} else {
+		fmt.Printf("V2V domain disks: %v\n", disks)
+	}
+
+	// Customization for vSphere source.
 	if source == vSphere {
+		// Windows
 		if strings.Contains(operatingSystem, "win") {
 			err = CustomizeWindows(disks)
 			if err != nil {
@@ -113,6 +133,7 @@ func customizeVM(source string, xmlFilePath string) error {
 			}
 		}
 	}
+
 	return nil
 }
 
