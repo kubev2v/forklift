@@ -108,7 +108,7 @@ go_library(
         "scripts/rhel/run/network_config_util.sh",
         "scripts/rhel/run/network_config_util_test",
     ],
-    importpath = "github.com/konveyor/forklift-controller/virt-v2v/cold",
+    importpath = "github.com/konveyor/forklift-controller/virt-v2v",
     visibility = ["//visibility:private"],
 )
 
