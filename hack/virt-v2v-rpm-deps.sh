@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-set -e 
+set -e
 
-bazeldnf_repos="--repofile rpm/stream8-repo.yaml"
+bazeldnf_repos="--repofile rpm/stream9-repo.yaml"
 if [ "${CUSTOM_REPO}" ]; then
     bazeldnf_repos="--repofile ${CUSTOM_REPO} ${bazeldnf_repos}"
 fi
@@ -31,22 +31,22 @@ v2v_missing="
 # here. We don't really have a strong preference for either of those and the
 # choice is mostly arbitrary with package size taken into consideration.
 alternative_picks="
-  bitmap-console-fonts
   coreutils-single
+  curl-minimal
   glibc-langpack-en
   kernel-core
   libcurl-minimal
   libverto-libev
-  llvm-compat-libs
   selinux-policy-targeted
 "
 bazel run \
         //:bazeldnf -- rpmtree \
         --public \
-        --workspace virt-v2v/warm/WORKSPACE \
-        --buildfile virt-v2v/warm/BUILD.bazel \
+        --workspace virt-v2v/WORKSPACE \
+        --buildfile virt-v2v/BUILD.bazel \
         --name virt-v2v \
         --basesystem centos-stream-release \
+	--force-ignore-with-dependencies 'python' \
         ${bazeldnf_repos} \
         $virt_v2v $v2v_missing $alternative_picks
 
