@@ -34,7 +34,6 @@
 # export API_IMAGE="${REGISTRY}/${REGISTRY_ORG}/forklift-api:${REGISTRY_TAG}"
 # export VALIDATION_IMAGE="${REGISTRY}/${REGISTRY_ORG}/forklift-validation:${REGISTRY_TAG}"
 # export VIRT_V2V_IMAGE="${REGISTRY}/${REGISTRY_ORG}/forklift-virt-v2v:${REGISTRY_TAG}"
-# export VIRT_V2V_WARM_IMAGE="${REGISTRY}/${REGISTRY_ORG}/forklift-virt-v2v-warm:${REGISTRY_TAG}"
 # export OPERATOR_IMAGE="${REGISTRY}/${REGISTRY_ORG}/forklift-operator:${REGISTRY_TAG}"
 # export OPERATOR_BUNDLE_IMAGE="${REGISTRY}/${REGISTRY_ORG}/forklift-operator-bundle:${REGISTRY_TAG}"
 # export OPERATOR_INDEX_IMAGE="${REGISTRY}/${REGISTRY_ORG}/forklift-operator-index:${REGISTRY_TAG}"

@@ -13,7 +13,6 @@ MUST_GATHER_IMAGE=${REGISTRY}/${REGISTRY_ORG}/forklift-must-gather:${REGISTRY_TA
 UI_PLUGIN_IMAGE=${REGISTRY}/${REGISTRY_ORG}/forklift-console-plugin:${REGISTRY_TAG}
 VALIDATION_IMAGE=${REGISTRY}/${REGISTRY_ORG}/forklift-validation:${REGISTRY_TAG}
 VIRT_V2V_IMAGE=${REGISTRY}/${REGISTRY_ORG}/forklift-virt-v2v:${REGISTRY_TAG}
-VIRT_V2V_WARM_IMAGE=${REGISTRY}/${REGISTRY_ORG}/forklift-virt-v2v-warm:${REGISTRY_TAG}
 API_IMAGE=${REGISTRY}/${REGISTRY_ORG}/forklift-api:${REGISTRY_TAG}
 POPULATOR_CONTROLLER_IMAGE=${REGISTRY}/${REGISTRY_ORG}/populator-controller:${REGISTRY_TAG}
 OVA_PROVIDER_SERVER=${REGISTRY}/${REGISTRY_ORG}/forklift-ova-provider-server:${REGISTRY_TAG}
@@ -21,8 +20,7 @@ OVA_PROVIDER_SERVER=${REGISTRY}/${REGISTRY_ORG}/forklift-ova-provider-server:${R
 bazel run push-forklift-api
 bazel run push-ovirt-populator
 bazel run push-openstack-populator
-bazel run --package_path=virt-v2v/cold push-forklift-virt-v2v
-bazel run --package_path=virt-v2v/warm push-forklift-virt-v2v-warm
+bazel run --package_path=virt-v2v push-forklift-virt-v2v
 bazel run push-populator-controller
 bazel run push-forklift-controller
 bazel run push-forklift-validation
@@ -34,7 +32,6 @@ bazel run push-forklift-operator-bundle \
     --action_env UI_PLUGIN_IMAGE=${UI_PLUGIN_IMAGE} \
     --action_env VALIDATION_IMAGE=${VALIDATION_IMAGE} \
     --action_env VIRT_V2V_IMAGE=${VIRT_V2V_IMAGE} \
-    --action_env VIRT_V2V_WARM_IMAGE=${VIRT_V2V_WARM_IMAGE} \
     --action_env CONTROLLER_IMAGE=${CONTROLLER_IMAGE} \
     --action_env API_IMAGE=${API_IMAGE} \
     --action_env POPULATOR_CONTROLLER_IMAGE=${POPULATOR_CONTROLLER_IMAGE} \

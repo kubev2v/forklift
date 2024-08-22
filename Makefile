@@ -49,7 +49,6 @@ CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-controller:$(REGISTRY_T
 API_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-api:$(REGISTRY_TAG)
 VALIDATION_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-validation:$(REGISTRY_TAG)
 VIRT_V2V_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-virt-v2v:$(REGISTRY_TAG)
-VIRT_V2V_WARM_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-virt-v2v-warm:$(REGISTRY_TAG)
 OPERATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator:$(REGISTRY_TAG)
 OPERATOR_BUNDLE_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-bundle:$(REGISTRY_TAG)
 OPERATOR_INDEX_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-index:$(REGISTRY_TAG)
@@ -82,7 +81,7 @@ all: test forklift-controller
 
 # Run tests
 test: generate fmt vet manifests validation-test
-	go test -coverprofile=cover.out ./pkg/... ./cmd/... ./virt-v2v/cold/...
+	go test -coverprofile=cover.out ./pkg/... ./cmd/... ./virt-v2v/...
 
 # Experimental e2e target
 e2e-sanity: e2e-sanity-ovirt e2e-sanity-vsphere
@@ -196,23 +195,13 @@ push-operator-image: build-operator-image
 
 build-virt-v2v-image: check_container_runtime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
-	bazel run --package_path=virt-v2v/cold forklift-virt-v2v \
+	bazel run --package_path=virt-v2v forklift-virt-v2v \
 		$(BAZEL_OPTS) \
 		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
 
 push-virt-v2v-image: build-virt-v2v-image
 	$(CONTAINER_CMD) tag bazel:forklift-virt-v2v $(VIRT_V2V_IMAGE)
 	$(CONTAINER_CMD) push $(VIRT_V2V_IMAGE)
-
-build-virt-v2v-warm-image: check_container_runtime
-	export CONTAINER_CMD=$(CONTAINER_CMD); \
-	bazel run --package_path=virt-v2v/warm forklift-virt-v2v-warm \
-		$(BAZEL_OPTS) \
-		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
-
-push-virt-v2v-warm-image: build-virt-v2v-warm-image
-	$(CONTAINER_CMD) tag bazel:forklift-virt-v2v-warm ${VIRT_V2V_WARM_IMAGE}
-	$(CONTAINER_CMD) push ${VIRT_V2V_WARM_IMAGE}
 
 build-operator-bundle-image: check_container_runtime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \
@@ -228,7 +217,6 @@ build-operator-bundle-image: check_container_runtime
 		--action_env UI_PLUGIN_IMAGE=$(UI_PLUGIN_IMAGE) \
 		--action_env VALIDATION_IMAGE=$(VALIDATION_IMAGE) \
 		--action_env VIRT_V2V_IMAGE=$(VIRT_V2V_IMAGE) \
-		--action_env VIRT_V2V_WARM_IMAGE=$(VIRT_V2V_WARM_IMAGE) \
 		--action_env CONTROLLER_IMAGE=$(CONTROLLER_IMAGE) \
 		--action_env API_IMAGE=$(API_IMAGE) \
 		--action_env POPULATOR_CONTROLLER_IMAGE=$(POPULATOR_CONTROLLER_IMAGE) \
@@ -302,7 +290,6 @@ build-all-images: build-api-image \
                   build-validation-image \
                   build-operator-image \
                   build-virt-v2v-image \
-                  build-virt-v2v-warm-image \
                   build-operator-bundle-image \
                   build-operator-index-image \
                   build-populator-controller-image \
@@ -315,7 +302,6 @@ push-all-images:  push-api-image \
                   push-validation-image \
                   push-operator-image \
                   push-virt-v2v-image \
-                  push-virt-v2v-warm-image \
                   push-operator-bundle-image \
                   push-operator-index-image \
                   push-populator-controller-image \
