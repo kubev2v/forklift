@@ -36,7 +36,7 @@ packageserver-d9c689b8f-g6pj9       1/1     Running   1 (7d23h ago)   49d
 
 Deploy Forklift using the [forklift-k8s.yaml manifest](../forklift-k8s.yaml):
 
-`$ kubectl apply -f https://raw.githubusercontent.com/konveyor/forklift-operator/main/forklift-k8s.yaml`
+`$ kubectl apply -f https://raw.githubusercontent.com/kubev2v/forklift/main/operator/forklift-k8s.yaml`
 
 **Note**: When working with the main branch, the subscription in the manifest will pull the _latest_ operator image via development channel.
 
