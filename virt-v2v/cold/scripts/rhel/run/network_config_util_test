@@ -1,106 +1,59 @@
 #!/bin/bash
 
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 
 # Temporary directory for testing
-test_dir=$(mktemp -d)
-test_input_file="$test_dir/macToIP"
-test_scripts_dir="$test_dir/network-scripts/"
-test_connections_dir="$test_dir/system-connections/"
-test_udev_rules_file="$test_dir/70-persistent-net.rules"
+TEST_DIR=$(mktemp -d)
 
-# Function to clean up the test environment
-cleanup() {
-    rm -rf "$test_dir"
-}
+# Paths for the test
+export V2V_MAP_FILE="$TEST_DIR/macToIP"
+export NETWORK_SCRIPTS_DIR="$TEST_DIR/network-scripts"
+export NETWORK_CONNECTIONS_DIR="$TEST_DIR/system-connections"
+export UDEV_RULES_FILE="$TEST_DIR/70-persistent-net.rules"
 
-# Trap to ensure cleanup on exit
-trap cleanup EXIT
+# Clean up from previous runs
+rm -f "$UDEV_RULES_FILE"
+rm -rf "$NETWORK_SCRIPTS_DIR" "$NETWORK_CONNECTIONS_DIR"
+mkdir -p "$NETWORK_SCRIPTS_DIR" "$NETWORK_CONNECTIONS_DIR"
 
-# Create mock input file
-cat <<EOL > "$test_input_file"
-00:1a:2b:3c:4d:5e:ip:192.168.1.100,some-other-info
-01:2b:3c:4d:5e:6f:ip:192.168.1.101,more-info
-EOL
+# Create mock data
+echo -e "aa:bb:cc:dd:ee:ff:ip:192.168.1.10\naa:bb:cc:dd:ee:fe:ip:192.168.1.11\naa:bb:cc:dd:ee:fd:ip:2001:0db8:85a3:0000:0000:8a2e:0370:7334\n" > "$V2V_MAP_FILE"
+echo -e "DEVICE=eth0\nIPADDR=192.168.1.10" > "$NETWORK_SCRIPTS_DIR/ifcfg-eth0"
+echo -e "[connection]\ninterface-name=eth3\naddress1=192.168.1.11/24" > "$NETWORK_CONNECTIONS_DIR/eth1 but with spaces.nmconnection"
 
-# Create mock network scripts files
-mkdir -p "$test_scripts_dir"
-cat <<EOL > "$test_scripts_dir/ifcfg-eth0"
-DEVICE=eth0
-IPADDR=192.168.1.100
-EOL
+# Source the script under test
+source ${SCRIPT_DIR}/network_config_util.sh
 
-cat <<EOL > "$test_scripts_dir/ifcfg-eth1"
-DEVICE=eth1
-IPADDR=192.168.1.101
-EOL
+# Run the script
+{
+    udev_from_ifcfg
+    udev_from_nm
+} | check_dupe_hws > "$UDEV_RULES_FILE"
 
-# Create mock network manager connection files
-mkdir -p "$test_connections_dir"
-cat <<EOL > "$test_connections_dir/Wired connection 1.nmconnection"
-[connection]
-id=Wired connection 1
-interface-name=eth0
+echo -e "\nTest output:"
+cat $UDEV_RULES_FILE
 
-[ethernet]
+# Test 1: Verify the udev rules file was created
+if [ ! -f "$UDEV_RULES_FILE" ]; then
+    echo "Test 1 Failed: UDEV_RULES_FILE not created."
+    exit 1
+fi
 
-[ipv4]
-address1=192.168.1.100
-EOL
+# Test 2: Verify the content of the udev rules file
+EXPECTED_RULE="SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"aa:bb:cc:dd:ee:ff\",NAME=\"eth0\""
+if ! grep -q "$EXPECTED_RULE" "$UDEV_RULES_FILE"; then
+    echo "Test 2 Failed: (ifcfg) Expected udev rule not found in $UDEV_RULES_FILE."
+    exit 1
+fi
 
-cat <<EOL > "$test_connections_dir/Wired connection 2.nmconnection"
-[connection]
-id=Wired connection 2
-interface-name=eth1
+# Test 3: Verify the content of the udev rules file
+EXPECTED_RULE="SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"aa:bb:cc:dd:ee:fe\",NAME=\"eth3\""
+if ! grep -q "$EXPECTED_RULE" "$UDEV_RULES_FILE"; then
+    echo "Test 3 Failed: (nm) Expected udev rule not found in $UDEV_RULES_FILE."
+    exit 1
+fi
 
-[ethernet]
+echo "All tests passed successfully."
 
-[ipv4]
-address1=192.168.1.101
-EOL
-
-# Function to run the test
-run_test() {
-    local description=$1
-
-    echo "Running test: $description"
-
-    # Run the original script with the test files
-    bash "${script_dir}/network_config_util.sh" "$test_input_file" "$test_scripts_dir" "$test_connections_dir" "$test_udev_rules_file"
-
-    # Verify that the udev rules file was created
-    if [ ! -f "$test_udev_rules_file" ]; then
-        echo "Test failed: $test_udev_rules_file was not created."
-        exit 1
-    fi
-
-    # Expected content of the udev rules file
-    expected_content=$(cat <<EOF
-SUBSYSTEM=="net",ACTION=="add",ATTR{address}=="00:1a:2b:3c:4d:5e",NAME="eth0"
-SUBSYSTEM=="net",ACTION=="add",ATTR{address}=="01:2b:3c:4d:5e:6f",NAME="eth1"
-EOF
-    )
-
-    # Verify the content of the udev rules file
-    actual_content=$(cat "$test_udev_rules_file")
-    if [ "$actual_content" != "$expected_content" ]; then
-        echo "Test failed: $test_udev_rules_file content is incorrect."
-        echo "Expected:"
-        echo "$expected_content"
-        echo "Got:"
-        echo "$actual_content"
-        exit 1
-    fi
-
-    echo "Test passed: $test_udev_rules_file was created with correct content."
-}
-
-# Run the first test with both network-scripts and system-connections directories
-run_test "With network-scripts and system-connections"
-
-# Remove network-scripts directory and rules file to test only with system-connections
-rm -rf "$test_scripts_dir"
-rm -rf "$test_udev_rules_file"
-
-# Run the second test with only system-connections directory
-run_test "With only system-connections"
+# Clean up test environment
+rm -rf "$TEST_DIR"

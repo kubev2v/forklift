@@ -1,145 +1,92 @@
 #!/bin/bash
 
+# Global variables with default values
+V2V_MAP_FILE="${V2V_MAP_FILE:-/tmp/macToIP}"
+NETWORK_SCRIPTS_DIR="${NETWORK_SCRIPTS_DIR:-/etc/sysconfig/network-scripts}"
+NETWORK_CONNECTIONS_DIR="${NETWORK_CONNECTIONS_DIR:-/etc/NetworkManager/system-connections}"
+UDEV_RULES_FILE="${UDEV_RULES_FILE:-/etc/udev/rules.d/70-persistent-net.rules}"
+
+# Check if udev rules file exists
+if [ -f "$UDEV_RULES_FILE" ]; then
+    echo "File $UDEV_RULES_FILE already exists. Exiting."
+    exit 0
+fi
+
 # Add log file descriptot and dump it to stdout
 exec 3>&1
 log() {
     echo $@ >&3
 }
 
-# Function to parse the MAC to IP mappings
-parse_mac_to_ip() {
-    local input_file="$1"
-    declare -a mac_addresses
-    declare -a ip_addresses
+# Validate MAC address and IPv4 address and extract them
+extract_mac_ip() {
+    S_HW=""
+    S_IP=""
+    if [[ "$1" =~ ^([0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}):ip:([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}) ]]; then
+        S_HW="${BASH_REMATCH[1]}"
+        S_IP="${BASH_REMATCH[2]}"
+    fi
+}
 
-    log "Read ${input_file}"
-
-    # Read the file line by line
+# Create udev rules based on the macToip mapping + ifcfg network scripts
+udev_from_ifcfg() {
+    # Read the mapping file line by line
     while IFS= read -r line; do
-        # Check if the line matches virt-v2v --mac argument format
-        # for our use case we only need the mac and the ip, we ignore the gateway, len and ns
-
-        # Ref: https://libguestfs.org/virt-v2v.1.html
-        # Example: --mac aa:bb:cc:dd:ee:ff:ip:ipaddr[,gw[,len[,ns,ns,...]]]
-        if [[ $line =~ ^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}:ip:[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+,.*$ ]]; then
-            # Extract MAC address and IP address using the correct delimiter
-            mac_address=$(echo "$line" | awk -F':ip:' '{print $1}')
-            ip_address=$(echo "$line" | awk -F':ip:' '{print $2}' | cut -d',' -f1)
+        # Extract S_HW and S_IP
+        extract_mac_ip "$line"
+        
+        # If S_HW and S_IP were extracted, proceed
+        if [[ -n "$S_HW" && -n "$S_IP" ]]; then
+            # Source the matching file, if found
+            IFCFG=$(grep -l "IPADDR=$S_IP" "$NETWORK_SCRIPTS_DIR"/*)
+            [[ -z "$IFCFG" ]] && continue
+            source "$IFCFG"
             
-            # Add the MAC address and IP address to their respective arrays
-            mac_addresses+=("$mac_address")
-            ip_addresses+=("$ip_address")
+            echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$S_HW\",NAME=\"$DEVICE\""
         fi
-    done < "$input_file"
-
-    log "Found MACs: ${mac_addresses[@]}"
-    log "Found IPs: ${ip_addresses[@]}"
-
-    # Return the arrays
-    echo "${mac_addresses[@]}"
-    echo "${ip_addresses[@]}"
+    done < "$V2V_MAP_FILE"
 }
 
-# Function to loop over nm configuration files
-# in:
-#   /etc/sysconfig/network-scripts/
-#   /etc/NetworkManager/system-connections/
-# And crate a mapping ip <=> mac <=> interface-name
-create_ip_mac_interface_mapping() {
-    local input_file="$1"
-    local network_scripts_dir="$2"
-    local network_connections_dir="$3"
+# Create udev rules based on the macToip mapping + network manager connections
+udev_from_nm() {
+    # Read the mapping file line by line
+    while IFS= read -r line; do
+        # Extract S_HW and S_IP
+        extract_mac_ip "$line"
 
-    declare -a interface_names_rhel8
-    declare -a interface_names_rhel9
-    declare -a interface_names
+        # If S_HW and S_IP were extracted, proceed
+        if [[ -n "$S_HW" && -n "$S_IP" ]]; then
+            # Find the matching NetworkManager connection file
+            NM_FILE=$(grep -El "address[0-9]*=$S_IP" "$NETWORK_CONNECTIONS_DIR"/*)
+            [[ -z "$NM_FILE" ]] && continue
+            
+            # Extract the DEVICE (interface name) from the matching file
+            DEVICE=$(grep -oP '^interface-name=\K.*' "$NM_FILE")
+            [[ -z "$DEVICE" ]] && continue
 
-    # Get the MAC and IP addresses
-    local mac_addresses=($(parse_mac_to_ip "$input_file" | head -n 1))
-    local ip_addresses=($(parse_mac_to_ip "$input_file" | tail -n 1))
-
-    log "Reading: ${network_scripts_dir}"
-
-    # Process RHEL 8 files
-    for ip in "${ip_addresses[@]}"; do
-        local matching_file
-        matching_file=$(grep -l "IPADDR=$ip" "$network_scripts_dir"*)
-        if [ -n "$matching_file" ]; then
-            # Extract the DEVICE value
-            local interface_name
-            interface_name=$(grep "^DEVICE=" "$matching_file" | cut -d'=' -f2)
-            interface_names_rhel8+=("$interface_name")
-        else
-            interface_names_rhel8+=("")
+            echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$S_HW\",NAME=\"$DEVICE\""
         fi
-    done
-
-    log "Reading: ${network_connections_dir}"
-
-    # Process RHEL 9 files
-    for ip in "${ip_addresses[@]}"; do
-        local matching_file
-        matching_file=$(grep -l "address[0-9]*=$ip" "$network_connections_dir"*)
-        if [ -n "$matching_file" ]; then
-            # Extract the interface-name value
-            local interface_name
-            interface_name=$(grep "^interface-name=" "$matching_file" | cut -d'=' -f2)
-            interface_names_rhel9+=("$interface_name")
-        else
-            interface_names_rhel9+=("")
-        fi
-    done
-
-    # Take the interface name from rhel8 config files, if missing fallback to rhel9
-    for i in "${!ip_addresses[@]}"; do
-        interface_name="${interface_names_rhel8[$i]:-${interface_names_rhel9[$i]}}"
-        interface_names+=("${interface_name}")
-    done
-
-    log "Found interfaces: ${interface_names[@]}"
-
-    echo "${interface_names[@]}"
+    done < "$V2V_MAP_FILE"
 }
 
-# Main function to run the script
-main() {
-    # /tmp/macToIP is auto generated by RHEL customization code,
-    # it contains the value of os.Getenv("V2V_staticIPs") and is added to the
-    # guest filesystem using go code.
-    # Ref: package:main method:handleStaticIPConfiguration
-    local input_file="${1:-/tmp/macToIP}"
+# Checks for duplicate hardware addresses 
+check_dupe_hws() {
+    input=$(cat)
 
-    # Default input file path and network scripts and connections directory
-    local network_scripts_dir="${2:-/etc/sysconfig/network-scripts/}"
-    local network_connections_dir="${3:-/etc/NetworkManager/system-connections/}"
-    
-    # Udev rules file argument or default location
-    local udev_rules_file="${4:-/etc/udev/rules.d/70-persistent-net.rules}"
-    
-    # Check if udev rules file exists
-    if [ -f "$udev_rules_file" ]; then
-        echo "File $udev_rules_file already exists. Exiting."
-        exit 0
+    # Extract MAC addresses, convert to uppercase, sort them, and find duplicates
+    dupes=$(grep -io -E "[0-9A-F:]{17}" <<< "$input" | tr 'a-f' 'A-F' | sort | uniq -d)
+
+    # If duplicates are found, print an error and exit
+    if [ -n "$dupes" ]; then
+        echo "ERR: Duplicate hw"
+        exit 2
     fi
 
-    # Parse MAC and IP addresses and create the mapping
-    local mac_addresses=($(parse_mac_to_ip "$input_file" | head -n 1))
-    local ip_addresses=($(parse_mac_to_ip "$input_file" | tail -n 1))
-    local interface_names=($(create_ip_mac_interface_mapping "$input_file" "$network_scripts_dir" "$network_connections_dir"))
-
-    log "Building ${udev_rules_file}"
-
-    # Add entries to the udev rules file
-    for i in "${!mac_addresses[@]}"; do
-        local mac="${mac_addresses[$i]}"
-        local interface="${interface_names[$i]}"
-
-        if [ -n "$mac" ] && [ -n "$interface" ]; then
-            echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$mac\",NAME=\"$interface\"" >> "$udev_rules_file"
-            echo "Added entry: MAC=$mac, Interface=$interface to $udev_rules_file"
-        fi
-    done
+    echo "$input"
 }
 
-# Call the main function with arguments if provided
-main "$@"
+# Create udev rules check for duplicates and write them to udev file
+{
+    udev_from_ifcfg
+    udev_from_nm
+} | check_dupe_hws > "$UDEV_RULES_FILE"
