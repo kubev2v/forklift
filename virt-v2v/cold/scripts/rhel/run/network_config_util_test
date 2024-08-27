@@ -1,0 +1,106 @@
+#!/bin/bash
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+
+# Temporary directory for testing
+test_dir=$(mktemp -d)
+test_input_file="$test_dir/macToIP"
+test_scripts_dir="$test_dir/network-scripts/"
+test_connections_dir="$test_dir/system-connections/"
+test_udev_rules_file="$test_dir/70-persistent-net.rules"
+
+# Function to clean up the test environment
+cleanup() {
+    rm -rf "$test_dir"
+}
+
+# Trap to ensure cleanup on exit
+trap cleanup EXIT
+
+# Create mock input file
+cat <<EOL > "$test_input_file"
+00:1a:2b:3c:4d:5e:ip:192.168.1.100,some-other-info
+01:2b:3c:4d:5e:6f:ip:192.168.1.101,more-info
+EOL
+
+# Create mock network scripts files
+mkdir -p "$test_scripts_dir"
+cat <<EOL > "$test_scripts_dir/ifcfg-eth0"
+DEVICE=eth0
+IPADDR=192.168.1.100
+EOL
+
+cat <<EOL > "$test_scripts_dir/ifcfg-eth1"
+DEVICE=eth1
+IPADDR=192.168.1.101
+EOL
+
+# Create mock network manager connection files
+mkdir -p "$test_connections_dir"
+cat <<EOL > "$test_connections_dir/Wired connection 1.nmconnection"
+[connection]
+id=Wired connection 1
+interface-name=eth0
+
+[ethernet]
+
+[ipv4]
+address1=192.168.1.100
+EOL
+
+cat <<EOL > "$test_connections_dir/Wired connection 2.nmconnection"
+[connection]
+id=Wired connection 2
+interface-name=eth1
+
+[ethernet]
+
+[ipv4]
+address1=192.168.1.101
+EOL
+
+# Function to run the test
+run_test() {
+    local description=$1
+
+    echo "Running test: $description"
+
+    # Run the original script with the test files
+    bash "${script_dir}/network_config_util.sh" "$test_input_file" "$test_scripts_dir" "$test_connections_dir" "$test_udev_rules_file"
+
+    # Verify that the udev rules file was created
+    if [ ! -f "$test_udev_rules_file" ]; then
+        echo "Test failed: $test_udev_rules_file was not created."
+        exit 1
+    fi
+
+    # Expected content of the udev rules file
+    expected_content=$(cat <<EOF
+SUBSYSTEM=="net",ACTION=="add",ATTR{address}=="00:1a:2b:3c:4d:5e",NAME="eth0"
+SUBSYSTEM=="net",ACTION=="add",ATTR{address}=="01:2b:3c:4d:5e:6f",NAME="eth1"
+EOF
+    )
+
+    # Verify the content of the udev rules file
+    actual_content=$(cat "$test_udev_rules_file")
+    if [ "$actual_content" != "$expected_content" ]; then
+        echo "Test failed: $test_udev_rules_file content is incorrect."
+        echo "Expected:"
+        echo "$expected_content"
+        echo "Got:"
+        echo "$actual_content"
+        exit 1
+    fi
+
+    echo "Test passed: $test_udev_rules_file was created with correct content."
+}
+
+# Run the first test with both network-scripts and system-connections directories
+run_test "With network-scripts and system-connections"
+
+# Remove network-scripts directory and rules file to test only with system-connections
+rm -rf "$test_scripts_dir"
+rm -rf "$test_udev_rules_file"
+
+# Run the second test with only system-connections directory
+run_test "With only system-connections"
