@@ -68,7 +68,7 @@ func TestCustomizeRHELWithMock(t *testing.T) {
 
 	// Run the CustomizeRHEL function
 	disks := []string{"disk1", "disk2"}
-	err := CustomizeRHEL(mockCustomizeDomainExec, disks, tempDir, mockTool)
+	err := CustomizeLinux(mockCustomizeDomainExec, disks, tempDir, mockTool)
 	if err != nil {
 		t.Fatalf("CustomizeRHEL returned an error: %v", err)
 	}
@@ -252,7 +252,7 @@ func TestCustomizeRHEL_CreateFilesFromFSFails(t *testing.T) {
 
 	// Run the CustomizeRHEL function
 	disks := []string{"disk1", "disk2"}
-	err := CustomizeRHEL(mockCustomizeDomainExec, disks, t.TempDir(), mockTool)
+	err := CustomizeLinux(mockCustomizeDomainExec, disks, t.TempDir(), mockTool)
 	if err == nil {
 		t.Fatalf("Expected error in CustomizeRHEL due to CreateFilesFromFS failure, got nil")
 	}
