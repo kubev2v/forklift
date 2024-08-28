@@ -24,6 +24,7 @@ import (
 	"github.com/openshift/library-go/pkg/template/templateprocessing"
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -1637,6 +1638,29 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 				RunAsNonRoot: &nonRoot,
 				SeccompProfile: &core.SeccompProfile{
 					Type: core.SeccompProfileTypeRuntimeDefault,
+				},
+			},
+			Affinity: &core.Affinity{
+				PodAntiAffinity: &core.PodAntiAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+						{
+							Weight: 100,
+							PodAffinityTerm: core.PodAffinityTerm{
+								TopologyKey: "kubernetes.io/hostname",
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key: kApp,
+											Values: []string{
+												"virt-v2v",
+											},
+											Operator: metav1.LabelSelectorOpIn,
+										},
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 			RestartPolicy:  core.RestartPolicyNever,
