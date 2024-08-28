@@ -26,14 +26,13 @@ const (
 //
 // Returns:
 //   - error: An error if something goes wrong during the process, or nil if successful.
-func CustomizeWindows(disks []string) error {
+func CustomizeWindows(disks []string, dir string, t FileSystemTool) error {
 	fmt.Printf("Customizing disks '%s'", disks)
-	t := EmbedTool{filesystem: &scriptFS}
-	err := t.CreateFilesFromFS(DIR)
+	err := t.CreateFilesFromFS(dir)
 	if err != nil {
 		return err
 	}
-	windowsScriptsPath := filepath.Join(DIR, "scripts", "windows")
+	windowsScriptsPath := filepath.Join(dir, "scripts", "windows")
 	initPath := filepath.Join(windowsScriptsPath, "9999-restore_config_init.bat")
 	restoreScriptPath := filepath.Join(windowsScriptsPath, "9999-restore_config.ps1")
 	firstbootPath := filepath.Join(windowsScriptsPath, "firstboot.bat")
@@ -82,6 +81,7 @@ func getScriptArgs(argName string, values ...string) []string {
 func CustomizeDomainExec(extraArgs ...string) error {
 	args := []string{"--verbose"}
 	args = append(args, extraArgs...)
+
 	customizeCmd := exec.Command("virt-customize", args...)
 	customizeCmd.Stdout = os.Stdout
 	customizeCmd.Stderr = os.Stderr

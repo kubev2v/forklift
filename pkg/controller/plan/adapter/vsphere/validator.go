@@ -139,9 +139,6 @@ func (r *Validator) StaticIPs(vmRef ref.Ref) (ok bool, err error) {
 		err = liberr.Wrap(err, "vm", vmRef)
 		return
 	}
-	if !isWindows(&vm.VM) {
-		return true, nil
-	}
 
 	for _, nic := range vm.NICs {
 		found := false

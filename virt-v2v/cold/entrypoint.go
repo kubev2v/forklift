@@ -108,7 +108,20 @@ func customizeVM(source string, xmlFilePath string) error {
 	}
 	if source == vSphere {
 		if strings.Contains(operatingSystem, "win") {
-			err = CustomizeWindows(disks)
+			t := EmbedTool{filesystem: &scriptFS}
+
+			err = CustomizeWindows(disks, DIR, &t)
+			if err != nil {
+				fmt.Println("Error customizing disk image:", err)
+				return err
+			}
+		}
+
+		// Linux
+		if !strings.Contains(operatingSystem, "win") {
+			t := EmbedTool{filesystem: &scriptFS}
+
+			err = CustomizeLinux(CustomizeDomainExec, disks, DIR, &t)
 			if err != nil {
 				fmt.Println("Error customizing disk image:", err)
 				return err
@@ -177,20 +190,14 @@ func buildCommand() []string {
 				virtV2vArgs = append(virtV2vArgs, "--mac", macToIp)
 			}
 		}
-		// Adds LUKS keys, if exist.
-		if _, err := os.Stat(LUKSDIR); err == nil {
-			files, err := getFilesInPath(LUKSDIR)
-			if err != nil {
-				fmt.Println("Error reading files in LUKS directory ", err)
-				os.Exit(1)
-			}
-			for _, file := range files {
-				virtV2vArgs = append(virtV2vArgs, "--key", fmt.Sprintf("all:file:%s", file))
-			}
-		} else if !os.IsNotExist(err) {
-			fmt.Println("Error accessing the LUKS directory ", err)
+
+		// Adds LUKS keys, if they exist
+		luksArgs, err := addLUKSKeys()
+		if err != nil {
+			fmt.Println("Error adding LUKS kyes ", err)
 			os.Exit(1)
 		}
+		virtV2vArgs = append(virtV2vArgs, luksArgs...)
 
 		if info, err := os.Stat(VDDK); err == nil && info.IsDir() {
 			virtV2vArgs = append(virtV2vArgs,
@@ -202,6 +209,35 @@ func buildCommand() []string {
 		virtV2vArgs = append(virtV2vArgs, "--", os.Getenv("V2V_vmName"))
 	}
 	return virtV2vArgs
+}
+
+// addLUKSKeys checks the LUKS directory for key files and returns the appropriate
+// arguments for a 'virt-' command to add these keys.
+//
+// Returns a slice of strings representing the LUKS key arguments, or an error if
+// there's an issue accessing the directory or reading the files.
+func addLUKSKeys() ([]string, error) {
+	var luksArgs []string
+
+	if _, err := os.Stat(LUKSDIR); err == nil {
+		files, err := getFilesInPath(LUKSDIR)
+		if err != nil {
+			fmt.Println("Error reading files in LUKS directory", err)
+			os.Exit(1)
+		}
+
+		var luksFiles []string
+		for _, file := range files {
+			luksFiles = append(luksFiles, fmt.Sprintf("all:file:%s", file))
+		}
+
+		luksArgs = append(luksArgs, getScriptArgs("key", luksFiles...)...)
+	} else if !os.IsNotExist(err) {
+		fmt.Println("Error accessing the LUKS directory", err)
+		os.Exit(1)
+	}
+
+	return luksArgs, nil
 }
 
 func getFilesInPath(rootPath string) (paths []string, err error) {
