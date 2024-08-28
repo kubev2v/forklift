@@ -25,10 +25,7 @@ echo -e "[connection]\ninterface-name=eth3\naddress1=192.168.1.11/24" > "$NETWOR
 source ${SCRIPT_DIR}/network_config_util.sh
 
 # Run the script
-{
-    udev_from_ifcfg
-    udev_from_nm
-} | check_dupe_hws > "$UDEV_RULES_FILE"
+main
 
 echo -e "\nTest output:"
 cat $UDEV_RULES_FILE

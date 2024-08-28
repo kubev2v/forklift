@@ -36,14 +36,15 @@ udev_from_ifcfg() {
         extract_mac_ip "$line"
         
         # If S_HW and S_IP were extracted, proceed
-        if [[ -n "$S_HW" && -n "$S_IP" ]]; then
-            # Source the matching file, if found
-            IFCFG=$(grep -l "IPADDR=$S_IP" "$NETWORK_SCRIPTS_DIR"/*)
-            [[ -z "$IFCFG" ]] && continue
-            source "$IFCFG"
-            
-            echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$S_HW\",NAME=\"$DEVICE\""
-        fi
+        [[ -z  "$S_HW" || -z "$S_IP" ]] && continue
+
+        # Source the matching file, if found
+        IFCFG=$(grep -l "IPADDR=$S_IP" "$NETWORK_SCRIPTS_DIR"/*)
+        [[ -z "$IFCFG" ]] && continue
+        source "$IFCFG"
+
+        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$S_HW\",NAME=\"$DEVICE\""
+
     done < "$V2V_MAP_FILE"
 }
 
@@ -55,17 +56,17 @@ udev_from_nm() {
         extract_mac_ip "$line"
 
         # If S_HW and S_IP were extracted, proceed
-        if [[ -n "$S_HW" && -n "$S_IP" ]]; then
-            # Find the matching NetworkManager connection file
-            NM_FILE=$(grep -El "address[0-9]*=$S_IP" "$NETWORK_CONNECTIONS_DIR"/*)
-            [[ -z "$NM_FILE" ]] && continue
-            
-            # Extract the DEVICE (interface name) from the matching file
-            DEVICE=$(grep -oP '^interface-name=\K.*' "$NM_FILE")
-            [[ -z "$DEVICE" ]] && continue
+        [[ -z  "$S_HW" || -z "$S_IP" ]] && continue
 
-            echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$S_HW\",NAME=\"$DEVICE\""
-        fi
+        # Find the matching NetworkManager connection file
+        NM_FILE=$(grep -El "address[0-9]*=$S_IP" "$NETWORK_CONNECTIONS_DIR"/*)
+        [[ -z "$NM_FILE" ]] && continue
+
+        # Extract the DEVICE (interface name) from the matching file
+        DEVICE=$(grep -oP '^interface-name=\K.*' "$NM_FILE")
+        [[ -z "$DEVICE" ]] && continue
+
+        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$S_HW\",NAME=\"$DEVICE\""
     done < "$V2V_MAP_FILE"
 }
 
@@ -78,7 +79,7 @@ check_dupe_hws() {
 
     # If duplicates are found, print an error and exit
     if [ -n "$dupes" ]; then
-        echo "ERR: Duplicate hw"
+        echo "ERR: Duplicate hw: $dupes"
         exit 2
     fi
 
@@ -86,7 +87,11 @@ check_dupe_hws() {
 }
 
 # Create udev rules check for duplicates and write them to udev file
-{
-    udev_from_ifcfg
-    udev_from_nm
-} | check_dupe_hws > "$UDEV_RULES_FILE"
+main() {
+    {
+        udev_from_ifcfg
+        udev_from_nm
+    } | check_dupe_hws > "$UDEV_RULES_FILE"
+}
+
+main
