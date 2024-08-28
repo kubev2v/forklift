@@ -13,7 +13,7 @@ type FileSystemTool interface {
 
 type DomainExecFunc func(args ...string) error
 
-func CustomizeRHEL(execFunc DomainExecFunc, disks []string, dir string, t FileSystemTool) error {
+func CustomizeLinux(execFunc DomainExecFunc, disks []string, dir string, t FileSystemTool) error {
 	fmt.Printf("Customizing disks '%v'\n", disks)
 
 	var extraArgs []string
