@@ -135,11 +135,11 @@ func customizeVM(source string, xmlFilePath string) error {
 			}
 		}
 
-		// RHEL
-		if strings.Contains(operatingSystem, "rhel") {
+		// Linux
+		if !strings.Contains(operatingSystem, "win") {
 			t := EmbedTool{filesystem: &scriptFS}
 
-			err = CustomizeRHEL(CustomizeDomainExec, disks, DIR, &t)
+			err = CustomizeLinux(CustomizeDomainExec, disks, DIR, &t)
 			if err != nil {
 				fmt.Println("Error customizing disk image:", err)
 				return err
