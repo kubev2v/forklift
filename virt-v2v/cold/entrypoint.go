@@ -66,8 +66,7 @@ func main() {
 
 	err = customizeVM(source, xmlFilePath)
 	if err != nil {
-		fmt.Println("Error customizing the VM:", err)
-		os.Exit(1)
+		fmt.Println("Warning customizing the VM failed:", err)
 	}
 
 	http.HandleFunc("/ovf", ovfHandler)
