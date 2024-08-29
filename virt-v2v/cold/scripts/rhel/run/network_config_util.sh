@@ -36,6 +36,12 @@ extract_mac_ip() {
 
 # Create udev rules based on the macToip mapping + ifcfg network scripts
 udev_from_ifcfg() {
+    # Check if the network scripts directory exists
+    if [[ ! -d "$NETWORK_SCRIPTS_DIR" ]]; then
+        echo "Warning: Directory $NETWORK_SCRIPTS_DIR does not exist." >&2
+        return 0
+    fi
+
     # Read the mapping file line by line
     while IFS= read -r line; do
         # Extract S_HW and S_IP
@@ -56,6 +62,12 @@ udev_from_ifcfg() {
 
 # Create udev rules based on the macToip mapping + network manager connections
 udev_from_nm() {
+     # Check if the network connections directory exists
+    if [[ ! -d "$NETWORK_CONNECTIONS_DIR" ]]; then
+        echo "Warning: Directory $NETWORK_CONNECTIONS_DIR does not exist." >&2
+        return 0
+    fi
+
     # Read the mapping file line by line
     while IFS= read -r line; do
         # Extract S_HW and S_IP
