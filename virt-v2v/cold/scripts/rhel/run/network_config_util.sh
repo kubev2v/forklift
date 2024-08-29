@@ -38,7 +38,7 @@ extract_mac_ip() {
 udev_from_ifcfg() {
     # Check if the network scripts directory exists
     if [[ ! -d "$NETWORK_SCRIPTS_DIR" ]]; then
-        echo "Warning: Directory $NETWORK_SCRIPTS_DIR does not exist." >&2
+        echo "Warning: Directory $NETWORK_SCRIPTS_DIR does not exist."
         return 0
     fi
 
@@ -64,7 +64,7 @@ udev_from_ifcfg() {
 udev_from_nm() {
      # Check if the network connections directory exists
     if [[ ! -d "$NETWORK_CONNECTIONS_DIR" ]]; then
-        echo "Warning: Directory $NETWORK_CONNECTIONS_DIR does not exist." >&2
+        echo "Warning: Directory $NETWORK_CONNECTIONS_DIR does not exist."
         return 0
     fi
 
@@ -97,8 +97,8 @@ check_dupe_hws() {
 
     # If duplicates are found, print an error and exit
     if [ -n "$dupes" ]; then
-        echo "ERR: Duplicate hw: $dupes"
-        exit 2
+        echo "Warning: Duplicate hw: $dupes"
+        return 0
     fi
 
     echo "$input"
