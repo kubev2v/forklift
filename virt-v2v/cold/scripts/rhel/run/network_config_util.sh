@@ -6,6 +6,12 @@ NETWORK_SCRIPTS_DIR="${NETWORK_SCRIPTS_DIR:-/etc/sysconfig/network-scripts}"
 NETWORK_CONNECTIONS_DIR="${NETWORK_CONNECTIONS_DIR:-/etc/NetworkManager/system-connections}"
 UDEV_RULES_FILE="${UDEV_RULES_FILE:-/etc/udev/rules.d/70-persistent-net.rules}"
 
+# Check if mapping file does not exist
+if [ ! -f "$V2V_MAP_FILE" ]; then
+    echo "File $V2V_MAP_FILE does not exist. Exiting."
+    exit 0
+fi
+
 # Check if udev rules file exists
 if [ -f "$UDEV_RULES_FILE" ]; then
     echo "File $UDEV_RULES_FILE already exists. Exiting."
