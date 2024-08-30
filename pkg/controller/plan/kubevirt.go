@@ -1751,7 +1751,8 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 						{
 							Weight: 100,
 							PodAffinityTerm: core.PodAffinityTerm{
-								TopologyKey: "kubernetes.io/hostname",
+								NamespaceSelector: &metav1.LabelSelector{},
+								TopologyKey:       "kubernetes.io/hostname",
 								LabelSelector: &metav1.LabelSelector{
 									MatchExpressions: []metav1.LabelSelectorRequirement{
 										{
