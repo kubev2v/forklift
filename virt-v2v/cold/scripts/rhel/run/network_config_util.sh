@@ -28,16 +28,16 @@ log() {
 extract_mac_ip() {
     S_HW=""
     S_IP=""
-    if [[ "$1" =~ ^([0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}):ip:([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}) ]]; then
-        S_HW="${BASH_REMATCH[1]}"
-        S_IP="${BASH_REMATCH[2]}"
+    if echo "$1" | grep -qE '^([0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}):ip:([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})$'; then
+        S_HW=$(echo "$1" | sed -nE 's/^([0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}):ip:.*$/\1/p')
+        S_IP=$(echo "$1" | sed -nE 's/^.*:ip:([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})$/\1/p')
     fi
 }
 
 # Create udev rules based on the macToip mapping + ifcfg network scripts
 udev_from_ifcfg() {
     # Check if the network scripts directory exists
-    if [[ ! -d "$NETWORK_SCRIPTS_DIR" ]]; then
+    if [ ! -d "$NETWORK_SCRIPTS_DIR" ]; then
         echo "Warning: Directory $NETWORK_SCRIPTS_DIR does not exist."
         return 0
     fi
@@ -46,24 +46,32 @@ udev_from_ifcfg() {
     while IFS= read -r line; do
         # Extract S_HW and S_IP
         extract_mac_ip "$line"
-        
-        # If S_HW and S_IP were extracted, proceed
-        [[ -z  "$S_HW" || -z "$S_IP" ]] && continue
+
+        # If S_HW and S_IP were not extracted, skip the line
+        if [ -z "$S_HW" ] || [ -z "$S_IP" ]; then
+            continue
+        fi
+
+        # Find the matching network script file
+        IFCFG=$(grep -l "IPADDR=$S_IP" "$NETWORK_SCRIPTS_DIR"/*)
+        if [ -z "$IFCFG" ]; then
+            continue
+        fi
 
         # Source the matching file, if found
-        IFCFG=$(grep -l "IPADDR=$S_IP" "$NETWORK_SCRIPTS_DIR"/*)
-        [[ -z "$IFCFG" ]] && continue
-        source "$IFCFG"
+        DEVICE=$(grep '^DEVICE=' "$IFCFG" | cut -d'=' -f2)
+        if [ -z "$DEVICE" ]; then
+            continue
+        fi
 
         echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$S_HW\",NAME=\"$DEVICE\""
-
     done < "$V2V_MAP_FILE"
 }
 
 # Create udev rules based on the macToip mapping + network manager connections
 udev_from_nm() {
-     # Check if the network connections directory exists
-    if [[ ! -d "$NETWORK_CONNECTIONS_DIR" ]]; then
+    # Check if the network connections directory exists
+    if [ ! -d "$NETWORK_CONNECTIONS_DIR" ]; then
         echo "Warning: Directory $NETWORK_CONNECTIONS_DIR does not exist."
         return 0
     fi
@@ -73,16 +81,22 @@ udev_from_nm() {
         # Extract S_HW and S_IP
         extract_mac_ip "$line"
 
-        # If S_HW and S_IP were extracted, proceed
-        [[ -z  "$S_HW" || -z "$S_IP" ]] && continue
+        # If S_HW and S_IP were not extracted, skip the line
+        if [ -z "$S_HW" ] || [ -z "$S_IP" ]; then
+            continue
+        fi
 
         # Find the matching NetworkManager connection file
         NM_FILE=$(grep -El "address[0-9]*=$S_IP" "$NETWORK_CONNECTIONS_DIR"/*)
-        [[ -z "$NM_FILE" ]] && continue
+        if [ -z "$NM_FILE" ]; then
+            continue
+        fi
 
         # Extract the DEVICE (interface name) from the matching file
-        DEVICE=$(grep -oP '^interface-name=\K.*' "$NM_FILE")
-        [[ -z "$DEVICE" ]] && continue
+        DEVICE=$(grep '^interface-name=' "$NM_FILE" | cut -d'=' -f2)
+        if [ -z "$DEVICE" ]; then
+            continue
+        fi
 
         echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$S_HW\",NAME=\"$DEVICE\""
     done < "$V2V_MAP_FILE"
@@ -93,7 +107,7 @@ check_dupe_hws() {
     input=$(cat)
 
     # Extract MAC addresses, convert to uppercase, sort them, and find duplicates
-    dupes=$(grep -io -E "[0-9A-F:]{17}" <<< "$input" | tr 'a-f' 'A-F' | sort | uniq -d)
+    dupes=$(echo "$input" | grep -ioE "[0-9A-F:]{17}" | tr 'a-f' 'A-F' | sort | uniq -d)
 
     # If duplicates are found, print an error and exit
     if [ -n "$dupes" ]; then
