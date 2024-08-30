@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Temporary directory for testing
 TEST_DIR=$(mktemp -d)
@@ -17,17 +17,17 @@ rm -rf "$NETWORK_SCRIPTS_DIR" "$NETWORK_CONNECTIONS_DIR"
 mkdir -p "$NETWORK_SCRIPTS_DIR" "$NETWORK_CONNECTIONS_DIR"
 
 # Create mock data
-echo -e "aa:bb:cc:dd:ee:ff:ip:192.168.1.10\naa:bb:cc:dd:ee:fe:ip:192.168.1.11\naa:bb:cc:dd:ee:fd:ip:2001:0db8:85a3:0000:0000:8a2e:0370:7334\n" > "$V2V_MAP_FILE"
-echo -e "DEVICE=eth0\nIPADDR=192.168.1.10" > "$NETWORK_SCRIPTS_DIR/ifcfg-eth0"
-echo -e "[connection]\ninterface-name=eth3\naddress1=192.168.1.11/24" > "$NETWORK_CONNECTIONS_DIR/eth1 but with spaces.nmconnection"
+printf "aa:bb:cc:dd:ee:ff:ip:192.168.1.10\naa:bb:cc:dd:ee:fe:ip:192.168.1.11\naa:bb:cc:dd:ee:fd:ip:2001:0db8:85a3:0000:0000:8a2e:0370:7334\n" > "$V2V_MAP_FILE"
+printf "DEVICE=eth0\nIPADDR=192.168.1.10\n" > "$NETWORK_SCRIPTS_DIR/ifcfg-eth0"
+printf "[connection]\ninterface-name=eth3\naddress1=192.168.1.11/24\n" > "$NETWORK_CONNECTIONS_DIR/eth1 but with spaces.nmconnection"
 
 # Source the script under test
-source ${SCRIPT_DIR}/network_config_util.sh
+. ${SCRIPT_DIR}/network_config_util.sh
 
 # Run the script
 main
 
-echo -e "\nTest output:"
+printf "\nTest output:\n"
 cat $UDEV_RULES_FILE
 
 # Test 1: Verify the udev rules file was created
