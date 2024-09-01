@@ -49,6 +49,11 @@ func CustomizeLinux(execFunc DomainExecFunc, disks []string, dir string, t FileS
 		return fmt.Errorf("failed to execute domain customization: %w", err)
 	}
 
+	// Step 7: flush page cache for the disk files
+	if err := SyncDisks(disks); err != nil {
+		return fmt.Errorf("failed to execute domain customization: %w", err)
+	}
+
 	return nil
 }
 

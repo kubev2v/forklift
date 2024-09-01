@@ -52,6 +52,20 @@ func mockCustomizeDomainExec(args ...string) error {
 	return nil
 }
 
+// CreateTestDisks creates temporary disk files in the specified directory and returns their paths.
+func CreateTestDisks(dir string, names []string) ([]string, error) {
+	var disks []string
+	for _, name := range names {
+		disk, err := os.CreateTemp(dir, name+"-*.img")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create temp file for %s: %w", name, err)
+		}
+		defer disk.Close()
+		disks = append(disks, disk.Name())
+	}
+	return disks, nil
+}
+
 // Test the CustomizeRHEL function using the mocked EmbedTool
 func TestCustomizeRHELWithMock(t *testing.T) {
 	// Create a temporary directory and add dummy .sh files
@@ -66,9 +80,15 @@ func TestCustomizeRHELWithMock(t *testing.T) {
 		files: mockFiles,
 	}
 
+	// Create disk files using the reusable method
+	diskNames := []string{"disk1", "disk2"}
+	disks, err := CreateTestDisks(tempDir, diskNames)
+	if err != nil {
+		t.Fatalf("Error creating test disks: %v", err)
+	}
+
 	// Run the CustomizeRHEL function
-	disks := []string{"disk1", "disk2"}
-	err := CustomizeLinux(mockCustomizeDomainExec, disks, tempDir, mockTool)
+	err = CustomizeLinux(mockCustomizeDomainExec, disks, tempDir, mockTool)
 	if err != nil {
 		t.Fatalf("CustomizeRHEL returned an error: %v", err)
 	}
@@ -250,9 +270,16 @@ func TestCustomizeRHEL_CreateFilesFromFSFails(t *testing.T) {
 		shouldFailCreateFiles: true, // Simulate failure in CreateFilesFromFS
 	}
 
+	// Create disk files using the reusable method
+	tempDir := t.TempDir()
+	diskNames := []string{"disk1", "disk2"}
+	disks, err := CreateTestDisks(tempDir, diskNames)
+	if err != nil {
+		t.Fatalf("Error creating test disks: %v", err)
+	}
+
 	// Run the CustomizeRHEL function
-	disks := []string{"disk1", "disk2"}
-	err := CustomizeLinux(mockCustomizeDomainExec, disks, t.TempDir(), mockTool)
+	err = CustomizeLinux(mockCustomizeDomainExec, disks, t.TempDir(), mockTool)
 	if err == nil {
 		t.Fatalf("Expected error in CustomizeRHEL due to CreateFilesFromFS failure, got nil")
 	}

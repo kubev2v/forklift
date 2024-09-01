@@ -92,3 +92,23 @@ func CustomizeDomainExec(extraArgs ...string) error {
 	}
 	return nil
 }
+
+// SyncDisks takes a slice of disk filenames and syncs each one, returning an error if any operation fails.
+func SyncDisks(disks []string) error {
+	for _, disk := range disks {
+		// Open the disk file in read-only mode
+		file, err := os.Open(disk)
+		if err != nil {
+			return fmt.Errorf("failed to open disk file %s: %w", disk, err)
+		}
+		defer file.Close()
+
+		// Sync the file to ensure all data is written to disk
+		if err := file.Sync(); err != nil {
+			return fmt.Errorf("failed to sync disk file %s: %w", disk, err)
+		}
+	}
+
+	// If we get here, all files were synced successfully
+	return nil
+}
