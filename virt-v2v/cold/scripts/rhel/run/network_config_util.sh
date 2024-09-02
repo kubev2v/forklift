@@ -18,6 +18,11 @@ if [ -f "$UDEV_RULES_FILE" ]; then
     exit 0
 fi
 
+# Clean strigs in case they have quates
+remove_quotes() {
+    echo "$1" | tr -d '"'
+}
+
 # Validate MAC address and IPv4 address and extract them
 extract_mac_ip() {
     S_HW=""
@@ -58,7 +63,7 @@ udev_from_ifcfg() {
             continue
         fi
 
-        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$S_HW\",NAME=\"$DEVICE\""
+        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"$(remove_quotes "$DEVICE")\""
     done < "$V2V_MAP_FILE"
 }
 
@@ -92,7 +97,7 @@ udev_from_nm() {
             continue
         fi
 
-        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$S_HW\",NAME=\"$DEVICE\""
+        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"$(remove_quotes "$DEVICE")\""
     done < "$V2V_MAP_FILE"
 }
 
