@@ -82,18 +82,8 @@ func main() {
 	}
 }
 
-func getVmDiskPaths(domain *OvaVmconfig) []string {
-	var resp []string
-	for _, disk := range domain.Devices.Disks {
-		if disk.Source.File != "" {
-			resp = append(resp, disk.Source.File)
-		}
-	}
-	return resp
-}
-
-func customizeVM(source string, xmlFilePath string) error {
-	domain, err := GetDomainFromXml(xmlFilePath)
+func customizeVM(source string, yamlFilePath string) error {
+	vmConfig, err := GetVmConfigYaml(yamlFilePath)
 	if err != nil {
 		fmt.Printf("Error mapping xml to domain: %v\n", err)
 
@@ -102,7 +92,7 @@ func customizeVM(source string, xmlFilePath string) error {
 	}
 
 	// Get operating system.
-	operatingSystem := domain.Metadata.LibOsInfo.V2VOS.ID
+	operatingSystem := vmConfig.OSInfo
 	if operatingSystem == "" {
 		fmt.Printf("Warning: no operating system found")
 
@@ -112,15 +102,13 @@ func customizeVM(source string, xmlFilePath string) error {
 		fmt.Printf("Operating System ID: %s\n", operatingSystem)
 	}
 
-	// Get domain disks.
-	disks := getVmDiskPaths(domain)
-	if len(disks) == 0 {
+	if len(vmConfig.DiskPaths) == 0 {
 		fmt.Printf("Warning: no V2V domain disks found")
 
 		// No customization when no disks found.
 		return nil
 	} else {
-		fmt.Printf("V2V domain disks: %v\n", disks)
+		fmt.Printf("V2V domain disks: %v\n", vmConfig.DiskPaths)
 	}
 
 	// Customization for vSphere source.
@@ -129,7 +117,7 @@ func customizeVM(source string, xmlFilePath string) error {
 		if strings.Contains(operatingSystem, "win") {
 			t := EmbedTool{filesystem: &scriptFS}
 
-			err = CustomizeWindows(disks, DIR, &t)
+			err = CustomizeWindows(vmConfig.DiskPaths, DIR, &t)
 			if err != nil {
 				fmt.Println("Error customizing disk image:", err)
 				return err
@@ -140,7 +128,7 @@ func customizeVM(source string, xmlFilePath string) error {
 		if !strings.Contains(operatingSystem, "win") {
 			t := EmbedTool{filesystem: &scriptFS}
 
-			err = CustomizeLinux(CustomizeDomainExec, disks, DIR, &t)
+			err = CustomizeLinux(CustomizeDomainExec, vmConfig.DiskPaths, DIR, &t)
 			if err != nil {
 				fmt.Println("Error customizing disk image:", err)
 				return err
