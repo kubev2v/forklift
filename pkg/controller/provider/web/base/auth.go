@@ -64,7 +64,7 @@ func (r *Auth) Permit(ctx *gin.Context, p *api.Provider) (status int, err error)
 		ns = q.Get(NsParam)
 	}
 	allowed, err := r.permit(token, ns, p)
-	if allowed && err != nil {
+	if err != nil {
 		log.Error(err, "Authorization failed.")
 		status = http.StatusInternalServerError
 		return
@@ -85,7 +85,6 @@ func (r *Auth) Permit(ctx *gin.Context, p *api.Provider) (status int, err error)
 
 // Authenticate token.
 func (r *Auth) permit(token string, ns string, p *api.Provider) (allowed bool, err error) {
-	allowed = true
 	tr := &auth.TokenReview{
 		Spec: auth.TokenReviewSpec{
 			Token: token,
