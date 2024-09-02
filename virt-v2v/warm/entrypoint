@@ -1,34 +1,143 @@
 #!/usr/bin/env bash
+set -x
 shopt -s nullglob
 
-export LIBGUESTFS_PATH=/usr/lib64/guestfs
-set -- "$LIBGUESTFS_PATH"/libguestfs-appliance.tar.xz
-if [ -f "$1" ] ; then
-    echo "Extracting libguestfs appliance..."
-    APPLIANCE="/var/tmp/libguestfs-appliance"
-    mkdir -p "$APPLIANCE"
-    tar -xvJf "$1" -C "$APPLIANCE"
-    LIBGUESTFS_PATH="$APPLIANCE/appliance"
-fi
+DOMAIN_DIR=${DOMAIN_DIR:-/var/tmp/v2v}
+SCRIPTS_DIR=${SCRIPTS_DIR:-/scripts}
 
-echo "Run virt-v2v with the following input:"
-cat /mnt/v2v/input.xml
+setup_libguestfs(){
+  export LIBGUESTFS_PATH=/usr/lib64/guestfs
+  set -- "$LIBGUESTFS_PATH"/libguestfs-appliance.tar.xz
+  if [ -f "$1" ] ; then
+      echo "Extracting libguestfs appliance..."
+      APPLIANCE="/var/tmp/libguestfs-appliance"
+      mkdir -p "$APPLIANCE"
+      tar -xvJf "$1" -C "$APPLIANCE"
+      LIBGUESTFS_PATH="$APPLIANCE/appliance"
+  fi
+}
 
-virt-v2v -v -x -i libvirtxml -o null --debug-overlays --no-copy --root=first /mnt/v2v/input.xml
-[ $? != 0 ] && exit 1
+run_v2v(){
+  echo "Run virt-v2v with the following input:"
+  cat /mnt/v2v/input.xml
+  # We need to create the directory where the v2v will output the xml domain
+  mkdir -p "$DOMAIN_DIR"
+  virt-v2v -v -x -i libvirtxml -o local -os "$DOMAIN_DIR" --debug-overlays --no-copy --root=first /mnt/v2v/input.xml
+  [ $? != 0 ] && return 1
+}
 
-echo "Conversion successful. Committing all overlays to local disks."
-for OVERLAY in /var/tmp/*.qcow2
-do
-	if ! qemu-img commit -p "$OVERLAY"
-	then
-		echo Failed to commit overlay "$OVERLAY"!
-		echo Unable to complete import!
-		exit 1
-	fi
-done
+commit_overlays(){
+  echo "Conversion successful. Committing all overlays to local disks."
+  for OVERLAY in /var/tmp/*.qcow2
+  do
+    if ! qemu-img commit -p "$OVERLAY"
+    then
+      echo "Failed to commit overlay \"$OVERLAY\"!"
+      echo "Unable to complete import!"
+      return 1
+    fi
+  done
 
-echo "Commit successful. Cleaning up."
-find /var/tmp -name '*.qcow2' -exec rm -f {} \;
+  echo "Commit successful. Cleaning up."
+  find /var/tmp -name '*.qcow2' -exec rm -f {} \;
+}
 
-exit 0
+get_disk_add_args(){
+  input=$1
+  add_disks=""
+  while IFS= read -r disk; do
+      add_disks+=" --add $disk"
+  done <<< "$input"
+  echo "$add_disks"
+}
+
+customize_windows(){
+  echo "Running win virt-customize"
+  windows_dir="$SCRIPTS_DIR/windows"
+	windows_firstboot_dir="/Program Files/Guestfs/Firstboot"
+	windows_firstboot_scripts_dir="/Program Files/Guestfs/Firstboot/scripts"
+  # shellcheck disable=SC2206
+  args=(
+    --verbose
+    --format raw
+    --upload "$windows_dir/9999-restore_config_init.bat:$windows_firstboot_scripts_dir"
+    --upload "$windows_dir/9999-restore_config.ps1:$windows_firstboot_scripts_dir"
+    --upload "$windows_dir/firstboot.bat:$windows_firstboot_dir"
+    $1
+  )
+  virt-customize "${args[@]}"
+}
+
+customize_linux(){
+  echo "Running linux virt-customize"
+  rhel_dir="$SCRIPTS_DIR/rhel"
+  # We need to expand the disk args with splitting $1
+  # shellcheck disable=SC2206
+  args=(
+    --verbose
+    --format raw
+    --run "$rhel_dir/run/network_config_util.sh"
+    $1
+  )
+  virt-customize "${args[@]}"
+}
+
+# num_to_alpha converts number into a alphabet if the number is larger than 26 the alphabet get chained
+# Example:
+# num_to_alpha 2 => c
+# num_to_alpha 29 => ad
+num_to_alpha() {
+    alphabet=({a..z})
+    if (( $1 <= 26 ));then
+      echo "${alphabet[$(($1%26))]}"
+    else
+      echo "${alphabet[$(($1/26))]}$(num_to_alpha $(($1-26)))"
+    fi
+}
+
+add_disks_links(){
+  # Link file system storage
+  find /mnt/disks/ -name "disk[0-9]*" -print0 |
+    while IFS= read -r -d '' disk; do
+        ln -s "$disk/disk.img" "$DOMAIN_DIR/$1-sd$(num_to_alpha "$(grep -Eo '[0-9]+$' <<< "$disk")")"
+    done
+  # Link block devices
+  find /dev/ -name "block[0-9]*" -print0 |
+    while IFS= read -r -d '' disk; do
+        ln -s "$disk" "$DOMAIN_DIR/$1-sd$(num_to_alpha "$(grep -Eo '[0-9]+$' <<< "$disk")")"
+    done
+}
+
+customize(){
+  echo "Starting customize"
+  # Find domain file
+  domain=$(realpath "$(find "$DOMAIN_DIR" -name "*.xml")")
+  if [ -z "$domain" ]; then
+      echo "Failed to locate xml domain."
+      exit 1
+  fi
+  # Query domain parameter
+  os=$(xmllint "$domain" --xpath '//domain/metadata/*[name()="libosinfo:libosinfo"]/*[name()="libosinfo:os"]/@id' | awk -F\" '{ print $2 }')
+  disks=$(xmllint "$domain"  --xpath '//domain/devices/disk/source/@file' | awk -F\" '{ print $2 }' )
+  name=$(xmllint "$domain"  --xpath '//domain/name/text()')
+
+  # Link the disks to the v2v directory with name that matches the domain
+  add_disks_links "$name"
+
+  # Generate disk arguments for the virt-customize
+  add_disks_args=$(get_disk_add_args "$disks")
+  if [[ "$os" =~ win ]]; then
+    customize_windows "$add_disks_args"
+  else
+    customize_linux "$add_disks_args"
+  fi
+}
+
+main() {
+  setup_libguestfs "$1"
+  run_v2v
+  commit_overlays
+  customize || echo "The virt-customize failed"
+}
+
+main "$@"

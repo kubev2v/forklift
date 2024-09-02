@@ -58,8 +58,28 @@ container_image(
 )
 
 container_image(
-    name = "forklift-virt-v2v-warm",
+    name = "virt-v2v-rhel-scripts-image",
     base = ":virt-v2v-image",
+    directory = "/scripts/rhel/run/",
+    files = [
+        "scripts/rhel/run/network_config_util.sh",
+    ],
+)
+
+container_image(
+    name = "virt-v2v-win-scripts-image",
+    base = ":virt-v2v-rhel-scripts-image",
+    directory = "/scripts/windows/",
+    files = [
+        "scripts/windows/9999-restore_config.ps1",
+        "scripts/windows/9999-restore_config_init.bat",
+        "scripts/windows/firstboot.bat",
+    ],
+)
+
+container_image(
+    name = "forklift-virt-v2v-warm",
+    base = ":virt-v2v-win-scripts-image",
     directory = "/usr/local/bin/",
     empty_dirs = ["/disks"],
     entrypoint = ["/usr/local/bin/entrypoint"],
