@@ -79,7 +79,7 @@ func getScriptArgs(argName string, values ...string) []string {
 // Returns:
 //   - error: An error if something goes wrong during the process, or nil if successful.
 func CustomizeDomainExec(extraArgs ...string) error {
-	args := []string{"--verbose"}
+	args := []string{"--verbose", "--format", "raw"}
 	args = append(args, extraArgs...)
 
 	customizeCmd := exec.Command("virt-customize", args...)
