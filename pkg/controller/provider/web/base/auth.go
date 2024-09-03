@@ -39,52 +39,48 @@ type Auth struct {
 }
 
 // Authenticate token.
-func (r *Auth) Permit(ctx *gin.Context, p *api.Provider) (status int, err error) {
+func (r *Auth) Permit(ctx *gin.Context, p *api.Provider) (int, error) {
 	r.mutex.Lock()
 	ns := ""
 	defer r.mutex.Unlock()
-	status = http.StatusOK
 	if r.cache == nil {
 		r.cache = make(map[string]time.Time)
 	}
 	r.prune()
 	token := r.token(ctx)
 	if token == "" {
-		status = http.StatusUnauthorized
-		return
+		return http.StatusUnauthorized, nil
 	}
 	key := r.key(token, p)
 	if t, found := r.cache[key]; found {
 		if time.Since(t) <= r.TTL {
-			return
+			return http.StatusOK, nil
 		}
 	}
 	if p.ObjectMeta.UID == "" {
 		q := ctx.Request.URL.Query()
 		ns = q.Get(NsParam)
 	}
-	allowed, err := r.permit(token, ns, p)
+	status, err := r.permit(token, ns, p)
 	if err != nil {
 		log.Error(err, "Authorization failed.")
-		status = http.StatusInternalServerError
-		return
+		return status, err
 	}
-	if allowed {
+	if status == http.StatusOK {
 		r.cache[key] = time.Now()
+		return http.StatusOK, nil
 	} else {
-		status = http.StatusForbidden
 		delete(r.cache, token)
 		log.Info(
 			http.StatusText(status),
 			"token",
 			token)
+		return status, nil
 	}
-
-	return
 }
 
 // Authenticate token.
-func (r *Auth) permit(token string, ns string, p *api.Provider) (allowed bool, err error) {
+func (r *Auth) permit(token string, ns string, p *api.Provider) (int, error) {
 	tr := &auth.TokenReview{
 		Spec: auth.TokenReviewSpec{
 			Token: token,
@@ -92,16 +88,14 @@ func (r *Auth) permit(token string, ns string, p *api.Provider) (allowed bool, e
 	}
 	w, err := r.writer()
 	if err != nil {
-		err = liberr.Wrap(err)
-		return
+		return http.StatusInternalServerError, liberr.Wrap(err)
 	}
 	err = w.Create(context.TODO(), tr)
 	if err != nil {
-		err = liberr.Wrap(err)
-		return
+		return http.StatusInternalServerError, liberr.Wrap(err)
 	}
 	if !tr.Status.Authenticated {
-		return
+		return http.StatusUnauthorized, nil
 	}
 	user := tr.Status.User
 	extra := map[string]auth2.ExtraValue{}
@@ -114,8 +108,7 @@ func (r *Auth) permit(token string, ns string, p *api.Provider) (allowed bool, e
 	// only if they have permissions for list/get 'providers' in the K8s API
 	group, resource, err := api.GetGroupResource(p)
 	if err != nil {
-		err = liberr.Wrap(err)
-		return
+		return http.StatusInternalServerError, liberr.Wrap(err)
 	}
 	var verb, namespace string
 	if p.ObjectMeta.UID != "" {
@@ -142,19 +135,19 @@ func (r *Auth) permit(token string, ns string, p *api.Provider) (allowed bool, e
 	}
 	err = w.Create(context.TODO(), review)
 	if err != nil {
-		err = liberr.Wrap(err)
-		return
+		return http.StatusInternalServerError, liberr.Wrap(err)
 	}
 
-	if allowed = review.Status.Allowed; !allowed {
+	if !review.Status.Allowed {
 		groupResource := &schema.GroupResource{
 			Resource: resource,
 			Group:    group,
 		}
 		err = fmt.Errorf("%s is forbidden: User %q cannot %s resource %q in API group %q in the namespace %q",
 			groupResource, user.Username, verb, resource, group, namespace)
+		return http.StatusForbidden, liberr.Wrap(err)
 	}
-	return
+	return http.StatusOK, nil
 }
 
 // Extract token.
