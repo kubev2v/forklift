@@ -30,7 +30,7 @@ func TestGenName(t *testing.T) {
 }
 
 func TestStaticIPs(t *testing.T) {
-	t.Setenv("V2V_source", vSphere)
+	t.Setenv("V2V_source", VSPHERE)
 	t.Setenv("V2V_libvirtURL", "http://fake.com")
 	t.Setenv("V2V_secretKey", "fake")
 	t.Setenv("V2V_vmName", "test")
