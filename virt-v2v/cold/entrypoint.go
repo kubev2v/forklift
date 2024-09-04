@@ -16,10 +16,10 @@ import (
 
 const (
 	OVA     = "ova"
-	vSphere = "vSphere"
+	VSPHERE = "vSphere"
 	DIR     = "/var/tmp/v2v"
 	FS      = "/mnt/disks/disk[0-9]*"
-	Block   = "/dev/block[0-9]*"
+	BLOCK   = "/dev/block[0-9]*"
 	VDDK    = "/opt/vmware-vix-disklib-distrib"
 	LUKSDIR = "/etc/luks"
 )
@@ -34,7 +34,7 @@ const LETTERS_LENGTH = len(LETTERS)
 
 func main() {
 	source := os.Getenv("V2V_source")
-	if source == vSphere {
+	if source == VSPHERE {
 		if _, err := os.Stat("/etc/secret/cacert"); err == nil {
 			// use the specified certificate
 			err = os.Symlink("/etc/secret/cacert", "/opt/ca-bundle.crt")
@@ -122,7 +122,7 @@ func customizeVM(source string, xmlFilePath string) error {
 	}
 
 	// Customization for vSphere source.
-	if source == vSphere {
+	if source == VSPHERE {
 		// Windows
 		if strings.Contains(operatingSystem, "win") {
 			t := EmbedTool{filesystem: &scriptFS}
@@ -154,7 +154,7 @@ func buildCommand() []string {
 	source := os.Getenv("V2V_source")
 
 	requiredEnvVars := map[string][]string{
-		vSphere: {"V2V_libvirtURL", "V2V_secretKey", "V2V_vmName"},
+		VSPHERE: {"V2V_libvirtURL", "V2V_secretKey", "V2V_vmName"},
 		OVA:     {"V2V_diskPath", "V2V_vmName"},
 	}
 
@@ -174,7 +174,7 @@ func buildCommand() []string {
 	fmt.Println("Preparing virt-v2v")
 
 	switch source {
-	case vSphere:
+	case VSPHERE:
 		virtV2vArgs = append(virtV2vArgs, "--root")
 		if checkEnvVariablesSet("V2V_RootDisk") {
 			virtV2vArgs = append(virtV2vArgs, os.Getenv("V2V_RootDisk"))
@@ -197,11 +197,11 @@ func buildCommand() []string {
 		os.Exit(1)
 	}
 	//Disks on block storage.
-	if err := LinkDisks(Block, 10); err != nil {
+	if err := LinkDisks(BLOCK, 10); err != nil {
 		os.Exit(1)
 	}
 
-	if source == vSphere {
+	if source == VSPHERE {
 		virtV2vArgs = append(virtV2vArgs, "-ip", "/etc/secret/secretKey")
 
 		if envStaticIPs := os.Getenv("V2V_staticIPs"); envStaticIPs != "" {
