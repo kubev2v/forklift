@@ -126,6 +126,25 @@ func convertVirtV2vInPlace() error {
 	return executeVirtV2v("/usr/libexec/virt-v2v-in-place", args)
 }
 
+// virtV2VPrepEnvironment prepares the filesystem of the virt-v2v container so
+// that it will be in the state expected by the virt-v2v command.
+func virtV2VPrepEnvironment() (err error) {
+	if err = os.MkdirAll(DIR, os.ModePerm); err != nil {
+		return fmt.Errorf("Error creating directory: %v", err)
+	}
+
+	//Disks on filesystem storage.
+	if err = LinkDisks(FS, 15); err != nil {
+		return
+	}
+	//Disks on block storage.
+	if err = LinkDisks(BLOCK, 10); err != nil {
+		return
+	}
+
+	return nil
+}
+
 func virtV2vBuildCommand() (args []string, err error) {
 	args = []string{"-v", "-x"}
 	source := os.Getenv("V2V_source")
@@ -148,6 +167,10 @@ func virtV2vBuildCommand() (args []string, err error) {
 	}
 	fmt.Println("Preparing virt-v2v")
 
+	if err = virtV2VPrepEnvironment(); err != nil {
+		return
+	}
+
 	switch source {
 	case VSPHERE:
 		args = append(args, "--root")
@@ -161,19 +184,7 @@ func virtV2vBuildCommand() (args []string, err error) {
 		args = append(args, "-i", "ova", os.Getenv("V2V_diskPath"))
 	}
 
-	if err := os.MkdirAll(DIR, os.ModePerm); err != nil {
-		return nil, fmt.Errorf("Error creating directory: %v", err)
-	}
 	args = append(args, "-o", "local", "-os", DIR)
-
-	//Disks on filesystem storage.
-	if err = LinkDisks(FS, 15); err != nil {
-		return
-	}
-	//Disks on block storage.
-	if err = LinkDisks(BLOCK, 10); err != nil {
-		return
-	}
 
 	if source == VSPHERE {
 		args = append(args, "-ip", "/etc/secret/secretKey")
