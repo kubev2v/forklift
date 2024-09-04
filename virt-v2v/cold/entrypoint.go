@@ -171,6 +171,8 @@ func virtV2vBuildCommand() (args []string, err error) {
 		return
 	}
 
+	args = append(args, "-o", "local", "-os", DIR)
+
 	switch source {
 	case VSPHERE:
 		args = append(args, "--root")
@@ -180,13 +182,6 @@ func virtV2vBuildCommand() (args []string, err error) {
 			args = append(args, "first")
 		}
 		args = append(args, "-i", "libvirt", "-ic", os.Getenv("V2V_libvirtURL"))
-	case OVA:
-		args = append(args, "-i", "ova", os.Getenv("V2V_diskPath"))
-	}
-
-	args = append(args, "-o", "local", "-os", DIR)
-
-	if source == VSPHERE {
 		args = append(args, "-ip", "/etc/secret/secretKey")
 
 		if envStaticIPs := os.Getenv("V2V_staticIPs"); envStaticIPs != "" {
@@ -218,7 +213,10 @@ func virtV2vBuildCommand() (args []string, err error) {
 		args = append(args, extraArgs...)
 
 		args = append(args, "--", os.Getenv("V2V_vmName"))
+	case OVA:
+		args = append(args, "-i", "ova", os.Getenv("V2V_diskPath"))
 	}
+
 	return args, nil
 }
 
