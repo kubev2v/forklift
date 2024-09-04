@@ -175,48 +175,57 @@ func virtV2vBuildCommand() (args []string, err error) {
 
 	switch source {
 	case VSPHERE:
-		args = append(args, "--root")
-		if checkEnvVariablesSet("V2V_RootDisk") {
-			args = append(args, os.Getenv("V2V_RootDisk"))
-		} else {
-			args = append(args, "first")
-		}
-		args = append(args, "-i", "libvirt", "-ic", os.Getenv("V2V_libvirtURL"))
-		args = append(args, "-ip", "/etc/secret/secretKey")
-
-		if envStaticIPs := os.Getenv("V2V_staticIPs"); envStaticIPs != "" {
-			for _, macToIp := range strings.Split(envStaticIPs, "_") {
-				args = append(args, "--mac", macToIp)
-			}
-		}
-
-		// Adds LUKS keys, if they exist
-		luksArgs, err := addLUKSKeys()
+		vsphereArgs, err := virtV2vVsphereArgs()
 		if err != nil {
-			return nil, fmt.Errorf("Error adding LUKS keys: %v", err)
+			return nil, err
 		}
-		args = append(args, luksArgs...)
-
-		if info, err := os.Stat(VDDK); err == nil && info.IsDir() {
-			args = append(args,
-				"-it", "vddk",
-				"-io", fmt.Sprintf("vddk-libdir=%s", VDDK),
-				"-io", fmt.Sprintf("vddk-thumbprint=%s", os.Getenv("V2V_fingerprint")),
-			)
-		}
-		var extraArgs []string
-		if envExtraArgs := os.Getenv("V2V_extra_args"); envExtraArgs != "" {
-			if err := json.Unmarshal([]byte(envExtraArgs), &extraArgs); err != nil {
-				return nil, fmt.Errorf("Error parsing extra arguments %v", err)
-			}
-		}
-		args = append(args, extraArgs...)
-
-		args = append(args, "--", os.Getenv("V2V_vmName"))
+		args = append(args, vsphereArgs...)
 	case OVA:
 		args = append(args, "-i", "ova", os.Getenv("V2V_diskPath"))
 	}
 
+	return args, nil
+}
+
+func virtV2vVsphereArgs() (args []string, err error) {
+	args = append(args, "--root")
+	if checkEnvVariablesSet("V2V_RootDisk") {
+		args = append(args, os.Getenv("V2V_RootDisk"))
+	} else {
+		args = append(args, "first")
+	}
+	args = append(args, "-i", "libvirt", "-ic", os.Getenv("V2V_libvirtURL"))
+	args = append(args, "-ip", "/etc/secret/secretKey")
+
+	if envStaticIPs := os.Getenv("V2V_staticIPs"); envStaticIPs != "" {
+		for _, macToIp := range strings.Split(envStaticIPs, "_") {
+			args = append(args, "--mac", macToIp)
+		}
+	}
+
+	// Adds LUKS keys, if they exist
+	luksArgs, err := addLUKSKeys()
+	if err != nil {
+		return nil, fmt.Errorf("Error adding LUKS keys: %v", err)
+	}
+	args = append(args, luksArgs...)
+
+	if info, err := os.Stat(VDDK); err == nil && info.IsDir() {
+		args = append(args,
+			"-it", "vddk",
+			"-io", fmt.Sprintf("vddk-libdir=%s", VDDK),
+			"-io", fmt.Sprintf("vddk-thumbprint=%s", os.Getenv("V2V_fingerprint")),
+		)
+	}
+	var extraArgs []string
+	if envExtraArgs := os.Getenv("V2V_extra_args"); envExtraArgs != "" {
+		if err := json.Unmarshal([]byte(envExtraArgs), &extraArgs); err != nil {
+			return nil, fmt.Errorf("Error parsing extra arguments %v", err)
+		}
+	}
+	args = append(args, extraArgs...)
+
+	args = append(args, "--", os.Getenv("V2V_vmName"))
 	return args, nil
 }
 
