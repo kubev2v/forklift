@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
+	"github.com/konveyor/forklift-controller/virt-v2v/pkg/global"
 	"github.com/konveyor/forklift-controller/virt-v2v/pkg/utils"
 )
 
 func CustomizeLinux(execFunc DomainExecFunc, disks []string, dir string, t FileSystemTool) error {
-	fmt.Printf("Customizing disks '%v'\n", disks)
-
 	var extraArgs []string
 
 	// Step 1: Create files from the filesystem
@@ -24,23 +24,31 @@ func CustomizeLinux(execFunc DomainExecFunc, disks []string, dir string, t FileS
 		return err
 	}
 
-	// Step 3: Add scripts
-	if err := addRunScripts(&extraArgs, dir); err != nil {
+	// Step 3: Add dynamic scripts from the configmap
+	if _, err := os.Stat(global.DYNAMIC_SCRIPTS_MOUNT_PATH); !os.IsNotExist(err) {
+		fmt.Println("Adding linux dynamic scripts")
+		if err = addRhelDynamicScripts(&extraArgs, global.DYNAMIC_SCRIPTS_MOUNT_PATH); err != nil {
+			return err
+		}
+	}
+
+	// Step 4: Add scripts from embedded FS
+	if err := addRhelRunScripts(&extraArgs, dir); err != nil {
 		return err
 	}
-	if err := addFirstbootScripts(&extraArgs, dir); err != nil {
+	if err := addRhelFirstbootScripts(&extraArgs, dir); err != nil {
 		return err
 	}
 
-	// Step 4: Add the disks to customize
+	// Step 5: Add the disks to customize
 	addDisksToCustomize(&extraArgs, disks)
 
-	// Step 5: Adds LUKS keys, if they exist
+	// Step 6: Adds LUKS keys, if they exist
 	if err := addLuksKeysToCustomize(&extraArgs); err != nil {
 		return err
 	}
 
-	// Step 6: Execute the customization with the collected arguments
+	// Step 7: Execute the customization with the collected arguments
 	if err := execFunc(extraArgs...); err != nil {
 		return fmt.Errorf("failed to execute domain customization: %w", err)
 	}
@@ -65,11 +73,11 @@ func handleStaticIPConfiguration(extraArgs *[]string, dir string) error {
 	return nil
 }
 
-// addFirstbootScripts appends firstboot script arguments to extraArgs
-func addFirstbootScripts(extraArgs *[]string, dir string) error {
+// addRhelFirstbootScripts appends firstboot script arguments to extraArgs
+func addRhelFirstbootScripts(extraArgs *[]string, dir string) error {
 	firstbootScriptsPath := filepath.Join(dir, "scripts", "rhel", "firstboot")
 
-	firstBootScripts, err := getScripts(firstbootScriptsPath)
+	firstBootScripts, err := getScriptsWithSuffix(firstbootScriptsPath, global.SHELL_SUFFIX)
 	if err != nil {
 		return err
 	}
@@ -83,11 +91,11 @@ func addFirstbootScripts(extraArgs *[]string, dir string) error {
 	return nil
 }
 
-// addRunScripts appends run script arguments to extraArgs
-func addRunScripts(extraArgs *[]string, dir string) error {
+// addRhelRunScripts appends run script arguments to extraArgs
+func addRhelRunScripts(extraArgs *[]string, dir string) error {
 	runScriptsPath := filepath.Join(dir, "scripts", "rhel", "run")
 
-	runScripts, err := getScripts(runScriptsPath)
+	runScripts, err := getScriptsWithSuffix(runScriptsPath, global.SHELL_SUFFIX)
 	if err != nil {
 		return err
 	}
@@ -101,29 +109,6 @@ func addRunScripts(extraArgs *[]string, dir string) error {
 	return nil
 }
 
-// getScripts retrieves all .sh scripts from the specified directory
-func getScripts(directory string) ([]string, error) {
-	files, err := os.ReadDir(directory)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read firstboot scripts directory: %w", err)
-	}
-
-	var scripts []string
-	for _, file := range files {
-		if !file.IsDir() && strings.HasSuffix(file.Name(), ".sh") && !strings.HasPrefix(file.Name(), "test-") {
-			scriptPath := filepath.Join(directory, file.Name())
-			scripts = append(scripts, scriptPath)
-		}
-	}
-
-	return scripts, nil
-}
-
-// addDisksToCustomize appends disk arguments to extraArgs
-func addDisksToCustomize(extraArgs *[]string, disks []string) {
-	*extraArgs = append(*extraArgs, utils.GetScriptArgs("add", disks...)...)
-}
-
 // addLuksKeysToCustomize appends key arguments to extraArgs
 func addLuksKeysToCustomize(extraArgs *[]string) error {
 	luksArgs, err := utils.AddLUKSKeys()
@@ -132,5 +117,21 @@ func addLuksKeysToCustomize(extraArgs *[]string) error {
 	}
 	*extraArgs = append(*extraArgs, luksArgs...)
 
+	return nil
+}
+
+func addRhelDynamicScripts(extraArgs *[]string, dir string) error {
+	dynamicScripts, err := getScriptsWithRegex(dir, global.LINUX_DYNAMIC_REGEX)
+	if err != nil {
+		return err
+	}
+	for _, script := range dynamicScripts {
+		fmt.Printf("Adding linux dynamic scripts '%s'\n", script)
+		r := regexp.MustCompile(global.LINUX_DYNAMIC_REGEX)
+		groups := r.FindStringSubmatch(filepath.Base(script))
+		// Option from the second regex group `(run|firstboot)`
+		action := groups[2]
+		*extraArgs = append(*extraArgs, utils.GetScriptArgs(action, script)...)
+	}
 	return nil
 }
