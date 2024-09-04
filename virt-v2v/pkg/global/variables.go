@@ -12,6 +12,13 @@ const (
 	VDDK                 = "/opt/vmware-vix-disklib-distrib"
 	LUKSDIR              = "/etc/luks"
 
+	WIN_FIRSTBOOT_PATH         = "/Program Files/Guestfs/Firstboot"
+	WIN_FIRSTBOOT_SCRIPTS_PATH = "/Program Files/Guestfs/Firstboot/scripts"
+	DYNAMIC_SCRIPTS_MOUNT_PATH = "/mnt/dynamic_scripts"
+	WINDOWS_DYNAMIC_REGEX      = `^([0-9]+_win_firstboot(([\w\-]*).ps1))$`
+	LINUX_DYNAMIC_REGEX        = `^([0-9]+_linux_(run|firstboot)(([\w\-]*).sh))$`
+	SHELL_SUFFIX               = ".sh"
+
 	LETTERS        = "abcdefghijklmnopqrstuvwxyz"
 	LETTERS_LENGTH = len(LETTERS)
 )

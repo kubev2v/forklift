@@ -68,8 +68,10 @@ const (
 	// DV deletion on completion
 	AnnDeleteAfterCompletion = "cdi.kubevirt.io/storage.deleteAfterCompletion"
 	// Max Length for vm name
-	NameMaxLength  = 63
-	VddkVolumeName = "vddk-vol-mount"
+	NameMaxLength            = 63
+	VddkVolumeName           = "vddk-vol-mount"
+	DynamicScriptsVolumeName = "scripts-volume-mount"
+	DynamicScriptsMountPath  = "/mnt/dynamic_scripts"
 )
 
 // Labels
@@ -1792,8 +1794,9 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 			InitContainers: initContainers,
 			Containers: []core.Container{
 				{
-					Name: "virt-v2v",
-					Env:  environment,
+					ImagePullPolicy: core.PullAlways,
+					Name:            "virt-v2v",
+					Env:             environment,
 					EnvFrom: []core.EnvFromSource{
 						{
 							Prefix: "V2V_",
@@ -1949,6 +1952,28 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 		}
 	}
 
+	_, exists, err := r.findConfigMapInNamespace(Settings.VirtCustomizeConfigMap, r.Plan.Spec.TargetNamespace)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	if exists {
+		volumes = append(volumes, core.Volume{
+			Name: DynamicScriptsVolumeName,
+			VolumeSource: core.VolumeSource{
+				ConfigMap: &core.ConfigMapVolumeSource{
+					LocalObjectReference: core.LocalObjectReference{
+						Name: Settings.VirtCustomizeConfigMap,
+					},
+				},
+			},
+		})
+		mounts = append(mounts, core.VolumeMount{
+			Name:      DynamicScriptsVolumeName,
+			MountPath: DynamicScriptsMountPath,
+		})
+	}
+
 	// Temporary space for VDDK library
 	volumes = append(volumes, core.Volume{
 		Name: VddkVolumeName,
@@ -2056,6 +2081,22 @@ func (r *KubeVirt) libvirtDomain(vmCr *VirtualMachine, pvcs []*core.PersistentVo
 	}
 
 	return
+}
+
+func (r *KubeVirt) findConfigMapInNamespace(name string, namespace string) (configMap *core.ConfigMap, exists bool, err error) {
+	configmap := &core.ConfigMap{}
+	err = r.Destination.Client.Get(
+		context.TODO(),
+		types.NamespacedName{Namespace: namespace, Name: name},
+		configmap,
+	)
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	return configmap, true, nil
 }
 
 // Ensure the config map exists on the destination.

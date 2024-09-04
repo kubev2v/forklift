@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/konveyor/forklift-controller/virt-v2v/pkg/global"
 )
 
 type MockEmbedTool struct {
@@ -125,9 +127,9 @@ func TestAddFirstbootScripts(t *testing.T) {
 	}
 
 	extraArgs := []string{}
-	err = addFirstbootScripts(&extraArgs, tempDir)
+	err = addRhelFirstbootScripts(&extraArgs, tempDir)
 	if err != nil {
-		t.Fatalf("addFirstbootScripts returned an error: %v", err)
+		t.Fatalf("addRhelFirstbootScripts returned an error: %v", err)
 	}
 
 	if len(extraArgs) == 0 || !contains(extraArgs, "--firstboot") {
@@ -148,9 +150,9 @@ func TestAddRunScripts(t *testing.T) {
 	}
 
 	extraArgs := []string{}
-	err = addRunScripts(&extraArgs, tempDir)
+	err = addRhelRunScripts(&extraArgs, tempDir)
 	if err != nil {
-		t.Fatalf("addRunScripts returned an error: %v", err)
+		t.Fatalf("addRhelRunScripts returned an error: %v", err)
 	}
 
 	if len(extraArgs) == 0 || !contains(extraArgs, "--run") {
@@ -170,9 +172,9 @@ func TestGetScripts(t *testing.T) {
 		t.Fatalf("Error WriteFile: %v", err)
 	}
 
-	scripts, err := getScripts(tempDir)
+	scripts, err := getScriptsWithSuffix(tempDir, global.SHELL_SUFFIX)
 	if err != nil {
-		t.Fatalf("getScripts returned an error: %v", err)
+		t.Fatalf("getScriptsWithSuffix returned an error: %v", err)
 	}
 
 	expectedScripts := []string{
@@ -180,7 +182,7 @@ func TestGetScripts(t *testing.T) {
 		filepath.Join(tempDir, "test2.sh"),
 	}
 	if !reflect.DeepEqual(scripts, expectedScripts) {
-		t.Fatalf("getScripts returned incorrect scripts: got %v, want %v", scripts, expectedScripts)
+		t.Fatalf("getScriptsWithSuffix returned incorrect scripts: got %v, want %v", scripts, expectedScripts)
 	}
 }
 
@@ -213,9 +215,9 @@ func TestAddFirstbootScripts_NoScripts(t *testing.T) {
 	}
 
 	extraArgs := []string{}
-	err = addFirstbootScripts(&extraArgs, tempDir)
+	err = addRhelFirstbootScripts(&extraArgs, tempDir)
 	if err != nil {
-		t.Fatalf("addFirstbootScripts returned an error: %v", err)
+		t.Fatalf("addRhelFirstbootScripts returned an error: %v", err)
 	}
 
 	// Ensure no "--firstboot" argument is added when no scripts are found
@@ -233,9 +235,9 @@ func TestAddRunScripts_NoScripts(t *testing.T) {
 	}
 
 	extraArgs := []string{}
-	err = addRunScripts(&extraArgs, tempDir)
+	err = addRhelRunScripts(&extraArgs, tempDir)
 	if err != nil {
-		t.Fatalf("addRunScripts returned an error: %v", err)
+		t.Fatalf("addRhelRunScripts returned an error: %v", err)
 	}
 
 	// Ensure no "--run" argument is added when no scripts are found
@@ -283,9 +285,9 @@ func TestAddFirstbootScripts_ReadDirFails(t *testing.T) {
 	tempDir := "/invalid-dir"
 
 	extraArgs := []string{}
-	err := addFirstbootScripts(&extraArgs, tempDir)
+	err := addRhelFirstbootScripts(&extraArgs, tempDir)
 	if err == nil {
-		t.Fatalf("Expected error in addFirstbootScripts due to read failure, got nil")
+		t.Fatalf("Expected error in addRhelFirstbootScripts due to read failure, got nil")
 	}
 }
 
@@ -294,8 +296,8 @@ func TestAddRunScripts_ReadDirFails(t *testing.T) {
 	tempDir := "/invalid-dir"
 
 	extraArgs := []string{}
-	err := addRunScripts(&extraArgs, tempDir)
+	err := addRhelRunScripts(&extraArgs, tempDir)
 	if err == nil {
-		t.Fatalf("Expected error in addRunScripts due to read failure, got nil")
+		t.Fatalf("Expected error in addRhelRunScripts due to read failure, got nil")
 	}
 }

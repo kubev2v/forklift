@@ -2,14 +2,11 @@ package customize
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
+	"github.com/konveyor/forklift-controller/virt-v2v/pkg/global"
 	"github.com/konveyor/forklift-controller/virt-v2v/pkg/utils"
-)
-
-const (
-	WIN_FIRSTBOOT_PATH         = "/Program Files/Guestfs/Firstboot"
-	WIN_FIRSTBOOT_SCRIPTS_PATH = "/Program Files/Guestfs/Firstboot/scripts"
 )
 
 // CustomizeWindows customizes a windows disk image by uploading scripts.
@@ -23,27 +20,56 @@ const (
 // Returns:
 //   - error: An error if something goes wrong during the process, or nil if successful.
 func CustomizeWindows(execFunc DomainExecFunc, disks []string, dir string, t FileSystemTool) error {
-	fmt.Printf("Customizing disks '%s'", disks)
 	err := t.CreateFilesFromFS(dir)
+	if err != nil {
+		return fmt.Errorf("failed to create files from filesystem: %w", err)
+	}
+
+	var extraArgs []string
+
+	if _, err = os.Stat(global.DYNAMIC_SCRIPTS_MOUNT_PATH); !os.IsNotExist(err) {
+		fmt.Println("Adding windows dynamic scripts")
+		err = addWinDynamicScripts(&extraArgs, global.DYNAMIC_SCRIPTS_MOUNT_PATH)
+		if err != nil {
+			return err
+		}
+	}
+
+	addWinFirstbootScripts(&extraArgs, dir)
+
+	addDisksToCustomize(&extraArgs, disks)
+
+	err = execFunc(extraArgs...)
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+// addRhelFirstbootScripts appends firstboot script arguments to extraArgs
+func addWinFirstbootScripts(extraArgs *[]string, dir string) {
 	windowsScriptsPath := filepath.Join(dir, "scripts", "windows")
-	initPath := filepath.Join(windowsScriptsPath, "9999-restore_config_init.bat")
+	initPath := filepath.Join(windowsScriptsPath, "9999-run-mtv-ps-scripts.bat")
 	restoreScriptPath := filepath.Join(windowsScriptsPath, "9999-restore_config.ps1")
 	firstbootPath := filepath.Join(windowsScriptsPath, "firstboot.bat")
 
 	// Upload scripts to the windows
-	uploadScriptPath := fmt.Sprintf("%s:%s", restoreScriptPath, WIN_FIRSTBOOT_SCRIPTS_PATH)
-	uploadInitPath := fmt.Sprintf("%s:%s", initPath, WIN_FIRSTBOOT_SCRIPTS_PATH)
-	uploadFirstbootPath := fmt.Sprintf("%s:%s", firstbootPath, WIN_FIRSTBOOT_PATH)
+	uploadScriptPath := formatUpload(restoreScriptPath, global.WIN_FIRSTBOOT_SCRIPTS_PATH)
+	uploadInitPath := formatUpload(initPath, global.WIN_FIRSTBOOT_SCRIPTS_PATH)
+	uploadFirstbootPath := formatUpload(firstbootPath, global.WIN_FIRSTBOOT_PATH)
 
-	var extraArgs []string
-	extraArgs = append(extraArgs, utils.GetScriptArgs("upload", uploadScriptPath, uploadInitPath, uploadFirstbootPath)...)
-	extraArgs = append(extraArgs, utils.GetScriptArgs("add", disks...)...)
-	err = execFunc(extraArgs...)
+	*extraArgs = append(*extraArgs, utils.GetScriptArgs("upload", uploadScriptPath, uploadInitPath, uploadFirstbootPath)...)
+}
+
+func addWinDynamicScripts(extraArgs *[]string, dir string) error {
+	dynamicScripts, err := getScriptsWithRegex(dir, global.WINDOWS_DYNAMIC_REGEX)
 	if err != nil {
 		return err
+	}
+	for _, script := range dynamicScripts {
+		fmt.Printf("Adding windows dynamic scripts '%s'\n", script)
+		upload := formatUpload(script, filepath.Join(global.WIN_FIRSTBOOT_SCRIPTS_PATH, filepath.Base(script)))
+		*extraArgs = append(*extraArgs, utils.GetScriptArgs("upload", upload)...)
 	}
 	return nil
 }

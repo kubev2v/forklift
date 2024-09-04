@@ -76,6 +76,8 @@ spec:
           value: ${OVIRT_OS_MAP}
         - name: VSPHERE_OS_MAP
           value: ${VSPHERE_OS_MAP}
+        - name: VIRT_CUSTOMIZE_MAP
+          value: ${VIRT_CUSTOMIZE_MAP}
         livenessProbe:
           httpGet:
             path: /healthz
