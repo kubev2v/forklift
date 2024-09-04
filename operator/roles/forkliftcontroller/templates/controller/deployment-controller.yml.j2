@@ -111,6 +111,10 @@ spec:
         - name: VSPHERE_OS_MAP
           value: {{ vsphere_osmap_configmap_name }}
 {% endif %}
+{% if virt_customize_configmap_name is defined %}
+        - name: VIRT_CUSTOMIZE_MAP
+          value: {{ virt_customize_configmap_name }}
+{% endif %}
 {% if controller_profile_kind is defined and controller_profile_path is defined and controller_profile_duration is defined %}
         - name: PROFILE_KIND
           value: "{{ controller_profile_kind }}"
