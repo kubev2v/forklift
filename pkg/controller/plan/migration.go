@@ -1652,8 +1652,6 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 		case err != nil:
 			return liberr.Wrap(err)
 		case coldLocal:
-			// FIXME: will this work for in-place conversions now that it also uses
-			// virt-v2v-monitor when executing virt-v2v-in-place?
 			if err := r.updateConversionProgressV2vMonitor(pod, step); err != nil {
 				// Just log it. Missing progress is not fatal.
 				log.Error(err, "Failed to update conversion progress")
