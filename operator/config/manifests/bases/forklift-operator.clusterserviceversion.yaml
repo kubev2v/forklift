@@ -107,6 +107,8 @@ spec:
 
     Forklift 2.6 is supported on OpenShift 4.14 and 4.15
 
+    Forklift 2.7 is supported on OpenShift 4.15 and 4.16
+
     ### Documentation
     Documentation can be found on our [website](https://konveyor.github.io/forklift).
 
