@@ -502,3 +502,13 @@ rpmtree(
     ],
     visibility = ["//visibility:public"],
 )
+
+go_test(
+    name = "virt-v2v_test",
+    srcs = [
+        "cold_test.go",
+        "customize-rhel_test.go",
+    ],
+    data = glob(["testdata/**"]),
+    embed = [":virt-v2v_lib"],
+)
