@@ -18,6 +18,7 @@ package main
 
 import (
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"time"
 
@@ -69,7 +70,20 @@ func main() {
 	// Start prometheus metrics HTTP handler
 	log.Info("setting up prometheus endpoint :2112/metrics")
 	http.Handle("/metrics", promhttp.Handler())
-	go http.ListenAndServe(":2112", nil)
+	go func() {
+		err := http.ListenAndServe(":2112", nil)
+		if err != nil {
+			log.Info("failed to setup the metrics endpoint")
+		}
+	}()
+
+	log.Info("setting up profiling endpoint :6060")
+	go func() {
+		err := http.ListenAndServe("localhost:6060", nil)
+		if err != nil {
+			log.Info("failed to setup the profiling endpoint")
+		}
+	}()
 
 	// Get a config to talk to the apiserver
 	log.Info("setting up client for manager")
