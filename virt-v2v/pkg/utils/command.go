@@ -101,6 +101,13 @@ func getDiskNumber(kind global.MountPath, disk string) (int, error) {
 	}
 }
 
+func GetDiskName() string {
+	if name := os.Getenv("V2V_newName"); name != "" {
+		return name
+	}
+	return os.Getenv("V2V_vmName")
+}
+
 func getDiskLink(kind global.MountPath, disk string) (string, error) {
 	diskNum, err := getDiskNumber(kind, disk)
 	if err != nil {
@@ -109,7 +116,7 @@ func getDiskLink(kind global.MountPath, disk string) (string, error) {
 	}
 	return filepath.Join(
 		global.DIR,
-		fmt.Sprintf("%s-sd%s", os.Getenv("V2V_vmName"), genName(diskNum+1)),
+		fmt.Sprintf("%s-sd%s", GetDiskName(), genName(diskNum+1)),
 	), nil
 }
 
@@ -117,7 +124,7 @@ func GetLinkedDisks() ([]string, error) {
 	disks, err := filepath.Glob(
 		filepath.Join(
 			global.DIR,
-			fmt.Sprintf("%s-sd*", os.Getenv("V2V_vmName")),
+			fmt.Sprintf("%s-sd*", GetDiskName()),
 		),
 	)
 	if err != nil {

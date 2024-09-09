@@ -982,18 +982,18 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 	case api.Ova:
 		vmConf, err := io.ReadAll(resp.Body)
 		if err != nil {
-			return err
+			return liberr.Wrap(err)
 		}
 		if vm.Firmware, err = util.GetFirmwareFromYaml(vmConf); err != nil {
-			return err
+			return liberr.Wrap(err)
 		}
 	case api.VSphere:
 		inspectionXML, err := r.getInspectionXml(pod)
 		if err != nil {
-			return err
+			return liberr.Wrap(err)
 		}
 		if vm.OperatingSystem, err = inspectionparser.GetOperationSystemFromConfig(inspectionXML); err != nil {
-			return err
+			return liberr.Wrap(err)
 		}
 		r.Log.Info("Setting the vm OS ", vm.OperatingSystem, "vmId", vm.ID)
 	}
@@ -1800,9 +1800,8 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 			InitContainers: initContainers,
 			Containers: []core.Container{
 				{
-					ImagePullPolicy: core.PullAlways,
-					Name:            "virt-v2v",
-					Env:             environment,
+					Name: "virt-v2v",
+					Env:  environment,
 					EnvFrom: []core.EnvFromSource{
 						{
 							Prefix: "V2V_",

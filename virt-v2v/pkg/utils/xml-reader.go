@@ -18,7 +18,7 @@ type InspectionV2V struct {
 }
 
 func GetInspectionV2vFromFile(xmlFilePath string) (*InspectionV2V, error) {
-	xmlData, err := ReadXMLFile(xmlFilePath)
+	xmlData, err := os.ReadFile(xmlFilePath)
 	if err != nil {
 		fmt.Printf("Error read XML: %v\n", err)
 		return nil, err
@@ -30,25 +30,4 @@ func GetInspectionV2vFromFile(xmlFilePath string) (*InspectionV2V, error) {
 		return nil, fmt.Errorf("Error unmarshalling XML: %v\n", err)
 	}
 	return &xmlConf, nil
-}
-
-// ReadXMLFile reads the content of an XML []byte from the given file path.
-//
-// Arguments:
-//   - filePath (string): The path to the XML file.
-//
-// Returns:
-//   - []byte: The content of the XML file.
-//   - error: An error if the file cannot be read, or nil if successful.
-func ReadXMLFile(filePath string) ([]byte, error) {
-	if filePath == "" {
-		return nil, fmt.Errorf("XML file path is empty")
-	}
-
-	xmlData, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("error reading XML file: %w", err)
-	}
-
-	return xmlData, nil
 }
