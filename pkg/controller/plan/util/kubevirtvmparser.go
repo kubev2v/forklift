@@ -1,11 +1,10 @@
 package util
 
 import (
-	"fmt"
-	"strings"
+	cnv "kubevirt.io/api/core/v1"
+	"sigs.k8s.io/yaml"
 
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -15,42 +14,6 @@ const (
 
 // Package logger.
 var log = logging.WithName(Name)
-
-// Map of osinfo ids to vmware guest ids.
-var osV2VMap = map[string]string{
-	"centos6":  "centos6_64Guest",
-	"centos7":  "centos7_64Guest",
-	"centos8":  "centos8_64Guest",
-	"centos9":  "centos9_64Guest",
-	"rhel7":    "rhel7_64Guest",
-	"rhel8":    "rhel8_64Guest",
-	"rhel9":    "rhel9_64Guest",
-	"rocky":    "rockylinux_64Guest",
-	"sles10":   "sles10_64Guest",
-	"sles11":   "sles11_64Guest",
-	"sles12":   "sles12_64Guest",
-	"sles15":   "sles15_64Guest",
-	"sles16":   "sles16_64Guest",
-	"opensuse": "opensuse64Guest",
-	"debian4":  "debian4_64Guest",
-	"debian5":  "debian5_64Guest",
-	"debian6":  "debian6_64Guest",
-	"debian7":  "debian7_64Guest",
-	"debian8":  "debian8_64Guest",
-	"debian9":  "debian9_64Guest",
-	"debian10": "debian10_64Guest",
-	"debian11": "debian11_64Guest",
-	"debian12": "debian12_64Guest",
-	"ubuntu":   "ubuntu64Guest",
-	"fedora":   "fedora64Guest",
-	"win7":     "windows7Server64Guest",
-	"win8":     "windows8Server64Guest",
-	"win10":    "windows9Server64Guest",
-	"win11":    "windows11_64Guest",
-	"win12":    "windows12_64Guest",
-	"win2k19":  "windows2019srv_64Guest",
-	"win2k22":  "windows2022srvNext_64Guest",
-}
 
 type OS struct {
 	Firmware string `yaml:"firmware"`
@@ -91,45 +54,25 @@ func GetFirmwareFromYaml(yamlData []byte) (string, error) {
 	}
 
 	firmware := vm.Spec.Template.Spec.Domain.OS.Firmware
-	if firmware == "" {
-		log.Info("Firmware type was not detected")
+	if firmware != "" {
+		return firmware, nil
 	}
 
-	return firmware, nil
-}
-
-func GetOperationSystemFromYaml(yamlData []byte) (os string, err error) {
-	var vm VirtualMachine
-	if err = yaml.Unmarshal(yamlData, &vm); err != nil {
-		return
+	// FIXME: In newer version of virt-v2v the output will change to support CNV VM format.
+	// With this we will support both so the migrations should not fail during the update to newer virt-v2v.
+	// But we still need to remove the custom templating.
+	// https://issues.redhat.com/browse/RHEL-58065
+	var cnvVm *cnv.VirtualMachine
+	if err := yaml.Unmarshal(yamlData, &cnvVm); err != nil {
+		return "", err
+	}
+	if cnvVm.Spec.Template.Spec.Domain.Firmware.Bootloader.BIOS != nil {
+		return "bios", nil
+	}
+	if cnvVm.Spec.Template.Spec.Domain.Firmware.Bootloader.EFI != nil {
+		return "uefi", nil
 	}
 
-	labels := vm.Metadata.Labels
-	if osinfo, ok := labels["libguestfs.org/osinfo"]; ok {
-		return mapOs(osinfo), nil
-
-	}
-	return
-}
-
-func mapOs(labelOS string) (os string) {
-	distro := strings.SplitN(labelOS, ".", 2)[0]
-
-	switch {
-	case strings.HasPrefix(distro, "rocky"):
-		distro = "rocky"
-	case strings.HasPrefix(distro, "opensuse"):
-		distro = "opensuse"
-	case strings.HasPrefix(distro, "ubuntu"):
-		distro = "ubuntu"
-	case strings.HasPrefix(distro, "fedora"):
-		distro = "fedora"
-	}
-
-	os, ok := osV2VMap[distro]
-	if !ok {
-		log.Info(fmt.Sprintf("Received %s, mapped to: %s", labelOS, os))
-		os = "otherGuest64"
-	}
-	return
+	log.Info("Firmware type was not detected")
+	return "", nil
 }

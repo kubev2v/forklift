@@ -6,15 +6,16 @@ metadata:
   name: mnecas-win-2022
   labels:
     libguestfs.org/virt-v2v-version: "2.5.8"
-    libguestfs.org/genid: 4f3c8a7c-3464-c9b0-cf79-08325a6bf1e8
+    libguestfs.org/genid: f2fc75e8-4961-1425-4740-fcf2bc09685a
     libguestfs.org/osinfo: win2k22
-    libguestfs.org/source: kvm
+    libguestfs.org/source: vmware
 spec:
   template:
     spec:
       domain:
-        os:
-          firmware: uefi
+        firmware:
+          bootloader:
+            bios: {}
         resources:
           clock:
             timer:
@@ -29,10 +30,9 @@ spec:
           requests:
             memory: 8192Mi
           features:
-            acpi: {}
-            apic: {}
         cpu:
           sockets: 2
           cores: 2
           thread: 1
       terminationGracePeriodSeconds: 0
+

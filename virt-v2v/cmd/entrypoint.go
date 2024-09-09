@@ -108,7 +108,7 @@ func virtV2vBuildCommand() (args []string, err error) {
 		}
 		return nil, fmt.Errorf("virt-v2v supports the following providers: {%v}. Provided: %s\n", strings.Join(providers, ", "), source)
 	}
-	args = append(args, "-o", "local", "-os", global.DIR)
+	args = append(args, "-o", "kubevirt", "-os", global.DIR)
 
 	switch source {
 	case global.VSPHERE:
@@ -119,6 +119,12 @@ func virtV2vBuildCommand() (args []string, err error) {
 		args = append(args, vsphereArgs...)
 	case global.OVA:
 		args = append(args, "-i", "ova", os.Getenv("V2V_diskPath"))
+	}
+
+	// When converting VM with name that do not meet DNS1123 RFC requirements,
+	// it should be changed to supported one to ensure the conversion does not fail.
+	if utils.CheckEnvVariablesSet("V2V_NewName") {
+		args = append(args, "-on", os.Getenv("V2V_NewName"))
 	}
 
 	return args, nil
