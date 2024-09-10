@@ -318,7 +318,7 @@ check_container_runtime:
 	fi
 
 bazel-generate:
-	bazel run //:gazelle
+	bazel run //:gazelle cmd operator pkg tests validation
 
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN)
