@@ -1,0 +1,32 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "customize",
+    srcs = [
+        "image.go",
+        "rhel.go",
+        "windows.go",
+    ],
+    embedsrcs = [
+        "scripts/rhel/firstboot/README.md",
+        "scripts/rhel/run/README.md",
+        "scripts/rhel/run/network_config_util.sh",
+        "scripts/rhel/run/network_config_util_test",
+        "scripts/windows/9999-restore_config.ps1",
+        "scripts/windows/9999-restore_config_init.bat",
+        "scripts/windows/firstboot.bat",
+    ],
+    importpath = "github.com/konveyor/forklift-controller/virt-v2v/pkg/customize",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//virt-v2v/pkg/global",
+        "//virt-v2v/pkg/utils",
+    ],
+)
+
+go_test(
+    name = "customize_test",
+    srcs = ["rhel_test.go"],
+    data = glob(["testdata/**"]),
+    embed = [":customize"],
+)
