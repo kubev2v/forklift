@@ -5,12 +5,16 @@ V2V_MAP_FILE="${V2V_MAP_FILE:-/tmp/macToIP}"
 NETWORK_SCRIPTS_DIR="${NETWORK_SCRIPTS_DIR:-/etc/sysconfig/network-scripts}"
 NETWORK_CONNECTIONS_DIR="${NETWORK_CONNECTIONS_DIR:-/etc/NetworkManager/system-connections}"
 UDEV_RULES_FILE="${UDEV_RULES_FILE:-/etc/udev/rules.d/70-persistent-net.rules}"
+NETPLAN_DIR="${NETPLAN_DIR:-/}"
 
 # Dump debug strings into a new file descriptor and redirect it to stdout.
 exec 3>&1
 log() {
     echo $@ >&3
 }
+
+# Sanity checks
+# -------------
 
 # Check if mapping file does not exist
 if [ ! -f "$V2V_MAP_FILE" ]; then
@@ -24,9 +28,19 @@ if [ -f "$UDEV_RULES_FILE" ]; then
     exit 0
 fi
 
+# Helper functions
+# ----------------
+
+# Get the v2v map file as list 
+v2v_list_as_envs() {
+    while IFS= read -r line; do
+        echo "$line"
+    done < "$V2V_MAP_FILE"
+}
+
 # Clean strigs in case they have quates
 remove_quotes() {
-    echo "$1" | tr -d '"'
+    echo "$1" | tr -d '"' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
 }
 
 # Validate MAC address and IPv4 address and extract them
@@ -39,6 +53,9 @@ extract_mac_ip() {
     fi
 }
 
+# Network infrastructure reading functions
+# ----------------------------------------
+
 # Create udev rules based on the macToip mapping + ifcfg network scripts
 udev_from_ifcfg() {
     # Check if the network scripts directory exists
@@ -48,7 +65,8 @@ udev_from_ifcfg() {
     fi
 
     # Read the mapping file line by line
-    while IFS= read -r line; do
+    v2v_list_as_envs | while read line;
+    do
         # Extract S_HW and S_IP
         extract_mac_ip "$line"
 
@@ -70,7 +88,7 @@ udev_from_ifcfg() {
         fi
 
         echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"$(remove_quotes "$DEVICE")\""
-    done < "$V2V_MAP_FILE"
+    done
 }
 
 # Create udev rules based on the macToip mapping + network manager connections
@@ -82,7 +100,8 @@ udev_from_nm() {
     fi
 
     # Read the mapping file line by line
-    while IFS= read -r line; do
+    v2v_list_as_envs | while read line;
+    do
         # Extract S_HW and S_IP
         extract_mac_ip "$line"
 
@@ -104,8 +123,60 @@ udev_from_nm() {
         fi
 
         echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"$(remove_quotes "$DEVICE")\""
-    done < "$V2V_MAP_FILE"
+    done
 }
+
+# Create udev rules based on the macToIP mapping + output from parse_netplan_file
+udev_from_netplan() {
+    # Check if netplan command exist
+    if ! command -v netplan >/dev/null 2>&1; then
+        log "Warning: netplan is not installed."
+        return 0
+    fi
+
+    # netplan with root dir
+    netplan_get() {
+        netplan get --root-dir "$NETPLAN_DIR" "$@" 2>/dev/null
+    }
+
+    # Loop over all interface names and treturn the one with target_ip, or null
+    find_interface_by_ip() {
+        target_ip="$1"
+
+        # Loop through all interfaces and check for the given IP address
+        netplan_get ethernets | grep -Eo "^[^[:space:]]+[^:]" | while read IFNAME; do
+            if netplan_get ethernets."$IFNAME".addresses | grep -q "$target_ip"; then
+                echo "$IFNAME"
+            fi
+        done
+    }
+
+    # Read the mapping file line by line
+    v2v_list_as_envs | while read line;
+    do
+        # Extract S_HW and S_IP from the current line in the mapping file
+        extract_mac_ip "$line"
+
+        # If S_HW and S_IP were not extracted, skip the line
+        if [ -z "$S_HW" ] || [ -z "$S_IP" ]; then
+            continue
+        fi
+
+        # Search the parsed netplan output for a matching IP address
+        interface_name=$(find_interface_by_ip "$S_IP")
+
+        # If no interface is found, skip this entry
+        if [ -z "$interface_name" ]; then
+            continue
+        fi
+
+        # Create the udev rule based on the extracted MAC address and interface name
+        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"$(remove_quotes "$interface_name")\""
+    done
+}
+
+# Write to udev config
+# ----------------------------------------
 
 # Checks for duplicate hardware addresses 
 check_dupe_hws() {
@@ -128,6 +199,7 @@ main() {
     {
         udev_from_ifcfg
         udev_from_nm
+        udev_from_netplan
     } | check_dupe_hws > "$UDEV_RULES_FILE" 2>/dev/null
 }
 
