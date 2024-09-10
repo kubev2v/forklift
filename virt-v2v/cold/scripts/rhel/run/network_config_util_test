@@ -10,13 +10,14 @@ export V2V_MAP_FILE="$TEST_DIR/macToIP"
 export NETWORK_SCRIPTS_DIR="$TEST_DIR/network-scripts"
 export NETWORK_CONNECTIONS_DIR="$TEST_DIR/system-connections"
 export UDEV_RULES_FILE="$TEST_DIR/70-persistent-net.rules"
+export NETPLAN_DIR="$TEST_DIR"
 
 # Test systems using network-scripts
 # ----------------------------------
 
 # Clean up from previous runs
 rm -f "$UDEV_RULES_FILE"
-rm -rf "$NETWORK_SCRIPTS_DIR" "$NETWORK_CONNECTIONS_DIR"
+rm -rf "$NETWORK_SCRIPTS_DIR" "$NETWORK_CONNECTIONS_DIR" "$NETPLAN_DIR"
 mkdir -p "$NETWORK_SCRIPTS_DIR"
 
 # Create mock data
@@ -52,15 +53,12 @@ fi
 
 # Clean up from previous runs
 rm -f "$UDEV_RULES_FILE"
-rm -rf "$NETWORK_SCRIPTS_DIR" "$NETWORK_CONNECTIONS_DIR"
+rm -rf "$NETWORK_SCRIPTS_DIR" "$NETWORK_CONNECTIONS_DIR" "$NETPLAN_DIR"
 mkdir -p "$NETWORK_CONNECTIONS_DIR"
 
 # Create mock data
 printf "aa:bb:cc:dd:ee:ff:ip:192.168.1.10,things,more\naa:bb:cc:dd:ee:fe:ip:192.168.1.11,hello,world\naa:bb:cc:dd:ee:fd:ip:2001:0db8:85a3:0000:0000:8a2e:0370:7334\n" > "$V2V_MAP_FILE"
 printf "[connection]\ninterface-name=eth3\naddress1=192.168.1.11/24\n" > "$NETWORK_CONNECTIONS_DIR/eth1 but with spaces.nmconnection"
-
-# Source the script under test
-. ${SCRIPT_DIR}/network_config_util.sh
 
 # Run the script
 main
@@ -76,8 +74,57 @@ if [ ! -f "$UDEV_RULES_FILE" ]; then
     exit 1
 fi
 
-# Test 3: Verify the content of the udev rules file
+# Test 1: Verify the content of the udev rules file
 EXPECTED_RULE="SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"aa:bb:cc:dd:ee:fe\",NAME=\"eth3\""
+if ! echo "$EXPECTED_RULE" | cmp -s - "$UDEV_RULES_FILE"; then
+    echo "Test 2 Failed: The content of $UDEV_RULES_FILE does not match the expected rule."
+    exit 1
+fi
+
+# Test systems using netplan YAML
+# -------------------------------
+
+NETPLAN_FILE="$NETPLAN_DIR/etc/netplan/50-netplan.yaml"
+
+# Clean up from previous runs
+rm -f "$UDEV_RULES_FILE"
+rm -rf "$NETWORK_SCRIPTS_DIR" "$NETWORK_CONNECTIONS_DIR" "$NETPLAN_DIR"
+mkdir -p "$NETPLAN_DIR/etc/netplan"
+
+# Create mock data for netplan YAML test
+cat <<EOL > "$NETPLAN_FILE"
+network:
+  version: 2
+  ethernets:
+    eth0:
+      dhcp4: true
+    eth1:
+      dhcp4: false
+      addresses:
+        - 192.168.1.11/24
+    enp3s0:
+      addresses: [192.168.1.12/24]
+EOL
+
+# Create mock mapping file
+printf "aa:bb:cc:dd:ee:ff:ip:192.168.1.10,things,more\naa:bb:cc:dd:ee:fe:ip:192.168.1.11,hello,world\naa:bb:cc:dd:ee:fd:ip:192.168.1.12,ipv6,support\n" > "$V2V_MAP_FILE"
+
+# Run the script
+main
+
+printf "\nTest netplan output:\n"
+echo "FILE_START"
+cat $UDEV_RULES_FILE
+echo "FILE_END"
+
+# Test 1: Verify the udev rules file was created
+if [ ! -f "$UDEV_RULES_FILE" ]; then
+    echo "Test 1 Failed: UDEV_RULES_FILE not created."
+    exit 1
+fi
+
+# Test 2: Verify the content of the udev rules file
+EXPECTED_RULE="SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"aa:bb:cc:dd:ee:fe\",NAME=\"eth1\"\nSUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"aa:bb:cc:dd:ee:fd\",NAME=\"enp3s0\""
 if ! echo "$EXPECTED_RULE" | cmp -s - "$UDEV_RULES_FILE"; then
     echo "Test 2 Failed: The content of $UDEV_RULES_FILE does not match the expected rule."
     exit 1
