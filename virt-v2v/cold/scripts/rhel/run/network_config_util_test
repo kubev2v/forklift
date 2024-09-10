@@ -11,15 +11,17 @@ export NETWORK_SCRIPTS_DIR="$TEST_DIR/network-scripts"
 export NETWORK_CONNECTIONS_DIR="$TEST_DIR/system-connections"
 export UDEV_RULES_FILE="$TEST_DIR/70-persistent-net.rules"
 
+# Test systems using network-scripts
+# ----------------------------------
+
 # Clean up from previous runs
 rm -f "$UDEV_RULES_FILE"
 rm -rf "$NETWORK_SCRIPTS_DIR" "$NETWORK_CONNECTIONS_DIR"
-mkdir -p "$NETWORK_SCRIPTS_DIR" "$NETWORK_CONNECTIONS_DIR"
+mkdir -p "$NETWORK_SCRIPTS_DIR"
 
 # Create mock data
 printf "aa:bb:cc:dd:ee:ff:ip:192.168.1.10,things,more\naa:bb:cc:dd:ee:fe:ip:192.168.1.11,hello,world\naa:bb:cc:dd:ee:fd:ip:2001:0db8:85a3:0000:0000:8a2e:0370:7334\n" > "$V2V_MAP_FILE"
 printf "DEVICE=\"eth0\"\nIPADDR=192.168.1.10\n" > "$NETWORK_SCRIPTS_DIR/ifcfg-eth0"
-printf "[connection]\ninterface-name=eth3\naddress1=192.168.1.11/24\n" > "$NETWORK_CONNECTIONS_DIR/eth1 but with spaces.nmconnection"
 
 # Source the script under test
 . ${SCRIPT_DIR}/network_config_util.sh
@@ -27,8 +29,10 @@ printf "[connection]\ninterface-name=eth3\naddress1=192.168.1.11/24\n" > "$NETWO
 # Run the script
 main
 
-printf "\nTest output:\n"
+printf "\nTest network config output:\n"
+echo "FILE_START"
 cat $UDEV_RULES_FILE
+echo "FILE_END"
 
 # Test 1: Verify the udev rules file was created
 if [ ! -f "$UDEV_RULES_FILE" ]; then
@@ -38,19 +42,50 @@ fi
 
 # Test 2: Verify the content of the udev rules file
 EXPECTED_RULE="SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"aa:bb:cc:dd:ee:ff\",NAME=\"eth0\""
-if ! grep -q "$EXPECTED_RULE" "$UDEV_RULES_FILE"; then
-    echo "Test 2 Failed: (ifcfg) Expected udev rule not found in $UDEV_RULES_FILE."
+if ! echo "$EXPECTED_RULE" | cmp -s - "$UDEV_RULES_FILE"; then
+    echo "Test 2 Failed: The content of $UDEV_RULES_FILE does not match the expected rule."
+    exit 1
+fi
+
+# Test systems using system-connections
+# -------------------------------------
+
+# Clean up from previous runs
+rm -f "$UDEV_RULES_FILE"
+rm -rf "$NETWORK_SCRIPTS_DIR" "$NETWORK_CONNECTIONS_DIR"
+mkdir -p "$NETWORK_CONNECTIONS_DIR"
+
+# Create mock data
+printf "aa:bb:cc:dd:ee:ff:ip:192.168.1.10,things,more\naa:bb:cc:dd:ee:fe:ip:192.168.1.11,hello,world\naa:bb:cc:dd:ee:fd:ip:2001:0db8:85a3:0000:0000:8a2e:0370:7334\n" > "$V2V_MAP_FILE"
+printf "[connection]\ninterface-name=eth3\naddress1=192.168.1.11/24\n" > "$NETWORK_CONNECTIONS_DIR/eth1 but with spaces.nmconnection"
+
+# Source the script under test
+. ${SCRIPT_DIR}/network_config_util.sh
+
+# Run the script
+main
+
+printf "\nTest network connection output:\n"
+echo "FILE_START"
+cat $UDEV_RULES_FILE
+echo "FILE_END"
+
+# Test 1: Verify the udev rules file was created
+if [ ! -f "$UDEV_RULES_FILE" ]; then
+    echo "Test 1 Failed: UDEV_RULES_FILE not created."
     exit 1
 fi
 
 # Test 3: Verify the content of the udev rules file
 EXPECTED_RULE="SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"aa:bb:cc:dd:ee:fe\",NAME=\"eth3\""
-if ! grep -q "$EXPECTED_RULE" "$UDEV_RULES_FILE"; then
-    echo "Test 3 Failed: (nm) Expected udev rule not found in $UDEV_RULES_FILE."
+if ! echo "$EXPECTED_RULE" | cmp -s - "$UDEV_RULES_FILE"; then
+    echo "Test 2 Failed: The content of $UDEV_RULES_FILE does not match the expected rule."
     exit 1
 fi
 
-echo "All tests passed successfully."
+# -----------------------
+
+printf "\nAll tests passed successfully.\n"
 
 # Clean up test environment
 rm -rf "$TEST_DIR"
