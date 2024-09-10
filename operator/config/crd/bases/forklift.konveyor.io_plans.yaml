@@ -160,7 +160,7 @@ spec:
                   its oVirt cluster.
                 type: boolean
               preserveStaticIPs:
-                description: Preserve static IPs of VMs in vSphere (Windows only)
+                description: Preserve static IPs of VMs in vSphere
                 type: boolean
               provider:
                 description: Providers.
