@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 
 	"github.com/konveyor/forklift-controller/virt-v2v/pkg/global"
@@ -21,6 +22,7 @@ var (
 // Operating System for the VM creation.
 func Start() error {
 	http.HandleFunc("/ovf", ovfHandler)
+	http.HandleFunc("/inspection", inspectorHandler)
 	http.HandleFunc("/shutdown", shutdownHandler)
 	server = &http.Server{Addr: ":8080"}
 
@@ -33,7 +35,7 @@ func Start() error {
 }
 
 func ovfHandler(w http.ResponseWriter, r *http.Request) {
-	xmlFilePath, err := GetXMLFile(global.DIR, "xml")
+	xmlFilePath, err := GetDomainFile(global.DIR, "xml")
 	if err != nil {
 		fmt.Println("Error getting XML file:", err)
 	}
@@ -52,7 +54,24 @@ func ovfHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("Error writing response: %v\n", err)
 		http.Error(w, "Error writing response", http.StatusInternalServerError)
 	}
+}
 
+func inspectorHandler(w http.ResponseWriter, r *http.Request) {
+	xmlData, err := utils.ReadXMLFile(global.INSPECTION)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/xml")
+	_, err = w.Write(xmlData)
+	if err == nil {
+		w.WriteHeader(http.StatusOK)
+	} else {
+		fmt.Printf("Error writing response: %v\n", err)
+		http.Error(w, "Error writing response", http.StatusInternalServerError)
+	}
 }
 
 func shutdownHandler(w http.ResponseWriter, r *http.Request) {
@@ -63,8 +82,8 @@ func shutdownHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func GetXMLFile(dir, fileExtension string) (string, error) {
-	files, err := filepath.Glob(filepath.Join(dir, "*."+fileExtension))
+func GetDomainFile(dir, fileExtension string) (string, error) {
+	files, err := filepath.Glob(filepath.Join(dir, fmt.Sprintf("%s.%s", os.Getenv("V2V_vmName"), fileExtension)))
 	if err != nil {
 		return "", err
 	}

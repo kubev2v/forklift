@@ -6,57 +6,30 @@ import (
 	"os"
 )
 
-type OvaVmconfig struct {
-	XMLName  xml.Name `xml:"domain"`
-	Name     string   `xml:"name"`
-	OS       OS       `xml:"os"`
-	Metadata Metadata `xml:"metadata"`
-	Devices  Devices  `xml:"devices"`
+type InspectionOS struct {
+	Name   string `xml:"name"`
+	Distro string `xml:"distro"`
+	Osinfo string `xml:"osinfo"`
+	Arch   string `xml:"arch"`
 }
 
-type OS struct {
-	Type   OSType `xml:"type"`
-	Loader Loader `xml:"loader"`
-	Nvram  Nvram  `xml:"nvram"`
+type InspectionV2V struct {
+	OS InspectionOS `xml:"operatingsystem"`
 }
 
-type Metadata struct {
-	LibOsInfo LibOsInfo `xml:"libosinfo"`
-}
+func GetInspectionV2vFromFile(xmlFilePath string) (*InspectionV2V, error) {
+	xmlData, err := ReadXMLFile(xmlFilePath)
+	if err != nil {
+		fmt.Printf("Error read XML: %v\n", err)
+		return nil, err
+	}
 
-type Devices struct {
-	Disks []Disk `xml:"disk"`
-}
-type Disk struct {
-	Source Source `xml:"source"`
-}
-type Source struct {
-	File string `xml:"file,attr"`
-}
-
-type LibOsInfo struct {
-	V2VOS V2VOS `xml:"os"`
-}
-
-type V2VOS struct {
-	ID string `xml:"id,attr"`
-}
-
-type OSType struct {
-	Arch    string `xml:"arch,attr"`
-	Machine string `xml:"machine,attr"`
-	Content string `xml:",chardata"`
-}
-
-type Loader struct {
-	Readonly string `xml:"readonly,attr"`
-	Type     string `xml:"type,attr"`
-	Secure   string `xml:"secure,attr"`
-	Path     string `xml:",chardata"`
-}
-
-type Nvram struct {
-	Template string `xml:"template,attr"`
+	var xmlConf InspectionV2V
+	err = xml.Unmarshal(xmlData, &xmlConf)
+	if err != nil {
+		return nil, fmt.Errorf("Error unmarshalling XML: %v\n", err)
+	}
+	return &xmlConf, nil
 }
 
 // ReadXMLFile reads the content of an XML []byte from the given file path.
@@ -78,20 +51,4 @@ func ReadXMLFile(filePath string) ([]byte, error) {
 	}
 
 	return xmlData, nil
-}
-
-func GetDomainFromXml(xmlFilePath string) (*OvaVmconfig, error) {
-	xmlData, err := ReadXMLFile(xmlFilePath)
-	if err != nil {
-		fmt.Printf("Error read XML: %v\n", err)
-		return nil, err
-	}
-
-	var xmlConf OvaVmconfig
-	err = xml.Unmarshal(xmlData, &xmlConf)
-	if err != nil {
-		fmt.Printf("Error unmarshalling XML: %v\n", err)
-		return nil, err
-	}
-	return &xmlConf, nil
 }
