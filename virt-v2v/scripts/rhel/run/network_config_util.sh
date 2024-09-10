@@ -6,15 +6,21 @@ NETWORK_SCRIPTS_DIR="${NETWORK_SCRIPTS_DIR:-/etc/sysconfig/network-scripts}"
 NETWORK_CONNECTIONS_DIR="${NETWORK_CONNECTIONS_DIR:-/etc/NetworkManager/system-connections}"
 UDEV_RULES_FILE="${UDEV_RULES_FILE:-/etc/udev/rules.d/70-persistent-net.rules}"
 
+# Dump debug strings into a new file descriptor and redirect it to stdout.
+exec 3>&1
+log() {
+    echo $@ >&3
+}
+
 # Check if mapping file does not exist
 if [ ! -f "$V2V_MAP_FILE" ]; then
-    echo "File $V2V_MAP_FILE does not exist. Exiting."
+    log "File $V2V_MAP_FILE does not exist. Exiting."
     exit 0
 fi
 
 # Check if udev rules file exists
 if [ -f "$UDEV_RULES_FILE" ]; then
-    echo "File $UDEV_RULES_FILE already exists. Exiting."
+    log "File $UDEV_RULES_FILE already exists. Exiting."
     exit 0
 fi
 
@@ -37,7 +43,7 @@ extract_mac_ip() {
 udev_from_ifcfg() {
     # Check if the network scripts directory exists
     if [ ! -d "$NETWORK_SCRIPTS_DIR" ]; then
-        echo "Warning: Directory $NETWORK_SCRIPTS_DIR does not exist."
+        log "Warning: Directory $NETWORK_SCRIPTS_DIR does not exist."
         return 0
     fi
 
@@ -71,7 +77,7 @@ udev_from_ifcfg() {
 udev_from_nm() {
     # Check if the network connections directory exists
     if [ ! -d "$NETWORK_CONNECTIONS_DIR" ]; then
-        echo "Warning: Directory $NETWORK_CONNECTIONS_DIR does not exist."
+        log "Warning: Directory $NETWORK_CONNECTIONS_DIR does not exist."
         return 0
     fi
 
@@ -110,7 +116,7 @@ check_dupe_hws() {
 
     # If duplicates are found, print an error and exit
     if [ -n "$dupes" ]; then
-        echo "Warning: Duplicate hw: $dupes"
+        log "Warning: Duplicate hw: $dupes"
         return 0
     fi
 
@@ -122,7 +128,7 @@ main() {
     {
         udev_from_ifcfg
         udev_from_nm
-    } | check_dupe_hws > "$UDEV_RULES_FILE"
+    } | check_dupe_hws > "$UDEV_RULES_FILE" 2>/dev/null
 }
 
 main
