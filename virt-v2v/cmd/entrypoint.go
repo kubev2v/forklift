@@ -17,19 +17,63 @@ import (
 
 func main() {
 	var err error
-	if _, found := os.LookupEnv("V2V_inPlace"); found {
-		err = convertVirtV2vInPlace()
-	} else {
-		err = convertVirtV2v()
+	if err = virtV2VPrepEnvironment(); err != nil {
+		return
 	}
 
+	// virt-v2v or virt-v2v-in-place
+	if _, found := os.LookupEnv("V2V_inPlace"); found {
+		err = runVirtV2vInPlace()
+	} else {
+		err = runVirtV2v()
+	}
 	if err != nil {
-		fmt.Println("Error executing virt-v2v command ", err)
+		fmt.Println("Failed to execute virt-v2v command:", err)
+		os.Exit(1)
+	}
+
+	// virt-v2v-inspector
+	var disks []string
+	disks, err = utils.GetLinkedDisks()
+	if err != nil {
+		fmt.Println("Failed to get linked disk", err)
+		os.Exit(1)
+	}
+
+	err = runVirtV2VInspection(disks)
+	if err != nil {
+		fmt.Println("Failed to inspect the disk", err)
+		os.Exit(1)
+	}
+	inspection, err := utils.GetInspectionV2vFromFile(global.INSPECTION)
+	if err != nil {
+		return
+	}
+	// virt-customize
+	err = customize.Run(disks, inspection.OS.Osinfo)
+	if err != nil {
+		fmt.Println("Error to customize the VM:", err)
+		os.Exit(1)
+	}
+
+	err = server.Start()
+	if err != nil {
+		fmt.Println("Failed to run the server", err)
 		os.Exit(1)
 	}
 }
 
-func convertVirtV2vInPlace() error {
+func runVirtV2VInspection(disks []string) error {
+	args := []string{"-v", "-x", "-if", "raw", "-i", "disk", "-O", global.INSPECTION}
+	args = append(args, disks...)
+	fmt.Println("Running the virt-v2v-inspector with args: ", args)
+	v2vCmd := exec.Command("virt-v2v-inspector", args...)
+	v2vCmd.Stdout = os.Stdout
+	v2vCmd.Stderr = os.Stderr
+	return v2vCmd.Run()
+}
+
+func runVirtV2vInPlace() error {
 	args := []string{"-v", "-x", "-i", "libvirtxml"}
 	args = append(args, "--root")
 	if val, found := os.LookupEnv("V2V_RootDisk"); found {
@@ -38,7 +82,10 @@ func convertVirtV2vInPlace() error {
 		args = append(args, "first")
 	}
 	args = append(args, "/mnt/v2v/input.xml")
-	return executeVirtV2v("/usr/libexec/virt-v2v-in-place", args)
+	v2vCmd := exec.Command("/usr/libexec/virt-v2v-in-place", args...)
+	v2vCmd.Stdout = os.Stdout
+	v2vCmd.Stderr = os.Stderr
+	return v2vCmd.Run()
 }
 
 func virtV2vBuildCommand() (args []string, err error) {
@@ -61,12 +108,6 @@ func virtV2vBuildCommand() (args []string, err error) {
 		}
 		return nil, fmt.Errorf("virt-v2v supports the following providers: {%v}. Provided: %s\n", strings.Join(providers, ", "), source)
 	}
-	fmt.Println("Preparing virt-v2v")
-
-	if err = utils.VirtV2VPrepEnvironment(); err != nil {
-		return
-	}
-
 	args = append(args, "-o", "local", "-os", global.DIR)
 
 	switch source {
@@ -125,51 +166,13 @@ func virtV2vVsphereArgs() (args []string, err error) {
 	return args, nil
 }
 
-func convertVirtV2v() (err error) {
-	source := os.Getenv("V2V_source")
-	if source == global.VSPHERE {
-		if _, err := os.Stat("/etc/secret/cacert"); err == nil {
-			// use the specified certificate
-			err = os.Symlink("/etc/secret/cacert", "/opt/ca-bundle.crt")
-			if err != nil {
-				fmt.Println("Error creating ca cert link ", err)
-				os.Exit(1)
-			}
-		} else {
-			// otherwise, keep system pool certificates
-			err := os.Symlink("/etc/pki/tls/certs/ca-bundle.crt.bak", "/opt/ca-bundle.crt")
-			if err != nil {
-				fmt.Println("Error creating ca cert link ", err)
-				os.Exit(1)
-			}
-		}
-	}
-
+func runVirtV2v() error {
 	args, err := virtV2vBuildCommand()
 	if err != nil {
-		return
-	}
-	if err = executeVirtV2v("virt-v2v", args); err != nil {
-		return
-	}
-
-	xmlFilePath, err := server.GetXMLFile(global.DIR, "xml")
-	if err != nil {
-		fmt.Println("Error getting XML file:", err)
 		return err
 	}
-
-	err = customize.Run(source, xmlFilePath)
-	if err != nil {
-		fmt.Println("Error customizing the VM:", err)
-		return err
-	}
-
-	return
-}
-
-func executeVirtV2v(command string, args []string) error {
-	v2vCmd := exec.Command(command, args...)
+	v2vCmd := exec.Command("virt-v2v", args...)
+	// The virt-v2v-monitor reads the virt-v2v stdout and processes it and exposes the progress of the migration.
 	monitorCmd := exec.Command("/usr/local/bin/virt-v2v-monitor")
 	monitorCmd.Stdout = os.Stdout
 	monitorCmd.Stderr = os.Stderr
@@ -199,5 +202,42 @@ func executeVirtV2v(command string, args []string) error {
 		return err
 	}
 
+	return nil
+}
+
+// VirtV2VPrepEnvironment used in the cold migration.
+// It creates a links between the downloaded guest image from virt-v2v and mounted PVC.
+func virtV2VPrepEnvironment() (err error) {
+	source := os.Getenv("V2V_source")
+	_, inplace := os.LookupEnv("V2V_inPlace")
+	if source == global.VSPHERE && !inplace {
+		if _, err := os.Stat("/etc/secret/cacert"); err == nil {
+			// use the specified certificate
+			err = os.Symlink("/etc/secret/cacert", "/opt/ca-bundle.crt")
+			if err != nil {
+				fmt.Println("Error creating ca cert link ", err)
+				os.Exit(1)
+			}
+		} else {
+			// otherwise, keep system pool certificates
+			err := os.Symlink("/etc/pki/tls/certs/ca-bundle.crt.bak", "/opt/ca-bundle.crt")
+			if err != nil {
+				fmt.Println("Error creating ca cert link ", err)
+				os.Exit(1)
+			}
+		}
+	}
+	if err = os.MkdirAll(global.DIR, os.ModePerm); err != nil {
+		return fmt.Errorf("Error creating directory: %v", err)
+	}
+
+	//Disks on Filesystem storage.
+	if err = utils.LinkDisks(global.FS); err != nil {
+		return
+	}
+	//Disks on block storage.
+	if err = utils.LinkDisks(global.BLOCK); err != nil {
+		return
+	}
 	return nil
 }
