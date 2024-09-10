@@ -1,0 +1,33 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+
+go_library(
+    name = "cmd_lib",
+    srcs = ["entrypoint.go"],
+    importpath = "github.com/konveyor/forklift-controller/virt-v2v/cmd",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//virt-v2v/pkg/customize",
+        "//virt-v2v/pkg/global",
+        "//virt-v2v/pkg/server",
+        "//virt-v2v/pkg/utils",
+    ],
+)
+
+go_binary(
+    name = "virt-v2v-wrapper",
+    embed = [":cmd_lib"],
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "entrypoint_test",
+    srcs = ["entrypoint_test.go"],
+    embed = [":cmd_lib"],
+)
+
+go_test(
+    name = "cmd_test",
+    srcs = ["entrypoint_test.go"],
+    embed = [":cmd_lib"],
+    deps = ["//virt-v2v/pkg/global"],
+)

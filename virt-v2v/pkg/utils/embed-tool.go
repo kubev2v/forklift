@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"embed"
@@ -8,12 +8,12 @@ import (
 	"path/filepath"
 )
 
-// EmbedTool for manipulating the embedded filesystem
+// EmbedTool for manipulating the embedded Filesystem
 type EmbedTool struct {
-	filesystem *embed.FS
+	Filesystem *embed.FS
 }
 
-// CreateFilesFromFS gets all files from the embedded filesystem and recreates them on the disk.
+// CreateFilesFromFS gets all files from the embedded Filesystem and recreates them on the disk.
 // It creates all directories and keeps the hierarchy of the embedded files.
 //
 // Arguments:
@@ -38,11 +38,11 @@ func (t *EmbedTool) CreateFilesFromFS(dstDir string) error {
 	return nil
 }
 
-// writeFileFromFS writes a file from the embedded filesystem to the disk.
+// writeFileFromFS writes a file from the embedded Filesystem to the disk.
 //
 // Arguments:
-//   - src (string): The filepath from the embedded filesystem which should be writen to the disk.
-//   - dst (string): The destination path on the host filesystem to which the path should be writen.
+//   - src (string): The filepath from the embedded Filesystem which should be writen to the disk.
+//   - dst (string): The destination path on the host Filesystem to which the path should be writen.
 //
 // Returns:
 //   - error: An error if the file cannot be read, or nil if successful.
@@ -57,7 +57,7 @@ func (t *EmbedTool) writeFileFromFS(src, dst string) error {
 		}
 	}
 	// Read the embedded file
-	srcData, err := t.filesystem.ReadFile(src)
+	srcData, err := t.Filesystem.ReadFile(src)
 	if err != nil {
 		fmt.Println("Error reading embedded file")
 		return err
@@ -70,14 +70,14 @@ func (t *EmbedTool) writeFileFromFS(src, dst string) error {
 	return nil
 }
 
-// getAllFilenames gets all files located inside the embedded filesystem.
+// getAllFilenames gets all files located inside the embedded Filesystem.
 // Example of one path `scripts/windows/9999-restore_config_init.bat`.
 //
 // Returns:
-//   - []files: The file paths which are located inside the embedded filesystem.
+//   - []files: The file paths which are located inside the embedded Filesystem.
 //   - error: An error if the file cannot be read, or nil if successful.
 func (t *EmbedTool) getAllFilenames() (files []string, err error) {
-	if err := fs.WalkDir(t.filesystem, ".", func(path string, d fs.DirEntry, err error) error {
+	if err := fs.WalkDir(t.Filesystem, ".", func(path string, d fs.DirEntry, err error) error {
 		if d.IsDir() {
 			return nil
 		}
