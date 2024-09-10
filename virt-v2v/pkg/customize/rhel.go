@@ -1,17 +1,13 @@
-package main
+package customize
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/konveyor/forklift-controller/virt-v2v/pkg/utils"
 )
-
-type FileSystemTool interface {
-	CreateFilesFromFS(dstDir string) error
-}
-
-type DomainExecFunc func(args ...string) error
 
 func CustomizeLinux(execFunc DomainExecFunc, disks []string, dir string, t FileSystemTool) error {
 	fmt.Printf("Customizing disks '%v'\n", disks)
@@ -83,7 +79,7 @@ func addFirstbootScripts(extraArgs *[]string, dir string) error {
 		return nil
 	}
 
-	*extraArgs = append(*extraArgs, getScriptArgs("firstboot", firstBootScripts...)...)
+	*extraArgs = append(*extraArgs, utils.GetScriptArgs("firstboot", firstBootScripts...)...)
 	return nil
 }
 
@@ -101,7 +97,7 @@ func addRunScripts(extraArgs *[]string, dir string) error {
 		return nil
 	}
 
-	*extraArgs = append(*extraArgs, getScriptArgs("run", runScripts...)...)
+	*extraArgs = append(*extraArgs, utils.GetScriptArgs("run", runScripts...)...)
 	return nil
 }
 
@@ -125,12 +121,12 @@ func getScripts(directory string) ([]string, error) {
 
 // addDisksToCustomize appends disk arguments to extraArgs
 func addDisksToCustomize(extraArgs *[]string, disks []string) {
-	*extraArgs = append(*extraArgs, getScriptArgs("add", disks...)...)
+	*extraArgs = append(*extraArgs, utils.GetScriptArgs("add", disks...)...)
 }
 
 // addLuksKeysToCustomize appends key arguments to extraArgs
 func addLuksKeysToCustomize(extraArgs *[]string) error {
-	luksArgs, err := addLUKSKeys()
+	luksArgs, err := utils.AddLUKSKeys()
 	if err != nil {
 		return fmt.Errorf("error adding LUKS kyes: %w", err)
 	}

@@ -3,34 +3,12 @@ package main
 import (
 	"strings"
 	"testing"
+
+	"github.com/konveyor/forklift-controller/virt-v2v/pkg/global"
 )
 
-func TestGenName(t *testing.T) {
-	cases := []struct {
-		diskNum  int
-		expected string
-	}{
-		{1, "a"},
-		{26, "z"},
-		{27, "aa"},
-		{28, "ab"},
-		{52, "az"},
-		{53, "ba"},
-		{55, "bc"},
-		{702, "zz"},
-		{754, "abz"},
-	}
-
-	for _, c := range cases {
-		got := genName(c.diskNum)
-		if got != c.expected {
-			t.Errorf("genName(%d) = %s; want %s", c.diskNum, got, c.expected)
-		}
-	}
-}
-
 func TestStaticIPs(t *testing.T) {
-	t.Setenv("V2V_source", VSPHERE)
+	t.Setenv("V2V_source", global.VSPHERE)
 	t.Setenv("V2V_libvirtURL", "http://fake.com")
 	t.Setenv("V2V_secretKey", "fake")
 	t.Setenv("V2V_vmName", "test")
