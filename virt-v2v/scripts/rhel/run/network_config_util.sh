@@ -31,13 +31,6 @@ fi
 # Helper functions
 # ----------------
 
-# Get the v2v map file as list 
-v2v_list_as_envs() {
-    while IFS= read -r line; do
-        echo "$line"
-    done < "$V2V_MAP_FILE"
-}
-
 # Clean strigs in case they have quates
 remove_quotes() {
     echo "$1" | tr -d '"' | tr -d "'" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
@@ -65,7 +58,7 @@ udev_from_ifcfg() {
     fi
 
     # Read the mapping file line by line
-    v2v_list_as_envs | while read line;
+    cat "$V2V_MAP_FILE" | while read line;
     do
         # Extract S_HW and S_IP
         extract_mac_ip "$line"
@@ -100,7 +93,7 @@ udev_from_nm() {
     fi
 
     # Read the mapping file line by line
-    v2v_list_as_envs | while read line;
+    cat "$V2V_MAP_FILE" | while read line;
     do
         # Extract S_HW and S_IP
         extract_mac_ip "$line"
@@ -152,7 +145,7 @@ udev_from_netplan() {
     }
 
     # Read the mapping file line by line
-    v2v_list_as_envs | while read line;
+    cat "$V2V_MAP_FILE" | while read line;
     do
         # Extract S_HW and S_IP from the current line in the mapping file
         extract_mac_ip "$line"
