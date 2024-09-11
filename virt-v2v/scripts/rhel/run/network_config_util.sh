@@ -40,7 +40,7 @@ v2v_list_as_envs() {
 
 # Clean strigs in case they have quates
 remove_quotes() {
-    echo "$1" | tr -d '"' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+    echo "$1" | tr -d '"' | tr -d "'" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
 }
 
 # Validate MAC address and IPv4 address and extract them
