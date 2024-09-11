@@ -160,6 +160,7 @@ udev_from_netplan() {
 
         # If no interface is found, skip this entry
         if [ -z "$interface_name" ]; then
+            log "Info: no interface name found to $S_IP."
             continue
         fi
 
