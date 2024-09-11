@@ -65,18 +65,21 @@ udev_from_ifcfg() {
 
         # If S_HW and S_IP were not extracted, skip the line
         if [ -z "$S_HW" ] || [ -z "$S_IP" ]; then
+            log "Warning: invalide mac to ip line: $line."
             continue
         fi
 
         # Find the matching network script file
         IFCFG=$(grep -l "IPADDR=$S_IP" "$NETWORK_SCRIPTS_DIR"/*)
         if [ -z "$IFCFG" ]; then
+            log "Info: no ifcg config file name foud for $S_IP."
             continue
         fi
 
         # Source the matching file, if found
         DEVICE=$(grep '^DEVICE=' "$IFCFG" | cut -d'=' -f2)
         if [ -z "$DEVICE" ]; then
+            log "Info: no interface name found to $S_IP."
             continue
         fi
 
@@ -100,18 +103,21 @@ udev_from_nm() {
 
         # If S_HW and S_IP were not extracted, skip the line
         if [ -z "$S_HW" ] || [ -z "$S_IP" ]; then
+            log "Warning: invalide mac to ip line: $line."
             continue
         fi
 
         # Find the matching NetworkManager connection file
         NM_FILE=$(grep -El "address[0-9]*=$S_IP" "$NETWORK_CONNECTIONS_DIR"/*)
         if [ -z "$NM_FILE" ]; then
+            log "Info: no nm config file name foud for $S_IP."
             continue
         fi
 
         # Extract the DEVICE (interface name) from the matching file
         DEVICE=$(grep '^interface-name=' "$NM_FILE" | cut -d'=' -f2)
         if [ -z "$DEVICE" ]; then
+            log "Info: no interface name found to $S_IP."
             continue
         fi
 
@@ -140,6 +146,7 @@ udev_from_netplan() {
         netplan_get ethernets | grep -Eo "^[^[:space:]]+[^:]" | while read IFNAME; do
             if netplan_get ethernets."$IFNAME".addresses | grep -q "$target_ip"; then
                 echo "$IFNAME"
+                return
             fi
         done
     }
@@ -152,6 +159,7 @@ udev_from_netplan() {
 
         # If S_HW and S_IP were not extracted, skip the line
         if [ -z "$S_HW" ] || [ -z "$S_IP" ]; then
+            log "Warning: invalide mac to ip line: $line."
             continue
         fi
 
