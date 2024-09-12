@@ -46,6 +46,42 @@ extract_mac_ip() {
     fi
 }
 
+netplan_get_py() {
+    python -c "
+import os
+import yaml
+import sys
+
+netplan_dir = os.getenv('NETPLAN_DIR', '') + '/etc/netplan'
+args = sys.argv[1].split('.')
+
+def find_yaml_files(directory):
+    yaml_files = []
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file.endswith(('.yaml', '.yml')):
+                yaml_files.append(os.path.join(root, file))
+
+    return yaml_files
+
+def get_yaml_path(yaml_data, keys):
+    for key in keys:
+        if yaml_data is None:
+            return None
+        yaml_data = yaml_data.get(key)
+    return yaml_data
+
+yaml_files = find_yaml_files(netplan_dir)
+
+for yaml_file in yaml_files:
+    with open(yaml_file, 'r') as file:
+        yaml_data = yaml.safe_load(file)        
+        result = get_yaml_path(yaml_data, ['network'] + args)
+        if result is not None:
+           print(yaml.dump(result, default_flow_style=False))
+" "$@"
+}
+
 # Network infrastructure reading functions
 # ----------------------------------------
 
@@ -133,9 +169,19 @@ udev_from_netplan() {
         return 0
     fi
 
+    # Function to check if netplan supports the 'get' subcommand
+    netplan_supports_get() {
+        netplan get 2>/dev/null
+        return $?
+    }
+
     # netplan with root dir
     netplan_get() {
-        netplan get --root-dir "$NETPLAN_DIR" "$@" 2>/dev/null
+        if netplan_supports_get; then
+            netplan get --root-dir "$NETPLAN_DIR" "$@" 2>/dev/null
+        else
+            netplan_get_py "$@" 2>/dev/null
+        fi
     }
 
     # Loop over all interface names and treturn the one with target_ip, or null
