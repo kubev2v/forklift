@@ -46,6 +46,10 @@ extract_mac_ip() {
     fi
 }
 
+# Get a netplan setting by specifying a nested key like "ethernets.eth0.addresses"
+# For example:
+#    netplan_get_py ethernets
+# Will return the yaml struct of all the thernet interfaces.
 netplan_get_py() {
     python -c "
 import os
