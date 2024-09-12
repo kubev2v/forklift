@@ -110,7 +110,7 @@ udev_from_ifcfg() {
         fi
 
         # Find the matching network script file
-        IFCFG=$(grep -l "IPADDR=$S_IP" "$NETWORK_SCRIPTS_DIR"/*)
+        IFCFG=$(grep -l "IPADDR=.*$S_IP.*$" "$NETWORK_SCRIPTS_DIR"/*)
         if [ -z "$IFCFG" ]; then
             log "Info: no ifcg config file name foud for $S_IP."
             continue
@@ -148,7 +148,7 @@ udev_from_nm() {
         fi
 
         # Find the matching NetworkManager connection file
-        NM_FILE=$(grep -El "address[0-9]*=$S_IP" "$NETWORK_CONNECTIONS_DIR"/*)
+        NM_FILE=$(grep -El "address[0-9]*=.*$S_IP.*$" "$NETWORK_CONNECTIONS_DIR"/*)
         if [ -z "$NM_FILE" ]; then
             log "Info: no nm config file name foud for $S_IP."
             continue
