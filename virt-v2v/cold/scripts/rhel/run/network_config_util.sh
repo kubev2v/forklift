@@ -175,7 +175,7 @@ udev_from_netplan() {
 
     # Function to check if netplan supports the 'get' subcommand
     netplan_supports_get() {
-        netplan get 2>/dev/null
+        netplan get 2>&3
         return $?
     }
 
