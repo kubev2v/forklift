@@ -192,3 +192,8 @@ func (r *Validator) DirectStorage(vmRef ref.Ref) (bool, error) {
 func (r *Validator) StaticIPs(vmRef ref.Ref) (bool, error) {
 	return true, nil
 }
+
+// NO-OP
+func (r *Validator) ChangeTrackingEnabled(vmRef ref.Ref) (bool, error) {
+	return true, nil
+}

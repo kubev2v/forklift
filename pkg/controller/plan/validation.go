@@ -35,40 +35,41 @@ import (
 
 // Types
 const (
-	WarmMigrationNotReady        = "WarmMigrationNotReady"
-	NamespaceNotValid            = "NamespaceNotValid"
-	TransferNetNotValid          = "TransferNetworkNotValid"
-	NetRefNotValid               = "NetworkMapRefNotValid"
-	NetMapNotReady               = "NetworkMapNotReady"
-	DsMapNotReady                = "StorageMapNotReady"
-	DsRefNotValid                = "StorageRefNotValid"
-	VMRefNotValid                = "VMRefNotValid"
-	VMNotFound                   = "VMNotFound"
-	VMAlreadyExists              = "VMAlreadyExists"
-	VMNetworksNotMapped          = "VMNetworksNotMapped"
-	VMStorageNotMapped           = "VMStorageNotMapped"
-	VMStorageNotSupported        = "VMStorageNotSupported"
-	VMMultiplePodNetworkMappings = "VMMultiplePodNetworkMappings"
-	VMMissingGuestIPs            = "VMMissingGuestIPs"
-	HostNotReady                 = "HostNotReady"
-	DuplicateVM                  = "DuplicateVM"
-	NameNotValid                 = "TargetNameNotValid"
-	HookNotValid                 = "HookNotValid"
-	HookNotReady                 = "HookNotReady"
-	HookStepNotValid             = "HookStepNotValid"
-	Executing                    = "Executing"
-	Succeeded                    = "Succeeded"
-	Failed                       = "Failed"
-	Canceled                     = "Canceled"
-	Deleted                      = "Deleted"
-	Paused                       = "Paused"
-	Pending                      = "Pending"
-	Running                      = "Running"
-	Blocked                      = "Blocked"
-	Archived                     = "Archived"
-	unsupportedVersion           = "UnsupportedVersion"
-	VDDKInvalid                  = "VDDKInvalid"
-	ValidatingVDDK               = "ValidatingVDDK"
+	WarmMigrationNotReady         = "WarmMigrationNotReady"
+	NamespaceNotValid             = "NamespaceNotValid"
+	TransferNetNotValid           = "TransferNetworkNotValid"
+	NetRefNotValid                = "NetworkMapRefNotValid"
+	NetMapNotReady                = "NetworkMapNotReady"
+	DsMapNotReady                 = "StorageMapNotReady"
+	DsRefNotValid                 = "StorageRefNotValid"
+	VMRefNotValid                 = "VMRefNotValid"
+	VMNotFound                    = "VMNotFound"
+	VMAlreadyExists               = "VMAlreadyExists"
+	VMNetworksNotMapped           = "VMNetworksNotMapped"
+	VMStorageNotMapped            = "VMStorageNotMapped"
+	VMStorageNotSupported         = "VMStorageNotSupported"
+	VMMultiplePodNetworkMappings  = "VMMultiplePodNetworkMappings"
+	VMMissingGuestIPs             = "VMMissingGuestIPs"
+	VMMissingChangedBlockTracking = "VMMissingChangedBlockTracking"
+	HostNotReady                  = "HostNotReady"
+	DuplicateVM                   = "DuplicateVM"
+	NameNotValid                  = "TargetNameNotValid"
+	HookNotValid                  = "HookNotValid"
+	HookNotReady                  = "HookNotReady"
+	HookStepNotValid              = "HookStepNotValid"
+	Executing                     = "Executing"
+	Succeeded                     = "Succeeded"
+	Failed                        = "Failed"
+	Canceled                      = "Canceled"
+	Deleted                       = "Deleted"
+	Paused                        = "Paused"
+	Pending                       = "Pending"
+	Running                       = "Running"
+	Blocked                       = "Blocked"
+	Archived                      = "Archived"
+	unsupportedVersion            = "UnsupportedVersion"
+	VDDKInvalid                   = "VDDKInvalid"
+	ValidatingVDDK                = "ValidatingVDDK"
 )
 
 // Categories
@@ -82,16 +83,17 @@ const (
 
 // Reasons
 const (
-	NotSet            = "NotSet"
-	NotFound          = "NotFound"
-	NotUnique         = "NotUnique"
-	NotSupported      = "NotSupported"
-	Ambiguous         = "Ambiguous"
-	NotValid          = "NotValid"
-	Modified          = "Modified"
-	UserRequested     = "UserRequested"
-	InMaintenanceMode = "InMaintenanceMode"
-	MissingGuestInfo  = "MissingGuestInformation"
+	NotSet                      = "NotSet"
+	NotFound                    = "NotFound"
+	NotUnique                   = "NotUnique"
+	NotSupported                = "NotSupported"
+	Ambiguous                   = "Ambiguous"
+	NotValid                    = "NotValid"
+	Modified                    = "Modified"
+	UserRequested               = "UserRequested"
+	InMaintenanceMode           = "InMaintenanceMode"
+	MissingGuestInfo            = "MissingGuestInformation"
+	MissingChangedBlockTracking = "MissingChangedBlockTracking"
 )
 
 // Statuses
@@ -235,6 +237,28 @@ func (r *Reconciler) validateWarmMigration(plan *api.Plan) (err error) {
 			Reason:   NotSupported,
 			Message:  "Warm migration from the source provider is not supported.",
 		})
+	}
+
+	missingCbtForWarm := libcnd.Condition{
+		Type:     VMMissingChangedBlockTracking,
+		Status:   True,
+		Reason:   MissingChangedBlockTracking,
+		Category: Critical,
+		Message:  "Changed Block Tracking (CBT) has not been enabled on some VM. This feature is a prerequisite for VM warm migration.",
+		Items:    []string{},
+	}
+	for i := range plan.Spec.VMs {
+		ref := &plan.Spec.VMs[i].Ref
+		enabled, err := validator.ChangeTrackingEnabled(*ref)
+		if err != nil {
+			return err
+		}
+		if !enabled {
+			missingCbtForWarm.Items = append(missingCbtForWarm.Items, ref.String())
+		}
+	}
+	if len(missingCbtForWarm.Items) > 0 {
+		plan.Status.SetCondition(missingCbtForWarm)
 	}
 	return
 }
