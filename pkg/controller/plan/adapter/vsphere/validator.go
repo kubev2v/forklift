@@ -155,3 +155,16 @@ func (r *Validator) StaticIPs(vmRef ref.Ref) (ok bool, err error) {
 	ok = true
 	return
 }
+
+// Validate that the vm has the change tracking enabled
+func (r *Validator) ChangeTrackingEnabled(vmRef ref.Ref) (bool, error) {
+	if !r.plan.Spec.Warm {
+		return true, nil
+	}
+	vm := &model.Workload{}
+	err := r.inventory.Find(vm, vmRef)
+	if err != nil {
+		return false, liberr.Wrap(err, "vm", vmRef)
+	}
+	return vm.ChangeTrackingEnabled, nil
+}
