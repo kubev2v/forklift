@@ -138,6 +138,8 @@ type Validator interface {
 	PodNetwork(vmRef ref.Ref) (bool, error)
 	// Validate that we have information about static IPs for every virtual NIC
 	StaticIPs(vmRef ref.Ref) (bool, error)
+	// Validate that the vm has the change tracking enabled
+	ChangeTrackingEnabled(vmRef ref.Ref) (bool, error)
 }
 
 // DestinationClient API.
