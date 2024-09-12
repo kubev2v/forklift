@@ -182,7 +182,7 @@ udev_from_netplan() {
     # netplan with root dir
     netplan_get() {
         if netplan_supports_get; then
-            netplan get --root-dir "$NETPLAN_DIR" "$@" 2>&3
+            netplan get --root-dir "$NETPLAN_DIR" "$@" 2>&3 
         else
             log 'Info: netplan not supporting get subcomment, using python'
             netplan_get_py "$@" 2>&3
