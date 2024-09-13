@@ -11,7 +11,6 @@ go_library(
         "scripts/rhel/firstboot/README.md",
         "scripts/rhel/run/README.md",
         "scripts/rhel/run/network_config_util.sh",
-        "scripts/rhel/run/network_config_util_test",
         "scripts/windows/9999-restore_config.ps1",
         "scripts/windows/9999-restore_config_init.bat",
         "scripts/windows/firstboot.bat",
@@ -41,8 +40,8 @@ go_library(
     importpath = "github.com/konveyor/forklift-controller/virt-v2v/pkg/customize",
     visibility = ["//visibility:public"],
     deps = [
-        "//virt-v2v/pkg/global",
-        "//virt-v2v/pkg/utils",
+        "//pkg/global",
+        "//pkg/utils",
     ],
 )
 
