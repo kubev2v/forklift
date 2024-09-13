@@ -142,10 +142,10 @@ udev_from_netplan() {
 
     # netplan with root dir
     netplan_get() {
-        netplan get --root-dir "$NETPLAN_DIR" "$@" 2>&3
+        netplan get --root-dir "$NETPLAN_DIR" "$@" >&3
     }
 
-    # Loop over all interface names and treturn the one with target_ip, or null
+    # Loop over all interface names and return the one with target_ip, or null
     find_interface_by_ip() {
         target_ip="$1"
         if netplan_supports_get; then
@@ -157,7 +157,11 @@ udev_from_netplan() {
               fi
           done
         else
-            netplan generate --root-dir "$NETPLAN_DIR"
+            if [ -z "$SYSTEMD_NETWORK_DIR" ]; then
+                log "Info: no systemd network directory"
+                return
+            fi
+            netplan generate --root-dir "$NETPLAN_DIR" 2>&3
             NM_FILE=$(grep -El "Address[0-9]*=.*$S_IP.*$" "$SYSTEMD_NETWORK_DIR"/*)
             if [ -z "$NM_FILE" ]; then
                 log "Info: no systemd nm config file name found for $S_IP."
@@ -224,6 +228,8 @@ main() {
         udev_from_nm
         udev_from_netplan
     } | check_dupe_hws > "$UDEV_RULES_FILE" 2>/dev/null
+    echo "New udev rule:"
+    cat $UDEV_RULES_FILE
 }
 
 main
