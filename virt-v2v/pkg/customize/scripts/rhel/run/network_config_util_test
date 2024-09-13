@@ -18,6 +18,7 @@ export NETPLAN_DIR="$TEST_DIR/etc/netplan"
     export TEST_SRC_DIR=$1  #${SCRIPT_DIR}/ifcfg-test.d
     export EXPECTED_UDEV_RULE_FILE="$TEST_SRC_DIR/expected-udev.rule"
 
+export IN_TESTING=true
     echo "Testing: $1"
 
     cp -a $TEST_SRC_DIR/root/* $TEST_DIR
@@ -34,17 +35,20 @@ export NETPLAN_DIR="$TEST_DIR/etc/netplan"
     # Test 1: Verify the udev rules file was created
     if [ ! -f "$UDEV_RULES_FILE" ]; then
         echo "Test 1 Failed: UDEV_RULES_FILE not created."
+        cat $TEST_DIR/main.log
         exit 1
     fi
 
     if ! cmp -s $EXPECTED_UDEV_RULE_FILE $UDEV_RULES_FILE ; then
         echo "Test 2 Failed: The content of $UDEV_RULES_FILE does not match the expected rule."
-        tail $UDEV_RULES_FILE
+        cat $UDEV_RULES_FILE
         diff -u $EXPECTED_UDEV_RULE_FILE $UDEV_RULES_FILE
+        cat $TEST_DIR/main.log
         exit 1
     fi
 
     PASS $TEST_SRC_DIR
+    rm -rf "$TEST_DIR"
 }
 
 test_glob_dirs() {
@@ -63,60 +67,6 @@ test_glob_dirs ${SCRIPT_DIR}/ifcfg-*-test.d;
 # -------------------------------------
 test_glob_dirs ${SCRIPT_DIR}/networkmanager*-test.d;
 
-exit 0
-
 # Test systems using netplan YAML
 # -------------------------------
-
-NETPLAN_FILE="$NETPLAN_DIR/etc/netplan/50-netplan.yaml"
-
-# Clean up from previous runs
-rm -f "$UDEV_RULES_FILE"
-rm -rf "$NETWORK_SCRIPTS_DIR" "$NETWORK_CONNECTIONS_DIR" "$NETPLAN_DIR"
-mkdir -p "$NETPLAN_DIR/etc/netplan"
-
-# Create mock data for netplan YAML test
-cat <<EOL > "$NETPLAN_FILE"
-network:
-  version: 2
-  ethernets:
-    eth0:
-      dhcp4: true
-    eth1:
-      dhcp4: false
-      addresses:
-        - 192.168.1.11/24
-    enp3s0:
-      addresses: [192.168.1.12/24]
-EOL
-
-# Create mock mapping file
-printf "aa:bb:cc:dd:ee:ff:ip:192.168.1.10,things,more\naa:bb:cc:dd:ee:fe:ip:192.168.1.11,hello,world\naa:bb:cc:dd:ee:fd:ip:192.168.1.12,ipv6,support\n" > "$V2V_MAP_FILE"
-
-# Run the script
-main
-
-printf "\nTest netplan output:\n"
-echo "FILE_START"
-cat $UDEV_RULES_FILE
-echo "FILE_END"
-
-# Test 1: Verify the udev rules file was created
-if [ ! -f "$UDEV_RULES_FILE" ]; then
-    echo "Test 1 Failed: UDEV_RULES_FILE not created."
-    exit 1
-fi
-
-# Test 2: Verify the content of the udev rules file
-EXPECTED_RULE="SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"aa:bb:cc:dd:ee:fe\",NAME=\"eth1\"\nSUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"aa:bb:cc:dd:ee:fd\",NAME=\"enp3s0\""
-if ! echo "$EXPECTED_RULE" | cmp -s - "$UDEV_RULES_FILE"; then
-    echo "Test 2 Failed: The content of $UDEV_RULES_FILE does not match the expected rule."
-    exit 1
-fi
-
-# -----------------------
-
-printf "\nAll tests passed successfully.\n"
-
-# Clean up test environment
-rm -rf "$TEST_DIR"
+test_glob_dirs ${SCRIPT_DIR}/netplan*-test.d;
