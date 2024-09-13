@@ -3,7 +3,7 @@
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 PASS() { echo "PASS: $@" ; }
-FAIL() { ${FAIL_IS_FATAL:-true} && ( echo "FAIL: $@" >&2 ; exit 1 ; ) || ( echo "FAIL (known): $@" ; ) }
+FAIL() { ${FAIL_IS_FATAL:-true} && { echo "FAIL: $@" >&2 ; exit 1 ; } || { echo "FAIL (known): $@" ; } ; }
 
 show_file() { echo "// File '$1'" ; cat "$1" | sed "s/^/| /" ; echo "\\\\" ; }
 
