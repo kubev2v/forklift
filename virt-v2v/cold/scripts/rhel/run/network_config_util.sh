@@ -136,13 +136,13 @@ udev_from_netplan() {
 
     # Function to check if netplan supports the 'get' subcommand
     netplan_supports_get() {
-        netplan get 2>&3
+        netplan get >&3
         return $?
     }
 
     # netplan with root dir
     netplan_get() {
-        netplan get --root-dir "$NETPLAN_DIR" "$@" >&3
+        netplan get --root-dir "$NETPLAN_DIR" "$@" 2>&3
     }
 
     # Loop over all interface names and return the one with target_ip, or null
