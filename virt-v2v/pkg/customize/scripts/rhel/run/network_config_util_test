@@ -3,6 +3,7 @@
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 PASS() { echo "PASS: $@" ; }
+PASS() { ${PASS_IS_FATAL:-false} && { echo "PASS (unexpected): $@" >&2 ; exit 1 ; } || { echo "PASS: $@" ; } ; }
 FAIL() { ${FAIL_IS_FATAL:-true} && { echo "FAIL: $@" >&2 ; exit 1 ; } || { echo "FAIL (known): $@" ; } ; }
 
 header() { echo -e "\n#\n# $@\n#\n" ; }
@@ -48,7 +49,7 @@ test_dir() {
         FAIL "Test 2 Failed: The content of $UDEV_RULES_FILE does not match the expected rule."
     fi
 
-    PASS $(basename $TEST_SRC_DIR)
+    PASS_IS_FATAL=false PASS $(basename $TEST_SRC_DIR)
     rm -rf "$TEST_DIR"
 }
 
@@ -63,8 +64,8 @@ expected_to_pass_dirs() {
 }
 
 
-known_to_fail_dirs() {
-    FAIL_IS_FATAL=false
+expected_to_fail_dirs() {
+    local FAIL_IS_FATAL=false PASS_IS_FATAL=true
     test_dirs "$@"
 }
 
@@ -72,7 +73,7 @@ known_to_fail_dirs() {
 # Test systems using network-scripts
 # ----------------------------------
 expected_to_pass_dirs ${SCRIPT_DIR}/ifcfg-*-test.d;
-known_to_fail_dirs ${SCRIPT_DIR}/ifcfg-*-test-failure.d;
+expected_to_fail_dirs ${SCRIPT_DIR}/ifcfg-*-test-failure.d;
 
 # Test systems using system-connections
 # -------------------------------------
@@ -80,6 +81,6 @@ expected_to_pass_dirs ${SCRIPT_DIR}/networkmanager*-test.d;
 
 # Test systems using netplan YAML
 # -------------------------------
-known_to_fail_dirs ${SCRIPT_DIR}/netplan*-test.d;
+expected_to_fail_dirs ${SCRIPT_DIR}/netplan*-test.d;
 
 PASS "All tests passed."
