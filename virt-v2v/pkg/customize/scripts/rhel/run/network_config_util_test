@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PASS() { echo "PASS: $@" ; }
 FAIL() { ${FAIL_IS_FATAL:-true} && { echo "FAIL: $@" >&2 ; exit 1 ; } || { echo "FAIL (known): $@" ; } ; }
 
+header() { echo -e "\n#\n# $@\n#\n" ; }
 show_file() { echo "// File '$1'" ; cat "$1" | sed "s/^/| /" ; echo "\\\\" ; }
 
 test_dir() {
@@ -21,7 +22,7 @@ test_dir() {
     export EXPECTED_UDEV_RULE_FILE="$TEST_SRC_DIR/expected-udev.rule"
 
     export IN_TESTING=true
-    echo "Testing: $1"
+    header "Testing: $(basename $TEST_SRC_DIR)"
 
     cp -a $TEST_SRC_DIR/root/* $TEST_DIR
 
@@ -38,7 +39,6 @@ test_dir() {
     if [ ! -f "$UDEV_RULES_FILE" ]; then
         show_file $TEST_DIR/main.log
         FAIL "Test 1 Failed: UDEV_RULES_FILE not created."
-        
     fi
 
     if ! cmp -s $EXPECTED_UDEV_RULE_FILE $UDEV_RULES_FILE ; then
@@ -48,7 +48,7 @@ test_dir() {
         FAIL "Test 2 Failed: The content of $UDEV_RULES_FILE does not match the expected rule."
     fi
 
-    PASS $TEST_SRC_DIR
+    PASS $(basename $TEST_SRC_DIR)
     rm -rf "$TEST_DIR"
 }
 
@@ -72,6 +72,7 @@ known_to_fail_dirs() {
 # Test systems using network-scripts
 # ----------------------------------
 expected_to_pass_dirs ${SCRIPT_DIR}/ifcfg-*-test.d;
+known_to_fail_dirs ${SCRIPT_DIR}/ifcfg-*-test-failure.d;
 
 # Test systems using system-connections
 # -------------------------------------
