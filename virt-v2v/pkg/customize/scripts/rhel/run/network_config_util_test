@@ -5,20 +5,20 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PASS() { echo "PASS: $@" ; }
 FAIL() { echo "FAIL: $@" ; }
 
-test_in_dir() {
-export TEST_DIR=$(mktemp -d --suffix="-forklift")
+expected_to_pass_dir() {
+    export TEST_DIR=$(mktemp -d --suffix="-forklift")
 
-# Paths for the test
-export V2V_MAP_FILE="$TEST_DIR/tmp/macToIP"
-export NETWORK_SCRIPTS_DIR="$TEST_DIR/etc/sysconfig/network-scripts"
-export NETWORK_CONNECTIONS_DIR="$TEST_DIR/etc/NetworkManager/system-connections"
-export UDEV_RULES_FILE="$TEST_DIR/etc/udev/rules.d/70-persistent-net.rules"
-export NETPLAN_DIR="$TEST_DIR/etc/netplan"
+    # Paths for the test
+    export V2V_MAP_FILE="$TEST_DIR/tmp/macToIP"
+    export NETWORK_SCRIPTS_DIR="$TEST_DIR/etc/sysconfig/network-scripts"
+    export NETWORK_CONNECTIONS_DIR="$TEST_DIR/etc/NetworkManager/system-connections"
+    export UDEV_RULES_FILE="$TEST_DIR/etc/udev/rules.d/70-persistent-net.rules"
+    export NETPLAN_DIR="$TEST_DIR/etc/netplan"
 
     export TEST_SRC_DIR=$1  #${SCRIPT_DIR}/ifcfg-test.d
     export EXPECTED_UDEV_RULE_FILE="$TEST_SRC_DIR/expected-udev.rule"
 
-export IN_TESTING=true
+    export IN_TESTING=true
     echo "Testing: $1"
 
     cp -a $TEST_SRC_DIR/root/* $TEST_DIR
@@ -51,22 +51,22 @@ export IN_TESTING=true
     rm -rf "$TEST_DIR"
 }
 
-test_glob_dirs() {
+expected_to_pass_dirs() {
     for THE_DIR in $@;
     do
-        test_in_dir "$THE_DIR"
+        expected_to_pass_dir "$THE_DIR"
     done
 }
 
 
 # Test systems using network-scripts
 # ----------------------------------
-test_glob_dirs ${SCRIPT_DIR}/ifcfg-*-test.d;
+expected_to_pass_dirs ${SCRIPT_DIR}/ifcfg-*-test.d;
 
 # Test systems using system-connections
 # -------------------------------------
-test_glob_dirs ${SCRIPT_DIR}/networkmanager*-test.d;
+expected_to_pass_dirs ${SCRIPT_DIR}/networkmanager*-test.d;
 
 # Test systems using netplan YAML
 # -------------------------------
-test_glob_dirs ${SCRIPT_DIR}/netplan*-test.d;
+expected_to_pass_dirs ${SCRIPT_DIR}/netplan*-test.d;
