@@ -168,7 +168,7 @@ udev_from_nm() {
 # Create udev rules based on the macToIP mapping + output from parse_netplan_file
 udev_from_netplan() {
     # Check if netplan command exist
-    if ! command -v netplan >/dev/null 2>&1; then
+    if ! ${IN_TESTING:-false} && ! command -v netplan >/dev/null 2>&1; then
         log "Warning: netplan is not installed."
         return 0
     fi
