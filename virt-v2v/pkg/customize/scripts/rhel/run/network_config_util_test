@@ -83,4 +83,9 @@ expected_to_pass_dirs ${SCRIPT_DIR}/networkmanager*-test.d;
 # -------------------------------
 expected_to_fail_dirs ${SCRIPT_DIR}/netplan*-test.d;
 
-PASS "All tests passed."
+# Test systems using systemd
+# --------------------------
+expected_to_fail_dirs ${SCRIPT_DIR}/systemd*-test.d;
+
+
+PASS "All tests behaved as expected."
