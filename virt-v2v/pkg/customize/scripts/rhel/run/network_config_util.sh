@@ -4,6 +4,7 @@
 V2V_MAP_FILE="${V2V_MAP_FILE:-/tmp/macToIP}"
 NETWORK_SCRIPTS_DIR="${NETWORK_SCRIPTS_DIR:-/etc/sysconfig/network-scripts}"
 NETWORK_CONNECTIONS_DIR="${NETWORK_CONNECTIONS_DIR:-/etc/NetworkManager/system-connections}"
+SYSTEMD_NETWORK_DIR="${SYSTEMD_NETWORK_DIR:-/run/systemd/network}"
 UDEV_RULES_FILE="${UDEV_RULES_FILE:-/etc/udev/rules.d/70-persistent-net.rules}"
 NETPLAN_DIR="${NETPLAN_DIR:-/}"
 
@@ -31,7 +32,7 @@ fi
 # Helper functions
 # ----------------
 
-# Clean strigs in case they have quates
+# Clean strings in case they have quotes
 remove_quotes() {
     echo "$1" | tr -d '"' | tr -d "'" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
 }
@@ -44,46 +45,6 @@ extract_mac_ip() {
         S_HW=$(echo "$1" | sed -nE 's/^([0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}):ip:.*$/\1/p')
         S_IP=$(echo "$1" | sed -nE 's/^.*:ip:([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}).*$/\1/p')
     fi
-}
-
-# Get a netplan setting by specifying a nested key like "ethernets.eth0.addresses"
-# For example:
-#    netplan_get_py ethernets
-# Will return the yaml struct of all the thernet interfaces.
-netplan_get_py() {
-    python -c "
-import os
-import yaml
-import sys
-
-netplan_dir = os.getenv('NETPLAN_DIR', '') + '/etc/netplan'
-args = sys.argv[1].split('.')
-
-def find_yaml_files(directory):
-    yaml_files = []
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            if file.endswith(('.yaml', '.yml')):
-                yaml_files.append(os.path.join(root, file))
-
-    return yaml_files
-
-def get_yaml_path(yaml_data, keys):
-    for key in keys:
-        if yaml_data is None:
-            return None
-        yaml_data = yaml_data.get(key)
-    return yaml_data
-
-yaml_files = find_yaml_files(netplan_dir)
-
-for yaml_file in yaml_files:
-    with open(yaml_file, 'r') as file:
-        yaml_data = yaml.safe_load(file)        
-        result = get_yaml_path(yaml_data, ['network'] + args)
-        if result is not None:
-           print(yaml.dump(result, default_flow_style=False))
-" "$@"
 }
 
 # Network infrastructure reading functions
@@ -105,14 +66,14 @@ udev_from_ifcfg() {
 
         # If S_HW and S_IP were not extracted, skip the line
         if [ -z "$S_HW" ] || [ -z "$S_IP" ]; then
-            log "Warning: invalide mac to ip line: $line."
+            log "Warning: invalid mac to ip line: $line."
             continue
         fi
 
         # Find the matching network script file
         IFCFG=$(grep -l "IPADDR=.*$S_IP.*$" "$NETWORK_SCRIPTS_DIR"/*)
         if [ -z "$IFCFG" ]; then
-            log "Info: no ifcg config file name foud for $S_IP."
+            log "Info: no ifcg config file name found for $S_IP."
             continue
         fi
 
@@ -143,14 +104,14 @@ udev_from_nm() {
 
         # If S_HW and S_IP were not extracted, skip the line
         if [ -z "$S_HW" ] || [ -z "$S_IP" ]; then
-            log "Warning: invalide mac to ip line: $line."
+            log "Warning: invalid mac to ip line: $line."
             continue
         fi
 
         # Find the matching NetworkManager connection file
         NM_FILE=$(grep -El "address[0-9]*=.*$S_IP.*$" "$NETWORK_CONNECTIONS_DIR"/*)
         if [ -z "$NM_FILE" ]; then
-            log "Info: no nm config file name foud for $S_IP."
+            log "Info: no nm config file name found for $S_IP."
             continue
         fi
 
@@ -181,25 +142,34 @@ udev_from_netplan() {
 
     # netplan with root dir
     netplan_get() {
-        if netplan_supports_get; then
-            netplan get --root-dir "$NETPLAN_DIR" "$@" 2>&3 
-        else
-            log 'Info: netplan not supporting get subcomment, using python'
-            netplan_get_py "$@" 2>&3
-        fi
+        netplan get --root-dir "$NETPLAN_DIR" "$@" 2>&3
     }
 
     # Loop over all interface names and treturn the one with target_ip, or null
     find_interface_by_ip() {
         target_ip="$1"
-
-        # Loop through all interfaces and check for the given IP address
-        netplan_get ethernets | grep -Eo "^[^[:space:]]+[^:]" | while read IFNAME; do
-            if netplan_get ethernets."$IFNAME".addresses | grep -q "$target_ip"; then
-                echo "$IFNAME"
+        if netplan_supports_get; then
+          # Loop through all interfaces and check for the given IP address
+          netplan_get ethernets | grep -Eo "^[^[:space:]]+[^:]" | while read IFNAME; do
+              if netplan_get ethernets."$IFNAME".addresses | grep -q "$target_ip"; then
+                  echo "$IFNAME"
+                  return
+              fi
+          done
+        else
+            netplan generate --root-dir "$NETPLAN_DIR"
+            NM_FILE=$(grep -El "Address[0-9]*=.*$S_IP.*$" "$SYSTEMD_NETWORK_DIR"/*)
+            if [ -z "$NM_FILE" ]; then
+                log "Info: no systemd nm config file name found for $S_IP."
                 return
             fi
-        done
+            # Extract the interface name from the matching file
+            NAME=$(grep '^Name=' "$NM_FILE" | cut -d'=' -f2)
+            if [ -z "$NAME" ]; then
+                log "Info: no interface name found to $S_IP."
+            fi
+            echo "$NAME"
+        fi
     }
 
     # Read the mapping file line by line
@@ -210,7 +180,7 @@ udev_from_netplan() {
 
         # If S_HW and S_IP were not extracted, skip the line
         if [ -z "$S_HW" ] || [ -z "$S_IP" ]; then
-            log "Warning: invalide mac to ip line: $line."
+            log "Warning: invalid mac to ip line: $line."
             continue
         fi
 
