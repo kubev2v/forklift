@@ -9,7 +9,7 @@ go_library(
     ],
     importpath = "github.com/konveyor/forklift-controller/virt-v2v/pkg/utils",
     visibility = ["//visibility:public"],
-    deps = ["//virt-v2v/pkg/global"],
+    deps = ["//pkg/global"],
 )
 
 go_test(
