@@ -1,0 +1,6 @@
+[Match]
+Name=ens160
+
+[Network]
+Address=10.184.121.84/21
+Gateway=10.194.120.1
