@@ -39,15 +39,17 @@ test_dir() {
 
     # Test 1: Verify the udev rules file was created
     if [ ! -f "$UDEV_RULES_FILE" ]; then
-        show_file $TEST_DIR/main.log
-        FAIL "Test 1 Failed: UDEV_RULES_FILE not created."
+        [ "$FAIL_IS_FATAL" = "true" ] && show_file $TEST_DIR/main.log
+        FAIL "UDEV_RULES_FILE not created."
     fi
 
     if ! cmp -s $EXPECTED_UDEV_RULE_FILE $UDEV_RULES_FILE ; then
-        show_file $UDEV_RULES_FILE
-        diff -u $EXPECTED_UDEV_RULE_FILE $UDEV_RULES_FILE
-        show_file $TEST_DIR/main.log
-        FAIL "Test 2 Failed: The content of $UDEV_RULES_FILE does not match the expected rule."
+        [ "$FAIL_IS_FATAL" = "true" ] && {
+            show_file $UDEV_RULES_FILE
+            diff -u $EXPECTED_UDEV_RULE_FILE $UDEV_RULES_FILE
+            show_file $TEST_DIR/main.log
+        }
+        FAIL "The content of $UDEV_RULES_FILE does not match the expected rule."
     fi
 
     PASS_IS_FATAL=false PASS $(basename $TEST_SRC_DIR)
