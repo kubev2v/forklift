@@ -50,6 +50,29 @@ extract_mac_ip() {
 # Network infrastructure reading functions
 # ----------------------------------------
 
+get_device_from_ifcfg() {
+    local IFCFG="$1"
+    local S_HW="$2"
+
+    # Check for DEVICE in the config file
+    DEVICE=$(grep '^DEVICE=' "$IFCFG" | cut -d'=' -f2)
+    if [ -n "$DEVICE" ]; then
+        echo "$DEVICE"
+        return
+    fi
+
+    # If no DEVICE, check for HWADDR and ensure S_HW is part of HWADDR (case-insensitive)
+    HWADDR=$(grep '^HWADDR=' "$IFCFG" | cut -d'=' -f2)
+    if echo "$HWADDR" | grep -iq "$S_HW"; then
+        # Extract device name from the file name, using last part after splitting by "-"
+        echo "$(basename "$IFCFG" | awk -F'-' '{print $NF}')"
+        return
+    fi
+
+    # Return an empty string if no valid device is found
+    echo ""
+}
+
 # Create udev rules based on the macToip mapping + ifcfg network scripts
 udev_from_ifcfg() {
     # Check if the network scripts directory exists
@@ -78,9 +101,9 @@ udev_from_ifcfg() {
         fi
 
         # Source the matching file, if found
-        DEVICE=$(grep '^DEVICE=' "$IFCFG" | cut -d'=' -f2)
+        DEVICE=$(get_device_from_ifcfg "$IFCFG" "$S_HW")
         if [ -z "$DEVICE" ]; then
-            log "Info: no interface name found to $S_IP."
+            log "Info: no interface name found to $S_IP in $IFCFG."
             continue
         fi
 
