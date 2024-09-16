@@ -110,7 +110,7 @@ func getScripts(directory string) ([]string, error) {
 
 	var scripts []string
 	for _, file := range files {
-		if !file.IsDir() && strings.HasSuffix(file.Name(), ".sh") {
+		if !file.IsDir() && strings.HasSuffix(file.Name(), ".sh") && !strings.HasPrefix(file.Name(), "test-") {
 			scriptPath := filepath.Join(directory, file.Name())
 			scripts = append(scripts, scriptPath)
 		}
