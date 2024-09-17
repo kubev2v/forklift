@@ -19,8 +19,8 @@ spec:
   proxy:
     - alias: {{ inventory_service_name }}
       authorization: UserToken
-      type: Service
       endpoint:
+        type: Service
         service:
           name: {{ inventory_service_name }}
           namespace: {{ app_namespace }}
