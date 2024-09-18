@@ -934,7 +934,7 @@ func createVddkCheckJob(plan *api.Plan) *batchv1.Job {
 			Template: core.PodTemplateSpec{
 				Spec: core.PodSpec{
 					SecurityContext: psc,
-					RestartPolicy:   core.RestartPolicyOnFailure,
+					RestartPolicy:   core.RestartPolicyNever,
 					InitContainers:  initContainers,
 					Containers: []core.Container{
 						{
