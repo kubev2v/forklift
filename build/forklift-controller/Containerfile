@@ -7,8 +7,8 @@ RUN GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o manager
 
 FROM registry.access.redhat.com/ubi9-minimal:9.4-1227.1725849298
 # RUN microdnf -y update && microdnf -y clean all
-# # Required to be able to get files from within the pod
-# RUN microdnf -y install tar && microdnf clean all
+# Required to be able to get files from within the pod
+RUN microdnf -y install tar && microdnf clean all
 
 COPY --from=builder /app/manager /usr/local/bin/forklift-controller
 ENTRYPOINT ["/usr/local/bin/forklift-controller"]
@@ -21,5 +21,6 @@ LABEL \
         io.k8s.description="Forklift - Controller" \
         io.openshift.tags="migration,mtv,forklift" \
         summary="Forklift - Controller" \
-        description="Forklift - Controller" \
+        description="Forklift controller pod orchestrates migrations and \
+        maintains an up-to-date inventory of the source providers." \
         maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>"
