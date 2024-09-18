@@ -70,8 +70,8 @@ func (t *EmbedTool) writeFileFromFS(src, dst string) error {
 	return nil
 }
 
-// getAllFilenames gets all files located inside the embedded Filesystem.
-// Example of one path `scripts/windows/9999-restore_config_init.bat`.
+// getAllFilenames gets all files located inside the embedded filesystem.
+// Example of one path `scripts/windows/9999-run-mtv-ps-scripts.bat`.
 //
 // Returns:
 //   - []files: The file paths which are located inside the embedded Filesystem.

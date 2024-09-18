@@ -22,6 +22,7 @@ type DomainExecFunc func(args ...string) error
 
 func Run(disks []string, operatingSystem string) error {
 	var err error
+	fmt.Printf("Customizing disks '%s'\n", disks)
 	// Customization for vSphere source.
 	t := utils.EmbedTool{Filesystem: &scriptFS}
 	// windows

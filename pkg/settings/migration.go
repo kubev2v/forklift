@@ -26,6 +26,7 @@ const (
 	CleanupRetries            = "CLEANUP_RETRIES"
 	OvirtOsConfigMap          = "OVIRT_OS_MAP"
 	VsphereOsConfigMap        = "VSPHERE_OS_MAP"
+	VirtCustomizeConfigMap    = "VIRT_CUSTOMIZE_MAP"
 	VddkJobActiveDeadline     = "VDDK_JOB_ACTIVE_DEADLINE"
 	VirtV2vExtraArgs          = "VIRT_V2V_EXTRA_ARGS"
 	VirtV2vExtraConfConfigMap = "VIRT_V2V_EXTRA_CONF_CONFIG_MAP"
@@ -61,6 +62,8 @@ type Migration struct {
 	OvirtOsConfigMap string
 	// vSphere OS config map name
 	VsphereOsConfigMap string
+	// vSphere OS config map name
+	VirtCustomizeConfigMap string
 	// Active deadline for VDDK validation job
 	VddkJobActiveDeadline int
 	// Additional arguments for virt-v2v
@@ -88,6 +91,11 @@ func (r *Migration) Load() (err error) {
 	}
 	if r.SnapshotStatusCheckRate, err = getPositiveEnvLimit(SnapshotStatusCheckRate, 10); err != nil {
 		return liberr.Wrap(err)
+	}
+	if virtCustomizeConfigMap, ok := os.LookupEnv(VirtCustomizeConfigMap); ok {
+		r.VirtCustomizeConfigMap = virtCustomizeConfigMap
+	} else if Settings.Role.Has(MainRole) {
+		return liberr.Wrap(fmt.Errorf("failed to find environment variable %s", VirtCustomizeConfigMap))
 	}
 	if r.CleanupRetries, err = getPositiveEnvLimit(CleanupRetries, 10); err != nil {
 		return liberr.Wrap(err)
