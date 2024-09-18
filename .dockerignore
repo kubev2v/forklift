@@ -1,0 +1,18 @@
+# Ignore Git files
+.git
+.github/
+
+# Ignore all test-related files
+**/test
+**/*.md
+**/*.yaml
+
+# Ignore build artifacts
+**/bin
+**/dist
+**/node_modules
+WORKSPACE
+**/BUILD.bazel
+
+# Ignore docs
+docs/
