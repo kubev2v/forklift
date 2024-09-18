@@ -761,11 +761,11 @@ func (r *Reconciler) validateHooks(plan *api.Plan) (err error) {
 func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 	source := plan.Referenced.Provider.Source
 	if source == nil {
-		return
+		return liberr.New("source provider is not set")
 	}
 	destination := plan.Referenced.Provider.Destination
 	if destination == nil {
-		return
+		return liberr.New("destination provider is not set")
 	}
 
 	if source.Type() != api.VSphere {
