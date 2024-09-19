@@ -238,28 +238,6 @@ func (r *Reconciler) validateWarmMigration(plan *api.Plan) (err error) {
 			Message:  "Warm migration from the source provider is not supported.",
 		})
 	}
-
-	missingCbtForWarm := libcnd.Condition{
-		Type:     VMMissingChangedBlockTracking,
-		Status:   True,
-		Reason:   MissingChangedBlockTracking,
-		Category: Critical,
-		Message:  "Changed Block Tracking (CBT) has not been enabled on some VM. This feature is a prerequisite for VM warm migration.",
-		Items:    []string{},
-	}
-	for i := range plan.Spec.VMs {
-		ref := &plan.Spec.VMs[i].Ref
-		enabled, err := validator.ChangeTrackingEnabled(*ref)
-		if err != nil {
-			return err
-		}
-		if !enabled {
-			missingCbtForWarm.Items = append(missingCbtForWarm.Items, ref.String())
-		}
-	}
-	if len(missingCbtForWarm.Items) > 0 {
-		plan.Status.SetCondition(missingCbtForWarm)
-	}
 	return
 }
 
@@ -464,6 +442,14 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "Guest information on vNICs is missing, cannot preserve static IPs. Make sure VMware tools are installed and the VM is running.",
 		Items:    []string{},
 	}
+	missingCbtForWarm := libcnd.Condition{
+		Type:     VMMissingChangedBlockTracking,
+		Status:   True,
+		Reason:   MissingChangedBlockTracking,
+		Category: Critical,
+		Message:  "Changed Block Tracking (CBT) has not been enabled on some VM. This feature is a prerequisite for VM warm migration.",
+		Items:    []string{},
+	}
 
 	setOf := map[string]bool{}
 	//
@@ -589,6 +575,16 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 				return liberr.Wrap(pErr)
 			}
 		}
+		// Warm migration.
+		if plan.Spec.Warm {
+			enabled, err := validator.ChangeTrackingEnabled(*ref)
+			if err != nil {
+				return err
+			}
+			if !enabled {
+				missingCbtForWarm.Items = append(missingCbtForWarm.Items, ref.String())
+			}
+		}
 	}
 	if len(notFound.Items) > 0 {
 		plan.Status.SetCondition(notFound)
@@ -622,6 +618,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(missingStaticIPs.Items) > 0 {
 		plan.Status.SetCondition(missingStaticIPs)
+	}
+	if len(missingCbtForWarm.Items) > 0 {
+		plan.Status.SetCondition(missingCbtForWarm)
 	}
 
 	return nil
