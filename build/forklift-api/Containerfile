@@ -19,4 +19,4 @@ LABEL \
         io.openshift.tags="migration,forklift,mtv" \
         summary="Forklift- API" \
         description="Forklift - API" \
-        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>"
+        maintainer="Forklift by Konveyor Community <forklift-dev@googlegroups.com>"
