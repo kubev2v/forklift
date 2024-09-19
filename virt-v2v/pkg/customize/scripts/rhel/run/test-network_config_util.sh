@@ -24,6 +24,8 @@ test_dir() {
     export EXPECTED_UDEV_RULE_FILE="$TEST_SRC_DIR/expected-udev.rule"
 
     export IN_TESTING=true
+    export PATH=$PATH:"$TEST_DIR/bin"
+
     header "Testing: $(basename $TEST_SRC_DIR)"
 
     cp -a $TEST_SRC_DIR/root/* $TEST_DIR
@@ -84,7 +86,7 @@ expected_to_pass_dirs ${SCRIPT_DIR}/networkmanager*-test.d;
 
 # Test systems using netplan YAML
 # -------------------------------
-expected_to_fail_dirs ${SCRIPT_DIR}/netplan*-test.d;
+expected_to_pass_dirs ${SCRIPT_DIR}/netplan*-test.d;
 
 # Test systems using systemd
 # --------------------------
