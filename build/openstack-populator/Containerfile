@@ -19,4 +19,4 @@ LABEL \
         io.openshift.tags="migration,forklift,mtv" \
         summary="Forklift - openstack-populator" \
         description="Forklift - openstack-populator" \
-        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>"
+        maintainer="Forklift by Konveyor Community <forklift-dev@googlegroups.com>"
