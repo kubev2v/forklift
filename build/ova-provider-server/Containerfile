@@ -22,4 +22,5 @@ LABEL \
         io.openshift.tags="migration,mtv,forklift" \
         summary="Forklift - OVA Provider Server" \
         description="Forklift - OVA Provider Server" \
+        vendor="Red Hat, Inc." \
         maintainer="Forklift by Konveyor Community <forklift-dev@googlegroups.com>"
