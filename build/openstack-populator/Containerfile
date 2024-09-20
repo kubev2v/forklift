@@ -3,7 +3,7 @@ WORKDIR /app
 COPY --chown=1001:0 ./ ./
 ENV GOFLAGS "-mod=vendor -tags=strictfipsruntime"
 ENV GOEXPERIMENT strictfipsruntime
-RUN GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o openstack-populator github.com/konveyor/forklift-controller/cmd/openstack-populator
+RUN GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o openstack-populator ./cmd/openstack-populator/openstack-populator.go
 
 FROM registry.access.redhat.com/ubi9-minimal:9.4-1227.1725849298
 # Required to be able to get files from within the pod
