@@ -19,4 +19,5 @@ LABEL \
         io.openshift.tags="migration,mtv,forklift" \
         summary="Forklift - Operator" \
         description="Forklift - Operator" \
+        vendor="Red Hat, Inc." \
         maintainer="Forklift by Konveyor Community <forklift-dev@googlegroups.com>"

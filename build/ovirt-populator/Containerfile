@@ -24,4 +24,5 @@ LABEL \
         io.openshift.tags="migration,mtv,forklift" \
         summary="Forklift - oVirt Populator" \
         description="Forklift - oVirt Populator" \
+        vendor="Red Hat, Inc." \
         maintainer="Forklift by Konveyor Community <forklift-dev@googlegroups.com>"
