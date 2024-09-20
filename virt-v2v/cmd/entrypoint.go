@@ -81,6 +81,11 @@ func runVirtV2vInPlace() error {
 	} else {
 		args = append(args, "first")
 	}
+	if envStaticIPs := os.Getenv("V2V_staticIPs"); envStaticIPs != "" {
+		for _, macToIp := range strings.Split(envStaticIPs, "_") {
+			args = append(args, "--mac", macToIp)
+		}
+	}
 	args = append(args, "/mnt/v2v/input.xml")
 	v2vCmd := exec.Command("/usr/libexec/virt-v2v-in-place", args...)
 	v2vCmd.Stdout = os.Stdout
