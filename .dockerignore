@@ -5,7 +5,6 @@
 # Ignore all test-related files
 **/test
 **/*.md
-**/*.yaml
 
 # Ignore build artifacts
 **/bin
