@@ -53,4 +53,5 @@ LABEL \
         io.openshift.tags="migration,mtv,forklift" \
         summary="Forklift - Virt-V2V" \
         io.k8s.description="Forklift - Virt-V2V" \
+        vendor="Red Hat, Inc." \
         maintainer="Forklift by Konveyor Community <forklift-dev@googlegroups.com>"

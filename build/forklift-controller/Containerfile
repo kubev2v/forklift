@@ -23,4 +23,5 @@ LABEL \
         summary="Forklift - Controller" \
         description="Forklift controller pod orchestrates migrations and \
         maintains an up-to-date inventory of the source providers." \
+        vendor="Red Hat, Inc." \
         maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>"
