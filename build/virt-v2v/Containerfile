@@ -1,0 +1,56 @@
+# Build virt-v2v binary
+FROM registry.access.redhat.com/ubi9/go-toolset:1.21.11-9.1726696856 AS builder
+WORKDIR /app
+COPY --chown=1001:0 ./ ./
+ENV GOFLAGS "-mod=vendor -tags=strictfipsruntime"
+ENV GOEXPERIMENT strictfipsruntime
+
+RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-monitor ./cmd/virt-v2v-monitor/virt-v2v-monitor.go
+RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o image-converter ./cmd/image-converter/image-converter.go
+RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-wrapper ./virt-v2v/cmd/entrypoint.go
+
+# Main container
+FROM quay.io/centos/centos:stream9-minimal
+RUN rm /etc/pki/tls/fips_local.cnf && \
+    echo -e '[fips_sect]\ntls1-prf-ems-check = 0\nactivate = 1' > /etc/pki/tls/fips_local.cnf && \
+    sed -i '/^\\[ crypto_policy \\]/a Options=RHNoEnforceEMSinFIPS' /etc/pki/tls/openssl.cnf
+
+ENV LIBGUESTFS_BACKEND=direct LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1
+
+RUN mkdir /disks && \
+    source /etc/os-release && \
+    microdnf install -y \
+        virt-v2v \
+        virtio-win && \
+    microdnf clean all
+
+RUN ( [ "$(rpm -q glibc)" == "glibc-2.34-66.el9.x86_64" ] && microdnf -y downgrade glibc-2.34-65.el9.x86_64 || true ) && \
+microdnf -y install libguestfs libguestfs-appliance libguestfs-xfs libguestfs-winsupport qemu-img supermin && \
+        depmod $(ls /lib/modules/ |tail -n1)
+
+# Create tarball for the appliance.
+RUN mkdir -p /usr/lib64/guestfs/appliance && \
+        cd /usr/lib64/guestfs/appliance && \
+        libguestfs-make-fixed-appliance . && \
+        qemu-img convert -c -O qcow2 root root.qcow2 && \
+        mv -vf root.qcow2 root && \
+        tar -cvf /libguestfs-appliance.tar /usr/lib64/guestfs/appliance
+
+COPY --from=builder /app/virt-v2v-monitor /usr/local/bin/virt-v2v-monitor
+
+COPY --from=builder /app/image-converter /usr/local/bin/image-converter
+
+COPY --from=builder /app/virt-v2v-wrapper /usr/bin/virt-v2v-wrapper
+
+ENTRYPOINT ["/usr/bin/virt-v2v-wrapper"]
+
+LABEL \
+        com.redhat.component="forklift-virt-v2v-container" \
+        name="forklift/forklift-virt-v2v-rhel9" \
+        license="Apache License 2.0" \
+        io.k8s.display-name="Forklift" \
+        io.k8s.description="Forklift - Virt-V2V" \
+        io.openshift.tags="migration,mtv,forklift" \
+        summary="Forklift - Virt-V2V" \
+        io.k8s.description="Forklift - Virt-V2V" \
+        maintainer="Forklift by Konveyor Community <forklift-dev@googlegroups.com>"
