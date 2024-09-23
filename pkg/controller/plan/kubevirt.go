@@ -1748,7 +1748,12 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 				Value: vm.NewName,
 			})
 	}
-
+	environment = append(environment,
+		core.EnvVar{
+			Name:  "LOCAL_MIGRATION",
+			Value: strconv.FormatBool(r.Destination.Provider.IsHost()),
+		},
+	)
 	// pod annotations
 	annotations := map[string]string{}
 	if r.Plan.Spec.TransferNetwork != nil {
