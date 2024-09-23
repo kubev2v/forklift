@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	"github.com/konveyor/forklift-controller/virt-v2v/pkg/customize"
@@ -18,7 +19,8 @@ import (
 func main() {
 	var err error
 	if err = virtV2VPrepEnvironment(); err != nil {
-		return
+		fmt.Println("Failed to prepare the environment", err)
+		os.Exit(1)
 	}
 
 	// virt-v2v or virt-v2v-in-place
@@ -39,7 +41,6 @@ func main() {
 		fmt.Println("Failed to get linked disk", err)
 		os.Exit(1)
 	}
-
 	err = runVirtV2VInspection(disks)
 	if err != nil {
 		fmt.Println("Failed to inspect the disk", err)
@@ -47,19 +48,32 @@ func main() {
 	}
 	inspection, err := utils.GetInspectionV2vFromFile(global.INSPECTION)
 	if err != nil {
-		return
+		fmt.Println("Failed to get inspection file", err)
+		os.Exit(1)
 	}
+
 	// virt-customize
 	err = customize.Run(disks, inspection.OS.Osinfo)
 	if err != nil {
 		fmt.Println("Error to customize the VM:", err)
-		os.Exit(1)
 	}
-
-	err = server.Start()
-	if err != nil {
-		fmt.Println("Failed to run the server", err)
-		os.Exit(1)
+	// In the remote migrations we can not connect to the conversion pod from the controller.
+	// This connection is needed for to get the additional configuration which is gathered either form virt-v2v or
+	// virt-v2v-inspector. We expose those parameters via server in this pod and once the controller gets the config
+	// the controller sends the request to terminate the pod.
+	if val, found := os.LookupEnv("LOCAL_MIGRATION"); found {
+		isLocalMigration, err := strconv.ParseBool(val)
+		if err != nil {
+			fmt.Println("Failed to parse the 'LOCAL_MIGRATION' environment variable.", err)
+			os.Exit(1)
+		}
+		if isLocalMigration {
+			err = server.Start()
+			if err != nil {
+				fmt.Println("Failed to run the server", err)
+				os.Exit(1)
+			}
+		}
 	}
 }
 
