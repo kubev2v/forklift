@@ -88,17 +88,11 @@ func runVirtV2VInspection(disks []string) error {
 }
 
 func runVirtV2vInPlace() error {
+	var err error
 	args := []string{"-v", "-x", "-i", "libvirtxml"}
-	args = append(args, "--root")
-	if val, found := os.LookupEnv("V2V_RootDisk"); found {
-		args = append(args, val)
-	} else {
-		args = append(args, "first")
-	}
-	if envStaticIPs := os.Getenv("V2V_staticIPs"); envStaticIPs != "" {
-		for _, macToIp := range strings.Split(envStaticIPs, "_") {
-			args = append(args, "--mac", macToIp)
-		}
+	args, err = addCommonArgs(args)
+	if err != nil {
+		return err
 	}
 	args = append(args, "/mnt/v2v/input.xml")
 	v2vCmd := exec.Command("/usr/libexec/virt-v2v-in-place", args...)
@@ -150,15 +144,35 @@ func virtV2vBuildCommand() (args []string, err error) {
 }
 
 func virtV2vVsphereArgs() (args []string, err error) {
+	args = append(args, "-i", "libvirt", "-ic", os.Getenv("V2V_libvirtURL"))
+	args = append(args, "-ip", "/etc/secret/secretKey")
+	args, err = addCommonArgs(args)
+	if err != nil {
+		return nil, err
+	}
+	if info, err := os.Stat(global.VDDK); err == nil && info.IsDir() {
+		args = append(args,
+			"-it", "vddk",
+			"-io", fmt.Sprintf("vddk-libdir=%s", global.VDDK),
+			"-io", fmt.Sprintf("vddk-thumbprint=%s", os.Getenv("V2V_fingerprint")),
+		)
+	}
+
+	args = append(args, "--", os.Getenv("V2V_vmName"))
+	return args, nil
+}
+
+// addCommonArgs adds a v2v arguments which is used for both virt-v2v and virt-v2v-in-place
+func addCommonArgs(args []string) ([]string, error) {
+	// Allow specifying which disk should be the bootable disk
 	args = append(args, "--root")
 	if utils.CheckEnvVariablesSet("V2V_RootDisk") {
 		args = append(args, os.Getenv("V2V_RootDisk"))
 	} else {
 		args = append(args, "first")
 	}
-	args = append(args, "-i", "libvirt", "-ic", os.Getenv("V2V_libvirtURL"))
-	args = append(args, "-ip", "/etc/secret/secretKey")
 
+	// Add the mapping to the virt-v2v, used mainly in the windows when migrating VMs with static IP
 	if envStaticIPs := os.Getenv("V2V_staticIPs"); envStaticIPs != "" {
 		for _, macToIp := range strings.Split(envStaticIPs, "_") {
 			args = append(args, "--mac", macToIp)
@@ -172,13 +186,6 @@ func virtV2vVsphereArgs() (args []string, err error) {
 	}
 	args = append(args, luksArgs...)
 
-	if info, err := os.Stat(global.VDDK); err == nil && info.IsDir() {
-		args = append(args,
-			"-it", "vddk",
-			"-io", fmt.Sprintf("vddk-libdir=%s", global.VDDK),
-			"-io", fmt.Sprintf("vddk-thumbprint=%s", os.Getenv("V2V_fingerprint")),
-		)
-	}
 	var extraArgs []string
 	if envExtraArgs := os.Getenv("V2V_extra_args"); envExtraArgs != "" {
 		if err := json.Unmarshal([]byte(envExtraArgs), &extraArgs); err != nil {
@@ -186,8 +193,6 @@ func virtV2vVsphereArgs() (args []string, err error) {
 		}
 	}
 	args = append(args, extraArgs...)
-
-	args = append(args, "--", os.Getenv("V2V_vmName"))
 	return args, nil
 }
 
