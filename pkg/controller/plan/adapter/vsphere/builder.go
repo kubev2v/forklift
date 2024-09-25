@@ -251,32 +251,28 @@ func (r *Builder) mapMacStaticIps(vm *model.VM) (ipMap string, err error) {
 	// on linux we collect all networks.
 	isWindowsFlag := isWindows(vm)
 
-	configurations := []string{}
-	gatewaySet := false
+	var configurations []string
 	for _, guestNetwork := range vm.GuestNetworks {
 		if !isWindowsFlag || guestNetwork.Origin == string(types.NetIpConfigInfoIpAddressOriginManual) {
 			gateway := ""
-			if !gatewaySet {
-				isIpv4 := net.IP.To4(net.ParseIP(guestNetwork.IP)) != nil
-				for _, ipStack := range vm.GuestIpStacks {
-					gwIpv4 := net.IP.To4(net.ParseIP(ipStack.Gateway)) != nil
-					if gwIpv4 && !isIpv4 || !gwIpv4 && isIpv4 {
-						// not the right IPv4 / IPv6 correlation
-						continue
-					}
-					network, err := netip.ParsePrefix(fmt.Sprintf("%s/%d", guestNetwork.IP, guestNetwork.PrefixLength))
-					if err != nil {
-						return "", err
-					}
-					gw, err := netip.ParseAddr(ipStack.Gateway)
-					if err != nil {
-						return "", err
-					}
-					if network.Contains(gw) {
-						// checks if the gateway in the right network subnet. we set gateway only once as it is suppose to be system wide.
-						gateway = ipStack.Gateway
-						gatewaySet = true
-					}
+			isIpv4 := net.IP.To4(net.ParseIP(guestNetwork.IP)) != nil
+			for _, ipStack := range vm.GuestIpStacks {
+				gwIpv4 := net.IP.To4(net.ParseIP(ipStack.Gateway)) != nil
+				if gwIpv4 && !isIpv4 || !gwIpv4 && isIpv4 {
+					// not the right IPv4 / IPv6 correlation
+					continue
+				}
+				network, err := netip.ParsePrefix(fmt.Sprintf("%s/%d", guestNetwork.IP, guestNetwork.PrefixLength))
+				if err != nil {
+					return "", err
+				}
+				gw, err := netip.ParseAddr(ipStack.Gateway)
+				if err != nil {
+					return "", err
+				}
+				if network.Contains(gw) {
+					// checks if the gateway in the right network subnet. we set gateway only once as it is suppose to be system wide.
+					gateway = ipStack.Gateway
 				}
 			}
 			dnsString := strings.Join(guestNetwork.DNS, ",")
