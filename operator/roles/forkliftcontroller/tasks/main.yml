@@ -142,46 +142,10 @@
       state: present
       definition: "{{ lookup('template', 'api/deployment-forklift-api.yml.j2') }}"
 
-  - name: "Delete aggregated validation webhook configurations"
-    k8s:
-      state: absent
-      definition: "{{ lookup('template', 'api/validatingwebhookconfiguration-forklift-api.yml.j2') }}"
-
-  - name: "Setup secrets validating webhook configuration"
-    k8s:
-      state: present
-      definition: "{{ lookup('template', 'api/validatingwebhookconfiguration-secrets.yml.j2') }}"
-
-  - name: "Setup plans validating webhook configuration"
-    k8s:
-      state: present
-      definition: "{{ lookup('template', 'api/validatingwebhookconfiguration-plans.yml.j2') }}"
-
-  - name: "Setup providers validating webhook configuration"
-    k8s:
-      state: present
-      definition: "{{ lookup('template', 'api/validatingwebhookconfiguration-providers.yml.j2') }}"
-
-  - name: "Delete aggregated mutating webhook configurations"
-    k8s:
-      state: absent
-      definition: "{{ lookup('template', 'api/mutatingwebhookconfiguration-forklift-api.yml.j2') }}"
-
-  - name: "Setup secrets mutating webhook configuration"
-    k8s:
-      state: present
-      definition: "{{ lookup('template', 'api/mutatingwebhookconfiguration-secrets.yml.j2') }}"
-
-  - name: "Setup plans mutating webhook configuration"
-    k8s:
-      state: present
-      definition: "{{ lookup('template', 'api/mutatingwebhookconfiguration-plans.yml.j2') }}"
-
-
-  - name: "Setup providers mutating webhook configuration"
-    k8s:
-      state: present
-      definition: "{{ lookup('template', 'api/mutatingwebhookconfiguration-providers.yml.j2') }}"
+  - name: "Setup webhook configuration"
+    include_tasks: webhooks.yml
+    vars:
+      webhook_state: "present"
 
   - name: "Setup default provider"
     k8s:
@@ -276,3 +240,17 @@
       namespace: "{{ app_namespace }}"
       name: forklift-must-gather-api
       state: absent
+  when: finalize is not defined
+
+- block:
+  - name: "Remove webhook configuration"
+    include_tasks: webhooks.yml
+    vars:
+      webhook_state: "absent"
+
+  - name: "Remove console plugin"
+    k8s:
+      state: absent
+      definition: "{{ lookup('template', 'ui-plugin/console-plugin.yml.j2') }}"
+
+  when: finalize is defined
