@@ -134,12 +134,6 @@ func virtV2vBuildCommand() (args []string, err error) {
 		args = append(args, "-i", "ova", os.Getenv("V2V_diskPath"))
 	}
 
-	// When converting VM with name that do not meet DNS1123 RFC requirements,
-	// it should be changed to supported one to ensure the conversion does not fail.
-	if utils.CheckEnvVariablesSet("V2V_NewName") {
-		args = append(args, "-on", os.Getenv("V2V_NewName"))
-	}
-
 	return args, nil
 }
 
@@ -156,6 +150,12 @@ func virtV2vVsphereArgs() (args []string, err error) {
 			"-io", fmt.Sprintf("vddk-libdir=%s", global.VDDK),
 			"-io", fmt.Sprintf("vddk-thumbprint=%s", os.Getenv("V2V_fingerprint")),
 		)
+	}
+
+	// When converting VM with name that do not meet DNS1123 RFC requirements,
+	// it should be changed to supported one to ensure the conversion does not fail.
+	if utils.CheckEnvVariablesSet("V2V_NewName") {
+		args = append(args, "-on", os.Getenv("V2V_NewName"))
 	}
 
 	args = append(args, "--", os.Getenv("V2V_vmName"))
