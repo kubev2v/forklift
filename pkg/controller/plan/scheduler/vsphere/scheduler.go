@@ -14,6 +14,21 @@ import (
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 )
 
+// Phases.
+const (
+	CopyingPaused            = "CopyingPaused"
+	CreateGuestConversionPod = "CreateGuestConversionPod"
+	ConvertGuest             = "ConvertGuest"
+	CreateVM                 = "CreateVM"
+	PostHook                 = "PostHook"
+	Completed                = "Completed"
+)
+
+// Steps.
+const (
+	DiskTransfer = "DiskTransfer"
+)
+
 // Package level mutex to ensure that
 // multiple concurrent reconciles don't
 // attempt to schedule VMs into the same
@@ -107,7 +122,7 @@ func (r *Scheduler) buildInFlight() (err error) {
 			return
 		}
 		if vmStatus.Running() {
-			r.inFlight[vm.Host] += r.cost(vm)
+			r.inFlight[vm.Host] += r.cost(vm, vmStatus)
 		}
 	}
 
@@ -153,7 +168,7 @@ func (r *Scheduler) buildInFlight() (err error) {
 				}
 				return err
 			}
-			r.inFlight[vm.Host] += r.cost(vm)
+			r.inFlight[vm.Host] += r.cost(vm, vmStatus)
 		}
 	}
 
@@ -170,11 +185,10 @@ func (r *Scheduler) buildPending() (err error) {
 		if err != nil {
 			return
 		}
-
 		if !vmStatus.MarkedStarted() && !vmStatus.MarkedCompleted() {
 			pending := &pendingVM{
 				status: vmStatus,
-				cost:   r.cost(vm),
+				cost:   r.cost(vm, vmStatus),
 			}
 			r.pending[vm.Host] = append(r.pending[vm.Host], pending)
 		}
@@ -182,13 +196,28 @@ func (r *Scheduler) buildPending() (err error) {
 	return
 }
 
-func (r *Scheduler) cost(vm *model.VM) int {
-	if coldLocal, _ := r.Plan.VSphereColdLocal(); coldLocal {
-		/// virt-v2v transfers one disk at a time
-		return 1
+func (r *Scheduler) cost(vm *model.VM, vmStatus *plan.VMStatus) int {
+	coldLocal, _ := r.Plan.VSphereColdLocal()
+	if coldLocal {
+		switch vmStatus.Phase {
+		case CreateVM, PostHook, Completed:
+			// In these phases we already have the disk transferred and are left only to create the VM
+			// By setting the cost to 0 other VMs can start migrating
+			return 0
+		default:
+			return 1
+		}
 	} else {
-		// CDI transfers the disks in parallel by different pods
-		return len(vm.Disks)
+		switch vmStatus.Phase {
+		case CreateVM, PostHook, Completed, CopyingPaused, ConvertGuest, CreateGuestConversionPod:
+			// The warm/remote migrations this is done on already transferred disks,
+			// and we can start other VM migrations at these point.
+			// By setting the cost to 0 other VMs can start migrating
+			return 0
+		default:
+			// CDI transfers the disks in parallel by different pods
+			return len(vm.Disks)
+		}
 	}
 }
 
