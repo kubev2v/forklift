@@ -204,6 +204,11 @@ func (r *Scheduler) schedulable() (schedulable map[string][]*pendingVM) {
 			if vms[i].cost+r.inFlight[host] <= r.MaxInFlight {
 				schedulable[host] = append(schedulable[host], vms[i])
 			}
+			// In case there is VM with more disks than the MaxInFlight MTV will migrate it, if there are no other VMs
+			// being migrated at that time.
+			if vms[i].cost > r.MaxInFlight && r.inFlight[host] == 0 {
+				schedulable[host] = append(schedulable[host], vms[i])
+			}
 		}
 	}
 
