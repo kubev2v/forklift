@@ -661,7 +661,7 @@ func (r *KubeVirt) getDVs(vm *plan.VMStatus) (edvs []ExtendedDataVolume, err err
 		context.TODO(),
 		dvsList,
 		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(r.vmLabels(vm.Ref)),
+			LabelSelector: k8slabels.SelectorFromSet(r.vmAllButMigrationLabels(vm.Ref)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		})
 
