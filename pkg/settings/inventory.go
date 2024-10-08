@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"errors"
 	"os"
 	"strconv"
 	"strings"
@@ -96,7 +97,9 @@ func (r *Inventory) Load() error {
 	if s, found := os.LookupEnv(TLSCa); found {
 		r.TLS.CA = s
 	} else {
-		r.TLS.CA = ServiceCAFile
+		if _, err := os.Stat(ServiceCAFile); !errors.Is(err, os.ErrNotExist) {
+			r.TLS.CA = ServiceCAFile
+		}
 	}
 
 	return nil
