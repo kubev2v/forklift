@@ -35,6 +35,8 @@ const (
 	ValidatingVDDK = "ValidatingVDDK"
 	// Missing IPs on vm pending condition
 	VMMissingGuestIPs = "VMMissingGuestIPs"
+	// Missing Changed Block
+	VMMissingChangedBlockTracking = "VMMissingChangedBlockTracking"
 )
 
 // Condition
@@ -319,7 +321,7 @@ func (r *Conditions) HasBlockerCondition() bool {
 
 // The collection contains blocker conditions that keep the plan reconciling.
 func (r *Conditions) HasReQCondition() bool {
-	return r.HasCondition(ValidatingVDDK) || r.HasCondition(VMMissingGuestIPs)
+	return r.HasCondition(ValidatingVDDK) || r.HasCondition(VMMissingGuestIPs) || r.HasCondition(VMMissingChangedBlockTracking)
 }
 
 // The collection contains the `Ready` condition.
