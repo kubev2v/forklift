@@ -1,4 +1,4 @@
-FROM quay.io/konflux-ci/operator-sdk-builder@sha256:08f084228288d6314573d7742671fc7ddf84c19e4cf8eeb7623f261a514d0e4e as builder
+FROM quay.io/konflux-ci/operator-sdk-builder@sha256:3ce32ca2187745b8700c9dba35e44f0743924eec872ccc40bf23b06d0fc0c918 as builder
 
 COPY ./. /repo
 WORKDIR /repo/operator
