@@ -221,6 +221,8 @@ spec:
         value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
       - name: CACHI2_ARTIFACT
         value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
+      - name: ACTIVATION_KEY
+        value: activation-key-rhel8
       runAfter:
       - prefetch-dependencies
       taskRef:

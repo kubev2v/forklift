@@ -12,12 +12,13 @@ RUN microdnf -y install tar && microdnf clean all
 COPY --from=builder /app/forklift-api /usr/local/bin/forklift-api
 ENTRYPOINT ["/usr/local/bin/forklift-api"]
 LABEL \
-        com.redhat.component="forklift-api-container" \
-        name="forklift/forklift-api-rhel9" \
-        io.k8s.display-name="Forklift" \
-        io.k8s.description="Forklift API server is running Kubernetes validation and mutation webhooks for Forklift resources." \
-        io.openshift.tags="migration,forklift,mtv" \
-        summary="Forklift- API" \
-        description="Forklift - API" \
+        com.redhat.component="mtv-api-container" \
+        name="migration-toolkit-virtualization/mtv-api-rhel9" \
+        license="Apache License 2.0" \
+        io.k8s.display-name="Migration Toolkit for Virtualization" \
+        io.k8s.description="Migration Toolkit for Virtualization - API" \
+        io.openshift.tags="migration,mtv,forklift" \
+        description="Migration Toolkit for Virtualization - API" \
+        summary="Migration Toolkit for Virtualization - API" \
         vendor="Red Hat, Inc." \
-        maintainer="Forklift by Konveyor Community <forklift-dev@googlegroups.com>"
+        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>"
