@@ -226,9 +226,9 @@ func (r *Scheduler) cost(vm *model.VM, vmStatus *plan.VMStatus) int {
 func (r *Scheduler) finishedDisks(vmStatus *plan.VMStatus) int {
 	var resp = 0
 	for _, step := range vmStatus.Pipeline {
-		if step.Name == "DiskTransfer" {
+		if step.Name == DiskTransfer {
 			for _, task := range step.Tasks {
-				if task.Phase == "Completed" {
+				if task.Phase == Completed {
 					resp += 1
 				}
 			}
