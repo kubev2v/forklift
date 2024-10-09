@@ -6,13 +6,14 @@ COPY validation/entrypoint.sh /usr/bin/
 ENTRYPOINT ["/usr/bin/entrypoint.sh"]
 
 LABEL \
-        com.redhat.component="forklift-validation-container" \
-        name="forklift/forklift-validation-rhel9" \
+        com.redhat.component="mtv-validation-container" \
+        version="$CI_VERSION" \
+        name="migration-toolkit-virtualization/mtv-validation-rhel9" \
         license="Apache License 2.0" \
-        io.k8s.display-name="Forklift" \
-        io.k8s.description="Forklift - Validation Service" \
+        io.k8s.display-name="Migration Toolkit for Virtualization" \
+        io.k8s.description="Migration Toolkit for Virtualization - Validation Service" \
         io.openshift.tags="migration,mtv,forklift" \
-        summary="Forklift - Validation Service" \
-        description="Forklift - Validation Service" \
+        summary="Migration Toolkit for Virtualization - Validation Service" \
+        description="Migration Toolkit for Virtualization - Validation Service" \
         vendor="Red Hat, Inc." \
-        maintainer="Forklift by Konveyor Community <forklift-dev@googlegroups.com>"
+        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>"
