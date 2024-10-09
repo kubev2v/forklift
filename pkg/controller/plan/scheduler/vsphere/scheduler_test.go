@@ -84,6 +84,9 @@ func TestScheduler(t *testing.T) {
 		},
 		hostC: {
 			{
+				cost: 11,
+			},
+			{
 				cost: 1,
 			},
 			{
