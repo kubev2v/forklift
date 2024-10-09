@@ -60,7 +60,7 @@ LABEL \
         io.openshift.tags="migration" \
         io.k8s.description="Migration Toolkit for Virtualization - Operator Bundle" \
         summary="Migration Toolkit for Virtualization - Operator Bundle" \
-        maintainer="Forklift by Konveyor Community <forklift-dev@googlegroups.com>" \
+        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
         description="Migration Toolkit for Virtualization - Operator Bundle" \
         vendor="Red Hat, Inc." \
         distribution-scope="public" \
