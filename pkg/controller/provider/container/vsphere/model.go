@@ -3,6 +3,7 @@ package vsphere
 import (
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
@@ -609,6 +610,14 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 						case "numa.nodeAffinity":
 							if s, cast := opt.Value.(string); cast {
 								v.model.NumaNodeAffinity = strings.Split(s, ",")
+							}
+						case "ctkEnabled":
+							if s, cast := opt.Value.(string); cast {
+								boolVal, err := strconv.ParseBool(s)
+								if err != nil {
+									return
+								}
+								v.model.ChangeTrackingEnabled = boolVal
 							}
 						}
 					}
