@@ -27,6 +27,8 @@ spec:
     value: build/virt-v2v/Containerfile
   - name: path-context
     value: .
+  - name: ACTIVATION_KEY
+    value: "activation-key-rhel9"
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
