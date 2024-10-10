@@ -102,7 +102,7 @@ func getDiskNumber(kind global.MountPath, disk string) (int, error) {
 }
 
 func GetDiskName() string {
-	if name := os.Getenv("V2V_newName"); name != "" {
+	if name := os.Getenv("V2V_NewName"); name != "" {
 		return name
 	}
 	return os.Getenv("V2V_vmName")
