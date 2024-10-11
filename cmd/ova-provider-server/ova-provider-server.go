@@ -466,9 +466,11 @@ func convertToVmStruct(envelope []Envelope, ovaPath []string) ([]VM, error) {
 					newVM.MemoryUnits = item.AllocationUnits
 
 				} else {
-					newVM.Devices = append(newVM.Devices, Device{
-						Kind: item.ElementName[:len(item.ElementName)-2],
-					})
+					if len(item.ElementName) > 2 {
+						newVM.Devices = append(newVM.Devices, Device{
+							Kind: item.ElementName[:len(item.ElementName)-2],
+						})
+					}
 				}
 
 			}
