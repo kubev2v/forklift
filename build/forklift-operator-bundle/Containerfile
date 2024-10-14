@@ -50,6 +50,8 @@ LABEL operators.operatorframework.io.metrics.project_layout=ansible.sdk.operator
 LABEL operators.operatorframework.io.test.config.v1=tests/scorecard/
 LABEL operators.operatorframework.io.test.mediatype.v1=scorecard+v1
 
+LABEL operators.openshift.io/valid-subscription: '["OpenShift Kubernetes Engine", "OpenShift Container Platform", "OpenShift Platform Plus"]'
+
 # Main labels
 LABEL \
         com.redhat.component="mtv-operator-bundle-container" \
