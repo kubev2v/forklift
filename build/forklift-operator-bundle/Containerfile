@@ -43,6 +43,18 @@ LABEL operators.operatorframework.io.bundle.package.v1=mtv-operator
 LABEL operators.operatorframework.io.bundle.channels.v1=release-v2.7
 LABEL operators.operatorframework.io.bundle.channel.default.v1=release-v2.7
 
+LABEL features.operators.openshift.io/disconnected: "false"
+LABEL features.operators.openshift.io/fips-compliant: "true"
+LABEL features.operators.openshift.io/fipsmode: "true"
+LABEL features.operators.openshift.io/proxy-aware: "false"
+LABEL features.operators.openshift.io/tls-profiles: "false"
+LABEL features.operators.openshift.io/token-auth-aws: "false"
+LABEL features.operators.openshift.io/token-auth-azure: "false"
+LABEL features.operators.openshift.io/token-auth-gcp: "false"
+LABEL features.operators.openshift.io/cnf: "false"
+LABEL features.operators.openshift.io/cni: "false"
+LABEL features.operators.openshift.io/csi: "false"
+
 # Not sure whate these label expand to
 LABEL operators.operatorframework.io.metrics.builder=operator-sdk-v1.22.0+git
 LABEL operators.operatorframework.io.metrics.mediatype.v1=metrics+v1
