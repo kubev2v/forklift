@@ -55,5 +55,8 @@ LABEL \
         description="Forklift - Virt-V2V" \
         io.k8s.description="Forklift - Virt-V2V" \
         vendor="Red Hat, Inc." \
-        maintainer="Forklift by Konveyor Community <forklift-dev@googlegroups.com>"
-
+        maintainer="Forklift by Konveyor Community <forklift-dev@googlegroups.com>" \
+        distribution-scope="public" \
+        release="v2.7" \
+        url="https://github.com/kubev2v/forklift" \
+        version="v2.7.1"
