@@ -66,11 +66,17 @@ func GetFirmwareFromYaml(yamlData []byte) (string, error) {
 	if err := yaml.Unmarshal(yamlData, &cnvVm); err != nil {
 		return "", err
 	}
-	if cnvVm.Spec.Template.Spec.Domain.Firmware.Bootloader.BIOS != nil {
-		return "bios", nil
-	}
-	if cnvVm.Spec.Template.Spec.Domain.Firmware.Bootloader.EFI != nil {
-		return "uefi", nil
+
+	if cnvVm.Spec.Template != nil &&
+		cnvVm.Spec.Template.Spec.Domain.Firmware != nil &&
+		cnvVm.Spec.Template.Spec.Domain.Firmware.Bootloader != nil {
+
+		if cnvVm.Spec.Template.Spec.Domain.Firmware.Bootloader.BIOS != nil {
+			return "bios", nil
+		}
+		if cnvVm.Spec.Template.Spec.Domain.Firmware.Bootloader.EFI != nil {
+			return "uefi", nil
+		}
 	}
 
 	log.Info("Firmware type was not detected")
