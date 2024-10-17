@@ -118,3 +118,12 @@ func (r *Plan) IsSourceProviderOCP() bool {
 func (r *Plan) IsSourceProviderOVA() bool {
 	return r.Provider.Source.Type() == Ova
 }
+
+func (r *Plan) HasOffloadPlugin() bool {
+	for _, storageMap := range r.Map.Storage.Spec.Map {
+		if storageMap.Destination.OffloadPlugin != nil {
+			return true
+		}
+	}
+	return false
+}
