@@ -1,0 +1,42 @@
+---
+- block:
+  - name: "Delete aggregated validation webhook configurations"
+    k8s:
+      state: absent
+      definition: "{{ lookup('template', 'api/validatingwebhookconfiguration-forklift-api.yml.j2') }}"
+
+  - name: "Setup secrets validating webhook configuration"
+    k8s:
+      state: "{{ webhook_state }}"
+      definition: "{{ lookup('template', 'api/validatingwebhookconfiguration-secrets.yml.j2') }}"
+
+  - name: "Setup plans validating webhook configuration"
+    k8s:
+      state: "{{ webhook_state }}"
+      definition: "{{ lookup('template', 'api/validatingwebhookconfiguration-plans.yml.j2') }}"
+
+  - name: "Setup providers validating webhook configuration"
+    k8s:
+      state: "{{ webhook_state }}"
+      definition: "{{ lookup('template', 'api/validatingwebhookconfiguration-providers.yml.j2') }}"
+
+  - name: "Delete aggregated mutating webhook configurations"
+    k8s:
+      state: absent
+      definition: "{{ lookup('template', 'api/mutatingwebhookconfiguration-forklift-api.yml.j2') }}"
+
+  - name: "Setup secrets mutating webhook configuration"
+    k8s:
+      state: "{{ webhook_state }}"
+      definition: "{{ lookup('template', 'api/mutatingwebhookconfiguration-secrets.yml.j2') }}"
+
+  - name: "Setup plans mutating webhook configuration"
+    k8s:
+      state: "{{ webhook_state }}"
+      definition: "{{ lookup('template', 'api/mutatingwebhookconfiguration-plans.yml.j2') }}"
+
+  - name: "Setup providers mutating webhook configuration"
+    k8s:
+      state: "{{ webhook_state }}"
+      definition: "{{ lookup('template', 'api/mutatingwebhookconfiguration-providers.yml.j2') }}"
+
