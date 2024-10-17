@@ -4,6 +4,8 @@ ENV LIBGUESTFS_BACKEND direct
 
 RUN subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey")
 
+RUN subscription-manager repos --enable=codeready-builder-for-rhel-9-x86_64-rhui-rpms
+
 RUN dnf update -y && \
     dnf install -y --setopt=install_weak_deps=False \
         qemu-img \
