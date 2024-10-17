@@ -37,6 +37,9 @@ RUN rm /etc/pki/tls/fips_local.cnf && \
     sed -i '/^\\[ crypto_policy \\]/a Options=RHNoEnforceEMSinFIPS' /etc/pki/tls/openssl.cnf
 RUN mv /etc/pki/tls/certs/ca-bundle.crt /etc/pki/tls/certs/ca-bundle.crt.bak && \
     ln -sf /opt/ca-bundle.crt /etc/pki/tls/certs/ca-bundle.crt
+
+RUN microdnf install -y subscription-manager
+RUN subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey")
 RUN mkdir /disks && \
     source /etc/os-release && \
     microdnf install -y \
