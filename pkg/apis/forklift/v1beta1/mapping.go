@@ -57,6 +57,8 @@ type StoragePair struct {
 type DestinationStorage struct {
 	// A storage class.
 	StorageClass string `json:"storageClass"`
+	// Offload plugin.
+	OffloadPlugin string `json:"offloadPlugin,omitempty"`
 	// Volume mode.
 	// +kubebuilder:validation:Enum=Filesystem;Block
 	VolumeMode core.PersistentVolumeMode `json:"volumeMode,omitempty"`

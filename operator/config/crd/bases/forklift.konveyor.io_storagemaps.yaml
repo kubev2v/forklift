@@ -60,6 +60,9 @@ spec:
                           - ReadWriteMany
                           - ReadOnlyMany
                           type: string
+                        offloadPlugin:
+                          description: Offload plugin.
+                          type: string
                         storageClass:
                           description: A storage class.
                           type: string

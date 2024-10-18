@@ -47,8 +47,9 @@ var (
 	HasPostHook             libitr.Flag = 0x02
 	RequiresConversion      libitr.Flag = 0x04
 	CDIDiskCopy             libitr.Flag = 0x08
-	VirtV2vDiskCopy         libitr.Flag = 0x10
+	OvaImageMigration       libitr.Flag = 0x10
 	OpenstackImageMigration libitr.Flag = 0x20
+	HasOffloadPlugin        libitr.Flag = 0x40
 )
 
 // Phases.
@@ -59,9 +60,9 @@ const (
 	PowerOffSource           = "PowerOffSource"
 	WaitForPowerOff          = "WaitForPowerOff"
 	CreateDataVolumes        = "CreateDataVolumes"
+	OffloadPlugin            = "OffloadPlugin"
 	CreateVM                 = "CreateVM"
 	CopyDisks                = "CopyDisks"
-	AllocateDisks            = "AllocateDisks"
 	CopyingPaused            = "CopyingPaused"
 	AddCheckpoint            = "AddCheckpoint"
 	AddFinalCheckpoint       = "AddFinalCheckpoint"
@@ -84,7 +85,6 @@ const (
 const (
 	Initialize      = "Initialize"
 	Cutover         = "Cutover"
-	DiskAllocation  = "DiskAllocation"
 	DiskTransfer    = "DiskTransfer"
 	ImageConversion = "ImageConversion"
 	DiskTransferV2v = "DiskTransferV2v"
@@ -107,11 +107,11 @@ var (
 			{Name: PowerOffSource},
 			{Name: WaitForPowerOff},
 			{Name: CreateDataVolumes},
+			{Name: OffloadPlugin, All: HasOffloadPlugin},
 			{Name: CopyDisks, All: CDIDiskCopy},
-			{Name: AllocateDisks, All: VirtV2vDiskCopy},
 			{Name: CreateGuestConversionPod, All: RequiresConversion},
 			{Name: ConvertGuest, All: RequiresConversion},
-			{Name: CopyDisksVirtV2V, All: RequiresConversion},
+			{Name: CopyDisksVirtV2V, All: OvaImageMigration},
 			{Name: ConvertOpenstackSnapshot, All: OpenstackImageMigration},
 			{Name: CreateVM},
 			{Name: PostHook, All: HasPostHook},
@@ -643,9 +643,7 @@ func (r *Migration) step(vm *plan.VMStatus) (step string) {
 	switch vm.Phase {
 	case Started, CreateInitialSnapshot, WaitForInitialSnapshot, CreateDataVolumes:
 		step = Initialize
-	case AllocateDisks:
-		step = DiskAllocation
-	case CopyDisks, CopyingPaused, CreateSnapshot, WaitForSnapshot, AddCheckpoint, ConvertOpenstackSnapshot:
+	case CopyDisks, CopyingPaused, CreateSnapshot, WaitForSnapshot, AddCheckpoint, ConvertOpenstackSnapshot, OffloadPlugin:
 		step = DiskTransfer
 	case CreateFinalSnapshot, WaitForFinalSnapshot, AddFinalCheckpoint, Finalize:
 		step = Cutover
@@ -744,6 +742,44 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 		} else {
 			vm.Phase = Completed
+		}
+	case OffloadPlugin:
+		step, found := vm.FindStep(r.step(vm))
+		if !found {
+			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
+			break
+		}
+		step.MarkStarted()
+		step.Phase = Running
+		runner := OffloadPluginRunner{
+			Context:  r.Context,
+			kubevirt: r.kubevirt,
+		}
+		var job *batchv1.Job
+		job, err = runner.Run(vm)
+		if err != nil {
+			r.Log.Error(err, "Starting the offload plugin", "vm", vm.Name)
+			step.AddError(err.Error())
+			err = nil
+			return
+		}
+		conditions := libcnd.Conditions{}
+		for _, cnd := range job.Status.Conditions {
+			conditions.SetCondition(libcnd.Condition{
+				Type:    string(cnd.Type),
+				Status:  string(cnd.Status),
+				Reason:  cnd.Reason,
+				Message: cnd.Message,
+			})
+		}
+		if conditions.HasCondition("Failed") {
+			step.AddError(conditions.FindCondition("Failed").Message)
+			step.MarkCompleted()
+		} else if int(job.Status.Failed) > retry {
+			step.AddError("Retry limit exceeded.")
+			step.MarkCompleted()
+		} else if job.Status.Succeeded > 0 {
+			vm.Phase = r.next(vm.Phase)
 		}
 	case CreateDataVolumes:
 		step, found := vm.FindStep(r.step(vm))
@@ -882,7 +918,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		step.MarkCompleted()
 		step.Phase = Completed
 		vm.Phase = r.next(vm.Phase)
-	case AllocateDisks, CopyDisks:
+	case CopyDisks:
 		step, found := vm.FindStep(r.step(vm))
 		if !found {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
@@ -890,7 +926,9 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		}
 		step.MarkStarted()
 		step.Phase = Running
-
+		if r.builder.SupportsOffloadPlugin() {
+			// TODO: Add progress of the offload plugin transfer
+		}
 		if r.builder.SupportsVolumePopulators() {
 			err = r.updatePopulatorCopyProgress(vm, step)
 		} else {
@@ -1255,7 +1293,7 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 						Phase:       Pending,
 					},
 				})
-		case AllocateDisks, CopyDisks, CopyDisksVirtV2V, ConvertOpenstackSnapshot:
+		case CopyDisks, CopyDisksVirtV2V, ConvertOpenstackSnapshot:
 			tasks, pErr := r.builder.Tasks(vm.Ref)
 			if pErr != nil {
 				err = liberr.Wrap(pErr)
@@ -1270,9 +1308,6 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 			case CopyDisks:
 				task_name = DiskTransfer
 				task_description = "Transfer disks."
-			case AllocateDisks:
-				task_name = DiskAllocation
-				task_description = "Allocate disks."
 			case CopyDisksVirtV2V:
 				task_name = DiskTransferV2v
 				task_description = "Copy disks."
@@ -1658,11 +1693,7 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 			break
 		}
 
-		coldLocal, err := r.Context.Plan.VSphereColdLocal()
-		switch {
-		case err != nil:
-			return liberr.Wrap(err)
-		case coldLocal:
+		if r.Context.Plan.IsSourceProviderOVA() {
 			if err := r.updateConversionProgressV2vMonitor(pod, step); err != nil {
 				// Just log it. Missing progress is not fatal.
 				log.Error(err, "Failed to update conversion progress")
@@ -1853,12 +1884,6 @@ type Predicate struct {
 
 // Evaluate predicate flags.
 func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
-	coldLocal, vErr := r.context.Plan.VSphereColdLocal()
-	if vErr != nil {
-		err = vErr
-		return
-	}
-
 	switch flag {
 	case HasPreHook:
 		_, allowed = r.vm.FindHook(PreHook)
@@ -1867,11 +1892,13 @@ func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 	case RequiresConversion:
 		allowed = r.context.Source.Provider.RequiresConversion()
 	case CDIDiskCopy:
-		allowed = !coldLocal
-	case VirtV2vDiskCopy:
-		allowed = coldLocal
+		allowed = !r.context.Plan.IsSourceProviderOVA()
+	case OvaImageMigration:
+		allowed = r.context.Plan.IsSourceProviderOVA()
 	case OpenstackImageMigration:
 		allowed = r.context.Plan.IsSourceProviderOpenstack()
+	case HasOffloadPlugin:
+		allowed = r.context.Plan.HasOffloadPlugin()
 	}
 
 	return

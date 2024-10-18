@@ -433,19 +433,14 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 		for _, disk := range vm.Disks {
 			if disk.Datastore.ID == ds.ID {
 				storageClass := mapped.Destination.StorageClass
+				offloadPlugin := mapped.Destination.OffloadPlugin
 				var dvSource cdi.DataVolumeSource
-				coldLocal, vErr := r.Context.Plan.VSphereColdLocal()
-				if vErr != nil {
-					err = vErr
-					return
-				}
-				if coldLocal {
-					// Let virt-v2v do the copying
+				// Let CDI do the copying
+				if offloadPlugin != "" {
 					dvSource = cdi.DataVolumeSource{
 						Blank: &cdi.DataVolumeBlankImage{},
 					}
 				} else {
-					// Let CDI do the copying
 					dvSource = cdi.DataVolumeSource{
 						VDDK: &cdi.DataVolumeSourceVDDK{
 							BackingFile:  r.baseVolume(disk.File),
@@ -759,6 +754,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
+	// TODO: Filter offload plugin by the Datastore?
 	for _, disk := range vm.Disks {
 		mB := disk.Capacity / 0x100000
 		list = append(
@@ -964,6 +960,10 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 
 func (r *Builder) SupportsVolumePopulators() bool {
 	return false
+}
+
+func (r *Builder) SupportsOffloadPlugin() bool {
+	return true
 }
 
 func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) (pvcs []*core.PersistentVolumeClaim, err error) {
