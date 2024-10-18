@@ -434,28 +434,16 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 			if disk.Datastore.ID == ds.ID {
 				storageClass := mapped.Destination.StorageClass
 				var dvSource cdi.DataVolumeSource
-				coldLocal, vErr := r.Context.Plan.VSphereColdLocal()
-				if vErr != nil {
-					err = vErr
-					return
-				}
-				if coldLocal {
-					// Let virt-v2v do the copying
-					dvSource = cdi.DataVolumeSource{
-						Blank: &cdi.DataVolumeBlankImage{},
-					}
-				} else {
-					// Let CDI do the copying
-					dvSource = cdi.DataVolumeSource{
-						VDDK: &cdi.DataVolumeSourceVDDK{
-							BackingFile:  r.baseVolume(disk.File),
-							UUID:         vm.UUID,
-							URL:          url,
-							SecretRef:    secret.Name,
-							Thumbprint:   thumbprint,
-							InitImageURL: r.Source.Provider.Spec.Settings[api.VDDK],
-						},
-					}
+				// Let CDI do the copying
+				dvSource = cdi.DataVolumeSource{
+					VDDK: &cdi.DataVolumeSourceVDDK{
+						BackingFile:  r.baseVolume(disk.File),
+						UUID:         vm.UUID,
+						URL:          url,
+						SecretRef:    secret.Name,
+						Thumbprint:   thumbprint,
+						InitImageURL: r.Source.Provider.Spec.Settings[api.VDDK],
+					},
 				}
 				dvSpec := cdi.DataVolumeSpec{
 					Source: &dvSource,
