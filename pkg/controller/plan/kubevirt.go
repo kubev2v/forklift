@@ -1805,8 +1805,9 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 			InitContainers: initContainers,
 			Containers: []core.Container{
 				{
-					Name: "virt-v2v",
-					Env:  environment,
+					Name:            "virt-v2v",
+					Env:             environment,
+					ImagePullPolicy: core.PullAlways,
 					EnvFrom: []core.EnvFromSource{
 						{
 							Prefix: "V2V_",
