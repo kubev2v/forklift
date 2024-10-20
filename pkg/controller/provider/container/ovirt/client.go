@@ -10,10 +10,11 @@ import (
 	"strings"
 	"time"
 
+	core "k8s.io/api/core/v1"
+
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	core "k8s.io/api/core/v1"
 )
 
 // Not found error.

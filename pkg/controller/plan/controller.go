@@ -22,6 +22,17 @@ import (
 	"sort"
 	"time"
 
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apiserver/pkg/storage/names"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
+
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/controller/base"
@@ -32,15 +43,6 @@ import (
 	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 	metrics "github.com/konveyor/forklift-controller/pkg/monitoring/metrics/forklift-controller"
 	"github.com/konveyor/forklift-controller/pkg/settings"
-	k8serr "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apiserver/pkg/storage/names"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 const (

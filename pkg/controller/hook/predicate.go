@@ -1,10 +1,11 @@
 package hook
 
 import (
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 )
 
 type HookPredicate struct {

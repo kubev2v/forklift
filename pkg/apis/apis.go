@@ -21,8 +21,9 @@ limitations under the License.
 package apis
 
 import (
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 )
 
 // May be used to add all resources defined in the project to a Scheme.

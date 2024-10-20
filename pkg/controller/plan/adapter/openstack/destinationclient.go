@@ -4,15 +4,17 @@ import (
 	"context"
 	"path"
 
+	core "k8s.io/api/core/v1"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	k8sutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	core "k8s.io/api/core/v1"
-	k8serr "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	k8sutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 type DestinationClient struct {

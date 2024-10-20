@@ -4,14 +4,16 @@ import (
 	"path"
 	"strings"
 
+	"golang.org/x/net/context"
+
+	"sigs.k8s.io/controller-runtime/pkg/event"
+
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ova"
 	"github.com/konveyor/forklift-controller/pkg/controller/watch/handler"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	"golang.org/x/net/context"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
 // Package logger.

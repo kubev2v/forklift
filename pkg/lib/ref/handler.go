@@ -5,11 +5,13 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	"k8s.io/apimachinery/pkg/types"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 )
 
 // Build an event handler.

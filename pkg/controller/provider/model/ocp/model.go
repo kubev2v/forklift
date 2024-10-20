@@ -4,16 +4,18 @@ import (
 	"path"
 	"strconv"
 
-	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/base"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
+	cnv "kubevirt.io/api/core/v1"
+	instancetype "kubevirt.io/api/instancetype/v1beta1"
+
 	core "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	cnv "kubevirt.io/api/core/v1"
-	instancetype "kubevirt.io/api/instancetype/v1beta1"
+
+	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/base"
+	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 )
 
 // Errors

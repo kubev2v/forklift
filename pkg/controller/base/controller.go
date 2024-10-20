@@ -4,14 +4,16 @@ import (
 	"errors"
 	"time"
 
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
-	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
+	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 )
 
 const (

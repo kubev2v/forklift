@@ -9,9 +9,10 @@ import (
 	liburl "net/url"
 	"strconv"
 
+	core "k8s.io/api/core/v1"
+
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	core "k8s.io/api/core/v1"
 )
 
 func GetTlsCertificate(url *liburl.URL, secret *core.Secret) (crt *x509.Certificate, err error) {

@@ -3,9 +3,10 @@ package webhooks
 import (
 	"net/http"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	mutating_webhooks "github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/mutating-webhook"
 	"github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/mutating-webhook/mutators"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func ServeSecretMutator(resp http.ResponseWriter, req *http.Request, client client.Client) {

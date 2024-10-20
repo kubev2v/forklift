@@ -6,14 +6,16 @@ import (
 	"os"
 	"strings"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	appsv1 "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 )
 
 const (

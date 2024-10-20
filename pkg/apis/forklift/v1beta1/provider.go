@@ -17,9 +17,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 )
 
 type ProviderType string

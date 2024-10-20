@@ -4,8 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/onsi/gomega"
 )
 
 func TestCondition_Equal(t *testing.T) {

@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"time"
 
+	core "k8s.io/api/core/v1"
+
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions"
@@ -33,7 +35,6 @@ import (
 	"github.com/gophercloud/utils/openstack/clientconfig"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	core "k8s.io/api/core/v1"
 )
 
 const (

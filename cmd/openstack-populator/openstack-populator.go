@@ -7,11 +7,12 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/klog/v2"
+
 	libclient "github.com/konveyor/forklift-controller/pkg/lib/client/openstack"
 	"github.com/konveyor/forklift-controller/pkg/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
-	"k8s.io/klog/v2"
 )
 
 type AppConfig struct {

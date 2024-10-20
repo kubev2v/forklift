@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/host/handler/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/host/handler/openstack"
@@ -9,8 +12,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/host/handler/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/watch/handler"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
 type WatchManager = handler.WatchManager

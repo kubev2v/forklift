@@ -7,10 +7,13 @@ import (
 	"strings"
 	"time"
 
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	"k8s.io/apimachinery/pkg/fields"
 	cnv "kubevirt.io/api/core/v1"
+
+	"k8s.io/apimachinery/pkg/fields"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 )
 
 func (r *KubeVirt) changeVmNameDNS1123(vmName string, vmNamespace string) (generatedName string, err error) {

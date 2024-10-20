@@ -75,6 +75,13 @@ BAZEL_OPTS +=	--sandbox_writable_path=$${XDG_RUNTIME_DIR}
 $(shell [ -d $(XDG_RUNTIME_DIR) ] || mkdir -p $(XDG_RUNTIME_DIR))
 endif
 
+MKFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
+PROJECT_PATH := $(patsubst %/,%,$(dir $(MKFILE_PATH)))
+LOCAL_BIN_PATH := $(PROJECT_PATH)/bin
+GOLANGCI_LINT ?= $(LOCAL_BIN_PATH)/golangci-lint
+GOLANGCI_LINT_VERSION ?= v1.54.1
+GOLANGCI_LINT_VERSIONED_BIN = $(LOCAL_BIN_PATH)/golangci-lint-$(GOLANGCI_LINT_VERSION)
+
 ci: all tidy vendor bazel-generate generate-verify
 
 all: test forklift-controller
@@ -130,10 +137,6 @@ install: manifests kubectl
 manifests: controller-gen
 	$(CONTROLLER_GEN) crd rbac:roleName=manager-role webhook paths="./pkg/apis/..." output:dir=operator/config/crd/bases
 
-# Run go fmt against code
-fmt:
-	go fmt ./pkg/... ./cmd/...
-
 # Run go vet against code
 vet:
 	go vet ./pkg/... ./cmd/...
@@ -152,6 +155,36 @@ generate: controller-gen
 
 generate-verify: generate
 	./hack/verify-generate.sh
+
+# Note: As documented in https://golangci-lint.run/usage/install/#local-installation
+# the recommended installation method is through the golangci-lint install
+# script and not through the go install command.
+golangci-lint-install:
+	@if [ ! -f "$(GOLANGCI_LINT_VERSIONED_BIN)" ]; then \
+		echo "Downloading golangci-lint $(GOLANGCI_LINT_VERSION) ..." ; \
+		mkdir -p $(LOCAL_BIN_PATH)/tmp ;\
+		wget -O- -nv https://raw.githubusercontent.com/golangci/golangci-lint/$(GOLANGCI_LINT_VERSION)/install.sh | sh -s -- -b $(LOCAL_BIN_PATH)/tmp $(GOLANGCI_LINT_VERSION) ;\
+		mv $(LOCAL_BIN_PATH)/tmp/golangci-lint $(GOLANGCI_LINT_VERSIONED_BIN) ;\
+		rmdir $(LOCAL_BIN_PATH)/tmp ;\
+		chmod u+x $(GOLANGCI_LINT_VERSIONED_BIN) ;\
+	fi
+	@( cd bin; ln -f -s golangci-lint-$(GOLANGCI_LINT_VERSION) golangci-lint ) ;\
+
+GCI := $(LOCAL_BIN_PATH)/gci
+gci-install:
+	@GOBIN=$(LOCAL_BIN_PATH) go install github.com/daixiang0/gci@v0.13.4 ;\
+
+.PHONY: lint
+lint: golangci-lint-install
+	GOLANGCI_LINT_CACHE=$(LOCAL_BIN_PATH)/.golangci-lint-cache $(GOLANGCI_LINT) run --allow-parallel-runners -v
+
+.PHONY: fmt
+fmt: fmt-imports
+	gofmt -s -l -w ./pkg/ ./cmd/
+
+.PHONY: fmt-imports
+fmt-imports: gci-install
+	$(GCI) write -s standard -s default -s "prefix(k8s)" -s "prefix(sigs.k8s)" -s "prefix(github.com)" -s "prefix(gitlab)" --custom-order --skip-generated ./pkg/ ./cmd/
 
 build-controller-image: check_container_runtime
 	export CONTAINER_CMD=$(CONTAINER_CMD); \

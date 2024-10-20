@@ -26,9 +26,10 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/types"
+
 	cmg "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 const (

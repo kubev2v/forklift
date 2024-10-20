@@ -3,11 +3,13 @@ package plan
 import (
 	"context"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 )
 
 // Ensure the namespace exists on the destination.

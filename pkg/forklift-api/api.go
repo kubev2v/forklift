@@ -20,10 +20,11 @@ import (
 	"net/http"
 	"os"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/konveyor/forklift-controller/pkg/forklift-api/services"
 	webhooks "github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (

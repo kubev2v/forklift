@@ -4,19 +4,22 @@ import (
 	"context"
 	"time"
 
+	cnv "kubevirt.io/api/core/v1"
+	export "kubevirt.io/api/export/v1alpha1"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+
+	core "k8s.io/api/core/v1"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/util"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"github.com/konveyor/forklift-controller/pkg/settings"
-	core "k8s.io/api/core/v1"
-	k8serr "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	cnv "kubevirt.io/api/core/v1"
-	export "kubevirt.io/api/export/v1alpha1"
-	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
-	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type Client struct {

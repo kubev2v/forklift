@@ -3,9 +3,10 @@ package webhooks
 import (
 	"net/http"
 
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 )
 
 var log = logging.WithName("webhooks")

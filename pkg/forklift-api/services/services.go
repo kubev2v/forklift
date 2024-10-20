@@ -3,9 +3,9 @@ package services
 import (
 	"net/http"
 
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 )
 
 const TLS_CERTIFICATE_PATH = "/tls-certificate"

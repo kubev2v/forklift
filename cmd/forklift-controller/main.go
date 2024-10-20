@@ -22,6 +22,19 @@ import (
 	"os"
 	"time"
 
+	cnv "kubevirt.io/api/core/v1"
+	export "kubevirt.io/api/export/v1alpha1"
+	instancetype "kubevirt.io/api/instancetype/v1beta1"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+
+	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+
 	"github.com/go-logr/logr"
 	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	"github.com/konveyor/forklift-controller/pkg/apis"
@@ -32,16 +45,6 @@ import (
 	template "github.com/openshift/api/template/v1"
 	"github.com/pkg/profile"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-	cnv "kubevirt.io/api/core/v1"
-	export "kubevirt.io/api/export/v1alpha1"
-	instancetype "kubevirt.io/api/instancetype/v1beta1"
-	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
-	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
 // Application settings.

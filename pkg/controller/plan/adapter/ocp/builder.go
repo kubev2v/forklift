@@ -8,16 +8,10 @@ import (
 	"io"
 	"net/http"
 
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
+	cnv "kubevirt.io/api/core/v1"
 	export "kubevirt.io/api/export/v1alpha1"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
-	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
-	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	ocpclient "github.com/konveyor/forklift-controller/pkg/lib/client/openshift"
 	core "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -26,9 +20,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes/scheme"
-	cnv "kubevirt.io/api/core/v1"
-	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
+	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
+	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	ocpclient "github.com/konveyor/forklift-controller/pkg/lib/client/openshift"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
 )
 
 // Network types

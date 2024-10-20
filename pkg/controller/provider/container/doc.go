@@ -1,6 +1,8 @@
 package container
 
 import (
+	core "k8s.io/api/core/v1"
+
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/openstack"
@@ -9,7 +11,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/vsphere"
 	libcontainer "github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
-	core "k8s.io/api/core/v1"
 )
 
 // Build

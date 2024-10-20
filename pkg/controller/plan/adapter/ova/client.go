@@ -5,14 +5,16 @@ import (
 	"net/http"
 	"time"
 
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+
+	core "k8s.io/api/core/v1"
+
 	"github.com/go-logr/logr"
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/util"
 	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
-	core "k8s.io/api/core/v1"
-	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
 
 // OVA VM Client

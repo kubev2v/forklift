@@ -11,12 +11,13 @@ import (
 	"reflect"
 	"time"
 
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
+
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
 	"github.com/konveyor/forklift-controller/pkg/settings"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 // Application settings.

@@ -1,13 +1,14 @@
 package storage
 
 import (
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/map/storage/handler"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 type MapPredicate struct {

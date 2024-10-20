@@ -6,13 +6,14 @@ import (
 	"strings"
 	"time"
 
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+
 	"github.com/gin-gonic/gin"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/base"
 	libcontainer "github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
 	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 // Root - all routes.

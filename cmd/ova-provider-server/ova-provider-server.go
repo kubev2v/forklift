@@ -16,9 +16,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/konveyor/forklift-controller/pkg/lib/gob"
-
 	"github.com/google/uuid"
+	"github.com/konveyor/forklift-controller/pkg/lib/gob"
 )
 
 const (

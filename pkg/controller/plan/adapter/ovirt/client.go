@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
@@ -18,7 +20,6 @@ import (
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	ovirtsdk "github.com/ovirt/go-ovirt"
-	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
 
 const (

@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"time"
 
+	core "k8s.io/api/core/v1"
+
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"github.com/vmware/govmomi"
@@ -13,7 +15,6 @@ import (
 	"github.com/vmware/govmomi/session"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/soap"
-	core "k8s.io/api/core/v1"
 )
 
 // ESX Host.

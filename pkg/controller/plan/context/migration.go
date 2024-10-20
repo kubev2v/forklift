@@ -4,13 +4,15 @@ import (
 	"context"
 	"path"
 
+	core "k8s.io/api/core/v1"
+
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	ocp "github.com/konveyor/forklift-controller/pkg/lib/client/openshift"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	core "k8s.io/api/core/v1"
-	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Not enough data to build the context.

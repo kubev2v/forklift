@@ -1,9 +1,10 @@
 package plan
 
 import (
+	"k8s.io/apimachinery/pkg/types"
+
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 // Error.

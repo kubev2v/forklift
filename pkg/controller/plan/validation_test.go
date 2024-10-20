@@ -3,14 +3,6 @@ package plan
 import (
 	"strconv"
 
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/provider"
-	"github.com/konveyor/forklift-controller/pkg/controller/base"
-	"github.com/konveyor/forklift-controller/pkg/lib/condition"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	ginkgo "github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 	core "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,7 +11,17 @@ import (
 	discovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/utils/ptr"
+
 	fakeClient "sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/provider"
+	"github.com/konveyor/forklift-controller/pkg/controller/base"
+	"github.com/konveyor/forklift-controller/pkg/lib/condition"
+	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	ginkgo "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 var (

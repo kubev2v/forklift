@@ -1,9 +1,8 @@
 package ova
 
 import (
-	"strings"
-
 	pathlib "path"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ova"

@@ -10,13 +10,14 @@ import (
 	"strconv"
 	"time"
 
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/gin-gonic/gin"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
 	"github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	"github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var log = logging.WithName("TESTER")

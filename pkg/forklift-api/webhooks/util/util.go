@@ -6,9 +6,10 @@ import (
 	"io"
 	"net/http"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	admissionv1 "k8s.io/api/admission/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 )
 
 type PatchOperation struct {

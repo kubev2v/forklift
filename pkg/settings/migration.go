@@ -6,8 +6,9 @@ import (
 	"os"
 	"strings"
 
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"k8s.io/apimachinery/pkg/api/resource"
+
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 )
 
 // Environment variables.

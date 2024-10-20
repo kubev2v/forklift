@@ -4,12 +4,13 @@ import (
 	"errors"
 	"net/http"
 
+	cnv "kubevirt.io/api/core/v1"
+
 	"github.com/gin-gonic/gin"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
-	cnv "kubevirt.io/api/core/v1"
 )
 
 // Routes.

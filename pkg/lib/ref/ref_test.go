@@ -3,12 +3,14 @@ package ref
 import (
 	"testing"
 
-	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	"sigs.k8s.io/controller-runtime/pkg/event"
+
+	"github.com/onsi/gomega"
 )
 
 type _ThingSpec struct {

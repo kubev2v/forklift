@@ -6,9 +6,11 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/konveyor/forklift-controller/pkg/lib/util"
 	core "k8s.io/api/core/v1"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/konveyor/forklift-controller/pkg/lib/util"
 )
 
 func serveTlsCertificate(resp http.ResponseWriter, req *http.Request, client client.Client) {

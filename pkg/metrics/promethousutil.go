@@ -5,9 +5,10 @@ import (
 	"os"
 	"path"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/klog/v2"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func StartPrometheusEndpoint(certsDirectory string) {

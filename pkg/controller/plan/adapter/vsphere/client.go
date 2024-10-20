@@ -6,6 +6,13 @@ import (
 	liburl "net/url"
 	"strconv"
 
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+
+	core "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
+
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
@@ -21,10 +28,6 @@ import (
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
-	core "k8s.io/api/core/v1"
-	"k8s.io/utils/ptr"
-	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
-	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (

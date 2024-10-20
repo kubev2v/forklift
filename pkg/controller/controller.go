@@ -17,6 +17,8 @@ limitations under the License.
 package controller
 
 import (
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+
 	"github.com/konveyor/forklift-controller/pkg/controller/hook"
 	"github.com/konveyor/forklift-controller/pkg/controller/host"
 	"github.com/konveyor/forklift-controller/pkg/controller/map/network"
@@ -25,7 +27,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/plan"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider"
 	"github.com/konveyor/forklift-controller/pkg/settings"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 // Application settings.
