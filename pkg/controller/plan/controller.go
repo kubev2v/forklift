@@ -146,7 +146,7 @@ func Add(mgr manager.Manager) error {
 	}
 
 	// Gather migration Plan metrics
-	metrics.RecordMigrationMetrics(mgr.GetClient())
+	metrics.RecordPlanMetrics(mgr.GetClient())
 
 	return nil
 }
