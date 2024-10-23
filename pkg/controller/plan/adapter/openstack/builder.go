@@ -936,6 +936,9 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 func (r *Builder) SupportsVolumePopulators() bool {
 	return true
 }
+func (r *Builder) SupportsOffloadPlugin() bool {
+	return false
+}
 
 func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) (pvcs []*core.PersistentVolumeClaim, err error) {
 	workload := &model.Workload{}
