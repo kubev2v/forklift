@@ -45,6 +45,13 @@ var populators = map[string]populator{
 		imageVar:        "OPENSTACK_POPULATOR_IMAGE",
 		metricsEndpoint: ":8081",
 	},
+	"offloadPlugin": {
+		kind:            "OffloadPluginVolumePopulator",
+		resource:        "offloadpluginvolumepopulators",
+		controllerFunc:  getOffloadPluginPopulatorPodArgs,
+		imageVar:        "", // the imageVar is empty so the volume populator controller gets the image from the resource specification
+		metricsEndpoint: ":8082",
+	},
 }
 
 func main() {
@@ -71,10 +78,14 @@ func main() {
 	}()
 
 	for _, populator := range populators {
-		imageName, ok := os.LookupEnv(populator.imageVar)
-		if !ok {
-			klog.Warning("Couldn't find", "imageVar", populator.imageVar)
-			continue
+		var imageName string
+		if populator.imageVar != "" {
+			var ok bool
+			imageName, ok = os.LookupEnv(populator.imageVar)
+			if !ok {
+				klog.Warning("Couldn't find", "imageVar", populator.imageVar)
+				continue
+			}
 		}
 		gk := schema.GroupKind{Group: groupName, Kind: populator.kind}
 		gvr := schema.GroupVersionResource{Group: groupName, Version: apiVersion, Resource: populator.resource}
@@ -120,6 +131,21 @@ func getOpenstackPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured) (
 	args = append(args, "--image-id="+openstackPopulator.Spec.ImageID)
 	args = append(args, "--cr-name="+openstackPopulator.Name)
 	args = append(args, "--cr-namespace="+openstackPopulator.Namespace)
+
+	return args, nil
+}
+
+func getOffloadPluginPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured) ([]string, error) {
+	var offloadPlugin v1beta1.OffloadPluginVolumePopulator
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &offloadPlugin)
+	if err != nil {
+		return nil, err
+	}
+	args := []string{}
+	args = append(args, "--volume-path="+getVolumePath(rawBlock))
+	args = append(args, "--cr-name="+offloadPlugin.Name)
+	args = append(args, "--cr-namespace="+offloadPlugin.Namespace)
+	args = append(args, "--secret-name="+offloadPlugin.Spec.SecretName)
 
 	return args, nil
 }

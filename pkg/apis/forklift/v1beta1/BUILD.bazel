@@ -8,6 +8,7 @@ go_library(
         "host.go",
         "mapping.go",
         "migration.go",
+        "offload-plugin-populator.go",
         "openstackpopulator.go",
         "ovirtpopulator.go",
         "plan.go",

@@ -440,7 +440,7 @@ func markStartedStepsCompleted(vm *plan.VMStatus) {
 }
 
 func (r *Migration) deletePopulatorPVCs(vm *plan.VMStatus) (err error) {
-	if r.builder.SupportsVolumePopulators() {
+	if r.builder.SupportsVolumePopulators() || r.builder.SupportsOffloadPlugins() {
 		err = r.kubevirt.DeletePopulatedPVCs(vm)
 	}
 	return
@@ -759,7 +759,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 		}
 
-		if r.builder.SupportsVolumePopulators() {
+		if r.builder.SupportsVolumePopulators() || r.builder.SupportsOffloadPlugins() {
 			var pvcs []*core.PersistentVolumeClaim
 			if pvcs, err = r.kubevirt.PopulatorVolumes(vm.Ref); err != nil {
 				if !errors.As(err, &web.ProviderNotReadyError{}) {
@@ -886,9 +886,15 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		step.MarkStarted()
 		step.Phase = Running
 
-		if r.builder.SupportsVolumePopulators() {
+		if r.builder.SupportsVolumePopulators() || r.builder.SupportsOffloadPlugins() {
 			err = r.updatePopulatorCopyProgress(vm, step)
-		} else {
+		}
+		if err != nil {
+			step.AddError(err.Error())
+			err = nil
+			break
+		}
+		if !r.builder.SupportsVolumePopulators() {
 			// Fallback to non-volume populator path
 			err = r.updateCopyProgress(vm, step)
 		}

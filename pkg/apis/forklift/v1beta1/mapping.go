@@ -57,12 +57,21 @@ type StoragePair struct {
 type DestinationStorage struct {
 	// A storage class.
 	StorageClass string `json:"storageClass"`
+	// Offload plugin.
+	OffloadPlugin *OffloadPlugin `json:"offloadPlugin,omitempty"`
 	// Volume mode.
 	// +kubebuilder:validation:Enum=Filesystem;Block
 	VolumeMode core.PersistentVolumeMode `json:"volumeMode,omitempty"`
 	// Access mode.
 	// +kubebuilder:validation:Enum=ReadWriteOnce;ReadWriteMany;ReadOnlyMany
 	AccessMode core.PersistentVolumeAccessMode `json:"accessMode,omitempty"`
+}
+
+type OffloadPlugin struct {
+	// Offload plugin.
+	Image string `json:"image"`
+	// Offload plugin variables passed to the populator
+	SecretName string `json:"secretName,omitempty"`
 }
 
 // Network map spec.

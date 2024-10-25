@@ -716,6 +716,10 @@ func (r *Builder) SupportsVolumePopulators() bool {
 	return !r.Context.Plan.Spec.Warm && r.Context.Plan.Provider.Destination.IsHost()
 }
 
+func (r *Builder) SupportsOffloadPlugins() bool {
+	return false
+}
+
 func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) (pvcs []*core.PersistentVolumeClaim, err error) {
 	workload := &model.Workload{}
 	err = r.Source.Inventory.Find(workload, vmRef)

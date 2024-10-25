@@ -2,6 +2,8 @@ package vsphere
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net"
@@ -10,8 +12,10 @@ import (
 	"path"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
@@ -32,7 +36,11 @@ import (
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	k8types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
@@ -432,6 +440,9 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 		}
 		for _, disk := range vm.Disks {
 			if disk.Datastore.ID == ds.ID {
+				if mapped.Destination.OffloadPlugin != nil {
+					continue
+				}
 				storageClass := mapped.Destination.StorageClass
 				var dvSource cdi.DataVolumeSource
 				// Let CDI do the copying
@@ -954,27 +965,295 @@ func (r *Builder) SupportsVolumePopulators() bool {
 	return false
 }
 
+func (r *Builder) SupportsOffloadPlugins() bool {
+	return r.Plan.HasOffloadPlugin()
+}
+
 func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) (pvcs []*core.PersistentVolumeClaim, err error) {
-	err = planbase.VolumePopulatorNotSupportedError
+	vm := &model.VM{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vmRef.String())
+		return
+	}
+	var destinationStorageMap map[string]v1beta1.DestinationStorage
+	if destinationStorageMap, err = r.mapDatastoreToDestinationStorage(); err != nil {
+		return
+	}
+	for _, disk := range vm.Disks {
+		destinationStorage := destinationStorageMap[disk.Datastore.ID]
+		if destinationStorage.OffloadPlugin == nil {
+			continue
+		}
+		var offloadVolumePopulator *api.OffloadPluginVolumePopulator
+		offloadVolumePopulator, err = r.ensureVolumePopulatorCR(disk, secretName, vmRef.ID, destinationStorage)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+		var pvc *core.PersistentVolumeClaim
+		pvc, err = r.persistentVolumeClaimWithSourceRef(
+			disk,
+			destinationStorage.StorageClass,
+			offloadVolumePopulator,
+			annotations,
+			vmRef.ID,
+		)
+		if err != nil {
+			if !k8serr.IsAlreadyExists(err) {
+				err = liberr.Wrap(err, "file", disk.File, "storage class", destinationStorage.StorageClass, "populator", offloadVolumePopulator.Name)
+				return
+			}
+			err = nil
+			continue
+		}
+		pvcs = append(pvcs, pvc)
+	}
+	return pvcs, nil
+}
+
+func (r *Builder) getFilenameHashFromDisk(disk vsphere.Disk) string {
+	return r.getFilenameHash(disk.File)
+}
+
+func (r *Builder) getFilenameHash(file string) string {
+	fileNameHashHex := md5.Sum([]byte(file))
+	return hex.EncodeToString(fileNameHashHex[:])
+}
+
+func (r *Builder) ensureVolumePopulatorCR(disk vsphere.Disk, secretName, vmId string, storage api.DestinationStorage) (plugin *api.OffloadPluginVolumePopulator, err error) {
+	list := api.OffloadPluginVolumePopulatorList{}
+	filenameHash := r.getFilenameHashFromDisk(disk)
+	err = r.Destination.Client.List(context.TODO(), &list, &client.ListOptions{
+		Namespace: r.Plan.Spec.TargetNamespace,
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			"migration": string(r.Migration.UID),
+			"file":      filenameHash,
+		}),
+	})
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	if len(list.Items) > 0 {
+		plugin = &list.Items[0]
+	} else {
+		plugin = &api.OffloadPluginVolumePopulator{
+			ObjectMeta: meta.ObjectMeta{
+				GenerateName: fmt.Sprintf("offloadplugin-"),
+				Namespace:    r.Plan.Spec.TargetNamespace,
+				Labels: map[string]string{
+					"vmID":      vmId,
+					"migration": string(r.Migration.UID),
+					"file":      filenameHash,
+				},
+			},
+			Spec: api.OffloadPluginVolumePopulatorSpec{
+				Image:      storage.OffloadPlugin.Image,
+				File:       disk.File,
+				SecretName: secretName,
+			},
+		}
+		err = r.Context.Client.Create(context.TODO(), plugin, &client.CreateOptions{})
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+		r.Log.V(1).Info(
+			"Offload plugin created.",
+			"offloadplugin",
+			path.Join(
+				plugin.Namespace,
+				plugin.Name),
+			"vm", vmId)
+	}
+
+	return
+}
+func (r *Builder) mapDatastoreToDestinationStorage() (map[string]v1beta1.DestinationStorage, error) {
+	sdToStorageClass := make(map[string]v1beta1.DestinationStorage)
+	for _, mapped := range r.Context.Map.Storage.Spec.Map {
+		sd := &model.Datastore{}
+		if err := r.Source.Inventory.Find(sd, mapped.Source); err != nil {
+			return nil, liberr.Wrap(err)
+		}
+		sdToStorageClass[sd.ID] = mapped.Destination
+	}
+	return sdToStorageClass, nil
+}
+
+// Build a PersistentVolumeClaim with DataSourceRef for VolumePopulator
+func (r *Builder) persistentVolumeClaimWithSourceRef(
+	disk vsphere.Disk,
+	storageClassName string,
+	offloadVolumePopulator *api.OffloadPluginVolumePopulator,
+	annotations map[string]string, vmID string) (pvc *core.PersistentVolumeClaim, err error) {
+	var accessModes []core.PersistentVolumeAccessMode
+	var volumeMode *core.PersistentVolumeMode
+	accessModes, volumeMode, err = r.getDefaultVolumeAndAccessMode(storageClassName)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	filenameHash := r.getFilenameHashFromDisk(disk)
+	annotations[planbase.AnnDiskSource] = disk.File
+
+	pvc = &core.PersistentVolumeClaim{
+		ObjectMeta: meta.ObjectMeta{
+			GenerateName: fmt.Sprintf("offloadplugin-pvc-"),
+			Namespace:    r.Plan.Spec.TargetNamespace,
+			Annotations:  annotations,
+			Labels: map[string]string{
+				"migration": string(r.Migration.UID),
+				"vmID":      vmID,
+				"file":      filenameHash,
+			},
+		},
+		Spec: core.PersistentVolumeClaimSpec{
+			AccessModes: accessModes,
+			Resources: core.ResourceRequirements{
+				Requests: map[core.ResourceName]resource.Quantity{
+					core.ResourceStorage: *resource.NewQuantity(disk.Capacity, resource.BinarySI)},
+			},
+			StorageClassName: &storageClassName,
+			VolumeMode:       volumeMode,
+			DataSourceRef: &core.TypedObjectReference{
+				APIGroup: &api.SchemeGroupVersion.Group,
+				Kind:     v1beta1.OffloadPluginVolumePopulatorKind,
+				Name:     offloadVolumePopulator.Name,
+			},
+		},
+	}
+
+	err = r.Client.Create(context.TODO(), pvc, &client.CreateOptions{})
 	return
 }
 
-func (r *Builder) PrePopulateActions(c planbase.Client, vmRef ref.Ref) (ready bool, err error) {
-	err = planbase.VolumePopulatorNotSupportedError
+func (r *Builder) getDefaultVolumeAndAccessMode(storageClassName string) ([]core.PersistentVolumeAccessMode, *core.PersistentVolumeMode, error) {
+	var filesystemMode = core.PersistentVolumeFilesystem
+	storageProfile := &cdi.StorageProfile{}
+	err := r.Client.Get(context.TODO(), k8types.NamespacedName{Name: storageClassName}, storageProfile)
+	if err != nil {
+		return nil, nil, liberr.Wrap(err)
+	}
+
+	if len(storageProfile.Status.ClaimPropertySets) > 0 &&
+		len(storageProfile.Status.ClaimPropertySets[0].AccessModes) > 0 {
+		accessModes := storageProfile.Status.ClaimPropertySets[0].AccessModes
+		volumeMode := storageProfile.Status.ClaimPropertySets[0].VolumeMode
+		if volumeMode == nil {
+			// volumeMode is an optional API parameter. Filesystem is the default mode used when volumeMode parameter is omitted.
+			volumeMode = &filesystemMode
+		}
+		return accessModes, volumeMode, nil
+	}
+	// no accessMode configured on storageProfile
+	return nil, nil, liberr.New("no accessMode defined on StorageProfile for StorageClass", "storageName", storageClassName)
+}
+
+// Get the OffloadPluginVolumePopulator CustomResource based on the disk ID.
+func (r *Builder) getVolumePopulator(file string) (populatorCr api.OffloadPluginVolumePopulator, err error) {
+	filenameHash := r.getFilenameHash(file)
+	list := api.OffloadPluginVolumePopulatorList{}
+	err = r.Destination.Client.List(context.TODO(), &list, &client.ListOptions{
+		Namespace: r.Plan.Spec.TargetNamespace,
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			"migration": string(r.Migration.UID),
+			"file":      filenameHash,
+		}),
+	})
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	if len(list.Items) == 0 {
+		err = k8serr.NewNotFound(api.SchemeGroupVersion.WithResource("OffloadPluginVolumePopulator").GroupResource(), file)
+		return
+	}
+	if len(list.Items) > 1 {
+		err = liberr.New("Multiple OffloadPluginVolumePopulator CRs found for the same disk", "file", file)
+		return
+	}
+
+	populatorCr = list.Items[0]
+
 	return
 }
 
-func (r *Builder) PopulatorTransferredBytes(persistentVolumeClaim *core.PersistentVolumeClaim) (transferredBytes int64, err error) {
-	err = planbase.VolumePopulatorNotSupportedError
+func (r *Builder) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (transferredBytes int64, err error) {
+	if _, ok := pvc.Annotations["lun"]; ok {
+		// skip LUNs
+		return
+	}
+
+	diskID := pvc.Annotations[planbase.AnnDiskSource]
+
+	populatorCr, err := r.getVolumePopulator(diskID)
+	if err != nil {
+		return
+	}
+
+	progressPercentage, err := strconv.ParseInt(populatorCr.Status.Progress, 10, 64)
+	if err != nil {
+		r.Log.Error(err, "Couldn't parse the progress percentage.", "pvcName", pvc.Name, "progressPercentage", progressPercentage)
+		transferredBytes = 0
+		err = nil
+		return
+	}
+
+	pvcSize := pvc.Spec.Resources.Requests["storage"]
+	transferredBytes = (progressPercentage * pvcSize.Value()) / 100
+
 	return
 }
 
 func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) (err error) {
-	err = planbase.VolumePopulatorNotSupportedError
+	vm := &model.Workload{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		return
+	}
+	var files []string
+	for _, da := range vm.Disks {
+		files = append(files, da.File)
+	}
+	if len(files) != len(pvcs) {
+		// To be sure we have every disk based on what already migrated and what's not.
+		// e.g when initializing the plan and the PVC has not been created yet (but the populator CR is) or when the disks that are attached to the source VM change.
+		for _, pvc := range pvcs {
+			files = append(files, pvc.Spec.DataSource.Name)
+		}
+	}
+	migrationID := string(r.Plan.Status.Migration.ActiveSnapshot().Migration.UID)
+	for _, file := range files {
+		populatorCr, err := r.getVolumePopulator(file)
+		if err != nil {
+			continue
+		}
+		err = r.setOffloadPluginPopulatorLabels(populatorCr, vmRef.ID, migrationID)
+		if err != nil {
+			r.Log.Error(err, "Couldn't update the Populator Custom Resource labels.",
+				"vmID", vmRef.ID, "migrationID", migrationID, "OffloadPluginVolumePopulator", populatorCr.Name)
+			continue
+		}
+	}
+	return
+}
+func (r *Builder) setOffloadPluginPopulatorLabels(populatorCr api.OffloadPluginVolumePopulator, vmId, migrationId string) (err error) {
+	populatorCrCopy := populatorCr.DeepCopy()
+	if populatorCr.Labels == nil {
+		populatorCr.Labels = make(map[string]string)
+	}
+	populatorCr.Labels["vmID"] = vmId
+	populatorCr.Labels["migration"] = migrationId
+	patch := client.MergeFrom(populatorCrCopy)
+	err = r.Destination.Client.Patch(context.TODO(), &populatorCr, patch)
 	return
 }
 
 func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error) {
-	err = planbase.VolumePopulatorNotSupportedError
+	taskName = pvc.Annotations[planbase.AnnDiskSource]
 	return
 }

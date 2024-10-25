@@ -610,6 +610,10 @@ func (r *Builder) SupportsVolumePopulators() bool {
 	return false
 }
 
+func (r *Builder) SupportsOffloadPlugins() bool {
+	return false
+}
+
 func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) (pvcs []*core.PersistentVolumeClaim, err error) {
 	err = planbase.VolumePopulatorNotSupportedError
 	return
