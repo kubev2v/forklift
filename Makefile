@@ -112,10 +112,36 @@ e2e-sanity-ova:
 forklift-controller: generate fmt vet
 	go build -o bin/forklift-controller github.com/konveyor/forklift-controller/cmd/forklift-controller
 
+# Define variables with default values for debug
+define DEBUG_VARS
+ROLE ?= main
+VIRT_V2V_IMAGE ?= quay.io/virt-v2v/forklift-virt-v2v:latest
+API_HOST ?= localhost
+API_PORT ?= 443
+DLV_PORT ?= 5432
+BLOCK_OVERHEAD ?= 0
+FILESYSTEM_OVERHEAD ?= 10
+MAX_VM_INFLIGHT ?= 2
+CLEANUP_RETRIES ?= 10
+SNAPSHOT_STATUS_CHECK_RATE_SECONDS ?= 10
+SNAPSHOT_REMOVAL_TIMEOUT_MINUTES ?= 120
+VDDK_JOB_ACTIVE_DEADLINE ?= 300
+PRECOPY_INTERVAL ?= 60
+OPENSHIFT ?= true
+METRICS_PORT ?= 8081
+KUBEVIRT_CLIENT_GO_SCHEME_REGISTRATION_VERSION ?= v1
+FEATURE_VSPHERE_INCREMENTAL_BACKUP ?= true
+VSPHERE_OS_MAP ?= forklift-virt-customize
+OVIRT_OS_MAP ?= forklift-ovirt-osmap
+VIRT_CUSTOMIZE_MAP ?= forklift-virt-customize
+endef
+$(eval $(DEBUG_VARS))
 
-# Build manager binary with compiler optimizations disabled
-debug: generate fmt vet
-	go build -o bin/forklift-controller -gcflags=all="-N -l" github.com/konveyor/forklift-controller/cmd/forklift-controller
+build-debug-%: fmt vet
+	go build -o bin/$* -gcflags=all="-N -l" github.com/konveyor/forklift-controller/cmd/$*
+
+debug-%: build-debug-%
+	dlv --listen=:$(DLV_PORT) --headless=true --api-version=2 exec bin/$*
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate fmt vet

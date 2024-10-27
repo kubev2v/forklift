@@ -296,15 +296,17 @@ func (c *RestClient) buildTransport() (err error) {
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	}
-	pool := x509.NewCertPool()
-	ca, xErr := os.ReadFile(Settings.Inventory.TLS.CA)
-	if xErr != nil {
-		err = liberr.Wrap(xErr)
-		return
-	}
-	pool.AppendCertsFromPEM(ca)
-	transport.TLSClientConfig = &tls.Config{
-		RootCAs: pool,
+	if Settings.Inventory.TLS.CA != "" {
+		pool := x509.NewCertPool()
+		ca, xErr := os.ReadFile(Settings.Inventory.TLS.CA)
+		if xErr != nil {
+			err = liberr.Wrap(xErr)
+			return
+		}
+		pool.AppendCertsFromPEM(ca)
+		transport.TLSClientConfig = &tls.Config{
+			RootCAs: pool,
+		}
 	}
 
 	c.Transport = transport
