@@ -45,15 +45,17 @@ COPY --from=builder /app/virt-v2v-wrapper /usr/bin/virt-v2v-wrapper
 ENTRYPOINT ["/usr/bin/virt-v2v-wrapper"]
 
 LABEL \
-        com.redhat.component="forklift-virt-v2v-container" \
-        name="forklift/forklift-virt-v2v-rhel9" \
+        com.redhat.component="mtv-virt-v2v-container" \
+        name="migration-toolkit-virtualization/mtv-virt-v2v-rhel9" \
         license="Apache License 2.0" \
-        io.k8s.display-name="Forklift" \
-        io.k8s.description="Forklift - Virt-V2V" \
+        io.k8s.display-name="Migration Toolkit for Virtualization" \
+        io.k8s.description="Migration Toolkit for Virtualization - Virt-V2V" \
         io.openshift.tags="migration,mtv,forklift" \
-        summary="Forklift - Virt-V2V" \
-        description="Forklift - Virt-V2V" \
-        io.k8s.description="Forklift - Virt-V2V" \
+        summary="Migration Toolkit for Virtualization - Virt-V2V" \
+        description="Migration Toolkit for Virtualization - Virt-V2V" \
         vendor="Red Hat, Inc." \
-        maintainer="Forklift by Konveyor Community <forklift-dev@googlegroups.com>"
-
+        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
+        distribution-scope="public" \
+        release="v2.7" \
+        url="https://github.com/kubev2v/forklift" \
+        version="v2.7.1"
