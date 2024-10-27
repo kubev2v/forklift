@@ -7,11 +7,11 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "main"
+      == "release-2.7"
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: forklift-operator
-    appstudio.openshift.io/component: populator-controller
+    appstudio.openshift.io/application: forklift-operator-2-7
+    appstudio.openshift.io/component: populator-controller-2-7
     pipelines.appstudio.openshift.io/type: build
   name: populator-controller-on-push
   namespace: rh-mtv-1-tenant
@@ -22,7 +22,7 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/populator-controller:{{revision}}
+    value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-2-7/populator-controller-2-7:{{revision}}
   - name: dockerfile
     value: build/populator-controller/Containerfile
   - name: path-context
