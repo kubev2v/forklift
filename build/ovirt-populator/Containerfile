@@ -7,21 +7,24 @@ ENV GOEXPERIMENT strictfipsruntime
 
 RUN GOOS=linux GOARCH=amd64 go build -o ovirt-populator github.com/konveyor/forklift-controller/cmd/ovirt-populator
 
-FROM registry.access.redhat.com/ubi8-minimal:8.10-1052.1724178568
+# FROM registry.access.redhat.com/ubi8-minimal:8.10-1086
+FROM registry.access.redhat.com/ubi8/ubi:8.10-1088
 COPY --from=builder /app/ovirt-populator /usr/local/bin/ovirt-populator
-# RUN microdnf install -y python3-ovirt-engine-sdk4 ovirt-imageio-client && microdnf clean all
-RUN microdnf install -y python3 python3-devel libcurl-devel gcc openssl-devel libxml2-devel
-
-RUN pip3 install ovirt-engine-sdk-python ovirt-imageio
+# RUN microdnf install -y subscription-manager
+RUN subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey")
+RUN subscription-manager repos --enable=rhv-4-tools-for-rhel-8-x86_64-rpms
+RUN dnf install -y python3-ovirt-engine-sdk4 ovirt-imageio-client && dnf clean all
 
 ENTRYPOINT ["/usr/local/bin/ovirt-populator"]
 LABEL \
-        com.redhat.component="forklift-ovirt-populator-container" \
-        name="forklift/forklift-ovirt-populator-rhel8" \
+        com.redhat.component="mtv-rhv-populator-container" \
+        name="migration-toolkit-virtualization/mtv-rhv-populator-rhel8" \
         license="Apache License 2.0" \
-        io.k8s.display-name="Forklift" \
-        io.k8s.description="oVirt populator pod facilitates data import from oVirt environments to PVCs" \
+        io.k8s.display-name="Migration Toolkit for Virtualization" \
+        io.k8s.description="Migration Toolkit for Virtualization - RHV Populator" \
         io.openshift.tags="migration,mtv,forklift" \
-        summary="Forklift - oVirt Populator" \
-        description="Forklift - oVirt Populator" \
-        maintainer="Forklift by Konveyor Community <forklift-dev@googlegroups.com>"
+        summary="Migration Toolkit for Virtualization - RHV Populator" \
+        description="Migration Toolkit for Virtualization - RHV Populator" \
+        vendor="Red Hat, Inc." \
+        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>"
+

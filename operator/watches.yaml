@@ -5,3 +5,7 @@
   kind: ForkliftController
   role: forkliftcontroller
 #+kubebuilder:scaffold:watch
+  finalizer:
+    name: forklift.konveyor.io/finalizer
+    vars:
+      finalize: true

@@ -661,7 +661,7 @@ func (r *KubeVirt) getDVs(vm *plan.VMStatus) (edvs []ExtendedDataVolume, err err
 		context.TODO(),
 		dvsList,
 		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(r.vmLabels(vm.Ref)),
+			LabelSelector: k8slabels.SelectorFromSet(r.vmAllButMigrationLabels(vm.Ref)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		})
 
@@ -1748,7 +1748,12 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 				Value: vm.NewName,
 			})
 	}
-
+	environment = append(environment,
+		core.EnvVar{
+			Name:  "LOCAL_MIGRATION",
+			Value: strconv.FormatBool(r.Destination.Provider.IsHost()),
+		},
+	)
 	// pod annotations
 	annotations := map[string]string{}
 	if r.Plan.Spec.TransferNetwork != nil {
@@ -1800,8 +1805,9 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 			InitContainers: initContainers,
 			Containers: []core.Container{
 				{
-					Name: "virt-v2v",
-					Env:  environment,
+					Name:            "virt-v2v",
+					Env:             environment,
+					ImagePullPolicy: core.PullAlways,
 					EnvFrom: []core.EnvFromSource{
 						{
 							Prefix: "V2V_",

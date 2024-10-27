@@ -6,20 +6,23 @@ ENV GOEXPERIMENT strictfipsruntime
 
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o ova-provider-server github.com/konveyor/forklift-controller/cmd/ova-provider-server
 
-FROM registry.access.redhat.com/ubi9-minimal:9.4-1227.1725849298
+FROM registry.access.redhat.com/ubi9-minimal:9.4-1227.1726694542
 # Required to be able to get files from within the pod
 RUN microdnf -y install tar && microdnf clean all
 
 COPY --from=builder /app/ova-provider-server /usr/local/bin/ova-provider-server
 ENTRYPOINT ["/usr/local/bin/ova-provider-server"]
 
+
 LABEL \
-        com.redhat.component="forklift-ova-provider-server-container" \
-        name="forklift/forklift-ova-provider-server-rhel9" \
+        com.redhat.component="mtv-ova-provider-server-container" \
+        name="migration-toolkit-virtualization/mtv-ova-provider-server-rhel9" \
         license="Apache License 2.0" \
-        io.k8s.display-name="Forklift" \
-        io.k8s.description="Forklift - OVA Provider Server" \
+        io.k8s.display-name="Migration Toolkit for Virtualization" \
+        io.k8s.description="Migration Toolkit for Virtualization - OVA Provider Server" \
         io.openshift.tags="migration,mtv,forklift" \
-        summary="Forklift - OVA Provider Server" \
-        description="Forklift - OVA Provider Server" \
-        maintainer="Forklift by Konveyor Community <forklift-dev@googlegroups.com>"
+        summary="Migration Toolkit for Virtualization - OVA Provider Server" \
+        description="Migration Toolkit for Virtualization - OVA Provider Server" \
+        vendor="Red Hat, Inc." \
+        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>"
+

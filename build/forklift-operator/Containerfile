@@ -12,11 +12,14 @@ COPY operator/watches.yaml watches.yaml
 COPY operator/roles roles
 
 LABEL \
-        com.redhat.component="forklift-operator-container" \
-        name="forklift/forklift-operator" \
-        io.k8s.display-name="Forklift" \
-        io.k8s.description="Forklift - Operator" \
+        com.redhat.component="mtv-operator-container" \
+        name="migration-toolkit-virtualization/mtv-rhel8-operator" \
+        license="Apache License 2.0" \
+        io.k8s.display-name="Migration Toolkit for Virtualization" \
+        io.k8s.description="Migration Toolkit for Virtualization - Operator" \
         io.openshift.tags="migration,mtv,forklift" \
-        summary="Forklift - Operator" \
-        description="Forklift - Operator" \
-        maintainer="Forklift by Konveyor Community <forklift-dev@googlegroups.com>"
+        summary="Migration Toolkit for Virtualization - Operator" \
+        description="Migration Toolkit for Virtualization - Operator" \
+        vendor="Red Hat, Inc." \
+        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>"
+

@@ -458,6 +458,9 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool) error
 		if err := r.deletePopulatorPVCs(vm); failOnErr(err) {
 			return err
 		}
+		if err := r.kubevirt.DeleteDataVolumes(vm); failOnErr(err) {
+			return err
+		}
 	}
 	if err := r.deleteImporterPods(vm); failOnErr(err) {
 		return err
@@ -1146,7 +1149,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				return err
 			}
 
-			if pod != nil && pod.Status.Phase != core.PodSucceeded {
+			if pod != nil && pod.Status.Phase == core.PodRunning {
 				err := r.kubevirt.UpdateVmByConvertedConfig(vm, pod, step)
 				if err != nil {
 					return liberr.Wrap(err)

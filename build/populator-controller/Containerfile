@@ -6,7 +6,7 @@ ENV GOEXPERIMENT strictfipsruntime
 
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o controller github.com/konveyor/forklift-controller/cmd/populator-controller
 
-FROM registry.access.redhat.com/ubi9-minimal:9.4-1227.1725849298
+FROM registry.access.redhat.com/ubi9-minimal:9.4-1227.1726694542
 # Required to be able to get files from within the pod
 RUN microdnf -y install tar && microdnf clean all
 
@@ -14,12 +14,13 @@ COPY --from=builder /app/controller /usr/local/bin/populator-controller
 ENTRYPOINT ["/usr/local/bin/populator-controller"]
 
 LABEL \
-        com.redhat.component="forklift-populator-controller-container" \
-        name="forklift/forklift-populator-controller-rhel9" \
+        com.redhat.component="mtv-populator-controller-container" \
+        name="migration-toolkit-virtualization/mtv-populator-controller-rhel9" \
         license="Apache License 2.0" \
-        io.k8s.display-name="Forklift" \
-        io.k8s.description="Forklift - Populator Controller" \
+        io.k8s.display-name="Migration Toolkit for Virtualization" \
+        io.k8s.description="Migration Toolkit for Virtualization - Populator Controller" \
         io.openshift.tags="migration,mtv,forklift" \
-        summary="Forklift - Populator Controller" \
-        description="Forklift - Populator Controller" \
-        maintainer="Forklift by Konveyor Community <forklift-dev@googlegroups.com>"
+        summary="Migration Toolkit for Virtualization - Populator Controller" \
+        description="Migration Toolkit for Virtualization - Populator Controller" \
+        vendor="Red Hat, Inc." \
+        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>"

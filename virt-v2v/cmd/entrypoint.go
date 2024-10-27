@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	"github.com/konveyor/forklift-controller/virt-v2v/pkg/customize"
@@ -18,7 +19,8 @@ import (
 func main() {
 	var err error
 	if err = virtV2VPrepEnvironment(); err != nil {
-		return
+		fmt.Println("Failed to prepare the environment", err)
+		os.Exit(1)
 	}
 
 	// virt-v2v or virt-v2v-in-place
@@ -39,7 +41,6 @@ func main() {
 		fmt.Println("Failed to get linked disk", err)
 		os.Exit(1)
 	}
-
 	err = runVirtV2VInspection(disks)
 	if err != nil {
 		fmt.Println("Failed to inspect the disk", err)
@@ -47,19 +48,32 @@ func main() {
 	}
 	inspection, err := utils.GetInspectionV2vFromFile(global.INSPECTION)
 	if err != nil {
-		return
+		fmt.Println("Failed to get inspection file", err)
+		os.Exit(1)
 	}
+
 	// virt-customize
 	err = customize.Run(disks, inspection.OS.Osinfo)
 	if err != nil {
 		fmt.Println("Error to customize the VM:", err)
-		os.Exit(1)
 	}
-
-	err = server.Start()
-	if err != nil {
-		fmt.Println("Failed to run the server", err)
-		os.Exit(1)
+	// In the remote migrations we can not connect to the conversion pod from the controller.
+	// This connection is needed for to get the additional configuration which is gathered either form virt-v2v or
+	// virt-v2v-inspector. We expose those parameters via server in this pod and once the controller gets the config
+	// the controller sends the request to terminate the pod.
+	if val, found := os.LookupEnv("LOCAL_MIGRATION"); found {
+		isLocalMigration, err := strconv.ParseBool(val)
+		if err != nil {
+			fmt.Println("Failed to parse the 'LOCAL_MIGRATION' environment variable.", err)
+			os.Exit(1)
+		}
+		if isLocalMigration {
+			err = server.Start()
+			if err != nil {
+				fmt.Println("Failed to run the server", err)
+				os.Exit(1)
+			}
+		}
 	}
 }
 
@@ -74,12 +88,11 @@ func runVirtV2VInspection(disks []string) error {
 }
 
 func runVirtV2vInPlace() error {
+	var err error
 	args := []string{"-v", "-x", "-i", "libvirtxml"}
-	args = append(args, "--root")
-	if val, found := os.LookupEnv("V2V_RootDisk"); found {
-		args = append(args, val)
-	} else {
-		args = append(args, "first")
+	args, err = addCommonArgs(args)
+	if err != nil {
+		return err
 	}
 	args = append(args, "/mnt/v2v/input.xml")
 	v2vCmd := exec.Command("/usr/libexec/virt-v2v-in-place", args...)
@@ -121,25 +134,45 @@ func virtV2vBuildCommand() (args []string, err error) {
 		args = append(args, "-i", "ova", os.Getenv("V2V_diskPath"))
 	}
 
+	return args, nil
+}
+
+func virtV2vVsphereArgs() (args []string, err error) {
+	args = append(args, "-i", "libvirt", "-ic", os.Getenv("V2V_libvirtURL"))
+	args = append(args, "-ip", "/etc/secret/secretKey")
+	args, err = addCommonArgs(args)
+	if err != nil {
+		return nil, err
+	}
+	if info, err := os.Stat(global.VDDK); err == nil && info.IsDir() {
+		args = append(args,
+			"-it", "vddk",
+			"-io", fmt.Sprintf("vddk-libdir=%s", global.VDDK),
+			"-io", fmt.Sprintf("vddk-thumbprint=%s", os.Getenv("V2V_fingerprint")),
+		)
+	}
+
 	// When converting VM with name that do not meet DNS1123 RFC requirements,
 	// it should be changed to supported one to ensure the conversion does not fail.
 	if utils.CheckEnvVariablesSet("V2V_NewName") {
 		args = append(args, "-on", os.Getenv("V2V_NewName"))
 	}
 
+	args = append(args, "--", os.Getenv("V2V_vmName"))
 	return args, nil
 }
 
-func virtV2vVsphereArgs() (args []string, err error) {
+// addCommonArgs adds a v2v arguments which is used for both virt-v2v and virt-v2v-in-place
+func addCommonArgs(args []string) ([]string, error) {
+	// Allow specifying which disk should be the bootable disk
 	args = append(args, "--root")
 	if utils.CheckEnvVariablesSet("V2V_RootDisk") {
 		args = append(args, os.Getenv("V2V_RootDisk"))
 	} else {
 		args = append(args, "first")
 	}
-	args = append(args, "-i", "libvirt", "-ic", os.Getenv("V2V_libvirtURL"))
-	args = append(args, "-ip", "/etc/secret/secretKey")
 
+	// Add the mapping to the virt-v2v, used mainly in the windows when migrating VMs with static IP
 	if envStaticIPs := os.Getenv("V2V_staticIPs"); envStaticIPs != "" {
 		for _, macToIp := range strings.Split(envStaticIPs, "_") {
 			args = append(args, "--mac", macToIp)
@@ -153,13 +186,6 @@ func virtV2vVsphereArgs() (args []string, err error) {
 	}
 	args = append(args, luksArgs...)
 
-	if info, err := os.Stat(global.VDDK); err == nil && info.IsDir() {
-		args = append(args,
-			"-it", "vddk",
-			"-io", fmt.Sprintf("vddk-libdir=%s", global.VDDK),
-			"-io", fmt.Sprintf("vddk-thumbprint=%s", os.Getenv("V2V_fingerprint")),
-		)
-	}
 	var extraArgs []string
 	if envExtraArgs := os.Getenv("V2V_extra_args"); envExtraArgs != "" {
 		if err := json.Unmarshal([]byte(envExtraArgs), &extraArgs); err != nil {
@@ -167,8 +193,6 @@ func virtV2vVsphereArgs() (args []string, err error) {
 		}
 	}
 	args = append(args, extraArgs...)
-
-	args = append(args, "--", os.Getenv("V2V_vmName"))
 	return args, nil
 }
 
