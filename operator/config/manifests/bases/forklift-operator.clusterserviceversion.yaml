@@ -26,6 +26,18 @@ metadata:
     operatorframework.io/suggested-namespace: ${NAMESPACE}
     repository: https://github.com/kubev2v/forklift
     support: https://github.com/kubev2v/forklift/issues
+    operators.openshift.io/valid-subscription: '["OpenShift Kubernetes Engine", "OpenShift Container Platform", "OpenShift Platform Plus"]'
+    features.operators.openshift.io/disconnected: "false"
+    features.operators.openshift.io/fips-compliant: "true"
+    features.operators.openshift.io/fipsmode: "true"
+    features.operators.openshift.io/proxy-aware: "false"
+    features.operators.openshift.io/tls-profiles: "false"
+    features.operators.openshift.io/token-auth-aws: "false"
+    features.operators.openshift.io/token-auth-azure: "false"
+    features.operators.openshift.io/token-auth-gcp: "false"
+    features.operators.openshift.io/cnf: "false"
+    features.operators.openshift.io/cni: "false"
+    features.operators.openshift.io/csi: "false"
   name: forklift-operator.v${VERSION}
   namespace: ${NAMESPACE}
 spec:
