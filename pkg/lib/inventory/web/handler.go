@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -152,6 +153,8 @@ type WatchWriter struct {
 	log logging.LevelLogger
 	// Done.
 	done bool
+	// Mutex lock
+	mu sync.Mutex
 }
 
 // Watch options.
@@ -257,6 +260,8 @@ func (r *WatchWriter) End() {
 
 // Write event to the socket.
 func (r *WatchWriter) send(e model.Event) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if r.done {
 		return
 	}
