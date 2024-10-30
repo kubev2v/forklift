@@ -7,7 +7,11 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "release-2.7"
+      == "release-2.7" && ( ".tekton/forklift-operator-pull-request.yaml".pathChanged() ||
+      ".tekton/forklift-operator-push.yaml".pathChanged() ||
+      "build/forklift-operator/Containerfile".pathChanged() ||
+      "operator/roles/***".pathChanged() ||
+      "operator/watches.yaml".pathChanged() )
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: forklift-operator-2-7

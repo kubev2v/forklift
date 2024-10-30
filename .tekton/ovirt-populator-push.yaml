@@ -7,7 +7,10 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "release-2.7"
+      == "release-2.7" && ( ".tekton/ovirt-populator-pull-request.yaml".pathChanged() ||
+      ".tekton/ovirt-populator-push.yaml".pathChanged() ||
+      "build/ovirt-populator/Containerfile".pathChanged() ||
+      "cmd/ovirt-populator/***".pathChanged() )
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: forklift-operator-2-7
