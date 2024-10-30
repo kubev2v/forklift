@@ -1,8 +1,10 @@
 FROM quay.io/konflux-ci/operator-sdk-builder@sha256:73fa40301aebf0c62903a5840918251f444212319f95a4e467eeaf0cd8c4349e as builder
 
+ARG STREAM=downstream
+
 COPY ./. /repo
 WORKDIR /repo/operator
-RUN source ./export-vars.sh && \
+RUN source ./export-vars.sh ${STREAM} && \
     kustomize build config/manifests/ \
     | envsubst \
     | operator-sdk generate bundle \
