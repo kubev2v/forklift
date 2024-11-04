@@ -1622,8 +1622,23 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 							path.Join(dv.Namespace, dv.Name))
 						continue
 					}
+					primePvc := &core.PersistentVolumeClaim{}
+					err = r.Destination.Client.Get(context.TODO(), types.NamespacedName{
+						Namespace: r.Plan.Spec.TargetNamespace,
+						Name:      fmt.Sprintf("prime-%s", pvc.UID),
+					}, primePvc)
+					if err != nil {
+						log.Error(
+							err,
+							"Could not get prime PVC for DataVolume.",
+							"vm",
+							vm.String(),
+							"dv",
+							path.Join(dv.Namespace, dv.Name))
+						continue
+					}
 
-					importer, found, kErr = r.kubevirt.GetImporterPod(*pvc)
+					importer, found, kErr = r.kubevirt.GetImporterPod(*primePvc)
 				}
 
 				if kErr != nil {
