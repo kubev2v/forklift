@@ -60,6 +60,19 @@ spec:
                           - ReadWriteMany
                           - ReadOnlyMany
                           type: string
+                        offloadPlugin:
+                          description: Offload plugin.
+                          properties:
+                            image:
+                              description: Offload plugin.
+                              type: string
+                            secretName:
+                              description: Offload plugin variables passed to the
+                                populator
+                              type: string
+                          required:
+                          - image
+                          type: object
                         storageClass:
                           description: A storage class.
                           type: string

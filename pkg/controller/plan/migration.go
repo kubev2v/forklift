@@ -47,7 +47,7 @@ var (
 	HasPostHook             libitr.Flag = 0x02
 	RequiresConversion      libitr.Flag = 0x04
 	CDIDiskCopy             libitr.Flag = 0x08
-	VirtV2vDiskCopy         libitr.Flag = 0x10
+	OvaImageMigration       libitr.Flag = 0x10
 	OpenstackImageMigration libitr.Flag = 0x20
 )
 
@@ -61,7 +61,6 @@ const (
 	CreateDataVolumes        = "CreateDataVolumes"
 	CreateVM                 = "CreateVM"
 	CopyDisks                = "CopyDisks"
-	AllocateDisks            = "AllocateDisks"
 	CopyingPaused            = "CopyingPaused"
 	AddCheckpoint            = "AddCheckpoint"
 	AddFinalCheckpoint       = "AddFinalCheckpoint"
@@ -84,7 +83,6 @@ const (
 const (
 	Initialize      = "Initialize"
 	Cutover         = "Cutover"
-	DiskAllocation  = "DiskAllocation"
 	DiskTransfer    = "DiskTransfer"
 	ImageConversion = "ImageConversion"
 	DiskTransferV2v = "DiskTransferV2v"
@@ -108,10 +106,9 @@ var (
 			{Name: WaitForPowerOff},
 			{Name: CreateDataVolumes},
 			{Name: CopyDisks, All: CDIDiskCopy},
-			{Name: AllocateDisks, All: VirtV2vDiskCopy},
 			{Name: CreateGuestConversionPod, All: RequiresConversion},
 			{Name: ConvertGuest, All: RequiresConversion},
-			{Name: CopyDisksVirtV2V, All: RequiresConversion},
+			{Name: CopyDisksVirtV2V, All: OvaImageMigration},
 			{Name: ConvertOpenstackSnapshot, All: OpenstackImageMigration},
 			{Name: CreateVM},
 			{Name: PostHook, All: HasPostHook},
@@ -443,7 +440,7 @@ func markStartedStepsCompleted(vm *plan.VMStatus) {
 }
 
 func (r *Migration) deletePopulatorPVCs(vm *plan.VMStatus) (err error) {
-	if r.builder.SupportsVolumePopulators() {
+	if r.builder.SupportsVolumePopulators() || r.builder.SupportsOffloadPlugins() {
 		err = r.kubevirt.DeletePopulatedPVCs(vm)
 	}
 	return
@@ -643,8 +640,6 @@ func (r *Migration) step(vm *plan.VMStatus) (step string) {
 	switch vm.Phase {
 	case Started, CreateInitialSnapshot, WaitForInitialSnapshot, CreateDataVolumes:
 		step = Initialize
-	case AllocateDisks:
-		step = DiskAllocation
 	case CopyDisks, CopyingPaused, CreateSnapshot, WaitForSnapshot, AddCheckpoint, ConvertOpenstackSnapshot:
 		step = DiskTransfer
 	case CreateFinalSnapshot, WaitForFinalSnapshot, AddFinalCheckpoint, Finalize:
@@ -764,7 +759,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 		}
 
-		if r.builder.SupportsVolumePopulators() {
+		if r.builder.SupportsVolumePopulators() || r.builder.SupportsOffloadPlugins() {
 			var pvcs []*core.PersistentVolumeClaim
 			if pvcs, err = r.kubevirt.PopulatorVolumes(vm.Ref); err != nil {
 				if !errors.As(err, &web.ProviderNotReadyError{}) {
@@ -882,7 +877,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		step.MarkCompleted()
 		step.Phase = Completed
 		vm.Phase = r.next(vm.Phase)
-	case AllocateDisks, CopyDisks:
+	case CopyDisks:
 		step, found := vm.FindStep(r.step(vm))
 		if !found {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
@@ -891,9 +886,15 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		step.MarkStarted()
 		step.Phase = Running
 
-		if r.builder.SupportsVolumePopulators() {
+		if r.builder.SupportsVolumePopulators() || r.builder.SupportsOffloadPlugins() {
 			err = r.updatePopulatorCopyProgress(vm, step)
-		} else {
+		}
+		if err != nil {
+			step.AddError(err.Error())
+			err = nil
+			break
+		}
+		if !r.builder.SupportsVolumePopulators() {
 			// Fallback to non-volume populator path
 			err = r.updateCopyProgress(vm, step)
 		}
@@ -1255,7 +1256,7 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 						Phase:       Pending,
 					},
 				})
-		case AllocateDisks, CopyDisks, CopyDisksVirtV2V, ConvertOpenstackSnapshot:
+		case CopyDisks, CopyDisksVirtV2V, ConvertOpenstackSnapshot:
 			tasks, pErr := r.builder.Tasks(vm.Ref)
 			if pErr != nil {
 				err = liberr.Wrap(pErr)
@@ -1270,9 +1271,6 @@ func (r *Migration) buildPipeline(vm *plan.VM) (pipeline []*plan.Step, err error
 			case CopyDisks:
 				task_name = DiskTransfer
 				task_description = "Transfer disks."
-			case AllocateDisks:
-				task_name = DiskAllocation
-				task_description = "Allocate disks."
 			case CopyDisksVirtV2V:
 				task_name = DiskTransferV2v
 				task_description = "Copy disks."
@@ -1658,11 +1656,7 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 			break
 		}
 
-		coldLocal, err := r.Context.Plan.VSphereColdLocal()
-		switch {
-		case err != nil:
-			return liberr.Wrap(err)
-		case coldLocal:
+		if r.Context.Plan.IsSourceProviderOVA() {
 			if err := r.updateConversionProgressV2vMonitor(pod, step); err != nil {
 				// Just log it. Missing progress is not fatal.
 				log.Error(err, "Failed to update conversion progress")
@@ -1853,12 +1847,6 @@ type Predicate struct {
 
 // Evaluate predicate flags.
 func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
-	coldLocal, vErr := r.context.Plan.VSphereColdLocal()
-	if vErr != nil {
-		err = vErr
-		return
-	}
-
 	switch flag {
 	case HasPreHook:
 		_, allowed = r.vm.FindHook(PreHook)
@@ -1866,10 +1854,10 @@ func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 		_, allowed = r.vm.FindHook(PostHook)
 	case RequiresConversion:
 		allowed = r.context.Source.Provider.RequiresConversion()
+	case OvaImageMigration:
+		allowed = r.context.Plan.IsSourceProviderOVA()
 	case CDIDiskCopy:
-		allowed = !coldLocal
-	case VirtV2vDiskCopy:
-		allowed = coldLocal
+		allowed = !r.context.Plan.IsSourceProviderOVA()
 	case OpenstackImageMigration:
 		allowed = r.context.Plan.IsSourceProviderOpenstack()
 	}

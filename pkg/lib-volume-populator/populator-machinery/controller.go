@@ -99,6 +99,11 @@ var (
 			resource:           "openstackvolumepopulators",
 			regexKey:           "openstack_volume_populator",
 		},
+		"OffloadPluginVolumePopulator": {
+			storageResourceKey: "image_id",
+			regexKey:           "openstack_volume_populator",
+			resource:           "offloadpluginvolumepopulators",
+		},
 	}
 
 	monitoredPVCs = map[string]interface{}{}
@@ -605,6 +610,19 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 				labels["migration"] = migration
 			}
 
+			imageName := c.imageName
+			// The offload plugin contains the image in the spec so the users can specify different plugins
+			if imageName == "" {
+				imageFromResource, found, err := unstructured.NestedString(crInstance.Object, "spec", "image")
+				if err != nil {
+					return err
+				}
+				if found {
+					imageName = imageFromResource
+				} else {
+					return fmt.Errorf("failed to find the volume populator image in the resource spec")
+				}
+			}
 			// Make the pod
 			pod = &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -617,7 +635,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 			}
 			pod.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName = pvcPrimeName
 			con := &pod.Spec.Containers[0]
-			con.Image = c.imageName
+			con.Image = imageName
 			con.Args = args
 			if rawBlock {
 				con.VolumeDevices = []corev1.VolumeDevice{
