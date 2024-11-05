@@ -1658,7 +1658,7 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 			break
 		}
 
-		coldLocal, err := r.Context.Plan.VSphereColdLocal()
+		coldLocal, err := r.Context.Plan.VSphereUseV2vTransport()
 		switch {
 		case err != nil:
 			return liberr.Wrap(err)
@@ -1853,7 +1853,7 @@ type Predicate struct {
 
 // Evaluate predicate flags.
 func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
-	coldLocal, vErr := r.context.Plan.VSphereColdLocal()
+	coldLocal, vErr := r.context.Plan.VSphereUseV2vTransport()
 	if vErr != nil {
 		err = vErr
 		return

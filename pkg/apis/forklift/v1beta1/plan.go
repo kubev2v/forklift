@@ -22,6 +22,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	"github.com/konveyor/forklift-controller/pkg/settings"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -97,7 +98,7 @@ type Plan struct {
 // just use virt-v2v directly to convert the vm while copying data over. In other
 // cases, we use CDI to transfer disks to the destination cluster and then use
 // virt-v2v-in-place to convert these disks after cutover.
-func (p *Plan) VSphereColdLocal() (bool, error) {
+func (p *Plan) VSphereUseV2vTransport() (bool, error) {
 	source := p.Referenced.Provider.Source
 	if source == nil {
 		return false, liberr.New("Cannot analyze plan, source provider is missing.")
@@ -109,7 +110,7 @@ func (p *Plan) VSphereColdLocal() (bool, error) {
 
 	switch source.Type() {
 	case VSphere:
-		return !p.Spec.Warm && destination.IsHost(), nil
+		return !p.Spec.Warm && destination.IsHost() && settings.Settings.VsphereV2vTransport, nil
 	case Ova:
 		return true, nil
 	default:

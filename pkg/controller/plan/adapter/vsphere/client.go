@@ -277,7 +277,7 @@ func (r *Client) getChangeIds(vmRef ref.Ref, snapshotId string, hosts util.Hosts
 }
 
 func (r *Client) getClient(vm *model.VM, hosts util.HostsFunc) (client *vim25.Client, err error) {
-	if coldLocal, vErr := r.Plan.VSphereColdLocal(); vErr == nil && coldLocal {
+	if coldLocal, vErr := r.Plan.VSphereUseV2vTransport(); vErr == nil && coldLocal {
 		// when virt-v2v runs the migration, forklift-controller should interact only
 		// with the component that serves the SDK endpoint of the provider
 		client = r.client.Client

@@ -115,6 +115,12 @@ spec:
         - name: VIRT_CUSTOMIZE_MAP
           value: {{ virt_customize_configmap_name }}
 {% endif %}
+        - name: FEATURE_VSPHERE_VIRT_V2V_TRANSPORT
+{% if feature_vsphere_v2v_transport|bool %}
+          value: "true"
+{% else %}
+          value: "false"
+{% endif %}
 {% if controller_profile_kind is defined and controller_profile_path is defined and controller_profile_duration is defined %}
         - name: PROFILE_KIND
           value: "{{ controller_profile_kind }}"

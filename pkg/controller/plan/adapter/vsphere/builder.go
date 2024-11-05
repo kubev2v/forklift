@@ -434,7 +434,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 			if disk.Datastore.ID == ds.ID {
 				storageClass := mapped.Destination.StorageClass
 				var dvSource cdi.DataVolumeSource
-				coldLocal, vErr := r.Context.Plan.VSphereColdLocal()
+				coldLocal, vErr := r.Context.Plan.VSphereUseV2vTransport()
 				if vErr != nil {
 					err = vErr
 					return

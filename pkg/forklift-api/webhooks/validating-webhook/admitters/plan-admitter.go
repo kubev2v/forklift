@@ -109,7 +109,7 @@ func (admitter *PlanAdmitter) validateLUKS() error {
 		return err
 	}
 
-	coldLocal, vErr := admitter.plan.VSphereColdLocal()
+	coldLocal, vErr := admitter.plan.VSphereUseV2vTransport()
 	if vErr != nil {
 		log.Error(vErr, "Could not analyze plan, failing")
 		return vErr
