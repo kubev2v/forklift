@@ -326,6 +326,13 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	conditionRequiresReQ := plan.Status.HasReQCondition()
 	if plan.Status.HasBlockerCondition() || plan.Status.HasCondition(Archived) || conditionRequiresReQ {
 		if conditionRequiresReQ {
+			r.Log.Info(
+				"Found a condition requiring re-reconcile.",
+				"plan",
+				path.Join(
+					plan.GetNamespace(),
+					plan.GetName()))
+
 			reQ = base.SlowReQ
 		}
 		return
