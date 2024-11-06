@@ -440,8 +440,8 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Type:     VMMissingGuestIPs,
 		Status:   True,
 		Reason:   MissingGuestInfo,
-		Category: Critical,
-		Message:  "Guest information on vNICs is missing, cannot preserve static IPs. Make sure VMware tools are installed and the VM is running.",
+		Category: Warn,
+		Message:  "Guest information on vNICs is missing, cannot preserve static IPs. If this machine has static IP, make sure VMware tools are installed and the VM is running.",
 		Items:    []string{},
 	}
 	missingCbtForWarm := libcnd.Condition{
