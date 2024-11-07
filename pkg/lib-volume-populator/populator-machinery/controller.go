@@ -75,7 +75,7 @@ const (
 	reasonPodFinished        = "PopulatorFinished"
 	reasonPVCCreationError   = "PopulatorPVCCreationError"
 	reasonPopulatorProgress  = "PopulatorProgress"
-	AnnDefaultNetwork        = "v1.multus-cni.io/default-network"
+	AnnDefaultNetwork        = "k8s.v1.cni.cncf.io/networks"
 	AnnPopulatorReCreations  = "recreations"
 
 	qemuGroup = 107

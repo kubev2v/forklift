@@ -54,7 +54,7 @@ import (
 // Annotations
 const (
 	// Transfer network annotation (value=network-attachment-definition name)
-	AnnDefaultNetwork = "v1.multus-cni.io/default-network"
+	AnnDefaultNetwork = "k8s.v1.cni.cncf.io/networks"
 	// Contains validations for a Kubevirt VM. Needs to be removed when
 	// creating a VM from a template.
 	AnnKubevirtValidations = "vm.kubevirt.io/validations"
