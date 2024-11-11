@@ -114,11 +114,6 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (imageI
 	return
 }
 
-// Remove all warm migration snapshots.
-func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy, hostsFunc util.HostsFunc) (err error) {
-	return
-}
-
 // Check if a snapshot is ready to transfer.
 func (r *Client) CheckSnapshotReady(vmRef ref.Ref, imageID string) (ready bool, err error) {
 	return
@@ -127,6 +122,16 @@ func (r *Client) CheckSnapshotReady(vmRef ref.Ref, imageID string) (ready bool, 
 // Set DataVolume checkpoints.
 func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []cdi.DataVolume, final bool, hostsFunc util.HostsFunc) error {
 	return nil
+}
+
+// Remove a VM snapshot. No-op for this provider.
+func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hostsFunc util.HostsFunc) (err error) {
+	return
+}
+
+// Get disk deltas for a VM snapshot. No-op for this provider.
+func (r *Client) GetSnapshotDeltas(vmRef ref.Ref, snapshot string, hostsFunc util.HostsFunc) (s map[string]string, err error) {
+	return
 }
 
 // Close connections to the provider API.

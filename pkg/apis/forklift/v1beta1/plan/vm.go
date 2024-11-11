@@ -98,9 +98,29 @@ const (
 
 // Precopy durations
 type Precopy struct {
-	Start    *meta.Time `json:"start,omitempty"`
-	End      *meta.Time `json:"end,omitempty"`
-	Snapshot string     `json:"snapshot,omitempty"`
+	Start    *meta.Time  `json:"start,omitempty"`
+	End      *meta.Time  `json:"end,omitempty"`
+	Snapshot string      `json:"snapshot,omitempty"`
+	Deltas   []DiskDelta `json:"deltas,omitempty"`
+}
+
+func (r *Precopy) WithDeltas(deltas map[string]string) {
+	for disk, deltaId := range deltas {
+		r.Deltas = append(r.Deltas, DiskDelta{Disk: disk, DeltaID: deltaId})
+	}
+}
+
+func (r *Precopy) DeltaMap() map[string]string {
+	mapping := make(map[string]string)
+	for _, d := range r.Deltas {
+		mapping[d.Disk] = d.DeltaID
+	}
+	return mapping
+}
+
+type DiskDelta struct {
+	Disk    string `json:"disk"`
+	DeltaID string `json:"deltaId"`
 }
 
 // Find a step by name.

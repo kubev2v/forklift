@@ -45,13 +45,18 @@ func (r *Client) connect() (err error) {
 	return
 }
 
-// Create a VM snapshot and return its ID.
+// Create a VM snapshot and return its ID. No-op for this provider.
 func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (snapshot string, err error) {
 	return
 }
 
-// Remove all warm migration snapshots.
-func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy, hostsFunc util.HostsFunc) (err error) {
+// Remove a VM snapshot. No-op for this provider.
+func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hostsFunc util.HostsFunc) (err error) {
+	return
+}
+
+// Get disk deltas for a VM snapshot. No-op for this provider.
+func (r *Client) GetSnapshotDeltas(vmRef ref.Ref, snapshot string, hostsFunc util.HostsFunc) (s map[string]string, err error) {
 	return
 }
 
