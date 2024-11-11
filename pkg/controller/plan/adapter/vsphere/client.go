@@ -13,7 +13,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/util"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	"github.com/konveyor/forklift-controller/pkg/settings"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/session"
@@ -67,35 +66,22 @@ func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool,
 	return true, nil
 }
 
-// Remove all warm migration snapshots.
-func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy, hosts util.HostsFunc) (err error) {
-
+// Remove a VM snapshot.
+func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hosts util.HostsFunc) (err error) {
 	r.Log.V(1).Info("RemoveSnapshot",
 		"vmRef", vmRef,
-		"precopies", precopies,
-		"incremental", settings.Settings.VsphereIncrementalBackup)
-	if len(precopies) == 0 {
-		return
-	}
-	if settings.Settings.VsphereIncrementalBackup {
-		// only necessary to clean up the last snapshot if this feature is enabled,
-		// because all others will have already been cleaned up.
-		lastSnapshot := precopies[len(precopies)-1].Snapshot
-		err = r.removeSnapshot(vmRef, lastSnapshot, false, hosts)
-	} else {
-		rootSnapshot := precopies[0].Snapshot
-		err = r.removeSnapshot(vmRef, rootSnapshot, true, hosts)
-	}
+		"snapshot", snapshot)
+	err = r.removeSnapshot(vmRef, snapshot, false, hosts)
 	return
 }
 
 // Set DataVolume checkpoints.
 func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []cdi.DataVolume, final bool, hosts util.HostsFunc) (err error) {
 	n := len(precopies)
-	previous := ""
-	current := precopies[n-1].Snapshot
+	var previous planapi.Precopy
+	current := precopies[n-1]
 	if n >= 2 {
-		previous = precopies[n-2].Snapshot
+		previous = precopies[n-2]
 	}
 
 	r.Log.V(1).Info("SetCheckpoint",
@@ -103,36 +89,17 @@ func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, data
 		"precopies", precopies,
 		"datavolumes", datavolumes,
 		"final", final,
-		"current", current,
-		"previous", previous)
+		"current", current.Snapshot,
+		"previous", previous.Snapshot)
 
-	if settings.Settings.VsphereIncrementalBackup && previous != "" {
-		var changeIds map[string]string
-		changeIds, err = r.getChangeIds(vmRef, previous, hosts)
-		if err != nil {
-			return
-		}
-		for i := range datavolumes {
-			dv := &datavolumes[i]
-			dv.Spec.Checkpoints = append(dv.Spec.Checkpoints, cdi.DataVolumeCheckpoint{
-				Current:  current,
-				Previous: changeIds[dv.Spec.Source.VDDK.BackingFile],
-			})
-			dv.Spec.FinalCheckpoint = final
-		}
-		err = r.removeSnapshot(vmRef, previous, false, hosts)
-		if err != nil {
-			return
-		}
-	} else {
-		for i := range datavolumes {
-			dv := &datavolumes[i]
-			dv.Spec.Checkpoints = append(dv.Spec.Checkpoints, cdi.DataVolumeCheckpoint{
-				Current:  current,
-				Previous: previous,
-			})
-			dv.Spec.FinalCheckpoint = final
-		}
+	changeIds := previous.DeltaMap()
+	for i := range datavolumes {
+		dv := &datavolumes[i]
+		dv.Spec.Checkpoints = append(dv.Spec.Checkpoints, cdi.DataVolumeCheckpoint{
+			Current:  current.Snapshot,
+			Previous: changeIds[dv.Spec.Source.VDDK.BackingFile],
+		})
+		dv.Spec.FinalCheckpoint = final
 	}
 	return
 }
@@ -239,8 +206,8 @@ func (r *Client) PreTransferActions(vmRef ref.Ref) (ready bool, err error) {
 	return
 }
 
-// Get the changeId for a VM snapshot.
-func (r *Client) getChangeIds(vmRef ref.Ref, snapshotId string, hosts util.HostsFunc) (changeIdMapping map[string]string, err error) {
+// Get a mapping of disks and change IDs for a given snapshot.
+func (r *Client) GetSnapshotDeltas(vmRef ref.Ref, snapshotId string, hosts util.HostsFunc) (changeIdMapping map[string]string, err error) {
 	vm, err := r.getVM(vmRef, hosts)
 	if err != nil {
 		return

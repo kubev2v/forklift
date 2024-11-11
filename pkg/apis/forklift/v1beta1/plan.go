@@ -139,3 +139,5 @@ func (r *Plan) IsSourceProviderOvirt() bool {
 func (r *Plan) IsSourceProviderOCP() bool {
 	return r.Provider.Source.Type() == OpenShift
 }
+
+func (r *Plan) IsSourceProviderVSphere() bool { return r.Provider.Source.Type() == VSphere }
