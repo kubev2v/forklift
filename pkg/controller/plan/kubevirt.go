@@ -54,7 +54,7 @@ import (
 // Annotations
 const (
 	// Transfer network annotation (value=network-attachment-definition name)
-	AnnDefaultNetwork = "v1.multus-cni.io/default-network"
+	AnnTransferNetwork = "k8s.v1.cni.cncf.io/networks"
 	// Contains validations for a Kubevirt VM. Needs to be removed when
 	// creating a VM from a template.
 	AnnKubevirtValidations = "vm.kubevirt.io/validations"
@@ -1227,7 +1227,7 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 		annotations[planbase.AnnRetainAfterCompletion] = "true"
 	}
 	if r.Plan.Spec.TransferNetwork != nil {
-		annotations[AnnDefaultNetwork] = path.Join(
+		annotations[AnnTransferNetwork] = path.Join(
 			r.Plan.Spec.TransferNetwork.Namespace, r.Plan.Spec.TransferNetwork.Name)
 	}
 	if r.Plan.Spec.Warm || !r.Destination.Provider.IsHost() || r.Plan.IsSourceProviderOCP() {
@@ -1757,7 +1757,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	// pod annotations
 	annotations := map[string]string{}
 	if r.Plan.Spec.TransferNetwork != nil {
-		annotations[AnnDefaultNetwork] = path.Join(
+		annotations[AnnTransferNetwork] = path.Join(
 			r.Plan.Spec.TransferNetwork.Namespace, r.Plan.Spec.TransferNetwork.Name)
 	}
 	// pod
