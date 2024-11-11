@@ -39,6 +39,16 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (string
 	return "", nil
 }
 
+// Remove a VM snapshot. No-op for this provider.
+func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hostsFunc util.HostsFunc) (err error) {
+	return
+}
+
+// Get disk deltas for a VM snapshot. No-op for this provider.
+func (r *Client) GetSnapshotDeltas(vmRef ref.Ref, snapshot string, hostsFunc util.HostsFunc) (s map[string]string, err error) {
+	return
+}
+
 // Finalize implements base.Client
 func (r *Client) Finalize(vms []*planapi.VMStatus, planName string) {
 	for _, vm := range vms {
@@ -121,11 +131,6 @@ func (r *Client) PoweredOff(vmRef ref.Ref) (bool, error) {
 	}
 
 	return true, nil
-}
-
-// RemoveSnapshots implements base.Client
-func (r *Client) RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy, hostsFunc util.HostsFunc) error {
-	return nil
 }
 
 // SetCheckpoints implements base.Client
