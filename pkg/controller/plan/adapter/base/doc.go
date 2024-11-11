@@ -105,8 +105,8 @@ type Client interface {
 	PoweredOff(vmRef ref.Ref) (bool, error)
 	// Create a snapshot of the source VM.
 	CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (string, error)
-	// Remove all warm migration snapshots.
-	RemoveSnapshots(vmRef ref.Ref, precopies []planapi.Precopy, hostsFunc util.HostsFunc) error
+	// Remove a snapshot.
+	RemoveSnapshot(vmRef ref.Ref, snapshot string, hostsFunc util.HostsFunc) error
 	// Check if a snapshot is ready to transfer.
 	CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool, err error)
 	// Set DataVolume checkpoints.
@@ -119,6 +119,8 @@ type Client interface {
 	DetachDisks(vmRef ref.Ref) error
 	// Actions on source env needed before running the populator pods
 	PreTransferActions(vmRef ref.Ref) (ready bool, err error)
+	// Get disk deltas for a VM snapshot.
+	GetSnapshotDeltas(vmRef ref.Ref, snapshot string, hostsFunc util.HostsFunc) (map[string]string, error)
 }
 
 // Validator API.

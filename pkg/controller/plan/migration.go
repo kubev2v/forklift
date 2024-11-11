@@ -49,35 +49,41 @@ var (
 	CDIDiskCopy             libitr.Flag = 0x08
 	VirtV2vDiskCopy         libitr.Flag = 0x10
 	OpenstackImageMigration libitr.Flag = 0x20
+	VSphere                 libitr.Flag = 0x30
 )
 
 // Phases.
 const (
-	Started                  = "Started"
-	PreHook                  = "PreHook"
-	StorePowerState          = "StorePowerState"
-	PowerOffSource           = "PowerOffSource"
-	WaitForPowerOff          = "WaitForPowerOff"
-	CreateDataVolumes        = "CreateDataVolumes"
-	CreateVM                 = "CreateVM"
-	CopyDisks                = "CopyDisks"
-	AllocateDisks            = "AllocateDisks"
-	CopyingPaused            = "CopyingPaused"
-	AddCheckpoint            = "AddCheckpoint"
-	AddFinalCheckpoint       = "AddFinalCheckpoint"
-	CreateSnapshot           = "CreateSnapshot"
-	CreateInitialSnapshot    = "CreateInitialSnapshot"
-	CreateFinalSnapshot      = "CreateFinalSnapshot"
-	Finalize                 = "Finalize"
-	CreateGuestConversionPod = "CreateGuestConversionPod"
-	ConvertGuest             = "ConvertGuest"
-	CopyDisksVirtV2V         = "CopyDisksVirtV2V"
-	PostHook                 = "PostHook"
-	Completed                = "Completed"
-	WaitForSnapshot          = "WaitForSnapshot"
-	WaitForInitialSnapshot   = "WaitForInitialSnapshot"
-	WaitForFinalSnapshot     = "WaitForFinalSnapshot"
-	ConvertOpenstackSnapshot = "ConvertOpenstackSnapshot"
+	Started                    = "Started"
+	PreHook                    = "PreHook"
+	StorePowerState            = "StorePowerState"
+	PowerOffSource             = "PowerOffSource"
+	WaitForPowerOff            = "WaitForPowerOff"
+	CreateDataVolumes          = "CreateDataVolumes"
+	CreateVM                   = "CreateVM"
+	CopyDisks                  = "CopyDisks"
+	AllocateDisks              = "AllocateDisks"
+	CopyingPaused              = "CopyingPaused"
+	AddCheckpoint              = "AddCheckpoint"
+	AddFinalCheckpoint         = "AddFinalCheckpoint"
+	CreateSnapshot             = "CreateSnapshot"
+	CreateInitialSnapshot      = "CreateInitialSnapshot"
+	CreateFinalSnapshot        = "CreateFinalSnapshot"
+	Finalize                   = "Finalize"
+	CreateGuestConversionPod   = "CreateGuestConversionPod"
+	ConvertGuest               = "ConvertGuest"
+	CopyDisksVirtV2V           = "CopyDisksVirtV2V"
+	PostHook                   = "PostHook"
+	Completed                  = "Completed"
+	WaitForSnapshot            = "WaitForSnapshot"
+	WaitForInitialSnapshot     = "WaitForInitialSnapshot"
+	WaitForFinalSnapshot       = "WaitForFinalSnapshot"
+	ConvertOpenstackSnapshot   = "ConvertOpenstackSnapshot"
+	GetSnapshotDeltas          = "GetSnapshotDeltas"
+	StoreInitialSnapshotDeltas = "StoreInitialSnapshotDeltas"
+	RemovePreviousSnapshot     = "RemovePreviousSnapshot"
+	RemovePenultimateSnapshot  = "RemovePenultimateSnapshot"
+	RemoveFinalSnapshot        = "RemoveFinalSnapshot"
 )
 
 // Steps.
@@ -125,19 +131,24 @@ var (
 			{Name: PreHook, All: HasPreHook},
 			{Name: CreateInitialSnapshot},
 			{Name: WaitForInitialSnapshot},
+			{Name: StoreInitialSnapshotDeltas, All: VSphere},
 			{Name: CreateDataVolumes},
 			{Name: CopyDisks},
 			{Name: CopyingPaused},
+			{Name: RemovePreviousSnapshot, All: VSphere},
 			{Name: CreateSnapshot},
 			{Name: WaitForSnapshot},
+			{Name: GetSnapshotDeltas, All: VSphere},
 			{Name: AddCheckpoint},
 			{Name: StorePowerState},
 			{Name: PowerOffSource},
 			{Name: WaitForPowerOff},
+			{Name: RemovePenultimateSnapshot, All: VSphere},
 			{Name: CreateFinalSnapshot},
 			{Name: WaitForFinalSnapshot},
 			{Name: AddFinalCheckpoint},
 			{Name: Finalize},
+			{Name: RemoveFinalSnapshot, All: VSphere},
 			{Name: CreateGuestConversionPod, All: RequiresConversion},
 			{Name: ConvertGuest, All: RequiresConversion},
 			{Name: CreateVM},
@@ -501,7 +512,12 @@ func (r *Migration) removeWarmSnapshots(vm *plan.VMStatus) {
 	if vm.Warm == nil {
 		return
 	}
-	if err := r.provider.RemoveSnapshots(vm.Ref, vm.Warm.Precopies, r.kubevirt.loadHosts); err != nil {
+	n := len(vm.Warm.Precopies)
+	if n < 1 {
+		return
+	}
+	snapshot := vm.Warm.Precopies[n-1].Snapshot
+	if err := r.provider.RemoveSnapshot(vm.Ref, snapshot, r.kubevirt.loadHosts); err != nil {
 		r.Log.Error(
 			err,
 			"Failed to clean up warm migration snapshots.",
@@ -641,13 +657,13 @@ func (r *Migration) itinerary() *libitr.Itinerary {
 // Get the name of the pipeline step corresponding to the current VM phase.
 func (r *Migration) step(vm *plan.VMStatus) (step string) {
 	switch vm.Phase {
-	case Started, CreateInitialSnapshot, WaitForInitialSnapshot, CreateDataVolumes:
+	case Started, CreateInitialSnapshot, WaitForInitialSnapshot, StoreInitialSnapshotDeltas, CreateDataVolumes:
 		step = Initialize
 	case AllocateDisks:
 		step = DiskAllocation
-	case CopyDisks, CopyingPaused, CreateSnapshot, WaitForSnapshot, AddCheckpoint, ConvertOpenstackSnapshot:
+	case CopyDisks, CopyingPaused, RemovePreviousSnapshot, CreateSnapshot, WaitForSnapshot, GetSnapshotDeltas, AddCheckpoint, ConvertOpenstackSnapshot:
 		step = DiskTransfer
-	case CreateFinalSnapshot, WaitForFinalSnapshot, AddFinalCheckpoint, Finalize:
+	case RemovePenultimateSnapshot, CreateFinalSnapshot, WaitForFinalSnapshot, AddFinalCheckpoint, Finalize, RemoveFinalSnapshot:
 		step = Cutover
 	case CreateGuestConversionPod, ConvertGuest:
 		step = ImageConversion
@@ -972,6 +988,20 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		} else if vm.Warm.NextPrecopyAt != nil && !vm.Warm.NextPrecopyAt.After(time.Now()) {
 			vm.Phase = CreateSnapshot
 		}
+	case RemovePreviousSnapshot, RemovePenultimateSnapshot, RemoveFinalSnapshot:
+		step, found := vm.FindStep(r.step(vm))
+		if !found {
+			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
+			break
+		}
+		n := len(vm.Warm.Precopies)
+		err = r.provider.RemoveSnapshot(vm.Ref, vm.Warm.Precopies[n-1].Snapshot, r.kubevirt.loadHosts)
+		if err != nil {
+			step.AddError(err.Error())
+			err = nil
+			break
+		}
+		vm.Phase = r.next(vm.Phase)
 	case CreateInitialSnapshot, CreateSnapshot, CreateFinalSnapshot:
 		step, found := vm.FindStep(r.step(vm))
 		if !found {
@@ -1008,6 +1038,24 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		if ready {
 			vm.Phase = r.next(vm.Phase)
 		}
+	case StoreInitialSnapshotDeltas, GetSnapshotDeltas:
+		step, found := vm.FindStep(r.step(vm))
+		if !found {
+			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
+			break
+		}
+
+		n := len(vm.Warm.Precopies)
+		snapshot := vm.Warm.Precopies[n-1].Snapshot
+		var deltas map[string]string
+		deltas, err = r.provider.GetSnapshotDeltas(vm.Ref, snapshot, r.kubevirt.loadHosts)
+		if err != nil {
+			step.AddError(err.Error())
+			err = nil
+			break
+		}
+		vm.Warm.Precopies[n-1].WithDeltas(deltas)
+		vm.Phase = r.next(vm.Phase)
 	case AddCheckpoint, AddFinalCheckpoint:
 		step, found := vm.FindStep(r.step(vm))
 		if !found {
@@ -1095,14 +1143,6 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			return
 		}
 		if step.MarkedCompleted() {
-			err = r.provider.RemoveSnapshots(vm.Ref, vm.Warm.Precopies, r.kubevirt.loadHosts)
-			if err != nil {
-				r.Log.Info(
-					"Failed to clean up warm migration snapshots.",
-					"vm",
-					vm)
-				err = nil
-			}
 			if !step.HasError() {
 				step.Phase = Completed
 				vm.Phase = r.next(vm.Phase)
@@ -1872,6 +1912,8 @@ func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 		allowed = coldLocal
 	case OpenstackImageMigration:
 		allowed = r.context.Plan.IsSourceProviderOpenstack()
+	case VSphere:
+		allowed = r.context.Plan.IsSourceProviderVSphere()
 	}
 
 	return
