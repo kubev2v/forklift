@@ -75,7 +75,7 @@ const (
 	reasonPodFinished        = "PopulatorFinished"
 	reasonPVCCreationError   = "PopulatorPVCCreationError"
 	reasonPopulatorProgress  = "PopulatorProgress"
-	AnnDefaultNetwork        = "k8s.v1.cni.cncf.io/networks"
+	AnnTransferNetwork       = "k8s.v1.cni.cncf.io/networks"
 	AnnPopulatorReCreations  = "recreations"
 
 	qemuGroup = 107
@@ -594,7 +594,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 			annotations := make(map[string]string)
 			if found {
 				// Join the transfer network namespace and name
-				annotations[AnnDefaultNetwork] = fmt.Sprintf("%s/%s", transferNetwork["namespace"], transferNetwork["name"])
+				annotations[AnnTransferNetwork] = fmt.Sprintf("%s/%s", transferNetwork["namespace"], transferNetwork["name"])
 			}
 			migration, found, err := unstructured.NestedString(crInstance.Object, "metadata", "labels", "migration")
 			if err != nil {
