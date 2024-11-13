@@ -180,78 +180,39 @@ generate-verify: generate
 	./hack/verify-generate.sh
 
 build-controller-image: check_container_runtime
-	export CONTAINER_CMD=$(CONTAINER_CMD); \
-	bazel run cmd/forklift-controller:forklift-controller-image \
-		$(BAZEL_OPTS) \
-		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
+	$(CONTAINER_CMD) build -t $(CONTROLLER_IMAGE) -f ./build/forklift-controller/Containerfile .
 
 push-controller-image: build-controller-image
-	$(CONTAINER_CMD) tag bazel/cmd/forklift-controller:forklift-controller-image $(CONTROLLER_IMAGE)
 	$(CONTAINER_CMD) push $(CONTROLLER_IMAGE)
 
 build-api-image: check_container_runtime
-	export CONTAINER_CMD=$(CONTAINER_CMD); \
-	bazel run cmd/forklift-api:forklift-api-image \
-		$(BAZEL_OPTS) \
-		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
+	$(CONTAINER_CMD) build -t $(API_IMAGE) -f ./build/forklift-api/Containerfile .
 
 push-api-image: build-api-image
-	$(CONTAINER_CMD) tag bazel/cmd/forklift-api:forklift-api-image $(API_IMAGE)
 	$(CONTAINER_CMD) push $(API_IMAGE)
 
 build-validation-image: check_container_runtime
-	export CONTAINER_CMD=$(CONTAINER_CMD); \
-	bazel run validation:forklift-validation-image \
-		$(BAZEL_OPTS) \
-		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
+	$(CONTAINER_CMD) build -t $(VALIDATION_IMAGE) -f ./build/validation/Containerfile .
 
 push-validation-image: build-validation-image
-	$(CONTAINER_CMD) tag bazel/validation:forklift-validation-image $(VALIDATION_IMAGE)
 	$(CONTAINER_CMD) push $(VALIDATION_IMAGE)
 
 build-operator-image: check_container_runtime
-	export CONTAINER_CMD=$(CONTAINER_CMD); \
-	bazel run operator:forklift-operator-image \
-		$(BAZEL_OPTS) \
-		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
+	$(CONTAINER_CMD) build -t $(OPERATOR_IMAGE) -f ./build/forklift-operator/Containerfile .
 
 push-operator-image: build-operator-image
-	$(CONTAINER_CMD) tag bazel/operator:forklift-operator-image $(OPERATOR_IMAGE)
 	$(CONTAINER_CMD) push $(OPERATOR_IMAGE)
 
 build-virt-v2v-image: check_container_runtime
-	export CONTAINER_CMD=$(CONTAINER_CMD); \
-	bazel run --package_path=virt-v2v forklift-virt-v2v \
-		$(BAZEL_OPTS) \
-		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
+	$(CONTAINER_CMD) build -t $(VIRT_V2V_IMAGE) -f ./build/virt-v2v/Containerfile .
 
 push-virt-v2v-image: build-virt-v2v-image
-	$(CONTAINER_CMD) tag bazel:forklift-virt-v2v $(VIRT_V2V_IMAGE)
 	$(CONTAINER_CMD) push $(VIRT_V2V_IMAGE)
 
 build-operator-bundle-image: check_container_runtime
-	export CONTAINER_CMD=$(CONTAINER_CMD); \
-	bazel run operator:forklift-operator-bundle-image \
-		$(BAZEL_OPTS) \
-		--action_env CONTAINER_CMD=$(CONTAINER_CMD) \
-		--action_env VERSION=$(VERSION) \
-		--action_env NAMESPACE=$(NAMESPACE) \
-		--action_env CHANNELS=$(CHANNELS) \
-		--action_env DEFAULT_CHANNEL=$(DEFAULT_CHANNEL) \
-		--action_env OPERATOR_IMAGE=$(OPERATOR_IMAGE) \
-		--action_env MUST_GATHER_IMAGE=$(MUST_GATHER_IMAGE) \
-		--action_env UI_PLUGIN_IMAGE=$(UI_PLUGIN_IMAGE) \
-		--action_env VALIDATION_IMAGE=$(VALIDATION_IMAGE) \
-		--action_env VIRT_V2V_IMAGE=$(VIRT_V2V_IMAGE) \
-		--action_env CONTROLLER_IMAGE=$(CONTROLLER_IMAGE) \
-		--action_env API_IMAGE=$(API_IMAGE) \
-		--action_env POPULATOR_CONTROLLER_IMAGE=$(POPULATOR_CONTROLLER_IMAGE) \
-		--action_env OVIRT_POPULATOR_IMAGE=$(OVIRT_POPULATOR_IMAGE) \
-		--action_env OPENSTACK_POPULATOR_IMAGE=$(OPENSTACK_POPULATOR_IMAGE)\
-		--action_env OVA_PROVIDER_SERVER_IMAGE=$(OVA_PROVIDER_SERVER_IMAGE)
+	$(CONTAINER_CMD) build -t $(OPERATOR_BUNDLE_IMAGE) -f ./build/forklift-operator-bundle/Containerfile .
 
 push-operator-bundle-image: build-operator-bundle-image
-	 $(CONTAINER_CMD) tag bazel/operator:forklift-operator-bundle-image $(OPERATOR_BUNDLE_IMAGE)
 	 $(CONTAINER_CMD) push $(OPERATOR_BUNDLE_IMAGE)
 
 build-operator-index-image: check_container_runtime
@@ -272,43 +233,27 @@ push-operator-index-image: build-operator-index-image
 	$(CONTAINER_CMD) push $(OPERATOR_INDEX_IMAGE)
 
 build-populator-controller-image: check_container_runtime
-	export CONTAINER_CMD=$(CONTAINER_CMD); \
-	bazel run cmd/populator-controller:populator-controller-image \
-		$(BAZEL_OPTS) \
-		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
+	$(CONTAINER_CMD) build -t $(POPULATOR_CONTROLLER_IMAGE) -f ./build/populator-controller/Containerfile .
 
 push-populator-controller-image: build-populator-controller-image
-	$(CONTAINER_CMD) tag bazel/cmd/populator-controller:populator-controller-image $(POPULATOR_CONTROLLER_IMAGE)
 	$(CONTAINER_CMD) push $(POPULATOR_CONTROLLER_IMAGE)
 
 build-ovirt-populator-image:
-	export CONTAINER_CMD=$(CONTAINER_CMD); \
-	bazel run cmd/ovirt-populator:ovirt-populator-image \
-		$(BAZEL_OPTS) \
-		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
+	$(CONTAINER_CMD) build -t $(OVIRT_POPULATOR_IMAGE) -f ./build/ovirt-populator/Containerfile .
 
 push-ovirt-populator-image: build-ovirt-populator-image
-	$(CONTAINER_CMD) tag bazel/cmd/ovirt-populator:ovirt-populator-image $(OVIRT_POPULATOR_IMAGE)
 	$(CONTAINER_CMD) push $(OVIRT_POPULATOR_IMAGE)
 
 build-openstack-populator-image: check_container_runtime
-	export CONTAINER_CMD=$(CONTAINER_CMD); \
-	bazel run cmd/openstack-populator:openstack-populator-image \
-		$(BAZEL_OPTS) \
-		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
+	$(CONTAINER_CMD) build -t $(OPENSTACK_POPULATOR_IMAGE) -f ./build/openstack-populator/Containerfile .
 
 push-openstack-populator-image: build-openstack-populator-image
-	$(CONTAINER_CMD) tag bazel/cmd/openstack-populator:openstack-populator-image $(OPENSTACK_POPULATOR_IMAGE)
 	$(CONTAINER_CMD) push $(OPENSTACK_POPULATOR_IMAGE)
 
 build-ova-provider-server-image: check_container_runtime
-	export CONTAINER_CMD=$(CONTAINER_CMD); \
-	bazel run cmd/ova-provider-server:ova-provider-server-image \
-		$(BAZEL_OPTS) \
-		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
+	$(CONTAINER_CMD) build -t $(OVA_PROVIDER_SERVER_IMAGE) -f ./build/ova-provider-server/Containerfile .
 
 push-ova-provider-server-image: build-ova-provider-server-image
-	$(CONTAINER_CMD) tag bazel/cmd/ova-provider-server:ova-provider-server-image $(OVA_PROVIDER_SERVER_IMAGE)
 	$(CONTAINER_CMD) push $(OVA_PROVIDER_SERVER_IMAGE)
 
 build-all-images: build-api-image \
@@ -413,25 +358,6 @@ install-crc:
 
 uninstall-crc:
 	crc delete -f
-
-# Driver: kvm2, docker or podman.
-MINIKUBE_DRIVER ?= $(CONTAINER_RUNTIME)
-MINIKUBE_CPUS ?= max
-MINIKUBE_MEMORY ?= 16384
-MINIKUBE_ADDONS ?= olm,kubevirt
-MINIKUBE_USE_INTEGRATED_REGISTRY ?=
-
-install-minikube:
-	ROOTLESS=$(ROOTLESS) \
-	MINIKUBE_DRIVER=$(MINIKUBE_DRIVER) \
-	MINIKUBE_CPUS=$(MINIKUBE_CPUS) \
-	MINIKUBE_MEMORY=$(MINIKUBE_MEMORY) \
-	MINIKUBE_ADDONS=$(MINIKUBE_ADDONS) \
-	MINIKUBE_USE_INTEGRATED_REGISTRY=$(MINIKUBE_USE_INTEGRATED_REGISTRY) \
-	./hack/installation/minikube.sh
-
-uninstall-minikube:
-	minikube delete
 
 ROOTLESS ?= true
 # Kind version to install (default: v0.15.0)
