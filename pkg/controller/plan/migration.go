@@ -503,12 +503,12 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool) error
 		return err
 	}
 
-	r.removeWarmSnapshots(vm)
+	r.removeLastWarmSnapshot(vm)
 
 	return nil
 }
 
-func (r *Migration) removeWarmSnapshots(vm *plan.VMStatus) {
+func (r *Migration) removeLastWarmSnapshot(vm *plan.VMStatus) {
 	if vm.Warm == nil {
 		return
 	}
