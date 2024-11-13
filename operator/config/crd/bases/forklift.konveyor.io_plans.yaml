@@ -1051,6 +1051,18 @@ spec:
                               items:
                                 description: Precopy durations
                                 properties:
+                                  deltas:
+                                    items:
+                                      properties:
+                                        deltaId:
+                                          type: string
+                                        disk:
+                                          type: string
+                                      required:
+                                      - deltaId
+                                      - disk
+                                      type: object
+                                    type: array
                                   end:
                                     format: date-time
                                     type: string
