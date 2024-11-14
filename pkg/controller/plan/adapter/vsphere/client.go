@@ -237,8 +237,12 @@ func (r *Client) GetSnapshotDeltas(vmRef ref.Ref, snapshotId string, hosts util.
 		case *types.VirtualDiskRawDiskVer2BackingInfo:
 			changeIdMapping[trimBackingFileName(dev.DescriptorFileName)] = dev.ChangeId
 		}
-
 	}
+
+	r.Log.V(1).Info("GetSnapshotDeltas",
+		"vmRef", vmRef,
+		"snapshot", snapshotId,
+		"deltas", changeIdMapping)
 
 	return
 }
