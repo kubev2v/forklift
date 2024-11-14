@@ -6,7 +6,7 @@ import (
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 )
 
-const NumPredicates = 24
+const NumPredicates = 0x40
 
 // List of steps.
 type Pipeline []Step

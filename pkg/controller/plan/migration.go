@@ -49,7 +49,7 @@ var (
 	CDIDiskCopy             libitr.Flag = 0x08
 	VirtV2vDiskCopy         libitr.Flag = 0x10
 	OpenstackImageMigration libitr.Flag = 0x20
-	VSphere                 libitr.Flag = 0x30
+	VSphere                 libitr.Flag = 0x40
 )
 
 // Phases.
@@ -79,7 +79,7 @@ const (
 	WaitForInitialSnapshot     = "WaitForInitialSnapshot"
 	WaitForFinalSnapshot       = "WaitForFinalSnapshot"
 	ConvertOpenstackSnapshot   = "ConvertOpenstackSnapshot"
-	GetSnapshotDeltas          = "GetSnapshotDeltas"
+	StoreSnapshotDeltas        = "StoreSnapshotDeltas"
 	StoreInitialSnapshotDeltas = "StoreInitialSnapshotDeltas"
 	RemovePreviousSnapshot     = "RemovePreviousSnapshot"
 	RemovePenultimateSnapshot  = "RemovePenultimateSnapshot"
@@ -138,7 +138,7 @@ var (
 			{Name: RemovePreviousSnapshot, All: VSphere},
 			{Name: CreateSnapshot},
 			{Name: WaitForSnapshot},
-			{Name: GetSnapshotDeltas, All: VSphere},
+			{Name: StoreSnapshotDeltas, All: VSphere},
 			{Name: AddCheckpoint},
 			{Name: StorePowerState},
 			{Name: PowerOffSource},
@@ -661,7 +661,7 @@ func (r *Migration) step(vm *plan.VMStatus) (step string) {
 		step = Initialize
 	case AllocateDisks:
 		step = DiskAllocation
-	case CopyDisks, CopyingPaused, RemovePreviousSnapshot, CreateSnapshot, WaitForSnapshot, GetSnapshotDeltas, AddCheckpoint, ConvertOpenstackSnapshot:
+	case CopyDisks, CopyingPaused, RemovePreviousSnapshot, CreateSnapshot, WaitForSnapshot, StoreSnapshotDeltas, AddCheckpoint, ConvertOpenstackSnapshot:
 		step = DiskTransfer
 	case RemovePenultimateSnapshot, CreateFinalSnapshot, WaitForFinalSnapshot, AddFinalCheckpoint, Finalize, RemoveFinalSnapshot:
 		step = Cutover
@@ -1038,7 +1038,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		if ready {
 			vm.Phase = r.next(vm.Phase)
 		}
-	case StoreInitialSnapshotDeltas, GetSnapshotDeltas:
+	case StoreInitialSnapshotDeltas, StoreSnapshotDeltas:
 		step, found := vm.FindStep(r.step(vm))
 		if !found {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
