@@ -986,7 +986,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		if r.Migration.Spec.Cutover != nil && !r.Migration.Spec.Cutover.After(time.Now()) {
 			vm.Phase = StorePowerState
 		} else if vm.Warm.NextPrecopyAt != nil && !vm.Warm.NextPrecopyAt.After(time.Now()) {
-			vm.Phase = CreateSnapshot
+			vm.Phase = r.next(vm.Phase)
 		}
 	case RemovePreviousSnapshot, RemovePenultimateSnapshot, RemoveFinalSnapshot:
 		step, found := vm.FindStep(r.step(vm))
