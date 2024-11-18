@@ -67,11 +67,11 @@ func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool,
 }
 
 // Remove a VM snapshot.
-func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hosts util.HostsFunc) (err error) {
+func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hosts util.HostsFunc, consolidate bool) (err error) {
 	r.Log.V(1).Info("RemoveSnapshot",
 		"vmRef", vmRef,
 		"snapshot", snapshot)
-	err = r.removeSnapshot(vmRef, snapshot, false, hosts)
+	err = r.removeSnapshot(vmRef, snapshot, false, hosts, consolidate)
 	return
 }
 
@@ -371,7 +371,7 @@ func nullableHosts() (hosts map[string]*v1beta1.Host, err error) {
 }
 
 // Remove a VM snapshot and optionally its children.
-func (r *Client) removeSnapshot(vmRef ref.Ref, snapshot string, children bool, hosts util.HostsFunc) (err error) {
+func (r *Client) removeSnapshot(vmRef ref.Ref, snapshot string, children bool, hosts util.HostsFunc, consolidate bool) (err error) {
 	r.Log.Info("Removing snapshot",
 		"vmRef", vmRef,
 		"snapshot", snapshot,
@@ -381,7 +381,7 @@ func (r *Client) removeSnapshot(vmRef ref.Ref, snapshot string, children bool, h
 	if err != nil {
 		return
 	}
-	_, err = vm.RemoveSnapshot(context.TODO(), snapshot, children, nil)
+	_, err = vm.RemoveSnapshot(context.TODO(), snapshot, children, &consolidate)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
