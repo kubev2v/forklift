@@ -381,11 +381,17 @@ func (r *Client) removeSnapshot(vmRef ref.Ref, snapshot string, children bool, h
 	if err != nil {
 		return
 	}
-	_, err = vm.RemoveSnapshot(context.TODO(), snapshot, children, &consolidate)
+	task, err := vm.RemoveSnapshot(context.TODO(), snapshot, children, &consolidate)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
+	res, err := task.WaitForResult(context.TODO(), nil)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	r.Log.Info("Deleted snapshot", "vmRef", vmRef, "state", res.State)
 	return
 }
 
