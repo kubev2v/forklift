@@ -124,8 +124,13 @@ func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, data
 	return nil
 }
 
+// Check if the VM has a disk consolidation.
+func (r *Client) CheckDisksConsolidationReady(vmRef ref.Ref, hostsFunc util.HostsFunc) (b bool, err error) {
+	return true, nil
+}
+
 // Remove a VM snapshot. No-op for this provider.
-func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hostsFunc util.HostsFunc, consolidate bool) (err error) {
+func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hostsFunc util.HostsFunc) (err error) {
 	return
 }
 

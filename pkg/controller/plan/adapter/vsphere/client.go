@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	liburl "net/url"
+	"sort"
 	"strconv"
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
@@ -17,6 +18,7 @@ import (
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/session"
 	"github.com/vmware/govmomi/vim25"
+	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
@@ -27,8 +29,11 @@ import (
 )
 
 const (
-	snapshotName = "forklift-migration-precopy"
-	snapshotDesc = "Forklift Operator warm migration precopy"
+	snapshotName            = "forklift-migration-precopy"
+	snapshotDesc            = "Forklift Operator warm migration precopy"
+	vmDiskConsolidatedEvent = "com.vmware.vc.VmDiskConsolidatedEvent"
+	taskEvent               = "vim.event.TaskEvent"
+	removeSnapshotTaskName  = "RemoveSnapshot_Task"
 )
 
 // vSphere VM Client
@@ -67,12 +72,111 @@ func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool,
 }
 
 // Remove a VM snapshot.
-func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hosts util.HostsFunc, consolidate bool) (err error) {
+func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hosts util.HostsFunc) (err error) {
 	r.Log.V(1).Info("RemoveSnapshot",
 		"vmRef", vmRef,
 		"snapshot", snapshot)
-	err = r.removeSnapshot(vmRef, snapshot, false, hosts, consolidate)
+	err = r.removeSnapshot(vmRef, snapshot, false, hosts)
 	return
+}
+
+// Remove a VM snapshot. No-op for this provider.
+func (r *Client) CheckDisksConsolidationReady(vmRef ref.Ref, hostsFunc util.HostsFunc) (b bool, err error) {
+	vm, err := r.getVM(vmRef, hostsFunc)
+	if err != nil {
+		return
+	}
+	// Create an EventFilterSpec for VmDiskConsolidatedEvent and the specific VM
+	events, err := r.getEvents(vm)
+	if err != nil {
+		return false, err
+	}
+	snapshotRemovalEvent := r.getLatestSnapshotRemovalEvent(events)
+	if snapshotRemovalEvent == nil {
+		r.Log.V(1).Info("No snapshot event found",
+			"vmRef", vmRef)
+		return false, nil
+	}
+	eventInfo := snapshotRemovalEvent.(*types.TaskEvent).Info
+	switch eventInfo.State {
+	// @mnecas note: I was getting TaskInfoStateQueued even after the snapshot was removed and consolidated
+	case types.TaskInfoStateSuccess, types.TaskInfoStateQueued, types.TaskInfoStateRunning:
+		r.Log.V(1).Info("Consolidation check", "removalEventState", eventInfo.State,
+			"vmRef", vmRef)
+		// If the snapshot removal task finished check the consolidation event
+		return r.hasSnapshotRemovalConsolidation(vm, snapshotRemovalEvent)
+	case types.TaskInfoStateError:
+		r.Log.V(1).Info("The snapshot removal task failed with TaskInfoStateError",
+			"vmRef", vmRef)
+		return false, fmt.Errorf("snapshot removal task failed with TaskInfoStateError", eventInfo.Error)
+	default:
+		r.Log.V(1).Info("Unknown task state",
+			"vmRef", vmRef)
+		return false, fmt.Errorf("unknown task state", "vmRef", vmRef)
+	}
+}
+
+func (r *Client) getEvents(vm *object.VirtualMachine) ([]types.BaseEvent, error) {
+	// Query for events
+	filter := types.EventFilterSpec{
+		EventTypeId: []string{taskEvent},
+		Entity: &types.EventFilterSpecByEntity{
+			Entity:    vm.Reference(),
+			Recursion: types.EventFilterSpecRecursionOptionSelf,
+		},
+	}
+	req := types.QueryEvents{
+		This:   r.client.ServiceContent.EventManager.Reference(),
+		Filter: filter,
+	}
+
+	response, err := methods.QueryEvents(context.TODO(), r.client, &req)
+	if err != nil {
+		return nil, err
+	}
+	return response.Returnval, err
+}
+
+func (r *Client) getLatestSnapshotRemovalEvent(events []types.BaseEvent) types.BaseEvent {
+	sortedEvents := r.sortEventsByCreationTime(events)
+	for _, event := range sortedEvents {
+		eventInfo := event.(*types.TaskEvent).Info
+		if eventInfo.Name == removeSnapshotTaskName {
+			return event
+		}
+	}
+	return nil
+}
+
+func (r *Client) sortEventsByCreationTime(events []types.BaseEvent) []types.BaseEvent {
+	sortedEvents := make([]types.BaseEvent, len(events))
+	copy(sortedEvents, events)
+	sort.Slice(sortedEvents, func(i, j int) bool {
+		return sortedEvents[i].GetEvent().CreatedTime.After(sortedEvents[j].GetEvent().CreatedTime)
+	})
+	return sortedEvents
+}
+
+func (r *Client) hasSnapshotRemovalConsolidation(vm *object.VirtualMachine, snapshotRemovalEvent types.BaseEvent) (bool, error) {
+	// Query for events
+	filter := types.EventFilterSpec{
+		EventTypeId: []string{vmDiskConsolidatedEvent},
+		Entity: &types.EventFilterSpecByEntity{
+			Entity:    vm.Reference(),
+			Recursion: types.EventFilterSpecRecursionOptionSelf,
+		},
+		EventChainId: snapshotRemovalEvent.GetEvent().ChainId,
+	}
+	req := types.QueryEvents{
+		This:   r.client.ServiceContent.EventManager.Reference(),
+		Filter: filter,
+	}
+
+	response, err := methods.QueryEvents(context.TODO(), r.client, &req)
+	if err != nil {
+		return false, err
+	}
+	return len(response.Returnval) > 0, nil
 }
 
 // Set DataVolume checkpoints.
@@ -371,7 +475,7 @@ func nullableHosts() (hosts map[string]*v1beta1.Host, err error) {
 }
 
 // Remove a VM snapshot and optionally its children.
-func (r *Client) removeSnapshot(vmRef ref.Ref, snapshot string, children bool, hosts util.HostsFunc, consolidate bool) (err error) {
+func (r *Client) removeSnapshot(vmRef ref.Ref, snapshot string, children bool, hosts util.HostsFunc) (err error) {
 	r.Log.Info("Removing snapshot",
 		"vmRef", vmRef,
 		"snapshot", snapshot,
@@ -381,6 +485,7 @@ func (r *Client) removeSnapshot(vmRef ref.Ref, snapshot string, children bool, h
 	if err != nil {
 		return
 	}
+	consolidate := true
 	_, err = vm.RemoveSnapshot(context.TODO(), snapshot, children, &consolidate)
 	if err != nil {
 		err = liberr.Wrap(err)
