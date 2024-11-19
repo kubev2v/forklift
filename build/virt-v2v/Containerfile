@@ -2,11 +2,7 @@ FROM registry.access.redhat.com/ubi9:9.4-1214.1729773476 AS appliance
 
 ENV LIBGUESTFS_BACKEND direct
 
-RUN subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey")
-
-RUN subscription-manager repos --enable=codeready-builder-for-rhel-9-x86_64-rhui-rpms
-
-RUN dnf update -y && \
+RUN subscription-manager refresh && \
     dnf install -y --setopt=install_weak_deps=False \
         qemu-img \
         libguestfs-devel \
@@ -38,9 +34,8 @@ FROM registry.access.redhat.com/ubi9:9.4-1214.1729773476
 # RUN mv /etc/pki/tls/certs/ca-bundle.crt /etc/pki/tls/certs/ca-bundle.crt.bak && \
 #     ln -sf /opt/ca-bundle.crt /etc/pki/tls/certs/ca-bundle.crt
 
-# RUN microdnf install -y subscription-manager
-RUN subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey")
-RUN mkdir /disks && \
+RUN subscription-manager refresh && \
+    mkdir /disks && \
     source /etc/os-release && \
     dnf install -y \
         virt-v2v \

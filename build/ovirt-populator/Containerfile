@@ -9,9 +9,8 @@ RUN GOOS=linux GOARCH=amd64 go build -o ovirt-populator github.com/konveyor/fork
 
 FROM registry.access.redhat.com/ubi8/ubi:8.10-1088
 COPY --from=builder /app/ovirt-populator /usr/local/bin/ovirt-populator
-RUN subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey")
-RUN subscription-manager repos --enable=rhv-4-tools-for-rhel-8-x86_64-rpms
-RUN dnf install -y python3-ovirt-engine-sdk4 ovirt-imageio-client && dnf clean all
+RUN subscription-manager refresh && \
+    dnf install -y python3-ovirt-engine-sdk4 ovirt-imageio-client && dnf clean all
 
 ENTRYPOINT ["/usr/local/bin/ovirt-populator"]
 LABEL \
