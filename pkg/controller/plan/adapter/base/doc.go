@@ -106,7 +106,7 @@ type Client interface {
 	// Create a snapshot of the source VM.
 	CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (string, error)
 	// Remove a snapshot.
-	RemoveSnapshot(vmRef ref.Ref, snapshot string, hostsFunc util.HostsFunc, consolidate bool) error
+	RemoveSnapshot(vmRef ref.Ref, snapshot string, hostsFunc util.HostsFunc) error
 	// Check if a snapshot is ready to transfer.
 	CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool, err error)
 	// Set DataVolume checkpoints.
