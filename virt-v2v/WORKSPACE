@@ -2931,10 +2931,10 @@ rpm(
 )
 
 rpm(
-    name = "virtio-win-1.9.40-1.el9.noarch",
-    sha256 = "7baa1bddc62a72798b00f1ccd7ba46e3a79d7cd8224d3aabae328719f4d604bc",
+    name = "virtio-win-0.1.266-1.noarch",
+    sha256 = "ea94b41acff28aebc90e100e9b4e6042ff85b170b9dfe397700a4c87403255c9",
     urls = [
-        "https://kojihub.stream.rdu2.redhat.com/kojifiles/packages/virtio-win/1.9.40/1.el9/noarch/virtio-win-1.9.40-1.el9.noarch.rpm",
+        "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.266-1/virtio-win-0.1.266-1.noarch.rpm",
     ],
 )
 
