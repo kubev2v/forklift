@@ -7,11 +7,10 @@ ENV GOEXPERIMENT strictfipsruntime
 
 RUN GOOS=linux GOARCH=amd64 go build -o ovirt-populator github.com/konveyor/forklift-controller/cmd/ovirt-populator
 
-FROM registry.access.redhat.com/ubi8-minimal:8.10-1086
+FROM registry.access.redhat.com/ubi8/ubi:8.10-1088
 COPY --from=builder /app/ovirt-populator /usr/local/bin/ovirt-populator
-RUN microdnf install -y subscription-manager
-RUN subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey")
-RUN microdnf install -y python3-ovirt-engine-sdk4 ovirt-imageio-client && microdnf clean all
+RUN subscription-manager refresh && \
+    dnf install -y python3-ovirt-engine-sdk4 ovirt-imageio-client && dnf clean all
 
 ENTRYPOINT ["/usr/local/bin/ovirt-populator"]
 LABEL \

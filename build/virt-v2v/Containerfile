@@ -1,10 +1,8 @@
-FROM registry.access.redhat.com/ubi9:9.4-1214.1726694543 AS appliance
+FROM registry.access.redhat.com/ubi9:9.4-1214.1729773476 AS appliance
 
 ENV LIBGUESTFS_BACKEND direct
 
-RUN subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey")
-
-RUN dnf update -y && \
+RUN subscription-manager refresh && \
     dnf install -y --setopt=install_weak_deps=False \
         qemu-img \
         libguestfs-devel \
@@ -28,19 +26,21 @@ RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-monitor github
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o image-converter github.com/konveyor/forklift-controller/cmd/image-converter
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-wrapper virt-v2v/cmd/entrypoint.go
 
-FROM registry.access.redhat.com/ubi9-minimal:9.4-1227.1726694542
+FROM registry.access.redhat.com/ubi9:9.4-1214.1729773476
 
-RUN rm /etc/pki/tls/fips_local.cnf && \
-    echo -e '[fips_sect]\ntls1-prf-ems-check = 0\nactivate = 1' > /etc/pki/tls/fips_local.cnf && \
-    sed -i '/^\\[ crypto_policy \\]/a Options=RHNoEnforceEMSinFIPS' /etc/pki/tls/openssl.cnf
-RUN mv /etc/pki/tls/certs/ca-bundle.crt /etc/pki/tls/certs/ca-bundle.crt.bak && \
-    ln -sf /opt/ca-bundle.crt /etc/pki/tls/certs/ca-bundle.crt
-RUN mkdir /disks && \
+# RUN rm /etc/pki/tls/fips_local.cnf && \
+#     echo -e '[fips_sect]\ntls1-prf-ems-check = 0\nactivate = 1' > /etc/pki/tls/fips_local.cnf && \
+#     sed -i '/^\\[ crypto_policy \\]/a Options=RHNoEnforceEMSinFIPS' /etc/pki/tls/openssl.cnf
+# RUN mv /etc/pki/tls/certs/ca-bundle.crt /etc/pki/tls/certs/ca-bundle.crt.bak && \
+#     ln -sf /opt/ca-bundle.crt /etc/pki/tls/certs/ca-bundle.crt
+
+RUN subscription-manager refresh && \
+    mkdir /disks && \
     source /etc/os-release && \
-    microdnf install -y \
+    dnf install -y \
         virt-v2v \
         virtio-win && \
-    microdnf clean all
+    dnf clean all
 
 ENV LIBGUESTFS_BACKEND=direct
 
