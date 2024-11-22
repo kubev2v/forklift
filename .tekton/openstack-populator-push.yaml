@@ -11,7 +11,7 @@ metadata:
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
       == "release-2.7" && ( ".tekton/openstack-populator-pull-request.yaml".pathChanged() ||
       ".tekton/openstack-populator-push.yaml".pathChanged() ||
-      "build/openstack-populator/Containerfile".pathChanged() || )
+      "build/openstack-populator/Containerfile".pathChanged() )
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: forklift-operator-2-7
