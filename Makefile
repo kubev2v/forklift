@@ -150,7 +150,7 @@ run: generate fmt vet
 
 # Install CRDs into a cluster
 install: manifests kubectl
-	$(KUBECTL) apply -k operator/config/crds
+	$(KUBECTL) apply -k operator/config/crd
 
 # Generate manifests e.g. CRD, Webhooks
 manifests: controller-gen
