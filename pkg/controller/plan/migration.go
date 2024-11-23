@@ -27,6 +27,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	batchv1 "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -1626,23 +1627,27 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 							path.Join(dv.Namespace, dv.Name))
 						continue
 					}
-					primePvc := &core.PersistentVolumeClaim{}
 					err = r.Destination.Client.Get(context.TODO(), types.NamespacedName{
 						Namespace: r.Plan.Spec.TargetNamespace,
 						Name:      fmt.Sprintf("prime-%s", pvc.UID),
-					}, primePvc)
+					}, pvc)
 					if err != nil {
-						log.Error(
-							err,
-							"Could not get prime PVC for DataVolume.",
-							"vm",
-							vm.String(),
-							"dv",
-							path.Join(dv.Namespace, dv.Name))
-						continue
+						if k8serr.IsNotFound(err) {
+							log.Info("Could not find prime PVC")
+							// Ignore error
+							err = nil
+						} else {
+							log.Error(
+								err,
+								"Could not get prime PVC for DataVolume.",
+								"vm",
+								vm.String(),
+								"dv",
+								path.Join(dv.Namespace, dv.Name))
+							continue
+						}
 					}
-
-					importer, found, kErr = r.kubevirt.GetImporterPod(*primePvc)
+					importer, found, kErr = r.kubevirt.GetImporterPod(*pvc)
 				}
 
 				if kErr != nil {
