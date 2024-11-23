@@ -191,6 +191,8 @@ func (r *Network) With(m *model.Network) {
 	case model.NetDvPortGroup:
 		r.DVSwitch = &m.DVSwitch
 		r.Key = m.Key
+	case model.OpaqueNetwork:
+		r.Key = m.Key
 	case model.NetDvSwitch:
 		r.Host = m.Host
 	}

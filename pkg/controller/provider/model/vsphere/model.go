@@ -10,6 +10,7 @@ const (
 	// Network.
 	NetStandard    = "Standard"
 	NetDvPortGroup = "DvPortGroup"
+	OpaqueNetwork  = "OpaqueNetwork"
 	NetDvSwitch    = "DvSwitch"
 	// Cluster.
 	ComputeResource = "ComputeResource"
