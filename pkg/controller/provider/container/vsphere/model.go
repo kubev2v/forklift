@@ -394,6 +394,10 @@ func (v *NetworkAdapter) Apply(u types.ObjectUpdate) {
 				}
 			case fDVSwitch:
 				v.model.DVSwitch = v.Ref(p.Val)
+			case fSummary:
+				if s, cast := p.Val.(types.OpaqueNetworkSummary); cast {
+					v.model.Key = s.OpaqueNetworkId
+				}
 			}
 		}
 	}
@@ -708,6 +712,8 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 								}
 							case *types.VirtualEthernetCardDistributedVirtualPortBackingInfo:
 								network = backing.Port.PortgroupKey
+							case *types.VirtualEthernetCardOpaqueNetworkBackingInfo:
+								network = backing.OpaqueNetworkId
 							}
 
 							devList = append(
