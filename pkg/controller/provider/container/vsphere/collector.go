@@ -42,6 +42,7 @@ const (
 	ComputeResource = "ComputeResource"
 	Host            = "HostSystem"
 	Network         = "Network"
+	OpaqueNetwork   = "OpaqueNetwork"
 	DVPortGroup     = "DistributedVirtualPortgroup"
 	DVSwitch        = "VmwareDistributedVirtualSwitch"
 	Datastore       = "Datastore"
@@ -83,7 +84,8 @@ const (
 	fThumbprint     = "summary.config.sslThumbprint"
 	fMgtServerIp    = "summary.managementServerIp"
 	// Network
-	fTag = "tag"
+	fTag     = "tag"
+	fSummary = "summary"
 	// PortGroup
 	fDVSwitch = "config.distributedVirtualSwitch"
 	fKey      = "key"
@@ -672,6 +674,15 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 			},
 		},
 		{
+			Type: OpaqueNetwork,
+			PathSet: []string{
+				fName,
+				fParent,
+				fTag,
+				fSummary,
+			},
+		},
+		{
 			Type: DVPortGroup,
 			PathSet: []string{
 				fName,
@@ -819,6 +830,15 @@ func (r *Collector) selectAdapter(u types.ObjectUpdate) (Adapter, bool) {
 			model: model.Network{
 				Base: model.Base{
 					Variant: model.NetStandard,
+					ID:      u.Obj.Value,
+				},
+			},
+		}
+	case OpaqueNetwork:
+		adapter = &NetworkAdapter{
+			model: model.Network{
+				Base: model.Base{
+					Variant: model.OpaqueNetwork,
 					ID:      u.Obj.Value,
 				},
 			},
