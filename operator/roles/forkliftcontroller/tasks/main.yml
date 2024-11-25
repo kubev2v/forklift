@@ -90,6 +90,11 @@
       k8s:
         state: present
         definition: "{{ lookup('template', 'monitor/servicemonitor-metrics.yml.j2') }}"
+
+    - name: "Setup migration recording rules"
+      k8s:
+        state: present
+        definition: "{{ lookup('template', 'monitor/recordingrole-migrations.yml.j2') }}"
     
     - name: "Add monitoring label to namespace"
       k8s:

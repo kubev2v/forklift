@@ -1,0 +1,14 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ metrics_rule_name }}
+  namespace: {{ app_namespace }}
+spec:
+  groups:
+  - name: mtv-migrations
+    rules:
+    - record: cluster:mtv_migrations_status_total:max
+      expr: max by(status, provider, mode, target) (mtv_migrations_status_total)
+      labels:
+        app: {{ app_name }}
