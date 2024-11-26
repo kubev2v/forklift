@@ -518,7 +518,7 @@ func (r *Migration) removeLastWarmSnapshot(vm *plan.VMStatus) {
 		return
 	}
 	snapshot := vm.Warm.Precopies[n-1].Snapshot
-	if err := r.provider.RemoveSnapshot(vm.Ref, snapshot, r.kubevirt.loadHosts, true); err != nil {
+	if err := r.provider.RemoveSnapshot(vm.Ref, snapshot, r.kubevirt.loadHosts); err != nil {
 		r.Log.Error(
 			err,
 			"Failed to clean up warm migration snapshots.",
@@ -996,11 +996,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			break
 		}
 		n := len(vm.Warm.Precopies)
-		consolidate := false
-		if vm.Phase == RemoveFinalSnapshot {
-			consolidate = true
-		}
-		err = r.provider.RemoveSnapshot(vm.Ref, vm.Warm.Precopies[n-1].Snapshot, r.kubevirt.loadHosts, consolidate)
+		err = r.provider.RemoveSnapshot(vm.Ref, vm.Warm.Precopies[n-1].Snapshot, r.kubevirt.loadHosts)
 		if err != nil {
 			step.AddError(err.Error())
 			err = nil
