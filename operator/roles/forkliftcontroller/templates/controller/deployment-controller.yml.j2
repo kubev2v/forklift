@@ -103,6 +103,10 @@ spec:
         - name: FEATURE_OVIRT_WARM_MIGRATION
           value: "true"
 {% endif %}
+{% if controller_retain_precopy_importer_pods|bool %}
+        - name: FEATURE_RETAIN_PRECOPY_IMPORTER_PODS
+          value: "true"
+{% endif %}
 {% if ovirt_osmap_configmap_name is defined %}
         - name: OVIRT_OS_MAP
           value: {{ ovirt_osmap_configmap_name }}
