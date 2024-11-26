@@ -36,6 +36,7 @@ controller_snapshot_status_check_rate_seconds: 10
 controller_cleanup_retries: 10
 controller_vsphere_incremental_backup: true
 controller_ovirt_warm_migration: true
+controller_retain_precopy_importer_pods: false
 controller_max_vm_inflight: 20
 controller_filesystem_overhead: 10
 controller_block_overhead: 0
