@@ -1958,7 +1958,7 @@ rpm(
     name = "perl-AutoLoader-0__5.74-481.el9.x86_64",
     sha256 = "c15952804a8cbd9a396566801a6c26e96c3c04396946a027e1b6e06ab3857580",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-AutoLoader-5.74-481.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-AutoLoader-5.74-481.el9.noarch.rpm",
     ],
 )
 
@@ -1966,7 +1966,7 @@ rpm(
     name = "perl-B-0__1.80-481.el9.x86_64",
     sha256 = "ce6648f5e26e96ed5151c0c55c21a854dafd49be0c6c19f98e11a89757757dea",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-B-1.80-481.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-B-1.80-481.el9.x86_64.rpm",
     ],
 )
 
@@ -1974,7 +1974,7 @@ rpm(
     name = "perl-Carp-0__1.50-460.el9.x86_64",
     sha256 = "7a30bdac2922f63e7a97f180ad1e7da66ca7db888d32c3a660e33486e827fc09",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-Carp-1.50-460.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-Carp-1.50-460.el9.noarch.rpm",
     ],
 )
 
@@ -1982,7 +1982,7 @@ rpm(
     name = "perl-Class-Struct-0__0.66-481.el9.x86_64",
     sha256 = "3fb30366998a2dcad139963940567fcc5c62d9acbdb81b537b489b777df09ce5",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-Class-Struct-0.66-481.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-Class-Struct-0.66-481.el9.noarch.rpm",
     ],
 )
 
@@ -1990,7 +1990,7 @@ rpm(
     name = "perl-Data-Dumper-0__2.174-462.el9.x86_64",
     sha256 = "b3b5f1c5240b24cb74f36c5ba443a68c8d4d37aaee93901d9fc913ce206f8f2b",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-Data-Dumper-2.174-462.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-Data-Dumper-2.174-462.el9.x86_64.rpm",
     ],
 )
 
@@ -1998,7 +1998,7 @@ rpm(
     name = "perl-Digest-0__1.19-4.el9.x86_64",
     sha256 = "f48b6b12a9b15fc59f8d119d1c32b94135eaae9f91323c9819116e8b9f6d0742",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-Digest-1.19-4.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-Digest-1.19-4.el9.noarch.rpm",
     ],
 )
 
@@ -2006,7 +2006,7 @@ rpm(
     name = "perl-Digest-MD5-0__2.58-4.el9.x86_64",
     sha256 = "1937fe693ee7ae82f185d9721d3699a22e4ef9d9cf638513e2acbd254fb239e7",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-Digest-MD5-2.58-4.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-Digest-MD5-2.58-4.el9.x86_64.rpm",
     ],
 )
 
@@ -2014,7 +2014,7 @@ rpm(
     name = "perl-Encode-4__3.08-462.el9.x86_64",
     sha256 = "3d092743aef883c87e72972369370bafe06b627cf872e610af5b632d726dbd82",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-Encode-3.08-462.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-Encode-3.08-462.el9.x86_64.rpm",
     ],
 )
 
@@ -2022,7 +2022,7 @@ rpm(
     name = "perl-Errno-0__1.30-481.el9.x86_64",
     sha256 = "4dc6ef0eb638a6a6679697478383864638a33c27daf724bcfcf6bd1f30e7e035",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-Errno-1.30-481.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-Errno-1.30-481.el9.x86_64.rpm",
     ],
 )
 
@@ -2030,7 +2030,7 @@ rpm(
     name = "perl-Exporter-0__5.74-461.el9.x86_64",
     sha256 = "565d2611d7fd5fb85133572db94961554cdcb0749d14ecbdef0f4df02797a446",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-Exporter-5.74-461.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-Exporter-5.74-461.el9.noarch.rpm",
     ],
 )
 
@@ -2038,7 +2038,7 @@ rpm(
     name = "perl-Fcntl-0__1.13-481.el9.x86_64",
     sha256 = "673847f6118856284131e7ebbdb17cae75ee8b106f0167548f6b9b9134305ebd",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-Fcntl-1.13-481.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-Fcntl-1.13-481.el9.x86_64.rpm",
     ],
 )
 
@@ -2046,7 +2046,7 @@ rpm(
     name = "perl-File-Basename-0__2.85-481.el9.x86_64",
     sha256 = "713e1b023869216b587a1f2dca3b2985cad561cf6d6d7d2888e9f1edbd77be56",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-File-Basename-2.85-481.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-File-Basename-2.85-481.el9.noarch.rpm",
     ],
 )
 
@@ -2054,7 +2054,7 @@ rpm(
     name = "perl-File-Path-0__2.18-4.el9.x86_64",
     sha256 = "5cda633d97d08e2f4d9c008114f096b047ede47eb934086568210e4ccb782dcc",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-File-Path-2.18-4.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-File-Path-2.18-4.el9.noarch.rpm",
     ],
 )
 
@@ -2062,7 +2062,7 @@ rpm(
     name = "perl-File-Temp-1__0.231.100-4.el9.x86_64",
     sha256 = "14a4a835c90ba89e3660ce674c9883f6e9b999ee6c4a3aece3969f7ff8bf9354",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-File-Temp-0.231.100-4.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-File-Temp-0.231.100-4.el9.noarch.rpm",
     ],
 )
 
@@ -2070,7 +2070,7 @@ rpm(
     name = "perl-File-stat-0__1.09-481.el9.x86_64",
     sha256 = "bee7edb7965591d9f554d348f7097f1dfa1cc083ec22b1301cd88b9d81183c02",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-File-stat-1.09-481.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-File-stat-1.09-481.el9.noarch.rpm",
     ],
 )
 
@@ -2078,7 +2078,7 @@ rpm(
     name = "perl-FileHandle-0__2.03-481.el9.x86_64",
     sha256 = "02a57b65cebbaa894109f390a996c5b11ca1df5c0dbeaca6a59a4604860f4b0b",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-FileHandle-2.03-481.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-FileHandle-2.03-481.el9.noarch.rpm",
     ],
 )
 
@@ -2086,7 +2086,7 @@ rpm(
     name = "perl-Getopt-Long-1__2.52-4.el9.x86_64",
     sha256 = "aae4ac9bfbd03f0ad70c0ced737737c67a6299811417ca08fe80443e7465597a",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-Getopt-Long-2.52-4.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-Getopt-Long-2.52-4.el9.noarch.rpm",
     ],
 )
 
@@ -2094,7 +2094,7 @@ rpm(
     name = "perl-Getopt-Std-0__1.12-481.el9.x86_64",
     sha256 = "55cc79f4b2f08ff5950c08dae118123d724a7aeee8737dc21909ab679bc27969",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-Getopt-Std-1.12-481.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-Getopt-Std-1.12-481.el9.noarch.rpm",
     ],
 )
 
@@ -2102,7 +2102,7 @@ rpm(
     name = "perl-HTTP-Tiny-0__0.076-462.el9.x86_64",
     sha256 = "bb9cedb962a0648c4f380f617b79e71ae4cdeec82c7f27e60db9ac5764bd5b42",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-HTTP-Tiny-0.076-462.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-HTTP-Tiny-0.076-462.el9.noarch.rpm",
     ],
 )
 
@@ -2110,7 +2110,7 @@ rpm(
     name = "perl-IO-0__1.43-481.el9.x86_64",
     sha256 = "09660cc9e121907585ff06da231a1ddacf13c5d0e2d1dca724fc10f24a37dcaa",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-IO-1.43-481.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-IO-1.43-481.el9.x86_64.rpm",
     ],
 )
 
@@ -2118,7 +2118,7 @@ rpm(
     name = "perl-IO-Socket-IP-0__0.41-5.el9.x86_64",
     sha256 = "131931924d208dc3bec865659a895f942d0bbf418eb12dae450d5b4fc52bbfec",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-IO-Socket-IP-0.41-5.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-IO-Socket-IP-0.41-5.el9.noarch.rpm",
     ],
 )
 
@@ -2126,7 +2126,7 @@ rpm(
     name = "perl-IO-Socket-SSL-0__2.073-2.el9.x86_64",
     sha256 = "0be095d0e6ba5ffeaa473fb5894f1f4dc4b010b81f27c724a100ce774ef16d80",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-IO-Socket-SSL-2.073-2.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-IO-Socket-SSL-2.073-2.el9.noarch.rpm",
     ],
 )
 
@@ -2134,7 +2134,7 @@ rpm(
     name = "perl-IPC-Open3-0__1.21-481.el9.x86_64",
     sha256 = "69e2ccc70c7843e4ec5c1a09243ab8de6a1be9e0894d42aceb095d4575c0b23c",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-IPC-Open3-1.21-481.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-IPC-Open3-1.21-481.el9.noarch.rpm",
     ],
 )
 
@@ -2142,7 +2142,7 @@ rpm(
     name = "perl-MIME-Base64-0__3.16-4.el9.x86_64",
     sha256 = "b4978c7c2271de024834c4c85e98e1f292dd7b9db9e7a16a8b2e5dd52f6bf8e1",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-MIME-Base64-3.16-4.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-MIME-Base64-3.16-4.el9.x86_64.rpm",
     ],
 )
 
@@ -2150,7 +2150,7 @@ rpm(
     name = "perl-Mozilla-CA-0__20200520-6.el9.x86_64",
     sha256 = "9177d80f9d0822af203019e68185f6e84a3ecd97c381af6a4c776a551752e2bc",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-Mozilla-CA-20200520-6.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-Mozilla-CA-20200520-6.el9.noarch.rpm",
     ],
 )
 
@@ -2158,7 +2158,7 @@ rpm(
     name = "perl-Net-SSLeay-0__1.94-1.el9.x86_64",
     sha256 = "e31f267f303dd178831373dabd4c2176136ab42d672d71a9ad779451b0c5a94c",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-Net-SSLeay-1.94-1.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-Net-SSLeay-1.94-1.el9.x86_64.rpm",
     ],
 )
 
@@ -2166,7 +2166,7 @@ rpm(
     name = "perl-POSIX-0__1.94-481.el9.x86_64",
     sha256 = "4a1139b631911e98b4aa3b35e2ac84b327def8bdc446e2f4d74e5ac88253e301",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-POSIX-1.94-481.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-POSIX-1.94-481.el9.x86_64.rpm",
     ],
 )
 
@@ -2174,7 +2174,7 @@ rpm(
     name = "perl-PathTools-0__3.78-461.el9.x86_64",
     sha256 = "843ccc42134c9903d77ca47de88f27113e8097c04417ed6c5fdc4ade3000d192",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-PathTools-3.78-461.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-PathTools-3.78-461.el9.x86_64.rpm",
     ],
 )
 
@@ -2182,7 +2182,7 @@ rpm(
     name = "perl-Pod-Escapes-1__1.07-460.el9.x86_64",
     sha256 = "54818499fbb20724b10d1147ff20e945e8d248d9fa715d53a5b76082c633de53",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-Pod-Escapes-1.07-460.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-Pod-Escapes-1.07-460.el9.noarch.rpm",
     ],
 )
 
@@ -2190,7 +2190,7 @@ rpm(
     name = "perl-Pod-Perldoc-0__3.28.01-461.el9.x86_64",
     sha256 = "080eecf541aa046233fd5f344456a16802ef61c33fa0ef1df25cf0e9398c098e",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-Pod-Perldoc-3.28.01-461.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-Pod-Perldoc-3.28.01-461.el9.noarch.rpm",
     ],
 )
 
@@ -2198,7 +2198,7 @@ rpm(
     name = "perl-Pod-Simple-1__3.42-4.el9.x86_64",
     sha256 = "9d594cd0978cf88e010c91c1ee8d280cd49c70f90277578e7d0c97953def8f4d",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-Pod-Simple-3.42-4.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-Pod-Simple-3.42-4.el9.noarch.rpm",
     ],
 )
 
@@ -2206,7 +2206,7 @@ rpm(
     name = "perl-Pod-Usage-4__2.01-4.el9.x86_64",
     sha256 = "1fec2d3cf4c92a633a1229b42e00e73b2ebb254c3efbd7a7cf0563a7ac00fac6",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-Pod-Usage-2.01-4.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-Pod-Usage-2.01-4.el9.noarch.rpm",
     ],
 )
 
@@ -2214,7 +2214,7 @@ rpm(
     name = "perl-Scalar-List-Utils-4__1.56-462.el9.x86_64",
     sha256 = "bbba257d5a3de71483d05d1c36c4c981e9f30b0466c5c9f23a6b0acd0feeba18",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-Scalar-List-Utils-1.56-462.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-Scalar-List-Utils-1.56-462.el9.x86_64.rpm",
     ],
 )
 
@@ -2222,7 +2222,7 @@ rpm(
     name = "perl-SelectSaver-0__1.02-481.el9.x86_64",
     sha256 = "dd4bdc41f5fb384428c33d5d491c583c413c5d2a4af27b6d184faaf01ab35c64",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-SelectSaver-1.02-481.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-SelectSaver-1.02-481.el9.noarch.rpm",
     ],
 )
 
@@ -2230,7 +2230,7 @@ rpm(
     name = "perl-Socket-4__2.031-4.el9.x86_64",
     sha256 = "80c5f940c127ed4e75813fbfdcc72052af33131431f52c8eef06e6b1c08f05cd",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-Socket-2.031-4.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-Socket-2.031-4.el9.x86_64.rpm",
     ],
 )
 
@@ -2238,7 +2238,7 @@ rpm(
     name = "perl-Storable-1__3.21-460.el9.x86_64",
     sha256 = "20ff6846c7bce2995e9826ae5bcbe135465ea8bb052e6e8c631f0452a7d9e8e8",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-Storable-3.21-460.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-Storable-3.21-460.el9.x86_64.rpm",
     ],
 )
 
@@ -2246,7 +2246,7 @@ rpm(
     name = "perl-Symbol-0__1.08-481.el9.x86_64",
     sha256 = "f14972835a81f040becd5b4ca691ecfefe18a6dd3d65414e3f73f1df664f26c7",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-Symbol-1.08-481.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-Symbol-1.08-481.el9.noarch.rpm",
     ],
 )
 
@@ -2254,7 +2254,7 @@ rpm(
     name = "perl-Term-ANSIColor-0__5.01-461.el9.x86_64",
     sha256 = "fb030930f957b704eb28241b1af66396b07f2cd3d3e53ab4cdd99bec9d8e9b0c",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-Term-ANSIColor-5.01-461.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-Term-ANSIColor-5.01-461.el9.noarch.rpm",
     ],
 )
 
@@ -2262,7 +2262,7 @@ rpm(
     name = "perl-Term-Cap-0__1.17-460.el9.x86_64",
     sha256 = "2790fea7b2b38df5720130fab473c61274409b4e5bee61d37db9ba5548c9371c",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-Term-Cap-1.17-460.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-Term-Cap-1.17-460.el9.noarch.rpm",
     ],
 )
 
@@ -2270,7 +2270,7 @@ rpm(
     name = "perl-Text-ParseWords-0__3.30-460.el9.x86_64",
     sha256 = "769b4c6e0831a45843202dbedcfdf51e2ae744d0bc093242b48e2d3475864f28",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-Text-ParseWords-3.30-460.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-Text-ParseWords-3.30-460.el9.noarch.rpm",
     ],
 )
 
@@ -2278,7 +2278,7 @@ rpm(
     name = "perl-Text-Tabs__plus__Wrap-0__2013.0523-460.el9.x86_64",
     sha256 = "ba097a3ff9627bfaf989cd89cfbb40bd5a32ee1a53969510494f950b5d6da47d",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-Text-Tabs+Wrap-2013.0523-460.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-Text-Tabs+Wrap-2013.0523-460.el9.noarch.rpm",
     ],
 )
 
@@ -2286,7 +2286,7 @@ rpm(
     name = "perl-Time-Local-2__1.300-7.el9.x86_64",
     sha256 = "3e62b49a7e6df19712fcc7c6103b61dc6912dc8a5efcec08bd2f242e3d56b3a9",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-Time-Local-1.300-7.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-Time-Local-1.300-7.el9.noarch.rpm",
     ],
 )
 
@@ -2294,7 +2294,7 @@ rpm(
     name = "perl-URI-0__5.09-3.el9.x86_64",
     sha256 = "d5ed01f374761f0628a7de57fa786a938f55c2105930dc920e9486d234f86072",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-URI-5.09-3.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-URI-5.09-3.el9.noarch.rpm",
     ],
 )
 
@@ -2302,7 +2302,7 @@ rpm(
     name = "perl-base-0__2.27-481.el9.x86_64",
     sha256 = "c2681e390980a349a4b6b0ba06e546229a1f9c2f18be703ef2e429c150b82ef8",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-base-2.27-481.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-base-2.27-481.el9.noarch.rpm",
     ],
 )
 
@@ -2310,7 +2310,7 @@ rpm(
     name = "perl-constant-0__1.33-461.el9.x86_64",
     sha256 = "844ce96440fe8f96c55335ce37544f8288064a90bb2a6dcbbfa58755d25bf92e",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-constant-1.33-461.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-constant-1.33-461.el9.noarch.rpm",
     ],
 )
 
@@ -2318,7 +2318,7 @@ rpm(
     name = "perl-if-0__0.60.800-481.el9.x86_64",
     sha256 = "20f4b34c203cff62b878528506d6413bfffe5a364aec329aa61b2b7a50db5de0",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-if-0.60.800-481.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-if-0.60.800-481.el9.noarch.rpm",
     ],
 )
 
@@ -2326,7 +2326,7 @@ rpm(
     name = "perl-interpreter-4__5.32.1-481.el9.x86_64",
     sha256 = "eac1fdfbc31d7596bb9e57a5a86f0855060b19b5d91f8587f400c6c56a6a6fff",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-interpreter-5.32.1-481.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-interpreter-5.32.1-481.el9.x86_64.rpm",
     ],
 )
 
@@ -2334,7 +2334,7 @@ rpm(
     name = "perl-libnet-0__3.13-4.el9.x86_64",
     sha256 = "a777c4998ec024f0aace7aeaa1ed6d4718f4a652b027f720191412ca2e265a47",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-libnet-3.13-4.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-libnet-3.13-4.el9.noarch.rpm",
     ],
 )
 
@@ -2342,7 +2342,7 @@ rpm(
     name = "perl-libs-4__5.32.1-481.el9.x86_64",
     sha256 = "2cbed8ef58f65a6518cb5570229031a516f9e44c5d28ceefd89054fcacbe7918",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-libs-5.32.1-481.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-libs-5.32.1-481.el9.x86_64.rpm",
     ],
 )
 
@@ -2350,7 +2350,7 @@ rpm(
     name = "perl-mro-0__1.23-481.el9.x86_64",
     sha256 = "32a0b159bd8cd8cb83030353993765c95fb9cb20c6fd716d91a7a8e730b088a8",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-mro-1.23-481.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-mro-1.23-481.el9.x86_64.rpm",
     ],
 )
 
@@ -2358,7 +2358,7 @@ rpm(
     name = "perl-overload-0__1.31-481.el9.x86_64",
     sha256 = "df999aa2373e4ce1a45b4b60a1f8a0a5a7ec2abef3aef899efbe2965e7db518f",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-overload-1.31-481.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-overload-1.31-481.el9.noarch.rpm",
     ],
 )
 
@@ -2366,7 +2366,7 @@ rpm(
     name = "perl-overloading-0__0.02-481.el9.x86_64",
     sha256 = "ee3cd4ccc851c0abe390296be096c8463ca2ccd19622e4703e08b3af7cb49d95",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-overloading-0.02-481.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-overloading-0.02-481.el9.noarch.rpm",
     ],
 )
 
@@ -2374,7 +2374,7 @@ rpm(
     name = "perl-parent-1__0.238-460.el9.x86_64",
     sha256 = "5ba7119b1f165e7dedb7694dce61b3c612a12c58e9f660311df88b2fbc0566ed",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-parent-0.238-460.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-parent-0.238-460.el9.noarch.rpm",
     ],
 )
 
@@ -2382,7 +2382,7 @@ rpm(
     name = "perl-podlators-1__4.14-460.el9.x86_64",
     sha256 = "ad6c7336fef16e491b71c9c6444b6df4c3adcb1c8edd31581790bb9bd1779c29",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-podlators-4.14-460.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-podlators-4.14-460.el9.noarch.rpm",
     ],
 )
 
@@ -2398,7 +2398,7 @@ rpm(
     name = "perl-subs-0__1.03-481.el9.x86_64",
     sha256 = "876fbe06a665a880dbe4329a57f787e39101b60fb15fefe720a2c1586514e46e",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-subs-1.03-481.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-subs-1.03-481.el9.noarch.rpm",
     ],
 )
 
@@ -2406,7 +2406,7 @@ rpm(
     name = "perl-vars-0__1.05-481.el9.x86_64",
     sha256 = "2e7018ab35ea11a612bed012457e65daa4088e4dfe46aec737078e56edec5440",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/perl-vars-1.05-481.el9.noarch.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/perl-vars-1.05-481.el9.noarch.rpm",
     ],
 )
 
