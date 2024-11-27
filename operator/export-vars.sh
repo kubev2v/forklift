@@ -4,7 +4,7 @@ declare -A images
 
 # The image refrences below will get updated by Konflux everytime there is a new image.
 
-images[API_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/forklift-api@sha256:cd2c3925eb529d2287c1b3af9129aa91e3b70e56bf831152c7d32a2347054838
+images[API_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/forklift-api@sha256:35f0675e518528d911fcc3d36b343ededd9782fe0a5b7284a229dd9a0afc9656
 
 images[CONTROLLER_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/forklift-controller@sha256:d156496b7dc81ab4b81c1808390f17cda7400ead44e22af6c7d682fd2d2da07b
 
