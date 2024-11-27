@@ -1,6 +1,7 @@
 package vsphere
 
 import (
+	"fmt"
 	"net/url"
 	"sort"
 	"strconv"
@@ -306,6 +307,7 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 								Key:    portGroup.Key,
 								Name:   portGroup.Spec.Name,
 								Switch: portGroup.Vswitch,
+								VlanId: portGroup.Spec.VlanId,
 							})
 					}
 				}
@@ -397,6 +399,21 @@ func (v *NetworkAdapter) Apply(u types.ObjectUpdate) {
 			case fSummary:
 				if s, cast := p.Val.(types.OpaqueNetworkSummary); cast {
 					v.model.Key = s.OpaqueNetworkId
+				}
+			case fDVSwitchVlan:
+				if portSettings, cast := p.Val.(types.VMwareDVSPortSetting); cast {
+					switch vlanIdSpec := portSettings.Vlan.(type) {
+					case *types.VmwareDistributedVirtualSwitchVlanIdSpec:
+						if int(vlanIdSpec.VlanId) > 0 {
+							v.model.VlanId = strconv.Itoa(int(vlanIdSpec.VlanId))
+						}
+					case *types.VmwareDistributedVirtualSwitchTrunkVlanSpec:
+						refList := []string{}
+						for _, val := range vlanIdSpec.VlanId {
+							refList = append(refList, fmt.Sprintf("%d-%d", val.Start, val.End))
+						}
+						v.model.VlanId = strings.Join(refList, ",")
+					}
 				}
 			}
 		}

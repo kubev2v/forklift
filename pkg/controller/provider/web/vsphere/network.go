@@ -176,6 +176,7 @@ type Network struct {
 	Resource
 	Variant  string          `json:"variant"`
 	DVSwitch *model.Ref      `json:"dvSwitch,omitempty"`
+	VlanId   string          `json:"vlanId"`
 	Host     []model.DVSHost `json:"host"`
 	Tag      string          `json:"tag,omitempty"`
 	Key      string          `json:"key,omitempty"`
@@ -191,6 +192,7 @@ func (r *Network) With(m *model.Network) {
 	case model.NetDvPortGroup:
 		r.DVSwitch = &m.DVSwitch
 		r.Key = m.Key
+		r.VlanId = m.VlanId
 	case model.OpaqueNetwork:
 		r.Key = m.Key
 	case model.NetDvSwitch:
