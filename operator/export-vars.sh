@@ -20,7 +20,7 @@ images[OVIRT_POPULATOR_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/fork
 
 images[POPULATOR_CONTROLLER_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/populator-controller@sha256:c127768d14d9c56d487e2356a315f634278a412a9a50ab9c3eda447d5e3d0f2d
 
-images[UI_PLUGIN_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/forklift-console-plugin@sha256:86d33a87e4e96858af57c9a574dfc7357b5e97aa78e269de39aa3d7b7c3423d9
+images[UI_PLUGIN_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/forklift-console-plugin@sha256:54e8204e829a6066ad45e4d79057df8f3752de6bee90601e376c129fe77ba7e4
 
 images[VALIDATION_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/validation@sha256:58edf1e9d49c33bdd62abcd632a61ba61e68b8977f3f57e9feb93c1dd4f07fb6
 
