@@ -201,6 +201,7 @@ type PortGroup struct {
 	Key    string `json:"key"`
 	Name   string `json:"name"`
 	Switch string `json:"vSwitch"`
+	VlanId int32  `json:"vlanId"`
 }
 
 type Switch struct {
@@ -216,6 +217,7 @@ type Network struct {
 	DVSwitch Ref       `sql:""`
 	Key      string    `sql:""`
 	Host     []DVSHost `sql:""`
+	VlanId   string    `sql:""`
 }
 
 type DVSHost struct {
