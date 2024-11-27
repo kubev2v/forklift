@@ -283,6 +283,7 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 			case fVSwitch:
 				if array, cast := p.Val.(types.ArrayOfHostVirtualSwitch); cast {
 					network := &v.model.Network
+					network.Switches = nil
 					for _, vSwitch := range array.HostVirtualSwitch {
 						network.Switches = append(
 							network.Switches,
@@ -297,6 +298,7 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 			case fPortGroup:
 				if array, cast := p.Val.(types.ArrayOfHostPortGroup); cast {
 					network := &v.model.Network
+					network.PortGroups = nil
 					for _, portGroup := range array.HostPortGroup {
 						network.PortGroups = append(
 							network.PortGroups,
@@ -310,6 +312,7 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 			case fPNIC:
 				if array, cast := p.Val.(types.ArrayOfPhysicalNic); cast {
 					network := &v.model.Network
+					network.PNICs = nil
 					for _, nic := range array.PhysicalNic {
 						linkSpeed := int32(0)
 						if nic.LinkSpeed != nil {
@@ -331,6 +334,7 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 			case fVNIC:
 				if array, cast := p.Val.(types.ArrayOfHostVirtualNic); cast {
 					network := &v.model.Network
+					network.VNICs = nil
 					for _, nic := range array.HostVirtualNic {
 						dGroup := func() (key string) {
 							dp := nic.Spec.DistributedVirtualPort
