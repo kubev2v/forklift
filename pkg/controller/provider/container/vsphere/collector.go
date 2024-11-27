@@ -349,8 +349,9 @@ func (r *Collector) getUpdates(ctx context.Context) error {
 	about := r.client.ServiceContent.About
 	err = r.db.Insert(
 		&model.About{
-			APIVersion: about.ApiVersion,
-			Product:    about.LicenseProductName,
+			APIVersion:   about.ApiVersion,
+			Product:      about.LicenseProductName,
+			InstanceUuid: about.InstanceUuid,
 		})
 	if err != nil {
 		return err
