@@ -140,6 +140,7 @@ func (h ProviderHandler) AddDerived(r *Provider) (err error) {
 	}
 	r.APIVersion = about.APIVersion
 	r.Product = about.Product
+	r.InstanceUuid = about.InstanceUuid
 	// Datacenter
 	n, err = db.Count(&vsphere.Datacenter{}, nil)
 	if err != nil {
@@ -187,6 +188,7 @@ type Provider struct {
 	Object          api.Provider `json:"object"`
 	APIVersion      string       `json:"apiVersion"`
 	Product         string       `json:"product"`
+	InstanceUuid    string       `json:"instanceUuid"`
 	DatacenterCount int64        `json:"datacenterCount"`
 	ClusterCount    int64        `json:"clusterCount"`
 	HostCount       int64        `json:"hostCount"`

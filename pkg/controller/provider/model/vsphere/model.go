@@ -91,8 +91,9 @@ func (m *Base) GetName() string {
 
 type About struct {
 	Base
-	APIVersion string `sql:""`
-	Product    string `sql:""`
+	APIVersion   string `sql:""`
+	Product      string `sql:""`
+	InstanceUuid string `sql:""`
 }
 
 type Folder struct {
