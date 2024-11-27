@@ -26,7 +26,7 @@ status: implementable
 
 ## Summary
 
-In the current implementation, Forklift supports importing OVAs exported from vSphere, to run on KubeVirt. Some (arguably most) OVAs rely on certain environment variables to be set in the guest in order to function correctly. Right now, Forklift does not provide a clear way to configure these environment variables during the migration. This is a shortcoming which may prevent users from being able to run VMs imported from OVAs. This proposal is to add several features to the migration process from OVA providers to address this issue. By making the necessary environment variables queriably via REST API prior to migration, and providing tools to inject them into the guest, Forklift will be able to support a much wider variety of OVAs. The newly added functionality will be optional and backwards compatible with existing Plans, allowing users to continue using the existing functionality without any changes.
+In the current implementation, Forklift supports importing OVAs exported from vSphere, to run on KubeVirt. Most OVAs expect to be able to obtain runtime configuration options - also known as OVF environment XML - on boot via `vmtoolsd --cmd 'info-get guestinfo.ovfEnv'`. Right now, Forklift does not provide a clear way to configure these OVF environment XML during the migration. This is a shortcoming which may prevent users from being able to run VMs imported from OVAs. This proposal is to add several features to the migration process from OVA providers to address this issue. By making the necessary OVF environment XML queriably via REST API prior to migration, and providing tools to inject them into the guest, Forklift will be able to support a much wider variety of OVAs. The newly added functionality will be optional and backwards compatible with existing Plans, allowing users to continue using the existing functionality without any changes.
 
 ## Motivation
 
@@ -34,22 +34,22 @@ The motivation for this proposal is to allow Forklift to import a wider variety 
 
 ### Goals
 
-* Forklift will allow users to specify OVF environment variables to be set in the guest during migration from OVA providers.
-* Forklift will provide all the tools necessary to inject the environment variables into the guest.
+* Forklift will allow users to specify OVF OVF environment XML to be set in the guest during migration from OVA providers.
+* Forklift will provide all the tools necessary to inject the OVF environment XML into the guest.
 
 ### Non-Goals
 
 * Forklift will not enforce that an ovfenv is set.
 * Forklift will not perform any validation of the user-defined ovfenv.
-* Forklift will not automatically populate the ovfenv based on the OVA metadata. It will only give users the tools and information needed to set the environment variables manually. (stretch goal - the UI plugin could be extended to provide an enhanced UX for creating the ovfenv)
+* Forklift will not automatically populate the ovfenv based on the OVA metadata. It will only give users the tools and information needed to set the OVF environment XML manually. (stretch goal - the UI plugin could be extended to provide an enhanced UX for creating the ovfenv)
 
 ## Proposal
 
 The proposed change consists of 3 distinct parts:
 
-1. Expanding the inventory REST API to support querying the required environment variables of an OVA. This change will also include expanding the `ova-provider-server` to support providing the required data to the inventory service. No new endpoints will be added, but the existing GET endpoints will be expanded to return the new data. This data is the [Product Section](https://pkg.go.dev/github.com/vmware/govmomi@v0.43.0/ovf#ProductSection) of the OVF envelope. By adding this data to the inventory, requests to GET `/forklift-inventory/providers/ova/<provider-id>/vms` and `/forklift-inventory/providers/ova/<provider-id>/vms/<vm-id>` will return the ovfenv data for all or the specified VM, respectively. The data can then be queried by the user to understand what environment variables are needed for the OVA. UI changes to accommodate this are outside the scope of this proposal.
+1. Expanding the inventory REST API to support querying the required OVF environment XML of an OVA. This change will also include expanding the `ova-provider-server` to support providing the required data to the inventory service. No new endpoints will be added, but the existing GET endpoints will be expanded to return the new data. This data is the [Product Section](https://pkg.go.dev/github.com/vmware/govmomi@v0.43.0/ovf#ProductSection) of the OVF envelope. By adding this data to the inventory, requests to GET `/forklift-inventory/providers/ova/<provider-id>/vms` and `/forklift-inventory/providers/ova/<provider-id>/vms/<vm-id>` will return the ovfenv data for all or the specified VM, respectively. The data can then be queried by the user to understand what OVF environment XML are needed for the OVA. UI changes to accommodate this are outside the scope of this proposal.
 
-2. Expanding the Plan CRD to support specifying a ConfigMap containing the environment variables to be set in the guest, for each VM in the Plan. This ConfigMap must be created by the user in the target namespace prior to starting the migration. When the OVA builder constructs the KubeVirt VM template, it will check for a ConfigMap reference in the VM entry in the plan, then check for the existence of the ConfigMap in the target namespace, and, if found, attach the ConfigMap as a disk to the VM template, as outlined in [this KubeVirt doc](https://kubevirt.io/user-guide/storage/disks_and_volumes/#configmap). 
+2. Expanding the Plan CRD to support specifying a ConfigMap containing the OVF environment XML to be set in the guest, for each VM in the Plan. This ConfigMap must be created by the user in the target namespace prior to starting the migration. When the OVA builder constructs the KubeVirt VM template, it will check for a ConfigMap reference in the VM entry in the plan, then check for the existence of the ConfigMap in the target namespace, and, if found, attach the ConfigMap as a disk to the VM template, as outlined in [this KubeVirt doc](https://kubevirt.io/user-guide/storage/disks_and_volumes/#configmap). 
 
     Sample of a ConfigMap with an ovfenv specified:
 
@@ -102,7 +102,20 @@ The proposed change consists of 3 distinct parts:
           name: my-other-vm
     ``` 
 
-3. Provide a `vmtoolsd-shim` binary that can be used to inject the environment variables into the guest. The binary will emulate the functionality of the `vmtoolsd` daemon related to the ovfenv, and will also be able to mount the ovfenv from the attached ConfigMap disk. When running `vmtoolsd-shim --cmd 'info-get guestinfo.ovfEnv'`, the tool will attempt to mount the ovfenv from the ConfigMap disk, and if successful, will return the environment variables to the caller.
+3. Provide a `vmtoolsd-shim` binary that can be used to inject the OVF environment XML into the guest. The binary will emulate the functionality of the `vmtoolsd` daemon related to the ovfenv, and will also be able to mount the ovfenv from the attached ConfigMap disk. When running `vmtoolsd --cmd 'info-get guestinfo.ovfEnv'`, the tool will attempt to mount the ovfenv from the ConfigMap disk, and if successful, will return the OVF environment XML to the caller.
+
+### User Stories
+
+#### Story 1
+
+- Given that I have an OVA with specific configuration requirements,
+- When I want to initiate a migration of an OVA appliance using the Forklift tool,
+- Then I should be able to query the necessary OVF environment XML using the forklift-inventory REST API,
+- And create a ConfigMap based on this data in the target namespace,
+- And include a reference to this ConfigMap in the Plan CRD for the migration,
+- And have a way to inject the `vmtoolsd-shim` binary into the guest,
+- So that the migration process makes the OVF environment XML available as a disk to be mounted in the guest,
+- Ensuring a smooth and consistent deployment on KubeVirt.
 
 ### Security, Risks, and Mitigations
 
