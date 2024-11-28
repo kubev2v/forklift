@@ -45,6 +45,13 @@ var populators = map[string]populator{
 		imageVar:        "OPENSTACK_POPULATOR_IMAGE",
 		metricsEndpoint: ":8081",
 	},
+    "vsphere-xcopy": {
+        kind:            "VSphereXcopyVolumePopulator",
+		resource:        "vspherexcopyvolumepopulators",
+		controllerFunc:  getVXPopulatorPodArgs,
+		imageVar:        "VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE",
+		metricsEndpoint: ":8082",
+    },
 }
 
 func main() {
@@ -60,6 +67,8 @@ func main() {
 	// Metrics args
 	flag.StringVar(&metricsPath, "metrics-path", "/metrics", "The HTTP path where prometheus metrics will be exposed. Default is `/metrics`.")
 
+
+    klog.InitFlags(nil)
 	flag.Parse()
 
 	sigs := make(chan os.Signal, 1)
@@ -122,6 +131,23 @@ func getOpenstackPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured) (
 	args = append(args, "--cr-namespace="+openstackPopulator.Namespace)
 
 	return args, nil
+}
+
+func getVXPopulatorPodArgs(_ bool, u *unstructured.Unstructured) ([]string, error) {
+		var xcopy v1beta1.VSphereXcopyVolumePopulator
+		err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &xcopy)
+		if nil != err {
+			return nil, err
+		}
+		args := []string{
+			"--source-vmdk=" + xcopy.Spec.VmdkPath,
+			"--target-pvc=" + xcopy.Spec.TargetPVC,
+			"--target-namespace=" + xcopy.GetNamespace(),
+            "--cr-name=" + xcopy.Name,
+            "--cr-namespace=" + xcopy.Namespace,
+            "--secret-name=" + xcopy.Spec.SecretRef,
+		}
+        return args, nil
 }
 
 func getVolumePath(rawBlock bool) string {

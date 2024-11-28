@@ -26,10 +26,10 @@ type Predicate interface {
 type Step struct {
 	// Name.
 	Name string
-	// Any of these conditions be satisfied for
+	// All of these conditions be satisfied for
 	// the step to be included.
 	All Flag
-	// All of these conditions be satisfied for
+	// Any of these conditions be satisfied for
 	// the step to be included.
 	Any Flag
 }

@@ -126,8 +126,6 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	defer func() {
 		r.Log.V(2).Info("Conditions.", "all", migration.Status.Conditions)
 	}()
-
-	// Detected completed.
 	if migration.Status.MarkedCompleted() {
 		return
 	}
