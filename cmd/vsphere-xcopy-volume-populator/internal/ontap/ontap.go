@@ -67,7 +67,6 @@ func NewNetappClonner(hostname, username, password string) (NetappClonner, error
 }
 
 func (c *NetappClonner) ResolveVolumeHandleToLUN(volumeHandle string) (populator.LUN, error) {
-
 	// for trident we need convert the dashes to underscores so pvc-123-456 becomes pvc_123_456
 	volumeHandle = strings.ReplaceAll(volumeHandle, "-", "_")
 	l, err := c.api.LunGetByName(context.Background(), fmt.Sprintf("/vol/trident_%s/lun0", volumeHandle))
@@ -76,11 +75,10 @@ func (c *NetappClonner) ResolveVolumeHandleToLUN(volumeHandle string) (populator
 	}
 
 	klog.Infof("found lun %s with serial %s", l.Name, l.SerialNumber)
-
 	// in RHEL lsblk needs that swap. In fedora it doesn't
 	//serialNumber :=  strings.ReplaceAll(l.SerialNumber, "?", "\\\\x3f")
 	naa := fmt.Sprintf("%s%x", OntapProviderID, l.SerialNumber)
-	lun := populator.LUN{Name: l.Name, VolumeHandle: volumeHandle, NAA: naa}
+	lun := populator.LUN{Name: l.Name, VolumeHandle: volumeHandle, SerialNumber: l.SerialNumber, NAA: naa}
 	return lun, nil
 }
 

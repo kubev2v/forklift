@@ -23,6 +23,11 @@ type LUN struct {
 	VolumeHandle string
 	// naa
 	NAA string
+	// SerialNumber is a representation of the disk. With combination of the
+	// vendor ID it should ve globally unique and can be identified by udev, usually
+	// under /dev/disk/by-id/ with some prefix or postfix, depending on the udev rule
+	// and can also be found by lsblk -o name,serial
+	SerialNumber string
 }
 
 // VMDisk is the target VMDisk in vmware

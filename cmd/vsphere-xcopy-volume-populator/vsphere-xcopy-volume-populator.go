@@ -5,17 +5,16 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
-	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/primera3par"
 	"net/http"
 	"os"
 	"path"
-	"strings"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/client-go/util/cert"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/ontap"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/primera3par"
 
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
@@ -186,7 +185,7 @@ func handleArgs() {
 	flag.StringVar(&ownerUID, "owner-uid", "", "Owner UID, passed by the populator - Usually PVC ID")
 	flag.StringVar(&sourceVMDKFile, "source-vmdk", "", "File name to populate")
 	flag.StringVar(&targetPVC, "target-pvc", "", "Target PVC for population")
-	flag.StringVar(&storageVendor, "storage-vendor", "ontap", "The storage vendor to work with. Current values: [ontap,]")
+	flag.StringVar(&storageVendor, "storage-vendor", "ontap", "The storage vendor to work with. Current values: [ontap, primera3par]")
 	flag.StringVar(&secretName, "secret-name", "", "The secret holding the credentials for vSphere API and the storage vendor API")
 	flag.StringVar(&targetNamespace, "target-namespace", "", "Contents to populate file with")
 	flag.StringVar(&storageHostname, "storage-hostname", os.Getenv("STORAGE_HOSTNAME"), "The storage vendor api hostname")
@@ -226,33 +225,12 @@ func handleArgs() {
 			}
 		case "storage-hostname", "storage-username", "storage-password",
 			"vsphere-hostname", "vsphere-username", "vsphere-password":
-
-			if secretName == "" && f.Value.String() == "" {
+			if f.Value.String() == "" {
 				missingFlags = true
 				klog.Errorf("missing value for flag --%s", f.Name)
 			}
 		}
 	})
-
-	klog.Infof("Current namespace %s ", targetNamespace)
-	if secretName != "" {
-		secret, err := clientSet.CoreV1().Secrets(targetNamespace).Get(context.Background(), secretName, metav1.GetOptions{})
-		if err != nil {
-			klog.Fatalf("fail to fetch the secret %s: %s", secretName, err)
-		}
-
-		flag.VisitAll(func(f *flag.Flag) {
-			if f.Value.String() != "" {
-				return
-			}
-			name := strings.ReplaceAll(strings.ToUpper(f.Name), "-", "_")
-			klog.V(2).Infof("Looking for key %q in the populator secret", name)
-			if v, exists := secret.Data[name]; exists {
-				f.Value.Set(string(v))
-			}
-		})
-	}
-
 	if missingFlags {
 		os.Exit(2)
 	}

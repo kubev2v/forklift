@@ -63,8 +63,6 @@ test-copy-using-cli-primera: build
 		--secret-name=populator-secret \
 		--kubeconfig=$$KUBECONFIG
 
-
-
 .PHONY: vmkfstools-wrapper
 vmkfstools-wrapper:
 	$(MAKE) -C vmkfstools-wrapper build

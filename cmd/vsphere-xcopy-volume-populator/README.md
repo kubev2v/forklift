@@ -1,4 +1,4 @@
-# vsphere-xcopy-volume-populator
+# vSphere XCOPY Volume-Populator
 
 ## Forklift Controller
 When the feature flag `feature_copy_offload` is true (off by default), the controller
@@ -11,7 +11,7 @@ the filed `dataSourceRef` in the PVC to reference it.
 ## Populator Controller
 Added a new populator controller for the resource VSPhereXcopyVolumePopulator
 
-## VSphereXcopyVolumePopulator
+## VSphereXcopyVolumePopulator Resource
 A new populator implementation under cmd/vsphere-xcopy-volume-populator
 is a cli program that runs in a container that is responsible to perform
 XCOPY to effciently copy data from a VMDK to the target PVC. See the
@@ -20,6 +20,38 @@ The populator uses the storage API (configurable) to map the PVC to an ESX
 then uses Vsphere API to call functions on the ESX to perform the actual
 XCOPY command (provided that VAAI and accelerations is enabled on that
 ESX).
+
+Example of the new resource and a PVC referencing it:
+```
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: my-pvc
+  namespace: default
+spec:
+  resources:
+    requests:
+      storage: 100000Mi
+  dataSourceRef:
+    apiGroup: forklift.konveyor.io
+    kind: VSphereXcopyVolumePopulator
+    name: vm-1-xcopy-1
+  storageClassName: sc-1  
+  volumeMode: Block
+  volumeName: pvc-6dff02f2-de63-40ab-a534-3bd5a7b47f82
+---
+apiVersion: forklift.konveyor.io/v1beta1
+kind: VSphereXcopyVolumePopulator
+metadata:
+  name: vm-1-xcopy-1 
+  namespace: default
+spec:
+  secretRef: vantara-secret 
+  storageVendorProduct: vantara
+  targetPVC: my-pvc 
+  vmdkPath: '[my-vsphere-ds] vm-1/vm-1.vmdk'
+```
 
 ## vmkfstools-wrapper
 An ESXi CLI extension that exposes the vmkfstools clone operation to API interaction.
@@ -59,7 +91,7 @@ To detect those conditions this heuristics is used:
 - locate the LUN where the vmdk disk is on iSCSI or FC
 - the PVC CSI provisioner creates LUNs on the same system as the VMFS where vmdks are
 
-An example StorageMap for copy offload: 
+An example `StorageMap` for copy offload: 
 ```yaml
 apiVersion: forklift.konveyor.io/v1beta1
 kind: StorageMap
@@ -119,5 +151,3 @@ spec:
   ```
   Try to set a mgmt interface for the SVM and put that hostname in the STORAGE_HOSTNAME
 
-## HP
-- on 3Par, host exports can disappear due to what appears to be cleanup/monitoring made by the CSI - bodnopoz@redhat.com reported and investigating
