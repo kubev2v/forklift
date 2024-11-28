@@ -1,0 +1,43 @@
+---
+- hosts: poweredon
+  gather_facts: false
+  user: root
+  vars:
+    src_vib: vmkfstools-wrapper.vib
+    src_location: ./
+    dest_location: /tmp/
+    maintenance_needed: no
+
+
+  tasks:
+    - name: Copy {{ src_vib }} to ESXI Host
+      copy: 
+        src="{{ src_location }}{{ src_vib }}"
+        dest="{{ dest_location }}{{src_vib}}"
+
+    - name: Search for existing VIB installation
+      shell: esxcli software vib list | grep vmkfstools-wrapper 
+      register: vibs
+      changed_when: false
+      ignore_errors: yes
+
+    - debug: var=vibs.stdout
+
+    - name: Remove Red Hat's vmkfstools-wrapper
+      shell: esxcli software vib -n vmkfstools-wrapper
+
+    - name: Install Red Hat's vmkfstools-wrapper
+      shell: esxcli software vib install -v {{ dest_location }}{{ src_vib }} -f
+
+    - name: restart /etc/init.d/hosts restart
+      shell: /etc/init.d/hostd restart
+
+    - name: Confirm VIB is installed
+      shell: esxcli software vib list | grep vmkfstools-wrapper
+      register: vibs
+      changed_when: false
+      ignore_errors: yes
+
+    - debug: var=vibs.stdout
+
+

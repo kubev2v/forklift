@@ -1,0 +1,6 @@
+plugin: vmware.vmware.esxi_hosts
+hostname: "{{ lookup('ansible.builtin.unvault', './vmware_vault.yaml')| from_yaml['hostname'] }}" 
+username: "{{ lookup('ansible.builtin.unvault', './vmware_vault.yaml')| from_yaml['hostname'] }}"
+password: "{{ lookup('ansible.builtin.unvault', './vmware_vault.yaml')| from_yaml['hostname'] }}" 
+validate_certs: false
+use_extra_vars: true

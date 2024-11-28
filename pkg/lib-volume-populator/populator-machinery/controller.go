@@ -99,6 +99,11 @@ var (
 			resource:           "openstackvolumepopulators",
 			regexKey:           "openstack_volume_populator",
 		},
+		"VSphereXcopyVolumePopulator": {
+			storageResourceKey: "source_vmdk",
+			resource:           "vspherexcopyvolumepopulators",
+			regexKey:           "vsphere_xcopy_volume_populator",
+		},
 	}
 
 	monitoredPVCs = map[string]interface{}{}
