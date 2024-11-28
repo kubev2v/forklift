@@ -12,6 +12,10 @@ import (
 	"strings"
 	"time"
 
+	v1 "k8s.io/api/storage/v1"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/klog/v2"
+
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
@@ -27,7 +31,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	batchv1 "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
-	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	storagev1 "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -942,7 +946,19 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		step.MarkStarted()
 		step.Phase = Running
 
-		if r.builder.SupportsVolumePopulators() {
+		// TODO rgolan - if copy offload then mark this step as Pending manual action
+		// this is a hack, this method should be checked per-disk. And need to check if the
+		//datavolume is copy-offload, and not the whole storage class
+		copyOffload, err := r.IsCopyOffload()
+		if err != nil {
+			return err
+		}
+		// TODO rgolan we must do it per disk, so this is currently a hack for all disk just as a POC
+		// The way to go is remove the check from here and check, inside the updatePopulatorCopyProgress
+		// and updateCopyProgress, and the make it a per disk thing
+		if copyOffload {
+			err = r.updateCopyOffloadProgress(vm, step)
+		} else if r.builder.SupportsVolumePopulators() {
 			err = r.updatePopulatorCopyProgress(vm, step)
 		} else {
 			// Fallback to non-volume populator path
@@ -1919,6 +1935,56 @@ func (r *Migration) setDataVolumeCheckpoints(vm *plan.VMStatus) (err error) {
 	return
 }
 
+// updateCopyOfflloadProgres check that the PVC has an annotation saying the offload copy is done
+// and then marks the task as completed.
+// TODO rgolan Another related annotation can mark progress with a number
+func (r *Migration) updateCopyOffloadProgress(vm *plan.VMStatus, step *plan.Step) (err error) {
+	pvcs, err := r.kubevirt.getPVCs(vm.Ref)
+	if err != nil {
+		return
+	}
+	klog.Infof("RGOLAN found kubvirt pvcs %v", pvcs)
+
+	for _, pvc := range pvcs {
+		var task *plan.Task
+		var taskName string
+		taskName, err = r.builder.GetPopulatorTaskName(pvc)
+		if err != nil {
+			return
+		}
+
+		found := false
+
+		if task, found = step.FindTask(taskName); !found {
+			continue
+		}
+
+		// TODO rgolan - the annotations are passed to PVC from the DV, so setting
+		// those on the DV in DataVolumes method should do the trick
+		if _, ok := pvc.Annotations["copy-offload"]; ok {
+			progress, _ := pvc.Annotations["copy-offload-progress"]
+			// skip LUNs
+			if progress == "100" || progress == "done" {
+				task.Phase = Completed
+				task.Reason = TransferCompleted
+				task.Progress.Completed = task.Progress.Total
+				task.MarkCompleted()
+				continue
+			} else {
+				task.Reason = "Task await offload copy intervention"
+				n, err := strconv.Atoi(progress)
+				if err != nil {
+					log.Error(err, "offload copy annotation failed to convert to number")
+				} else {
+					task.Progress.Completed = int64(n)
+				}
+			}
+		}
+	}
+	step.ReflectTasks()
+	return
+}
+
 func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.Step) (err error) {
 	pvcs, err := r.kubevirt.getPVCs(vm.Ref)
 	if err != nil {
@@ -2067,4 +2133,50 @@ func restartLimitExceeded(pod *core.Pod) (exceeded bool) {
 	cs := pod.Status.ContainerStatuses[0]
 	exceeded = int(cs.RestartCount) > settings.Settings.ImporterRetry
 	return
+}
+
+// IsCopyOffload is determined by the use of a storage class with copy-offload annotation on it
+// TODO rgolan - for now the check will be done if any disk target storage class has that storage class, this is obviously coarse
+// and should be per a disk's storage class, for example a disk from NFS or local doesn't support that
+// (specifically referring to vmkfstools xcopy for RDM)
+func (r *Migration) IsCopyOffload() (bool, error) {
+	ref := r.Plan.Spec.Map.Storage
+	key := client.ObjectKey{
+		Namespace: ref.Namespace,
+		Name:      ref.Name,
+	}
+	sm := &v1beta1.StorageMap{}
+	err := r.Get(context.TODO(), key, sm)
+	if k8serr.IsNotFound(err) {
+		log.Error(err, "Failed to get storage map")
+		return false, err
+	}
+	log.Info("Identify storage class for storage maps")
+
+	sc := v1.StorageClass{}
+	scName := ""
+	if len(sm.Spec.Map) > 0 {
+		scName = sm.Spec.Map[0].Destination.StorageClass
+	}
+	storageClassList := &storagev1.StorageClassList{}
+	if err := r.List(context.TODO(), storageClassList, &client.ListOptions{}); err != nil {
+		log.Error(err, "Failed to list StorageClasses")
+		return false, err
+	}
+	// Iterate through StorageClasses to find the default one
+	for _, v := range storageClassList.Items {
+		if scName == "" {
+			if isDefault, ok := v.Annotations["storageclass.kubernetes.io/is-default-class"]; ok && isDefault == "true" {
+				sc = v
+				break
+			}
+		} else {
+			if scName == v.Name {
+				sc = v
+				break
+			}
+		}
+	}
+	_, ok := sc.Annotations["copy-offload"]
+	return ok, nil
 }
