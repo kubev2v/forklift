@@ -1,0 +1,41 @@
+# as of January 2025 go 1.22 is still the latest go-toolset for ubi-9
+# but since trident depends on 1.23 we must install it.
+# go-toolset 1.23 on ubi-9 is targeted to ubi 9.6 which is around May 2025
+#FROM registry.access.redhat.com/ubi8/go-toolset:1.23.1 AS builder
+
+From docker.io/golang:1.23 AS builder
+USER root
+WORKDIR /usr/src/app
+
+# pre-copy/cache go.mod for pre-downloading dependencies and only redownloading
+# them in subsequent builds if they change
+COPY go.mod go.sum ./
+RUN go mod download && go mod verify
+
+COPY . .
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/.cache/go-build \
+    go build -o bin/vsphere-xcopy-volume-populator
+
+FROM registry.access.redhat.com/ubi9/ubi-minimal
+
+COPY --from=builder /usr/src/app/bin/vsphere-xcopy-volume-populator \
+    /bin/vsphere-xcopy-volume-populator
+
+ENTRYPOINT ["/bin/vsphere-xcopy-volume-populator"]
+
+LABEL \
+        com.redhat.component="mtv-vsphere-xcopy-volume-populator-container" \
+        name="migration-toolkit-virtualization/mtv-vsphere-xcopy-volume-populator-rhel9" \
+        license="Apache License 2.0" \
+        io.k8s.display-name="Migration Toolkit for Virtualization" \
+        io.k8s.description="Migration Toolkit for Virtualization - vSphere XCOPY Volume Populator" \
+        io.openshift.tags="migration,mtv,forklift" \
+        summary="Migration Toolkit for Virtualization - vSphere XCOPY Volume Populator" \
+        description="Migration Toolkit for Virtualization - vSphere XCOPY Volume Populator" \
+        vendor="Red Hat, Inc." \
+        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>"
+
+
+
+
