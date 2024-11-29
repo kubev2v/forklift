@@ -6,7 +6,7 @@ declare -A images
 
 images[API_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/forklift-api@sha256:35f0675e518528d911fcc3d36b343ededd9782fe0a5b7284a229dd9a0afc9656
 
-images[CONTROLLER_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/forklift-controller@sha256:3a70be74984ec0530496c7a1d66fecda41216a2afa36803eaaa422a832677a23
+images[CONTROLLER_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/forklift-controller@sha256:0cb957b731f3b63452eb8b95aea2a0edf4e4bd61f5cfb436cd9cc7f98934c42f
 
 images[MUST_GATHER_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/forklift-must-gather@sha256:3ff09dbc5ca4c0dd196eab5da46a98da7deaa4e71de010cd52684ca2eaaa0d7a
 
