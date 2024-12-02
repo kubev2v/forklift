@@ -20,6 +20,11 @@ test_dir() {
     export SYSTEMD_NETWORK_DIR="$TEST_DIR/run/systemd/network"
     export NETPLAN_DIR="$TEST_DIR/etc/netplan"
 
+    export IFQUERY_CMD="
+      podman run
+      -v $TEST_DIR/etc/network:/etc/network
+      cmd.cat/ifquery ifquery
+    "
     export TEST_SRC_DIR=$1  #${SCRIPT_DIR}/ifcfg-test.d
     export EXPECTED_UDEV_RULE_FILE="$TEST_SRC_DIR/expected-udev.rule"
 
@@ -92,5 +97,8 @@ expected_to_pass_dirs ${SCRIPT_DIR}/netplan*-test.d;
 # --------------------------
 expected_to_fail_dirs ${SCRIPT_DIR}/systemd*-test.d;
 
+# Test systems using network interfaces
+# --------------------------
+expected_to_pass_dirs ${SCRIPT_DIR}/network-interfaces*-test.d;
 
 PASS "All tests behaved as expected."

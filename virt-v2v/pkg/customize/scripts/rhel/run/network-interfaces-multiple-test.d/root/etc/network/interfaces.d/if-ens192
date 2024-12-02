@@ -1,0 +1,5 @@
+# The primary network interface
+auto ens192
+iface ens192 inet static
+	address 10.184.121.84/24
+	gateway 10.184.121.1
