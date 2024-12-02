@@ -107,7 +107,8 @@ const (
 
 // Kinds
 const (
-	ConfigMap = "ConfigMap"
+	ConfigMap                   = "ConfigMap"
+	NetworkAttachmentDefinition = "NetworkAttachmentDefinition"
 )
 
 // Validate the plan resource.
@@ -713,8 +714,17 @@ func (r *Reconciler) validateTransferNetwork(plan *api.Plan) (err error) {
 	switch plan.Spec.TransferNetwork.Kind {
 	case ConfigMap:
 		err = r.validateTransferNetworkConfigMap(plan, key)
-	default:
+	case "", NetworkAttachmentDefinition:
 		err = r.validateTransferNetworkAttachmentDefinition(plan, key)
+	default:
+		unsupported := libcnd.Condition{
+			Type:     TransferNetNotValid,
+			Status:   True,
+			Category: Critical,
+			Reason:   NotSupported,
+			Message:  "Unsupported transfer network reference Kind.",
+		}
+		plan.Status.SetCondition(unsupported)
 	}
 	if err != nil {
 		err = liberr.Wrap(err)
