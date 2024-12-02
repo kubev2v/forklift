@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path"
@@ -102,6 +103,11 @@ const (
 const (
 	True  = libcnd.True
 	False = libcnd.False
+)
+
+// Kinds
+const (
+	ConfigMap = "ConfigMap"
 )
 
 // Validate the plan resource.
@@ -628,28 +634,87 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	return nil
 }
 
-// Validate transfer network selection.
-func (r *Reconciler) validateTransferNetwork(plan *api.Plan) (err error) {
-	if plan.Spec.TransferNetwork == nil {
-		return
-	}
+// validateTransferNetworkConfigMap checks for the presence of a configMap matching the specified
+// namespace and name, checks that the content is a valid NetworkSelectionElement, and then ensures
+// that the NetworkAttachmentDefinition specified by the NSE exists.
+func (r *Reconciler) validateTransferNetworkConfigMap(plan *api.Plan, key client.ObjectKey) (err error) {
 	notFound := libcnd.Condition{
 		Type:     TransferNetNotValid,
 		Status:   True,
 		Category: Critical,
 		Reason:   NotFound,
-		Message:  "Transfer network is not valid.",
+		Message:  "Transfer network ConfigMap could not be found.",
 	}
-	key := client.ObjectKey{
-		Namespace: plan.Spec.TransferNetwork.Namespace,
-		Name:      plan.Spec.TransferNetwork.Name,
+	notValid := libcnd.Condition{
+		Type:     TransferNetNotValid,
+		Status:   True,
+		Category: Critical,
+		Reason:   NotValid,
+		Message:  "Transfer network ConfigMap not valid.",
+	}
+	configMap := &v1.ConfigMap{}
+	err = r.Get(context.TODO(), key, configMap)
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			err = nil
+			plan.Status.SetCondition(notFound)
+			return
+		}
+		return
+	}
+	var bytes []byte
+	bytes, err = json.Marshal(configMap.Data)
+	if err != nil {
+		err = nil
+		plan.Status.SetCondition(notValid)
+		return
+	}
+	var nse net.NetworkSelectionElement
+	err = json.Unmarshal(bytes, &nse)
+	if err != nil {
+		err = nil
+		plan.Status.SetCondition(notValid)
+		return
+	}
+	key.Namespace = nse.Namespace
+	key.Name = nse.Name
+	err = r.validateTransferNetworkAttachmentDefinition(plan, key)
+	return
+}
+
+func (r *Reconciler) validateTransferNetworkAttachmentDefinition(plan *api.Plan, key client.ObjectKey) (err error) {
+	notFound := libcnd.Condition{
+		Type:     TransferNetNotValid,
+		Status:   True,
+		Category: Critical,
+		Reason:   NotFound,
+		Message:  "Transfer network could not be found.",
 	}
 	netAttachDef := &net.NetworkAttachmentDefinition{}
 	err = r.Get(context.TODO(), key, netAttachDef)
 	if k8serr.IsNotFound(err) {
 		err = nil
 		plan.Status.SetCondition(notFound)
+	}
+	return
+}
+
+// Validate transfer network selection.
+func (r *Reconciler) validateTransferNetwork(plan *api.Plan) (err error) {
+	if plan.Spec.TransferNetwork == nil {
 		return
+	}
+
+	key := client.ObjectKey{
+		Namespace: plan.Spec.TransferNetwork.Namespace,
+		Name:      plan.Spec.TransferNetwork.Name,
+	}
+
+	switch plan.Spec.TransferNetwork.Kind {
+	case ConfigMap:
+		err = r.validateTransferNetworkConfigMap(plan, key)
+	default:
+		err = r.validateTransferNetworkAttachmentDefinition(plan, key)
 	}
 	if err != nil {
 		err = liberr.Wrap(err)

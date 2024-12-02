@@ -2,6 +2,7 @@ package plan
 
 import (
 	"context"
+	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -53,7 +54,9 @@ import (
 
 // Annotations
 const (
-	// Transfer network annotation (value=network-attachment-definition name)
+	// Legacy transfer network annotation
+	AnnMultusDefaultNetwork = "v1.multus-cni.io/default-network"
+	// Transfer network annotation (value=[]NetworkSelectionElement)
 	AnnTransferNetwork = "k8s.v1.cni.cncf.io/networks"
 	// Contains validations for a Kubevirt VM. Needs to be removed when
 	// creating a VM from a template.
@@ -1227,8 +1230,10 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 		annotations[planbase.AnnRetainAfterCompletion] = "true"
 	}
 	if r.Plan.Spec.TransferNetwork != nil {
-		annotations[AnnTransferNetwork] = path.Join(
-			r.Plan.Spec.TransferNetwork.Namespace, r.Plan.Spec.TransferNetwork.Name)
+		err = r.setTransferNetworkAnnotation(annotations)
+		if err != nil {
+			return
+		}
 	}
 	if r.Plan.Spec.Warm || !r.Destination.Provider.IsHost() || r.Plan.IsSourceProviderOCP() {
 		// Set annotation for WFFC storage classes. Note that we create data volumes while
@@ -1757,8 +1762,10 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	// pod annotations
 	annotations := map[string]string{}
 	if r.Plan.Spec.TransferNetwork != nil {
-		annotations[AnnTransferNetwork] = path.Join(
-			r.Plan.Spec.TransferNetwork.Namespace, r.Plan.Spec.TransferNetwork.Name)
+		err = r.setTransferNetworkAnnotation(annotations)
+		if err != nil {
+			return
+		}
 	}
 	// pod
 	pod = &core.Pod{
@@ -2348,6 +2355,46 @@ func (r *KubeVirt) vmLabels(vmRef ref.Ref) (labels map[string]string) {
 func (r *KubeVirt) vmAllButMigrationLabels(vmRef ref.Ref) (labels map[string]string) {
 	labels = r.vmLabels(vmRef)
 	delete(labels, kMigration)
+	return
+}
+
+// Set the transfer network annotation (either the namespaced name of the NAD, or a NetworkSelectionElement)
+func (r *KubeVirt) setTransferNetworkAnnotation(annotations map[string]string) (err error) {
+	if r.Plan.Spec.TransferNetwork != nil {
+		switch r.Plan.Spec.TransferNetwork.Kind {
+		case ConfigMap:
+			var configMap *core.ConfigMap
+			configMap, err = r.getTransferNetworkConfigMap()
+			var bytes []byte
+			bytes, err = json.Marshal([]map[string]string{configMap.Data})
+			if err != nil {
+				err = liberr.Wrap(err)
+				return
+			}
+			annotations[AnnTransferNetwork] = fmt.Sprintf("%s", bytes)
+			if err != nil {
+				return
+			}
+		default:
+			annotations[AnnMultusDefaultNetwork] = path.Join(
+				r.Plan.Spec.TransferNetwork.Namespace, r.Plan.Spec.TransferNetwork.Name)
+		}
+	}
+	return
+}
+
+// Get the configMap containing the NetworkSelectionElement for the transfer network.
+func (r *KubeVirt) getTransferNetworkConfigMap() (configMap *core.ConfigMap, err error) {
+	configMap = &core.ConfigMap{}
+	err = r.Client.Get(
+		context.TODO(),
+		client.ObjectKey{Name: r.Plan.Spec.TransferNetwork.Name, Namespace: r.Plan.Spec.TransferNetwork.Namespace},
+		configMap,
+	)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
 	return
 }
 
