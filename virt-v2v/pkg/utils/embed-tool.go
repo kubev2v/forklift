@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 )
 
 // EmbedTool for manipulating the embedded Filesystem
@@ -77,8 +78,12 @@ func (t *EmbedTool) writeFileFromFS(src, dst string) error {
 //   - []files: The file paths which are located inside the embedded Filesystem.
 //   - error: An error if the file cannot be read, or nil if successful.
 func (t *EmbedTool) getAllFilenames() (files []string, err error) {
+	var nameExcludeChars = regexp.MustCompile(".*test.*")
 	if err := fs.WalkDir(t.Filesystem, ".", func(path string, d fs.DirEntry, err error) error {
 		if d.IsDir() {
+			return nil
+		}
+		if nameExcludeChars.MatchString(path) {
 			return nil
 		}
 		files = append(files, path)
