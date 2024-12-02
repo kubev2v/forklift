@@ -4,6 +4,8 @@
 V2V_MAP_FILE="${V2V_MAP_FILE:-/tmp/macToIP}"
 NETWORK_SCRIPTS_DIR="${NETWORK_SCRIPTS_DIR:-/etc/sysconfig/network-scripts}"
 NETWORK_CONNECTIONS_DIR="${NETWORK_CONNECTIONS_DIR:-/etc/NetworkManager/system-connections}"
+NETWORK_INTERFACES_DIR="${NETWORK_INTERFACES_DIR:-/etc/network/interfaces}"
+IFQUERY_CMD="${IFQUERY_CMD:-ifquery}"
 SYSTEMD_NETWORK_DIR="${SYSTEMD_NETWORK_DIR:-/run/systemd/network}"
 UDEV_RULES_FILE="${UDEV_RULES_FILE:-/etc/udev/rules.d/70-persistent-net.rules}"
 NETPLAN_DIR="${NETPLAN_DIR:-/}"
@@ -225,6 +227,57 @@ udev_from_netplan() {
     done
 }
 
+# Create udev rules based on the macToIP mapping + output from parse_ifquery_file
+udev_from_ifquery() {
+    # Check if ifquery command exist
+    if ! ${IN_TESTING:-false} && ! command -v $IFQUERY_CMD>/dev/null 2>&1; then
+        log "Warning: ifquery is not installed."
+        return 0
+    fi
+
+    # ifquery with interface dir
+    ifquery_get() {
+        $IFQUERY_CMD -i "$NETWORK_INTERFACES_DIR" "$@" 2>&3
+    }
+
+    # Loop over all interface names and return the one with target_ip, or null
+    find_interface_by_ip() {
+        target_ip="$1"
+        # Loop through all interfaces and check for the given IP address
+        ifquery_get -l | while read IFNAME; do
+            if ifquery_get $IFNAME | grep -q "$target_ip"; then
+                echo "$IFNAME"
+                return
+            fi
+        done
+    }
+
+    # Read the mapping file line by line
+    cat "$V2V_MAP_FILE" | while read line;
+    do
+        # Extract S_HW and S_IP from the current line in the mapping file
+        extract_mac_ip "$line"
+
+        # If S_HW and S_IP were not extracted, skip the line
+        if [ -z "$S_HW" ] || [ -z "$S_IP" ]; then
+            log "Warning: invalid mac to ip line: $line."
+            continue
+        fi
+
+        # Search the parsed ifquery output for a matching IP address
+        interface_name=$(find_interface_by_ip "$S_IP")
+
+        # If no interface is found, skip this entry
+        if [ -z "$interface_name" ]; then
+            log "Info: no interface name found to $S_IP."
+            continue
+        fi
+
+        # Create the udev rule based on the extracted MAC address and interface name
+        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"$(remove_quotes "$interface_name")\""
+    done
+}
+
 # Write to udev config
 # ----------------------------------------
 
@@ -250,6 +303,7 @@ main() {
         udev_from_ifcfg
         udev_from_nm
         udev_from_netplan
+        udev_from_ifquery
     } | check_dupe_hws > "$UDEV_RULES_FILE" 2>/dev/null
     echo "New udev rule:"
     cat $UDEV_RULES_FILE
