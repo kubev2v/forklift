@@ -12,7 +12,7 @@ images[MUST_GATHER_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift
 
 images[OPENSTACK_POPULATOR_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/openstack-populator@sha256:f7bbdd2504f4e8441a9be58ee780b6c6ca3b4285ba4020b8958575dc5ecf9026
 
-images[OPERATOR_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/forklift-operator@sha256:3e54959b60651873c7410a10dfaa8537d064d304cf34f47680bdaccfc6f3aeba
+images[OPERATOR_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/forklift-operator@sha256:3bea35f1448ef2d05e4ce604770b015efbbcf2e6666aa5d4fc9aef60112c3420
 
 images[OVA_PROVIDER_SERVER_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/ova-provider-server@sha256:fea2945986e40914f615438497b478dee5d3adbcb0e4729c177dee21772e4342
 
