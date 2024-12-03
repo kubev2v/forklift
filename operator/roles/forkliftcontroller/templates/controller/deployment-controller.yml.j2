@@ -81,6 +81,10 @@ spec:
         - name: CLEANUP_RETRIES
           value: "{{ controller_cleanup_retries }}"
 {% endif %}
+{% if controller_dv_status_check_retries is number %}
+        - name: DV_STATUS_CHECK_RETRIES
+          value: "{{ controller_dv_status_check_retries }}"
+{% endif %}
 {% if controller_max_vm_inflight is number %}
         - name: MAX_VM_INFLIGHT
           value: "{{ controller_max_vm_inflight }}"
