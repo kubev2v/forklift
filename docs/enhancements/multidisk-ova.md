@@ -33,6 +33,36 @@ such fine-grained storage mapping because it becomes untenable with a
 large number of VMs, but because an OVA plan is expected to involve only
 a small number of VMs it should be acceptable.
 
+### Example StorageMap
+
+```yaml
+spec:
+  map:
+    - destination:
+        storageClass: fast
+      source:
+        id: vm1-disk1
+    - destination:
+        storageClass: slow
+      source:
+        id: vm1-disk2
+    - destination:
+        storageClass: fast
+      source:
+        id: vm2-disk1
+    - destination:
+        storageClass: default
+      source:
+        id: default
+  provider:
+    destination:
+      name: host
+      namespace: default
+    source:
+      name: ova
+      namespace: default
+```
+
 ### Goals
 
 * Forklift will enable end users to individually map each disk of a
@@ -67,7 +97,8 @@ individual disk mappings. No additional tests should be necessary.
 Permitting OVA disks to be mapped individually does not require any
 changes to the update or downgrade path of Forklift itself, although
 Plans created with this feature would not be compatible with a downgraded
-version of Forklift.
+version of Forklift as the previous version would not recognize the individual
+disk mappings.
 
 ### Open Questions
 
