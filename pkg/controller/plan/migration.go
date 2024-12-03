@@ -55,36 +55,38 @@ var (
 
 // Phases.
 const (
-	Started                    = "Started"
-	PreHook                    = "PreHook"
-	StorePowerState            = "StorePowerState"
-	PowerOffSource             = "PowerOffSource"
-	WaitForPowerOff            = "WaitForPowerOff"
-	CreateDataVolumes          = "CreateDataVolumes"
-	CreateVM                   = "CreateVM"
-	CopyDisks                  = "CopyDisks"
-	AllocateDisks              = "AllocateDisks"
-	CopyingPaused              = "CopyingPaused"
-	AddCheckpoint              = "AddCheckpoint"
-	AddFinalCheckpoint         = "AddFinalCheckpoint"
-	CreateSnapshot             = "CreateSnapshot"
-	CreateInitialSnapshot      = "CreateInitialSnapshot"
-	CreateFinalSnapshot        = "CreateFinalSnapshot"
-	Finalize                   = "Finalize"
-	CreateGuestConversionPod   = "CreateGuestConversionPod"
-	ConvertGuest               = "ConvertGuest"
-	CopyDisksVirtV2V           = "CopyDisksVirtV2V"
-	PostHook                   = "PostHook"
-	Completed                  = "Completed"
-	WaitForSnapshot            = "WaitForSnapshot"
-	WaitForInitialSnapshot     = "WaitForInitialSnapshot"
-	WaitForFinalSnapshot       = "WaitForFinalSnapshot"
-	ConvertOpenstackSnapshot   = "ConvertOpenstackSnapshot"
-	StoreSnapshotDeltas        = "StoreSnapshotDeltas"
-	StoreInitialSnapshotDeltas = "StoreInitialSnapshotDeltas"
-	RemovePreviousSnapshot     = "RemovePreviousSnapshot"
-	RemovePenultimateSnapshot  = "RemovePenultimateSnapshot"
-	RemoveFinalSnapshot        = "RemoveFinalSnapshot"
+	Started                       = "Started"
+	PreHook                       = "PreHook"
+	StorePowerState               = "StorePowerState"
+	PowerOffSource                = "PowerOffSource"
+	WaitForPowerOff               = "WaitForPowerOff"
+	CreateDataVolumes             = "CreateDataVolumes"
+	WaitForDataVolumesStatus      = "WaitForDataVolumesStatus"
+	WaitForFinalDataVolumesStatus = "WaitForFinalDataVolumesStatus"
+	CreateVM                      = "CreateVM"
+	CopyDisks                     = "CopyDisks"
+	AllocateDisks                 = "AllocateDisks"
+	CopyingPaused                 = "CopyingPaused"
+	AddCheckpoint                 = "AddCheckpoint"
+	AddFinalCheckpoint            = "AddFinalCheckpoint"
+	CreateSnapshot                = "CreateSnapshot"
+	CreateInitialSnapshot         = "CreateInitialSnapshot"
+	CreateFinalSnapshot           = "CreateFinalSnapshot"
+	Finalize                      = "Finalize"
+	CreateGuestConversionPod      = "CreateGuestConversionPod"
+	ConvertGuest                  = "ConvertGuest"
+	CopyDisksVirtV2V              = "CopyDisksVirtV2V"
+	PostHook                      = "PostHook"
+	Completed                     = "Completed"
+	WaitForSnapshot               = "WaitForSnapshot"
+	WaitForInitialSnapshot        = "WaitForInitialSnapshot"
+	WaitForFinalSnapshot          = "WaitForFinalSnapshot"
+	ConvertOpenstackSnapshot      = "ConvertOpenstackSnapshot"
+	StoreSnapshotDeltas           = "StoreSnapshotDeltas"
+	StoreInitialSnapshotDeltas    = "StoreInitialSnapshotDeltas"
+	RemovePreviousSnapshot        = "RemovePreviousSnapshot"
+	RemovePenultimateSnapshot     = "RemovePenultimateSnapshot"
+	RemoveFinalSnapshot           = "RemoveFinalSnapshot"
 )
 
 // Steps.
@@ -100,8 +102,9 @@ const (
 )
 
 const (
-	TransferCompleted  = "Transfer completed."
-	PopulatorPodPrefix = "populate-"
+	TransferCompleted              = "Transfer completed."
+	PopulatorPodPrefix             = "populate-"
+	DvStatusCheckRetriesAnnotation = "dvStatusCheckRetries"
 )
 
 var (
@@ -134,6 +137,7 @@ var (
 			{Name: WaitForInitialSnapshot},
 			{Name: StoreInitialSnapshotDeltas, All: VSphere},
 			{Name: CreateDataVolumes},
+			{Name: WaitForDataVolumesStatus},
 			{Name: CopyDisks},
 			{Name: CopyingPaused},
 			{Name: RemovePreviousSnapshot, All: VSphere},
@@ -148,6 +152,7 @@ var (
 			{Name: CreateFinalSnapshot},
 			{Name: WaitForFinalSnapshot},
 			{Name: AddFinalCheckpoint},
+			{Name: WaitForFinalDataVolumesStatus},
 			{Name: Finalize},
 			{Name: RemoveFinalSnapshot, All: VSphere},
 			{Name: CreateGuestConversionPod, All: RequiresConversion},
@@ -662,9 +667,9 @@ func (r *Migration) step(vm *plan.VMStatus) (step string) {
 		step = Initialize
 	case AllocateDisks:
 		step = DiskAllocation
-	case CopyDisks, CopyingPaused, RemovePreviousSnapshot, CreateSnapshot, WaitForSnapshot, StoreSnapshotDeltas, AddCheckpoint, ConvertOpenstackSnapshot:
+	case CopyDisks, CopyingPaused, RemovePreviousSnapshot, CreateSnapshot, WaitForSnapshot, StoreSnapshotDeltas, AddCheckpoint, ConvertOpenstackSnapshot, WaitForDataVolumesStatus:
 		step = DiskTransfer
-	case RemovePenultimateSnapshot, CreateFinalSnapshot, WaitForFinalSnapshot, AddFinalCheckpoint, Finalize, RemoveFinalSnapshot:
+	case RemovePenultimateSnapshot, CreateFinalSnapshot, WaitForFinalSnapshot, AddFinalCheckpoint, Finalize, RemoveFinalSnapshot, WaitForFinalDataVolumesStatus:
 		step = Cutover
 	case CreateGuestConversionPod, ConvertGuest:
 		step = ImageConversion
@@ -1039,6 +1044,51 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		if ready {
 			vm.Phase = r.next(vm.Phase)
 		}
+	case WaitForDataVolumesStatus, WaitForFinalDataVolumesStatus:
+		step, found := vm.FindStep(r.step(vm))
+		if !found {
+			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
+			break
+		}
+
+		dvs, err := r.kubevirt.getDVs(vm)
+		if err != nil {
+			step.AddError(err.Error())
+			err = nil
+			break
+		}
+		if !r.hasPausedDv(dvs) {
+			vm.Phase = r.next(vm.Phase)
+			// Reset for next precopy
+			step.Annotations[DvStatusCheckRetriesAnnotation] = "1"
+		} else {
+			var retries int
+			retriesAnnotation := step.Annotations[DvStatusCheckRetriesAnnotation]
+			if retriesAnnotation == "" {
+				step.Annotations[DvStatusCheckRetriesAnnotation] = "1"
+			} else {
+				retries, err = strconv.Atoi(retriesAnnotation)
+				if err != nil {
+					step.AddError(err.Error())
+					err = nil
+					break
+				}
+				if retries >= settings.Settings.DvStatusCheckRetries {
+					// Do not fail the step as this can happen when the user runs the warm migration but the VM is already shutdown
+					// In that case we don't create any delta and don't change the CDI DV status.
+					r.Log.Info(
+						"DataVolume status check exceeded the retry limit."+
+							"If this causes the problems with the snapshot removal in the CDI please bump the controller_dv_status_check_retries.",
+						"vm",
+						vm.String())
+					vm.Phase = r.next(vm.Phase)
+					// Reset for next precopy
+					step.Annotations[DvStatusCheckRetriesAnnotation] = "1"
+				} else {
+					step.Annotations[DvStatusCheckRetriesAnnotation] = strconv.Itoa(retries + 1)
+				}
+			}
+		}
 	case StoreInitialSnapshotDeltas, StoreSnapshotDeltas:
 		step, found := vm.FindStep(r.step(vm))
 		if !found {
@@ -1073,9 +1123,9 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 
 		switch vm.Phase {
 		case AddCheckpoint:
-			vm.Phase = CopyDisks
+			vm.Phase = WaitForDataVolumesStatus
 		case AddFinalCheckpoint:
-			vm.Phase = Finalize
+			vm.Phase = WaitForFinalDataVolumesStatus
 		}
 	case StorePowerState:
 		step, found := vm.FindStep(r.step(vm))
@@ -1257,6 +1307,15 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 	}
 
 	return
+}
+
+func (r *Migration) hasPausedDv(dvs []ExtendedDataVolume) bool {
+	for _, dv := range dvs {
+		if dv.Status.Phase == Paused {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *Migration) resetPrecopyTasks(vm *plan.VMStatus, step *plan.Step) {
