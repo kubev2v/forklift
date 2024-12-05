@@ -19,7 +19,7 @@ func (r *OvaClient) LoadSourceDetails() (vm *OvaVM, err error) {
 
 	r.vmData.testVMId = "c5686650854d1e69b4123f4bf2e70fe1ed2a"
 	r.vmData.testNetworkID = "ae1badc8c693926f492a01e2f357d6af321b"
-	r.vmData.testStorageName = "Dummy storage for source provider ova-provider"
+	r.vmData.testStorageName = "centos44_new-disk1.vmdk"
 	return &r.vmData, nil
 }
 
@@ -39,7 +39,7 @@ func (r *OvaClient) GetNfsServerForOva(k8sClient *kubernetes.Clientset) (string,
 	}
 	nfsShare := server + ":" + share
 	if nfsShare == "" {
-		return "", errors.New("failed to fatch NFS settings")
+		return "", errors.New("failed to fetch NFS settings")
 	}
 
 	r.nfsPath = nfsShare

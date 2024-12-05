@@ -3,13 +3,18 @@ package ova
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ova"
 	fb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+)
+
+// Default Storage
+const (
+	DefaultStorageID   = "default"
+	DefaultStorageName = "Default"
 )
 
 // All adapters.
@@ -356,25 +361,61 @@ type StorageAdapter struct {
 }
 
 func (r *StorageAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
+	disks := []Disk{}
+	err = ctx.client.list("disks", &disks)
+	if err != nil {
+		return
+	}
+	for i := range disks {
+		disk := &disks[i]
+		updater := func(tx *libmodel.Tx) (err error) {
+			m := &model.Storage{
+				Base: model.Base{
+					ID: disk.ID,
+				},
+			}
+			err = tx.Get(m)
+			if err != nil {
+				if errors.Is(err, libmodel.NotFound) {
+					m.Name = disk.Name
+					err = tx.Insert(m)
+				}
+				return
+			}
+			m.Name = disk.Name
+			err = tx.Update(m)
+			return
+		}
+		updates = append(updates, updater)
+	}
 	return
 }
 
 // List the collection.
 func (r *StorageAdapter) List(ctx *Context, provider *api.Provider) (itr fb.Iterator, err error) {
-	storageName := fmt.Sprintf("Dummy storage for source provider %s", provider.Name)
-	dummyStorge := Storage{
-		Name: storageName,
-		ID:   string(provider.UID),
+	diskList := []Disk{}
+	err = ctx.client.list("disks", &diskList)
+	if err != nil {
+		return
 	}
 	list := fb.NewList()
 	m := &model.Storage{
 		Base: model.Base{
-			ID:   dummyStorge.ID,
-			Name: dummyStorge.Name,
+			ID:   DefaultStorageID,
+			Name: DefaultStorageName,
 		},
 	}
-	dummyStorge.ApplyTo(m)
 	list.Append(m)
+
+	for _, object := range diskList {
+		m := &model.Storage{
+			Base: model.Base{
+				ID:   object.ID,
+				Name: object.Name,
+			},
+		}
+		list.Append(m)
+	}
 
 	itr = list.Iter()
 
@@ -382,7 +423,37 @@ func (r *StorageAdapter) List(ctx *Context, provider *api.Provider) (itr fb.Iter
 }
 
 func (r *StorageAdapter) DeleteUnexisting(ctx *Context) (deletions []Updater, err error) {
-	// Each provider have only one storage hence it can't be changed,
-	// Will be removed only if the provider deleted.
+	storageList := []model.Storage{}
+	err = ctx.db.List(&storageList, libmodel.FilterOptions{})
+	if err != nil {
+		if errors.Is(err, libmodel.NotFound) {
+			err = nil
+		}
+		return
+	}
+	inventory := make(map[string]bool)
+	for _, storage := range storageList {
+		inventory[storage.ID] = true
+	}
+	disks := []Disk{}
+	err = ctx.client.list("disks", &disks)
+	if err != nil {
+		return
+	}
+	gone := []string{}
+	for _, disk := range disks {
+		if _, found := inventory[disk.ID]; !found {
+			gone = append(gone, disk.ID)
+		}
+	}
+	for _, id := range gone {
+		updater := func(tx *libmodel.Tx) (err error) {
+			m := &model.Storage{
+				Base: model.Base{ID: id},
+			}
+			return tx.Delete(m)
+		}
+		deletions = append(deletions, updater)
+	}
 	return
 }
