@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
@@ -60,6 +61,11 @@ const (
 // Operating Systems
 const (
 	Unknown = "unknown"
+)
+
+// Default Storage
+const (
+	DefaultStorageID = "default"
 )
 
 // Regex which matches the snapshot identifier suffix of a
@@ -155,45 +161,85 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 		return
 	}
 
-	// For OVA provider we are assuming a single storage mapping.
-	dsMapIn := r.Context.Map.Storage.Spec.Map
-	for _, mapped := range dsMapIn {
+	var defaultMapping *v1beta1.DestinationStorage
+	mappedDiskIds := make(map[string]bool)
+	storageMapIn := r.Context.Map.Storage.Spec.Map
+	for i := range storageMapIn {
+		mapped := &storageMapIn[i]
+		ref := mapped.Source
+		storage := &model.Storage{}
+		fErr := r.Source.Inventory.Find(storage, ref)
+		if fErr != nil {
+			err = fErr
+			return
+		}
+		if storage.ID == DefaultStorageID {
+			defaultMapping = &mapped.Destination
+			continue
+		}
 		for _, disk := range vm.Disks {
-			diskSize, err := getResourceCapacity(disk.Capacity, disk.CapacityAllocationUnits)
-			if err != nil {
-				return nil, err
+			if disk.ID == storage.ID {
+				var dv *cdi.DataVolume
+				dv, err = r.mapDataVolume(disk, mapped.Destination, dvTemplate)
+				if err != nil {
+					return
+				}
+				dvs = append(dvs, *dv)
+				mappedDiskIds[disk.ID] = true
 			}
-			storageClass := mapped.Destination.StorageClass
-			dvSource := cdi.DataVolumeSource{
-				Blank: &cdi.DataVolumeBlankImage{},
-			}
-			dvSpec := cdi.DataVolumeSpec{
-				Source: &dvSource,
-				Storage: &cdi.StorageSpec{
-					Resources: core.ResourceRequirements{
-						Requests: core.ResourceList{
-							core.ResourceStorage: *resource.NewQuantity(diskSize, resource.BinarySI),
-						},
-					},
-					StorageClassName: &storageClass,
-				},
-			}
-			// set the access mode and volume mode if they were specified in the storage map.
-			// otherwise, let the storage profile decide the default values.
-			if mapped.Destination.AccessMode != "" {
-				dvSpec.Storage.AccessModes = []core.PersistentVolumeAccessMode{mapped.Destination.AccessMode}
-			}
-			if mapped.Destination.VolumeMode != "" {
-				dvSpec.Storage.VolumeMode = &mapped.Destination.VolumeMode
-			}
+		}
+	}
 
-			dv := dvTemplate.DeepCopy()
-			dv.Spec = dvSpec
-			updateDataVolumeAnnotations(dv, &disk)
+	for _, disk := range vm.Disks {
+		if !mappedDiskIds[disk.ID] {
+			if defaultMapping == nil {
+				err = liberr.New("VM has unmapped disks and no default disk mapping is set.", "vm", vm.ID)
+				return
+			}
+			var dv *cdi.DataVolume
+			dv, err = r.mapDataVolume(disk, *defaultMapping, dvTemplate)
+			if err != nil {
+				return
+			}
 			dvs = append(dvs, *dv)
 		}
 	}
 
+	return
+}
+
+func (r *Builder) mapDataVolume(disk ova.Disk, destination v1beta1.DestinationStorage, dvTemplate *cdi.DataVolume) (dv *cdi.DataVolume, err error) {
+	diskSize, err := getResourceCapacity(disk.Capacity, disk.CapacityAllocationUnits)
+	if err != nil {
+		return
+	}
+	storageClass := destination.StorageClass
+	dvSource := cdi.DataVolumeSource{
+		Blank: &cdi.DataVolumeBlankImage{},
+	}
+	dvSpec := cdi.DataVolumeSpec{
+		Source: &dvSource,
+		Storage: &cdi.StorageSpec{
+			Resources: core.ResourceRequirements{
+				Requests: core.ResourceList{
+					core.ResourceStorage: *resource.NewQuantity(diskSize, resource.BinarySI),
+				},
+			},
+			StorageClassName: &storageClass,
+		},
+	}
+	// set the access mode and volume mode if they were specified in the storage map.
+	// otherwise, let the storage profile decide the default values.
+	if destination.AccessMode != "" {
+		dvSpec.Storage.AccessModes = []core.PersistentVolumeAccessMode{destination.AccessMode}
+	}
+	if destination.VolumeMode != "" {
+		dvSpec.Storage.VolumeMode = &destination.VolumeMode
+	}
+
+	dv = dvTemplate.DeepCopy()
+	dv.Spec = dvSpec
+	updateDataVolumeAnnotations(dv, &disk)
 	return
 }
 

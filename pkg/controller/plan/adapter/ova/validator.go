@@ -91,8 +91,27 @@ func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
 
 // Validate that a VM's disk backing storage has been mapped.
 func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
-	//For OVA providers, we don't have an actual storage connected,
-	// since we use a dummy storage for mapping the function should always return true.
+	if r.plan.Referenced.Map.Storage == nil {
+		return
+	}
+	vm := &model.VM{}
+	err = r.inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vmRef.String())
+		return
+	}
+
+	// If a default mapping is defined, that satisfies the requirement.
+	if r.plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{ID: DefaultStorageID}) {
+		ok = true
+		return
+	}
+
+	for _, disk := range vm.Disks {
+		if !r.plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{ID: disk.ID}) {
+			return
+		}
+	}
 	ok = true
 	return
 }
