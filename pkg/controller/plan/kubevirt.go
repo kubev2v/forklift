@@ -56,6 +56,10 @@ import (
 
 // Annotations
 const (
+	// Legacy transfer network annotation (value=network-attachment-definition name)
+	// FIXME: this should be phased out and replaced with the
+	// k8s.v1.cni.cncf.io/networks annotation.
+	AnnLegacyTransferNetwork = "v1.multus-cni.io/default-network"
 	// Transfer network annotation (value=network-attachment-definition name)
 	AnnTransferNetwork = "k8s.v1.cni.cncf.io/networks"
 	// Annotation to specify the default route for the transfer network.
@@ -2362,6 +2366,12 @@ func (r *KubeVirt) vmAllButMigrationLabels(vmRef ref.Ref) (labels map[string]str
 	return
 }
 
+// setTransferNetwork sets the transfer network annotation on the DataVolume so
+// that it can be used by the importer pod. If the `forklift.konveyor.io/route` annotation
+// is present on the referenced NAD, then it will be used with the `k8s.v1.cni.cncf.io/networks` annotation
+// to set the default route. If not, this will fall back to setting the `v1.multus-cni.io/default-network` annotation
+// with the namespaced name of the NAD.
+// FIXME: the codepath using the multus annotation should be phased out.
 func (r *KubeVirt) setTransferNetwork(annotations map[string]string) (err error) {
 	key := client.ObjectKey{
 		Namespace: r.Plan.Spec.TransferNetwork.Namespace,
@@ -2373,12 +2383,13 @@ func (r *KubeVirt) setTransferNetwork(annotations map[string]string) (err error)
 		err = liberr.Wrap(err)
 		return
 	}
-	nse := k8snet.NetworkSelectionElement{
-		Namespace: r.Plan.Spec.TransferNetwork.Namespace,
-		Name:      r.Plan.Spec.TransferNetwork.Name,
-	}
+
 	route, found := netAttachDef.Annotations[AnnForkliftNetworkRoute]
 	if found {
+		nse := k8snet.NetworkSelectionElement{
+			Namespace: key.Namespace,
+			Name:      key.Name,
+		}
 		ip := net.ParseIP(route)
 		if ip != nil {
 			nse.GatewayRequest = []net.IP{ip}
@@ -2388,13 +2399,16 @@ func (r *KubeVirt) setTransferNetwork(annotations map[string]string) (err error)
 				"route", route)
 			return
 		}
+		transferNetwork, jErr := json.Marshal([]k8snet.NetworkSelectionElement{nse})
+		if jErr != nil {
+			err = liberr.Wrap(jErr)
+			return
+		}
+		annotations[AnnTransferNetwork] = string(transferNetwork)
+	} else {
+		annotations[AnnLegacyTransferNetwork] = path.Join(key.Namespace, key.Name)
 	}
-	transferNetwork, err := json.Marshal([]k8snet.NetworkSelectionElement{nse})
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	annotations[AnnTransferNetwork] = string(transferNetwork)
+
 	return
 }
 
