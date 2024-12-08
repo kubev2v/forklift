@@ -4,7 +4,7 @@ ARG STREAM=downstream
 
 COPY ./. /repo
 WORKDIR /repo/operator
-RUN source ./export-vars.sh ${STREAM} && \
+RUN source ./export-vars-${STREAM}.sh && \
     kustomize build config/manifests/ \
     | envsubst \
     | operator-sdk generate bundle \
