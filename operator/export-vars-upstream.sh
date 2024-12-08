@@ -1,14 +1,5 @@
 #!/bin/bash -ex
 
-# Check if the script has exactly one parameter
-if [ "$#" -ne 1 ]; then
-    echo "Error: Exactly one parameter is required."
-    echo "Usage: $0 <upstream|downstream>"
-    exit 1
-fi
-
-stream=$1
-
 declare -A images
 
 # The image refrences below will get updated by Konflux everytime there is a new image.
@@ -35,41 +26,13 @@ images[VALIDATION_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-
 
 images[VIRT_V2V_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/virt-v2v@sha256:9a8548cf4439121ceaa7a8d626d6c6f1f9280f63b2daf471d24fd62c8185a3f4
 
-# For downstream, the names of the images change
-
-declare -A replacements
-
-replacements[API_IMAGE]=mtv-api-rhel9
-replacements[CONTROLLER_IMAGE]=mtv-controller-rhel8
-replacements[MUST_GATHER_IMAGE]=mtv-must-gather-rhel8
-replacements[OPENSTACK_POPULATOR_IMAGE]=mtv-openstack-populator-rhel9
-replacements[OPERATOR_IMAGE]=mtv-rhel8-operator
-replacements[OVA_PROVIDER_SERVER_IMAGE]=mtv-ova-provider-server-rhel9
-replacements[OVIRT_POPULATOR_IMAGE]=mtv-rhv-populator-rhel8
-replacements[POPULATOR_CONTROLLER_IMAGE]=mtv-populator-controller-rhel9
-replacements[UI_PLUGIN_IMAGE]=mtv-console-plugin-rhel9
-replacements[VALIDATION_IMAGE]=mtv-validation-rhel8
-replacements[VIRT_V2V_IMAGE]=mtv-virt-v2v-rhel8
-
 # Chage the repository of the images to match the repository they would be pushed
 # to during a release.
 
-if [ $stream == "upstream" ]; then
-    for k in "${!images[@]}"; do
-        image="${images[$k]}"
-        new_image="${image/quay.io\/redhat-user-workloads\/rh-mtv-1-tenant\/forklift-operator/kubev2v}"
-        export "$k=$new_image"
-    done
-elif [ $stream == "downstream" ]; then
-    for k in "${!images[@]}"; do
-        image="${images[$k]}"
-        new_image="${image/forklift-operator\/[^@]*@/forklift-operator\/${replacements[$k]}@}"
-        new_image="${new_image/quay.io\/redhat-user-workloads\/rh-mtv-1-tenant\/forklift-operator/registry.redhat.io\/migration-toolkit-virtualization}"
-        export "$k=$new_image"
-    done
-else
-    echo "Stream not valid. Expected 'upstream' or 'downstream'."
-    exit 1
-fi
+for k in "${!images[@]}"; do
+    image="${images[$k]}"
+    new_image="${image/redhat-user-workloads\/rh-mtv-1-tenant\/forklift-operator/kubev2v}"
+    export "$k=$new_image"
+done
 
 export VERSION="v2.7.0"
