@@ -1,4 +1,4 @@
-FROM quay.io/konflux-ci/operator-sdk-builder@sha256:73fa40301aebf0c62903a5840918251f444212319f95a4e467eeaf0cd8c4349e as builder
+FROM quay.io/konflux-ci/operator-sdk-builder@sha256:9f75516848faf6549f74213258f963869189283f47d1e0290ba5b170064a88a6 as builder
 
 ARG STREAM=downstream
 
