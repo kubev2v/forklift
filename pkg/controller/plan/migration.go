@@ -83,7 +83,6 @@ const (
 	StoreSnapshotDeltas        = "StoreSnapshotDeltas"
 	StoreInitialSnapshotDeltas = "StoreInitialSnapshotDeltas"
 	RemovePreviousSnapshot     = "RemovePreviousSnapshot"
-	RemovePenultimateSnapshot  = "RemovePenultimateSnapshot"
 	RemoveFinalSnapshot        = "RemoveFinalSnapshot"
 )
 
@@ -135,8 +134,8 @@ var (
 			{Name: StoreInitialSnapshotDeltas, All: VSphere},
 			{Name: CreateDataVolumes},
 			{Name: CopyDisks},
-			{Name: CopyingPaused},
 			{Name: RemovePreviousSnapshot, All: VSphere},
+			{Name: CopyingPaused},
 			{Name: CreateSnapshot},
 			{Name: WaitForSnapshot},
 			{Name: StoreSnapshotDeltas, All: VSphere},
@@ -144,7 +143,6 @@ var (
 			{Name: StorePowerState},
 			{Name: PowerOffSource},
 			{Name: WaitForPowerOff},
-			{Name: RemovePenultimateSnapshot, All: VSphere},
 			{Name: CreateFinalSnapshot},
 			{Name: WaitForFinalSnapshot},
 			{Name: AddFinalCheckpoint},
@@ -664,7 +662,7 @@ func (r *Migration) step(vm *plan.VMStatus) (step string) {
 		step = DiskAllocation
 	case CopyDisks, CopyingPaused, RemovePreviousSnapshot, CreateSnapshot, WaitForSnapshot, StoreSnapshotDeltas, AddCheckpoint, ConvertOpenstackSnapshot:
 		step = DiskTransfer
-	case RemovePenultimateSnapshot, CreateFinalSnapshot, WaitForFinalSnapshot, AddFinalCheckpoint, Finalize, RemoveFinalSnapshot:
+	case CreateFinalSnapshot, WaitForFinalSnapshot, AddFinalCheckpoint, Finalize, RemoveFinalSnapshot:
 		step = Cutover
 	case CreateGuestConversionPod, ConvertGuest:
 		step = ImageConversion
@@ -989,7 +987,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		} else if vm.Warm.NextPrecopyAt != nil && !vm.Warm.NextPrecopyAt.After(time.Now()) {
 			vm.Phase = r.next(vm.Phase)
 		}
-	case RemovePreviousSnapshot, RemovePenultimateSnapshot, RemoveFinalSnapshot:
+	case RemovePreviousSnapshot, RemoveFinalSnapshot:
 		step, found := vm.FindStep(r.step(vm))
 		if !found {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
