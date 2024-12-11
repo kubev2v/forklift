@@ -115,8 +115,13 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (imageI
 }
 
 // Check if a snapshot is ready to transfer.
-func (r *Client) CheckSnapshotReady(vmRef ref.Ref, imageID string) (ready bool, err error) {
+func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool, snapshotId string, err error) {
 	return
+}
+
+// CheckSnapshotRemoved implements base.Client
+func (r *Client) CheckSnapshotRemoved(vmRef ref.Ref, snapshot string) (bool, error) {
+	return false, nil
 }
 
 // Set DataVolume checkpoints.
