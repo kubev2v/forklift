@@ -12,26 +12,25 @@ import (
 
 // Environment variables.
 const (
-	MaxVmInFlight               = "MAX_VM_INFLIGHT"
-	HookRetry                   = "HOOK_RETRY"
-	ImporterRetry               = "IMPORTER_RETRY"
-	VirtV2vImage                = "VIRT_V2V_IMAGE"
-	PrecopyInterval             = "PRECOPY_INTERVAL"
-	VirtV2vDontRequestKVM       = "VIRT_V2V_DONT_REQUEST_KVM"
-	SnapshotRemovalTimeout      = "SNAPSHOT_REMOVAL_TIMEOUT"
-	SnapshotStatusCheckRate     = "SNAPSHOT_STATUS_CHECK_RATE"
-	CDIExportTokenTTL           = "CDI_EXPORT_TOKEN_TTL"
-	FileSystemOverhead          = "FILESYSTEM_OVERHEAD"
-	BlockOverhead               = "BLOCK_OVERHEAD"
-	CleanupRetries              = "CLEANUP_RETRIES"
-	DvStatusCheckRetries        = "DV_STATUS_CHECK_RETRIES"
-	SnapshotRemovalCheckRetries = "SNAPSHOT_REMOVAL_CHECK_RETRIES"
-	OvirtOsConfigMap            = "OVIRT_OS_MAP"
-	VsphereOsConfigMap          = "VSPHERE_OS_MAP"
-	VirtCustomizeConfigMap      = "VIRT_CUSTOMIZE_MAP"
-	VddkJobActiveDeadline       = "VDDK_JOB_ACTIVE_DEADLINE"
-	VirtV2vExtraArgs            = "VIRT_V2V_EXTRA_ARGS"
-	VirtV2vExtraConfConfigMap   = "VIRT_V2V_EXTRA_CONF_CONFIG_MAP"
+	MaxVmInFlight             = "MAX_VM_INFLIGHT"
+	HookRetry                 = "HOOK_RETRY"
+	ImporterRetry             = "IMPORTER_RETRY"
+	VirtV2vImage              = "VIRT_V2V_IMAGE"
+	PrecopyInterval           = "PRECOPY_INTERVAL"
+	VirtV2vDontRequestKVM     = "VIRT_V2V_DONT_REQUEST_KVM"
+	SnapshotRemovalTimeout    = "SNAPSHOT_REMOVAL_TIMEOUT"
+	SnapshotStatusCheckRate   = "SNAPSHOT_STATUS_CHECK_RATE"
+	CDIExportTokenTTL         = "CDI_EXPORT_TOKEN_TTL"
+	FileSystemOverhead        = "FILESYSTEM_OVERHEAD"
+	BlockOverhead             = "BLOCK_OVERHEAD"
+	CleanupRetries            = "CLEANUP_RETRIES"
+	DvStatusCheckRetries      = "DV_STATUS_CHECK_RETRIES"
+	OvirtOsConfigMap          = "OVIRT_OS_MAP"
+	VsphereOsConfigMap        = "VSPHERE_OS_MAP"
+	VirtCustomizeConfigMap    = "VIRT_CUSTOMIZE_MAP"
+	VddkJobActiveDeadline     = "VDDK_JOB_ACTIVE_DEADLINE"
+	VirtV2vExtraArgs          = "VIRT_V2V_EXTRA_ARGS"
+	VirtV2vExtraConfConfigMap = "VIRT_V2V_EXTRA_CONF_CONFIG_MAP"
 )
 
 // Migration settings
@@ -62,8 +61,6 @@ type Migration struct {
 	CleanupRetries int
 	// DvStatusCheckRetries retries
 	DvStatusCheckRetries int
-	// SnapshotRemovalCheckRetries retries
-	SnapshotRemovalCheckRetries int
 	// oVirt OS config map name
 	OvirtOsConfigMap string
 	// vSphere OS config map name
@@ -107,9 +104,6 @@ func (r *Migration) Load() (err error) {
 		return liberr.Wrap(err)
 	}
 	if r.DvStatusCheckRetries, err = getPositiveEnvLimit(DvStatusCheckRetries, 10); err != nil {
-		return liberr.Wrap(err)
-	}
-	if r.SnapshotRemovalCheckRetries, err = getPositiveEnvLimit(SnapshotRemovalCheckRetries, 20); err != nil {
 		return liberr.Wrap(err)
 	}
 	if virtV2vImage, ok := os.LookupEnv(VirtV2vImage); ok {
