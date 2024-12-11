@@ -222,15 +222,21 @@ func (r *Migration) Run() (reQ time.Duration, err error) {
 			return
 		}
 	}
-
-	vm, hasNext, err := r.scheduler.Next()
-	if err != nil {
-		return
-	}
-	if hasNext {
-		err = r.execute(vm)
+	for {
+		var hasNext bool
+		var vm *plan.VMStatus
+		vm, hasNext, err = r.scheduler.Next()
 		if err != nil {
 			return
+		}
+		if hasNext {
+			err = r.execute(vm)
+			if err != nil {
+				return
+			}
+		} else {
+			r.Log.Info("The scheduler does not have any additional VMs.")
+			break
 		}
 	}
 
