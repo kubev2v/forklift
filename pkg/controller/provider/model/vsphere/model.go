@@ -268,6 +268,7 @@ type VM struct {
 	Concerns              []Concern      `sql:""`
 	GuestNetworks         []GuestNetwork `sql:""`
 	GuestIpStacks         []GuestIpStack `sql:""`
+	SecureBoot            bool           `sql:""`
 }
 
 // Determine if current revision has been validated.
