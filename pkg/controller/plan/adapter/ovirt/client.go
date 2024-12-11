@@ -75,7 +75,7 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (snapsh
 }
 
 // Check if a snapshot is ready to transfer, to avoid importer restarts.
-func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool, err error) {
+func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool, snapshotId string, err error) {
 	correlationID, err := r.getSnapshotCorrelationID(vmRef, &snapshot)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -102,6 +102,11 @@ func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool,
 		}
 	}
 	return
+}
+
+// CheckSnapshotRemoved implements base.Client
+func (r *Client) CheckSnapshotRemoved(vmRef ref.Ref, snapshot string) (bool, error) {
+	return false, nil
 }
 
 // Remove a VM snapshot. No-op for this provider.

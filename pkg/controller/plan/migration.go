@@ -108,7 +108,6 @@ const (
 	TransferCompleted              = "Transfer completed."
 	PopulatorPodPrefix             = "populate-"
 	DvStatusCheckRetriesAnnotation = "dvStatusCheckRetries"
-	SnapshotRemovalCheckRetries    = "snapshotRemovalCheckRetries"
 )
 
 var (
@@ -1027,27 +1026,15 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
 			break
 		}
-		// FIXME: This is just temporary timeout to unblock the migrations which get stuck on issue https://issues.redhat.com/browse/MTV-1753
-		// This should be fixed properly by adding the task manager inside the inventory and monitor the task status
-		// from the main controller.
-		var retries int
-		retriesAnnotation := step.Annotations[SnapshotRemovalCheckRetries]
-		if retriesAnnotation == "" {
-			step.Annotations[SnapshotRemovalCheckRetries] = "1"
-		} else {
-			retries, err = strconv.Atoi(retriesAnnotation)
-			if err != nil {
-				step.AddError(err.Error())
-				err = nil
-				break
-			}
-			if retries >= settings.Settings.SnapshotRemovalCheckRetries {
-				vm.Phase = r.next(vm.Phase)
-				// Reset for next precopy
-				step.Annotations[SnapshotRemovalCheckRetries] = "1"
-			} else {
-				step.Annotations[SnapshotRemovalCheckRetries] = strconv.Itoa(retries + 1)
-			}
+		snapshot := vm.Warm.Precopies[len(vm.Warm.Precopies)-1].Snapshot
+		ready, err := r.provider.CheckSnapshotRemoved(vm.Ref, snapshot)
+		if err != nil {
+			step.AddError(err.Error())
+			err = nil
+			break
+		}
+		if ready {
+			vm.Phase = r.next(vm.Phase)
 		}
 	case CreateInitialSnapshot, CreateSnapshot, CreateFinalSnapshot:
 		step, found := vm.FindStep(r.step(vm))
@@ -1076,11 +1063,17 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			break
 		}
 		snapshot := vm.Warm.Precopies[len(vm.Warm.Precopies)-1].Snapshot
-		ready, err := r.provider.CheckSnapshotReady(vm.Ref, snapshot)
+		ready, snapshotId, err := r.provider.CheckSnapshotReady(vm.Ref, snapshot)
 		if err != nil {
 			step.AddError(err.Error())
 			err = nil
 			break
+		}
+		// If the provider does not directly create the snapshot, but we need to wait for the snapshot to be created
+		// We start the creation task in CreateSnapshot, set the task ID as a snapshot id which needs to be replaced
+		// by the snapshot id after the task finishes.
+		if snapshotId != "" {
+			vm.Warm.Precopies[len(vm.Warm.Precopies)-1].Snapshot = snapshotId
 		}
 		if ready {
 			vm.Phase = r.next(vm.Phase)
