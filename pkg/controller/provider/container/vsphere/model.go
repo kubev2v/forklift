@@ -544,6 +544,12 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				if a, cast := p.Val.(types.VirtualMachineAffinityInfo); cast {
 					v.model.CpuAffinity = a.AffinitySet
 				}
+			case fBootOptions:
+				if a, cast := p.Val.(types.VirtualMachineBootOptions); cast {
+					if a.EfiSecureBootEnabled != nil {
+						v.model.SecureBoot = *a.EfiSecureBootEnabled
+					}
+				}
 			case fCpuHotAddEnabled:
 				if b, cast := p.Val.(bool); cast {
 					v.model.CpuHotAddEnabled = b
