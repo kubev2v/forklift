@@ -100,6 +100,7 @@ const (
 	fUUID                = "config.uuid"
 	fFirmware            = "config.firmware"
 	fFtInfo              = "config.ftInfo"
+	fBootOptions         = "config.bootOptions"
 	fCpuAffinity         = "config.cpuAffinity"
 	fCpuHotAddEnabled    = "config.cpuHotAddEnabled"
 	fCpuHotRemoveEnabled = "config.cpuHotRemoveEnabled"
@@ -726,6 +727,7 @@ func (r *Collector) vmPathSet() []string {
 		fFirmware,
 		fFtInfo,
 		fCpuAffinity,
+		fBootOptions,
 		fCpuHotAddEnabled,
 		fCpuHotRemoveEnabled,
 		fMemoryHotAddEnabled,

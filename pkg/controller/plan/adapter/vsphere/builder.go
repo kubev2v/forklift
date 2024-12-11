@@ -668,15 +668,9 @@ func (r *Builder) mapFirmware(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	}
 	switch vm.Firmware {
 	case Efi:
-		// We don't distinguish between UEFI and UEFI with secure boot, but we anyway would have
-		// disabled secure boot, even if we knew it was enabled on the source, because the guest
-		// OS won't be able to boot without getting the NVRAM data. By starting the VM without
-		// secure boot we ease the procedure users need to do in order to make a guest OS that
-		// was previously configured with secure boot bootable.
-		secureBootEnabled := false
 		firmware.Bootloader = &cnv.Bootloader{
 			EFI: &cnv.EFI{
-				SecureBoot: &secureBootEnabled,
+				SecureBoot: &vm.SecureBoot,
 			}}
 	default:
 		firmware.Bootloader = &cnv.Bootloader{BIOS: &cnv.BIOS{}}
