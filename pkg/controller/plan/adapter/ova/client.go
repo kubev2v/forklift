@@ -61,13 +61,8 @@ func (r *Client) GetSnapshotDeltas(vmRef ref.Ref, snapshot string, hostsFunc uti
 }
 
 // Check if a snapshot is ready to transfer, to avoid importer restarts.
-func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool, snapshotId string, err error) {
+func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool, err error) {
 	return
-}
-
-// CheckSnapshotRemoved implements base.Client
-func (r *Client) CheckSnapshotRemoved(vmRef ref.Ref, snapshot string) (bool, error) {
-	return false, nil
 }
 
 // Set DataVolume checkpoints.

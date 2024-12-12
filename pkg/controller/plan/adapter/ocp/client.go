@@ -25,12 +25,7 @@ type Client struct {
 }
 
 // CheckSnapshotReady implements base.Client
-func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool, snapshotId string, err error) {
-	return
-}
-
-// CheckSnapshotRemoved implements base.Client
-func (r *Client) CheckSnapshotRemoved(vmRef ref.Ref, snapshot string) (bool, error) {
+func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (bool, error) {
 	return false, nil
 }
 
