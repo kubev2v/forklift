@@ -108,9 +108,7 @@ type Client interface {
 	// Remove a snapshot.
 	RemoveSnapshot(vmRef ref.Ref, snapshot string, hostsFunc util.HostsFunc) error
 	// Check if a snapshot is ready to transfer.
-	CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool, snapshotId string, err error)
-	// Check if a snapshot is removed.
-	CheckSnapshotRemoved(vmRef ref.Ref, snapshot string) (ready bool, err error)
+	CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool, err error)
 	// Set DataVolume checkpoints.
 	SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []cdi.DataVolume, final bool, hostsFunc util.HostsFunc) (err error)
 	// Close connections to the provider API.

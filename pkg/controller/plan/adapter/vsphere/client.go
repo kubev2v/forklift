@@ -16,7 +16,6 @@ import (
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/session"
-	"github.com/vmware/govmomi/task"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
@@ -28,11 +27,8 @@ import (
 )
 
 const (
-	snapshotName       = "forklift-migration-precopy"
-	snapshotDesc       = "Forklift Operator warm migration precopy"
-	VirtualMachine     = "VirtualMachine"
-	CreateSnapshotTask = "CreateSnapshot_Task"
-	RemoveSnapshotTask = "RemoveSnapshot_Task"
+	snapshotName = "forklift-migration-precopy"
+	snapshotDesc = "Forklift Operator warm migration precopy"
 )
 
 // vSphere VM Client
@@ -43,9 +39,9 @@ type Client struct {
 }
 
 // Create a VM snapshot and return its ID.
-func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (id string, err error) {
+func (r *Client) CreateSnapshot(vmRef ref.Ref, hosts util.HostsFunc) (id string, err error) {
 	r.Log.V(1).Info("Creating snapshot", "vmRef", vmRef)
-	vm, err := r.getVM(vmRef, hostsFunc)
+	vm, err := r.getVM(vmRef, hosts)
 	if err != nil {
 		return
 	}
@@ -54,82 +50,28 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (id str
 		err = liberr.Wrap(err)
 		return
 	}
-	return task.Common.Reference().Value, nil
+	res, err := task.WaitForResult(context.TODO(), nil)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	id = res.Result.(types.ManagedObjectReference).Value
+	r.Log.Info("Created snapshot", "vmRef", vmRef, "id", id)
+
+	return
 }
 
 // Check if a snapshot is ready to transfer.
-func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool, snapshotId string, err error) {
-	taskInfo, err := r.getLatestTaskByName(vmRef, CreateSnapshotTask)
-	if err != nil {
-		return false, "", liberr.Wrap(err)
-	}
-	ready, err = r.checkTaskStatus(taskInfo)
-	if err != nil {
-		return false, "", liberr.Wrap(err)
-	}
-	if ready {
-		return true, taskInfo.Result.(types.ManagedObjectReference).Value, nil
-	} else {
-		// The snapshot is not ready, retry the check
-		return false, "", nil
-	}
-}
-
-// Check if a snapshot is removed.
-func (r *Client) CheckSnapshotRemoved(vmRef ref.Ref, snapshot string) (ready bool, err error) {
-	taskInfo, err := r.getLatestTaskByName(vmRef, RemoveSnapshotTask)
-	if err != nil {
-		return false, liberr.Wrap(err)
-	}
-	return r.checkTaskStatus(taskInfo)
-}
-
-func (r *Client) checkTaskStatus(taskInfo *types.TaskInfo) (ready bool, err error) {
-	r.Log.Info("Snapshot task", "task", taskInfo.Task.Value, "name", taskInfo.Name, "status", taskInfo.State)
-	switch taskInfo.State {
-	case types.TaskInfoStateSuccess:
-		return true, nil
-	case types.TaskInfoStateError:
-		return false, fmt.Errorf(taskInfo.Error.LocalizedMessage)
-	default:
-		return false, nil
-	}
-}
-
-func (r *Client) getLatestTaskByName(vmRef ref.Ref, taskName string) (*types.TaskInfo, error) {
-	taskManager := task.NewManager(r.client.Client)
-	taskCollector, err := taskManager.CreateCollectorForTasks(context.TODO(), types.TaskFilterSpec{
-		Entity: &types.TaskFilterSpecByEntity{
-			Entity: types.ManagedObjectReference{
-				Type:  VirtualMachine,
-				Value: vmRef.ID,
-			},
-			Recursion: types.TaskFilterSpecRecursionOptionSelf,
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-	//nolint:errcheck
-	defer taskCollector.Destroy(context.Background())
-	tasks, err := taskCollector.LatestPage(context.TODO())
-	if err != nil {
-		return nil, err
-	}
-	for _, taskInfo := range tasks {
-		if taskInfo.Name == taskName {
-			return &taskInfo, nil
-		}
-	}
-	return nil, fmt.Errorf("no task found with name %s, vmRef %v", taskName, vmRef)
+func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool, err error) {
+	return true, nil
 }
 
 // Remove a VM snapshot.
-func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hostsFunc util.HostsFunc) (err error) {
+func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hosts util.HostsFunc) (err error) {
 	r.Log.V(1).Info("RemoveSnapshot",
 		"vmRef", vmRef,
 		"snapshot", snapshot)
-	err = r.removeSnapshot(vmRef, snapshot, false, hostsFunc)
+	err = r.removeSnapshot(vmRef, snapshot, false, hosts)
 	return
 }
 
