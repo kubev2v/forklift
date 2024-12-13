@@ -539,6 +539,8 @@ spec:
                           items:
                             description: Precopy durations
                             properties:
+                              createTaskId:
+                                type: string
                               deltas:
                                 items:
                                   properties:
@@ -553,6 +555,8 @@ spec:
                                 type: array
                               end:
                                 format: date-time
+                                type: string
+                              removeTaskId:
                                 type: string
                               snapshot:
                                 type: string
