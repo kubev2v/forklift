@@ -14,6 +14,7 @@ import (
 	"gopkg.in/yaml.v2"
 	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -181,6 +182,16 @@ func (r *HookRunner) template(mp *core.ConfigMap) (template *core.PodTemplateSpe
 				{
 					Name:  "hook",
 					Image: r.hook.Spec.Image,
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceCPU:    resource.MustParse(Settings.Migration.HooksContainerRequestsCpu),
+							core.ResourceMemory: resource.MustParse(Settings.Migration.HooksContainerRequestsMemory),
+						},
+						Limits: core.ResourceList{
+							core.ResourceCPU:    resource.MustParse(Settings.Migration.HooksContainerLimitsCpu),
+							core.ResourceMemory: resource.MustParse(Settings.Migration.HooksContainerLimitsMemory),
+						},
+					},
 					VolumeMounts: []core.VolumeMount{
 						{
 							Name:      "hook",
