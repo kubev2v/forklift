@@ -98,10 +98,12 @@ const (
 
 // Precopy durations
 type Precopy struct {
-	Start    *meta.Time  `json:"start,omitempty"`
-	End      *meta.Time  `json:"end,omitempty"`
-	Snapshot string      `json:"snapshot,omitempty"`
-	Deltas   []DiskDelta `json:"deltas,omitempty"`
+	Start        *meta.Time  `json:"start,omitempty"`
+	End          *meta.Time  `json:"end,omitempty"`
+	Snapshot     string      `json:"snapshot,omitempty"`
+	CreateTaskId string      `json:"createTaskId,omitempty"`
+	RemoveTaskId string      `json:"removeTaskId,omitempty"`
+	Deltas       []DiskDelta `json:"deltas,omitempty"`
 }
 
 func (r *Precopy) WithDeltas(deltas map[string]string) {

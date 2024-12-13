@@ -15,6 +15,7 @@ import (
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/object"
+	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/session"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/mo"
@@ -29,6 +30,7 @@ import (
 const (
 	snapshotName = "forklift-migration-precopy"
 	snapshotDesc = "Forklift Operator warm migration precopy"
+	taskType     = "Task"
 )
 
 // vSphere VM Client
@@ -39,9 +41,9 @@ type Client struct {
 }
 
 // Create a VM snapshot and return its ID.
-func (r *Client) CreateSnapshot(vmRef ref.Ref, hosts util.HostsFunc) (id string, err error) {
+func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (snapshotId string, creationTaskId string, err error) {
 	r.Log.V(1).Info("Creating snapshot", "vmRef", vmRef)
-	vm, err := r.getVM(vmRef, hosts)
+	vm, err := r.getVM(vmRef, hostsFunc)
 	if err != nil {
 		return
 	}
@@ -50,28 +52,15 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref, hosts util.HostsFunc) (id string,
 		err = liberr.Wrap(err)
 		return
 	}
-	res, err := task.WaitForResult(context.TODO(), nil)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	id = res.Result.(types.ManagedObjectReference).Value
-	r.Log.Info("Created snapshot", "vmRef", vmRef, "id", id)
-
-	return
-}
-
-// Check if a snapshot is ready to transfer.
-func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool, err error) {
-	return true, nil
+	return "", task.Reference().Value, nil
 }
 
 // Remove a VM snapshot.
-func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hosts util.HostsFunc) (err error) {
+func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hosts util.HostsFunc) (taskId string, err error) {
 	r.Log.V(1).Info("RemoveSnapshot",
 		"vmRef", vmRef,
 		"snapshot", snapshot)
-	err = r.removeSnapshot(vmRef, snapshot, false, hosts)
+	taskId, err = r.removeSnapshot(vmRef, snapshot, false, hosts)
 	return
 }
 
@@ -247,6 +236,89 @@ func (r *Client) GetSnapshotDeltas(vmRef ref.Ref, snapshotId string, hosts util.
 	return
 }
 
+// Check if a snapshot is removed
+func (r *Client) CheckSnapshotRemove(vmRef ref.Ref, precopy planapi.Precopy, hosts util.HostsFunc) (bool, error) {
+	r.Log.Info("Check Snapshot Remove", "vmRef", vmRef, "precopy", precopy)
+	taskInfo, err := r.getTaskById(vmRef, precopy.RemoveTaskId, hosts)
+	if err != nil {
+		return false, liberr.Wrap(err)
+	}
+	return r.checkTaskStatus(taskInfo)
+}
+
+// Check if a snapshot is ready to transfer.
+func (r *Client) CheckSnapshotReady(vmRef ref.Ref, precopy planapi.Precopy, hosts util.HostsFunc) (ready bool, snapshotId string, err error) {
+	r.Log.Info("Check Snapshot Ready", "vmRef", vmRef, "precopy", precopy)
+	taskInfo, err := r.getTaskById(vmRef, precopy.CreateTaskId, hosts)
+	if err != nil {
+		return false, snapshotId, liberr.Wrap(err)
+	}
+	ready, err = r.checkTaskStatus(taskInfo)
+	snapshotId = taskInfo.Result.(types.ManagedObjectReference).Value
+	return
+}
+
+func (r *Client) checkTaskStatus(taskInfo *types.TaskInfo) (ready bool, err error) {
+	r.Log.Info("Snapshot task", "task", taskInfo.Task.Value, "name", taskInfo.Name, "status", taskInfo.State)
+	switch taskInfo.State {
+	case types.TaskInfoStateSuccess:
+		return true, nil
+	case types.TaskInfoStateError:
+		return false, fmt.Errorf(taskInfo.Error.LocalizedMessage)
+	default:
+		return false, nil
+	}
+}
+
+func (r *Client) getClientFromVmRef(vmRef ref.Ref, hosts util.HostsFunc) (client *vim25.Client, err error) {
+	vm := &model.VM{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		return nil, liberr.Wrap(err, "vm", vmRef.String())
+	}
+	return r.getClient(vm, hosts)
+}
+
+func (r *Client) getTaskById(vmRef ref.Ref, taskId string, hosts util.HostsFunc) (*types.TaskInfo, error) {
+	r.Log.V(1).Info("Get task by id", "taskId", taskId, "vmRef", vmRef)
+
+	// Get the ESXi client for the haTasks
+	client, err := r.getClientFromVmRef(vmRef, hosts)
+	if err != nil {
+		return nil, err
+	}
+	// Create a collector to receive the tasks
+	pc := property.DefaultCollector(client)
+	pc, err = pc.Create(context.TODO())
+	if err != nil {
+		return nil, err
+	}
+	//nolint:errcheck
+	defer pc.Destroy(context.TODO())
+
+	// Retrieve the task from ESXi host
+	taskRef := types.ManagedObjectReference{
+		Type:  taskType,
+		Value: taskId,
+	}
+	var content []types.ObjectContent
+	err = pc.RetrieveOne(context.TODO(), taskRef, []string{"info"}, &content)
+	if err != nil {
+		return nil, err
+	}
+	if len(content) == 0 {
+		return nil, fmt.Errorf("task %s not found", taskId)
+	}
+	if len(content[0].PropSet) == 0 {
+		return nil, fmt.Errorf("task %s not found property set", taskId)
+	}
+	if content[0].PropSet[0].Val == nil {
+		return nil, fmt.Errorf("no task value found for task %s", taskId)
+	}
+	task := content[0].PropSet[0].Val.(types.TaskInfo)
+	return &task, nil
+}
+
 func (r *Client) getClient(vm *model.VM, hosts util.HostsFunc) (client *vim25.Client, err error) {
 	if coldLocal, vErr := r.Plan.VSphereColdLocal(); vErr == nil && coldLocal {
 		// when virt-v2v runs the migration, forklift-controller should interact only
@@ -371,7 +443,7 @@ func nullableHosts() (hosts map[string]*v1beta1.Host, err error) {
 }
 
 // Remove a VM snapshot and optionally its children.
-func (r *Client) removeSnapshot(vmRef ref.Ref, snapshot string, children bool, hosts util.HostsFunc) (err error) {
+func (r *Client) removeSnapshot(vmRef ref.Ref, snapshot string, children bool, hosts util.HostsFunc) (taskId string, err error) {
 	r.Log.Info("Removing snapshot",
 		"vmRef", vmRef,
 		"snapshot", snapshot,
@@ -381,12 +453,11 @@ func (r *Client) removeSnapshot(vmRef ref.Ref, snapshot string, children bool, h
 	if err != nil {
 		return
 	}
-	_, err = vm.RemoveSnapshot(context.TODO(), snapshot, children, nil)
+	task, err := vm.RemoveSnapshot(context.TODO(), snapshot, children, nil)
 	if err != nil {
-		err = liberr.Wrap(err)
-		return
+		return "", liberr.Wrap(err)
 	}
-	return
+	return task.Reference().Value, nil
 }
 
 // Connect to the vSphere API.
