@@ -143,6 +143,30 @@ spec:
           value: "{{ virt_v2v_extra_args }}"
         - name: VIRT_V2V_EXTRA_CONF_CONFIG_MAP
           value: "{{ virt_v2v_extra_conf_config_map }}"
+        - name: VIRT_V2V_CONTAINER_LIMITS_CPU
+          value: "{{ virt_v2v_container_limits_cpu }}"
+        - name: VIRT_V2V_CONTAINER_LIMITS_MEMORY
+          value: "{{ virt_v2v_container_limits_memory }}"
+        - name: VIRT_V2V_CONTAINER_REQUESTS_CPU
+          value: "{{ virt_v2v_container_requests_cpu }}"
+        - name: VIRT_V2V_CONTAINER_REQUESTS_MEMORY
+          value: "{{ virt_v2v_container_requests_memory }}"
+        - name: HOOKS_CONTAINER_LIMITS_CPU
+          value: "{{ hooks_container_limits_cpu }}"
+        - name: HOOKS_CONTAINER_LIMITS_MEMORY
+          value: "{{ hooks_container_limits_memory }}"
+        - name: HOOKS_CONTAINER_REQUESTS_CPU
+          value: "{{ hooks_container_requests_cpu }}"
+        - name: HOOKS_CONTAINER_REQUESTS_MEMORY
+          value: "{{ hooks_container_requests_memory }}"
+        - name: OVA_CONTAINER_LIMITS_CPU
+          value: "{{ ova_container_limits_cpu }}"
+        - name: OVA_CONTAINER_LIMITS_MEMORY
+          value: "{{ ova_container_limits_memory }}"
+        - name: OVA_CONTAINER_REQUESTS_CPU
+          value: "{{ ova_container_requests_cpu }}"
+        - name: OVA_CONTAINER_REQUESTS_MEMORY
+          value: "{{ ova_container_requests_memory }}"
         envFrom:
         - configMapRef:
             name: {{ controller_configmap_name }}

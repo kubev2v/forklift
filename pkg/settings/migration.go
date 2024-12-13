@@ -12,26 +12,38 @@ import (
 
 // Environment variables.
 const (
-	MaxVmInFlight               = "MAX_VM_INFLIGHT"
-	HookRetry                   = "HOOK_RETRY"
-	ImporterRetry               = "IMPORTER_RETRY"
-	VirtV2vImage                = "VIRT_V2V_IMAGE"
-	PrecopyInterval             = "PRECOPY_INTERVAL"
-	VirtV2vDontRequestKVM       = "VIRT_V2V_DONT_REQUEST_KVM"
-	SnapshotRemovalTimeout      = "SNAPSHOT_REMOVAL_TIMEOUT"
-	SnapshotStatusCheckRate     = "SNAPSHOT_STATUS_CHECK_RATE"
-	CDIExportTokenTTL           = "CDI_EXPORT_TOKEN_TTL"
-	FileSystemOverhead          = "FILESYSTEM_OVERHEAD"
-	BlockOverhead               = "BLOCK_OVERHEAD"
-	CleanupRetries              = "CLEANUP_RETRIES"
-	DvStatusCheckRetries        = "DV_STATUS_CHECK_RETRIES"
-	SnapshotRemovalCheckRetries = "SNAPSHOT_REMOVAL_CHECK_RETRIES"
-	OvirtOsConfigMap            = "OVIRT_OS_MAP"
-	VsphereOsConfigMap          = "VSPHERE_OS_MAP"
-	VirtCustomizeConfigMap      = "VIRT_CUSTOMIZE_MAP"
-	VddkJobActiveDeadline       = "VDDK_JOB_ACTIVE_DEADLINE"
-	VirtV2vExtraArgs            = "VIRT_V2V_EXTRA_ARGS"
-	VirtV2vExtraConfConfigMap   = "VIRT_V2V_EXTRA_CONF_CONFIG_MAP"
+	MaxVmInFlight                  = "MAX_VM_INFLIGHT"
+	HookRetry                      = "HOOK_RETRY"
+	ImporterRetry                  = "IMPORTER_RETRY"
+	VirtV2vImage                   = "VIRT_V2V_IMAGE"
+	PrecopyInterval                = "PRECOPY_INTERVAL"
+	VirtV2vDontRequestKVM          = "VIRT_V2V_DONT_REQUEST_KVM"
+	SnapshotRemovalTimeout         = "SNAPSHOT_REMOVAL_TIMEOUT"
+	SnapshotStatusCheckRate        = "SNAPSHOT_STATUS_CHECK_RATE"
+	CDIExportTokenTTL              = "CDI_EXPORT_TOKEN_TTL"
+	FileSystemOverhead             = "FILESYSTEM_OVERHEAD"
+	BlockOverhead                  = "BLOCK_OVERHEAD"
+	CleanupRetries                 = "CLEANUP_RETRIES"
+	DvStatusCheckRetries           = "DV_STATUS_CHECK_RETRIES"
+	SnapshotRemovalCheckRetries    = "SNAPSHOT_REMOVAL_CHECK_RETRIES"
+	OvirtOsConfigMap               = "OVIRT_OS_MAP"
+	VsphereOsConfigMap             = "VSPHERE_OS_MAP"
+	VirtCustomizeConfigMap         = "VIRT_CUSTOMIZE_MAP"
+	VddkJobActiveDeadline          = "VDDK_JOB_ACTIVE_DEADLINE"
+	VirtV2vExtraArgs               = "VIRT_V2V_EXTRA_ARGS"
+	VirtV2vExtraConfConfigMap      = "VIRT_V2V_EXTRA_CONF_CONFIG_MAP"
+	VirtV2vContainerLimitsCpu      = "VIRT_V2V_CONTAINER_LIMITS_CPU"
+	VirtV2vContainerLimitsMemory   = "VIRT_V2V_CONTAINER_LIMITS_MEMORY"
+	VirtV2vContainerRequestsCpu    = "VIRT_V2V_CONTAINER_REQUESTS_CPU"
+	VirtV2vContainerRequestsMemory = "VIRT_V2V_CONTAINER_REQUESTS_MEMORY"
+	HooksContainerLimitsCpu        = "HOOKS_CONTAINER_LIMITS_CPU"
+	HooksContainerLimitsMemory     = "HOOKS_CONTAINER_LIMITS_MEMORY"
+	HooksContainerRequestsCpu      = "HOOKS_CONTAINER_REQUESTS_CPU"
+	HooksContainerRequestsMemory   = "HOOKS_CONTAINER_REQUESTS_MEMORY"
+	OvaContainerLimitsCpu          = "OVA_CONTAINER_LIMITS_CPU"
+	OvaContainerLimitsMemory       = "OVA_CONTAINER_LIMITS_MEMORY"
+	OvaContainerRequestsCpu        = "OVA_CONTAINER_REQUESTS_CPU"
+	OvaContainerRequestsMemory     = "OVA_CONTAINER_REQUESTS_MEMORY"
 )
 
 // Migration settings
@@ -75,7 +87,19 @@ type Migration struct {
 	// Additional arguments for virt-v2v
 	VirtV2vExtraArgs string
 	// Additional configuration for virt-v2v
-	VirtV2vExtraConfConfigMap string
+	VirtV2vExtraConfConfigMap      string
+	VirtV2vContainerLimitsCpu      string
+	VirtV2vContainerLimitsMemory   string
+	VirtV2vContainerRequestsCpu    string
+	VirtV2vContainerRequestsMemory string
+	HooksContainerLimitsCpu        string
+	HooksContainerLimitsMemory     string
+	HooksContainerRequestsCpu      string
+	HooksContainerRequestsMemory   string
+	OvaContainerLimitsCpu          string
+	OvaContainerLimitsMemory       string
+	OvaContainerRequestsCpu        string
+	OvaContainerRequestsMemory     string
 }
 
 // Load settings.
@@ -156,6 +180,67 @@ func (r *Migration) Load() (err error) {
 	}
 	if val, found := os.LookupEnv(VirtV2vExtraConfConfigMap); found {
 		r.VirtV2vExtraConfConfigMap = val
+	}
+	// Containers configurations
+	if val, found := os.LookupEnv(VirtV2vContainerLimitsCpu); found {
+		r.VirtV2vContainerLimitsCpu = val
+	} else {
+		r.VirtV2vContainerLimitsCpu = "4000m"
+	}
+	if val, found := os.LookupEnv(VirtV2vContainerLimitsMemory); found {
+		r.VirtV2vContainerLimitsMemory = val
+	} else {
+		r.VirtV2vContainerLimitsMemory = "8Gi"
+	}
+	if val, found := os.LookupEnv(VirtV2vContainerRequestsCpu); found {
+		r.VirtV2vContainerRequestsCpu = val
+	} else {
+		r.VirtV2vContainerRequestsCpu = "1000m"
+	}
+	if val, found := os.LookupEnv(VirtV2vContainerRequestsMemory); found {
+		r.VirtV2vContainerRequestsMemory = val
+	} else {
+		r.VirtV2vContainerRequestsMemory = "1Gi"
+	}
+	if val, found := os.LookupEnv(HooksContainerLimitsCpu); found {
+		r.HooksContainerLimitsCpu = val
+	} else {
+		r.HooksContainerLimitsCpu = "1000m"
+	}
+	if val, found := os.LookupEnv(HooksContainerLimitsMemory); found {
+		r.HooksContainerLimitsMemory = val
+	} else {
+		r.HooksContainerLimitsMemory = "1Gi"
+	}
+	if val, found := os.LookupEnv(HooksContainerRequestsCpu); found {
+		r.HooksContainerRequestsCpu = val
+	} else {
+		r.HooksContainerRequestsCpu = "100m"
+	}
+	if val, found := os.LookupEnv(HooksContainerRequestsMemory); found {
+		r.HooksContainerRequestsMemory = val
+	} else {
+		r.HooksContainerRequestsMemory = "150Mi"
+	}
+	if val, found := os.LookupEnv(OvaContainerLimitsCpu); found {
+		r.OvaContainerLimitsCpu = val
+	} else {
+		r.OvaContainerLimitsCpu = "1000m"
+	}
+	if val, found := os.LookupEnv(OvaContainerLimitsMemory); found {
+		r.OvaContainerLimitsMemory = val
+	} else {
+		r.OvaContainerLimitsMemory = "1Gi"
+	}
+	if val, found := os.LookupEnv(OvaContainerRequestsCpu); found {
+		r.OvaContainerRequestsCpu = val
+	} else {
+		r.OvaContainerRequestsCpu = "100m"
+	}
+	if val, found := os.LookupEnv(OvaContainerRequestsMemory); found {
+		r.OvaContainerRequestsMemory = val
+	} else {
+		r.OvaContainerRequestsMemory = "150Mi"
 	}
 	return
 }
