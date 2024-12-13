@@ -104,11 +104,13 @@ type Client interface {
 	// Return whether the source VM is powered off.
 	PoweredOff(vmRef ref.Ref) (bool, error)
 	// Create a snapshot of the source VM.
-	CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (string, error)
+	CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (snapshotId string, creationTaskId string, err error)
 	// Remove a snapshot.
-	RemoveSnapshot(vmRef ref.Ref, snapshot string, hostsFunc util.HostsFunc) error
+	RemoveSnapshot(vmRef ref.Ref, snapshot string, hostsFunc util.HostsFunc) (removeTaskId string, err error)
 	// Check if a snapshot is ready to transfer.
-	CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool, err error)
+	CheckSnapshotReady(vmRef ref.Ref, precopy planapi.Precopy, hosts util.HostsFunc) (ready bool, snapshotId string, err error)
+	// Check if a snapshot is removed.
+	CheckSnapshotRemove(vmRef ref.Ref, precopy planapi.Precopy, hosts util.HostsFunc) (ready bool, err error)
 	// Set DataVolume checkpoints.
 	SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, datavolumes []cdi.DataVolume, final bool, hostsFunc util.HostsFunc) (err error)
 	// Close connections to the provider API.
