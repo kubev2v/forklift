@@ -224,6 +224,16 @@ func (r *Reconciler) makeOvaProviderPodSpec(pvcName, providerName, providerNames
 				MountPath: mountPath,
 			},
 		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceCPU:    resource.MustParse(Settings.OvaContainerRequestsCpu),
+				core.ResourceMemory: resource.MustParse(Settings.OvaContainerRequestsMemory),
+			},
+			Limits: core.ResourceList{
+				core.ResourceCPU:    resource.MustParse(Settings.OvaContainerLimitsCpu),
+				core.ResourceMemory: resource.MustParse(Settings.OvaContainerRequestsMemory),
+			},
+		},
 		SecurityContext: securityContext,
 	}
 

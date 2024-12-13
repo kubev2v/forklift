@@ -25,6 +25,7 @@ import (
 	core "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
@@ -888,6 +889,16 @@ func createVddkCheckJob(plan *api.Plan, labels map[string]string, vddkImage stri
 					Drop: []core.Capability{"ALL"},
 				},
 			},
+			Resources: core.ResourceRequirements{
+				Requests: core.ResourceList{
+					core.ResourceCPU:    resource.MustParse("100m"),
+					core.ResourceMemory: resource.MustParse("150Mi"),
+				},
+				Limits: core.ResourceList{
+					core.ResourceCPU:    resource.MustParse("1000m"),
+					core.ResourceMemory: resource.MustParse("500Mi"),
+				},
+			},
 		},
 	}
 
@@ -930,7 +941,17 @@ func createVddkCheckJob(plan *api.Plan, labels map[string]string, vddkImage stri
 					InitContainers:  initContainers,
 					Containers: []core.Container{
 						{
-							Name:  "validator",
+							Name: "validator",
+							Resources: core.ResourceRequirements{
+								Requests: core.ResourceList{
+									core.ResourceCPU:    resource.MustParse("100m"),
+									core.ResourceMemory: resource.MustParse("150Mi"),
+								},
+								Limits: core.ResourceList{
+									core.ResourceCPU:    resource.MustParse("1000m"),
+									core.ResourceMemory: resource.MustParse("500Mi"),
+								},
+							},
 							Image: Settings.Migration.VirtV2vImage,
 							SecurityContext: &core.SecurityContext{
 								AllowPrivilegeEscalation: ptr.To(false),
