@@ -672,6 +672,13 @@ func (r *Builder) mapFirmware(vm *model.VM, object *cnv.VirtualMachineSpec) {
 			EFI: &cnv.EFI{
 				SecureBoot: &vm.SecureBoot,
 			}}
+		if vm.SecureBoot {
+			object.Template.Spec.Domain.Features = &cnv.Features{
+				SMM: &cnv.FeatureState{
+					Enabled: &vm.SecureBoot,
+				},
+			}
+		}
 	default:
 		firmware.Bootloader = &cnv.Bootloader{BIOS: &cnv.BIOS{}}
 	}
