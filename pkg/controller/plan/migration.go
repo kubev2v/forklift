@@ -108,7 +108,6 @@ const (
 	TransferCompleted              = "Transfer completed."
 	PopulatorPodPrefix             = "populate-"
 	DvStatusCheckRetriesAnnotation = "dvStatusCheckRetries"
-	SnapshotRemovalCheckRetries    = "snapshotRemovalCheckRetries"
 )
 
 var (
@@ -536,7 +535,7 @@ func (r *Migration) removeLastWarmSnapshot(vm *plan.VMStatus) {
 		return
 	}
 	snapshot := vm.Warm.Precopies[n-1].Snapshot
-	if err := r.provider.RemoveSnapshot(vm.Ref, snapshot, r.kubevirt.loadHosts); err != nil {
+	if _, err := r.provider.RemoveSnapshot(vm.Ref, snapshot, r.kubevirt.loadHosts); err != nil {
 		r.Log.Error(
 			err,
 			"Failed to clean up warm migration snapshots.",
@@ -1014,7 +1013,9 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			break
 		}
 		n := len(vm.Warm.Precopies)
-		err = r.provider.RemoveSnapshot(vm.Ref, vm.Warm.Precopies[n-1].Snapshot, r.kubevirt.loadHosts)
+		var taskId string
+		taskId, err = r.provider.RemoveSnapshot(vm.Ref, vm.Warm.Precopies[n-1].Snapshot, r.kubevirt.loadHosts)
+		vm.Warm.Precopies[len(vm.Warm.Precopies)-1].RemoveTaskId = taskId
 		if err != nil {
 			step.AddError(err.Error())
 			err = nil
@@ -1027,27 +1028,15 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
 			break
 		}
-		// FIXME: This is just temporary timeout to unblock the migrations which get stuck on issue https://issues.redhat.com/browse/MTV-1753
-		// This should be fixed properly by adding the task manager inside the inventory and monitor the task status
-		// from the main controller.
-		var retries int
-		retriesAnnotation := step.Annotations[SnapshotRemovalCheckRetries]
-		if retriesAnnotation == "" {
-			step.Annotations[SnapshotRemovalCheckRetries] = "1"
-		} else {
-			retries, err = strconv.Atoi(retriesAnnotation)
-			if err != nil {
-				step.AddError(err.Error())
-				err = nil
-				break
-			}
-			if retries >= settings.Settings.SnapshotRemovalCheckRetries {
-				vm.Phase = r.next(vm.Phase)
-				// Reset for next precopy
-				step.Annotations[SnapshotRemovalCheckRetries] = "1"
-			} else {
-				step.Annotations[SnapshotRemovalCheckRetries] = strconv.Itoa(retries + 1)
-			}
+		precopy := vm.Warm.Precopies[len(vm.Warm.Precopies)-1]
+		ready, err := r.provider.CheckSnapshotRemove(vm.Ref, precopy, r.kubevirt.loadHosts)
+		if err != nil {
+			step.AddError(err.Error())
+			err = nil
+			break
+		}
+		if ready {
+			vm.Phase = r.next(vm.Phase)
 		}
 	case CreateInitialSnapshot, CreateSnapshot, CreateFinalSnapshot:
 		step, found := vm.FindStep(r.step(vm))
@@ -1055,8 +1044,8 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
 			break
 		}
-		var snapshot string
-		if snapshot, err = r.provider.CreateSnapshot(vm.Ref, r.kubevirt.loadHosts); err != nil {
+		var snapshot, taskId string
+		if snapshot, taskId, err = r.provider.CreateSnapshot(vm.Ref, r.kubevirt.loadHosts); err != nil {
 			if errors.As(err, &web.ProviderNotReadyError{}) || errors.As(err, &web.ConflictError{}) {
 				return
 			}
@@ -1065,7 +1054,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			break
 		}
 		now := meta.Now()
-		precopy := plan.Precopy{Snapshot: snapshot, Start: &now}
+		precopy := plan.Precopy{Snapshot: snapshot, CreateTaskId: taskId, Start: &now}
 		vm.Warm.Precopies = append(vm.Warm.Precopies, precopy)
 		r.resetPrecopyTasks(vm, step)
 		vm.Phase = r.next(vm.Phase)
@@ -1075,14 +1064,17 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
 			break
 		}
-		snapshot := vm.Warm.Precopies[len(vm.Warm.Precopies)-1].Snapshot
-		ready, err := r.provider.CheckSnapshotReady(vm.Ref, snapshot)
+		precopy := vm.Warm.Precopies[len(vm.Warm.Precopies)-1]
+		ready, snapshotId, err := r.provider.CheckSnapshotReady(vm.Ref, precopy, r.kubevirt.loadHosts)
 		if err != nil {
 			step.AddError(err.Error())
 			err = nil
 			break
 		}
 		if ready {
+			if snapshotId != "" {
+				vm.Warm.Precopies[len(vm.Warm.Precopies)-1].Snapshot = snapshotId
+			}
 			vm.Phase = r.next(vm.Phase)
 		}
 	case WaitForDataVolumesStatus, WaitForFinalDataVolumesStatus:
