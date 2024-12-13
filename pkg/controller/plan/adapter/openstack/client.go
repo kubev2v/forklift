@@ -110,13 +110,18 @@ func (r *Client) PoweredOff(vmRef ref.Ref) (off bool, err error) {
 }
 
 // Create a snapshot of the source VM.
-func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (imageID string, err error) {
+func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (snapshotId string, creationTaskId string, err error) {
 	return
 }
 
 // Check if a snapshot is ready to transfer.
-func (r *Client) CheckSnapshotReady(vmRef ref.Ref, imageID string) (ready bool, err error) {
+func (r *Client) CheckSnapshotReady(vmRef ref.Ref, precopy planapi.Precopy, hosts util.HostsFunc) (ready bool, snapshotId string, err error) {
 	return
+}
+
+// CheckSnapshotRemove implements base.Client
+func (r *Client) CheckSnapshotRemove(vmRef ref.Ref, precopy planapi.Precopy, hosts util.HostsFunc) (bool, error) {
+	return false, nil
 }
 
 // Set DataVolume checkpoints.
@@ -125,7 +130,7 @@ func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, data
 }
 
 // Remove a VM snapshot. No-op for this provider.
-func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hostsFunc util.HostsFunc) (err error) {
+func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hostsFunc util.HostsFunc) (removeTaskId string, err error) {
 	return
 }
 
