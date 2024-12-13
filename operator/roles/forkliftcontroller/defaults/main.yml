@@ -110,12 +110,26 @@ populator_controller_container_name: "{{ app_name }}-populator-controller"
 populator_openstack_image_fqin: "{{ lookup( 'env', 'OPENSTACK_POPULATOR_IMAGE') or lookup( 'env', 'RELATED_IMAGE_OPENSTACK_POPULATOR') }}"
 
 must_gather_image_fqin: "{{ lookup( 'env', 'MUST_GATHER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_MUST_GATHER') }}"
+
 virt_v2v_image_fqin: "{{ lookup( 'env', 'VIRT_V2V_IMAGE') or lookup( 'env', 'RELATED_IMAGE_VIRT_V2V') }}"
 virt_v2v_dont_request_kvm: "{{ lookup( 'env', 'VIRT_V2V_DONT_REQUEST_KVM') }}"
 virt_v2v_extra_args: "{{ lookup( 'env', 'VIRT_V2V_EXTRA_ARGS') }}"
 virt_v2v_extra_conf_config_map: "{{ lookup( 'env', 'VIRT_V2V_EXTRA_CONF_CONFIG_MAP') }}"
+virt_v2v_container_limits_cpu: "4000m"
+virt_v2v_container_limits_memory: "8Gi"
+virt_v2v_container_requests_cpu: "1000m"
+virt_v2v_container_requests_memory: "1Gi"
+
+hooks_container_limits_cpu: "1000m"
+hooks_container_limits_memory: "1Gi"
+hooks_container_requests_cpu: "100m"
+hooks_container_requests_memory: "150Mi"
 
 ova_provider_server_fqin: "{{ lookup( 'env', 'OVA_PROVIDER_SERVER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_OVA_PROVIDER_SERVER') }}"
+ova_container_limits_cpu: "1000m"
+ova_container_limits_memory: "1Gi"
+ova_container_requests_cpu: "100m"
+ova_container_requests_memory: "150Mi"
 
 metric_service_name: "{{ app_name }}-metrics"
 metric_servicemonitor_name: "{{ app_name }}-metrics"
