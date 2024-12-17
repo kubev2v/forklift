@@ -3,14 +3,15 @@ package global
 type MountPath string
 
 const (
-	OVA                  = "ova"
-	VSPHERE              = "vSphere"
-	DIR                  = "/var/tmp/v2v"
-	INSPECTION           = "/var/tmp/v2v/inspection.xml"
-	FS         MountPath = "/mnt/disks/disk[0-9]*"
-	BLOCK      MountPath = "/dev/block[0-9]*"
-	VDDK                 = "/opt/vmware-vix-disklib-distrib"
-	LUKSDIR              = "/etc/luks"
+	OVA                      = "ova"
+	VSPHERE                  = "vSphere"
+	DIR                      = "/var/tmp/v2v"
+	INSPECTION               = "/var/tmp/v2v/inspection.xml"
+	FS             MountPath = "/mnt/disks/disk[0-9]*"
+	BLOCK          MountPath = "/dev/block[0-9]*"
+	VDDK_LIB                 = "/opt/vmware-vix-disklib-distrib"
+	LUKSDIR                  = "/etc/luks"
+	VDDK_CONF_FILE           = "/mnt/vddk-conf/vddk-config-file"
 
 	WIN_FIRSTBOOT_PATH         = "/Program Files/Guestfs/Firstboot"
 	WIN_FIRSTBOOT_SCRIPTS_PATH = "/Program Files/Guestfs/Firstboot/scripts"
