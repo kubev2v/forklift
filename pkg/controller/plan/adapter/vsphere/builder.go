@@ -391,7 +391,7 @@ func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
 }
 
 // Create DataVolume specs for the VM.
-func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.ConfigMap, dvTemplate *cdi.DataVolume) (dvs []cdi.DataVolume, err error) {
+func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.ConfigMap, dvTemplate *cdi.DataVolume, vddkConfigMap *core.ConfigMap) (dvs []cdi.DataVolume, err error) {
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
@@ -516,6 +516,9 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 					}
 				}
 
+				if !useV2vForTransfer && vddkConfigMap != nil {
+					dv.ObjectMeta.Annotations[planbase.AnnVddkExtraArgs] = vddkConfigMap.Name
+				}
 				dvs = append(dvs, *dv)
 			}
 		}

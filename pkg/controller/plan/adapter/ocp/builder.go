@@ -65,7 +65,7 @@ func (r *Builder) ConfigMap(vmRef ref.Ref, secret *core.Secret, object *core.Con
 }
 
 // DataVolumes implements base.Builder
-func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume) (dvs []cdi.DataVolume, err error) {
+func (r *Builder) DataVolumes(vmRef ref.Ref, secret *v1.Secret, configMap *v1.ConfigMap, dvTemplate *cdi.DataVolume, vddkConfigMap *v1.ConfigMap) (dvs []cdi.DataVolume, err error) {
 	vmExport := &export.VirtualMachineExport{}
 	key := client.ObjectKey{
 		Namespace: vmRef.Namespace,
