@@ -3,6 +3,7 @@ package main
 import (
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -141,6 +142,16 @@ func virtV2vBuildCommand() (args []string, err error) {
 	return args, nil
 }
 
+func getExtraArgs() []string {
+	var extraArgs []string
+	if envExtraArgs := os.Getenv("V2V_extra_args"); envExtraArgs != "" {
+		if err := json.Unmarshal([]byte(envExtraArgs), &extraArgs); err != nil {
+			return nil
+		}
+	}
+	return extraArgs
+}
+
 func virtV2vVsphereArgs() (args []string, err error) {
 	args = append(args, "-i", "libvirt", "-ic", os.Getenv("V2V_libvirtURL"))
 	args = append(args, "-ip", "/etc/secret/secretKey")
@@ -148,12 +159,19 @@ func virtV2vVsphereArgs() (args []string, err error) {
 	if err != nil {
 		return nil, err
 	}
-	if info, err := os.Stat(global.VDDK); err == nil && info.IsDir() {
+	if info, err := os.Stat(global.VDDK_LIB); err == nil && info.IsDir() {
 		args = append(args,
 			"-it", "vddk",
-			"-io", fmt.Sprintf("vddk-libdir=%s", global.VDDK),
+			"-io", fmt.Sprintf("vddk-libdir=%s", global.VDDK_LIB),
 			"-io", fmt.Sprintf("vddk-thumbprint=%s", os.Getenv("V2V_fingerprint")),
 		)
+		// Check if the config file exists but still allow the extra args to override the vddk-config for testing
+		var extraArgs = getExtraArgs()
+		if _, err := os.Stat(global.VDDK_CONF_FILE); !errors.Is(err, os.ErrNotExist) && len(extraArgs) == 0 {
+			args = append(args,
+				"-io", fmt.Sprintf("vddk-config=%s", global.VDDK_CONF_FILE),
+			)
+		}
 	}
 
 	// When converting VM with name that do not meet DNS1123 RFC requirements,
@@ -190,12 +208,7 @@ func addCommonArgs(args []string) ([]string, error) {
 	}
 	args = append(args, luksArgs...)
 
-	var extraArgs []string
-	if envExtraArgs := os.Getenv("V2V_extra_args"); envExtraArgs != "" {
-		if err := json.Unmarshal([]byte(envExtraArgs), &extraArgs); err != nil {
-			return nil, fmt.Errorf("Error parsing extra arguments %v", err)
-		}
-	}
+	var extraArgs = getExtraArgs()
 	args = append(args, extraArgs...)
 	return args, nil
 }
