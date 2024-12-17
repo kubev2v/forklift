@@ -101,12 +101,6 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 		return
 	}
 
-	// If a default mapping is defined, that satisfies the requirement.
-	if r.plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{ID: DefaultStorageID}) {
-		ok = true
-		return
-	}
-
 	for _, disk := range vm.Disks {
 		if !r.plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{ID: disk.ID}) {
 			return

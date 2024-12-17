@@ -63,11 +63,6 @@ const (
 	Unknown = "unknown"
 )
 
-// Default Storage
-const (
-	DefaultStorageID = "default"
-)
-
 // Regex which matches the snapshot identifier suffix of a
 // OVA disk backing file.
 var backingFilePattern = regexp.MustCompile(`-\d\d\d\d\d\d.vmdk`)
@@ -161,8 +156,6 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 		return
 	}
 
-	var defaultMapping *v1beta1.DestinationStorage
-	mappedDiskIds := make(map[string]bool)
 	storageMapIn := r.Context.Map.Storage.Spec.Map
 	for i := range storageMapIn {
 		mapped := &storageMapIn[i]
@@ -173,10 +166,6 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 			err = fErr
 			return
 		}
-		if storage.ID == DefaultStorageID {
-			defaultMapping = &mapped.Destination
-			continue
-		}
 		for _, disk := range vm.Disks {
 			if disk.ID == storage.ID {
 				var dv *cdi.DataVolume
@@ -185,23 +174,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 					return
 				}
 				dvs = append(dvs, *dv)
-				mappedDiskIds[disk.ID] = true
 			}
-		}
-	}
-
-	for _, disk := range vm.Disks {
-		if !mappedDiskIds[disk.ID] {
-			if defaultMapping == nil {
-				err = liberr.New("VM has unmapped disks and no default disk mapping is set.", "vm", vm.ID)
-				return
-			}
-			var dv *cdi.DataVolume
-			dv, err = r.mapDataVolume(disk, *defaultMapping, dvTemplate)
-			if err != nil {
-				return
-			}
-			dvs = append(dvs, *dv)
 		}
 	}
 
