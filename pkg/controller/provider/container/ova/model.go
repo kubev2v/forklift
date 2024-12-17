@@ -11,12 +11,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 )
 
-// Default Storage
-const (
-	DefaultStorageID   = "default"
-	DefaultStorageName = "Default"
-)
-
 // All adapters.
 var adapterList []Adapter
 
@@ -399,13 +393,6 @@ func (r *StorageAdapter) List(ctx *Context, provider *api.Provider) (itr fb.Iter
 		return
 	}
 	list := fb.NewList()
-	m := &model.Storage{
-		Base: model.Base{
-			ID:   DefaultStorageID,
-			Name: DefaultStorageName,
-		},
-	}
-	list.Append(m)
 
 	for _, object := range diskList {
 		m := &model.Storage{
