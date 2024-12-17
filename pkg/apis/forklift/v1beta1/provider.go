@@ -17,6 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"strconv"
+
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,10 +61,12 @@ const (
 
 // Provider settings.
 const (
-	VDDK    = "vddkInitImage"
-	SDK     = "sdkEndpoint"
-	VCenter = "vcenter"
-	ESXI    = "esxi"
+	VDDK                   = "vddkInitImage"
+	SDK                    = "sdkEndpoint"
+	VCenter                = "vcenter"
+	ESXI                   = "esxi"
+	UseVddkAioOptimization = "useVddkAioOptimization"
+	VddkConfig             = "vddkConfig"
 )
 
 const OvaProviderFinalizer = "forklift/ova-provider"
@@ -146,4 +150,17 @@ func (p *Provider) HasReconciled() bool {
 // This provider requires VM guest conversion.
 func (p *Provider) RequiresConversion() bool {
 	return p.Type() == VSphere || p.Type() == Ova
+}
+
+// This provider support the vddk aio parameters.
+func (p *Provider) UseVddkAioOptimization() bool {
+	useVddkAioOptimization := p.Spec.Settings[UseVddkAioOptimization]
+	if useVddkAioOptimization == "" {
+		return false
+	}
+	parseBool, err := strconv.ParseBool(useVddkAioOptimization)
+	if err != nil {
+		return false
+	}
+	return parseBool
 }

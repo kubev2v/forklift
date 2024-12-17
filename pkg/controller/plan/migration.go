@@ -394,6 +394,9 @@ func (r *Migration) Archive() {
 		if err := r.deleteValidateVddkJob(); err != nil {
 			r.Log.Error(err, "Failed to clean up validate-VDDK job(s)")
 		}
+		if err := r.deleteConfigMap(); err != nil {
+			r.Log.Error(err, "Failed to clean up vddk configmap")
+		}
 	}
 
 	for _, vm := range r.Plan.Status.Migration.VMs {
@@ -614,6 +617,36 @@ func (r *Migration) deletePvcPvForOva() (err error) {
 		if err != nil {
 			r.Log.Error(err, "Failed to delete the plan PV", pv)
 			return
+		}
+	}
+	return
+}
+
+func (r *Migration) deleteConfigMap() (err error) {
+	selector := labels.SelectorFromSet(map[string]string{
+		kPlan: string(r.Plan.UID),
+		kUse:  VddkConf,
+	})
+	list := &core.ConfigMapList{}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: selector,
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		return
+	}
+	for _, configmap := range list.Items {
+		background := meta.DeletePropagationBackground
+		opts := &client.DeleteOptions{PropagationPolicy: &background}
+		err = r.Destination.Client.Delete(context.TODO(), &configmap, opts)
+		if err != nil {
+			r.Log.Error(err, "Failed to delete vddk-config", "configmap", configmap)
+		} else {
+			r.Log.Info("ConfigMap vddk-config deleted", "configmap", configmap.Name)
 		}
 	}
 	return
