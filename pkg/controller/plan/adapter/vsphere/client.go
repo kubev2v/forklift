@@ -251,9 +251,20 @@ func (r *Client) CheckSnapshotReady(vmRef ref.Ref, precopy planapi.Precopy, host
 	r.Log.Info("Check Snapshot Ready", "vmRef", vmRef, "precopy", precopy)
 	taskInfo, err := r.getTaskById(vmRef, precopy.CreateTaskId, hosts)
 	if err != nil {
-		return false, snapshotId, liberr.Wrap(err)
+		return false, "", liberr.Wrap(err)
 	}
 	ready, err = r.checkTaskStatus(taskInfo)
+	if err != nil {
+		return false, "", liberr.Wrap(err)
+	}
+	if !ready {
+		// Task is not finished retry
+		return false, "", nil
+	}
+	if taskInfo.Result == nil {
+		// Empty result so the task did not finish retry
+		return false, "", nil
+	}
 	snapshotId = taskInfo.Result.(types.ManagedObjectReference).Value
 	return
 }
