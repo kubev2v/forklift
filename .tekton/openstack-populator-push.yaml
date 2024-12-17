@@ -31,6 +31,8 @@ spec:
     value: build/openstack-populator/Containerfile
   - name: path-context
     value: .
+  - name: build-source-image
+    value: "true"
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
