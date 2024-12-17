@@ -36,6 +36,8 @@ spec:
     value: .
   - name: build-args-file
     value: build/forklift-operator-bundle/downstream-args
+  - name: build-source-image
+    value: "true"
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
