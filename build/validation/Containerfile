@@ -7,7 +7,6 @@ ENTRYPOINT ["/usr/bin/entrypoint.sh"]
 
 LABEL \
         com.redhat.component="mtv-validation-container" \
-        version="$CI_VERSION" \
         name="migration-toolkit-virtualization/mtv-validation-rhel9" \
         license="Apache License 2.0" \
         io.k8s.display-name="Migration Toolkit for Virtualization" \
