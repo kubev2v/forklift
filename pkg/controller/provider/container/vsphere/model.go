@@ -685,10 +685,14 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 					for _, ipa := range ipas.GuestStackInfo {
 						routes := ipa.IpRouteConfig.IpRoute
 						for _, route := range routes {
+							var dnsList []string
+							if ipa.DnsConfig != nil {
+								dnsList = ipa.DnsConfig.IpAddress
+							}
 							if len(route.Gateway.IpAddress) > 0 {
 								guestIpStackList = append(guestIpStackList, model.GuestIpStack{
 									Gateway: route.Gateway.IpAddress,
-									DNS:     ipa.DnsConfig.IpAddress,
+									DNS:     dnsList,
 								})
 							}
 						}
