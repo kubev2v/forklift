@@ -159,7 +159,7 @@ func (mutator *SecretMutator) patchSecret() *admissionv1.AdmissionResponse {
 func (mutator *SecretMutator) mutateHostSecret() *admissionv1.AdmissionResponse {
 	if _, ok := mutator.secret.GetLabels()["createdForResource"]; ok { // checking this just because there's no point in mutating an invalid secret
 		var secretChanged bool
-		if _, ok := mutator.secret.Data["user"]; !ok {
+		if user, ok := mutator.secret.Data["user"]; !ok || string(user) == "" {
 			provider := &api.Provider{}
 			providerName := string(mutator.secret.Data["provider"])
 			providerNamespace := mutator.secret.Namespace
