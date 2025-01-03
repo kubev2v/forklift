@@ -45,6 +45,12 @@ func GetGroupResource(required runtime.Object) (group string, resource string, e
 	case *Provider:
 		group = SchemeGroupVersion.Group
 		resource = "providers"
+	case *Plan:
+		group = SchemeGroupVersion.Group
+		resource = "plans"
+	case *Migration:
+		group = SchemeGroupVersion.Group
+		resource = "migrations"
 	default:
 		err = fmt.Errorf("resource type is not known")
 		return

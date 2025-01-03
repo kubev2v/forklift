@@ -158,6 +158,15 @@ func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv
 	admitter.plan.Referenced.Provider.Source = &admitter.sourceProvider
 	admitter.plan.Referenced.Provider.Destination = &admitter.destinationProvider
 
+	if admitter.destinationProvider.IsHost() {
+		// Check whether the user has permission to create VMs in the target namespace
+		err = util.PermitUser(ar.Request, admitter.Client, cnv.Resource("virtualmachines"), "", admitter.plan.Spec.TargetNamespace, util.Create)
+		if err != nil {
+			log.Error(err, "Unable to migrate to namespace")
+			return util.ToAdmissionResponseError(err)
+		}
+	}
+
 	err = admitter.validateStorage()
 	if err != nil {
 		return util.ToAdmissionResponseError(err)
