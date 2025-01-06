@@ -140,6 +140,7 @@ var (
 			{Name: WaitForInitialSnapshot},
 			{Name: StoreInitialSnapshotDeltas, All: VSphere},
 			{Name: CreateDataVolumes},
+			// Precopy loop start
 			{Name: WaitForDataVolumesStatus},
 			{Name: CopyDisks},
 			{Name: CopyingPaused},
@@ -149,6 +150,7 @@ var (
 			{Name: WaitForSnapshot},
 			{Name: StoreSnapshotDeltas, All: VSphere},
 			{Name: AddCheckpoint},
+			// Precopy loop end
 			{Name: StorePowerState},
 			{Name: PowerOffSource},
 			{Name: WaitForPowerOff},
