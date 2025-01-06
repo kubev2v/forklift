@@ -268,7 +268,6 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	}
 	r.mapDisks(vm, persistentVolumeClaims, object)
 	r.mapFirmware(vm, &vm.Cluster, object)
-	r.setMachine(object)
 	if !usesInstanceType {
 		r.mapCPU(vm, object)
 		r.mapMemory(vm, object)
@@ -368,10 +367,6 @@ func (r *Builder) mapMemory(vm *model.Workload, object *cnv.VirtualMachineSpec) 
 		},
 	}
 	object.Template.Spec.Domain.Memory = &cnv.Memory{Guest: reservation}
-}
-
-func (r *Builder) setMachine(object *cnv.VirtualMachineSpec) {
-	object.Template.Spec.Domain.Machine = &cnv.Machine{Type: "q35"}
 }
 
 func (r *Builder) mapCPU(vm *model.Workload, object *cnv.VirtualMachineSpec) {
