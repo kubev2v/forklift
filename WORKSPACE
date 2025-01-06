@@ -3508,10 +3508,18 @@ rpm(
 )
 
 rpm(
-    name = "coreutils-single-0__8.32-39.el9.x86_64",
-    sha256 = "65e9fd2ee40cc97d87a426df6102082fc4fb27cfc8f9e09b7632ef4a0e75f992",
+    name = "coreutils-0__8.32-39.el9.x86_64",
+    sha256 = "65bf4800b76553a41df2a9fd56e55713bcbc3420202a859b7a14495f62fb8bbb",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/coreutils-single-8.32-39.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/coreutils-8.32-39.el9.x86_64.rpm",
+    ],
+)
+
+rpm(
+    name = "coreutils-common-0__8.32-39.el9.x86_64",
+    sha256 = "f2c46b1da2b96e60dc4c110324d6e7db298a1abad9b9021c41f2c16848f297de",
+    urls = [
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/coreutils-common-8.32-39.el9.x86_64.rpm",
     ],
 )
 
@@ -3644,10 +3652,10 @@ rpm(
 )
 
 rpm(
-    name = "glibc-langpack-bn-0__2.34-147.el9.x86_64",
-    sha256 = "354508d0c8129b1b71f69c4510e736e8a77f26318b5f00d0d06a648ed921bf78",
+    name = "glibc-langpack-ka-0__2.34-147.el9.x86_64",
+    sha256 = "cd7f3e1dabddd605cddbf2597eb2a964702d72f785292e433e8f420516b09a29",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/glibc-langpack-bn-2.34-147.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/glibc-langpack-ka-2.34-147.el9.x86_64.rpm",
     ],
 )
 
@@ -3684,10 +3692,10 @@ rpm(
 )
 
 rpm(
-    name = "kernel-headers-0__5.14.0-545.el9.x86_64",
-    sha256 = "b1f769d6dfa7c69748fad59be7dcd8dad2e7454dc88b881dd38e149764c73347",
+    name = "kernel-headers-0__5.14.0-547.el9.x86_64",
+    sha256 = "8f02a20bf391f0dedb9c5954cff4339db749dd9a3cd67c5286854c8e8bd09299",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/kernel-headers-5.14.0-545.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/kernel-headers-5.14.0-547.el9.x86_64.rpm",
     ],
 )
 
