@@ -543,7 +543,6 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	}
 	r.mapDisks(vm, vmRef, persistentVolumeClaims, object)
 	r.mapFirmware(vm, object)
-	r.setMachine(object)
 	if !usesInstanceType {
 		r.mapCPU(vm, object)
 		r.mapMemory(vm, object)
@@ -638,10 +637,6 @@ func (r *Builder) mapClock(host *model.Host, object *cnv.VirtualMachineSpec) {
 		tz := cnv.ClockOffsetTimezone(host.Timezone)
 		object.Template.Spec.Domain.Clock.ClockOffset.Timezone = &tz
 	}
-}
-
-func (r *Builder) setMachine(object *cnv.VirtualMachineSpec) {
-	object.Template.Spec.Domain.Machine = &cnv.Machine{Type: "q35"}
 }
 
 func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec) {

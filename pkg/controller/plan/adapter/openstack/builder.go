@@ -407,8 +407,6 @@ func (r *Builder) mapInput(vm *model.Workload, object *cnv.VirtualMachineSpec) {
 }
 
 func (r *Builder) mapResources(vm *model.Workload, object *cnv.VirtualMachineSpec, usesInstanceType bool) {
-	// KubeVirt supports Q35 or PC-Q35 machine types only.
-	object.Template.Spec.Domain.Machine = &cnv.Machine{Type: Q35}
 	if usesInstanceType {
 		return
 	}
