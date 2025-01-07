@@ -94,13 +94,6 @@ const (
 	SecureBootOptional = "optional"
 )
 
-// Machine types
-const (
-	PC    = "pc"
-	Q35   = "q35"
-	PcQ35 = "pc-q35"
-)
-
 // Firmware types
 const (
 	BIOS = "bios"
@@ -204,7 +197,6 @@ const (
 	CpuSockets           = "hw_cpu_sockets"
 	CpuThreads           = "hw_cpu_threads"
 	FirmwareType         = "hw_firmware_type"
-	MachineType          = "hw_machine_type"
 	CdromBus             = "hw_cdrom_bus"
 	PointerModel         = "hw_pointer_model"
 	VideoModel           = "hw_video_model"
@@ -247,7 +239,6 @@ var DefaultProperties = map[string]string{
 	CpuPolicy:       CpuPolicyShared,
 	CpuThreadPolicy: CpuThreadPolicyPrefer,
 	FirmwareType:    BIOS,
-	MachineType:     PC,
 	CdromBus:        IdeBus,
 	PointerModel:    UsbTablet,
 	VideoModel:      VideoVirtio,
