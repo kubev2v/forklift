@@ -316,11 +316,6 @@ func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec) error 
 		return err
 	}
 	reservation := resource.NewQuantity(memoryBytes, resource.BinarySI)
-	object.Template.Spec.Domain.Resources = cnv.ResourceRequirements{
-		Requests: map[core.ResourceName]resource.Quantity{
-			core.ResourceMemory: *reservation,
-		},
-	}
 	object.Template.Spec.Domain.Memory = &cnv.Memory{Guest: reservation}
 	return nil
 }
