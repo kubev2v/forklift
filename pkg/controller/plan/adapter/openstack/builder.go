@@ -440,11 +440,7 @@ func (r *Builder) mapResources(vm *model.Workload, object *cnv.VirtualMachineSpe
 
 	// TODO Support HugePages
 	memory := resource.NewQuantity(int64(vm.Flavor.RAM)*1024*1024, resource.BinarySI)
-	resourceRequests := map[core.ResourceName]resource.Quantity{}
-	resourceRequests[core.ResourceMemory] = *memory
 	object.Template.Spec.Domain.Memory = &cnv.Memory{Guest: memory}
-
-	object.Template.Spec.Domain.Resources.Requests = resourceRequests
 }
 
 func (r *Builder) getCpuCount(vm *model.Workload, imageCpuProperty string) (count uint32) {
