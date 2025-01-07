@@ -362,11 +362,6 @@ func (r *Builder) mapClock(vm *model.Workload, object *cnv.VirtualMachineSpec) {
 
 func (r *Builder) mapMemory(vm *model.Workload, object *cnv.VirtualMachineSpec) {
 	reservation := resource.NewQuantity(vm.Memory, resource.BinarySI)
-	object.Template.Spec.Domain.Resources = cnv.ResourceRequirements{
-		Requests: map[core.ResourceName]resource.Quantity{
-			core.ResourceMemory: *reservation,
-		},
-	}
 	object.Template.Spec.Domain.Memory = &cnv.Memory{Guest: reservation}
 }
 
