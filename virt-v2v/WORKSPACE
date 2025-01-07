@@ -859,18 +859,18 @@ rpm(
 )
 
 rpm(
-    name = "kernel-core-0__5.14.0-545.el9.x86_64",
-    sha256 = "e06cee89b4c8d2aefa94876cb29f1927d843c4e7d8141c520525402f8600ab80",
+    name = "kernel-core-0__5.14.0-547.el9.x86_64",
+    sha256 = "925da9ef5d6d462e9a63aa77be40215ca53d2bd92e21f3d5819cb5958eb2ddcd",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/kernel-core-5.14.0-545.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/kernel-core-5.14.0-547.el9.x86_64.rpm",
     ],
 )
 
 rpm(
-    name = "kernel-modules-core-0__5.14.0-545.el9.x86_64",
-    sha256 = "4df228a45c79d8047eb5216e13d53c400084cefaeda0381a580d1dc34950aef1",
+    name = "kernel-modules-core-0__5.14.0-547.el9.x86_64",
+    sha256 = "a2a7c7b45b7813d676ae9ad445cf3a7c8abefbe6c6507b539622c0048a38ea3a",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/kernel-modules-core-5.14.0-545.el9.x86_64.rpm",
+        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/Packages/kernel-modules-core-5.14.0-547.el9.x86_64.rpm",
     ],
 )
 
@@ -2819,10 +2819,10 @@ rpm(
 )
 
 rpm(
-    name = "virtio-win-0__1.9.15-4.el9.x86_64",
-    sha256 = "6673ae4cb0f24fdc75b12b68aa37533c29eae2a98eaa60d1ee7c8390f7edd20b",
+    name = "virtio-win-1.9.40-1.el9.noarch",
+    sha256 = "ce37961310f5466016ff8c68f15d80c2fbcc5b7c73ec7d789790609c887551c7",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/virtio-win-1.9.15-4.el9.noarch.rpm",
+        "https://kojihub.stream.centos.org/kojifiles/packages/virtio-win/1.9.40/1.el9/noarch/virtio-win-1.9.40-1.el9.noarch.rpm",
     ],
 )
 
