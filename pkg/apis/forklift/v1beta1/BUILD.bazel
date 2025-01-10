@@ -24,6 +24,7 @@ go_library(
         "//pkg/apis/forklift/v1beta1/ref",
         "//pkg/lib/condition",
         "//pkg/lib/error",
+        "//pkg/settings",
         "//vendor/k8s.io/api/core/v1:core",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:meta",
         "//vendor/k8s.io/apimachinery/pkg/runtime",

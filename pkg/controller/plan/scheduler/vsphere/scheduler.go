@@ -197,7 +197,7 @@ func (r *Scheduler) buildPending() (err error) {
 }
 
 func (r *Scheduler) cost(vm *model.VM, vmStatus *plan.VMStatus) int {
-	coldLocal, _ := r.Plan.VSphereColdLocal()
+	coldLocal, _ := r.Plan.VSphereUseV2vTransport()
 	if coldLocal {
 		switch vmStatus.Phase {
 		case CreateVM, PostHook, Completed:
