@@ -18,7 +18,7 @@ test_dir() {
     export NETWORK_CONNECTIONS_DIR="$TEST_DIR/etc/NetworkManager/system-connections"
     export UDEV_RULES_FILE="$TEST_DIR/etc/udev/rules.d/70-persistent-net.rules"
     export SYSTEMD_NETWORK_DIR="$TEST_DIR/run/systemd/network"
-    export NETPLAN_DIR="$TEST_DIR/etc/netplan"
+    export NETPLAN_DIR="$TEST_DIR/"
 
     export IFQUERY_CMD="
       podman run
@@ -70,6 +70,7 @@ test_dirs() {
 }
 
 expected_to_pass_dirs() {
+    local FAIL_IS_FATAL=true PASS_IS_FATAL=false
     test_dirs "$@"
 }
 
