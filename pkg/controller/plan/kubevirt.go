@@ -1311,20 +1311,17 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 	}
 
 	var ok bool
-	object, err = r.vmPreference(vm)
-	if err != nil {
-		r.Log.Info("Building VirtualMachine without a VirtualMachinePreference.",
+	r.Log.Info("Building VirtualMachine without a VirtualMachinePreference.",
+		"vm",
+		vm.String(),
+		"err",
+		err)
+	object, ok = r.vmTemplate(vm)
+	if !ok {
+		r.Log.Info("Building VirtualMachine without template.",
 			"vm",
-			vm.String(),
-			"err",
-			err)
-		object, ok = r.vmTemplate(vm)
-		if !ok {
-			r.Log.Info("Building VirtualMachine without template.",
-				"vm",
-				vm.String())
-			object = r.emptyVm(vm)
-		}
+			vm.String())
+		object = r.emptyVm(vm)
 	}
 
 	err = r.setInstanceType(vm, object)
