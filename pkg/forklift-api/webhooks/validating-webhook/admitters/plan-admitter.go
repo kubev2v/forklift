@@ -139,8 +139,8 @@ func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv
 		},
 		&admitter.sourceProvider)
 	if err != nil {
-		log.Error(err, "Couldn't get the source provider, passing unwillingly")
-		return util.ToAdmissionResponseAllow()
+		log.Error(err, "Failed to get source provider, can't determine permissions")
+		return util.ToAdmissionResponseError(err)
 	}
 
 	err = admitter.Client.Get(
@@ -151,8 +151,8 @@ func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv
 		},
 		&admitter.destinationProvider)
 	if err != nil {
-		log.Error(err, "Couldn't get the destination provider, passing unwillingly")
-		return util.ToAdmissionResponseAllow()
+		log.Error(err, "Failed to get destination provider, can't determine permissions")
+		return util.ToAdmissionResponseError(err)
 	}
 
 	admitter.plan.Referenced.Provider.Source = &admitter.sourceProvider
