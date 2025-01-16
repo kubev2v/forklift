@@ -167,6 +167,17 @@ func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv
 		}
 	}
 
+	// Check whether user has permission to access the VMs from the plan
+	if admitter.sourceProvider.IsHost() {
+		for _, planvm := range admitter.plan.Spec.VMs {
+			err = util.PermitUser(ar.Request, admitter.Client, cnv.Resource("virtualmachines"), planvm.Name, planvm.Namespace, util.Get)
+			if err != nil {
+				log.Error(err, "Unable to access VM")
+				return util.ToAdmissionResponseError(err)
+			}
+		}
+	}
+
 	err = admitter.validateStorage()
 	if err != nil {
 		return util.ToAdmissionResponseError(err)
