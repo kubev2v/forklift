@@ -53,8 +53,6 @@ jobs:
 
 
     runs-on: ${{ matrix.os }}
-    env:
-      USE_BAZEL_VERSION: 5.4.0
     timeout-minutes: 45
     steps:
       - name: Free Disk Space (Ubuntu)
@@ -74,9 +72,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: kubev2v/forkliftci
-          ref: v16.0
+          ref: v17.0
 
-      - name: Build and setup everything with bazel
+      - name: Build and setup everything
         id: forkliftci
         uses: kubev2v/forkliftci/ci/build-and-setup@v8.0
         with:
@@ -106,8 +104,6 @@ jobs:
   build:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
-    env:
-      USE_BAZEL_VERSION: 5.4.0
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       - name: Checks-out repository under $GITHUB_WORKSPACE

@@ -67,6 +67,4 @@ LABEL \
         vendor="Red Hat, Inc." \
         maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
         distribution-scope="public" \
-        release="v2.7" \
-        url="https://github.com/kubev2v/forklift" \
-        version="v2.7.1"
+        url="https://github.com/kubev2v/forklift"

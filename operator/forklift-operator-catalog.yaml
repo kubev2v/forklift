@@ -7,4 +7,4 @@ spec:
   displayName: Forklift Operator
   publisher: Konveyor
   sourceType: grpc
-  image: quay.io/kubev2v/forklift-operator-index:latest
+  image: ${OPERATOR_INDEX_IMAGE}
