@@ -1,7 +1,0 @@
-generator
-*.sublime-workspace
-*.sublime-project
-.vagrant
-*~
-.#*
-\#*
