@@ -7,8 +7,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/konveyor/forklift-controller/virt-v2v/pkg/global"
-	"github.com/konveyor/forklift-controller/virt-v2v/pkg/utils"
+	"github.com/konveyor/forklift-controller/pkg/virt-v2v/global"
+	"github.com/konveyor/forklift-controller/pkg/virt-v2v/utils"
 )
 
 func CustomizeLinux(execFunc DomainExecFunc, disks []string, dir string, t FileSystemTool) error {
