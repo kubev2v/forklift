@@ -1,9 +1,0 @@
-repositories:
-- arch: x86_64
-  baseurl: https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/BaseOS/x86_64/os/
-  name: centos/stream9-baseos-x86_64
-  gpgkey: https://www.centos.org/keys/RPM-GPG-KEY-CentOS-Official
-- arch: x86_64
-  baseurl: https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/
-  name: centos/stream9-appstream-x86_64
-  gpgkey: https://www.centos.org/keys/RPM-GPG-KEY-CentOS-Official
