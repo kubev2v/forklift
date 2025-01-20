@@ -32,7 +32,7 @@ jobs:
       - name: Check out forklift repository
         uses: actions/checkout@v4
 
-      - run: ${{ matrix.shell }} ./virt-v2v/pkg/customize/scripts/rhel/run/test-network_config_util.sh
+      - run: ${{ matrix.shell }} ./pkg/virt-v2v/customize/scripts/rhel/run/test-network_config_util.sh
 
   ci_setup:
     strategy:
