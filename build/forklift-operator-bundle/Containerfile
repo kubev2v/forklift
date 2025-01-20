@@ -2,19 +2,17 @@ FROM quay.io/konflux-ci/operator-sdk-builder@sha256:9f75516848faf6549f74213258f9
 
 ARG STREAM=downstream
 ARG VERSION="2.7.0"
-ARG CONTROLLER_IMAGE \
-    API_IMAGE \
-    VIRT_V2V_IMAGE \
-    OPERATOR_IMAGE \
-    OPERATOR_BUNDLE_IMAGE \
-    OPERATOR_INDEX_IMAGE \
-    POPULATOR_CONTROLLER_IMAGE \
-    OVIRT_POPULATOR_IMAGE \
-    OPENSTACK_POPULATOR_IMAGE \
-    MUST_GATHER_IMAGE \
-    UI_PLUGIN_IMAGE \
-    OVA_PROVIDER_SERVER_IMAGE \
-    VALIDATION_IMAGE
+ARG CONTROLLER_IMAGE="quay.io/kubev2v/forklift-controller:latest"
+ARG API_IMAGE="quay.io/kubev2v/forklift-api:latest"
+ARG VIRT_V2V_IMAGE="quay.io/kubev2v/forklift-virt-v2v:latest"
+ARG OPERATOR_IMAGE="quay.io/kubev2v/forklift-operator:latest"
+ARG POPULATOR_CONTROLLER_IMAGE="quay.io/kubev2v/populator-controller:latest"
+ARG OVIRT_POPULATOR_IMAGE="quay.io/kubev2v/ovirt-populator:latest"
+ARG OPENSTACK_POPULATOR_IMAGE="quay.io/kubev2v/openstack-populator:latest"
+ARG MUST_GATHER_IMAGE="quay.io/kubev2v/forklift-must-gather:latest"
+ARG UI_PLUGIN_IMAGE="quay.io/kubev2v/forklift-console-plugin:latest"
+ARG OVA_PROVIDER_SERVER_IMAGE="quay.io/kubev2v/forklift-ova-provider-server:latest"
+ARG VALIDATION_IMAGE="quay.io/kubev2v/forklift-validation:latest"
 
 COPY ./operator /repo
 WORKDIR /repo
