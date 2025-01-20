@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/konveyor/forklift-controller/virt-v2v/pkg/global"
-	"github.com/konveyor/forklift-controller/virt-v2v/pkg/utils"
+	"github.com/konveyor/forklift-controller/pkg/virt-v2v/global"
+	"github.com/konveyor/forklift-controller/pkg/virt-v2v/utils"
 )
 
 // CustomizeWindows customizes a windows disk image by uploading scripts.

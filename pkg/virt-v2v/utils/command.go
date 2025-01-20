@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/konveyor/forklift-controller/virt-v2v/pkg/global"
+	"github.com/konveyor/forklift-controller/pkg/virt-v2v/global"
 )
 
 func CheckEnvVariablesSet(envVars ...string) bool {

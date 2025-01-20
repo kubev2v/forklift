@@ -7,7 +7,7 @@ ENV GOEXPERIMENT strictfipsruntime
 
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-monitor ./cmd/virt-v2v-monitor/virt-v2v-monitor.go
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o image-converter ./cmd/image-converter/image-converter.go
-RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-wrapper ./virt-v2v/cmd/entrypoint.go
+RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-wrapper ./cmd/virt-v2v/entrypoint.go
 
 # Main container
 FROM quay.io/centos/centos:stream9-minimal

@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/konveyor/forklift-controller/virt-v2v/pkg/utils"
+	"github.com/konveyor/forklift-controller/pkg/virt-v2v/utils"
 )
 
 // getScriptsWithSuffix retrieves all scripts with suffix from the specified directory
