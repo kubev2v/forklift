@@ -1,9 +1,18 @@
 ![Build](https://github.com/kubev2v/forklift/workflows/Build%20and%20push%20images/badge.svg)&nbsp;![CI](https://github.com/kubev2v/forklift/workflows/CI/badge.svg)&nbsp;[![Code Coverage](https://codecov.io/gh/kubev2v/forklift/branch/main/graph/badge.svg?token=VV6EBWKJGB)](https://codecov.io/gh/kubev2v/forklift)
 
 # Forklift
+Migrates virtual machines at scale to Kubernetes KubeVirt.
+Migrations are performed in a few simple steps, first by providing source and destination credentials,
+then mapping the source and destination infrastructure and creating a choreographed plan, and finally,
+executing the migration effort.
+![diagram.png](docs/diagram.png)
 
-Forklift controller.
-
+## Features
+- **Warm migration** using Change Block Tracking/Incremental Backup to reduce the downtime, supported in VMware and oVirt migrations.
+- For VMware migrations, the Forklift uses [virt-v2v](https://libguestfs.org/virt-v2v.1.html) **guest conversions** which installs the virtio drivers and edits the guest to run on QEMU-KVM.
+- Migrating to **remote clusters**, user can install the Forklift on one cluster and orchestrate other cluster to do the migration.
+- Migrating VMs **between clusters** using the KubeVirt [Export API](https://kubevirt.io/user-guide/storage/export_api/).
+- **Validations** of the Virtual Machines to let users know if migration would be successful.
 ---
 
 ## Deploy
