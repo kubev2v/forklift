@@ -57,6 +57,19 @@ type PlanSpec struct {
 	// Determines if the plan should migrate shared disks.
 	// +kubebuilder:default:=true
 	MigrateSharedDisks bool `json:"migrateSharedDisks,omitempty"`
+	// PVCNameTemplate is a template for generating PVC names for VM disks.
+	// It follows Go template syntax and has access to the following variables:
+	//   - .VmName: name of the VM
+	//   - .PlanName: name of the migration plan
+	//   - .DiskIndex: initial volume index of the disk
+	//   - .RootDiskIndex: index of the root disk
+	// Note:
+	//   This template can be overridden at the individual VM level.
+	// Examples:
+	//   "{{.VmName}}-disk-{{.DiskIndex}}"
+	//   "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
+	// +optional
+	PVCNameTemplate string `json:"pvcNameTemplate,omitempty"`
 }
 
 // Find a planned VM.
@@ -152,3 +165,11 @@ func (r *Plan) IsSourceProviderOCP() bool {
 }
 
 func (r *Plan) IsSourceProviderVSphere() bool { return r.Provider.Source.Type() == VSphere }
+
+// PVCNameTemplateData contains fields used in naming templates.
+type PVCNameTemplateData struct {
+	VmName        string `json:"vmName"`
+	PlanName      string `json:"planName"`
+	DiskIndex     int    `json:"diskIndex"`
+	RootDiskIndex int    `json:"rootDiskIndex"`
+}
