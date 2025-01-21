@@ -10,8 +10,6 @@
 **/bin
 **/dist
 **/node_modules
-WORKSPACE
-**/BUILD.bazel
 
 # Ignore docs
 docs/

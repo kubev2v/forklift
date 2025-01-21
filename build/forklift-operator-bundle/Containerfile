@@ -1,25 +1,41 @@
 FROM quay.io/konflux-ci/operator-sdk-builder@sha256:9f75516848faf6549f74213258f963869189283f47d1e0290ba5b170064a88a6 as builder
 
 ARG STREAM=downstream
+ARG VERSION="2.7.0"
+ARG CONTROLLER_IMAGE \
+    API_IMAGE \
+    VIRT_V2V_IMAGE \
+    OPERATOR_IMAGE \
+    OPERATOR_BUNDLE_IMAGE \
+    OPERATOR_INDEX_IMAGE \
+    POPULATOR_CONTROLLER_IMAGE \
+    OVIRT_POPULATOR_IMAGE \
+    OPENSTACK_POPULATOR_IMAGE \
+    MUST_GATHER_IMAGE \
+    UI_PLUGIN_IMAGE \
+    OVA_PROVIDER_SERVER_IMAGE \
+    VALIDATION_IMAGE
 
-COPY ./. /repo
-WORKDIR /repo/operator
+COPY ./operator /repo
+WORKDIR /repo
 RUN source ./export-vars-${STREAM}.sh && \
     kustomize build config/manifests/ \
     | envsubst \
     | operator-sdk generate bundle \
         -q \
         --overwrite \
-        --extra-service-accounts forklift-controller,forklift-api,forklift-populator-controller  \
-        --version 2.7.0 \
+        --extra-service-accounts forklift-controller,forklift-api,forklift-populator-controller \
+        --version $VERSION \
         --channels development \
         --default-channel development \
         --output-dir build
 
 FROM scratch
 
-COPY --from=builder /repo/operator/build/manifests /manifests/
-COPY --from=builder /repo/operator/build/metadata /metadata/
+ARG VERSION="2.7.0"
+
+COPY --from=builder /repo/build/manifests /manifests/
+COPY --from=builder /repo/build/metadata /metadata/
 
 # These are three labels needed to control how the pipeline should handle this container image
 # This first label tells the pipeline that this is a bundle image and should be
@@ -28,7 +44,6 @@ LABEL com.redhat.delivery.operator.bundle=true
 
 # This second label tells the pipeline which versions of OpenShift the operator supports.
 # This is used to control which index images should include this operator.
-# TODO: move to 4.7 once available!
 LABEL com.redhat.openshift.versions="v4.14-v4.16"
 
 # This third label tells the pipeline that this operator should *also* be supported on OCP 4.4 and
@@ -55,7 +70,6 @@ LABEL operators.operatorframework.io.test.mediatype.v1=scorecard+v1
 # Main labels
 LABEL \
         com.redhat.component="mtv-operator-bundle-container" \
-        version="2.7.0" \
         name="migration-toolkit-virtualization/mtv-operator-bundle" \
         License="Apache License 2.0" \
         io.k8s.display-name="Migration Toolkit for Virtualization" \
@@ -68,4 +82,4 @@ LABEL \
         distribution-scope="public" \
         release="v2.7" \
         url="https://github.com/kubev2v/forklift" \
-        version="v2.7.1"
+        version="v$VERSION"

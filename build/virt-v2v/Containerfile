@@ -24,7 +24,7 @@ ENV GOEXPERIMENT strictfipsruntime
 
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-monitor github.com/konveyor/forklift-controller/cmd/virt-v2v-monitor
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o image-converter github.com/konveyor/forklift-controller/cmd/image-converter
-RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-wrapper virt-v2v/cmd/entrypoint.go
+RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-wrapper github.com/konveyor/forklift-controller/cmd/virt-v2v
 
 FROM registry.access.redhat.com/ubi9:9.5-1736404036
 
@@ -67,6 +67,4 @@ LABEL \
         vendor="Red Hat, Inc." \
         maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
         distribution-scope="public" \
-        release="v2.7" \
-        url="https://github.com/kubev2v/forklift" \
-        version="v2.7.1"
+        url="https://github.com/kubev2v/forklift"

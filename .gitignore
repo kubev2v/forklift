@@ -31,10 +31,6 @@ migsamples
 # tilt settings
 tools/tilt/tilt-settings.json
 
-# bazel build artifacts
-bazel-*
-.bazeldnf
-
 # deploy env
 hack/deploy/**/deploy.env
 
