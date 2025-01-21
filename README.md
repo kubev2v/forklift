@@ -12,7 +12,7 @@ executing the migration effort.
 - For VMware migrations, the Forklift uses [virt-v2v](https://libguestfs.org/virt-v2v.1.html) **guest conversions** which installs the virtio drivers and edits the guest to run on QEMU-KVM.
 - Migrating to **remote clusters**, user can install the Forklift on one cluster and orchestrate other cluster to do the migration.
 - Migrating VMs **between clusters** using the KubeVirt [Export API](https://kubevirt.io/user-guide/storage/export_api/).
-- **Validations** of the Virtual Machines to let users know if migration would be successful.
+- **Validations** of the Virtual Machines to let users know if migration plan has issues that need to be addressed before running.
 ---
 
 ## Deploy
