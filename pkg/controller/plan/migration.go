@@ -278,12 +278,6 @@ func (r *Migration) init() (err error) {
 	return
 }
 
-func (r *Migration) logout() {
-	if r.provider != nil {
-		r.provider.Close()
-	}
-}
-
 // Begin the migration.
 func (r *Migration) begin() (err error) {
 	snapshot := r.Plan.Status.Migration.ActiveSnapshot()
@@ -379,6 +373,11 @@ func (r *Migration) begin() (err error) {
 // Archive the plan.
 // Best effort to remove any retained migration resources.
 func (r *Migration) Archive() {
+	defer func() {
+		if r.provider != nil {
+			r.provider.Close()
+		}
+	}()
 	if err := r.init(); err != nil {
 		r.Log.Error(err, "Archive initialization failed.")
 		return
@@ -410,6 +409,11 @@ func (r *Migration) Archive() {
 }
 
 func (r *Migration) SetPopulatorDataSourceLabels() {
+	defer func() {
+		if r.provider != nil {
+			r.provider.Close()
+		}
+	}()
 	err := r.init()
 	if err != nil {
 		r.Log.Error(err, "Setting Populator Data Source labels failed.")
@@ -437,6 +441,11 @@ func (r *Migration) SetPopulatorDataSourceLabels() {
 // Cancel the migration.
 // Delete resources associated with VMs that have been marked canceled.
 func (r *Migration) Cancel() error {
+	defer func() {
+		if r.provider != nil {
+			r.provider.Close()
+		}
+	}()
 	if err := r.init(); err != nil {
 		return liberr.Wrap(err)
 	}
