@@ -280,6 +280,12 @@ func (r *Migration) init() (err error) {
 	return
 }
 
+func (r *Migration) logout() {
+	if r.provider != nil {
+		r.provider.Close()
+	}
+}
+
 // Begin the migration.
 func (r *Migration) begin() (err error) {
 	snapshot := r.Plan.Status.Migration.ActiveSnapshot()
