@@ -270,6 +270,7 @@ func (r *Reconciler) setPopulatorDataSourceLabels(plan *api.Plan) {
 			r.Log.Error(err, "Couldn't construct plan context when trying to set populator labels.")
 		} else {
 			runner := Migration{Context: ctx}
+			defer runner.logout()
 			runner.SetPopulatorDataSourceLabels()
 			planCopy := plan.DeepCopy()
 			if plan.Annotations == nil {
@@ -301,6 +302,7 @@ func (r *Reconciler) archive(plan *api.Plan) {
 		r.Log.Error(err, "Couldn't construct plan context while archiving plan.")
 	} else {
 		runner := Migration{Context: ctx}
+		defer runner.logout()
 		runner.Archive()
 	}
 	// Regardless of whether or not we can clean up, mark the plan archived.
@@ -393,6 +395,7 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	//
 	// Cancel.
 	runner := Migration{Context: ctx}
+	defer runner.logout()
 	err = runner.Cancel()
 	if err != nil {
 		return
@@ -432,6 +435,7 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	// Run the migration.
 	snapshot.BeginStagingConditions()
 	runner = Migration{Context: ctx}
+	defer runner.logout()
 	reQ, err = runner.Run()
 	if err != nil {
 		return
