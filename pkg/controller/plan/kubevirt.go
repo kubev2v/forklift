@@ -1708,7 +1708,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	nonRoot := true
 	allowPrivilageEscalation := false
 	// virt-v2v image
-	coldLocal, vErr := r.Context.Plan.VSphereColdLocal()
+	coldLocal, vErr := r.Context.Plan.ShouldUseV2vForTransfer()
 	if vErr != nil {
 		err = vErr
 		return
