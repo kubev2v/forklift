@@ -54,6 +54,9 @@ type PlanSpec struct {
 	// Defaults to 'virtio'.
 	// +optional
 	DiskBus cnv.DiskBus `json:"diskBus,omitempty"`
+	// Determines if the plan should migrate shared disks.
+	// +kubebuilder:default:=true
+	MigrateSharedDisks bool `json:"migrateSharedDisks,omitempty"`
 }
 
 // Find a planned VM.
@@ -103,7 +106,7 @@ type Plan struct {
 // just use virt-v2v directly to convert the vm while copying data over. In other
 // cases, we use CDI to transfer disks to the destination cluster and then use
 // virt-v2v-in-place to convert these disks after cutover.
-func (p *Plan) VSphereColdLocal() (bool, error) {
+func (p *Plan) ShouldUseV2vForTransfer() (bool, error) {
 	source := p.Referenced.Provider.Source
 	if source == nil {
 		return false, liberr.New("Cannot analyze plan, source provider is missing.")
@@ -115,7 +118,9 @@ func (p *Plan) VSphereColdLocal() (bool, error) {
 
 	switch source.Type() {
 	case VSphere:
-		return !p.Spec.Warm && destination.IsHost(), nil
+		// The virt-v2v transferes all disks attached to the VM. If we want to skip the shared disks so we don't transfer
+		// them multiple times we need to manage the transfer using KubeVirt CDI DataVolumes and v2v-in-place.
+		return !p.Spec.Warm && destination.IsHost() && p.Spec.MigrateSharedDisks, nil
 	case Ova:
 		return true, nil
 	default:
