@@ -33,6 +33,7 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/utils/ptr"
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
@@ -80,6 +81,10 @@ const (
 const (
 	// CDI import backing file annotation on PVC
 	AnnImportBackingFile = "cdi.kubevirt.io/storage.import.backingFile"
+)
+
+const (
+	Shareable = "shareable"
 )
 
 // Map of vmware guest ids to osinfo ids.
@@ -490,12 +495,73 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 					dv.ObjectMeta.Annotations = make(map[string]string)
 				}
 				dv.ObjectMeta.Annotations[planbase.AnnDiskSource] = r.baseVolume(disk.File)
+				if disk.Shared {
+					dv.ObjectMeta.Labels[Shareable] = "true"
+				}
 				dvs = append(dvs, *dv)
 			}
 		}
 	}
 
 	return
+}
+
+// Return all shareable PVCs
+func (r *Builder) ShareablePVCs() (pvcs []*core.PersistentVolumeClaim, err error) {
+	pvcsList := &core.PersistentVolumeClaimList{}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		pvcsList,
+		&client.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(map[string]string{
+				Shareable: "true",
+			}),
+		},
+	)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	pvcs = make([]*core.PersistentVolumeClaim, len(pvcsList.Items))
+	for i, pvc := range pvcsList.Items {
+		// loopvar
+		copyPvc := pvc
+		pvcs[i] = &copyPvc
+	}
+
+	return
+}
+
+// Return PersistentVolumeClaims associated with a VM.
+func (r *Builder) getSharedPVCs(vm *model.VM) (pvcs []*core.PersistentVolumeClaim, err error) {
+	allPvcs, err := r.ShareablePVCs()
+	if err != nil {
+		return pvcs, err
+	}
+	for _, disk := range vm.Disks {
+		if !disk.Shared {
+			continue
+		}
+		pvc := r.getDisksPvc(disk, allPvcs)
+		if pvc != nil {
+			pvcs = append(pvcs, pvc)
+			r.Log.Info("Found shared PVC disk", "disk", disk.File)
+		} else {
+			// No PVC found skipping disk
+			r.Log.Info("No PVC found to the shared disk, the disk will not be created", "disk", disk.File)
+		}
+	}
+	return pvcs, nil
+}
+
+// Return PersistentVolumeClaims associated with a VM.
+func (r *Builder) getDisksPvc(disk vsphere.Disk, pvcs []*core.PersistentVolumeClaim) *core.PersistentVolumeClaim {
+	for _, pvc := range pvcs {
+		if pvc.Annotations[planbase.AnnDiskSource] == r.baseVolume(disk.File) {
+			return pvc
+		}
+	}
+	return nil
 }
 
 // Create the destination Kubevirt VM.
@@ -529,7 +595,27 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 		return
 	}
 	if !r.Context.Plan.Spec.MigrateSharedDisks {
-		r.removeSharedDisks(vm)
+		sharedPVCs, err := r.getSharedPVCs(vm)
+		if err != nil {
+			return err
+		}
+		var temp []vsphere.Disk
+		for _, disk := range vm.Disks {
+			if !disk.Shared {
+				temp = append(temp, disk)
+				continue
+			}
+			pvc := r.getDisksPvc(disk, sharedPVCs)
+			if pvc != nil {
+				temp = append(temp, disk)
+				persistentVolumeClaims = append(persistentVolumeClaims, pvc)
+				r.Log.Info("Found shared PVC disk", "disk", disk.File)
+			} else {
+				// No PVC found skipping disk
+				r.Log.Info("No PVC found to the shared disk, the disk will not be created", "disk", disk.File)
+			}
+		}
+		vm.Disks = temp
 	}
 
 	var conflicts []string
@@ -747,6 +833,9 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 					Bus: bus,
 				},
 			},
+		}
+		if disk.Shared {
+			kubevirtDisk.Cache = cnv.CacheNone
 		}
 		// For multiboot VMs, if the selected boot device is the current disk,
 		// set it as the first in the boot order.
