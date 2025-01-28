@@ -41,7 +41,8 @@ import (
 
 // BIOS types
 const (
-	Efi = "efi"
+	Efi  = "efi"
+	BIOS = "bios"
 )
 
 // Bus types
@@ -738,6 +739,11 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 func (r *Builder) mapTpm(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	if vm.TpmEnabled {
 		persistData := true
+		object.Template.Spec.Domain.Devices.TPM = &cnv.TPMDevice{Persistent: &persistData}
+	}
+	if vm.Firmware == BIOS {
+		// Disable the vTPM on non UEFI
+		persistData := false
 		object.Template.Spec.Domain.Devices.TPM = &cnv.TPMDevice{Persistent: &persistData}
 	}
 }
