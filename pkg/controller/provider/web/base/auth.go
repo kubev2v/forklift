@@ -14,7 +14,6 @@ import (
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	auth "k8s.io/api/authentication/v1"
 	auth2 "k8s.io/api/authorization/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -106,7 +105,7 @@ func (r *Auth) permit(token string, ns string, p *api.Provider) (int, error) {
 	}
 	// Users should be able to query information on providers from the inventory
 	// only if they have permissions for list/get 'providers' in the K8s API
-	group, resource, err := api.GetGroupResource(p)
+	gr, err := api.GetGroupResource(p)
 	if err != nil {
 		return http.StatusInternalServerError, liberr.Wrap(err)
 	}
@@ -121,8 +120,8 @@ func (r *Auth) permit(token string, ns string, p *api.Provider) (int, error) {
 	review := &auth2.SubjectAccessReview{
 		Spec: auth2.SubjectAccessReviewSpec{
 			ResourceAttributes: &auth2.ResourceAttributes{
-				Group:     group,
-				Resource:  resource,
+				Group:     gr.Group,
+				Resource:  gr.Resource,
 				Namespace: namespace,
 				Name:      p.Name,
 				Verb:      verb,
@@ -139,12 +138,8 @@ func (r *Auth) permit(token string, ns string, p *api.Provider) (int, error) {
 	}
 
 	if !review.Status.Allowed {
-		groupResource := &schema.GroupResource{
-			Resource: resource,
-			Group:    group,
-		}
 		err = fmt.Errorf("%s is forbidden: User %q cannot %s resource %q in API group %q in the namespace %q",
-			groupResource, user.Username, verb, resource, group, namespace)
+			gr, user.Username, verb, gr.Resource, gr.Group, namespace)
 		return http.StatusForbidden, liberr.Wrap(err)
 	}
 	return http.StatusOK, nil

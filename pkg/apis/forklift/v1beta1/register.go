@@ -39,21 +39,26 @@ var SchemeBuilder = &scheme.Builder{GroupVersion: SchemeGroupVersion}
 
 // TODO: find a better place for this, it would be nice to use it also to
 // determine the plural configuration of a resource for the operator
-func GetGroupResource(required runtime.Object) (group string, resource string, err error) {
+func GetGroupResource(required runtime.Object) (groupresource schema.GroupResource, err error) {
 
 	switch required.(type) {
 	case *Provider:
-		group = SchemeGroupVersion.Group
-		resource = "providers"
+		groupresource = schema.GroupResource{
+			Group:    SchemeGroupVersion.Group,
+			Resource: "providers",
+		}
 	case *Plan:
-		group = SchemeGroupVersion.Group
-		resource = "plans"
+		groupresource = schema.GroupResource{
+			Group:    SchemeGroupVersion.Group,
+			Resource: "plans",
+		}
 	case *Migration:
-		group = SchemeGroupVersion.Group
-		resource = "migrations"
+		groupresource = schema.GroupResource{
+			Group:    SchemeGroupVersion.Group,
+			Resource: "migrations",
+		}
 	default:
 		err = fmt.Errorf("resource type is not known")
-		return
 	}
 
 	return
