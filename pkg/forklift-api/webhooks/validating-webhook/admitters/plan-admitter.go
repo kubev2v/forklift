@@ -143,6 +143,17 @@ func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv
 		return util.ToAdmissionResponseError(err)
 	}
 
+	providerGR, err := api.GetGroupResource(&api.Provider{})
+	if err != nil {
+		return util.ToAdmissionResponseError(err)
+	}
+
+	// Check whether the user has permission to access the source provider
+	err = util.PermitUser(ar.Request, admitter.Client, providerGR, admitter.sourceProvider.Name, admitter.sourceProvider.Namespace, util.Get)
+	if err != nil {
+		return util.ToAdmissionResponseError(err)
+	}
+
 	err = admitter.Client.Get(
 		context.TODO(),
 		client.ObjectKey{
@@ -152,6 +163,12 @@ func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv
 		&admitter.destinationProvider)
 	if err != nil {
 		log.Error(err, "Failed to get destination provider, can't determine permissions")
+		return util.ToAdmissionResponseError(err)
+	}
+
+	// Check whether the user has permission to access the destination provider
+	err = util.PermitUser(ar.Request, admitter.Client, providerGR, admitter.destinationProvider.Name, admitter.destinationProvider.Namespace, util.Get)
+	if err != nil {
 		return util.ToAdmissionResponseError(err)
 	}
 
