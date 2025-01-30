@@ -21,10 +21,11 @@ WORKDIR /app
 COPY --chown=1001:0 ./ ./
 ENV GOFLAGS "-mod=vendor -tags=strictfipsruntime"
 ENV GOEXPERIMENT strictfipsruntime
+ENV GOCACHE /go-build/cache
 
-RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-monitor github.com/konveyor/forklift-controller/cmd/virt-v2v-monitor
-RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o image-converter github.com/konveyor/forklift-controller/cmd/image-converter
-RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-wrapper github.com/konveyor/forklift-controller/cmd/virt-v2v
+RUN --mount=type=cache,target=${GOCACHE},uid=1001 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-monitor github.com/konveyor/forklift-controller/cmd/virt-v2v-monitor
+RUN --mount=type=cache,target=${GOCACHE},uid=1001 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o image-converter github.com/konveyor/forklift-controller/cmd/image-converter
+RUN --mount=type=cache,target=${GOCACHE},uid=1001 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-wrapper github.com/konveyor/forklift-controller/cmd/virt-v2v
 
 FROM registry.access.redhat.com/ubi9:9.5-1731517889
 
