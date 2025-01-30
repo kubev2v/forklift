@@ -716,11 +716,16 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 				},
 			},
 		}
+		bus := cnv.DiskBusVirtio
+		if r.Plan.Spec.DiskBus != "" {
+			bus = r.Plan.Spec.DiskBus
+		}
+
 		kubevirtDisk := cnv.Disk{
 			Name: volumeName,
 			DiskDevice: cnv.DiskDevice{
 				Disk: &cnv.DiskTarget{
-					Bus: Virtio,
+					Bus: bus,
 				},
 			},
 		}

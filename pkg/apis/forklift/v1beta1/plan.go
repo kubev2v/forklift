@@ -24,6 +24,7 @@ import (
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	cnv "kubevirt.io/api/core/v1"
 )
 
 // PlanSpec defines the desired state of Plan.
@@ -48,6 +49,11 @@ type PlanSpec struct {
 	PreserveClusterCPUModel bool `json:"preserveClusterCpuModel,omitempty"`
 	// Preserve static IPs of VMs in vSphere
 	PreserveStaticIPs bool `json:"preserveStaticIPs,omitempty"`
+	// Specify the disk bus which will be applied to all VMs disks in plan.
+	// Possible options 'scsi', 'sata' and 'virtio'.
+	// Defaults to 'virtio'.
+	// +optional
+	DiskBus cnv.DiskBus `json:"diskBus,omitempty"`
 }
 
 // Find a planned VM.
