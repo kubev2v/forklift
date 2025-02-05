@@ -16,8 +16,8 @@ const (
 func Handlers(container *container.Container) []libweb.RequestHandler {
 	return []libweb.RequestHandler{
 		&ProviderHandler{
-			Handler: base.Handler{
-				Container: container,
+			Handler: Handler{
+				base.Handler{Container: container},
 			},
 		},
 		&NamespaceHandler{
