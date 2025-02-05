@@ -43,9 +43,9 @@ func (h ProviderHandler) List(ctx *gin.Context) {
 	}
 	// OCP
 	ocpHandler := &ocp.ProviderHandler{
-		Handler: base.Handler{
+		Handler: ocp.Handler{Handler: base.Handler{
 			Container: h.Container,
-		},
+		}},
 	}
 	status, err = ocpHandler.Prepare(ctx)
 	if status != http.StatusOK {
