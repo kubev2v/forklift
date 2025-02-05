@@ -1,6 +1,7 @@
 package ocp
 
 import (
+	"context"
 	pathlib "path"
 
 	"github.com/gin-gonic/gin"
@@ -13,6 +14,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	cnv "kubevirt.io/api/core/v1"
 	ocpclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
@@ -171,6 +173,26 @@ func (h Handler) UserClient(ctx *gin.Context) (cl ocpclient.Client, err error) {
 			return
 		}
 		cl = ocpcollector.Client()
+	}
+	return
+}
+
+func (h Handler) VMs(ctx *gin.Context) (vms []*model.VM, err error) {
+	client, err := h.UserClient(ctx)
+	if err != nil {
+		return
+	}
+	l := cnv.VirtualMachineList{}
+	// FIXME: consider list options
+	err = client.List(context.TODO(), &l)
+	if err != nil {
+		return
+	}
+
+	for _, obj := range l.Items {
+		m := &model.VM{}
+		m.With(&obj)
+		vms = append(vms, m)
 	}
 	return
 }
