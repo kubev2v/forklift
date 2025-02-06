@@ -523,6 +523,9 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 					generatedName, err := r.executeTemplate(pvcNameTemplate, &templateData)
 					if err == nil && generatedName != "" {
 						dv.ObjectMeta.GenerateName = generatedName
+					} else {
+						// Failed to generate PVC name using template
+						r.Log.Info("Failed to generate PVC name using template", "template", pvcNameTemplate, "error", err)
 					}
 				}
 
