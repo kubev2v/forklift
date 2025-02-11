@@ -929,11 +929,6 @@ func (r *Builder) mapTpm(vm *model.VM, object *cnv.VirtualMachineSpec) {
 		persistData := true
 		object.Template.Spec.Domain.Devices.TPM = &cnv.TPMDevice{Persistent: &persistData}
 	}
-	if vm.Firmware == BIOS {
-		// Disable the vTPM on non UEFI
-		persistData := false
-		object.Template.Spec.Domain.Devices.TPM = &cnv.TPMDevice{Persistent: &persistData}
-	}
 }
 
 // Build tasks.
