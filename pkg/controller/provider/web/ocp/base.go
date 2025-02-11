@@ -13,6 +13,7 @@ import (
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	cnv "kubevirt.io/api/core/v1"
@@ -212,6 +213,26 @@ func (h *Handler) Namespaces(ctx *gin.Context) (namespaces []model.Namespace, er
 		m := model.Namespace{}
 		m.With(&ns)
 		namespaces = append(namespaces, m)
+	}
+	return
+}
+
+func (h Handler) StorageClasses(ctx *gin.Context) (storageclasses []model.StorageClass, err error) {
+	client, err := h.UserClient(ctx)
+	if err != nil {
+		return
+	}
+	list := storage.StorageClassList{}
+	// FIXME: consider list options
+	err = client.List(context.TODO(), &list)
+	if err != nil {
+		return
+	}
+
+	for _, sc := range list.Items {
+		m := model.StorageClass{}
+		m.With(&sc)
+		storageclasses = append(storageclasses, m)
 	}
 	return
 }
