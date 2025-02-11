@@ -1,7 +1,6 @@
 package ocp
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -46,9 +45,7 @@ func (h StorageClassHandler) List(ctx *gin.Context) {
 		h.watch(ctx)
 		return
 	}
-	db := h.Collector.DB()
-	list := []model.StorageClass{}
-	err = db.List(&list, h.ListOptions(ctx))
+	storageclasses, err := h.StorageClasses(ctx)
 	if err != nil {
 		log.Trace(
 			err,
@@ -58,12 +55,13 @@ func (h StorageClassHandler) List(ctx *gin.Context) {
 		return
 	}
 	content := []interface{}{}
-	for _, m := range list {
+	for _, m := range storageclasses {
 		r := &StorageClass{}
 		r.With(&m)
 		r.Link(h.Provider)
 		content = append(content, r.Content(h.Detail))
 	}
+	h.Page.Slice(&content)
 
 	ctx.JSON(http.StatusOK, content)
 }
@@ -76,17 +74,7 @@ func (h StorageClassHandler) Get(ctx *gin.Context) {
 		base.SetForkliftError(ctx, err)
 		return
 	}
-	m := &model.StorageClass{
-		Base: model.Base{
-			UID: ctx.Param(StorageClassParam),
-		},
-	}
-	db := h.Collector.DB()
-	err = db.Get(m)
-	if errors.Is(err, model.NotFound) {
-		ctx.Status(http.StatusNotFound)
-		return
-	}
+	storageclasses, err := h.StorageClasses(ctx)
 	if err != nil {
 		log.Trace(
 			err,
@@ -95,12 +83,17 @@ func (h StorageClassHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	r := &StorageClass{}
-	r.With(m)
-	r.Link(h.Provider)
-	content := r.Content(model.MaxDetail)
-
-	ctx.JSON(http.StatusOK, content)
+	for _, sc := range storageclasses {
+		if sc.UID == ctx.Param(NsParam) {
+			r := &StorageClass{}
+			r.With(&sc)
+			r.Link(h.Provider)
+			content := r.Content(model.MaxDetail)
+			ctx.JSON(http.StatusOK, content)
+			return
+		}
+	}
+	ctx.Status(http.StatusNotFound)
 }
 
 // Watch.
