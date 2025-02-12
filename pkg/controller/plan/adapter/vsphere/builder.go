@@ -719,6 +719,29 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 		}
 		for _, nic := range needed {
 			networkName := fmt.Sprintf("net-%v", numNetworks)
+
+			// If the network name template is set, use it to generate the network name.
+			networkNameTemplate := r.getNetworkNameTemplate(vm)
+			if networkNameTemplate != "" {
+				// Create template data
+				templateData := api.NetworkNameTemplateData{
+					NetworkName:      mapped.Destination.Name,
+					NetworkNamespace: mapped.Destination.Namespace,
+					NetworkType:      mapped.Destination.Type,
+					NetworkIndex:     numNetworks,
+				}
+
+				networkName, err = r.executeTemplate(networkNameTemplate, &templateData)
+				if err != nil {
+					// Failed to generate network name using template
+					r.Log.Info("Failed to generate network name using template, using default name", "template", networkNameTemplate, "error", err)
+
+					// Fallback to default name and reset error
+					networkName = fmt.Sprintf("net-%v", numNetworks)
+					err = nil
+				}
+			}
+
 			numNetworks++
 			kNetwork := cnv.Network{
 				Name: networkName,
@@ -1222,6 +1245,27 @@ func (r *Builder) getVolumeNameTemplate(vm *model.VM) string {
 	// if planSpec.VolumeNameTemplate is set, use it
 	if r.Plan.Spec.VolumeNameTemplate != "" {
 		return r.Plan.Spec.VolumeNameTemplate
+	}
+
+	return ""
+}
+
+// getNetworkNameTemplate returns the network name template
+func (r *Builder) getNetworkNameTemplate(vm *model.VM) string {
+	// Get plan VM
+	planVM := r.getPlanVM(vm)
+	if planVM == nil {
+		return ""
+	}
+
+	// if vm.NetworkNameTemplate is set, use it
+	if planVM.NetworkNameTemplate != "" {
+		return planVM.NetworkNameTemplate
+	}
+
+	// if planSpec.NetworkNameTemplate is set, use it
+	if r.Plan.Spec.NetworkNameTemplate != "" {
+		return r.Plan.Spec.NetworkNameTemplate
 	}
 
 	return ""

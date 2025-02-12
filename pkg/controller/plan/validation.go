@@ -176,6 +176,11 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 		return err
 	}
 
+	// Validate network name template
+	if err := r.validateNetworkNameTemplate(plan); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -202,6 +207,22 @@ func (r *Reconciler) validateVolumeNameTemplate(plan *api.Plan) error {
 			Status:   True,
 			Category: Critical,
 			Message:  "Volume name template is invalid.",
+			Items:    []string{},
+		}
+
+		plan.Status.SetCondition(invalidPVCNameTemplate)
+	}
+
+	return nil
+}
+
+func (r *Reconciler) validateNetworkNameTemplate(plan *api.Plan) error {
+	if err := r.IsValidNetworkNameTemplate(plan.Spec.NetworkNameTemplate); err != nil {
+		invalidPVCNameTemplate := libcnd.Condition{
+			Type:     NotValid,
+			Status:   True,
+			Category: Critical,
+			Message:  "Network name template is invalid.",
 			Items:    []string{},
 		}
 
@@ -512,6 +533,13 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "VM volume name template is invalid.",
 		Items:    []string{},
 	}
+	networkNameInvalid := libcnd.Condition{
+		Type:     NotValid,
+		Status:   True,
+		Category: Critical,
+		Message:  "VM network name template is invalid.",
+		Items:    []string{},
+	}
 
 	setOf := map[string]bool{}
 	//
@@ -659,6 +687,12 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 				volumeNameInvalid.Items = append(volumeNameInvalid.Items, ref.String())
 			}
 		}
+		// is valid vm pvc name template
+		if plan.Spec.VMs[i].NetworkNameTemplate != "" {
+			if err := r.IsValidNetworkNameTemplate(plan.Spec.VMs[i].NetworkNameTemplate); err != nil {
+				networkNameInvalid.Items = append(networkNameInvalid.Items, ref.String())
+			}
+		}
 	}
 	if len(notFound.Items) > 0 {
 		plan.Status.SetCondition(notFound)
@@ -701,6 +735,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(volumeNameInvalid.Items) > 0 {
 		plan.Status.SetCondition(volumeNameInvalid)
+	}
+	if len(networkNameInvalid.Items) > 0 {
+		plan.Status.SetCondition(networkNameInvalid)
 	}
 
 	return nil
@@ -1273,6 +1310,32 @@ func (r *Reconciler) IsValidVolumeNameTemplate(volumeNameTemplate string) error 
 	}
 
 	result, err := r.IsValidTemplate(volumeNameTemplate, testData)
+	if err != nil {
+		return err
+	}
+
+	// Validate that template output is a valid k8s label
+	errs := k8svalidation.IsValidLabelValue(result)
+	if len(errs) > 0 {
+		return liberr.New("Template output is not a valid k8s label", "errors", errs)
+	}
+
+	return nil
+}
+
+func (r *Reconciler) IsValidNetworkNameTemplate(networkNameTemplate string) error {
+	if networkNameTemplate == "" {
+		return nil
+	}
+
+	testData := api.NetworkNameTemplateData{
+		NetworkName:      "test-network",
+		NetworkNamespace: "test-namespace",
+		NetworkType:      "Multus",
+		NetworkIndex:     0,
+	}
+
+	result, err := r.IsValidTemplate(networkNameTemplate, testData)
 	if err != nil {
 		return err
 	}
