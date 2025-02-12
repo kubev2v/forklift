@@ -64,6 +64,21 @@ type VM struct {
 	//   "pvc-{{.PVCName}}"
 	// +optional
 	VolumeNameTemplate string `json:"volumeNameTemplate,omitempty"`
+	// NetworkNameTemplate is a template for generating network interface names in the target virtual machine.
+	// It follows Go template syntax and has access to the following variables:
+	//   - .NetworkName: If target network is multus, name of the Multus network attachment definition, empty otherwise.
+	//   - .NetworkNamespace: If target network is multus, namespace where the network attachment definition is located.
+	//   - .NetworkType: type of the network ("Multus" or "Pod")
+	//   - .NetworkIndex: sequential index of the network interface (0-based)
+	// The template can be used to customize network interface names based on target network configuration.
+	// Note:
+	//   - This template will override at the plan level template
+	//   - If not specified on VM level and on Plan leverl, default naming conventions will be used
+	// Examples:
+	//   "net-{{.NetworkIndex}}"
+	//   "{{if eq .NetworkType "Pod"}}pod{{else}}multus-{{.NetworkIndex}}{{end}}"
+	// +optional
+	NetworkNameTemplate string `json:"networkNameTemplate,omitempty"`
 }
 
 // Find a Hook for the specified step.

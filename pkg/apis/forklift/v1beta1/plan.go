@@ -82,6 +82,21 @@ type PlanSpec struct {
 	//   "pvc-{{.PVCName}}"
 	// +optional
 	VolumeNameTemplate string `json:"volumeNameTemplate,omitempty"`
+	// NetworkNameTemplate is a template for generating network interface names in the target virtual machine.
+	// It follows Go template syntax and has access to the following variables:
+	//   - .NetworkName: If target network is multus, name of the Multus network attachment definition, empty otherwise.
+	//   - .NetworkNamespace: If target network is multus, namespace where the network attachment definition is located.
+	//   - .NetworkType: type of the network ("Multus" or "Pod")
+	//   - .NetworkIndex: sequential index of the network interface (0-based)
+	// The template can be used to customize network interface names based on target network configuration.
+	// Note:
+	//   - This template can be overridden at the individual VM level
+	//   - If not specified on VM level and on Plan leverl, default naming conventions will be used
+	// Examples:
+	//   "net-{{.NetworkIndex}}"
+	//   "{{if eq .NetworkType "Pod"}}pod{{else}}multus-{{.NetworkIndex}}{{end}}"
+	// +optional
+	NetworkNameTemplate string `json:"networkNameTemplate,omitempty"`
 }
 
 // Find a planned VM.
@@ -190,4 +205,16 @@ type PVCNameTemplateData struct {
 type VolumeNameTemplateData struct {
 	PVCName     string `json:"pvcName,omitempty"`
 	VolumeIndex int    `json:"volumeIndex,omitempty"`
+}
+
+// NetworkNameTemplateData contains fields used in naming templates.
+type NetworkNameTemplateData struct {
+	// NetworkName is the name of the Multus network attachment definition if target network is multus, empty otherwise
+	NetworkName string `json:"networkName,omitempty"`
+	// NetworkNamespace is the namespace where the network attachment definition is located if target network is multus
+	NetworkNamespace string `json:"networkNamespace,omitempty"`
+	// NetworkType is the type of the network ("Multus" or "Pod")
+	NetworkType string `json:"networkType,omitempty"`
+	// NetworkIndex is the sequential index of the network interface (0-based)
+	NetworkIndex int `json:"networkIndex,omitempty"`
 }
