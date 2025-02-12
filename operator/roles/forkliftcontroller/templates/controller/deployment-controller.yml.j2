@@ -123,6 +123,14 @@ spec:
         - name: VSPHERE_OS_MAP
           value: {{ vsphere_osmap_configmap_name }}
 {% endif %}
+{% if vsphere_tls_ciphers is defined %}
+        - name: VSPHERE_TLS_CIPHERS
+          value: {{ vsphere_tls_ciphers }}
+{% endif %}
+{% if vsphere_tls_max_version is defined %}
+        - name: VSPHERE_TLS_MAX_VERSION
+          value: {{ vsphere_tls_max_version }}
+{% endif %}
 {% if virt_customize_configmap_name is defined %}
         - name: VIRT_CUSTOMIZE_MAP
           value: {{ virt_customize_configmap_name }}
@@ -225,6 +233,14 @@ spec:
 {% if controller_log_level is defined and controller_log_level is number %}
         - name: LOG_LEVEL
           value: "{{ controller_log_level }}"
+{% endif %}
+{% if vsphere_tls_ciphers is defined %}
+        - name: VSPHERE_TLS_CIPHERS
+          value: {{ vsphere_tls_ciphers }}
+{% endif %}
+{% if vsphere_tls_max_version is defined %}
+        - name: VSPHERE_TLS_MAX_VERSION
+          value: {{ vsphere_tls_max_version }}
 {% endif %}
 {% if controller_profile_kind is defined and controller_profile_path is defined and controller_profile_duration is defined %}
         - name: PROFILE_KIND
