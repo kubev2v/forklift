@@ -20,6 +20,11 @@
       state: "{{ webhook_state }}"
       definition: "{{ lookup('template', 'api/validatingwebhookconfiguration-providers.yml.j2') }}"
 
+  - name: "Setup migrations validating webhook configuration"
+    k8s:
+      state: "{{ webhook_state }}"
+      definition: "{{ lookup('template', 'api/validatingwebhookconfiguration-migrations.yml.j2') }}"
+
   - name: "Delete aggregated mutating webhook configurations"
     k8s:
       state: absent

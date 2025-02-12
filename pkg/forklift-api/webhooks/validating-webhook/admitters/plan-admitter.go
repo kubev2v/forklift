@@ -139,8 +139,19 @@ func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv
 		},
 		&admitter.sourceProvider)
 	if err != nil {
-		log.Error(err, "Couldn't get the source provider, passing unwillingly")
-		return util.ToAdmissionResponseAllow()
+		log.Error(err, "Failed to get source provider, can't determine permissions")
+		return util.ToAdmissionResponseError(err)
+	}
+
+	providerGR, err := api.GetGroupResource(&api.Provider{})
+	if err != nil {
+		return util.ToAdmissionResponseError(err)
+	}
+
+	// Check whether the user has permission to access the source provider
+	err = util.PermitUser(ar.Request, admitter.Client, providerGR, admitter.sourceProvider.Name, admitter.sourceProvider.Namespace, util.Get)
+	if err != nil {
+		return util.ToAdmissionResponseError(err)
 	}
 
 	err = admitter.Client.Get(
@@ -151,12 +162,38 @@ func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv
 		},
 		&admitter.destinationProvider)
 	if err != nil {
-		log.Error(err, "Couldn't get the destination provider, passing unwillingly")
-		return util.ToAdmissionResponseAllow()
+		log.Error(err, "Failed to get destination provider, can't determine permissions")
+		return util.ToAdmissionResponseError(err)
+	}
+
+	// Check whether the user has permission to access the destination provider
+	err = util.PermitUser(ar.Request, admitter.Client, providerGR, admitter.destinationProvider.Name, admitter.destinationProvider.Namespace, util.Get)
+	if err != nil {
+		return util.ToAdmissionResponseError(err)
 	}
 
 	admitter.plan.Referenced.Provider.Source = &admitter.sourceProvider
 	admitter.plan.Referenced.Provider.Destination = &admitter.destinationProvider
+
+	if admitter.destinationProvider.IsHost() {
+		// Check whether the user has permission to create VMs in the target namespace
+		err = util.PermitUser(ar.Request, admitter.Client, cnv.Resource("virtualmachines"), "", admitter.plan.Spec.TargetNamespace, util.Create)
+		if err != nil {
+			log.Error(err, "Unable to migrate to namespace")
+			return util.ToAdmissionResponseError(err)
+		}
+	}
+
+	// Check whether user has permission to access the VMs from the plan
+	if admitter.sourceProvider.IsHost() {
+		for _, planvm := range admitter.plan.Spec.VMs {
+			err = util.PermitUser(ar.Request, admitter.Client, cnv.Resource("virtualmachines"), planvm.Name, planvm.Namespace, util.Get)
+			if err != nil {
+				log.Error(err, "Unable to access VM")
+				return util.ToAdmissionResponseError(err)
+			}
+		}
+	}
 
 	err = admitter.validateStorage()
 	if err != nil {
