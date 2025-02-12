@@ -2,8 +2,10 @@ package vsphere
 
 import (
 	"context"
+	"crypto/tls"
 	"net/http"
 	liburl "net/url"
+	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -23,6 +25,11 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	VsphereTlsCiphers    = "VSPHERE_TLS_CIPHERS"
+	VsphereTlsMaxVersion = "VSPHERE_TLS_MAX_VERSION"
 )
 
 // Settings
@@ -493,6 +500,64 @@ func (r *Collector) watch() (list []*libmodel.Watch) {
 	return
 }
 
+// CipherSuiteId similar to CipherSuiteName from TLS go library just in reverse order where it takes the cipher name
+// and returns cipher ID.
+// Input string `name` for example "TLS_AES_128_GCM_SHA256" and returns cipher ID for this example it would be 0x1301.
+func CipherSuiteId(name string) uint16 {
+	for _, c := range tls.CipherSuites() {
+		if c.Name == name {
+			return c.ID
+		}
+	}
+	for _, c := range tls.InsecureCipherSuites() {
+		if c.Name == name {
+			return c.ID
+		}
+	}
+	return 0
+}
+
+// GetCipherSuitesIds finds the CipherSuiteId across the list of names and returns the list of found IDs
+func GetCipherSuitesIds(names []string) []uint16 {
+	var resp []uint16
+	for _, name := range names {
+		if id := CipherSuiteId(name); id != 0 {
+			resp = append(resp, id)
+		}
+	}
+	return resp
+}
+
+// VersionNumber similar to VersionName from TLS go library just in reverse where it takes a version name
+// and returns the version number.
+// Input string `versionName` for example "1.0" and returns TLS number ID for this example it would be 0x0301.
+func VersionNumber(versionName string) uint16 {
+	switch versionName {
+	case "1.0":
+		return tls.VersionTLS10
+	case "1.1":
+		return tls.VersionTLS11
+	case "1.2":
+		return tls.VersionTLS12
+	case "1.3":
+		return tls.VersionTLS13
+	default:
+		return 0
+	}
+}
+
+func SetTLSClientConfig(c *tls.Config) {
+	if tlsCiphers := os.Getenv(VsphereTlsCiphers); tlsCiphers != "" {
+		tlsCiphersList := strings.Split(tlsCiphers, ",")
+		c.CipherSuites = GetCipherSuitesIds(tlsCiphersList)
+	}
+	if tlsMaxVersion := os.Getenv(VsphereTlsMaxVersion); tlsMaxVersion != "" {
+		if version := VersionNumber(tlsMaxVersion); version != 0 {
+			c.MaxVersion = version
+		}
+	}
+}
+
 // Build the client.
 func (r *Collector) connect(ctx context.Context) (status int, err error) {
 	r.close()
@@ -505,6 +570,7 @@ func (r *Collector) connect(ctx context.Context) (status int, err error) {
 		r.user(),
 		r.password())
 	soapClient := soap.NewClient(url, r.getInsecureSkipVerifyFlag())
+	SetTLSClientConfig(soapClient.Client.Transport.(*http.Transport).TLSClientConfig)
 	soapClient.SetThumbprint(url.Host, r.thumbprint())
 	vimClient, err := vim25.NewClient(ctx, soapClient)
 	if err != nil {
