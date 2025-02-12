@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/konveyor/forklift-controller/pkg/lib/gob"
 
@@ -466,8 +467,23 @@ func convertToVmStruct(envelope []Envelope, ovaPath []string) ([]VM, error) {
 					newVM.MemoryUnits = item.AllocationUnits
 
 				} else {
+					var itemKind string
+					if len(item.ElementName) > 0 {
+						// if the `ElementName` element has a name such as "Hard Disk 1", strip off the
+						// number suffix to try to get a more generic name for the device type
+						itemKind = strings.TrimRightFunc(item.ElementName, func(r rune) bool {
+							return unicode.IsDigit(r) || unicode.IsSpace(r)
+						})
+					} else {
+						// Some .ova files do not include an `ElementName` element for each device. Fall
+						// back to using the `Description` element
+						itemKind = item.Description
+					}
+					if len(itemKind) == 0 {
+						itemKind = "Unknown"
+					}
 					newVM.Devices = append(newVM.Devices, Device{
-						Kind: item.ElementName[:len(item.ElementName)-2],
+						Kind: itemKind,
 					})
 				}
 
