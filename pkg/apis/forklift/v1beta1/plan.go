@@ -70,6 +70,18 @@ type PlanSpec struct {
 	//   "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
 	// +optional
 	PVCNameTemplate string `json:"pvcNameTemplate,omitempty"`
+	// VolumeNameTemplate is a template for generating volume interface names in the target virtual machine.
+	// It follows Go template syntax and has access to the following variables:
+	//   - .PVCName: name of the PVC mounted to the VM using this volume
+	//   - .VolumeIndex: sequential index of the volume interface (0-based)
+	// Note:
+	//   - This template can be overridden at the individual VM level
+	//   - If not specified on VM level and on Plan leverl, default naming conventions will be used
+	// Examples:
+	//   "disk-{{.VolumeIndex}}"
+	//   "pvc-{{.PVCName}}"
+	// +optional
+	VolumeNameTemplate string `json:"volumeNameTemplate,omitempty"`
 }
 
 // Find a planned VM.
@@ -172,4 +184,10 @@ type PVCNameTemplateData struct {
 	PlanName      string `json:"planName"`
 	DiskIndex     int    `json:"diskIndex"`
 	RootDiskIndex int    `json:"rootDiskIndex"`
+}
+
+// VolumeNameTemplateData contains fields used in naming templates.
+type VolumeNameTemplateData struct {
+	PVCName     string `json:"pvcName,omitempty"`
+	VolumeIndex int    `json:"volumeIndex,omitempty"`
 }

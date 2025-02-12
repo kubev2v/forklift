@@ -171,6 +171,11 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 		return err
 	}
 
+	// Validate volume name template
+	if err := r.validateVolumeNameTemplate(plan); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -181,6 +186,22 @@ func (r *Reconciler) validatePVCNameTemplate(plan *api.Plan) error {
 			Status:   True,
 			Category: Critical,
 			Message:  "PVC name template is invalid.",
+			Items:    []string{},
+		}
+
+		plan.Status.SetCondition(invalidPVCNameTemplate)
+	}
+
+	return nil
+}
+
+func (r *Reconciler) validateVolumeNameTemplate(plan *api.Plan) error {
+	if err := r.IsValidVolumeNameTemplate(plan.Spec.VolumeNameTemplate); err != nil {
+		invalidPVCNameTemplate := libcnd.Condition{
+			Type:     NotValid,
+			Status:   True,
+			Category: Critical,
+			Message:  "Volume name template is invalid.",
 			Items:    []string{},
 		}
 
@@ -484,6 +505,13 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "VM PVC name template is invalid.",
 		Items:    []string{},
 	}
+	volumeNameInvalid := libcnd.Condition{
+		Type:     NotValid,
+		Status:   True,
+		Category: Critical,
+		Message:  "VM volume name template is invalid.",
+		Items:    []string{},
+	}
 
 	setOf := map[string]bool{}
 	//
@@ -625,6 +653,12 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 				pvcNameInvalid.Items = append(pvcNameInvalid.Items, ref.String())
 			}
 		}
+		// is valid vm pvc name template
+		if plan.Spec.VMs[i].VolumeNameTemplate != "" {
+			if err := r.IsValidVolumeNameTemplate(plan.Spec.VMs[i].VolumeNameTemplate); err != nil {
+				volumeNameInvalid.Items = append(volumeNameInvalid.Items, ref.String())
+			}
+		}
 	}
 	if len(notFound.Items) > 0 {
 		plan.Status.SetCondition(notFound)
@@ -664,6 +698,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(pvcNameInvalid.Items) > 0 {
 		plan.Status.SetCondition(pvcNameInvalid)
+	}
+	if len(volumeNameInvalid.Items) > 0 {
+		plan.Status.SetCondition(volumeNameInvalid)
 	}
 
 	return nil
@@ -1176,6 +1213,28 @@ func (r *Reconciler) checkOCPVersion(clientset kubernetes.Interface) error {
 	return nil
 }
 
+func (r *Reconciler) IsValidTemplate(templateStr string, testData interface{}) (string, error) {
+	// Validate golang template syntax
+	tmpl, err := template.New("template").Parse(templateStr)
+	if err != nil {
+		return "", liberr.Wrap(err, "Invalid template syntax")
+	}
+
+	var buf bytes.Buffer
+	err = tmpl.Execute(&buf, testData)
+	if err != nil {
+		return "", liberr.Wrap(err, "Template execution failed")
+	}
+	result := buf.String()
+
+	// Empty output is not valid
+	if result == "" {
+		return "", liberr.New("Template output is empty")
+	}
+
+	return result, nil
+}
+
 func (r *Reconciler) IsValidPVCNameTemplate(pvcNameTemplate string) error {
 	if pvcNameTemplate == "" {
 		return nil
@@ -1203,24 +1262,26 @@ func (r *Reconciler) IsValidPVCNameTemplate(pvcNameTemplate string) error {
 	return nil
 }
 
-func (r *Reconciler) IsValidTemplate(templateStr string, testData interface{}) (string, error) {
-	// Validate golang template syntax
-	tmpl, err := template.New("template").Parse(templateStr)
+func (r *Reconciler) IsValidVolumeNameTemplate(volumeNameTemplate string) error {
+	if volumeNameTemplate == "" {
+		return nil
+	}
+
+	testData := api.VolumeNameTemplateData{
+		PVCName:     "test-pvc",
+		VolumeIndex: 0,
+	}
+
+	result, err := r.IsValidTemplate(volumeNameTemplate, testData)
 	if err != nil {
-		return "", liberr.Wrap(err, "Invalid template syntax")
+		return err
 	}
 
-	var buf bytes.Buffer
-	err = tmpl.Execute(&buf, testData)
-	if err != nil {
-		return "", liberr.Wrap(err, "Template execution failed")
-	}
-	result := buf.String()
-
-	// Empty output is not valid
-	if result == "" {
-		return "", liberr.New("Template output is empty")
+	// Validate that template output is a valid k8s label
+	errs := k8svalidation.IsValidLabelValue(result)
+	if len(errs) > 0 {
+		return liberr.New("Template output is not a valid k8s label", "errors", errs)
 	}
 
-	return result, nil
+	return nil
 }

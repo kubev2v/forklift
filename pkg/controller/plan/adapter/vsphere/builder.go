@@ -815,6 +815,7 @@ func (r *Builder) removeSharedDisks(vm *model.VM) {
 func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims []*core.PersistentVolumeClaim, object *cnv.VirtualMachineSpec) {
 	var kVolumes []cnv.Volume
 	var kDisks []cnv.Disk
+	var templateErr error
 
 	disks := vm.Disks
 	sort.Slice(disks, func(i, j int) bool {
@@ -842,6 +843,26 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 	for i, disk := range disks {
 		pvc := pvcMap[r.baseVolume(disk.File)]
 		volumeName := fmt.Sprintf("vol-%v", i)
+
+		// If the volume name template is set, use it to generate the volume name.
+		volumeNameTemplate := r.getVolumeNameTemplate(vm)
+		if volumeNameTemplate != "" {
+			// Create template data
+			templateData := api.VolumeNameTemplateData{
+				PVCName:     pvc.Name,
+				VolumeIndex: i,
+			}
+
+			volumeName, templateErr = r.executeTemplate(volumeNameTemplate, &templateData)
+			if templateErr != nil {
+				// Failed to generate volume name using template
+				r.Log.Info("Failed to generate volume name using template, using default name", "template", volumeNameTemplate, "error", templateErr)
+
+				// fallback to default name and reset error
+				volumeName = fmt.Sprintf("vol-%v", i)
+			}
+		}
+
 		volume := cnv.Volume{
 			Name: volumeName,
 			VolumeSource: cnv.VolumeSource{
@@ -1180,6 +1201,27 @@ func (r *Builder) getPVCNameTemplate(vm *model.VM) string {
 	// if planSpec.PVCNameTemplate is set, use it
 	if r.Plan.Spec.PVCNameTemplate != "" {
 		return r.Plan.Spec.PVCNameTemplate
+	}
+
+	return ""
+}
+
+// getVolumeNameTemplate returns the volume name template
+func (r *Builder) getVolumeNameTemplate(vm *model.VM) string {
+	// Get plan VM
+	planVM := r.getPlanVM(vm)
+	if planVM == nil {
+		return ""
+	}
+
+	// if vm.VolumeNameTemplate is set, use it
+	if planVM.VolumeNameTemplate != "" {
+		return planVM.VolumeNameTemplate
+	}
+
+	// if planSpec.VolumeNameTemplate is set, use it
+	if r.Plan.Spec.VolumeNameTemplate != "" {
+		return r.Plan.Spec.VolumeNameTemplate
 	}
 
 	return ""

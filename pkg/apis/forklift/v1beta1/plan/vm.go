@@ -52,6 +52,18 @@ type VM struct {
 	//   "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
 	// +optional
 	PVCNameTemplate string `json:"pvcNameTemplate,omitempty"`
+	// VolumeNameTemplate is a template for generating volume interface names in the target virtual machine.
+	// It follows Go template syntax and has access to the following variables:
+	//   - .PVCName: name of the PVC mounted to the VM using this volume
+	//   - .VolumeIndex: sequential index of the volume interface (0-based)
+	// Note:
+	//   - This template will override at the plan level template
+	//   - If not specified on VM level and on Plan leverl, default naming conventions will be used
+	// Examples:
+	//   "disk-{{.VolumeIndex}}"
+	//   "pvc-{{.PVCName}}"
+	// +optional
+	VolumeNameTemplate string `json:"volumeNameTemplate,omitempty"`
 }
 
 // Find a Hook for the specified step.
