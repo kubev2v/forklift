@@ -5,6 +5,7 @@ import (
 	pathlib "path"
 
 	"github.com/gin-gonic/gin"
+	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	ocpcontainer "github.com/konveyor/forklift-controller/pkg/controller/provider/container/ocp"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
@@ -233,6 +234,25 @@ func (h Handler) StorageClasses(ctx *gin.Context) (storageclasses []model.Storag
 		m := model.StorageClass{}
 		m.With(&sc)
 		storageclasses = append(storageclasses, m)
+	}
+	return
+}
+
+func (h *NadHandler) NetworkAttachmentDefinitions(ctx *gin.Context) (nets []model.NetworkAttachmentDefinition, err error) {
+	client, err := h.UserClient(ctx)
+	if err != nil {
+		return
+	}
+	list := net.NetworkAttachmentDefinitionList{}
+	// FIXME: consider ListOptions
+	err = client.List(context.TODO(), &list)
+	if err != nil {
+		return
+	}
+	for _, nad := range list.Items {
+		m := model.NetworkAttachmentDefinition{}
+		m.With(&nad)
+		nets = append(nets, m)
 	}
 	return
 }
