@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"bytes"
 	"context"
 	"crypto/md5"
 	"encoding/hex"
@@ -9,6 +10,7 @@ import (
 	"net"
 	"path"
 	"strconv"
+	"text/template"
 
 	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
@@ -162,6 +164,27 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	// Validate version only if migration is OCP to OCP
 	if err := r.validateOpenShiftVersion(plan); err != nil {
 		return err
+	}
+
+	// Validate PVC name template
+	if err := r.validatePVCNameTemplate(plan); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *Reconciler) validatePVCNameTemplate(plan *api.Plan) error {
+	if err := r.IsValidPVCNameTemplate(plan.Spec.PVCNameTemplate); err != nil {
+		invalidPVCNameTemplate := libcnd.Condition{
+			Type:     NotValid,
+			Status:   True,
+			Category: Critical,
+			Message:  "PVC name template is invalid.",
+			Items:    []string{},
+		}
+
+		plan.Status.SetCondition(invalidPVCNameTemplate)
 	}
 
 	return nil
@@ -454,6 +477,13 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "Changed Block Tracking (CBT) has not been enabled on some VM. This feature is a prerequisite for VM warm migration.",
 		Items:    []string{},
 	}
+	pvcNameInvalid := libcnd.Condition{
+		Type:     NotValid,
+		Status:   True,
+		Category: Critical,
+		Message:  "VM PVC name template is invalid.",
+		Items:    []string{},
+	}
 
 	setOf := map[string]bool{}
 	//
@@ -589,6 +619,12 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 				missingCbtForWarm.Items = append(missingCbtForWarm.Items, ref.String())
 			}
 		}
+		// is valid vm pvc name template
+		if plan.Spec.VMs[i].PVCNameTemplate != "" {
+			if err := r.IsValidPVCNameTemplate(plan.Spec.VMs[i].PVCNameTemplate); err != nil {
+				pvcNameInvalid.Items = append(pvcNameInvalid.Items, ref.String())
+			}
+		}
 	}
 	if len(notFound.Items) > 0 {
 		plan.Status.SetCondition(notFound)
@@ -625,6 +661,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(missingCbtForWarm.Items) > 0 {
 		plan.Status.SetCondition(missingCbtForWarm)
+	}
+	if len(pvcNameInvalid.Items) > 0 {
+		plan.Status.SetCondition(pvcNameInvalid)
 	}
 
 	return nil
@@ -1135,4 +1174,53 @@ func (r *Reconciler) checkOCPVersion(clientset kubernetes.Interface) error {
 	}
 
 	return nil
+}
+
+func (r *Reconciler) IsValidPVCNameTemplate(pvcNameTemplate string) error {
+	if pvcNameTemplate == "" {
+		return nil
+	}
+
+	// Test template with sample data
+	testData := api.PVCNameTemplateData{
+		VmName:        "test-vm",
+		PlanName:      "test-plan",
+		DiskIndex:     0,
+		RootDiskIndex: 0,
+	}
+
+	result, err := r.IsValidTemplate(pvcNameTemplate, testData)
+	if err != nil {
+		return err
+	}
+
+	// Validate that template output is a valid k8s label
+	errs := k8svalidation.IsValidLabelValue(result)
+	if len(errs) > 0 {
+		return liberr.New("Template output is not a valid k8s label", "errors", errs)
+	}
+
+	return nil
+}
+
+func (r *Reconciler) IsValidTemplate(templateStr string, testData interface{}) (string, error) {
+	// Validate golang template syntax
+	tmpl, err := template.New("template").Parse(templateStr)
+	if err != nil {
+		return "", liberr.Wrap(err, "Invalid template syntax")
+	}
+
+	var buf bytes.Buffer
+	err = tmpl.Execute(&buf, testData)
+	if err != nil {
+		return "", liberr.Wrap(err, "Template execution failed")
+	}
+	result := buf.String()
+
+	// Empty output is not valid
+	if result == "" {
+		return "", liberr.New("Template output is empty")
+	}
+
+	return result, nil
 }

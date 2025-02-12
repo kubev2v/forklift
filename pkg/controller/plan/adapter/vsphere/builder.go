@@ -1,6 +1,7 @@
 package vsphere
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"text/template"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
@@ -442,7 +444,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 			err = fErr
 			return
 		}
-		for _, disk := range vm.Disks {
+		for diskIndex, disk := range vm.Disks {
 			if disk.Datastore.ID == ds.ID {
 				storageClass := mapped.Destination.StorageClass
 				var dvSource cdi.DataVolumeSource
@@ -498,6 +500,35 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 				if disk.Shared {
 					dv.ObjectMeta.Labels[Shareable] = "true"
 				}
+
+				// if exists, get the PVC generate name from the PlanSpec, generate the name
+				// and update the GenerateName field in the DataVolume object.
+				pvcNameTemplate := r.getPVCNameTemplate(vm)
+				if pvcNameTemplate != "" {
+					// Get the VM root disk index
+					planVM := r.getPlanVM(vm)
+					rootDiskIndex := 0
+					if planVM != nil {
+						rootDiskIndex = utils.GetDeviceNumber(planVM.RootDisk)
+					}
+
+					// Create template data
+					templateData := api.PVCNameTemplateData{
+						VmName:        vm.Name,
+						PlanName:      r.Plan.Name,
+						DiskIndex:     diskIndex,
+						RootDiskIndex: rootDiskIndex,
+					}
+
+					generatedName, err := r.executeTemplate(pvcNameTemplate, &templateData)
+					if err == nil && generatedName != "" {
+						dv.ObjectMeta.GenerateName = generatedName
+					} else {
+						// Failed to generate PVC name using template
+						r.Log.Info("Failed to generate PVC name using template", "template", pvcNameTemplate, "error", err)
+					}
+				}
+
 				dvs = append(dvs, *dv)
 			}
 		}
@@ -1102,4 +1133,54 @@ func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.Persi
 func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error) {
 	err = planbase.VolumePopulatorNotSupportedError
 	return
+}
+
+// Get the plan VM for the given vsphere VM
+func (r *Builder) getPlanVM(vm *model.VM) *plan.VM {
+	for _, planVM := range r.Plan.Spec.VMs {
+		if planVM.ID == vm.ID {
+			return &planVM
+		}
+	}
+
+	return nil
+}
+
+func (r *Builder) executeTemplate(templateText string, templateData any) (string, error) {
+	var buf bytes.Buffer
+
+	// Parse template syntax
+	tmpl, err := template.New("template").Parse(templateText)
+	if err != nil {
+		return "", err
+	}
+
+	// Execute template
+	err = tmpl.Execute(&buf, templateData)
+	if err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
+}
+
+// GetPVCNameTemplate returns the PVC name template
+func (r *Builder) getPVCNameTemplate(vm *model.VM) string {
+	// Get plan VM
+	planVM := r.getPlanVM(vm)
+	if planVM == nil {
+		return ""
+	}
+
+	// if vm.PVCNameTemplate is set, use it
+	if planVM.PVCNameTemplate != "" {
+		return planVM.PVCNameTemplate
+	}
+
+	// if planSpec.PVCNameTemplate is set, use it
+	if r.Plan.Spec.PVCNameTemplate != "" {
+		return r.Plan.Spec.PVCNameTemplate
+	}
+
+	return ""
 }

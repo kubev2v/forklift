@@ -22,6 +22,19 @@ import (
 	fakeClient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
+const (
+	sourceNamespace  = "source-namespace"
+	destNamespace    = "destination-namespace"
+	testNamespace    = "test-namespace"
+	sourceName       = "source"
+	destName         = "destination"
+	sourceSecretName = "source-secret"
+	testPlanName     = "test-plan"
+	tokenKey         = "token"
+	tokenValue       = "token"
+	insecureSkipKey  = "inscureSkipVerify"
+)
+
 var (
 	planValidationLog = logging.WithName("planValidation")
 )
@@ -65,10 +78,10 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 
 	ginkgo.Describe("validate", func() {
 		ginkgo.It("Should setup secret when source is not local cluster", func() {
-			secret := createSecret("source-secret", "source-namespace", false)
-			source := createProvider("source", "source-namespace", "https://source", v1beta1.OpenShift, &core.ObjectReference{Name: "source-secret", Namespace: "source-namespace"})
-			destination := createProvider("destination", "destination-namespace", "", v1beta1.OpenShift, &core.ObjectReference{})
-			plan := createPlan("test-plan", "test-namespace", source, destination)
+			secret := createSecret(sourceSecretName, sourceNamespace, false)
+			source := createProvider(sourceName, sourceNamespace, "https://source", v1beta1.OpenShift, &core.ObjectReference{Name: sourceSecretName, Namespace: sourceNamespace})
+			destination := createProvider(destName, destNamespace, "", v1beta1.OpenShift, &core.ObjectReference{})
+			plan := createPlan(testPlanName, testNamespace, source, destination)
 			source.Status.Conditions.SetCondition(condition.Condition{Type: condition.Ready, Status: condition.True})
 			destination.Status.Conditions.SetCondition(condition.Condition{Type: condition.Ready, Status: condition.True})
 
@@ -81,10 +94,10 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 		})
 
 		ginkgo.It("Should not setup secret when source is local cluster", func() {
-			secret := createSecret("source-secret", "source-namespace", false)
-			source := createProvider("source", "source-namespace", "", v1beta1.OpenShift, &core.ObjectReference{Name: "source-secret", Namespace: "source-namespace"})
-			destination := createProvider("destination", "destination-namespace", "https://destination", v1beta1.OpenShift, &core.ObjectReference{})
-			plan := createPlan("test-plan", "test-namespace", source, destination)
+			secret := createSecret(sourceSecretName, sourceNamespace, false)
+			source := createProvider(sourceName, sourceNamespace, "", v1beta1.OpenShift, &core.ObjectReference{Name: sourceSecretName, Namespace: sourceNamespace})
+			destination := createProvider(destName, destNamespace, "https://destination", v1beta1.OpenShift, &core.ObjectReference{})
+			plan := createPlan(testPlanName, testNamespace, source, destination)
 			source.Status.Conditions.SetCondition(condition.Condition{Type: condition.Ready, Status: condition.True})
 			destination.Status.Conditions.SetCondition(condition.Condition{Type: condition.Ready, Status: condition.True})
 
@@ -95,6 +108,78 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			// secret should NOT be set on plan.Referenced.Secret
 			gomega.Expect(plan.Referenced.Secret).To(gomega.BeNil())
 		})
+	})
+
+	ginkgo.Describe("validatePVCNameTemplate", func() {
+		var reconciler *Reconciler
+
+		ginkgo.BeforeEach(func() {
+			reconciler = &Reconciler{}
+		})
+
+		source := createProvider(sourceName, sourceNamespace, "", v1beta1.OpenShift, &core.ObjectReference{Name: sourceSecretName, Namespace: sourceNamespace})
+		destination := createProvider(destName, destNamespace, "https://destination", v1beta1.OpenShift, &core.ObjectReference{})
+
+		ginkgo.DescribeTable("should validate a plan correctly",
+			func(template string, shouldBeValid bool) {
+				plan := createPlan(testPlanName, testNamespace, source, destination)
+				plan.Spec.PVCNameTemplate = template
+
+				err := reconciler.validatePVCNameTemplate(plan)
+				if err != nil {
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				}
+
+				hasInvalidCondition := false
+				for _, cond := range plan.Status.Conditions.List {
+					if cond.Type == NotValid {
+						hasInvalidCondition = true
+						break
+					}
+				}
+
+				if shouldBeValid {
+					gomega.Expect(hasInvalidCondition).To(gomega.BeFalse())
+				} else {
+
+					gomega.Expect(hasInvalidCondition).To(gomega.BeTrue())
+				}
+			},
+			ginkgo.Entry("empty template is valid", "", true),
+			ginkgo.Entry("simple valid template", "{{.VmName}}-disk-{{.DiskIndex}}", true),
+			ginkgo.Entry("complex valid template", "{{.PlanName}}-{{.VmName}}-disk-{{.DiskIndex}}", true),
+			ginkgo.Entry("valid template with root disk index", "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}", true),
+			ginkgo.Entry("template with invalid k8s label chars", "disk@{{.DiskIndex}}", false),
+			ginkgo.Entry("template with undefined variable", "{{.UndefinedVar}}", false),
+			ginkgo.Entry("template resulting in empty string", "{{if false}}disk{{end}}", false),
+		)
+	})
+
+	ginkgo.Describe("IsValidPVCNameTemplate", func() {
+		var reconciler *Reconciler
+
+		ginkgo.BeforeEach(func() {
+			reconciler = &Reconciler{}
+		})
+
+		ginkgo.DescribeTable("should validate PVC name template correctly",
+			func(template string, shouldBeValid bool) {
+				err := reconciler.IsValidPVCNameTemplate(template)
+				if shouldBeValid {
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				} else {
+					gomega.Expect(err).To(gomega.HaveOccurred())
+				}
+			},
+			ginkgo.Entry("empty template is valid", "", true),
+			ginkgo.Entry("simple valid template", "{{.VmName}}-disk-{{.DiskIndex}}", true),
+			ginkgo.Entry("complex valid template", "{{.PlanName}}-{{.VmName}}-disk-{{.DiskIndex}}", true),
+			ginkgo.Entry("valid template with root disk index", "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}", true),
+			ginkgo.Entry("invalid template syntax", "{{.VmName}-disk-{{.DiskIndex}", false),
+			ginkgo.Entry("template with invalid k8s label chars", "disk@{{.DiskIndex}}", false),
+			ginkgo.Entry("template with undefined variable", "{{.UndefinedVar}}", false),
+			ginkgo.Entry("template resulting in empty string", "{{if false}}disk{{end}}", false),
+		)
 	})
 })
 
@@ -141,8 +226,8 @@ func createSecret(name, namespace string, insecure bool) *core.Secret {
 			Namespace: namespace,
 		},
 		Data: map[string][]byte{
-			"inscureSkipVerify": []byte(strconv.FormatBool(insecure)),
-			"token":             []byte("token"),
+			insecureSkipKey: []byte(strconv.FormatBool(insecure)),
+			tokenKey:        []byte(tokenValue),
 		},
 	}
 }
