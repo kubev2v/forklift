@@ -39,6 +39,19 @@ type VM struct {
 	// Selected InstanceType that will override the VM properties.
 	// +optional
 	InstanceType string `json:"instanceType,omitempty"`
+	// PVCNameTemplate is a template for generating PVC names for VM disks.
+	// It follows Go template syntax and has access to the following variables:
+	//   - .VmName: name of the VM
+	//   - .PlanName: name of the migration plan
+	//   - .DiskIndex: initial volume index of the disk
+	//   - .RootDiskIndex: index of the root disk
+	// Note:
+	//   This template overrides the plan level template.
+	// Examples:
+	//   "{{.VmName}}-disk-{{.DiskIndex}}"
+	//   "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
+	// +optional
+	PVCNameTemplate string `json:"pvcNameTemplate,omitempty"`
 }
 
 // Find a Hook for the specified step.

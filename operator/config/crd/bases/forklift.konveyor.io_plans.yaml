@@ -267,6 +267,20 @@ spec:
                 - destination
                 - source
                 type: object
+              pvcNameTemplate:
+                description: |-
+                  PVCNameTemplate is a template for generating PVC names for VM disks.
+                  It follows Go template syntax and has access to the following variables:
+                    - .VmName: name of the VM
+                    - .PlanName: name of the migration plan
+                    - .DiskIndex: initial volume index of the disk
+                    - .RootDiskIndex: index of the root disk
+                  Note:
+                    This template can be overridden at the individual VM level.
+                  Examples:
+                    "{{.VmName}}-disk-{{.DiskIndex}}"
+                    "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
+                type: string
               targetNamespace:
                 description: Target namespace.
                 type: string
@@ -441,6 +455,20 @@ spec:
                       description: |-
                         The VM Namespace
                         Only relevant for an openshift source.
+                      type: string
+                    pvcNameTemplate:
+                      description: |-
+                        PVCNameTemplate is a template for generating PVC names for VM disks.
+                        It follows Go template syntax and has access to the following variables:
+                          - .VmName: name of the VM
+                          - .PlanName: name of the migration plan
+                          - .DiskIndex: initial volume index of the disk
+                          - .RootDiskIndex: index of the root disk
+                        Note:
+                          This template overrides the plan level template.
+                        Examples:
+                          "{{.VmName}}-disk-{{.DiskIndex}}"
+                          "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
                       type: string
                     rootDisk:
                       description: Choose the primary disk the VM boots from
@@ -1034,6 +1062,20 @@ spec:
                             - progress
                             type: object
                           type: array
+                        pvcNameTemplate:
+                          description: |-
+                            PVCNameTemplate is a template for generating PVC names for VM disks.
+                            It follows Go template syntax and has access to the following variables:
+                              - .VmName: name of the VM
+                              - .PlanName: name of the migration plan
+                              - .DiskIndex: initial volume index of the disk
+                              - .RootDiskIndex: index of the root disk
+                            Note:
+                              This template overrides the plan level template.
+                            Examples:
+                              "{{.VmName}}-disk-{{.DiskIndex}}"
+                              "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
+                          type: string
                         restorePowerState:
                           description: Source VM power state before migration.
                           type: string
