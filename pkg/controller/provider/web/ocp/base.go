@@ -18,6 +18,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	cnv "kubevirt.io/api/core/v1"
+	instancetype "kubevirt.io/api/instancetype/v1beta1"
 	ocpclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
@@ -253,6 +254,27 @@ func (h *NadHandler) NetworkAttachmentDefinitions(ctx *gin.Context) (nets []mode
 		m := model.NetworkAttachmentDefinition{}
 		m.With(&nad)
 		nets = append(nets, m)
+	}
+	return
+}
+
+func (h Handler) InstanceTypes(ctx *gin.Context) (instancetypes []model.InstanceType, err error) {
+	client, err := h.UserClient(ctx)
+	if err != nil {
+		return
+	}
+
+	list := instancetype.VirtualMachineInstancetypeList{}
+	// FIXME: consider list options
+	err = client.List(context.TODO(), &list)
+	if err != nil {
+		return
+	}
+
+	for _, itype := range list.Items {
+		m := model.InstanceType{}
+		m.With(&itype)
+		instancetypes = append(instancetypes, m)
 	}
 	return
 }
