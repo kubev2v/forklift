@@ -7,6 +7,9 @@ NETWORK_CONNECTIONS_DIR="${NETWORK_CONNECTIONS_DIR:-/etc/NetworkManager/system-c
 NETWORK_INTERFACES_DIR="${NETWORK_INTERFACES_DIR:-/etc/network/interfaces}"
 IFQUERY_CMD="${IFQUERY_CMD:-ifquery}"
 SYSTEMD_NETWORK_DIR="${SYSTEMD_NETWORK_DIR:-/run/systemd/network}"
+# UDEV_RULES_FILE_TEMP comes earlier lexicographically, hence it take precedence over UDEV_RULES_FILE
+# and will prevent collisions by creating temporary rules first. 
+UDEV_RULES_FILE_TEMP="${UDEV_RULES_FILE_TEMP:-/etc/udev/rules.d/70-persistent-net-temp.rules}"
 UDEV_RULES_FILE="${UDEV_RULES_FILE:-/etc/udev/rules.d/70-persistent-net.rules}"
 NETPLAN_DIR="${NETPLAN_DIR:-/}"
 
@@ -109,7 +112,7 @@ udev_from_ifcfg() {
             continue
         fi
 
-        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"$(remove_quotes "$DEVICE")\""
+        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"temp_$(remove_quotes "$DEVICE")\""
     done
 }
 
@@ -147,7 +150,7 @@ udev_from_nm() {
             continue
         fi
 
-        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"$(remove_quotes "$DEVICE")\""
+        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"temp_$(remove_quotes "$DEVICE")\""
     done
 }
 
@@ -223,7 +226,7 @@ udev_from_netplan() {
         fi
 
         # Create the udev rule based on the extracted MAC address and interface name
-        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"$(remove_quotes "$interface_name")\""
+        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"temp_$(remove_quotes "$interface_name")\""
     done
 }
 
@@ -274,7 +277,22 @@ udev_from_ifquery() {
         fi
 
         # Create the udev rule based on the extracted MAC address and interface name
-        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"$(remove_quotes "$interface_name")\""
+        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"temp_$(remove_quotes "$interface_name")\""
+    done
+}
+
+
+# Create final udev rules based on the temporary udev rules
+udev_final_from_temp_rules() {
+    # Read the temporary udev rules file line by line
+    cat "$UDEV_RULES_FILE_TEMP" | while read line;
+    do
+        # Extract the temporary name and final name
+        TEMP_NAME=$(echo "$line" | grep -o 'NAME="temp_[^"]*"' | cut -d'"' -f2)
+        FINAL_NAME=$(echo "$TEMP_NAME" | sed 's/^temp_//')
+
+        # Generate final udev rule by replacing the temporary name with the final name in the original line
+        echo "$(echo "$line" | sed "s/temp_$FINAL_NAME/$FINAL_NAME/")"
     done
 }
 
@@ -299,14 +317,18 @@ check_dupe_hws() {
 
 # Create udev rules check for duplicates and write them to udev file
 main() {
-    {
+   {
         udev_from_ifcfg
         udev_from_nm
         udev_from_netplan
         udev_from_ifquery
+    } | check_dupe_hws > "$UDEV_RULES_FILE_TEMP" 2>/dev/null
+
+    {
+        udev_final_from_temp_rules
     } | check_dupe_hws > "$UDEV_RULES_FILE" 2>/dev/null
-    echo "New udev rule:"
+
+    echo "New udev rules:"
     cat $UDEV_RULES_FILE
 }
-
 main
