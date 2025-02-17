@@ -33,8 +33,8 @@ func (r *KubeVirt) changeVmNameDNS1123(vmName string, vmNamespace string) (gener
 
 // changes VM name to match DNS1123 RFC convention.
 func changeVmName(currName string) string {
-	var underscoreExcluded = regexp.MustCompile("[_.]")
-	var nameExcludeChars = regexp.MustCompile("[^a-z0-9-]")
+	var underscoreExcluded = regexp.MustCompile("^[.]|[_]|[.]$")
+	var nameExcludeChars = regexp.MustCompile("[^a-z0-9-.]")
 
 	newName := strings.ToLower(currName)
 	if len(newName) > NameMaxLength {

@@ -323,7 +323,7 @@ func (r *Reconciler) validateTargetNamespace(plan *api.Plan) (err error) {
 		plan.Status.SetCondition(newCnd)
 		return
 	}
-	if len(k8svalidation.IsDNS1123Label(plan.Spec.TargetNamespace)) > 0 {
+	if len(k8svalidation.IsDNS1123Subdomain(plan.Spec.TargetNamespace)) > 0 {
 		newCnd.Reason = NotValid
 		plan.Status.SetCondition(newCnd)
 	}
@@ -577,7 +577,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			}
 			return liberr.Wrap(pErr)
 		}
-		if len(k8svalidation.IsDNS1123Label(ref.Name)) > 0 {
+		if len(k8svalidation.IsDNS1123Subdomain(ref.Name)) > 0 {
 			nameNotValid.Items = append(nameNotValid.Items, ref.String())
 		}
 		if _, found := setOf[ref.ID]; found {
