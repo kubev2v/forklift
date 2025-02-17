@@ -17,6 +17,7 @@ test_dir() {
     export NETWORK_SCRIPTS_DIR="$TEST_DIR/etc/sysconfig/network-scripts"
     export NETWORK_CONNECTIONS_DIR="$TEST_DIR/etc/NetworkManager/system-connections"
     export UDEV_RULES_FILE="$TEST_DIR/etc/udev/rules.d/70-persistent-net.rules"
+    export UDEV_RULES_FILE_TEMP="$TEST_DIR/etc/udev/rules.d/70-persistent-net-temp.rules"
     export SYSTEMD_NETWORK_DIR="$TEST_DIR/run/systemd/network"
     export NETPLAN_DIR="$TEST_DIR/"
 
@@ -36,6 +37,7 @@ test_dir() {
     cp -a $TEST_SRC_DIR/root/* $TEST_DIR
 
     # Clean up from previous runs
+    rm -f "$UDEV_RULES_FILE_TEMP"
     rm -f "$UDEV_RULES_FILE"
     mkdir -p $(dirname "$UDEV_RULES_FILE")
 
