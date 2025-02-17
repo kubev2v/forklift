@@ -773,7 +773,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			err = nil
 			break
 		}
-		if errs := k8svalidation.IsDNS1123Label(vm.Name); len(errs) > 0 {
+		if errs := k8svalidation.IsDNS1123Subdomain(vm.Name); len(errs) > 0 {
 			vm.NewName, err = r.kubevirt.changeVmNameDNS1123(vm.Name, r.Plan.Spec.TargetNamespace)
 			if err != nil {
 				r.Log.Error(err, "Failed to update the VM name to meet DNS1123 protocol requirements.")
