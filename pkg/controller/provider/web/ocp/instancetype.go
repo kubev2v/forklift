@@ -1,7 +1,6 @@
 package ocp
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -46,9 +45,7 @@ func (h InstanceHandler) List(ctx *gin.Context) {
 		h.watch(ctx)
 		return
 	}
-	db := h.Collector.DB()
-	list := []model.InstanceType{}
-	err = db.List(&list, h.ListOptions(ctx))
+	instancetypes, err := h.InstanceTypes(ctx)
 	if err != nil {
 		log.Trace(
 			err,
@@ -58,12 +55,13 @@ func (h InstanceHandler) List(ctx *gin.Context) {
 		return
 	}
 	content := []interface{}{}
-	for _, m := range list {
+	for _, m := range instancetypes {
 		r := &InstanceType{}
 		r.With(&m)
 		r.Link(h.Provider)
 		content = append(content, r.Content(h.Detail))
 	}
+	h.Page.Slice(&content)
 
 	ctx.JSON(http.StatusOK, content)
 }
@@ -76,17 +74,7 @@ func (h InstanceHandler) Get(ctx *gin.Context) {
 		base.SetForkliftError(ctx, err)
 		return
 	}
-	m := &model.InstanceType{
-		Base: model.Base{
-			UID: ctx.Param(InstanceParam),
-		},
-	}
-	db := h.Collector.DB()
-	err = db.Get(m)
-	if errors.Is(err, model.NotFound) {
-		ctx.Status(http.StatusNotFound)
-		return
-	}
+	instancetypes, err := h.InstanceTypes(ctx)
 	if err != nil {
 		log.Trace(
 			err,
@@ -95,12 +83,17 @@ func (h InstanceHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	r := &InstanceType{}
-	r.With(m)
-	r.Link(h.Provider)
-	content := r.Content(model.MaxDetail)
-
-	ctx.JSON(http.StatusOK, content)
+	for _, m := range instancetypes {
+		if ctx.Param(InstanceParam) == m.UID {
+			r := &InstanceType{}
+			r.With(&m)
+			r.Link(h.Provider)
+			content := r.Content(model.MaxDetail)
+			ctx.JSON(http.StatusOK, content)
+			return
+		}
+	}
+	ctx.Status(http.StatusNotFound)
 }
 
 // Watch.
