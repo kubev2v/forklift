@@ -278,3 +278,20 @@ func (h Handler) InstanceTypes(ctx *gin.Context) (instancetypes []model.Instance
 	}
 	return
 }
+
+func (h ClusterInstanceHandler) ClusterInstanceTypes(ctx *gin.Context) (clusterinstances []model.ClusterInstanceType, err error) {
+	client, err := h.UserClient(ctx)
+	if err != nil {
+		return
+	}
+	list := instancetype.VirtualMachineClusterInstancetypeList{}
+	// FIXME: consider ListOptions
+	err = client.List(context.TODO(), &list)
+	for _, cit := range list.Items {
+		m := model.ClusterInstanceType{}
+		m.With(&cit)
+		clusterinstances = append(clusterinstances, m)
+	}
+
+	return
+}
