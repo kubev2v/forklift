@@ -297,6 +297,7 @@ type NIC struct {
 
 // Guest network.
 type GuestNetwork struct {
+	Device       string   `json:"device"`
 	MAC          string   `json:"mac"`
 	IP           string   `json:"ip"`
 	Origin       string   `json:"origin"`
@@ -306,6 +307,7 @@ type GuestNetwork struct {
 
 // Guest ipStack
 type GuestIpStack struct {
+	Device  string   `json:"device"`
 	Gateway string   `json:"gateway"`
 	DNS     []string `json:"dns"`
 }

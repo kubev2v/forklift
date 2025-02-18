@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/netip"
 	liburl "net/url"
 	"path"
 	"regexp"
@@ -269,18 +268,10 @@ func (r *Builder) mapMacStaticIps(vm *model.VM) (ipMap string, err error) {
 					// not the right IPv4 / IPv6 correlation
 					continue
 				}
-				network, err := netip.ParsePrefix(fmt.Sprintf("%s/%d", guestNetwork.IP, guestNetwork.PrefixLength))
-				if err != nil {
-					return "", err
+				if ipStack.Device != guestNetwork.Device {
+					continue
 				}
-				gw, err := netip.ParseAddr(ipStack.Gateway)
-				if err != nil {
-					return "", err
-				}
-				if network.Contains(gw) {
-					// checks if the gateway in the right network subnet. we set gateway only once as it is suppose to be system wide.
-					gateway = ipStack.Gateway
-				}
+				gateway = ipStack.Gateway
 			}
 			dnsString := strings.Join(guestNetwork.DNS, ",")
 			configurationString := fmt.Sprintf("%s:ip:%s,%s,%d,%s", guestNetwork.MAC, guestNetwork.IP, gateway, guestNetwork.PrefixLength, dnsString)
