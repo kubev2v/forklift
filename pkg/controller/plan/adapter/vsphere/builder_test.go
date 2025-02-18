@@ -130,6 +130,21 @@ var _ = Describe("vSphere builder", func() {
 					Gateway: "172.29.3.1",
 				}},
 		}, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,16"),
+		Entry("gateway from different subnet", &model.VM{
+			GuestID: "windows9Guest",
+			GuestNetworks: []vsphere.GuestNetwork{
+				{
+					MAC:          "00:50:56:83:25:47",
+					IP:           "172.29.3.193",
+					Origin:       ManualOrigin,
+					PrefixLength: 24,
+					DNS:          []string{"8.8.8.8"},
+				}},
+			GuestIpStacks: []vsphere.GuestIpStack{
+				{
+					Gateway: "172.29.4.1",
+				}},
+		}, "00:50:56:83:25:47:ip:172.29.3.193,172.29.4.1,24,8.8.8.8"),
 	)
 })
 
