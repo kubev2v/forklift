@@ -665,7 +665,7 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 			case fGuestNet:
 				if nics, cast := p.Val.(types.ArrayOfGuestNicInfo); cast {
 					guestNetworksList := []model.GuestNetwork{}
-					for _, info := range nics.GuestNicInfo {
+					for index, info := range nics.GuestNicInfo {
 						if info.IpConfig == nil {
 							continue
 						}
@@ -680,6 +680,7 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 								Origin:       ip.Origin,
 								PrefixLength: ip.PrefixLength,
 								DNS:          dnsList,
+								Device:       strconv.Itoa(index),
 							})
 						}
 					}
@@ -700,6 +701,7 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 							}
 							if len(route.Gateway.IpAddress) > 0 {
 								guestIpStackList = append(guestIpStackList, model.GuestIpStack{
+									Device:  route.Gateway.Device,
 									Gateway: route.Gateway.IpAddress,
 									DNS:     dnsList,
 								})
