@@ -3,7 +3,6 @@ package vsphere
 import (
 	"context"
 	"fmt"
-	"net/http"
 	liburl "net/url"
 	"strconv"
 
@@ -12,7 +11,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/util"
-	vsphereclient "github.com/konveyor/forklift-controller/pkg/controller/provider/container/vsphere"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"github.com/vmware/govmomi"
@@ -394,9 +392,9 @@ func (r *Client) getHostClient(hostDef *v1beta1.Host, host *model.Host) (client 
 		err = liberr.Wrap(err)
 		return
 	}
+
 	url.User = liburl.UserPassword(string(secret.Data["user"]), string(secret.Data["password"]))
 	soapClient := soap.NewClient(url, r.getInsecureSkipVerifyFlag())
-	vsphereclient.SetTLSClientConfig(soapClient.Client.Transport.(*http.Transport).TLSClientConfig)
 	soapClient.SetThumbprint(url.Host, host.Thumbprint)
 	vimClient, err := vim25.NewClient(context.TODO(), soapClient)
 	if err != nil {
@@ -482,7 +480,6 @@ func (r *Client) connect() error {
 	}
 	url.User = liburl.UserPassword(r.user(), r.password())
 	soapClient := soap.NewClient(url, r.getInsecureSkipVerifyFlag())
-	vsphereclient.SetTLSClientConfig(soapClient.Client.Transport.(*http.Transport).TLSClientConfig)
 	soapClient.SetThumbprint(url.Host, r.thumbprint())
 	vimClient, err := vim25.NewClient(context.TODO(), soapClient)
 	if err != nil {
