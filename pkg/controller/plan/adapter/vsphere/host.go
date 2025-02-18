@@ -2,12 +2,10 @@ package vsphere
 
 import (
 	"context"
-	"net/http"
 	liburl "net/url"
 	"strconv"
 	"time"
 
-	vsphereclient "github.com/konveyor/forklift-controller/pkg/controller/provider/container/vsphere"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"github.com/vmware/govmomi"
@@ -76,7 +74,6 @@ func (r *EsxHost) connect(ctx context.Context) (err error) {
 		r.user(),
 		r.password())
 	soapClient := soap.NewClient(url, r.getInsecureSkipVerifyFlag())
-	vsphereclient.SetTLSClientConfig(soapClient.Client.Transport.(*http.Transport).TLSClientConfig)
 	soapClient.SetThumbprint(url.Host, r.thumbprint())
 	vimClient, err := vim25.NewClient(ctx, soapClient)
 	if err != nil {
