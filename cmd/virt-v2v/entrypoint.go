@@ -3,6 +3,7 @@ package main
 import (
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -148,12 +149,18 @@ func virtV2vVsphereArgs() (args []string, err error) {
 	if err != nil {
 		return nil, err
 	}
-	if info, err := os.Stat(global.VDDK); err == nil && info.IsDir() {
+	if info, err := os.Stat(global.VDDK_LIB); err == nil && info.IsDir() {
 		args = append(args,
 			"-it", "vddk",
-			"-io", fmt.Sprintf("vddk-libdir=%s", global.VDDK),
+			"-io", fmt.Sprintf("vddk-libdir=%s", global.VDDK_LIB),
 			"-io", fmt.Sprintf("vddk-thumbprint=%s", os.Getenv("V2V_fingerprint")),
 		)
+		// Check if the config file exists but still allow the extra args to override the vddk-config for testing
+		if _, err := os.Stat(global.VDDK_CONF_FILE); !errors.Is(err, os.ErrNotExist) && os.Getenv("V2V_extra_args") != "" {
+			args = append(args,
+				"-io", fmt.Sprintf("vddk-config=%s", global.VDDK_CONF_FILE),
+			)
+		}
 	}
 
 	// When converting VM with name that do not meet DNS1123 RFC requirements,

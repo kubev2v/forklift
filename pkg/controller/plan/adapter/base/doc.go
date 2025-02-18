@@ -34,6 +34,10 @@ const (
 
 	// DV immediate bind to WaitForFirstConsumer storage class
 	AnnBindImmediate = "cdi.kubevirt.io/storage.bind.immediate.requested"
+
+	// Add extra vddk configmap, in the Forklift used to pass AIO configuration to the VDDK.
+	// Related to https://github.com/kubevirt/containerized-data-importer/pull/3572
+	AnnVddkExtraArgs = "cdi.kubevirt.io/storage.pod.vddk.extraargs"
 )
 
 var VolumePopulatorNotSupportedError = liberr.New("provider does not support volume populators")
