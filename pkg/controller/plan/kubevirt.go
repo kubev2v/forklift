@@ -1900,15 +1900,6 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 
 	for i, v := range vmVolumes {
 		pvc := pvcsByName[v.PersistentVolumeClaim.ClaimName]
-		if pvc == nil {
-			r.Log.V(1).Info(
-				"Failed to find the PVC to the Volume for the pod volume mount",
-				"volume",
-				v.Name,
-				"pvc",
-				v.PersistentVolumeClaim.ClaimName)
-			continue
-		}
 		vol := core.Volume{
 			Name: pvc.Name,
 			VolumeSource: core.VolumeSource{
@@ -2090,15 +2081,6 @@ func (r *KubeVirt) libvirtDomain(vmCr *VirtualMachine, pvcs []*core.PersistentVo
 		diskSource := libvirtxml.DomainDiskSource{}
 
 		pvc := pvcsByName[vol.PersistentVolumeClaim.ClaimName]
-		if pvc == nil {
-			r.Log.V(1).Info(
-				"Failed to find the PVC to the Volume for the libvirt domain",
-				"volume",
-				vol.Name,
-				"pvc",
-				vol.PersistentVolumeClaim.ClaimName)
-			continue
-		}
 		if pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == core.PersistentVolumeBlock {
 			diskSource.Block = &libvirtxml.DomainDiskSourceBlock{
 				Dev: fmt.Sprintf("/dev/block%v", i),
