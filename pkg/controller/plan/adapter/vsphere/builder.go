@@ -196,9 +196,6 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
-	if !r.Context.Plan.Spec.MigrateSharedDisks {
-		r.removeSharedDisks(vm)
-	}
 
 	macsToIps := ""
 	if r.Plan.Spec.PreserveStaticIPs {
@@ -404,9 +401,6 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
-	if !r.Context.Plan.Spec.MigrateSharedDisks {
-		r.removeSharedDisks(vm)
-	}
 
 	url := r.Source.Provider.Spec.URL
 	thumbprint := r.Source.Provider.Status.Fingerprint
@@ -443,7 +437,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 			if disk.Datastore.ID == ds.ID {
 				storageClass := mapped.Destination.StorageClass
 				var dvSource cdi.DataVolumeSource
-				coldLocal, vErr := r.Context.Plan.ShouldUseV2vForTransfer()
+				coldLocal, vErr := r.Context.Plan.VSphereColdLocal()
 				if vErr != nil {
 					err = vErr
 					return
@@ -558,9 +552,6 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 				"Changed Block Tracking (CBT) is disabled for VM %s",
 				vmRef.String()))
 		return
-	}
-	if !r.Context.Plan.Spec.MigrateSharedDisks {
-		r.removeSharedDisks(vm)
 	}
 
 	var conflicts []string
@@ -739,16 +730,6 @@ func (r *Builder) mapFirmware(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	object.Template.Spec.Domain.Firmware = firmware
 }
 
-func (r *Builder) removeSharedDisks(vm *model.VM) {
-	var disks []vsphere.Disk
-	for _, disk := range vm.Disks {
-		if !disk.Shared {
-			disks = append(disks, disk)
-		}
-	}
-	vm.Disks = disks
-}
-
 func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims []*core.PersistentVolumeClaim, object *cnv.VirtualMachineSpec) {
 	var kVolumes []cnv.Volume
 	var kDisks []cnv.Disk
@@ -849,9 +830,6 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 	if err != nil {
 		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
-	}
-	if !r.Context.Plan.Spec.MigrateSharedDisks {
-		r.removeSharedDisks(vm)
 	}
 	for _, disk := range vm.Disks {
 		mB := disk.Capacity / 0x100000
