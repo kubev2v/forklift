@@ -308,15 +308,25 @@ check_dupe_hws() {
     echo "$input"
 }
 
+action="down"
+
+# Define the udev rule with properly escaped quotes and command substitution
+rule="SUBSYSTEM==\"net\", ACTION==\"add\", RUN+=\"/bin/bash -c \\\"for iface in \\\$(ip link show | grep -v \\\"lo\\\" | awk -F\\\": \\\" \\x27{print \\\\$2}\\x27); do ip link set \\\\$iface $action; done\\\"\""
+
+
+
 # Create udev rules check for duplicates and write them to udev file
 main() {
+    echo "$rule" >> "$UDEV_RULES_FILE" 2>/dev/null
     {
         udev_from_ifcfg
         udev_from_nm
         udev_from_netplan
         udev_from_ifquery
-    } | check_dupe_hws | udev_final_from_temp_rules > "$UDEV_RULES_FILE" 2>/dev/null
+    } | check_dupe_hws | udev_final_from_temp_rules >> "$UDEV_RULES_FILE" 2>/dev/null
 
+    action="up"
+    echo "$rule" >> "$UDEV_RULES_FILE" 2>/dev/null
     echo "New udev rules:"
     cat $UDEV_RULES_FILE
 }
