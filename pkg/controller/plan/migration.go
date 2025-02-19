@@ -773,7 +773,23 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			err = nil
 			break
 		}
-		if errs := k8svalidation.IsDNS1123Subdomain(vm.Name); len(errs) > 0 {
+		// Check if user requested vm name change
+		if vm.TargetName != "" {
+			vm.NewName = vm.TargetName
+
+			// Check if the VM new nam name is used by another VM in the same namespace
+			vm.NewName, err = r.kubevirt.changeVmNameDNS1123(vm.NewName, r.Plan.Spec.TargetNamespace)
+			if err != nil {
+				r.Log.Error(err, "Failed to update the VM name using TagetName to meet DNS1123 protocol requirements.",
+					"TagetName",
+					vm.TargetName)
+				return
+			}
+		}
+
+		// Check if the VM name meets DNS1123 protocol requirements, and name not used by another
+		// VM in the same namespace
+		if errs := k8svalidation.IsDNS1123Subdomain(vm.Name); vm.NewName == "" && len(errs) > 0 {
 			vm.NewName, err = r.kubevirt.changeVmNameDNS1123(vm.Name, r.Plan.Spec.TargetNamespace)
 			if err != nil {
 				r.Log.Error(err, "Failed to update the VM name to meet DNS1123 protocol requirements.")

@@ -540,6 +540,13 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "VM network name template is invalid.",
 		Items:    []string{},
 	}
+	targetNameInvalid := libcnd.Condition{
+		Type:     NotValid,
+		Status:   True,
+		Category: Critical,
+		Message:  "TagetName is invalid.",
+		Items:    []string{},
+	}
 
 	setOf := map[string]bool{}
 	//
@@ -693,6 +700,12 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 				networkNameInvalid.Items = append(networkNameInvalid.Items, ref.String())
 			}
 		}
+		// is valid customized vm name
+		if plan.Spec.VMs[i].TargetName != "" {
+			if err := r.IsValidTargetName(plan.Spec.VMs[i].TargetName); err != nil {
+				targetNameInvalid.Items = append(targetNameInvalid.Items, ref.String())
+			}
+		}
 	}
 	if len(notFound.Items) > 0 {
 		plan.Status.SetCondition(notFound)
@@ -738,6 +751,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(networkNameInvalid.Items) > 0 {
 		plan.Status.SetCondition(networkNameInvalid)
+	}
+	if len(targetNameInvalid.Items) > 0 {
+		plan.Status.SetCondition(targetNameInvalid)
 	}
 
 	return nil
@@ -1344,6 +1360,20 @@ func (r *Reconciler) IsValidNetworkNameTemplate(networkNameTemplate string) erro
 	errs := k8svalidation.IsValidLabelValue(result)
 	if len(errs) > 0 {
 		return liberr.New("Template output is not a valid k8s label", "errors", errs)
+	}
+
+	return nil
+}
+
+func (r *Reconciler) IsValidTargetName(targetName string) error {
+	if targetName == "" {
+		return nil
+	}
+
+	// Validate that the target name is a valid k8s name ( e.g. label with dots )
+	errs := k8svalidation.IsDNS1123Subdomain(targetName)
+	if len(errs) > 0 {
+		return liberr.New("Target name is not a valid k8s subdomain", "errors", errs)
 	}
 
 	return nil

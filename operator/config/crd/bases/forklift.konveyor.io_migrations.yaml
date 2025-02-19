@@ -195,6 +195,14 @@ spec:
                 items:
                   description: VM Status
                   properties:
+                    TagetName:
+                      description: |-
+                        TargetName is an optional field to specify a custom name for the VM in the target cluster.
+                        If not provided, a name that does not conform to k8s DNS1123 requirements will be automatically adjusted,
+                        ensuring uniqueness within the target namespace.
+                        If provided, this name will be used for the VM in the target cluster. If it is not unique, a random suffix will be
+                        appended to ensure uniqueness.
+                      type: string
                     completed:
                       description: Completed timestamp.
                       format: date-time
