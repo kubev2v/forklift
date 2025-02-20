@@ -1,8 +1,19 @@
-package v1beta1
+package v1alpha1
 
 import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/scheme"
 )
+
+var SchemeGroupVersion = schema.GroupVersion{
+	Group: "forklift.konveyor.io",
+	// Version: "v1alpha1",
+	// workaround mtv code
+	Version: "v1beta1",
+}
+
+var SchemeBuilder = &scheme.Builder{GroupVersion: SchemeGroupVersion}
 
 var VSphereXcopyVolumePopulatorKind = "VSphereXcopyVolumePopulator"
 var VSphereXcopyVolumePopulatorResource = "vspherexcopyvolumepopulators"

@@ -63,6 +63,7 @@ POPULATOR_CONTROLLER_IMAGE ?= quay.io/kubev2v/populator-controller:latest
 OVIRT_POPULATOR_IMAGE ?= quay.io/kubev2v/ovirt-populator:latest
 OPENSTACK_POPULATOR_IMAGE ?= quay.io/kubev2v/openstack-populator:latest
 OVA_PROVIDER_SERVER_IMAGE ?= quay.io/kubev2v/forklift-ova-provider-server:latest
+VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/vsphere-xcopy-volume-populator:$(REGISTRY_TAG)
 
 ### OLM
 OPERATOR_BUNDLE_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-bundle:$(REGISTRY_TAG)
@@ -198,7 +199,6 @@ build-operator-bundle-image: check_container_runtime
 		--build-arg UI_PLUGIN_IMAGE=$(UI_PLUGIN_IMAGE) \
 		--build-arg OVA_PROVIDER_SERVER_IMAGE=$(OVA_PROVIDER_SERVER_IMAGE)
 
-
 push-operator-bundle-image: build-operator-bundle-image
 	 $(CONTAINER_CMD) push $(OPERATOR_BUNDLE_IMAGE)
 
@@ -235,6 +235,13 @@ build-openstack-populator-image: check_container_runtime
 push-openstack-populator-image: build-openstack-populator-image
 	$(CONTAINER_CMD) push $(OPENSTACK_POPULATOR_IMAGE)
 
+build-vsphere-xcopy-volume-populator-image: check_container_runtime
+	$(eval VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/vsphere-xcopy-volume-populator:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) build -t $(VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE) -f build/vsphere-xcopy-volume-populator/Containerfile cmd/vsphere-xcopy-volume-populator
+
+push-vsphere-xcopy-volume-populator-image: build-vsphere-xcopy-volume-populator-image
+	$(CONTAINER_CMD) push $(VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE)
+
 build-ova-provider-server-image: check_container_runtime
 	$(eval OVA_PROVIDER_SERVER_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-provider-server:$(REGISTRY_TAG))
 	$(CONTAINER_CMD) build -t $(OVA_PROVIDER_SERVER_IMAGE) -f build/ova-provider-server/Containerfile .
@@ -250,6 +257,7 @@ build-all-images: build-api-image \
                   build-populator-controller-image \
                   build-ovirt-populator-image \
                   build-openstack-populator-image\
+                  build-vsphere-xcopy-volume-populator-image\
                   build-ova-provider-server-image \
                   build-operator-bundle-image \
                   build-operator-index-image
@@ -262,6 +270,7 @@ push-all-images:  push-api-image \
                   push-populator-controller-image \
                   push-ovirt-populator-image \
                   push-openstack-populator-image\
+                  push-vsphere-xcoy-volume-populator-image\
                   push-ova-provider-server-image \
                   push-operator-bundle-image \
                   push-operator-index-image
@@ -460,6 +469,7 @@ $(ENVTEST): $(LOCALBIN)
 integration-test: generate fmt vet manifests
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -i --bin-dir $(LOCALBIN) -p path)" go test ./pkg/controller/migration/... -coverprofile cover.out
 
+# TODO rgolan remove
 rgolan:
 	BLOCK_OVERHEAD="0" \
 	FILESYSTEM_OVERHEAD="10" \
@@ -482,6 +492,4 @@ rgolan:
 	VSPHERE_COLD_CDI="true" \
 	SSL_CERT_FILE="/home/rgolan/src/kubev2v/forklift/tls-ca-bundle.pem" \
 	./bin/forklift-controller
-
 	#dlv --listen=:5432 --headless=true --api-version=2 exec ./bin/forklift-controller \
->>>>>>> 826216fd (A working copy-offload with vsphere-xcopy-volume-populator)
