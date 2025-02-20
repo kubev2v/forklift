@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: manual-xcopy-vm-5
+spec:
+  dataSourceRef:
+    name: vm-5 
+    kind: xcopy
+    apiGroup: xcopy.konveyor.io
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: "4299Mi"
+  storageClassName: ontap-san-storage-rwx
+  volumeMode: Block
