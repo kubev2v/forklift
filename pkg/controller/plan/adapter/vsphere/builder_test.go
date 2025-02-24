@@ -3,6 +3,7 @@ package vsphere
 import (
 	v1beta1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	container "github.com/konveyor/forklift-controller/pkg/controller/provider/container/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
@@ -130,6 +131,89 @@ var _ = Describe("vSphere builder", func() {
 					Gateway: "172.29.3.1",
 				}},
 		}, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,16"),
+	)
+
+	DescribeTable("should", func(disks []vsphere.Disk, output []vsphere.Disk) {
+		Expect(builder.sortedDisks(disks)).Should(Equal(output))
+	},
+		Entry("sort all disks by buses",
+			[]vsphere.Disk{
+				{Key: 1, Bus: container.IDE},
+				{Key: 1, Bus: container.SATA},
+				{Key: 1, Bus: container.SCSI},
+				{Key: 2, Bus: container.SCSI},
+			},
+			[]vsphere.Disk{
+				{Key: 1, Bus: container.SCSI},
+				{Key: 2, Bus: container.SCSI},
+				{Key: 1, Bus: container.SATA},
+				{Key: 1, Bus: container.IDE},
+			},
+		),
+		Entry("sort IDE and SATA disks by buses",
+			[]vsphere.Disk{
+				{Key: 1, Bus: container.IDE},
+				{Key: 1, Bus: container.SATA},
+			},
+			[]vsphere.Disk{
+				{Key: 1, Bus: container.SATA},
+				{Key: 1, Bus: container.IDE},
+			},
+		),
+		Entry("sort multiple SATA disks by buses",
+			[]vsphere.Disk{
+				{Key: 3, Bus: container.SATA},
+				{Key: 1, Bus: container.SATA},
+				{Key: 2, Bus: container.SATA},
+			},
+			[]vsphere.Disk{
+				{Key: 1, Bus: container.SATA},
+				{Key: 2, Bus: container.SATA},
+				{Key: 3, Bus: container.SATA},
+			},
+		),
+		Entry("sort multiple SATA and multiple SCSI disks by buses",
+			[]vsphere.Disk{
+				{Key: 3, Bus: container.SATA},
+				{Key: 3, Bus: container.SCSI},
+				{Key: 2, Bus: container.SCSI},
+				{Key: 1, Bus: container.SATA},
+				{Key: 2, Bus: container.SATA},
+				{Key: 1, Bus: container.SCSI},
+			},
+			[]vsphere.Disk{
+				{Key: 1, Bus: container.SCSI},
+				{Key: 2, Bus: container.SCSI},
+				{Key: 3, Bus: container.SCSI},
+				{Key: 1, Bus: container.SATA},
+				{Key: 2, Bus: container.SATA},
+				{Key: 3, Bus: container.SATA},
+			},
+		),
+		Entry("sort multiple all disks by buses",
+			[]vsphere.Disk{
+				{Key: 2, Bus: container.IDE},
+				{Key: 3, Bus: container.SATA},
+				{Key: 3, Bus: container.SCSI},
+				{Key: 2, Bus: container.SCSI},
+				{Key: 3, Bus: container.IDE},
+				{Key: 1, Bus: container.SATA},
+				{Key: 2, Bus: container.SATA},
+				{Key: 1, Bus: container.SCSI},
+				{Key: 1, Bus: container.IDE},
+			},
+			[]vsphere.Disk{
+				{Key: 1, Bus: container.SCSI},
+				{Key: 2, Bus: container.SCSI},
+				{Key: 3, Bus: container.SCSI},
+				{Key: 1, Bus: container.SATA},
+				{Key: 2, Bus: container.SATA},
+				{Key: 3, Bus: container.SATA},
+				{Key: 1, Bus: container.IDE},
+				{Key: 2, Bus: container.IDE},
+				{Key: 3, Bus: container.IDE},
+			},
+		),
 	)
 })
 
