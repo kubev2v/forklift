@@ -730,15 +730,41 @@ func (r *Builder) mapFirmware(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	object.Template.Spec.Domain.Firmware = firmware
 }
 
+func (r *Builder) filterDisksWithBus(disks []vsphere.Disk, bus string) []vsphere.Disk {
+	var resp []vsphere.Disk
+	for _, disk := range disks {
+		if disk.Bus == bus {
+			resp = append(resp, disk)
+		}
+	}
+	return resp
+}
+
+// The disks are first sorted by the buses going in order SCSI, SATA and IDE and within the controller the
+// disks are sorted by the key. This needs to be done because the virt-v2v outputs the files in an order,
+// which it gets from libvirt. The libvirt orders the devices starting with SCSI, SATA and IDE.
+// When we were sorting by the keys the order was IDE, SATA and SCSI. This cause that some PVs were populated by
+// incorrect disks.
+// https://github.com/libvirt/libvirt/blob/master/src/vmx/vmx.c#L1713
+func (r *Builder) sortedDisks(disks []vsphere.Disk) []vsphere.Disk {
+	var buses = []string{container.SCSI, container.SATA, container.IDE}
+	var resp []vsphere.Disk
+	for _, bus := range buses {
+		disksWithBus := r.filterDisksWithBus(disks, bus)
+		sort.Slice(disksWithBus, func(i, j int) bool {
+			return disksWithBus[i].Key < disksWithBus[j].Key
+		})
+		resp = append(resp, disksWithBus...)
+	}
+	return resp
+}
+
 func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims []*core.PersistentVolumeClaim, object *cnv.VirtualMachineSpec) {
 	var kVolumes []cnv.Volume
 	var kDisks []cnv.Disk
 	var templateErr error
 
-	disks := vm.Disks
-	sort.Slice(disks, func(i, j int) bool {
-		return disks[i].Key < disks[j].Key
-	})
+	disks := r.sortedDisks(vm.Disks)
 	pvcMap := make(map[string]*core.PersistentVolumeClaim)
 	for i := range persistentVolumeClaims {
 		pvc := persistentVolumeClaims[i]
