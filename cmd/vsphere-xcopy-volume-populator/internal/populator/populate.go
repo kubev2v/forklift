@@ -17,17 +17,12 @@ type Populator interface {
 type LUN struct {
 	//Name is the volume name or just name in the storage system
 	Name string
-	// SerialNumber is a representation of the disk. With combination of the
-	// vendor ID it should ve globally unique and can be identified by udev, usually
-	// under /dev/disk/by-id/ with some prefix or postfix, depending on the udev rule
-	// and can also be found by lsblk -o name,serial
-	SerialNumber string
 	// target's IQN
 	IQN string
-	// Storage provider ID in hex
-	ProviderID string
 	// the volume handle as set by the CSI driver field spec.volumeHandle
 	VolumeHandle string
+	// naa
+	NAA string
 }
 
 // VMDisk is the target VMDisk in vmware

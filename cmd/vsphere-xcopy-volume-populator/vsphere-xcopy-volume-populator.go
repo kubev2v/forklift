@@ -5,9 +5,11 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/primera3par"
 	"net/http"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/client-go/util/cert"
@@ -67,6 +69,12 @@ func main() {
 			klog.Fatalf("failed to initialize ontap storage mapper with %s", err)
 		}
 		storageApi = &sm
+	case "primera3par":
+		sm, err := primera3par.NewPrimera3ParClonner(storageHostname, storageUsername, storagePassword)
+		if err != nil {
+			klog.Fatalf("failed to initialize primera3par clonner with %s", err)
+		}
+		storageApi = &sm
 	default:
 		klog.Fatalf("Unsupported storage vendor %s use one of [ontap,]", storageVendor)
 	}
@@ -114,10 +122,10 @@ func main() {
 		case q := <-quitCh:
 			klog.Infof("channel quit %s", q)
 			if q != nil {
-                klog.Fatal(q)
-            }
-            return
-		} 
+				klog.Fatal(q)
+			}
+			return
+		}
 	}
 
 }
@@ -218,12 +226,33 @@ func handleArgs() {
 			}
 		case "storage-hostname", "storage-username", "storage-password",
 			"vsphere-hostname", "vsphere-username", "vsphere-password":
-			if f.Value.String() == "" {
+
+			if secretName == "" && f.Value.String() == "" {
 				missingFlags = true
 				klog.Errorf("missing value for flag --%s", f.Name)
 			}
 		}
 	})
+
+	klog.Infof("Current namespace %s ", targetNamespace)
+	if secretName != "" {
+		secret, err := clientSet.CoreV1().Secrets(targetNamespace).Get(context.Background(), secretName, metav1.GetOptions{})
+		if err != nil {
+			klog.Fatalf("fail to fetch the secret %s: %s", secretName, err)
+		}
+
+		flag.VisitAll(func(f *flag.Flag) {
+			if f.Value.String() != "" {
+				return
+			}
+			name := strings.ReplaceAll(strings.ToUpper(f.Name), "-", "_")
+			klog.V(2).Infof("Looking for key %q in the populator secret", name)
+			if v, exists := secret.Data[name]; exists {
+				f.Value.Set(string(v))
+			}
+		})
+	}
+
 	if missingFlags {
 		os.Exit(2)
 	}

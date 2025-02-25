@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"slices"
 	"time"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
@@ -45,27 +46,14 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 	if err != nil {
 		return err
 	}
-
 	klog.Infof("Starting to populate using remote esxcli vmkfstools, source vmdk %s target LUN %s", sourceVMDKFile, volumeHandle)
-	lun, err := p.StorageApi.ResolveVolumeHandleToLUN(volumeHandle)
-	if err != nil {
-		return err
-	}
-
-	originalInitiatorGroups, err := p.StorageApi.CurrentMappedGroups(lun, nil)
-	if err != nil {
-		return fmt.Errorf("failed to fetch the current initiator groups of the lun %s: %w", lun.Name, err)
-	}
-	klog.Infof("Current initiator groups the LUN %s is mapped to %+v", lun.IQN, originalInitiatorGroups)
-
-	targetLUN := fmt.Sprintf("/vmfs/devices/disks/naa.%s%x", lun.ProviderID, lun.SerialNumber)
-	klog.Infof("resolved lun serial number %s with IQN %s to lun %s", lun.SerialNumber, lun.IQN, targetLUN)
 
 	host, err := p.VSphereClient.GetEsxByVm(context.Background(), vmDisk.VMName)
+	klog.Infof("Got ESXI host: %s", host)
+	klog.Infof("Got ESXI name: %s", host.Name())
 	if err != nil {
 		return err
 	}
-	klog.Infof("Working with ESXi %+v", host)
 
 	// for iSCSI add the host to the group using IQN. Is there something else for FC?
 	r, err := p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"iscsi", "adapter", "list"})
@@ -88,40 +76,53 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 		return fmt.Errorf("failed to add the ESX IQN %s to the initiator group %w", esxIQN, err)
 	}
 
-	err = p.StorageApi.Map(xcopyInitiatorGroup, lun, m)
+	lun, err := p.StorageApi.ResolveVolumeHandleToLUN(volumeHandle)
+	if err != nil {
+		return err
+	}
+
+	lun, err = p.StorageApi.Map(xcopyInitiatorGroup, lun, m)
 	if err != nil {
 		return fmt.Errorf("failed to map lun %s to initiator group %s: %w", lun, xcopyInitiatorGroup, err)
 	}
+
+	originalInitiatorGroups, err := p.StorageApi.CurrentMappedGroups(lun, nil)
+	if err != nil {
+		return fmt.Errorf("failed to fetch the current initiator groups of the lun %s: %w", lun.Name, err)
+	}
+	klog.Infof("Current initiator groups the LUN %s is mapped to %+v", lun.IQN, originalInitiatorGroups)
+
 	defer func() {
-		p.StorageApi.UnMap(xcopyInitiatorGroup, lun, m)
-		for _, group := range originalInitiatorGroups {
-			p.StorageApi.Map(group, lun, m)
+		if !slices.Contains(originalInitiatorGroups, xcopyInitiatorGroup) {
+			p.StorageApi.UnMap(xcopyInitiatorGroup, lun, m)
 		}
-
 	}()
+	esxNaa := fmt.Sprintf("naa.%s", lun.NAA)
 
-    retries := 3
-    for i := 3; i > 0; i--{
+	targetLUN := fmt.Sprintf("/vmfs/devices/disks/%s", esxNaa)
+	klog.Infof("resolved lun with IQN %s to lun %s", lun.IQN, targetLUN)
+
+	retries := 3
+	for i := 3; i > 0; i-- {
 		_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "adapter", "rescan", "-a", "1"})
 		if err != nil {
-            klog.Errorf("failed to rescan adapters, probably in progress. Rerty %d/%d", i, retries)
-	        time.Sleep(time.Duration(rand.Intn(10)))
+			klog.Errorf("failed to rescan adapters, probably in progress. Rerty %d/%d", i, retries)
+			time.Sleep(time.Duration(rand.Intn(10)))
 		} else {
-            break
-        }
+			break
+		}
 	}
-    if err != nil {
-        return err
-    }
-	naa := fmt.Sprintf("naa.%s%x", lun.ProviderID, lun.SerialNumber)
-	_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "list", "-d", naa})
 	if err != nil {
-		return fmt.Errorf("failed to locate the target LUN %s. Check the LUN details and the host mapping response: %s", naa, err)
+		return err
+	}
+
+	_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "list", "-d", esxNaa})
+	if err != nil {
+		return fmt.Errorf("failed to locate the target LUN %s. Check the LUN details and the host mapping response: %s", esxNaa, err)
 	}
 
 	r, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"vmkfstools", "clone", "-s", vmDisk.Path(), "-t", targetLUN})
 	if err != nil {
-
 		klog.Infof("error response from esxcli %+v", r)
 		return err
 	}
