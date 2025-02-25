@@ -10,6 +10,7 @@ import (
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"github.com/konveyor/forklift-controller/pkg/settings"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // oVirt validator.
@@ -21,6 +22,12 @@ type Validator struct {
 // Load.
 func (r *Validator) Load() (err error) {
 	r.inventory, err = web.NewClient(r.plan.Referenced.Provider.Source)
+	return
+}
+
+// NOOP
+func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, s string, s2 string, err error) {
+	ok = true
 	return
 }
 
