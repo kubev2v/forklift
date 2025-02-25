@@ -83,6 +83,10 @@ const (
 	AnnImportBackingFile = "cdi.kubevirt.io/storage.import.backingFile"
 )
 
+const (
+	Shareable = "shareable"
+)
+
 // Map of vmware guest ids to osinfo ids.
 var osMap = map[string]string{
 	"centos64Guest":              "centos5.11",
@@ -195,7 +199,9 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
-
+	if !r.Context.Plan.Spec.MigrateSharedDisks {
+		vm.RemoveSharedDisks()
+	}
 	macsToIps := ""
 	if r.Plan.Spec.PreserveStaticIPs {
 		macsToIps, err = r.mapMacStaticIps(vm)
@@ -392,7 +398,9 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
-
+	if !r.Context.Plan.Spec.MigrateSharedDisks {
+		vm.RemoveSharedDisks()
+	}
 	url := r.Source.Provider.Spec.URL
 	thumbprint := r.Source.Provider.Status.Fingerprint
 	hostID, err := r.hostID(vmRef)
@@ -428,12 +436,12 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 			if disk.Datastore.ID == ds.ID {
 				storageClass := mapped.Destination.StorageClass
 				var dvSource cdi.DataVolumeSource
-				coldLocal, vErr := r.Context.Plan.VSphereColdLocal()
+				useV2vForTransfer, vErr := r.Context.Plan.ShouldUseV2vForTransfer()
 				if vErr != nil {
 					err = vErr
 					return
 				}
-				if coldLocal {
+				if useV2vForTransfer {
 					// Let virt-v2v do the copying
 					dvSource = cdi.DataVolumeSource{
 						Blank: &cdi.DataVolumeBlankImage{},
@@ -442,7 +450,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 					// Let CDI do the copying
 					dvSource = cdi.DataVolumeSource{
 						VDDK: &cdi.DataVolumeSourceVDDK{
-							BackingFile:  r.baseVolume(disk.File),
+							BackingFile:  baseVolume(disk.File, r.Plan.Spec.Warm),
 							UUID:         vm.UUID,
 							URL:          url,
 							SecretRef:    secret.Name,
@@ -476,8 +484,10 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 				if dv.ObjectMeta.Annotations == nil {
 					dv.ObjectMeta.Annotations = make(map[string]string)
 				}
-				dv.ObjectMeta.Annotations[planbase.AnnDiskSource] = r.baseVolume(disk.File)
-
+				dv.ObjectMeta.Annotations[planbase.AnnDiskSource] = baseVolume(disk.File, r.Plan.Spec.Warm)
+				if disk.Shared {
+					dv.ObjectMeta.Labels[Shareable] = "true"
+				}
 				// if exists, get the PVC generate name from the PlanSpec, generate the name
 				// and update the GenerateName field in the DataVolume object.
 				pvcNameTemplate := r.getPVCNameTemplate(vm)
@@ -543,6 +553,20 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 				"Changed Block Tracking (CBT) is disabled for VM %s",
 				vmRef.String()))
 		return
+	}
+	if !r.Context.Plan.Spec.MigrateSharedDisks {
+		sharedPVCs, missingDiskPVCs, err := findSharedPVCs(r.Destination.Client, vm)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		for _, disk := range missingDiskPVCs {
+			// This is one of the last steps of migration we should not fail as users can migrate the disk later and reattach it manually.
+			r.Log.Error(err, "Failed to find shared PVCs", "vm", vmRef.String(), "disk", disk.File)
+			vm.RemoveDisk(disk)
+		}
+		if sharedPVCs != nil {
+			persistentVolumeClaims = append(persistentVolumeClaims, sharedPVCs...)
+		}
 	}
 
 	var conflicts []string
@@ -776,7 +800,7 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 	}
 
 	for i, disk := range disks {
-		pvc := pvcMap[r.baseVolume(disk.File)]
+		pvc := pvcMap[baseVolume(disk.File, r.Plan.Spec.Warm)]
 		volumeName := fmt.Sprintf("vol-%v", i)
 
 		// If the volume name template is set, use it to generate the volume name.
@@ -821,6 +845,9 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 				},
 			},
 		}
+		if disk.Shared {
+			kubevirtDisk.Cache = cnv.CacheNone
+		}
 		// For multiboot VMs, if the selected boot device is the current disk,
 		// set it as the first in the boot order.
 		if bootDisk == i+1 {
@@ -848,12 +875,15 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
+	if !r.Context.Plan.Spec.MigrateSharedDisks {
+		vm.RemoveSharedDisks()
+	}
 	for _, disk := range vm.Disks {
 		mB := disk.Capacity / 0x100000
 		list = append(
 			list,
 			&plan.Task{
-				Name: r.baseVolume(disk.File),
+				Name: baseVolume(disk.File, r.Plan.Spec.Warm),
 				Progress: libitr.Progress{
 					Total: mB,
 				},
@@ -910,12 +940,12 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 
 // Return a stable identifier for a VDDK DataVolume.
 func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
-	return r.baseVolume(dv.ObjectMeta.Annotations[planbase.AnnDiskSource])
+	return baseVolume(dv.ObjectMeta.Annotations[planbase.AnnDiskSource], r.Plan.Spec.Warm)
 }
 
 // Return a stable identifier for a PersistentDataVolume.
 func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string {
-	return r.baseVolume(pvc.Annotations[AnnImportBackingFile])
+	return baseVolume(pvc.Annotations[AnnImportBackingFile], r.Plan.Spec.Warm)
 }
 
 // Load
@@ -1012,31 +1042,6 @@ func (r *Builder) host(hostID string) (host *model.Host, err error) {
 	}
 
 	return
-}
-
-// Trims the snapshot suffix from a disk backing file name if there is one.
-//
-//	Example:
-//	Input: 	[datastore13] my-vm/disk-name-000015.vmdk
-//	Output: [datastore13] my-vm/disk-name.vmdk
-func trimBackingFileName(fileName string) string {
-	return backingFilePattern.ReplaceAllString(fileName, ".vmdk")
-}
-
-func (r *Builder) baseVolume(fileName string) string {
-	if r.Plan.Spec.Warm {
-		// for warm migrations, we return the very first volume of the disk
-		// as the base volume and CBT will be used to transfer later changes
-		return trimBackingFileName(fileName)
-	} else {
-		// for cold migrations, we return the latest volume as the base,
-		// e.g., my-vm/disk-name-000015.vmdk, since we should transfer
-		// only its state
-		// note that this setting is insignificant when we use virt-v2v on
-		// el9 since virt-v2v doesn't receive the volume to transfer - we
-		// only need this to be consistent for correlating disks with PVCs
-		return fileName
-	}
 }
 
 // Build LUN PVs.

@@ -331,7 +331,7 @@ func (r *Client) getTaskById(vmRef ref.Ref, taskId string, hosts util.HostsFunc)
 }
 
 func (r *Client) getClient(vm *model.VM, hosts util.HostsFunc) (client *vim25.Client, err error) {
-	if coldLocal, vErr := r.Plan.VSphereColdLocal(); vErr == nil && coldLocal {
+	if useV2vForTransfer, vErr := r.Plan.ShouldUseV2vForTransfer(); vErr == nil && useV2vForTransfer {
 		// when virt-v2v runs the migration, forklift-controller should interact only
 		// with the component that serves the SDK endpoint of the provider
 		client = r.client.Client

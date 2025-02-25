@@ -65,6 +65,12 @@ func (r *Validator) WarmMigration() bool {
 	return false
 }
 
+// NOOP
+func (r *Validator) SharedDisks(vmRef ref.Ref, client k8sclient.Client) (ok bool, s string, s2 string, err error) {
+	ok = true
+	return
+}
+
 // Load.
 func (r *Validator) Load() (err error) {
 	r.inventory, err = web.NewClient(r.plan.Referenced.Provider.Source)
