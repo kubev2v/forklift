@@ -197,8 +197,8 @@ func (r *Scheduler) buildPending() (err error) {
 }
 
 func (r *Scheduler) cost(vm *model.VM, vmStatus *plan.VMStatus) int {
-	coldLocal, _ := r.Plan.VSphereColdLocal()
-	if coldLocal {
+	useV2vForTransfer, _ := r.Plan.ShouldUseV2vForTransfer()
+	if useV2vForTransfer {
 		switch vmStatus.Phase {
 		case CreateVM, PostHook, Completed:
 			// In these phases we already have the disk transferred and are left only to create the VM

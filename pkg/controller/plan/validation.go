@@ -55,6 +55,7 @@ const (
 	VMMissingChangedBlockTracking = "VMMissingChangedBlockTracking"
 	HostNotReady                  = "HostNotReady"
 	DuplicateVM                   = "DuplicateVM"
+	SharedDisks                   = "SharedDisks"
 	NameNotValid                  = "TargetNameNotValid"
 	HookNotValid                  = "HookNotValid"
 	HookNotReady                  = "HookNotReady"
@@ -102,6 +103,10 @@ const (
 const (
 	True  = libcnd.True
 	False = libcnd.False
+)
+
+const (
+	Shareable = "shareable"
 )
 
 // Validate the plan resource.
@@ -452,6 +457,13 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "Changed Block Tracking (CBT) has not been enabled on some VM. This feature is a prerequisite for VM warm migration.",
 		Items:    []string{},
 	}
+	sharedDisks := libcnd.Condition{
+		Type:     SharedDisks,
+		Status:   True,
+		Category: Critical,
+		Message:  "VMs with shared disk can not be migrated.", // This should be set by the provider validator
+		Items:    []string{},
+	}
 
 	setOf := map[string]bool{}
 	//
@@ -551,6 +563,25 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		if !ok {
 			missingStaticIPs.Items = append(missingStaticIPs.Items, ref.String())
 		}
+
+		var ctx *plancontext.Context
+		ctx, err = plancontext.New(r, plan, r.Log)
+		if err != nil {
+			return err
+		}
+		ok, msg, category, err := validator.SharedDisks(*ref, ctx.Destination.Client)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			if msg != "" {
+				sharedDisks.Message = msg
+			}
+			if category != "" {
+				sharedDisks.Category = category
+			}
+			sharedDisks.Items = append(sharedDisks.Items, ref.String())
+		}
 		// Destination.
 		provider = plan.Referenced.Provider.Destination
 		if provider == nil {
@@ -620,6 +651,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(missingStaticIPs.Items) > 0 {
 		plan.Status.SetCondition(missingStaticIPs)
+	}
+	if len(sharedDisks.Items) > 0 {
+		plan.Status.SetCondition(sharedDisks)
 	}
 	if len(missingCbtForWarm.Items) > 0 {
 		plan.Status.SetCondition(missingCbtForWarm)
