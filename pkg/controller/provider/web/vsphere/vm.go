@@ -287,3 +287,41 @@ func (r *VM) Content(detail int) interface{} {
 
 	return r
 }
+
+func (r *VM) HasDisk(disk model.Disk) bool {
+	for _, d := range r.Disks {
+		if d.File == disk.File {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *VM) HasSharedDisk() bool {
+	for _, d := range r.Disks {
+		if d.Shared {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *VM) RemoveSharedDisks() {
+	var disks []model.Disk
+	for _, disk := range r.Disks {
+		if !disk.Shared {
+			disks = append(disks, disk)
+		}
+	}
+	r.Disks = disks
+}
+
+func (r *VM) RemoveDisk(removeDisk model.Disk) {
+	var disks []model.Disk
+	for _, disk := range r.Disks {
+		if disk.File != removeDisk.File {
+			disks = append(disks, disk)
+		}
+	}
+	r.Disks = disks
+}
