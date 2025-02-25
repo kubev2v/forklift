@@ -161,6 +161,10 @@ spec:
                 - network
                 - storage
                 type: object
+              migrateSharedDisks:
+                default: true
+                description: Determines if the plan should migrate shared disks.
+                type: boolean
               preserveClusterCpuModel:
                 description: Preserve the CPU model and flags the VM runs with in
                   its oVirt cluster.

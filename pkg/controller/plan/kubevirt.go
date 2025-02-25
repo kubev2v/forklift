@@ -1708,12 +1708,12 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	nonRoot := true
 	allowPrivilageEscalation := false
 	// virt-v2v image
-	coldLocal, vErr := r.Context.Plan.VSphereColdLocal()
+	useV2vForTransfer, vErr := r.Context.Plan.ShouldUseV2vForTransfer()
 	if vErr != nil {
 		err = vErr
 		return
 	}
-	if coldLocal {
+	if useV2vForTransfer {
 		// mount the secret for the password and CA certificate
 		volumes = append(volumes, core.Volume{
 			Name: "secret-volume",
@@ -1900,6 +1900,15 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.Confi
 
 	for i, v := range vmVolumes {
 		pvc := pvcsByName[v.PersistentVolumeClaim.ClaimName]
+		if pvc == nil {
+			r.Log.V(1).Info(
+				"Failed to find the PVC to the Volume for the pod volume mount",
+				"volume",
+				v.Name,
+				"pvc",
+				v.PersistentVolumeClaim.ClaimName)
+			continue
+		}
 		vol := core.Volume{
 			Name: pvc.Name,
 			VolumeSource: core.VolumeSource{
@@ -2081,6 +2090,15 @@ func (r *KubeVirt) libvirtDomain(vmCr *VirtualMachine, pvcs []*core.PersistentVo
 		diskSource := libvirtxml.DomainDiskSource{}
 
 		pvc := pvcsByName[vol.PersistentVolumeClaim.ClaimName]
+		if pvc == nil {
+			r.Log.V(1).Info(
+				"Failed to find the PVC to the Volume for the libvirt domain",
+				"volume",
+				vol.Name,
+				"pvc",
+				vol.PersistentVolumeClaim.ClaimName)
+			continue
+		}
 		if pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == core.PersistentVolumeBlock {
 			diskSource.Block = &libvirtxml.DomainDiskSourceBlock{
 				Dev: fmt.Sprintf("/dev/block%v", i),

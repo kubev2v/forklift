@@ -1825,11 +1825,11 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 			break
 		}
 
-		coldLocal, err := r.Context.Plan.VSphereColdLocal()
+		useV2vForTransfer, err := r.Context.Plan.ShouldUseV2vForTransfer()
 		switch {
 		case err != nil:
 			return liberr.Wrap(err)
-		case coldLocal:
+		case useV2vForTransfer:
 			if err := r.updateConversionProgressV2vMonitor(pod, step); err != nil {
 				// Just log it. Missing progress is not fatal.
 				log.Error(err, "Failed to update conversion progress")
@@ -2020,7 +2020,7 @@ type Predicate struct {
 
 // Evaluate predicate flags.
 func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
-	coldLocal, vErr := r.context.Plan.VSphereColdLocal()
+	useV2vForTransfer, vErr := r.context.Plan.ShouldUseV2vForTransfer()
 	if vErr != nil {
 		err = vErr
 		return
@@ -2034,9 +2034,9 @@ func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 	case RequiresConversion:
 		allowed = r.context.Source.Provider.RequiresConversion()
 	case CDIDiskCopy:
-		allowed = !coldLocal
+		allowed = !useV2vForTransfer
 	case VirtV2vDiskCopy:
-		allowed = coldLocal
+		allowed = useV2vForTransfer
 	case OpenstackImageMigration:
 		allowed = r.context.Plan.IsSourceProviderOpenstack()
 	case VSphere:
