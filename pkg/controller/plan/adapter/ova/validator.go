@@ -6,6 +6,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ova"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // OVA validator.
@@ -23,6 +24,12 @@ func (r *Validator) Load() (err error) {
 // Validate whether warm migration is supported from this provider type.
 func (r *Validator) WarmMigration() (ok bool) {
 	ok = false
+	return
+}
+
+// NOOP
+func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, s string, s2 string, err error) {
+	ok = true
 	return
 }
 
