@@ -307,6 +307,11 @@ func (c *RestClient) buildTransport() (err error) {
 		transport.TLSClientConfig = &tls.Config{
 			RootCAs: pool,
 		}
+	} else if Settings.Development {
+		// Disable TLS for development when certs are missing
+		transport.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: true,
+		}
 	}
 
 	c.Transport = transport
