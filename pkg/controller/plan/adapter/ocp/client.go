@@ -78,8 +78,14 @@ func (r *Client) PowerOff(vmRef ref.Ref) error {
 		return err
 	}
 
-	running := false
-	vm.Spec.Running = &running
+	if vm.Spec.Running != nil {
+		running := false
+		vm.Spec.Running = &running
+	} else if vm.Spec.RunStrategy != nil {
+		runStrategy := cnv.RunStrategyHalted
+		vm.Spec.RunStrategy = &runStrategy
+	}
+
 	err = r.sourceClient.Update(context.Background(), &vm)
 	if err != nil {
 		return err
@@ -96,8 +102,14 @@ func (r *Client) PowerOn(vmRef ref.Ref) error {
 		return err
 	}
 
-	running := true
-	vm.Spec.Running = &running
+	if vm.Spec.Running != nil {
+		running := true
+		vm.Spec.Running = &running
+	} else if vm.Spec.RunStrategy != nil {
+		runStrategy := cnv.RunStrategyAlways
+		vm.Spec.RunStrategy = &runStrategy
+	}
+
 	err = r.sourceClient.Update(context.Background(), &vm)
 	if err != nil {
 		return err
@@ -115,10 +127,10 @@ func (r *Client) PowerState(vmRef ref.Ref) (planapi.VMPowerState, error) {
 		return planapi.VMPowerStateUnknown, err
 	}
 
-	if vm.Spec.Running != nil && *vm.Spec.Running {
+	if (vm.Spec.Running != nil && *vm.Spec.Running) ||
+		(vm.Spec.RunStrategy != nil && *vm.Spec.RunStrategy == cnv.RunStrategyAlways) {
 		return planapi.VMPowerStateOn, nil
 	}
-
 	return planapi.VMPowerStateOff, nil
 }
 
@@ -131,7 +143,8 @@ func (r *Client) PoweredOff(vmRef ref.Ref) (bool, error) {
 		return false, err
 	}
 
-	if vm.Spec.Running != nil && *vm.Spec.Running {
+	if (vm.Spec.Running != nil && *vm.Spec.Running) ||
+		(vm.Spec.RunStrategy != nil && *vm.Spec.RunStrategy == cnv.RunStrategyAlways) {
 		return false, nil
 	}
 
