@@ -69,6 +69,13 @@ func (h VMHandler) List(ctx *gin.Context) {
 	}
 	pb := PathBuilder{DB: db}
 	for _, m := range list {
+		if m.IsTemplate {
+			log.Info(
+				"Skipping template VM",
+				"vmID", m.ID,
+				"isTemplate", m.IsTemplate)
+			continue
+		}
 		r := &VM{}
 		r.With(&m)
 		r.Link(h.Provider)
