@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: test-cli 
+  namespace: default
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 4299Mi
+  # put he storage class for 3par/dell
+  storageClassName: ontap-san-storage-rwx
+  volumeMode: Block
