@@ -1,0 +1,151 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-cli
+spec:
+  containers:
+  - args:
+    - -c
+    - sleep 3000m
+    command:
+    - /bin/bash
+    image: registry.access.redhat.com/ubi9/ubi-minimal
+    imagePullPolicy: Always
+    name: shell
+    resources: {}
+    securityContext:
+      allowPrivilegeEscalation: true
+      privileged: true
+      runAsGroup: 0
+      runAsUser: 0
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeDevices:
+    - devicePath: /dev/sdy
+      name: target
+    - devicePath: /dev/sdz
+      name: source
+    volumeMounts:
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-hgxt9
+      readOnly: true
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
+  hostNetwork: true
+  imagePullSecrets:
+  - name: default-dockercfg-xxg2m
+  nodeName: worker-0-2
+  preemptionPolicy: PreemptLowerPriority
+  priority: 0
+  restartPolicy: Always
+  schedulerName: default-scheduler
+  securityContext:
+    runAsGroup: 0
+    runAsUser: 0
+  serviceAccount: default
+  serviceAccountName: default
+  terminationGracePeriodSeconds: 30
+  tolerations:
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoExecute
+    key: node.kubernetes.io/unreachable
+    operator: Exists
+    tolerationSeconds: 300
+  volumes:
+  - name: source
+    persistentVolumeClaim:
+      claimName: test-cli
+  - name: target
+    persistentVolumeClaim:
+      claimName: test-service-vm-targetcli
+  - name: kube-api-access-hgxt9
+    projected:
+      defaultMode: 420
+      sources:
+      - serviceAccountToken:
+          expirationSeconds: 3607
+          path: token
+      - configMap:
+          items:
+          - key: ca.crt
+            path: ca.crt
+          name: kube-root-ca.crt
+      - downwardAPI:
+          items:
+          - fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+            path: namespace
+      - configMap:
+          items:
+          - key: service-ca.crt
+            path: service-ca.crt
+          name: openshift-service-ca.crt
+status:
+  conditions:
+  - lastProbeTime: null
+    lastTransitionTime: "2025-02-06T12:21:14Z"
+    message: 'The node was low on resource: ephemeral-storage. Threshold quantity:
+      9572919471, available: 9099988Ki. '
+    reason: TerminationByKubelet
+    status: "True"
+    type: DisruptionTarget
+  - lastProbeTime: null
+    lastTransitionTime: "2025-02-06T12:21:14Z"
+    status: "False"
+    type: PodReadyToStartContainers
+  - lastProbeTime: null
+    lastTransitionTime: "2025-01-28T10:47:31Z"
+    status: "True"
+    type: Initialized
+  - lastProbeTime: null
+    lastTransitionTime: "2025-02-06T12:21:14Z"
+    reason: PodFailed
+    status: "False"
+    type: Ready
+  - lastProbeTime: null
+    lastTransitionTime: "2025-02-06T12:21:14Z"
+    reason: PodFailed
+    status: "False"
+    type: ContainersReady
+  - lastProbeTime: null
+    lastTransitionTime: "2025-01-28T10:47:31Z"
+    status: "True"
+    type: PodScheduled
+  containerStatuses:
+  - containerID: cri-o://8c70d42535789fd74c0710c98773682f844e731bbbb00b6589877953fb01fd19
+    image: registry.fedoraproject.org/fedora-toolbox:41
+    imageID: registry.fedoraproject.org/fedora-toolbox@sha256:2a20c8e115a60c7654b0b021fd4b445743e607ade9d45efd5631b944b6b2b7f5
+    lastState:
+      terminated:
+        containerID: cri-o://62ec3c5fe91a33ef8573e93bcf3dc521ad428852a49e01fcd8350ac304e5f4a3
+        exitCode: 0
+        finishedAt: "2025-02-05T18:47:50Z"
+        reason: Completed
+        startedAt: "2025-02-03T16:47:50Z"
+    name: shell
+    ready: false
+    restartCount: 4
+    started: false
+    state:
+      terminated:
+        containerID: cri-o://8c70d42535789fd74c0710c98773682f844e731bbbb00b6589877953fb01fd19
+        exitCode: 137
+        finishedAt: "2025-02-06T12:21:14Z"
+        reason: Error
+        startedAt: "2025-02-05T18:47:52Z"
+  hostIP: 192.168.123.64
+  hostIPs:
+  - ip: 192.168.123.64
+  message: 'The node was low on resource: ephemeral-storage. Threshold quantity: 9572919471,
+    available: 9099988Ki. '
+  phase: Failed
+  podIP: 192.168.123.64
+  podIPs:
+  - ip: 192.168.123.64
+  qosClass: BestEffort
+  reason: Evicted
+  startTime: "2025-01-28T10:47:31Z"

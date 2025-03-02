@@ -1,0 +1,14 @@
+apiVersion: forklift.konveyor.io/v1beta1
+kind: VSphereXcopyVolumePopulator
+metadata:
+  name: vm-x
+spec:
+  sourceVMDK: "[ds-2] vm-x/vm-x.vmdk"
+  # the volume is already mounted at /mnt/block. internally this would be
+  # resolved by the populator pod to the serial number of the LUN, so there is
+  # a need to consider not using targetLUN field at all
+  targetLUN: pvc-name
+  secretRef: vsphere-x-populator-secret
+  storageVendor: ontap
+
+
