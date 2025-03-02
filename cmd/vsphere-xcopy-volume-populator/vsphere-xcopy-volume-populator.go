@@ -4,11 +4,19 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
+	"path"
 	"strings"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"k8s.io/client-go/util/cert"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/ontap"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
+
+	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -25,7 +33,11 @@ var (
 	// deployment. When/if we gain control on the pod deployment we should mount
 	// the secret as env vars. There is an attempt to push that,
 	// see https://github.com/kubernetes-csi/lib-volume-populator/pull/171
-	secretRef       string
+	crName          string
+	crNamespace     string
+	pvcSize         string
+	ownerUID        string
+	secretName      string
 	sourceVMDKFile  string
 	targetPVC       string
 	targetNamespace string
@@ -78,39 +90,37 @@ func main() {
 	if err != nil {
 		klog.Fatalf("Failed to fetch the volume handle details from the target pvc %s: %s", targetPVC, err)
 	}
-	err = p.Populate(sourceVMDKFile, volumeHandle)
+
+	progressCounter, err := setupTracing()
 	if err != nil {
 		klog.Fatal(err)
 	}
 
-	err = annotatingPVC(clientSet, targetPVC, targetNamespace)
-	if err != nil {
-		klog.Fatal(err)
+	// channel for progress report
+	progressCh := make(chan int)
+	// channel for quitting with output
+	quitCh := make(chan string)
+
+	go p.Populate(sourceVMDKFile, volumeHandle, progressCh, quitCh)
+
+	for {
+		select {
+		case p := <-progressCh:
+			// print progress
+			klog.Infof(" progress reported %d", p)
+			// call metric add code
+			metric := dto.Metric{}
+			if err := progressCounter.WithLabelValues(ownerUID).Write(&metric); err != nil {
+				klog.Error(err)
+			} else if float64(p) > metric.Counter.GetValue() {
+				progressCounter.WithLabelValues(ownerUID).Add(float64(p))
+			}
+		case q := <-quitCh:
+			klog.Infof("channel quit %s", q)
+			return
+		}
 	}
 
-}
-
-func annotatingPVC(kubeClient *kubernetes.Clientset, pvcName string, pvcNamespace string) error {
-	klog.Info("annotating the PVC with progress 100")
-	pvc, err := kubeClient.CoreV1().PersistentVolumeClaims(pvcNamespace).Get(context.Background(), pvcName, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("Failed to fetch the PVC %w", err)
-	}
-	// Annotate the PVC
-	if pvc.Annotations == nil {
-		pvc.Annotations = make(map[string]string)
-	}
-	pvc.Annotations["copy-offload-progress"] = "100"
-
-	// Update the PVC with the new annotation
-	_, err = kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(
-		context.Background(),
-		pvc,
-		metav1.UpdateOptions{})
-	if err != nil {
-		return fmt.Errorf("Failed to update PVC with xcopy progress: %w", err)
-	}
-	return nil
 }
 
 func newKubeClient(masterURL string, kubeconfig string) (*kubernetes.Clientset, error) {
@@ -163,10 +173,14 @@ func handleArgs() {
 	klog.InitFlags(nil)
 
 	// Populator args
+	flag.StringVar(&crName, "cr-name", "", "The Custom Resouce Name")
+	flag.StringVar(&crNamespace, "cr-namespace", "", "The Custom Resouce Namespace")
+	flag.StringVar(&pvcSize, "pvc-size", "", "The size of the PVC, passed by the populator - unused")
+	flag.StringVar(&ownerUID, "owner-uid", "", "Owner UID, passed by the populator - Usually PVC ID")
 	flag.StringVar(&sourceVMDKFile, "source-vmdk", "", "File name to populate")
 	flag.StringVar(&targetPVC, "target-pvc", "", "Target PVC for population")
 	flag.StringVar(&storageVendor, "storage-vendor", "ontap", "The storage vendor to work with. Current values: [ontap,]")
-	flag.StringVar(&secretRef, "secret-ref", "", "The secret holding the credentials for vSphere API and the storage vendor API")
+	flag.StringVar(&secretName, "secret-name", "", "The secret holding the credentials for vSphere API and the storage vendor API")
 	flag.StringVar(&targetNamespace, "target-namespace", "", "Contents to populate file with")
 	flag.StringVar(&storageHostname, "storage-hostname", os.Getenv("STORAGE_HOSTNAME"), "The storage vendor api hostname")
 	flag.StringVar(&storageUsername, "storage-username", os.Getenv("STORAGE_USERNAME"), "The storage vendor api username")
@@ -205,7 +219,7 @@ func handleArgs() {
 			}
 		case "storage-hostname", "storage-username", "storage-password",
 			"vsphere-hostname", "vsphere-username", "vsphere-password":
-			if secretRef == "" && f.Value.String() == "" {
+			if secretName == "" && f.Value.String() == "" {
 				missingFlags = true
 				klog.Errorf("secret-ref is not set, missing value for flag --%s", f.Name)
 			}
@@ -216,10 +230,10 @@ func handleArgs() {
 	}
 
 	klog.Infof("Current namespace %s ", targetNamespace)
-	if secretRef != "" {
-		secret, err := clientSet.CoreV1().Secrets(targetNamespace).Get(context.Background(), secretRef, metav1.GetOptions{})
+	if secretName != "" {
+		secret, err := clientSet.CoreV1().Secrets(targetNamespace).Get(context.Background(), secretName, metav1.GetOptions{})
 		if err != nil {
-			klog.Fatalf("fail to fetch the secret %s: %s", secretRef, err)
+			klog.Fatalf("fail to fetch the secret %s: %s", secretName, err)
 		}
 
 		flag.VisitAll(func(f *flag.Flag) {
@@ -233,4 +247,48 @@ func handleArgs() {
 			}
 		})
 	}
+}
+
+func setupTracing() (*prometheus.CounterVec, error) {
+	certsDirectory, err := os.MkdirTemp("", "certsdir")
+	if err != nil {
+		return nil, err
+	}
+
+	certBytes, keyBytes, err := cert.GenerateSelfSignedCertKey("", nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("Error generating cert for prometheus")
+	}
+
+	certFile := path.Join(certsDirectory, "tls.crt")
+	if err = os.WriteFile(certFile, certBytes, 0600); err != nil {
+		return nil, fmt.Errorf("Error writing cert file: %w", err)
+	}
+
+	keyFile := path.Join(certsDirectory, "tls.key")
+	if err = os.WriteFile(keyFile, keyBytes, 0600); err != nil {
+		return nil, fmt.Errorf("Error writing key file: %w", err)
+	}
+
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		klog.Info("Staring metrics server")
+		if err := http.ListenAndServeTLS(":8443", certFile, keyFile, nil); err != nil {
+			klog.Fatal("Error starting prometheus endpoint: ", err)
+		}
+	}()
+
+	progressCounter := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "vsphere_xcopy_volume_populator_progress",
+			Help: "Progress of vsphere XCOPY volume population",
+		},
+		[]string{"ownerUID"},
+	)
+	if err := prometheus.Register(progressCounter); err != nil {
+		return nil, fmt.Errorf("Prometheus progress gauge not registered: %w", err)
+	}
+
+	return progressCounter, nil
+
 }

@@ -946,19 +946,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		step.MarkStarted()
 		step.Phase = Running
 
-		// TODO rgolan - if copy offload then mark this step as Pending manual action
-		// this is a hack, this method should be checked per-disk. And need to check if the
-		//datavolume is copy-offload, and not the whole storage class
-		copyOffload, err := r.IsCopyOffload()
-		if err != nil {
-			return err
-		}
-		// TODO rgolan we must do it per disk, so this is currently a hack for all disk just as a POC
-		// The way to go is remove the check from here and check, inside the updatePopulatorCopyProgress
-		// and updateCopyProgress, and the make it a per disk thing
-		if copyOffload {
-			err = r.updateCopyOffloadProgress(vm, step)
-		} else if r.builder.SupportsVolumePopulators() {
+	    if r.builder.SupportsVolumePopulators() {
 			err = r.updatePopulatorCopyProgress(vm, step)
 		} else {
 			// Fallback to non-volume populator path
@@ -1959,24 +1947,26 @@ func (r *Migration) updateCopyOffloadProgress(vm *plan.VMStatus, step *plan.Step
 			continue
 		}
 
-		// TODO rgolan - the annotations are passed to PVC from the DV, so setting
-		// those on the DV in DataVolumes method should do the trick
+		// TODO rgolan - Since using a popoulator should be enough in terms of orchestration then 
+        // we can ditch this annotation and use the popoulator resouce .status.progress for it
+        // Chnage ASAP
 		if _, ok := pvc.Annotations["copy-offload"]; ok {
-			progress, _ := pvc.Annotations["copy-offload-progress"]
-			// skip LUNs
-			if progress == "100" || progress == "done" {
-				task.Phase = Completed
-				task.Reason = TransferCompleted
-				task.Progress.Completed = task.Progress.Total
-				task.MarkCompleted()
-				continue
-			} else {
-				task.Reason = "Task await offload copy intervention"
-				n, err := strconv.Atoi(progress)
-				if err != nil {
-					log.Error(err, "offload copy annotation failed to convert to number")
+			if progress, ok := pvc.Annotations["copy-offload-progress"]; ok {
+				// skip LUNs
+				if progress == "100" {
+					task.Phase = Completed
+					task.Reason = TransferCompleted
+					task.Progress.Completed = task.Progress.Total
+					task.MarkCompleted()
+					continue
 				} else {
-					task.Progress.Completed = int64(n)
+					task.Reason = "Task awaits xcopy using popoulator"
+					n, err := strconv.Atoi(progress)
+					if err != nil {
+						log.Error(err, "offload copy annotation failed to convert to number")
+					} else {
+						task.Progress.Completed = int64(n)
+					}
 				}
 			}
 		}
