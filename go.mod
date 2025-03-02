@@ -12,7 +12,7 @@ require (
 	github.com/gophercloud/utils v0.0.0-20230418172808-6eab72e966e1
 	github.com/gorilla/websocket v1.5.1
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.4.0
-	github.com/mattn/go-sqlite3 v1.14.18
+	github.com/mattn/go-sqlite3 v1.14.24
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/ginkgo/v2 v2.13.2
 	github.com/onsi/gomega v1.30.0

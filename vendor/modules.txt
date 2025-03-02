@@ -219,8 +219,8 @@ github.com/mailru/easyjson/jwriter
 # github.com/mattn/go-isatty v0.0.19
 ## explicit; go 1.15
 github.com/mattn/go-isatty
-# github.com/mattn/go-sqlite3 v1.14.18
-## explicit; go 1.16
+# github.com/mattn/go-sqlite3 v1.14.24
+## explicit; go 1.19
 github.com/mattn/go-sqlite3
 # github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0
 ## explicit; go 1.19
