@@ -10,7 +10,7 @@ require (
 	github.com/google/uuid v1.4.0
 	github.com/gophercloud/gophercloud v1.3.0
 	github.com/gophercloud/utils v0.0.0-20230418172808-6eab72e966e1
-	github.com/gorilla/websocket v1.5.1
+	github.com/gorilla/websocket v1.5.3
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.4.0
 	github.com/mattn/go-sqlite3 v1.14.18
 	github.com/onsi/ginkgo v1.16.5
