@@ -32,7 +32,7 @@ type VSphereXcopyVolumePopulatorSpec struct {
 	SecretRef string `json:"secretRef"`
 	// StorageVendor is the storage vendor the target disk and PVC are connected to
 	// Supported values [ontap, ]
-	StorageVendor string `json:"storageVendor"`
+	StorageVendorProduct string `json:"storageVendorProduct"`
 }
 
 type VSphereXcopyVolumePopulatorStatus struct {

@@ -801,6 +801,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			vm.Phase = Completed
 		}
 	case CreateDataVolumes:
+		klog.Infof("RGOLAN create data volumes called ")
 		step, found := vm.FindStep(r.step(vm))
 		if !found {
 			vm.AddError(fmt.Sprintf("Step '%s' not found", r.step(vm)))
@@ -819,7 +820,9 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 		}
 
+		klog.Infof("RGOLAN before supports volume populators")
 		if r.builder.SupportsVolumePopulators() {
+			klog.Infof("RGOLAN after supports volume populators")
 			var pvcs []*core.PersistentVolumeClaim
 			if pvcs, err = r.kubevirt.PopulatorVolumes(vm.Ref); err != nil {
 				if !errors.As(err, &web.ProviderNotReadyError{}) {
@@ -1959,24 +1962,26 @@ func (r *Migration) updateCopyOffloadProgress(vm *plan.VMStatus, step *plan.Step
 			continue
 		}
 
-		// TODO rgolan - the annotations are passed to PVC from the DV, so setting
-		// those on the DV in DataVolumes method should do the trick
+		// TODO rgolan - Since using a popoulator should be enough in terms of orchestration then 
+        // we can ditch this annotation and use the popoulator resouce .status.progress for it
+        // Chnage ASAP
 		if _, ok := pvc.Annotations["copy-offload"]; ok {
-			progress, _ := pvc.Annotations["copy-offload-progress"]
-			// skip LUNs
-			if progress == "100" || progress == "done" {
-				task.Phase = Completed
-				task.Reason = TransferCompleted
-				task.Progress.Completed = task.Progress.Total
-				task.MarkCompleted()
-				continue
-			} else {
-				task.Reason = "Task await offload copy intervention"
-				n, err := strconv.Atoi(progress)
-				if err != nil {
-					log.Error(err, "offload copy annotation failed to convert to number")
+			if progress, ok := pvc.Annotations["copy-offload-progress"]; ok {
+				// skip LUNs
+				if progress == "100" {
+					task.Phase = Completed
+					task.Reason = TransferCompleted
+					task.Progress.Completed = task.Progress.Total
+					task.MarkCompleted()
+					continue
 				} else {
-					task.Progress.Completed = int64(n)
+					task.Reason = "Task awaits xcopy using popoulator"
+					n, err := strconv.Atoi(progress)
+					if err != nil {
+						log.Error(err, "offload copy annotation failed to convert to number")
+					} else {
+						task.Progress.Completed = int64(n)
+					}
 				}
 			}
 		}

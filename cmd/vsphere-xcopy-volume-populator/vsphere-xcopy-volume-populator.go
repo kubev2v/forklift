@@ -25,7 +25,11 @@ var (
 	// deployment. When/if we gain control on the pod deployment we should mount
 	// the secret as env vars. There is an attempt to push that,
 	// see https://github.com/kubernetes-csi/lib-volume-populator/pull/171
-	secretRef       string
+	crName          string
+	crNamespace     string
+	pvcSize         string
+	ownerUID        string
+	secretName      string
 	sourceVMDKFile  string
 	targetPVC       string
 	targetNamespace string
@@ -163,10 +167,14 @@ func handleArgs() {
 	klog.InitFlags(nil)
 
 	// Populator args
+	flag.StringVar(&crName, "cr-name", "", "The Custom Resouce Name")
+	flag.StringVar(&crNamespace, "cr-namespace", "", "The Custom Resouce Namespace")
+	flag.StringVar(&pvcSize, "pvc-size", "", "The size of the PVC, passed by the populator - unused")
+	flag.StringVar(&ownerUID, "owner-uid", "", "Owner UID, passed by the populator - unused")
 	flag.StringVar(&sourceVMDKFile, "source-vmdk", "", "File name to populate")
 	flag.StringVar(&targetPVC, "target-pvc", "", "Target PVC for population")
 	flag.StringVar(&storageVendor, "storage-vendor", "ontap", "The storage vendor to work with. Current values: [ontap,]")
-	flag.StringVar(&secretRef, "secret-ref", "", "The secret holding the credentials for vSphere API and the storage vendor API")
+	flag.StringVar(&secretName, "secret-name", "", "The secret holding the credentials for vSphere API and the storage vendor API")
 	flag.StringVar(&targetNamespace, "target-namespace", "", "Contents to populate file with")
 	flag.StringVar(&storageHostname, "storage-hostname", os.Getenv("STORAGE_HOSTNAME"), "The storage vendor api hostname")
 	flag.StringVar(&storageUsername, "storage-username", os.Getenv("STORAGE_USERNAME"), "The storage vendor api username")
@@ -205,7 +213,7 @@ func handleArgs() {
 			}
 		case "storage-hostname", "storage-username", "storage-password",
 			"vsphere-hostname", "vsphere-username", "vsphere-password":
-			if secretRef == "" && f.Value.String() == "" {
+			if secretName == "" && f.Value.String() == "" {
 				missingFlags = true
 				klog.Errorf("secret-ref is not set, missing value for flag --%s", f.Name)
 			}
@@ -216,10 +224,10 @@ func handleArgs() {
 	}
 
 	klog.Infof("Current namespace %s ", targetNamespace)
-	if secretRef != "" {
-		secret, err := clientSet.CoreV1().Secrets(targetNamespace).Get(context.Background(), secretRef, metav1.GetOptions{})
+	if secretName != "" {
+		secret, err := clientSet.CoreV1().Secrets(targetNamespace).Get(context.Background(), secretName, metav1.GetOptions{})
 		if err != nil {
-			klog.Fatalf("fail to fetch the secret %s: %s", secretRef, err)
+			klog.Fatalf("fail to fetch the secret %s: %s", secretName, err)
 		}
 
 		flag.VisitAll(func(f *flag.Flag) {
