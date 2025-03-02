@@ -32,7 +32,7 @@ func NewWithRemoteEsxcli(storageApi StorageApi, vsphereHostname, vsphereUsername
 
 }
 
-func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle string) error {
+func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle string, progress chan int, quit chan string) error {
 	vmDisk, err := ParseVmdkPath(sourceVMDKFile)
 	if err != nil {
 		return err
@@ -108,6 +108,18 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 		return err
 	}
 
+	response := ""
 	klog.Info("respose from esxcli ", r)
+
+	for _, l := range r {
+		response += l.Value("message")
+	}
+
+	go func() {
+		// TODO need to process the vmkfstools stderr(probably) and to write the
+		// progress to a file, and then continuously read and report on the channel
+		progress <- 100
+		quit <- response
+	}()
 	return nil
 }

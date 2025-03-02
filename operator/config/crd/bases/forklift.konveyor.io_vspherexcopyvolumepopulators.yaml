@@ -43,7 +43,7 @@ spec:
               secretRef:
                 description: The secret name with vsphere and storage credentials
                 type: string
-              storageVendor:
+              storageVendorProduct:
                 description: |-
                   StorageVendor is the storage vendor the target disk and PVC are connected to
                   Supported values [ontap, ]
@@ -61,6 +61,7 @@ spec:
                 type: string
             required:
             - secretRef
+            - storageVendorProduct
             - targetPVC
             - vmdkPath
             type: object

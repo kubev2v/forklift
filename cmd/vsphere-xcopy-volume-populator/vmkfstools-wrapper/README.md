@@ -12,6 +12,8 @@ copy to host:
 install:
 ```console
     esxcli software vib install -v /path/to/vmkfstool-wrapper.vib -f
+    # to reload the esx vibs
+    /etc/init.d/hostd restart
 ```
 or using powerCli
 ```console

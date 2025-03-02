@@ -199,7 +199,7 @@ test-copy-using-cli: build
 		--target-pvc=test-cli \
 		--target-namespace=default \
 		--storage-vendor=ontap \
-		--secret-ref=populator-secret \
+		--secret-name=populator-secret \
 		--kubeconfig=$$KUBECONFIG
 
 .PHONY: vmkfstools-wrapper

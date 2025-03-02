@@ -18,7 +18,6 @@ import (
 	"time"
 
 	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
-	storagev1 "k8s.io/api/storage/v1"
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/util"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
@@ -1716,7 +1715,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 		return
 	}
 
-	isCopyOffload, err := r.IsCopyOffload()
+	isCopyOffload := r.IsCopyOffload(pvcs)
 	if coldLocal && !isCopyOffload {
 		// mount the secret for the password and CA certificate
 		volumes = append(volumes, core.Volume{
@@ -2797,48 +2796,18 @@ func (r *KubeVirt) loadHosts() (hosts map[string]*api.Host, err error) {
 	return
 }
 
-// IsCopyOffload is determined by the use of a storage class with copy-offload annotation on it
-// TODO rgolan - for now the check will be done if any disk target storage class has that storage class, this is obviously coarse
+// IsCopyOffload is determined by PVC having the copy-offload label, which is
+// set by the builder earlier in #PopulatorVolumes 
+// TODO rgolan - for now the check will be done if any PVC match - this is obviously coarse
 // and should be per a disk's storage class, for example a disk from NFS or local doesn't support that
 // (specifically referring to vmkfstools xcopy for RDM)
-func (r *KubeVirt) IsCopyOffload() (bool, error) {
-	ref := r.Plan.Spec.Map.Storage
-	key := client.ObjectKey{
-		Namespace: ref.Namespace,
-		Name:      ref.Name,
-	}
-	sm := &api.StorageMap{}
-	err := r.Get(context.TODO(), key, sm)
-	if k8serr.IsNotFound(err) {
-		log.Error(err, "Failed to get storage map")
-		return false, err
-	}
-	log.Info("Identify storage class for storage maps")
-
-	sc := storagev1.StorageClass{}
-	scName := ""
-	if len(sm.Spec.Map) > 0 {
-		scName = sm.Spec.Map[0].Destination.StorageClass
-	}
-	storageClassList := &storagev1.StorageClassList{}
-	if err := r.List(context.TODO(), storageClassList, &client.ListOptions{}); err != nil {
-		log.Error(err, "Failed to list StorageClasses")
-		return false, err
-	}
-	// Iterate through StorageClasses to match the one from the map
-	for _, v := range storageClassList.Items {
-		if scName == "" {
-			if isDefault, ok := v.Annotations["storageclass.kubernetes.io/is-default-class"]; ok && isDefault == "true" {
-				sc = v
-				break
-			}
-		} else {
-			if scName == v.Name {
-				sc = v
-				break
-			}
-		}
-	}
-	_, ok := sc.Annotations["copy-offload"]
-	return ok, nil
+func (r *KubeVirt) IsCopyOffload(pvcs []*core.PersistentVolumeClaim) (bool) {
+    for _, p := range pvcs {
+        for a := range p.Annotations {
+            if a == "copy-offload" {
+                return true
+            }
+        }
+    }
+	return false
 }

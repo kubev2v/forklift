@@ -67,7 +67,6 @@ func (c *VSphereClient) RunEsxCommand(ctx context.Context, host *object.HostSyst
 			return nil, fmt.Errorf("Failed to invoke vmkfstools: %v", message)
 		}
 	}
-
 	return res.Values, nil
 }
 
