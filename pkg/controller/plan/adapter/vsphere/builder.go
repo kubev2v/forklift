@@ -16,6 +16,7 @@ import (
 	"text/template"
 
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/klog/v2"
 
 	"github.com/google/uuid"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
@@ -40,6 +41,7 @@ import (
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/utils/ptr"
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
@@ -540,8 +542,8 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 					} else {
 						// Failed to generate PVC name using template
 						r.Log.Info("Failed to generate PVC name using template", "template", pvcNameTemplate, "error", err)
-                    }
-                }
+					}
+				}
 
 				for _, sc := range copyOffloadStorageClasses {
 					// If the DV can support copy-offload, because of its storage class, then mark it as one
@@ -1126,12 +1128,12 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 		return
 	}
 
-	copyOffloadStorageClasses, err := r.GetCopyOffloadStorageClasses()
+	copyOffloadMapping, err := r.GetCopyOffloadMapping()
 	if err != nil {
 		return nil, err
 	}
 
-	log.Info("copy-offload capabale storage classes", "storageClasses", copyOffloadStorageClasses)
+	log.Info("copy-offload capable storage classes", "storageClasses", copyOffloadMapping)
 	dsMapIn := r.Context.Map.Storage.Spec.Map
 	for i := range dsMapIn {
 		mapped := &dsMapIn[i]
@@ -1152,11 +1154,9 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					err = vErr
 					return
 				}
-				if coldLocal &&
-					// check if disk storage class supports offloading
-					slices.ContainsFunc(copyOffloadStorageClasses, func(e storagev1.StorageClass) bool {
-						return e.GetName() == storageClass
-					}) {
+
+				vsphereInstance, storageVendorProduct, mappingSecret := copyOffloadMapping.GetStorageMappingBy(storageClass, disk.Datastore.ID)
+				if coldLocal && vsphereInstance != "" {
 					namespace := r.Plan.Spec.TargetNamespace
 					commonName := fmt.Sprintf("%s-%s-%s", r.Plan.Name, vm.Name, uuid.New())
 					labels := map[string]string{"migration": string(r.Migration.UID), "vmID": vmRef.ID}
@@ -1200,13 +1200,19 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 							Namespace: namespace,
 						},
 						Spec: api.VSphereXcopyVolumePopulatorSpec{
-							VmdkPath:  disk.File,
-							TargetPVC: commonName,
+							VmdkPath:      disk.File,
+							TargetPVC:     commonName,
+							StorageVendor: storageVendorProduct,
+							SecretRef:     mappingSecret,
 						},
 					}
+                    // TODO should we handle if already exists due to re-entry? if the former
+                    // reconcile was successful in creating the pvc but failed after that, e.g when
+                    // creating the volumepopulator resouce failed
 					log.Info("Creating pvc", "pvc", pvc)
 					err = r.Client.Create(context.TODO(), &pvc, &client.CreateOptions{})
 					if err != nil {
+                        // ignore if already exists?
 						return nil, err
 					}
 					log.Info("Creating volumepopulator", "volumepopulator", vp)
@@ -1214,7 +1220,6 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					if err != nil {
 						return nil, err
 					}
-
 				}
 			}
 		}
@@ -1352,9 +1357,50 @@ func (r *Builder) FilterStorageClasses(filter func(sc storagev1.StorageClass) bo
 	return filtered, nil
 }
 
-func (r *Builder) GetCopyOffloadStorageClasses() ([]storagev1.StorageClass, error) {
-	return r.FilterStorageClasses(func(sc storagev1.StorageClass) bool {
-		_, ok := sc.Annotations["copy-offload"]
-		return ok
-	})
+type CopyOffloadMapping struct {
+	StorageClasses map[string]struct {
+		StorageVendorProduct string `yaml:"storageVendorProduct"`
+		VsphereInstance      []struct {
+			Name       string   `yaml:"name"`
+			DataStores []string `yaml:"dataStores"`
+		} `yaml:"vsphereInstance"`
+	}
+}
+
+func (m *CopyOffloadMapping) GetStorageMappingBy(storageClass string, dataStore string) (vsphereInstance string, storageVendor string, mappingSecret string) {
+	klog.Infof("getting copy offload storage mapping by storage class %s and datastare %s ", storageClass, dataStore)
+	mapping, exists := m.StorageClasses[storageClass]
+	if exists {
+		for _, v := range mapping.VsphereInstance {
+			if slices.Contains(v.DataStores, dataStore) {
+				return v.Name, mapping.StorageVendorProduct, fmt.Sprintf("%s-%s", v.Name, mapping.StorageVendorProduct)
+			}
+		}
+	}
+	return "", "", ""
+}
+
+func (r *Builder) GetCopyOffloadMapping() (CopyOffloadMapping, error) {
+	mapping := CopyOffloadMapping{}
+	cm := &core.ConfigMap{}
+	err := r.Get(context.TODO(), client.ObjectKey{
+		// TODO openshift-mtv or forklift controlledr ns
+		Namespace: "openshift-mtv",
+		Name:      "copy-offload-mapping",
+	},
+		cm)
+	if err != nil {
+		return mapping, err
+	}
+
+	scm, exists := cm.Data["storageClassMapping"]
+	klog.Infof("found storage class mapping %s, now unmarshal", scm)
+	if exists {
+		err := yaml.Unmarshal([]byte(scm), &mapping)
+		if err != nil {
+			return mapping, fmt.Errorf("failed to marshal the storage class mapping from the config map %w", err)
+		}
+	}
+
+	return mapping, nil
 }

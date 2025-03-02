@@ -30,20 +30,21 @@ metadata:
   namespace: openshift-mtv
 data:
     # name of the storage class
-    storage-class-abc:
-        storageProductVendor: ontap
-        # name of the vsphere provider configured in forklift
-        vsphere-provider-id-abc:
-            # Vsphere data-store
-            - ds-iscsi-1
-            - ds-iscsi-2
-        vsphere-provider-id-def:
-            - ds-iscsi-3
-    storage-class-lmn:
-        storageProductVendor: powerStore
-        vsphere-provider-id-def:
-            - ds-iscsi-5
-            - ds-iscsi-6
+    storageClassMapping:
+        storage-class-abc:
+            storageProductVendor: ontap
+            # name of the vsphere provider configured in forklift
+            vsphere-provider-id-abc:
+                # Vsphere data-store
+                - ds-iscsi-1
+                - ds-iscsi-2
+            vsphere-provider-id-def:
+                - ds-iscsi-3
+        storage-class-lmn:
+            storageProductVendor: powerStore
+            vsphere-provider-id-def:
+                - ds-iscsi-5
+                - ds-iscsi-6
 ```
 
 According to this ConfigMap a migration plan to for 'vm-5' with storage mapping
