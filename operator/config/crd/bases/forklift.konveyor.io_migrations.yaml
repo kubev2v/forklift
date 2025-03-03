@@ -552,6 +552,12 @@ spec:
                       description: Started timestamp.
                       format: date-time
                       type: string
+                    targetName:
+                      description: |-
+                        TargetName specifies a custom name for the VM in the target cluster.
+                        If not provided, the original VM name will be used and automatically adjusted to meet k8s DNS1123 requirements.
+                        If provided, this exact name will be used instead. The migration will fail if the name is not unique or already in use.
+                      type: string
                     type:
                       description: Type used to qualify the name.
                       type: string
