@@ -79,6 +79,11 @@ type VM struct {
 	//   "{{if eq .NetworkType "Pod"}}pod{{else}}multus-{{.NetworkIndex}}{{end}}"
 	// +optional
 	NetworkNameTemplate string `json:"networkNameTemplate,omitempty"`
+	// TargetName specifies a custom name for the VM in the target cluster.
+	// If not provided, the original VM name will be used and automatically adjusted to meet k8s DNS1123 requirements.
+	// If provided, this exact name will be used instead. The migration will fail if the name is not unique or already in use.
+	// +optional
+	TargetName string `json:"targetName,omitempty"`
 }
 
 // Find a Hook for the specified step.
