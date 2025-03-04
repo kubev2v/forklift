@@ -755,6 +755,7 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 			},
 		}
 		if disk.Shared {
+			kubevirtDisk.Shareable = ptr.To(true)
 			kubevirtDisk.Cache = cnv.CacheNone
 		}
 		// For multiboot VMs, if the selected boot device is the current disk,
