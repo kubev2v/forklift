@@ -57,8 +57,13 @@ func (r *Builder) ConfigMap(vmRef ref.Ref, secret *core.Secret, object *core.Con
 		return liberr.Wrap(err)
 	}
 
-	object.Data = map[string]string{
-		"ca.pem": vmExport.Status.Links.External.Cert,
+	links := vmExport.Status.Links
+	if links.External != nil {
+		object.Data = map[string]string{
+			"ca.pem": links.External.Cert,
+		}
+	} else {
+		return liberr.Wrap(fmt.Errorf("failed to get external link from VM-exports"))
 	}
 
 	return nil
