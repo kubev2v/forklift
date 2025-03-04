@@ -690,6 +690,16 @@ func (r *KubeVirt) getDVs(vm *plan.VMStatus) (edvs []ExtendedDataVolume, err err
 	return
 }
 
+// Helper function to get disk index from PVC annotation.
+func getDiskIndex(pvc *core.PersistentVolumeClaim) int {
+	if idx, exists := pvc.Annotations[planbase.AnnDiskIndex]; exists {
+		if val, err := strconv.Atoi(idx); err == nil {
+			return val
+		}
+	}
+	return -1 // Return -1 for PVCs without index annotation
+}
+
 // Return PersistentVolumeClaims associated with a VM.
 func (r *KubeVirt) getPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, err error) {
 	pvcsList := &core.PersistentVolumeClaimList{}
@@ -714,6 +724,13 @@ func (r *KubeVirt) getPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, e
 		pvc := pvc
 		pvcs[i] = &pvc
 	}
+
+	// Sort the pvcs slice by disk index
+	sort.Slice(pvcs, func(i, j int) bool {
+		iIdx := getDiskIndex(pvcs[i])
+		jIdx := getDiskIndex(pvcs[j])
+		return iIdx < jIdx
+	})
 
 	return
 }

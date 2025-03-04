@@ -488,6 +488,12 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 				if disk.Shared {
 					dv.ObjectMeta.Labels[Shareable] = "true"
 				}
+
+				// Preserve the disk index as an annotation on the created DataVolume
+				// Note: this annotation will be used to match the PVC to the VM disks by
+				//       matching the disk and PVC index.
+				dv.ObjectMeta.Annotations[planbase.AnnDiskIndex] = fmt.Sprintf("%d", diskIndex)
+
 				// if exists, get the PVC generate name from the PlanSpec, generate the name
 				// and update the GenerateName field in the DataVolume object.
 				pvcNameTemplate := r.getPVCNameTemplate(vm)

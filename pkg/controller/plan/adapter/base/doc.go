@@ -19,6 +19,9 @@ const (
 	// VMware or disk ID in oVirt.
 	AnnDiskSource = "forklift.konveyor.io/disk-source"
 
+	// Used on DataVolume, contains disk mount order.
+	AnnDiskIndex = "forklift.konveyor.io/disk-index"
+
 	// Set on a PVC to indicate it requires format conversion
 	AnnRequiresConversion = "forklift.konveyor.io/requires-conversion"
 
