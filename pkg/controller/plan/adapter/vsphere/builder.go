@@ -58,8 +58,9 @@ const (
 
 // Network types
 const (
-	Pod    = "pod"
-	Multus = "multus"
+	Pod     = "pod"
+	Multus  = "multus"
+	Ignored = "ignored"
 )
 
 // Template labels
@@ -622,6 +623,12 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 	netMapIn := r.Context.Map.Network.Spec.Map
 	for i := range netMapIn {
 		mapped := &netMapIn[i]
+
+		// Skip network mappings with destination type 'Ignored'
+		if mapped.Destination.Type == Ignored {
+			continue
+		}
+
 		ref := mapped.Source
 		network := &model.Network{}
 		fErr := r.Source.Inventory.Find(network, ref)
