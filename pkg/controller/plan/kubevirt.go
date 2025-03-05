@@ -1465,9 +1465,16 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 		object.ObjectMeta.Annotations = annotations
 	}
 
-	// Power on the destination VM if the source VM was originally powered on.
-	running := vm.RestorePowerState == plan.VMPowerStateOn
-	object.Spec.Running = &running
+	// Set the default run strategy to Halted
+	runStrategy := cnv.RunStrategyHalted
+
+	// If the source VM is powered on, set the destination VM to always run
+	if vm.RestorePowerState == plan.VMPowerStateOn {
+		runStrategy = cnv.RunStrategyAlways
+	}
+
+	// Assign the determined run strategy to the object
+	object.Spec.RunStrategy = &runStrategy
 
 	err = r.Builder.VirtualMachine(vm.Ref, &object.Spec, pvcs, vm.InstanceType != "")
 	if err != nil {
