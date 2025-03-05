@@ -298,6 +298,7 @@ func (r *Finder) Storage(ref *base.Ref) (object interface{}, err error) {
 	storage := &Storage{}
 	err = r.ByRef(storage, *ref)
 	if err == nil {
+		ref.ID = storage.ID
 		ref.Name = storage.Name
 		object = storage
 	}
