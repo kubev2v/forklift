@@ -597,7 +597,10 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	if object.Template == nil {
 		object.Template = &cnv.VirtualMachineInstanceTemplateSpec{}
 	}
-	r.mapDisks(vm, vmRef, persistentVolumeClaims, object)
+	err = r.mapDisks(vm, vmRef, persistentVolumeClaims, object)
+	if err != nil {
+		return
+	}
 	r.mapFirmware(vm, object)
 	if !usesInstanceType {
 		r.mapCPU(vm, object)
@@ -783,7 +786,7 @@ func (r *Builder) sortedDisks(disks []vsphere.Disk) []vsphere.Disk {
 	return resp
 }
 
-func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims []*core.PersistentVolumeClaim, object *cnv.VirtualMachineSpec) {
+func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims []*core.PersistentVolumeClaim, object *cnv.VirtualMachineSpec) error {
 	var kVolumes []cnv.Volume
 	var kDisks []cnv.Disk
 	var templateErr error
@@ -794,9 +797,9 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 		pvc := persistentVolumeClaims[i]
 		// the PVC BackingFile value has already been trimmed.
 		if source, ok := pvc.Annotations[planbase.AnnDiskSource]; ok {
-			pvcMap[source] = pvc
+			pvcMap[trimBackingFileName(source)] = pvc
 		} else {
-			pvcMap[pvc.Annotations[AnnImportBackingFile]] = pvc
+			pvcMap[trimBackingFileName(pvc.Annotations[AnnImportBackingFile])] = pvc
 		}
 	}
 
@@ -809,7 +812,13 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 	}
 
 	for i, disk := range disks {
-		pvc := pvcMap[baseVolume(disk.File, r.Plan.Spec.Warm)]
+		// If the user creates in middle of migration snapshot the disk file name gets the snapshot suffix.
+		// This is updated in the inventory as it's the current disk state, but all PVCs and DVs were created with
+		// the original name. The trim will remove the suffix from the disk name showing the original name.
+		pvc := pvcMap[trimBackingFileName(disk.File)]
+		if pvc == nil {
+			return fmt.Errorf("failed to find persistent volume for disk %s", disk.File)
+		}
 		volumeName := fmt.Sprintf("vol-%v", i)
 
 		// If the volume name template is set, use it to generate the volume name.
@@ -868,6 +877,7 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 	}
 	object.Template.Spec.Volumes = kVolumes
 	object.Template.Spec.Domain.Devices.Disks = kDisks
+	return nil
 }
 
 func (r *Builder) mapTpm(vm *model.VM, object *cnv.VirtualMachineSpec) {
