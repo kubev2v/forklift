@@ -146,9 +146,6 @@ func (r *XVM) Expand(db libmodel.DB) (err error) {
 				subnet := &Subnet{}
 				subnet.With(&subnetModel)
 				subnets = append(subnets, *subnet)
-				if err != nil {
-					return
-				}
 			}
 		}
 	}
