@@ -545,6 +545,21 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "VM network name template is invalid.",
 		Items:    []string{},
 	}
+	targetNameInvalid := libcnd.Condition{
+		Type:     NotValid,
+		Status:   True,
+		Category: Critical,
+		Message:  "TargetName is invalid.",
+		Items:    []string{},
+	}
+	targetNameNotUnique := libcnd.Condition{
+		Type:     DuplicateVM,
+		Status:   True,
+		Reason:   NotUnique,
+		Category: Critical,
+		Message:  "Duplicate targerName.",
+		Items:    []string{},
+	}
 	sharedDisks := libcnd.Condition{
 		Type:     SharedDisks,
 		Status:   True,
@@ -554,10 +569,12 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 
 	setOf := map[string]bool{}
+	setOfTargetName := map[string]bool{}
 	//
 	// Referenced VMs.
 	for i := range plan.Spec.VMs {
-		ref := &plan.Spec.VMs[i].Ref
+		vm := &plan.Spec.VMs[i]
+		ref := &vm.Ref
 		if ref.NotSet() {
 			plan.Status.SetCondition(libcnd.Condition{
 				Type:     VMRefNotValid,
@@ -589,13 +606,28 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			}
 			return liberr.Wrap(pErr)
 		}
-		if len(k8svalidation.IsDNS1123Subdomain(ref.Name)) > 0 {
-			nameNotValid.Items = append(nameNotValid.Items, ref.String())
+		if vm.TargetName == "" {
+			if len(k8svalidation.IsDNS1123Subdomain(ref.Name)) > 0 {
+				// if source VM name is not valid
+				nameNotValid.Items = append(nameNotValid.Items, ref.String())
+			}
+		} else {
+			if len(k8svalidation.IsDNS1123Subdomain(vm.TargetName)) > 0 {
+				// if a manually assigned target name is not valid
+				targetNameInvalid.Items = append(targetNameInvalid.Items, ref.String())
+			}
 		}
+		// check if vm ID is unique
 		if _, found := setOf[ref.ID]; found {
 			notUnique.Items = append(notUnique.Items, ref.String())
 		} else {
 			setOf[ref.ID] = true
+		}
+		// check if targetName is unique
+		if _, found := setOfTargetName[vm.TargetName]; found {
+			targetNameNotUnique.Items = append(targetNameNotUnique.Items, ref.String())
+		} else {
+			setOfTargetName[vm.TargetName] = true
 		}
 		pAdapter, err := adapter.New(provider)
 		if err != nil {
@@ -682,6 +714,12 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		id := path.Join(
 			plan.Spec.TargetNamespace,
 			ref.Name)
+		if vm.TargetName != "" {
+			// if target name is provided, use it to look for existing VMs
+			id = path.Join(
+				plan.Spec.TargetNamespace,
+				vm.TargetName)
+		}
 		_, pErr = inventory.VM(&refapi.Ref{Name: id})
 		if pErr == nil {
 			if _, found := plan.Status.Migration.FindVM(*ref); !found {
@@ -707,20 +745,20 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			}
 		}
 		// is valid vm pvc name template
-		if plan.Spec.VMs[i].PVCNameTemplate != "" {
-			if err := r.IsValidPVCNameTemplate(plan.Spec.VMs[i].PVCNameTemplate); err != nil {
+		if vm.PVCNameTemplate != "" {
+			if err := r.IsValidPVCNameTemplate(vm.PVCNameTemplate); err != nil {
 				pvcNameInvalid.Items = append(pvcNameInvalid.Items, ref.String())
 			}
 		}
 		// is valid vm pvc name template
-		if plan.Spec.VMs[i].VolumeNameTemplate != "" {
-			if err := r.IsValidVolumeNameTemplate(plan.Spec.VMs[i].VolumeNameTemplate); err != nil {
+		if vm.VolumeNameTemplate != "" {
+			if err := r.IsValidVolumeNameTemplate(vm.VolumeNameTemplate); err != nil {
 				volumeNameInvalid.Items = append(volumeNameInvalid.Items, ref.String())
 			}
 		}
 		// is valid vm pvc name template
-		if plan.Spec.VMs[i].NetworkNameTemplate != "" {
-			if err := r.IsValidNetworkNameTemplate(plan.Spec.VMs[i].NetworkNameTemplate); err != nil {
+		if vm.NetworkNameTemplate != "" {
+			if err := r.IsValidNetworkNameTemplate(vm.NetworkNameTemplate); err != nil {
 				networkNameInvalid.Items = append(networkNameInvalid.Items, ref.String())
 			}
 		}
@@ -772,6 +810,12 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(networkNameInvalid.Items) > 0 {
 		plan.Status.SetCondition(networkNameInvalid)
+	}
+	if len(targetNameInvalid.Items) > 0 {
+		plan.Status.SetCondition(targetNameInvalid)
+	}
+	if len(targetNameNotUnique.Items) > 0 {
+		plan.Status.SetCondition(targetNameNotUnique)
 	}
 
 	return nil
@@ -1378,6 +1422,20 @@ func (r *Reconciler) IsValidNetworkNameTemplate(networkNameTemplate string) erro
 	errs := k8svalidation.IsValidLabelValue(result)
 	if len(errs) > 0 {
 		return liberr.New("Template output is not a valid k8s label", "errors", errs)
+	}
+
+	return nil
+}
+
+func (r *Reconciler) IsValidTargetName(targetName string) error {
+	if targetName == "" {
+		return nil
+	}
+
+	// Validate that the target name is a valid k8s name ( e.g. label with dots )
+	errs := k8svalidation.IsDNS1123Subdomain(targetName)
+	if len(errs) > 0 {
+		return liberr.New("Target name is not a valid k8s subdomain", "errors", errs)
 	}
 
 	return nil
