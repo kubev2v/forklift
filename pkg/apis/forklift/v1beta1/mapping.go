@@ -28,8 +28,12 @@ import (
 
 // Mapped network destination.
 type DestinationNetwork struct {
-	// The network type.
-	// +kubebuilder:validation:Enum=pod;multus
+	// Type of network to use for the destination.
+	// Valid values:
+	// - pod: Use the Kubernetes pod network
+	// - multus: Use a Multus additional network
+	// - ignored: Network is excluded from mapping
+	// +kubebuilder:validation:Enum=pod;multus;ignored
 	Type string `json:"type"`
 	// The namespace (multus only).
 	Namespace string `json:"namespace,omitempty"`
