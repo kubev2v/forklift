@@ -56,6 +56,9 @@ func (h VMHandler) List(ctx *gin.Context) {
 			ctx.Status(http.StatusInternalServerError)
 		}
 	}()
+
+	// We need model.MaxDetail for retrieving IsTemplate field from the database
+	h.Detail = model.MaxDetail
 	db := h.Collector.DB()
 	list := []model.VM{}
 	err = db.List(&list, h.ListOptions(ctx))
@@ -69,6 +72,13 @@ func (h VMHandler) List(ctx *gin.Context) {
 	}
 	pb := PathBuilder{DB: db}
 	for _, m := range list {
+		if m.IsTemplate {
+			log.Info(
+				"Skipping template VM",
+				"vmID", m.ID,
+				"isTemplate", m.IsTemplate)
+			continue
+		}
 		r := &VM{}
 		r.With(&m)
 		r.Link(h.Provider)
