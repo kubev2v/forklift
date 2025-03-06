@@ -52,7 +52,7 @@ spec:
         - name: name
           value: show-sbom
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-show-sbom:0.1@sha256:945a7c9066d3e0a95d3fddb7e8a6992e4d632a2a75d8f3a9bd2ff2fef0ec9aa0
+          value: quay.io/konflux-ci/tekton-catalog/task-show-sbom:0.1@ sha256:f5c927b0140815c9eb79ff38214ead94ccc7aebde5e956cf0c12d1b4387cc3da 
         - name: kind
           value: task
         resolver: bundles
