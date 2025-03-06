@@ -23,7 +23,7 @@ test_dir() {
     export IFQUERY_CMD="
       podman run
       -v $TEST_DIR/etc/network:/etc/network
-      cmd.cat/ifquery ifquery
+      quay.io/kubev2v/ifquery:latest ifquery
     "
     export TEST_SRC_DIR=$1  #${SCRIPT_DIR}/ifcfg-test.d
     export EXPECTED_UDEV_RULE_FILE="$TEST_SRC_DIR/expected-udev.rule"
