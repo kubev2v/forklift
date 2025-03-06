@@ -76,7 +76,7 @@ expected_to_pass_dirs() {
 
 
 expected_to_fail_dirs() {
-    local FAIL_IS_FATAL=false PASS_IS_FATAL=true
+    local FAIL_IS_FATAL=true PASS_IS_FATAL=true
     test_dirs "$@"
 }
 
@@ -96,7 +96,7 @@ expected_to_pass_dirs ${SCRIPT_DIR}/netplan*-test.d;
 
 # Test systems using systemd
 # --------------------------
-expected_to_fail_dirs ${SCRIPT_DIR}/systemd*-test.d;
+DISABLE_NETPLAN_GET=true expected_to_fail_dirs ${SCRIPT_DIR}/systemd*-test.d;
 
 # Test systems using network interfaces
 # --------------------------
