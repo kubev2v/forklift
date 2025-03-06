@@ -121,4 +121,3 @@ The profiler can be enabled using the following environment variables:
 - PROFILE_PATH: Profiler output directory.
 - PROFILE_DURATION: The duration (minutes) the profiler
   will collect data. (0=indefinately)
-
