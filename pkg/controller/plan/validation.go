@@ -56,6 +56,7 @@ const (
 	HostNotReady                  = "HostNotReady"
 	DuplicateVM                   = "DuplicateVM"
 	SharedDisks                   = "SharedDisks"
+	SharedWarnDisks               = "SharedWarnDisks"
 	NameNotValid                  = "TargetNameNotValid"
 	HookNotValid                  = "HookNotValid"
 	HookNotReady                  = "HookNotReady"
@@ -464,6 +465,13 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "VMs with shared disk can not be migrated.", // This should be set by the provider validator
 		Items:    []string{},
 	}
+	sharedWarnDisks := libcnd.Condition{
+		Type:     SharedWarnDisks,
+		Status:   True,
+		Category: Warn,
+		Message:  "VMs with shared disk can not be migrated.", // This should be set by the provider validator
+		Items:    []string{},
+	}
 
 	setOf := map[string]bool{}
 	//
@@ -576,11 +584,13 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		if !ok {
 			if msg != "" {
 				sharedDisks.Message = msg
+				sharedWarnDisks.Message = msg
 			}
-			if category != "" {
-				sharedDisks.Category = category
+			if category == validation.Warn {
+				sharedWarnDisks.Items = append(sharedWarnDisks.Items, ref.String())
+			} else {
+				sharedDisks.Items = append(sharedDisks.Items, ref.String())
 			}
-			sharedDisks.Items = append(sharedDisks.Items, ref.String())
 		}
 		// Destination.
 		provider = plan.Referenced.Provider.Destination
@@ -654,6 +664,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(sharedDisks.Items) > 0 {
 		plan.Status.SetCondition(sharedDisks)
+	}
+	if len(sharedWarnDisks.Items) > 0 {
+		plan.Status.SetCondition(sharedWarnDisks)
 	}
 	if len(missingCbtForWarm.Items) > 0 {
 		plan.Status.SetCondition(missingCbtForWarm)
