@@ -1,2 +1,4 @@
+SUBSYSTEM=="net",ACTION=="add",ATTR{address}=="aa:bb:cc:dd:ee:fe",NAME="temp_eth1"
+SUBSYSTEM=="net",ACTION=="add",ATTR{address}=="aa:bb:cc:dd:ee:fd",NAME="temp_enp3s0"
 SUBSYSTEM=="net",ACTION=="add",ATTR{address}=="aa:bb:cc:dd:ee:fe",NAME="eth1"
 SUBSYSTEM=="net",ACTION=="add",ATTR{address}=="aa:bb:cc:dd:ee:fd",NAME="enp3s0"
