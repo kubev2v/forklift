@@ -25,3 +25,4 @@ LABEL \
         vendor="Red Hat, Inc." \
         maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>"
 
+# tests
