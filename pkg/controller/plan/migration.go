@@ -811,6 +811,13 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		if vm.TargetName != "" {
 			vm.NewName = vm.TargetName
 
+			// Check if the new VM name meets DNS1123 protocol requirements
+			if errs := k8svalidation.IsDNS1123Subdomain(vm.NewName); len(errs) > 0 {
+				err = fmt.Errorf("VM name '%s' does not meet DNS1123 protocol requirements", vm.NewName)
+				r.Log.Error(err, "Failed to update the VM name to targetName.")
+				return
+			}
+
 			// Verify target VM name uniqueness in the destination namespace.
 			// Return error if name exists since we do not want to mutate explicit name assignments.
 			nameExist, errName := r.kubevirt.checkIfVmNameExistsInNamespace(vm.NewName, r.Plan.Spec.TargetNamespace)
