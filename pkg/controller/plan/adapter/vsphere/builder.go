@@ -495,7 +495,6 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 				if disk.Shared {
 					dv.ObjectMeta.Labels[Shareable] = "true"
 				}
-
 				dvs = append(dvs, *dv)
 			}
 		}
@@ -535,7 +534,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 		return
 	}
 	if !r.Context.Plan.Spec.MigrateSharedDisks {
-		sharedPVCs, missingDiskPVCs, err := findSharedPVCs(r.Destination.Client, vm)
+		sharedPVCs, missingDiskPVCs, err := findSharedPVCs(r.Destination.Client, vm, r.Plan.Spec.TargetNamespace)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
