@@ -513,14 +513,25 @@ func (r *Builder) getSourceVmFromDefinition(vme *export.VirtualMachineExport) (*
 	}
 
 	caCert := vme.Status.Links.External.Cert
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM([]byte(caCert))
+	var transport *http.Transport
 
-	tlsConfig := &tls.Config{
-		RootCAs: caCertPool,
+	if caCert != "" {
+		caCertPool := x509.NewCertPool()
+		if !caCertPool.AppendCertsFromPEM([]byte(caCert)) {
+			return nil, liberr.New("failed to parse CA certificate")
+		}
+
+		tlsConfig := &tls.Config{
+			RootCAs: caCertPool,
+		}
+
+		transport = &http.Transport{TLSClientConfig: tlsConfig}
+
+	} else {
+		r.Log.Info("Certificate from VM export is empty, using system CA certificates")
+		transport = &http.Transport{}
 	}
 
-	transport := &http.Transport{TLSClientConfig: tlsConfig}
 	httpClient := &http.Client{Transport: transport}
 	req, err := http.NewRequest("GET", vmManifestUrl, nil)
 	if err != nil {
