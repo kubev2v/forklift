@@ -564,7 +564,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 		return
 	}
 	if !r.Context.Plan.Spec.MigrateSharedDisks {
-		sharedPVCs, missingDiskPVCs, err := findSharedPVCs(r.Destination.Client, vm)
+		sharedPVCs, missingDiskPVCs, err := findSharedPVCs(r.Destination.Client, vm, r.Plan.Spec.TargetNamespace)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
