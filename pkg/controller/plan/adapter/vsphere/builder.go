@@ -495,6 +495,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 				if disk.Shared {
 					dv.ObjectMeta.Labels[Shareable] = "true"
 				}
+
 				dvs = append(dvs, *dv)
 			}
 		}
@@ -726,7 +727,7 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 	var bootDisk int
 	for _, vmConf := range r.Plan.Spec.VMs {
 		if vmConf.ID == vmRef.ID {
-			bootDisk = utils.GetDeviceNumber(vmConf.RootDisk)
+			bootDisk = utils.GetBootDiskNumber(vmConf.RootDisk)
 			break
 		}
 	}
@@ -767,14 +768,15 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 			kubevirtDisk.Shareable = ptr.To(true)
 			kubevirtDisk.Cache = cnv.CacheNone
 		}
-		// For multiboot VMs, if the selected boot device is the current disk,
-		// set it as the first in the boot order.
-		if bootDisk == i+1 {
-			kubevirtDisk.BootOrder = ptr.To(uint(1))
-		}
 		kVolumes = append(kVolumes, volume)
 		kDisks = append(kDisks, kubevirtDisk)
 	}
+	// For multiboot VMs, if the selected boot device is the current disk,
+	// set it as the first in the boot order.
+	kDisks[bootDisk].BootOrder = ptr.To(uint(1))
+	// The boot disk needs to have a virtio bus
+	kDisks[bootDisk].Disk.Bus = cnv.DiskBusVirtio
+
 	object.Template.Spec.Volumes = kVolumes
 	object.Template.Spec.Domain.Devices.Disks = kDisks
 	return nil
