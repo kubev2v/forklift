@@ -5,6 +5,7 @@ import (
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
+	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
@@ -207,7 +208,7 @@ func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, m
 
 	// Check existing PVCs
 	if !r.plan.Spec.MigrateSharedDisks {
-		_, missingDiskPVCs, err := findSharedPVCs(client, vm)
+		_, missingDiskPVCs, err := findSharedPVCs(client, vm, r.plan.Spec.TargetNamespace)
 		if err != nil {
 			return false, "", "", liberr.Wrap(err, "vm", vm)
 		}
@@ -217,6 +218,59 @@ func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, m
 				missingDiskNames = append(missingDiskNames, disk.File)
 			}
 			msg = fmt.Sprintf("Missing shared disks PVC '%s' in namespace '%s', the VMs can be migrated but the disk will not be attached", missingDiskNames, r.plan.Spec.TargetNamespace)
+			return false, msg, validation.Warn, nil
+		}
+	} else {
+		// Find duplicate already shared disk
+		sharedPVCs, _, err := findSharedPVCs(client, vm, r.plan.Spec.TargetNamespace)
+		if err != nil {
+			return false, "", "", liberr.Wrap(err, "vm", vm)
+		}
+		if sharedPVCs != nil {
+			var alreadyExistingPvc []string
+			for _, pvc := range sharedPVCs {
+				alreadyExistingPvc = append(alreadyExistingPvc, pvc.Annotations[planbase.AnnDiskSource])
+			}
+			msg = fmt.Sprintf("Already existing shared disks PVCs '%s' in namespace '%s', the VMs can be migrated but the disk will be duplicated", alreadyExistingPvc, r.plan.Spec.TargetNamespace)
+			return false, msg, validation.Warn, nil
+		}
+
+		// Find duplicate shared disk in the plan
+		sharedDisksDuplicate := make(map[string]int)
+		for _, duplicateVmRef := range r.plan.Spec.VMs {
+			duplicateVm := &model.VM{}
+			err = r.inventory.Find(duplicateVm, duplicateVmRef.Ref)
+			if err != nil {
+				return false, "", "", liberr.Wrap(err, "vm", vm)
+			}
+			for _, disk := range duplicateVm.Disks {
+				if disk.Shared && vm.HasDisk(disk) {
+					sharedDisksDuplicate[disk.File] += 1
+				}
+			}
+		}
+		msg := ""
+		disksWithMultipleOccurrences := 0
+		for diskFile, occurrences := range sharedDisksDuplicate {
+			if occurrences > 1 {
+				msg = fmt.Sprintf("the shared disk '%s' will be coppied %dx, %s", diskFile, occurrences, msg)
+				disksWithMultipleOccurrences += 1
+			}
+		}
+		if msg != "" {
+			var diskLabel string
+			if disksWithMultipleOccurrences == 1 {
+				diskLabel = "disk"
+			} else {
+				diskLabel = "disks"
+			}
+
+			msg = fmt.Sprintf(
+				"%s please detach the %s from all but one of the VMs, or remove the VMs from the plan to avoid duplicating the %s",
+				msg,
+				diskLabel,
+				diskLabel,
+			)
 			return false, msg, validation.Warn, nil
 		}
 	}
