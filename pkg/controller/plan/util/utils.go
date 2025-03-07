@@ -40,6 +40,15 @@ func CalculateSpaceWithOverhead(requestedSpace int64, volumeMode *core.Persisten
 	return spaceWithOverhead
 }
 
+func GetBootDiskNumber(deviceString string) int {
+	resp := GetDeviceNumber(deviceString)
+	if resp == 0 {
+		return 0
+	} else {
+		return resp - 1
+	}
+}
+
 func GetDeviceNumber(deviceString string) int {
 	if !(strings.HasPrefix(deviceString, diskPrefix) && len(deviceString) > len(diskPrefix)) {
 		// In case we encounter an issue detecting the root disk order,
