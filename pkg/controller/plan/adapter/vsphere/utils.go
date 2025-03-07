@@ -48,7 +48,7 @@ func trimBackingFileName(fileName string) string {
 }
 
 // Return all shareable PVCs
-func listShareablePVCs(c client.Client) (pvcs []*core.PersistentVolumeClaim, err error) {
+func listShareablePVCs(c client.Client, targetNamespace string) (pvcs []*core.PersistentVolumeClaim, err error) {
 	pvcsList := &core.PersistentVolumeClaimList{}
 	err = c.List(
 		context.TODO(),
@@ -57,6 +57,7 @@ func listShareablePVCs(c client.Client) (pvcs []*core.PersistentVolumeClaim, err
 			LabelSelector: k8slabels.SelectorFromSet(map[string]string{
 				Shareable: "true",
 			}),
+			Namespace: targetNamespace,
 		},
 	)
 	if err != nil {
@@ -74,8 +75,8 @@ func listShareablePVCs(c client.Client) (pvcs []*core.PersistentVolumeClaim, err
 }
 
 // Return PersistentVolumeClaims and disks associated with a VM.
-func findSharedPVCs(c client.Client, vm *model.VM) (pvcs []*core.PersistentVolumeClaim, missingDiskPVCs []vsphere.Disk, err error) {
-	allPvcs, err := listShareablePVCs(c)
+func findSharedPVCs(client client.Client, vm *model.VM, targetNamespace string) (pvcs []*core.PersistentVolumeClaim, missingDiskPVCs []vsphere.Disk, err error) {
+	allPvcs, err := listShareablePVCs(client, targetNamespace)
 	if err != nil {
 		return
 	}
@@ -84,7 +85,7 @@ func findSharedPVCs(c client.Client, vm *model.VM) (pvcs []*core.PersistentVolum
 		if !disk.Shared {
 			continue
 		}
-		// Warm migration disable as the shared disks can't be migrated with warm migration
+		// Warm migration disabled as the shared disks can't be migrated with warm migration
 		pvc := getDisksPvc(disk, allPvcs, false)
 		if pvc != nil {
 			pvcs = append(pvcs, pvc)
