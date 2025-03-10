@@ -41,8 +41,9 @@ const (
 
 // Network types.
 const (
-	Pod    = "pod"
-	Multus = "multus"
+	Pod     = "pod"
+	Multus  = "multus"
+	Ignored = "ignored"
 )
 
 // Validate the mp resource.
@@ -151,7 +152,7 @@ func (r *Reconciler) validateDestination(mp *api.NetworkMap) (err error) {
 next:
 	for _, entry := range list {
 		switch entry.Destination.Type {
-		case Pod:
+		case Ignored, Pod:
 			continue next
 		case Multus:
 			if entry.Destination.Namespace == "" {
