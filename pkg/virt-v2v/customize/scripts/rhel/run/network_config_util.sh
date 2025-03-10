@@ -109,7 +109,7 @@ udev_from_ifcfg() {
             continue
         fi
 
-        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"$(remove_quotes "$DEVICE")\""
+        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"temp_$(remove_quotes "$DEVICE")\""
     done
 }
 
@@ -147,7 +147,7 @@ udev_from_nm() {
             continue
         fi
 
-        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"$(remove_quotes "$DEVICE")\""
+        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"temp_$(remove_quotes "$DEVICE")\""
     done
 }
 
@@ -223,7 +223,7 @@ udev_from_netplan() {
         fi
 
         # Create the udev rule based on the extracted MAC address and interface name
-        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"$(remove_quotes "$interface_name")\""
+        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"temp_$(remove_quotes "$interface_name")\""
     done
 }
 
@@ -274,8 +274,19 @@ udev_from_ifquery() {
         fi
 
         # Create the udev rule based on the extracted MAC address and interface name
-        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"$(remove_quotes "$interface_name")\""
+        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"temp_$(remove_quotes "$interface_name")\""
     done
+}
+
+
+# Create final udev rules based on the temporary udev rules
+# When generating udev rules, there might be conflicts if multiple interfaces 
+# are being processed simultaneously. By separating the generation of temporary rules 
+# and the assignment of final names, the script ensures that the final udev rules are consistent and free of conflicts.
+udev_final_from_temp_rules() {
+    input=$(cat)
+    echo "$input"
+    echo "$input" | sed "s/temp_//"
 }
 
 # Write to udev config
@@ -297,16 +308,26 @@ check_dupe_hws() {
     echo "$input"
 }
 
+action="down"
+
+# Define the udev rule with properly escaped quotes and command substitution
+rule="SUBSYSTEM==\"net\", ACTION==\"add\", RUN+=\"/bin/bash -c \\\"for iface in \\\$(ip link show | grep -v \\\"lo\\\" | awk -F\\\": \\\" \\x27{print \\\\$2}\\x27); do ip link set \\\\$iface $action; done\\\"\""
+
+
+
 # Create udev rules check for duplicates and write them to udev file
 main() {
+    echo "$rule" >> "$UDEV_RULES_FILE" 2>/dev/null
     {
         udev_from_ifcfg
         udev_from_nm
         udev_from_netplan
         udev_from_ifquery
-    } | check_dupe_hws > "$UDEV_RULES_FILE" 2>/dev/null
-    echo "New udev rule:"
+    } | check_dupe_hws | udev_final_from_temp_rules >> "$UDEV_RULES_FILE" 2>/dev/null
+
+    action="up"
+    echo "$rule" >> "$UDEV_RULES_FILE" 2>/dev/null
+    echo "New udev rules:"
     cat $UDEV_RULES_FILE
 }
-
 main
