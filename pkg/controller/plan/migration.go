@@ -456,7 +456,7 @@ func (r *Migration) Cancel() error {
 	}
 
 	for _, vm := range r.Plan.Status.Migration.VMs {
-		if vm.HasCondition(Canceled) {
+		if vm.HasCondition(Canceled) && !vm.MarkedCompleted() {
 			dontFailOnError := func(err error) bool {
 				if err != nil {
 					r.Log.Error(liberr.Wrap(err),

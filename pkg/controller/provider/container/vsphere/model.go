@@ -880,7 +880,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					Key:      disk.Key,
 					File:     backing.FileName,
 					Capacity: disk.CapacityInBytes,
-					Shared:   backing.Sharing != "sharingNone",
+					Shared:   backing.Sharing != "sharingNone" && backing.Sharing != "",
 					Mode:     backing.DiskMode,
 					Bus:      controller.Bus,
 				}
@@ -897,7 +897,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					Key:      disk.Key,
 					File:     backing.FileName,
 					Capacity: disk.CapacityInBytes,
-					Shared:   backing.Sharing != "sharingNone",
+					Shared:   backing.Sharing != "sharingNone" && backing.Sharing != "",
 					Mode:     backing.DiskMode,
 					RDM:      true,
 					Bus:      controller.Bus,
@@ -915,7 +915,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					Key:      disk.Key,
 					File:     backing.DescriptorFileName,
 					Capacity: disk.CapacityInBytes,
-					Shared:   backing.Sharing != "sharingNone",
+					Shared:   backing.Sharing != "sharingNone" && backing.Sharing != "",
 					RDM:      true,
 					Bus:      controller.Bus,
 				}
