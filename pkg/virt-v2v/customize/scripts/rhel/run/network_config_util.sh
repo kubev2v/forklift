@@ -161,6 +161,9 @@ udev_from_netplan() {
 
     # Function to check if netplan supports the 'get' subcommand
     netplan_supports_get() {
+        if ${DISABLE_NETPLAN_GET:-false}; then
+            return 1
+        fi
         netplan get >&3
         return $?
     }

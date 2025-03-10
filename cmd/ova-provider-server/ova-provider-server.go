@@ -467,6 +467,8 @@ func convertToVmStruct(envelope []Envelope, ovaPath []string) ([]VM, error) {
 					newVM.MemoryUnits = item.AllocationUnits
 
 				} else {
+					fmt.Println("item", item)
+					fmt.Println("item.ElementName[:len(item.ElementName)-2]", item.ElementName[:len(item.ElementName)-2])
 					var itemKind string
 					if len(item.ElementName) > 0 {
 						// if the `ElementName` element has a name such as "Hard Disk 1", strip off the
@@ -482,6 +484,7 @@ func convertToVmStruct(envelope []Envelope, ovaPath []string) ([]VM, error) {
 					if len(itemKind) == 0 {
 						itemKind = "Unknown"
 					}
+					fmt.Println("itemKind", itemKind)
 					newVM.Devices = append(newVM.Devices, Device{
 						Kind: itemKind,
 					})
