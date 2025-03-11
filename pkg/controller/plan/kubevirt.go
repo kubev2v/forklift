@@ -669,7 +669,7 @@ func (r *KubeVirt) vddkConfigMap(labels map[string]string) (*core.ConfigMap, err
 			data["vddk-config-file"] = vddkConfig
 		} else {
 			data["vddk-config-file"] =
-				"VixDiskLib.nfcAio.Session.BufSizeIn64K=16\n" +
+				"VixDiskLib.nfcAio.Session.BufSizeIn64KB=16\n" +
 					"VixDiskLib.nfcAio.Session.BufCount=4"
 		}
 	}
