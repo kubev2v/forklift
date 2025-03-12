@@ -110,6 +110,7 @@ type VirtualSystem struct {
 		OsType      string `xml:"osType,attr"`
 	} `xml:"OperatingSystemSection"`
 	HardwareSection VirtualHardwareSection `xml:"VirtualHardwareSection"`
+	Product         ProductSection         `xml:"ProductSection"`
 }
 
 type Envelope struct {
@@ -118,6 +119,28 @@ type Envelope struct {
 	DiskSection    DiskSection     `xml:"DiskSection"`
 	NetworkSection NetworkSection  `xml:"NetworkSection"`
 	References     References      `xml:"References"`
+}
+
+type ProductSection struct {
+	Property []Property `xml:"Property"`
+}
+
+type Property struct {
+	Key              string  `xml:"key,attr"`
+	Type             string  `xml:"type,attr"`
+	Qualifiers       *string `xml:"qualifiers,attr"`
+	UserConfigurable *bool   `xml:"userConfigurable,attr"`
+	Default          *string `xml:"value,attr"`
+	Password         *bool   `xml:"password,attr"`
+
+	Label       *string `xml:"Label"`
+	Description *string `xml:"Description"`
+
+	Values []PropertyConfigurationValue `xml:"Value"`
+}
+
+type PropertyConfigurationValue struct {
+	Value string `xml:"value,attr"`
 }
 
 // vm struct
@@ -148,6 +171,7 @@ type VM struct {
 	NICs                  []NIC
 	Disks                 []VmDisk
 	Networks              []VmNetwork
+	Product               ProductSection
 }
 
 // Virtual Disk.
@@ -441,6 +465,7 @@ func convertToVmStruct(envelope []Envelope, ovaPath []string) ([]VM, error) {
 				OvaPath: ovaPath[i],
 				Name:    virtualSystem.Name,
 				OsType:  virtualSystem.OperatingSystemSection.OsType,
+				Product: virtualSystem.Product,
 			}
 
 			for _, item := range virtualSystem.HardwareSection.Items {
