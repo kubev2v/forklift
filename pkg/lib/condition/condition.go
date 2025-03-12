@@ -324,8 +324,7 @@ func (r *Conditions) HasBlockerCondition() bool {
 // The collection contains blocker conditions that keep the plan reconciling.
 func (r *Conditions) HasReQCondition() bool {
 	return r.HasCondition(ValidatingVDDK) ||
-		r.HasCondition(VMMissingChangedBlockTracking) ||
-		r.HasCondition(SharedDisks)
+		r.HasCondition(VMMissingChangedBlockTracking)
 }
 
 // The collection contains the `Ready` condition.

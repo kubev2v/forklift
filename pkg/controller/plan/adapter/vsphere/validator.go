@@ -2,7 +2,6 @@ package vsphere
 
 import (
 	"fmt"
-
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
@@ -158,13 +157,30 @@ func (r *Validator) findVmsWithSharedDisk(disk vsphere.Disk) ([]model.VM, error)
 	return resp, nil
 }
 
-func (r *Validator) findSharedDisksVms(disks []vsphere.Disk) ([]model.VM, error) {
-	for _, disk := range disks {
-		if disk.Shared {
-			return r.findVmsWithSharedDisk(disk)
+func (r *Validator) removeDuplicateVms(vms []model.VM) []model.VM {
+	allVms := make(map[string]bool)
+	var noDuplicateVms []model.VM
+	for _, vm := range vms {
+		if _, value := allVms[vm.ID]; !value {
+			allVms[vm.ID] = true
+			noDuplicateVms = append(noDuplicateVms, vm)
 		}
 	}
-	return nil, nil
+	return noDuplicateVms
+}
+
+func (r *Validator) findSharedDisksVms(disks []vsphere.Disk) ([]model.VM, error) {
+	var vms []model.VM
+	for _, disk := range disks {
+		if disk.Shared {
+			vmsWithSharedDisks, err := r.findVmsWithSharedDisk(disk)
+			if err != nil {
+				return nil, err
+			}
+			vms = append(vms, vmsWithSharedDisks...)
+		}
+	}
+	return r.removeDuplicateVms(vms), nil
 }
 
 func (r *Validator) findRunningVms(vms []model.VM) []string {
@@ -202,7 +218,8 @@ func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, m
 		return false, "", "", liberr.Wrap(err, "vm", vm)
 	}
 	if len(runningVms) > 0 {
-		msg = fmt.Sprintf("Virtual Machines '%s' are running with attached shared disk, please power them off", runningVms)
+		msg = fmt.Sprintf("Virtual Machines %s are running with attached shared disk, please power them off",
+			stringifyWithQuotes(runningVms))
 		return false, msg, validation.Critical, nil
 	}
 
@@ -217,7 +234,8 @@ func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, m
 			for _, disk := range missingDiskPVCs {
 				missingDiskNames = append(missingDiskNames, disk.File)
 			}
-			msg = fmt.Sprintf("Missing shared disks PVC '%s' in namespace '%s', the VMs can be migrated but the disk will not be attached", missingDiskNames, r.plan.Spec.TargetNamespace)
+			msg = fmt.Sprintf("Missing shared disks PVC %s in namespace '%s', the VMs can be migrated but the disk will not be attached",
+				stringifyWithQuotes(missingDiskNames), r.plan.Spec.TargetNamespace)
 			return false, msg, validation.Warn, nil
 		}
 	} else {
@@ -231,7 +249,8 @@ func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, m
 			for _, pvc := range sharedPVCs {
 				alreadyExistingPvc = append(alreadyExistingPvc, pvc.Annotations[planbase.AnnDiskSource])
 			}
-			msg = fmt.Sprintf("Already existing shared disks PVCs '%s' in namespace '%s', the VMs can be migrated but the disk will be duplicated", alreadyExistingPvc, r.plan.Spec.TargetNamespace)
+			msg = fmt.Sprintf("Already existing shared disks PVCs %s in namespace '%s', the VMs can be migrated but the disk will be duplicated",
+				stringifyWithQuotes(alreadyExistingPvc), r.plan.Spec.TargetNamespace)
 			return false, msg, validation.Warn, nil
 		}
 
