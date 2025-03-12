@@ -307,6 +307,7 @@ type Device struct {
 type NIC struct {
 	Network Ref    `json:"network"`
 	MAC     string `json:"mac"`
+	Index   int    `json:"order"`
 }
 
 // Guest network.
