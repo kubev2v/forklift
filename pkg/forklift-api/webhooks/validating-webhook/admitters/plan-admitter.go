@@ -113,15 +113,6 @@ func (admitter *PlanAdmitter) validateLUKS() error {
 	return nil
 }
 
-func (admitter *PlanAdmitter) IsValidDiskBus() bool {
-	switch admitter.plan.Spec.DiskBus {
-	case cnv.DiskBusSCSI, cnv.DiskBusSATA, cnv.DiskBusVirtio:
-		return true
-	default:
-		return false
-	}
-}
-
 func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
 	log.Info("Plan admitter was called")
 	raw := ar.Request.Object.Raw
@@ -209,9 +200,6 @@ func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv
 	if err != nil {
 		return util.ToAdmissionResponseError(err)
 	}
-	if admitter.plan.Spec.DiskBus != "" && !admitter.IsValidDiskBus() {
-		err = liberr.New(fmt.Sprintf("migration to diskBus '%s' is not supported", admitter.plan.Spec.DiskBus))
-		return util.ToAdmissionResponseError(err)
-	}
+
 	return util.ToAdmissionResponseAllow()
 }

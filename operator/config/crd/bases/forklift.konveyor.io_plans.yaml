@@ -61,10 +61,7 @@ spec:
                 description: Description
                 type: string
               diskBus:
-                description: |-
-                  Specify the disk bus which will be applied to all VMs disks in plan.
-                  Possible options 'scsi', 'sata' and 'virtio'.
-                  Defaults to 'virtio'.
+                description: 'Deprecated: this field will be deprecated in 2.8.'
                 type: string
               map:
                 description: Resource mapping.

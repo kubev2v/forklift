@@ -850,16 +850,11 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 				},
 			},
 		}
-		bus := cnv.DiskBusVirtio
-		if r.Plan.Spec.DiskBus != "" {
-			bus = r.Plan.Spec.DiskBus
-		}
-
 		kubevirtDisk := cnv.Disk{
 			Name: volumeName,
 			DiskDevice: cnv.DiskDevice{
 				Disk: &cnv.DiskTarget{
-					Bus: bus,
+					Bus: cnv.DiskBusVirtio,
 				},
 			},
 		}
@@ -873,8 +868,6 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 	// For multiboot VMs, if the selected boot device is the current disk,
 	// set it as the first in the boot order.
 	kDisks[bootDisk].BootOrder = ptr.To(uint(1))
-	// The boot disk needs to have a virtio bus
-	kDisks[bootDisk].Disk.Bus = cnv.DiskBusVirtio
 
 	object.Template.Spec.Volumes = kVolumes
 	object.Template.Spec.Domain.Devices.Disks = kDisks
