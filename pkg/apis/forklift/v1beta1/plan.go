@@ -49,10 +49,7 @@ type PlanSpec struct {
 	PreserveClusterCPUModel bool `json:"preserveClusterCpuModel,omitempty"`
 	// Preserve static IPs of VMs in vSphere
 	PreserveStaticIPs bool `json:"preserveStaticIPs,omitempty"`
-	// Specify the disk bus which will be applied to all VMs disks in plan.
-	// Possible options 'scsi', 'sata' and 'virtio'.
-	// Defaults to 'virtio'.
-	// +optional
+	// Deprecated: this field will be deprecated in 2.8.
 	DiskBus cnv.DiskBus `json:"diskBus,omitempty"`
 	// PVCNameTemplate is a template for generating PVC names for VM disks.
 	// It follows Go template syntax and has access to the following variables:
