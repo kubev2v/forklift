@@ -49,7 +49,7 @@ func AddLUKSKeys() ([]string, error) {
 	if _, err := os.Stat(global.LUKSDIR); err == nil {
 		files, err := GetFilesInPath(global.LUKSDIR)
 		if err != nil {
-			return nil, fmt.Errorf("Error reading files in LUKS directory: %v", err)
+			return nil, fmt.Errorf("error reading files in LUKS directory: %v", err)
 		}
 
 		var luksFiles []string
@@ -57,9 +57,9 @@ func AddLUKSKeys() ([]string, error) {
 			luksFiles = append(luksFiles, fmt.Sprintf("all:file:%s", file))
 		}
 
-		luksArgs = append(luksArgs, GetScriptArgs("key", luksFiles...)...)
+		luksArgs = append(luksArgs, GetScriptArgs("--key", luksFiles...)...)
 	} else if !os.IsNotExist(err) {
-		return nil, fmt.Errorf("Error accessing the LUKS directory: %v", err)
+		return nil, fmt.Errorf("error accessing the LUKS directory: %v", err)
 	}
 
 	return luksArgs, nil

@@ -30,7 +30,7 @@ func getScriptsWithSuffix(directory string, suffix string) ([]string, error) {
 
 // addDisksToCustomize appends disk arguments to extraArgs
 func addDisksToCustomize(extraArgs *[]string, disks []string) {
-	*extraArgs = append(*extraArgs, utils.GetScriptArgs("add", disks...)...)
+	*extraArgs = append(*extraArgs, utils.GetScriptArgs("--add", disks...)...)
 }
 
 func formatUpload(src string, dst string) string {

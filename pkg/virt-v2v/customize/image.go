@@ -23,11 +23,24 @@ type DomainExecFunc func(args ...string) error
 func Run(disks []string, operatingSystem string) error {
 	var err error
 	fmt.Printf("Customizing disks '%s'\n", disks)
+
+	// Create extraArgs for both customization types
+	var extraArgs []string
+
+	// Add the disks to customize
+	addDisksToCustomize(&extraArgs, disks)
+
+	// Add the VM new name if provided
+	if newName, found := os.LookupEnv("V2V_NewName"); found && newName != "" {
+		extraArgs = append(extraArgs, utils.GetScriptArgs("-on", newName)...)
+	}
+
 	// Customization for vSphere source.
 	t := utils.EmbedTool{Filesystem: &scriptFS}
+
 	// windows
 	if strings.Contains(operatingSystem, "win") {
-		err = CustomizeWindows(CustomizeDomainExec, disks, global.DIR, &t)
+		err = CustomizeWindows(CustomizeDomainExec, extraArgs, global.DIR, &t)
 		if err != nil {
 			fmt.Println("Error customizing disk image:", err)
 			return err
@@ -36,7 +49,7 @@ func Run(disks []string, operatingSystem string) error {
 
 	// Linux
 	if !strings.Contains(operatingSystem, "win") {
-		err = CustomizeLinux(CustomizeDomainExec, disks, global.DIR, &t)
+		err = CustomizeLinux(CustomizeDomainExec, extraArgs, global.DIR, &t)
 		if err != nil {
 			fmt.Println("Error customizing disk image:", err)
 			return err

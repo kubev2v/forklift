@@ -1861,6 +1861,14 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 				Value: "1",
 			})
 	}
+	// RFC 1123 compliant name
+	if vm.NewName != "" {
+		environment = append(environment,
+			core.EnvVar{
+				Name:  "V2V_NewName",
+				Value: vm.NewName,
+			})
+	}
 	// VDDK image
 	var initContainers []core.Container
 	if vddkImage, found := r.Source.Provider.Spec.Settings[api.VDDK]; found {

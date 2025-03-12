@@ -15,17 +15,17 @@ import (
 // uploads them to the disk image using `virt-customize`.
 //
 // Arguments:
-//   - disks ([]string): The list of disk paths which should be customized
+//   - extraArgs ([]string): Base arguments for customization
+//   - dir (string): The directory where scripts are located
+//   - t (FileSystemTool): Tool for handling filesystem operations
 //
 // Returns:
 //   - error: An error if something goes wrong during the process, or nil if successful.
-func CustomizeWindows(execFunc DomainExecFunc, disks []string, dir string, t FileSystemTool) error {
+func CustomizeWindows(execFunc DomainExecFunc, extraArgs []string, dir string, t FileSystemTool) error {
 	err := t.CreateFilesFromFS(dir)
 	if err != nil {
 		return fmt.Errorf("failed to create files from filesystem: %w", err)
 	}
-
-	var extraArgs []string
 
 	if _, err = os.Stat(global.DYNAMIC_SCRIPTS_MOUNT_PATH); !os.IsNotExist(err) {
 		fmt.Println("Adding windows dynamic scripts")
@@ -36,8 +36,6 @@ func CustomizeWindows(execFunc DomainExecFunc, disks []string, dir string, t Fil
 	}
 
 	addWinFirstbootScripts(&extraArgs, dir)
-
-	addDisksToCustomize(&extraArgs, disks)
 
 	err = execFunc(extraArgs...)
 	if err != nil {
@@ -58,7 +56,7 @@ func addWinFirstbootScripts(extraArgs *[]string, dir string) {
 	uploadInitPath := formatUpload(initPath, global.WIN_FIRSTBOOT_SCRIPTS_PATH)
 	uploadFirstbootPath := formatUpload(firstbootPath, global.WIN_FIRSTBOOT_PATH)
 
-	*extraArgs = append(*extraArgs, utils.GetScriptArgs("upload", uploadScriptPath, uploadInitPath, uploadFirstbootPath)...)
+	*extraArgs = append(*extraArgs, utils.GetScriptArgs("--upload", uploadScriptPath, uploadInitPath, uploadFirstbootPath)...)
 }
 
 func addWinDynamicScripts(extraArgs *[]string, dir string) error {
@@ -69,7 +67,7 @@ func addWinDynamicScripts(extraArgs *[]string, dir string) error {
 	for _, script := range dynamicScripts {
 		fmt.Printf("Adding windows dynamic scripts '%s'\n", script)
 		upload := formatUpload(script, filepath.Join(global.WIN_FIRSTBOOT_SCRIPTS_PATH, filepath.Base(script)))
-		*extraArgs = append(*extraArgs, utils.GetScriptArgs("upload", upload)...)
+		*extraArgs = append(*extraArgs, utils.GetScriptArgs("--upload", upload)...)
 	}
 	return nil
 }
