@@ -1,1 +1,2 @@
+SUBSYSTEM=="net",ACTION=="add",ATTR{address}=="aa:bb:cc:dd:ee:fe",NAME="temp_eth3"
 SUBSYSTEM=="net",ACTION=="add",ATTR{address}=="aa:bb:cc:dd:ee:fe",NAME="eth3"
