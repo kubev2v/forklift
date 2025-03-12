@@ -26,6 +26,45 @@ func (r *Validator) WarmMigration() (ok bool) {
 	return
 }
 
+// Validate the VM's network mapping order.
+func (r *Validator) NetworkMappingOrder(vmRef ref.Ref) (ok bool, err error) {
+	if r.plan.Referenced.Map.Network == nil {
+		return false, nil
+	}
+
+	vm := &model.VM{}
+	err = r.inventory.Find(vm, vmRef)
+	if err != nil {
+		return false, liberr.Wrap(err, "vm", vmRef.String())
+	}
+
+	mapping := r.plan.Referenced.Map.Network.Spec.Map
+
+	// Ensure both lists are of equal length
+	if len(vm.NICs) != len(mapping) {
+		return false, nil
+	}
+
+	// Iterate by index to ensure one-to-one mapping
+	for i := range mapping {
+		mapped := &mapping[i]
+		network := &model.Network{}
+		// Fetch the network at the corresponding index
+		fErr := r.inventory.Find(network, mapped.Source)
+		if fErr != nil {
+			return false, fErr
+		}
+
+		// Ensure NIC and network IDs match exactly at the same index
+		if vm.NICs[i].Network.ID != network.ID {
+			return false, nil // Mismatch found at the same index
+		}
+	}
+
+	ok = true
+	return
+}
+
 // Validate that a VM's networks have been mapped.
 func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 	if r.plan.Referenced.Map.Network == nil {

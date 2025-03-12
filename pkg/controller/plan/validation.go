@@ -76,6 +76,7 @@ const (
 	ValidatingVDDK                = "ValidatingVDDK"
 	VDDKInitImageNotReady         = "VDDKInitImageNotReady"
 	VDDKInitImageUnavailable      = "VDDKInitImageUnavailable"
+	NetMapOrder                   = "NetworkMapUnordered"
 )
 
 // Categories
@@ -540,6 +541,14 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "VM network name template is invalid.",
 		Items:    []string{},
 	}
+	unorderedNics := libcnd.Condition{
+		Type:     NetMapOrder,
+		Status:   True,
+		Reason:   NotValid,
+		Category: Warn,
+		Message:  "VM network mapping is unordered.",
+		Items:    []string{},
+	}
 
 	setOf := map[string]bool{}
 	//
@@ -607,6 +616,13 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			}
 			if !ok {
 				multiplePodNetworkMappings.Items = append(multiplePodNetworkMappings.Items, ref.String())
+			}
+			ok, err = validator.NetworkMappingOrder(*ref)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				unorderedNics.Items = append(unorderedNics.Items, ref.String())
 			}
 		}
 		if plan.Referenced.Map.Storage != nil {
@@ -738,6 +754,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(networkNameInvalid.Items) > 0 {
 		plan.Status.SetCondition(networkNameInvalid)
+	}
+	if len(unorderedNics.Items) > 0 {
+		plan.Status.SetCondition(unorderedNics)
 	}
 
 	return nil
