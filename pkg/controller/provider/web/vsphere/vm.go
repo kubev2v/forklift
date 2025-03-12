@@ -246,6 +246,7 @@ type VM struct {
 	GuestNetworks         []model.GuestNetwork `json:"guestNetworks"`
 	GuestIpStacks         []model.GuestIpStack `json:"guestIpStacks"`
 	SecureBoot            bool                 `json:"secureBoot"`
+	DiskEnableUuid        bool                 `json:"diskEnableUuid"`
 }
 
 // Build the resource using the model.
@@ -277,6 +278,7 @@ func (r *VM) With(m *model.VM) {
 	r.GuestNetworks = m.GuestNetworks
 	r.GuestIpStacks = m.GuestIpStacks
 	r.SecureBoot = m.SecureBoot
+	r.DiskEnableUuid = m.DiskEnableUuid
 }
 
 // Build self link (URI).
