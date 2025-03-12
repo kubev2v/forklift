@@ -558,7 +558,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Status:   True,
 		Reason:   NotUnique,
 		Category: Critical,
-		Message:  "Duplicate targerName.",
+		Message:  "Duplicate targetName.",
 		Items:    []string{},
 	}
 	sharedDisks := libcnd.Condition{
@@ -632,10 +632,12 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			setOf[ref.ID] = true
 		}
 		// check if targetName is unique
-		if _, found := setOfTargetName[vm.TargetName]; found {
-			targetNameNotUnique.Items = append(targetNameNotUnique.Items, ref.String())
-		} else {
-			setOfTargetName[vm.TargetName] = true
+		if vm.TargetName != "" {
+			if _, found := setOfTargetName[vm.TargetName]; found {
+				targetNameNotUnique.Items = append(targetNameNotUnique.Items, ref.String())
+			} else {
+				setOfTargetName[vm.TargetName] = true
+			}
 		}
 		pAdapter, err := adapter.New(provider)
 		if err != nil {
