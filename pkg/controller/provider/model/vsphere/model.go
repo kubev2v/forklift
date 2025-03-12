@@ -270,6 +270,7 @@ type VM struct {
 	GuestNetworks         []GuestNetwork `sql:""`
 	GuestIpStacks         []GuestIpStack `sql:""`
 	SecureBoot            bool           `sql:""`
+	DiskEnableUuid        bool           `sql:""`
 }
 
 // Determine if current revision has been validated.
