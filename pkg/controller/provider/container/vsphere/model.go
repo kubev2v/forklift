@@ -659,7 +659,16 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 								}
 								v.model.ChangeTrackingEnabled = boolVal
 							}
+						case "disk.EnableUUID":
+							if s, cast := opt.Value.(string); cast {
+								boolVal, err := strconv.ParseBool(s)
+								if err != nil {
+									return
+								}
+								v.model.DiskEnableUuid = boolVal
+							}
 						}
+
 					}
 				}
 			case fGuestNet:
