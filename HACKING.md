@@ -61,7 +61,6 @@ should be aware of.
 | Command | Description |
 | --- | --- |
 | `run` | Build a controller manager binary and run the controller against the active cluster |
-| `manager` | Build a controller manager binary |
 | `install` | Install generated CRDs onto the active cluster |
 | `manifests` | Generate updated CRDs from types.go files, RBAC from annotations in controller, deploy manifest YAML |
-| `docker-build` | Build the controller into a container image. Requires support for multi-stage builds, which may require moby-engine |
+

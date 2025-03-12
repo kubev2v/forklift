@@ -57,15 +57,20 @@ func (r *Builder) ConfigMap(vmRef ref.Ref, secret *core.Secret, object *core.Con
 		return liberr.Wrap(err)
 	}
 
-	object.Data = map[string]string{
-		"ca.pem": vmExport.Status.Links.External.Cert,
+	links := vmExport.Status.Links
+	if links.External != nil {
+		object.Data = map[string]string{
+			"ca.pem": links.External.Cert,
+		}
+	} else {
+		return liberr.Wrap(fmt.Errorf("failed to get external link from VM-exports"))
 	}
 
 	return nil
 }
 
 // DataVolumes implements base.Builder
-func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume) (dvs []cdi.DataVolume, err error) {
+func (r *Builder) DataVolumes(vmRef ref.Ref, secret *v1.Secret, configMap *v1.ConfigMap, dvTemplate *cdi.DataVolume, vddkConfigMap *v1.ConfigMap) (dvs []cdi.DataVolume, err error) {
 	vmExport := &export.VirtualMachineExport{}
 	key := client.ObjectKey{
 		Namespace: vmRef.Namespace,
@@ -513,14 +518,25 @@ func (r *Builder) getSourceVmFromDefinition(vme *export.VirtualMachineExport) (*
 	}
 
 	caCert := vme.Status.Links.External.Cert
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM([]byte(caCert))
+	var transport *http.Transport
 
-	tlsConfig := &tls.Config{
-		RootCAs: caCertPool,
+	if caCert != "" {
+		caCertPool := x509.NewCertPool()
+		if !caCertPool.AppendCertsFromPEM([]byte(caCert)) {
+			return nil, liberr.New("failed to parse CA certificate")
+		}
+
+		tlsConfig := &tls.Config{
+			RootCAs: caCertPool,
+		}
+
+		transport = &http.Transport{TLSClientConfig: tlsConfig}
+
+	} else {
+		r.Log.Info("Certificate from VM export is empty, using system CA certificates")
+		transport = &http.Transport{}
 	}
 
-	transport := &http.Transport{TLSClientConfig: tlsConfig}
 	httpClient := &http.Client{Transport: transport}
 	req, err := http.NewRequest("GET", vmManifestUrl, nil)
 	if err != nil {

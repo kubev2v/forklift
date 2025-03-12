@@ -12,6 +12,15 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 )
 
+// Bus types
+const (
+	NVME = "nvme"
+	USB  = "usb"
+	SATA = "sata"
+	SCSI = "scsi"
+	IDE  = "ide"
+)
+
 // Model adapter.
 // Each adapter provides provider-specific management of a model.
 type Adapter interface {
@@ -656,7 +665,7 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 			case fGuestNet:
 				if nics, cast := p.Val.(types.ArrayOfGuestNicInfo); cast {
 					guestNetworksList := []model.GuestNetwork{}
-					for _, info := range nics.GuestNicInfo {
+					for index, info := range nics.GuestNicInfo {
 						if info.IpConfig == nil {
 							continue
 						}
@@ -671,6 +680,7 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 								Origin:       ip.Origin,
 								PrefixLength: ip.PrefixLength,
 								DNS:          dnsList,
+								Device:       strconv.Itoa(index),
 							})
 						}
 					}
@@ -691,6 +701,7 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 							}
 							if len(route.Gateway.IpAddress) > 0 {
 								guestIpStackList = append(guestIpStackList, model.GuestIpStack{
+									Device:  route.Gateway.Device,
 									Gateway: route.Gateway.IpAddress,
 									DNS:     dnsList,
 								})
@@ -762,11 +773,81 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 					}
 					v.model.Devices = devList
 					v.model.NICs = nicList
+					v.updateControllers(&devArray)
 					v.updateDisks(&devArray)
 				}
 			}
 		}
 	}
+}
+
+// Update virtual disk devices.
+func (v *VmAdapter) updateControllers(devArray *types.ArrayOfVirtualDevice) {
+	controllers := []model.Controller{}
+	for _, dev := range devArray.VirtualDevice {
+		var md model.Controller
+		switch controller := dev.(type) {
+		case *types.VirtualIDEController:
+			md = model.Controller{
+				Bus:   IDE,
+				Disks: controller.Device,
+				Key:   controller.Key,
+			}
+		case *types.VirtualBusLogicController:
+			md = model.Controller{
+				Bus:   SCSI,
+				Disks: controller.Device,
+				Key:   controller.Key,
+			}
+		case *types.VirtualLsiLogicController:
+			md = model.Controller{
+				Bus:   SCSI,
+				Disks: controller.Device,
+				Key:   controller.Key,
+			}
+		case *types.VirtualLsiLogicSASController:
+			md = model.Controller{
+				Bus:   SCSI,
+				Disks: controller.Device,
+				Key:   controller.Key,
+			}
+		case *types.ParaVirtualSCSIController:
+			md = model.Controller{
+				Bus:   SCSI,
+				Disks: controller.Device,
+				Key:   controller.Key,
+			}
+		case *types.VirtualAHCIController:
+			md = model.Controller{
+				Bus:   SATA,
+				Disks: controller.Device,
+				Key:   controller.Key,
+			}
+		case *types.VirtualUSBController:
+			md = model.Controller{
+				Bus:   USB,
+				Disks: controller.Device,
+				Key:   controller.Key,
+			}
+		case *types.VirtualNVMEController:
+			md = model.Controller{
+				Bus:   NVME,
+				Disks: controller.Device,
+				Key:   controller.Key,
+			}
+		}
+		controllers = append(controllers, md)
+	}
+	v.model.Controllers = controllers
+}
+
+func (v *VmAdapter) getDiskController(key int32) *model.Controller {
+	for _, controller := range v.model.Controllers {
+		if controller.Key == key {
+			return &controller
+		}
+	}
+	return nil
 }
 
 // Update virtual disk devices.
@@ -776,6 +857,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 		switch dev.(type) {
 		case *types.VirtualDisk:
 			disk := dev.(*types.VirtualDisk)
+			controller := v.getDiskController(disk.ControllerKey)
 			switch backing := disk.Backing.(type) {
 			case *types.VirtualDiskFlatVer1BackingInfo:
 				md := model.Disk{
@@ -783,6 +865,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					File:     backing.FileName,
 					Capacity: disk.CapacityInBytes,
 					Mode:     backing.DiskMode,
+					Bus:      controller.Bus,
 				}
 				if backing.Datastore != nil {
 					datastoreId, _ := sanitize(backing.Datastore.Value)
@@ -799,6 +882,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					Capacity: disk.CapacityInBytes,
 					Shared:   backing.Sharing != "sharingNone",
 					Mode:     backing.DiskMode,
+					Bus:      controller.Bus,
 				}
 				if backing.Datastore != nil {
 					datastoreId, _ := sanitize(backing.Datastore.Value)
@@ -816,6 +900,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					Shared:   backing.Sharing != "sharingNone",
 					Mode:     backing.DiskMode,
 					RDM:      true,
+					Bus:      controller.Bus,
 				}
 				if backing.Datastore != nil {
 					datastoreId, _ := sanitize(backing.Datastore.Value)
@@ -832,6 +917,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					Capacity: disk.CapacityInBytes,
 					Shared:   backing.Sharing != "sharingNone",
 					RDM:      true,
+					Bus:      controller.Bus,
 				}
 				disks = append(disks, md)
 			}

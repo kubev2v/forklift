@@ -394,6 +394,9 @@ func (r *Migration) Archive() {
 		if err := r.deleteValidateVddkJob(); err != nil {
 			r.Log.Error(err, "Failed to clean up validate-VDDK job(s)")
 		}
+		if err := r.deleteConfigMap(); err != nil {
+			r.Log.Error(err, "Failed to clean up vddk configmap")
+		}
 	}
 
 	for _, vm := range r.Plan.Status.Migration.VMs {
@@ -453,7 +456,7 @@ func (r *Migration) Cancel() error {
 	}
 
 	for _, vm := range r.Plan.Status.Migration.VMs {
-		if vm.HasCondition(Canceled) {
+		if vm.HasCondition(Canceled) && !vm.MarkedCompleted() {
 			dontFailOnError := func(err error) bool {
 				if err != nil {
 					r.Log.Error(liberr.Wrap(err),
@@ -619,6 +622,36 @@ func (r *Migration) deletePvcPvForOva() (err error) {
 	return
 }
 
+func (r *Migration) deleteConfigMap() (err error) {
+	selector := labels.SelectorFromSet(map[string]string{
+		kPlan: string(r.Plan.UID),
+		kUse:  VddkConf,
+	})
+	list := &core.ConfigMapList{}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: selector,
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		return
+	}
+	for _, configmap := range list.Items {
+		background := meta.DeletePropagationBackground
+		opts := &client.DeleteOptions{PropagationPolicy: &background}
+		err = r.Destination.Client.Delete(context.TODO(), &configmap, opts)
+		if err != nil {
+			r.Log.Error(err, "Failed to delete vddk-config", "configmap", configmap)
+		} else {
+			r.Log.Info("ConfigMap vddk-config deleted", "configmap", configmap.Name)
+		}
+	}
+	return
+}
+
 func (r *Migration) deleteValidateVddkJob() (err error) {
 	selector := labels.SelectorFromSet(map[string]string{"plan": string(r.Plan.UID)})
 	jobs := &batchv1.JobList{}
@@ -773,11 +806,38 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			err = nil
 			break
 		}
-		if errs := k8svalidation.IsDNS1123Subdomain(vm.Name); len(errs) > 0 {
-			vm.NewName, err = r.kubevirt.changeVmNameDNS1123(vm.Name, r.Plan.Spec.TargetNamespace)
-			if err != nil {
-				r.Log.Error(err, "Failed to update the VM name to meet DNS1123 protocol requirements.")
+
+		// Check if user provided explicit a target virtual machine name
+		if vm.TargetName != "" {
+			vm.NewName = vm.TargetName
+
+			// Check if the new VM name meets DNS1123 protocol requirements
+			if errs := k8svalidation.IsDNS1123Subdomain(vm.NewName); len(errs) > 0 {
+				err = fmt.Errorf("VM name '%s' does not meet DNS1123 protocol requirements", vm.NewName)
+				r.Log.Error(err, "Failed to update the VM name to targetName.")
 				return
+			}
+
+			// Verify target VM name uniqueness in the destination namespace.
+			// Return error if name exists since we do not want to mutate explicit name assignments.
+			nameExist, errName := r.kubevirt.checkIfVmNameExistsInNamespace(vm.NewName, r.Plan.Spec.TargetNamespace)
+			if errName != nil {
+				err = liberr.Wrap(errName)
+				return
+			}
+			if nameExist {
+				err = fmt.Errorf("VM name '%s' already exists in the target namespace '%s'", vm.NewName, r.Plan.Spec.TargetNamespace)
+				r.Log.Error(err, "Failed to update the VM name to targetName.")
+				return
+			}
+		} else {
+			// Check if the VM name meets DNS1123 protocol requirements
+			if errs := k8svalidation.IsDNS1123Subdomain(vm.Name); len(errs) > 0 {
+				vm.NewName, err = r.kubevirt.changeVmNameDNS1123(vm.Name, r.Plan.Spec.TargetNamespace)
+				if err != nil {
+					r.Log.Error(err, "Failed to update the VM name to meet DNS1123 protocol requirements.")
+					return
+				}
 			}
 		}
 		vm.Phase = r.next(vm.Phase)
@@ -1827,11 +1887,11 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 			break
 		}
 
-		coldLocal, err := r.Context.Plan.ShouldUseV2vForTransfer()
+		useV2vForTransfer, err := r.Context.Plan.ShouldUseV2vForTransfer()
 		switch {
 		case err != nil:
 			return liberr.Wrap(err)
-		case coldLocal:
+		case useV2vForTransfer:
 			if err := r.updateConversionProgressV2vMonitor(pod, step); err != nil {
 				// Just log it. Missing progress is not fatal.
 				log.Error(err, "Failed to update conversion progress")
@@ -2022,7 +2082,7 @@ type Predicate struct {
 
 // Evaluate predicate flags.
 func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
-	coldLocal, vErr := r.context.Plan.ShouldUseV2vForTransfer()
+	useV2vForTransfer, vErr := r.context.Plan.ShouldUseV2vForTransfer()
 	if vErr != nil {
 		err = vErr
 		return
@@ -2036,9 +2096,9 @@ func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 	case RequiresConversion:
 		allowed = r.context.Source.Provider.RequiresConversion()
 	case CDIDiskCopy:
-		allowed = !coldLocal
+		allowed = !useV2vForTransfer
 	case VirtV2vDiskCopy:
-		allowed = coldLocal
+		allowed = useV2vForTransfer
 	case OpenstackImageMigration:
 		allowed = r.context.Plan.IsSourceProviderOpenstack()
 	case VSphere:

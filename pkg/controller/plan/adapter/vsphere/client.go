@@ -3,7 +3,6 @@ package vsphere
 import (
 	"context"
 	"fmt"
-	"net/http"
 	liburl "net/url"
 	"strconv"
 
@@ -12,7 +11,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/util"
-	vsphereclient "github.com/konveyor/forklift-controller/pkg/controller/provider/container/vsphere"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"github.com/vmware/govmomi"
@@ -333,7 +331,7 @@ func (r *Client) getTaskById(vmRef ref.Ref, taskId string, hosts util.HostsFunc)
 }
 
 func (r *Client) getClient(vm *model.VM, hosts util.HostsFunc) (client *vim25.Client, err error) {
-	if coldLocal, vErr := r.Plan.ShouldUseV2vForTransfer(); vErr == nil && coldLocal {
+	if useV2vForTransfer, vErr := r.Plan.ShouldUseV2vForTransfer(); vErr == nil && useV2vForTransfer {
 		// when virt-v2v runs the migration, forklift-controller should interact only
 		// with the component that serves the SDK endpoint of the provider
 		client = r.client.Client
@@ -394,9 +392,9 @@ func (r *Client) getHostClient(hostDef *v1beta1.Host, host *model.Host) (client 
 		err = liberr.Wrap(err)
 		return
 	}
+
 	url.User = liburl.UserPassword(string(secret.Data["user"]), string(secret.Data["password"]))
 	soapClient := soap.NewClient(url, r.getInsecureSkipVerifyFlag())
-	vsphereclient.SetTLSClientConfig(soapClient.Client.Transport.(*http.Transport).TLSClientConfig)
 	soapClient.SetThumbprint(url.Host, host.Thumbprint)
 	vimClient, err := vim25.NewClient(context.TODO(), soapClient)
 	if err != nil {
@@ -482,7 +480,6 @@ func (r *Client) connect() error {
 	}
 	url.User = liburl.UserPassword(r.user(), r.password())
 	soapClient := soap.NewClient(url, r.getInsecureSkipVerifyFlag())
-	vsphereclient.SetTLSClientConfig(soapClient.Client.Transport.(*http.Transport).TLSClientConfig)
 	soapClient.SetThumbprint(url.Host, r.thumbprint())
 	vimClient, err := vim25.NewClient(context.TODO(), soapClient)
 	if err != nil {

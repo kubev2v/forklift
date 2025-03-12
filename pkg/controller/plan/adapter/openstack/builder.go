@@ -230,8 +230,9 @@ const (
 
 // Network types
 const (
-	Pod    = "pod"
-	Multus = "multus"
+	Pod     = "pod"
+	Multus  = "multus"
+	Ignored = "ignored"
 )
 
 // Default properties
@@ -597,6 +598,34 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 	for vmNetworkName, vmAddresses := range vm.Addresses {
 		if nics, ok := vmAddresses.([]interface{}); ok {
 			for _, nic := range nics {
+				// Look for the network map for the source network
+				var vmNetworkID string
+				for _, vmNetwork := range vm.Networks {
+					if vmNetwork.Name == vmNetworkName {
+						vmNetworkID = vmNetwork.ID
+						break
+					}
+				}
+				var networkPair *api.NetworkPair
+				networkMaps := r.Context.Map.Network.Spec.Map
+				found := false
+				for i := range networkMaps {
+					networkPair = &networkMaps[i]
+					if networkPair.Source.ID == vmNetworkID {
+						found = true
+						break
+					}
+				}
+				if !found {
+					err = liberr.New("no network map for vm network", "network", vmNetworkID)
+					return
+				}
+
+				// Skip network mappings with destination type 'Ignored'
+				if networkPair.Destination.Type == Ignored {
+					continue
+				}
+
 				networkName := fmt.Sprintf("net-%v", numNetworks)
 				kNetwork := cnv.Network{
 					Name: networkName,
@@ -633,27 +662,6 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 					}
 				}
 
-				var vmNetworkID string
-				for _, vmNetwork := range vm.Networks {
-					if vmNetwork.Name == vmNetworkName {
-						vmNetworkID = vmNetwork.ID
-						break
-					}
-				}
-				var networkPair *api.NetworkPair
-				networkMaps := r.Context.Map.Network.Spec.Map
-				found := false
-				for i := range networkMaps {
-					networkPair = &networkMaps[i]
-					if networkPair.Source.ID == vmNetworkID {
-						found = true
-						break
-					}
-				}
-				if !found {
-					err = liberr.New("no network map for vm network", "network", vmNetworkID)
-					return
-				}
 				switch networkPair.Destination.Type {
 				case Pod:
 					kNetwork.Pod = &cnv.PodNetwork{}
@@ -748,7 +756,7 @@ func (r *Builder) ConfigMap(_ ref.Ref, in *core.Secret, object *core.ConfigMap) 
 	return
 }
 
-func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume) (dvs []cdi.DataVolume, err error) {
+func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume, vddkConfigMap *core.ConfigMap) (dvs []cdi.DataVolume, err error) {
 	return nil, nil
 }
 

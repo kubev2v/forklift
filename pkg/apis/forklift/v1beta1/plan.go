@@ -54,9 +54,6 @@ type PlanSpec struct {
 	// Defaults to 'virtio'.
 	// +optional
 	DiskBus cnv.DiskBus `json:"diskBus,omitempty"`
-	// Determines if the plan should migrate shared disks.
-	// +kubebuilder:default:=true
-	MigrateSharedDisks bool `json:"migrateSharedDisks,omitempty"`
 	// PVCNameTemplate is a template for generating PVC names for VM disks.
 	// It follows Go template syntax and has access to the following variables:
 	//   - .VmName: name of the VM
@@ -97,6 +94,9 @@ type PlanSpec struct {
 	//   "{{if eq .NetworkType "Pod"}}pod{{else}}multus-{{.NetworkIndex}}{{end}}"
 	// +optional
 	NetworkNameTemplate string `json:"networkNameTemplate,omitempty"`
+	// Determines if the plan should migrate shared disks.
+	// +kubebuilder:default:=true
+	MigrateSharedDisks bool `json:"migrateSharedDisks,omitempty"`
 }
 
 // Find a planned VM.

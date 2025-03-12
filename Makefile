@@ -30,6 +30,13 @@ CATALOG_NAME ?= forklift-catalog
 CATALOG_DISPLAY_NAME ?= Konveyor Forklift
 CATALOG_PUBLISHER ?= Community
 
+# Defaults for local development
+VSPHERE_OS_MAP ?= forklift-virt-customize
+OVIRT_OS_MAP ?= forklift-ovirt-osmap
+VIRT_CUSTOMIZE_MAP ?= forklift-virt-customize
+METRICS_PORT ?= 8888
+METRICS_PORT_INVENTORY ?= 8889
+
 # Use OPM_OPTS="--use-http" when using a non HTTPS registry
 # Use OPM_OPTS="--skip-tls-verify" when using an HTTPS registry with self-signed certificate
 OPM_OPTS ?=
@@ -108,8 +115,26 @@ forklift-controller: generate fmt vet
 	go build -o bin/forklift-controller github.com/konveyor/forklift-controller/cmd/forklift-controller
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
+.PHONY: run
 run: generate fmt vet
-	export METRICS_PORT=8888;\
+	VSPHERE_OS_MAP=$(VSPHERE_OS_MAP) \
+	OVIRT_OS_MAP=$(OVIRT_OS_MAP) \
+	VIRT_V2V_IMAGE=$(VIRT_V2V_IMAGE) \
+	VIRT_CUSTOMIZE_MAP=$(VIRT_CUSTOMIZE_MAP) \
+	METRICS_PORT=$(METRICS_PORT) \
+	AUTH_REQUIRED=false \
+		KUBEVIRT_CLIENT_GO_SCHEME_REGISTRATION_VERSION=v1 go run ./cmd/forklift-controller/main.go
+
+# Run against the configured Kubernetes cluster in ~/.kube/config
+.PHONY: run-inventory
+run-inventory: generate fmt vet
+	VSPHERE_OS_MAP=$(VSPHERE_OS_MAP) \
+	OVIRT_OS_MAP=$(OVIRT_OS_MAP) \
+	VIRT_V2V_IMAGE=$(VIRT_V2V_IMAGE) \
+	VIRT_CUSTOMIZE_MAP=$(VIRT_CUSTOMIZE_MAP) \
+	METRICS_PORT=$(METRICS_PORT_INVENTORY) \
+	ROLE=inventory \
+	AUTH_REQUIRED=false \
 		KUBEVIRT_CLIENT_GO_SCHEME_REGISTRATION_VERSION=v1 go run ./cmd/forklift-controller/main.go
 
 # Install CRDs into a cluster

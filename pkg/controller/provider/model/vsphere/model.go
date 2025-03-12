@@ -264,6 +264,7 @@ type VM struct {
 	Devices               []Device       `sql:""`
 	NICs                  []NIC          `sql:""`
 	Disks                 []Disk         `sql:""`
+	Controllers           []Controller   `sql:""`
 	Networks              []Ref          `sql:""`
 	Concerns              []Concern      `sql:""`
 	GuestNetworks         []GuestNetwork `sql:""`
@@ -276,6 +277,13 @@ func (m *VM) Validated() bool {
 	return m.RevisionValidated == m.Revision
 }
 
+// Virtual Controller.
+type Controller struct {
+	Key   int32   `json:"key"`
+	Bus   string  `json:"bus"`
+	Disks []int32 `sql:""`
+}
+
 // Virtual Disk.
 type Disk struct {
 	Key       int32  `json:"key"`
@@ -284,6 +292,7 @@ type Disk struct {
 	Capacity  int64  `json:"capacity"`
 	Shared    bool   `json:"shared"`
 	RDM       bool   `json:"rdm"`
+	Bus       string `json:"bus"`
 	Mode      string `json:"mode,omitempty"`
 }
 
@@ -300,6 +309,7 @@ type NIC struct {
 
 // Guest network.
 type GuestNetwork struct {
+	Device       string   `json:"device"`
 	MAC          string   `json:"mac"`
 	IP           string   `json:"ip"`
 	Origin       string   `json:"origin"`
@@ -309,6 +319,7 @@ type GuestNetwork struct {
 
 // Guest ipStack
 type GuestIpStack struct {
+	Device  string   `json:"device"`
 	Gateway string   `json:"gateway"`
 	DNS     []string `json:"dns"`
 }

@@ -10,6 +10,7 @@ import (
 	core "k8s.io/api/core/v1"
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Annotations
@@ -17,6 +18,9 @@ const (
 	// Used on DataVolume, contains disk source -- e.g. backing file in
 	// VMware or disk ID in oVirt.
 	AnnDiskSource = "forklift.konveyor.io/disk-source"
+
+	// Used on DataVolume, contains disk mount order.
+	AnnDiskIndex = "forklift.konveyor.io/disk-index"
 
 	// Set on a PVC to indicate it requires format conversion
 	AnnRequiresConversion = "forklift.konveyor.io/requires-conversion"
@@ -34,6 +38,10 @@ const (
 
 	// DV immediate bind to WaitForFirstConsumer storage class
 	AnnBindImmediate = "cdi.kubevirt.io/storage.bind.immediate.requested"
+
+	// Add extra vddk configmap, in the Forklift used to pass AIO configuration to the VDDK.
+	// Related to https://github.com/kubevirt/containerized-data-importer/pull/3572
+	AnnVddkExtraArgs = "cdi.kubevirt.io/storage.pod.vddk.extraargs"
 )
 
 var VolumePopulatorNotSupportedError = liberr.New("provider does not support volume populators")
@@ -63,7 +71,7 @@ type Builder interface {
 	// Build the Kubevirt VirtualMachine spec.
 	VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim, usesInstanceType bool) error
 	// Build DataVolumes.
-	DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume) (dvs []cdi.DataVolume, err error)
+	DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume, vddkConfigMap *core.ConfigMap) (dvs []cdi.DataVolume, err error)
 	// Build tasks.
 	Tasks(vmRef ref.Ref) ([]*planapi.Task, error)
 	// Build template labels.
@@ -142,6 +150,8 @@ type Validator interface {
 	PodNetwork(vmRef ref.Ref) (bool, error)
 	// Validate that we have information about static IPs for every virtual NIC
 	StaticIPs(vmRef ref.Ref) (bool, error)
+	// Validate the shared disk, returns msg and category as the errors depends on the provider implementations
+	SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, msg string, category string, err error)
 	// Validate that the vm has the change tracking enabled
 	ChangeTrackingEnabled(vmRef ref.Ref) (bool, error)
 }

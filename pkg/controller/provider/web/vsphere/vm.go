@@ -56,6 +56,9 @@ func (h VMHandler) List(ctx *gin.Context) {
 			ctx.Status(http.StatusInternalServerError)
 		}
 	}()
+
+	// We need model.MaxDetail for retrieving IsTemplate field from the database
+	h.Detail = model.MaxDetail
 	db := h.Collector.DB()
 	list := []model.VM{}
 	err = db.List(&list, h.ListOptions(ctx))
@@ -69,6 +72,13 @@ func (h VMHandler) List(ctx *gin.Context) {
 	}
 	pb := PathBuilder{DB: db}
 	for _, m := range list {
+		if m.IsTemplate {
+			log.Info(
+				"Skipping template VM",
+				"vmID", m.ID,
+				"isTemplate", m.IsTemplate)
+			continue
+		}
 		r := &VM{}
 		r.With(&m)
 		r.Link(h.Provider)
@@ -286,4 +296,42 @@ func (r *VM) Content(detail int) interface{} {
 	}
 
 	return r
+}
+
+func (r *VM) HasDisk(disk model.Disk) bool {
+	for _, d := range r.Disks {
+		if d.File == disk.File {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *VM) HasSharedDisk() bool {
+	for _, d := range r.Disks {
+		if d.Shared {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *VM) RemoveSharedDisks() {
+	var disks []model.Disk
+	for _, disk := range r.Disks {
+		if !disk.Shared {
+			disks = append(disks, disk)
+		}
+	}
+	r.Disks = disks
+}
+
+func (r *VM) RemoveDisk(removeDisk model.Disk) {
+	var disks []model.Disk
+	for _, disk := range r.Disks {
+		if disk.File != removeDisk.File {
+			disks = append(disks, disk)
+		}
+	}
+	r.Disks = disks
 }
