@@ -892,6 +892,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					Shared:   backing.Sharing != "sharingNone",
 					Mode:     backing.DiskMode,
 					Bus:      controller.Bus,
+					Serial:   backing.Uuid,
 				}
 				if backing.Datastore != nil {
 					datastoreId, _ := sanitize(backing.Datastore.Value)
@@ -910,6 +911,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					Mode:     backing.DiskMode,
 					RDM:      true,
 					Bus:      controller.Bus,
+					Serial:   backing.Uuid,
 				}
 				if backing.Datastore != nil {
 					datastoreId, _ := sanitize(backing.Datastore.Value)
