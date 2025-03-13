@@ -295,6 +295,7 @@ type Disk struct {
 	RDM       bool   `json:"rdm"`
 	Bus       string `json:"bus"`
 	Mode      string `json:"mode,omitempty"`
+	Serial    string `json:"serial,omitempty"`
 }
 
 // Virtual Device.
