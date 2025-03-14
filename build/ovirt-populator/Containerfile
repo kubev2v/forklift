@@ -7,7 +7,7 @@ ENV GOEXPERIMENT strictfipsruntime
 
 RUN GOOS=linux GOARCH=amd64 go build -o ovirt-populator github.com/konveyor/forklift-controller/cmd/ovirt-populator
 
-FROM registry.access.redhat.com/ubi8/ubi:8.10-1161.1735829865
+FROM registry.access.redhat.com/ubi8/ubi:8.10-1222
 COPY --from=builder /app/ovirt-populator /usr/local/bin/ovirt-populator
 RUN subscription-manager refresh && \
     dnf install -y python3-ovirt-engine-sdk4 ovirt-imageio-client && dnf clean all
