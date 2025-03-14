@@ -6,7 +6,7 @@ ENV GOEXPERIMENT strictfipsruntime
 
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o controller github.com/konveyor/forklift-controller/cmd/populator-controller
 
-FROM registry.access.redhat.com/ubi9-minimal:9.5-1739420147
+FROM registry.access.redhat.com/ubi9-minimal:9.5-1741850109
 # Required to be able to get files from within the pod
 RUN microdnf -y install tar && microdnf clean all
 
