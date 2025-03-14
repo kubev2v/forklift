@@ -561,21 +561,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "Duplicate targetName.",
 		Items:    []string{},
 	}
-	sharedDisks := libcnd.Condition{
-		Type:     SharedDisks,
-		Status:   True,
-		Category: Critical,
-		Message:  "VMs with shared disk can not be migrated.", // This should be set by the provider validator
-		Items:    []string{},
-	}
-	sharedWarnDisks := libcnd.Condition{
-		Type:     SharedWarnDisks,
-		Status:   True,
-		Category: Warn,
-		Message:  "VMs with shared disk can not be migrated.", // This should be set by the provider validator
-		Items:    []string{},
-	}
-
+	var sharedDisksConditions []libcnd.Condition
 	setOf := map[string]bool{}
 	setOfTargetName := map[string]bool{}
 	//
@@ -704,15 +690,23 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			return err
 		}
 		if !ok {
+			sharedDisks := libcnd.Condition{
+				Type:     SharedWarnDisks,
+				Status:   True,
+				Category: category,
+				Message:  "VMs with shared disk can not be migrated.", // This should be set by the provider validator
+				Items:    []string{ref.String()},
+			}
 			if msg != "" {
 				sharedDisks.Message = msg
-				sharedWarnDisks.Message = msg
 			}
 			if category == validation.Warn {
-				sharedWarnDisks.Items = append(sharedWarnDisks.Items, ref.String())
+				sharedDisks.Type = SharedWarnDisks
 			} else {
-				sharedDisks.Items = append(sharedDisks.Items, ref.String())
+				sharedDisks.Type = SharedDisks
 			}
+			sharedDisks.Type = fmt.Sprintf("%s-%s", sharedDisks.Type, ref.ID)
+			sharedDisksConditions = append(sharedDisksConditions, sharedDisks)
 		}
 		// Destination.
 		provider = plan.Referenced.Provider.Destination
@@ -808,11 +802,8 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	if len(missingStaticIPs.Items) > 0 {
 		plan.Status.SetCondition(missingStaticIPs)
 	}
-	if len(sharedDisks.Items) > 0 {
-		plan.Status.SetCondition(sharedDisks)
-	}
-	if len(sharedWarnDisks.Items) > 0 {
-		plan.Status.SetCondition(sharedWarnDisks)
+	if len(sharedDisksConditions) > 0 {
+		plan.Status.SetCondition(sharedDisksConditions...)
 	}
 	if len(missingCbtForWarm.Items) > 0 {
 		plan.Status.SetCondition(missingCbtForWarm)

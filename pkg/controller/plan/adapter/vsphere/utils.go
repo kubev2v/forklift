@@ -2,6 +2,8 @@ package vsphere
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
@@ -45,6 +47,12 @@ func baseVolume(fileName string, warm bool) string {
 //	Output: [datastore13] my-vm/disk-name.vmdk
 func trimBackingFileName(fileName string) string {
 	return backingFilePattern.ReplaceAllString(fileName, ".vmdk")
+}
+
+// stringifyWithQuotes formats the slice with comas between the items and quotes around each item
+// Example [disk1, disk2, disk3] -> 'disk1', 'disk2', 'disk3'
+func stringifyWithQuotes(s []string) string {
+	return fmt.Sprintf("'%s'", strings.Join(s, "', '"))
 }
 
 // Return all shareable PVCs
