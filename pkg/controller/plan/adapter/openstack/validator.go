@@ -127,3 +127,8 @@ func (r *Validator) StaticIPs(vmRef ref.Ref) (bool, error) {
 func (r *Validator) ChangeTrackingEnabled(vmRef ref.Ref) (bool, error) {
 	return true, nil
 }
+
+// NO-OP
+func (r *Validator) NetworkMappingOrder(vmRef ref.Ref) (bool, []string, error) {
+	return true, nil, nil
+}

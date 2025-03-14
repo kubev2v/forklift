@@ -726,6 +726,7 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				if devArray, cast := p.Val.(types.ArrayOfVirtualDevice); cast {
 					devList := []model.Device{}
 					nicList := []model.NIC{}
+					nicsIndex := 0
 					for _, dev := range devArray.VirtualDevice {
 						var nic *types.VirtualEthernetCard
 						switch device := dev.(type) {
@@ -772,12 +773,14 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 							nicList = append(
 								nicList,
 								model.NIC{
-									MAC: nic.MacAddress,
+									MAC:   nic.MacAddress,
+									Index: nicsIndex,
 									Network: model.Ref{
 										Kind: model.NetKind,
 										ID:   network,
 									},
 								})
+							nicsIndex++
 						}
 					}
 					v.model.Devices = devList

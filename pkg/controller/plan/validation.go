@@ -10,6 +10,7 @@ import (
 	"net"
 	"path"
 	"strconv"
+	"strings"
 	"text/template"
 
 	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
@@ -78,6 +79,7 @@ const (
 	ValidatingVDDK                = "ValidatingVDDK"
 	VDDKInitImageNotReady         = "VDDKInitImageNotReady"
 	VDDKInitImageUnavailable      = "VDDKInitImageUnavailable"
+	NetMapOrder                   = "NetworkMapUnordered"
 )
 
 // Categories
@@ -573,6 +575,21 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Status:   True,
 		Category: Warn,
 		Message:  "VMs with shared disk can not be migrated.", // This should be set by the provider validator
+	}
+	unorderedNics := libcnd.Condition{
+		Type:     NetMapOrder,
+		Status:   True,
+		Reason:   NotValid,
+		Category: Warn,
+		Message:  "VM network mapping is unordered, this can cause the interface names to be different after migration.",
+		Items:    []string{},
+	}
+	unEvenNicsToNetwork := libcnd.Condition{
+		Type:     NetMapOrder,
+		Status:   True,
+		Reason:   NotValid,
+		Category: Warn,
+		Message:  "VM nics number per plan's network number are unequal, names might not be preserved.",
 		Items:    []string{},
 	}
 
@@ -661,6 +678,18 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			}
 			if !ok {
 				multiplePodNetworkMappings.Items = append(multiplePodNetworkMappings.Items, ref.String())
+			}
+			ok, correctOrder, err := validator.NetworkMappingOrder(*ref)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				if len(correctOrder) == 0 {
+					unEvenNicsToNetwork.Items = append(unEvenNicsToNetwork.Items, ref.String())
+				} else {
+					unorderedNics.Message = fmt.Sprintf("%s\n Expected order: %s", unorderedNics.Message, strings.Join(correctOrder, ", "))
+					unorderedNics.Items = append(unorderedNics.Items, ref.String())
+				}
 			}
 		}
 		if plan.Referenced.Map.Storage != nil {
@@ -831,6 +860,12 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(targetNameNotUnique.Items) > 0 {
 		plan.Status.SetCondition(targetNameNotUnique)
+	}
+	if len(unorderedNics.Items) > 0 {
+		plan.Status.SetCondition(unorderedNics)
+	}
+	if len(unEvenNicsToNetwork.Items) > 0 {
+		plan.Status.SetCondition(unEvenNicsToNetwork)
 	}
 
 	return nil
