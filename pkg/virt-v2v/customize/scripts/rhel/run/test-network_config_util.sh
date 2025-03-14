@@ -23,7 +23,7 @@ test_dir() {
     export IFQUERY_CMD="
       podman run
       -v $TEST_DIR/etc/network:/etc/network
-      cmd.cat/ifquery ifquery
+      quay.io/kubev2v/ifquery:latest ifquery
     "
     export TEST_SRC_DIR=$1  #${SCRIPT_DIR}/ifcfg-test.d
     export EXPECTED_UDEV_RULE_FILE="$TEST_SRC_DIR/expected-udev.rule"
@@ -76,7 +76,7 @@ expected_to_pass_dirs() {
 
 
 expected_to_fail_dirs() {
-    local FAIL_IS_FATAL=false PASS_IS_FATAL=true
+    local FAIL_IS_FATAL=true PASS_IS_FATAL=true
     test_dirs "$@"
 }
 
@@ -96,7 +96,7 @@ expected_to_pass_dirs ${SCRIPT_DIR}/netplan*-test.d;
 
 # Test systems using systemd
 # --------------------------
-expected_to_fail_dirs ${SCRIPT_DIR}/systemd*-test.d;
+DISABLE_NETPLAN_GET=true expected_to_fail_dirs ${SCRIPT_DIR}/systemd*-test.d;
 
 # Test systems using network interfaces
 # --------------------------
