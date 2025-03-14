@@ -1921,6 +1921,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 			return
 		}
 	}
+	unshare := "profiles/unshare.json"
 	// pod
 	pod = &core.Pod{
 		ObjectMeta: meta.ObjectMeta{
@@ -1935,7 +1936,8 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 				RunAsUser:    &user,
 				RunAsNonRoot: &nonRoot,
 				SeccompProfile: &core.SeccompProfile{
-					Type: core.SeccompProfileTypeRuntimeDefault,
+					Type:             core.SeccompProfileTypeLocalhost,
+					LocalhostProfile: &unshare,
 				},
 			},
 			Affinity: &core.Affinity{
