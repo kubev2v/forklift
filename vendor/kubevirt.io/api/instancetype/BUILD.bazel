@@ -1,9 +1,0 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
-
-go_library(
-    name = "instancetype",
-    srcs = ["register.go"],
-    importmap = "github.com/konveyor/forklift-controller/vendor/kubevirt.io/api/instancetype",
-    importpath = "kubevirt.io/api/instancetype",
-    visibility = ["//visibility:public"],
-)
