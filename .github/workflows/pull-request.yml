@@ -44,9 +44,6 @@ jobs:
             source_provider: vsphere
 
           - os: ubuntu-latest
-            source_provider: openstack
-
-          - os: ubuntu-latest
             source_provider: ova
 
 
