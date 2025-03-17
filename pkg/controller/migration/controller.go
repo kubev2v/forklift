@@ -28,7 +28,9 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/storage/names"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	k8sutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -127,6 +129,14 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		r.Log.V(2).Info("Conditions.", "all", migration.Status.Conditions)
 	}()
 
+	// Set owner ref for migration CR if it was created using CLI
+	// Try to set owner reference before doing anything with the migration CR so we fail fast.
+	migration, err = r.setOwnerReference(migration)
+	if err != nil {
+		r.Log.Error(err, "Could not set migration owner reference.")
+		return
+	}
+
 	// Detected completed.
 	if migration.Status.MarkedCompleted() {
 		return
@@ -216,4 +226,55 @@ func (r *Reconciler) reflectPlan(plan *api.Plan, migration *api.Migration) {
 		})
 	}
 	migration.Status.VMs = plan.Status.Migration.VMs
+}
+
+// Set owner reference for Migration.
+// This is needed so the migration CR will be auto deleted once the plan CR is deleted.
+//
+// Update owner reference to an owning plan or return error if any occured.
+//
+// Arguments:
+//   - migration (*api.Migration): Migration object to which owner reference will be set
+//
+// Returns:
+//   - *api.Migration - Updated migration with owner reference set.
+//   - error: An error if something goes wrong during the process.
+func (r *Reconciler) setOwnerReference(migration *api.Migration) (*api.Migration, error) {
+	plan := &api.Plan{}
+	err := r.Client.Get(
+		context.TODO(),
+		client.ObjectKey{
+			Namespace: migration.Spec.Plan.Namespace,
+			Name:      migration.Spec.Plan.Name,
+		},
+		plan,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = k8sutil.SetOwnerReference(plan, migration, r.Scheme())
+	if err != nil {
+		return nil, err
+	}
+
+	err = r.Client.Update(context.TODO(), migration)
+	if err != nil {
+		return nil, err
+	}
+
+	err = r.Client.Get(
+		context.TODO(),
+		client.ObjectKey{
+			Namespace: migration.Namespace,
+			Name:      migration.Name,
+		},
+		migration,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return migration, nil
 }
