@@ -2,7 +2,7 @@ FROM quay.io/operator-framework/opm:latest AS opm
 FROM registry.access.redhat.com/ubi9-minimal:9.5-1739420147 AS builder
 ARG CHANNELS="development"
 ARG DEFAULT_CHANNEL="development"
-ARG VERSION="2.7.0"
+ARG VERSION="99.0.0"
 ARG OPERATOR_BUNDLE_IMAGE
 ARG OPM_OPTS
 
