@@ -136,7 +136,12 @@ func virtV2vBuildCommand() (args []string, err error) {
 		}
 		args = append(args, vsphereArgs...)
 	case global.OVA:
-		args = append(args, "-i", "ova", os.Getenv("V2V_diskPath"))
+		ovaArgs, err := virtV2vOVAArgs()
+		if err != nil {
+			return nil, err
+		}
+
+		args = append(args, ovaArgs...)
 	}
 
 	return args, nil
@@ -181,6 +186,18 @@ func virtV2vVsphereArgs() (args []string, err error) {
 	}
 
 	args = append(args, "--", os.Getenv("V2V_vmName"))
+	return args, nil
+}
+
+func virtV2vOVAArgs() (args []string, err error) {
+	args = append(args, "-i", "ova", os.Getenv("V2V_diskPath"))
+
+	// When converting VM with name that do not meet DNS1123 RFC requirements,
+	// it should be changed to supported one to ensure the conversion does not fail.
+	if utils.CheckEnvVariablesSet("V2V_NewName") {
+		args = append(args, "-on", os.Getenv("V2V_NewName"))
+	}
+
 	return args, nil
 }
 
