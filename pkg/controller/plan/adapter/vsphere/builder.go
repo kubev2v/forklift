@@ -884,6 +884,15 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 				// fallback to default name and reset error
 				volumeName = fmt.Sprintf("vol-%v", i)
 			}
+
+			// check if the generated name is longer then 63 characters
+			if len(volumeName) > 63 {
+				// if the generated name is longer then 63 characters, trancate it
+				newVolumeName := volumeName[:63]
+				r.Log.Info("Generated volume name is longer than 63 characters, sanitizing it", "volumeName", volumeName, "newVolumeName", newVolumeName)
+
+				volumeName = newVolumeName
+			}
 		}
 
 		volume := cnv.Volume{
