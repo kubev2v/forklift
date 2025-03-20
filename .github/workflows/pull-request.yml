@@ -63,6 +63,11 @@ jobs:
       - name: Check out forklift repository
         uses: actions/checkout@v4
 
+      - name: Setup Golang
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21.9'
+
       - name: Checkout forkliftci
         uses: actions/checkout@v4
         with:

@@ -54,7 +54,7 @@ func WaitForMigrationSucceededWithTimeout(cl crclient.Client, namespace string, 
 
 	err := wait.PollUntilContextTimeout(context.TODO(), 3*time.Second, timeout, true, func(context.Context) (bool, error) {
 		err := cl.Get(context.TODO(), migrationIdentifier, returnedMap)
-
+		fmt.Println(returnedMap)
 		//terminate the retry if migration failed
 		if condition := returnedMap.Status.Conditions.FindCondition("Failed"); condition != nil {
 			return true, fmt.Errorf("migration failed %v", returnedMap.Status.VMs[0].Error.Reasons)
