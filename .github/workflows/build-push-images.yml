@@ -118,3 +118,4 @@ jobs:
           build-args: |
             OPERATOR_BUNDLE_IMAGE=${{ env.REGISTRY }}/${{ env.REGISTRY_ORG }}/forklift-operator-bundle:${{ env.REGISTRY_TAG }}
             STREAM=dev
+            VERSION=${{ env.VERSION }}
