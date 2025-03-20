@@ -227,6 +227,7 @@ type VM struct {
 	NICs                  []model.NIC     `json:"nics"`
 	Disks                 []model.Disk    `json:"disks"`
 	Networks              []model.Network `json:"networks"`
+	Product               model.Product   `json:"product"`
 }
 
 // Build the resource using the model.
@@ -255,6 +256,7 @@ func (r *VM) With(m *model.VM) {
 	r.OvaPath = m.OvaPath
 	r.Disks = m.Disks
 	r.Networks = m.Networks
+	r.Product = m.Product
 }
 
 // Build self link (URI).
