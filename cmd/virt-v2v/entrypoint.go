@@ -100,7 +100,7 @@ func runVirtV2vInPlace() error {
 		return err
 	}
 	args = append(args, "/mnt/v2v/input.xml")
-	v2vCmd := exec.Command("/usr/libexec/virt-v2v-in-place", args...)
+	v2vCmd := exec.Command("virt-v2v-in-place", args...)
 	v2vCmd.Stdout = os.Stdout
 	v2vCmd.Stderr = os.Stderr
 	return v2vCmd.Run()
