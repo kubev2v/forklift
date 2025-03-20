@@ -516,6 +516,10 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 
 					generatedName, err := r.executeTemplate(pvcNameTemplate, &templateData)
 					if err == nil && generatedName != "" {
+						// Ensure generatedName ends with "-"
+						if !strings.HasSuffix(generatedName, "-") {
+							generatedName = generatedName + "-"
+						}
 						dv.ObjectMeta.GenerateName = generatedName
 					} else {
 						// Failed to generate PVC name using template
