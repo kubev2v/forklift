@@ -17,10 +17,11 @@ RUN rm /etc/pki/tls/fips_local.cnf && \
 
 ENV LIBGUESTFS_BACKEND=direct LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1
 
+# The 2.7.8 virt-v2v has a issue in the package we need to use the older version
 RUN mkdir /disks && \
     source /etc/os-release && \
     dnf install -y \
-        virt-v2v && \
+        https://kojipkgs.fedoraproject.org//packages/virt-v2v/2.7.7/1.fc41/x86_64/virt-v2v-2.7.7-1.fc41.x86_64.rpm && \
     dnf clean all
 
 RUN dnf install -y https://kojihub.stream.centos.org/kojifiles/packages/virtio-win/1.9.40/1.el9/noarch/virtio-win-1.9.40-1.el9.noarch.rpm
