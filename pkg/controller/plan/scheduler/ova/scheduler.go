@@ -16,6 +16,8 @@ import (
 // slots.
 var mutex sync.Mutex
 
+const Canceled = "Canceled"
+
 // Scheduler for migrations from OVA.
 type Scheduler struct {
 	*plancontext.Context
@@ -60,6 +62,9 @@ func (r *Scheduler) Next() (vm *plan.VMStatus, hasNext bool, err error) {
 	}
 
 	for _, vmStatus := range r.Plan.Status.Migration.VMs {
+		if vmStatus.HasCondition(Canceled) {
+			continue
+		}
 		if !vmStatus.MarkedStarted() && !vmStatus.MarkedCompleted() {
 			vm = vmStatus
 			hasNext = true
