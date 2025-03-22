@@ -22,6 +22,7 @@ const (
 	CreateVM                 = "CreateVM"
 	PostHook                 = "PostHook"
 	Completed                = "Completed"
+	Canceled                 = "Canceled"
 )
 
 // Steps.
@@ -184,6 +185,9 @@ func (r *Scheduler) buildPending() (err error) {
 		err = r.Source.Inventory.Find(vm, vmStatus.Ref)
 		if err != nil {
 			return
+		}
+		if vmStatus.HasCondition(Canceled) {
+			continue
 		}
 		if !vmStatus.MarkedStarted() && !vmStatus.MarkedCompleted() {
 			pending := &pendingVM{
