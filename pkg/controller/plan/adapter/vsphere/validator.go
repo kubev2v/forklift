@@ -2,6 +2,8 @@ package vsphere
 
 import (
 	"fmt"
+	"strings"
+
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
@@ -310,8 +312,9 @@ func (r *Validator) StaticIPs(vmRef ref.Ref) (ok bool, err error) {
 
 	for _, nic := range vm.NICs {
 		found := false
+		nicMAC := strings.ToLower(nic.MAC)
 		for _, guestNetwork := range vm.GuestNetworks {
-			if nic.MAC == guestNetwork.MAC {
+			if nicMAC == strings.ToLower(guestNetwork.MAC) {
 				found = true
 				break
 			}
