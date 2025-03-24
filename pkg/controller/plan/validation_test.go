@@ -152,6 +152,11 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			ginkgo.Entry("template with invalid k8s label chars", "disk@{{.DiskIndex}}", false),
 			ginkgo.Entry("template with undefined variable", "{{.UndefinedVar}}", false),
 			ginkgo.Entry("template resulting in empty string", "{{if false}}disk{{end}}", false),
+			ginkgo.Entry("template with special characters", "disk!{{.DiskIndex}}", false),
+			ginkgo.Entry("template with spaces", "disk {{.DiskIndex}}", false),
+			ginkgo.Entry("template with invalid start character", "_{{.VmName}}", false),
+			ginkgo.Entry("template exceeding length limit", "very-very-very-very-very-very-very-very-very-very-long-prefix-{{.VmName}}", false),
+			ginkgo.Entry("template with slash character", "{{.VmName}}/{{.DiskIndex}}", false),
 		)
 	})
 
@@ -179,6 +184,11 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			ginkgo.Entry("template with invalid k8s label chars", "disk@{{.DiskIndex}}", false),
 			ginkgo.Entry("template with undefined variable", "{{.UndefinedVar}}", false),
 			ginkgo.Entry("template resulting in empty string", "{{if false}}disk{{end}}", false),
+			ginkgo.Entry("template starting with non-alphanumeric", "-{{.VmName}}", false),
+			ginkgo.Entry("template ending with non-alphanumeric", "{{.VmName}}-", false),
+			ginkgo.Entry("template with too long result", "very-long-prefix-that-will-definitely-exceed-kubernetes-label-length-limit-for-sure-{{.VmName}}", false),
+			ginkgo.Entry("template with invalid character in the middle", "disk-{{.VmName}}/{{.DiskIndex}}", false),
+			ginkgo.Entry("template with uppercase characters (invalid K8s name)", "DISK-{{.VmName}}", false),
 		)
 	})
 })
