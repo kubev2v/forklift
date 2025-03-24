@@ -508,7 +508,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 
 					// Create template data
 					templateData := api.PVCNameTemplateData{
-						VmName:        vm.Name,
+						VmName:        r.getPlenVMNewName(vm),
 						PlanName:      r.Plan.Name,
 						DiskIndex:     diskIndex,
 						RootDiskIndex: rootDiskIndex,
@@ -1118,11 +1118,22 @@ func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskNam
 	return
 }
 
-// Get the plan VM for the given vsphere VM
+// getPlanVM get the plan VM for the given vsphere VM
 func (r *Builder) getPlanVM(vm *model.VM) *plan.VM {
 	for _, planVM := range r.Plan.Spec.VMs {
 		if planVM.ID == vm.ID {
 			return &planVM
+		}
+	}
+
+	return nil
+}
+
+// getPlanVMStatus get the plan VM status for the given vsphere VM
+func (r *Builder) getPlanVMStatus(vm *model.VM) *plan.VMStatus {
+	for _, planVMStatus := range r.Plan.Status.Migration.VMs {
+		if planVMStatus.ID == vm.ID {
+			return planVMStatus
 		}
 	}
 
@@ -1166,6 +1177,22 @@ func (r *Builder) getPVCNameTemplate(vm *model.VM) string {
 	}
 
 	return ""
+}
+
+// getPlenVMNewName returns the VM new name if exist, or just the name
+func (r *Builder) getPlenVMNewName(vm *model.VM) string {
+	// Get plan VM
+	planVM := r.getPlanVMStatus(vm)
+	if planVM == nil {
+		return ""
+	}
+
+	// if vm.PVCNameTNewNameemplate is set, use it
+	if planVM.NewName != "" {
+		return planVM.NewName
+	}
+
+	return vm.Name
 }
 
 // getVolumeNameTemplate returns the volume name template
