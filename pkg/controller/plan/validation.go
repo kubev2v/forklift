@@ -1376,7 +1376,7 @@ func (r *Reconciler) IsValidPVCNameTemplate(pvcNameTemplate string) error {
 	}
 
 	// Validate that template output is a valid k8s label
-	errs := k8svalidation.IsValidLabelValue(result)
+	errs := k8svalidation.IsDNS1123Label(result)
 	if len(errs) > 0 {
 		return liberr.New("Template output is not a valid k8s label", "errors", errs)
 	}
@@ -1400,7 +1400,7 @@ func (r *Reconciler) IsValidVolumeNameTemplate(volumeNameTemplate string) error 
 	}
 
 	// Validate that template output is a valid k8s label
-	errs := k8svalidation.IsValidLabelValue(result)
+	errs := k8svalidation.IsDNS1123Label(result)
 	if len(errs) > 0 {
 		return liberr.New("Template output is not a valid k8s label", "errors", errs)
 	}
@@ -1426,7 +1426,7 @@ func (r *Reconciler) IsValidNetworkNameTemplate(networkNameTemplate string) erro
 	}
 
 	// Validate that template output is a valid k8s label
-	errs := k8svalidation.IsValidLabelValue(result)
+	errs := k8svalidation.IsDNS1123Label(result)
 	if len(errs) > 0 {
 		return liberr.New("Template output is not a valid k8s label", "errors", errs)
 	}
