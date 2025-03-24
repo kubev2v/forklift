@@ -46,6 +46,7 @@ const (
 	DVPortGroup     = "DistributedVirtualPortgroup"
 	DVSwitch        = "VmwareDistributedVirtualSwitch"
 	Datastore       = "Datastore"
+	ResourcePool    = "ResourcePool"
 )
 
 // Fields
@@ -92,6 +93,8 @@ const (
 	fKey          = "key"
 	// DV Switch
 	fDVSwitchHost = "config.host"
+	// ResourcePool
+	fResourcePool = "resourcePool"
 	// Datastore
 	fDsType      = "summary.type"
 	fCapacity    = "summary.capacity"
@@ -130,6 +133,7 @@ const (
 // Selections
 const (
 	TraverseFolders = "traverseFolders"
+	TraverseVApps   = "TraverseVApps"
 )
 
 // Actions
@@ -195,6 +199,32 @@ var TsDatacenterDatastore = &types.TraversalSpec{
 	},
 }
 
+// Datacenter/nested VApp traversal Spec.
+var TsDatacenterNestedVApp = &types.TraversalSpec{
+	SelectionSpec: types.SelectionSpec{
+		Name: TraverseVApps, // Unique name for this TraversalSpec
+	},
+	Type: ResourcePool,  // vApps are ResourcePools in vSphere
+	Path: fResourcePool, // Traverse nested resource pools
+	SelectSet: []types.BaseSelectionSpec{
+		&types.SelectionSpec{
+			Name: TraverseVApps, // Recursively traverse nested vApps
+		},
+		TsDatacenterVApp, // Traverse VMs in the vApp
+	},
+}
+
+// Datacenter/root VApp traversal Spec.
+var TsDatacenterVApp = &types.TraversalSpec{
+	Type: ResourcePool,
+	Path: fVm,
+	SelectSet: []types.BaseSelectionSpec{
+		&types.SelectionSpec{
+			Name: TraverseFolders,
+		},
+	},
+}
+
 // Root Folder traversal Spec
 var TsRootFolder = &types.TraversalSpec{
 	SelectionSpec: types.SelectionSpec{
@@ -211,6 +241,8 @@ var TsRootFolder = &types.TraversalSpec{
 		TsDatacenterHost,
 		TsDatacenterNet,
 		TsDatacenterDatastore,
+		TsDatacenterVApp,
+		TsDatacenterNestedVApp,
 	},
 }
 
