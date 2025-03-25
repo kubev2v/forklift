@@ -1651,9 +1651,7 @@ func (r *KubeVirt) vmTemplate(vm *plan.VMStatus) (virtualMachine *cnv.VirtualMac
 	}
 	tmpl, err := r.findTemplate(vm)
 	if err != nil {
-		r.Log.Error(err, "could not find template for destination VM.",
-			"vm",
-			vm.String())
+		r.Log.Info("Can't find matching template, not setting a template", "vm", vm.String())
 		return
 	}
 
