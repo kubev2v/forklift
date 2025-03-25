@@ -675,7 +675,7 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 								dnsList = info.DnsConfig.IpAddress
 							}
 							guestNetworksList = append(guestNetworksList, model.GuestNetwork{
-								MAC:          info.MacAddress,
+								MAC:          strings.ToLower(info.MacAddress),
 								IP:           ip.IpAddress,
 								Origin:       ip.Origin,
 								PrefixLength: ip.PrefixLength,
@@ -763,7 +763,7 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 							nicList = append(
 								nicList,
 								model.NIC{
-									MAC: nic.MacAddress,
+									MAC: strings.ToLower(nic.MacAddress),
 									Network: model.Ref{
 										Kind: model.NetKind,
 										ID:   network,
