@@ -1180,12 +1180,9 @@ func (r *Builder) getPVCNameTemplate(vm *model.VM) string {
 func (r *Builder) getPlenVMNewName(vm *model.VM) string {
 	// Get plan VM
 	planVM := r.getPlanVMStatus(vm)
-	if planVM == nil {
-		return ""
-	}
 
-	// if vm.PVCNameTNewNameemplate is set, use it
-	if planVM.NewName != "" {
+	// if plan VM status has a new name, use it
+	if planVM != nil && planVM.NewName != "" {
 		return planVM.NewName
 	}
 
