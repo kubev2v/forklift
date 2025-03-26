@@ -1658,7 +1658,7 @@ func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (ready bool, err
 	var pvcs []*core.PersistentVolumeClaim
 	found := false
 	if vmCr, found = r.vmMap[vm.ID]; !found {
-		vmCr.VirtualMachine, err = r.kubevirt.virtualMachine(vm)
+		vmCr.VirtualMachine, err = r.kubevirt.virtualMachine(vm, true)
 		if err != nil {
 			return
 		}
