@@ -2109,7 +2109,7 @@ func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 	case HasPostHook:
 		_, allowed = r.vm.FindHook(PostHook)
 	case RequiresConversion:
-		allowed = r.context.Source.Provider.RequiresConversion()
+		allowed = r.context.Source.Provider.RequiresConversion() && !r.context.Plan.Spec.SkipGuestConversion
 	case CDIDiskCopy:
 		allowed = !useV2vForTransfer
 	case VirtV2vDiskCopy:
