@@ -49,6 +49,7 @@ const (
 // Bus types
 const (
 	Virtio = "virtio"
+	E1000e = "e1000e"
 )
 
 // Input types
@@ -689,9 +690,14 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 			kNetwork := cnv.Network{
 				Name: networkName,
 			}
+			interfaceModel := Virtio
+			if r.Plan.Spec.SkipGuestConversion {
+				interfaceModel = E1000e
+			}
+
 			kInterface := cnv.Interface{
 				Name:       networkName,
-				Model:      Virtio,
+				Model:      interfaceModel,
 				MacAddress: nic.MAC,
 			}
 			switch mapped.Destination.Type {
@@ -714,10 +720,15 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 }
 
 func (r *Builder) mapInput(object *cnv.VirtualMachineSpec) {
+	bus := cnv.InputBusVirtio
+	if r.Plan.Spec.SkipGuestConversion {
+		bus = cnv.InputBusUSB
+	}
+
 	tablet := cnv.Input{
 		Type: Tablet,
 		Name: Tablet,
-		Bus:  Virtio,
+		Bus:  bus,
 	}
 	object.Template.Spec.Domain.Devices.Inputs = []cnv.Input{tablet}
 }
@@ -861,11 +872,15 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 				},
 			},
 		}
+		bus := cnv.DiskBusVirtio
+		if r.Plan.Spec.SkipGuestConversion {
+			bus = cnv.DiskBusSATA
+		}
 		kubevirtDisk := cnv.Disk{
 			Name: volumeName,
 			DiskDevice: cnv.DiskDevice{
 				Disk: &cnv.DiskTarget{
-					Bus: cnv.DiskBusVirtio,
+					Bus: bus,
 				},
 			},
 		}

@@ -1451,6 +1451,11 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 		return
 	}
 
+	err = r.setVmLabels(object)
+	if err != nil {
+		return
+	}
+
 	if object.Spec.Template.ObjectMeta.Labels == nil {
 		object.Spec.Template.ObjectMeta.Labels = map[string]string{}
 	}
@@ -1518,6 +1523,18 @@ func (r *KubeVirt) setInstanceType(vm *plan.VMStatus, object *cnv.VirtualMachine
 		return
 	}
 	object.Spec.Instancetype = &cnv.InstancetypeMatcher{Name: vm.InstanceType, Kind: kind}
+	return
+}
+
+func (r *KubeVirt) setVmLabels(object *cnv.VirtualMachine) (err error) {
+	labels := object.ObjectMeta.Labels
+	if labels == nil {
+		object.ObjectMeta.Labels = map[string]string{}
+	}
+	if r.Plan.Provider.Source.RequiresConversion() {
+		labels["guest-converted"] = strconv.FormatBool(!r.Plan.Spec.SkipGuestConversion)
+	}
+	object.ObjectMeta.Labels = labels
 	return
 }
 
