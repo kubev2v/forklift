@@ -535,7 +535,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 }
 
 // Create the destination Kubevirt VM.
-func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim, usesInstanceType bool) (err error) {
+func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim, usesInstanceType bool, sortVolumesByLibvirt bool) (err error) {
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
@@ -598,7 +598,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	if object.Template == nil {
 		object.Template = &cnv.VirtualMachineInstanceTemplateSpec{}
 	}
-	err = r.mapDisks(vm, vmRef, persistentVolumeClaims, object)
+	err = r.mapDisks(vm, vmRef, persistentVolumeClaims, object, sortVolumesByLibvirt)
 	if err != nil {
 		return
 	}
@@ -780,8 +780,7 @@ func (r *Builder) filterDisksWithBus(disks []vsphere.Disk, bus string) []vsphere
 // When we were sorting by the keys the order was IDE, SATA and SCSI. This cause that some PVs were populated by
 // incorrect disks.
 // https://github.com/libvirt/libvirt/blob/master/src/vmx/vmx.c#L1713
-func (r *Builder) sortedDisks(disks []vsphere.Disk) []vsphere.Disk {
-	var buses = []string{container.SCSI, container.SATA, container.IDE}
+func (r *Builder) sortedDisksByBusses(disks []vsphere.Disk, buses []string) []vsphere.Disk {
 	var resp []vsphere.Disk
 	for _, bus := range buses {
 		disksWithBus := r.filterDisksWithBus(disks, bus)
@@ -793,12 +792,27 @@ func (r *Builder) sortedDisks(disks []vsphere.Disk) []vsphere.Disk {
 	return resp
 }
 
-func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims []*core.PersistentVolumeClaim, object *cnv.VirtualMachineSpec) error {
+func (r *Builder) sortedDisksAsLibvirt(disks []vsphere.Disk) []vsphere.Disk {
+	var buses = []string{container.SCSI, container.SATA, container.IDE}
+	return r.sortedDisksByBusses(disks, buses)
+}
+
+func (r *Builder) sortedDisksAsVmware(disks []vsphere.Disk) []vsphere.Disk {
+	var buses = []string{container.SATA, container.IDE, container.SCSI}
+	return r.sortedDisksByBusses(disks, buses)
+}
+
+func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims []*core.PersistentVolumeClaim, object *cnv.VirtualMachineSpec, sortByLibvirt bool) error {
 	var kVolumes []cnv.Volume
 	var kDisks []cnv.Disk
 	var templateErr error
+	var disks []vsphere.Disk
 
-	disks := r.sortedDisks(vm.Disks)
+	if sortByLibvirt {
+		disks = r.sortedDisksAsLibvirt(vm.Disks)
+	} else {
+		disks = r.sortedDisksAsVmware(vm.Disks)
+	}
 	pvcMap := make(map[string]*core.PersistentVolumeClaim)
 	for i := range persistentVolumeClaims {
 		pvc := persistentVolumeClaims[i]
