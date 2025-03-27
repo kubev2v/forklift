@@ -1251,7 +1251,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					commonName := fmt.Sprintf("%s-%s-%s", r.Plan.Name, vm.Name, uuid.New().String()[:8])
 					labels := map[string]string{
 						"migration": string(r.Migration.UID),
-						// we need uniqness and a value which is less than 64 chars, hence using disk.key
+						// we need uniqness and a value which is less than 64 chars, hence using vmRef.id + disk.key
 						"vmdkKey": fmt.Sprint(disk.Key),
 						"vmID":    vmRef.ID,
 					}
@@ -1338,7 +1338,8 @@ func (r *Builder) PrePopulateActions(c planbase.Client, vmRef ref.Ref) (ready bo
 
 func (r *Builder) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (transferredBytes int64, err error) {
 	vmdkKey := pvc.Labels["vmdkKey"]
-	populatorCr, err := r.getVolumePopulator(vmdkKey)
+	vmId := pvc.Labels["vmID"]
+	populatorCr, err := r.getVolumePopulator(vmId, vmdkKey)
 	if err != nil {
 		return
 	}
@@ -1357,13 +1358,14 @@ func (r *Builder) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (tr
 	return
 }
 
-func (r *Builder) getVolumePopulator(vmdkKey string) (api.VSphereXcopyVolumePopulator, error) {
+func (r *Builder) getVolumePopulator(vmId, vmdkKey string) (api.VSphereXcopyVolumePopulator, error) {
 	list := api.VSphereXcopyVolumePopulatorList{}
 	err := r.Destination.Client.List(context.TODO(), &list, &client.ListOptions{
 		Namespace: r.Plan.Spec.TargetNamespace,
 		LabelSelector: labels.SelectorFromSet(map[string]string{
 			"migration": string(r.Migration.UID),
 			"vmdkKey":   vmdkKey,
+			"vmID":      vmId,
 		}),
 	})
 	if err != nil {
@@ -1618,11 +1620,11 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 	for key, value := range dst.Data {
 		switch key {
 		case "url":
-            h, err := liburl.Parse(string(value))
-            if err != nil {
-                // ignore and try to use as is
-			    dst.Data["GOVMOMI_HOSTNAME"] = value
-            }
+			h, err := liburl.Parse(string(value))
+			if err != nil {
+				// ignore and try to use as is
+				dst.Data["GOVMOMI_HOSTNAME"] = value
+			}
 			dst.Data["GOVMOMI_HOSTNAME"] = []byte(h.Hostname())
 		case "user":
 			dst.Data["GOVMOMI_USERNAME"] = value

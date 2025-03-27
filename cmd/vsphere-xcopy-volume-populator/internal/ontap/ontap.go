@@ -26,11 +26,11 @@ func (c *NetappClonner) Map(initatorGroup string, targetLUN populator.LUN) error
 	return err
 }
 
-func (c *NetappClonner) UnMap(initatorGroup string, targetLUN populator.LUN) error {
+func (c *NetappClonner) UnMap(initatorGroup string, targetLUN populator.LUN, _ populator.MappingContext) error {
 	return c.api.LunUnmap(context.TODO(), initatorGroup, targetLUN.Name)
 }
 
-func (c *NetappClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn string) error {
+func (c *NetappClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn string, _ populator.MappingContext) error {
 	// esxs needs "vmware" as the group protocol.
 	err := c.api.IgroupCreate(context.Background(), initiatorGroup, "iscsi", "vmware")
 	if err != nil {
