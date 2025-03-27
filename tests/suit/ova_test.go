@@ -80,6 +80,5 @@ var _ = Describe("[level:component]Migration tests for OVA provider", func() {
 		Expect(err).ToNot(HaveOccurred())
 		err = utils.WaitForMigrationSucceededWithTimeout(f.CrClient, provider.Namespace, test_migration_name, 900*time.Second)
 		Expect(err).ToNot(HaveOccurred())
-
 	})
 })
