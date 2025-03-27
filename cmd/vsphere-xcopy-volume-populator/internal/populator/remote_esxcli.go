@@ -44,7 +44,7 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 		return err
 	}
 
-	originalInitiatorGroups, err := p.StorageApi.CurrentMappedGroups(lun)
+	originalInitiatorGroups, err := p.StorageApi.CurrentMappedGroups(lun, nil)
 	if err != nil {
 		return fmt.Errorf("failed to fetch the current initiator groups of the lun %s: %w", lun.Name, err)
 	}
@@ -74,19 +74,19 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 		klog.Infof("iSCSI adapter IQN %s", esxIQN)
 	}
 
-	err = p.StorageApi.EnsureClonnerIgroup(xcopyInitiatorGroup, esxIQN)
+	m, err := p.StorageApi.EnsureClonnerIgroup(xcopyInitiatorGroup, esxIQN)
 	if err != nil {
 		return fmt.Errorf("failed to add the ESX IQN %s to the initiator group %w", esxIQN, err)
 	}
 
-	err = p.StorageApi.Map(xcopyInitiatorGroup, lun)
+	err = p.StorageApi.Map(xcopyInitiatorGroup, lun, m)
 	if err != nil {
 		return fmt.Errorf("failed to map lun %s to initiator group %s: %w", lun, xcopyInitiatorGroup, err)
 	}
 	defer func() {
-		p.StorageApi.UnMap(xcopyInitiatorGroup, lun)
+		p.StorageApi.UnMap(xcopyInitiatorGroup, lun, m)
 		for _, group := range originalInitiatorGroups {
-			p.StorageApi.Map(group, lun)
+			p.StorageApi.Map(group, lun, m)
 		}
 
 	}()

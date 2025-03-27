@@ -41,26 +41,27 @@ func (m *MockStorageApi) EXPECT() *MockStorageApiMockRecorder {
 }
 
 // CurrentMappedGroups mocks base method.
-func (m *MockStorageApi) CurrentMappedGroups(targetLUN populator.LUN) ([]string, error) {
+func (m *MockStorageApi) CurrentMappedGroups(targetLUN populator.LUN, context populator.MappingContext) ([]string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CurrentMappedGroups", targetLUN)
+	ret := m.ctrl.Call(m, "CurrentMappedGroups", targetLUN, context)
 	ret0, _ := ret[0].([]string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CurrentMappedGroups indicates an expected call of CurrentMappedGroups.
-func (mr *MockStorageApiMockRecorder) CurrentMappedGroups(targetLUN any) *gomock.Call {
+func (mr *MockStorageApiMockRecorder) CurrentMappedGroups(targetLUN, context any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CurrentMappedGroups", reflect.TypeOf((*MockStorageApi)(nil).CurrentMappedGroups), targetLUN)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CurrentMappedGroups", reflect.TypeOf((*MockStorageApi)(nil).CurrentMappedGroups), targetLUN, context)
 }
 
 // EnsureClonnerIgroup mocks base method.
-func (m *MockStorageApi) EnsureClonnerIgroup(initiatorGroup, clonnerIqn string) error {
+func (m *MockStorageApi) EnsureClonnerIgroup(initiatorGroup, clonnerIqn string) (populator.MappingContext, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "EnsureClonnerIgroup", initiatorGroup, clonnerIqn)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(populator.MappingContext)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // EnsureClonnerIgroup indicates an expected call of EnsureClonnerIgroup.
@@ -70,17 +71,17 @@ func (mr *MockStorageApiMockRecorder) EnsureClonnerIgroup(initiatorGroup, clonne
 }
 
 // Map mocks base method.
-func (m *MockStorageApi) Map(initatorGroup string, targetLUN populator.LUN) error {
+func (m *MockStorageApi) Map(initatorGroup string, targetLUN populator.LUN, context populator.MappingContext) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Map", initatorGroup, targetLUN)
+	ret := m.ctrl.Call(m, "Map", initatorGroup, targetLUN, context)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Map indicates an expected call of Map.
-func (mr *MockStorageApiMockRecorder) Map(initatorGroup, targetLUN any) *gomock.Call {
+func (mr *MockStorageApiMockRecorder) Map(initatorGroup, targetLUN, context any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Map", reflect.TypeOf((*MockStorageApi)(nil).Map), initatorGroup, targetLUN)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Map", reflect.TypeOf((*MockStorageApi)(nil).Map), initatorGroup, targetLUN, context)
 }
 
 // ResolveVolumeHandleToLUN mocks base method.
@@ -99,15 +100,15 @@ func (mr *MockStorageApiMockRecorder) ResolveVolumeHandleToLUN(volumeHandle any)
 }
 
 // UnMap mocks base method.
-func (m *MockStorageApi) UnMap(initatorGroup string, targetLUN populator.LUN) error {
+func (m *MockStorageApi) UnMap(initatorGroup string, targetLUN populator.LUN, context populator.MappingContext) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UnMap", initatorGroup, targetLUN)
+	ret := m.ctrl.Call(m, "UnMap", initatorGroup, targetLUN, context)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // UnMap indicates an expected call of UnMap.
-func (mr *MockStorageApiMockRecorder) UnMap(initatorGroup, targetLUN any) *gomock.Call {
+func (mr *MockStorageApiMockRecorder) UnMap(initatorGroup, targetLUN, context any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnMap", reflect.TypeOf((*MockStorageApi)(nil).UnMap), initatorGroup, targetLUN)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnMap", reflect.TypeOf((*MockStorageApi)(nil).UnMap), initatorGroup, targetLUN, context)
 }
