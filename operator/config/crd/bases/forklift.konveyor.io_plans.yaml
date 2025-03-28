@@ -294,6 +294,10 @@ spec:
                     "{{.VmName}}-disk-{{.DiskIndex}}"
                     "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
                 type: string
+              skipGuestConversion:
+                default: false
+                description: Determines if the plan should skip the guest conversion.
+                type: boolean
               targetNamespace:
                 description: Target namespace.
                 type: string

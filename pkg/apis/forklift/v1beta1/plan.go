@@ -94,6 +94,9 @@ type PlanSpec struct {
 	// Determines if the plan should migrate shared disks.
 	// +kubebuilder:default:=true
 	MigrateSharedDisks bool `json:"migrateSharedDisks,omitempty"`
+	// Determines if the plan should skip the guest conversion.
+	// +kubebuilder:default:=false
+	SkipGuestConversion bool `json:"skipGuestConversion,omitempty"`
 }
 
 // Find a planned VM.
@@ -157,7 +160,7 @@ func (p *Plan) ShouldUseV2vForTransfer() (bool, error) {
 	case VSphere:
 		// The virt-v2v transferes all disks attached to the VM. If we want to skip the shared disks so we don't transfer
 		// them multiple times we need to manage the transfer using KubeVirt CDI DataVolumes and v2v-in-place.
-		return !p.Spec.Warm && destination.IsHost() && p.Spec.MigrateSharedDisks, nil
+		return !p.Spec.Warm && destination.IsHost() && p.Spec.MigrateSharedDisks && !p.Spec.SkipGuestConversion, nil
 	case Ova:
 		return true, nil
 	default:
