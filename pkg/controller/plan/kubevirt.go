@@ -446,7 +446,7 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) error {
 
 	var virtualMachine *cnv.VirtualMachine
 	if len(vms.Items) == 0 {
-		if virtualMachine, err = r.virtualMachine(vm); err != nil {
+		if virtualMachine, err = r.virtualMachine(vm, false); err != nil {
 			return liberr.Wrap(err)
 		}
 		if err = r.Destination.Client.Create(context.TODO(), virtualMachine); err != nil {
@@ -1410,7 +1410,7 @@ func (r *KubeVirt) getGeneratedName(vm *plan.VMStatus) string {
 }
 
 // Build the Kubevirt VM CR.
-func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine, err error) {
+func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) (object *cnv.VirtualMachine, err error) {
 	pvcs, err := r.getPVCs(vm.Ref)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -1476,7 +1476,7 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 	// Assign the determined run strategy to the object
 	object.Spec.RunStrategy = &runStrategy
 
-	err = r.Builder.VirtualMachine(vm.Ref, &object.Spec, pvcs, vm.InstanceType != "")
+	err = r.Builder.VirtualMachine(vm.Ref, &object.Spec, pvcs, vm.InstanceType != "", sortVolumesByLibvirt)
 	if err != nil {
 		return
 	}
