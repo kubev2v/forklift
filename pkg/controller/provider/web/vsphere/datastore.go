@@ -174,10 +174,11 @@ func (h *DatastoreHandler) filter(ctx *gin.Context, list *[]model.Datastore) (er
 // REST Resource.
 type Datastore struct {
 	Resource
-	Type            string `json:"type"`
-	Capacity        int64  `json:"capacity"`
-	Free            int64  `json:"free"`
-	MaintenanceMode string `json:"maintenance"`
+	Type                string   `json:"type"`
+	Capacity            int64    `json:"capacity"`
+	Free                int64    `json:"free"`
+	MaintenanceMode     string   `json:"maintenance"`
+	BackingDevicesNames []string `json:"backingDevicesNames"`
 }
 
 // Build the resource using the model.
@@ -187,6 +188,7 @@ func (r *Datastore) With(m *model.Datastore) {
 	r.Capacity = m.Capacity
 	r.Free = m.Free
 	r.MaintenanceMode = m.MaintenanceMode
+	r.BackingDevicesNames = m.BackingDevicesNames
 }
 
 // Build self link (URI).

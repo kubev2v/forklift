@@ -84,6 +84,7 @@ const (
 	fCpuCores       = "summary.hardware.numCpuCores"
 	fThumbprint     = "summary.config.sslThumbprint"
 	fMgtServerIp    = "summary.managementServerIp"
+	fScsiLun        = "config.storageDevice.scsiLun"
 	// Network
 	fTag     = "tag"
 	fSummary = "summary"
@@ -100,6 +101,7 @@ const (
 	fCapacity    = "summary.capacity"
 	fFreeSpace   = "summary.freeSpace"
 	fDsMaintMode = "summary.maintenanceMode"
+	fVmfsExtent  = "info"
 	// VM
 	fUUID                = "config.uuid"
 	fFirmware            = "config.firmware"
@@ -698,6 +700,7 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 				fPortGroup,
 				fPNIC,
 				fVNIC,
+				fScsiLun,
 			},
 		},
 		{ // Network
@@ -744,6 +747,7 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 				fCapacity,
 				fFreeSpace,
 				fDsMaintMode,
+				fVmfsExtent,
 				fHost,
 			},
 		},
