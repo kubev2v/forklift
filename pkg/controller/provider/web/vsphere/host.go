@@ -203,21 +203,22 @@ func (h *HostHandler) buildAdapters(host *Host) (err error) {
 // REST Resource.
 type Host struct {
 	Resource
-	Cluster            string            `json:"cluster"`
-	Status             string            `json:"status"`
-	InMaintenanceMode  bool              `json:"inMaintenance"`
-	ManagementServerIp string            `json:"managementServerIp"`
-	Thumbprint         string            `json:"thumbprint"`
-	Timezone           string            `json:"timezone"`
-	CpuSockets         int16             `json:"cpuSockets"`
-	CpuCores           int16             `json:"cpuCores"`
-	ProductName        string            `json:"productName"`
-	ProductVersion     string            `json:"productVersion"`
-	Network            model.HostNetwork `json:"networking"`
-	Networks           []model.Ref       `json:"networks"`
-	Datastores         []model.Ref       `json:"datastores"`
-	VMs                []model.Ref       `json:"vms"`
-	NetworkAdapters    []NetworkAdapter  `json:"networkAdapters"`
+	Cluster            string               `json:"cluster"`
+	Status             string               `json:"status"`
+	InMaintenanceMode  bool                 `json:"inMaintenance"`
+	ManagementServerIp string               `json:"managementServerIp"`
+	Thumbprint         string               `json:"thumbprint"`
+	Timezone           string               `json:"timezone"`
+	CpuSockets         int16                `json:"cpuSockets"`
+	CpuCores           int16                `json:"cpuCores"`
+	ProductName        string               `json:"productName"`
+	ProductVersion     string               `json:"productVersion"`
+	Network            model.HostNetwork    `json:"networking"`
+	Networks           []model.Ref          `json:"networks"`
+	Datastores         []model.Ref          `json:"datastores"`
+	VMs                []model.Ref          `json:"vms"`
+	NetworkAdapters    []NetworkAdapter     `json:"networkAdapters"`
+	HostScsiDisks      []model.HostScsiDisk `json:"hostScsiDisks"`
 }
 
 // Build the resource using the model.
@@ -237,6 +238,7 @@ func (r *Host) With(m *model.Host) {
 	r.Networks = m.Networks
 	r.Datastores = m.Datastores
 	r.NetworkAdapters = []NetworkAdapter{}
+	r.HostScsiDisks = append(r.HostScsiDisks, m.HostScsiDisks...)
 }
 
 // Build self link (URI).

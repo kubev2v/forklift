@@ -371,6 +371,17 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 							return network.VNICs[i].MTU > network.VNICs[j].MTU
 						})
 				}
+			case fScsiLun:
+				if array, cast := p.Val.(types.ArrayOfScsiLun); cast {
+					v.model.HostScsiDisks = nil
+					for _, iScsiLun := range array.ScsiLun {
+						hostScsiDisk := model.HostScsiDisk{}
+						scsiLun := iScsiLun.GetScsiLun()
+						hostScsiDisk.CanonicalName = scsiLun.CanonicalName
+						hostScsiDisk.Vendor = strings.TrimSpace(scsiLun.Vendor)
+						v.model.HostScsiDisks = append(v.model.HostScsiDisks, hostScsiDisk)
+					}
+				}
 			}
 		}
 	}
@@ -512,6 +523,14 @@ func (v *DatastoreAdapter) Apply(u types.ObjectUpdate) {
 			case fDsMaintMode:
 				if s, cast := p.Val.(string); cast {
 					v.model.MaintenanceMode = s
+				}
+			case fVmfsExtent:
+				if s, cast := p.Val.(types.VmfsDatastoreInfo); cast {
+					backingDevList := []string{}
+					for _, val := range s.Vmfs.Extent {
+						backingDevList = append(backingDevList, val.DiskName)
+					}
+					v.model.BackingDevicesNames = backingDevList
 				}
 			}
 		}
