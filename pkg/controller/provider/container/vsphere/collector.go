@@ -84,6 +84,7 @@ const (
 	fCpuCores       = "summary.hardware.numCpuCores"
 	fThumbprint     = "summary.config.sslThumbprint"
 	fMgtServerIp    = "summary.managementServerIp"
+	fScsiLun        = "config.storageDevice.scsiLun"
 	// Network
 	fTag     = "tag"
 	fSummary = "summary"
@@ -698,6 +699,7 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 				fPortGroup,
 				fPNIC,
 				fVNIC,
+				fScsiLun,
 			},
 		},
 		{ // Network
