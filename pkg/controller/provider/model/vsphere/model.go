@@ -126,19 +126,31 @@ type Cluster struct {
 
 type Host struct {
 	Base
-	Cluster            string      `sql:"d0,index(cluster)"`
-	Status             string      `sql:""`
-	InMaintenanceMode  bool        `sql:""`
-	ManagementServerIp string      `sql:""`
-	Thumbprint         string      `sql:""`
-	Timezone           string      `sql:""`
-	CpuSockets         int16       `sql:""`
-	CpuCores           int16       `sql:""`
-	ProductName        string      `sql:""`
-	ProductVersion     string      `sql:""`
-	Network            HostNetwork `sql:""`
-	Networks           []Ref       `sql:""`
-	Datastores         []Ref       `sql:""`
+	Cluster            string         `sql:"d0,index(cluster)"`
+	Status             string         `sql:""`
+	InMaintenanceMode  bool           `sql:""`
+	ManagementServerIp string         `sql:""`
+	Thumbprint         string         `sql:""`
+	Timezone           string         `sql:""`
+	CpuSockets         int16          `sql:""`
+	CpuCores           int16          `sql:""`
+	ProductName        string         `sql:""`
+	ProductVersion     string         `sql:""`
+	Network            HostNetwork    `sql:""`
+	Networks           []Ref          `sql:""`
+	Datastores         []Ref          `sql:""`
+	HostScsiDisks      []HostScsiDisk `sql:""`
+}
+
+type HostScsiDisk struct {
+	// Canonical name of the SCSI logical unit.
+	//
+	// Disk partition or extent identifiers refer to this name when
+	// referring to a disk. Use this property to correlate a partition
+	// or extent to a specific SCSI disk.
+	CanonicalName string `json:"canonicalName"`
+	// The vendor of the SCSI device.
+	Vendor string `json:"vendor"`
 }
 
 type HostNetwork struct {
@@ -227,10 +239,11 @@ type DVSHost struct {
 
 type Datastore struct {
 	Base
-	Type            string `sql:""`
-	Capacity        int64  `sql:""`
-	Free            int64  `sql:""`
-	MaintenanceMode string `sql:""`
+	Type                string   `sql:""`
+	Capacity            int64    `sql:""`
+	Free                int64    `sql:""`
+	MaintenanceMode     string   `sql:""`
+	BackingDevicesNames []string `sql:""`
 }
 
 type VM struct {
