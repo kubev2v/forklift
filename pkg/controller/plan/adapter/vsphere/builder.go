@@ -88,6 +88,10 @@ const (
 	Shareable = "shareable"
 )
 
+const (
+	ManagementNetwork = "Management Network"
+)
+
 // Map of vmware guest ids to osinfo ids.
 var osMap = map[string]string{
 	"centos64Guest":              "centos5.11",
@@ -290,6 +294,19 @@ func isWindows(vm *model.VM) bool {
 	return strings.Contains(vm.GuestID, WindowsPrefix) || strings.Contains(vm.GuestName, WindowsPrefix)
 }
 
+// Retrieve the IP address of an ESXI host from its Management Network VNIC or fall back to the hostname.
+func getHostAddress(host *model.Host) string {
+	for _, vnic := range host.Network.VNICs {
+		if vnic.PortGroup == ManagementNetwork {
+			if vnic.IpAddress != "" && net.ParseIP(vnic.IpAddress) != nil {
+				return vnic.IpAddress // Return the IP address if found
+			}
+		}
+	}
+	// otherwise fall back to the host name
+	return host.Name
+}
+
 func (r *Builder) getSourceDetails(vm *model.VM, sourceSecret *core.Secret) (libvirtURL liburl.URL, fingerprint string, err error) {
 	host, err := r.host(vm.Host)
 	if err != nil {
@@ -324,7 +341,7 @@ func (r *Builder) getSourceDetails(vm *model.VM, sourceSecret *core.Secret) (lib
 	} else if r.Source.Provider.Spec.Settings[api.SDK] == api.ESXI {
 		libvirtURL = liburl.URL{
 			Scheme:   "esx",
-			Host:     host.Name,
+			Host:     getHostAddress(host),
 			User:     liburl.User(string(sourceSecret.Data["user"])),
 			Path:     "",
 			RawQuery: sslVerify,
