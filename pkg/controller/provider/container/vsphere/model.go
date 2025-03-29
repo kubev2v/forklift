@@ -565,6 +565,8 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 					if ref != nil {
 						v.model.Snapshot = v.Ref(*ref)
 					}
+				} else { //Also sync the snapshot status upon deletion
+					v.model.Snapshot = model.Ref{}
 				}
 			case fChangeTracking:
 				if b, cast := p.Val.(bool); cast {
