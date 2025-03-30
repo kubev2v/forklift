@@ -6,7 +6,7 @@ type StorageApi interface {
 	StorageResolver
 }
 
-type MappingContext map[string]interface{}
+type MappingContext map[string]any
 
 type StorageMapper interface {
 	// EnsureClonnerIgroup creates or updates an initiator group with the clonnerIqn

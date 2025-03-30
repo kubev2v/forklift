@@ -84,7 +84,7 @@ func TestPopulator(t *testing.T) {
 			setup: func() {
 				storageClient.EXPECT().ResolveVolumeHandleToLUN("pvc-12345").Return(populator.LUN{SerialNumber: "abc"}, nil)
 				storageClient.EXPECT().CurrentMappedGroups(gomock.Any(), gomock.Any())
-				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any(), gomock.Any())
+				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any())
 				storageClient.EXPECT().Map("xcopy-esxs", gomock.Any(), gomock.Any())
 				storageClient.EXPECT().UnMap(gomock.Any(), gomock.Any(), gomock.Any())
 				vmwareClient.EXPECT().GetEsxByVm(context.Background(), gomock.Any())

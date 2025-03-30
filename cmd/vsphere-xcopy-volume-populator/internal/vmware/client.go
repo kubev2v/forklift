@@ -73,8 +73,8 @@ func (c *VSphereClient) RunEsxCommand(ctx context.Context, host *object.HostSyst
 func (c *VSphereClient) GetEsxByVm(ctx context.Context, vmName string) (*object.HostSystem, error) {
 	finder := find.NewFinder(c.Client.Client, true)
 
-    //FIXME - need to trace the VM by the datastore, which we should have because 
-    // of the vmdkPath and then run a finder of vms on a datastore.
+	//FIXME - need to trace the VM by the datastore, which we should have because
+	// of the vmdkPath and then run a finder of vms on a datastore.
 	// Get the default datacenter
 	dc, err := finder.DefaultDatacenter(ctx)
 	if err != nil {

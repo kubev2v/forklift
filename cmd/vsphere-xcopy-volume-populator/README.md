@@ -1,6 +1,5 @@
 # vsphere-xcopy-volume-populator
 
-
 ## Forklift Controller
 When the feature flag `feature_copy_offload` is true (off by default), the controller will
 consult a config map to decided if VM disk from VMWare could be copied
@@ -97,4 +96,21 @@ of 'ds-iscsi-3' to storageClass 'storage-class-2' will use the populator with
 storage product vendor 'productY'.
 
 
+# Troubleshooting
 
+## vSphere/ESXi
+- Sometimes remote ESXi execution can fail with SOAP error with no apparent root cause message
+  Since VSphere is invoking some SOAP/Rest endpoints on the ESXi, those can fail because of 
+  standard error reasons and vanish after the next try. If the popoulator fails the migration
+  can be restarted. We may want to restart/retry that populator or restart the migration.
+
+## NetApp
+- Error `cannot derive SVM to use; please specify SVM in config file`
+  This is a configuration issue with Ontap and could be fixed by specifying a default
+  SVM using vserver commands on the ontap server:
+  ```
+  # show current config for an SVM
+  vserver show -vserver ${NAME_OF_SVM}
+  ...
+  ```
+  Try to set a mgmt interface for the SVM and put that hostname in the STORAGE_HOSTNAME

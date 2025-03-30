@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"strings"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/client-go/util/cert"
@@ -30,18 +29,14 @@ import (
 var version = "unknown"
 
 var (
-	//secretRef is needed because of lack of control on the populator pod
-	// deployment. When/if we gain control on the pod deployment we should mount
-	// the secret as env vars. There is an attempt to push that,
-	// see https://github.com/kubernetes-csi/lib-volume-populator/pull/171
 	crName          string
 	crNamespace     string
 	pvcSize         string
 	ownerUID        string
-	secretName      string
 	sourceVMDKFile  string
 	targetPVC       string
 	targetNamespace string
+    secretName      string
 	storageVendor   string
 	storageHostname string
 	storageUsername string
@@ -220,33 +215,14 @@ func handleArgs() {
 			}
 		case "storage-hostname", "storage-username", "storage-password",
 			"vsphere-hostname", "vsphere-username", "vsphere-password":
-			if secretName == "" && f.Value.String() == "" {
+			if f.Value.String() == "" {
 				missingFlags = true
-				klog.Errorf("secret-ref is not set, missing value for flag --%s", f.Name)
+				klog.Errorf("missing value for flag --%s", f.Name)
 			}
 		}
 	})
 	if missingFlags {
 		os.Exit(2)
-	}
-
-	klog.Infof("Current namespace %s ", targetNamespace)
-	if secretName != "" {
-		secret, err := clientSet.CoreV1().Secrets(targetNamespace).Get(context.Background(), secretName, metav1.GetOptions{})
-		if err != nil {
-			klog.Fatalf("fail to fetch the secret %s: %s", secretName, err)
-		}
-
-		flag.VisitAll(func(f *flag.Flag) {
-			if f.Value.String() != "" {
-				return
-			}
-			name := strings.ReplaceAll(strings.ToUpper(f.Name), "-", "_")
-			klog.V(2).Infof("Looking for key %q in the populator secret", name)
-			if v, exists := secret.Data[name]; exists {
-				f.Value.Set(string(v))
-			}
-		})
 	}
 }
 
@@ -273,8 +249,13 @@ func setupTracing() (*prometheus.CounterVec, error) {
 
 	go func() {
 		http.Handle("/metrics", promhttp.Handler())
+		// use minumum TLS 1.2
+		cfg := tls.Config{MinVersion: tls.VersionTLS12}
+		server := http.Server{
+			Addr:      ":8443",
+			TLSConfig: &cfg}
 		klog.Info("Staring metrics server")
-		if err := http.ListenAndServeTLS(":8443", certFile, keyFile, nil); err != nil {
+		if err := server.ListenAndServeTLS(certFile, keyFile); err != nil {
 			klog.Fatal("Error starting prometheus endpoint: ", err)
 		}
 	}()
