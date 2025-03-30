@@ -18,7 +18,7 @@ type NetappClonner struct {
 }
 
 // Map the targetLUN to the initiator group.
-func (c *NetappClonner) Map(initatorGroup string, targetLUN populator.LUN) error {
+func (c *NetappClonner) Map(initatorGroup string, targetLUN populator.LUN, _ populator.MappingContext) error {
 	_, err := c.api.EnsureLunMapped(context.TODO(), initatorGroup, targetLUN.Name)
 	if err != nil {
 		return fmt.Errorf("Failed to map lun path %s to group %s: %w ", targetLUN.Name, initatorGroup, err)
@@ -30,18 +30,18 @@ func (c *NetappClonner) UnMap(initatorGroup string, targetLUN populator.LUN, _ p
 	return c.api.LunUnmap(context.TODO(), initatorGroup, targetLUN.Name)
 }
 
-func (c *NetappClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn string, _ populator.MappingContext) error {
+func (c *NetappClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn string) (populator.MappingContext, error) {
 	// esxs needs "vmware" as the group protocol.
 	err := c.api.IgroupCreate(context.Background(), initiatorGroup, "iscsi", "vmware")
 	if err != nil {
 		// TODO ignore if exists error? with ontap there is no error
-		return fmt.Errorf("failed adding igroup %w", err)
+		return nil, fmt.Errorf("failed adding igroup %w", err)
 	}
 	err = c.api.EnsureIgroupAdded(context.Background(), initiatorGroup, clonnerIqn)
 	if err != nil {
-		return fmt.Errorf("failed adding host to igroup %w", err)
+		return nil, fmt.Errorf("failed adding host to igroup %w", err)
 	}
-	return nil
+	return nil, nil
 }
 
 func NewNetappClonner(hostname, username, password string) (NetappClonner, error) {
@@ -80,30 +80,18 @@ func (c *NetappClonner) ResolveVolumeHandleToLUN(volumeHandle string) (populator
 	return lun, nil
 }
 
-func (c *NetappClonner) Get(lun populator.LUN) (string, error) {
+func (c *NetappClonner) Get(lun populator.LUN, _ populator.MappingContext) (string, error) {
 	// this code is from netapp/trident/storage_drivers/ontap/ontap_common.go
-	//reportingNodes, err := c.api.LunMapGetReportingNodes(context.Background(), XCOPY_CLONNER_GROUP, fmt.Sprintf("/vol/%s/lun0",lun))
-	//if err != nil {
-	//   return "",err
-	//}
-
-	// FIXME - this ips list needs to be intersected with the list of reporting nodes for the LUN? see c.api.LunMapGetReportingNodes
+	// FIXME - this ips list needs to be intersected with the list of reporting
+	// nodes for the LUN? see c.api.LunMapGetReportingNodes
 	ips, err := c.api.NetInterfaceGetDataLIFs(context.Background(), "iscsi")
 	if err != nil || len(ips) < 1 {
 		return "", err
 	}
 	return ips[0], nil
-
-	//lifs, err  := c.api.GetSLMDataLifs(context.Background(), []string{}, reportingNodes)
-	//if err != nil {
-	//    return "", err
-	//}
-	//for _, l := range lifs {
-	//   l.
-	//}
 }
 
-func (c *NetappClonner) CurrentMappedGroups(targetLUN populator.LUN) ([]string, error) {
+func (c *NetappClonner) CurrentMappedGroups(targetLUN populator.LUN, _ populator.MappingContext) ([]string, error) {
 	lunMappedIgroups, err := c.api.LunListIgroupsMapped(context.Background(), targetLUN.Name)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get mapped luns by path %s: %w ", targetLUN.Name, err)

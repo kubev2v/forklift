@@ -49,12 +49,37 @@ type NetworkPair struct {
 	Destination DestinationNetwork `json:"destination"`
 }
 
+type OffloadPlugin string
+// StorageVendorProduct is an identifier of the product used for XCOPY.
+// NOTE - Update the kubebuilder:validation line for every change to this enum
+type StorageVendorProduct string
+
+const (
+	OffloadPluginVSphereXcopy   OffloadPlugin        = "VSphereXcopy"
+	StorageVendorProductVantara StorageVendorProduct = "vantara"
+	StorageVendorProductOntap   StorageVendorProduct = "ontap"
+)
+
+type OffloadPluginVSphereXcopyConfig struct {
+	// SecretRef is the name of the secret with the storage credentials for the plugin.
+	// The secret should reside in the same namespace where the source provider is.
+    SecretRef string `json:"secretRef"`
+	// StorageVendorProduct the string identifier of the storage vendor product
+	// +kubebuilder:validation:Enum=ontap
+	StorageVendorProduct StorageVendorProduct `json:"storageVendorProduct"`
+}
+
 // Mapped storage.
 type StoragePair struct {
 	// Source storage.
 	Source ref.Ref `json:"source"`
 	// Destination storage.
 	Destination DestinationStorage `json:"destination"`
+	// Offload Plugin
+	// +kubebuilder:validation:Enum=OffloadPlugin;VSphereXcopy
+	OffloadPlugin OffloadPlugin `json:"offloadPlugin,omitempty"`
+	// OffloadPluginVSphereXcopyConfig is the config for OffloadPluginVSphereXcopy
+	OffloadPluginVSphereXcopyConfig *OffloadPluginVSphereXcopyConfig `json:"offloadPluginVSpereXcopyConfig,omitempty"`
 }
 
 // Mapped storage destination.
