@@ -1,8 +1,5 @@
-//go:build go1.15 && !go1.16
-// +build go1.15,!go1.16
-
-/*
- * Copyright 2021 ByteDance Inc.
+/**
+ * Copyright 2023 ByteDance Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,12 +14,22 @@
  * limitations under the License.
  */
 
-package loader
+package abi
 
 import (
-    `github.com/bytedance/sonic/internal/loader`
+    _ `unsafe`
+
+    `github.com/bytedance/sonic/internal/rt`
 )
 
-func (self Loader) LoadOne(text []byte, funcName string, frameSize int, argSize int, argStackmap []bool, localStackmap []bool) Function {
-    return Function(loader.Loader(text).Load(funcName, frameSize, argSize, argStackmap, localStackmap))
-}
+const (
+    _G_stackguard0 = 0x10
+)
+
+var (
+    F_morestack_noctxt = uintptr(rt.FuncAddr(morestack_noctxt))
+)
+
+//go:linkname morestack_noctxt runtime.morestack_noctxt
+func morestack_noctxt()
+
