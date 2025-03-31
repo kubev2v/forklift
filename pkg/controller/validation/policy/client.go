@@ -321,6 +321,13 @@ func (r *Worker) run() {
 				task.completed = time.Now()
 			} else {
 				task.Error = err
+				task.Concerns = []model.Concern{
+					{
+						Category:   "Critical",
+						Label:      err.Error(),
+						Assessment: err.Error(),
+					},
+				}
 			}
 			func() {
 				defer func() {
@@ -372,10 +379,11 @@ func (r *Pool) Start() {
 					"task",
 					task.String())
 			} else {
-				log.Info(
+				log.Error(
+					task.Error,
 					"VM validation failed.",
-					"task",
-					task.String())
+					"task", task.String(),
+				)
 			}
 			task.notify()
 		}
