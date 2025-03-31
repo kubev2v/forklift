@@ -23,7 +23,7 @@ status: implementable
 ## Summary
 
 Implement a pipeline for orchestrating Live Migration between Kubernetes clusters.
-This pipeline represents a third migration type (cold, warm live) and the first
+This pipeline represents a new migration type (cold, warm, live) and the first
 that has an entirely provider-specific implementation. The cluster admin will be
 responsible for establishing connectivity between the source and target clusters.
 KubeVirt will be responsible for the migration mechanics, including storage migration.
@@ -32,23 +32,25 @@ wait for migration to complete.
 
 ## Motivation
 
-Migrating between clusters without VM downtime is a clear benefit to users. The motivation
-to do this orchestration with Forklift is that it already does the hard work of building
-the inventory of resources on the source, mapping source resources to the destination,
-and managing the migration pipeline.
+A [KubeVirt enhancement](https://github.com/kubevirt/enhancements/pull/6) has been opened for live migrating VMs between clusters. 
+Migrating manually is possible but impractical, as it requires the user to create the destination VM object and any volumes,
+secrets, configmaps or other resources that the source VM will require and requires the user to manage every step of the process.
+These are things that Forklift already specializes in,  so it's a natural fit to do the orchestration in Forklift to
+simplify the migration process for users. The motivation to do this orchestration with Forklift is that it already does the hard work of building
+the inventory of resources on the source, mapping source resources to the destination, and managing the migration pipeline.
 
 ### Goals
 
-* Orchestrate live migration of a Kubevirt VM from one cluster to another via a "live" Plan.
-    * Ensure necessary shared resources are accessible on the destination, including instance types,
-      ssh keys, and configmaps which may be mounted by multiple VMs.
+* Orchestrate live migration of a KubeVirt VM from one cluster to another via a "live" Plan.
+    * Ensure necessary shared resources are accessible on the destination, including instance types, VM preferences,
+      secrets, and configmaps which may be mounted by multiple VMs.
 
 ### Non-Goals
 
 * Automatically establish intercluster connectivity
 * Migrate resources unrelated to VMs that may be necessary for application availability
   after migration (services, routes, etc)
-* Implement live migration for providers other than KubeVirt
+* Implement live migration for providers other than KubeVirt.
 
 ## Proposal
 
@@ -95,30 +97,29 @@ Whether this should be a hard stop on the migration could be configured at the p
 
             {Name: Started},
             {Name: PreHook, All: HasPreHook},
+            {Name: EnsureResources}, // preferences and instance types
             {Name: CreateEmptyDataVolumes},
-            {Name: EnsureResources}, // secrets and configmaps
             {Name: CreateStandbyVM},
-            {Name: CreateTargetMigration},
-            {Name: WaitForTargetMigration},
-            {Name: CreateSourceMigration},
+            {Name: CreateServiceExports},
+            {Name: CreateVirtualMachineInstanceMigrations},
             {Name: WaitForStateTransfer},
             {Name: PostHook, All: HasPostHook},
             {Name: Completed}
 
-* **CreateEmptyDataVolumes**: KubeVirt is going to handle storage migration, so all that is necessary
-  for Forklift to do is create blank target DataVolumes.
 * **EnsureResources**: Any secrets or configmaps that are mounted by the VM on the source need to be
   duplicated to the target namespace. Multiple VMs could rely on the same configmap or secret, so Forklift
   will allow this step to pass if secrets or configmaps with the correct names (and Forklift labels) already
   exist.
+* **CreateEmptyDataVolumes**: KubeVirt is going to handle storage migration, so all that is necessary
+  for Forklift to do is create blank target DataVolumes.
 * **CreateStandbyVM**: The target VM needs to be created mounting the blank disks and any secrets or configmaps.
-  It also needs to be created in the running state, with a special KubeVirt annotation indicating that the VM is to be
-  started in migration target mode.
-* **CreateTargetMigration**: A VirtualMachineInstanceMigration needs to be created in the target cluster.
-* **WaitForTargetMigration**: Once the target VMIM is reconciled and ready, it will present a migration endpoint
-  to use for the state transfer.
-* **CreateSourceMigration**: A VMIM must be created in the source cluster, specifying the source VM and the migration
-  endpoint from the target migration.
+  It needs to be created in a halted state, as KubeVirt will be responsible for starting it once the synchronization
+  is complete.
+* **CreateServiceExports**: If necessary, Forklift will create ServiceExports in the KubeVirt namespace on the
+  target cluster to expose the synchronization endpoints to the source.
+* **CreateVirtualMachineInstanceMigrations**: A VirtualMachineInstanceMigration needs to be created in both the source and target namespaces.
+  Once the target VMIM is reconciled and ready, it will present a migration endpoint to use for the state transfer. This must be provided in
+  the source VMIM spec. If Submariner is in use,
 * **WaitForStateTransfer**: Once the source VMIM is created, KubeVirt will handle the state transfer and
   Forklift only needs to wait for the destination VM to report ready. KubeVirt will handle shutdown of the
   source VM.
@@ -140,11 +141,13 @@ A draft of the new component interface might look something like this:
 ```go
 
 type Migrator interface {
-	SupportsPath(path string) bool
-	Itinerary(path string) (libitr.Itinerary, bool)
-	Pipeline(path string) (libitr.Pipeline, bool)
-	Predicate(path string) (libitr.Predicate, bool)
-	Phase(vmStatus *planapi.VMStatus) error
+    Init() error
+    Status(plan.VM) *plan.VMStatus
+    Reset(*plan.VMStatus, []*plan.Step)
+    Pipeline(plan.VM) ([]*plan.Step, error)
+    ExecutePhase(*plan.VMStatus) (bool, error)
+    Step(*plan.VMStatus) string
+    Next(status *plan.VMStatus) (next string)
 }
 ```
 
@@ -158,8 +161,9 @@ of the migration flows for each provider all at once.
 
 ### Security, Risks, and Mitigations
 
-Forklift will require new access to read and create VirtualMachineInstanceMigration instances
-on the source and target clusters. Otherwise, the usual security risks apply for cluster to cluster migrations: Forklift
+Forklift will require new access to read and create VirtualMachineInstanceMigration and ServiceExport
+instances on the source and target clusters.
+Otherwise, the usual security risks apply for cluster to cluster migrations: Forklift
 has significant access to secrets and other resources on both clusters, and we need to ensure
 that the user deploying the migration plan has the appropriate rights in the source and target
 namespaces.
@@ -172,7 +176,7 @@ Unit tests will be written to ensure that the Migrator component logic
 behaves correctly and that the migration runner defers to provider specific
 implementations correctly.
 
-Integration tests need to be written to ensure that the Kubevirt live migration path
+Integration tests need to be written to ensure that the KubeVirt live migration path
 succeeds.
 
 ### Upgrade / Downgrade Strategy
@@ -186,4 +190,3 @@ to upgrade or downgrade since the changes are purely additive.
 ## Implementation History
 
 * **February 13, 2025**: Enhancement submitted.
-
