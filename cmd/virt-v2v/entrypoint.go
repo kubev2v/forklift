@@ -92,14 +92,60 @@ func runVirtV2VInspection(disks []string) error {
 	return v2vCmd.Run()
 }
 
+func createOverlay(path string, i int) (string, error) {
+	overlayPath := fmt.Sprintf("%s/disk-overlay-%d.qcow2", global.DIR, i)
+	if !strings.HasPrefix(path, "/dev") {
+		path = fmt.Sprintf("%s/disk.img", path)
+	}
+	args := []string{"create", "-b", path, "-F", "raw", "-f", "qcow2", overlayPath}
+	fmt.Println("Running the qemu-img with args: ", args)
+	v2vCmd := exec.Command("qemu-img", args...)
+	v2vCmd.Stdout = os.Stdout
+	v2vCmd.Stderr = os.Stderr
+	return overlayPath, v2vCmd.Run()
+}
+
+func addOverlaysToSharedDisks() (destinationDomain string, err error) {
+	// We need to create new file as the original is mounted read only configmap
+	sourceDomain := "/mnt/v2v/input.xml"
+	destinationDomain = "/var/tmp/v2v/domain.xml"
+	// switch to shared disks
+	disks, err := utils.GetSharedDisks()
+	if err != nil {
+		return "", fmt.Errorf("failed to get linked disk: %s", err.Error())
+	}
+	domain, err := utils.ReadDomainFromFile(sourceDomain)
+	if err != nil {
+		return "", fmt.Errorf("failed to read the domain file %s", err.Error())
+	}
+	diskCount := len(domain.Devices.Disks)
+	for i, linkedDisk := range disks {
+		var overlayPath string
+		overlayPath, err = createOverlay(linkedDisk, i)
+		if err != nil {
+			return
+		}
+		utils.AddDiskToDomain(domain, overlayPath, i+diskCount)
+	}
+	err = utils.WriteDomainToFile(domain, destinationDomain)
+	if err != nil {
+		return "", err
+	}
+	return destinationDomain, nil
+}
+
 func runVirtV2vInPlace() error {
 	var err error
+	domainPath, err := addOverlaysToSharedDisks()
+	if err != nil {
+		return err
+	}
 	args := []string{"-v", "-x", "-i", "libvirtxml"}
 	args, err = addCommonArgs(args)
 	if err != nil {
 		return err
 	}
-	args = append(args, "/mnt/v2v/input.xml")
+	args = append(args, domainPath)
 	v2vCmd := exec.Command("virt-v2v-in-place", args...)
 	v2vCmd.Stdout = os.Stdout
 	v2vCmd.Stderr = os.Stderr

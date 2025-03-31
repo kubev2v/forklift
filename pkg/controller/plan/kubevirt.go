@@ -2057,6 +2057,37 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, libvirtConfigMap *cor
 			})
 		}
 	}
+	if !r.Plan.Spec.MigrateSharedDisks {
+		sharedPvcs, err := r.Builder.GetSharedPVCs(vm.Ref)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		for i, pvc := range sharedPvcs {
+			vol := core.Volume{
+				Name: pvc.Name,
+				VolumeSource: core.VolumeSource{
+					PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
+						ClaimName: pvc.Name,
+						ReadOnly:  false,
+					},
+				},
+			}
+			volumes = append(volumes, vol)
+			if pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == core.PersistentVolumeBlock {
+				devPath := fmt.Sprintf("/dev/block-shared%v", i)
+				devices = append(devices, core.VolumeDevice{
+					Name:       pvc.Name,
+					DevicePath: devPath,
+				})
+			} else {
+				devPath := fmt.Sprintf("/mnt/disks/disk-shared%v", i)
+				mounts = append(mounts, core.VolumeMount{
+					Name:      pvc.Name,
+					MountPath: devPath,
+				})
+			}
+		}
+	}
 
 	// add volume and mount for the libvirt domain xml config map.
 	// the virt-v2v pod expects to see the libvirt xml at /mnt/v2v/input.xml

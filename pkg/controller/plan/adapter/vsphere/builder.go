@@ -200,9 +200,6 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
-	if !r.Context.Plan.Spec.MigrateSharedDisks {
-		vm.RemoveSharedDisks()
-	}
 	macsToIps := ""
 	if r.Plan.Spec.PreserveStaticIPs {
 		macsToIps, err = r.mapMacStaticIps(vm)
@@ -536,6 +533,22 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 	}
 
 	return
+}
+
+func (r *Builder) GetSharedPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, err error) {
+	vm := &model.VM{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		return nil, liberr.Wrap(err, "vm", vmRef.String())
+	}
+	sharedPVCs, _, err := findSharedPVCs(r.Destination.Client, vm, r.Plan.Spec.TargetNamespace)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	if sharedPVCs != nil {
+		pvcs = append(pvcs, sharedPVCs...)
+	}
+	return pvcs, nil
 }
 
 // Create the destination Kubevirt VM.
