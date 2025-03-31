@@ -301,7 +301,11 @@ func (r *VMEventHandler) validated(batch []*policy.Task) {
 		if task.Error != nil {
 			r.log.Error(
 				task.Error, "VM validation failed.")
-			continue
+
+			if len(task.Concerns) == 0 {
+				continue
+			}
+			// If there are concerns we need to update and commit the changes
 		}
 		latest := &model.VM{Base: model.Base{ID: task.Ref.ID}}
 		err = tx.Get(latest)
@@ -324,14 +328,16 @@ func (r *VMEventHandler) validated(batch []*policy.Task) {
 			r.log.Error(err, "VM update failed.")
 			continue
 		}
-		r.log.V(3).Info(
-			"VM validated.",
-			"vmID",
-			latest.ID,
-			"revision",
-			latest.Revision,
-			"duration",
-			task.Duration())
+		if task.Error == nil {
+			r.log.V(3).Info(
+				"VM validated.",
+				"vmID",
+				latest.ID,
+				"revision",
+				latest.Revision,
+				"duration",
+				task.Duration())
+		}
 	}
 	err = tx.Commit()
 	if err != nil {
