@@ -3,6 +3,7 @@ package ontap
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
@@ -45,12 +46,15 @@ func (c *NetappClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn st
 }
 
 func NewNetappClonner(hostname, username, password string) (NetappClonner, error) {
+    // additional ontap values should be passed as env variables using prefix ONTAP_
+    svm := os.Getenv("ONTAP_SVM")
 	config := drivers.OntapStorageDriverConfig{
 		CommonStorageDriverConfig: &drivers.CommonStorageDriverConfig{},
 		ManagementLIF:             hostname,
 		Username:                  username,
 		Password:                  password,
 		LimitAggregateUsage:       "",
+        SVM: svm,
 	}
 
 	client, err := api.NewRestClientFromOntapConfig(context.TODO(), &config)
