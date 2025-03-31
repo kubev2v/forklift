@@ -460,7 +460,11 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 		return
 	}
 
-	for diskIndex, disk := range vm.Disks {
+	// Sort disks by bus, so we can match the disk index to the boot order.
+	// Important: need to match order in mapDisks method
+	disks := r.sortedDisksAsVmware(vm.Disks)
+
+	for diskIndex, disk := range disks {
 		mapped, found := dsMap[disk.Datastore.ID]
 		if !found {
 			continue
