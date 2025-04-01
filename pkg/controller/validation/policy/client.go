@@ -199,7 +199,7 @@ func (c *Client) buildTransport() (err error) {
 		transport.TLSClientConfig = &tls.Config{
 			RootCAs: pool,
 		}
-	} else {
+	} else if Settings.Development {
 		transport.TLSClientConfig = &tls.Config{
 			InsecureSkipVerify: true,
 		}
