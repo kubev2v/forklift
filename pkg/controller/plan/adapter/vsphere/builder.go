@@ -555,6 +555,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 				PlanName:      r.Plan.Name,
 				DiskIndex:     diskIndex,
 				RootDiskIndex: rootDiskIndex,
+				Shared:        disk.Shared,
 			}
 
 			generatedName, err := r.executeTemplate(pvcNameTemplate, &templateData)
