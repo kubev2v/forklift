@@ -371,6 +371,18 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 							return network.VNICs[i].MTU > network.VNICs[j].MTU
 						})
 				}
+			case fScsiLun:
+				if array, cast := p.Val.(types.ArrayOfScsiLun); cast {
+					v.model.HostScsiDisks = nil
+					for _, iScsiLun := range array.ScsiLun {
+						hostScsiDisk := model.HostScsiDisk{}
+						scsiLun := iScsiLun.GetScsiLun()
+						hostScsiDisk.ApplicationProtocol = scsiLun.ApplicationProtocol
+						hostScsiDisk.CanonicalName = scsiLun.CanonicalName
+						hostScsiDisk.Vendor = scsiLun.Vendor
+						v.model.HostScsiDisks = append(v.model.HostScsiDisks, hostScsiDisk)
+					}
+				}
 			}
 		}
 	}
