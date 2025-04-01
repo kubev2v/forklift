@@ -57,11 +57,13 @@ type PlanSpec struct {
 	//   - .PlanName: name of the migration plan
 	//   - .DiskIndex: initial volume index of the disk
 	//   - .RootDiskIndex: index of the root disk
+	//   - .Shared: true if the volume is shared by multiple VMs, false otherwise
 	// Note:
 	//   This template can be overridden at the individual VM level.
 	// Examples:
 	//   "{{.VmName}}-disk-{{.DiskIndex}}"
 	//   "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
+	//   "{{if .Shared}}shared-{{end}}{{.VmName}}-{{.DiskIndex}}"
 	// +optional
 	PVCNameTemplate string `json:"pvcNameTemplate,omitempty"`
 	// PVCNameTemplateUseGenerateName indicates if the PVC name template should use generateName instead of name.
@@ -206,6 +208,7 @@ type PVCNameTemplateData struct {
 	PlanName      string `json:"planName"`
 	DiskIndex     int    `json:"diskIndex"`
 	RootDiskIndex int    `json:"rootDiskIndex"`
+	Shared        bool   `json:"shared,omitempty"`
 }
 
 // VolumeNameTemplateData contains fields used in naming templates.

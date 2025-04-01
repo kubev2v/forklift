@@ -1410,6 +1410,7 @@ func (r *Reconciler) IsValidPVCNameTemplate(pvcNameTemplate string) error {
 		PlanName:      "test-plan",
 		DiskIndex:     0,
 		RootDiskIndex: 0,
+		Shared:        false,
 	}
 
 	result, err := r.IsValidTemplate(pvcNameTemplate, testData)
