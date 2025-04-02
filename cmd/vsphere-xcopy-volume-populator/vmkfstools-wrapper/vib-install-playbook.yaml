@@ -7,17 +7,18 @@
     src_location: ./
     dest_location: /tmp/
     maintenance_needed: no
-    ansible_ssh_common_args: '-o PreferredAuthentications=keyboard-interactive'
-
+    copy_ssh_key: false
+    # uncomment when you need to connect using password
+    #ansible_ssh_common_args: '-o PreferredAuthentications=keyboard-interactive'
 
   tasks:
     - name: Copy SSH public key
-      authorized_key:
-        user: root 
-        state: present
-        key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}" # or id_ed25519.pub
-        path: /etc/ssh/keys-root
-    
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/keys-root/authorized_keys
+        line: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+        create: true
+      when: copy_ssh_key | bool
+         
     - name: Copy {{ src_vib }} to ESXI Host
       copy: 
         src="{{ src_location }}{{ src_vib }}"
