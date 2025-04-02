@@ -37,7 +37,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/types"
-	"gopkg.in/yaml.v3"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -1189,17 +1188,29 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 // For now this method returns true, if there's a mapping (backend by copy-offload-mapping ConfigMap, that
 // maps StoragetClasses to Vsphere data stores
 func (r *Builder) SupportsVolumePopulators() bool {
-	mapping, err := r.GetCopyOffloadMapping()
-	if err != nil {
-		if k8serr.IsNotFound(err) {
-			// no support for copy offload or not configured. The config map
-			// is a must for the feature to work
-			r.Log.Info("the config map to configure copy offloading is missing, hence the feature is unusable", CopyOffloadConfigMap)
+	dsMapIn := r.Context.Map.Storage.Spec.Map
+	klog.Infof("####### RGOLAN storage map %+v", dsMapIn)
+	for _, m := range dsMapIn {
+	    klog.Infof("####### RGOLAN mapping pair source %+v, dest %+v", m.Source, m.Destination)
+		ref := m.Source
+		ds := &model.Datastore{}
+		err := r.Source.Inventory.Find(ds, ref)
+		if err != nil {
+			// TODO this method from the interface doesn't have error in the return value
+			klog.Errorf("####### RGOLAN failed to get datastore %+v", err)
+			return false
 		}
-		return false
-	}
 
-	return len(mapping.StorageClasses) > 0
+		/// LEFT IN MIDDLE - NEED TO GET THE LOGIC STRAIGHT && EFFICIENT
+		switch m.OffloadPlugin {
+		case api.OffloadPluginVSphereXcopy:
+			klog.Infof("####### RGOLAN found offload plugin on ds map  %+v", dsMapIn)
+			klog.Infof("####### RGOLAN match vm disks datastores with mapping %+v", dsMapIn)
+		    return true	
+
+		}
+	}
+    return false
 }
 
 // PopulatorVolumes is needed for vSphereXcopyVolomePopulator
@@ -1211,17 +1222,6 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 		return
 	}
 
-	copyOffloadMapping, err := r.GetCopyOffloadMapping()
-	if err != nil {
-		if k8serr.IsNotFound(err) {
-			// no support for copy offload or not configured. The config map
-			// is a must for the feature to work
-		} else {
-			return nil, err
-		}
-	}
-
-	r.Log.Info("copy-offload capable storage classes", "storageClasses", copyOffloadMapping)
 	dsMapIn := r.Context.Map.Storage.Spec.Map
 	for i := range dsMapIn {
 		mapped := &dsMapIn[i]
@@ -1243,7 +1243,11 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					return
 				}
 				r.Log.Info(fmt.Sprintf("getting storage mapping by storage class %q and datastore %v datastore name %s datastore", storageClass, disk.Datastore, disk.Datastore))
-				vsphereInstance, storageVendorProduct, storageVendorSecretRef := copyOffloadMapping.GetStorageMappingBy(storageClass, ds.Name)
+                vsphereInstance := r.Context.Plan.Provider.Source.GetName()
+                storageVendorProduct :=  mapped.OffloadPluginVSphereXcopyConfig.StorageVendorProduct
+                storageVendorSecretRef := mapped.OffloadPluginVSphereXcopyConfig.SecretRef 
+
+				r.Log.Info(fmt.Sprintf("vsphere provider %v storage vendor product %v storage secret name %v ", vsphereInstance, storageVendorProduct, storageVendorSecretRef))
 				if coldLocal && vsphereInstance != "" {
 					namespace := r.Plan.Spec.TargetNamespace
 					// pvs names needs to be less than 63, this leaves 53 chars
@@ -1298,7 +1302,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 						Spec: api.VSphereXcopyVolumePopulatorSpec{
 							VmdkPath:             disk.File,
 							TargetPVC:            commonName,
-							StorageVendorProduct: storageVendorProduct,
+							StorageVendorProduct: string(storageVendorProduct),
 							SecretRef:            secretName,
 						},
 					}
@@ -1560,32 +1564,6 @@ func (m *CopyOffloadMapping) GetStorageMappingBy(storageClass string, dataStore 
 		}
 	}
 	return "", "", ""
-}
-
-func (r *Builder) GetCopyOffloadMapping() (CopyOffloadMapping, error) {
-	klog.Infof("Getting copy offload map name %s namespace %s", CopyOffloadConfigMap, r.Source.Provider.Namespace)
-	mapping := CopyOffloadMapping{}
-	cm := &core.ConfigMap{}
-	err := r.Get(context.TODO(), client.ObjectKey{
-		Namespace: r.Source.Provider.Namespace,
-		Name:      CopyOffloadConfigMap,
-	},
-		cm)
-	if err != nil {
-		return mapping, err
-	}
-
-	scm, exists := cm.Data["storageClassMapping"]
-	if exists {
-		klog.V(2).Infof("found storage class mapping %s, now unmarshal", scm)
-		err := yaml.Unmarshal([]byte(scm), &mapping)
-		if err != nil {
-			return mapping, fmt.Errorf("failed to marshal the storage class mapping from the config map %w", err)
-		}
-	}
-
-	klog.V(2).Infof("copy offload mapping marshal succeded %+v", mapping)
-	return mapping, nil
 }
 
 // MergeSecrets merges the data from secret2 into secret1.

@@ -114,3 +114,6 @@ storage product vendor 'productY'.
   ...
   ```
   Try to set a mgmt interface for the SVM and put that hostname in the STORAGE_HOSTNAME
+
+## HP
+- on 3Par, host exports can disappear due to what appears to be cleanup/monitoring made by the CSI - bodnopoz@redhat.com reported and investigating

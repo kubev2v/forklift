@@ -17,10 +17,19 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/.cache/go-build \
     go build -o bin/vsphere-xcopy-volume-populator
 
+RUN make vmkfstools-wrapper
+
 FROM registry.access.redhat.com/ubi9/ubi-minimal
 
 COPY --from=builder /usr/src/app/bin/vsphere-xcopy-volume-populator \
     /bin/vsphere-xcopy-volume-populator
+
+COPY --from=builder /usr/src/app/vmkfstools-wrapper/vmkfstools-wrapper.vib \
+    /bin/vmkfstools-wrapper.vib
+COPY --from=builder /usr/src/app/vmkfstools-wrapper/vib-install-playbook.yaml \
+    /bin/vib-install-playbook.yaml
+COPY --from=builder /usr/src/app/vmkfstools-wrapper/esxi_hosts.yaml \
+    /bin/esxi_hosts.yaml
 
 ENTRYPOINT ["/bin/vsphere-xcopy-volume-populator"]
 

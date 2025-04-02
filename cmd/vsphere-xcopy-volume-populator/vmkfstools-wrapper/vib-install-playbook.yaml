@@ -1,5 +1,5 @@
 ---
-- hosts: poweredon
+- hosts: poweredOn
   gather_facts: false
   user: root
   vars:
@@ -7,9 +7,17 @@
     src_location: ./
     dest_location: /tmp/
     maintenance_needed: no
+    ansible_ssh_common_args: '-o PreferredAuthentications=keyboard-interactive'
 
 
   tasks:
+    - name: Copy SSH public key
+      authorized_key:
+        user: root 
+        state: present
+        key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}" # or id_ed25519.pub
+        path: /etc/ssh/keys-root
+    
     - name: Copy {{ src_vib }} to ESXI Host
       copy: 
         src="{{ src_location }}{{ src_vib }}"

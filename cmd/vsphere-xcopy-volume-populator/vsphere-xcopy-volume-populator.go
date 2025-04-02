@@ -36,7 +36,7 @@ var (
 	sourceVMDKFile  string
 	targetPVC       string
 	targetNamespace string
-    secretName      string
+	secretName      string
 	storageVendor   string
 	storageHostname string
 	storageUsername string
@@ -82,7 +82,7 @@ func main() {
 		klog.Fatalf("Failed to create a remote esxcli populator: %s", err)
 	}
 
-	volumeHandle, err := getVolumeHandle(clientSet, targetNamespace, targetNamespace, targetPVC)
+	volumeHandle, err := getVolumeHandle(clientSet, targetNamespace, targetPVC)
 	if err != nil {
 		klog.Fatalf("Failed to fetch the volume handle details from the target pvc %s: %s", targetPVC, err)
 	}
@@ -134,7 +134,7 @@ func newKubeClient(masterURL string, kubeconfig string) (*kubernetes.Clientset, 
 // to locate the created volume on the PVC. There is a  chance where the volume details are listed on the
 // "prime-{ORIG_PVC_NAME}" PVC because when the controller pod is handling it, the pvc prime should be bounded
 // to popoulator pod. However it is not guarnteed to be bounded at that stage and it may take time
-func getVolumeHandle(kubeClient *kubernetes.Clientset, targetNamespace, namespace, targetPVC string) (string, error) {
+func getVolumeHandle(kubeClient *kubernetes.Clientset, targetNamespace, targetPVC string) (string, error) {
 	pvc, err := kubeClient.CoreV1().PersistentVolumeClaims(targetNamespace).Get(context.Background(), targetPVC, metav1.GetOptions{})
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch the the target persistent volume claim %q %w", pvc.Name, err)
@@ -146,7 +146,7 @@ func getVolumeHandle(kubeClient *kubernetes.Clientset, targetNamespace, namespac
 		primePVCName := "prime-" + pvc.GetUID()
 		klog.Infof("the volume name is not found on the claim %q. Trying the prime pvc %q", pvc.Name, primePVCName)
 		// try pvc with postfix "prime" that the populator copies. The prime volume is created in the namespace where the populator controller runs.
-		primePVC, err := kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(context.Background(), string(primePVCName), metav1.GetOptions{})
+		primePVC, err := kubeClient.CoreV1().PersistentVolumeClaims(targetNamespace).Get(context.Background(), string(primePVCName), metav1.GetOptions{})
 		if err != nil {
 			return "", fmt.Errorf("failed to fetch the the target persistent volume claim %q %w", primePVC.Name, err)
 		}

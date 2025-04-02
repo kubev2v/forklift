@@ -47,4 +47,4 @@ test-copy-using-cli: build
 
 .PHONY: vmkfstools-wrapper
 vmkfstools-wrapper:
-	vmkfstools-wrapper/create-vib.sh
+	$(MAKE) -C vmkfstools-wrapper build
