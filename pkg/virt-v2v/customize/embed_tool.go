@@ -1,4 +1,4 @@
-package utils
+package customize
 
 import (
 	"embed"
@@ -9,8 +9,13 @@ import (
 	"regexp"
 )
 
-// EmbedTool for manipulating the embedded Filesystem
-type EmbedTool struct {
+//go:generate mockgen -source=embed_tool.go -package=customize -destination=mock_embed_tool.go
+type EmbedTool interface {
+	CreateFilesFromFS(dstDir string) error
+}
+
+// EmbedToolImpl for manipulating the embedded Filesystem
+type EmbedToolImpl struct {
 	Filesystem *embed.FS
 }
 
@@ -22,7 +27,7 @@ type EmbedTool struct {
 //
 // Returns:
 //   - error: An error if the file cannot be read, or nil if successful.
-func (t *EmbedTool) CreateFilesFromFS(dstDir string) error {
+func (t *EmbedToolImpl) CreateFilesFromFS(dstDir string) error {
 	files, err := t.getAllFilenames()
 	if err != nil {
 		return err
@@ -47,7 +52,7 @@ func (t *EmbedTool) CreateFilesFromFS(dstDir string) error {
 //
 // Returns:
 //   - error: An error if the file cannot be read, or nil if successful.
-func (t *EmbedTool) writeFileFromFS(src, dst string) error {
+func (t *EmbedToolImpl) writeFileFromFS(src, dst string) error {
 	// Create destination directory to the destination if missing
 	dstDir := filepath.Dir(dst)
 	if _, err := os.Stat(dstDir); os.IsNotExist(err) {
@@ -77,7 +82,7 @@ func (t *EmbedTool) writeFileFromFS(src, dst string) error {
 // Returns:
 //   - []files: The file paths which are located inside the embedded Filesystem.
 //   - error: An error if the file cannot be read, or nil if successful.
-func (t *EmbedTool) getAllFilenames() (files []string, err error) {
+func (t *EmbedToolImpl) getAllFilenames() (files []string, err error) {
 	var nameExcludeChars = regexp.MustCompile(".*test.*")
 	if err := fs.WalkDir(t.Filesystem, ".", func(path string, d fs.DirEntry, err error) error {
 		if d.IsDir() {

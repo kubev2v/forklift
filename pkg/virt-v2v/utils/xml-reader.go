@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"os"
+	"strings"
 )
 
 type InspectionOS struct {
@@ -30,4 +31,8 @@ func GetInspectionV2vFromFile(xmlFilePath string) (*InspectionV2V, error) {
 		return nil, fmt.Errorf("Error unmarshalling XML: %v\n", err)
 	}
 	return &xmlConf, nil
+}
+
+func (os InspectionOS) IsWindows() bool {
+	return strings.Contains(strings.ToLower(os.Osinfo), "win")
 }
