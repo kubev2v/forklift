@@ -991,7 +991,8 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 		return
 	}
 
-	if _, found := source.Spec.Settings[api.VDDK]; found {
+	vddkImage := settings.GetVDDKImage(source.Spec.Settings)
+	if vddkImage != "" {
 		var job *batchv1.Job
 		if job, err = r.ensureVddkImageValidationJob(plan); err != nil {
 			return
@@ -1012,7 +1013,7 @@ func jobExceedsDeadline(job *batchv1.Job) bool {
 }
 
 func (r *Reconciler) validateVddkImageJob(job *batchv1.Job, plan *api.Plan) (err error) {
-	image := plan.Referenced.Provider.Source.Spec.Settings[api.VDDK]
+	image := settings.GetVDDKImage(plan.Referenced.Provider.Source.Spec.Settings)
 	vddkInvalid := libcnd.Condition{
 		Type:     VDDKInvalid,
 		Status:   True,
@@ -1188,7 +1189,7 @@ func (r *Reconciler) ensureNamespace(ctx *plancontext.Context) error {
 }
 
 func getVddkImageValidationJobLabels(plan *api.Plan) map[string]string {
-	image := plan.Referenced.Provider.Source.Spec.Settings[api.VDDK]
+	image := settings.GetVDDKImage(plan.Referenced.Provider.Source.Spec.Settings)
 	sum := md5.Sum([]byte(image))
 	return map[string]string{
 		"plan": string(plan.ObjectMeta.UID),
@@ -1197,7 +1198,7 @@ func getVddkImageValidationJobLabels(plan *api.Plan) map[string]string {
 }
 
 func createVddkCheckJob(plan *api.Plan) *batchv1.Job {
-	vddkImage := plan.Referenced.Provider.Source.Spec.Settings[api.VDDK]
+	image := settings.GetVDDKImage(plan.Referenced.Provider.Source.Spec.Settings)
 
 	mount := core.VolumeMount{
 		Name:      VddkVolumeName,
@@ -1206,7 +1207,7 @@ func createVddkCheckJob(plan *api.Plan) *batchv1.Job {
 	initContainers := []core.Container{
 		{
 			Name:            "vddk-side-car",
-			Image:           vddkImage,
+			Image:           image,
 			ImagePullPolicy: core.PullIfNotPresent,
 			VolumeMounts:    []core.VolumeMount{mount},
 			SecurityContext: &core.SecurityContext{
@@ -1252,7 +1253,7 @@ func createVddkCheckJob(plan *api.Plan) *batchv1.Job {
 			Labels:       getVddkImageValidationJobLabels(plan),
 			Annotations: map[string]string{
 				"provider": plan.Referenced.Provider.Source.Name,
-				"vddk":     vddkImage,
+				"vddk":     image,
 				"plan":     plan.Name,
 			},
 		},
