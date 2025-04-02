@@ -1202,10 +1202,8 @@ func (r *Builder) SupportsVolumePopulators() bool {
 		}
 
 		/// LEFT IN MIDDLE - NEED TO GET THE LOGIC STRAIGHT && EFFICIENT
-		switch m.OffloadPlugin {
-		case api.OffloadPluginVSphereXcopy:
-			klog.Infof("####### RGOLAN found offload plugin on ds map  %+v", dsMapIn)
-			klog.Infof("####### RGOLAN match vm disks datastores with mapping %+v", dsMapIn)
+		if m.OffloadPlugin != nil && m.OffloadPlugin.VSphereXcopyPluginConfig != nil {
+            klog.Infof("####### RGOLAN found offload plugin: config %+v on ds map  %+v",m.OffloadPlugin.VSphereXcopyPluginConfig, dsMapIn)
 		    return true	
 
 		}
@@ -1244,8 +1242,8 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				}
 				r.Log.Info(fmt.Sprintf("getting storage mapping by storage class %q and datastore %v datastore name %s datastore", storageClass, disk.Datastore, disk.Datastore))
                 vsphereInstance := r.Context.Plan.Provider.Source.GetName()
-                storageVendorProduct :=  mapped.OffloadPluginVSphereXcopyConfig.StorageVendorProduct
-                storageVendorSecretRef := mapped.OffloadPluginVSphereXcopyConfig.SecretRef 
+                storageVendorProduct :=  mapped.OffloadPlugin.VSphereXcopyPluginConfig.StorageVendorProduct
+                storageVendorSecretRef := mapped.OffloadPlugin.VSphereXcopyPluginConfig.SecretRef 
 
 				r.Log.Info(fmt.Sprintf("vsphere provider %v storage vendor product %v storage secret name %v ", vsphereInstance, storageVendorProduct, storageVendorSecretRef))
 				if coldLocal && vsphereInstance != "" {
