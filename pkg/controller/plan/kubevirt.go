@@ -23,6 +23,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
+	"github.com/konveyor/forklift-controller/pkg/settings"
 	template "github.com/openshift/api/template/v1"
 	"github.com/openshift/library-go/pkg/template/generator"
 	"github.com/openshift/library-go/pkg/template/templateprocessing"
@@ -1861,7 +1862,9 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	}
 	// VDDK image
 	var initContainers []core.Container
-	if vddkImage, found := r.Source.Provider.Spec.Settings[api.VDDK]; found {
+
+	vddkImage := settings.GetVDDKImage(r.Source.Provider.Spec.Settings)
+	if vddkImage != "" {
 		initContainers = append(initContainers, core.Container{
 			Name:            "vddk-side-car",
 			Image:           vddkImage,

@@ -488,6 +488,8 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 				Blank: &cdi.DataVolumeBlankImage{},
 			}
 		} else {
+			vddkImage := settings.GetVDDKImage(r.Source.Provider.Spec.Settings)
+
 			// Let CDI do the copying
 			dvSource = cdi.DataVolumeSource{
 				VDDK: &cdi.DataVolumeSourceVDDK{
@@ -496,7 +498,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 					URL:          url,
 					SecretRef:    secret.Name,
 					Thumbprint:   thumbprint,
-					InitImageURL: r.Source.Provider.Spec.Settings[api.VDDK],
+					InitImageURL: vddkImage,
 				},
 			}
 		}

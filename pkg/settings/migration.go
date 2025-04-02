@@ -16,6 +16,7 @@ const (
 	HookRetry                      = "HOOK_RETRY"
 	ImporterRetry                  = "IMPORTER_RETRY"
 	VirtV2vImage                   = "VIRT_V2V_IMAGE"
+	vddkImage                      = "VDDK_IMAGE"
 	PrecopyInterval                = "PRECOPY_INTERVAL"
 	VirtV2vDontRequestKVM          = "VIRT_V2V_DONT_REQUEST_KVM"
 	SnapshotRemovalTimeout         = "SNAPSHOT_REMOVAL_TIMEOUT"
@@ -100,6 +101,8 @@ type Migration struct {
 	OvaContainerLimitsMemory       string
 	OvaContainerRequestsCpu        string
 	OvaContainerRequestsMemory     string
+	// VDDK image for guest conversion
+	VddkImage string
 }
 
 // Load settings.
@@ -142,6 +145,11 @@ func (r *Migration) Load() (err error) {
 		return liberr.Wrap(fmt.Errorf("failed to find environment variable %s", VirtV2vImage))
 	}
 	r.VirtV2vDontRequestKVM = getEnvBool(VirtV2vDontRequestKVM, false)
+
+	// VDDK image for guest conversion
+	if vddkImage, ok := os.LookupEnv(vddkImage); ok {
+		r.VddkImage = vddkImage
+	}
 
 	// Set timeout to 12 hours instead of the default 2
 	if r.CDIExportTokenTTL, err = getPositiveEnvLimit(CDIExportTokenTTL, 720); err != nil {

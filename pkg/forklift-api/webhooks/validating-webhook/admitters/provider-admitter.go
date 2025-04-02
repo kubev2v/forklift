@@ -6,6 +6,7 @@ import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/util"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	"github.com/konveyor/forklift-controller/pkg/settings"
 	admissionv1 "k8s.io/api/admission/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -16,7 +17,8 @@ type ProviderAdmitter struct {
 }
 
 func (admitter *ProviderAdmitter) validateVddkImage() error {
-	if image, found := admitter.provider.Spec.Settings[api.VDDK]; found {
+	image := settings.GetVDDKImage(admitter.provider.Spec.Settings)
+	if image != "" {
 		if image == "" {
 			err := liberr.New("The specified VDDK init image name is empty")
 			log.Error(err, "The specified VDDK init image cannot be empty, failing",
