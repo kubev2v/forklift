@@ -260,13 +260,10 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 }
 
 func (r *Builder) mapMacStaticIps(vm *model.VM) (ipMap string, err error) {
-	// on windows machines we check if the interface origin is manual
-	// on linux we collect all networks.
-	isWindowsFlag := isWindows(vm)
 
 	var configurations []string
 	for _, guestNetwork := range vm.GuestNetworks {
-		if !isWindowsFlag || guestNetwork.Origin == string(types.NetIpConfigInfoIpAddressOriginManual) {
+		if guestNetwork.Origin == string(types.NetIpConfigInfoIpAddressOriginManual) {
 			gateway := ""
 			isIpv4 := net.IP.To4(net.ParseIP(guestNetwork.IP)) != nil
 			for _, ipStack := range vm.GuestIpStacks {
@@ -288,10 +285,6 @@ func (r *Builder) mapMacStaticIps(vm *model.VM) (ipMap string, err error) {
 		}
 	}
 	return strings.Join(configurations, "_"), nil
-}
-
-func isWindows(vm *model.VM) bool {
-	return strings.Contains(vm.GuestID, WindowsPrefix) || strings.Contains(vm.GuestName, WindowsPrefix)
 }
 
 // Retrieve the IP address of an ESXI host from its Management Network VNIC or fall back to the hostname.
