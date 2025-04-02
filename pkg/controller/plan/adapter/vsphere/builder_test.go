@@ -149,7 +149,7 @@ var _ = Describe("vSphere builder", func() {
 	)
 
 	DescribeTable("should", func(disks []vsphere.Disk, output []vsphere.Disk) {
-		Expect(builder.sortedDisks(disks)).Should(Equal(output))
+		Expect(builder.sortedDisksAsLibvirt(disks)).Should(Equal(output))
 	},
 		Entry("sort all disks by buses",
 			[]vsphere.Disk{
