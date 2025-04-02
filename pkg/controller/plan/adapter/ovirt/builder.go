@@ -545,6 +545,10 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 	return
 }
 
+// NOOP
+func (r *Builder) GetSharedPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, err error) {
+	return
+}
 func (r *Builder) PreferenceName(vmRef ref.Ref, configMap *core.ConfigMap) (name string, err error) {
 	vm := &model.Workload{}
 	if err = r.Source.Inventory.Find(vm, vmRef); err != nil {

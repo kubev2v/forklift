@@ -308,7 +308,6 @@ func (c *RestClient) buildTransport() (err error) {
 			RootCAs: pool,
 		}
 	}
-
 	c.Transport = transport
 
 	return

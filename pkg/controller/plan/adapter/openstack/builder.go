@@ -760,6 +760,10 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 	return nil, nil
 }
 
+// NOOP
+func (r *Builder) GetSharedPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, err error) {
+	return
+}
 func (r *Builder) PreferenceName(vmRef ref.Ref, configMap *core.ConfigMap) (name string, err error) {
 	vm := &model.Workload{}
 	if err = r.Source.Inventory.Find(vm, vmRef); err != nil {

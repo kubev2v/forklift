@@ -98,6 +98,8 @@ type Builder interface {
 	GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error)
 	// Get the virtual machine preference name
 	PreferenceName(vmRef ref.Ref, configMap *core.ConfigMap) (name string, err error)
+	// Get the virtual machine preference name
+	GetSharedPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, err error)
 }
 
 // Client API.

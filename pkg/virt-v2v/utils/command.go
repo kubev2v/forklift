@@ -120,6 +120,21 @@ func getDiskLink(kind global.MountPath, disk string) (string, error) {
 	), nil
 }
 
+func GetSharedDisks() ([]string, error) {
+	fsDisks, err := filepath.Glob(string(global.FS_SHARED))
+	if err != nil {
+		return nil, fmt.Errorf("error getting disks %v", err)
+	}
+	blockDisks, err := filepath.Glob(string(global.BLOCK_SHARED))
+	if err != nil {
+		return nil, fmt.Errorf("error getting disks %v", err)
+	}
+	var resp []string
+	resp = append(resp, fsDisks...)
+	resp = append(resp, blockDisks...)
+	return resp, nil
+}
+
 func GetLinkedDisks() ([]string, error) {
 	disks, err := filepath.Glob(
 		filepath.Join(

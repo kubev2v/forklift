@@ -30,6 +30,9 @@ RUN ( [ "$(rpm -q glibc)" == "glibc-2.34-66.el9.x86_64" ] && dnf -y downgrade gl
 dnf -y install libguestfs libguestfs-appliance libguestfs-xfs libguestfs-winsupport qemu-img supermin && \
         depmod $(ls /lib/modules/ |tail -n1)
 
+# The virt-v2v-in-place in centos is not in the bin directory and is not accessible via PATH
+ENV PATH="$PATH:/usr/libexec"
+
 # Create tarball for the appliance.
 RUN mkdir -p /usr/lib64/guestfs/appliance && \
         cd /usr/lib64/guestfs/appliance && \
