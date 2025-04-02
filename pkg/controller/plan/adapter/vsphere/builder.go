@@ -58,8 +58,9 @@ const (
 
 // Network types
 const (
-	Pod    = "pod"
-	Multus = "multus"
+	Pod     = "pod"
+	Multus  = "multus"
+	Ignored = "ignored"
 )
 
 // Template labels
@@ -507,7 +508,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 
 					// Create template data
 					templateData := api.PVCNameTemplateData{
-						VmName:        vm.Name,
+						VmName:        r.getPlenVMNewName(vm),
 						PlanName:      r.Plan.Name,
 						DiskIndex:     diskIndex,
 						RootDiskIndex: rootDiskIndex,
@@ -534,7 +535,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 }
 
 // Create the destination Kubevirt VM.
-func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim, usesInstanceType bool) (err error) {
+func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim, usesInstanceType bool, sortVolumesByLibvirt bool) (err error) {
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
@@ -597,7 +598,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	if object.Template == nil {
 		object.Template = &cnv.VirtualMachineInstanceTemplateSpec{}
 	}
-	err = r.mapDisks(vm, vmRef, persistentVolumeClaims, object)
+	err = r.mapDisks(vm, vmRef, persistentVolumeClaims, object, sortVolumesByLibvirt)
 	if err != nil {
 		return
 	}
@@ -625,6 +626,12 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 	netMapIn := r.Context.Map.Network.Spec.Map
 	for i := range netMapIn {
 		mapped := &netMapIn[i]
+
+		// Skip network mappings with destination type 'Ignored'
+		if mapped.Destination.Type == Ignored {
+			continue
+		}
+
 		ref := mapped.Source
 		network := &model.Network{}
 		fErr := r.Source.Inventory.Find(network, ref)
@@ -773,8 +780,7 @@ func (r *Builder) filterDisksWithBus(disks []vsphere.Disk, bus string) []vsphere
 // When we were sorting by the keys the order was IDE, SATA and SCSI. This cause that some PVs were populated by
 // incorrect disks.
 // https://github.com/libvirt/libvirt/blob/master/src/vmx/vmx.c#L1713
-func (r *Builder) sortedDisks(disks []vsphere.Disk) []vsphere.Disk {
-	var buses = []string{container.SCSI, container.SATA, container.IDE}
+func (r *Builder) sortedDisksByBusses(disks []vsphere.Disk, buses []string) []vsphere.Disk {
 	var resp []vsphere.Disk
 	for _, bus := range buses {
 		disksWithBus := r.filterDisksWithBus(disks, bus)
@@ -786,12 +792,27 @@ func (r *Builder) sortedDisks(disks []vsphere.Disk) []vsphere.Disk {
 	return resp
 }
 
-func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims []*core.PersistentVolumeClaim, object *cnv.VirtualMachineSpec) error {
+func (r *Builder) sortedDisksAsLibvirt(disks []vsphere.Disk) []vsphere.Disk {
+	var buses = []string{container.SCSI, container.SATA, container.IDE}
+	return r.sortedDisksByBusses(disks, buses)
+}
+
+func (r *Builder) sortedDisksAsVmware(disks []vsphere.Disk) []vsphere.Disk {
+	var buses = []string{container.SATA, container.IDE, container.SCSI}
+	return r.sortedDisksByBusses(disks, buses)
+}
+
+func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims []*core.PersistentVolumeClaim, object *cnv.VirtualMachineSpec, sortByLibvirt bool) error {
 	var kVolumes []cnv.Volume
 	var kDisks []cnv.Disk
 	var templateErr error
+	var disks []vsphere.Disk
 
-	disks := r.sortedDisks(vm.Disks)
+	if sortByLibvirt {
+		disks = r.sortedDisksAsLibvirt(vm.Disks)
+	} else {
+		disks = r.sortedDisksAsVmware(vm.Disks)
+	}
 	pvcMap := make(map[string]*core.PersistentVolumeClaim)
 	for i := range persistentVolumeClaims {
 		pvc := persistentVolumeClaims[i]
@@ -837,6 +858,15 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 
 				// fallback to default name and reset error
 				volumeName = fmt.Sprintf("vol-%v", i)
+			}
+
+			// check if the generated name is longer then 63 characters
+			if len(volumeName) > 63 {
+				// if the generated name is longer then 63 characters, trancate it
+				newVolumeName := volumeName[:63]
+				r.Log.Info("Generated volume name is longer than 63 characters, sanitizing it", "volumeName", volumeName, "newVolumeName", newVolumeName)
+
+				volumeName = newVolumeName
 			}
 		}
 
@@ -1099,11 +1129,22 @@ func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskNam
 	return
 }
 
-// Get the plan VM for the given vsphere VM
+// getPlanVM get the plan VM for the given vsphere VM
 func (r *Builder) getPlanVM(vm *model.VM) *plan.VM {
 	for _, planVM := range r.Plan.Spec.VMs {
 		if planVM.ID == vm.ID {
 			return &planVM
+		}
+	}
+
+	return nil
+}
+
+// getPlanVMStatus get the plan VM status for the given vsphere VM
+func (r *Builder) getPlanVMStatus(vm *model.VM) *plan.VMStatus {
+	for _, planVMStatus := range r.Plan.Status.Migration.VMs {
+		if planVMStatus.ID == vm.ID {
+			return planVMStatus
 		}
 	}
 
@@ -1147,6 +1188,19 @@ func (r *Builder) getPVCNameTemplate(vm *model.VM) string {
 	}
 
 	return ""
+}
+
+// getPlenVMNewName returns the VM new name if exist, or just the name
+func (r *Builder) getPlenVMNewName(vm *model.VM) string {
+	// Get plan VM
+	planVM := r.getPlanVMStatus(vm)
+
+	// if plan VM status has a new name, use it
+	if planVM != nil && planVM.NewName != "" {
+		return planVM.NewName
+	}
+
+	return vm.Name
 }
 
 // getVolumeNameTemplate returns the volume name template

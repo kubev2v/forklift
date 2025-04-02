@@ -446,7 +446,7 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) error {
 
 	var virtualMachine *cnv.VirtualMachine
 	if len(vms.Items) == 0 {
-		if virtualMachine, err = r.virtualMachine(vm); err != nil {
+		if virtualMachine, err = r.virtualMachine(vm, false); err != nil {
 			return liberr.Wrap(err)
 		}
 		if err = r.Destination.Client.Create(context.TODO(), virtualMachine); err != nil {
@@ -1410,7 +1410,7 @@ func (r *KubeVirt) getGeneratedName(vm *plan.VMStatus) string {
 }
 
 // Build the Kubevirt VM CR.
-func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine, err error) {
+func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) (object *cnv.VirtualMachine, err error) {
 	pvcs, err := r.getPVCs(vm.Ref)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -1465,11 +1465,18 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine
 		object.ObjectMeta.Annotations = annotations
 	}
 
-	// Power on the destination VM if the source VM was originally powered on.
-	running := vm.RestorePowerState == plan.VMPowerStateOn
-	object.Spec.Running = &running
+	// Set the default run strategy to Halted
+	runStrategy := cnv.RunStrategyHalted
 
-	err = r.Builder.VirtualMachine(vm.Ref, &object.Spec, pvcs, vm.InstanceType != "")
+	// If the source VM is powered on, set the destination VM to always run
+	if vm.RestorePowerState == plan.VMPowerStateOn {
+		runStrategy = cnv.RunStrategyAlways
+	}
+
+	// Assign the determined run strategy to the object
+	object.Spec.RunStrategy = &runStrategy
+
+	err = r.Builder.VirtualMachine(vm.Ref, &object.Spec, pvcs, vm.InstanceType != "", sortVolumesByLibvirt)
 	if err != nil {
 		return
 	}
@@ -1914,6 +1921,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 			return
 		}
 	}
+	unshare := "profiles/unshare.json"
 	// pod
 	pod = &core.Pod{
 		ObjectMeta: meta.ObjectMeta{
@@ -1928,7 +1936,8 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 				RunAsUser:    &user,
 				RunAsNonRoot: &nonRoot,
 				SeccompProfile: &core.SeccompProfile{
-					Type: core.SeccompProfileTypeRuntimeDefault,
+					Type:             core.SeccompProfileTypeLocalhost,
+					LocalhostProfile: &unshare,
 				},
 			},
 			Affinity: &core.Affinity{
