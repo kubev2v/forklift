@@ -33,7 +33,7 @@ func NewWithRemoteEsxcli(storageApi StorageApi, vsphereHostname, vsphereUsername
 }
 
 func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle string, progress chan int, quit chan string) (err error) {
-    // isn't it better to not call close the channel from the caller?
+	// isn't it better to not call close the channel from the caller?
 	defer func() {
 		if err != nil {
 			quit <- err.Error()
@@ -54,6 +54,7 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 	if err != nil {
 		return fmt.Errorf("failed to fetch the current initiator groups of the lun %s: %w", lun.Name, err)
 	}
+	klog.Infof("Current initiator groups the LUN %s is mapped to %+v", lun.IQN, originalInitiatorGroups)
 
 	targetLUN := fmt.Sprintf("/vmfs/devices/disks/naa.%s%x", lun.ProviderID, lun.SerialNumber)
 	klog.Infof("resolved lun serial number %s with IQN %s to lun %s", lun.SerialNumber, lun.IQN, targetLUN)

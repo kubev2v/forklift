@@ -72,6 +72,31 @@ spec:
                       required:
                       - storageClass
                       type: object
+                    offloadPlugin:
+                      description: Offload Plugin
+                      enum:
+                      - OffloadPlugin
+                      - VSphereXcopy
+                      type: string
+                    offloadPluginVSpereXcopyConfig:
+                      description: OffloadPluginVSphereXcopyConfig is the config for
+                        OffloadPluginVSphereXcopy
+                      properties:
+                        secretRef:
+                          description: |-
+                            SecretRef is the name of the secret with the storage credentials for the plugin.
+                            The secret should reside in the same namespace where the source provider is.
+                          type: string
+                        storageVendorProduct:
+                          description: StorageVendorProduct the string identifier
+                            of the storage vendor product
+                          enum:
+                          - ontap
+                          type: string
+                      required:
+                      - secretRef
+                      - storageVendorProduct
+                      type: object
                     source:
                       description: Source storage.
                       properties:
