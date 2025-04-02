@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 )
 
@@ -116,4 +117,14 @@ func getEnvBool(name string, def bool) bool {
 	}
 
 	return boolean
+}
+
+// GetVDDKImage gets the VDDK image from provider spec settings with fall back to global settings.
+func GetVDDKImage(providerSpecSettings map[string]string) string {
+	vddkImage := providerSpecSettings[api.VDDK]
+	if vddkImage == "" && Settings.Migration.VddkImage != "" {
+		vddkImage = Settings.Migration.VddkImage
+	}
+
+	return vddkImage
 }

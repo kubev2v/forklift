@@ -93,6 +93,10 @@ spec:
         - name: MAX_VM_INFLIGHT
           value: "{{ controller_max_vm_inflight }}"
 {% endif %}
+{% if vddk_image is string and vddk_image|length > 0 %}
+        - name: VDDK_IMAGE
+          value: "{{ vddk_image }}"
+{% endif %}
 {% if controller_cdi_export_token_ttl is number %}
         - name: CDI_EXPORT_TOKEN_TTL
           value: "{{ controller_cdi_export_token_ttl }}"
