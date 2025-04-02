@@ -15,7 +15,7 @@ valid_vm_string {
 default valid_vm_name = false
 
 valid_vm_name {
-	regex.match("^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$", input.name)
+	regex.match("^(([A-Za-z0-9][-A-Za-z0-9.]*)?[A-Za-z0-9])?$", input.name)
 	count(input.name) < 64
 }
 
