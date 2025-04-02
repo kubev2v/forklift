@@ -95,7 +95,7 @@ func main() {
 	// channel for progress report
 	progressCh := make(chan int)
 	// channel for quitting with output
-	quitCh := make(chan string)
+	quitCh := make(chan error)
 
 	go p.Populate(sourceVMDKFile, volumeHandle, progressCh, quitCh)
 
@@ -113,8 +113,11 @@ func main() {
 			}
 		case q := <-quitCh:
 			klog.Infof("channel quit %s", q)
-			return
-		}
+			if q != nil {
+                klog.Fatal(q)
+            }
+            return
+		} 
 	}
 
 }

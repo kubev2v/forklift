@@ -32,11 +32,11 @@ func NewWithRemoteEsxcli(storageApi StorageApi, vsphereHostname, vsphereUsername
 
 }
 
-func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle string, progress chan int, quit chan string) (err error) {
+func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle string, progress chan int, quit chan error) (err error) {
 	// isn't it better to not call close the channel from the caller?
 	defer func() {
 		if err != nil {
-			quit <- err.Error()
+			quit <- err
 		}
 	}()
 	vmDisk, err := ParseVmdkPath(sourceVMDKFile)
@@ -126,7 +126,7 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 		// TODO need to process the vmkfstools stderr(probably) and to write the
 		// progress to a file, and then continuously read and report on the channel
 		progress <- 100
-		quit <- response
+		quit <- nil 
 	}()
 	return nil
 }
