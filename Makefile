@@ -326,6 +326,9 @@ $(DEFAULT_KUBECTL):
 validation-test: opa-bin
 	ENVIRONMENT=test ${OPA} test validation/policies --explain fails
 
+mockgen-install:
+	go install go.uber.org/mock/mockgen@v0.4.0
+
 opa-bin:
 ifeq (, $(shell command -v opa))
 	@{ \
