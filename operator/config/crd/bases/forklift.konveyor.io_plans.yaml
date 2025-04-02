@@ -288,11 +288,13 @@ spec:
                     - .PlanName: name of the migration plan
                     - .DiskIndex: initial volume index of the disk
                     - .RootDiskIndex: index of the root disk
+                    - .Shared: true if the volume is shared by multiple VMs, false otherwise
                   Note:
                     This template can be overridden at the individual VM level.
                   Examples:
                     "{{.VmName}}-disk-{{.DiskIndex}}"
                     "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
+                    "{{if .Shared}}shared-{{end}}{{.VmName}}-{{.DiskIndex}}"
                 type: string
               targetNamespace:
                 description: Target namespace.
@@ -493,11 +495,13 @@ spec:
                           - .PlanName: name of the migration plan
                           - .DiskIndex: initial volume index of the disk
                           - .RootDiskIndex: index of the root disk
+                          - .Shared: true if the volume is shared by multiple VMs, false otherwise
                         Note:
                           This template overrides the plan level template.
                         Examples:
                           "{{.VmName}}-disk-{{.DiskIndex}}"
                           "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
+                          "{{if .Shared}}shared-{{end}}{{.VmName}}-{{.DiskIndex}}"
                       type: string
                     rootDisk:
                       description: Choose the primary disk the VM boots from
@@ -1147,11 +1151,13 @@ spec:
                               - .PlanName: name of the migration plan
                               - .DiskIndex: initial volume index of the disk
                               - .RootDiskIndex: index of the root disk
+                              - .Shared: true if the volume is shared by multiple VMs, false otherwise
                             Note:
                               This template overrides the plan level template.
                             Examples:
                               "{{.VmName}}-disk-{{.DiskIndex}}"
                               "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
+                              "{{if .Shared}}shared-{{end}}{{.VmName}}-{{.DiskIndex}}"
                           type: string
                         restorePowerState:
                           description: Source VM power state before migration.

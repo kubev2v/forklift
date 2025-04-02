@@ -45,11 +45,13 @@ type VM struct {
 	//   - .PlanName: name of the migration plan
 	//   - .DiskIndex: initial volume index of the disk
 	//   - .RootDiskIndex: index of the root disk
+	//   - .Shared: true if the volume is shared by multiple VMs, false otherwise
 	// Note:
 	//   This template overrides the plan level template.
 	// Examples:
 	//   "{{.VmName}}-disk-{{.DiskIndex}}"
 	//   "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
+	//   "{{if .Shared}}shared-{{end}}{{.VmName}}-{{.DiskIndex}}"
 	// +optional
 	PVCNameTemplate string `json:"pvcNameTemplate,omitempty"`
 	// VolumeNameTemplate is a template for generating volume interface names in the target virtual machine.
