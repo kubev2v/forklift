@@ -1,9 +1,6 @@
 build:
 	./create-vib.sh
 
-copy:
-	scp vmkfstools-wrapper.vib root@ecoesxi04.lab.eng.tlv2.redhat.com:/vmfs/volumes/eco-iscsi-ds2/
-
 install: build
 	ANSIBLE_HOST_KEY_CHECKING=false \
 	VMWARE_HOST=$(shell ansible-vault view ~/vaults/vmware_vault.yaml --vault-password-file ~/vaults/passfile |yq .hostname) \

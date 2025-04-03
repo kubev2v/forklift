@@ -3,6 +3,8 @@ package populator
 import (
 	"context"
 	"fmt"
+	"math/rand"
+	"time"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
 	"k8s.io/klog/v2"
@@ -98,10 +100,19 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 
 	}()
 
-	_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "adapter", "rescan", "-a", "1"})
-	if err != nil {
-		return err
+    retries := 3
+    for i := 3; i > 0; i--{
+		_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "adapter", "rescan", "-a", "1"})
+		if err != nil {
+            klog.Errorf("failed to rescan adapters, probably in progress. Rerty %d/%d", i, retries)
+	        time.Sleep(time.Duration(rand.Intn(10)))
+		} else {
+            break
+        }
 	}
+    if err != nil {
+        return err
+    }
 	naa := fmt.Sprintf("naa.%s%x", lun.ProviderID, lun.SerialNumber)
 	_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "list", "-d", naa})
 	if err != nil {
@@ -126,7 +137,7 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 		// TODO need to process the vmkfstools stderr(probably) and to write the
 		// progress to a file, and then continuously read and report on the channel
 		progress <- 100
-		quit <- nil 
+		quit <- nil
 	}()
 	return nil
 }
