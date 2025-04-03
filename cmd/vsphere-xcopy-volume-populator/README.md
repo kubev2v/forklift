@@ -1,9 +1,9 @@
 # vsphere-xcopy-volume-populator
 
 ## Forklift Controller
-When the feature flag `feature_copy_offload` is true (off by default), the controller will
-consult a config map to decided if VM disk from VMWare could be copied
-by the storage backend(offloaded) into the newly created PVC.
+When the feature flag `feature_copy_offload` is true (off by default), the controller
+consult the storagemaps offload plugin configuration, to decided if VM disk from
+VMWare could be copied by the storage backend(offloaded) into the newly created PVC.
 When the controller creates the PVC for the v2v pod it will also create
 a volume popoulator resource of type VSphereXcopyVolumePopulator and set
 the filed `dataSourceRef` in the PVC to reference it.
@@ -53,8 +53,7 @@ When a user is picking a VM to migrate to OpenShift there is no direct indicatio
 of that info, other then if the current storage mapping supports it or not.
 The plan should know if a specific disk should use the XCOPY populator by matching
 the source vmdk data-store with the storage class. The supported pair of such
-mapping is specified in a config map name 'copy-offload-mapping' along with 
-other storage specific identifiers.
+mapping is specified in the migration plan storagemap object.
 
 To detect those conditions this heuristics is used:
 - locate the LUN where the vmdk disk is on iSCSI or FC
