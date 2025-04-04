@@ -30,11 +30,3 @@ migsamples
 
 # tilt settings
 tools/tilt/tilt-settings.json
-
-# deploy env
-hack/deploy/**/deploy.env
-
-# unused Dockerfiles
-vendor/**/Dockerfile
-vendor/**/Dockerfile.vcsim
-vendor/**/Dockerfile.govc
