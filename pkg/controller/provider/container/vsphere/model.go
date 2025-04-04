@@ -533,6 +533,8 @@ func (v *VmAdapter) Model() model.Model {
 // Apply the update to the model.
 func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 	v.Base.Apply(&v.model.Base, u)
+
+	staticIpEncountered := false
 	for _, p := range u.ChangeSet {
 		switch p.Op {
 		case Assign:
@@ -685,6 +687,13 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 							if info.DnsConfig != nil {
 								dnsList = info.DnsConfig.IpAddress
 							}
+
+							// Skip static IP assignment if a static IP was found.
+							// For example : On windows vms we expect the static ip to be set
+							if hasEncounteredStaticIp(staticIpEncountered, ip.Origin) {
+								staticIpEncountered = true
+							}
+
 							guestNetworksList = append(guestNetworksList, model.GuestNetwork{
 								MAC:          strings.ToLower(info.MacAddress),
 								IP:           ip.IpAddress,
@@ -790,6 +799,34 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 			}
 		}
 	}
+
+	if !staticIpEncountered {
+		v.assignStaticIpOrigin()
+	}
+}
+
+// There might be cases where GuestNetworks.origin (which indicates the IP address type) is missing.
+// In such cases, we need to mark the static IP address by setting the GuestNetworks.origin field to "manual".
+func (v *VmAdapter) assignStaticIpOrigin() {
+	// Build a map of NICs by lowercase MAC address
+	nicMap := make(map[string]struct{})
+	for _, nic := range v.model.NICs {
+		nicMap[strings.ToLower(nic.MAC)] = struct{}{}
+	}
+
+	// Iterate over guest networks and assign origin if not already set and MAC matches
+	for i := range v.model.GuestNetworks {
+		guestNetwork := &v.model.GuestNetworks[i]
+
+		if _, found := nicMap[strings.ToLower(guestNetwork.MAC)]; found && strings.TrimSpace(guestNetwork.Origin) == "" {
+			guestNetwork.Origin = string(types.NetIpConfigInfoIpAddressOriginManual)
+		}
+	}
+
+}
+
+func hasEncounteredStaticIp(staticIpEncountered bool, ipOrigin string) bool {
+	return !staticIpEncountered && strings.TrimSpace(ipOrigin) == string(types.NetIpConfigInfoIpAddressOriginManual)
 }
 
 // Update virtual disk devices.
