@@ -372,10 +372,11 @@ func (r *Pool) Start() {
 					"task",
 					task.String())
 			} else {
-				log.Info(
+				log.Error(
+					task.Error,
 					"VM validation failed.",
-					"task",
-					task.String())
+					"task", task.String(),
+				)
 			}
 			task.notify()
 		}
