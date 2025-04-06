@@ -1,9 +1,0 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
-
-go_library(
-    name = "exec",
-    srcs = ["exec.go"],
-    importmap = "github.com/konveyor/forklift-controller/vendor/k8s.io/client-go/util/exec",
-    importpath = "k8s.io/client-go/util/exec",
-    visibility = ["//visibility:public"],
-)
