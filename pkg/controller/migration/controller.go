@@ -129,9 +129,9 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		r.Log.V(2).Info("Conditions.", "all", migration.Status.Conditions)
 	}()
 
-	// Set owner reference (OR) for migration CR if it was created using CLI
-	// Try to set OR before doing anything with the migration CR so we fail fast.
-	// Skip setting of OR if plan is not found
+	// Set owner reference for migration CR if it was created using CLI
+	// Try to set owner reference before doing anything with the migration CR so we fail fast.
+	// Skip setting of owner reference if plan is not found
 	plan := &api.Plan{}
 	err = r.Client.Get(
 		context.TODO(),
