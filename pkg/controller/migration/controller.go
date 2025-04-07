@@ -129,24 +129,13 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		r.Log.V(2).Info("Conditions.", "all", migration.Status.Conditions)
 	}()
 
-	// Set owner reference (OR) for migration CR if it was created using CLI
-	// Try to set OR before doing anything with the migration CR so we fail fast.
-	// Skip setting of OR if plan is not found
-	plan := &api.Plan{}
-	err = r.Client.Get(
-		context.TODO(),
-		client.ObjectKey{
-			Namespace: migration.Spec.Plan.Namespace,
-			Name:      migration.Spec.Plan.Name,
-		},
-		plan,
-	)
-	if err == nil {
-		err = r.setOwnerReference(migration, plan)
-		if err != nil {
-			r.Log.Error(err, "Could not set migration owner reference.")
-			return
-		}
+	// Set owner reference for migration CR if it was created using CLI
+	// Try to set owner reference before doing anything with the migration CR so we fail fast.
+	// Skip setting of owner reference if plan is not found
+	err = r.setOwnerReference(migration)
+	if err != nil {
+		r.Log.Error(err, "Could not set migration owner reference.")
+		return
 	}
 
 	// Detected completed.
@@ -158,7 +147,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	migration.Status.BeginStagingConditions()
 
 	// Validations.
-	plan, err = r.validate(migration)
+	plan, err := r.validate(migration)
 	if err != nil {
 		return
 	}
@@ -247,12 +236,28 @@ func (r *Reconciler) reflectPlan(plan *api.Plan, migration *api.Migration) {
 //
 // Arguments:
 //   - migration (*api.Migration): Migration object to which owner reference will be set
-//   - plan (*api.Plan): Plan object which is being referenced
 //
 // Returns:
 //   - error: An error if something goes wrong during the process.
-func (r *Reconciler) setOwnerReference(migration *api.Migration, plan *api.Plan) error {
-	err := k8sutil.SetOwnerReference(plan, migration, r.Scheme())
+func (r *Reconciler) setOwnerReference(migration *api.Migration) error {
+	plan := &api.Plan{}
+	err := r.Client.Get(
+		context.TODO(),
+		client.ObjectKey{
+			Namespace: migration.Spec.Plan.Namespace,
+			Name:      migration.Spec.Plan.Name,
+		},
+		plan,
+	)
+	if err != nil {
+		// Ignore setting of owner ref if the plan is was not found e.g. deleted
+		if k8serr.IsNotFound(err) {
+			err = nil
+		}
+		return err
+	}
+
+	err = k8sutil.SetOwnerReference(plan, migration, r.Scheme())
 	if err != nil {
 		return err
 	}
@@ -262,7 +267,6 @@ func (r *Reconciler) setOwnerReference(migration *api.Migration, plan *api.Plan)
 		return err
 	}
 
-	// Get updated migration from server
 	err = r.Client.Get(
 		context.TODO(),
 		client.ObjectKey{
@@ -271,6 +275,9 @@ func (r *Reconciler) setOwnerReference(migration *api.Migration, plan *api.Plan)
 		},
 		migration,
 	)
+	if err != nil {
+		return err
+	}
 
-	return err
+	return nil
 }
