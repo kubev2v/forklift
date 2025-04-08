@@ -61,6 +61,21 @@ type VM struct {
 		Name        string `json:"Name"`
 		Description string `json:"Description"`
 	} `json:"Networks"`
+	Product struct {
+		Property []struct {
+			Key              string  `json:"Key"`
+			Type             string  `json:"Type"`
+			Qualifiers       *string `json:"Qualifiers"`
+			UserConfigurable *bool   `json:"UserConfigurable"`
+			Default          *string `json:"Default"`
+			Password         *bool   `json:"Password"`
+			Label            *string `json:"Label"`
+			Description      *string `json:"Description"`
+			Values           []struct {
+				Value string `json:"Value"`
+			} `json:"Values"`
+		} `json:"Property"`
+	} `json:"Product"`
 }
 
 // Apply to (update) the model.
@@ -91,6 +106,7 @@ func (r *VM) ApplyTo(m *model.VM) {
 	r.addDisks(m)
 	r.addDevices(m)
 	r.addNetworks(m)
+	r.addProduct(m)
 }
 
 func (r *VM) addNICs(m *model.VM) {
@@ -159,6 +175,27 @@ func (r *VM) addNetworks(m *model.VM) {
 					ID:   network.ID,
 				},
 			})
+	}
+}
+
+func (r *VM) addProduct(m *model.VM) {
+	m.Product = model.Product{}
+	for _, property := range r.Product.Property {
+		values := []model.PropertyConfigurationValue{}
+		for _, value := range property.Values {
+			values = append(values, model.PropertyConfigurationValue{Value: value.Value})
+		}
+		m.Product.Property = append(m.Product.Property, model.Property{
+			Key:              property.Key,
+			Type:             property.Type,
+			Qualifiers:       property.Qualifiers,
+			UserConfigurable: property.UserConfigurable,
+			Default:          property.Default,
+			Password:         property.Password,
+			Label:            property.Label,
+			Description:      property.Description,
+			Values:           values,
+		})
 	}
 }
 

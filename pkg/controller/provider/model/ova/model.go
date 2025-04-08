@@ -93,6 +93,29 @@ type VM struct {
 	Disks                 []Disk    `sql:""`
 	Networks              []Network `sql:""`
 	Concerns              []Concern `sql:""`
+	Product               Product   `sql:""`
+}
+
+type Product struct {
+	Property []Property `sql:""`
+}
+
+type Property struct {
+	Key              string  `sql:""`
+	Type             string  `sql:""`
+	Qualifiers       *string `sql:""`
+	UserConfigurable *bool   `sql:""`
+	Default          *string `sql:""`
+	Password         *bool   `sql:""`
+
+	Label       *string `sql:""`
+	Description *string `sql:""`
+
+	Values []PropertyConfigurationValue `sql:""`
+}
+
+type PropertyConfigurationValue struct {
+	Value string `sql:""`
 }
 
 // Virtual Disk.
