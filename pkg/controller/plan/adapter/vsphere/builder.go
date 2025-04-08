@@ -556,6 +556,17 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 			}
 
 			generatedName, err := r.executeTemplate(pvcNameTemplate, &templateData)
+
+			// Validate that template output is a valid k8s label
+			errs := k8svalidation.IsDNS1123Label(generatedName)
+			if len(errs) > 0 {
+				// Raise an error if the generated name is not valid
+				err = errors.New("generated PVC name is not valid")
+
+				// Failed to generate PVC name using template
+				r.Log.Info("Failed to generate PVC name using template", "template", pvcNameTemplate, "error", err)
+			}
+
 			if err == nil && generatedName != "" {
 				// Ensure generatedName ends with "-"
 				if !strings.HasSuffix(generatedName, "-") {
