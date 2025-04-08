@@ -34,6 +34,7 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/utils/ptr"
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
@@ -508,13 +509,24 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 
 					// Create template data
 					templateData := api.PVCNameTemplateData{
-						VmName:        r.getPlenVMNewName(vm),
+						VmName:        r.getPlenVMSafeName(vm),
 						PlanName:      r.Plan.Name,
 						DiskIndex:     diskIndex,
 						RootDiskIndex: rootDiskIndex,
 					}
 
 					generatedName, err := r.executeTemplate(pvcNameTemplate, &templateData)
+
+					// Validate that template output is a valid k8s label
+					errs := k8svalidation.IsDNS1123Label(generatedName)
+					if len(errs) > 0 {
+						// Raise an error if the generated name is not valid
+						err = errors.New("generated PVC name is not valid")
+
+						// Failed to generate PVC name using template
+						r.Log.Info("Failed to generate PVC name using template", "template", pvcNameTemplate, "error", err)
+					}
+
 					if err == nil && generatedName != "" {
 						dv.ObjectMeta.GenerateName = generatedName
 					} else {
@@ -1190,17 +1202,38 @@ func (r *Builder) getPVCNameTemplate(vm *model.VM) string {
 	return ""
 }
 
-// getPlenVMNewName returns the VM new name if exist, or just the name
-func (r *Builder) getPlenVMNewName(vm *model.VM) string {
+// getPlenVMSafeName returns a safe name for the VM
+// that can be used in the template output
+// The name is sanitized to be a valid k8s label
+func (r *Builder) getPlenVMSafeName(vm *model.VM) string {
+	// Default to vm name
+	newName := vm.Name
+
 	// Get plan VM
 	planVM := r.getPlanVMStatus(vm)
 
 	// if plan VM status has a new name, use it
 	if planVM != nil && planVM.NewName != "" {
-		return planVM.NewName
+		newName = planVM.NewName
 	}
 
-	return vm.Name
+	// New name is a valid subdomain name,
+	// but we need to check if it is a valid k8s label
+
+	// Check if new vm name is valid k8s label
+	if len(newName) > 63 {
+		// if the new name is longer then 63 characters, trancate it
+		newName = newName[:63]
+	}
+
+	// Validate that template output is a valid k8s label
+	errs := k8svalidation.IsDNS1123Label(newName)
+	if len(errs) > 0 {
+		// if the new name replace "." with "-"
+		newName = strings.ReplaceAll(newName, ".", "-")
+	}
+
+	return newName
 }
 
 // getVolumeNameTemplate returns the volume name template
