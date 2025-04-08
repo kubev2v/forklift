@@ -301,15 +301,18 @@ type Controller struct {
 
 // Virtual Disk.
 type Disk struct {
-	Key       int32  `json:"key"`
-	File      string `json:"file"`
-	Datastore Ref    `json:"datastore"`
-	Capacity  int64  `json:"capacity"`
-	Shared    bool   `json:"shared"`
-	RDM       bool   `json:"rdm"`
-	Bus       string `json:"bus"`
-	Mode      string `json:"mode,omitempty"`
-	Serial    string `json:"serial,omitempty"`
+	Key                   int32  `json:"key"`
+	UnitNumber            int32  `json:"unitNumber"`
+	ControllerKey         int32  `json:"controllerKey"`
+	File                  string `json:"file"`
+	Datastore             Ref    `json:"datastore"`
+	Capacity              int64  `json:"capacity"`
+	Shared                bool   `json:"shared"`
+	RDM                   bool   `json:"rdm"`
+	Bus                   string `json:"bus"`
+	Mode                  string `json:"mode,omitempty"`
+	Serial                string `json:"serial,omitempty"`
+	ChangeTrackingEnabled bool   `json:"changeTrackingEnabled"`
 }
 
 // Virtual Device.

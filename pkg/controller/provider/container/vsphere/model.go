@@ -551,6 +551,9 @@ func (v *VmAdapter) Model() model.Model {
 
 // Apply the update to the model.
 func (v *VmAdapter) Apply(u types.ObjectUpdate) {
+	// ctkPerDisk map - CBT enabled disks, we need this here to update the model.Disks
+	// which on initial state is ready only after the ctkPerDisk update
+	ctkPerDisk := map[string]bool{}
 	v.Base.Apply(&v.model.Base, u)
 	for _, p := range u.ChangeSet {
 		switch p.Op {
@@ -667,12 +670,12 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				if options, cast := p.Val.(types.ArrayOfOptionValue); cast {
 					for _, val := range options.OptionValue {
 						opt := val.GetOptionValue()
-						switch opt.Key {
-						case "numa.nodeAffinity":
+
+						if opt.Key == "numa.nodeAffinity" {
 							if s, cast := opt.Value.(string); cast {
 								v.model.NumaNodeAffinity = strings.Split(s, ",")
 							}
-						case "ctkEnabled":
+						} else if opt.Key == "ctkEnabled" {
 							if s, cast := opt.Value.(string); cast {
 								boolVal, err := strconv.ParseBool(s)
 								if err != nil {
@@ -680,7 +683,7 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 								}
 								v.model.ChangeTrackingEnabled = boolVal
 							}
-						case "disk.EnableUUID":
+						} else if opt.Key == "disk.EnableUUID" {
 							if s, cast := opt.Value.(string); cast {
 								boolVal, err := strconv.ParseBool(s)
 								if err != nil {
@@ -688,8 +691,23 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 								}
 								v.model.DiskEnableUuid = boolVal
 							}
-						}
+						} else if hasDiskPrefix(opt.Key) && strings.HasSuffix(opt.Key, ".ctkEnabled") {
 
+							if s, cast := opt.Value.(string); cast {
+								boolVal, err := strconv.ParseBool(s)
+								if err != nil {
+									return
+								}
+								if boolVal {
+									ctkPerDisk[strings.Split(opt.Key, ".")[0]] = true
+								}
+							}
+						}
+					}
+
+					//In case of ExtraConfig update, on initial state model.Disks is not ready yet
+					if len(v.model.Disks) > 0 {
+						isCBTEnabledForDisks(ctkPerDisk, v.model.Disks)
 					}
 				}
 			case fNestedHVEnabled:
@@ -814,8 +832,38 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 					v.model.NICs = nicList
 					v.updateControllers(&devArray)
 					v.updateDisks(&devArray)
+
+					if len(ctkPerDisk) > 0 {
+						isCBTEnabledForDisks(ctkPerDisk, v.model.Disks)
+					}
 				}
 			}
+		}
+	}
+}
+
+func hasDiskPrefix(key string) bool {
+	return strings.HasPrefix(key, SCSI) ||
+		strings.HasPrefix(key, SATA) ||
+		strings.HasPrefix(key, IDE) ||
+		strings.HasPrefix(key, NVME)
+}
+
+func isCBTEnabledForDisks(ctkPerDisk map[string]bool, disks []model.Disk) {
+	for i := range disks {
+		disk := &disks[i]
+
+		// In vSphere, ControllerKey values are typically large integers that encode the controller bus number.
+		// To extract the actual controller index (e.g., scsi0, scsi1), we round down to the nearest 100 to get the base,
+		// then subtract it from the ControllerKey. For example, 16001 → controllerIndex 1 (16001 - 16000).
+		baseKey := (disk.ControllerKey / 100) * 100
+		controllerIndex := disk.ControllerKey - baseKey
+		deviceKey := fmt.Sprintf("%s%d:%d", disk.Bus, controllerIndex, disk.UnitNumber)
+
+		if ctkPerDisk[deviceKey] {
+			disk.ChangeTrackingEnabled = true
+		} else {
+			disk.ChangeTrackingEnabled = false
 		}
 	}
 }
@@ -900,11 +948,13 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 			switch backing := disk.Backing.(type) {
 			case *types.VirtualDiskFlatVer1BackingInfo:
 				md := model.Disk{
-					Key:      disk.Key,
-					File:     backing.FileName,
-					Capacity: disk.CapacityInBytes,
-					Mode:     backing.DiskMode,
-					Bus:      controller.Bus,
+					Key:           disk.Key,
+					UnitNumber:    *disk.UnitNumber,
+					ControllerKey: disk.ControllerKey,
+					File:          backing.FileName,
+					Capacity:      disk.CapacityInBytes,
+					Mode:          backing.DiskMode,
+					Bus:           controller.Bus,
 				}
 				if backing.Datastore != nil {
 					datastoreId, _ := sanitize(backing.Datastore.Value)
@@ -916,13 +966,15 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 				disks = append(disks, md)
 			case *types.VirtualDiskFlatVer2BackingInfo:
 				md := model.Disk{
-					Key:      disk.Key,
-					File:     backing.FileName,
-					Capacity: disk.CapacityInBytes,
-					Shared:   backing.Sharing != "sharingNone" && backing.Sharing != "",
-					Mode:     backing.DiskMode,
-					Bus:      controller.Bus,
-					Serial:   backing.Uuid,
+					Key:           disk.Key,
+					UnitNumber:    *disk.UnitNumber,
+					ControllerKey: disk.ControllerKey,
+					File:          backing.FileName,
+					Capacity:      disk.CapacityInBytes,
+					Shared:        backing.Sharing != "sharingNone" && backing.Sharing != "",
+					Mode:          backing.DiskMode,
+					Bus:           controller.Bus,
+					Serial:        backing.Uuid,
 				}
 				if backing.Datastore != nil {
 					datastoreId, _ := sanitize(backing.Datastore.Value)
@@ -934,14 +986,16 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 				disks = append(disks, md)
 			case *types.VirtualDiskRawDiskMappingVer1BackingInfo:
 				md := model.Disk{
-					Key:      disk.Key,
-					File:     backing.FileName,
-					Capacity: disk.CapacityInBytes,
-					Shared:   backing.Sharing != "sharingNone" && backing.Sharing != "",
-					Mode:     backing.DiskMode,
-					RDM:      true,
-					Bus:      controller.Bus,
-					Serial:   backing.Uuid,
+					Key:           disk.Key,
+					UnitNumber:    *disk.UnitNumber,
+					ControllerKey: disk.ControllerKey,
+					File:          backing.FileName,
+					Capacity:      disk.CapacityInBytes,
+					Shared:        backing.Sharing != "sharingNone" && backing.Sharing != "",
+					Mode:          backing.DiskMode,
+					RDM:           true,
+					Bus:           controller.Bus,
+					Serial:        backing.Uuid,
 				}
 				if backing.Datastore != nil {
 					datastoreId, _ := sanitize(backing.Datastore.Value)
@@ -953,12 +1007,14 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 				disks = append(disks, md)
 			case *types.VirtualDiskRawDiskVer2BackingInfo:
 				md := model.Disk{
-					Key:      disk.Key,
-					File:     backing.DescriptorFileName,
-					Capacity: disk.CapacityInBytes,
-					Shared:   backing.Sharing != "sharingNone" && backing.Sharing != "",
-					RDM:      true,
-					Bus:      controller.Bus,
+					Key:           disk.Key,
+					UnitNumber:    *disk.UnitNumber,
+					ControllerKey: disk.ControllerKey,
+					File:          backing.DescriptorFileName,
+					Capacity:      disk.CapacityInBytes,
+					Shared:        backing.Sharing != "sharingNone" && backing.Sharing != "",
+					RDM:           true,
+					Bus:           controller.Bus,
 				}
 				disks = append(disks, md)
 			}
