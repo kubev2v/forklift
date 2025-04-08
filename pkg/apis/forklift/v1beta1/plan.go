@@ -64,6 +64,16 @@ type PlanSpec struct {
 	//   "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
 	// +optional
 	PVCNameTemplate string `json:"pvcNameTemplate,omitempty"`
+	// PVCNameTemplateUseGenerateName indicates if the PVC name template should use generateName instead of name.
+	// Setting this to false will use the name field of the PVCNameTemplate.
+	// This is useful when using a template that generates a name without a suffix.
+	// For example, if the template is "{{.VmName}}-disk-{{.DiskIndex}}", setting this to false will result in
+	// the PVC name being "{{.VmName}}-disk-{{.DiskIndex}}", which may not be unique.
+	// but will be more predictable.
+	// **DANGER** When set to false, the generated PVC name may not be unique and may cause conflicts.
+	// +optional
+	// +kubebuilder:default:=true
+	PVCNameTemplateUseGenerateName bool `json:"pvcNameTemplateUseGenerateName,omitempty"`
 	// VolumeNameTemplate is a template for generating volume interface names in the target virtual machine.
 	// It follows Go template syntax and has access to the following variables:
 	//   - .PVCName: name of the PVC mounted to the VM using this volume
