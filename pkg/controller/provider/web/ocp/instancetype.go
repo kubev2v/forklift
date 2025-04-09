@@ -7,7 +7,6 @@ import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	instancetype "kubevirt.io/api/instancetype/v1beta1"
 )
 
@@ -42,7 +41,7 @@ func (h InstanceHandler) List(ctx *gin.Context) {
 		return
 	}
 	if h.WatchRequest {
-		h.watch(ctx)
+		ctx.Status(http.StatusNotImplemented)
 		return
 	}
 	instancetypes, err := h.InstanceTypes(ctx)
@@ -94,30 +93,6 @@ func (h InstanceHandler) Get(ctx *gin.Context) {
 		}
 	}
 	ctx.Status(http.StatusNotFound)
-}
-
-// Watch.
-func (h InstanceHandler) watch(ctx *gin.Context) {
-	db := h.Collector.DB()
-	err := h.Watch(
-		ctx,
-		db,
-		&model.InstanceType{},
-		func(in libmodel.Model) (r interface{}) {
-			m := in.(*model.InstanceType)
-			it := &InstanceType{}
-			it.With(m)
-			it.Link(h.Provider)
-			r = it
-			return
-		})
-	if err != nil {
-		log.Trace(
-			err,
-			"url",
-			ctx.Request.URL)
-		ctx.Status(http.StatusInternalServerError)
-	}
 }
 
 // REST Resource.
