@@ -42,7 +42,7 @@ func (h InstanceHandler) List(ctx *gin.Context) {
 		return
 	}
 	if h.WatchRequest {
-		h.watch(ctx)
+		ctx.Status(http.StatusNotImplemented)
 		return
 	}
 	instancetypes, err := h.InstanceTypes(ctx)
