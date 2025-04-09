@@ -42,7 +42,7 @@ func (h ClusterInstanceHandler) List(ctx *gin.Context) {
 		return
 	}
 	if h.WatchRequest {
-		h.watch(ctx)
+		ctx.Status(http.StatusNotImplemented)
 		return
 	}
 	clusterinstances, err := h.ClusterInstanceTypes(ctx)

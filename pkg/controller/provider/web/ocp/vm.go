@@ -42,7 +42,7 @@ func (h VMHandler) List(ctx *gin.Context) {
 		return
 	}
 	if h.WatchRequest {
-		h.watch(ctx)
+		ctx.Status(http.StatusNotImplemented)
 		return
 	}
 	vms, err := h.VMs(ctx)
