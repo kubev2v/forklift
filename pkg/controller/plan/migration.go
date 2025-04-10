@@ -25,8 +25,6 @@ import (
 
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
-
 	"github.com/konveyor/forklift-controller/pkg/settings"
 	batchv1 "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
@@ -42,17 +40,6 @@ import (
 const (
 	NoReQ   = time.Duration(0)
 	PollReQ = time.Second * 3
-)
-
-// Predicates.
-var (
-	HasPreHook              libitr.Flag = 0x01
-	HasPostHook             libitr.Flag = 0x02
-	RequiresConversion      libitr.Flag = 0x04
-	CDIDiskCopy             libitr.Flag = 0x08
-	VirtV2vDiskCopy         libitr.Flag = 0x10
-	OpenstackImageMigration libitr.Flag = 0x20
-	VSphere                 libitr.Flag = 0x40
 )
 
 // Phases.
@@ -96,14 +83,8 @@ const (
 
 // Steps.
 const (
-	Initialize      = "Initialize"
-	Cutover         = "Cutover"
-	DiskAllocation  = "DiskAllocation"
-	DiskTransfer    = "DiskTransfer"
 	ImageConversion = "ImageConversion"
 	DiskTransferV2v = "DiskTransferV2v"
-	VMCreation      = "VirtualMachineCreation"
-	Unknown         = "Unknown"
 )
 
 const (
