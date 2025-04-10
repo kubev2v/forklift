@@ -2268,8 +2268,8 @@ func (r *KubeVirt) libvirtDomain(vmCr *VirtualMachine, pvcs []*core.PersistentVo
 			},
 			Source: &diskSource,
 			Target: &libvirtxml.DomainDiskTarget{
-				Dev: "hd" + string(rune('a'+i)),
-				Bus: "virtio",
+				Dev: "sd" + string(rune('a'+i)),
+				Bus: "scsi",
 			},
 		}
 		libvirtDisks = append(libvirtDisks, libvirtDisk)
@@ -2294,7 +2294,7 @@ func (r *KubeVirt) libvirtDomain(vmCr *VirtualMachine, pvcs []*core.PersistentVo
 			},
 			BootDevices: []libvirtxml.DomainBootDevice{
 				{
-					Dev: "hd",
+					Dev: "sd",
 				},
 			},
 		},
