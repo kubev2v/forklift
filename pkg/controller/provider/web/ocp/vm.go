@@ -7,7 +7,6 @@ import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	cnv "kubevirt.io/api/core/v1"
 )
 
@@ -91,30 +90,6 @@ func (h VMHandler) Get(ctx *gin.Context) {
 	}
 	ctx.Status(http.StatusNotFound)
 	return
-}
-
-// Watch.
-func (h VMHandler) watch(ctx *gin.Context) {
-	db := h.Collector.DB()
-	err := h.Watch(
-		ctx,
-		db,
-		&model.VM{},
-		func(in libmodel.Model) (r interface{}) {
-			m := in.(*model.VM)
-			vm := &VM{}
-			vm.With(m)
-			vm.Link(h.Provider)
-			r = vm
-			return
-		})
-	if err != nil {
-		log.Trace(
-			err,
-			"url",
-			ctx.Request.URL)
-		ctx.Status(http.StatusInternalServerError)
-	}
 }
 
 // REST Resource.
