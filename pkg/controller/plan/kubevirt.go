@@ -483,9 +483,11 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) error {
 	}
 
 	for _, pvc := range pvcs {
-		ownerRefs := []meta.OwnerReference{vmOwnerReference(virtualMachine)}
 		pvcCopy := pvc.DeepCopy()
-		pvc.OwnerReferences = ownerRefs
+		pvc.OwnerReferences = createOwnerReferences(
+			virtualMachine.ObjectMeta,
+			metav1.TypeMeta{APIVersion: "kubevirt.io/v1",
+				Kind: "VirtualMachine"}, true)
 		patch := client.MergeFrom(pvcCopy)
 		err = r.Destination.Client.Patch(context.TODO(), pvc, patch)
 		if err != nil {
@@ -871,9 +873,10 @@ func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) (er
 	allowPrivilageEscalation := false
 	pod := &core.Pod{
 		ObjectMeta: meta.ObjectMeta{
-			Namespace:    r.Plan.Spec.TargetNamespace,
-			Labels:       r.consumerLabels(vm.Ref, false),
-			GenerateName: r.getGeneratedName(vm) + "pvcinit-",
+			Namespace:       r.Plan.Spec.TargetNamespace,
+			OwnerReferences: createOwnerReferences(r.Plan.ObjectMeta, r.Plan.TypeMeta, false),
+			Labels:          r.consumerLabels(vm.Ref, false),
+			GenerateName:    r.getGeneratedName(vm) + "pvcinit-",
 		},
 		Spec: core.PodSpec{
 			RestartPolicy: core.RestartPolicyNever,
@@ -1383,9 +1386,10 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 	annotations[AnnDeleteAfterCompletion] = "false"
 	dvTemplate := cdi.DataVolume{
 		ObjectMeta: meta.ObjectMeta{
-			Namespace:    r.Plan.Spec.TargetNamespace,
-			Annotations:  annotations,
-			GenerateName: r.getGeneratedName(vm),
+			Namespace:       r.Plan.Spec.TargetNamespace,
+			Annotations:     annotations,
+			GenerateName:    r.getGeneratedName(vm),
+			OwnerReferences: createOwnerReferences(r.Plan.ObjectMeta, r.Plan.TypeMeta, false),
 		},
 	}
 	dvTemplate.Labels = r.vmLabels(vm.Ref)
@@ -1923,10 +1927,11 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	// pod
 	pod = &core.Pod{
 		ObjectMeta: meta.ObjectMeta{
-			Namespace:    r.Plan.Spec.TargetNamespace,
-			Annotations:  annotations,
-			Labels:       r.conversionLabels(vm.Ref, false),
-			GenerateName: r.getGeneratedName(vm),
+			Namespace:       r.Plan.Spec.TargetNamespace,
+			Annotations:     annotations,
+			Labels:          r.conversionLabels(vm.Ref, false),
+			GenerateName:    r.getGeneratedName(vm),
+			OwnerReferences: createOwnerReferences(r.Plan.ObjectMeta, r.Plan.TypeMeta, false),
 		},
 		Spec: core.PodSpec{
 			SecurityContext: &core.PodSecurityContext{
@@ -2400,8 +2405,9 @@ func (r *KubeVirt) ensureLibvirtConfigMap(vmRef ref.Ref, vmCr *VirtualMachine, p
 func (r *KubeVirt) configMap(vmRef ref.Ref) (object *core.ConfigMap, err error) {
 	object = &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
-			Labels:    r.vmLabels(vmRef),
-			Namespace: r.Plan.Spec.TargetNamespace,
+			Labels:          r.vmLabels(vmRef),
+			Namespace:       r.Plan.Spec.TargetNamespace,
+			OwnerReferences: createOwnerReferences(r.Plan.ObjectMeta, r.Plan.TypeMeta, false),
 			GenerateName: strings.Join(
 				[]string{
 					r.Plan.Name,
@@ -2503,8 +2509,9 @@ func (r *KubeVirt) ensureSecret(vmRef ref.Ref, setSecretData func(*core.Secret) 
 func (r *KubeVirt) secret(vmRef ref.Ref, setSecretData func(*core.Secret) error, labels map[string]string) (secret *core.Secret, err error) {
 	secret = &core.Secret{
 		ObjectMeta: meta.ObjectMeta{
-			Labels:    labels,
-			Namespace: r.Plan.Spec.TargetNamespace,
+			Labels:          labels,
+			Namespace:       r.Plan.Spec.TargetNamespace,
+			OwnerReferences: createOwnerReferences(r.Plan.ObjectMeta, r.Plan.TypeMeta, false),
 			GenerateName: strings.Join(
 				[]string{
 					r.Plan.Name,
@@ -2686,19 +2693,19 @@ func (r *VirtualMachine) Conditions() (cnd *libcnd.Conditions) {
 	return
 }
 
-// Create an OwnerReference from a VM.
-func vmOwnerReference(vm *cnv.VirtualMachine) (ref meta.OwnerReference) {
-	blockOwnerDeletion := true
+// Generic function to create OwnerReferences based on the input type.
+func createOwnerReferences(objMeta metav1.ObjectMeta, typeMeta metav1.TypeMeta, blockOwnerDeletion bool) []meta.OwnerReference {
 	isController := false
-	ref = meta.OwnerReference{
-		APIVersion:         "kubevirt.io/v1",
-		Kind:               "VirtualMachine",
-		Name:               vm.Name,
-		UID:                vm.UID,
-		BlockOwnerDeletion: &blockOwnerDeletion,
-		Controller:         &isController,
+	return []meta.OwnerReference{
+		{
+			APIVersion:         typeMeta.APIVersion,
+			Kind:               typeMeta.Kind,
+			Name:               objMeta.Name,
+			UID:                objMeta.UID,
+			Controller:         &isController,
+			BlockOwnerDeletion: &blockOwnerDeletion,
+		},
 	}
-	return
 }
 
 func (r *KubeVirt) setPopulatorPodLabels(pod core.Pod, migrationId string) (err error) {
@@ -2811,7 +2818,14 @@ func (r *KubeVirt) CreatePvForNfs() (pvName string, err error) {
 	nfsPath := splitted[1]
 	pvcNamePrefix := getEntityPrefixName("pv", r.Source.Provider.Name, r.Plan.Name)
 
-	labels := map[string]string{"provider": r.Plan.Provider.Source.Name, "app": "forklift", "migration": r.Migration.Name, "plan": string(r.Plan.UID), "ova": OvaPVLabel}
+	labels := map[string]string{
+		"provider":  r.Plan.Provider.Source.Name,
+		"app":       "forklift",
+		"migration": r.Migration.Name,
+		"plan":      string(r.Plan.UID),
+		"ova":       OvaPVLabel,
+	}
+
 	pv := &core.PersistentVolume{
 		ObjectMeta: meta.ObjectMeta{
 			GenerateName: pvcNamePrefix,
@@ -2830,6 +2844,7 @@ func (r *KubeVirt) CreatePvForNfs() (pvName string, err error) {
 					Server: nfsServer,
 				},
 			},
+			PersistentVolumeReclaimPolicy: core.PersistentVolumeReclaimDelete,
 		},
 	}
 	err = r.Destination.Create(context.TODO(), pv)
@@ -2843,12 +2858,20 @@ func (r *KubeVirt) CreatePvForNfs() (pvName string, err error) {
 
 func (r *KubeVirt) CreatePvcForNfs(pvcNamePrefix, pvName, vmID string) (pvcName string, err error) {
 	sc := ""
-	labels := map[string]string{"provider": r.Plan.Provider.Source.Name, "app": "forklift", "migration": string(r.Migration.UID), "plan": string(r.Plan.UID), "ova": OvaPVCLabel, kVM: vmID}
+	labels := map[string]string{
+		"provider":  r.Plan.Provider.Source.Name,
+		"app":       "forklift",
+		"migration": string(r.Migration.UID),
+		"plan":      string(r.Plan.UID),
+		"ova":       OvaPVCLabel, kVM: vmID,
+	}
+
 	pvc := &core.PersistentVolumeClaim{
 		ObjectMeta: meta.ObjectMeta{
-			GenerateName: pvcNamePrefix,
-			Namespace:    r.Plan.Spec.TargetNamespace,
-			Labels:       labels,
+			GenerateName:    pvcNamePrefix,
+			Namespace:       r.Plan.Spec.TargetNamespace,
+			OwnerReferences: createOwnerReferences(r.Plan.ObjectMeta, r.Plan.TypeMeta, false),
+			Labels:          labels,
 		},
 		Spec: core.PersistentVolumeClaimSpec{
 			Resources: core.ResourceRequirements{
