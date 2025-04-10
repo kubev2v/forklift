@@ -235,6 +235,11 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*planapi.Task, err error) {
 	return
 }
 
+// NOOP
+func (r *Builder) GetSharedPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, err error) {
+	return
+}
+
 func (r *Builder) PreferenceName(vmRef ref.Ref, configMap *core.ConfigMap) (name string, err error) {
 	// The VM is built from configuration, we don't need the preference
 	err = liberr.New("preferences are not used by this provider")

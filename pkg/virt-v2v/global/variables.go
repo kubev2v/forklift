@@ -9,6 +9,8 @@ const (
 	INSPECTION               = "/var/tmp/v2v/inspection.xml"
 	FS             MountPath = "/mnt/disks/disk[0-9]*"
 	BLOCK          MountPath = "/dev/block[0-9]*"
+	FS_SHARED      MountPath = "/mnt/disks/disk-shared[0-9]*"
+	BLOCK_SHARED   MountPath = "/dev/block-shared[0-9]*"
 	VDDK_LIB                 = "/opt/vmware-vix-disklib-distrib"
 	LUKSDIR                  = "/etc/luks"
 	VDDK_CONF_FILE           = "/mnt/vddk-conf/vddk-config-file"
