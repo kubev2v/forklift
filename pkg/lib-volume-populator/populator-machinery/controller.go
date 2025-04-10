@@ -31,6 +31,7 @@ import (
 	"syscall"
 	"time"
 
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -99,9 +100,9 @@ var (
 			resource:           "openstackvolumepopulators",
 			regexKey:           "openstack_volume_populator",
 		},
-		"VSphereXcopyVolumePopulator": {
+		api.VSphereXcopyVolumePopulatorKind: {
 			storageResourceKey: "source_vmdk",
-			resource:           "vspherexcopyvolumepopulators",
+			resource:           api.VSphereXcopyVolumePopulatorResource,
 			regexKey:           "vsphere_xcopy_volume_populator",
 		},
 	}
@@ -619,6 +620,9 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 					Labels:      labels,
 				},
 				Spec: makePopulatePodSpec(pvcPrimeName, secretName),
+			}
+			if c.gk.Kind == api.VSphereXcopyVolumePopulatorKind {
+				pod.Spec.ServiceAccountName = "populator"
 			}
 			pod.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName = pvcPrimeName
 			con := &pod.Spec.Containers[0]
