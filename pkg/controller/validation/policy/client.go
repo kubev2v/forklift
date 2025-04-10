@@ -30,6 +30,10 @@ var Settings = &settings.Settings
 // Pool (singleton).
 var Agent Pool
 
+const (
+	ForcedConcern = "Forced concern"
+)
+
 // Error reported by the service.
 type ValidationError struct {
 	Errors []string
@@ -321,6 +325,18 @@ func (r *Worker) run() {
 				task.completed = time.Now()
 			} else {
 				task.Error = err
+				task.Concerns = []model.Concern{
+					//We add a dummy concern to mark forced concern we need to add upon failure in the workload builder
+					//hence it skips the validation and no concern will arise we need to force it for user readability
+					{
+						Label: ForcedConcern,
+					},
+					{
+						Category:   "Critical",
+						Label:      err.Error(),
+						Assessment: err.Error(),
+					},
+				}
 			}
 			func() {
 				defer func() {
@@ -372,10 +388,11 @@ func (r *Pool) Start() {
 					"task",
 					task.String())
 			} else {
-				log.Info(
+				log.Error(
+					task.Error,
 					"VM validation failed.",
-					"task",
-					task.String())
+					"task", task.String(),
+				)
 			}
 			task.notify()
 		}
