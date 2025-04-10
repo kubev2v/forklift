@@ -24,14 +24,10 @@ type VSphereXcopyVolumePopulatorSpec struct {
 	// VmdkPath is the full path the vmdk disk. A valid path format is
 	// '[$DATASTORE_NAME] $VM_NAME/$DISK_NAME.vmdk'
 	VmdkPath string `json:"vmdkPath"`
-	// TargetPVC is the kubernetes PVC name that is used as the target
-	// The controller will resolve the underlying PV and will copy the data
-	// from the vmdk to that target volume
-	TargetPVC string `json:"targetPVC"`
 	// The secret name with vsphere and storage credentials
-	SecretRef string `json:"secretRef"`
+	SecretName string `json:"secretName"`
 	// StorageVendorProduct is the storage vendor the target disk and PVC are connected to
-	// Supported values [ontap, ]
+	// Supported values [ontap, primera3par]
 	StorageVendorProduct string `json:"storageVendorProduct"`
 }
 

@@ -9,7 +9,6 @@ import (
 	liburl "net/url"
 	"path"
 	"regexp"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -1189,6 +1188,9 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 // For now this method returns true, if there's a mapping (backend by copy-offload-mapping ConfigMap, that
 // maps StoragetClasses to Vsphere data stores
 func (r *Builder) SupportsVolumePopulators() bool {
+	if !settings.Settings.Features.CopyOffload {
+		return false
+	}
 	dsMapIn := r.Context.Map.Storage.Spec.Map
 	for _, m := range dsMapIn {
 		ref := m.Source
@@ -1297,9 +1299,8 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 						},
 						Spec: api.VSphereXcopyVolumePopulatorSpec{
 							VmdkPath:             disk.File,
-							TargetPVC:            commonName,
+							SecretName:           secretName,
 							StorageVendorProduct: string(storageVendorProduct),
-							SecretRef:            secretName,
 						},
 					}
 
@@ -1540,38 +1541,10 @@ func (r *Builder) getNetworkNameTemplate(vm *model.VM) string {
 	return ""
 }
 
-type CopyOffloadMapping struct {
-	StorageClasses map[string]struct {
-		StorageVendorProduct   string              `yaml:"storageVendorProduct"`
-		StorageVendorSecretRef string              `yaml:"storageVendorSecretRef"`
-		VsphereInstance        map[string][]string `yaml:",inline"`
-	} `yaml:",inline"`
-}
-
-// GetStorageMappingBy uses the config map copy-offload-mapping and is used to
-// identity copy-offload supprt of storage classes to data stores.
-// That mapping holds the details to create the VSphereXcopyVolumePopulator
-// resouce and arguments.
-// If a mapping cannot match the plan storage mapping(hence returns empty),
-// then there will be no copy offload storage copying, and it falls back to
-// regular copy using DataVolumes
-func (m *CopyOffloadMapping) GetStorageMappingBy(storageClass string, dataStore string) (vsphereInstance string, storageVendor string, storageVendorSecret string) {
-	mapping, exists := m.StorageClasses[storageClass]
-	if exists {
-		for vsphereInstanceName, dataStores := range mapping.VsphereInstance {
-			klog.Infof("matching vsphere instance %s d datastore %s on datastores %v", vsphereInstanceName, dataStore, dataStores)
-			if slices.Contains(dataStores, dataStore) {
-				return vsphereInstanceName, mapping.StorageVendorProduct, mapping.StorageVendorSecretRef
-			}
-		}
-	}
-	return "", "", ""
-}
-
-// MergeSecrets merges the data from secret2 into secret1.
+// MergeSecrets merges the storage vendor secret into the migration secret
 func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendorSecret, storageVendorSecretNS string) error {
 	dst := &core.Secret{}
-	if err := r.Get(context.Background(), client.ObjectKey{
+	if err := r.Destination.Get(context.Background(), client.ObjectKey{
 		Name:      migrationSecret,
 		Namespace: migrationSecretNS}, dst); err != nil {
 		return fmt.Errorf("failed to get migration secret: %w", err)
@@ -1615,7 +1588,7 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 		}
 	}
 	// Update secret1 with the merged data.
-	if err := r.Update(context.Background(), dst); err != nil {
+	if err := r.Destination.Update(context.Background(), dst); err != nil {
 		return fmt.Errorf("failed to update secret1: %w", err)
 	}
 
@@ -1630,7 +1603,7 @@ func (r *Builder) ensurePopulatorServiceAccount(namespace string) error {
 			Namespace: namespace,
 		},
 	}
-	err := r.Client.Create(context.TODO(), &sa, &client.CreateOptions{})
+	err := r.Destination.Client.Create(context.TODO(), &sa, &client.CreateOptions{})
 	if err != nil && !k8serr.IsAlreadyExists(err) {
 		return err
 	}
@@ -1647,7 +1620,7 @@ func (r *Builder) ensurePopulatorServiceAccount(namespace string) error {
 			},
 		},
 	}
-	err = r.Client.Create(context.TODO(), &role, &client.CreateOptions{})
+	err = r.Destination.Client.Create(context.TODO(), &role, &client.CreateOptions{})
 	if err != nil && !k8serr.IsAlreadyExists(err) {
 		return err
 	}
@@ -1672,7 +1645,7 @@ func (r *Builder) ensurePopulatorServiceAccount(namespace string) error {
 		},
 	}
 
-	err = r.Client.Create(context.TODO(), &binding, &client.CreateOptions{})
+	err = r.Destination.Client.Create(context.TODO(), &binding, &client.CreateOptions{})
 	if err != nil && !k8serr.IsAlreadyExists(err) {
 		return err
 	}

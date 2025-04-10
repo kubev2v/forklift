@@ -138,7 +138,7 @@ type controller struct {
 	notifyMap         map[string]*stringSet
 	cleanupMap        map[string]*stringSet
 	workqueue         workqueue.RateLimitingInterface
-	populatorArgs     func(bool, *unstructured.Unstructured) ([]string, error)
+	populatorArgs     func(bool, *unstructured.Unstructured, corev1.PersistentVolumeClaim) ([]string, error)
 	gk                schema.GroupKind
 	metrics           *metricsManager
 	recorder          record.EventRecorder
@@ -147,7 +147,7 @@ type controller struct {
 
 func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, prefix string,
 	gk schema.GroupKind, gvr schema.GroupVersionResource, mountPath, devicePath string,
-	populatorArgs func(bool, *unstructured.Unstructured) ([]string, error),
+	populatorArgs func(bool, *unstructured.Unstructured, corev1.PersistentVolumeClaim) ([]string, error),
 ) {
 	klog.Infof("Starting populator controller for %s", gk)
 
@@ -505,7 +505,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 	}
 
 	// Set the args for the populator pod
-	args, err := c.populatorArgs(rawBlock, crInstance)
+	args, err := c.populatorArgs(rawBlock, crInstance, *pvc)
 	if err != nil {
 		return err
 	}

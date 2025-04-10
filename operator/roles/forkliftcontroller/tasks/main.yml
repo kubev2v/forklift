@@ -120,13 +120,6 @@
         state: "{{ volume_populator_state }}"
         definition: "{{ lookup('template', 'populator/deployment-populator-controller.yml.j2') }}"
 
-  - when: feature_copy_offload|bool
-    block:
-    - name: "Setup copy offload config-map"
-      k8s:
-        state: "{{ copy_offload_state}}"
-        definition: "{{ lookup('template', 'controller/copy-offload-config-map.yml.j2') }}"
-
   - when: k8s_cluster|bool
     block:
     - name: "Create a trusted CA issuer"

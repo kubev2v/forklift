@@ -34,10 +34,10 @@ var (
 	crNamespace     string
 	pvcSize         string
 	ownerUID        string
-	sourceVMDKFile  string
-	targetPVC       string
-	targetNamespace string
+	ownerName       string
 	secretName      string
+	sourceVMDKFile  string
+	targetNamespace string
 	storageVendor   string
 	storageHostname string
 	storageUsername string
@@ -89,9 +89,9 @@ func main() {
 		klog.Fatalf("Failed to create a remote esxcli populator: %s", err)
 	}
 
-	volumeHandle, err := getVolumeHandle(clientSet, targetNamespace, targetPVC)
+	volumeHandle, err := getVolumeHandle(clientSet, targetNamespace, ownerName)
 	if err != nil {
-		klog.Fatalf("Failed to fetch the volume handle details from the target pvc %s: %s", targetPVC, err)
+		klog.Fatalf("Failed to fetch the volume handle details from the target pvc %s: %s", ownerName, err)
 	}
 
 	progressCounter, err := setupTracing()
@@ -175,11 +175,11 @@ func handleArgs() {
 	flag.StringVar(&crName, "cr-name", "", "The Custom Resouce Name")
 	flag.StringVar(&crNamespace, "cr-namespace", "", "The Custom Resouce Namespace")
 	flag.StringVar(&pvcSize, "pvc-size", "", "The size of the PVC, passed by the populator - unused")
-	flag.StringVar(&ownerUID, "owner-uid", "", "Owner UID, passed by the populator - Usually PVC ID")
+	flag.StringVar(&ownerUID, "owner-uid", "", "Owner UID, passed by the populator - the PVC ID")
+	flag.StringVar(&ownerName, "owner-name", "", "Owner Name, passed by the populator - the PVC Name")
+	flag.StringVar(&secretName, "secret-name", "", "Secret name the populator controller uses it to mount env vars from it. Not for use internally")
 	flag.StringVar(&sourceVMDKFile, "source-vmdk", "", "File name to populate")
-	flag.StringVar(&targetPVC, "target-pvc", "", "Target PVC for population")
 	flag.StringVar(&storageVendor, "storage-vendor", "ontap", "The storage vendor to work with. Current values: [ontap, primera3par]")
-	flag.StringVar(&secretName, "secret-name", "", "The secret holding the credentials for vSphere API and the storage vendor API")
 	flag.StringVar(&targetNamespace, "target-namespace", "", "Contents to populate file with")
 	flag.StringVar(&storageHostname, "storage-hostname", os.Getenv("STORAGE_HOSTNAME"), "The storage vendor api hostname")
 	flag.StringVar(&storageUsername, "storage-username", os.Getenv("STORAGE_USERNAME"), "The storage vendor api username")
@@ -252,7 +252,7 @@ func setupTracing() (*prometheus.CounterVec, error) {
 
 	go func() {
 		http.Handle("/metrics", promhttp.Handler())
-		// use minumum TLS 1.2
+		// use minimum TLS 1.2
 		cfg := tls.Config{MinVersion: tls.VersionTLS12}
 		server := http.Server{
 			Addr:      ":8443",

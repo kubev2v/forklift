@@ -48,12 +48,14 @@ type NetworkPair struct {
 	// Destination network.
 	Destination DestinationNetwork `json:"destination"`
 }
+
 // OffloadPlugin is a storage plugin that acts on the storage allocation and copying
 // phase of the migration. There can be more than one available but currently only
 // one will be supported
 type OffloadPlugin struct {
-    VSphereXcopyPluginConfig *VSphereXcopyPluginConfig `json:"vsphereXcopyConfig"`
+	VSphereXcopyPluginConfig *VSphereXcopyPluginConfig `json:"vsphereXcopyConfig"`
 }
+
 // StorageVendorProduct is an identifier of the product used for XCOPY.
 // NOTE - Update the kubebuilder:validation line for every change to this enum
 type StorageVendorProduct string
@@ -68,7 +70,7 @@ const (
 type VSphereXcopyPluginConfig struct {
 	// SecretRef is the name of the secret with the storage credentials for the plugin.
 	// The secret should reside in the same namespace where the source provider is.
-    SecretRef string `json:"secretRef"`
+	SecretRef string `json:"secretRef"`
 	// StorageVendorProduct the string identifier of the storage vendor product
 	// +kubebuilder:validation:Enum=vantara;ontap
 	StorageVendorProduct StorageVendorProduct `json:"storageVendorProduct"`

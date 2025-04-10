@@ -40,7 +40,7 @@ spec:
             type: object
           spec:
             properties:
-              secretRef:
+              secretName:
                 description: The secret name with vsphere and storage credentials
                 type: string
               storageVendorProduct:
@@ -48,21 +48,14 @@ spec:
                   StorageVendorProduct is the storage vendor the target disk and PVC are connected to
                   Supported values [ontap, ]
                 type: string
-              targetPVC:
-                description: |-
-                  TargetPVC is the kubernetes PVC name that is used as the target
-                  The controller will resolve the underlying PV and will copy the data
-                  from the vmdk to that target volume
-                type: string
               vmdkPath:
                 description: |-
                   VmdkPath is the full path the vmdk disk. A valid path format is
                   '[$DATASTORE_NAME] $VM_NAME/$DISK_NAME.vmdk'
                 type: string
             required:
-            - secretRef
+            - secretName
             - storageVendorProduct
-            - targetPVC
             - vmdkPath
             type: object
           status:
