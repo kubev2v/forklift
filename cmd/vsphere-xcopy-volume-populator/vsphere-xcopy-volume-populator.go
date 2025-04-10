@@ -149,30 +149,23 @@ func getVolumeHandle(kubeClient *kubernetes.Clientset, targetNamespace, targetPV
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch the the target persistent volume claim %q %w", pvc.Name, err)
 	}
-	var volumeName string
 	if pvc.Spec.VolumeName != "" {
-		volumeName = pvc.Spec.VolumeName
-	} else {
-		primePVCName := "prime-" + pvc.GetUID()
-		klog.Infof("the volume name is not found on the claim %q. Trying the prime pvc %q", pvc.Name, primePVCName)
-		// try pvc with postfix "prime" that the populator copies. The prime volume is created in the namespace where the populator controller runs.
-		primePVC, err := kubeClient.CoreV1().PersistentVolumeClaims(targetNamespace).Get(context.Background(), string(primePVCName), metav1.GetOptions{})
-		if err != nil {
-			return "", fmt.Errorf("failed to fetch the the target persistent volume claim %q %w", primePVC.Name, err)
-		}
-
-		if primePVC.Spec.VolumeName == "" {
-			return "", fmt.Errorf("the volume name is not found on the prime volume claim %q", primePVC.Name)
-		}
-		volumeName = primePVC.Spec.VolumeName
+		return pvc.Spec.VolumeName, nil
 	}
 
-	pv, err := kubeClient.CoreV1().PersistentVolumes().Get(context.Background(), volumeName, metav1.GetOptions{})
+	primePVCName := "prime-" + pvc.GetUID()
+	klog.Infof("the volume name is not found on the claim %q. Trying the prime pvc %q", pvc.Name, primePVCName)
+	// try pvc with postfix "prime" that the populator copies. The prime volume is created in the namespace where the populator controller runs.
+	primePVC, err := kubeClient.CoreV1().PersistentVolumeClaims(targetNamespace).Get(context.Background(), string(primePVCName), metav1.GetOptions{})
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch the the target volume details %w", err)
+		return "", fmt.Errorf("failed to fetch the the target persistent volume claim %q %w", primePVC.Name, err)
 	}
-	klog.Infof("target volume %s volumeHandle %s", pv.Name, pv.Spec.CSI.VolumeHandle)
-	return pv.Spec.CSI.VolumeHandle, nil
+
+	if primePVC.Spec.VolumeName == "" {
+		return "", fmt.Errorf("the volume name is not found on the prime volume claim %q", primePVC.Name)
+	}
+	return primePVC.Spec.VolumeName, nil
+
 }
 
 func handleArgs() {
