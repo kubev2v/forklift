@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"text/template"
 
+	"github.com/Masterminds/sprig/v3"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 )
 
@@ -13,24 +14,26 @@ func AddStringFuncs(funcMap template.FuncMap) template.FuncMap {
 		funcMap = make(template.FuncMap)
 	}
 
-	// Add string functions
-	funcMap["lower"] = ToLower
-	funcMap["upper"] = ToUpper
-	funcMap["contains"] = Contains
-	funcMap["replace"] = Replace
-	funcMap["trim"] = Trim
-	funcMap["trimAll"] = TrimAll
-	funcMap["trimSuffix"] = TrimSuffix
-	funcMap["trimPrefix"] = TrimPrefix
-	funcMap["title"] = Title
-	funcMap["untitle"] = ToLower
-	funcMap["repeat"] = Repeat
-	funcMap["substr"] = Substr
-	funcMap["nospace"] = Nospace
-	funcMap["trunc"] = Trunc
-	funcMap["initials"] = Initials
-	funcMap["hasPrefix"] = HasPrefix
-	funcMap["hasSuffix"] = HasSuffix
+	sprigFuncs := sprig.FuncMap()
+
+	// Add string functions from sprig
+	funcMap["lower"] = sprigFuncs["lower"]
+	funcMap["upper"] = sprigFuncs["upper"]
+	funcMap["contains"] = sprigFuncs["contains"]
+	funcMap["replace"] = sprigFuncs["replace"]
+	funcMap["trim"] = sprigFuncs["trim"]
+	funcMap["trimAll"] = sprigFuncs["trimAll"]
+	funcMap["trimSuffix"] = sprigFuncs["trimSuffix"]
+	funcMap["trimPrefix"] = sprigFuncs["trimPrefix"]
+	funcMap["title"] = sprigFuncs["title"]
+	funcMap["untitle"] = sprigFuncs["untitle"]
+	funcMap["repeat"] = sprigFuncs["repeat"]
+	funcMap["substr"] = sprigFuncs["substr"]
+	funcMap["nospace"] = sprigFuncs["nospace"]
+	funcMap["trunc"] = sprigFuncs["trunc"]
+	funcMap["initials"] = sprigFuncs["initials"]
+	funcMap["hasPrefix"] = sprigFuncs["hasPrefix"]
+	funcMap["hasSuffix"] = sprigFuncs["hasSuffix"]
 
 	return funcMap
 }
@@ -41,18 +44,20 @@ func AddMathFuncs(funcMap template.FuncMap) template.FuncMap {
 		funcMap = make(template.FuncMap)
 	}
 
-	// Add math functions
-	funcMap["add"] = Add
-	funcMap["add1"] = Add1
-	funcMap["sub"] = Sub
-	funcMap["div"] = Div
-	funcMap["mod"] = Mod
-	funcMap["mul"] = Mul
-	funcMap["max"] = Max
-	funcMap["min"] = Min
-	funcMap["floor"] = Floor
-	funcMap["ceil"] = Ceil
-	funcMap["round"] = Round
+	sprigFuncs := sprig.FuncMap()
+
+	// Add math functions from sprig
+	funcMap["add"] = sprigFuncs["add"]
+	funcMap["add1"] = sprigFuncs["add1"]
+	funcMap["sub"] = sprigFuncs["sub"]
+	funcMap["div"] = sprigFuncs["div"]
+	funcMap["mod"] = sprigFuncs["mod"]
+	funcMap["mul"] = sprigFuncs["mul"]
+	funcMap["max"] = sprigFuncs["max"]
+	funcMap["min"] = sprigFuncs["min"]
+	funcMap["floor"] = sprigFuncs["floor"]
+	funcMap["ceil"] = sprigFuncs["ceil"]
+	funcMap["round"] = sprigFuncs["round"]
 
 	return funcMap
 }

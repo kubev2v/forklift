@@ -37,7 +37,7 @@ The following string functions are available for use in your templates:
 | `lower` | Converts string to lowercase | `{{ lower "TEXT" }}` → `text` |
 | `upper` | Converts string to uppercase | `{{ upper "text" }}` → `TEXT` |
 | `contains` | Checks if string contains substring | `{{ contains "hello" "lo" }}` → `true` |
-| `replace` | Replaces occurrences in a string | `{{ replace "hello" "l" "x" -1 }}` → `hexxo` |
+| `replace` | Replaces occurrences in a string | `{{"I Am Henry VIII" \| replace " " "-"}}` → `I-Am-Henry-VIII` |
 | `trim` | Removes whitespace from both ends | `{{ trim "  text  " }}` → `text` |
 | `trimAll` | Removes specified characters from both ends | `{{ trimAll "$" "$5.00$" }}` → `5.00` |
 | `trimSuffix` | Removes suffix if present | `{{ trimSuffix ".go" "file.go" }}` → `file` |
