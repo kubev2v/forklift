@@ -8,7 +8,6 @@ import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 )
 
 // Routes.
@@ -97,30 +96,6 @@ func (h NadHandler) Get(ctx *gin.Context) {
 	}
 	ctx.Status(http.StatusNotFound)
 	return
-}
-
-// Watch.
-func (h NadHandler) watch(ctx *gin.Context) {
-	db := h.Collector.DB()
-	err := h.Watch(
-		ctx,
-		db,
-		&model.NetworkAttachmentDefinition{},
-		func(in libmodel.Model) (r interface{}) {
-			m := in.(*model.NetworkAttachmentDefinition)
-			nad := &NetworkAttachmentDefinition{}
-			nad.With(m)
-			nad.Link(h.Provider)
-			r = nad
-			return
-		})
-	if err != nil {
-		log.Trace(
-			err,
-			"url",
-			ctx.Request.URL)
-		ctx.Status(http.StatusInternalServerError)
-	}
 }
 
 // REST Resource.
