@@ -107,10 +107,15 @@ spec:
 {% endif %}
         - name: BLOCK_OVERHEAD
           value: "{{ controller_block_overhead }}"
-{% if controller_vsphere_incremental_backup|bool %}
+{% if feature_copy_offload|bool %}
         - name: FEATURE_VSPHERE_INCREMENTAL_BACKUP
           value: "true"
 {% endif %}
+{% if feature_copy_offload|bool %}
+        - name: FEATURE_COPY_OFFLOAD
+          value: "true"
+{% endif %}
+
 {% if controller_ovirt_warm_migration|bool %}
         - name: FEATURE_OVIRT_WARM_MIGRATION
           value: "true"
