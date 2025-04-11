@@ -6,8 +6,6 @@ import (
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 )
 
-const NumPredicates = 0x40
-
 // List of steps.
 type Pipeline []Step
 
@@ -20,6 +18,7 @@ type Predicate interface {
 	// Evaluate the condition.
 	// Returns (true) when the step should be included.
 	Evaluate(Flag) (bool, error)
+	Count() int
 }
 
 // Itinerary step.
@@ -151,12 +150,13 @@ func (r *Itinerary) Progress(step string) (report Progress, err error) {
 
 // The step has satisfied ANY of the predicates.
 func (r *Itinerary) hasAny(step Step) (pTrue bool, err error) {
-	for i := 0; i < NumPredicates; i++ {
+	if r.Predicate == nil {
+		pTrue = true
+		return
+	}
+	for i := 0; i < r.Predicate.Count(); i++ {
 		flag := Flag(1 << i)
 		if (step.Any & flag) == 0 {
-			continue
-		}
-		if r.Predicate == nil {
 			continue
 		}
 		pTrue, err = r.Predicate.Evaluate(flag)
@@ -171,12 +171,13 @@ func (r *Itinerary) hasAny(step Step) (pTrue bool, err error) {
 
 // The step has satisfied ALL of the predicates.
 func (r *Itinerary) hasAll(step Step) (pTrue bool, err error) {
-	for i := 0; i < NumPredicates; i++ {
+	if r.Predicate == nil {
+		pTrue = true
+		return
+	}
+	for i := 0; i < r.Predicate.Count(); i++ {
 		flag := Flag(1 << i)
 		if (step.All & flag) == 0 {
-			continue
-		}
-		if r.Predicate == nil {
 			continue
 		}
 		pTrue, err = r.Predicate.Evaluate(flag)
