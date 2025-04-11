@@ -111,7 +111,7 @@ spec:
         - name: FEATURE_VSPHERE_INCREMENTAL_BACKUP
           value: "true"
 {% endif %}
-{% if controller_feature_copy_offload|bool %}
+{% if feature_copy_offload|bool %}
         - name: FEATURE_COPY_OFFLOAD
           value: "true"
 {% endif %}
