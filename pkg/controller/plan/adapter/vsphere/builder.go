@@ -1313,7 +1313,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					// reconcile was successful in creating the pvc but failed after that, e.g when
 					// creating the volumepopulator resouce failed
 					r.Log.Info("Creating pvc", "pvc", pvc)
-					err = r.Client.Create(context.TODO(), &pvc, &client.CreateOptions{})
+					err = r.Destination.Client.Create(context.TODO(), &pvc, &client.CreateOptions{})
 					if err != nil {
 						// ignore if already exists?
 						return nil, err
@@ -1325,7 +1325,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 						return nil, err
 					}
 					r.Log.Info("Creating volumepopulator", "volumepopulator", vp)
-					err = r.Client.Create(context.TODO(), &vp, &client.CreateOptions{})
+					err = r.Destination.Client.Create(context.TODO(), &vp, &client.CreateOptions{})
 					if err != nil {
 						return nil, err
 					}
