@@ -12,8 +12,8 @@ type Primera3ParClonner struct {
 	client Primera3ParClient
 }
 
-func NewPrimera3ParClonner(storageHostname, storageUsername, storagePassword string) (Primera3ParClonner, error) {
-	clon := NewPrimera3ParClientWsImpl(storageHostname, storageUsername, storagePassword)
+func NewPrimera3ParClonner(storageHostname, storageUsername, storagePassword string, sslSkipVerify bool) (Primera3ParClonner, error) {
+	clon := NewPrimera3ParClientWsImpl(storageHostname, storageUsername, storagePassword, sslSkipVerify)
 	return Primera3ParClonner{
 		client: &clon,
 	}, nil

@@ -30,21 +30,22 @@ import (
 var version = "unknown"
 
 var (
-	crName          string
-	crNamespace     string
-	pvcSize         string
-	ownerUID        string
-	ownerName       string
-	secretName      string
-	sourceVMDKFile  string
-	targetNamespace string
-	storageVendor   string
-	storageHostname string
-	storageUsername string
-	storagePassword string
-	vsphereHostname string
-	vsphereUsername string
-	vspherePassword string
+	crName                     string
+	crNamespace                string
+	pvcSize                    string
+	ownerUID                   string
+	ownerName                  string
+	secretName                 string
+	sourceVMDKFile             string
+	targetNamespace            string
+	storageVendor              string
+	storageHostname            string
+	storageUsername            string
+	storagePassword            string
+	storageSkipSSLVerification string
+	vsphereHostname            string
+	vsphereUsername            string
+	vspherePassword            string
 
 	// kube args
 	httpEndpoint string
@@ -69,7 +70,8 @@ func main() {
 		}
 		storageApi = &sm
 	case "primera3par":
-		sm, err := primera3par.NewPrimera3ParClonner(storageHostname, storageUsername, storagePassword)
+		sm, err := primera3par.NewPrimera3ParClonner(
+			storageHostname, storageUsername, storagePassword, storageSkipSSLVerification == "true")
 		if err != nil {
 			klog.Fatalf("failed to initialize primera3par clonner with %s", err)
 		}
@@ -184,6 +186,7 @@ func handleArgs() {
 	flag.StringVar(&storageHostname, "storage-hostname", os.Getenv("STORAGE_HOSTNAME"), "The storage vendor api hostname")
 	flag.StringVar(&storageUsername, "storage-username", os.Getenv("STORAGE_USERNAME"), "The storage vendor api username")
 	flag.StringVar(&storagePassword, "storage-password", os.Getenv("STORAGE_PASSWORD"), "The storage vendor api password")
+	flag.StringVar(&storageSkipSSLVerification, "storage-skip-ssl-verification", os.Getenv("STORAGE_SKIP_SSL_VERIFICATION"), "skip the storage ssl verification")
 	flag.StringVar(&vsphereHostname, "vsphere-hostname", os.Getenv("GOVMOMI_HOSTNAME"), "vSphere's API hostname")
 	flag.StringVar(&vsphereUsername, "vsphere-username", os.Getenv("GOVMOMI_USERNAME"), "vSphere's API username")
 	flag.StringVar(&vspherePassword, "vsphere-password", os.Getenv("GOVMOMI_PASSWORD"), "vSphere's API password")
