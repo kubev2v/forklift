@@ -69,14 +69,14 @@ type Primera3ParClientWsImpl struct {
 	SessionStartTime time.Time
 }
 
-func NewPrimera3ParClientWsImpl(storageHostname, storageUsername, storagePassword string) Primera3ParClientWsImpl {
+func NewPrimera3ParClientWsImpl(storageHostname, storageUsername, storagePassword string, skipSSLVerification bool) Primera3ParClientWsImpl {
 	return Primera3ParClientWsImpl{
 		BaseURL:  storageHostname,
 		Password: storagePassword,
 		Username: storageUsername,
 		HTTPClient: &http.Client{
 			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // Disable SSL verification
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: skipSSLVerification}, // Disable SSL verification
 			},
 		},
 	}

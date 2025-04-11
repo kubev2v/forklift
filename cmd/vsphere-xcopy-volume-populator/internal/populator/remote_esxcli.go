@@ -2,8 +2,9 @@ package populator
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"slices"
 	"time"
 
@@ -110,7 +111,11 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 			_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "adapter", "rescan", "-t", "add", "-a", "1"})
 			if err != nil {
 				klog.Errorf("failed to rescan for adapters, atepmt %d/%d due to: %s", i, retries, err)
-				time.Sleep(time.Duration(rand.Intn(10)) * time.Second)
+				i, err := rand.Int(rand.Reader, big.NewInt(10))
+				if err != nil {
+					return fmt.Errorf("failed to randomize a sleep interval: %w", err)
+				}
+				time.Sleep(time.Duration(i.Int64()) * time.Second)
 			}
 		}
 	}
