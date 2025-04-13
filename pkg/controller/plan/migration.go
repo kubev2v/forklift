@@ -1396,6 +1396,20 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			err = nil
 			return
 		}
+		// Delete pod if user specified that they want to remove it after successful migration.
+		if r.Plan.Spec.DeleteGuestConversionPod {
+			r.Log.Info("Removing guest conversion pod for finished VM.", "vm", vm.String())
+			err = r.kubevirt.DeleteGuestConversionPod(vm)
+			if err != nil {
+				r.Log.Error(
+					err,
+					"Could not remove guest conversion pod for finished VM.",
+					"vm",
+					vm.String(),
+				)
+				err = nil
+			}
+		}
 		vm.SetCondition(
 			libcnd.Condition{
 				Type:     Succeeded,
