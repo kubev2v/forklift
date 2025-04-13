@@ -106,6 +106,12 @@ type PlanSpec struct {
 	// Determines if the plan should migrate shared disks.
 	// +kubebuilder:default:=true
 	MigrateSharedDisks bool `json:"migrateSharedDisks,omitempty"`
+	// DeleteGuestConversionPod determines if the guest conversion pod should be deleted after successful migration.
+	// Note:
+	//   - If this option is enabled and migration succeeds then the pod will get deleted. However the VM could still not boot and the virt-v2v logs, with additional information, will be deleted alongside guest conversion pod.
+	//   - If migration fails the conversion pod will remain present even if this option is enabled.
+	// +optional
+	DeleteGuestConversionPod bool `json:"deleteGuestConversionPod,omitempty"`
 }
 
 // Find a planned VM.
