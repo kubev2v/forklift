@@ -31,6 +31,7 @@ import (
 	"syscall"
 	"time"
 
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -99,6 +100,11 @@ var (
 			resource:           "openstackvolumepopulators",
 			regexKey:           "openstack_volume_populator",
 		},
+		api.VSphereXcopyVolumePopulatorKind: {
+			storageResourceKey: "source_vmdk",
+			resource:           api.VSphereXcopyVolumePopulatorResource,
+			regexKey:           "vsphere_xcopy_volume_populator",
+		},
 	}
 
 	monitoredPVCs = map[string]interface{}{}
@@ -132,7 +138,7 @@ type controller struct {
 	notifyMap         map[string]*stringSet
 	cleanupMap        map[string]*stringSet
 	workqueue         workqueue.RateLimitingInterface
-	populatorArgs     func(bool, *unstructured.Unstructured) ([]string, error)
+	populatorArgs     func(bool, *unstructured.Unstructured, corev1.PersistentVolumeClaim) ([]string, error)
 	gk                schema.GroupKind
 	metrics           *metricsManager
 	recorder          record.EventRecorder
@@ -141,7 +147,7 @@ type controller struct {
 
 func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, prefix string,
 	gk schema.GroupKind, gvr schema.GroupVersionResource, mountPath, devicePath string,
-	populatorArgs func(bool, *unstructured.Unstructured) ([]string, error),
+	populatorArgs func(bool, *unstructured.Unstructured, corev1.PersistentVolumeClaim) ([]string, error),
 ) {
 	klog.Infof("Starting populator controller for %s", gk)
 
@@ -499,7 +505,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 	}
 
 	// Set the args for the populator pod
-	args, err := c.populatorArgs(rawBlock, crInstance)
+	args, err := c.populatorArgs(rawBlock, crInstance, *pvc)
 	if err != nil {
 		return err
 	}
@@ -614,6 +620,9 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 					Labels:      labels,
 				},
 				Spec: makePopulatePodSpec(pvcPrimeName, secretName),
+			}
+			if c.gk.Kind == api.VSphereXcopyVolumePopulatorKind {
+				pod.Spec.ServiceAccountName = "populator"
 			}
 			pod.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName = pvcPrimeName
 			con := &pod.Spec.Containers[0]
