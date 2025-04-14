@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hpe-3par-block-pvc
+  namespace: pop
+spec:
+  accessModes:
+    - ReadWriteOnce  # RWO (Single-user access mode)
+  dataSource:
+    apiGroup: forklift.konveyor.io
+    kind: VSphereXcopyVolumePopulator
+    name: test-xcopy
+  dataSourceRef:
+    apiGroup: forklift.konveyor.io
+    kind: VSphereXcopyVolumePopulator
+    name: test-xcopy
+  resources:
+    requests:
+      storage: 10Gi  # Adjust the size as needed
+  storageClassName: hpe-3par-block
+  volumeMode: Block  # Since the StorageClass has fstype=xfs
+

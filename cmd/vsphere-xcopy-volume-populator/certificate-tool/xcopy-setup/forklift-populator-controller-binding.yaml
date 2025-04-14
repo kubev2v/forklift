@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: forklift-populator-controller-binding
+subjects:
+- kind: ServiceAccount
+  name: forklift-populator-controller
+  namespace: kube-system  # Change this if your service account is in another namespace
+roleRef:
+  kind: ClusterRole
+  name: forklift-populator-controller-role
+  apiGroup: rbac.authorization.k8s.io
+

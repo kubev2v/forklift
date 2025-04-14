@@ -142,7 +142,19 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 	for _, l := range r {
 		response += l.Value("message")
 	}
-
+	klog.Info("verifying copy succeeded")
+	r, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"md5sum", esxNaa})
+	if err != nil {
+		klog.Infof("error during checking naa, response from esxcli %+v", r)
+		return err
+	}
+	fmt.Println("md5sum >>>>>>>>>> %w", r)
+	r, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"md5sum", vmDisk.Path()})
+	if err != nil {
+		klog.Infof("error during checking vmdk file, response from esxcli %+v", r)
+		return err
+	}
+	fmt.Println("md5sum >>>>>>>>>> %w", r)
 	go func() {
 		// TODO need to process the vmkfstools stderr(probably) and to write the
 		// progress to a file, and then continuously read and report on the channel

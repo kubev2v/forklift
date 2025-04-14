@@ -1,0 +1,9 @@
+pod-namespace: pop
+test-namespace: vsphere-populator-test
+storage-vendor: primera3par
+secret-name: populator-secret
+kubeconfig: "/home/amit/.kube/config"
+test-image-label:  0.38
+test-labels: vsphere-populator
+test-ppopulator-image: quay.io/amitos/vsphere-xcopy-volume-populator
+

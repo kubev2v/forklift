@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: forklift-volume-populator-controller
+  namespace: ${.TEST_NAMESPACE}
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${.TEST_LABELS}
+  template:
+    metadata:
+      labels:
+        app: ${.TEST_LABELS}
+    spec:
+      containers:
+        - args:
+            - -v
+            - "5"
+          env:
+            - name: ${.POD_NAMESPACE}
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+            - name: OVIRT_POPULATOR_IMAGE
+              value: registry.redhat.io/migration-toolkit-virtualization/mtv-rhv-populator-rhel8@sha256:762af9ee50257a1b358b702b660cf4a6dff6b9fdd64cfeeca139e4919f2cc139
+            - name: OPENSTACK_POPULATOR_IMAGE
+              value: registry.redhat.io/migration-toolkit-virtualization/mtv-openstack-populator-rhel9@sha256:500943bfc5642810b75ae64da758b4eed079c4d5fff0f5090b5b0b6e550831dd
+            - name: VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE
+              value: ${.TEST_POPULATOR_IMAGE}:${.TEST_IMAGE_LABEL}
+          image: quay.io/amitos/populator-controller:${.TEST_IMAGE_LABEL}
+          imagePullPolicy: Always
+          name: forklift-populator-controller
+          ports:
+            - containerPort: 8080
+              name: http-endpoint
+              protocol: TCP
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: forklift-populator-controller
+      serviceAccountName: forklift-populator-controller
+      terminationGracePeriodSeconds: 30

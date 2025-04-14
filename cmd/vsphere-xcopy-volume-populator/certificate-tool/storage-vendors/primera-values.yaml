@@ -1,0 +1,128 @@
+# Default values for hpe-csi-driver Helm chart
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Control CSP Service and Deployments for HPE storage products
+disable:
+  nimble: true 
+  primera: false
+  alletra6000: true
+  alletra9000: true
+  alletraStorageMP: true
+
+# For controlling automatic iscsi/multipath package installation
+disableNodeConformance: false
+
+# For controlling automatic iscsi/multipath service configuration
+disableNodeConfiguration: false
+
+# NodeGetVolumestats will be called by default, set true to disable the call
+disableNodeGetVolumeStats: false
+
+# The Node Monitor ensure the node has no stale storage resources attached
+disableNodeMonitor: false
+
+# The number of volumes the CSI controller will publish to an individual node
+maxVolumesPerNode: 100
+
+# Disables host deletion by the CSP when no volumes are associated with the host
+disableHostDeletion: false
+
+# Disable pre-install hooks when the chart is rendered outside of Kubernetes, such as CI/CD systems
+disablePreInstallHooks: false
+
+# imagePullPolicy applied for all hpe-csi-driver images
+imagePullPolicy: "IfNotPresent"
+
+# Cluster wide values for CHAP authentication
+iscsi:
+  chapSecretName: ""
+
+# Log level for all hpe-csi-driver components
+logLevel: "info"
+
+# Kubelet root directory path
+kubeletRootDir: "/var/lib/kubelet"
+
+controller:
+
+  # These values map directly to yaml in the deployment spec, see the kubernetes docs for info
+  labels: {}
+
+  # These values map directly to yaml in the deployment spec, see the kubernetes docs for info
+  nodeSelector: {}
+
+  # These values map directly to yaml in the deployment spec, see the kubernetes docs for info
+  tolerations: []
+
+  affinity: {}
+
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+csp:
+
+  # These values map directly to yaml in the deployment spec, see the kubernetes docs for info
+  labels: {}
+
+  # These values map directly to yaml in the deployment spec, see the kubernetes docs for info
+  nodeSelector: {}
+
+  # These values map directly to yaml in the deployment spec, see the kubernetes docs for info
+  tolerations: []
+
+  affinity: {}
+
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+node:
+
+  # These values map directly to yaml in the deployment spec, see the kubernetes docs for info
+  labels: {}
+
+  # These values map directly to yaml in the deployment spec, see the kubernetes docs for info
+  nodeSelector: {}
+
+  # These values map directly to yaml in the deployment spec, see the kubernetes docs for info
+  tolerations: []
+
+  affinity: {}
+
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# Release images
+images:
+  csiNodeDriver: quay.io/hpestorage/csi-driver:v2.5.2
+  csiControllerDriver: quay.io/hpestorage/csi-driver:v2.5.2
+  nimbleCSP: quay.io/hpestorage/alletra-6000-and-nimble-csp:v2.5.2
+  primera3parCSP: quay.io/hpestorage/alletra-9000-primera-and-3par-csp:v2.5.2
+  nfsProvisioner: quay.io/hpestorage/nfs-provisioner:v3.0.6
+  csiExtensions: quay.io/hpestorage/csi-extensions:v1.2.8
+  csiVolumeGroupProvisioner: quay.io/hpestorage/volume-group-provisioner:v1.0.7
+  csiVolumeGroupSnapshotter: quay.io/hpestorage/volume-group-snapshotter:v1.0.7
+  csiVolumeMutator: quay.io/hpestorage/volume-mutator:v1.3.7
+  csiAttacher: registry.k8s.io/sig-storage/csi-attacher:v4.8.0
+  csiNodeDriverRegistrar: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.13.0
+  csiProvisioner: registry.k8s.io/sig-storage/csi-provisioner:v5.1.0
+  csiResizer: registry.k8s.io/sig-storage/csi-resizer:v1.12.0
+  csiSnapshotter: registry.k8s.io/sig-storage/csi-snapshotter:v8.2.0
+
+
+
