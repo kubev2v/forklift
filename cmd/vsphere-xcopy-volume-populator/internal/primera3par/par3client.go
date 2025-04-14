@@ -6,14 +6,15 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
 	"io"
-	"k8s.io/klog/v2"
 	"log"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
+	"k8s.io/klog/v2"
 )
 
 type Primera3ParClient interface {
