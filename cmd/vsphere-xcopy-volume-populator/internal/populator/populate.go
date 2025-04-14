@@ -51,20 +51,48 @@ func (d *VMDisk) Path() string {
 }
 
 func ParseVmdkPath(vmdkPath string) (VMDisk, error) {
+	if vmdkPath == "" {
+		return VMDisk{}, fmt.Errorf("vmdkPath cannot be empty")
+	}
+
 	parts := strings.SplitN(vmdkPath, "] ", 2)
 	if len(parts) != 2 {
-		return VMDisk{}, fmt.Errorf("Invalid vmdkPath %q, should be '[datastore] vmname/vmname.vmdk'", vmdkPath)
+		return VMDisk{}, fmt.Errorf("invalid vmdkPath %q: missing closing bracket and space after datastore, expected '[datastore] vmname/vmname.vmdk'", vmdkPath)
 	}
+
 	datastore := strings.TrimPrefix(parts[0], "[")
-	pathParts := strings.SplitN(parts[1], "/", 2)
+	if datastore == "" {
+		return VMDisk{}, fmt.Errorf("invalid vmdkPath %q: datastore name cannot be empty", vmdkPath)
+	}
+
+	pathAndFile := parts[1]
+	pathParts := strings.SplitN(pathAndFile, "/", 2)
 
 	if len(pathParts) != 2 {
-		return VMDisk{}, fmt.Errorf("Invalid vmdkPath %q, should be '[datastore] vmname/vmname.vmdk'", vmdkPath)
+		return VMDisk{}, fmt.Errorf("invalid vmdkPath %q: missing slash between vmname directory and vmdk file, expected '[datastore] vmname/vmname.vmdk'", vmdkPath)
 	}
 
-	vmname_dir := pathParts[0]
-	vmdk := pathParts[1]
-	vmdkParts := strings.SplitN(vmdk, ".", 2)
-	vmname_sub := vmdkParts[0]
-	return VMDisk{VMName: vmname_sub, Datastore: datastore, VmdkFile: vmdk, VmnameDir: vmname_dir}, nil
+	vmnameDir := pathParts[0]
+	if vmnameDir == "" {
+		return VMDisk{}, fmt.Errorf("invalid vmdkPath %q: VM directory name cannot be empty", vmdkPath)
+	}
+
+	vmdkFile := pathParts[1]
+	if vmdkFile == "" {
+		return VMDisk{}, fmt.Errorf("invalid vmdkPath %q: VMDK file name cannot be empty", vmdkPath)
+	}
+
+	//vmdkParts := strings.SplitN(vmdkFile, ".", 2)
+	//vmName := vmdkParts[0]
+
+	if !strings.HasSuffix(vmdkFile, ".vmdk") {
+		return VMDisk{}, fmt.Errorf("invalid vmdkPath %q: vmdk file name must end with '.vmdk'", vmdkPath)
+	}
+
+	return VMDisk{
+		VMName:    vmnameDir,
+		Datastore: datastore,
+		VmdkFile:  vmdkFile,
+		VmnameDir: vmnameDir,
+	}, nil
 }
