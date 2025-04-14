@@ -10,9 +10,13 @@ import (
 	"path"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"text/template"
 
+	"k8s.io/klog/v2"
+
+	"github.com/google/uuid"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
@@ -33,7 +37,11 @@ import (
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/utils/ptr"
 	cnv "kubevirt.io/api/core/v1"
@@ -1112,13 +1120,158 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 	return
 }
 
+// FIXME rgolan - the behaviour needs to be per disk hense this method is flawed. Needs a bigger change.
+// For now this method returns true, if there's a mapping (backend by copy-offload-mapping ConfigMap, that
+// maps StoragetClasses to Vsphere data stores
 func (r *Builder) SupportsVolumePopulators() bool {
+	if !settings.Settings.Features.CopyOffload || r.Plan.Spec.Warm {
+		return false
+	}
+	dsMapIn := r.Context.Map.Storage.Spec.Map
+	for _, m := range dsMapIn {
+		ref := m.Source
+		ds := &model.Datastore{}
+		err := r.Source.Inventory.Find(ds, ref)
+		if err != nil {
+			klog.Errorf("failed to get datastore to detect volume populators support: %s", err)
+			return false
+		}
+
+		if m.OffloadPlugin != nil && m.OffloadPlugin.VSphereXcopyPluginConfig != nil {
+			klog.V(2).Infof("found offload plugin: config %+v on ds map  %+v", m.OffloadPlugin.VSphereXcopyPluginConfig, dsMapIn)
+			return true
+
+		}
+	}
 	return false
 }
 
+// PopulatorVolumes creates PVC in case the their are needed for the disks
+// in context, and according to the offload plugin configuration in the StorageMap
 func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) (pvcs []*core.PersistentVolumeClaim, err error) {
-	err = planbase.VolumePopulatorNotSupportedError
-	return
+	vm := &model.VM{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vmRef.String())
+		return
+	}
+
+	dsMapIn := r.Context.Map.Storage.Spec.Map
+	for i := range dsMapIn {
+		mapped := &dsMapIn[i]
+		ref := mapped.Source
+		ds := &model.Datastore{}
+		fErr := r.Source.Inventory.Find(ds, ref)
+		if fErr != nil {
+			err = fErr
+			return
+		}
+
+		pvblock := core.PersistentVolumeBlock
+		for _, disk := range vm.Disks {
+			if disk.Datastore.ID == ds.ID {
+				storageClass := mapped.Destination.StorageClass
+
+				r.Log.Info(fmt.Sprintf("getting storage mapping by storage class %q and datastore %v datastore name %s datastore", storageClass, disk.Datastore, disk.Datastore))
+				vsphereInstance := r.Context.Plan.Provider.Source.GetName()
+				storageVendorProduct := mapped.OffloadPlugin.VSphereXcopyPluginConfig.StorageVendorProduct
+				storageVendorSecretRef := mapped.OffloadPlugin.VSphereXcopyPluginConfig.SecretRef
+
+				r.Log.Info(fmt.Sprintf("vsphere provider %v storage vendor product %v storage secret name %v ", vsphereInstance, storageVendorProduct, storageVendorSecretRef))
+
+				if vsphereInstance == "" || storageVendorProduct == "" || storageVendorSecretRef == "" {
+					return nil, fmt.Errorf(
+						"The offload pluging configuration has missing details. Can't continue with PVC and populator resources creation.")
+				}
+
+				namespace := r.Plan.Spec.TargetNamespace
+				// pvs names needs to be less than 63, this leaves 53 chars
+				// for the plan and vm name (2 dashes and 8 chars uuid)
+				commonName := fmt.Sprintf("%s-%s-%s", r.Plan.Name, vm.Name, uuid.New().String()[:8])
+				labels := map[string]string{
+					"migration": string(r.Migration.UID),
+					// we need uniqness and a value which is less than 64 chars, hence using vmRef.id + disk.key
+					"vmdkKey": fmt.Sprint(disk.Key),
+					"vmID":    vmRef.ID,
+				}
+				r.Log.Info("target namespace for migration", "namespace", namespace)
+				pvc := core.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        commonName,
+						Namespace:   namespace,
+						Labels:      labels,
+						Annotations: annotations,
+					},
+					Spec: core.PersistentVolumeClaimSpec{
+						AccessModes:      []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+						StorageClassName: &storageClass,
+						VolumeMode:       &pvblock,
+						Resources: core.ResourceRequirements{
+							Requests: core.ResourceList{
+								core.ResourceStorage: *resource.NewQuantity(disk.Capacity, resource.BinarySI),
+							},
+						},
+						DataSourceRef: &core.TypedObjectReference{
+							APIGroup: &api.SchemeGroupVersion.Group,
+							Kind:     api.VSphereXcopyVolumePopulatorKind,
+							Name:     commonName,
+						},
+					},
+				}
+
+				if annotations == nil {
+					pvc.Annotations = make(map[string]string)
+				} else {
+					pvc.Annotations = annotations
+				}
+				pvc.Annotations[planbase.AnnDiskSource] = baseVolume(disk.File, false)
+				pvc.Annotations["copy-offload"] = baseVolume(disk.File, false)
+				pvcs = append(pvcs, &pvc)
+
+				vp := api.VSphereXcopyVolumePopulator{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      commonName,
+						Namespace: namespace,
+						Labels:    labels,
+					},
+					Spec: api.VSphereXcopyVolumePopulatorSpec{
+						VmdkPath:             disk.File,
+						SecretName:           secretName,
+						StorageVendorProduct: string(storageVendorProduct),
+					},
+				}
+
+				// Ensure a Secret combining Vsphere and Storage secrets
+				err = r.mergeSecrets(secretName, namespace, storageVendorSecretRef, r.Source.Provider.Namespace)
+				if err != nil {
+					return nil, fmt.Errorf("failed to merge secrets for popoulators %w", err)
+				}
+				// TODO should we handle if already exists due to re-entry? if the former
+				// reconcile was successful in creating the pvc but failed after that, e.g when
+				// creating the volumepopulator resouce failed
+				r.Log.Info("Creating pvc", "pvc", pvc)
+				err = r.Destination.Client.Create(context.TODO(), &pvc, &client.CreateOptions{})
+				if err != nil {
+					// ignore if already exists?
+					return nil, err
+				}
+
+				r.Log.Info("Ensuring a populator service account")
+				err := r.ensurePopulatorServiceAccount(namespace)
+				if err != nil {
+					return nil, err
+				}
+				r.Log.Info("Creating the populator resource", "VSphereXcopyVolumePopulator", vp)
+				err = r.Destination.Client.Create(context.TODO(), &vp, &client.CreateOptions{})
+				if err != nil {
+					return nil, err
+				}
+
+			}
+		}
+	}
+
+	return pvcs, nil
 }
 
 func (r *Builder) PrePopulateActions(c planbase.Client, vmRef ref.Ref) (ready bool, err error) {
@@ -1126,9 +1279,54 @@ func (r *Builder) PrePopulateActions(c planbase.Client, vmRef ref.Ref) (ready bo
 	return
 }
 
-func (r *Builder) PopulatorTransferredBytes(persistentVolumeClaim *core.PersistentVolumeClaim) (transferredBytes int64, err error) {
-	err = planbase.VolumePopulatorNotSupportedError
+func (r *Builder) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (transferredBytes int64, err error) {
+	vmdkKey := pvc.Labels["vmdkKey"]
+	vmId := pvc.Labels["vmID"]
+	populatorCr, err := r.getVolumePopulator(vmId, vmdkKey)
+	if err != nil {
+		return
+	}
+
+	progressPercentage, err := strconv.ParseInt(populatorCr.Status.Progress, 10, 64)
+	if err != nil {
+		r.Log.Error(err, "Couldn't parse the progress percentage.", "pvcName", pvc.Name, "progressPercentage", progressPercentage)
+		transferredBytes = 0
+		err = nil
+		return
+	}
+
+	pvcSize := pvc.Spec.Resources.Requests["storage"]
+	transferredBytes = (progressPercentage * pvcSize.Value()) / 100
+
 	return
+}
+
+func (r *Builder) getVolumePopulator(vmId, vmdkKey string) (api.VSphereXcopyVolumePopulator, error) {
+	list := api.VSphereXcopyVolumePopulatorList{}
+	err := r.Destination.Client.List(context.TODO(), &list, &client.ListOptions{
+		Namespace: r.Plan.Spec.TargetNamespace,
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			"migration": string(r.Migration.UID),
+			"vmdkKey":   vmdkKey,
+			"vmID":      vmId,
+		}),
+	})
+	if err != nil {
+		return api.VSphereXcopyVolumePopulator{}, liberr.Wrap(err)
+	}
+	if len(list.Items) == 0 {
+		return api.VSphereXcopyVolumePopulator{},
+			k8serr.NewNotFound(
+				api.SchemeGroupVersion.WithResource("VSphereXcopyVolumePopulator").GroupResource(), vmdkKey)
+	}
+	if len(list.Items) > 1 {
+		return api.VSphereXcopyVolumePopulator{},
+			liberr.New(
+				"Multiple VSphereXcopyVolumePopulator CRs found for the same VMDK disk (with special chars replaced with _)",
+				"vmdkKey",
+				vmdkKey)
+	}
+	return list.Items[0], nil
 }
 
 func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) (err error) {
@@ -1137,7 +1335,8 @@ func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.Persi
 }
 
 func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error) {
-	err = planbase.VolumePopulatorNotSupportedError
+	// copy-offload only
+	taskName, _ = pvc.Annotations[planbase.AnnDiskSource]
 	return
 }
 
@@ -1276,4 +1475,115 @@ func (r *Builder) getNetworkNameTemplate(vm *model.VM) string {
 	}
 
 	return ""
+}
+
+// MergeSecrets merges the storage vendor secret into the migration secret
+func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendorSecret, storageVendorSecretNS string) error {
+	dst := &core.Secret{}
+	if err := r.Destination.Get(context.Background(), client.ObjectKey{
+		Name:      migrationSecret,
+		Namespace: migrationSecretNS}, dst); err != nil {
+		return fmt.Errorf("failed to get migration secret: %w", err)
+	}
+
+	src := &core.Secret{}
+	if err := r.Destination.Get(context.Background(), client.ObjectKey{
+		Name:      storageVendorSecret,
+		Namespace: storageVendorSecretNS},
+		src); err != nil {
+		return fmt.Errorf("failed to get storage secret: %w", err)
+	}
+
+	// Merge the data from storage secret into migration secret
+	if dst.Data == nil {
+		dst.Data = make(map[string][]byte)
+	}
+	for key, value := range src.Data {
+		if _, exists := dst.Data[key]; exists {
+			r.Log.Info(fmt.Sprintf("secret key %s is going to be overriden in secret %s", key, dst.Name))
+		}
+		dst.Data[key] = value
+	}
+
+	// copy the keys into the keys the populator needs
+	for key, value := range dst.Data {
+		switch key {
+		case "url":
+			h, err := liburl.Parse(string(value))
+			if err != nil {
+				// ignore and try to use as is
+				dst.Data["GOVMOMI_HOSTNAME"] = value
+			}
+			dst.Data["GOVMOMI_HOSTNAME"] = []byte(h.Hostname())
+		case "user":
+			dst.Data["GOVMOMI_USERNAME"] = value
+		case "password":
+			dst.Data["GOVMOMI_PASSWORD"] = value
+		case "insecureSkipVerify":
+			dst.Data["GOVMOMI_INSECURE"] = value
+		}
+	}
+	// Update secret1 with the merged data.
+	if err := r.Destination.Update(context.Background(), dst); err != nil {
+		return fmt.Errorf("failed to update secret1: %w", err)
+	}
+
+	return nil
+}
+
+func (r *Builder) ensurePopulatorServiceAccount(namespace string) error {
+	r.Log.Info("Ensuring a ServiceAccount for the volume-populator SA")
+	sa := core.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "populator",
+			Namespace: namespace,
+		},
+	}
+	err := r.Destination.Client.Create(context.TODO(), &sa, &client.CreateOptions{})
+	if err != nil && !k8serr.IsAlreadyExists(err) {
+		return err
+	}
+	role := rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "populator-pvc-reader",
+			Namespace: namespace,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{""},
+				Resources: []string{"persistentvolumeclaims"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+		},
+	}
+	err = r.Destination.Client.Create(context.TODO(), &role, &client.CreateOptions{})
+	if err != nil && !k8serr.IsAlreadyExists(err) {
+		return err
+	}
+
+	// Create the RoleBinding to bind the ServiceAccount to the ClusterRole
+	binding := rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "populator-pvc-reader-binding",
+			Namespace: namespace,
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      "populator",
+				Namespace: namespace,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			Kind:     "Role",
+			Name:     "populator-pvc-reader",
+			APIGroup: "rbac.authorization.k8s.io",
+		},
+	}
+
+	err = r.Destination.Client.Create(context.TODO(), &binding, &client.CreateOptions{})
+	if err != nil && !k8serr.IsAlreadyExists(err) {
+		return err
+	}
+	return nil
 }
