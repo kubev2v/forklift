@@ -808,6 +808,7 @@ func (r *KubeVirt) getPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, e
 			}),
 		},
 	)
+
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -1838,7 +1839,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 		err = vErr
 		return
 	}
-	if useV2vForTransfer {
+	if useV2vForTransfer && !r.IsCopyOffload(pvcs) {
 		// mount the secret for the password and CA certificate
 		volumes = append(volumes, core.Volume{
 			Name: "secret-volume",
@@ -1908,6 +1909,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 				Value: vm.NewName,
 			})
 	}
+
 	environment = append(environment,
 		core.EnvVar{
 			Name:  "LOCAL_MIGRATION",
@@ -2961,4 +2963,20 @@ func (r *KubeVirt) loadHosts() (hosts map[string]*api.Host, err error) {
 	hosts = hostMap
 
 	return
+}
+
+// IsCopyOffload is determined by PVC having the copy-offload label, which is
+// set by the builder earlier in #PopulatorVolumes
+// TODO rgolan - for now the check will be done if any PVC match in the migration - this is obviously coarse
+// and should be per a disk's storage class, for example a disk from NFS or local doesn't support that
+// (specifically referring to vmkfstools xcopy for RDM)
+func (r *KubeVirt) IsCopyOffload(pvcs []*core.PersistentVolumeClaim) bool {
+	for _, p := range pvcs {
+		for a := range p.Annotations {
+			if a == "copy-offload" {
+				return true
+			}
+		}
+	}
+	return false
 }
