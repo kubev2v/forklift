@@ -1,0 +1,9 @@
+apiVersion: forklift.konveyor.io/v1beta1
+kind: VSphereXcopyVolumePopulator
+metadata:
+  name: test-xcopy
+  namespace: ${.POD_NAMESPACE}
+spec:
+  secretName: populator-secret
+  storageVendorProduct: ${.STORAGE_VENDOR}
+  vmdkPath: "${.VMDK_PATH}"

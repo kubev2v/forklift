@@ -7,12 +7,12 @@ pushd "$SCRIPT_DIR"
 
 CUSTOM_VIB_TEMP_DIR=/tmp/vib-temp-rgo
 CUSTOM_VIB_NAME=vmkfstools-wrapper
-CUSTOM_VIB_VERSION="0.0.86"
+CUSTOM_VIB_VERSION="0.0.49"
 CUSTOM_VIB_VENDOR="REDHAT"
 CUSTOM_VIB_VENDOR_URL="https://redhat.com"
 CUSTOM_VIB_SUMMARY="Custom VIB to wrap vmkfstools as esxcli plugin"
 CUSTOM_VIB_DESCRIPTION="Custom VIB to wrap vmkfstools as esxcli plugin"
-CUSTOM_VIB_BUILD_DATE=$(date --utc '+%Y-%m-%dT%H:%I:%S')
+CUSTOM_VIB_BUILD_DATE=$(date '+%Y-%m-%dT%H:%I:%S')
 
 # clean up any prior builds
 CUSTOM_VIB_FILE_NAME=${CUSTOM_VIB_NAME}.vib
