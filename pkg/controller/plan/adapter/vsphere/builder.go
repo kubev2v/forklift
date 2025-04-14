@@ -1,7 +1,6 @@
 package vsphere
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -11,7 +10,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"text/template"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
@@ -30,6 +28,7 @@ import (
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
 	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 	"github.com/konveyor/forklift-controller/pkg/settings"
+	"github.com/konveyor/forklift-controller/pkg/templateutil"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
@@ -1228,21 +1227,7 @@ func (r *Builder) getPlanVMStatus(vm *model.VM) *plan.VMStatus {
 }
 
 func (r *Builder) executeTemplate(templateText string, templateData any) (string, error) {
-	var buf bytes.Buffer
-
-	// Parse template syntax
-	tmpl, err := template.New("template").Parse(templateText)
-	if err != nil {
-		return "", err
-	}
-
-	// Execute template
-	err = tmpl.Execute(&buf, templateData)
-	if err != nil {
-		return "", err
-	}
-
-	return buf.String(), nil
+	return templateutil.ExecuteTemplate(templateText, templateData)
 }
 
 // GetPVCNameTemplate returns the PVC name template
