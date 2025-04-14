@@ -1839,7 +1839,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 		err = vErr
 		return
 	}
-	if useV2vForTransfer && !r.IsCopyOffload(pvcs){
+	if useV2vForTransfer && !r.IsCopyOffload(pvcs) {
 		// mount the secret for the password and CA certificate
 		volumes = append(volumes, core.Volume{
 			Name: "secret-volume",

@@ -107,7 +107,7 @@ spec:
 {% endif %}
         - name: BLOCK_OVERHEAD
           value: "{{ controller_block_overhead }}"
-{% if feature_copy_offload|bool %}
+{% if controller_vsphere_incremental_backup|bool %}
         - name: FEATURE_VSPHERE_INCREMENTAL_BACKUP
           value: "true"
 {% endif %}
