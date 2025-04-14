@@ -1551,7 +1551,7 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 	}
 
 	src := &core.Secret{}
-	if err := r.Get(context.Background(), client.ObjectKey{
+	if err := r.Destination.Get(context.Background(), client.ObjectKey{
 		Name:      storageVendorSecret,
 		Namespace: storageVendorSecretNS},
 		src); err != nil {
