@@ -1,7 +1,6 @@
 package plan
 
 import (
-	"bytes"
 	"context"
 	"crypto/md5"
 	"encoding/hex"
@@ -11,7 +10,6 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"text/template"
 
 	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
@@ -25,6 +23,7 @@ import (
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 	"github.com/konveyor/forklift-controller/pkg/settings"
+	"github.com/konveyor/forklift-controller/pkg/templateutil"
 	batchv1 "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
@@ -1380,18 +1379,11 @@ func (r *Reconciler) checkOCPVersion(clientset kubernetes.Interface) error {
 }
 
 func (r *Reconciler) IsValidTemplate(templateStr string, testData interface{}) (string, error) {
-	// Validate golang template syntax
-	tmpl, err := template.New("template").Parse(templateStr)
-	if err != nil {
-		return "", liberr.Wrap(err, "Invalid template syntax")
-	}
-
-	var buf bytes.Buffer
-	err = tmpl.Execute(&buf, testData)
+	// Execute the template with test data
+	result, err := templateutil.ExecuteTemplate(templateStr, testData)
 	if err != nil {
 		return "", liberr.Wrap(err, "Template execution failed")
 	}
-	result := buf.String()
 
 	// Empty output is not valid
 	if result == "" {
