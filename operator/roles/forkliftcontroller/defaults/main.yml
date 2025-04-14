@@ -6,6 +6,7 @@ app_namespace: "{{ lookup( 'env', 'WATCH_NAMESPACE') or 'konveyor-forklift' }}"
 feature_ui_plugin: true
 feature_validation: true
 feature_volume_populator: true
+feature_copy_offload: false
 
 k8s_cluster: false
 feature_auth_required: true
