@@ -236,6 +236,13 @@ func (r *Reconciler) validateSecret(host *api.Host) (err error) {
 				"user",
 				"password",
 			}
+
+			err := r.VerifyTLSConnection(host.Spec.IpAddress, secret)
+			if err != nil {
+				cnd.Message = err.Error()
+				cnd.Reason = DataErr
+				host.Status.SetCondition(cnd)
+			}
 		}
 	}
 	for _, key := range keyList {
