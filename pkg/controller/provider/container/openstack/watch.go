@@ -40,6 +40,8 @@ const (
 	MaxBatch = 1024
 	// Transaction label.
 	ValidationLabel = "VM-validated"
+	// Forced concern label for the validation task.
+	ForcedConcern = "Forced concern"
 )
 
 // Endpoints.
@@ -299,10 +301,17 @@ func (r *VMEventHandler) validated(batch []*policy.Task) {
 		_ = tx.End()
 	}()
 	for _, task := range batch {
+		forceConcern := false
+
 		if task.Error != nil {
 			r.log.Error(
 				task.Error, "VM validation failed.")
-			continue
+
+			if task.Concerns[0].Label == ForcedConcern {
+				forceConcern = true
+			} else {
+				continue
+			}
 		}
 		latest := &model.VM{Base: model.Base{ID: task.Ref.ID}}
 		err = tx.Get(latest)
@@ -325,14 +334,16 @@ func (r *VMEventHandler) validated(batch []*policy.Task) {
 			r.log.Error(err, "VM update failed.")
 			continue
 		}
-		r.log.V(3).Info(
-			"VM validated.",
-			"ID",
-			latest.ID,
-			"revision",
-			latest.Revision,
-			"duration",
-			task.Duration())
+		if !forceConcern && task.Error == nil {
+			r.log.V(3).Info(
+				"VM validated.",
+				"vmID",
+				latest.ID,
+				"revision",
+				latest.Revision,
+				"duration",
+				task.Duration())
+		}
 	}
 	err = tx.Commit()
 	if err != nil {
