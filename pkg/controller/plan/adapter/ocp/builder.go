@@ -33,8 +33,9 @@ import (
 
 // Network types
 const (
-	Pod    = "pod"
-	Multus = "multus"
+	Pod     = "pod"
+	Multus  = "multus"
+	Ignored = "ignored"
 )
 
 type Builder struct {
@@ -489,11 +490,44 @@ func (r *Builder) mapNetworks(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.Vi
 				r.Log.Info("Network not found", "namespace", namespace, "name", name)
 				continue
 			}
+
+			// Check if the network should be ignored
+			if pair.Destination.Type == Ignored {
+				r.Log.Info("Network is ignored", "namespace", namespace, "name", name)
+				continue
+			}
+
+			// Check if the network is mapped to the pod network
+			if pair.Destination.Type == Pod {
+				targetNetwork.Pod = &cnv.PodNetwork{}
+				continue
+			}
+
 			targetNetwork.Multus = &cnv.MultusNetwork{
 				NetworkName: fmt.Sprintf("%s/%s", pair.Destination.Namespace, pair.Destination.Name),
 			}
 
 		case network.Pod != nil:
+			pair, found := r.Map.Network.FindNetworkByType(Pod)
+			if !found {
+				r.Log.Info("Network not found", "type", Pod)
+				continue
+			}
+
+			// Check if the network should be ignored
+			if pair.Destination.Type == Ignored {
+				r.Log.Info("Network is ignored", "type", Pod)
+				continue
+			}
+
+			// Check if the network is mapped to a multus network
+			if pair.Destination.Type == Multus {
+				targetNetwork.Multus = &cnv.MultusNetwork{
+					NetworkName: fmt.Sprintf("%s/%s", pair.Destination.Namespace, pair.Destination.Name),
+				}
+				continue
+			}
+
 			targetNetwork.Pod = &cnv.PodNetwork{}
 		default:
 			r.Log.Error(nil, "Unknown network type")
