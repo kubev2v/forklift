@@ -14,9 +14,8 @@ import (
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
-	"github.com/konveyor/forklift-controller/pkg/lib/util"
 	core "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -203,7 +202,7 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 		Name:      ref.Name,
 	}
 	err = r.Get(context.TODO(), key, secret)
-	if errors.IsNotFound(err) {
+	if k8serrors.IsNotFound(err) {
 		err = nil
 		newCnd.Reason = NotFound
 		provider.Status.Phase = ValidationFailed
@@ -234,33 +233,15 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 			})
 		}
 
-		url, _ := url.Parse(provider.Spec.URL)
-		if crt, err := util.GetTlsCertificate(url, secret); err == nil {
-			provider.Status.Fingerprint = util.Fingerprint(crt)
-		} else {
-			// When user specified they want to skip ceritificate verification we want to just
-			// inform the customer about failed connection and not about certificate.
-			// The reason behind this is that the GetTlsCertificate is our first attempt to connect
-			// to the provider and when connection fails, the customer will still get the cert
-			// error even when they don't care about certificates.
-			if vsphere.GetInsecureSkipVerifyFlag(secret) {
-				log.Error(err, "failed to connect to provider", "url", provider.Spec.URL)
-				provider.Status.SetCondition(libcnd.Condition{
-					Type:     ConnectionTestFailed,
-					Status:   True,
-					Reason:   Tested,
-					Category: Critical,
-				})
-			} else {
-				log.Error(err, "failed to get TLS certificate", "url", provider.Spec.URL)
-				provider.Status.SetCondition(libcnd.Condition{
-					Type:     ConnectionTestFailed,
-					Status:   True,
-					Reason:   Tested,
-					Category: Critical,
-					Message:  "TLS certificate cannot be retrieved",
-				})
-			}
+		err := r.VerifyTLSConnection(provider.Spec.URL, secret)
+		if err != nil {
+			provider.Status.SetCondition(libcnd.Condition{
+				Type:     ConnectionTestFailed,
+				Status:   True,
+				Reason:   Tested,
+				Category: Critical,
+				Message:  err.Error(),
+			})
 		}
 	case api.OVirt:
 		keyList = []string{
