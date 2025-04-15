@@ -2,7 +2,10 @@ package provider
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -235,8 +238,34 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 		}
 
 		url, _ := url.Parse(provider.Spec.URL)
-		if crt, err := util.GetTlsCertificate(url, secret); err == nil {
-			provider.Status.Fingerprint = util.Fingerprint(crt)
+		if cert, err := util.GetTlsCertificate(url, secret); err == nil {
+			provider.Status.Fingerprint = util.Fingerprint(cert)
+
+			tlsConfig := &tls.Config{
+				RootCAs: x509.NewCertPool(),
+			}
+
+			// Add the server certificate to the certificate pool
+			tlsConfig.RootCAs.AddCert(cert)
+
+			// We want to confirm that url.Host does not already include a port to avoid duplication
+			host := url.Host
+			if _, _, err := net.SplitHostPort(url.Host); err != nil {
+				host = url.Host + ":443" // Default to HTTPS port if not provided
+			}
+			// Dial the server with TLS and verify the connection
+			conn, err := tls.Dial("tcp", host, tlsConfig)
+			if err != nil {
+				log.Error(err, "Failed to create a secure connection to server")
+				provider.Status.SetCondition(libcnd.Condition{
+					Type:     ConnectionTestFailed,
+					Status:   True,
+					Reason:   Tested,
+					Category: Critical,
+				})
+			}
+			defer conn.Close()
+
 		} else {
 			// When user specified they want to skip ceritificate verification we want to just
 			// inform the customer about failed connection and not about certificate.
