@@ -62,6 +62,8 @@ type Context struct {
 	Hooks []*api.Hook
 	// Logger.
 	Log logging.LevelLogger
+	// Labeler.
+	Labeler Labeler
 }
 
 // Build.
@@ -87,6 +89,7 @@ func (r *Context) build() (err error) {
 		return
 	}
 	r.Hooks = r.Plan.Hooks
+	r.Labeler = Labeler{r}
 
 	return
 }
