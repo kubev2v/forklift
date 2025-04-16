@@ -3,7 +3,7 @@ package openstack
 import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
-	"github.com/kubev2v/forklift/pkg/controller/provider/web"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/openstack"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -11,34 +11,27 @@ import (
 
 // Validator
 type Validator struct {
-	plan      *api.Plan
-	inventory web.Client
-}
-
-// Load.
-func (r *Validator) Load() (err error) {
-	r.inventory, err = web.NewClient(r.plan.Referenced.Provider.Source)
-	return
+	*plancontext.Context
 }
 
 func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
-	if r.plan.Referenced.Map.Storage == nil {
+	if r.Plan.Referenced.Map.Storage == nil {
 		return
 	}
 	vm := &model.Workload{}
-	err = r.inventory.Find(vm, vmRef)
+	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
 		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
 	for _, volType := range vm.VolumeTypes {
-		if !r.plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{ID: volType.ID}) {
+		if !r.Plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{ID: volType.ID}) {
 			return
 		}
 	}
 
 	// If vm is image based, we need to see glance in the storage map
-	if vm.ImageID != "" && !r.plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{Name: api.GlanceSource}) {
+	if vm.ImageID != "" && !r.Plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{Name: api.GlanceSource}) {
 		return
 	}
 
@@ -48,17 +41,17 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 
 // Validate that a VM's networks have been mapped.
 func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
-	if r.plan.Referenced.Map.Network == nil {
+	if r.Plan.Referenced.Map.Network == nil {
 		return
 	}
 	vm := &model.Workload{}
-	err = r.inventory.Find(vm, vmRef)
+	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
 		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
 	for _, network := range vm.Networks {
-		if !r.plan.Referenced.Map.Network.Status.Refs.Find(ref.Ref{ID: network.ID}) {
+		if !r.Plan.Referenced.Map.Network.Status.Refs.Find(ref.Ref{ID: network.ID}) {
 			return
 		}
 	}
@@ -84,19 +77,30 @@ func (r *Validator) WarmMigration() (ok bool) {
 	return
 }
 
+// MigrationType indicates whether the plan's migration type
+// is supported by this provider.
+func (r *Validator) MigrationType() bool {
+	switch r.Plan.Spec.Type {
+	case api.MigrationCold, "":
+		return true
+	default:
+		return false
+	}
+}
+
 // Validate that no more than one of a VM's networks is mapped to the pod network.
 func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
-	if r.plan.Referenced.Map.Network == nil {
+	if r.Plan.Referenced.Map.Network == nil {
 		return
 	}
 	vm := &model.Workload{}
-	err = r.inventory.Find(vm, vmRef)
+	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
 		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
 
-	mapping := r.plan.Referenced.Map.Network.Spec.Map
+	mapping := r.Plan.Referenced.Map.Network.Spec.Map
 	podMapped := 0
 	for i := range mapping {
 		mapped := &mapping[i]
@@ -126,4 +130,14 @@ func (r *Validator) StaticIPs(vmRef ref.Ref) (bool, error) {
 // NO-OP
 func (r *Validator) ChangeTrackingEnabled(vmRef ref.Ref) (bool, error) {
 	return true, nil
+}
+
+func (r *Validator) PowerState(vmRef ref.Ref) (ok bool, err error) {
+	ok = true
+	return
+}
+
+func (r *Validator) VMMigrationType(vmRef ref.Ref) (ok bool, err error) {
+	ok = true
+	return
 }

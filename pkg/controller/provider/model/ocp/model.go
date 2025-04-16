@@ -177,3 +177,14 @@ func (m *DataVolume) With(dv *cdi.DataVolume) {
 	m.Base.With(dv)
 	m.Object = *dv
 }
+
+// KubeVirt
+type KubeVirt struct {
+	Base
+	Object cnv.KubeVirt `sql:""`
+}
+
+func (m *KubeVirt) With(kv *cnv.KubeVirt) {
+	m.Base.With(kv)
+	m.Object = *kv
+}

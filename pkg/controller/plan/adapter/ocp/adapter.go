@@ -29,19 +29,18 @@ func (r *Adapter) Builder(ctx *plancontext.Context) (builder base.Builder, err e
 }
 
 // Constructs a openshift validator.
-func (r *Adapter) Validator(plan *api.Plan) (validator base.Validator, err error) {
-	sourceClient, err := createClient(plan.Provider.Source)
+func (r *Adapter) Validator(ctx *plancontext.Context) (validator base.Validator, err error) {
+	log := logging.WithName("validator|ocp").WithValues(
+		"plan",
+		path.Join(
+			ctx.Plan.GetNamespace(),
+			ctx.Plan.GetName()))
+	sourceClient, err := createClient(ctx.Source.Provider)
 	if err != nil {
 		return
 	}
 
-	log := logging.WithName("validator|ocp").WithValues(
-		"plan",
-		path.Join(
-			plan.GetNamespace(),
-			plan.GetName()))
-
-	validator = &Validator{plan: plan, sourceClient: sourceClient, log: log}
+	validator = &Validator{log: log, Context: ctx, sourceClient: sourceClient}
 	return
 }
 

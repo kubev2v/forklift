@@ -84,6 +84,14 @@ rules:
   - patch
   - delete
 - apiGroups:
+  - kubevirt.io
+  resources:
+  - kubevirts
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - cdi.kubevirt.io
   resources:
   - datavolumes
@@ -138,14 +146,25 @@ rules:
 - apiGroups:
   - instancetype.kubevirt.io
   resources:
-  - virtualmachinepreferences
   - virtualmachineclusterpreferences
-  - virtualmachineinstancetypes
   - virtualmachineclusterinstancetypes
   verbs:
   - get
   - list
   - watch
+- apiGroups:
+  - instancetype.kubevirt.io
+  resources:
+  - virtualmachinepreferences
+  - virtualmachineinstancetypes
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
 - apiGroups:
   - ""
   resources:
