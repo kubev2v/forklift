@@ -58,6 +58,20 @@ func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) libcontain
 					path.Join(
 						provider.GetNamespace(),
 						provider.GetName())),
+			},
+			&PersistentVolumeClaim{
+				log: logging.WithName("collection|persistentvolumeclaim").WithValues(
+					"provider",
+					path.Join(
+						provider.GetNamespace(),
+						provider.GetName())),
+			},
+			&DataVolume{
+				log: logging.WithName("collection|datavolume").WithValues(
+					"provider",
+					path.Join(
+						provider.GetNamespace(),
+						provider.GetName())),
 			}),
 	}
 }
