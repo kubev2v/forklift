@@ -1,7 +1,6 @@
 package base
 
 import (
-	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
@@ -55,7 +54,7 @@ type Adapter interface {
 	// Construct VM client.
 	Client(ctx *plancontext.Context) (Client, error)
 	// Construct validator.
-	Validator(plan *api.Plan) (Validator, error)
+	Validator(ctx *plancontext.Context) (Validator, error)
 	// Construct DestinationClient.
 	DestinationClient(ctx *plancontext.Context) (DestinationClient, error)
 }
@@ -146,6 +145,8 @@ type Validator interface {
 	MaintenanceMode(vmRef ref.Ref) (bool, error)
 	// Validate whether warm migration is supported from this provider type.
 	WarmMigration() bool
+	// Validate whether the migration type is supported by this provider.
+	MigrationType() bool
 	// Validate that no more than one of a VM's networks is mapped to the pod network.
 	PodNetwork(vmRef ref.Ref) (bool, error)
 	// Validate that we have information about static IPs for every virtual NIC
@@ -154,6 +155,10 @@ type Validator interface {
 	SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, msg string, category string, err error)
 	// Validate that the vm has the change tracking enabled
 	ChangeTrackingEnabled(vmRef ref.Ref) (bool, error)
+	// Validate that the VM power state is compatible with the migration type.
+	PowerState(vmRef ref.Ref) (bool, error)
+	// Validate that the VM is inherently compatible with the migration type.
+	VMMigrationType(vmRef ref.Ref) (bool, error)
 }
 
 // DestinationClient API.

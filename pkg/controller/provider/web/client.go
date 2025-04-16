@@ -15,6 +15,9 @@ import (
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 )
 
+// Common parameters
+const DetailParam = base.DetailParam
+
 // Resource kind cannot be resolved.
 type ProviderNotSupportedError struct {
 	*api.Provider

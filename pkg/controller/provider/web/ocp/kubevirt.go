@@ -7,33 +7,30 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
-	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+	cnv "kubevirt.io/api/core/v1"
 )
 
 // Routes.
 const (
-	DataVolumeParam = "dv"
-	DataVolumesRoot = ProviderRoot + "/datavolumes"
-	DataVolumeRoot  = DataVolumesRoot + "/:" + DataVolumeParam
+	KubeVirtParam = "kubevirt"
+	KubeVirtsRoot = ProviderRoot + "/kubevirts"
+	KubeVirtRoot  = KubeVirtsRoot + "/:" + KubeVirtParam
 )
 
-// DataVolume handler.
-type DataVolumeHandler struct {
+// KubeVirt handler.
+type KubeVirtHandler struct {
 	Handler
 }
 
 // Add routes to the `gin` router.
-func (h *DataVolumeHandler) AddRoutes(e *gin.Engine) {
-	e.GET(DataVolumesRoot, h.List)
-	e.GET(DataVolumesRoot+"/", h.List)
-	e.GET(DataVolumeRoot, h.Get)
+func (h *KubeVirtHandler) AddRoutes(e *gin.Engine) {
+	e.GET(KubeVirtsRoot, h.List)
+	e.GET(KubeVirtsRoot+"/", h.List)
+	e.GET(KubeVirtRoot, h.Get)
 }
 
 // List resources in a REST collection.
-// A GET onn the collection that includes the `X-Watch`
-// header will negotiate an upgrade of the connection
-// to a websocket and push watch events.
-func (h DataVolumeHandler) List(ctx *gin.Context) {
+func (h KubeVirtHandler) List(ctx *gin.Context) {
 	status, err := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
@@ -44,44 +41,52 @@ func (h DataVolumeHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusNotImplemented)
 		return
 	}
-	dvs, err := h.DataVolumes(ctx, h.Provider)
+	kvs, err := h.KubeVirts(ctx, h.Provider)
 	if err != nil {
-		log.Trace(err, "url", ctx.Request.URL)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
 
 	content := []interface{}{}
-	for _, m := range dvs {
-		r := &DataVolume{}
+	for _, m := range kvs {
+		r := &KubeVirt{}
 		r.With(&m)
 		r.Link(h.Provider)
 		content = append(content, r.Content(h.Detail))
 	}
+	h.Page.Slice(&content)
 
 	ctx.JSON(http.StatusOK, content)
 }
 
 // Get a specific REST resource.
-func (h DataVolumeHandler) Get(ctx *gin.Context) {
+func (h KubeVirtHandler) Get(ctx *gin.Context) {
 	status, err := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
 		base.SetForkliftError(ctx, err)
 		return
 	}
-	dvs, err := h.DataVolumes(ctx, h.Provider)
+	kvs, err := h.KubeVirts(ctx, h.Provider)
 	if err != nil {
-		log.Trace(err, "url", ctx.Request.URL)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	for _, m := range dvs {
-		if m.UID == ctx.Param(DataVolumeParam) {
-			r := &DataVolume{}
+	for _, m := range kvs {
+		if ctx.Param(KubeVirtParam) == m.UID {
+			r := &KubeVirt{}
 			r.With(&m)
 			r.Link(h.Provider)
 			content := r.Content(model.MaxDetail)
+
 			ctx.JSON(http.StatusOK, content)
 			return
 		}
@@ -90,29 +95,29 @@ func (h DataVolumeHandler) Get(ctx *gin.Context) {
 }
 
 // REST Resource.
-type DataVolume struct {
+type KubeVirt struct {
 	Resource
-	Object cdi.DataVolume `json:"object"`
+	Object cnv.KubeVirt `json:"object"`
 }
 
 // Set fields with the specified object.
-func (r *DataVolume) With(m *model.DataVolume) {
+func (r *KubeVirt) With(m *model.KubeVirt) {
 	r.Resource.With(&m.Base)
 	r.Object = m.Object
 }
 
 // Build self link (URI).
-func (r *DataVolume) Link(p *api.Provider) {
+func (r *KubeVirt) Link(p *api.Provider) {
 	r.SelfLink = base.Link(
-		DataVolumeRoot,
+		KubeVirtRoot,
 		base.Params{
 			base.ProviderParam: string(p.UID),
-			DataVolumeParam:    r.UID,
+			KubeVirtParam:      r.UID,
 		})
 }
 
 // As content.
-func (r *DataVolume) Content(detail int) interface{} {
+func (r *KubeVirt) Content(detail int) interface{} {
 	if detail == 0 {
 		return r.Resource
 	}
