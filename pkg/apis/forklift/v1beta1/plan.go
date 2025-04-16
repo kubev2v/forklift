@@ -27,6 +27,12 @@ import (
 	cnv "kubevirt.io/api/core/v1"
 )
 
+const (
+	MigrationCold = "cold"
+	MigrationWarm = "warm"
+	MigrationLive = "live"
+)
+
 // PlanSpec defines the desired state of Plan.
 type PlanSpec struct {
 	// Description
@@ -136,6 +142,7 @@ type PlanSpec struct {
 	SkipGuestConversion bool `json:"skipGuestConversion,omitempty"`
 	// Migration type. e.g. "cold", "warm", "live". Supersedes the `warm` boolean if set.
 	// +optional
+	// +kubebuilder:validation:Enum=cold;warm;live
 	Type string `json:"type,omitempty"`
 }
 

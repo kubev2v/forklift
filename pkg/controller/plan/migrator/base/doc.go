@@ -1,6 +1,8 @@
 package base
 
 import (
+	"fmt"
+
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
@@ -99,5 +101,36 @@ type Migrator interface {
 	ExecutePhase(*plan.VMStatus) (bool, error)
 	Step(*plan.VMStatus) string
 	Next(status *plan.VMStatus) (next string)
-	Cleanup(status *plan.VMStatus, successful bool) (err error)
+	Complete(status *plan.VMStatus)
+}
+
+// NextPhase transitions the VM to the next migration phase.
+// If this was the last phase in the current pipeline step, the pipeline step
+// is marked complete.
+func NextPhase(migrator Migrator, vm *plan.VMStatus) {
+	currentStep, found := vm.FindStep(migrator.Step(vm))
+	if !found {
+		vm.AddError(fmt.Sprintf("Step '%s' not found", migrator.Step(vm)))
+		return
+	}
+	vm.Phase = migrator.Next(vm)
+	switch vm.Phase {
+	case api.PhaseCompleted:
+		// `Completed` is a terminal phase that does not belong
+		// to a pipeline step. If it is the next VM phase, then
+		// mark the current pipeline step complete without
+		// looking for a following step.
+		currentStep.MarkCompleted()
+		currentStep.Phase = api.StepCompleted
+	default:
+		nextStep, found := vm.FindStep(migrator.Step(vm))
+		if !found {
+			vm.AddError(fmt.Sprintf("Next step '%s' not found", migrator.Step(vm)))
+			return
+		}
+		if currentStep.Name != nextStep.Name {
+			currentStep.MarkCompleted()
+			currentStep.Phase = api.StepCompleted
+		}
+	}
 }
