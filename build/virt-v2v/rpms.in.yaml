@@ -1,0 +1,13 @@
+packages:
+  - qemu-img
+  - libguestfs-devel
+  - libguestfs-winsupport
+  - libguestfs-xfs
+  - virt-v2v
+  - virtio-win
+contentOrigin:
+  repofiles:
+    - ../repos/ubi.repo
+    - ../repos/centos.repo
+    - ../repos/ghettoforge.repo
+arches: [x86_64]
