@@ -400,6 +400,25 @@ func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
 	return
 }
 
+// buildDatastoreMap builds a map of storage mappings keyed by source datastore ID
+func (r *Builder) buildDatastoreMap() (map[string]*api.StoragePair, error) {
+	dsMap := make(map[string]*api.StoragePair)
+	dsMapIn := r.Context.Map.Storage.Spec.Map
+
+	for i := range dsMapIn {
+		mapped := &dsMapIn[i]
+		ref := mapped.Source
+		ds := &model.Datastore{}
+		err := r.Source.Inventory.Find(ds, ref)
+		if err != nil {
+			return nil, liberr.Wrap(err)
+		}
+		dsMap[ds.ID] = mapped
+	}
+
+	return dsMap, nil
+}
+
 // Create DataVolume specs for the VM.
 func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.ConfigMap, dvTemplate *cdi.DataVolume, vddkConfigMap *core.ConfigMap) (dvs []cdi.DataVolume, err error) {
 	vm := &model.VM{}
@@ -432,138 +451,136 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 		thumbprint = h.Thumbprint
 	}
 
-	dsMapIn := r.Context.Map.Storage.Spec.Map
-	for i := range dsMapIn {
-		mapped := &dsMapIn[i]
-		ref := mapped.Source
-		ds := &model.Datastore{}
-		fErr := r.Source.Inventory.Find(ds, ref)
-		if fErr != nil {
-			err = fErr
+	// Build datastore map for more efficient lookups
+	dsMap, err := r.buildDatastoreMap()
+	if err != nil {
+		return
+	}
+
+	for diskIndex, disk := range vm.Disks {
+		mapped, found := dsMap[disk.Datastore.ID]
+		if !found {
+			continue
+		}
+
+		storageClass := mapped.Destination.StorageClass
+		var dvSource cdi.DataVolumeSource
+		useV2vForTransfer, vErr := r.Context.Plan.ShouldUseV2vForTransfer()
+		if vErr != nil {
+			err = vErr
 			return
 		}
-		for diskIndex, disk := range vm.Disks {
-			if disk.Datastore.ID == ds.ID {
-				storageClass := mapped.Destination.StorageClass
-				var dvSource cdi.DataVolumeSource
-				useV2vForTransfer, vErr := r.Context.Plan.ShouldUseV2vForTransfer()
-				if vErr != nil {
-					err = vErr
-					return
-				}
-				if useV2vForTransfer {
-					// Let virt-v2v do the copying
-					dvSource = cdi.DataVolumeSource{
-						Blank: &cdi.DataVolumeBlankImage{},
-					}
-				} else {
-					// Let CDI do the copying
-					dvSource = cdi.DataVolumeSource{
-						VDDK: &cdi.DataVolumeSourceVDDK{
-							BackingFile:  baseVolume(disk.File, r.Plan.Spec.Warm),
-							UUID:         vm.UUID,
-							URL:          url,
-							SecretRef:    secret.Name,
-							Thumbprint:   thumbprint,
-							InitImageURL: r.Source.Provider.Spec.Settings[api.VDDK],
-						},
-					}
-				}
-				dvSpec := cdi.DataVolumeSpec{
-					Source: &dvSource,
-					Storage: &cdi.StorageSpec{
-						Resources: core.ResourceRequirements{
-							Requests: core.ResourceList{
-								core.ResourceStorage: *resource.NewQuantity(disk.Capacity, resource.BinarySI),
-							},
-						},
-						StorageClassName: &storageClass,
-					},
-				}
-				// set the access mode and volume mode if they were specified in the storage map.
-				// otherwise, let the storage profile decide the default values.
-				if mapped.Destination.AccessMode != "" {
-					dvSpec.Storage.AccessModes = []core.PersistentVolumeAccessMode{mapped.Destination.AccessMode}
-				}
-				if mapped.Destination.VolumeMode != "" {
-					dvSpec.Storage.VolumeMode = &mapped.Destination.VolumeMode
-				}
-
-				dv := dvTemplate.DeepCopy()
-				dv.Spec = dvSpec
-				if dv.ObjectMeta.Annotations == nil {
-					dv.ObjectMeta.Annotations = make(map[string]string)
-				}
-				dv.ObjectMeta.Annotations[planbase.AnnDiskSource] = baseVolume(disk.File, r.Plan.Spec.Warm)
-				if disk.Shared {
-					dv.ObjectMeta.Labels[Shareable] = "true"
-				}
-
-				// Preserve the disk index as an annotation on the created DataVolume
-				// Note: this annotation will be used to match the PVC to the VM disks by
-				//       matching the disk and PVC index.
-				dv.ObjectMeta.Annotations[planbase.AnnDiskIndex] = fmt.Sprintf("%d", diskIndex)
-
-				// if exists, get the PVC generate name from the PlanSpec, generate the name
-				// and update the GenerateName field in the DataVolume object.
-				pvcNameTemplate := r.getPVCNameTemplate(vm)
-				if pvcNameTemplate != "" {
-					// Get the VM root disk index
-					planVM := r.getPlanVM(vm)
-					rootDiskIndex := 0
-					if planVM != nil {
-						rootDiskIndex = utils.GetBootDiskNumber(planVM.RootDisk)
-					}
-
-					// Create template data
-					templateData := api.PVCNameTemplateData{
-						VmName:        r.getPlenVMSafeName(vm),
-						PlanName:      r.Plan.Name,
-						DiskIndex:     diskIndex,
-						RootDiskIndex: rootDiskIndex,
-					}
-
-					generatedName, err := r.executeTemplate(pvcNameTemplate, &templateData)
-					useGenerateName := r.Plan.Spec.PVCNameTemplateUseGenerateName
-
-					// Validate that template output is a valid k8s label
-					errs := k8svalidation.IsDNS1123Label(generatedName)
-					if len(errs) > 0 {
-						// Raise an error if the generated name is not valid
-						err = errors.New("generated PVC name is not valid")
-
-						// Failed to generate PVC name using template
-						r.Log.Info("Failed to generate PVC name using template", "template", pvcNameTemplate, "error", err)
-					}
-
-					if err == nil && generatedName != "" {
-						if useGenerateName {
-							// Ensure generatedName ends with "-"
-							if !strings.HasSuffix(generatedName, "-") {
-								generatedName = generatedName + "-"
-							}
-							dv.ObjectMeta.GenerateName = generatedName
-						} else {
-							// Ensure generatedName does not end with "-"
-							if strings.HasSuffix(generatedName, "-") {
-								generatedName = strings.Trim(generatedName, "-")
-							}
-
-							// Use the generated name as the PVC name
-							dv.ObjectMeta.Name = generatedName
-						}
-					} else {
-						// Failed to generate PVC name using template
-						r.Log.Info("Failed to generate PVC name using template", "template", pvcNameTemplate, "error", err)
-					}
-				}
-
-				if !useV2vForTransfer && vddkConfigMap != nil {
-					dv.ObjectMeta.Annotations[planbase.AnnVddkExtraArgs] = vddkConfigMap.Name
-				}
-				dvs = append(dvs, *dv)
+		if useV2vForTransfer {
+			// Let virt-v2v do the copying
+			dvSource = cdi.DataVolumeSource{
+				Blank: &cdi.DataVolumeBlankImage{},
+			}
+		} else {
+			// Let CDI do the copying
+			dvSource = cdi.DataVolumeSource{
+				VDDK: &cdi.DataVolumeSourceVDDK{
+					BackingFile:  baseVolume(disk.File, r.Plan.Spec.Warm),
+					UUID:         vm.UUID,
+					URL:          url,
+					SecretRef:    secret.Name,
+					Thumbprint:   thumbprint,
+					InitImageURL: r.Source.Provider.Spec.Settings[api.VDDK],
+				},
 			}
 		}
+		dvSpec := cdi.DataVolumeSpec{
+			Source: &dvSource,
+			Storage: &cdi.StorageSpec{
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceStorage: *resource.NewQuantity(disk.Capacity, resource.BinarySI),
+					},
+				},
+				StorageClassName: &storageClass,
+			},
+		}
+		// set the access mode and volume mode if they were specified in the storage map.
+		// otherwise, let the storage profile decide the default values.
+		if mapped.Destination.AccessMode != "" {
+			dvSpec.Storage.AccessModes = []core.PersistentVolumeAccessMode{mapped.Destination.AccessMode}
+		}
+		if mapped.Destination.VolumeMode != "" {
+			dvSpec.Storage.VolumeMode = &mapped.Destination.VolumeMode
+		}
+
+		dv := dvTemplate.DeepCopy()
+		dv.Spec = dvSpec
+		if dv.ObjectMeta.Annotations == nil {
+			dv.ObjectMeta.Annotations = make(map[string]string)
+		}
+		dv.ObjectMeta.Annotations[planbase.AnnDiskSource] = baseVolume(disk.File, r.Plan.Spec.Warm)
+		if disk.Shared {
+			dv.ObjectMeta.Labels[Shareable] = "true"
+		}
+
+		// Preserve the disk index as an annotation on the created DataVolume
+		// Note: this annotation will be used to match the PVC to the VM disks by
+		//       matching the disk and PVC index.
+		dv.ObjectMeta.Annotations[planbase.AnnDiskIndex] = fmt.Sprintf("%d", diskIndex)
+
+		// if exists, get the PVC generate name from the PlanSpec, generate the name
+		// and update the GenerateName field in the DataVolume object.
+		pvcNameTemplate := r.getPVCNameTemplate(vm)
+		if pvcNameTemplate != "" {
+			// Get the VM root disk index
+			planVM := r.getPlanVM(vm)
+			rootDiskIndex := 0
+			if planVM != nil {
+				rootDiskIndex = utils.GetBootDiskNumber(planVM.RootDisk)
+			}
+
+			// Create template data
+			templateData := api.PVCNameTemplateData{
+				VmName:        r.getPlenVMSafeName(vm),
+				PlanName:      r.Plan.Name,
+				DiskIndex:     diskIndex,
+				RootDiskIndex: rootDiskIndex,
+			}
+
+			generatedName, err := r.executeTemplate(pvcNameTemplate, &templateData)
+			useGenerateName := r.Plan.Spec.PVCNameTemplateUseGenerateName
+
+			// Validate that template output is a valid k8s label
+			errs := k8svalidation.IsDNS1123Label(generatedName)
+			if len(errs) > 0 {
+				// Raise an error if the generated name is not valid
+				err = errors.New("generated PVC name is not valid")
+
+				// Failed to generate PVC name using template
+				r.Log.Info("Failed to generate PVC name using template", "template", pvcNameTemplate, "error", err)
+			}
+
+			if err == nil && generatedName != "" {
+				if useGenerateName {
+					// Ensure generatedName ends with "-"
+					if !strings.HasSuffix(generatedName, "-") {
+						generatedName = generatedName + "-"
+					}
+					dv.ObjectMeta.GenerateName = generatedName
+				} else {
+					// Ensure generatedName does not end with "-"
+					if strings.HasSuffix(generatedName, "-") {
+						generatedName = strings.Trim(generatedName, "-")
+					}
+
+					// Use the generated name as the PVC name
+					dv.ObjectMeta.Name = generatedName
+				}
+			} else {
+				// Failed to generate PVC name using template
+				r.Log.Info("Failed to generate PVC name using template", "template", pvcNameTemplate, "error", err)
+			}
+		}
+
+		if !useV2vForTransfer && vddkConfigMap != nil {
+			dv.ObjectMeta.Annotations[planbase.AnnVddkExtraArgs] = vddkConfigMap.Name
+		}
+		dvs = append(dvs, *dv)
 	}
 
 	return
