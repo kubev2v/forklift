@@ -47,6 +47,8 @@ const (
 	PreHook                                = "PreHook"
 	CreateServiceExports                   = "CreateServiceExports"
 	SynchronizeCertificates                = "SynchronizeCertificates"
+	CreateSecrets                          = "CreateSecrets"
+	CreateConfigMaps                       = "CreateConfigMaps"
 	CreateTarget                           = "CreateTarget"
 	CreateVirtualMachineInstanceMigrations = "CreateVirtualMachineInstanceMigrations"
 	WaitForStateTransfer                   = "WaitForStateTransfer"
@@ -111,19 +113,17 @@ func (r *LiveMigrator) Init() (err error) {
 }
 
 func (r *LiveMigrator) Cleanup(vm *planapi.VMStatus, successful bool) (err error) {
-	if !successful {
-		err = r.DeleteTargetVMIM(vm)
-		if err != nil {
-			return
-		}
-		err = r.DeleteSourceVMIM(vm)
-		if err != nil {
-			return
-		}
-		err = r.DeleteServiceExports(vm)
-		if err != nil {
-			return
-		}
+	err = r.DeleteTargetVMIM(vm)
+	if err != nil {
+		return
+	}
+	err = r.DeleteSourceVMIM(vm)
+	if err != nil {
+		return
+	}
+	err = r.DeleteServiceExports(vm)
+	if err != nil {
+		return
 	}
 	return
 }
@@ -159,6 +159,8 @@ func (r *LiveMigrator) Itinerary() (itinerary *libitr.Itinerary) {
 			{Name: Started},
 			{Name: PreHook},
 			{Name: SynchronizeCertificates},
+			{Name: CreateSecrets},
+			{Name: CreateConfigMaps},
 			{Name: CreateTarget},
 			{Name: CreateServiceExports},
 			{Name: CreateVirtualMachineInstanceMigrations},
@@ -191,7 +193,7 @@ func (r *LiveMigrator) Step(status *planapi.VMStatus) (step string) {
 		step = base.Initialize
 	case PreHook, PostHook:
 		step = status.Phase
-	case CreateTarget, SynchronizeCertificates, CreateServiceExports:
+	case CreateSecrets, CreateConfigMaps, CreateTarget, SynchronizeCertificates, CreateServiceExports:
 		step = PrepareTarget
 	case CreateVirtualMachineInstanceMigrations, WaitForStateTransfer:
 		step = Synchronization
@@ -239,7 +241,7 @@ func (r *LiveMigrator) Pipeline(vm planapi.VM) (pipeline []*planapi.Step, err er
 						Phase:       base.Pending,
 					},
 				})
-		case CreateTarget:
+		case CreateSecrets:
 			pipeline = append(
 				pipeline,
 				&planapi.Step{
@@ -301,6 +303,58 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 		step.MarkedStarted()
 		step.Phase = Running
 		vm.Phase = r.Next(vm)
+	case CreateSecrets:
+		step, found := vm.FindStep(r.Step(vm))
+		if !found {
+			vm.AddError(fmt.Sprintf("Step '%s' not found", r.Step(vm)))
+			return
+		}
+		var secrets []core.Secret
+		secrets, err = r.builder.Secrets(vm)
+		if err != nil {
+			if !errors.As(err, &web.ProviderNotReadyError{}) {
+				log.Error(err, "error building secrets", "vm", vm.Name)
+				step.AddError(err.Error())
+				err = nil
+			}
+			break
+		}
+		err = r.ensurer.EnsureSecrets(vm, secrets)
+		if err != nil {
+			if !errors.As(err, &web.ProviderNotReadyError{}) {
+				log.Error(err, "error ensuring secrets", "vm", vm.Name)
+				step.AddError(err.Error())
+				err = nil
+			}
+			break
+		}
+		vm.Phase = r.Next(vm)
+	case CreateConfigMaps:
+		step, found := vm.FindStep(r.Step(vm))
+		if !found {
+			vm.AddError(fmt.Sprintf("Step '%s' not found", r.Step(vm)))
+			return
+		}
+		var configmaps []core.ConfigMap
+		configmaps, err = r.builder.ConfigMaps(vm)
+		if err != nil {
+			if !errors.As(err, &web.ProviderNotReadyError{}) {
+				log.Error(err, "error building configmaps", "vm", vm.Name)
+				step.AddError(err.Error())
+				err = nil
+			}
+			break
+		}
+		err = r.ensurer.EnsureConfigMaps(vm, configmaps)
+		if err != nil {
+			if !errors.As(err, &web.ProviderNotReadyError{}) {
+				log.Error(err, "error ensuring configmaps", "vm", vm.Name)
+				step.AddError(err.Error())
+				err = nil
+			}
+			break
+		}
+		vm.Phase = r.Next(vm)
 	case CreateTarget:
 		step, found := vm.FindStep(r.Step(vm))
 		if !found {
@@ -311,7 +365,7 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 		dataVolumes, err = r.builder.DataVolumes(vm)
 		if err != nil {
 			if !errors.As(err, &web.ProviderNotReadyError{}) {
-				log.Error(err, "error creating volumes", "vm", vm.Name)
+				log.Error(err, "error building volumes", "vm", vm.Name)
 				step.AddError(err.Error())
 				err = nil
 			}
@@ -657,14 +711,57 @@ func (r *LiveMigrator) sourceVMIM(vm *planapi.VMStatus, target *cnv.VirtualMachi
 }
 
 func (r *LiveMigrator) DeleteServiceExports(vm *planapi.VMStatus) (err error) {
+	err = r.Destination.Client.DeleteAllOf(
+		context.Background(),
+		&multicluster.ServiceExport{},
+		&client.DeleteAllOfOptions{
+			ListOptions: client.ListOptions{
+				LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+				// TODO: find a better way to determine where Kubevirt is installed on the destination.
+				Namespace: r.Context.Destination.Provider.Spec.Settings[KubeVirtNamespace],
+			},
+		})
+	if err != nil {
+		err = liberr.Wrap(err)
+	}
 	return
 }
 
 func (r *LiveMigrator) DeleteSourceVMIM(vm *planapi.VMStatus) (err error) {
+	inventoryVm := &model.VM{}
+	err = r.Context.Source.Inventory.Find(inventoryVm, vm.Ref)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		return
+	}
+	err = r.sourceClient.DeleteAllOf(
+		context.Background(),
+		&cnv.VirtualMachineInstanceMigration{},
+		&client.DeleteAllOfOptions{
+			ListOptions: client.ListOptions{
+				LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+				Namespace:     inventoryVm.Namespace,
+			},
+		})
+	if err != nil {
+		err = liberr.Wrap(err)
+	}
 	return
 }
 
 func (r *LiveMigrator) DeleteTargetVMIM(vm *planapi.VMStatus) (err error) {
+	err = r.Destination.Client.DeleteAllOf(
+		context.Background(),
+		&cnv.VirtualMachineInstanceMigration{},
+		&client.DeleteAllOfOptions{
+			ListOptions: client.ListOptions{
+				LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+				Namespace:     r.Plan.Spec.TargetNamespace,
+			},
+		})
+	if err != nil {
+		err = liberr.Wrap(err)
+	}
 	return
 }
 
