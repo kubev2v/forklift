@@ -23,6 +23,7 @@ import (
 	"k8s.io/client-go/rest"
 	cnv "kubevirt.io/api/core/v1"
 	instancetype "kubevirt.io/api/instancetype/v1beta1"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	ocpclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
@@ -335,5 +336,75 @@ func (h Handler) ClusterInstanceTypes(ctx *gin.Context) (clusterinstances []mode
 		clusterinstances = append(clusterinstances, m)
 	}
 
+	return
+}
+
+func (h Handler) DataVolumes(ctx *gin.Context, provider *api.Provider) (dvs []model.DataVolume, err error) {
+	client, err := h.UserClient(ctx)
+	if err != nil {
+		return
+	}
+
+	list := cdi.DataVolumeList{}
+	options := h.ListOptions(ctx)
+	if provider != nil && provider.IsRestrictedHost() {
+		options = append(options, ocpclient.InNamespace(provider.GetNamespace()))
+	}
+	err = client.List(context.TODO(), &list, options...)
+	if err != nil {
+		return
+	}
+
+	for _, dv := range list.Items {
+		m := model.DataVolume{}
+		m.With(&dv)
+		dvs = append(dvs, m)
+	}
+	return
+}
+
+func (h Handler) PersistentVolumeClaims(ctx *gin.Context, provider *api.Provider) (pvcs []model.PersistentVolumeClaim, err error) {
+	client, err := h.UserClient(ctx)
+	if err != nil {
+		return
+	}
+
+	list := core.PersistentVolumeClaimList{}
+	options := h.ListOptions(ctx)
+	if provider != nil && provider.IsRestrictedHost() {
+		options = append(options, ocpclient.InNamespace(provider.GetNamespace()))
+	}
+	err = client.List(context.TODO(), &list, options...)
+	if err != nil {
+		return
+	}
+
+	for _, pvc := range list.Items {
+		m := model.PersistentVolumeClaim{}
+		m.With(&pvc)
+		pvcs = append(pvcs, m)
+	}
+	return
+}
+
+func (h Handler) KubeVirts(ctx *gin.Context, provider *api.Provider) (kvs []model.KubeVirt, err error) {
+	client, err := h.UserClient(ctx)
+	if err != nil {
+		return
+	}
+	list := cnv.KubeVirtList{}
+	options := h.ListOptions(ctx)
+	if provider != nil && provider.IsRestrictedHost() {
+		options = append(options, ocpclient.InNamespace(provider.GetNamespace()))
+	}
+	err = client.List(context.TODO(), &list, options...)
+	if err != nil {
+		return
+	}
+	for _, kv := range list.Items {
+		m := model.KubeVirt{}
+		m.With(&kv)
+		kvs = append(kvs, m)
+	}
 	return
 }

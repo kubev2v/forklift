@@ -3,27 +3,83 @@ package ocp
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web"
+	inventory "github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
+	ocpclient "github.com/kubev2v/forklift/pkg/lib/client/openshift"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
-
-	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
-	"github.com/kubev2v/forklift/pkg/controller/provider/web"
-	ocpclient "github.com/kubev2v/forklift/pkg/lib/client/openshift"
+	"github.com/kubev2v/forklift/pkg/settings"
 	core "k8s.io/api/core/v1"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	cnv "kubevirt.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const VM_NOT_FOUND = "VM not found."
+const FeatureDecentralizedLiveMigration = "DecentralizedLiveMigration"
+const ConditionStorageLiveMigratable = "StorageLiveMigratable"
+const True = "True"
+
+var Settings = &settings.Settings
 
 // Validator
 type Validator struct {
-	plan         *api.Plan
-	inventory    web.Client
+	log logging.LevelLogger
+	*plancontext.Context
 	sourceClient k8sclient.Client
-	log          logging.LevelLogger
+}
+
+// PowerState validates that the VM is in a power state that is compatible
+// with the migration type.
+func (r *Validator) PowerState(vmRef ref.Ref) (ok bool, err error) {
+	switch r.Plan.Spec.Type {
+	case api.MigrationLive:
+		vmi := &cnv.VirtualMachineInstance{}
+		err = r.sourceClient.Get(context.TODO(), k8sclient.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vmi)
+		if err != nil {
+			if k8serr.IsNotFound(err) {
+				err = nil
+				return
+			}
+			err = liberr.Wrap(err, "vm", vmRef.String())
+			return
+		}
+		ok = true
+	default:
+		ok = true
+	}
+	return
+}
+
+// VMMigrationType validates that the VM is compatible with the selected migration type.
+func (r *Validator) VMMigrationType(vmRef ref.Ref) (ok bool, err error) {
+	switch r.Plan.Spec.Type {
+	case api.MigrationLive:
+		vm := &cnv.VirtualMachine{}
+		err = r.sourceClient.Get(context.TODO(), k8sclient.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vm)
+		if err != nil {
+			err = liberr.Wrap(
+				err,
+				VM_NOT_FOUND,
+				"vm",
+				vmRef.String())
+			return
+		}
+		for _, cnd := range vm.Status.Conditions {
+			if cnd.Type == ConditionStorageLiveMigratable {
+				ok = cnd.Status == True
+				return
+			}
+		}
+	default:
+		ok = true
+	}
+	return
 }
 
 // MaintenanceMode implements base.Validator
@@ -33,7 +89,7 @@ func (r *Validator) MaintenanceMode(vmRef ref.Ref) (bool, error) {
 
 // PodNetwork implements base.Validator
 func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
-	if r.plan.Referenced.Map.Network == nil {
+	if r.Plan.Referenced.Map.Network == nil {
 		return
 	}
 
@@ -47,7 +103,7 @@ func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
 			vmRef.String())
 		return
 	}
-	mapping := r.plan.Referenced.Map.Network.Spec.Map
+	mapping := r.Plan.Referenced.Map.Network.Spec.Map
 	podMapped := 0
 	for i := range mapping {
 		mapped := &mapping[i]
@@ -65,20 +121,58 @@ func (r *Validator) WarmMigration() bool {
 	return false
 }
 
+// MigrationType indicates whether the plan's migration type
+// is supported by this provider.
+func (r *Validator) MigrationType() bool {
+	switch r.Plan.Spec.Type {
+	case api.MigrationCold, "":
+		return true
+	case api.MigrationLive:
+		kvs := []inventory.KubeVirt{}
+		err := r.Source.Inventory.List(&kvs, web.Param{
+			Key:   web.DetailParam,
+			Value: "all",
+		})
+		if err != nil {
+			r.log.Error(err, "unable to read KubeVirt resource from source inventory.")
+			return false
+		}
+		if len(kvs) == 0 {
+			r.log.Info("No KubeVirt resources found in source cluster inventory.")
+			return false
+		}
+		src := KubeVirt{}
+		src.With(kvs[0])
+		err = r.Destination.Inventory.List(&kvs, web.Param{
+			Key:   web.DetailParam,
+			Value: "all",
+		})
+		if err != nil {
+			r.log.Error(err, "unable to read KubeVirt resource from destination inventory.")
+			return false
+		}
+		if len(kvs) == 0 {
+			r.log.Info("No KubeVirt resources found in destination cluster inventory.")
+			return false
+		}
+		dest := KubeVirt{}
+		dest.With(kvs[0])
+		return Settings.OCPLiveMigration &&
+			src.FeatureGate(FeatureDecentralizedLiveMigration) &&
+			dest.FeatureGate(FeatureDecentralizedLiveMigration)
+	default:
+		return false
+	}
+}
+
 // NOOP
 func (r *Validator) SharedDisks(vmRef ref.Ref, client k8sclient.Client) (ok bool, s string, s2 string, err error) {
 	ok = true
 	return
 }
 
-// Load.
-func (r *Validator) Load() (err error) {
-	r.inventory, err = web.NewClient(r.plan.Referenced.Provider.Source)
-	return
-}
-
 func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
-	if r.plan.Referenced.Map.Storage == nil {
+	if r.Plan.Referenced.Map.Storage == nil {
 		return
 	}
 
@@ -124,7 +218,7 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 			return false, nil
 		}
 
-		_, found := r.plan.Referenced.Map.Storage.FindStorageByName(*storageClass)
+		_, found := r.Plan.Referenced.Map.Storage.FindStorageByName(*storageClass)
 		if !found {
 			err = liberr.Wrap(
 				err,
@@ -141,7 +235,7 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 
 // Validate that a VM's networks have been mapped.
 func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
-	if r.plan.Referenced.Map.Network == nil {
+	if r.Plan.Referenced.Map.Network == nil {
 		return
 	}
 
@@ -158,7 +252,7 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 
 	for _, net := range vm.Spec.Template.Spec.Networks {
 		if net.Pod != nil {
-			_, found := r.plan.Referenced.Map.Network.FindNetworkByType(Pod)
+			_, found := r.Plan.Referenced.Map.Network.FindNetworkByType(Pod)
 			if !found {
 				err = liberr.Wrap(
 					err,
@@ -172,7 +266,7 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 			}
 		} else if net.Multus != nil {
 			name, namespace := ocpclient.GetNetworkNameAndNamespace(net.Multus.NetworkName, &vmRef)
-			_, found := r.plan.Referenced.Map.Network.FindNetworkByNameAndNamespace(namespace, name)
+			_, found := r.Plan.Referenced.Map.Network.FindNetworkByNameAndNamespace(namespace, name)
 			if !found {
 				err = liberr.Wrap(
 					err,
@@ -202,4 +296,26 @@ func (r *Validator) StaticIPs(vmRef ref.Ref) (bool, error) {
 // NO-OP
 func (r *Validator) ChangeTrackingEnabled(vmRef ref.Ref) (bool, error) {
 	return true, nil
+}
+
+// KubeVirt CR representation.
+type KubeVirt struct {
+	*cnv.KubeVirt
+}
+
+func (r *KubeVirt) With(kv inventory.KubeVirt) {
+	r.KubeVirt = &kv.Object
+}
+
+func (r *KubeVirt) FeatureGate(feature string) (enabled bool) {
+	if r.Spec.Configuration.DeveloperConfiguration == nil {
+		return
+	}
+	for _, gate := range r.Spec.Configuration.DeveloperConfiguration.FeatureGates {
+		if strings.ToLower(gate) == strings.ToLower(feature) {
+			enabled = true
+			return
+		}
+	}
+	return
 }

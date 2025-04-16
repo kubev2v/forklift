@@ -44,6 +44,7 @@ require (
 	kubevirt.io/containerized-data-importer-api v1.60.3-0.20241105012228-50fbed985de9
 	libvirt.org/libvirt-go-xml v7.4.0+incompatible
 	sigs.k8s.io/controller-runtime v0.20.4
+	sigs.k8s.io/mcs-api v0.1.0
 	sigs.k8s.io/yaml v1.4.0
 )
 

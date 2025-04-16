@@ -65,5 +65,10 @@ func Handlers(container *container.Container) []libweb.RequestHandler {
 				base.Handler{Container: container},
 			},
 		},
+		&KubeVirtHandler{
+			Handler: Handler{
+				base.Handler{Container: container},
+			},
+		},
 	}
 }
