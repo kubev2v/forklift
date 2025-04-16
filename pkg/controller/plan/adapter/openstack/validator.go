@@ -84,6 +84,17 @@ func (r *Validator) WarmMigration() (ok bool) {
 	return
 }
 
+// MigrationType indicates whether the plan's migration type
+// is supported by this provider.
+func (r *Validator) MigrationType() bool {
+	switch r.plan.Spec.Type {
+	case api.MigrationCold, "":
+		return true
+	default:
+		return false
+	}
+}
+
 // Validate that no more than one of a VM's networks is mapped to the pod network.
 func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
 	if r.plan.Referenced.Map.Network == nil {
