@@ -294,6 +294,17 @@ spec:
                     "{{.VmName}}-disk-{{.DiskIndex}}"
                     "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
                 type: string
+              pvcNameTemplateUseGenerateName:
+                default: true
+                description: |-
+                  PVCNameTemplateUseGenerateName indicates if the PVC name template should use generateName instead of name.
+                  Setting this to false will use the name field of the PVCNameTemplate.
+                  This is useful when using a template that generates a name without a suffix.
+                  For example, if the template is "{{.VmName}}-disk-{{.DiskIndex}}", setting this to false will result in
+                  the PVC name being "{{.VmName}}-disk-{{.DiskIndex}}", which may not be unique.
+                  but will be more predictable.
+                  **DANGER** When set to false, the generated PVC name may not be unique and may cause conflicts.
+                type: boolean
               targetNamespace:
                 description: Target namespace.
                 type: string
