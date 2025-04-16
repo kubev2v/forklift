@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
@@ -17,7 +17,6 @@ import (
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	k8slabels "k8s.io/apimachinery/pkg/labels"
@@ -26,10 +25,6 @@ import (
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	multicluster "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
-)
-
-const (
-	Live = "live"
 )
 
 const (
@@ -67,12 +62,9 @@ const (
 	Running = "Running"
 )
 
-// Package logger.
-var log = logging.WithName("migrator|ocp")
-
 func New(context *plancontext.Context) (migrator base.Migrator, err error) {
 	switch context.Plan.Spec.Type {
-	case Live:
+	case api.MigrationLive:
 		m := LiveMigrator{Context: context}
 		err = m.Init()
 		if err != nil {
@@ -87,7 +79,7 @@ func New(context *plancontext.Context) (migrator base.Migrator, err error) {
 		}
 		migrator = &m
 	}
-	log.Info("Built OCP migrator.", "plan", path.Join(context.Plan.Namespace, context.Plan.Name), "type", context.Plan.Spec.Type)
+	r.Log.Info("Built OCP migrator.", "plan", path.Join(context.Plan.Namespace, context.Plan.Name), "type", context.Plan.Spec.Type)
 	return
 }
 
@@ -178,12 +170,12 @@ func (r *LiveMigrator) Next(status *planapi.VMStatus) (next string) {
 	if done || err != nil {
 		next = Completed
 		if err != nil {
-			log.Error(err, "Next phase failed.")
+			r.Log.Error(err, "Next phase failed.")
 		}
 	} else {
 		next = step.Name
 	}
-	log.Info("Itinerary transition", "current phase", status.Phase, "next phase", next)
+	r.Log.Info("Itinerary transition", "current phase", status.Phase, "next phase", next)
 	return
 }
 
@@ -272,7 +264,7 @@ func (r *LiveMigrator) Pipeline(vm planapi.VM) (pipeline []*planapi.Step, err er
 		}
 	}
 
-	log.V(2).Info(
+	r.Log.V(2).Info(
 		"Pipeline built.",
 		"vm",
 		vm.String())
@@ -313,7 +305,7 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 		secrets, err = r.builder.Secrets(vm)
 		if err != nil {
 			if !errors.As(err, &web.ProviderNotReadyError{}) {
-				log.Error(err, "error building secrets", "vm", vm.Name)
+				r.Log.Error(err, "error building secrets", "vm", vm.Name)
 				step.AddError(err.Error())
 				err = nil
 			}
@@ -322,7 +314,7 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 		err = r.ensurer.EnsureSecrets(vm, secrets)
 		if err != nil {
 			if !errors.As(err, &web.ProviderNotReadyError{}) {
-				log.Error(err, "error ensuring secrets", "vm", vm.Name)
+				r.Log.Error(err, "error ensuring secrets", "vm", vm.Name)
 				step.AddError(err.Error())
 				err = nil
 			}
@@ -339,7 +331,7 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 		configmaps, err = r.builder.ConfigMaps(vm)
 		if err != nil {
 			if !errors.As(err, &web.ProviderNotReadyError{}) {
-				log.Error(err, "error building configmaps", "vm", vm.Name)
+				r.Log.Error(err, "error building configmaps", "vm", vm.Name)
 				step.AddError(err.Error())
 				err = nil
 			}
@@ -348,7 +340,7 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 		err = r.ensurer.EnsureConfigMaps(vm, configmaps)
 		if err != nil {
 			if !errors.As(err, &web.ProviderNotReadyError{}) {
-				log.Error(err, "error ensuring configmaps", "vm", vm.Name)
+				r.Log.Error(err, "error ensuring configmaps", "vm", vm.Name)
 				step.AddError(err.Error())
 				err = nil
 			}
@@ -365,7 +357,7 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 		dataVolumes, err = r.builder.DataVolumes(vm)
 		if err != nil {
 			if !errors.As(err, &web.ProviderNotReadyError{}) {
-				log.Error(err, "error building volumes", "vm", vm.Name)
+				r.Log.Error(err, "error building volumes", "vm", vm.Name)
 				step.AddError(err.Error())
 				err = nil
 			}
@@ -475,7 +467,7 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 		vm.Phase = r.Next(vm)
 	default:
 		ok = false
-		log.Info(
+		r.Log.Info(
 			"Phase unknown, defer to base migrator.",
 			"vm",
 			vm,
@@ -602,7 +594,7 @@ func (r *LiveMigrator) EnsureTargetMigration(vm *planapi.VMStatus) (vmim *cnv.Vi
 			err = liberr.Wrap(err)
 			return
 		}
-		log.Info(
+		r.Log.Info(
 			"Created target VirtualMachineInstanceMigration.",
 			"vmim",
 			path.Join(vmim.Namespace, vmim.Name),
@@ -630,7 +622,7 @@ func (r *LiveMigrator) EnsureSourceMigration(vm *planapi.VMStatus, target *cnv.V
 			err = liberr.Wrap(err)
 			return
 		}
-		log.Info(
+		r.Log.Info(
 			"Created source VirtualMachineInstanceMigration.",
 			"vmim",
 			path.Join(vmim.Namespace, vmim.Name),
