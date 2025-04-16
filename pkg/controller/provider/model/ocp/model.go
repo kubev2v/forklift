@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	cnv "kubevirt.io/api/core/v1"
 	instancetype "kubevirt.io/api/instancetype/v1beta1"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
 
 // Errors
@@ -153,4 +154,26 @@ type VM struct {
 func (m *VM) With(v *cnv.VirtualMachine) {
 	m.Base.With(v)
 	m.Object = *v
+}
+
+// PersistentVolumeClaim
+type PersistentVolumeClaim struct {
+	Base
+	Object core.PersistentVolumeClaim `sql:""`
+}
+
+func (m *PersistentVolumeClaim) With(pvc *core.PersistentVolumeClaim) {
+	m.Base.With(pvc)
+	m.Object = *pvc
+}
+
+// DataVolume
+type DataVolume struct {
+	Base
+	Object cdi.DataVolume `sql:""`
+}
+
+func (m *DataVolume) With(dv *cdi.DataVolume) {
+	m.Base.With(dv)
+	m.Object = *dv
 }

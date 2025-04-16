@@ -263,6 +263,84 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 			}
 			*res = list[0]
 		}
+	case *PersistentVolumeClaim:
+		id := ref.ID
+		if id != "" {
+			err = r.Get(resource, id)
+			return
+		}
+		name := ref.Name
+		if name != "" {
+			var ns string
+			ns, name := path.Split(name)
+			ns = strings.TrimRight(ns, "/")
+			list := []PersistentVolumeClaim{}
+			err = r.List(
+				&list,
+				base.Param{
+					Key:   DetailParam,
+					Value: "all",
+				},
+				base.Param{
+					Key:   NsParam,
+					Value: ns,
+				},
+				base.Param{
+					Key:   NameParam,
+					Value: name,
+				})
+			if err != nil {
+				break
+			}
+			if len(list) == 0 {
+				err = liberr.Wrap(NotFoundError{Ref: ref})
+				break
+			}
+			if len(list) > 1 {
+				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
+				break
+			}
+			*res = list[0]
+		}
+	case *DataVolume:
+		id := ref.ID
+		if id != "" {
+			err = r.Get(resource, id)
+			return
+		}
+		name := ref.Name
+		if name != "" {
+			var ns string
+			ns, name := path.Split(name)
+			ns = strings.TrimRight(ns, "/")
+			list := []DataVolume{}
+			err = r.List(
+				&list,
+				base.Param{
+					Key:   DetailParam,
+					Value: "all",
+				},
+				base.Param{
+					Key:   NsParam,
+					Value: ns,
+				},
+				base.Param{
+					Key:   NameParam,
+					Value: name,
+				})
+			if err != nil {
+				break
+			}
+			if len(list) == 0 {
+				err = liberr.Wrap(NotFoundError{Ref: ref})
+				break
+			}
+			if len(list) > 1 {
+				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
+				break
+			}
+			*res = list[0]
+		}
 	}
 
 	return
@@ -395,6 +473,44 @@ func (r *Finder) ClusterInstanceType(ref *base.Ref) (object interface{}, err err
 		ref.ID = it.UID
 		ref.Name = it.Name
 		object = it
+	}
+
+	return
+}
+
+// Find a PersistentVolumeClaim by ref.
+// Returns the matching resource and:
+//
+//	ProviderNotSupportedErr
+//	ProviderNotReadyErr
+//	NotFoundErr
+//	RefNotUniqueErr
+func (r *Finder) PersistentVolumeClaim(ref *base.Ref) (object interface{}, err error) {
+	pvc := &PersistentVolumeClaim{}
+	err = r.ByRef(pvc, *ref)
+	if err == nil {
+		ref.ID = pvc.UID
+		ref.Name = path.Join(pvc.Namespace, pvc.Name)
+		object = pvc
+	}
+
+	return
+}
+
+// Find a DataVolume by ref.
+// Returns the matching resource and:
+//
+//	ProviderNotSupportedErr
+//	ProviderNotReadyErr
+//	NotFoundErr
+//	RefNotUniqueErr
+func (r *Finder) DataVolume(ref *base.Ref) (object interface{}, err error) {
+	dv := &DataVolume{}
+	err = r.ByRef(dv, *ref)
+	if err == nil {
+		ref.ID = dv.UID
+		ref.Name = path.Join(dv.Namespace, dv.Name)
+		object = dv
 	}
 
 	return
