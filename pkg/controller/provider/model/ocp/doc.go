@@ -10,5 +10,7 @@ func All() []interface{} {
 		&InstanceType{},
 		&ClusterInstanceType{},
 		&VM{},
+		&PersistentVolumeClaim{},
+		&DataVolume{},
 	}
 }
