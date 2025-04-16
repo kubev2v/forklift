@@ -94,6 +94,9 @@ type PlanSpec struct {
 	// Determines if the plan should migrate shared disks.
 	// +kubebuilder:default:=true
 	MigrateSharedDisks bool `json:"migrateSharedDisks,omitempty"`
+	// Migration type. e.g. "cold", "warm", "live". Supersedes the `warm` boolean if set.
+	// +optional
+	Type string `json:"type,omitempty"`
 }
 
 // Find a planned VM.
