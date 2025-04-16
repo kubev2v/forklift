@@ -55,5 +55,15 @@ func Handlers(container *container.Container) []libweb.RequestHandler {
 				base.Handler{Container: container},
 			},
 		},
+		&PersistentVolumeClaimHandler{
+			Handler: Handler{
+				base.Handler{Container: container},
+			},
+		},
+		&DataVolumeHandler{
+			Handler: Handler{
+				base.Handler{Container: container},
+			},
+		},
 	}
 }
