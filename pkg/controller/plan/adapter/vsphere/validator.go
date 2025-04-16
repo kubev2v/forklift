@@ -2,6 +2,7 @@ package vsphere
 
 import (
 	"fmt"
+
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
@@ -31,6 +32,17 @@ func (r *Validator) Load() (err error) {
 func (r *Validator) WarmMigration() (ok bool) {
 	ok = true
 	return
+}
+
+// MigrationType indicates whether the plan's migration type
+// is supported by this provider.
+func (r *Validator) MigrationType() bool {
+	switch r.plan.Spec.Type {
+	case api.MigrationCold, api.MigrationWarm, "":
+		return true
+	default:
+		return false
+	}
 }
 
 // Validate that a VM's networks have been mapped.

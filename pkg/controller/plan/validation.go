@@ -40,6 +40,7 @@ import (
 // Types
 const (
 	WarmMigrationNotReady         = "WarmMigrationNotReady"
+	MigrationTypeNotValid         = "MigrationTypeNotValid"
 	NamespaceNotValid             = "NamespaceNotValid"
 	TransferNetNotValid           = "TransferNetworkNotValid"
 	NetRefNotValid                = "NetworkMapRefNotValid"
@@ -312,6 +313,31 @@ func (r *Reconciler) validateWarmMigration(plan *api.Plan) (err error) {
 			Category: Critical,
 			Reason:   NotSupported,
 			Message:  "Warm migration from the source provider is not supported.",
+		})
+	}
+	return
+}
+
+func (r *Reconciler) validateMigrationType(plan *api.Plan) (err error) {
+	provider := plan.Referenced.Provider.Source
+	if provider == nil {
+		return nil
+	}
+	pAdapter, err := adapter.New(provider)
+	if err != nil {
+		return err
+	}
+	validator, err := pAdapter.Validator(plan)
+	if err != nil {
+		return err
+	}
+	if !validator.MigrationType() {
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     MigrationTypeNotValid,
+			Status:   True,
+			Category: Critical,
+			Reason:   NotSupported,
+			Message:  fmt.Sprintf("`%s` migration from the source provider is not supported.", plan.Spec.Type),
 		})
 	}
 	return

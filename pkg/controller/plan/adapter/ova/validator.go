@@ -27,6 +27,17 @@ func (r *Validator) WarmMigration() (ok bool) {
 	return
 }
 
+// MigrationType indicates whether the plan's migration type
+// is supported by this provider.
+func (r *Validator) MigrationType() bool {
+	switch r.plan.Spec.Type {
+	case api.MigrationCold, "":
+		return true
+	default:
+		return false
+	}
+}
+
 // NOOP
 func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, s string, s2 string, err error) {
 	ok = true
