@@ -42,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	multicluster "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 // Application settings.
@@ -132,6 +133,9 @@ func main() {
 	}
 	if err := instancetype.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Error(err, "proceeding without optional kubevirt instance type APIs")
+	}
+	if err := multicluster.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "proceeding without optional multicluster APIs.")
 	}
 	// Setup all Controllers
 	log.Info("Setting up controller")

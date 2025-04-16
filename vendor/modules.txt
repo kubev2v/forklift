@@ -192,7 +192,7 @@ github.com/gorilla/websocket
 # github.com/hashicorp/go-uuid v1.0.3
 ## explicit
 github.com/hashicorp/go-uuid
-# github.com/imdario/mergo v0.3.7
+# github.com/imdario/mergo v0.3.9
 ## explicit
 github.com/imdario/mergo
 # github.com/josharian/intern v1.0.0
@@ -1102,6 +1102,9 @@ sigs.k8s.io/controller-runtime/pkg/webhook/internal/metrics
 ## explicit; go 1.18
 sigs.k8s.io/json
 sigs.k8s.io/json/internal/golang/encoding/json
+# sigs.k8s.io/mcs-api v0.1.0
+## explicit; go 1.14
+sigs.k8s.io/mcs-api/pkg/apis/v1alpha1
 # sigs.k8s.io/structured-merge-diff/v4 v4.4.1
 ## explicit; go 1.13
 sigs.k8s.io/structured-merge-diff/v4/fieldpath
