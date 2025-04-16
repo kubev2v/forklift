@@ -1,14 +1,12 @@
 package ocp
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/ocp"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
 	core "k8s.io/api/core/v1"
 )
 
@@ -43,22 +41,17 @@ func (h PersistentVolumeClaimHandler) List(ctx *gin.Context) {
 		return
 	}
 	if h.WatchRequest {
-		h.watch(ctx)
+		ctx.Status(http.StatusNotImplemented)
 		return
 	}
-	db := h.Collector.DB()
-	list := []model.PersistentVolumeClaim{}
-	err = db.List(&list, h.ListOptions(ctx))
+	pvcs, err := h.PersistentVolumeClaims(ctx, h.Provider)
 	if err != nil {
-		log.Trace(
-			err,
-			"url",
-			ctx.Request.URL)
+		log.Trace(err, "url", ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
 	content := []interface{}{}
-	for _, m := range list {
+	for _, m := range pvcs {
 		r := &PersistentVolumeClaim{}
 		r.With(&m)
 		r.Link(h.Provider)
@@ -76,55 +69,23 @@ func (h PersistentVolumeClaimHandler) Get(ctx *gin.Context) {
 		base.SetForkliftError(ctx, err)
 		return
 	}
-	m := &model.PersistentVolumeClaim{
-		Base: model.Base{
-			UID: ctx.Param(PersistentVolumeClaimParam),
-		},
-	}
-	db := h.Collector.DB()
-	err = db.Get(m)
-	if errors.Is(err, model.NotFound) {
-		ctx.Status(http.StatusNotFound)
-		return
-	}
+	pvcs, err := h.PersistentVolumeClaims(ctx, h.Provider)
 	if err != nil {
-		log.Trace(
-			err,
-			"url",
-			ctx.Request.URL)
+		log.Trace(err, "url", ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	r := &PersistentVolumeClaim{}
-	r.With(m)
-	r.Link(h.Provider)
-	content := r.Content(model.MaxDetail)
-
-	ctx.JSON(http.StatusOK, content)
-}
-
-// Watch.
-func (h PersistentVolumeClaimHandler) watch(ctx *gin.Context) {
-	db := h.Collector.DB()
-	err := h.Watch(
-		ctx,
-		db,
-		&model.PersistentVolumeClaim{},
-		func(in libmodel.Model) (r interface{}) {
-			m := in.(*model.PersistentVolumeClaim)
-			sc := &PersistentVolumeClaim{}
-			sc.With(m)
-			sc.Link(h.Provider)
-			r = sc
+	for _, m := range pvcs {
+		if m.UID == ctx.Param(PersistentVolumeClaimParam) {
+			r := &PersistentVolumeClaim{}
+			r.With(&m)
+			r.Link(h.Provider)
+			content := r.Content(model.MaxDetail)
+			ctx.JSON(http.StatusOK, content)
 			return
-		})
-	if err != nil {
-		log.Trace(
-			err,
-			"url",
-			ctx.Request.URL)
-		ctx.Status(http.StatusInternalServerError)
+		}
 	}
+	ctx.Status(http.StatusNotFound)
 }
 
 // REST Resource.

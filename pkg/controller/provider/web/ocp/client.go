@@ -51,6 +51,18 @@ func (r *Resolver) Path(object interface{}, id string) (path string, err error) 
 		r.UID = id
 		r.Link(provider)
 		path = r.SelfLink
+	case *KubeVirt:
+		r.UID = id
+		r.Link(provider)
+		path = r.SelfLink
+	case *DataVolume:
+		r.UID = id
+		r.Link(provider)
+		path = r.SelfLink
+	case *PersistentVolumeClaim:
+		r.UID = id
+		r.Link(provider)
+		path = r.SelfLink
 	default:
 		err = liberr.Wrap(
 			ResourceNotResolvedError{
@@ -272,8 +284,12 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 		name := ref.Name
 		if name != "" {
 			var ns string
-			ns, name := path.Split(name)
-			ns = strings.TrimRight(ns, "/")
+			if ref.Namespace != "" {
+				ns = ref.Namespace
+			} else {
+				ns, name = path.Split(name)
+				ns = strings.TrimRight(ns, "/")
+			}
 			list := []PersistentVolumeClaim{}
 			err = r.List(
 				&list,
@@ -311,9 +327,56 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 		name := ref.Name
 		if name != "" {
 			var ns string
-			ns, name := path.Split(name)
-			ns = strings.TrimRight(ns, "/")
+			if ref.Namespace != "" {
+				ns = ref.Namespace
+			} else {
+				ns, name = path.Split(name)
+				ns = strings.TrimRight(ns, "/")
+			}
 			list := []DataVolume{}
+			err = r.List(
+				&list,
+				base.Param{
+					Key:   DetailParam,
+					Value: "all",
+				},
+				base.Param{
+					Key:   NsParam,
+					Value: ns,
+				},
+				base.Param{
+					Key:   NameParam,
+					Value: name,
+				})
+			if err != nil {
+				break
+			}
+			if len(list) == 0 {
+				err = liberr.Wrap(NotFoundError{Ref: ref})
+				break
+			}
+			if len(list) > 1 {
+				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
+				break
+			}
+			*res = list[0]
+		}
+	case *KubeVirt:
+		id := ref.ID
+		if id != "" {
+			err = r.Get(resource, id)
+			return
+		}
+		name := ref.Name
+		if name != "" {
+			var ns string
+			if ref.Namespace != "" {
+				ns = ref.Namespace
+			} else {
+				ns, name = path.Split(name)
+				ns = strings.TrimRight(ns, "/")
+			}
+			list := []KubeVirt{}
 			err = r.List(
 				&list,
 				base.Param{
@@ -489,8 +552,9 @@ func (r *Finder) PersistentVolumeClaim(ref *base.Ref) (object interface{}, err e
 	pvc := &PersistentVolumeClaim{}
 	err = r.ByRef(pvc, *ref)
 	if err == nil {
+		ref.Name = pvc.Name
+		ref.Namespace = pvc.Namespace
 		ref.ID = pvc.UID
-		ref.Name = path.Join(pvc.Namespace, pvc.Name)
 		object = pvc
 	}
 
@@ -508,9 +572,30 @@ func (r *Finder) DataVolume(ref *base.Ref) (object interface{}, err error) {
 	dv := &DataVolume{}
 	err = r.ByRef(dv, *ref)
 	if err == nil {
+		ref.Name = dv.Name
+		ref.Namespace = dv.Namespace
 		ref.ID = dv.UID
-		ref.Name = path.Join(dv.Namespace, dv.Name)
 		object = dv
+	}
+
+	return
+}
+
+// Find a KubeVirt by ref.
+// Returns the matching resource and:
+//
+//	ProviderNotSupportedErr
+//	ProviderNotReadyErr
+//	NotFoundErr
+//	RefNotUniqueErr
+func (r *Finder) KubeVirt(ref *base.Ref) (object interface{}, err error) {
+	kv := &KubeVirt{}
+	err = r.ByRef(kv, *ref)
+	if err == nil {
+		ref.Name = kv.Name
+		ref.Namespace = kv.Namespace
+		ref.ID = kv.UID
+		object = kv
 	}
 
 	return

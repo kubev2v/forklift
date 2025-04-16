@@ -280,6 +280,7 @@ func (r *Migration) Archive() {
 			return false
 		}
 		_ = r.cleanup(vm, dontFailOnError)
+		r.migrator.Complete(vm)
 	}
 }
 
@@ -345,6 +346,7 @@ func (r *Migration) Cancel() error {
 						vm.String())
 				}
 			}
+			r.migrator.Complete(vm)
 			vm.MarkCompleted()
 			markStartedStepsCompleted(vm)
 		}
@@ -357,31 +359,7 @@ func (r *Migration) Cancel() error {
 // If this was the last phase in the current pipeline step, the pipeline step
 // is marked complete.
 func (r *Migration) NextPhase(vm *plan.VMStatus) {
-	currentStep, found := vm.FindStep(r.migrator.Step(vm))
-	if !found {
-		vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
-		return
-	}
-	vm.Phase = r.migrator.Next(vm)
-	switch vm.Phase {
-	case api.PhaseCompleted:
-		// `Completed` is a terminal phase that does not belong
-		// to a pipeline step. If it is the next VM phase, then
-		// mark the current pipeline step complete without
-		// looking for a following step.
-		currentStep.MarkCompleted()
-		currentStep.Phase = api.StepCompleted
-	default:
-		nextStep, found := vm.FindStep(r.migrator.Step(vm))
-		if !found {
-			vm.AddError(fmt.Sprintf("Next step '%s' not found", r.migrator.Step(vm)))
-			return
-		}
-		if currentStep.Name != nextStep.Name {
-			currentStep.MarkCompleted()
-			currentStep.Phase = api.StepCompleted
-		}
-	}
+	migrator.NextPhase(r.migrator, vm)
 }
 
 func markStartedStepsCompleted(vm *plan.VMStatus) {

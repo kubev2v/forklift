@@ -72,6 +72,13 @@ func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) libcontain
 					path.Join(
 						provider.GetNamespace(),
 						provider.GetName())),
+			},
+			&KubeVirt{
+				log: logging.WithName("collection|kubevirt").WithValues(
+					"provider",
+					path.Join(
+						provider.GetNamespace(),
+						provider.GetName())),
 			}),
 	}
 }

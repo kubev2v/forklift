@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.0
+    controller-gen.kubebuilder.io/version: v0.17.3
   name: plans.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
@@ -385,6 +385,10 @@ spec:
               type:
                 description: Migration type. e.g. "cold", "warm", "live". Supersedes
                   the `warm` boolean if set.
+                enum:
+                - cold
+                - warm
+                - live
                 type: string
               vms:
                 description: List of VMs.
