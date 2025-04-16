@@ -4,6 +4,7 @@ import (
 	"context"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	ocp "github.com/konveyor/forklift-controller/pkg/lib/client/openshift"
 	core "k8s.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -31,7 +32,7 @@ func K8sClient(provider *api.Provider) (client k8sclient.Client, err error) {
 			return
 		}
 
-		client, err = openshift.Client(provider, secret)
+		client, err = ocp.Client(provider, secret)
 		if err != nil {
 			return
 		}
