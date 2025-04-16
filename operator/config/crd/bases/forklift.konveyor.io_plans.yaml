@@ -382,6 +382,10 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+              type:
+                description: Migration type. e.g. "cold", "warm", "live". Supersedes
+                  the `warm` boolean if set.
+                type: string
               vms:
                 description: List of VMs.
                 items:

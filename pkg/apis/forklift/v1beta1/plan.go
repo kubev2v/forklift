@@ -134,6 +134,9 @@ type PlanSpec struct {
 	// Determines if the plan should skip the guest conversion.
 	// +kubebuilder:default:=false
 	SkipGuestConversion bool `json:"skipGuestConversion,omitempty"`
+	// Migration type. e.g. "cold", "warm", "live". Supersedes the `warm` boolean if set.
+	// +optional
+	Type string `json:"type,omitempty"`
 }
 
 // Find a planned VM.
