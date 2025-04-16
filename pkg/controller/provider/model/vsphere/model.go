@@ -284,6 +284,7 @@ type VM struct {
 	GuestIpStacks         []GuestIpStack `sql:""`
 	SecureBoot            bool           `sql:""`
 	DiskEnableUuid        bool           `sql:""`
+	NestedHVEnabled       bool           `sql:""`
 }
 
 // Determine if current revision has been validated.

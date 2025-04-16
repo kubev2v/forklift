@@ -692,6 +692,10 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 
 					}
 				}
+			case fNestedHVEnabled:
+				if b, cast := p.Val.(bool); cast {
+					v.model.NestedHVEnabled = b
+				}
 			case fGuestNet:
 				if nics, cast := p.Val.(types.ArrayOfGuestNicInfo); cast {
 					guestNetworksList := []model.GuestNetwork{}

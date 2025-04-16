@@ -804,6 +804,19 @@ func (r *Builder) mapCPU(vm *model.VM, object *cnv.VirtualMachineSpec) {
 		Sockets: uint32(vm.CpuCount / vm.CoresPerSocket),
 		Cores:   uint32(vm.CoresPerSocket),
 	}
+	if vm.NestedHVEnabled {
+		//FIXME: Replace in future with single feature flag for nested virt https://issues.redhat.com/browse/CNV-60150
+		var features []cnv.CPUFeature
+		features = append(features, cnv.CPUFeature{
+			Name:   "vmx",
+			Policy: "optional",
+		})
+		features = append(features, cnv.CPUFeature{
+			Name:   "svm",
+			Policy: "optional",
+		})
+		object.Template.Spec.Domain.CPU.Features = features
+	}
 }
 
 func (r *Builder) mapFirmware(vm *model.VM, object *cnv.VirtualMachineSpec) {
