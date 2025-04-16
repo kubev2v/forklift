@@ -679,89 +679,75 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 
 	numNetworks := 0
 	netMapIn := r.Context.Map.Network.Spec.Map
-	for i := range netMapIn {
-		mapped := &netMapIn[i]
 
-		// Skip network mappings with destination type 'Ignored'
-		if mapped.Destination.Type == Ignored {
+	for _, nic := range vm.NICs {
+		mapped := r.findNetworkMapping(nic, netMapIn)
+
+		// Skip if no valid mapping found or the destination type is Ignored
+		if mapped == nil || mapped.Destination.Type == Ignored {
 			continue
 		}
 
-		ref := mapped.Source
-		network := &model.Network{}
-		fErr := r.Source.Inventory.Find(network, ref)
-		if fErr != nil {
-			err = fErr
-			return
-		}
+		networkName := fmt.Sprintf("net-%v", numNetworks)
 
-		needed := []vsphere.NIC{}
-		for _, nic := range vm.NICs {
-			switch network.Variant {
-			case vsphere.NetDvPortGroup, vsphere.OpaqueNetwork:
-				if nic.Network.ID == network.Key {
-					needed = append(needed, nic)
-				}
-			default:
-				if nic.Network.ID == network.ID {
-					needed = append(needed, nic)
-				}
+		// If a name template is defined, try to use it
+		networkNameTemplate := r.getNetworkNameTemplate(vm)
+		if networkNameTemplate != "" {
+			templateData := api.NetworkNameTemplateData{
+				NetworkName:      mapped.Destination.Name,
+				NetworkNamespace: mapped.Destination.Namespace,
+				NetworkType:      mapped.Destination.Type,
+				NetworkIndex:     numNetworks,
+			}
+			if generated, err := r.executeTemplate(networkNameTemplate, &templateData); err == nil && generated != "" {
+				networkName = generated
+			} else {
+				r.Log.Info("Failed to generate network name using template, using default", "template", networkNameTemplate, "error", err)
 			}
 		}
-		if len(needed) == 0 {
-			continue
+
+		numNetworks++
+		kNetwork := cnv.Network{Name: networkName}
+		kInterface := cnv.Interface{
+			Name:       networkName,
+			Model:      Virtio,
+			MacAddress: nic.MAC,
 		}
-		for _, nic := range needed {
-			networkName := fmt.Sprintf("net-%v", numNetworks)
 
-			// If the network name template is set, use it to generate the network name.
-			networkNameTemplate := r.getNetworkNameTemplate(vm)
-			if networkNameTemplate != "" {
-				// Create template data
-				templateData := api.NetworkNameTemplateData{
-					NetworkName:      mapped.Destination.Name,
-					NetworkNamespace: mapped.Destination.Namespace,
-					NetworkType:      mapped.Destination.Type,
-					NetworkIndex:     numNetworks,
-				}
-
-				networkName, err = r.executeTemplate(networkNameTemplate, &templateData)
-				if err != nil {
-					// Failed to generate network name using template
-					r.Log.Info("Failed to generate network name using template, using default name", "template", networkNameTemplate, "error", err)
-
-					// Fallback to default name and reset error
-					networkName = fmt.Sprintf("net-%v", numNetworks)
-					err = nil
-				}
+		switch mapped.Destination.Type {
+		case Pod:
+			kNetwork.Pod = &cnv.PodNetwork{}
+			kInterface.Masquerade = &cnv.InterfaceMasquerade{}
+		case Multus:
+			kNetwork.Multus = &cnv.MultusNetwork{
+				NetworkName: path.Join(mapped.Destination.Namespace, mapped.Destination.Name),
 			}
-
-			numNetworks++
-			kNetwork := cnv.Network{
-				Name: networkName,
-			}
-			kInterface := cnv.Interface{
-				Name:       networkName,
-				Model:      Virtio,
-				MacAddress: nic.MAC,
-			}
-			switch mapped.Destination.Type {
-			case Pod:
-				kNetwork.Pod = &cnv.PodNetwork{}
-				kInterface.Masquerade = &cnv.InterfaceMasquerade{}
-			case Multus:
-				kNetwork.Multus = &cnv.MultusNetwork{
-					NetworkName: path.Join(mapped.Destination.Namespace, mapped.Destination.Name),
-				}
-				kInterface.Bridge = &cnv.InterfaceBridge{}
-			}
-			kNetworks = append(kNetworks, kNetwork)
-			kInterfaces = append(kInterfaces, kInterface)
+			kInterface.Bridge = &cnv.InterfaceBridge{}
 		}
+
+		kNetworks = append(kNetworks, kNetwork)
+		kInterfaces = append(kInterfaces, kInterface)
 	}
+
 	object.Template.Spec.Networks = kNetworks
 	object.Template.Spec.Domain.Devices.Interfaces = kInterfaces
 	return
+}
+
+func (r *Builder) findNetworkMapping(nic vsphere.NIC, netMap []api.NetworkPair) *api.NetworkPair {
+	for i := range netMap {
+		candidate := &netMap[i]
+		network := &model.Network{}
+		if err := r.Source.Inventory.Find(network, candidate.Source); err != nil {
+			continue
+		}
+
+		if (network.Variant == vsphere.NetDvPortGroup || network.Variant == vsphere.OpaqueNetwork) &&
+			nic.Network.ID == network.Key || nic.Network.ID == network.ID {
+			return candidate
+		}
+	}
+	return nil
 }
 
 func (r *Builder) mapInput(object *cnv.VirtualMachineSpec) {
