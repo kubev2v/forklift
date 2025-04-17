@@ -79,7 +79,7 @@ func New(context *plancontext.Context) (migrator base.Migrator, err error) {
 		}
 		migrator = &m
 	}
-	r.Log.Info("Built OCP migrator.", "plan", path.Join(context.Plan.Namespace, context.Plan.Name), "type", context.Plan.Spec.Type)
+	context.Log.Info("Built OCP migrator.", "type", context.Plan.Spec.Type)
 	return
 }
 
@@ -271,6 +271,7 @@ func (r *LiveMigrator) Pipeline(vm planapi.VM) (pipeline []*planapi.Step, err er
 	return
 }
 
+// TODO: make logging consistent
 func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 	ok = true
 	switch vm.Phase {
@@ -477,6 +478,7 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 	return
 }
 
+// TODO: improve error messages
 func (r *LiveMigrator) WaitForStateTransfer(vm *planapi.VMStatus) (done bool, err error) {
 	source, found, err := r.GetSourceVMIM(vm)
 	if err != nil {
@@ -578,6 +580,7 @@ func (r *LiveMigrator) GetSourceVMIM(vm *planapi.VMStatus) (vmim *cnv.VirtualMac
 	return
 }
 
+// TODO: move into ensurer, refactor to use new pattern (receive object to ensure as parameter)
 func (r *LiveMigrator) EnsureTargetMigration(vm *planapi.VMStatus) (vmim *cnv.VirtualMachineInstanceMigration, err error) {
 	vmim, found, err := r.GetTargetVMIM(vm)
 	if err != nil {
@@ -605,6 +608,7 @@ func (r *LiveMigrator) EnsureTargetMigration(vm *planapi.VMStatus) (vmim *cnv.Vi
 	return
 }
 
+// TODO: move into ensurer, refactor to use new pattern (receive object to ensure as parameter)
 func (r *LiveMigrator) EnsureSourceMigration(vm *planapi.VMStatus, target *cnv.VirtualMachineInstanceMigration) (err error) {
 	vmim, found, err := r.GetSourceVMIM(vm)
 	if err != nil {
@@ -633,6 +637,7 @@ func (r *LiveMigrator) EnsureSourceMigration(vm *planapi.VMStatus, target *cnv.V
 	return
 }
 
+// TODO: move into ensurer, clean up
 func (r *LiveMigrator) EnsureServiceExports(vm *planapi.VMStatus, target *cnv.VirtualMachine) (err error) {
 	for _, kind := range []string{"sync", "migration"} {
 		export := &multicluster.ServiceExport{}
@@ -664,6 +669,7 @@ func (r *LiveMigrator) TargetVMIMReady(vmim *cnv.VirtualMachineInstanceMigration
 	return
 }
 
+// TODO: move into builder
 func (r *LiveMigrator) targetVMIM(vm *planapi.VMStatus) (vmim *cnv.VirtualMachineInstanceMigration, err error) {
 	target, err := r.GetTargetVM(vm)
 	if err != nil {
@@ -680,6 +686,7 @@ func (r *LiveMigrator) targetVMIM(vm *planapi.VMStatus) (vmim *cnv.VirtualMachin
 	return
 }
 
+// TODO: move into builder
 func (r *LiveMigrator) sourceVMIM(vm *planapi.VMStatus, target *cnv.VirtualMachineInstanceMigration) (vmim *cnv.VirtualMachineInstanceMigration, err error) {
 	inventoryVm := &model.VM{}
 	err = r.Context.Source.Inventory.Find(inventoryVm, vm.Ref)
@@ -702,6 +709,8 @@ func (r *LiveMigrator) sourceVMIM(vm *planapi.VMStatus, target *cnv.VirtualMachi
 	return
 }
 
+// DeleteServiceExports deletes the ServiceExports that were created to expose the sync endpooints on
+// the destination cluster.
 func (r *LiveMigrator) DeleteServiceExports(vm *planapi.VMStatus) (err error) {
 	err = r.Destination.Client.DeleteAllOf(
 		context.Background(),
@@ -719,6 +728,7 @@ func (r *LiveMigrator) DeleteServiceExports(vm *planapi.VMStatus) (err error) {
 	return
 }
 
+// DeleteSourceVMIM deletes the VMIM resource from the source cluster.
 func (r *LiveMigrator) DeleteSourceVMIM(vm *planapi.VMStatus) (err error) {
 	inventoryVm := &model.VM{}
 	err = r.Context.Source.Inventory.Find(inventoryVm, vm.Ref)
@@ -741,6 +751,7 @@ func (r *LiveMigrator) DeleteSourceVMIM(vm *planapi.VMStatus) (err error) {
 	return
 }
 
+// DeleteTargetVMIM deletes the VMIM resource from the target cluster.
 func (r *LiveMigrator) DeleteTargetVMIM(vm *planapi.VMStatus) (err error) {
 	err = r.Destination.Client.DeleteAllOf(
 		context.Background(),
@@ -757,10 +768,14 @@ func (r *LiveMigrator) DeleteTargetVMIM(vm *planapi.VMStatus) (err error) {
 	return
 }
 
+// Ensurer has the limited responsibility of ensuring resources
+// are present in the destination cluster and namespace.
 type Ensurer struct {
 	*plancontext.Context
 }
 
+// EnsureDataVolumes have been created on the destination cluster. Although we build DataVolumes with the same
+// names they had on the source cluster, we search by label so that we notice conflicts with existing DVs.
 func (r *Ensurer) EnsureDataVolumes(vm *planapi.VMStatus, dvs []cdi.DataVolume) (err error) {
 	list := &cdi.DataVolumeList{}
 	err = r.Destination.Client.List(
@@ -803,8 +818,8 @@ func (r *Ensurer) EnsureDataVolumes(vm *planapi.VMStatus, dvs []cdi.DataVolume) 
 // with the same name that they have on the source cluster because they are likely to be shared between
 // multiple VMs. If one with a matching name already exists, we assume it's the intended ConfigMap for
 // the VM to mount.
-// TODO: raise a VM concern if a configmap with the desired name already exists but does not
-// have the annotation indicating that Forklift created it.
+// TODO: consider raising a concern at the VM or plan level if a configmap with the desired
+// name already exists but does not have the annotation indicating that Forklift created it.
 func (r *Ensurer) EnsureConfigMaps(vm *planapi.VMStatus, configMaps []core.ConfigMap) (err error) {
 	for _, configMap := range configMaps {
 		err = r.Destination.Client.Create(context.Background(), &configMap)
@@ -841,8 +856,8 @@ func (r *Ensurer) EnsureConfigMaps(vm *planapi.VMStatus, configMaps []core.Confi
 // with the same name that they have on the source cluster because they are likely to be shared between
 // multiple VMs. If one with a matching name already exists, we assume it's the intended Secret for
 // the VM to mount.
-// TODO: raise a VM concern if a secret with the desired name already exists but does not
-// have the annotation indicating that Forklift created it.
+// TODO: consider raising a concern at the VM or plan level if a secret with the desired
+// name already exists but does not have the annotation indicating that Forklift created it.
 func (r *Ensurer) EnsureSecrets(vm *planapi.VMStatus, secrets []core.Secret) (err error) {
 	for _, secret := range secrets {
 		err = r.Destination.Client.Create(context.Background(), &secret)
@@ -875,6 +890,8 @@ func (r *Ensurer) EnsureSecrets(vm *planapi.VMStatus, secrets []core.Secret) (er
 	return
 }
 
+// EnsureVirtualMachine ensures that the target VirtualMachine has been created in the destination cluster.
+// Labels are used to search for the VM in order to be sure that Forklift is what created it.
 func (r *Ensurer) EnsureVirtualMachine(vm *planapi.VMStatus, target *cnv.VirtualMachine) (err error) {
 	vms := &cnv.VirtualMachineList{}
 	err = r.Destination.Client.List(
@@ -897,7 +914,7 @@ func (r *Ensurer) EnsureVirtualMachine(vm *planapi.VMStatus, target *cnv.Virtual
 			return
 		}
 		r.Log.Info(
-			"Created Kubevirt VM.",
+			"Created destination VM.",
 			"vm",
 			path.Join(
 				target.Namespace,
@@ -910,26 +927,18 @@ func (r *Ensurer) EnsureVirtualMachine(vm *planapi.VMStatus, target *cnv.Virtual
 	return
 }
 
-func (r *Ensurer) EnsureDataVolumeOwnership(vm *planapi.VMStatus) (err error) {
-	dvs := &cdi.DataVolumeList{}
-	err = r.Destination.Client.List(
-		context.TODO(),
-		dvs,
-		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
-			Namespace:     r.Plan.Spec.TargetNamespace,
-		})
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-	return
-}
-
 type Builder struct {
 	*plancontext.Context
 	sourceClient client.Client
 }
 
+// VirtualMachine builds a cnv.VirtualMachine resource that is a copy of the source VirtualMachine with
+// its resources remapped to ones present on the destination. It is important that all DataVolumes are built
+// and applied to the destination before the VirtualMachine is so that KubeVirt doesn't try to act on
+// any DataVolumeTemplates.
+// We assume that DataVolumes, PVCs, Secrets, ConfigMaps, etc on the destination are created with the
+// same names as on the source so that they stay consistent, especially across multiple migrations.
+// This means that the volume mappings on the target VM spec do not need to change.
 func (r *Builder) VirtualMachine(vm *planapi.VMStatus, dvs []cdi.DataVolume) (obj *cnv.VirtualMachine, err error) {
 	source := &model.VM{}
 	err = r.Source.Inventory.Find(source, vm.Ref)
@@ -941,39 +950,18 @@ func (r *Builder) VirtualMachine(vm *planapi.VMStatus, dvs []cdi.DataVolume) (ob
 	halted := cnv.RunStrategyHalted
 	object := &cnv.VirtualMachine{
 		Spec: cnv.VirtualMachineSpec{
-			Template:    source.Object.Spec.Template.DeepCopy(),
-			Running:     nil,
-			RunStrategy: &halted,
+			DataVolumeTemplates: source.Object.Spec.DataVolumeTemplates,
+			Template:            source.Object.Spec.Template.DeepCopy(),
+			Running:             nil,
+			RunStrategy:         &halted,
 		},
 	}
-	r.mapVolumes(object, dvs)
 	r.mapNetworks(object)
 	return
 }
 
-func (r *Builder) mapVolumes(target *cnv.VirtualMachine, dvs []cdi.DataVolume) {
-	volMap := make(map[string]*cdi.DataVolume)
-	for i := range dvs {
-		dv := &dvs[i]
-		volMap[dv.Annotations[AnnVolumeName]] = dv
-	}
-	for i := range target.Spec.Template.Spec.Volumes {
-		vol := &target.Spec.Template.Spec.Volumes[i]
-		switch {
-		case vol.DataVolume != nil:
-			vol.DataVolume.Name = volMap[vol.Name].Name
-		case vol.PersistentVolumeClaim != nil:
-			vol.DataVolume = &cnv.DataVolumeSource{
-				Name: volMap[vol.Name].Name,
-			}
-			vol.PersistentVolumeClaim = nil
-		}
-	}
-	return
-}
-
 func (r *Builder) mapNetworks(target *cnv.VirtualMachine) {
-	networkMap := make(map[string]v1beta1.DestinationNetwork)
+	networkMap := make(map[string]api.DestinationNetwork)
 	for _, network := range r.Map.Network.Spec.Map {
 		networkMap[network.Source.Name] = network.Destination
 	}
@@ -988,6 +976,12 @@ func (r *Builder) mapNetworks(target *cnv.VirtualMachine) {
 	}
 }
 
+// DataVolumes builds CRs for each of the DataVolumes specified in the source VM. The
+// destination CRs should have a `blank` DataVolumeSource as the live migration mechanism
+// in KubeVirt will deal with populating them.
+// These need to be applied to the target cluster before the VM that refers to them.
+// (in part because if the VM spec has DataVolumeTemplates and the specified DVs do not exist yet,
+// then KubeVirt will try to create and populate them based on the template source which we don't want.)
 func (r *Builder) DataVolumes(vm *planapi.VMStatus) (dvs []cdi.DataVolume, err error) {
 	virtualMachine := &model.VM{}
 	err = r.Source.Inventory.Find(virtualMachine, vm.Ref)
@@ -995,22 +989,79 @@ func (r *Builder) DataVolumes(vm *planapi.VMStatus) (dvs []cdi.DataVolume, err e
 		err = liberr.Wrap(err, "vm", vm.Ref.String())
 		return
 	}
-	storageMap := make(map[string]v1beta1.DestinationStorage)
+	storageMap := make(map[string]api.DestinationStorage)
 	for _, storage := range r.Map.Storage.Spec.Map {
 		storageMap[storage.Source.Name] = storage.Destination
 	}
 	for _, vol := range virtualMachine.Object.Spec.Template.Spec.Volumes {
+		source := &model.DataVolume{}
 		pvc := &model.PersistentVolumeClaim{}
 		switch {
 		case vol.DataVolume != nil:
-			pvc, err = r.pvc(vm, vol)
+			dvRef := ref.Ref{Name: vol.DataVolume.Name, Namespace: vm.Namespace}
+			err = r.Source.Inventory.Find(&source, dvRef)
+			if err != nil {
+				return
+			}
+			pvcRef := ref.Ref{Name: source.Object.Status.ClaimName, Namespace: vm.Namespace}
+			err = r.Source.Inventory.Find(pvc, pvcRef)
+			if err != nil {
+				return
+			}
+		default:
+			continue
+		}
+		var storageClass string
+		if source.Object.Spec.Storage != nil && source.Object.Spec.Storage.StorageClassName != nil {
+			storageClass = *source.Object.Spec.Storage.StorageClassName
+		} else if pvc.Object.Spec.StorageClassName != nil {
+			storageClass = *pvc.Object.Spec.StorageClassName
+		}
+		storage, ok := storageMap[storageClass]
+		if !ok {
+			err = liberr.New(
+				"Couldn't find destination storage mapping for volume.",
+				"sc", storageClass,
+				"volume", vol.Name,
+				"kind", "dv",
+			)
+			return
+		}
+		target := r.targetDataVolume(source, pvc, storage)
+		r.Labeler.SetLabels(&target, r.Labeler.VMLabels(vm.Ref))
+		r.Labeler.SetAnnotations(&target, r.Labeler.VMLabels(vm.Ref))
+		r.Labeler.SetAnnotation(&target, AnnDiskSource, path.Join(pvc.Namespace, pvc.Name))
+		r.Labeler.SetAnnotation(&target, AnnVolumeName, vol.Name)
+		dvs = append(dvs, target)
+	}
+	return
+}
+
+// PersistentVolumeClaims builds CRs for each of the PersistentVolumeClaims specified in the source VM.
+func (r *Builder) PersistentVolumeClaims(vm *planapi.VMStatus) (pvcs []core.PersistentVolumeClaim, err error) {
+	virtualMachine := &model.VM{}
+	err = r.Source.Inventory.Find(virtualMachine, vm.Ref)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		return
+	}
+	storageMap := make(map[string]api.DestinationStorage)
+	for _, storage := range r.Map.Storage.Spec.Map {
+		storageMap[storage.Source.Name] = storage.Destination
+	}
+	for _, vol := range virtualMachine.Object.Spec.Template.Spec.Volumes {
+		source := &model.PersistentVolumeClaim{}
+		switch {
+		case vol.PersistentVolumeClaim != nil:
+			pvcRef := ref.Ref{Name: vol.PersistentVolumeClaim.ClaimName, Namespace: vm.Namespace}
+			err = r.Source.Inventory.Find(source, pvcRef)
 			if err != nil {
 				err = liberr.Wrap(err, "vm", vm.Ref.String(), "volume", vol.Name)
 				return
 			}
-		case vol.PersistentVolumeClaim != nil:
-			pvcRef := ref.Ref{Name: vol.PersistentVolumeClaim.ClaimName, Namespace: vm.Namespace}
-			err = r.Source.Inventory.Find(pvc, pvcRef)
+		case vol.Ephemeral != nil && vol.Ephemeral.PersistentVolumeClaim != nil:
+			pvcRef := ref.Ref{Name: vol.Ephemeral.PersistentVolumeClaim.ClaimName, Namespace: vm.Namespace}
+			err = r.Source.Inventory.Find(source, pvcRef)
 			if err != nil {
 				err = liberr.Wrap(err, "vm", vm.Ref.String(), "volume", vol.Name)
 				return
@@ -1018,32 +1069,61 @@ func (r *Builder) DataVolumes(vm *planapi.VMStatus) (dvs []cdi.DataVolume, err e
 		default:
 			continue
 		}
-		if pvc.Object.Spec.StorageClassName == nil {
-			err = liberr.New("Couldn't find destination storage class for volume.", "")
+		var storageClass string
+		if source.Object.Spec.StorageClassName != nil {
+			storageClass = *source.Object.Spec.StorageClassName
+		}
+		storage, ok := storageMap[storageClass]
+		if !ok {
+			err = liberr.New(
+				"Couldn't find destination storage mapping for volume.",
+				"sc", storageClass,
+				"volume", vol.Name,
+				"kind", "pvc",
+			)
 			return
 		}
-		storage := storageMap[*pvc.Object.Spec.StorageClassName]
-		dv := r.dataVolume(vm, pvc, storage)
-		r.Labeler.SetAnnotation(&dv, AnnDiskSource, path.Join(pvc.Namespace, pvc.Name))
-		r.Labeler.SetAnnotation(&dv, AnnVolumeName, vol.Name)
-		dvs = append(dvs, dv)
+		target := r.targetPvc(source, storage)
+		r.Labeler.SetLabels(&target, r.Labeler.VMLabels(vm.Ref))
+		r.Labeler.SetAnnotations(&target, r.Labeler.VMLabels(vm.Ref))
+		r.Labeler.SetAnnotation(&target, AnnDiskSource, path.Join(source.Namespace, source.Name))
+		r.Labeler.SetAnnotation(&target, AnnVolumeName, vol.Name)
+		pvcs = append(pvcs, target)
 	}
 	return
 }
 
-func (r *Builder) dataVolume(vm *planapi.VMStatus, pvc *model.PersistentVolumeClaim, storage v1beta1.DestinationStorage) (dv cdi.DataVolume) {
+// targetPvc creates a target CR based on the source CR.
+func (r *Builder) targetPvc(source *model.PersistentVolumeClaim, storage api.DestinationStorage) (pvc core.PersistentVolumeClaim) {
+	pvc = core.PersistentVolumeClaim{}
+	pvc.Namespace = r.Plan.Spec.TargetNamespace
+	pvc.Name = source.Name
+	pvc.Labels = source.Object.Labels
+	pvc.Annotations = source.Object.Annotations
+	pvc.Spec = core.PersistentVolumeClaimSpec{
+		Selector:         source.Object.Spec.Selector,
+		Resources:        source.Object.Spec.Resources,
+		StorageClassName: &storage.StorageClass,
+	}
+	if storage.AccessMode != "" {
+		pvc.Spec.AccessModes = []core.PersistentVolumeAccessMode{storage.AccessMode}
+	}
+	if storage.VolumeMode != "" {
+		pvc.Spec.VolumeMode = &storage.VolumeMode
+	}
+	return
+}
+
+// targetDataVolume creates a target CR based on the source CR.
+func (r *Builder) targetDataVolume(source *model.DataVolume, pvc *model.PersistentVolumeClaim, storage api.DestinationStorage) (dv cdi.DataVolume) {
 	size := pvc.Object.Spec.Resources.Requests["storage"]
 	dv = cdi.DataVolume{}
 	dv.Namespace = r.Plan.Spec.TargetNamespace
-	dv.GenerateName = strings.Join(
-		[]string{
-			r.Plan.Name,
-			vm.ID},
-		"-") + "-"
-	dv.Annotations = r.Labeler.VMLabels(vm.Ref)
+	dv.Name = source.Name
+	dv.Labels = source.Object.Labels
+	dv.Annotations = source.Object.Annotations
 	dv.Annotations[AnnBindImmediate] = "true"
 	dv.Annotations[AnnDeleteAfterCompletion] = "false"
-	dv.Labels = r.Labeler.VMLabels(vm.Ref)
 	dv.Spec = cdi.DataVolumeSpec{
 		Source: &cdi.DataVolumeSource{
 			Blank: &cdi.DataVolumeBlankImage{},
@@ -1057,6 +1137,14 @@ func (r *Builder) dataVolume(vm *planapi.VMStatus, pvc *model.PersistentVolumeCl
 			StorageClassName: &storage.StorageClass,
 		},
 	}
+	if source.Object.Spec.Storage != nil {
+		if len(source.Object.Spec.Storage.Resources.Limits) != 0 {
+			dv.Spec.Storage.Resources.Limits = source.Object.Spec.Storage.Resources.Limits
+		}
+		if len(source.Object.Spec.Storage.Resources.Requests) != 0 {
+			dv.Spec.Storage.Resources.Requests = source.Object.Spec.Storage.Resources.Requests
+		}
+	}
 	if storage.AccessMode != "" {
 		dv.Spec.Storage.AccessModes = []core.PersistentVolumeAccessMode{storage.AccessMode}
 	}
@@ -1066,22 +1154,9 @@ func (r *Builder) dataVolume(vm *planapi.VMStatus, pvc *model.PersistentVolumeCl
 	return
 }
 
-func (r *Builder) pvc(vm *planapi.VMStatus, vol cnv.Volume) (pvc *model.PersistentVolumeClaim, err error) {
-	source := model.DataVolume{}
-	dvRef := ref.Ref{Name: vol.DataVolume.Name, Namespace: vm.Namespace}
-	err = r.Source.Inventory.Find(&source, dvRef)
-	if err != nil {
-		return
-	}
-	pvc = &model.PersistentVolumeClaim{}
-	pvcRef := ref.Ref{Name: source.Object.Status.ClaimName, Namespace: vm.Namespace}
-	err = r.Source.Inventory.Find(pvc, pvcRef)
-	if err != nil {
-		return
-	}
-	return
-}
-
+// ConfigMaps builds CRs for each of the ConfigMaps that the source VM depends upon.
+// Migration labels are set to track when they were first created, but since these may be
+// used by more than one VM they are not labeled with the VM id.
 func (r *Builder) ConfigMaps(vm *planapi.VMStatus) (list []core.ConfigMap, err error) {
 	virtualMachine := &model.VM{}
 	err = r.Source.Inventory.Find(virtualMachine, vm.Ref)
@@ -1089,31 +1164,41 @@ func (r *Builder) ConfigMaps(vm *planapi.VMStatus) (list []core.ConfigMap, err e
 		err = liberr.Wrap(err, "vm", vm.Ref.String())
 		return
 	}
+	sources := []types.NamespacedName{}
 	for _, vol := range virtualMachine.Object.Spec.Template.Spec.Volumes {
 		switch {
 		case vol.ConfigMap != nil:
-			source := &core.ConfigMap{}
 			key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.ConfigMap.Name}
-			err = r.sourceClient.Get(context.Background(), key, source)
-			if err != nil {
-				err = liberr.Wrap(err)
-				return
-			}
-			target := core.ConfigMap{}
-			target.Name = source.Name
-			target.Namespace = r.Plan.Spec.TargetNamespace
-			target.Data = source.Data
-			target.BinaryData = source.BinaryData
-			target.Immutable = source.Immutable
-			target.SetLabels(source.GetLabels())
-			target.SetAnnotations(source.GetAnnotations())
-			r.Labeler.SetAnnotation(&target, AnnSource, key.String())
-			list = append(list, target)
+			sources = append(sources, key)
+		default:
+			continue
 		}
+	}
+	for _, key := range sources {
+		source := &core.ConfigMap{}
+		err = r.sourceClient.Get(context.Background(), key, source)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+		target := core.ConfigMap{}
+		target.Name = source.Name
+		target.Namespace = r.Plan.Spec.TargetNamespace
+		target.Data = source.Data
+		target.BinaryData = source.BinaryData
+		target.Immutable = source.Immutable
+		target.SetLabels(source.GetLabels())
+		r.Labeler.SetLabels(&target, r.Labeler.MigrationLabels())
+		target.SetAnnotations(source.GetAnnotations())
+		r.Labeler.SetAnnotation(&target, AnnSource, key.String())
+		list = append(list, target)
 	}
 	return
 }
 
+// Secrets builds CRs for each of the Secrets that the source VM depends upon.
+// Migration labels are set to track when they were first created, but since these may be
+// used by more than one VM they are not labeled with the VM id.
 func (r *Builder) Secrets(vm *planapi.VMStatus) (list []core.Secret, err error) {
 	virtualMachine := &model.VM{}
 	err = r.Source.Inventory.Find(virtualMachine, vm.Ref)
@@ -1121,26 +1206,50 @@ func (r *Builder) Secrets(vm *planapi.VMStatus) (list []core.Secret, err error) 
 		err = liberr.Wrap(err, "vm", vm.Ref.String())
 		return
 	}
+	sources := []types.NamespacedName{}
 	for _, vol := range virtualMachine.Object.Spec.Template.Spec.Volumes {
 		switch {
 		case vol.Secret != nil:
-			source := &core.Secret{}
 			key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.Secret.SecretName}
-			err = r.sourceClient.Get(context.Background(), key, source)
-			if err != nil {
-				err = liberr.Wrap(err)
-				return
+			sources = append(sources, key)
+		case vol.CloudInitNoCloud != nil:
+			if vol.CloudInitNoCloud.UserDataSecretRef != nil {
+				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.CloudInitNoCloud.UserDataSecretRef.Name}
+				sources = append(sources, key)
 			}
-			target := core.Secret{}
-			target.Name = source.Name
-			target.Namespace = r.Plan.Spec.TargetNamespace
-			target.Data = source.Data
-			target.Immutable = source.Immutable
-			target.SetLabels(source.GetLabels())
-			target.SetAnnotations(source.GetAnnotations())
-			r.Labeler.SetAnnotation(&target, AnnSource, key.String())
-			list = append(list, target)
+			if vol.CloudInitNoCloud.NetworkDataSecretRef != nil {
+				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.CloudInitNoCloud.NetworkDataSecretRef.Name}
+				sources = append(sources, key)
+			}
+		case vol.CloudInitConfigDrive != nil:
+			if vol.CloudInitConfigDrive.UserDataSecretRef != nil {
+				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.CloudInitConfigDrive.UserDataSecretRef.Name}
+				sources = append(sources, key)
+			}
+			if vol.CloudInitConfigDrive.NetworkDataSecretRef != nil {
+				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.CloudInitConfigDrive.NetworkDataSecretRef.Name}
+				sources = append(sources, key)
+			}
+		default:
+			continue
 		}
+	}
+	for _, key := range sources {
+		source := &core.Secret{}
+		err = r.sourceClient.Get(context.Background(), key, source)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+		target := core.Secret{}
+		target.Name = source.Name
+		target.Namespace = r.Plan.Spec.TargetNamespace
+		target.Data = source.Data
+		target.Immutable = source.Immutable
+		target.SetLabels(source.GetLabels())
+		target.SetAnnotations(source.GetAnnotations())
+		r.Labeler.SetAnnotation(&target, AnnSource, key.String())
+		list = append(list, target)
 	}
 	return
 }
