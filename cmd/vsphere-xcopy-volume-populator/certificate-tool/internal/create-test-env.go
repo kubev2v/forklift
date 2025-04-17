@@ -1,6 +1,8 @@
-package cmd
+package internal
 
 import (
+	"certificate-tool/cmd"
+	"certificate-tool/internal/utils"
 	"fmt"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -15,7 +17,7 @@ var (
 	vspherePassword string
 )
 var createTestEnvCmd = &cobra.Command{
-	Use:   "create-test-env",
+	Use:   "prepate",
 	Short: "Creates the environment (K8s cluster, CSI driver, etc.)",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Creating environment...")
@@ -33,28 +35,28 @@ var createTestEnvCmd = &cobra.Command{
 
 		fmt.Println("Ensuring ns:", kubeconfigPath)
 		// Ensure required resources exist.
-		if err := EnsureNamespace(clientset, podNamespace); err != nil {
+		if err := utils.EnsureNamespace(clientset, podNamespace); err != nil {
 			panic(err)
 		}
-		if err := EnsureServiceAccount(clientset, podNamespace, "forklift-populator-controller"); err != nil {
+		if err := utils.EnsureServiceAccount(clientset, podNamespace, "forklift-populator-controller"); err != nil {
 			panic(err)
 		}
 
 		fmt.Println("Ensuring first role binding:", kubeconfigPath)
 		// Define the ClusterRoleBinding.
 		PopulatorAccessRB := PopulatorAccessRoleBinding(podNamespace)
-		if err := EnsureRoleBinding(clientset, PopulatorAccessRB); err != nil {
+		if err := utils.EnsureRoleBinding(clientset, PopulatorAccessRB); err != nil {
 			panic(err)
 		}
 
 		fmt.Println("Ensuring second role binding:", kubeconfigPath)
 		PopulatorSecretReaderRB := PopulatorSecretReaderRoleBinding(podNamespace)
-		if err := EnsureRoleBinding(clientset, PopulatorSecretReaderRB); err != nil {
+		if err := utils.EnsureRoleBinding(clientset, PopulatorSecretReaderRB); err != nil {
 			panic(err)
 		}
 		fmt.Println("Ensuring secret:", kubeconfigPath)
 		Secret := PopulatorSecret(podNamespace, storagePassword, vspherePassword)
-		if err := EnsureSecret(clientset, Secret); err != nil {
+		if err := utils.EnsureSecret(clientset, Secret); err != nil {
 			panic(err)
 		}
 		fmt.Println("Environment created successfully.")
@@ -62,7 +64,7 @@ var createTestEnvCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(createTestEnvCmd)
+	cmd.RootCmd.AddCommand(createTestEnvCmd)
 	createTestEnvCmd.Flags().StringVar(&kubeconfigPath, "kubeconfig", "", "Path to the kubeconfig file")
 	createTestEnvCmd.Flags().StringVar(&storagePassword, "storagePassword", "", "Path to the kubeconfig file")
 	createTestEnvCmd.Flags().StringVar(&vspherePassword, "vspherePassword", "", "Path to the kubeconfig file")

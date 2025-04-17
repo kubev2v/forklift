@@ -23,7 +23,7 @@ TEST_POPULATOR_IMAGE = $(shell yq e '.test-populator-image' $(CONFIG_FILE))
 # -----------------------------------------------------------------------------
 # Dynamic Variables from ENV (overridable)
 # -----------------------------------------------------------------------------
-override OWNER_PVC   ?= $(shell ( yq e '.owner-name // ""' $(ENV_FILE) 2>/dev/null ))
+override OWNER_NAME   ?= $(shell ( yq e '.owner-name // ""' $(ENV_FILE) 2>/dev/null ))
 override SOURCE_VMDK ?= $(shell ( yq e '.source-vmdk // ""' $(ENV_FILE) 2>/dev/null ))
 override BACKEND      ?= $(shell ( yq e '.backend // ""' $(ENV_FILE) 2>/dev/null ))
 override PASSWORD     ?= $(shell ( yq e '.password // ""' $(ENV_FILE) 2>/dev/null ))
@@ -34,17 +34,19 @@ override USERNAME     ?= $(shell ( yq e '.username // ""' $(ENV_FILE) 2>/dev/nul
 # -----------------------------------------------------------------------------
 # Populator Files (for prerequisites)
 # -----------------------------------------------------------------------------
-OPENSTACK_POPULATOR ?= xcopy-setup/forklift.konveyor.io_openstackvolumepopulators.yaml
-OVIRT_POPULATOR     ?= xcopy-setup/forklift.konveyor.io_ovirtvolumepopulators.yaml
-VSPHERE_POPULATOR   ?= xcopy-setup/forklift.konveyor.io_vspherexcopyvolumepopulators.yaml
-
+OPENSTACK_POPULATOR ?= https://raw.githubusercontent.com/kubev2v/forklift/main/operator/config/crd/bases/forklift.konveyor.io_ovirtvolumepopulators.yaml
+OVIRT_POPULATOR     ?= https://raw.githubusercontent.com/kubev2v/forklift/main/operator/config/crd/bases/forklift.konveyor.io_openstackvolumepopulators.yaml
+VSPHERE_POPULATOR   ?= https://raw.githubusercontent.com/kubev2v/forklift/main/operator/config/crd/bases/forklift.konveyor.io_vspherexcopyvolumepopulators.yaml
+CLUSTER_ROLE   ?= https://raw.githubusercontent.com/kubev2v/forklift/main/operator/config/rbac/populator-controller/role.yaml
+ROLE_BINDING   ?= https://raw.githubusercontent.com/kubev2v/forklift/main/operator/config/rbac/populator-controller/role_binding.yaml
+SERVICE_ACCOUNT   ?= https://raw.githubusercontent.com/kubev2v/forklift/main/operator/config/rbac/populator-controller/service_account.yaml
 # -----------------------------------------------------------------------------
 # Additional Variables for Certificate-Tool CLI (defaults can be overridden)
 # -----------------------------------------------------------------------------
 # Use POD_NAMESPACE as the default cluster name.
 CLUSTER_NAME ?= $(POD_NAMESPACE)
 VM_NAME      ?= certificate-vm
-PVC_NAME     ?= $(OWNER_PVC)
+PVC_NAME     ?= $(OWNER_NAME)
 
 # The CLI binary name
 BINARY = certificate-tool
@@ -74,7 +76,7 @@ read-config: ## Read and display configuration from files.
 	@echo "  secret_name      = $(SECRET_NAME)"
 	@echo "  kubeconfig       = $(KUBECONFIG)"
 	@echo "Dynamic file vars:"
-	@echo "  target_pvc       = $(OWNER_PVC)"
+	@echo "  target_pvc       = $(OWNER_NAME)"
 	@echo "  source_vmdk      = $(SOURCE_VMDK)"
 	@echo "  backend          = $(BACKEND)"
 	@echo "  password         = $(PASSWORD)"
@@ -85,10 +87,13 @@ read-config: ## Read and display configuration from files.
 build: ## Build the certificate-tool CLI binary.
 	go build -o $(BINARY) .
 
-create-populator-env: build ## Run certificate-tool create-env subcommand.
+prepare: build ## Run certificate-tool create-env subcommand.
 	@kubectl apply -f $(OPENSTACK_POPULATOR)
 	@kubectl apply -f $(OVIRT_POPULATOR)
 	@kubectl apply -f $(VSPHERE_POPULATOR)
+#	@kubectl apply -f $(CLUSTER_ROLE)
+#	@kubectl apply -f $(ROLE_BINDING)
+#	@kubectl apply -f $(SERVICE_ACCOUNT)
 	./$(BINARY) create-populator-env \
 				--kubeconfig $(KUBECONFIG) \
 				--test-namespace $(TEST_NAMESPACE) \
@@ -96,18 +101,17 @@ create-populator-env: build ## Run certificate-tool create-env subcommand.
 				--test-labels $(TEST_LABELS) \
 				--test-populator-image $(TEST_POPULATOR_IMAGE) \
 				--pod-namespace $(POD_NAMESPACE)
-
-create-test-env: build ## Run certificate-tool create-env subcommand.
 	./$(BINARY) create-test-env \
-		--kubeconfig $(KUBECONFIG) \
-		--storagePassword $(STORAGE_PASSWORD) \
-		--vspherePassword $(VSPHERE_PASSWORD) \
-		--populatorNamespace $(POD_NAMESPACE)
+    		--kubeconfig $(KUBECONFIG) \
+    		--storagePassword $(STORAGE_PASSWORD) \
+    		--vspherePassword $(VSPHERE_PASSWORD) \
+    		--populatorNamespace $(POD_NAMESPACE)
+
 
 create-vm: build ## Run certificate-tool create-vm subcommand.
 	./$(BINARY) create-vm --vm-name=$(VM_NAME)
 
-test-xcopy: build create-populator-env create-test-env
+test-xcopy: build prepare
 	@echo "Running test-xcopy..."
 	./$(BINARY) test-xcopy \
 		--kubeconfig $(KUBECONFIG) \

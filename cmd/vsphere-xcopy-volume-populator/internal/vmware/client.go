@@ -105,3 +105,20 @@ func (c *VSphereClient) GetEsxByVm(ctx context.Context, vmName string) (*object.
 	}
 	return host, nil
 }
+
+func ParseGetMD5(vals []esx.Values) (headMD5, tailMD5 string, err error) {
+	if len(vals) == 0 {
+		return "", "", fmt.Errorf("no output returned")
+	}
+	m := vals[0]
+
+	heads, ok := m["head_md5"]
+	if !ok || len(heads) == 0 {
+		return "", "", fmt.Errorf("head_md5 missing in response")
+	}
+	tails, ok := m["tail_md5"]
+	if !ok || len(tails) == 0 {
+		return "", "", fmt.Errorf("tail_md5 missing in response")
+	}
+	return heads[0], tails[0], nil
+}

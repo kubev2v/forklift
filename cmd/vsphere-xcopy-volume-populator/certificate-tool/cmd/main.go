@@ -7,8 +7,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// rootCmd represents the base command
-var rootCmd = &cobra.Command{
+// RootCmd represents the base command
+var RootCmd = &cobra.Command{
 	Use:   "certificate-tool",
 	Short: "CLI tool to orchestrate xcopy offload tests",
 	Long:  `This tool creates the environment, a VM with data, configures PVC and CR, and finally runs xcopy offload tests.`,
@@ -16,7 +16,7 @@ var rootCmd = &cobra.Command{
 
 // Execute executes the root command.
 func Execute() {
-	if err := rootCmd.Execute(); err != nil {
+	if err := RootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}

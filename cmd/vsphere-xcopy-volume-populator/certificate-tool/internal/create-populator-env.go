@@ -1,6 +1,8 @@
-package cmd
+package internal
 
 import (
+	"certificate-tool/cmd"
+	"certificate-tool/internal/utils"
 	"fmt"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,39 +46,39 @@ var createPopEnvCmd = &cobra.Command{
 			"TEST_POPULATOR_IMAGE": testPopulatorImage,
 			"POD_NAMESPACE":        podNamespace,
 		}
-		processedData, err := ProcessTemplate("vsphere-populator.yaml", vars, "${", "}")
+		processedData, err := utils.ProcessTemplate("vsphere-populator.yaml", vars, "${", "}")
 		if err != nil {
 			panic(err)
 		}
 
 		// Decode the processed YAML into a Deployment object.
-		deploy, err := DecodeDeployment(processedData)
+		deploy, err := utils.DecodeDeployment(processedData)
 		if err != nil {
 			panic(err)
 		}
 
 		// Ensure required resources exist.
-		if err := EnsureNamespace(clientset, testNamespace); err != nil {
+		if err := utils.EnsureNamespace(clientset, testNamespace); err != nil {
 			panic(err)
 		}
-		if err := EnsureServiceAccount(clientset, testNamespace, "forklift-populator-controller"); err != nil {
+		if err := utils.EnsureServiceAccount(clientset, testNamespace, "populator"); err != nil {
 			panic(err)
 		}
 
 		// Define the ClusterRole.
 		clusterRole := ForkliftPopulatorClusterRole()
-		if err := EnsureClusterRole(clientset, clusterRole); err != nil {
+		if err := utils.EnsureClusterRole(clientset, clusterRole); err != nil {
 			panic(err)
 		}
 
 		// Define the ClusterRoleBinding.
 		clusterRoleBinding := ForkliftPopulatorClusterRoleBinding(testNamespace)
-		if err := EnsureClusterRoleBinding(clientset, clusterRoleBinding); err != nil {
+		if err := utils.EnsureClusterRoleBinding(clientset, clusterRoleBinding); err != nil {
 			panic(err)
 		}
 
 		// Finally, create the deployment.
-		if err := EnsureDeployment(clientset, testNamespace, deploy); err != nil {
+		if err := utils.EnsureDeployment(clientset, testNamespace, deploy); err != nil {
 			panic(err)
 		}
 
@@ -85,7 +87,7 @@ var createPopEnvCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(createPopEnvCmd)
+	cmd.RootCmd.AddCommand(createPopEnvCmd)
 
 	createPopEnvCmd.Flags().StringVar(&kubeconfigPath, "kubeconfig", "", "Path to the kubeconfig file")
 	createPopEnvCmd.Flags().StringVar(&testNamespace, "test-namespace", "vsphere-populator-test", "Namespace for testing")
@@ -98,7 +100,7 @@ func init() {
 func ForkliftPopulatorClusterRole() *rbacv1.ClusterRole {
 	return &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "forklift-populator-controller-role",
+			Name: "populator",
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
@@ -130,7 +132,7 @@ func ForkliftPopulatorClusterRole() *rbacv1.ClusterRole {
 func ForkliftPopulatorClusterRoleBinding(namespace string) *rbacv1.ClusterRoleBinding {
 	return &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "forklift-populator-controller-binding",
+			Name: "populator-binding",
 		},
 		Subjects: []rbacv1.Subject{
 			{
@@ -142,7 +144,7 @@ func ForkliftPopulatorClusterRoleBinding(namespace string) *rbacv1.ClusterRoleBi
 		RoleRef: rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
-			Name:     "forklift-populator-controller-role",
+			Name:     "populator",
 		},
 	}
 }

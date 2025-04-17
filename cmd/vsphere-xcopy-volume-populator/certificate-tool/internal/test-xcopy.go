@@ -1,6 +1,8 @@
-package cmd
+package internal
 
 import (
+	"certificate-tool/cmd"
+	"certificate-tool/internal/utils"
 	"fmt"
 	"github.com/spf13/cobra"
 )
@@ -17,12 +19,12 @@ var createTestCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Creating test parts...")
 		// Process and apply PVC YAML.
-		if err := ApplyYAMLFile(pvcYamlPath); err != nil {
+		if err := utils.ApplyYAMLFile(pvcYamlPath); err != nil {
 			panic(err)
 		}
 
 		// Process and apply the CR instance YAML.
-		if err := ApplyYAMLFile(crYamlPath); err != nil {
+		if err := utils.ApplyYAMLFile(crYamlPath); err != nil {
 			panic(err)
 		}
 
@@ -31,7 +33,7 @@ var createTestCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(createTestCmd)
+	cmd.RootCmd.AddCommand(createTestCmd)
 	createTestCmd.Flags().StringVar(&testEnvKubeconfig, "kubeconfig", "", "Path to the kubeconfig file")
 	createTestCmd.Flags().StringVar(&pvcYamlPath, "pvc-yaml", "pvc.yaml", "Path to the PVC YAML file")
 	createTestCmd.Flags().StringVar(&crYamlPath, "cr-yaml", "cr.yaml", "Path to the CR instance YAML file")

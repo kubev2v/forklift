@@ -1,6 +1,7 @@
-package cmd
+package internal
 
 import (
+	ccmd "certificate-tool/cmd"
 	"context"
 	"fmt"
 	"log"
@@ -30,9 +31,9 @@ func runCmd(cmdName string, args ...string) error {
 	return cmd.Run()
 }
 
-// CreateTestVMWithDiskAndISO downloads the VMDK if necessary, uploads it (unless skipped),
+// createTestVMWithDiskAndISO downloads the VMDK if necessary, uploads it (unless skipped),
 // creates the VM, attaches the disk, adds a CDROM with the ISO, and powers the VM on.
-func CreateTestVMWithDiskAndISO(vmdkURL, vmName, isoPath, datastore string, skipUpload bool) error {
+func createTestVMWithDiskAndISO(vmdkURL, vmName, isoPath, datastore string, skipUpload bool) error {
 	if vmdkURL == "" {
 		vmdkURL = defaultVmdkURL
 	}
@@ -156,7 +157,7 @@ var createVmCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Creating VM with disk and ISO...")
 		// Create the VM using govc commands.
-		err := CreateTestVMWithDiskAndISO(vmdkURL, vmName, isoPath, datastore, skipUpload)
+		err := createTestVMWithDiskAndISO(vmdkURL, vmName, isoPath, datastore, skipUpload)
 		if err != nil {
 			panic(err)
 		}
@@ -186,7 +187,7 @@ var createVmCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(createVmCmd)
+	ccmd.RootCmd.AddCommand(createVmCmd)
 	createVmCmd.Flags().StringVar(&vmdkURL, "vmdk-url", "", "URL to the VMDK image (default downloads if empty)")
 	createVmCmd.Flags().StringVar(&vmName, "vm-name", "", "Name of the VM")
 	createVmCmd.Flags().StringVar(&isoPath, "iso-path", "seed.iso", "Path to the ISO file")

@@ -1,11 +1,10 @@
-package cmd
+package utils
 
 import (
 	"bytes"
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"text/template"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -133,14 +132,6 @@ func EnsureDeployment(clientset *kubernetes.Clientset, namespace string, deploy 
 	// Deployment already exists.
 	fmt.Println("Deployment already exists:", existing.Name)
 	return nil
-}
-
-func ApplyYAMLFile(filePath string) error {
-	fmt.Printf("Applying YAML file: %s\n", filePath)
-	cmd := exec.Command("kubectl", "apply", "-f", filePath)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
 }
 
 func EnsureRoleBinding(clientset *kubernetes.Clientset, binding *rbacv1.RoleBinding) error {
