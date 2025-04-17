@@ -1,7 +1,6 @@
-package internal
+package cmd
 
 import (
-	"certificate-tool/cmd"
 	"certificate-tool/internal/utils"
 	"fmt"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -87,7 +86,7 @@ var createPopEnvCmd = &cobra.Command{
 }
 
 func init() {
-	cmd.RootCmd.AddCommand(createPopEnvCmd)
+	RootCmd.AddCommand(createPopEnvCmd)
 
 	createPopEnvCmd.Flags().StringVar(&kubeconfigPath, "kubeconfig", "", "Path to the kubeconfig file")
 	createPopEnvCmd.Flags().StringVar(&testNamespace, "test-namespace", "vsphere-populator-test", "Namespace for testing")

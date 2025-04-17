@@ -1,4 +1,4 @@
-package main
+package tests
 
 import (
 	"os/exec"
@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	configFile = "read-config-files/static_values.yaml"
-	envFile    = "read-config-files/dynamic_values.yaml"
+	configFile = "config/static_values.yaml"
+	envFile    = "config/dynamic_values.yaml"
 )
 
 func runMake(target string, envVars ...string) (string, error) {

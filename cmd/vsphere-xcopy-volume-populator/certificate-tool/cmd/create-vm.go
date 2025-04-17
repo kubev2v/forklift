@@ -1,7 +1,6 @@
-package internal
+package cmd
 
 import (
-	ccmd "certificate-tool/cmd"
 	"context"
 	"fmt"
 	"log"
@@ -187,7 +186,7 @@ var createVmCmd = &cobra.Command{
 }
 
 func init() {
-	ccmd.RootCmd.AddCommand(createVmCmd)
+	RootCmd.AddCommand(createVmCmd)
 	createVmCmd.Flags().StringVar(&vmdkURL, "vmdk-url", "", "URL to the VMDK image (default downloads if empty)")
 	createVmCmd.Flags().StringVar(&vmName, "vm-name", "", "Name of the VM")
 	createVmCmd.Flags().StringVar(&isoPath, "iso-path", "seed.iso", "Path to the ISO file")

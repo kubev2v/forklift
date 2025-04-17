@@ -1,7 +1,6 @@
-package internal
+package cmd
 
 import (
-	"certificate-tool/cmd"
 	"certificate-tool/internal/utils"
 	"fmt"
 	"github.com/spf13/cobra"
@@ -64,7 +63,7 @@ var createTestEnvCmd = &cobra.Command{
 }
 
 func init() {
-	cmd.RootCmd.AddCommand(createTestEnvCmd)
+	RootCmd.AddCommand(createTestEnvCmd)
 	createTestEnvCmd.Flags().StringVar(&kubeconfigPath, "kubeconfig", "", "Path to the kubeconfig file")
 	createTestEnvCmd.Flags().StringVar(&storagePassword, "storagePassword", "", "Path to the kubeconfig file")
 	createTestEnvCmd.Flags().StringVar(&vspherePassword, "vspherePassword", "", "Path to the kubeconfig file")
