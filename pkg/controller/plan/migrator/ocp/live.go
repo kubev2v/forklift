@@ -22,6 +22,7 @@ import (
 	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	cnv "kubevirt.io/api/core/v1"
+	instancetype "kubevirt.io/api/instancetype/v1beta1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	multicluster "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
@@ -951,9 +952,22 @@ func (r *Builder) VirtualMachine(vm *planapi.VMStatus, dvs []cdi.DataVolume) (ob
 	object := &cnv.VirtualMachine{
 		Spec: cnv.VirtualMachineSpec{
 			DataVolumeTemplates: source.Object.Spec.DataVolumeTemplates,
-			Template:            source.Object.Spec.Template.DeepCopy(),
-			Running:             nil,
-			RunStrategy:         &halted,
+			// TODO: decide how to handle missing instance types and preferences.
+			// The least painful option is probably to assume that any instance type
+			// or preference with the same name is the same and use it, and if there
+			// isn't one with the same name then create it. This situation exists with
+			// secrets and configmaps as well, and like that situations it could result
+			// in failed migrations if the CRs are actually different.
+			// We don't want to create our own with different names, because that will
+			// result in the VM spec changing every time the VM is migrated between clusters.
+			//
+			// If the VM refers to cluster scope preferences and instance types rather than
+			// local scope, we should probably not attempt to create missing ones.
+			Instancetype: source.Object.Spec.Instancetype,
+			Preference:   source.Object.Spec.Preference,
+			Template:     source.Object.Spec.Template.DeepCopy(),
+			Running:      nil,
+			RunStrategy:  &halted,
 		},
 	}
 	r.mapNetworks(object)
@@ -1151,6 +1165,14 @@ func (r *Builder) targetDataVolume(source *model.DataVolume, pvc *model.Persiste
 	if storage.VolumeMode != "" {
 		dv.Spec.Storage.VolumeMode = &storage.VolumeMode
 	}
+	return
+}
+
+func (r *Builder) InstanceType(vm *planapi.VMStatus) (it instancetype.VirtualMachineInstancetype, err error) {
+	return
+}
+
+func (r *Builder) ClusterInstanceType(vm *planapi.VMStatus) (it instancetype.VirtualMachineClusterInstancetype, err error) {
 	return
 }
 
