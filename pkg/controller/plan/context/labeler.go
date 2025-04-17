@@ -13,6 +13,7 @@ const (
 	LabelVM        = "vmID"
 )
 
+// TODO: comments, prune methods
 type Labeler struct {
 	*Context
 }
@@ -46,6 +47,17 @@ func (r *Labeler) SetLabel(object client.Object, key string, value string) {
 	object.SetLabels(labels)
 }
 
+func (r *Labeler) SetLabels(object client.Object, merge map[string]string) {
+	labels := object.GetLabels()
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+	for key, value := range merge {
+		labels[key] = value
+	}
+	object.SetLabels(labels)
+}
+
 func (r *Labeler) DeleteLabel(object client.Object, key string) {
 	labels := object.GetLabels()
 	if labels == nil {
@@ -61,6 +73,17 @@ func (r *Labeler) SetAnnotation(object client.Object, key string, value string) 
 		annotations = make(map[string]string)
 	}
 	annotations[key] = value
+	object.SetAnnotations(annotations)
+}
+
+func (r *Labeler) SetAnnotations(object client.Object, merge map[string]string) {
+	annotations := object.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	for key, value := range merge {
+		annotations[key] = value
+	}
 	object.SetAnnotations(annotations)
 }
 
