@@ -114,6 +114,7 @@ const (
 	fMemorySize          = "config.hardware.memoryMB"
 	fDevices             = "config.hardware.device"
 	fExtraConfig         = "config.extraConfig"
+	fNestedHVEnabled     = "config.nestedHVEnabled"
 	fChangeTracking      = "config.changeTrackingEnabled"
 	fGuestName           = "summary.config.guestFullName"
 	fGuestID             = "summary.guest.guestId"
@@ -772,6 +773,7 @@ func (r *Collector) vmPathSet() []string {
 		fDevices,
 		fGuestNet,
 		fExtraConfig,
+		fNestedHVEnabled,
 		fGuestName,
 		fGuestID,
 		fBalloonedMemory,
