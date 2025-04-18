@@ -4,6 +4,7 @@
 V2V_MAP_FILE="${V2V_MAP_FILE:-/tmp/macToIP}"
 NETWORK_SCRIPTS_DIR="${NETWORK_SCRIPTS_DIR:-/etc/sysconfig/network-scripts}"
 NETWORK_CONNECTIONS_DIR="${NETWORK_CONNECTIONS_DIR:-/etc/NetworkManager/system-connections}"
+NM_LEASES_DIR="${NM_LEASES_DIR:-/var/lib/NetworkManager}"
 NETWORK_INTERFACES_DIR="${NETWORK_INTERFACES_DIR:-/etc/network/interfaces}"
 IFQUERY_CMD="${IFQUERY_CMD:-ifquery}"
 SYSTEMD_NETWORK_DIR="${SYSTEMD_NETWORK_DIR:-/run/systemd/network}"
@@ -149,6 +150,93 @@ udev_from_nm() {
 
         echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"$(remove_quotes "$DEVICE")\""
     done
+}
+
+# Attempt to parse the `timestamps` file and find a matching timestamp for the
+# given UUID. The `timestamps` file is an 'ini'-like file with a format like:
+#   [timestamps]
+#   UUID1=TIMESTAMP1
+#   UUID2=TIMESTAMP2
+#   ...
+#
+get_timestamp_for_uuid() {
+    TIMESTAMPS_FILE="$NM_LEASES_DIR/timestamps"
+
+    if [ ! -f "$TIMESTAMPS_FILE" ]; then
+        log "Warning: Timestamps file '$TIMESTAMPS_FILE' not found."
+        echo "" # Return empty string
+        return
+    fi
+
+    # Read the timestamps file line by line
+    # Expected format: uuid=timestamp
+    while IFS='=' read -r UUID TIMESTAMP; do
+        # Skip header lines like "[timestamps]"
+        [ "$UUID" = "[timestamps]" ] && continue
+        # Skip empty lines or lines not in the expected key=value format
+        [ -z "$UUID" ] || [ -z "$TIMESTAMP" ] && continue
+
+        if [ "$UUID" = "$1" ]; then
+            echo "$TIMESTAMP"
+            break # UUID found, no need to read further
+        fi
+    done < "$TIMESTAMPS_FILE"
+}
+
+udev_from_nm_dhcp_lease() {
+    if [ ! -d "$NM_LEASES_DIR" ]; then
+        log "Warning: Directory $NM_LEASES_DIR does not exist."
+        return 0
+    fi
+
+    # Read the mapping file line by line
+    while read -r line;
+    do
+        # Extract S_HW and S_IP
+        extract_mac_ip "$line"
+
+        # If S_HW and S_IP were not extracted, skip the line
+        if [ -z "$S_HW" ] || [ -z "$S_IP" ]; then
+            log "Warning: invalid mac to ip line: $line."
+            continue
+        fi
+
+        # find all lease files that mention the given address
+        LEASE_FILES=$(grep -El "ADDRESS=$S_IP$" "$NM_LEASES_DIR"/*.lease)
+        if [ -z "$LEASE_FILES" ]; then
+            log "Warning: No lease files found containing address $S_IP"
+            continue
+        fi
+
+        # parse the filenames of the matching lease files and grab the device name of
+        # the most recent one
+        DEVICE=$(for FILENAME in $LEASE_FILES;
+        do
+            log "Checking $FILENAME"
+            # Filenames are of the form 'prefix-$(UUID)-$(INTERFACE_NAME).lease'
+            FILENAME_PARTS=$(echo "$FILENAME" | sed -n 's|^.*-\([0-9a-f]\{8\}-[0-9a-f]\{4\}-[0-9a-f]\{4\}-[0-9a-f]\{4\}-[0-9a-f]\{12\}\)-\(.*\)\.lease$|\1 \2|p')
+            if [ -n "$FILENAME_PARTS" ]; then
+                UUID=$(echo "$FILENAME_PARTS" | cut -d' ' -f1)
+                INTERFACE=$(echo "$FILENAME_PARTS" | cut -d' ' -f2)
+                TIMESTAMP=$(get_timestamp_for_uuid "$UUID")
+                if [ -n "$TIMESTAMP" ]; then
+                    echo "$TIMESTAMP $INTERFACE"
+                else
+                    log "Warning: No timestamp found for UUID '$UUID' from file '$FILENAME'"
+                    echo "0 $INTERFACE"
+                fi
+            else
+                log "Warning: Could not parse UUID/Interface from filename '$FILENAME'"
+            fi
+        done |sort -nr |head -1 |cut -d' ' -f2)
+
+        if [ -z "$DEVICE" ]; then
+            log "Warning: No device found for $S_IP"
+            continue
+        fi
+
+        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"$(remove_quotes "$DEVICE")\""
+    done < "$V2V_MAP_FILE"
 }
 
 # Create udev rules based on the macToIP mapping + output from parse_netplan_file
@@ -305,6 +393,7 @@ main() {
     {
         udev_from_ifcfg
         udev_from_nm
+        udev_from_nm_dhcp_lease
         udev_from_netplan
         udev_from_ifquery
     } | check_dupe_hws > "$UDEV_RULES_FILE" 2>/dev/null
