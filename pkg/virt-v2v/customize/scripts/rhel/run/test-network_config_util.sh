@@ -19,6 +19,7 @@ test_dir() {
     export UDEV_RULES_FILE="$TEST_DIR/etc/udev/rules.d/70-persistent-net.rules"
     export SYSTEMD_NETWORK_DIR="$TEST_DIR/run/systemd/network"
     export NETPLAN_DIR="$TEST_DIR/"
+    export NM_LEASES_DIR="$TEST_DIR/var/lib/NetworkManager"
 
     export IFQUERY_CMD="
       podman run
@@ -101,5 +102,9 @@ DISABLE_NETPLAN_GET=true expected_to_fail_dirs ${SCRIPT_DIR}/systemd*-test.d;
 # Test systems using network interfaces
 # --------------------------
 expected_to_pass_dirs ${SCRIPT_DIR}/network-interfaces*-test.d;
+
+# Test systems using dhcp
+# --------------------------
+expected_to_pass_dirs ${SCRIPT_DIR}/dhcp*-test.d;
 
 PASS "All tests behaved as expected."
