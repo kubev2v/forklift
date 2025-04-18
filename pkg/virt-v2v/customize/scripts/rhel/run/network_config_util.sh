@@ -86,7 +86,7 @@ udev_from_ifcfg() {
     fi
 
     # Read the mapping file line by line
-    cat "$V2V_MAP_FILE" | while read line;
+    cat "$V2V_MAP_FILE" | while read -r line;
     do
         # Extract S_HW and S_IP
         extract_mac_ip "$line"
@@ -124,7 +124,7 @@ udev_from_nm() {
     fi
 
     # Read the mapping file line by line
-    cat "$V2V_MAP_FILE" | while read line;
+    cat "$V2V_MAP_FILE" | while read -r line;
     do
         # Extract S_HW and S_IP
         extract_mac_ip "$line"
@@ -355,7 +355,7 @@ udev_from_netplan() {
         target_ip="$1"
         if netplan_supports_get; then
           # Loop through all interfaces and check for the given IP address
-          netplan_get ethernets | grep -Eo "^[^[:space:]]+[^:]" | while read IFNAME; do
+          netplan_get ethernets | grep -Eo "^[^[:space:]]+[^:]" | while read -r IFNAME; do
               if netplan_get ethernets."$IFNAME".addresses | grep -q "$target_ip"; then
                   echo "$IFNAME"
                   return
@@ -382,7 +382,7 @@ udev_from_netplan() {
     }
 
     # Read the mapping file line by line
-    cat "$V2V_MAP_FILE" | while read line;
+    cat "$V2V_MAP_FILE" | while read -r line;
     do
         # Extract S_HW and S_IP from the current line in the mapping file
         extract_mac_ip "$line"
@@ -424,7 +424,7 @@ udev_from_ifquery() {
     find_interface_by_ip() {
         target_ip="$1"
         # Loop through all interfaces and check for the given IP address
-        ifquery_get -l | while read IFNAME; do
+        ifquery_get -l | while read -r IFNAME; do
             if ifquery_get $IFNAME | grep -q "$target_ip"; then
                 echo "$IFNAME"
                 return
@@ -433,7 +433,7 @@ udev_from_ifquery() {
     }
 
     # Read the mapping file line by line
-    cat "$V2V_MAP_FILE" | while read line;
+    cat "$V2V_MAP_FILE" | while read -r line;
     do
         # Extract S_HW and S_IP from the current line in the mapping file
         extract_mac_ip "$line"
