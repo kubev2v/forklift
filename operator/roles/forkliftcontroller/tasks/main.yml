@@ -16,6 +16,12 @@
       volume_populator_state: "present"
     when: feature_volume_populator|bool
 
+  - name: "Set copy-offload feature state"
+    set_fact:
+      copy_offload_state: "present"
+    when: feature_copy_offload|bool
+
+
   - name: "Load cluster API groups"
     set_fact:
       api_groups: "{{ lookup('k8s', cluster_info='api_groups') }}"
@@ -113,6 +119,13 @@
       k8s:
         state: "{{ volume_populator_state }}"
         definition: "{{ lookup('template', 'populator/deployment-populator-controller.yml.j2') }}"
+
+  - when: feature_copy_offload|bool
+    block:
+    - name: "Setup copy offload config-map"
+      k8s:
+        state: "{{ copy_offload_state}}"
+        definition: "{{ lookup('template', 'controller/copy-offload-config-map.yml.j2') }}"
 
   - when: k8s_cluster|bool
     block:

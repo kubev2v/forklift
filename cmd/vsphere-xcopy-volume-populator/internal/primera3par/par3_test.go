@@ -20,7 +20,7 @@ func TestPrimera3ParClonner(t *testing.T) {
 	mockClient.Volumes[targetLUN.Name] = targetLUN
 
 	t.Run("Ensure Clonner Igroup", func(t *testing.T) {
-		_, err := clonner.EnsureClonnerIgroup(initiatorGroup, targetLUN.IQN)
+		_, err := clonner.EnsureClonnerIgroup([]string{initiatorGroup}, []string{targetLUN.IQN})
 		assert.NoError(t, err, "Expected no error when ensuring Clonner Igroup")
 		_, hostExists := mockClient.Hosts["mock-host-"+targetLUN.IQN]
 		assert.True(t, hostExists, "Expected host to exist")
@@ -29,7 +29,7 @@ func TestPrimera3ParClonner(t *testing.T) {
 	})
 
 	t.Run("Map LUN", func(t *testing.T) {
-		_, err := clonner.Map(initiatorGroup, targetLUN, nil)
+		_, err := clonner.Map([]string{initiatorGroup}, targetLUN, nil)
 		assert.NoError(t, err, "Expected no error when mapping LUN")
 	})
 
@@ -45,7 +45,7 @@ func TestPrimera3ParClonner(t *testing.T) {
 	})
 
 	t.Run("Unmap LUN", func(t *testing.T) {
-		err := clonner.UnMap(initiatorGroup, targetLUN, nil)
+		err := clonner.UnMap([]string{initiatorGroup}, targetLUN, nil)
 		assert.NoError(t, err, "Expected no error when unmapping LUN")
 	})
 }

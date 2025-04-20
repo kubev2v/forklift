@@ -23,7 +23,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
-	"github.com/konveyor/forklift-controller/pkg/settings"
 	template "github.com/openshift/api/template/v1"
 	"github.com/openshift/library-go/pkg/template/generator"
 	"github.com/openshift/library-go/pkg/template/templateprocessing"
@@ -96,8 +95,6 @@ const (
 	kApp = "forklift.app"
 	// LUKS
 	kLUKS = "isLUKS"
-	// Use
-	kUse = "use"
 )
 
 // User
@@ -114,14 +111,7 @@ const (
 	OvaPVLabel  = "nfs-pv"
 )
 
-// Vddk v2v conf
-const (
-	ExtraV2vConf = "extra-v2v-conf"
-	VddkConf     = "vddk-conf"
-
-	VddkAioBufSizeDefault  = "16"
-	VddkAioBufCountDefault = "4"
-)
+const ExtraV2vConf = "extra-v2v-conf"
 
 // Map of VirtualMachines keyed by vmID.
 type VirtualMachineMap map[string]VirtualMachine
@@ -250,10 +240,6 @@ func (r *KubeVirt) EnsureExtraV2vConfConfigMap() error {
 
 func genExtraV2vConfConfigMapName(plan *api.Plan) string {
 	return fmt.Sprintf("%s-%s", plan.Name, ExtraV2vConf)
-}
-
-func genVddkConfConfigMapName(plan *api.Plan) string {
-	return fmt.Sprintf("%s-%s-", plan.Name, VddkConf)
 }
 
 // Get the importer pod for a PersistentVolumeClaim.
@@ -447,7 +433,7 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) error {
 
 	var virtualMachine *cnv.VirtualMachine
 	if len(vms.Items) == 0 {
-		if virtualMachine, err = r.virtualMachine(vm, false); err != nil {
+		if virtualMachine, err = r.virtualMachine(vm); err != nil {
 			return liberr.Wrap(err)
 		}
 		if err = r.Destination.Client.Create(context.TODO(), virtualMachine); err != nil {
@@ -597,15 +583,8 @@ func (r *KubeVirt) DataVolumes(vm *plan.VMStatus) (dataVolumes []cdi.DataVolume,
 	if err != nil {
 		return
 	}
-	var vddkConfigMap *core.ConfigMap
-	if r.Source.Provider.UseVddkAioOptimization() {
-		vddkConfigMap, err = r.ensureVddkConfigMap()
-		if err != nil {
-			return nil, err
-		}
-	}
 
-	dataVolumes, err = r.dataVolumes(vm, secret, configMap, vddkConfigMap)
+	dataVolumes, err = r.dataVolumes(vm, secret, configMap)
 	if err != nil {
 		return
 	}
@@ -662,80 +641,6 @@ func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus, dataVolumes []cdi.DataVo
 	return
 }
 
-func (r *KubeVirt) vddkConfigMap(labels map[string]string) (*core.ConfigMap, error) {
-	data := make(map[string]string)
-	if r.Source.Provider.UseVddkAioOptimization() {
-		vddkConfig := r.Source.Provider.Spec.Settings[api.VddkConfig]
-		if vddkConfig != "" {
-			data["vddk-config-file"] = vddkConfig
-		} else {
-			data["vddk-config-file"] =
-				"VixDiskLib.nfcAio.Session.BufSizeIn64KB=16\n" +
-					"VixDiskLib.nfcAio.Session.BufCount=4"
-		}
-	}
-	configMap := core.ConfigMap{
-		Data: data,
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: genVddkConfConfigMapName(r.Plan),
-			Namespace:    r.Plan.Spec.TargetNamespace,
-			Labels:       labels,
-		},
-	}
-	return &configMap, nil
-}
-
-func (r *KubeVirt) ensureVddkConfigMap() (configMap *core.ConfigMap, err error) {
-	labels := r.vddkLabels()
-	newConfigMap, err := r.vddkConfigMap(labels)
-	if err != nil {
-		return
-	}
-
-	list := &core.ConfigMapList{}
-	err = r.Destination.Client.List(
-		context.TODO(),
-		list,
-		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(labels),
-			Namespace:     r.Plan.Spec.TargetNamespace,
-		},
-	)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	if len(list.Items) > 0 {
-		configMap = &list.Items[0]
-		configMap.Data = newConfigMap.Data
-		err = r.Destination.Client.Update(context.TODO(), configMap)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-		r.Log.V(1).Info(
-			"VDDK extra args configmap updated.",
-			"configmap",
-			path.Join(
-				configMap.Namespace,
-				configMap.Name))
-	} else {
-		configMap = newConfigMap
-		err = r.Destination.Client.Create(context.TODO(), configMap)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-		r.Log.V(1).Info(
-			"VDDK extra args configmap created.",
-			"configmap",
-			path.Join(
-				configMap.Namespace,
-				configMap.Name))
-	}
-	return
-}
-
 func (r *KubeVirt) EnsurePopulatorVolumes(vm *plan.VMStatus, pvcs []*core.PersistentVolumeClaim) (err error) {
 	var pendingPvcNames []string
 	for _, pvc := range pvcs {
@@ -785,16 +690,6 @@ func (r *KubeVirt) getDVs(vm *plan.VMStatus) (edvs []ExtendedDataVolume, err err
 	return
 }
 
-// Helper function to get disk index from PVC annotation.
-func getDiskIndex(pvc *core.PersistentVolumeClaim) int {
-	if idx, exists := pvc.Annotations[planbase.AnnDiskIndex]; exists {
-		if val, err := strconv.Atoi(idx); err == nil {
-			return val
-		}
-	}
-	return -1 // Return -1 for PVCs without index annotation
-}
-
 // Return PersistentVolumeClaims associated with a VM.
 func (r *KubeVirt) getPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, err error) {
 	pvcsList := &core.PersistentVolumeClaimList{}
@@ -820,13 +715,6 @@ func (r *KubeVirt) getPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, e
 		pvc := pvc
 		pvcs[i] = &pvc
 	}
-
-	// Sort the pvcs slice by disk index
-	sort.Slice(pvcs, func(i, j int) bool {
-		iIdx := getDiskIndex(pvcs[i])
-		jIdx := getDiskIndex(pvcs[j])
-		return iIdx < jIdx
-	})
 
 	return
 }
@@ -963,20 +851,12 @@ func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, vmCr *VirtualMach
 		return
 	}
 
-	libvirtConfigMap, err := r.ensureLibvirtConfigMap(vm.Ref, vmCr, pvcs)
+	configMap, err := r.ensureLibvirtConfigMap(vm.Ref, vmCr, pvcs)
 	if err != nil {
 		return
 	}
 
-	var vddkConfigMap *core.ConfigMap
-	if r.Source.Provider.UseVddkAioOptimization() {
-		vddkConfigMap, err = r.ensureVddkConfigMap()
-		if err != nil {
-			return err
-		}
-	}
-
-	newPod, err := r.guestConversionPod(vm, vmCr.Spec.Template.Spec.Volumes, libvirtConfigMap, vddkConfigMap, pvcs, v2vSecret)
+	newPod, err := r.guestConversionPod(vm, vmCr.Spec.Template.Spec.Volumes, configMap, pvcs, v2vSecret)
 	if err != nil {
 		return
 	}
@@ -1357,7 +1237,7 @@ func (r *KubeVirt) getPopulatorPods() (pods []core.Pod, err error) {
 }
 
 // Build the DataVolume CRs.
-func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap *core.ConfigMap, vddkConfigMap *core.ConfigMap) (dataVolumes []cdi.DataVolume, err error) {
+func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap *core.ConfigMap) (dataVolumes []cdi.DataVolume, err error) {
 	_, err = r.Source.Inventory.VM(&vm.Ref)
 	if err != nil {
 		return
@@ -1392,7 +1272,7 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 	}
 	dvTemplate.Labels = r.vmLabels(vm.Ref)
 
-	dataVolumes, err = r.Builder.DataVolumes(vm.Ref, secret, configMap, &dvTemplate, vddkConfigMap)
+	dataVolumes, err = r.Builder.DataVolumes(vm.Ref, secret, configMap, &dvTemplate)
 	if err != nil {
 		return
 	}
@@ -1412,7 +1292,7 @@ func (r *KubeVirt) getGeneratedName(vm *plan.VMStatus) string {
 }
 
 // Build the Kubevirt VM CR.
-func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) (object *cnv.VirtualMachine, err error) {
+func (r *KubeVirt) virtualMachine(vm *plan.VMStatus) (object *cnv.VirtualMachine, err error) {
 	pvcs, err := r.getPVCs(vm.Ref)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -1467,18 +1347,11 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) 
 		object.ObjectMeta.Annotations = annotations
 	}
 
-	// Set the default run strategy to Halted
-	runStrategy := cnv.RunStrategyHalted
+	// Power on the destination VM if the source VM was originally powered on.
+	running := vm.RestorePowerState == plan.VMPowerStateOn
+	object.Spec.Running = &running
 
-	// If the source VM is powered on, set the destination VM to always run
-	if vm.RestorePowerState == plan.VMPowerStateOn {
-		runStrategy = cnv.RunStrategyAlways
-	}
-
-	// Assign the determined run strategy to the object
-	object.Spec.RunStrategy = &runStrategy
-
-	err = r.Builder.VirtualMachine(vm.Ref, &object.Spec, pvcs, vm.InstanceType != "", sortVolumesByLibvirt)
+	err = r.Builder.VirtualMachine(vm.Ref, &object.Spec, pvcs, vm.InstanceType != "")
 	if err != nil {
 		return
 	}
@@ -1653,7 +1526,9 @@ func (r *KubeVirt) vmTemplate(vm *plan.VMStatus) (virtualMachine *cnv.VirtualMac
 	}
 	tmpl, err := r.findTemplate(vm)
 	if err != nil {
-		r.Log.Info("Can't find matching template, not setting a template", "vm", vm.String())
+		r.Log.Error(err, "could not find template for destination VM.",
+			"vm",
+			vm.String())
 		return
 	}
 
@@ -1816,8 +1691,8 @@ func (r *KubeVirt) findTemplate(vm *plan.VMStatus) (tmpl *template.Template, err
 	return
 }
 
-func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, libvirtConfigMap *core.ConfigMap, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, v2vSecret *core.Secret) (pod *core.Pod, err error) {
-	volumes, volumeMounts, volumeDevices, err := r.podVolumeMounts(vmVolumes, libvirtConfigMap, vddkConfigmap, pvcs, vm)
+func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, configMap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, v2vSecret *core.Secret) (pod *core.Pod, err error) {
+	volumes, volumeMounts, volumeDevices, err := r.podVolumeMounts(vmVolumes, configMap, pvcs, vm)
 	if err != nil {
 		return
 	}
@@ -1834,38 +1709,41 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	nonRoot := true
 	allowPrivilageEscalation := false
 	// virt-v2v image
-	useV2vForTransfer, vErr := r.Context.Plan.ShouldUseV2vForTransfer()
+	coldLocal, vErr := r.Context.Plan.VSphereColdLocal()
 	if vErr != nil {
 		err = vErr
 		return
 	}
-	if useV2vForTransfer && !r.IsCopyOffload(pvcs) {
-		// mount the secret for the password and CA certificate
-		volumes = append(volumes, core.Volume{
-			Name: "secret-volume",
-			VolumeSource: core.VolumeSource{
-				Secret: &core.SecretVolumeSource{
-					SecretName: v2vSecret.Name,
+
+	isCopyOffload := r.IsCopyOffload(pvcs)
+	if coldLocal {
+		if isCopyOffload {
+			// in-place is always needed in case of copy-offload and RDM disk
+			environment = append(environment,
+				core.EnvVar{
+					Name:  "V2V_inPlace",
+					Value: "1",
+				})
+		} else {
+			// mount the secret for the password and CA certificate
+			volumes = append(volumes, core.Volume{
+				Name: "secret-volume",
+				VolumeSource: core.VolumeSource{
+					Secret: &core.SecretVolumeSource{
+						SecretName: v2vSecret.Name,
+					},
 				},
-			},
-		})
-		volumeMounts = append(volumeMounts, core.VolumeMount{
-			Name:      "secret-volume",
-			ReadOnly:  true,
-			MountPath: "/etc/secret",
-		})
-	} else {
-		environment = append(environment,
-			core.EnvVar{
-				Name:  "V2V_inPlace",
-				Value: "1",
 			})
+			volumeMounts = append(volumeMounts, core.VolumeMount{
+				Name:      "secret-volume",
+				ReadOnly:  true,
+				MountPath: "/etc/secret",
+			})
+		}
 	}
 	// VDDK image
 	var initContainers []core.Container
-
-	vddkImage := settings.GetVDDKImage(r.Source.Provider.Spec.Settings)
-	if vddkImage != "" {
+	if vddkImage, found := r.Source.Provider.Spec.Settings[api.VDDK]; found {
 		initContainers = append(initContainers, core.Container{
 			Name:            "vddk-side-car",
 			Image:           vddkImage,
@@ -1910,12 +1788,14 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 			})
 	}
 
-	environment = append(environment,
-		core.EnvVar{
-			Name:  "LOCAL_MIGRATION",
-			Value: strconv.FormatBool(r.Destination.Provider.IsHost()),
-		},
-	)
+	if !isCopyOffload {
+		environment = append(environment,
+			core.EnvVar{
+				Name:  "LOCAL_MIGRATION",
+				Value: strconv.FormatBool(r.Destination.Provider.IsHost()),
+			},
+		)
+	}
 	// pod annotations
 	annotations := map[string]string{}
 	if r.Plan.Spec.TransferNetwork != nil {
@@ -1924,7 +1804,6 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 			return
 		}
 	}
-	unshare := "profiles/unshare.json"
 	// pod
 	pod = &core.Pod{
 		ObjectMeta: meta.ObjectMeta{
@@ -1939,8 +1818,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 				RunAsUser:    &user,
 				RunAsNonRoot: &nonRoot,
 				SeccompProfile: &core.SeccompProfile{
-					Type:             core.SeccompProfileTypeLocalhost,
-					LocalhostProfile: &unshare,
+					Type: core.SeccompProfileTypeRuntimeDefault,
 				},
 			},
 			Affinity: &core.Affinity{
@@ -2023,7 +1901,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	return
 }
 
-func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, libvirtConfigMap *core.ConfigMap, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, vm *plan.VMStatus) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice, err error) {
+func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, configMap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, vm *plan.VMStatus) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice, err error) {
 	pvcsByName := make(map[string]*core.PersistentVolumeClaim)
 	for _, pvc := range pvcs {
 		pvcsByName[pvc.Name] = pvc
@@ -2031,15 +1909,6 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, libvirtConfigMap *cor
 
 	for i, v := range vmVolumes {
 		pvc := pvcsByName[v.PersistentVolumeClaim.ClaimName]
-		if pvc == nil {
-			r.Log.V(1).Info(
-				"Failed to find the PVC to the Volume for the pod volume mount",
-				"volume",
-				v.Name,
-				"pvc",
-				v.PersistentVolumeClaim.ClaimName)
-			continue
-		}
 		vol := core.Volume{
 			Name: pvc.Name,
 			VolumeSource: core.VolumeSource{
@@ -2070,7 +1939,7 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, libvirtConfigMap *cor
 		VolumeSource: core.VolumeSource{
 			ConfigMap: &core.ConfigMapVolumeSource{
 				LocalObjectReference: core.LocalObjectReference{
-					Name: libvirtConfigMap.Name,
+					Name: configMap.Name,
 				},
 			},
 		},
@@ -2084,18 +1953,6 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, libvirtConfigMap *cor
 				ConfigMap: &core.ConfigMapVolumeSource{
 					LocalObjectReference: core.LocalObjectReference{
 						Name: genExtraV2vConfConfigMapName(r.Plan),
-					},
-				},
-			},
-		})
-	}
-	if vddkConfigmap != nil {
-		volumes = append(volumes, core.Volume{
-			Name: VddkConf,
-			VolumeSource: core.VolumeSource{
-				ConfigMap: &core.ConfigMapVolumeSource{
-					LocalObjectReference: core.LocalObjectReference{
-						Name: vddkConfigmap.Name,
 					},
 				},
 			},
@@ -2155,14 +2012,6 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, libvirtConfigMap *cor
 				core.VolumeMount{
 					Name:      ExtraV2vConf,
 					MountPath: fmt.Sprintf("/mnt/%s", ExtraV2vConf),
-				},
-			)
-		}
-		if vddkConfigmap != nil {
-			mounts = append(mounts,
-				core.VolumeMount{
-					Name:      VddkConf,
-					MountPath: fmt.Sprintf("/mnt/%s", VddkConf),
 				},
 			)
 		}
@@ -2241,15 +2090,6 @@ func (r *KubeVirt) libvirtDomain(vmCr *VirtualMachine, pvcs []*core.PersistentVo
 		diskSource := libvirtxml.DomainDiskSource{}
 
 		pvc := pvcsByName[vol.PersistentVolumeClaim.ClaimName]
-		if pvc == nil {
-			r.Log.V(1).Info(
-				"Failed to find the PVC to the Volume for the libvirt domain",
-				"volume",
-				vol.Name,
-				"pvc",
-				vol.PersistentVolumeClaim.ClaimName)
-			continue
-		}
 		if pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == core.PersistentVolumeBlock {
 			diskSource.Block = &libvirtxml.DomainDiskSourceBlock{
 				Dev: fmt.Sprintf("/dev/block%v", i),
@@ -2270,8 +2110,8 @@ func (r *KubeVirt) libvirtDomain(vmCr *VirtualMachine, pvcs []*core.PersistentVo
 			},
 			Source: &diskSource,
 			Target: &libvirtxml.DomainDiskTarget{
-				Dev: "sd" + string(rune('a'+i)),
-				Bus: "scsi",
+				Dev: "hd" + string(rune('a'+i)),
+				Bus: "virtio",
 			},
 		}
 		libvirtDisks = append(libvirtDisks, libvirtDisk)
@@ -2296,7 +2136,7 @@ func (r *KubeVirt) libvirtDomain(vmCr *VirtualMachine, pvcs []*core.PersistentVo
 			},
 			BootDevices: []libvirtxml.DomainBootDevice{
 				{
-					Dev: "sd",
+					Dev: "hd",
 				},
 			},
 		},
@@ -2555,14 +2395,6 @@ func (r *KubeVirt) conversionLabels(vmRef ref.Ref, filterOutMigrationLabel bool)
 func (r *KubeVirt) vmLabels(vmRef ref.Ref) (labels map[string]string) {
 	labels = r.planLabels()
 	labels[kVM] = vmRef.ID
-	return
-}
-
-// Labels for a vddk config
-// We need to distinguish between the libvirt configmap which uses also the plan labels and the vddk configmap
-func (r *KubeVirt) vddkLabels() (labels map[string]string) {
-	labels = r.planLabels()
-	labels[kUse] = VddkConf
 	return
 }
 

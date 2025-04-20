@@ -19,8 +19,8 @@ import (
 
 type Primera3ParClient interface {
 	GetSessionKey() (string, error)
-	EnsureLunMapped(initiatorGroup string, targetLUN populator.LUN) (populator.LUN, error)
-	LunUnmap(ctx context.Context, initiatorGroupName, lunName string) error
+	EnsureLunMapped(initiatorGroup []string, targetLUN populator.LUN) (populator.LUN, error)
+	LunUnmap(ctx context.Context, initiatorGroupName []string, lunName string) error
 	EnsureHostWithIqn(iqn string) (string, error)
 	EnsureHostSetExists(hostSetName string) error
 	AddHostToHostSet(hostSetName string, hostName string) error
@@ -245,8 +245,8 @@ func (p *Primera3ParClientWsImpl) GetSessionKey() (string, error) {
 	return "", fmt.Errorf("failed to retrieve session key, response: %s", string(bodyBytes))
 }
 
-func (p *Primera3ParClientWsImpl) EnsureLunMapped(initiatorGroup string, targetLUN populator.LUN) (populator.LUN, error) {
-	targetLUN.IQN = initiatorGroup
+func (p *Primera3ParClientWsImpl) EnsureLunMapped(initiatorGroup []string, targetLUN populator.LUN) (populator.LUN, error) {
+	targetLUN.IQN = initiatorGroup[0]
 	hostSetName := fmt.Sprintf("set:%s", initiatorGroup)
 	vlun, err := p.GetVLun(targetLUN.Name, hostSetName)
 	if err != nil {
@@ -257,7 +257,7 @@ func (p *Primera3ParClientWsImpl) EnsureLunMapped(initiatorGroup string, targetL
 		return targetLUN, nil
 	}
 
-	lunID, err := p.GetFreeLunID(initiatorGroup)
+	lunID, err := p.GetFreeLunID(initiatorGroup[0])
 	if err != nil {
 		return populator.LUN{}, err
 	}
@@ -294,8 +294,8 @@ func (p *Primera3ParClientWsImpl) EnsureLunMapped(initiatorGroup string, targetL
 	return targetLUN, nil
 }
 
-func (p *Primera3ParClientWsImpl) LunUnmap(ctx context.Context, initiatorGroupName, lunName string) error {
-	lunID, err := p.GetVLunID(lunName, fmt.Sprintf("set:%s", initiatorGroupName))
+func (p *Primera3ParClientWsImpl) LunUnmap(ctx context.Context, initiatorGroupName []string, lunName string) error {
+	lunID, err := p.GetVLunID(lunName, fmt.Sprintf("set:%s", initiatorGroupName[0]))
 	if err != nil {
 		return fmt.Errorf("failed to get LUN ID: %w", err)
 	}

@@ -224,6 +224,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		r.archive(plan)
 	}
 
+	// TODO rgolan - copy offload doesn't need vddk, consider changing this condition
 	// Ready condition.
 	if !plan.Status.HasBlockerCondition() && !plan.Status.HasCondition(Archived) && !plan.Status.HasCondition(ValidatingVDDK) {
 		plan.Status.SetCondition(libcnd.Condition{

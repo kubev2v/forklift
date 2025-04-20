@@ -19,26 +19,30 @@ type NetappClonner struct {
 }
 
 // Map the targetLUN to the initiator group.
-func (c *NetappClonner) Map(initatorGroup string, targetLUN populator.LUN, _ populator.MappingContext) (populator.LUN, error) {
-	_, err := c.api.EnsureLunMapped(context.TODO(), initatorGroup, targetLUN.Name)
+func (c *NetappClonner) Map(initatorGroup []string, targetLUN populator.LUN, _ populator.MappingContext) (populator.LUN, error) {
+	_, err := c.api.EnsureLunMapped(context.TODO(), initatorGroup[0], targetLUN.Name)
 	if err != nil {
-		return populator.LUN{}, fmt.Errorf("Failed to map lun path %s to group %s: %w ", targetLUN.Name, initatorGroup, err)
+		return targetLUN, fmt.Errorf("Failed to map lun path %s to group %s: %w ", targetLUN.Name, initatorGroup, err)
 	}
-	return targetLUN, nil
+	return targetLUN, err
 }
 
-func (c *NetappClonner) UnMap(initatorGroup string, targetLUN populator.LUN, _ populator.MappingContext) error {
-	return c.api.LunUnmap(context.TODO(), initatorGroup, targetLUN.Name)
+func (c *NetappClonner) GetNaaID(lun populator.LUN) populator.LUN {
+	return lun
 }
 
-func (c *NetappClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn string) (populator.MappingContext, error) {
+func (c *NetappClonner) UnMap(initatorGroup []string, targetLUN populator.LUN, _ populator.MappingContext) error {
+	return c.api.LunUnmap(context.TODO(), initatorGroup[0], targetLUN.Name)
+}
+
+func (c *NetappClonner) EnsureClonnerIgroup(initiatorGroup []string, clonnerIqn []string) (populator.MappingContext, error) {
 	// esxs needs "vmware" as the group protocol.
-	err := c.api.IgroupCreate(context.Background(), initiatorGroup, "iscsi", "vmware")
+	err := c.api.IgroupCreate(context.Background(), initiatorGroup[0], "iscsi", "vmware")
 	if err != nil {
 		// TODO ignore if exists error? with ontap there is no error
 		return nil, fmt.Errorf("failed adding igroup %w", err)
 	}
-	err = c.api.EnsureIgroupAdded(context.Background(), initiatorGroup, clonnerIqn)
+	err = c.api.EnsureIgroupAdded(context.Background(), initiatorGroup[0], clonnerIqn[0])
 	if err != nil {
 		return nil, fmt.Errorf("failed adding host to igroup %w", err)
 	}
@@ -67,6 +71,7 @@ func NewNetappClonner(hostname, username, password string) (NetappClonner, error
 }
 
 func (c *NetappClonner) ResolveVolumeHandleToLUN(volumeHandle string) (populator.LUN, error) {
+
 	// for trident we need convert the dashes to underscores so pvc-123-456 becomes pvc_123_456
 	volumeHandle = strings.ReplaceAll(volumeHandle, "-", "_")
 	l, err := c.api.LunGetByName(context.Background(), fmt.Sprintf("/vol/trident_%s/lun0", volumeHandle))
@@ -75,10 +80,11 @@ func (c *NetappClonner) ResolveVolumeHandleToLUN(volumeHandle string) (populator
 	}
 
 	klog.Infof("found lun %s with serial %s", l.Name, l.SerialNumber)
+
 	// in RHEL lsblk needs that swap. In fedora it doesn't
 	//serialNumber :=  strings.ReplaceAll(l.SerialNumber, "?", "\\\\x3f")
-	naa := fmt.Sprintf("%s%x", OntapProviderID, l.SerialNumber)
-	lun := populator.LUN{Name: l.Name, VolumeHandle: volumeHandle, SerialNumber: l.SerialNumber, NAA: naa}
+	serialNumber := l.SerialNumber
+	lun := populator.LUN{Name: l.Name, VolumeHandle: volumeHandle, SerialNumber: serialNumber, ProviderID: OntapProviderID}
 	return lun, nil
 }
 

@@ -8,7 +8,6 @@ import (
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	populator_machinery "github.com/konveyor/forklift-controller/pkg/lib-volume-populator/populator-machinery"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -26,7 +25,7 @@ const (
 type populator struct {
 	kind            string
 	resource        string
-	controllerFunc  func(bool, *unstructured.Unstructured, corev1.PersistentVolumeClaim) ([]string, error)
+	controllerFunc  func(bool, *unstructured.Unstructured) ([]string, error)
 	imageVar        string
 	metricsEndpoint string
 }
@@ -98,7 +97,7 @@ func main() {
 	<-stop
 }
 
-func getOvirtPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured, _ corev1.PersistentVolumeClaim) ([]string, error) {
+func getOvirtPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured) ([]string, error) {
 	var ovirtVolumePopulator v1beta1.OvirtVolumePopulator
 	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &ovirtVolumePopulator)
 	if err != nil {
@@ -116,7 +115,7 @@ func getOvirtPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured, _ cor
 	return args, nil
 }
 
-func getOpenstackPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured, _ corev1.PersistentVolumeClaim) ([]string, error) {
+func getOpenstackPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured) ([]string, error) {
 	var openstackPopulator v1beta1.OpenstackVolumePopulator
 	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &openstackPopulator)
 	if nil != err {
@@ -133,7 +132,7 @@ func getOpenstackPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured, _
 	return args, nil
 }
 
-func getVXPopulatorPodArgs(_ bool, u *unstructured.Unstructured, pvc corev1.PersistentVolumeClaim) ([]string, error) {
+func getVXPopulatorPodArgs(_ bool, u *unstructured.Unstructured) ([]string, error) {
 	var xcopy v1beta1.VSphereXcopyVolumePopulator
 	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &xcopy)
 	if nil != err {
@@ -141,11 +140,11 @@ func getVXPopulatorPodArgs(_ bool, u *unstructured.Unstructured, pvc corev1.Pers
 	}
 	args := []string{
 		"--source-vmdk=" + xcopy.Spec.VmdkPath,
+		"--target-pvc=" + xcopy.Spec.TargetPVC,
 		"--target-namespace=" + xcopy.GetNamespace(),
 		"--cr-name=" + xcopy.Name,
 		"--cr-namespace=" + xcopy.Namespace,
-		"--owner-name=" + pvc.Name,
-		"--secret-name=" + xcopy.Spec.SecretName,
+		"--secret-name=" + xcopy.Spec.SecretRef,
 	}
 	return args, nil
 }
