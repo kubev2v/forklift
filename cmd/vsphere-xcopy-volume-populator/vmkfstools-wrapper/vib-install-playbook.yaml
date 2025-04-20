@@ -8,6 +8,7 @@
     dest_location: /tmp/
     maintenance_needed: no
     copy_ssh_key: false
+    ssh_key: ~/.ssh/id_rsa.pub
     # uncomment when you need to connect using password
     #ansible_ssh_common_args: '-o PreferredAuthentications=keyboard-interactive'
 
@@ -15,7 +16,7 @@
     - name: Copy SSH public key
       ansible.builtin.lineinfile:
         path: /etc/ssh/keys-root/authorized_keys
-        line: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+        line: "{{ lookup('file', ssh_key) }}"
         create: true
       when: copy_ssh_key | bool
          
