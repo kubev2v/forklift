@@ -712,9 +712,11 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 							}
 							if len(route.Gateway.IpAddress) > 0 {
 								guestIpStackList = append(guestIpStackList, model.GuestIpStack{
-									Device:  route.Gateway.Device,
-									Gateway: route.Gateway.IpAddress,
-									DNS:     dnsList,
+									Device:       route.Gateway.Device,
+									Gateway:      route.Gateway.IpAddress,
+									Network:      route.Network,
+									PrefixLength: route.PrefixLength,
+									DNS:          dnsList,
 								})
 							}
 						}
