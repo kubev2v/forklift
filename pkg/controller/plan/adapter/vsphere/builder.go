@@ -287,6 +287,9 @@ func (r *Builder) mapMacStaticIps(vm *model.VM) (ipMap string, err error) {
 				if ipStack.Device != guestNetwork.Device {
 					continue
 				}
+				if ipStack.Network != "0.0.0.0" {
+					continue
+				}
 				gateway = ipStack.Gateway
 			}
 			dnsString := strings.Join(guestNetwork.DNS, ",")
