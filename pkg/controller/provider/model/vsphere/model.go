@@ -322,7 +322,9 @@ type GuestNetwork struct {
 
 // Guest ipStack
 type GuestIpStack struct {
-	Device  string   `json:"device"`
-	Gateway string   `json:"gateway"`
-	DNS     []string `json:"dns"`
+	Device       string   `json:"device"`
+	Gateway      string   `json:"gateway"`
+	Network      string   `json:"network"`
+	PrefixLength int32    `json:"prefix"`
+	DNS          []string `json:"dns"`
 }
