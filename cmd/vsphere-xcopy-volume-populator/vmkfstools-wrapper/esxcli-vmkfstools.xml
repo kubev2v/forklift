@@ -18,6 +18,9 @@
             <parameter name="target-lun" type="string" required="true" shortname="t">
                <description>Target RDM device (e.g., /vmfs/devices/disks/naa.$8-digits-vendor$24-disk-serial-number-in-hex)</description>
             </parameter>
+            <parameter name="verify-md5" type="string" required="true" shortname="v">
+               <description>Enable head/tail hash comparison between source and target</description>
+            </parameter>
          </input-spec>
          <output-spec>
              <structure typeName="result">
@@ -28,27 +31,12 @@
          <format-parameters>
             <formatter>simple</formatter>
          </format-parameters>
-         <execute>/bin/vmkfstools-wrapper.sh -s $val{source-vmdk} -t $val{target-lun} </execute>
-      </command>
-      <command path="vmkfstools.getmd5">
-         <description>Compute MD5 for first and last 1GiB of a file</description>
-         <input-spec>
-            <parameter name="file-path" type="string" required="true" shortname="f">
-               <description>Full path to the file</description>
-            </parameter>
-         </input-spec>
-         <output-spec>
-            <structure typeName="result">
-               <field name="head_md5"> <string/></field>
-               <field name="tail_md5"> <string/></field>
-               <field name="status"> <string/></field>
-               <field name="message"> <string/></field>
-            </structure>
-         </output-spec>
-         <format-parameters>
-            <formatter>simple</formatter>
-         </format-parameters>
-         <execute>/bin/vmkfstools-md5.sh -f $val{file-path}</execute>
+         <execute>
+            /bin/vmkfstools-wrapper.sh \
+            -s $val{source-vmdk} \
+            -t $val{target-lun} \
+            -v $val{verify-md5}
+         </execute>
       </command>
    </commands>
 </plugin>

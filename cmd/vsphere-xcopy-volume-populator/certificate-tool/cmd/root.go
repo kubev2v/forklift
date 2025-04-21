@@ -19,9 +19,11 @@ func Execute() error {
 func init() {
 	// register subcommands
 	RootCmd.AddCommand(
-		createPopEnvCmd,
-		createTestEnvCmd,
+		prepare,
 		createVmCmd,
 		createTestCmd,
 	)
+	RootCmd.PersistentFlags().
+		StringVar(&kubeconfigPath, "kubeconfig", "",
+			"Path to the kubeconfig file (shared by all commands)")
 }

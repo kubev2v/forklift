@@ -1,8 +1,0 @@
-target-pvc: my-pvc
-source-vmdk: "[eco-iscsi-ds2] vm-1/vm-1.vmdk"
-backend: 10.46.2.10
-password: mmypass
-serviceName: primera3par-csp-svc
-servicePort: 8080
-username: admin
-

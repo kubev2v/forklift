@@ -1,7 +1,7 @@
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: hpe-3par-block
+  name: xcopy-storage-class
 provisioner: csi.hpe.com
 parameters:
   volumeMode: Block
@@ -25,4 +25,3 @@ reclaimPolicy: Delete
 allowVolumeExpansion: true
 volumeBindingMode: Immediate
 
-#  cpg: SSD_r5
