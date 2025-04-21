@@ -38,6 +38,7 @@ var _ = Describe("vSphere builder", func() {
 			GuestIpStacks: []vsphere.GuestIpStack{
 				{
 					Gateway: "172.29.3.1",
+					Network: "0.0.0.0",
 				}},
 		}, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,16,8.8.8.8"),
 		Entry("multiple static ips", &model.VM{
@@ -61,9 +62,11 @@ var _ = Describe("vSphere builder", func() {
 			GuestIpStacks: []vsphere.GuestIpStack{
 				{
 					Gateway: "172.29.3.1",
+					Network: "0.0.0.0",
 				},
 				{
 					Gateway: "fe80::5da:b7a5:e0a2:a095",
+					Network: "0.0.0.0",
 				},
 			},
 		}, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,16,8.8.8.8_00:50:56:83:25:47:ip:fe80::5da:b7a5:e0a2:a097,fe80::5da:b7a5:e0a2:a095,64,fec0:0:0:ffff::1,fec0:0:0:ffff::2,fec0:0:0:ffff::3"),
@@ -105,15 +108,19 @@ var _ = Describe("vSphere builder", func() {
 			GuestIpStacks: []vsphere.GuestIpStack{
 				{
 					Gateway: "172.29.3.2",
+					Network: "0.0.0.0",
 				},
 				{
 					Gateway: "fe80::5da:b7a5:e0a2:a098",
+					Network: "0.0.0.0",
 				},
 				{
 					Gateway: "172.29.3.1",
+					Network: "0.0.0.0",
 				},
 				{
 					Gateway: "fe80::5da:b7a5:e0a2:a095",
+					Network: "0.0.0.0",
 				},
 			},
 		}, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,16,8.8.8.8_00:50:56:83:25:47:ip:fe80::5da:b7a5:e0a2:a097,fe80::5da:b7a5:e0a2:a095,64,fec0:0:0:ffff::1,fec0:0:0:ffff::2,fec0:0:0:ffff::3_00:50:56:83:25:48:ip:172.29.3.192,172.29.3.1,24,4.4.4.4_00:50:56:83:25:48:ip:fe80::5da:b7a5:e0a2:a090,fe80::5da:b7a5:e0a2:a095,32,fec0:0:0:ffff::4,fec0:0:0:ffff::5,fec0:0:0:ffff::6"),
@@ -129,6 +136,7 @@ var _ = Describe("vSphere builder", func() {
 			GuestIpStacks: []vsphere.GuestIpStack{
 				{
 					Gateway: "172.29.3.1",
+					Network: "0.0.0.0",
 				}},
 		}, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,16"),
 		Entry("gateway from different subnet", &model.VM{
@@ -144,8 +152,33 @@ var _ = Describe("vSphere builder", func() {
 			GuestIpStacks: []vsphere.GuestIpStack{
 				{
 					Gateway: "172.29.4.1",
+					Network: "0.0.0.0",
 				}},
 		}, "00:50:56:83:25:47:ip:172.29.3.193,172.29.4.1,24,8.8.8.8"),
+		Entry("multiple gateways with different networks", &model.VM{
+			GuestID: "windows9Guest",
+			GuestNetworks: []vsphere.GuestNetwork{
+				{
+					MAC:          "00:50:56:83:25:47",
+					IP:           "172.29.3.193",
+					Origin:       ManualOrigin,
+					PrefixLength: 24,
+					DNS:          []string{"8.8.8.8"},
+				}},
+			GuestIpStacks: []vsphere.GuestIpStack{
+				{
+					Gateway: "10.10.10.2",
+					Network: "10.10.10.1",
+				},
+				{
+					Gateway: "172.29.3.1",
+					Network: "0.0.0.0",
+				},
+				{
+					Gateway: "10.10.10.1",
+					Network: "10.10.10.0",
+				}},
+		}, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,24,8.8.8.8"),
 	)
 
 	DescribeTable("should", func(disks []vsphere.Disk, output []vsphere.Disk) {
