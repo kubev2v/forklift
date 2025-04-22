@@ -47,7 +47,7 @@ type VMDisk struct {
 }
 
 func (d *VMDisk) Path() string {
-	return fmt.Sprintf("/vmfs/volumes/%s/%s/%s", d.Datacenter, d.VMName, d.VmdkFile)
+	return fmt.Sprintf("/vmfs/volumes/%s/%s/%s", d.Datacenter, d.VmnameDir, d.VmdkFile)
 }
 
 func ParseVmdkPath(vmdkPath string) (VMDisk, error) {
