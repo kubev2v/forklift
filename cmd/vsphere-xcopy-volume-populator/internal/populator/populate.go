@@ -43,6 +43,7 @@ type VMDisk struct {
 	VMName     string
 	Datacenter string
 	VmdkFile   string
+	VmnameDir  string
 }
 
 func (d *VMDisk) Path() string {
