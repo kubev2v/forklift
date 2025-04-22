@@ -443,6 +443,7 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool) error
 	}
 
 	r.removeLastWarmSnapshot(vm)
+	r.removeOffloadSnapshot(vm)
 
 	return nil
 }
@@ -457,6 +458,18 @@ func (r *Migration) removeLastWarmSnapshot(vm *plan.VMStatus) {
 	}
 	snapshot := vm.Warm.Precopies[n-1].Snapshot
 	if _, err := r.provider.RemoveSnapshot(vm.Ref, snapshot, r.kubevirt.loadHosts); err != nil {
+		r.Log.Error(
+			err,
+			"Failed to clean up warm migration snapshots.",
+			"vm", vm)
+	}
+}
+
+func (r *Migration) removeOffloadSnapshot(vm *plan.VMStatus) {
+	if vm.OffloadSnapshot == nil {
+		return
+	}
+	if _, err := r.provider.RemoveSnapshot(vm.Ref, vm.OffloadSnapshot.Snapshot, r.kubevirt.loadHosts); err != nil {
 		r.Log.Error(
 			err,
 			"Failed to clean up warm migration snapshots.",
@@ -931,10 +944,22 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
 				break
 			}
-			n := len(vm.Warm.Precopies)
+
+			var snapshotId string
+			if r.Plan.SupportsCopyOffload() {
+				snapshotId = vm.OffloadSnapshot.Snapshot
+			} else {
+				n := len(vm.Warm.Precopies)
+				snapshotId = vm.Warm.Precopies[n-1].Snapshot
+			}
 			var taskId string
-			taskId, err = r.provider.RemoveSnapshot(vm.Ref, vm.Warm.Precopies[n-1].Snapshot, r.kubevirt.loadHosts)
-			vm.Warm.Precopies[len(vm.Warm.Precopies)-1].RemoveTaskId = taskId
+			taskId, err = r.provider.RemoveSnapshot(vm.Ref, snapshotId, r.kubevirt.loadHosts)
+
+			if r.Plan.SupportsCopyOffload() {
+				vm.OffloadSnapshot.RemoveTaskId = taskId
+			} else {
+				vm.Warm.Precopies[len(vm.Warm.Precopies)-1].RemoveTaskId = taskId
+			}
 			if err != nil {
 				step.AddError(err.Error())
 				err = nil
@@ -947,8 +972,13 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
 				break
 			}
-			precopy := vm.Warm.Precopies[len(vm.Warm.Precopies)-1]
-			ready, err := r.provider.CheckSnapshotRemove(vm.Ref, precopy, r.kubevirt.loadHosts)
+			var removeTaskId string
+			if r.Plan.SupportsCopyOffload() {
+				removeTaskId = vm.OffloadSnapshot.RemoveTaskId
+			} else {
+				removeTaskId = vm.Warm.Precopies[len(vm.Warm.Precopies)-1].RemoveTaskId
+			}
+			ready, err := r.provider.CheckSnapshotRemove(vm.Ref, removeTaskId, r.kubevirt.loadHosts)
 			if err != nil {
 				step.AddError(err.Error())
 				err = nil
@@ -973,9 +1003,13 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				break
 			}
 			now := meta.Now()
-			precopy := plan.Precopy{Snapshot: snapshot, CreateTaskId: taskId, Start: &now}
-			vm.Warm.Precopies = append(vm.Warm.Precopies, precopy)
-			r.resetPrecopyTasks(vm, step)
+			if r.Plan.SupportsCopyOffload() {
+				vm.OffloadSnapshot = &plan.OffloadSnapshot{Snapshot: snapshot, CreateTaskId: taskId}
+			} else {
+				precopy := plan.Precopy{Snapshot: snapshot, CreateTaskId: taskId, Start: &now}
+				vm.Warm.Precopies = append(vm.Warm.Precopies, precopy)
+				r.resetPrecopyTasks(vm, step)
+			}
 			r.NextPhase(vm)
 		case api.PhaseWaitForInitialSnapshot, api.PhaseWaitForSnapshot, api.PhaseWaitForFinalSnapshot:
 			step, found := vm.FindStep(r.migrator.Step(vm))
@@ -983,8 +1017,13 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
 				break
 			}
-			precopy := vm.Warm.Precopies[len(vm.Warm.Precopies)-1]
-			ready, snapshotId, err := r.provider.CheckSnapshotReady(vm.Ref, precopy, r.kubevirt.loadHosts)
+			var createTaskId string
+			if r.Plan.SupportsCopyOffload() {
+				createTaskId = vm.OffloadSnapshot.CreateTaskId
+			} else {
+				createTaskId = vm.Warm.Precopies[len(vm.Warm.Precopies)-1].CreateTaskId
+			}
+			ready, snapshotId, err := r.provider.CheckSnapshotReady(vm.Ref, createTaskId, r.kubevirt.loadHosts)
 			if err != nil {
 				step.AddError(err.Error())
 				err = nil
@@ -992,7 +1031,11 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 			if ready {
 				if snapshotId != "" {
-					vm.Warm.Precopies[len(vm.Warm.Precopies)-1].Snapshot = snapshotId
+					if r.Plan.SupportsCopyOffload() {
+						vm.OffloadSnapshot.Snapshot = snapshotId
+					} else {
+						vm.Warm.Precopies[len(vm.Warm.Precopies)-1].Snapshot = snapshotId
+					}
 				}
 				r.NextPhase(vm)
 			}

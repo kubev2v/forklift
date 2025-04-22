@@ -255,9 +255,15 @@ func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 		api.PhaseConvertOpenstackSnapshot, api.PhaseWaitForDataVolumesStatus:
 		step = DiskTransfer
 	case api.PhaseRemovePenultimateSnapshot, api.PhaseWaitForPenultimateSnapshotRemoval, api.PhaseCreateFinalSnapshot,
-		api.PhaseWaitForFinalSnapshot, api.PhaseAddFinalCheckpoint, api.PhaseFinalize, api.PhaseRemoveFinalSnapshot,
-		api.PhaseWaitForFinalSnapshotRemoval, api.PhaseWaitForFinalDataVolumesStatus:
+		api.PhaseWaitForFinalSnapshot, api.PhaseAddFinalCheckpoint, api.PhaseFinalize,
+		api.PhaseWaitForFinalDataVolumesStatus:
 		step = Cutover
+	case api.PhaseRemoveFinalSnapshot, api.PhaseWaitForFinalSnapshotRemoval:
+		if r.Context.Plan.Spec.Warm {
+			step = Cutover
+		} else {
+			step = DiskTransferV2v
+		}
 	case api.PhaseCreateGuestConversionPod, api.PhaseConvertGuest:
 		step = ImageConversion
 	case api.PhaseCopyDisksVirtV2V:
@@ -309,6 +315,8 @@ func (r *BasePredicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 		allowed = r.context.Plan.IsSourceProviderOpenstack()
 	case VSphere:
 		allowed = r.context.Plan.IsSourceProviderVSphere()
+	case SupportsCopyOffload:
+		allowed = r.context.Plan.SupportsCopyOffload()
 	}
 
 	return
