@@ -38,5 +38,9 @@ hack/deploy/**/deploy.env
 vendor/**/Dockerfile
 vendor/**/Dockerfile.vcsim
 vendor/**/Dockerfile.govc
-
 cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper/vmkfstools-wrapper.vib
+cmd/vsphere-xcopy-volume-populator/vendor
+vmware_vault.yaml
+vendor/
+.env
+.github/workflows/build-push-images-hal.yml

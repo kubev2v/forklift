@@ -28,6 +28,16 @@ type LUN struct {
 	// under /dev/disk/by-id/ with some prefix or postfix, depending on the udev rule
 	// and can also be found by lsblk -o name,serial
 	SerialNumber string
+	// target's IQN
+	// Storage provider ID in hex
+	ProviderID string
+	// the volume handle as set by the CSI driver field spec.volumeHandle
+	//  Logical device ID of the volume
+	LDeviceID string
+	// Storage device Serial Number
+	StorageSerialNumber string
+	// Storage Protocol
+	Protocol string
 }
 
 // VMDisk is the target VMDisk in vmware

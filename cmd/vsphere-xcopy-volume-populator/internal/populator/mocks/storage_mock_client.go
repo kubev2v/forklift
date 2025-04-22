@@ -56,7 +56,7 @@ func (mr *MockStorageApiMockRecorder) CurrentMappedGroups(targetLUN, context any
 }
 
 // EnsureClonnerIgroup mocks base method.
-func (m *MockStorageApi) EnsureClonnerIgroup(initiatorGroup, clonnerIqn string) (populator.MappingContext, error) {
+func (m *MockStorageApi) EnsureClonnerIgroup(initiatorGroup, clonnerIqn []string) (populator.MappingContext, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "EnsureClonnerIgroup", initiatorGroup, clonnerIqn)
 	ret0, _ := ret[0].(populator.MappingContext)
@@ -70,8 +70,22 @@ func (mr *MockStorageApiMockRecorder) EnsureClonnerIgroup(initiatorGroup, clonne
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureClonnerIgroup", reflect.TypeOf((*MockStorageApi)(nil).EnsureClonnerIgroup), initiatorGroup, clonnerIqn)
 }
 
+// GetNaaID mocks base method.
+func (m *MockStorageApi) GetNaaID(lun populator.LUN) populator.LUN {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNaaID", lun)
+	ret0, _ := ret[0].(populator.LUN)
+	return ret0
+}
+
+// GetNaaID indicates an expected call of GetNaaID.
+func (mr *MockStorageApiMockRecorder) GetNaaID(lun any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNaaID", reflect.TypeOf((*MockStorageApi)(nil).GetNaaID), lun)
+}
+
 // Map mocks base method.
-func (m *MockStorageApi) Map(initatorGroup string, targetLUN populator.LUN, context populator.MappingContext) (populator.LUN, error) {
+func (m *MockStorageApi) Map(initatorGroup []string, targetLUN populator.LUN, context populator.MappingContext) (populator.LUN, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Map", initatorGroup, targetLUN, context)
 	ret0, _ := ret[0].(populator.LUN)
@@ -101,7 +115,7 @@ func (mr *MockStorageApiMockRecorder) ResolveVolumeHandleToLUN(volumeHandle any)
 }
 
 // UnMap mocks base method.
-func (m *MockStorageApi) UnMap(initatorGroup string, targetLUN populator.LUN, context populator.MappingContext) error {
+func (m *MockStorageApi) UnMap(initatorGroup []string, targetLUN populator.LUN, context populator.MappingContext) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UnMap", initatorGroup, targetLUN, context)
 	ret0, _ := ret[0].(error)

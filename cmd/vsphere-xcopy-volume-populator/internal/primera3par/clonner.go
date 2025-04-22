@@ -21,18 +21,18 @@ func NewPrimera3ParClonner(storageHostname, storageUsername, storagePassword str
 }
 
 // EnsureClonnerIgroup creates or update an initiator group with the clonnerIqn
-func (c *Primera3ParClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn string) (populator.MappingContext, error) {
-	hostName, err := c.client.EnsureHostWithIqn(clonnerIqn)
+func (c *Primera3ParClonner) EnsureClonnerIgroup(initiatorGroup []string, clonnerIqn []string) (populator.MappingContext, error) {
+	hostName, err := c.client.EnsureHostWithIqn(clonnerIqn[0])
 	if err != nil {
 		return nil, fmt.Errorf("failed to ensure host with IQN: %w", err)
 	}
 
-	err = c.client.EnsureHostSetExists(initiatorGroup)
+	err = c.client.EnsureHostSetExists(initiatorGroup[0])
 	if err != nil {
 		return nil, fmt.Errorf("failed to ensure host set: %w", err)
 	}
 
-	err = c.client.AddHostToHostSet(initiatorGroup, hostName)
+	err = c.client.AddHostToHostSet(initiatorGroup[0], hostName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to add host to host set: %w", err)
 	}
@@ -40,13 +40,17 @@ func (c *Primera3ParClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerI
 	return nil, nil
 }
 
+func (p *Primera3ParClonner) GetNaaID(lun populator.LUN) populator.LUN {
+	return lun
+}
+
 // Map is responsible to mapping an initiator group to a LUN
-func (c *Primera3ParClonner) Map(initiatorGroup string, targetLUN populator.LUN, mappingContext populator.MappingContext) (populator.LUN, error) {
+func (c *Primera3ParClonner) Map(initiatorGroup []string, targetLUN populator.LUN, mappingContext populator.MappingContext) (populator.LUN, error) {
 	return c.client.EnsureLunMapped(initiatorGroup, targetLUN)
 }
 
 // UnMap is responsible to unmapping an initiator group from a LUN
-func (c *Primera3ParClonner) UnMap(initiatorGroup string, targetLUN populator.LUN, mappingContext populator.MappingContext) error {
+func (c *Primera3ParClonner) UnMap(initiatorGroup []string, targetLUN populator.LUN, mappingContext populator.MappingContext) error {
 	return c.client.LunUnmap(context.TODO(), initiatorGroup, targetLUN.Name)
 }
 

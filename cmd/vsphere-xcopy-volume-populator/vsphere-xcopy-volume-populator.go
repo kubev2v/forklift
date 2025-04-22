@@ -15,6 +15,7 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/ontap"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/primera3par"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vantara"
 
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
@@ -63,6 +64,12 @@ func main() {
 
 	var storageApi populator.StorageApi
 	switch storageVendor {
+	case "vantara":
+		sm, err := vantara.NewVantaraClonner(storageHostname, storageUsername, storagePassword)
+		if err != nil {
+			klog.Fatalf("failed to initialize vantara storage mapper with %s", err)
+		}
+		storageApi = &sm
 	case "ontap":
 		sm, err := ontap.NewNetappClonner(storageHostname, storageUsername, storagePassword)
 		if err != nil {

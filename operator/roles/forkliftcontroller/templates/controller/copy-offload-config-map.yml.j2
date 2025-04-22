@@ -1,0 +1,21 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app: {{ app_name }}
+  name: copy-offload-mapping 
+  namespace: "{{ app_namespace }}"
+data:
+  # A mapping of a storage-class to a vsphere instance and data-stores.
+  # When there is a match with a migration storage map then copy-offload will be used
+  # The mapping must be a valid yaml string, indented with 2 spaces
+  storageClassMapping: |
+    # # name of the storage class
+    # my-storage-class:
+    #   # the name of the storage provider one of [vantara,ontap,primera3par]
+    #   storageVendorProduct: vantara
+    #   # vsphere system
+    #   eco-vsphere:
+    #     # list of datastore names
+    #     - eco-iscsi-ds1

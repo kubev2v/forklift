@@ -68,31 +68,31 @@ func (m *MockPrimera3ParClient) AddHostToHostSet(hostSetName string, hostName st
 	return nil
 }
 
-func (m *MockPrimera3ParClient) EnsureLunMapped(initiatorGroup string, targetLUN populator.LUN) (populator.LUN, error) {
+func (m *MockPrimera3ParClient) EnsureLunMapped(initiatorGroup []string, targetLUN populator.LUN) (populator.LUN, error) {
 	if _, exists := m.Volumes[targetLUN.Name]; !exists {
 		return populator.LUN{}, fmt.Errorf("mock: volume %s does not exist", targetLUN.Name)
 	}
 
 	vlun := VLun{
 		VolumeName: targetLUN.Name,
-		LUN:        len(m.VLUNs[initiatorGroup]) + 1,
-		Hostname:   initiatorGroup,
+		LUN:        len(m.VLUNs[initiatorGroup[0]]) + 1,
+		Hostname:   initiatorGroup[0],
 	}
 
-	m.VLUNs[initiatorGroup] = append(m.VLUNs[initiatorGroup], vlun)
+	m.VLUNs[initiatorGroup[0]] = append(m.VLUNs[initiatorGroup[0]], vlun)
 	log.Printf("Mock: EnsureLunMapped -> Volume %s mapped to initiator group %s with LUN ID %d", targetLUN.Name, initiatorGroup, vlun.LUN)
 	return targetLUN, nil
 }
 
-func (m *MockPrimera3ParClient) LunUnmap(ctx context.Context, initiatorGroupName, lunName string) error {
-	vluns, exists := m.VLUNs[initiatorGroupName]
+func (m *MockPrimera3ParClient) LunUnmap(ctx context.Context, initiatorGroupName []string, lunName string) error {
+	vluns, exists := m.VLUNs[initiatorGroupName[0]]
 	if !exists {
 		return fmt.Errorf("mock: no VLUNs found for initiator group %s", initiatorGroupName)
 	}
 
 	for i, vlun := range vluns {
 		if vlun.VolumeName == lunName {
-			m.VLUNs[initiatorGroupName] = append(vluns[:i], vluns[i+1:]...)
+			m.VLUNs[initiatorGroupName[0]] = append(vluns[:i], vluns[i+1:]...)
 			log.Printf("Mock: LunUnmap -> Volume %s unmapped from initiator group %s", lunName, initiatorGroupName)
 			return nil
 		}
