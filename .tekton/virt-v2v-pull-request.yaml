@@ -11,7 +11,6 @@ metadata:
       == "main" && ( ".tekton/virt-v2v-pull-request.yaml".pathChanged() ||
       ".tekton/virt-v2v-push.yaml".pathChanged() ||
       "build/virt-v2v/Containerfile-downstream".pathChanged() ||
-      "build/virt-v2v/rpms.in.yaml".pathChanged() ||
       "pkg/virt-v2v/***".pathChanged() ||
       "cmd/virt-v2v/***".pathChanged() ||
       "cmd/virt-v2v-monitor/***".pathChanged() )
@@ -39,7 +38,7 @@ spec:
   - name: build-source-image
     value: "true"
   - name: prefetch-input
-    value: '[{"type": "rpm", "path": "./build/virt-v2v/"}]'
+    value: '[{"type": "rpm", "path": ".konflux/virt-v2v/appliance"},{"type": "rpm", "path": ".konflux/virt-v2v/runtime"}]'
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
@@ -189,6 +188,8 @@ spec:
         value: $(params.image-expires-after)
       - name: dev-package-managers 
         value: "true"
+      - name: ACTIVATION_KEY
+        value: activation-key-rhel9
       runAfter:
       - clone-repository
       taskRef:
