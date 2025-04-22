@@ -31,14 +31,14 @@ func (c *NetappClonner) UnMap(initatorGroup string, targetLUN populator.LUN, _ p
 	return c.api.LunUnmap(context.TODO(), initatorGroup, targetLUN.Name)
 }
 
-func (c *NetappClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn string) (populator.MappingContext, error) {
+func (c *NetappClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn []string) (populator.MappingContext, error) {
 	// esxs needs "vmware" as the group protocol.
 	err := c.api.IgroupCreate(context.Background(), initiatorGroup, "iscsi", "vmware")
 	if err != nil {
 		// TODO ignore if exists error? with ontap there is no error
 		return nil, fmt.Errorf("failed adding igroup %w", err)
 	}
-	err = c.api.EnsureIgroupAdded(context.Background(), initiatorGroup, clonnerIqn)
+	err = c.api.EnsureIgroupAdded(context.Background(), initiatorGroup, clonnerIqn[0])
 	if err != nil {
 		return nil, fmt.Errorf("failed adding host to igroup %w", err)
 	}
