@@ -779,6 +779,17 @@ spec:
                     newName:
                       description: The new name of the VM after matching DNS1123 requirements.
                       type: string
+                    offloadSnapshot:
+                      description: OffloadSnapshot shows snapshot creation and deletion
+                        task ID which MTV will monitor and snapshot name
+                      properties:
+                        createTaskId:
+                          type: string
+                        removeTaskId:
+                          type: string
+                        snapshot:
+                          type: string
+                      type: object
                     operatingSystem:
                       description: The Operating System detected by virt-v2v.
                       type: string
@@ -2560,6 +2571,17 @@ spec:
                           description: The new name of the VM after matching DNS1123
                             requirements.
                           type: string
+                        offloadSnapshot:
+                          description: OffloadSnapshot shows snapshot creation and
+                            deletion task ID which MTV will monitor and snapshot name
+                          properties:
+                            createTaskId:
+                              type: string
+                            removeTaskId:
+                              type: string
+                            snapshot:
+                              type: string
+                          type: object
                         operatingSystem:
                           description: The Operating System detected by virt-v2v.
                           type: string
