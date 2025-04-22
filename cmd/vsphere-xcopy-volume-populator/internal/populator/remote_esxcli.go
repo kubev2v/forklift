@@ -55,7 +55,6 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 	if err != nil {
 		return err
 	}
-
 	originalInitiatorGroups, err := p.StorageApi.CurrentMappedGroups(lun, nil)
 	if err != nil {
 		return fmt.Errorf("failed to fetch the current initiator groups of the lun %s: %w", lun.Name, err)
@@ -115,7 +114,7 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 		// Check if the UID is FC, iSCSI or NVMe-oF
 		isTargetUID := strings.HasPrefix(id, "fc.") || strings.HasPrefix(id, "iqn.") || strings.HasPrefix(id, "nqn.")
 
-		if link == "link-up" && isTargetUID {
+		if (link == "link-up" || link == "online") && isTargetUID {
 			if _, exists := uniqueUIDs[id]; !exists {
 				uniqueUIDs[id] = true
 				hbaUIDs = append(hbaUIDs, id)
@@ -124,13 +123,12 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 		}
 	}
 
-	xcopyInitiatorGroup := []string{}
+	xcopyInitiatorGroup := []string{DefaultXcopyInitiatorGroup}
 
 	m, err := p.StorageApi.EnsureClonnerIgroup(xcopyInitiatorGroup, hbaUIDs)
 	if err != nil {
 		return fmt.Errorf("failed to add the ESX IQN %s to the initiator group %w", hbaUIDs, err)
 	}
-
 	lun, err = p.StorageApi.Map(xcopyInitiatorGroup, lun, m)
 	if err != nil {
 		return fmt.Errorf("failed to map lun %s to initiator group %s: %w", lun, xcopyInitiatorGroup, err)
@@ -148,7 +146,7 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 
 	lun = p.StorageApi.GetNaaID(lun)
 
-	targetLUN := fmt.Sprintf("/vmfs/devices/disks/naa.%s%s", lun.ProviderID, lun.SerialNumber)
+	targetLUN := fmt.Sprintf("/vmfs/devices/disks/naa.%s", lun.NAA)
 	klog.Infof("resolved lun serial number %s with IQN %s to lun %s", lun.SerialNumber, lun.IQN, targetLUN)
 	esxNaa := fmt.Sprintf("naa.%s", lun.NAA)
 
@@ -174,11 +172,9 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 		return fmt.Errorf("failed to find the device %s after scanning: %w", esxNaa, err)
 	}
 
-	naa := fmt.Sprintf("naa.%s%s", lun.ProviderID, lun.SerialNumber)
-
-	_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "list", "-d", naa})
+	_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "list", "-d", esxNaa})
 	if err != nil {
-		return fmt.Errorf("failed to locate the target LUN %s. Check the LUN details and the host mapping response: %s", naa, err)
+		return fmt.Errorf("failed to locate the target LUN %s. Check the LUN details and the host mapping response: %s", esxNaa, err)
 	}
 
 	r, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"vmkfstools", "clone", "-s", vmDisk.Path(), "-t", targetLUN})

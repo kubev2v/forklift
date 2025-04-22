@@ -247,7 +247,7 @@ func (p *Primera3ParClientWsImpl) GetSessionKey() (string, error) {
 
 func (p *Primera3ParClientWsImpl) EnsureLunMapped(initiatorGroup []string, targetLUN populator.LUN) (populator.LUN, error) {
 	targetLUN.IQN = initiatorGroup[0]
-	hostSetName := fmt.Sprintf("set:%s", initiatorGroup)
+	hostSetName := fmt.Sprintf("set:%s", initiatorGroup[0])
 	vlun, err := p.GetVLun(targetLUN.Name, hostSetName)
 	if err != nil {
 		return populator.LUN{}, err
