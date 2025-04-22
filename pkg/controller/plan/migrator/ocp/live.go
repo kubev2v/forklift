@@ -22,6 +22,7 @@ import (
 	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	cnv "kubevirt.io/api/core/v1"
+	kubevirtapi "kubevirt.io/api/instancetype"
 	instancetype "kubevirt.io/api/instancetype/v1beta1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -45,6 +46,8 @@ const (
 	SynchronizeCertificates                = "SynchronizeCertificates"
 	CreateSecrets                          = "CreateSecrets"
 	CreateConfigMaps                       = "CreateConfigMaps"
+	EnsurePreference                       = "EnsurePreference"
+	EnsureInstanceType                     = "EnsureInstanceType"
 	CreateTarget                           = "CreateTarget"
 	CreateVirtualMachineInstanceMigrations = "CreateVirtualMachineInstanceMigrations"
 	WaitForStateTransfer                   = "WaitForStateTransfer"
@@ -154,6 +157,8 @@ func (r *LiveMigrator) Itinerary() (itinerary *libitr.Itinerary) {
 			{Name: SynchronizeCertificates},
 			{Name: CreateSecrets},
 			{Name: CreateConfigMaps},
+			{Name: EnsurePreference},
+			{Name: EnsureInstanceType},
 			{Name: CreateTarget},
 			{Name: CreateServiceExports},
 			{Name: CreateVirtualMachineInstanceMigrations},
@@ -186,7 +191,7 @@ func (r *LiveMigrator) Step(status *planapi.VMStatus) (step string) {
 		step = base.Initialize
 	case PreHook, PostHook:
 		step = status.Phase
-	case CreateSecrets, CreateConfigMaps, CreateTarget, SynchronizeCertificates, CreateServiceExports:
+	case CreateSecrets, CreateConfigMaps, EnsurePreference, EnsureInstanceType, CreateTarget, SynchronizeCertificates, CreateServiceExports:
 		step = PrepareTarget
 	case CreateVirtualMachineInstanceMigrations, WaitForStateTransfer:
 		step = Synchronization
@@ -347,6 +352,82 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 				err = nil
 			}
 			break
+		}
+		vm.Phase = r.Next(vm)
+	case EnsurePreference:
+		step, found := vm.FindStep(r.Step(vm))
+		if !found {
+			vm.AddError(fmt.Sprintf("Step '%s' not found", r.Step(vm)))
+			return
+		}
+		var required bool
+		required, err = r.RequiresLocalPreference(vm)
+		if err != nil {
+			if !errors.As(err, &web.ProviderNotReadyError{}) {
+				r.Log.Error(err, "error checking for Preference", "vm", vm.Name)
+				step.AddError(err.Error())
+				err = nil
+			}
+			break
+		}
+		if !required {
+			var preference *instancetype.VirtualMachinePreference
+			preference, err = r.builder.LocalPreference(vm)
+			if err != nil {
+				if !errors.As(err, &web.ProviderNotReadyError{}) {
+					r.Log.Error(err, "error building Preference", "vm", vm.Name)
+					step.AddError(err.Error())
+					err = nil
+				}
+				break
+			}
+			err = r.ensurer.EnsureLocalPreference(vm, preference)
+			if err != nil {
+				if !errors.As(err, &web.ProviderNotReadyError{}) {
+					r.Log.Error(err, "error ensuring Preference", "vm", vm.Name)
+					step.AddError(err.Error())
+					err = nil
+				}
+				break
+			}
+		}
+		vm.Phase = r.Next(vm)
+	case EnsureInstanceType:
+		step, found := vm.FindStep(r.Step(vm))
+		if !found {
+			vm.AddError(fmt.Sprintf("Step '%s' not found", r.Step(vm)))
+			return
+		}
+		var required bool
+		required, err = r.RequiresLocalInstanceType(vm)
+		if err != nil {
+			if !errors.As(err, &web.ProviderNotReadyError{}) {
+				r.Log.Error(err, "error checking for InstanceType", "vm", vm.Name)
+				step.AddError(err.Error())
+				err = nil
+			}
+			break
+		}
+		if !required {
+			var instancetype *instancetype.VirtualMachineInstancetype
+			instancetype, err = r.builder.LocalInstanceType(vm)
+			if err != nil {
+				if !errors.As(err, &web.ProviderNotReadyError{}) {
+					r.Log.Error(err, "error building InstanceType", "vm", vm.Name)
+					step.AddError(err.Error())
+					err = nil
+				}
+				break
+			}
+			err = r.ensurer.EnsureLocalInstanceType(vm, instancetype)
+			if err != nil {
+				if !errors.As(err, &web.ProviderNotReadyError{}) {
+					r.Log.Error(err, "error ensuring InstanceType", "vm", vm.Name)
+					step.AddError(err.Error())
+					err = nil
+				}
+				break
+			}
 		}
 		vm.Phase = r.Next(vm)
 	case CreateTarget:
@@ -531,6 +612,54 @@ func (r *LiveMigrator) GetTargetVM(vm *planapi.VMStatus) (target *cnv.VirtualMac
 	}
 }
 
+// TODO:
+func (r *LiveMigrator) RequiresLocalPreference(vm *planapi.VMStatus) (required bool, err error) {
+	virtualMachine := &model.VM{}
+	err = r.Context.Source.Inventory.Find(virtualMachine, vm.Ref)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		return
+	}
+	required = virtualMachine.Object.Spec.Preference != nil && virtualMachine.Object.Spec.Preference.Kind != kubevirtapi.ClusterSingularPreferenceResourceName
+	return
+}
+
+// TODO:
+func (r *LiveMigrator) RequiresClusterPreference(vm *planapi.VMStatus) (required bool, err error) {
+	virtualMachine := &model.VM{}
+	err = r.Context.Source.Inventory.Find(virtualMachine, vm.Ref)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		return
+	}
+	required = virtualMachine.Object.Spec.Preference != nil && virtualMachine.Object.Spec.Preference.Kind == kubevirtapi.ClusterSingularPreferenceResourceName
+	return
+}
+
+// TODO:
+func (r *LiveMigrator) RequiresLocalInstanceType(vm *planapi.VMStatus) (required bool, err error) {
+	virtualMachine := &model.VM{}
+	err = r.Context.Source.Inventory.Find(virtualMachine, vm.Ref)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		return
+	}
+	required = virtualMachine.Object.Spec.Instancetype != nil && virtualMachine.Object.Spec.Instancetype.Kind != kubevirtapi.ClusterSingularResourceName
+	return
+}
+
+// TODO:
+func (r *LiveMigrator) RequiresClusterInstanceType(vm *planapi.VMStatus) (required bool, err error) {
+	virtualMachine := &model.VM{}
+	err = r.Context.Source.Inventory.Find(virtualMachine, vm.Ref)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		return
+	}
+	required = virtualMachine.Object.Spec.Instancetype != nil && virtualMachine.Object.Spec.Instancetype.Kind == kubevirtapi.ClusterSingularResourceName
+	return
+}
+
 func (r *LiveMigrator) GetTargetVMIM(vm *planapi.VMStatus) (vmim *cnv.VirtualMachineInstanceMigration, found bool, err error) {
 	vmims := &cnv.VirtualMachineInstanceMigrationList{}
 	err = r.Context.Destination.Client.List(
@@ -554,8 +683,8 @@ func (r *LiveMigrator) GetTargetVMIM(vm *planapi.VMStatus) (vmim *cnv.VirtualMac
 }
 
 func (r *LiveMigrator) GetSourceVMIM(vm *planapi.VMStatus) (vmim *cnv.VirtualMachineInstanceMigration, found bool, err error) {
-	inventoryVm := &model.VM{}
-	err = r.Context.Source.Inventory.Find(inventoryVm, vm.Ref)
+	virtualMachine := &model.VM{}
+	err = r.Context.Source.Inventory.Find(virtualMachine, vm.Ref)
 	if err != nil {
 		err = liberr.Wrap(err, "vm", vm.Ref.String())
 		return
@@ -566,7 +695,7 @@ func (r *LiveMigrator) GetSourceVMIM(vm *planapi.VMStatus) (vmim *cnv.VirtualMac
 		vmims,
 		&client.ListOptions{
 			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
-			Namespace:     inventoryVm.Namespace,
+			Namespace:     virtualMachine.Namespace,
 		})
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -891,6 +1020,70 @@ func (r *Ensurer) EnsureSecrets(vm *planapi.VMStatus, secrets []core.Secret) (er
 	return
 }
 
+// EnsureLocalPreference ensures that the target local Preference has been created in the destination cluster.
+// If one already exists, we assume it's the intended preference to use.
+func (r *Ensurer) EnsureLocalPreference(vm *planapi.VMStatus, target *instancetype.VirtualMachinePreference) (err error) {
+	err = r.Destination.Client.Create(context.Background(), target)
+	if err != nil {
+		if k8serr.IsAlreadyExists(err) {
+			_, found := target.Annotations[AnnSource]
+			if !found {
+				r.Log.Info("Matching local VirtualMachinePreference already present in destination namespace.", "preference",
+					path.Join(
+						target.Namespace,
+						target.Name),
+					"forklift-created", false)
+			}
+			return
+		}
+		err = liberr.Wrap(err, "Failed to create VirtualMachinePreference.", "preference",
+			path.Join(
+				target.Namespace,
+				target.Name))
+		return
+	}
+	r.Log.Info("Created VirtualMachinePreference.",
+		"preference",
+		path.Join(
+			target.Namespace,
+			target.Name),
+		"vm",
+		vm.String())
+	return
+}
+
+// EnsureLocalInstanceType ensures that the target local InstanceType has been created in the destination cluster.
+// If one already exists, we assume it's the intended preference to use.
+func (r *Ensurer) EnsureLocalInstanceType(vm *planapi.VMStatus, target *instancetype.VirtualMachineInstancetype) (err error) {
+	err = r.Destination.Client.Create(context.Background(), target)
+	if err != nil {
+		if k8serr.IsAlreadyExists(err) {
+			_, found := target.Annotations[AnnSource]
+			if !found {
+				r.Log.Info("Matching local VirtualMachineInstancetype already present in destination namespace.", "instancetype",
+					path.Join(
+						target.Namespace,
+						target.Name),
+					"forklift-created", false)
+			}
+			return
+		}
+		err = liberr.Wrap(err, "Failed to create VirtualMachineInstancetype.", "instancetype",
+			path.Join(
+				target.Namespace,
+				target.Name))
+		return
+	}
+	r.Log.Info("Created VirtualMachineInstancetype.",
+		"instancetype",
+		path.Join(
+			target.Namespace,
+			target.Name),
+		"vm",
+		vm.String())
+	return
+}
+
 // EnsureVirtualMachine ensures that the target VirtualMachine has been created in the destination cluster.
 // Labels are used to search for the VM in order to be sure that Forklift is what created it.
 func (r *Ensurer) EnsureVirtualMachine(vm *planapi.VMStatus, target *cnv.VirtualMachine) (err error) {
@@ -1168,11 +1361,61 @@ func (r *Builder) targetDataVolume(source *model.DataVolume, pvc *model.Persiste
 	return
 }
 
-func (r *Builder) InstanceType(vm *planapi.VMStatus) (it instancetype.VirtualMachineInstancetype, err error) {
+// LocalInstanceType builds a copy of a namespace-local InstanceType from the source.
+func (r *Builder) LocalInstanceType(vm *planapi.VMStatus) (target *instancetype.VirtualMachineInstancetype, err error) {
+	virtualMachine := &model.VM{}
+	err = r.Source.Inventory.Find(virtualMachine, vm.Ref)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		return
+	}
+
+	if virtualMachine.Object.Spec.Instancetype == nil || virtualMachine.Object.Spec.Instancetype.Kind == kubevirtapi.ClusterSingularResourceName {
+		err = liberr.New("VM does not have a reference to a local InstanceType.")
+		return
+	}
+	source := instancetype.VirtualMachineInstancetype{}
+	key := types.NamespacedName{Namespace: vm.Namespace, Name: virtualMachine.Object.Spec.Instancetype.Name}
+	err = r.sourceClient.Get(context.Background(), key, &source)
+	if err != nil {
+		err = liberr.Wrap(err, "instancetype", virtualMachine.Object.Spec.Instancetype.Name)
+	}
+	target = &instancetype.VirtualMachineInstancetype{}
+	target.Namespace = r.Plan.Spec.TargetNamespace
+	target.Name = source.Name
+	target.SetLabels(source.GetLabels())
+	target.SetAnnotations(source.GetAnnotations())
+	r.Labeler.SetAnnotation(target, AnnSource, key.String())
+	source.Spec.DeepCopyInto(&target.Spec)
 	return
 }
 
-func (r *Builder) ClusterInstanceType(vm *planapi.VMStatus) (it instancetype.VirtualMachineClusterInstancetype, err error) {
+// LocalPreference builds a copy of a namespace-local Preference from the source.
+func (r *Builder) LocalPreference(vm *planapi.VMStatus) (target *instancetype.VirtualMachinePreference, err error) {
+	virtualMachine := &model.VM{}
+	err = r.Source.Inventory.Find(virtualMachine, vm.Ref)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		return
+	}
+
+	if virtualMachine.Object.Spec.Preference == nil || virtualMachine.Object.Spec.Preference.Kind == kubevirtapi.ClusterSingularPreferenceResourceName {
+		err = liberr.New("VM does not have a reference to a local Preference.")
+		return
+	}
+	source := instancetype.VirtualMachinePreference{}
+	key := types.NamespacedName{Namespace: vm.Namespace, Name: virtualMachine.Object.Spec.Preference.Name}
+	err = r.sourceClient.Get(context.Background(), key, &source)
+	if err != nil {
+		err = liberr.Wrap(err, "preference", virtualMachine.Object.Spec.Preference.Name)
+	}
+	target = &instancetype.VirtualMachinePreference{}
+	target.Namespace = r.Plan.Spec.TargetNamespace
+	target.Name = source.Name
+	target.SetLabels(source.GetLabels())
+	target.SetAnnotations(source.GetAnnotations())
+	r.Labeler.SetAnnotation(target, AnnSource, key.String())
+	source.Spec.DeepCopyInto(&target.Spec)
 	return
 }
 
