@@ -15,6 +15,7 @@ var (
 	VirtV2vDiskCopy         libitr.Flag = 0x10
 	OpenstackImageMigration libitr.Flag = 0x20
 	VSphere                 libitr.Flag = 0x40
+	SupportsCopyOffload     libitr.Flag = 0x80
 )
 
 // Steps.
@@ -36,6 +37,8 @@ var (
 			{Name: api.PhaseStarted},
 			{Name: api.PhasePreHook, All: HasPreHook},
 			{Name: api.PhaseStorePowerState},
+			{Name: api.PhaseCreateInitialSnapshot, All: SupportsCopyOffload},
+			{Name: api.PhaseWaitForInitialSnapshot, All: SupportsCopyOffload},
 			{Name: api.PhasePowerOffSource},
 			{Name: api.PhaseWaitForPowerOff},
 			{Name: api.PhaseCreateDataVolumes},
@@ -46,6 +49,8 @@ var (
 			{Name: api.PhaseCopyDisksVirtV2V, All: RequiresConversion},
 			{Name: api.PhaseConvertOpenstackSnapshot, All: OpenstackImageMigration},
 			{Name: api.PhaseCreateVM},
+			{Name: api.PhaseRemoveFinalSnapshot, All: SupportsCopyOffload},
+			{Name: api.PhaseWaitForFinalSnapshotRemoval, All: SupportsCopyOffload},
 			{Name: api.PhasePostHook, All: HasPostHook},
 			{Name: api.PhaseCompleted},
 		},

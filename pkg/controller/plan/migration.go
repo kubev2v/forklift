@@ -412,6 +412,7 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool) error
 	}
 
 	r.removeLastWarmSnapshot(vm)
+	r.removeOffloadSnapshot(vm)
 
 	return nil
 }
@@ -426,6 +427,18 @@ func (r *Migration) removeLastWarmSnapshot(vm *plan.VMStatus) {
 	}
 	snapshot := vm.Warm.Precopies[n-1].Snapshot
 	if _, err := r.provider.RemoveSnapshot(vm.Ref, snapshot, r.kubevirt.loadHosts); err != nil {
+		r.Log.Error(
+			err,
+			"Failed to clean up warm migration snapshots.",
+			"vm", vm)
+	}
+}
+
+func (r *Migration) removeOffloadSnapshot(vm *plan.VMStatus) {
+	if vm.OffloadSnapshot == nil {
+		return
+	}
+	if _, err := r.provider.RemoveSnapshot(vm.Ref, vm.OffloadSnapshot.Snapshot, r.kubevirt.loadHosts); err != nil {
 		r.Log.Error(
 			err,
 			"Failed to clean up warm migration snapshots.",
@@ -926,7 +939,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				break
 			}
 			precopy := vm.Warm.Precopies[len(vm.Warm.Precopies)-1]
-			ready, err := r.provider.CheckSnapshotRemove(vm.Ref, precopy, r.kubevirt.loadHosts)
+			ready, err := r.provider.CheckSnapshotRemove(vm.Ref, precopy.RemoveTaskId, r.kubevirt.loadHosts)
 			if err != nil {
 				step.AddError(err.Error())
 				err = nil
@@ -962,7 +975,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				break
 			}
 			precopy := vm.Warm.Precopies[len(vm.Warm.Precopies)-1]
-			ready, snapshotId, err := r.provider.CheckSnapshotReady(vm.Ref, precopy, r.kubevirt.loadHosts)
+			ready, snapshotId, err := r.provider.CheckSnapshotReady(vm.Ref, precopy.CreateTaskId, r.kubevirt.loadHosts)
 			if err != nil {
 				step.AddError(err.Error())
 				err = nil
