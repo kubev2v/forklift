@@ -10,7 +10,8 @@ metadata:
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
       == "main" && ( ".tekton/populator-controller-pull-request.yaml".pathChanged() ||
       ".tekton/populator-controller-push.yaml".pathChanged() ||
-      "build/populator-controller/Containerfile".pathChanged() ||
+      ".konflux/populator-controller/rpms.lock.yaml".pathChanged() ||
+      "build/populator-controller/Containerfile-downstream".pathChanged() ||
       "cmd/populator-controller/***".pathChanged() )
   creationTimestamp: null
   labels:
@@ -30,11 +31,13 @@ spec:
   - name: image-expires-after
     value: 5d
   - name: dockerfile
-    value: build/populator-controller/Containerfile
+    value: build/populator-controller/Containerfile-downstream
   - name: path-context
     value: .
   - name: build-source-image
     value: "true"
+  - name: prefetch-input
+    value: '[{"type": "rpm", "path": ".konflux/populator-controller"}]'
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
@@ -84,7 +87,7 @@ spec:
       description: Skip checks against built image
       name: skip-checks
       type: string
-    - default: "false"
+    - default: "true"
       description: Execute the build with network isolation
       name: hermetic
       type: string
@@ -182,6 +185,10 @@ spec:
         value: $(params.output-image).prefetch
       - name: ociArtifactExpiresAfter
         value: $(params.image-expires-after)
+      - name: dev-package-managers 
+        value: "true"
+      - name: ACTIVATION_KEY
+        value: activation-key-rhel9
       runAfter:
       - clone-repository
       taskRef:
