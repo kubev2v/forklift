@@ -11,7 +11,7 @@ metadata:
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
       == "main" && ( ".tekton/forklift-operator-pull-request.yaml".pathChanged() ||
       ".tekton/forklift-operator-push.yaml".pathChanged() ||
-      "build/forklift-operator/Containerfile".pathChanged() ||
+      "build/forklift-operator/Containerfile-downstream".pathChanged() ||
       "operator/roles/***".pathChanged() ||
       "operator/watches.yaml".pathChanged() )
   creationTimestamp: null
@@ -30,7 +30,7 @@ spec:
   - name: output-image
     value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/forklift-operator:{{revision}}
   - name: dockerfile
-    value: build/forklift-operator/Containerfile
+    value: build/forklift-operator/Containerfile-downstream
   - name: path-context
     value: .
   - name: build-source-image
@@ -84,7 +84,7 @@ spec:
       description: Skip checks against built image
       name: skip-checks
       type: string
-    - default: "false"
+    - default: "true"
       description: Execute the build with network isolation
       name: hermetic
       type: string

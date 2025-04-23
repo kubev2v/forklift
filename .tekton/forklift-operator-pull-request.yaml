@@ -10,7 +10,7 @@ metadata:
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
       == "main" && ( ".tekton/forklift-operator-pull-request.yaml".pathChanged() ||
       ".tekton/forklift-operator-push.yaml".pathChanged() ||
-      "build/forklift-operator/Containerfile".pathChanged() ||
+      "build/forklift-operator/Containerfile-downstream".pathChanged() ||
       "operator/roles/***".pathChanged() ||
       "operator/watches.yaml".pathChanged() )
   creationTimestamp: null
@@ -31,7 +31,7 @@ spec:
   - name: image-expires-after
     value: 5d
   - name: dockerfile
-    value: build/forklift-operator/Containerfile
+    value: build/forklift-operator/Containerfile-downstream
   - name: path-context
     value: .
   - name: build-source-image
@@ -85,7 +85,7 @@ spec:
       description: Skip checks against built image
       name: skip-checks
       type: string
-    - default: "false"
+    - default: "true"
       description: Execute the build with network isolation
       name: hermetic
       type: string
