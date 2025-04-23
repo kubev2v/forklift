@@ -10,7 +10,7 @@ metadata:
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
       == "main" && ( ".tekton/validation-pull-request.yaml".pathChanged() ||
       ".tekton/validation-push.yaml".pathChanged() ||
-      "build/validation/Containerfile".pathChanged() ||
+      "build/validation/Containerfile-downstream".pathChanged() ||
       "validation/***".pathChanged() )
   creationTimestamp: null
   labels:
@@ -30,7 +30,7 @@ spec:
   - name: image-expires-after
     value: 5d
   - name: dockerfile
-    value: build/validation/Containerfile
+    value: build/validation/Containerfile-downstream
   - name: path-context
     value: .
   - name: build-source-image
@@ -84,7 +84,7 @@ spec:
       description: Skip checks against built image
       name: skip-checks
       type: string
-    - default: "false"
+    - default: "true"
       description: Execute the build with network isolation
       name: hermetic
       type: string

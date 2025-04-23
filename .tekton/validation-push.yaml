@@ -11,7 +11,7 @@ metadata:
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
       == "main" && ( ".tekton/validation-pull-request.yaml".pathChanged() ||
       ".tekton/validation-push.yaml".pathChanged() ||
-      "build/validation/Containerfile".pathChanged() ||
+      "build/validation/Containerfile-downstream".pathChanged() ||
       "validation/***".pathChanged() )
   creationTimestamp: null
   labels:
@@ -29,7 +29,7 @@ spec:
   - name: output-image
     value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/validation:{{revision}}
   - name: dockerfile
-    value: build/validation/Containerfile
+    value: build/validation/Containerfile-downstream
   - name: path-context
     value: .
   - name: build-source-image
@@ -83,7 +83,7 @@ spec:
       description: Skip checks against built image
       name: skip-checks
       type: string
-    - default: "false"
+    - default: "true"
       description: Execute the build with network isolation
       name: hermetic
       type: string
