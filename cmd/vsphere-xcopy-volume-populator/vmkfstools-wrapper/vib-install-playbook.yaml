@@ -24,6 +24,13 @@
         src="{{ src_location }}{{ src_vib }}"
         dest="{{ dest_location }}{{src_vib}}"
 
+    - name: Wait for hostd status to be 'hostd is running' and exit code 0
+      command: /etc/init.d/hostd status
+      register: hostd_status_result
+      until: hostd_status_result.stdout is search('hostd is running') and hostd_status_result.rc == 0
+      retries: 5
+      delay: 10
+
     - name: Search for existing VIB installation
       shell: esxcli software vib list | grep vmkfstools-wrapper 
       register: vibs
@@ -41,6 +48,13 @@
     - name: restart /etc/init.d/hosts restart
       shell: /etc/init.d/hostd restart
 
+    - name: Wait for hostd status to be 'hostd is running' and exit code 0
+      command: /etc/init.d/hostd status
+      register: hostd_status_result
+      until: hostd_status_result.stdout is search('hostd is running') and hostd_status_result.rc == 0
+      retries: 5
+      delay: 10
+
     - name: Confirm VIB is installed
       shell: esxcli software vib list | grep vmkfstools-wrapper
       register: vibs
@@ -48,5 +62,4 @@
       ignore_errors: yes
 
     - debug: var=vibs.stdout
-
 

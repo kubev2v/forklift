@@ -103,6 +103,7 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 
 	retries := 5
 	for i := 1; i < retries; i++ {
+		klog.Infof("retry %d/%d to find the device %s", i, retries, esxNaa)
 		_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "list", "-d", esxNaa})
 		if err == nil {
 			klog.Infof("found device %s", esxNaa)
@@ -110,12 +111,12 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 		} else {
 			_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "adapter", "rescan", "-t", "add", "-a", "1"})
 			if err != nil {
-				klog.Errorf("failed to rescan for adapters, atepmt %d/%d due to: %s", i, retries, err)
-				i, err := rand.Int(rand.Reader, big.NewInt(10))
+				klog.Errorf("failed to rescan for adapters, attempt %d/%d due to: %s", i, retries, err)
+				r, err := rand.Int(rand.Reader, big.NewInt(10))
 				if err != nil {
 					return fmt.Errorf("failed to randomize a sleep interval: %w", err)
 				}
-				time.Sleep(time.Duration(i.Int64()) * time.Second)
+				time.Sleep(time.Duration(r.Int64()) * time.Second)
 			}
 		}
 	}
@@ -138,7 +139,7 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 	}
 
 	response := ""
-	klog.Info("respose from esxcli ", r)
+	klog.Info("response from esxcli ", r)
 	for _, l := range r {
 		response += l.Value("message")
 	}
