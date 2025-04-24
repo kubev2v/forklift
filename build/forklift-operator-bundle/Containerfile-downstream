@@ -1,4 +1,12 @@
-FROM registry.redhat.io/openshift4/ose-operator-sdk-rhel9@sha256:4e59ce6570325c0cba001b4dd95f7af9e0a8d87bc6e5d27ea2714155fb964699
+FROM registry.redhat.io/ubi9/go-toolset:1.21.13-2.1729776560 AS kustomize
+ENV GO111MODULE=on 
+
+COPY .konflux/forklift-operator-bundle/go.mod go.mod
+COPY .konflux/forklift-operator-bundle/go.sum go.sum
+
+RUN go build sigs.k8s.io/kustomize/kustomize/v5
+
+FROM registry.redhat.io/openshift4/ose-operator-sdk-rhel9@sha256:4e59ce6570325c0cba001b4dd95f7af9e0a8d87bc6e5d27ea2714155fb964699 AS builder
 
 ARG VERSION="2.9.0"
 ARG CHANNEL="tech-preview"
@@ -16,6 +24,11 @@ ARG UI_PLUGIN_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-con
 ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-ova-provider-server-rhel9@sha256:fea2945986e40914f615438497b478dee5d3adbcb0e4729c177dee21772e4342"
 ARG VALIDATION_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-validation-rhel8@sha256:58edf1e9d49c33bdd62abcd632a61ba61e68b8977f3f57e9feb93c1dd4f07fb6"
 
+USER root
+
+COPY --from=kustomize /opt/app-root/src/kustomize /usr/bin/kustomize
+COPY --from=kustomize /usr/bin/envsubst /usr/bin/envsubst
+
 COPY ./operator /repo
 WORKDIR /repo
 RUN kustomize build config/manifests/ \
@@ -28,6 +41,8 @@ RUN kustomize build config/manifests/ \
     --channels $CHANNEL \
     --default-channel $CHANNEL \
     --output-dir build
+
+USER 1001
 
 FROM scratch
 
