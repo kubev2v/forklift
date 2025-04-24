@@ -1,0 +1,1 @@
+This is just a placeholder directory as forklift-operator-bundle container does not need RPM prefetch

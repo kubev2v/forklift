@@ -11,7 +11,7 @@ metadata:
       == "main" && ( "operator/config/manifests/***".pathChanged() || 
       ".tekton/forklift-operator-bundle-pull-request.yaml".pathChanged() ||
       ".tekton/forklift-operator-bundle-push.yaml".pathChanged() ||
-      "build/forklift-operator-bundle/Containerfile".pathChanged() ||
+      "build/forklift-operator-bundle/Containerfile-downstream".pathChanged() ||
       "operator/export-vars.sh".pathChanged() )
   creationTimestamp: null
   labels:
@@ -31,11 +31,9 @@ spec:
   - name: image-expires-after
     value: 5d
   - name: dockerfile
-    value: build/forklift-operator-bundle/Containerfile
+    value: build/forklift-operator-bundle/Containerfile-downstream
   - name: path-context
     value: .
-  - name: build-args-file
-    value: build/forklift-operator-bundle/downstream-args
   - name: build-source-image
     value: "true"
   pipelineSpec:
@@ -87,7 +85,7 @@ spec:
       description: Skip checks against built image
       name: skip-checks
       type: string
-    - default: "false"
+    - default: "true"
       description: Execute the build with network isolation
       name: hermetic
       type: string
