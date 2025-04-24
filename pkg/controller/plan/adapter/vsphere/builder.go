@@ -1256,7 +1256,6 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 						Annotations: annotations,
 					},
 					Spec: core.PersistentVolumeClaimSpec{
-						AccessModes:      []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
 						StorageClassName: &storageClass,
 						VolumeMode:       &pvblock,
 						Resources: core.ResourceRequirements{
@@ -1270,6 +1269,11 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 							Name:     commonName,
 						},
 					},
+				}
+				// set the access mode and volume mode if they were specified in the storage map.
+				// otherwise, let the storage profile decide the default values.
+				if mapped.Destination.AccessMode != "" {
+					pvc.Spec.AccessModes = []core.PersistentVolumeAccessMode{mapped.Destination.AccessMode}
 				}
 
 				if annotations == nil {
