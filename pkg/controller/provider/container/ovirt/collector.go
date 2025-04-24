@@ -128,6 +128,11 @@ func (r *Collector) HasParity() bool {
 	return r.parity
 }
 
+// Follow link
+func (r *Collector) Follow(moRef interface{}, p []string, dst interface{}) error {
+	return fmt.Errorf("not implemented")
+}
+
 // Test connect/logout.
 func (r *Collector) Test() (status int, err error) {
 	_, status, err = r.client.system()

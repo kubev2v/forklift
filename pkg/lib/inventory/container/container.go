@@ -146,6 +146,8 @@ type Collector interface {
 	// Return the status code of the connection
 	// 0 = Ignore
 	Test() (int, error)
+	// Follow the link
+	Follow(moRef interface{}, p []string, dst interface{}) error
 	// Reset
 	Reset()
 	// Get the system version - currently, ovirt-only

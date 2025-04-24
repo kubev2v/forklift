@@ -2,6 +2,7 @@ package ocp
 
 import (
 	"context"
+	"fmt"
 	"path"
 	"time"
 
@@ -110,6 +111,11 @@ func (r *Collector) Reset() {
 // Collector has achieved parity.
 func (r *Collector) HasParity() bool {
 	return r.parity
+}
+
+// Follow link
+func (r *Collector) Follow(moRef interface{}, p []string, dst interface{}) error {
+	return fmt.Errorf("not implemented")
 }
 
 // Update the versionThreshold
