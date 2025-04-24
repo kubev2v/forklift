@@ -181,6 +181,10 @@ func (r *Collector) Name() string {
 	return "tester"
 }
 
+func (r *Collector) Follow(moRef interface{}, p []string, dst interface{}) error {
+	return nil
+}
+
 func (r *Collector) Owner() meta.Object {
 	return &meta.ObjectMeta{
 		UID: "TEST",
