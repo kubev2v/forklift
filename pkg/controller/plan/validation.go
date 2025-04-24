@@ -1077,6 +1077,9 @@ func (r *Reconciler) cancelOtherActiveVddkCheckJobs(plan *api.Plan) (err error) 
 	}
 
 	for _, job := range jobs.Items {
+		if _, found := job.Labels["vddk"]; !found {
+			continue
+		}
 		if job.Status.Active > 0 && job.Labels["vddk"] != jobLabels["vddk"] {
 			r.Log.Info("Another validation job is active for this plan. Stopping...", "job", job)
 			// make sure to delete the pod associated with this job so that it doesn't
