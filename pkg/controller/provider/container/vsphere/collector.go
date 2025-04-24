@@ -2,6 +2,7 @@ package vsphere
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	liburl "net/url"
 	"path"
@@ -85,6 +86,7 @@ const (
 	fThumbprint     = "summary.config.sslThumbprint"
 	fMgtServerIp    = "summary.managementServerIp"
 	fScsiLun        = "config.storageDevice.scsiLun"
+	fAdvancedOption = "configManager.advancedOption"
 	// Network
 	fTag     = "tag"
 	fSummary = "summary"
@@ -314,6 +316,24 @@ func (r *Collector) HasParity() bool {
 	return r.parity
 }
 
+// Follow
+func (r *Collector) Follow(moRef interface{}, p []string, dst interface{}) error {
+	ref, ok := moRef.(types.ManagedObjectReference)
+	if !ok {
+		return fmt.Errorf("reference must be of type ManagedObjectReference")
+	}
+
+	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	client, err := r.buildClient(ctx)
+	if err != nil {
+		return err
+	}
+	defer client.CloseIdleConnections()
+	return client.RetrieveOne(ctx, ref, p, dst)
+}
+
 // Test connect/logout.
 func (r *Collector) Test() (status int, err error) {
 	ctx := context.Background()
@@ -530,10 +550,22 @@ func (r *Collector) watch() (list []*libmodel.Watch) {
 // Build the client.
 func (r *Collector) connect(ctx context.Context) (status int, err error) {
 	r.close()
+	r.client, err = r.buildClient(ctx)
+	if err != nil {
+		if strings.Contains(err.Error(), "incorrect") && strings.Contains(err.Error(), "password") {
+			return http.StatusUnauthorized, err
+		}
+		return
+	}
+
+	return http.StatusOK, nil
+}
+
+// Build the client.
+func (r *Collector) buildClient(ctx context.Context) (*govmomi.Client, error) {
 	url, err := liburl.Parse(r.url)
 	if err != nil {
-		err = liberr.Wrap(err)
-		return
+		return nil, liberr.Wrap(err)
 	}
 	url.User = liburl.UserPassword(
 		r.user(),
@@ -542,23 +574,15 @@ func (r *Collector) connect(ctx context.Context) (status int, err error) {
 	soapClient.SetThumbprint(url.Host, r.thumbprint())
 	vimClient, err := vim25.NewClient(ctx, soapClient)
 	if err != nil {
-		err = liberr.Wrap(err)
-		return
+		return nil, liberr.Wrap(err)
 	}
-	r.client = &govmomi.Client{
+	client := &govmomi.Client{
 		SessionManager: session.NewManager(vimClient),
 		Client:         vimClient,
 	}
-	err = r.client.Login(ctx, url.User)
-	if err != nil {
-		err = liberr.Wrap(err)
-		if strings.Contains(err.Error(), "incorrect") && strings.Contains(err.Error(), "password") {
-			return http.StatusUnauthorized, err
-		}
-		return
-	}
+	err = client.Login(ctx, url.User)
+	return client, err
 
-	return http.StatusOK, nil
 }
 
 // Close connections.
@@ -701,6 +725,7 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 				fPNIC,
 				fVNIC,
 				fScsiLun,
+				fAdvancedOption,
 			},
 		},
 		{ // Network

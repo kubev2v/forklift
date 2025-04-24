@@ -2,6 +2,7 @@ package ova
 
 import (
 	"context"
+	"fmt"
 	liburl "net/url"
 	libpath "path"
 	"time"
@@ -120,6 +121,11 @@ func (r *Collector) Test() (_ int, err error) {
 // NO-OP
 func (r *Collector) Version() (_, _, _, _ string, err error) {
 	return
+}
+
+// Follow link
+func (r *Collector) Follow(moRef interface{}, p []string, dst interface{}) error {
+	return fmt.Errorf("not implemented")
 }
 
 // Start the collector.

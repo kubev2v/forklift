@@ -140,6 +140,7 @@ type Host struct {
 	Networks           []Ref          `sql:""`
 	Datastores         []Ref          `sql:""`
 	HostScsiDisks      []HostScsiDisk `sql:""`
+	AdvancedOptions    Ref            `sql:""`
 }
 
 type HostScsiDisk struct {

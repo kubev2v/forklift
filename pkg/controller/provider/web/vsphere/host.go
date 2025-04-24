@@ -2,6 +2,7 @@ package vsphere
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"sort"
 	"strings"
@@ -9,8 +10,12 @@ import (
 	"github.com/gin-gonic/gin"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
+	"github.com/vmware/govmomi/vim25/types"
+
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
+
+	"github.com/vmware/govmomi/vim25/mo"
 )
 
 // Routes
@@ -124,11 +129,37 @@ func (h HostHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
+
+	// Parse advancedOption query parameter
+	h.parseAdvancedOptions(ctx, r, m)
+
 	r.Link(h.Provider)
 	r.Path = pb.Path(m)
 	content := r.Content(h.Detail)
 
 	ctx.JSON(http.StatusOK, content)
+}
+
+func (h *HostHandler) parseAdvancedOptions(ctx *gin.Context, r *Host, m *model.Host) {
+	// Check the advanced option is passed
+	advancedOption := ctx.Query("advancedOption")
+	if advancedOption == "" {
+		return
+	}
+
+	// Get settings of option manager
+	optManagers := mo.OptionManager{}
+	moRef := types.ManagedObjectReference{Type: m.AdvancedOptions.Kind, Value: m.AdvancedOptions.ID}
+	if err := h.Collector.Follow(moRef, []string{"setting"}, &optManagers); err != nil {
+		return
+	}
+
+	// Find the option we are interested in:
+	for _, option := range optManagers.Setting {
+		if option.GetOptionValue().Key == advancedOption {
+			r.AdvancedOptions = []AdvancedOptions{{Key: advancedOption, Value: fmt.Sprintf("%v", option.GetOptionValue().Value)}}
+		}
+	}
 }
 
 // Watch.
@@ -219,6 +250,12 @@ type Host struct {
 	VMs                []model.Ref          `json:"vms"`
 	NetworkAdapters    []NetworkAdapter     `json:"networkAdapters"`
 	HostScsiDisks      []model.HostScsiDisk `json:"hostScsiDisks"`
+	AdvancedOptions    []AdvancedOptions    `json:"advancedOptions"`
+}
+
+type AdvancedOptions struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
 // Build the resource using the model.

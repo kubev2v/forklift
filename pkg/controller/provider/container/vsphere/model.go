@@ -382,6 +382,8 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 						v.model.HostScsiDisks = append(v.model.HostScsiDisks, hostScsiDisk)
 					}
 				}
+			case fAdvancedOption:
+				v.model.AdvancedOptions = v.Ref(p.Val)
 			}
 		}
 	}
