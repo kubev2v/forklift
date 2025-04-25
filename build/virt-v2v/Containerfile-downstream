@@ -1,4 +1,4 @@
-FROM registry.redhat.io/ubi9:9.5-1739449058 AS appliance
+FROM registry.redhat.io/ubi9:9.5-1744101466 AS appliance
 
 ENV LIBGUESTFS_BACKEND direct
 
@@ -26,7 +26,7 @@ RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-monitor github
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o image-converter github.com/konveyor/forklift-controller/cmd/image-converter
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-wrapper github.com/konveyor/forklift-controller/cmd/virt-v2v
 
-FROM registry.redhat.io/ubi9:9.5-1739449058
+FROM registry.redhat.io/ubi9:9.5-1744101466
 RUN mkdir /disks && \
     source /etc/os-release && \
     dnf update -y && \
