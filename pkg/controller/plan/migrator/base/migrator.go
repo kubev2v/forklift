@@ -3,6 +3,7 @@ package base
 import (
 	"fmt"
 
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
@@ -10,10 +11,6 @@ import (
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 )
-
-const Pending = "Pending"
-const Canceled = "Canceled"
-const Failed = "Failed"
 
 // Package logger.
 var log = logging.WithName("migrator|base")
@@ -52,7 +49,7 @@ func (r *BaseMigrator) Status(vm plan.VM) (status *plan.VMStatus) {
 }
 
 func (r *BaseMigrator) Reset(status *plan.VMStatus, pipeline []*plan.Step) {
-	status.DeleteCondition(Canceled, Failed)
+	status.DeleteCondition(api.ConditionCanceled, api.ConditionFailed)
 	status.MarkReset()
 	itr := r.Itinerary(&BasePredicate{vm: &status.VM, context: r.Context})
 	step, _ := itr.First()
@@ -70,7 +67,7 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 	step, _ := itinerary.First()
 	for {
 		switch step.Name {
-		case Started:
+		case api.PhaseStarted:
 			pipeline = append(
 				pipeline,
 				&plan.Step{
@@ -78,21 +75,21 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 						Name:        Initialize,
 						Description: "Initialize migration.",
 						Progress:    libitr.Progress{Total: 1},
-						Phase:       Pending,
+						Phase:       api.StepPending,
 					},
 				})
-		case PreHook:
+		case api.PhasePreHook:
 			pipeline = append(
 				pipeline,
 				&plan.Step{
 					Task: plan.Task{
-						Name:        PreHook,
+						Name:        api.PhasePreHook,
 						Description: "Run pre-migration hook.",
 						Progress:    libitr.Progress{Total: 1},
-						Phase:       Pending,
+						Phase:       api.StepPending,
 					},
 				})
-		case AllocateDisks, CopyDisks, CopyDisksVirtV2V, ConvertOpenstackSnapshot:
+		case api.PhaseAllocateDisks, api.PhaseCopyDisks, api.PhaseCopyDisksVirtV2V, api.PhaseConvertOpenstackSnapshot:
 			tasks, pErr := r.builder.Tasks(vm.Ref)
 			if pErr != nil {
 				err = liberr.Wrap(pErr)
@@ -104,17 +101,17 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 			}
 			var taskDescription, taskName string
 			switch step.Name {
-			case CopyDisks:
+			case api.PhaseCopyDisks:
 				taskName = DiskTransfer
 				taskDescription = "Transfer disks."
-			case AllocateDisks:
+			case api.PhaseAllocateDisks:
 				taskName = DiskAllocation
 				taskDescription = "Allocate disks."
-			case CopyDisksVirtV2V:
+			case api.PhaseCopyDisksVirtV2V:
 				taskName = DiskTransferV2v
 				taskDescription = "Copy disks."
-			case ConvertOpenstackSnapshot:
-				taskName = ConvertOpenstackSnapshot
+			case api.PhaseConvertOpenstackSnapshot:
+				taskName = api.PhaseConvertOpenstackSnapshot
 				taskDescription = "Convert OpenStack snapshot."
 			default:
 				err = liberr.New(fmt.Sprintf("Unknown step '%s'. Not implemented.", step.Name))
@@ -132,11 +129,11 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 						Annotations: map[string]string{
 							"unit": "MB",
 						},
-						Phase: Pending,
+						Phase: api.StepPending,
 					},
 					Tasks: tasks,
 				})
-		case Finalize:
+		case api.PhaseFinalize:
 			tasks, pErr := r.builder.Tasks(vm.Ref)
 			if pErr != nil {
 				err = liberr.Wrap(pErr)
@@ -161,7 +158,7 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 					},
 					Tasks: tasks,
 				})
-		case ConvertGuest:
+		case api.PhaseConvertGuest:
 			pipeline = append(
 				pipeline,
 				&plan.Step{
@@ -169,28 +166,28 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 						Name:        ImageConversion,
 						Description: "Convert image to kubevirt.",
 						Progress:    libitr.Progress{Total: 1},
-						Phase:       Pending,
+						Phase:       api.StepPending,
 					},
 				})
-		case PostHook:
+		case api.PhasePostHook:
 			pipeline = append(
 				pipeline,
 				&plan.Step{
 					Task: plan.Task{
-						Name:        PostHook,
+						Name:        api.PhasePostHook,
 						Description: "Run post-migration hook.",
 						Progress:    libitr.Progress{Total: 1},
-						Phase:       Pending,
+						Phase:       api.StepPending,
 					},
 				})
-		case CreateVM:
+		case api.PhaseCreateVM:
 			pipeline = append(
 				pipeline,
 				&plan.Step{
 					Task: plan.Task{
 						Name:        VMCreation,
 						Description: "Create VM.",
-						Phase:       Pending,
+						Phase:       api.StepPending,
 						Progress:    libitr.Progress{Total: 1},
 					},
 				})
@@ -229,7 +226,7 @@ func (r *BaseMigrator) Next(status *plan.VMStatus) (next string) {
 	itinerary := r.Itinerary(&BasePredicate{vm: &status.VM, context: r.Context})
 	step, done, err := itinerary.Next(status.Phase)
 	if done || err != nil {
-		next = Completed
+		next = api.PhaseCompleted
 		if err != nil {
 			log.Error(err, "Next phase failed.")
 		}
@@ -249,23 +246,28 @@ func (r *BaseMigrator) ExecutePhase(vm *plan.VMStatus) (ok bool, err error) {
 // Step gets the name of the pipeline step corresponding to the current VM phase.
 func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 	switch status.Phase {
-	case Started, CreateInitialSnapshot, WaitForInitialSnapshot, StoreInitialSnapshotDeltas, CreateDataVolumes:
+	case api.PhaseStarted, api.PhaseCreateInitialSnapshot, api.PhaseWaitForInitialSnapshot,
+		api.PhaseStoreInitialSnapshotDeltas, api.PhaseCreateDataVolumes:
 		step = Initialize
-	case AllocateDisks:
+	case api.PhaseAllocateDisks:
 		step = DiskAllocation
-	case CopyDisks, CopyingPaused, RemovePreviousSnapshot, WaitForPreviousSnapshotRemoval, CreateSnapshot, WaitForSnapshot, StoreSnapshotDeltas, AddCheckpoint, ConvertOpenstackSnapshot, WaitForDataVolumesStatus:
+	case api.PhaseCopyDisks, api.PhaseCopyingPaused, api.PhaseRemovePreviousSnapshot, api.PhaseWaitForPreviousSnapshotRemoval,
+		api.PhaseCreateSnapshot, api.PhaseWaitForSnapshot, api.PhaseStoreSnapshotDeltas, api.PhaseAddCheckpoint,
+		api.PhaseConvertOpenstackSnapshot, api.PhaseWaitForDataVolumesStatus:
 		step = DiskTransfer
-	case RemovePenultimateSnapshot, WaitForPenultimateSnapshotRemoval, CreateFinalSnapshot, WaitForFinalSnapshot, AddFinalCheckpoint, Finalize, RemoveFinalSnapshot, WaitForFinalSnapshotRemoval, WaitForFinalDataVolumesStatus:
+	case api.PhaseRemovePenultimateSnapshot, api.PhaseWaitForPenultimateSnapshotRemoval, api.PhaseCreateFinalSnapshot,
+		api.PhaseWaitForFinalSnapshot, api.PhaseAddFinalCheckpoint, api.PhaseFinalize, api.PhaseRemoveFinalSnapshot,
+		api.PhaseWaitForFinalSnapshotRemoval, api.PhaseWaitForFinalDataVolumesStatus:
 		step = Cutover
-	case CreateGuestConversionPod, ConvertGuest:
+	case api.PhaseCreateGuestConversionPod, api.PhaseConvertGuest:
 		step = ImageConversion
-	case CopyDisksVirtV2V:
+	case api.PhaseCopyDisksVirtV2V:
 		step = DiskTransferV2v
-	case CreateVM:
+	case api.PhaseCreateVM:
 		step = VMCreation
-	case PreHook, PostHook:
+	case api.PhasePreHook, api.PhasePostHook:
 		step = status.Phase
-	case StorePowerState, PowerOffSource, WaitForPowerOff:
+	case api.PhaseStorePowerState, api.PhasePowerOffSource, api.PhaseWaitForPowerOff:
 		if r.Context.Plan.Spec.Warm {
 			step = Cutover
 		} else {
@@ -295,9 +297,9 @@ func (r *BasePredicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 
 	switch flag {
 	case HasPreHook:
-		_, allowed = r.vm.FindHook(PreHook)
+		_, allowed = r.vm.FindHook(api.PhasePreHook)
 	case HasPostHook:
-		_, allowed = r.vm.FindHook(PostHook)
+		_, allowed = r.vm.FindHook(api.PhasePostHook)
 	case RequiresConversion:
 		allowed = r.context.Source.Provider.RequiresConversion()
 	case CDIDiskCopy:

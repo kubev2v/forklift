@@ -229,7 +229,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		plan.Status.SetCondition(libcnd.Condition{
 			Type:     libcnd.Ready,
 			Status:   True,
-			Category: Required,
+			Category: api.CategoryRequired,
 			Message:  "The migration plan is ready.",
 		})
 	}
@@ -308,7 +308,7 @@ func (r *Reconciler) archive(plan *api.Plan) {
 		libcnd.Condition{
 			Type:     Archived,
 			Status:   True,
-			Category: Advisory,
+			Category: api.CategoryAdvisory,
 			Reason:   UserRequested,
 			Message:  "The migration plan has been archived.",
 		})
@@ -378,7 +378,7 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 					libcnd.Condition{
 						Type:     Canceled,
 						Status:   True,
-						Category: Advisory,
+						Category: api.CategoryAdvisory,
 						Reason:   Modified,
 						Message:  "The migration has been canceled.",
 						Durable:  true,
@@ -500,7 +500,7 @@ func (r *Reconciler) matchSnapshot(ctx *plancontext.Context) (matched bool) {
 				libcnd.Condition{
 					Type:     Canceled,
 					Status:   True,
-					Category: Advisory,
+					Category: api.CategoryAdvisory,
 					Reason:   Modified,
 					Message:  "The migration has been canceled.",
 					Durable:  true,
@@ -548,7 +548,7 @@ func (r *Reconciler) activeMigration(plan *api.Plan) (migration *api.Migration, 
 	deleted := libcnd.Condition{
 		Type:     Canceled,
 		Status:   True,
-		Category: Advisory,
+		Category: api.CategoryAdvisory,
 		Reason:   Deleted,
 		Message:  "The migration has been deleted.",
 		Durable:  true,
