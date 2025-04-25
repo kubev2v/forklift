@@ -69,9 +69,6 @@ const (
 	Canceled                      = "Canceled"
 	Deleted                       = "Deleted"
 	Paused                        = "Paused"
-	Pending                       = "Pending"
-	Running                       = "Running"
-	Blocked                       = "Blocked"
 	Archived                      = "Archived"
 	unsupportedVersion            = "UnsupportedVersion"
 	VDDKInvalid                   = "VDDKInvalid"
@@ -81,17 +78,9 @@ const (
 	NetMapOrder                   = "NetworkMapUnordered"
 )
 
-// Categories
-const (
-	Required = libcnd.Required
-	Advisory = libcnd.Advisory
-	Critical = libcnd.Critical
-	Error    = libcnd.Error
-	Warn     = libcnd.Warn
-)
-
 // Reasons
 const (
+	Started                     = "Started"
 	NotSet                      = "NotSet"
 	NotFound                    = "NotFound"
 	NotUnique                   = "NotUnique"
@@ -196,7 +185,7 @@ func (r *Reconciler) validatePVCNameTemplate(plan *api.Plan) error {
 		invalidPVCNameTemplate := libcnd.Condition{
 			Type:     NotValid,
 			Status:   True,
-			Category: Critical,
+			Category: api.CategoryCritical,
 			Message:  "PVC name template is invalid.",
 			Items:    []string{},
 		}
@@ -212,7 +201,7 @@ func (r *Reconciler) validateVolumeNameTemplate(plan *api.Plan) error {
 		invalidPVCNameTemplate := libcnd.Condition{
 			Type:     NotValid,
 			Status:   True,
-			Category: Critical,
+			Category: api.CategoryCritical,
 			Message:  "Volume name template is invalid.",
 			Items:    []string{},
 		}
@@ -228,7 +217,7 @@ func (r *Reconciler) validateNetworkNameTemplate(plan *api.Plan) error {
 		invalidPVCNameTemplate := libcnd.Condition{
 			Type:     NotValid,
 			Status:   True,
-			Category: Critical,
+			Category: api.CategoryCritical,
 			Message:  "Network name template is invalid.",
 			Items:    []string{},
 		}
@@ -255,7 +244,7 @@ func (r *Reconciler) validateOpenShiftVersion(plan *api.Plan) error {
 			Type:     unsupportedVersion,
 			Status:   True,
 			Reason:   NotSupported,
-			Category: Critical,
+			Category: api.CategoryCritical,
 			Message:  "Source version is not supported.",
 			Items:    []string{},
 		}
@@ -310,7 +299,7 @@ func (r *Reconciler) validateWarmMigration(plan *api.Plan) (err error) {
 		plan.Status.SetCondition(libcnd.Condition{
 			Type:     WarmMigrationNotReady,
 			Status:   True,
-			Category: Critical,
+			Category: api.CategoryCritical,
 			Reason:   NotSupported,
 			Message:  "Warm migration from the source provider is not supported.",
 		})
@@ -323,7 +312,7 @@ func (r *Reconciler) validateTargetNamespace(plan *api.Plan) (err error) {
 	newCnd := libcnd.Condition{
 		Type:     NamespaceNotValid,
 		Status:   True,
-		Category: Critical,
+		Category: api.CategoryCritical,
 		Message:  "Target namespace is not valid.",
 	}
 	if plan.Spec.TargetNamespace == "" {
@@ -344,7 +333,7 @@ func (r *Reconciler) validateNetworkMap(plan *api.Plan) (err error) {
 	newCnd := libcnd.Condition{
 		Type:     NetRefNotValid,
 		Status:   True,
-		Category: Critical,
+		Category: api.CategoryCritical,
 		Message:  "Map.Network is not valid.",
 	}
 	if !libref.RefSet(&ref) {
@@ -372,7 +361,7 @@ func (r *Reconciler) validateNetworkMap(plan *api.Plan) (err error) {
 		plan.Status.SetCondition(libcnd.Condition{
 			Type:     NetMapNotReady,
 			Status:   True,
-			Category: Critical,
+			Category: api.CategoryCritical,
 			Message:  "Map.Network does not have Ready condition.",
 		})
 	}
@@ -388,7 +377,7 @@ func (r *Reconciler) validateStorageMap(plan *api.Plan) (err error) {
 	newCnd := libcnd.Condition{
 		Type:     DsRefNotValid,
 		Status:   True,
-		Category: Critical,
+		Category: api.CategoryCritical,
 		Message:  "Map.Storage is not valid.",
 	}
 	if !libref.RefSet(&ref) {
@@ -416,7 +405,7 @@ func (r *Reconciler) validateStorageMap(plan *api.Plan) (err error) {
 		plan.Status.SetCondition(libcnd.Condition{
 			Type:     DsMapNotReady,
 			Status:   True,
-			Category: Critical,
+			Category: api.CategoryCritical,
 			Message:  "Map.Storage does not have Ready condition.",
 		})
 	}
@@ -435,7 +424,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Type:     VMNotFound,
 		Status:   True,
 		Reason:   NotFound,
-		Category: Critical,
+		Category: api.CategoryCritical,
 		Message:  "VM not found.",
 		Items:    []string{},
 	}
@@ -443,7 +432,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Type:     DuplicateVM,
 		Status:   True,
 		Reason:   NotUnique,
-		Category: Critical,
+		Category: api.CategoryCritical,
 		Message:  "Duplicate (source) VM.",
 		Items:    []string{},
 	}
@@ -451,7 +440,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Type:     DuplicateVM,
 		Status:   True,
 		Reason:   Ambiguous,
-		Category: Critical,
+		Category: api.CategoryCritical,
 		Message:  "VM reference is ambiguous.",
 		Items:    []string{},
 	}
@@ -459,7 +448,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Type:     NameNotValid,
 		Status:   True,
 		Reason:   NotValid,
-		Category: Warn,
+		Category: api.CategoryWarn,
 		Message:  "Target VM name does not comply with DNS1123 RFC, will be automatically changed.",
 		Items:    []string{},
 	}
@@ -467,7 +456,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Type:     VMAlreadyExists,
 		Status:   True,
 		Reason:   NotUnique,
-		Category: Critical,
+		Category: api.CategoryCritical,
 		Message:  "Target VM already exists.",
 		Items:    []string{},
 	}
@@ -475,7 +464,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Type:     VMNetworksNotMapped,
 		Status:   True,
 		Reason:   NotValid,
-		Category: Critical,
+		Category: api.CategoryCritical,
 		Message:  "VM has unmapped networks.",
 		Items:    []string{},
 	}
@@ -483,7 +472,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Type:     VMStorageNotMapped,
 		Status:   True,
 		Reason:   NotValid,
-		Category: Critical,
+		Category: api.CategoryCritical,
 		Message:  "VM has unmapped storage.",
 		Items:    []string{},
 	}
@@ -491,7 +480,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Type:     VMStorageNotSupported,
 		Status:   True,
 		Reason:   NotValid,
-		Category: Critical,
+		Category: api.CategoryCritical,
 		Message:  "VM has unsupported storage. Migration of Direct LUN/FC from oVirt is supported as from version 4.5.2.1",
 		Items:    []string{},
 	}
@@ -499,7 +488,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Type:     HostNotReady,
 		Status:   True,
 		Reason:   InMaintenanceMode,
-		Category: Warn,
+		Category: api.CategoryWarn,
 		Message:  "VM host is in maintenance mode.",
 		Items:    []string{},
 	}
@@ -507,7 +496,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Type:     VMMultiplePodNetworkMappings,
 		Status:   True,
 		Reason:   NotValid,
-		Category: Critical,
+		Category: api.CategoryCritical,
 		Message:  "VM has more than one interface mapped to the pod network.",
 		Items:    []string{},
 	}
@@ -515,7 +504,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Type:     VMMissingGuestIPs,
 		Status:   True,
 		Reason:   MissingGuestInfo,
-		Category: Warn,
+		Category: api.CategoryWarn,
 		Message:  "Guest information on vNICs is missing, cannot preserve static IPs. If this machine has static IP, make sure VMware tools are installed and the VM is running.",
 		Items:    []string{},
 	}
@@ -523,35 +512,35 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Type:     VMMissingChangedBlockTracking,
 		Status:   True,
 		Reason:   MissingChangedBlockTracking,
-		Category: Critical,
+		Category: api.CategoryCritical,
 		Message:  "Changed Block Tracking (CBT) has not been enabled on some VM. This feature is a prerequisite for VM warm migration.",
 		Items:    []string{},
 	}
 	pvcNameInvalid := libcnd.Condition{
 		Type:     NotValid,
 		Status:   True,
-		Category: Critical,
+		Category: api.CategoryCritical,
 		Message:  "VM PVC name template is invalid.",
 		Items:    []string{},
 	}
 	volumeNameInvalid := libcnd.Condition{
 		Type:     NotValid,
 		Status:   True,
-		Category: Critical,
+		Category: api.CategoryCritical,
 		Message:  "VM volume name template is invalid.",
 		Items:    []string{},
 	}
 	networkNameInvalid := libcnd.Condition{
 		Type:     NotValid,
 		Status:   True,
-		Category: Critical,
+		Category: api.CategoryCritical,
 		Message:  "VM network name template is invalid.",
 		Items:    []string{},
 	}
 	targetNameInvalid := libcnd.Condition{
 		Type:     NotValid,
 		Status:   True,
-		Category: Critical,
+		Category: api.CategoryCritical,
 		Message:  "TargetName is invalid.",
 		Items:    []string{},
 	}
@@ -559,7 +548,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Type:     DuplicateVM,
 		Status:   True,
 		Reason:   NotUnique,
-		Category: Critical,
+		Category: api.CategoryCritical,
 		Message:  "Duplicate targetName.",
 		Items:    []string{},
 	}
@@ -569,7 +558,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Type:     NetMapOrder,
 		Status:   True,
 		Reason:   NotValid,
-		Category: Warn,
+		Category: api.CategoryWarn,
 		Message:  "VM network mapping is unordered, this can cause the interface names to be different after migration.",
 		Items:    []string{},
 	}
@@ -577,7 +566,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Type:     NetMapOrder,
 		Status:   True,
 		Reason:   NotValid,
-		Category: Warn,
+		Category: api.CategoryWarn,
 		Message:  "VM nics number per plan's network number are unequal, names might not be preserved.",
 		Items:    []string{},
 	}
@@ -594,7 +583,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 				Type:     VMRefNotValid,
 				Status:   True,
 				Reason:   NotSet,
-				Category: Critical,
+				Category: api.CategoryCritical,
 				Message:  "Either `ID` or `Name` required.",
 			})
 			continue
@@ -876,14 +865,14 @@ func (r *Reconciler) validateTransferNetwork(plan *api.Plan) (err error) {
 	notFound := libcnd.Condition{
 		Type:     TransferNetNotValid,
 		Status:   True,
-		Category: Critical,
+		Category: api.CategoryCritical,
 		Reason:   NotFound,
 		Message:  "Transfer network is not valid.",
 	}
 	notValid := libcnd.Condition{
 		Type:     TransferNetNotValid,
 		Status:   True,
-		Category: Critical,
+		Category: api.CategoryCritical,
 		Reason:   NotValid,
 		Message:  "Transfer network default route annotation is not a valid IP address.",
 	}
@@ -920,7 +909,7 @@ func (r *Reconciler) validateHooks(plan *api.Plan) (err error) {
 		Type:     HookNotValid,
 		Status:   True,
 		Reason:   NotSet,
-		Category: Critical,
+		Category: api.CategoryCritical,
 		Message:  "Hook specified by: `namespace` and `name`.",
 		Items:    []string{},
 	}
@@ -928,7 +917,7 @@ func (r *Reconciler) validateHooks(plan *api.Plan) (err error) {
 		Type:     HookNotValid,
 		Status:   True,
 		Reason:   NotFound,
-		Category: Critical,
+		Category: api.CategoryCritical,
 		Message:  "Hook not found.",
 		Items:    []string{},
 	}
@@ -936,7 +925,7 @@ func (r *Reconciler) validateHooks(plan *api.Plan) (err error) {
 		Type:     HookNotReady,
 		Status:   True,
 		Reason:   NotFound,
-		Category: Critical,
+		Category: api.CategoryCritical,
 		Message:  "Hook does not have `Ready` condition.",
 		Items:    []string{},
 	}
@@ -944,14 +933,14 @@ func (r *Reconciler) validateHooks(plan *api.Plan) (err error) {
 		Type:     HookStepNotValid,
 		Status:   True,
 		Reason:   NotValid,
-		Category: Critical,
+		Category: api.CategoryCritical,
 		Message:  "Hook step not valid.",
 		Items:    []string{},
 	}
 	for _, vm := range plan.Spec.VMs {
 		for _, ref := range vm.Hooks {
 			// Step not valid.
-			if _, found := map[string]int{PreHook: 1, PostHook: 1}[ref.Step]; !found {
+			if _, found := map[string]int{api.PhasePreHook: 1, api.PhasePostHook: 1}[ref.Step]; !found {
 				description := fmt.Sprintf(
 					"VM: %s step: %s",
 					vm.String(),
@@ -1058,14 +1047,14 @@ func (r *Reconciler) validateVddkImageJob(job *batchv1.Job, plan *api.Plan) (err
 		Type:     VDDKInvalid,
 		Status:   True,
 		Reason:   NotSet,
-		Category: Critical,
+		Category: api.CategoryCritical,
 		Message:  "VDDK init image is invalid",
 	}
 	vddkValidationInProgress := libcnd.Condition{
 		Type:     ValidatingVDDK,
 		Status:   True,
 		Reason:   Started,
-		Category: Advisory,
+		Category: api.CategoryAdvisory,
 		Message:  "Validating VDDK init image",
 	}
 
@@ -1102,7 +1091,7 @@ func (r *Reconciler) validateVddkImageJob(job *batchv1.Job, plan *api.Plan) (err
 					Type:     VDDKInitImageUnavailable,
 					Status:   True,
 					Reason:   waiting.Reason,
-					Category: Critical,
+					Category: api.CategoryCritical,
 					Message:  "Unable to Pull VDDK init image. Check that the image URL is correct.",
 				})
 			} else {
@@ -1110,7 +1099,7 @@ func (r *Reconciler) validateVddkImageJob(job *batchv1.Job, plan *api.Plan) (err
 					Type:     VDDKInitImageNotReady,
 					Status:   True,
 					Reason:   waiting.Reason,
-					Category: Advisory,
+					Category: api.CategoryAdvisory,
 					Message:  waiting.Message,
 				})
 			}

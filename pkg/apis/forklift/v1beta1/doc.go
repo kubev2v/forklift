@@ -22,5 +22,81 @@ limitations under the License.
 // +groupName=forklift.konveyor.io
 package v1beta1
 
+import libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
+
 // GlanceSource represents an image of which the source is Glance, to be used in storage mapping
 const GlanceSource = "glance"
+
+// Conditions
+const (
+	ConditionExecuting = "Executing"
+	ConditionRunning   = "Running"
+	ConditionPending   = "Pending"
+	ConditionCanceled  = "Canceled"
+	ConditionSucceeded = "Succeeded"
+	ConditionFailed    = "Failed"
+	ConditionBlocked   = "Blocked"
+	ConditionDeleted   = "Deleted"
+)
+
+// Condition categories
+const (
+	CategoryRequired = libcnd.Required
+	CategoryAdvisory = libcnd.Advisory
+	CategoryCritical = libcnd.Critical
+	CategoryError    = libcnd.Error
+	CategoryWarn     = libcnd.Warn
+)
+
+// VM Phases:
+//
+// Common phases.
+const (
+	PhaseStarted   = "Started"
+	PhasePreHook   = "PreHook"
+	PhasePostHook  = "PostHook"
+	PhaseCompleted = "Completed"
+)
+
+// Warm and cold phases.
+const (
+	PhaseAddCheckpoint                     = "AddCheckpoint"
+	PhaseAddFinalCheckpoint                = "AddFinalCheckpoint"
+	PhaseAllocateDisks                     = "AllocateDisks"
+	PhaseConvertGuest                      = "ConvertGuest"
+	PhaseConvertOpenstackSnapshot          = "ConvertOpenstackSnapshot"
+	PhaseCopyDisks                         = "CopyDisks"
+	PhaseCopyDisksVirtV2V                  = "CopyDisksVirtV2V"
+	PhaseCopyingPaused                     = "CopyingPaused"
+	PhaseCreateDataVolumes                 = "CreateDataVolumes"
+	PhaseCreateFinalSnapshot               = "CreateFinalSnapshot"
+	PhaseCreateGuestConversionPod          = "CreateGuestConversionPod"
+	PhaseCreateInitialSnapshot             = "CreateInitialSnapshot"
+	PhaseCreateSnapshot                    = "CreateSnapshot"
+	PhaseCreateVM                          = "CreateVM"
+	PhaseFinalize                          = "Finalize"
+	PhasePowerOffSource                    = "PowerOffSource"
+	PhaseRemoveFinalSnapshot               = "RemoveFinalSnapshot"
+	PhaseRemovePenultimateSnapshot         = "RemovePenultimateSnapshot"
+	PhaseRemovePreviousSnapshot            = "RemovePreviousSnapshot"
+	PhaseStoreInitialSnapshotDeltas        = "StoreInitialSnapshotDeltas"
+	PhaseStorePowerState                   = "StorePowerState"
+	PhaseStoreSnapshotDeltas               = "StoreSnapshotDeltas"
+	PhaseWaitForDataVolumesStatus          = "WaitForDataVolumesStatus"
+	PhaseWaitForFinalDataVolumesStatus     = "WaitForFinalDataVolumesStatus"
+	PhaseWaitForFinalSnapshot              = "WaitForFinalSnapshot"
+	PhaseWaitForFinalSnapshotRemoval       = "WaitForFinalSnapshotRemoval"
+	PhaseWaitForInitialSnapshot            = "WaitForInitialSnapshot"
+	PhaseWaitForPenultimateSnapshotRemoval = "WaitForPenultimateSnapshotRemoval"
+	PhaseWaitForPowerOff                   = "WaitForPowerOff"
+	PhaseWaitForPreviousSnapshotRemoval    = "WaitForPreviousSnapshotRemoval"
+	PhaseWaitForSnapshot                   = "WaitForSnapshot"
+)
+
+// Step/task phases.
+const (
+	StepStarted   = "Started"
+	StepPending   = "Pending"
+	StepRunning   = "Running"
+	StepCompleted = "Completed"
+)

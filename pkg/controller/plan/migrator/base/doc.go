@@ -1,6 +1,7 @@
 package base
 
 import (
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
 )
@@ -14,45 +15,6 @@ var (
 	VirtV2vDiskCopy         libitr.Flag = 0x10
 	OpenstackImageMigration libitr.Flag = 0x20
 	VSphere                 libitr.Flag = 0x40
-)
-
-// Phases.
-const (
-	Started                           = "Started"
-	PreHook                           = "PreHook"
-	StorePowerState                   = "StorePowerState"
-	PowerOffSource                    = "PowerOffSource"
-	WaitForPowerOff                   = "WaitForPowerOff"
-	CreateDataVolumes                 = "CreateDataVolumes"
-	WaitForDataVolumesStatus          = "WaitForDataVolumesStatus"
-	WaitForFinalDataVolumesStatus     = "WaitForFinalDataVolumesStatus"
-	CreateVM                          = "CreateVM"
-	CopyDisks                         = "CopyDisks"
-	AllocateDisks                     = "AllocateDisks"
-	CopyingPaused                     = "CopyingPaused"
-	AddCheckpoint                     = "AddCheckpoint"
-	AddFinalCheckpoint                = "AddFinalCheckpoint"
-	CreateSnapshot                    = "CreateSnapshot"
-	CreateInitialSnapshot             = "CreateInitialSnapshot"
-	CreateFinalSnapshot               = "CreateFinalSnapshot"
-	Finalize                          = "Finalize"
-	CreateGuestConversionPod          = "CreateGuestConversionPod"
-	ConvertGuest                      = "ConvertGuest"
-	CopyDisksVirtV2V                  = "CopyDisksVirtV2V"
-	PostHook                          = "PostHook"
-	Completed                         = "Completed"
-	WaitForSnapshot                   = "WaitForSnapshot"
-	WaitForInitialSnapshot            = "WaitForInitialSnapshot"
-	WaitForFinalSnapshot              = "WaitForFinalSnapshot"
-	ConvertOpenstackSnapshot          = "ConvertOpenstackSnapshot"
-	StoreSnapshotDeltas               = "StoreSnapshotDeltas"
-	StoreInitialSnapshotDeltas        = "StoreInitialSnapshotDeltas"
-	RemovePreviousSnapshot            = "RemovePreviousSnapshot"
-	RemovePenultimateSnapshot         = "RemovePenultimateSnapshot"
-	RemoveFinalSnapshot               = "RemoveFinalSnapshot"
-	WaitForFinalSnapshotRemoval       = "WaitForFinalSnapshotRemoval"
-	WaitForPreviousSnapshotRemoval    = "WaitForPreviousSnapshotRemoval"
-	WaitForPenultimateSnapshotRemoval = "WaitForPenultimateSnapshotRemoval"
 )
 
 // Steps.
@@ -71,60 +33,60 @@ var (
 	ColdItinerary = libitr.Itinerary{
 		Name: "",
 		Pipeline: libitr.Pipeline{
-			{Name: Started},
-			{Name: PreHook, All: HasPreHook},
-			{Name: StorePowerState},
-			{Name: PowerOffSource},
-			{Name: WaitForPowerOff},
-			{Name: CreateDataVolumes},
-			{Name: CopyDisks, All: CDIDiskCopy},
-			{Name: AllocateDisks, All: VirtV2vDiskCopy},
-			{Name: CreateGuestConversionPod, All: RequiresConversion},
-			{Name: ConvertGuest, All: RequiresConversion},
-			{Name: CopyDisksVirtV2V, All: RequiresConversion},
-			{Name: ConvertOpenstackSnapshot, All: OpenstackImageMigration},
-			{Name: CreateVM},
-			{Name: PostHook, All: HasPostHook},
-			{Name: Completed},
+			{Name: api.PhaseStarted},
+			{Name: api.PhasePreHook, All: HasPreHook},
+			{Name: api.PhaseStorePowerState},
+			{Name: api.PhasePowerOffSource},
+			{Name: api.PhaseWaitForPowerOff},
+			{Name: api.PhaseCreateDataVolumes},
+			{Name: api.PhaseCopyDisks, All: CDIDiskCopy},
+			{Name: api.PhaseAllocateDisks, All: VirtV2vDiskCopy},
+			{Name: api.PhaseCreateGuestConversionPod, All: RequiresConversion},
+			{Name: api.PhaseConvertGuest, All: RequiresConversion},
+			{Name: api.PhaseCopyDisksVirtV2V, All: RequiresConversion},
+			{Name: api.PhaseConvertOpenstackSnapshot, All: OpenstackImageMigration},
+			{Name: api.PhaseCreateVM},
+			{Name: api.PhasePostHook, All: HasPostHook},
+			{Name: api.PhaseCompleted},
 		},
 	}
 	WarmItinerary = libitr.Itinerary{
 		Name: "Warm",
 		Pipeline: libitr.Pipeline{
-			{Name: Started},
-			{Name: PreHook, All: HasPreHook},
-			{Name: CreateInitialSnapshot},
-			{Name: WaitForInitialSnapshot},
-			{Name: StoreInitialSnapshotDeltas, All: VSphere},
-			{Name: CreateDataVolumes},
+			{Name: api.PhaseStarted},
+			{Name: api.PhasePreHook, All: HasPreHook},
+			{Name: api.PhaseCreateInitialSnapshot},
+			{Name: api.PhaseWaitForInitialSnapshot},
+			{Name: api.PhaseStoreInitialSnapshotDeltas, All: VSphere},
+			{Name: api.PhaseCreateDataVolumes},
 			// Precopy loop start
-			{Name: WaitForDataVolumesStatus},
-			{Name: CopyDisks},
-			{Name: CopyingPaused},
-			{Name: RemovePreviousSnapshot, All: VSphere},
-			{Name: WaitForPreviousSnapshotRemoval, All: VSphere},
-			{Name: CreateSnapshot},
-			{Name: WaitForSnapshot},
-			{Name: StoreSnapshotDeltas, All: VSphere},
-			{Name: AddCheckpoint},
+			{Name: api.PhaseWaitForDataVolumesStatus},
+			{Name: api.PhaseCopyDisks},
+			{Name: api.PhaseCopyingPaused},
+			{Name: api.PhaseRemovePreviousSnapshot, All: VSphere},
+			{Name: api.PhaseWaitForPreviousSnapshotRemoval, All: VSphere},
+			{Name: api.PhaseCreateSnapshot},
+			{Name: api.PhaseWaitForSnapshot},
+			{Name: api.PhaseStoreSnapshotDeltas, All: VSphere},
+			{Name: api.PhaseAddCheckpoint},
 			// Precopy loop end
-			{Name: StorePowerState},
-			{Name: PowerOffSource},
-			{Name: WaitForPowerOff},
-			{Name: RemovePenultimateSnapshot, All: VSphere},
-			{Name: WaitForPenultimateSnapshotRemoval, All: VSphere},
-			{Name: CreateFinalSnapshot},
-			{Name: WaitForFinalSnapshot},
-			{Name: AddFinalCheckpoint},
-			{Name: WaitForFinalDataVolumesStatus},
-			{Name: Finalize},
-			{Name: RemoveFinalSnapshot, All: VSphere},
-			{Name: WaitForFinalSnapshotRemoval, All: VSphere},
-			{Name: CreateGuestConversionPod, All: RequiresConversion},
-			{Name: ConvertGuest, All: RequiresConversion},
-			{Name: CreateVM},
-			{Name: PostHook, All: HasPostHook},
-			{Name: Completed},
+			{Name: api.PhaseStorePowerState},
+			{Name: api.PhasePowerOffSource},
+			{Name: api.PhaseWaitForPowerOff},
+			{Name: api.PhaseRemovePenultimateSnapshot, All: VSphere},
+			{Name: api.PhaseWaitForPenultimateSnapshotRemoval, All: VSphere},
+			{Name: api.PhaseCreateFinalSnapshot},
+			{Name: api.PhaseWaitForFinalSnapshot},
+			{Name: api.PhaseAddFinalCheckpoint},
+			{Name: api.PhaseWaitForFinalDataVolumesStatus},
+			{Name: api.PhaseFinalize},
+			{Name: api.PhaseRemoveFinalSnapshot, All: VSphere},
+			{Name: api.PhaseWaitForFinalSnapshotRemoval, All: VSphere},
+			{Name: api.PhaseCreateGuestConversionPod, All: RequiresConversion},
+			{Name: api.PhaseConvertGuest, All: RequiresConversion},
+			{Name: api.PhaseCreateVM},
+			{Name: api.PhasePostHook, All: HasPostHook},
+			{Name: api.PhaseCompleted},
 		},
 	}
 )
