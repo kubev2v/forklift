@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"k8s.io/klog/v2"
 
@@ -1530,10 +1531,10 @@ func (r *Builder) getNetworkNameTemplate(vm *model.VM) string {
 
 // MergeSecrets merges the storage vendor secret into the migration secret
 func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendorSecret, storageVendorSecretNS string) error {
-	dst := &core.Secret{}
+	dst := core.Secret{}
 	if err := r.Destination.Get(context.Background(), client.ObjectKey{
 		Name:      migrationSecret,
-		Namespace: migrationSecretNS}, dst); err != nil {
+		Namespace: migrationSecretNS}, &dst); err != nil {
 		return fmt.Errorf("failed to get migration secret: %w", err)
 	}
 
@@ -1549,6 +1550,7 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 	if dst.Data == nil {
 		dst.Data = make(map[string][]byte)
 	}
+
 	for key, value := range src.Data {
 		if _, exists := dst.Data[key]; exists {
 			r.Log.Info(fmt.Sprintf("secret key %s is going to be overriden in secret %s", key, dst.Name))
@@ -1574,9 +1576,22 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 			dst.Data["GOVMOMI_INSECURE"] = value
 		}
 	}
+
 	// Update secret1 with the merged data.
-	if err := r.Destination.Update(context.Background(), dst); err != nil {
-		return fmt.Errorf("failed to update secret1: %w", err)
+	maxRetries := 10
+	for i := 0; i <= maxRetries; i++ {
+		current := core.Secret{}
+		if err := r.Destination.Get(context.Background(), client.ObjectKey{
+			Name:      migrationSecret,
+			Namespace: migrationSecretNS}, &current); err != nil {
+			return fmt.Errorf("failed to get migration secret: %w", err)
+		}
+		current.Data = dst.Data
+		if err := r.Destination.Update(context.Background(), &current); err != nil {
+			r.Log.Info(fmt.Sprintf("Try numer %d - failed to update secret1: %v",i, err))
+			time.Sleep(2 * time.Second)
+		}
+
 	}
 
 	return nil
@@ -1594,7 +1609,7 @@ func (r *Builder) ensurePopulatorServiceAccount(namespace string) error {
 	if err != nil && !k8serr.IsAlreadyExists(err) {
 		return err
 	}
-	role := rbacv1.Role{
+	pvcReaderRole := rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "populator-pvc-reader",
 			Namespace: namespace,
@@ -1607,13 +1622,29 @@ func (r *Builder) ensurePopulatorServiceAccount(namespace string) error {
 			},
 		},
 	}
-	err = r.Destination.Client.Create(context.TODO(), &role, &client.CreateOptions{})
+	err = r.Destination.Client.Create(context.TODO(), &pvcReaderRole, &client.CreateOptions{})
+	if err != nil && !k8serr.IsAlreadyExists(err) {
+		return err
+	}
+	pvReaderRole := rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "populator-pv-reader",
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{""},
+				Resources: []string{"persistentvolumes"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+		},
+	}
+	err = r.Destination.Client.Create(context.TODO(), &pvReaderRole, &client.CreateOptions{})
 	if err != nil && !k8serr.IsAlreadyExists(err) {
 		return err
 	}
 
 	// Create the RoleBinding to bind the ServiceAccount to the ClusterRole
-	binding := rbacv1.RoleBinding{
+	pvcReaderBinding := rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "populator-pvc-reader-binding",
 			Namespace: namespace,
@@ -1632,9 +1663,33 @@ func (r *Builder) ensurePopulatorServiceAccount(namespace string) error {
 		},
 	}
 
-	err = r.Destination.Client.Create(context.TODO(), &binding, &client.CreateOptions{})
+	err = r.Destination.Client.Create(context.TODO(), &pvcReaderBinding, &client.CreateOptions{})
 	if err != nil && !k8serr.IsAlreadyExists(err) {
 		return err
 	}
+	// Create the RoleBinding to bind the ServiceAccount to the ClusterRole
+	pvReaderBinding := rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "populator-pv-reader-binding",
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      "populator",
+				Namespace: namespace,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			Kind:     "ClusterRole",
+			Name:     "populator-pv-reader",
+			APIGroup: "rbac.authorization.k8s.io",
+		},
+	}
+
+	err = r.Destination.Client.Create(context.TODO(), &pvReaderBinding, &client.CreateOptions{})
+	if err != nil && !k8serr.IsAlreadyExists(err) {
+		return err
+	}
+
 	return nil
 }

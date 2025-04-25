@@ -2514,15 +2514,19 @@ func (r *KubeVirt) ensureSecret(vmRef ref.Ref, setSecretData func(*core.Secret) 
 func (r *KubeVirt) secret(vmRef ref.Ref, setSecretData func(*core.Secret) error, labels map[string]string) (secret *core.Secret, err error) {
 	secret = &core.Secret{
 		ObjectMeta: meta.ObjectMeta{
-			Labels:          labels,
-			Namespace:       r.Plan.Spec.TargetNamespace,
-			OwnerReferences: createOwnerReferences(r.Plan.ObjectMeta, r.Plan.TypeMeta, false),
+			Labels:    labels,
+			Namespace: r.Plan.Spec.TargetNamespace,
 			GenerateName: strings.Join(
 				[]string{
 					r.Plan.Name,
 					vmRef.ID},
 				"-") + "-",
 		},
+	}
+	err = k8sutil.SetOwnerReference(r.Plan, secret, r.Scheme())
+	if err != nil {
+		// cross ns is disallowed, so ignoring this error if the plan and target
+		// are in different namespaces
 	}
 	err = setSecretData(secret)
 	return

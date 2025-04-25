@@ -38,7 +38,7 @@ build: generate fmt vet ## Build manager binary.
 test-copy-using-cli: build
 	bin/vsphere-xcopy-volume-populator \
 		--source-vmdk="[eco-iscsi-ds2] vm-1/vm-1.vmdk" \
-		--target-pvc=test-cli \
+		--owner-name=test-cli \
 		--target-namespace=default \
 		--storage-vendor=ontap \
 		--secret-name=populator-secret \
