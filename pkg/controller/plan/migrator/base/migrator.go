@@ -247,7 +247,7 @@ func (r *BaseMigrator) ExecutePhase(vm *plan.VMStatus) (ok bool, err error) {
 func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 	switch status.Phase {
 	case api.PhaseStarted, api.PhaseCreateInitialSnapshot, api.PhaseWaitForInitialSnapshot,
-		api.PhaseStoreInitialSnapshotDeltas, api.PhaseCreateDataVolumes:
+		api.PhaseStoreInitialSnapshotDeltas, api.PhaseCreateDataVolumes, api.PhaseVirtV2vInspection:
 		step = Initialize
 	case api.PhaseAllocateDisks:
 		step = DiskAllocation

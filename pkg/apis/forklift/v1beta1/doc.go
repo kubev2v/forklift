@@ -82,6 +82,7 @@ const (
 	PhaseStoreInitialSnapshotDeltas        = "StoreInitialSnapshotDeltas"
 	PhaseStorePowerState                   = "StorePowerState"
 	PhaseStoreSnapshotDeltas               = "StoreSnapshotDeltas"
+	PhaseVirtV2vInspection                 = "VirtV2vInspection"
 	PhaseWaitForDataVolumesStatus          = "WaitForDataVolumesStatus"
 	PhaseWaitForFinalDataVolumesStatus     = "WaitForFinalDataVolumesStatus"
 	PhaseWaitForFinalSnapshot              = "WaitForFinalSnapshot"

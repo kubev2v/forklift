@@ -12,18 +12,20 @@ type MountPath string
 
 // Enviroment variables
 const (
-	EnvLibvirtUrlName     = "V2V_libvirtURL"
-	EnvFingerprintName    = "V2V_fingerprint"
-	EnvInPlaceName        = "V2V_inPlace"
-	EnvExtraArgsName      = "V2V_extra_args"
-	EnvNewNameName        = "V2V_NewName"
-	EnvVmNameName         = "V2V_vmName"
-	EnvRootDiskName       = "V2V_RootDisk"
-	EnvStaticIPsName      = "V2V_staticIPs"
-	EnvSourceName         = "V2V_source"
-	EnvDiskPathName       = "V2V_diskPath"
-	EnvSecretKeyName      = "V2V_secretKey"
-	EnvLocalMigrationName = "LOCAL_MIGRATION"
+	EnvLibvirtUrlName       = "V2V_libvirtURL"
+	EnvFingerprintName      = "V2V_fingerprint"
+	EnvInPlaceName          = "V2V_inPlace"
+	EnvExtraArgsName        = "V2V_extra_args"
+	EnvNewNameName          = "V2V_NewName"
+	EnvVmNameName           = "V2V_vmName"
+	EnvRootDiskName         = "V2V_RootDisk"
+	EnvStaticIPsName        = "V2V_staticIPs"
+	EnvSourceName           = "V2V_source"
+	EnvDiskPathName         = "V2V_diskPath"
+	EnvSecretKeyName        = "V2V_secretKey"
+	EnvLocalMigrationName   = "LOCAL_MIGRATION"
+	EnvInspection           = "INSPECTION"
+	EnvInspectionDiskFormat = "INSPECTION_DISK_%d"
 )
 
 const (
@@ -77,6 +79,10 @@ type AppConfig struct {
 	// V2V_secretKey
 	SecretKey string
 
+	// INSPECTION
+	IsInspection    bool
+	InspectionDisks []string
+
 	// Paths
 	VddkConfFile         string
 	InspectionOutputFile string
@@ -91,6 +97,7 @@ func (s *AppConfig) Load() (err error) {
 	s.ExtraArgs = s.getExtraArgs()
 	flag.BoolVar(&s.IsLocalMigration, "local-migration", s.getEnvBool(EnvLocalMigrationName, true), "Migration is in local or remote cluster")
 	flag.BoolVar(&s.IsInPlace, "in-place", s.getEnvBool(EnvInPlaceName, false), "Run virt-v2v-in-place on already populated disks")
+	flag.BoolVar(&s.IsInspection, "inspection", s.getEnvBool(EnvInspection, false), "Run virt-v2v-inspection on specified disks")
 	flag.StringVar(&s.Source, "source", os.Getenv(EnvSourceName), "Source of VM ['ova','vSphere']")
 	flag.StringVar(&s.LibvirtUrl, "libvirt-url", os.Getenv(EnvLibvirtUrlName), "Libvirt domain to the vSphere")
 	flag.StringVar(&s.Fingerprint, "fingerprint", os.Getenv(EnvFingerprintName), "Fingerprint for the vddk")
@@ -108,7 +115,9 @@ func (s *AppConfig) Load() (err error) {
 	flag.StringVar(&s.InspectionOutputFile, "inspection-output-file", InspectionOutputFile, "Path where the virt-v2v-inspector will output the metadata")
 	flag.StringVar(&s.LibvirtDomainFile, "libvirt-domain-file", V2vInPlaceLibvirtDomain, "Path to the libvirt domain used in the in-place conversion")
 	flag.Parse()
-
+	if s.IsInspection {
+		s.InspectionDisks = s.getInspectionDisks()
+	}
 	return s.validate()
 }
 
@@ -170,4 +179,16 @@ func (s *AppConfig) validate() error {
 		}
 	}
 	return nil
+}
+
+func (s *AppConfig) getInspectionDisks() []string {
+	var disks []string
+	for counter := 0; counter < 60; counter++ {
+		if s, found := os.LookupEnv(fmt.Sprintf(EnvInspectionDiskFormat, counter)); found {
+			disks = append(disks, s)
+		} else {
+			break
+		}
+	}
+	return disks
 }

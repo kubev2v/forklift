@@ -89,6 +89,24 @@ func (c *Conversion) addCommonArgs(cmd utils.CommandBuilder) error {
 	return nil
 }
 
+func (c *Conversion) RunVirtV2VInspectionOnRunningVm() error {
+	v2vCmdBuilder := c.CommandBuilder.New("virt-v2v-inspector").
+		AddFlag("-v").
+		AddFlag("-x").
+		AddArg("-O", c.InspectionOutputFile)
+	for _, disk := range c.InspectionDisks {
+		v2vCmdBuilder.AddArg("-io", fmt.Sprintf("vddk-file=%s", disk))
+	}
+	err := c.addVirtV2vVsphereArgs(v2vCmdBuilder)
+	if err != nil {
+		return err
+	}
+	v2vCmd := v2vCmdBuilder.Build()
+	v2vCmd.SetStdout(os.Stdout)
+	v2vCmd.SetStderr(os.Stderr)
+	return v2vCmd.Run()
+}
+
 func (c *Conversion) RunVirtV2VInspection() error {
 	v2vCmdBuilder := c.CommandBuilder.New("virt-v2v-inspector").
 		AddFlag("-v").

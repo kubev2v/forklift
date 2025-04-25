@@ -16,6 +16,7 @@ import (
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
+	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
@@ -1129,6 +1130,42 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 					vm.Phase = r.migrator.Next(vm)
 				}
 			}
+		case api.PhaseVirtV2vInspection:
+			step, found := vm.FindStep(r.migrator.Step(vm))
+			if !found {
+				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
+				break
+			}
+			step.MarkStarted()
+			step.Phase = api.StepRunning
+			var ready bool
+			if ready, err = r.ensureGuestInspectionPod(vm); err != nil {
+				step.AddError(err.Error())
+				err = nil
+				break
+			}
+			if !ready {
+				r.Log.Info("virt-v2v pod isn't ready yet")
+				return
+			}
+			// fetch config from the conversion pod
+			var pod *core.Pod
+			pod, err = r.kubevirt.GetGuestInspectionPod(vm)
+			if err != nil {
+				return err
+			}
+			if pod == nil {
+				return
+			}
+			if pod.Status.Phase == core.PodSucceeded {
+				vm.Phase = r.migrator.Next(vm)
+			}
+			if pod.Status.Phase == core.PodFailed {
+				step.Error = &planapi.Error{
+					Reasons: []string{"VM guest inspection failed"},
+					Phase:   step.Phase,
+				}
+			}
 		case api.PhaseCreateGuestConversionPod:
 			step, found := vm.FindStep(r.migrator.Step(vm))
 			if !found {
@@ -1332,6 +1369,15 @@ func (r *Migration) end() (completed bool, err error) {
 
 	completed = true
 	return
+}
+
+// Ensure the guest conversion pod is present.
+func (r *Migration) ensureGuestInspectionPod(vm *plan.VMStatus) (ready bool, err error) {
+	err = r.kubevirt.EnsureGuestInspectionPod(vm)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // Ensure the guest conversion pod is present.
