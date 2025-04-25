@@ -14,7 +14,7 @@ import (
 
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
@@ -42,55 +42,15 @@ const (
 	PollReQ = time.Second * 3
 )
 
-// Phases.
-const (
-	Started                           = "Started"
-	PreHook                           = "PreHook"
-	StorePowerState                   = "StorePowerState"
-	PowerOffSource                    = "PowerOffSource"
-	WaitForPowerOff                   = "WaitForPowerOff"
-	CreateDataVolumes                 = "CreateDataVolumes"
-	WaitForDataVolumesStatus          = "WaitForDataVolumesStatus"
-	WaitForFinalDataVolumesStatus     = "WaitForFinalDataVolumesStatus"
-	CreateVM                          = "CreateVM"
-	CopyDisks                         = "CopyDisks"
-	AllocateDisks                     = "AllocateDisks"
-	CopyingPaused                     = "CopyingPaused"
-	AddCheckpoint                     = "AddCheckpoint"
-	AddFinalCheckpoint                = "AddFinalCheckpoint"
-	CreateSnapshot                    = "CreateSnapshot"
-	CreateInitialSnapshot             = "CreateInitialSnapshot"
-	CreateFinalSnapshot               = "CreateFinalSnapshot"
-	Finalize                          = "Finalize"
-	CreateGuestConversionPod          = "CreateGuestConversionPod"
-	ConvertGuest                      = "ConvertGuest"
-	CopyDisksVirtV2V                  = "CopyDisksVirtV2V"
-	PostHook                          = "PostHook"
-	Completed                         = "Completed"
-	WaitForSnapshot                   = "WaitForSnapshot"
-	WaitForInitialSnapshot            = "WaitForInitialSnapshot"
-	WaitForFinalSnapshot              = "WaitForFinalSnapshot"
-	ConvertOpenstackSnapshot          = "ConvertOpenstackSnapshot"
-	StoreSnapshotDeltas               = "StoreSnapshotDeltas"
-	StoreInitialSnapshotDeltas        = "StoreInitialSnapshotDeltas"
-	RemovePreviousSnapshot            = "RemovePreviousSnapshot"
-	RemovePenultimateSnapshot         = "RemovePenultimateSnapshot"
-	RemoveFinalSnapshot               = "RemoveFinalSnapshot"
-	WaitForFinalSnapshotRemoval       = "WaitForFinalSnapshotRemoval"
-	WaitForPreviousSnapshotRemoval    = "WaitForPreviousSnapshotRemoval"
-	WaitForPenultimateSnapshotRemoval = "WaitForPenultimateSnapshotRemoval"
-)
-
-// Steps.
-const (
-	ImageConversion = "ImageConversion"
-	DiskTransferV2v = "DiskTransferV2v"
-)
-
 const (
 	TransferCompleted              = "Transfer completed."
 	PopulatorPodPrefix             = "populate-"
 	DvStatusCheckRetriesAnnotation = "dvStatusCheckRetries"
+	// TODO: ImageConversion and DiskTransferV2v step names remain here
+	// until remaining cold/warm migration flow details can be
+	// moved into base migrators.
+	ImageConversion = "ImageConversion"
+	DiskTransferV2v = "DiskTransferV2v"
 )
 
 // Migration.
@@ -210,16 +170,16 @@ func (r *Migration) init() (err error) {
 // Begin the migration.
 func (r *Migration) begin() (err error) {
 	snapshot := r.Plan.Status.Migration.ActiveSnapshot()
-	if snapshot.HasAnyCondition(Executing, Succeeded, Failed, Canceled) {
+	if snapshot.HasAnyCondition(api.ConditionExecuting, api.ConditionSucceeded, api.ConditionFailed, api.ConditionCanceled) {
 		return
 	}
 	r.Plan.Status.Migration.MarkReset()
 	r.Plan.Status.Migration.MarkStarted()
 	snapshot.SetCondition(
 		libcnd.Condition{
-			Type:     Executing,
+			Type:     api.ConditionExecuting,
 			Status:   True,
-			Category: Advisory,
+			Category: api.CategoryAdvisory,
 			Message:  "The plan is EXECUTING.",
 			Durable:  true,
 		})
@@ -255,7 +215,7 @@ func (r *Migration) begin() (err error) {
 	list := []*plan.VMStatus{}
 	for _, vm := range r.Plan.Spec.VMs {
 		status := r.migrator.Status(vm)
-		if status.Phase != Completed || status.HasAnyCondition(Canceled, Failed) {
+		if status.Phase != api.PhaseCompleted || status.HasAnyCondition(api.ConditionCanceled, api.ConditionFailed) {
 			pipeline, pErr := r.migrator.Pipeline(vm)
 			if pErr != nil {
 				err = liberr.Wrap(pErr)
@@ -296,11 +256,11 @@ func (r *Migration) Archive() {
 	}
 
 	switch r.Plan.Provider.Source.Type() {
-	case v1beta1.Ova:
+	case api.Ova:
 		if err := r.deletePvcPvForOva(); err != nil {
 			r.Log.Error(err, "Failed to clean up the PVC and PV for the OVA plan")
 		}
-	case v1beta1.VSphere:
+	case api.VSphere:
 		if err := r.deleteValidateVddkJob(); err != nil {
 			r.Log.Error(err, "Failed to clean up validate-VDDK job(s)")
 		}
@@ -366,7 +326,7 @@ func (r *Migration) Cancel() error {
 	}
 
 	for _, vm := range r.Plan.Status.Migration.VMs {
-		if vm.HasCondition(Canceled) && !vm.MarkedCompleted() {
+		if vm.HasCondition(api.ConditionCanceled) && !vm.MarkedCompleted() {
 			dontFailOnError := func(err error) bool {
 				if err != nil {
 					r.Log.Error(liberr.Wrap(err),
@@ -410,7 +370,7 @@ func (r *Migration) deletePopulatorPVCs(vm *plan.VMStatus) (err error) {
 
 // Delete left over migration resources associated with a VM.
 func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool) error {
-	if !vm.HasCondition(Succeeded) {
+	if !vm.HasCondition(api.ConditionSucceeded) {
 		if err := r.kubevirt.DeleteVM(vm); failOnErr(err) {
 			return err
 		}
@@ -614,14 +574,14 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 	if r.Context.Migration.Spec.Canceled(vm.Ref) {
 		vm.SetCondition(
 			libcnd.Condition{
-				Type:     Canceled,
+				Type:     api.ConditionCanceled,
 				Status:   True,
-				Category: Advisory,
+				Category: api.CategoryAdvisory,
 				Reason:   UserRequested,
 				Message:  "The migration has been canceled.",
 				Durable:  true,
 			})
-		vm.Phase = Completed
+		vm.Phase = api.PhaseCompleted
 		r.Log.Info(
 			"Migration [CANCELED]",
 			"vm",
@@ -651,7 +611,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		}
 	} else {
 		switch vm.Phase {
-		case Started:
+		case api.PhaseStarted:
 			step, found := vm.FindStep(r.migrator.Step(vm))
 			if !found {
 				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
@@ -659,7 +619,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 			vm.MarkStarted()
 			step.MarkStarted()
-			step.Phase = Running
+			step.Phase = api.StepRunning
 			err = r.cleanup(vm, func(err error) bool { return err != nil })
 			if err != nil {
 				step.AddError(err.Error())
@@ -701,22 +661,22 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				}
 			}
 			vm.Phase = r.migrator.Next(vm)
-		case PreHook, PostHook:
+		case api.PhasePreHook, api.PhasePostHook:
 			runner := HookRunner{Context: r.Context}
 			err = runner.Run(vm)
 			if err != nil {
 				return
 			}
 			if step, found := vm.FindStep(r.migrator.Step(vm)); found {
-				step.Phase = Running
+				step.Phase = api.StepRunning
 				if step.MarkedCompleted() && step.Error == nil {
-					step.Phase = Completed
+					step.Phase = api.StepCompleted
 					vm.Phase = r.migrator.Next(vm)
 				}
 			} else {
-				vm.Phase = Completed
+				vm.Phase = api.PhaseCompleted
 			}
-		case CreateDataVolumes:
+		case api.PhaseCreateDataVolumes:
 			step, found := vm.FindStep(r.migrator.Step(vm))
 			if !found {
 				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
@@ -798,17 +758,17 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 
 			step.MarkCompleted()
-			step.Phase = Completed
+			step.Phase = api.StepCompleted
 			vm.Phase = r.migrator.Next(vm)
 
-		case CreateVM:
+		case api.PhaseCreateVM:
 			step, found := vm.FindStep(r.migrator.Step(vm))
 			if !found {
 				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
 				break
 			}
 			step.MarkStarted()
-			step.Phase = Running
+			step.Phase = api.StepRunning
 			err = r.kubevirt.EnsureVM(vm)
 			if err != nil {
 				if !errors.As(err, &web.ProviderNotReadyError{}) {
@@ -851,16 +811,16 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				return
 			}
 			step.MarkCompleted()
-			step.Phase = Completed
+			step.Phase = api.StepCompleted
 			vm.Phase = r.migrator.Next(vm)
-		case AllocateDisks, CopyDisks:
+		case api.PhaseAllocateDisks, api.PhaseCopyDisks:
 			step, found := vm.FindStep(r.migrator.Step(vm))
 			if !found {
 				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
 				break
 			}
 			step.MarkStarted()
-			step.Phase = Running
+			step.Phase = api.StepRunning
 
 			if r.builder.SupportsVolumePopulators() {
 				err = r.updatePopulatorCopyProgress(vm, step)
@@ -882,10 +842,10 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 					vm.Warm.NextPrecopyAt = &next
 					vm.Warm.Successes++
 				}
-				step.Phase = Completed
+				step.Phase = api.StepCompleted
 				vm.Phase = r.migrator.Next(vm)
 			}
-		case ConvertOpenstackSnapshot:
+		case api.PhaseConvertOpenstackSnapshot:
 			step, found := vm.FindStep(r.migrator.Step(vm))
 			if !found {
 				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
@@ -907,7 +867,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 
 			step.MarkStarted()
-			step.Phase = Running
+			step.Phase = api.StepRunning
 			pvcs, err := r.kubevirt.getPVCs(vm.Ref)
 			if err != nil {
 				r.Log.Error(err,
@@ -934,16 +894,16 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 
 			if step.MarkedCompleted() && !step.HasError() {
-				step.Phase = Completed
+				step.Phase = api.StepCompleted
 				vm.Phase = r.migrator.Next(vm)
 			}
-		case CopyingPaused:
+		case api.PhaseCopyingPaused:
 			if r.Migration.Spec.Cutover != nil && !r.Migration.Spec.Cutover.After(time.Now()) {
-				vm.Phase = StorePowerState
+				vm.Phase = api.PhaseStorePowerState
 			} else if vm.Warm.NextPrecopyAt != nil && !vm.Warm.NextPrecopyAt.After(time.Now()) {
 				vm.Phase = r.migrator.Next(vm)
 			}
-		case RemovePreviousSnapshot, RemovePenultimateSnapshot, RemoveFinalSnapshot:
+		case api.PhaseRemovePreviousSnapshot, api.PhaseRemovePenultimateSnapshot, api.PhaseRemoveFinalSnapshot:
 			step, found := vm.FindStep(r.migrator.Step(vm))
 			if !found {
 				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
@@ -959,7 +919,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				break
 			}
 			vm.Phase = r.migrator.Next(vm)
-		case WaitForPreviousSnapshotRemoval, WaitForPenultimateSnapshotRemoval, WaitForFinalSnapshotRemoval:
+		case api.PhaseWaitForPreviousSnapshotRemoval, api.PhaseWaitForPenultimateSnapshotRemoval, api.PhaseWaitForFinalSnapshotRemoval:
 			step, found := vm.FindStep(r.migrator.Step(vm))
 			if !found {
 				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
@@ -975,7 +935,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			if ready {
 				vm.Phase = r.migrator.Next(vm)
 			}
-		case CreateInitialSnapshot, CreateSnapshot, CreateFinalSnapshot:
+		case api.PhaseCreateInitialSnapshot, api.PhaseCreateSnapshot, api.PhaseCreateFinalSnapshot:
 			step, found := vm.FindStep(r.migrator.Step(vm))
 			if !found {
 				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
@@ -995,7 +955,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			vm.Warm.Precopies = append(vm.Warm.Precopies, precopy)
 			r.resetPrecopyTasks(vm, step)
 			vm.Phase = r.migrator.Next(vm)
-		case WaitForInitialSnapshot, WaitForSnapshot, WaitForFinalSnapshot:
+		case api.PhaseWaitForInitialSnapshot, api.PhaseWaitForSnapshot, api.PhaseWaitForFinalSnapshot:
 			step, found := vm.FindStep(r.migrator.Step(vm))
 			if !found {
 				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
@@ -1014,7 +974,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				}
 				vm.Phase = r.migrator.Next(vm)
 			}
-		case WaitForDataVolumesStatus, WaitForFinalDataVolumesStatus:
+		case api.PhaseWaitForDataVolumesStatus, api.PhaseWaitForFinalDataVolumesStatus:
 			step, found := vm.FindStep(r.migrator.Step(vm))
 			if !found {
 				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
@@ -1059,7 +1019,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 					}
 				}
 			}
-		case StoreInitialSnapshotDeltas, StoreSnapshotDeltas:
+		case api.PhaseStoreInitialSnapshotDeltas, api.PhaseStoreSnapshotDeltas:
 			step, found := vm.FindStep(r.migrator.Step(vm))
 			if !found {
 				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
@@ -1077,7 +1037,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 			vm.Warm.Precopies[n-1].WithDeltas(deltas)
 			vm.Phase = r.migrator.Next(vm)
-		case AddCheckpoint, AddFinalCheckpoint:
+		case api.PhaseAddCheckpoint, api.PhaseAddFinalCheckpoint:
 			step, found := vm.FindStep(r.migrator.Step(vm))
 			if !found {
 				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
@@ -1092,12 +1052,12 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 
 			switch vm.Phase {
-			case AddCheckpoint:
-				vm.Phase = WaitForDataVolumesStatus
-			case AddFinalCheckpoint:
-				vm.Phase = WaitForFinalDataVolumesStatus
+			case api.PhaseAddCheckpoint:
+				vm.Phase = api.PhaseWaitForDataVolumesStatus
+			case api.PhaseAddFinalCheckpoint:
+				vm.Phase = api.PhaseWaitForFinalDataVolumesStatus
 			}
-		case StorePowerState:
+		case api.PhaseStorePowerState:
 			step, found := vm.FindStep(r.migrator.Step(vm))
 			if !found {
 				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
@@ -1116,7 +1076,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 			vm.RestorePowerState = state
 			vm.Phase = r.migrator.Next(vm)
-		case PowerOffSource:
+		case api.PhasePowerOffSource:
 			step, found := vm.FindStep(r.migrator.Step(vm))
 			if !found {
 				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
@@ -1133,7 +1093,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				}
 			}
 			vm.Phase = r.migrator.Next(vm)
-		case WaitForPowerOff:
+		case api.PhaseWaitForPowerOff:
 			step, found := vm.FindStep(r.migrator.Step(vm))
 			if !found {
 				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
@@ -1153,7 +1113,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			if off {
 				vm.Phase = r.migrator.Next(vm)
 			}
-		case Finalize:
+		case api.PhaseFinalize:
 			step, found := vm.FindStep(r.migrator.Step(vm))
 			if !found {
 				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
@@ -1165,18 +1125,18 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 			if step.MarkedCompleted() {
 				if !step.HasError() {
-					step.Phase = Completed
+					step.Phase = api.StepCompleted
 					vm.Phase = r.migrator.Next(vm)
 				}
 			}
-		case CreateGuestConversionPod:
+		case api.PhaseCreateGuestConversionPod:
 			step, found := vm.FindStep(r.migrator.Step(vm))
 			if !found {
 				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
 				break
 			}
 			step.MarkStarted()
-			step.Phase = Running
+			step.Phase = api.StepRunning
 			var ready bool
 			if ready, err = r.ensureGuestConversionPod(vm); err != nil {
 				step.AddError(err.Error())
@@ -1188,14 +1148,14 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				return
 			}
 			vm.Phase = r.migrator.Next(vm)
-		case ConvertGuest, CopyDisksVirtV2V:
+		case api.PhaseConvertGuest, api.PhaseCopyDisksVirtV2V:
 			step, found := vm.FindStep(r.migrator.Step(vm))
 			if !found {
 				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
 				break
 			}
 			step.MarkStarted()
-			step.Phase = Running
+			step.Phase = api.StepRunning
 
 			err = r.updateConversionProgress(vm, step)
 			if err != nil {
@@ -1203,7 +1163,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 
 			switch r.Source.Provider.Type() {
-			case v1beta1.Ova, v1beta1.VSphere:
+			case api.Ova, api.VSphere:
 				// fetch config from the conversion pod
 				pod, err := r.kubevirt.GetGuestConversionPod(vm)
 				if err != nil {
@@ -1219,10 +1179,10 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 
 			if step.MarkedCompleted() && !step.HasError() {
-				step.Phase = Completed
+				step.Phase = api.StepCompleted
 				vm.Phase = r.migrator.Next(vm)
 			}
-		case Completed:
+		case api.PhaseCompleted:
 			vm.MarkCompleted()
 			r.Log.Info(
 				"Migration [COMPLETED]",
@@ -1237,11 +1197,11 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				fmt.Sprintf(
 					"Phase [%s] unknown",
 					vm.Phase))
-			vm.Phase = Completed
+			vm.Phase = api.PhaseCompleted
 		}
 	}
 	vm.ReflectPipeline()
-	if vm.Phase == Completed && vm.Error == nil {
+	if vm.Phase == api.PhaseCompleted && vm.Error == nil {
 		err = r.provider.DetachDisks(vm.Ref)
 		if err != nil {
 			step, found := vm.FindStep(r.migrator.Step(vm))
@@ -1272,20 +1232,20 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		}
 		vm.SetCondition(
 			libcnd.Condition{
-				Type:     Succeeded,
+				Type:     api.ConditionSucceeded,
 				Status:   True,
-				Category: Advisory,
+				Category: api.CategoryAdvisory,
 				Message:  "The VM migration has SUCCEEDED.",
 				Durable:  true,
 			})
 
 	} else if vm.Error != nil {
-		vm.Phase = Completed
+		vm.Phase = api.PhaseCompleted
 		vm.SetCondition(
 			libcnd.Condition{
-				Type:     Failed,
+				Type:     api.ConditionFailed,
 				Status:   True,
-				Category: Advisory,
+				Category: api.CategoryAdvisory,
 				Message:  "The VM migration has FAILED.",
 				Durable:  true,
 			})
@@ -1320,10 +1280,10 @@ func (r *Migration) end() (completed bool, err error) {
 		if !vm.MarkedCompleted() {
 			return
 		}
-		if vm.HasCondition(Failed) {
+		if vm.HasCondition(api.ConditionFailed) {
 			failed++
 		}
-		if vm.HasCondition(Succeeded) {
+		if vm.HasCondition(api.ConditionSucceeded) {
 			succeeded++
 		}
 	}
@@ -1337,9 +1297,9 @@ func (r *Migration) end() (completed bool, err error) {
 		r.Log.Info("Migration [FAILED]")
 		snapshot.SetCondition(
 			libcnd.Condition{
-				Type:     Failed,
+				Type:     api.ConditionFailed,
 				Status:   True,
-				Category: Advisory,
+				Category: api.CategoryAdvisory,
 				Message:  "The plan execution has FAILED.",
 				Durable:  true,
 			})
@@ -1349,9 +1309,9 @@ func (r *Migration) end() (completed bool, err error) {
 		r.Log.Info("Migration [SUCCEEDED]")
 		snapshot.SetCondition(
 			libcnd.Condition{
-				Type:     Succeeded,
+				Type:     api.ConditionSucceeded,
 				Status:   True,
-				Category: Advisory,
+				Category: api.CategoryAdvisory,
 				Message:  "The plan execution has SUCCEEDED.",
 				Durable:  true,
 			})
@@ -1362,9 +1322,9 @@ func (r *Migration) end() (completed bool, err error) {
 		r.Log.Info("Migration [CANCELED]")
 		snapshot.SetCondition(
 			libcnd.Condition{
-				Type:     Canceled,
+				Type:     api.ConditionCanceled,
 				Status:   True,
-				Category: Advisory,
+				Category: api.CategoryAdvisory,
 				Message:  "The plan execution has been CANCELED.",
 				Durable:  true,
 			})
@@ -1402,9 +1362,9 @@ func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (ready bool, err
 	}
 
 	switch r.Source.Provider.Type() {
-	case v1beta1.Ova:
+	case api.Ova:
 		ready, err = r.kubevirt.EnsureOVAVirtV2VPVCStatus(vm.ID)
-	case v1beta1.VSphere:
+	case api.VSphere:
 		ready = true
 	}
 
@@ -1412,7 +1372,7 @@ func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (ready bool, err
 }
 
 func (r *Migration) setTaskCompleted(task *plan.Task) {
-	task.Phase = Completed
+	task.Phase = api.StepCompleted
 	task.Reason = TransferCompleted
 	task.Progress.Completed = task.Progress.Total
 	task.MarkCompleted()
@@ -1472,7 +1432,7 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 				r.setTaskCompleted(task)
 			case cdi.Pending, cdi.ImportScheduled:
 				pending++
-				task.Phase = Pending
+				task.Phase = api.StepPending
 				cnd := conditions.FindCondition("Bound")
 				if cnd != nil && cnd.Status == True {
 					cnd = conditions.FindCondition("Running")
@@ -1483,7 +1443,7 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 				task.Reason = pendingReason
 			case cdi.ImportInProgress:
 				running++
-				task.Phase = Running
+				task.Phase = api.StepRunning
 				task.MarkStarted()
 				cnd := conditions.FindCondition("Running")
 				if cnd != nil {
@@ -1578,13 +1538,13 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 
 	step.ReflectTasks()
 	if pending > 0 {
-		step.Phase = Pending
+		step.Phase = api.StepPending
 		step.Reason = pendingReason
 	} else if running > 0 {
-		step.Phase = Running
+		step.Phase = api.StepRunning
 		step.Reason = ""
 	} else if (len(dvs) > 0 && completed == len(dvs)) || completed == len(pvcs) {
-		step.Phase = Completed
+		step.Phase = api.StepCompleted
 		step.Reason = ""
 	}
 	return
@@ -1673,7 +1633,7 @@ func (r *Migration) updateConversionProgressV2vMonitor(pod *core.Pod, step *plan
 		}
 	}
 	step.ReflectTasks()
-	if step.Name == ImageConversion && someProgress && r.Source.Provider.Type() != v1beta1.Ova {
+	if step.Name == ImageConversion && someProgress && r.Source.Provider.Type() != api.Ova {
 		// Disk copying has already started. Transition from
 		// ConvertGuest to CopyDisksVirtV2V .
 		step.MarkCompleted()
@@ -1692,7 +1652,7 @@ func (r *Migration) setDataVolumeCheckpoints(vm *plan.VMStatus) (err error) {
 	for _, disk := range disks {
 		dvs = append(dvs, *disk.DataVolume)
 	}
-	err = r.provider.SetCheckpoints(vm.Ref, vm.Warm.Precopies, dvs, vm.Phase == AddFinalCheckpoint, r.kubevirt.loadHosts)
+	err = r.provider.SetCheckpoints(vm.Ref, vm.Warm.Precopies, dvs, vm.Phase == api.PhaseAddFinalCheckpoint, r.kubevirt.loadHosts)
 	if err != nil {
 		return
 	}
@@ -1731,7 +1691,7 @@ func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.St
 		}
 
 		if pvc.Status.Phase == core.ClaimBound {
-			task.Phase = Completed
+			task.Phase = api.StepCompleted
 			task.Reason = TransferCompleted
 			task.Progress.Completed = task.Progress.Total
 			task.MarkCompleted()
