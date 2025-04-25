@@ -929,6 +929,7 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 		// the original name. The trim will remove the suffix from the disk name showing the original name.
 		pvc := pvcMap[trimBackingFileName(disk.File)]
 		if pvc == nil {
+			r.Log.Info("No matching PVC found for disk", "diskFile", disk.File, "trimmedFile", trimBackingFileName(disk.File))
 			return fmt.Errorf("failed to find persistent volume for disk %s", disk.File)
 		}
 		volumeName := fmt.Sprintf("vol-%v", i)
@@ -994,9 +995,22 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 		kVolumes = append(kVolumes, volume)
 		kDisks = append(kDisks, kubevirtDisk)
 	}
-	// For multiboot VMs, if the selected boot device is the current disk,
-	// set it as the first in the boot order.
-	kDisks[bootDisk].BootOrder = ptr.To(uint(1))
+	if len(kDisks) == 0 {
+		r.Log.Info("No disks were successfully mapped", "vm", vm.Name, "vmID", vmRef.ID)
+		for _, d := range disks {
+			r.Log.Info("Unmapped disk", "diskFile", d.File)
+		}
+		for key, pvc := range pvcMap {
+			r.Log.Info("Available PVC mapping", "diskKey", key, "pvcName", pvc.Name)
+		}
+		return fmt.Errorf("no disks were successfully mapped for VM %s", vm.Name)
+	} else if bootDisk < len(kDisks) {
+		// For multiboot VMs, if the selected boot device is the current disk,
+		// set it as the first in the boot order.
+		kDisks[bootDisk].BootOrder = ptr.To(uint(1))
+	} else {
+		r.Log.Info("Boot disk index out of range", "bootDisk", bootDisk, "diskCount", len(kDisks), "vm", vm.Name)
+	}
 
 	object.Template.Spec.Volumes = kVolumes
 	object.Template.Spec.Domain.Devices.Disks = kDisks
