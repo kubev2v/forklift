@@ -39,10 +39,6 @@ if [ -z "$source_vmdk" ] || [ -z "$target_lun" ]; then
     usage
 fi
 
-if [ "$verify_md5_value" = "true" ]; then
-    do_md5_check="true"
-fi
-
 
 # Construct output file path
 prefix=$(dirname "$source_vmdk")
@@ -62,7 +58,7 @@ md5_compare_result=""
 hash_mismatch=false
 
 # MD5 comparison block
-if [ "$do_md5_check" = "true" ]; then
+if [ "$verify_md5_value" = "true" ]; then
     CHUNK=$((1024 * 1024 * 1024))  # 1 GiB
 
     # Validate files
@@ -100,13 +96,11 @@ rm -f "$resulting_rdm_file" >> /var/log/vmkfstools-wrapper.log 2>&1
 echo "check the file $resulting_rdm_file doesn't exist" >> /var/log/vmkfstools-wrapper.log 2>&1
 ls -la "$resulting_rdm_file" >> /var/log/vmkfstools-wrapper.log 2>&1
 
-# Overwrite exit_code if hash mismatch occurred
-if [ "$do_md5_check" = "true" ] && [ "$hash_mismatch" = true ]; then
+if [ "$verify_md5_value" = "true" ] && [ "$hash_mismatch" = true ]; then
     exit_code=2
 fi
 
-# Append hash result if needed
-if [ "$do_md5_check" = "true" ]; then
+if [ "$verify_md5_value" = "true" ]; then
     output="$output $md5_compare_result"
 fi
 

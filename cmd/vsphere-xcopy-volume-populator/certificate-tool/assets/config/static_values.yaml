@@ -11,3 +11,4 @@ test-image-label:  0.47
 test-populator-image: quay.io/amitos/vsphere-xcopy-volume-populator
 ### storage
 storage-vendor: primera3par
+storage-class-name: xcopy-storage-class

@@ -11,7 +11,6 @@ import (
 )
 
 var (
-	kubeconfigPath     string
 	testNamespace      string
 	testImageLabel     string
 	testLabels         string
@@ -20,12 +19,6 @@ var (
 	controllerPath     string
 	saName             string
 	roleName           string
-	storagePassword    string
-	storageUser        string
-	storageUrl         string
-	vspherePassword    string
-	vsphereUser        string
-	vsphereUrl         string
 	secretName         string
 )
 
@@ -112,11 +105,5 @@ func init() {
 	prepare.Flags().StringVar(&testImageLabel, "test-image-label", "0.38", "Image tag for test pods")
 	prepare.Flags().StringVar(&testLabels, "test-labels", "vsphere-populator", "Labels for test objects")
 	prepare.Flags().StringVar(&testPopulatorImage, "test-populator-image", "quay.io/amitos/vsphere-xcopy-volume-populator", "Populator image")
-	prepare.Flags().StringVar(&storageUser, "storage-user", "", "Storage username")
-	prepare.Flags().StringVar(&storagePassword, "storage-password", "", "Storage password")
-	prepare.Flags().StringVar(&storageUrl, "storage-url", "", "Storage endpoint URL")
-	prepare.Flags().StringVar(&vsphereUser, "vsphere-user", "", "vSphere username")
-	prepare.Flags().StringVar(&vspherePassword, "vsphere-password", "", "vSphere password")
-	prepare.Flags().StringVar(&vsphereUrl, "vsphere-url", "", "vSphere / govmomi endpoint")
 	prepare.Flags().StringVar(&secretName, "secret-name", "populator-secret", "Name of the secret to create")
 }

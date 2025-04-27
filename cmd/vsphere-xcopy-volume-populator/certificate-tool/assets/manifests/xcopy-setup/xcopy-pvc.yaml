@@ -17,6 +17,6 @@ spec:
   resources:
     requests:
       storage: 10Gi
-  storageClassName: xcopy-storage-class
+  storageClassName: ${.STORAGE_CLASS_NAME}
   volumeMode: Block
 
