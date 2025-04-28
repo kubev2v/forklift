@@ -4,10 +4,10 @@ WORKDIR /usr/src/app
 
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading
 # them in subsequent builds if they change
-COPY go.mod go.sum ./
+COPY . .
+WORKDIR /usr/src/app/cmd/vsphere-xcopy-volume-populator
 RUN go mod download && go mod verify
 
-COPY . .
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/.cache/go-build \
     go build -o bin/vsphere-xcopy-volume-populator
@@ -16,14 +16,14 @@ RUN make vmkfstools-wrapper
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal
 
-COPY --from=builder /usr/src/app/bin/vsphere-xcopy-volume-populator \
+COPY --from=builder /usr/src/app/cmd/vsphere-xcopy-volume-populator/bin/vsphere-xcopy-volume-populator \
     /bin/vsphere-xcopy-volume-populator
 
-COPY --from=builder /usr/src/app/vmkfstools-wrapper/vmkfstools-wrapper.vib \
+COPY --from=builder /usr/src/app/cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper/vmkfstools-wrapper.vib \
     /bin/vmkfstools-wrapper.vib
-COPY --from=builder /usr/src/app/vmkfstools-wrapper/vib-install-playbook.yaml \
+COPY --from=builder /usr/src/app/cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper/vib-install-playbook.yaml \
     /bin/vib-install-playbook.yaml
-COPY --from=builder /usr/src/app/vmkfstools-wrapper/esxi_hosts.yaml \
+COPY --from=builder /usr/src/app/cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper/esxi_hosts.yaml \
     /bin/esxi_hosts.yaml
 
 ENTRYPOINT ["/bin/vsphere-xcopy-volume-populator"]

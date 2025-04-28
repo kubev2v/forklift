@@ -262,7 +262,7 @@ push-openstack-populator-image: build-openstack-populator-image
 
 build-vsphere-xcopy-volume-populator-image: check_container_runtime
 	$(eval VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/vsphere-xcopy-volume-populator:$(REGISTRY_TAG))
-	$(CONTAINER_CMD) build -t $(VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE) -f build/vsphere-xcopy-volume-populator/Containerfile cmd/vsphere-xcopy-volume-populator
+	$(CONTAINER_CMD) build -t $(VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE) -f build/vsphere-xcopy-volume-populator/Containerfile .
 
 push-vsphere-xcopy-volume-populator-image: build-vsphere-xcopy-volume-populator-image
 	$(CONTAINER_CMD) push $(VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE)
