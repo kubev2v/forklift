@@ -126,9 +126,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		return
 	}
 	defer func() {
-		if migration != nil {
-			r.Log.V(2).Info("Conditions.", "all", migration.Status.Conditions)
-		}
+		r.Log.V(2).Info("Conditions.", "all", migration.Status.Conditions)
 	}()
 
 	// Set owner reference for migration CR if it was created using CLI

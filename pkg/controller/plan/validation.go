@@ -1289,13 +1289,11 @@ func createVddkCheckJob(plan *api.Plan) *batchv1.Job {
 		psc.RunAsNonRoot = ptr.To(true)
 		psc.RunAsUser = ptr.To(qemuUser)
 	}
-
 	return &batchv1.Job{
 		ObjectMeta: meta.ObjectMeta{
-			GenerateName:    fmt.Sprintf("vddk-validator-%s", plan.Name),
-			Namespace:       plan.Spec.TargetNamespace,
-			OwnerReferences: createOwnerReferences(plan.ObjectMeta, plan.TypeMeta, false),
-			Labels:          getVddkImageValidationJobLabels(plan),
+			GenerateName: fmt.Sprintf("vddk-validator-%s", plan.Name),
+			Namespace:    plan.Spec.TargetNamespace,
+			Labels:       getVddkImageValidationJobLabels(plan),
 			Annotations: map[string]string{
 				"provider": plan.Referenced.Provider.Source.Name,
 				"vddk":     image,
