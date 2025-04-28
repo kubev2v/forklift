@@ -56,7 +56,7 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 	klog.Infof("Got ESXI host: %s", host)
 
 	// for iSCSI add the host to the group using IQN. Is there something else for FC?
-	r, err := p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"iscsi", "adapter", "list"})
+	r, err := p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "adapter", "list"})
 	if err != nil {
 		return err
 	}
@@ -87,7 +87,7 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 		// Check if the UID is FC, iSCSI or NVMe-oF
 		isTargetUID := strings.HasPrefix(id, "fc.") || strings.HasPrefix(id, "iqn.") || strings.HasPrefix(id, "nqn.")
 
-		if link == "link-up" && isTargetUID {
+		if (link == "link-up" || link == "online") && isTargetUID {
 			if _, exists := uniqueUIDs[id]; !exists {
 				uniqueUIDs[id] = true
 				hbaUIDs = append(hbaUIDs, id)
@@ -107,11 +107,6 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 		return err
 	}
 
-	lun, err = p.StorageApi.Map(xcopyInitiatorGroup, lun, mappingContext)
-	if err != nil {
-		return fmt.Errorf("failed to map lun %s to initiator group %s: %w", lun, xcopyInitiatorGroup, err)
-	}
-
 	originalInitiatorGroups, err := p.StorageApi.CurrentMappedGroups(lun, nil)
 	if err != nil {
 		return fmt.Errorf("failed to fetch the current initiator groups of the lun %s: %w", lun.Name, err)
@@ -123,6 +118,12 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 			p.StorageApi.UnMap(xcopyInitiatorGroup, lun, mappingContext)
 		}
 	}()
+
+	lun, err = p.StorageApi.Map(xcopyInitiatorGroup, lun, mappingContext)
+	if err != nil {
+		return fmt.Errorf("failed to map lun %s to initiator group %s: %w", lun, xcopyInitiatorGroup, err)
+	}
+
 	esxNaa := fmt.Sprintf("naa.%s", lun.NAA)
 
 	targetLUN := fmt.Sprintf("/vmfs/devices/disks/%s", esxNaa)

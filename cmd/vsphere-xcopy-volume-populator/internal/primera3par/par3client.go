@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -20,8 +21,8 @@ import (
 type Primera3ParClient interface {
 	GetSessionKey() (string, error)
 	EnsureLunMapped(initiatorGroup string, targetLUN populator.LUN) (populator.LUN, error)
-	LunUnmap(ctx context.Context, initiatorGroupName, lunName string) error
-	EnsureHostWithIqn(iqn string) (string, error)
+	LunUnmap(ctx context.Context, initiatorGroupName string, lunName string) error
+	EnsureHostsWithIds(adapterIds []string) ([]string, error)
 	EnsureHostSetExists(hostSetName string) error
 	AddHostToHostSet(hostSetName string, hostName string) error
 	GetLunDetailsByVolumeName(lunName string, lun populator.LUN) (populator.LUN, error)
@@ -48,6 +49,7 @@ type Descriptor struct {
 }
 
 type FCPath struct {
+	WWN string `json:"wwpn"`
 }
 
 type ISCSIPath struct {
@@ -83,45 +85,81 @@ func NewPrimera3ParClientWsImpl(storageHostname, storageUsername, storagePasswor
 	}
 }
 
-func (p *Primera3ParClientWsImpl) EnsureHostWithIqn(iqn string) (string, error) {
-	hostName, err := p.getHostByIQN(iqn)
-	if err != nil {
-		return "", fmt.Errorf("failed to get host by iqn: %w", err)
-	}
-	if hostName != "" {
-		return hostName, nil
-	}
-	hostName = uuid.New().String()
-	hostName = hostName[:10]
-	err = p.createHost(hostName, iqn)
-	if err != nil {
-		return "", err
-	}
+// EnsureHostsWithIds We return a list of host names that are connected to the adapters provided. If a host already exists we find it,
+// if it does not, we crate a new one. When we create a new host it will always have one path, but an existing host may
+// aggregate several.
+func (p *Primera3ParClientWsImpl) EnsureHostsWithIds(adapterIds []string) ([]string, error) {
+	hostnames := make([]string, len(adapterIds))
+	for _, adapterId := range adapterIds {
+		hostName, err := p.getHostByAdapterId(adapterId)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get host by adapterId: %w", err)
+		}
+		if hostName != "" {
+			hostnames = append(hostnames, hostName)
+			continue
+		}
+		hostName = uuid.New().String()
+		hostName = hostName[:10]
+		err = p.createHost(hostName, adapterId)
+		if err != nil {
+			return nil, err
+		}
 
-	return hostName, err
+		hostnames = append(hostnames, hostName)
+	}
+	hostnames = cleanHostnames(hostnames)
+	return hostnames, nil
 }
 
-func (p *Primera3ParClientWsImpl) getHostByIQN(iqn string) (string, error) {
-	url := fmt.Sprintf("%s/api/v1/hosts", p.BaseURL)
+func cleanHostnames(hosts []string) []string {
+	seen := make(map[string]struct{}, len(hosts))
+	var out []string
+	for _, h := range hosts {
+		if h == "" {
+			continue
+		}
+		if _, ok := seen[h]; ok {
+			continue
+		}
+		seen[h] = struct{}{}
+		out = append(out, h)
+	}
+	return out
+}
 
-	req, err := http.NewRequest("GET", url, nil)
+func (p *Primera3ParClientWsImpl) getHostByAdapterId(id string) (string, error) {
+	var rawFilter string
+	if strings.HasPrefix(id, "fc.") {
+		parts := strings.SplitN(strings.TrimPrefix(id, "fc."), ":", 2)
+		if len(parts) != 2 {
+			return "", fmt.Errorf("invalid FC adapter id %q", id)
+		}
+		wwpn := sanitizeWWN(parts[1])
+		rawFilter = fmt.Sprintf(`" FCPaths[wwn EQ %s] "`, wwpn)
+	} else if strings.HasPrefix(id, "iqn.") {
+		rawFilter = fmt.Sprintf(`" iSCSIPaths[name EQ %s] "`, id)
+	} else {
+		klog.Infof("host with adapterId %s not found since this adapter type is not supported", id)
+		return "", nil
+	}
+
+	esc := url.PathEscape(rawFilter)
+
+	uri := fmt.Sprintf("%s/api/v1/hosts?query=%s", p.BaseURL, esc)
+
+	req, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
-	var hostData HostsResponse
-
-	err = p.doRequestUnmarshalResponse(req, "getHostByIQN", &hostData)
-	if err != nil {
+	var respData HostsResponse
+	if err := p.doRequestUnmarshalResponse(req, "getHostByAdapterId", &respData); err != nil {
 		return "", err
 	}
-	for _, host := range hostData.Members {
-		for _, existingIQN := range host.ISCSIPaths {
-			if existingIQN.Name == iqn {
-				return host.Name, nil
-			}
-		}
-	}
 
+	if len(respData.Members) > 0 {
+		return respData.Members[0].Name, nil
+	}
 	return "", nil
 }
 
@@ -151,42 +189,57 @@ func (p *Primera3ParClientWsImpl) hostExists(hostname string) (bool, error) {
 	return false, fmt.Errorf("unexpected response: %d, body: %s", resp.StatusCode, string(body))
 }
 
-func (p *Primera3ParClientWsImpl) createHost(hostname, iqn string) error {
+func (p *Primera3ParClientWsImpl) createHost(hostname, adapterId string) error {
 	url := fmt.Sprintf("%s/api/v1/hosts", p.BaseURL)
 
-	requestBody := map[string]interface{}{
-		"name":       hostname,
-		"persona":    2,
-		"iSCSINames": []string{iqn},
+	body := map[string]interface{}{
+		"name":    hostname,
+		"persona": 2,
 	}
 
-	jsonBody, err := json.Marshal(requestBody)
+	if strings.HasPrefix(adapterId, "fc.") {
+		raw := strings.TrimPrefix(adapterId, "fc.")
+		parts := strings.FieldsFunc(raw, func(r rune) bool {
+			return r == ':' || r == '-'
+		})
+
+		var wwns []string
+		for _, p := range parts {
+			wwns = append(wwns, sanitizeWWN(p))
+		}
+		body["FCWWNs"] = wwns
+	} else {
+		body["iSCSINames"] = []string{adapterId}
+	}
+
+	jsonBody, err := json.Marshal(body)
 	if err != nil {
-		return fmt.Errorf("failed to encode JSON: %w", err)
+		return fmt.Errorf("failed to marshal create-host body: %w", err)
 	}
-
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return fmt.Errorf("failed to create POST request: %w", err)
 	}
 
 	resp, err := p.doRequest(req, "createHost")
 	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
+		return fmt.Errorf("createHost request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusCreated {
-		return nil
+	if resp.StatusCode != http.StatusCreated {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("createHost returned %d: %s", resp.StatusCode, string(b))
 	}
-
-	body, _ := io.ReadAll(resp.Body)
-	return fmt.Errorf("failed to create host: status %d, body: %s", resp.StatusCode, string(body))
+	return nil
+}
+func sanitizeWWN(raw string) string {
+	cleaned := strings.ReplaceAll(strings.ReplaceAll(raw, ":", ""), "-", "")
+	return strings.ToUpper(cleaned)
 }
 
 func (p *Primera3ParClientWsImpl) GetSessionKey() (string, error) {
 	if time.Since(p.SessionStartTime) < 3*time.Minute && p.SessionKey != "" {
-		klog.Info("Reusing existing session key, still valid.")
 		return p.SessionKey, nil
 	}
 	url := fmt.Sprintf("%s/api/v1/credentials", p.BaseURL)
@@ -294,7 +347,7 @@ func (p *Primera3ParClientWsImpl) EnsureLunMapped(initiatorGroup string, targetL
 	return targetLUN, nil
 }
 
-func (p *Primera3ParClientWsImpl) LunUnmap(ctx context.Context, initiatorGroupName, lunName string) error {
+func (p *Primera3ParClientWsImpl) LunUnmap(ctx context.Context, initiatorGroupName string, lunName string) error {
 	lunID, err := p.GetVLunID(lunName, fmt.Sprintf("set:%s", initiatorGroupName))
 	if err != nil {
 		return fmt.Errorf("failed to get LUN ID: %w", err)
