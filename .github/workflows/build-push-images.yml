@@ -23,39 +23,51 @@ jobs:
           - name: forklift-api
             file: build/forklift-api/Containerfile
             repo: forklift-api
+            context: .
           - name: forklift-controller
             file: build/forklift-controller/Containerfile
             repo: forklift-controller
+            context: .
           - name: forklift-operator
             file: build/forklift-operator/Containerfile
             repo: forklift-operator
+            context: .
           - name: openstack-populator
             file: build/openstack-populator/Containerfile
             repo: openstack-populator
+            context: .
           - name: openstack-populator
             file: build/openstack-populator/Containerfile
             repo: openstack-populator
+            context: .
           - name: forklift-ova-provider-server
             file: build/ova-provider-server/Containerfile
             repo: forklift-ova-provider-server
+            context: .
           - name: ovirt-populator
             file: build/ovirt-populator/Containerfile-upstream
             repo: ovirt-populator
+            context: .
           - name: populator-controller
             file: build/populator-controller/Containerfile
             repo: populator-controller
+            context: .
           - name: forklift-validation
             file: build/validation/Containerfile
             repo: forklift-validation
+            context: .
           - name: virt-v2v
             file: build/virt-v2v/Containerfile-upstream
             repo: forklift-virt-v2v
+            context: .
           - name: virt-v2v
             file: build/virt-v2v/Containerfile-upstream-fedora
             repo: forklift-virt-v2v-fedora
+            context: .
           - name: vsphere-xcopy-volume-populator
             file: build/vsphere-xcopy-volume-populator/Containerfile
             repo: vsphere-xcopy-volume-populator
+            context: "{{defaultContext}}:cmd/vsphere-xcopy-volume-populator"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout forklift
@@ -72,6 +84,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           push: true
+          context: "${{ matrix.context }}"
           file: "${{ matrix.file }}"
           tags: ${{ env.REGISTRY }}/${{ env.REGISTRY_ORG }}/${{ matrix.repo }}:${{ env.REGISTRY_TAG }}
 
