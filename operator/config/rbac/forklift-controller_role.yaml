@@ -159,3 +159,24 @@ rules:
   - rolebindings
   verbs:
   - create
+- apiGroups:
+    - build.openshift.io
+  resources:
+    - builds
+    - buildconfigs
+    - buildconfigs/instantiate
+  verbs:
+    - create
+    - get
+    - list
+    - watch
+    - update
+- apiGroups:
+    - image.openshift.io
+  resources:
+    - imagestreamtags
+    - imagestreams
+  verbs:
+    - get
+    - list
+    - watch
