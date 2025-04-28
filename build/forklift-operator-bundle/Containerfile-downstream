@@ -1,10 +1,4 @@
-FROM registry.redhat.io/ubi9/go-toolset:1.21.13-2.1729776560 AS kustomize
-ENV GO111MODULE=on 
-
-COPY .konflux/forklift-operator-bundle/go.mod go.mod
-COPY .konflux/forklift-operator-bundle/go.sum go.sum
-
-RUN go build sigs.k8s.io/kustomize/kustomize/v5
+FROM registry.redhat.io/ubi9/go-toolset:1.21.13-2.1729776560 AS envsubst
 
 FROM registry.redhat.io/openshift4/ose-operator-sdk-rhel9@sha256:4e59ce6570325c0cba001b4dd95f7af9e0a8d87bc6e5d27ea2714155fb964699 AS builder
 
@@ -26,12 +20,11 @@ ARG VALIDATION_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-va
 
 USER root
 
-COPY --from=kustomize /opt/app-root/src/kustomize /usr/bin/kustomize
-COPY --from=kustomize /usr/bin/envsubst /usr/bin/envsubst
+COPY --from=envsubst /usr/bin/envsubst /usr/bin/envsubst
 
 COPY ./operator /repo
 WORKDIR /repo
-RUN kustomize build config/manifests/ \
+RUN cat .kustomized_manifests \
     | envsubst \
     | operator-sdk generate bundle \
     -q \
