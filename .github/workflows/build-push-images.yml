@@ -53,6 +53,9 @@ jobs:
           - name: virt-v2v
             file: build/virt-v2v/Containerfile-upstream-fedora
             repo: forklift-virt-v2v-fedora
+          - name: vsphere-xcopy-volume-populator
+            file: build/vsphere-xcopy-volume-populator/Containerfile
+            repo: vsphere-xcopy-volume-populator
     runs-on: ubuntu-latest
     steps:
       - name: Checkout forklift
