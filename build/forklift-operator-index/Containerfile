@@ -1,5 +1,5 @@
 FROM quay.io/operator-framework/opm:latest AS opm
-FROM registry.access.redhat.com/ubi9-minimal:9.5-1739420147 AS builder
+FROM registry.access.redhat.com/ubi9-minimal:9.5-1745855087 AS builder
 ARG CHANNELS="development"
 ARG DEFAULT_CHANNEL="development"
 ARG VERSION="99.0.0"
