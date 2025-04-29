@@ -33,6 +33,7 @@ var prepare = &cobra.Command{
 			TestLabels:         testLabels,
 			TestPopulatorImage: testPopulatorImage,
 			PodNamespace:       podNamespace,
+			StorageClassName:   storageClassName,
 		}
 		config, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
 		if err != nil {

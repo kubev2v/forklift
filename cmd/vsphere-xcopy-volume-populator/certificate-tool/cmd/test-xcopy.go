@@ -31,9 +31,10 @@ var createTestCmd = &cobra.Command{
 			panic(err)
 		}
 		params := &k8s.TemplateParams{
-			VmdkPath:      vmdkPath,
-			StorageVendor: storageVendor,
-			PodNamespace:  podNamespace,
+			VmdkPath:         vmdkPath,
+			StorageVendor:    storageVendor,
+			PodNamespace:     podNamespace,
+			StorageClassName: storageClassName,
 		}
 
 		cobra.CheckErr(k8s.ApplyResource[corev1.PersistentVolumeClaim](

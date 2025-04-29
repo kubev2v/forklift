@@ -17,4 +17,3 @@ runcmd:
   - sudo touch /tmp/cloud-init-ran
   - sudo echo "Cloud-Init Worked" > /tmp/cloud-init-test.txt
   - sudo systemctl enable --now vmtoolsd
-  - sudo reboot

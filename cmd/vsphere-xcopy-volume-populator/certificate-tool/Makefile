@@ -22,7 +22,7 @@ TEST_POPULATOR_IMAGE = $(shell yq e '.test-populator-image' $(CONFIG_FILE))
 CONTROLLER_PATH  = $(shell yq e '.controller-path' $(CONFIG_FILE))
 STORAGE_CLASS_NAME  = $(shell yq e '.storage-class-name' $(CONFIG_FILE))
 
-REQUIRED_VARS := STORAGE_USER STORAGE_PASSWORD STORAGE_URL VSPHERE_USER VSPHERE_PASSWORD VSPHERE_URL
+REQUIRED_VARS := STORAGE_USER STORAGE_PASSWORD STORAGE_URL VSPHERE_USER VSPHERE_PASSWORD VSPHERE_URL STORAGE_CLASS_NAME
 
 $(foreach var,$(REQUIRED_VARS),\
   $(if $(value $(var)),,$(error Environment variable $(var) is required)))
@@ -34,8 +34,8 @@ OVIRT_POPULATOR     ?= https://raw.githubusercontent.com/kubev2v/forklift/main/o
 VSPHERE_POPULATOR   ?= https://raw.githubusercontent.com/kubev2v/forklift/main/operator/config/crd/bases/forklift.konveyor.io_vspherexcopyvolumepopulators.yaml
 CLUSTER_ROLE   ?= https://raw.githubusercontent.com/kubev2v/forklift/main/operator/config/rbac/populator-controller/role.yaml
 ROLE_BINDING   ?= https://raw.githubusercontent.com/kubev2v/forklift/main/operator/config/rbac/populator-controller/role_binding.yaml
-VM_NAME      ?= certificate-vm
-
+VM_NAME      ?= certificate-vm1
+DATA_STORE   ?= eco-iscsi-ds1
 BINARY = certificate-tool
 
 .PHONY: help build prepare test-xcopy all clean
@@ -54,11 +54,11 @@ build: ## Build the certificate-tool CLI binary.
 	go build -o $(BINARY) .
 
 prepare: check-tools build ## Run certificate-tool create-env subcommand.
-	$(KUBECTL) create -f $(OPENSTACK_POPULATOR)
-	$(KUBECTL) create -f $(OVIRT_POPULATOR)
-	$(KUBECTL) create -f $(VSPHERE_POPULATOR)
-	$(KUBECTL) create -f $(CLUSTER_ROLE)
-	$(KUBECTL) create -f $(ROLE_BINDING)
+	$(KUBECTL) apply -f $(OPENSTACK_POPULATOR)
+	$(KUBECTL) apply -f $(OVIRT_POPULATOR)
+	$(KUBECTL) apply -f $(VSPHERE_POPULATOR)
+	$(KUBECTL) apply -f $(CLUSTER_ROLE)
+	$(KUBECTL) apply -f $(ROLE_BINDING)
 	@echo "running prepare..."
 	@./$(BINARY) prepare \
 			 --kubeconfig            "$(KUBECONFIG)" \
@@ -80,22 +80,23 @@ prepare: check-tools build ## Run certificate-tool create-env subcommand.
 
 create-vm: build ## Run certificate-tool create-vm subcommand.
 	@echo "creating vm..."
-	@./BINARY) create-vm \
-		--vm-name=$(VM_NAME)1 \
-		--datastore="eco-iscsi-ds1"\
-		--local-vmdk-path="assets/cloudinit/ubuntu-20.04-server-cloudimg-amd64.vmdk" \
+	./$(BINARY) create-vm \
+		--vm-name               $(VM_NAME) \
 		--vsphere-user          "$(VSPHERE_USER)" \
 		--vsphere-password      "$(VSPHERE_PASSWORD)" \
-		--vsphere-url           "$(VSPHERE_URL)/sdk"
+		--vsphere-url           "$(VSPHERE_URL)/sdk" \
+		--data-center           "Eco-Datacenter" \
+		--local-vmdk-path       "assets/cloudinit/fedora.vmdk" \
+		--data-store            $(DATA_STORE)
 
 test-xcopy: build prepare
 	@echo "Running test-xcopy..."
 	@./$(BINARY) test-xcopy \
-		--kubeconfig $(KUBECONFIG) \
-		--pvc-yaml "assets/manifests/xcopy-setup/xcopy-pvc.yaml"\
-		--cr-yaml "assets/manifests/xcopy-setup/cr-test-xcopy.yaml" \
-		--vmdk-path "[eco-iscsi-ds1] boris01/boris01.vmdk"  \
-		--storage-vendor $(STORAGE_VENDOR) \
+		--kubeconfig          $(KUBECONFIG) \
+		--pvc-yaml           "assets/manifests/xcopy-setup/xcopy-pvc.yaml"\
+		--cr-yaml            "assets/manifests/xcopy-setup/cr-test-xcopy.yaml" \
+		--vmdk-path          "[$(DATA_STORE)] $(VM_NAME)/fedora.vmdk"  \
+		--storage-vendor     $(STORAGE_VENDOR) \
 		--storage-class-name $(STORAGE_CLASS_NAME)
 
 

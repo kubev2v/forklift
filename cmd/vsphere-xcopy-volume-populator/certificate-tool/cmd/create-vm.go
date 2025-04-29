@@ -4,10 +4,13 @@ import (
 	"certificate-tool/internal/utils/osutils"
 	"context"
 	"fmt"
+	"github.com/vmware/govmomi/vmdk"
 	"k8s.io/klog/v2"
+	"log"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -33,85 +36,160 @@ type VMConfig struct {
 	CDDeviceKey string
 }
 
+var (
+	vmName, isoPath, dataStore     string
+	guestID                        string
+	dataCenter                     string
+	memoryMB, cpus                 int
+	network, pool, cdDeviceKey     string
+	guestUser, guestPass           string
+	dataSizeMB                     int
+	waitTimeout                    time.Duration
+	downloadVmdkURL, localVmdkPath string
+)
+
 // downloadVMDKIfMissing checks for the VMDK locally, downloading it if absent.
 // Returns the local filename of the VMDK.
-func downloadVMDKIfMissing(vmdkURL string) (string, error) {
-	if vmdkURL == "" {
-		vmdkURL = defaultVMDKURL
+func ensureVmdk(downloadVmdkURL, localVmdkPath string) (string, error) {
+	if downloadVmdkURL == "" && localVmdkPath == "" {
+		downloadVmdkURL = defaultVMDKURL
 	}
-	file := filepath.Base(vmdkURL)
-	if _, err := os.Stat(file); os.IsNotExist(err) {
-		klog.Infof("Downloading VMDK from %s", vmdkURL)
-		if err := osutils.ExecCommand("wget", vmdkURL); err != nil {
+	if localVmdkPath != "" {
+		if _, err := os.Stat(localVmdkPath); err == nil {
+			klog.Infof("Using existing local VMDK: %s", localVmdkPath)
+			return localVmdkPath, nil
+		} else if !os.IsNotExist(err) {
+			return "", fmt.Errorf("unable to stat local VMDK %q: %w", localVmdkPath, err)
+		}
+	}
+	u, err := url.Parse(downloadVmdkURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid VMDK URL %q: %w", downloadVmdkURL, err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return "", fmt.Errorf("no local VMDK at %q and %q is not an HTTP URL", localVmdkPath, downloadVmdkURL)
+	}
+	dest := filepath.Base(u.Path)
+	if _, err := os.Stat(dest); os.IsNotExist(err) {
+		klog.Infof("Downloading VMDK from %s → %s", downloadVmdkURL, dest)
+		if err := osutils.ExecCommand("wget", "-O", dest, downloadVmdkURL); err != nil {
 			return "", fmt.Errorf("failed to download VMDK: %w", err)
 		}
 	} else {
-		klog.Infof("VMDK already present locally: %s", file)
+		klog.Infof("Using cached download: %s", dest)
 	}
-	return file, nil
+
+	return dest, nil
+}
+func fileExist(ctx context.Context, ds *object.Datastore, fullPath string) (bool, error) {
+	_, err := ds.Stat(ctx, fullPath)
+	if err != nil {
+		if strings.Contains(err.Error(), "No such file") || strings.Contains(err.Error(), "No such directory") {
+			return false, nil
+		}
+		return false, fmt.Errorf("stat %q: %w", fullPath, err)
+	}
+	return true, nil
 }
 
-// uploadVMDK uploads a local VMDK file to the datastore under the VM folder.
-func uploadVMDK(ctx context.Context, client *govmomi.Client, dsName, vmName, localFile string) error {
-	finder := find.NewFinder(client.Client, false)
-	dc, err := finder.DefaultDatacenter(ctx)
+func uploadFile(ctx context.Context, ds *object.Datastore, vmName, localFilePath string) (string, error) {
+	remote := filepath.Join(vmName, filepath.Base(localFilePath))
+	fullRemotePath := fmt.Sprintf("[%s] %s", ds.Name(), remote)
+	exist, err := fileExist(ctx, ds, remote)
 	if err != nil {
-		return fmt.Errorf("find datacenter: %w", err)
+		return "", fmt.Errorf("error checking remote file %s exist: %w", remote, err)
 	}
-	finder.SetDatacenter(dc)
-
-	ds, err := finder.Datastore(ctx, dsName)
-	if err != nil {
-		return fmt.Errorf("find datastore %s: %w", dsName, err)
+	if exist == true {
+		return fullRemotePath, nil
 	}
-
-	remotePath := ds.Path(filepath.Join(vmName, filepath.Base(localFile)))
-
-	if err := ds.UploadFile(ctx, localFile, remotePath, nil); err != nil {
-		return fmt.Errorf("upload VMDK: %w", err)
+	if err = ds.UploadFile(ctx, localFilePath, remote, nil); err != nil {
+		return "", fmt.Errorf("upload ISO to %s failed: %w", remote, err)
 	}
-
-	klog.Infof("Uploaded VMDK to %s", remotePath)
-	return nil
+	return fullRemotePath, nil
 }
-func createVM(ctx context.Context, client *govmomi.Client, cfg VMConfig, datastore, vmName string) (*object.VirtualMachine, error) {
-	finder := find.NewFinder(client.Client, false)
 
-	dc, err := finder.DefaultDatacenter(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("default datacenter: %w", err)
-	}
-	finder.SetDatacenter(dc)
-
-	pool, err := finder.ResourcePool(ctx, cfg.Pool)
-	if err != nil {
-		return nil, fmt.Errorf("resource pool %s: %w", cfg.Pool, err)
-	}
-
-	spec := types.VirtualMachineConfigSpec{
-		Name:     vmName,
-		GuestId:  cfg.GuestID,
-		NumCPUs:  int32(cfg.CPUs),
-		MemoryMB: int64(cfg.MemoryMB),
-	}
-
+func uploadVmdk(ctx context.Context, client *govmomi.Client, ds *object.Datastore, dc *object.Datacenter, rp *object.ResourcePool, vmName, localFilePath string) (string, error) {
 	folders, err := dc.Folders(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("get dc folders: %w", err)
+		return "", fmt.Errorf("cannot get DC folders: %w", err)
+	}
+	remoteVmdkPath := fmt.Sprintf("[%s] %s/%s", ds.Name(), vmName, filepath.Base(localVmdkPath))
+	err = vmdk.Import(
+		ctx,
+		client.Client,
+		localFilePath,
+		ds,
+		vmdk.ImportParams{
+			Datacenter: dc,                        // required
+			Pool:       rp,                        // resource pool (nil → dc’s default)
+			Folder:     folders.VmFolder,          // VM folder for the temp VM (nil → dc root)
+			Host:       nil,                       // specific host (nil → let vCenter choose)
+			Force:      false,                     // overwrite if file already exists
+			Path:       vmName,                    // where to put the disk in the datastore
+			Type:       types.VirtualDiskTypeThin, // converts to thin/flat
+			Logger:     nil,                       // or progress func implementing soap.FileUploadProgress
+		},
+	)
+	if err != nil {
+		return "", fmt.Errorf("import vmdk: %v", err)
+	}
+	return remoteVmdkPath, nil
+}
+
+func createVM(ctx context.Context, cli *govmomi.Client,
+	dc *object.Datacenter, rp *object.ResourcePool, vmName, vmdkPath, dsName string) (*object.VirtualMachine, error) {
+	vmxPath := fmt.Sprintf("[%s] %s/%s.vmx", dsName, vmName, vmName)
+
+	vmConfig := types.VirtualMachineConfigSpec{
+		Name:     vmName,
+		GuestId:  "Fedora64Guest",
+		MemoryMB: 2048,
+		NumCPUs:  2,
+		Files: &types.VirtualMachineFileInfo{
+			VmPathName: vmxPath,
+		},
 	}
 
-	task, err := folders.VmFolder.CreateVM(ctx, spec, pool, nil)
-	if err != nil {
-		return nil, fmt.Errorf("create VM task: %w", err)
+	isciController := addDefaultSCSIController(&vmConfig)
+	diskBacking := &types.VirtualDiskFlatVer2BackingInfo{}
+	diskBacking.FileName = vmdkPath
+	diskBacking.DiskMode = string(types.VirtualDiskModePersistent)
+	diskBacking.ThinProvisioned = types.NewBool(true)
+	unit := int32(0) // the first unit on your new controller
+
+	disk := &types.VirtualDisk{
+		CapacityInKB:    0,
+		CapacityInBytes: 0,
+		VirtualDevice: types.VirtualDevice{
+			ControllerKey: isciController.Key, // use the real controller key
+			UnitNumber:    &unit,
+			Backing:       diskBacking,
+		},
 	}
+
+	deviceConfigSpec := &types.VirtualDeviceConfigSpec{
+		Operation: types.VirtualDeviceConfigSpecOperationAdd,
+		Device:    disk,
+	}
+	vmConfig.DeviceChange = append(vmConfig.DeviceChange, deviceConfigSpec)
+	log.Printf("Creating VM %s...", vmName)
+	folders, err := dc.Folders(context.TODO())
+	if err != nil {
+		panic(err)
+	}
+	task, err := folders.VmFolder.CreateVM(ctx, vmConfig, rp, nil)
+	if err != nil {
+		return nil, err
+	}
+
 	info, err := task.WaitForResult(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("create VM: %w", err)
+		return nil, err
 	}
 
-	vm := object.NewVirtualMachine(client.Client, info.Result.(types.ManagedObjectReference))
-	klog.Infof("Created VM %s", vmName)
-	return vm, nil
+	log.Printf("created VM %s...", vmName)
+	return object.NewVirtualMachine(cli.Client, info.Result.(types.ManagedObjectReference)), nil
+
 }
 
 func attachCDROM(ctx context.Context, vm *object.VirtualMachine, isoPath string) error {
@@ -137,6 +215,11 @@ func attachCDROM(ctx context.Context, vm *object.VirtualMachine, isoPath string)
 		VirtualDeviceFileBackingInfo: types.VirtualDeviceFileBackingInfo{
 			FileName: isoPath,
 		},
+	}
+	cdrom.Connectable = &types.VirtualDeviceConnectInfo{
+		StartConnected:    true,
+		Connected:         true,
+		AllowGuestControl: true,
 	}
 
 	cdSpec := &types.VirtualDeviceConfigSpec{
@@ -206,74 +289,177 @@ func writeRandomDataToGuest(ctx context.Context, client *govmomi.Client, finder 
 	return nil
 }
 
-var (
-	vmdkURL, vmName, isoPath, datastore string
-	skipUpload                          bool
-	guestID                             string
-	memoryMB, cpus                      int
-	network, pool, cdDeviceKey          string
-	vcURL, vcUser, vcPass               string
-	guestUser, guestPass                string
-	dataSizeMB                          int
-	waitTimeout                         time.Duration
-)
+func addDefaultSCSIController(vmConfig *types.VirtualMachineConfigSpec) *types.ParaVirtualSCSIController {
+	controller := &types.ParaVirtualSCSIController{
+		VirtualSCSIController: types.VirtualSCSIController{
+			SharedBus: types.VirtualSCSISharingNoSharing,
+			VirtualController: types.VirtualController{
+				VirtualDevice: types.VirtualDevice{Key: 3000},
+				BusNumber:     0,
+			},
+		},
+	}
+
+	controller.VirtualController = types.VirtualController{}
+	controller.VirtualController.Key = 1000
+	controller.SharedBus = types.VirtualSCSISharingNoSharing
+	controller.VirtualController.BusNumber = 0
+
+	// Create a VirtualDeviceConfigSpec for adding the controller.
+	controllerSpec := types.VirtualDeviceConfigSpec{
+		Operation: types.VirtualDeviceConfigSpecOperationAdd,
+		Device:    controller,
+	}
+
+	// Append the controller spec to the VM configuration.
+	vmConfig.DeviceChange = append(vmConfig.DeviceChange, &controllerSpec)
+
+	log.Println("Added default LSI Logic SAS controller to VM configuration")
+	return controller
+}
+
+func attachNetwork(
+	ctx context.Context,
+	cli *govmomi.Client,
+	vm *object.VirtualMachine,
+	networkName string,
+) error {
+	finder := find.NewFinder(cli.Client, false)
+	dc, err := finder.DefaultDatacenter(ctx) // datacenter the VM lives in
+	if err != nil {
+		return fmt.Errorf("get DC: %w", err)
+	}
+	finder.SetDatacenter(dc)
+
+	netObj, err := finder.Network(ctx, networkName)
+	if err != nil {
+		return fmt.Errorf("find network %q: %w", networkName, err)
+	}
+	devices, err := vm.Device(ctx)
+	if err != nil {
+		return fmt.Errorf("device list: %w", err)
+	}
+
+	backing, err := netObj.EthernetCardBackingInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("build NIC backing: %w", err)
+	}
+
+	nic, err := devices.CreateEthernetCard("vmxnet3", backing)
+	if err != nil {
+		return fmt.Errorf("create NIC: %w", err)
+	}
+
+	nicSpec := &types.VirtualDeviceConfigSpec{
+		Operation: types.VirtualDeviceConfigSpecOperationAdd,
+		Device:    nic,
+	}
+	spec := types.VirtualMachineConfigSpec{
+		DeviceChange: []types.BaseVirtualDeviceConfigSpec{nicSpec},
+	}
+
+	task, err := vm.Reconfigure(ctx, spec)
+	if err != nil {
+		return fmt.Errorf("reconfigure: %w", err)
+	}
+
+	if err = task.Wait(ctx); err != nil {
+		return fmt.Errorf("reconfigure task: %w", err)
+	}
+
+	return nil
+}
+func SetupVSphere(
+	timeout time.Duration,
+	vcURL, user, pass, dcName, dsName, poolName string,
+) (
+	ctx context.Context,
+	cancel context.CancelFunc,
+	cli *govmomi.Client,
+	finder *find.Finder,
+	dc *object.Datacenter,
+	ds *object.Datastore,
+	rp *object.ResourcePool,
+	err error,
+) {
+	ctx, cancel = context.WithTimeout(context.Background(), timeout)
+	u, err := url.Parse(vcURL)
+	if err != nil {
+		err = fmt.Errorf("invalid vCenter URL: %w", err)
+		return
+	}
+	u.User = url.UserPassword(user, pass)
+	cli, err = govmomi.NewClient(ctx, u, true /* allowInsecure */)
+	if err != nil {
+		err = fmt.Errorf("vCenter connect error: %w", err)
+		return
+	}
+	finder = find.NewFinder(cli.Client, false)
+	dc, err = finder.Datacenter(ctx, dcName)
+	if err != nil {
+		err = fmt.Errorf("find datacenter %q: %w", dcName, err)
+		return
+	}
+	finder.SetDatacenter(dc)
+	ds, err = finder.Datastore(ctx, dsName)
+	if err != nil {
+		err = fmt.Errorf("find datastore %q: %w", dsName, err)
+		return
+	}
+	rp, err = finder.ResourcePool(ctx, poolName)
+	if err != nil {
+		err = fmt.Errorf("find resource pool %q: %w", dsName, err)
+		return
+	}
+
+	return
+}
 
 var createVmCmd = &cobra.Command{
 	Use:   "create-vm",
 	Short: "Create a VM, attach ISO, and inject data into guest",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		localFile, err := downloadVMDKIfMissing(vmdkURL)
-		if err != nil {
-			return err
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), waitTimeout)
-		defer cancel()
-
-		u, err := url.Parse(vcURL)
-		if err != nil {
-			return fmt.Errorf("invalid vCenter URL: %w", err)
-		}
-		u.User = url.UserPassword(vcUser, vcPass)
-		client, err := govmomi.NewClient(ctx, u, true)
-		if err != nil {
-			return fmt.Errorf("vCenter connect error: %w", err)
-		}
-
-		finder := find.NewFinder(client.Client, false)
-		dc, err := finder.DefaultDatacenter(ctx)
-		if err != nil {
-			return fmt.Errorf("find datacenter: %w", err)
-		}
-		finder.SetDatacenter(dc)
-
-		if !skipUpload {
-			if err := uploadVMDK(ctx, client, datastore, vmName, localFile); err != nil {
-				return err
-			}
-		}
-
 		vmCfg := VMConfig{GuestID: guestID, MemoryMB: memoryMB, CPUs: cpus, Network: network, Pool: pool, CDDeviceKey: cdDeviceKey}
-		vm, err := createVM(ctx, client, vmCfg, datastore, vmName)
+		ctx, cancel, client, finder, dc, ds, rp, err := SetupVSphere(
+			5*time.Minute, vsphereUrl, vsphereUser, vspherePassword, dataCenter, dataStore, vmCfg.Pool)
+		if err != nil {
+			log.Fatalf("vSphere setup failed: %v", err)
+		}
+		defer cancel()
+		_, err = ensureVmdk(downloadVmdkURL, localVmdkPath)
 		if err != nil {
 			return err
 		}
-
-		if err := attachCDROM(ctx, vm, isoPath); err != nil {
+		remoteVmdkPath, err := uploadVmdk(ctx, client, ds, dc, rp, vmName, localVmdkPath)
+		if err != nil {
 			return err
 		}
-
-		if err := powerOn(ctx, vm); err != nil {
+		remoteIsoPath, err := uploadFile(ctx, ds, vmName, isoPath)
+		if err != nil {
 			return err
 		}
+		vm, err := createVM(ctx, client, dc, rp, vmName, remoteVmdkPath, ds.Name())
+		if err != nil {
+			return err
+		}
+		if err := attachCDROM(ctx, vm, remoteIsoPath); err != nil {
+			return err
+		}
+		if err := attachNetwork(ctx, client, vm, "VM Network"); err != nil {
+			log.Fatalf("add NIC: %v", err)
+		}
+		//>>>>>>>>>>>>>>>>>>>>>>VM must be shut down for some reason<<<<<<<<<<<<<<<<<<<<<<<
+		//if err := powerOn(ctx, vm); err != nil {
+		//	return err
+		//}
 
 		if err := waitForVMRegistration(ctx, finder, vmName, waitTimeout); err != nil {
 			return err
 		}
-
-		if err := writeRandomDataToGuest(ctx, client, finder, vmName, guestUser, guestPass, dataSizeMB); err != nil {
-			return err
-		}
+		//>>>>>>>>>>>>>>>>>>>>>>This step doesnt work until manual log in to the new vm (idk why)<<<<<<<<<<<<<<<<<<<<<<<
+		//if err := writeRandomDataToGuest(ctx, client, finder, vmName, guestUser, guestPass, dataSizeMB); err != nil {
+		//	return err
+		//}
 
 		klog.Infof("VM %s is ready.", vmName)
 		return nil
@@ -284,35 +470,21 @@ func init() {
 	RootCmd.AddCommand(createVmCmd)
 
 	// Image / source flags
-	createVmCmd.Flags().StringVar(&vmdkURL, "vmdk-url", "", "VMDK URL (defaults to Ubuntu 20.04)")
+	createVmCmd.Flags().StringVar(&downloadVmdkURL, "download-vmdk-url", "", "URL to download VMDK from (defaults to Ubuntu 20.04)")
+	createVmCmd.Flags().StringVar(&localVmdkPath, "local-vmdk-path", "assets/cloudinit/ubuntu-20.04-server-cloudimg-amd64.vmdk", "Path to an already-downloaded VMDK file")
 	createVmCmd.Flags().StringVar(&vmName, "vm-name", "", "Name for the new VM")
 	createVmCmd.Flags().StringVar(&isoPath, "iso-path", "assets/cloudinit/seed.iso", "ISO path to attach as CD‑ROM")
-	createVmCmd.Flags().StringVar(&datastore, "datastore", "", "Target datastore name")
-	createVmCmd.Flags().BoolVar(&skipUpload, "skip-upload", false, "Skip uploading the VMDK if it already exists in datastore")
-
-	// VM size & placement
+	createVmCmd.Flags().StringVar(&dataStore, "data-store", "", "Target dataStore name")
+	createVmCmd.Flags().StringVar(&dataCenter, "data-center", "", "Target dataStore name")
 	createVmCmd.Flags().StringVar(&guestID, "guest-id", "ubuntu64Guest", "VM guest ID")
 	createVmCmd.Flags().IntVar(&memoryMB, "memory-mb", 2048, "Memory size (MB)")
 	createVmCmd.Flags().IntVar(&cpus, "cpus", 2, "vCPU count")
 	createVmCmd.Flags().StringVar(&network, "network", "VM Network", "Network name")
 	createVmCmd.Flags().StringVar(&pool, "pool", "Resources", "Resource pool path")
 	createVmCmd.Flags().StringVar(&cdDeviceKey, "cd-device-key", "cdrom-3000", "Virtual CD‑ROM device key")
-
-	// Credentials / connection
-	createVmCmd.Flags().StringVar(&vcURL, "vsphereUrl", "", "vCenter URL (e.g. https://vc/sdk)")
-	createVmCmd.Flags().StringVar(&vcUser, "vsphereUser", "", "vCenter username")
-	createVmCmd.Flags().StringVar(&vcPass, "vspherePassword", "", "vCenter password")
 	createVmCmd.Flags().StringVar(&guestUser, "guest-user", "fedora", "Guest OS user")
 	createVmCmd.Flags().StringVar(&guestPass, "guest-pass", "password", "Guest OS password")
-
-	// Misc
 	createVmCmd.Flags().IntVar(&dataSizeMB, "data-size-mb", 1, "Random data size (MB) to write inside guest")
-	createVmCmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 2*time.Minute, "Timeout for vCenter operations")
+	createVmCmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Timeout for vCenter operations")
 
-	// Required flags for safety
-	createVmCmd.MarkFlagRequired("vm-name")
-	createVmCmd.MarkFlagRequired("datastore")
-	createVmCmd.MarkFlagRequired("vsphereUrl")
-	createVmCmd.MarkFlagRequired("vsphereUser")
-	createVmCmd.MarkFlagRequired("vspherePassword")
 }

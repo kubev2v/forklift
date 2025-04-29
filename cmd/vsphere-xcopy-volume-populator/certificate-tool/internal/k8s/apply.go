@@ -21,7 +21,7 @@ type TemplateParams struct {
 	PodNamespace       string
 	VmdkPath           string
 	StorageVendor      string
-	storageClassName   string
+	StorageClassName   string
 }
 
 // ProcessTemplate reads a file and processes it as a Go template using the provided variables.
@@ -61,7 +61,7 @@ func (p *TemplateParams) ToMap() map[string]string {
 		"POD_NAMESPACE":        p.PodNamespace,
 		"VMDK_PATH":            p.VmdkPath,
 		"STORAGE_VENDOR":       p.StorageVendor,
-		"STORAGE_CLASS_NAME":   p.storageClassName,
+		"STORAGE_CLASS_NAME":   p.StorageClassName,
 	}
 }
 

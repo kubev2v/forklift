@@ -71,29 +71,21 @@ The Makefile will load CONFIG_FILE (static_values.yaml) and .env automatically.
    ```bash
     make prepare
    ```
-Under the hood this does:
-   ```bash
+Creates the necessary OpenShift (OCP) objects to test the vSphere populator (mimicking some MTV behavior).
 
-   ./certificate-tool   test-xcopy \
-  --kubeconfig         "$KUBECONFIG" \
-  --pvc-yaml           "assets/manifests/xcopy-setup/xcopy-pvc.yaml" \
-  --cr-yaml            "assets/manifests/xcopy-setup/cr-test-xcopy.yaml" \
-  --vmdk-path          "[ds] vm1/vm1.vmdk" \
-  --storage-vendor     "$STORAGE_VENDOR" \
-  --storage-class-name "$STORAGE_CLASS_NAME" 
+**Create VM**
+   ```bash
+    make create-vm
    ```
+Creates a VM in your configured vSphere environment.
+The VM remains powered off and no data is written to it.
 
 **End-to-end xcopy test**
    ```bash
     make test-xcopy
    ```
-Runs:
-  ```bash
-   ./certificate-tool   test-xcopy \
-  --kubeconfig         "$KUBECONFIG" \
-  --pvc-yaml           "assets/manifests/xcopy-setup/xcopy-pvc.yaml" \
-  --cr-yaml            "assets/manifests/xcopy-setup/cr-test-xcopy.yaml" \
-  --vmdk-path          "[ds] vm1/vm1.vmdk" \
-  --storage-vendor     "$STORAGE_VENDOR" \
-  --storage-class-name "$STORAGE_CLASS_NAME" 
-   ```
+
+Runs the complete xcopy test workflow.
+
+
+
