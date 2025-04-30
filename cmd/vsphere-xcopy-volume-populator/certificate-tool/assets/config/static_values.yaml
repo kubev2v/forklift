@@ -1,0 +1,14 @@
+## test values
+### cluster config
+pod-namespace: pop
+test-namespace: vsphere-populator-test
+kubeconfig: "/home/amit/.kube/config"
+secret-name: populator-secret
+controller-path: assets/manifests/xcopy-setup/controller.yaml
+test-labels: vsphere-populator
+### images
+test-image-label:  0.47
+test-populator-image: quay.io/amitos/vsphere-xcopy-volume-populator
+### storage
+storage-vendor: primera3par
+storage-class-name: xcopy-storage-class

@@ -18,6 +18,9 @@
             <parameter name="target-lun" type="string" required="true" shortname="t">
                <description>Target RDM device (e.g., /vmfs/devices/disks/naa.$8-digits-vendor$24-disk-serial-number-in-hex)</description>
             </parameter>
+            <parameter name="verify-md5" type="string" required="true" shortname="v">
+               <description>Enable head/tail hash comparison between source and target</description>
+            </parameter>
          </input-spec>
          <output-spec>
              <structure typeName="result">
@@ -28,7 +31,12 @@
          <format-parameters>
             <formatter>simple</formatter>
          </format-parameters>
-         <execute>/bin/vmkfstools-wrapper.sh -s $val{source-vmdk} -t $val{target-lun} </execute>
+         <execute>
+            /bin/vmkfstools-wrapper.sh \
+            -s $val{source-vmdk} \
+            -t $val{target-lun} \
+            -v $val{verify-md5}
+         </execute>
       </command>
    </commands>
 </plugin>

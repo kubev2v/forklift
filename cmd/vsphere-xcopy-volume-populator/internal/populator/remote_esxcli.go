@@ -53,7 +53,6 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 		return err
 	}
 	klog.Infof("Got ESXI host: %s", host)
-
 	// for iSCSI add the host to the group using IQN. Is there something else for FC?
 	r, err := p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"iscsi", "adapter", "list"})
 	if err != nil {
@@ -130,8 +129,7 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 			p.StorageApi.Map(group, lun, mappingContext)
 		}
 	}()
-
-	r, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"vmkfstools", "clone", "-s", vmDisk.Path(), "-t", targetLUN})
+	r, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"vmkfstools", "clone", "-s", vmDisk.Path(), "-t", targetLUN, "-v", "true"})
 	if err != nil {
 		klog.Infof("error during copy, response from esxcli %+v", r)
 		return err
@@ -142,7 +140,6 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 	for _, l := range r {
 		response += l.Value("message")
 	}
-
 	go func() {
 		// TODO need to process the vmkfstools stderr(probably) and to write the
 		// progress to a file, and then continuously read and report on the channel
