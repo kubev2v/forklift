@@ -120,14 +120,14 @@ func uploadVmdk(ctx context.Context, client *govmomi.Client, ds *object.Datastor
 		localFilePath,
 		ds,
 		vmdk.ImportParams{
-			Datacenter: dc,                        // required
-			Pool:       rp,                        // resource pool (nil → dc’s default)
-			Folder:     folders.VmFolder,          // VM folder for the temp VM (nil → dc root)
-			Host:       nil,                       // specific host (nil → let vCenter choose)
-			Force:      false,                     // overwrite if file already exists
-			Path:       vmName,                    // where to put the disk in the datastore
-			Type:       types.VirtualDiskTypeThin, // converts to thin/flat
-			Logger:     nil,                       // or progress func implementing soap.FileUploadProgress
+			Datacenter: dc,
+			Pool:       rp,
+			Folder:     folders.VmFolder,
+			Host:       nil,
+			Force:      false,
+			Path:       vmName,
+			Type:       types.VirtualDiskTypeThin,
+			Logger:     nil,
 		},
 	)
 	if err != nil {
@@ -155,13 +155,13 @@ func createVM(ctx context.Context, cli *govmomi.Client,
 	diskBacking.FileName = vmdkPath
 	diskBacking.DiskMode = string(types.VirtualDiskModePersistent)
 	diskBacking.ThinProvisioned = types.NewBool(true)
-	unit := int32(0) // the first unit on your new controller
+	unit := int32(0)
 
 	disk := &types.VirtualDisk{
 		CapacityInKB:    0,
 		CapacityInBytes: 0,
 		VirtualDevice: types.VirtualDevice{
-			ControllerKey: isciController.Key, // use the real controller key
+			ControllerKey: isciController.Key,
 			UnitNumber:    &unit,
 			Backing:       diskBacking,
 		},
@@ -305,13 +305,11 @@ func addDefaultSCSIController(vmConfig *types.VirtualMachineConfigSpec) *types.P
 	controller.SharedBus = types.VirtualSCSISharingNoSharing
 	controller.VirtualController.BusNumber = 0
 
-	// Create a VirtualDeviceConfigSpec for adding the controller.
 	controllerSpec := types.VirtualDeviceConfigSpec{
 		Operation: types.VirtualDeviceConfigSpecOperationAdd,
 		Device:    controller,
 	}
 
-	// Append the controller spec to the VM configuration.
 	vmConfig.DeviceChange = append(vmConfig.DeviceChange, &controllerSpec)
 
 	log.Println("Added default LSI Logic SAS controller to VM configuration")
@@ -325,7 +323,7 @@ func attachNetwork(
 	networkName string,
 ) error {
 	finder := find.NewFinder(cli.Client, false)
-	dc, err := finder.DefaultDatacenter(ctx) // datacenter the VM lives in
+	dc, err := finder.DefaultDatacenter(ctx)
 	if err != nil {
 		return fmt.Errorf("get DC: %w", err)
 	}

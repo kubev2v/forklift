@@ -51,7 +51,7 @@ A command-line utility to automate VM creation, Kubernetes populator setup, and 
    vi assets/config/static_values.yaml
 ```
 
-2. **Either edit the .env file**
+2. **Edit the .env file**
 ```bash
    vi assets/config/.env
 ```
@@ -65,6 +65,21 @@ A command-line utility to automate VM creation, Kubernetes populator setup, and 
    VSPHERE_URL
 ```
 The Makefile will load CONFIG_FILE (static_values.yaml) and .env automatically.
+
+4. **Get a  vmdk file (you can use your own or run the following script)**
+```bash
+  podman pull quay.io/amitos/fedora-vmdk
+  podman create --name fedora-vmdk-container quay.io/amitos/fedora-vmdk:latest
+  podman cp fedora-vmdk-container:/disk.img ./fedora.vmdk
+  podman rm fedora-vmdk-container
+
+```
+Update your Makefile variable
+Set the VMDK_PATH variable in your Makefile (or environment) to point to this file. For example:
+```bash
+  VMDK_PATH = ./fedora.vmdk
+```
+
 
 ## Usage Example
 **Prepare Your Cluster**

@@ -37,7 +37,7 @@ ROLE_BINDING   ?= https://raw.githubusercontent.com/kubev2v/forklift/main/operat
 VM_NAME      ?= certificate-vm1
 DATA_STORE   ?= eco-iscsi-ds1
 BINARY = certificate-tool
-
+VMDK_PATH ?= "assets/cloudinit/fedora.vmdk"
 .PHONY: help build prepare test-xcopy all clean
 
 help: ## Display this help.
@@ -86,8 +86,8 @@ create-vm: build ## Run certificate-tool create-vm subcommand.
 		--vsphere-password      "$(VSPHERE_PASSWORD)" \
 		--vsphere-url           "$(VSPHERE_URL)/sdk" \
 		--data-center           "Eco-Datacenter" \
-		--local-vmdk-path       "assets/cloudinit/fedora.vmdk" \
-		--data-store            $(DATA_STORE)
+		--local-vmdk-path        $(VMDK_PATH) \
+		--data-store             $(DATA_STORE)
 
 test-xcopy: build prepare
 	@echo "Running test-xcopy..."
