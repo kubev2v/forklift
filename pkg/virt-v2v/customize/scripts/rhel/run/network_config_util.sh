@@ -15,7 +15,7 @@ NETPLAN_DIR="${NETPLAN_DIR:-/}"
 # Dump debug strings into a new file descriptor and redirect it to stdout.
 exec 3>&1
 log() {
-    echo $@ >&3
+    echo "$@" >&3
 }
 
 # Sanity checks
