@@ -89,6 +89,17 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 						Phase:       api.StepPending,
 					},
 				})
+		case api.PhaseVirtV2vInspection:
+			pipeline = append(
+				pipeline,
+				&plan.Step{
+					Task: plan.Task{
+						Name:        VirtV2vInspection,
+						Description: "Run virt-v2v-inspector.",
+						Progress:    libitr.Progress{Total: 1},
+						Phase:       api.StepPending,
+					},
+				})
 		case api.PhaseAllocateDisks, api.PhaseCopyDisks, api.PhaseCopyDisksVirtV2V, api.PhaseConvertOpenstackSnapshot:
 			tasks, pErr := r.builder.Tasks(vm.Ref)
 			if pErr != nil {
@@ -232,6 +243,7 @@ func (r *BaseMigrator) Next(status *plan.VMStatus) (next string) {
 		}
 	} else {
 		next = step.Name
+
 	}
 	r.Log.Info("Itinerary transition", "current phase", status.Phase, "next phase", next)
 	return
@@ -247,8 +259,16 @@ func (r *BaseMigrator) ExecutePhase(vm *plan.VMStatus) (ok bool, err error) {
 func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 	switch status.Phase {
 	case api.PhaseStarted, api.PhaseCreateInitialSnapshot, api.PhaseWaitForInitialSnapshot,
-		api.PhaseStoreInitialSnapshotDeltas, api.PhaseCreateDataVolumes, api.PhaseVirtV2vInspection:
+		api.PhaseStoreInitialSnapshotDeltas:
 		step = Initialize
+	case api.PhaseVirtV2vInspection:
+		step = VirtV2vInspection
+	case api.PhaseCreateDataVolumes:
+		if ok, _ := r.Plan.ShouldUseV2vForTransfer(); ok {
+			step = DiskAllocation
+		} else {
+			step = DiskTransfer
+		}
 	case api.PhaseAllocateDisks:
 		step = DiskAllocation
 	case api.PhaseCopyDisks, api.PhaseCopyingPaused, api.PhaseRemovePreviousSnapshot, api.PhaseWaitForPreviousSnapshotRemoval,

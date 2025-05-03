@@ -19,14 +19,15 @@ var (
 
 // Steps.
 const (
-	Initialize      = "Initialize"
-	Cutover         = "Cutover"
-	DiskAllocation  = "DiskAllocation"
-	DiskTransfer    = "DiskTransfer"
-	ImageConversion = "ImageConversion"
-	DiskTransferV2v = "DiskTransferV2v"
-	VMCreation      = "VirtualMachineCreation"
-	Unknown         = "Unknown"
+	Initialize        = "Initialize"
+	Cutover           = "Cutover"
+	DiskAllocation    = "DiskAllocation"
+	DiskTransfer      = "DiskTransfer"
+	ImageConversion   = "ImageConversion"
+	DiskTransferV2v   = "DiskTransferV2v"
+	VMCreation        = "VirtualMachineCreation"
+	VirtV2vInspection = "VirtV2vInspection"
+	Unknown           = "Unknown"
 )
 
 var (
