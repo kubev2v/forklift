@@ -2517,6 +2517,11 @@ func (r *KubeVirt) secret(vmRef ref.Ref, setSecretData func(*core.Secret) error,
 				"-") + "-",
 		},
 	}
+	err = k8sutil.SetOwnerReference(r.Plan, secret, r.Scheme())
+	if err != nil {
+		// cross ns is disallowed, so ignoring this error if the plan and target
+		// are in different namespaces
+	}
 	err = setSecretData(secret)
 	return
 }

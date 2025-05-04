@@ -146,28 +146,35 @@ func newKubeClient(masterURL string, kubeconfig string) (*kubernetes.Clientset, 
 // to locate the created volume on the PVC. There is a  chance where the volume details are listed on the
 // "prime-{ORIG_PVC_NAME}" PVC because when the controller pod is handling it, the pvc prime should be bounded
 // to popoulator pod. However it is not guarnteed to be bounded at that stage and it may take time
-func getVolumeHandle(kubeClient *kubernetes.Clientset, targetNamespace, targetPVC string) (string, error) {
+func getVolumeHandle(kubeClient *kubernetes.Clientset, namespace, targetPVC string) (string, error) {
 	pvc, err := kubeClient.CoreV1().PersistentVolumeClaims(targetNamespace).Get(context.Background(), targetPVC, metav1.GetOptions{})
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch the the target persistent volume claim %q %w", pvc.Name, err)
 	}
+	var volumeName string
 	if pvc.Spec.VolumeName != "" {
-		return pvc.Spec.VolumeName, nil
+		volumeName = pvc.Spec.VolumeName
+	} else {
+		primePVCName := "prime-" + pvc.GetUID()
+		klog.Infof("the volume name is not found on the claim %q. Trying the prime pvc %q", pvc.Name, primePVCName)
+		// try pvc with postfix "prime" that the populator copies. The prime volume is created in the namespace where the populator controller runs.
+		primePVC, err := kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(context.Background(), string(primePVCName), metav1.GetOptions{})
+		if err != nil {
+			return "", fmt.Errorf("failed to fetch the the target persistent volume claim %q %w", primePVC.Name, err)
+		}
+
+		if primePVC.Spec.VolumeName == "" {
+			return "", fmt.Errorf("the volume name is not found on the prime volume claim %q", primePVC.Name)
+		}
+		volumeName = primePVC.Spec.VolumeName
 	}
 
-	primePVCName := "prime-" + pvc.GetUID()
-	klog.Infof("the volume name is not found on the claim %q. Trying the prime pvc %q", pvc.Name, primePVCName)
-	// try pvc with postfix "prime" that the populator copies. The prime volume is created in the namespace where the populator controller runs.
-	primePVC, err := kubeClient.CoreV1().PersistentVolumeClaims(targetNamespace).Get(context.Background(), string(primePVCName), metav1.GetOptions{})
+	pv, err := kubeClient.CoreV1().PersistentVolumes().Get(context.Background(), volumeName, metav1.GetOptions{})
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch the the target persistent volume claim %q %w", primePVC.Name, err)
+		return "", fmt.Errorf("failed to fetch the the target volume details %w", err)
 	}
-
-	if primePVC.Spec.VolumeName == "" {
-		return "", fmt.Errorf("the volume name is not found on the prime volume claim %q", primePVC.Name)
-	}
-	return primePVC.Spec.VolumeName, nil
-
+	klog.Infof("target volume %s volumeHandle %s", pv.Name, pv.Spec.CSI.VolumeHandle)
+	return pv.Spec.CSI.VolumeHandle, nil
 }
 
 func handleArgs() {
