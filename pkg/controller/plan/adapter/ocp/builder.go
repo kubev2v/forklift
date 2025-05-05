@@ -482,7 +482,7 @@ func (r *Builder) mapNetworks(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.Vi
 		kInterface = interfacesMap[network.Name]
 		kInterface.Name = network.Name
 		kInterface.MacAddress = ""
-		
+
 		switch {
 		case network.Multus != nil:
 			name, namespace := ocpclient.GetNetworkNameAndNamespace(network.Multus.NetworkName, &ref.Ref{Name: sourceVm.Name, Namespace: sourceVm.Namespace})
