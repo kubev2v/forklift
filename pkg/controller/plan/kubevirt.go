@@ -71,8 +71,6 @@ const (
 	AnnKubevirtValidations = "vm.kubevirt.io/validations"
 	// PVC annotation containing the name of the importer pod.
 	AnnImporterPodName = "cdi.kubevirt.io/storage.import.importPodName"
-	//  Original VM name on source (value=vmOriginalName)
-	AnnOriginalName = "original-name"
 	// Openshift display name annotation (value=vmName)
 	AnnDisplayName = "openshift.io/display-name"
 	//  Original VM name on source (value=vmOriginalID)
@@ -1465,7 +1463,6 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) 
 	//Add the original name and ID info to the VM annotations
 	if len(vm.NewName) > 0 {
 		annotations := make(map[string]string)
-		annotations[AnnOriginalName] = vm.Name
 		annotations[AnnDisplayName] = vm.Name
 		annotations[AnnOriginalID] = vm.ID
 		object.ObjectMeta.Annotations = annotations
