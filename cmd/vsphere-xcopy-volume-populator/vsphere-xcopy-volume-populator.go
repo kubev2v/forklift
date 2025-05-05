@@ -108,9 +108,7 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	// channel for progress report
-	progressCh := make(chan int)
-	// channel for quitting with output
+	progressCh := make(chan uint)
 	quitCh := make(chan error)
 
 	go p.Populate(sourceVMDKFile, volumeHandle, progressCh, quitCh)
@@ -118,14 +116,12 @@ func main() {
 	for {
 		select {
 		case p := <-progressCh:
-			// print progress
-			klog.Infof(" progress reported %d", p)
-			// call metric add code
+			klog.Infof(" progress reported %d%%", p)
 			metric := dto.Metric{}
 			if err := progressCounter.WithLabelValues(ownerUID).Write(&metric); err != nil {
 				klog.Error(err)
 			} else if float64(p) > metric.Counter.GetValue() {
-				progressCounter.WithLabelValues(ownerUID).Add(float64(p))
+				progressCounter.WithLabelValues(ownerUID).Add(float64(p) - metric.Counter.GetValue())
 			}
 		case q := <-quitCh:
 			klog.Infof("channel quit %s", q)
@@ -195,7 +191,7 @@ func handleArgs() {
 	flag.StringVar(&ownerName, "owner-name", "", "Owner Name, passed by the populator - the PVC Name")
 	flag.StringVar(&secretName, "secret-name", "", "Secret name the populator controller uses it to mount env vars from it. Not for use internally")
 	flag.StringVar(&sourceVMDKFile, "source-vmdk", "", "File name to populate")
-	flag.StringVar(&storageVendor, "storage-vendor", "vantara", "The storage vendor to work with. Current values: [vantara, ontap, primera3par]")
+	flag.StringVar(&storageVendor, "storage-vendor-product", "", "The storage vendor to work with. Current values: [vantara, ontap, primera3par]")
 	flag.StringVar(&targetNamespace, "target-namespace", "", "Contents to populate file with")
 	flag.StringVar(&storageHostname, "storage-hostname", os.Getenv("STORAGE_HOSTNAME"), "The storage vendor api hostname")
 	flag.StringVar(&storageUsername, "storage-username", os.Getenv("STORAGE_USERNAME"), "The storage vendor api username")
