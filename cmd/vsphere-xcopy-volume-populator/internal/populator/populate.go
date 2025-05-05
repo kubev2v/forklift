@@ -10,7 +10,7 @@ type Populator interface {
 	// the sourceVMDKFile.
 	// volumeHanle is the the PVC.Spec.Csi.VolumeHandle field, which by the CSI spec, represents
 	// the volume in the storage system and is set by the CSI driver
-	Populate(sourceVMDKFile string, volumeHanle string, progress chan int, quit chan error) error
+	Populate(sourceVMDKFile string, volumeHanle string, progress chan<- uint, quit chan error) error
 }
 
 // LUN describes the object in the storage system

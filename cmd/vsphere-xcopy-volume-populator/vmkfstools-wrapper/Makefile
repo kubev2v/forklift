@@ -1,6 +1,9 @@
 SHELL := /bin/bash
 
-build:
+test:
+	python vmkfstools_wrapper_test.py
+
+build: test
 	./create-vib.sh
 
 install: build

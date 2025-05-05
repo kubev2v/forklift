@@ -46,6 +46,8 @@
       register: vibs
       changed_when: false
       ignore_errors: yes
+      retries: 3
+      delay: 10
 
     - debug: var=vibs.stdout
 

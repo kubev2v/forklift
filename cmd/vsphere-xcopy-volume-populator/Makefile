@@ -38,9 +38,9 @@ build: generate fmt vet ## Build manager binary.
 test-copy-using-cli: build
 	bin/vsphere-xcopy-volume-populator \
 		--source-vmdk="[eco-iscsi-ds2] vm-1/vm-1.vmdk" \
-		--target-pvc=test-cli \
+		--owner-name=test-cli \
 		--target-namespace=default \
-		--storage-vendor=ontap \
+		--storage-vendor-product=ontap \
 		--secret-name=populator-secret \
 		--owner-uid=test-cli \
 		--kubeconfig=$$KUBECONFIG
@@ -50,7 +50,7 @@ test-copy-using-cli-3par: build
 		--source-vmdk="[eco-iscsi-ds1] boris01/boris01.vmdk" \
 	    --target-pvc=test1\
 		--target-namespace=default \
-		--storage-vendor=primera3par \
+		--storage-vendor-product=primera3par \
 		--secret-name=populator-secret \
 		--kubeconfig=$$KUBECONFIG
 
@@ -59,7 +59,7 @@ test-copy-using-cli-primera: build
 		--source-vmdk="[primera-iscsi-vmfs1] fedora/fedora.vmdk" \
 	    --target-pvc=boris-block\
 		--target-namespace=default \
-		--storage-vendor=primera3par \
+		--storage-vendor-product=primera3par \
 		--secret-name=populator-secret \
 		--kubeconfig=$$KUBECONFIG
 
