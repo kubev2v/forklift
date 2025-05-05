@@ -151,6 +151,24 @@ var osMap = map[string]string{
 	"windows2022srvNext_64Guest": "win2k22",
 }
 
+// Global list of legacy guest OS identifiers and names (OSes without native SHA-2 support)
+var legacyIdentifiers = []string{
+	"windows xp",
+	"winXPProGuest",
+	"server 2003",
+	"winNetEnterpriseGuest",
+	"winNetStandardGuest",
+	"winNetEnterprise64Guest",
+	"vista",
+	"windowsVistaGuest",
+	"server 2008",
+	"longhornGuest",
+	"windows 7",
+	"windows7Guest",
+	"server 2008 r2",
+	"windows7Server64Guest",
+}
+
 // Regex which matches the snapshot identifier suffix of a
 // vSphere disk backing file.
 var backingFilePattern = regexp.MustCompile(`-\d\d\d\d\d\d.vmdk`)
@@ -206,6 +224,19 @@ func (r *Builder) ConfigMap(_ ref.Ref, _ *core.Secret, _ *core.ConfigMap) (err e
 	return
 }
 
+func IsLegacyWindows(vm *model.VM) bool {
+
+	guestID := strings.ToLower(vm.GuestID)
+	guestName := strings.ToLower(vm.GuestName)
+
+	for _, id := range legacyIdentifiers {
+		if strings.Contains(guestID, id) || strings.Contains(guestName, id) {
+			return true
+		}
+	}
+	return false
+}
+
 func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env []core.EnvVar, err error) {
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
@@ -226,6 +257,20 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		env = append(env, core.EnvVar{
 			Name:  "V2V_preserveStaticIPs",
 			Value: "true",
+		})
+	}
+
+	useLegacyDrivers := false
+	if r.Plan.Spec.InstallLegacyDrivers == nil {
+		useLegacyDrivers = IsLegacyWindows(vm)
+	} else {
+		useLegacyDrivers = *r.Plan.Spec.InstallLegacyDrivers
+	}
+
+	if useLegacyDrivers {
+		env = append(env, core.EnvVar{
+			Name:  "VIRTIO_WIN",
+			Value: "/usr/local/virtio-win.iso",
 		})
 	}
 
