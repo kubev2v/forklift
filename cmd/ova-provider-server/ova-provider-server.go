@@ -124,6 +124,7 @@ type Envelope struct {
 type VM struct {
 	Name                  string
 	OvaPath               string
+	OvaSource             string
 	OsType                string
 	RevisionValidated     int64
 	PolicyVersion         int
