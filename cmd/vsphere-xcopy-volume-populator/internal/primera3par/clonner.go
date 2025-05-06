@@ -21,8 +21,8 @@ func NewPrimera3ParClonner(storageHostname, storageUsername, storagePassword str
 }
 
 // EnsureClonnerIgroup creates or update an initiator group with the clonnerIqn
-func (c *Primera3ParClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn string) (populator.MappingContext, error) {
-	hostName, err := c.client.EnsureHostWithIqn(clonnerIqn)
+func (c *Primera3ParClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn []string) (populator.MappingContext, error) {
+	hostName, err := c.client.EnsureHostWithIqn(clonnerIqn[0])
 	if err != nil {
 		return nil, fmt.Errorf("failed to ensure host with IQN: %w", err)
 	}

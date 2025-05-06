@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
@@ -59,20 +60,46 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 	if err != nil {
 		return err
 	}
-	esxIQN := ""
-	for _, a := range r {
-		// get the first adapter iqn
-		iqnValue, ok := a["UID"]
-		if !ok || len(iqnValue) == 0 {
-			return fmt.Errorf("failed to extract the IQN from the adapter item%s", a)
+	uniqueUIDs := make(map[string]bool)
+	hbaUIDs := []string{}
+
+	// Print the adapter information for debugging
+	for i, val := range r {
+		klog.Infof("Adapter [%d]: %+v", i, val)
+		for key, field := range val {
+			klog.Infof("  %s: %v", key, field)
 		}
-		esxIQN = iqnValue[0]
-		klog.Infof("iSCSI adapter IQN %s", esxIQN)
 	}
 
-	mappingContext, err := p.StorageApi.EnsureClonnerIgroup(xcopyInitiatorGroup, esxIQN)
+	for _, a := range r {
+		driver, hasDriver := a["Driver"]
+		linkState, hasLink := a["LinkState"]
+		uid, hasUID := a["UID"]
+
+		if !hasDriver || !hasLink || !hasUID || len(driver) == 0 || len(linkState) == 0 || len(uid) == 0 {
+			continue
+		}
+
+		drv := driver[0]
+		link := linkState[0]
+		id := uid[0]
+
+		// Check if the UID is FC, iSCSI or NVMe-oF
+		isTargetUID := strings.HasPrefix(id, "fc.") || strings.HasPrefix(id, "iqn.") || strings.HasPrefix(id, "nqn.")
+
+		if link == "link-up" && isTargetUID {
+			if _, exists := uniqueUIDs[id]; !exists {
+				uniqueUIDs[id] = true
+				hbaUIDs = append(hbaUIDs, id)
+				klog.Infof("Storage Adapter UID: %s (Driver: %s)", id, drv)
+			}
+		}
+	}
+
+	mappingContext, err := p.StorageApi.EnsureClonnerIgroup(xcopyInitiatorGroup, hbaUIDs)
+
 	if err != nil {
-		return fmt.Errorf("failed to add the ESX IQN %s to the initiator group %w", esxIQN, err)
+		return fmt.Errorf("failed to add the ESX HBA UID %s to the initiator group %w", hbaUIDs, err)
 	}
 
 	lun, err := p.StorageApi.ResolveVolumeHandleToLUN(volumeHandle)

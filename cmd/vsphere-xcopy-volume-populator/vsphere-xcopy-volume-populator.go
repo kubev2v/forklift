@@ -15,6 +15,7 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/ontap"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/primera3par"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vantara"
 
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
@@ -63,6 +64,12 @@ func main() {
 
 	var storageApi populator.StorageApi
 	switch storageVendor {
+	case "vantara":
+		sm, err := vantara.NewVantaraClonner(storageHostname, storageUsername, storagePassword)
+		if err != nil {
+			klog.Fatalf("failed to initialize vantara storage mapper with %s", err)
+		}
+		storageApi = &sm
 	case "ontap":
 		sm, err := ontap.NewNetappClonner(storageHostname, storageUsername, storagePassword)
 		if err != nil {
@@ -151,23 +158,30 @@ func getVolumeHandle(kubeClient *kubernetes.Clientset, targetNamespace, targetPV
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch the the target persistent volume claim %q %w", pvc.Name, err)
 	}
+	var volumeName string
 	if pvc.Spec.VolumeName != "" {
-		return pvc.Spec.VolumeName, nil
+		volumeName = pvc.Spec.VolumeName
+	} else {
+		primePVCName := "prime-" + pvc.GetUID()
+		klog.Infof("the volume name is not found on the claim %q. Trying the prime pvc %q", pvc.Name, primePVCName)
+		// try pvc with postfix "prime" that the populator copies. The prime volume is created in the namespace where the populator controller runs.
+		primePVC, err := kubeClient.CoreV1().PersistentVolumeClaims(targetNamespace).Get(context.Background(), string(primePVCName), metav1.GetOptions{})
+		if err != nil {
+			return "", fmt.Errorf("failed to fetch the the target persistent volume claim %q %w", primePVC.Name, err)
+		}
+
+		if primePVC.Spec.VolumeName == "" {
+			return "", fmt.Errorf("the volume name is not found on the prime volume claim %q", primePVC.Name)
+		}
+		volumeName = primePVC.Spec.VolumeName
 	}
 
-	primePVCName := "prime-" + pvc.GetUID()
-	klog.Infof("the volume name is not found on the claim %q. Trying the prime pvc %q", pvc.Name, primePVCName)
-	// try pvc with postfix "prime" that the populator copies. The prime volume is created in the namespace where the populator controller runs.
-	primePVC, err := kubeClient.CoreV1().PersistentVolumeClaims(targetNamespace).Get(context.Background(), string(primePVCName), metav1.GetOptions{})
+	pv, err := kubeClient.CoreV1().PersistentVolumes().Get(context.Background(), volumeName, metav1.GetOptions{})
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch the the target persistent volume claim %q %w", primePVC.Name, err)
+		return "", fmt.Errorf("failed to fetch the the target volume details %w", err)
 	}
-
-	if primePVC.Spec.VolumeName == "" {
-		return "", fmt.Errorf("the volume name is not found on the prime volume claim %q", primePVC.Name)
-	}
-	return primePVC.Spec.VolumeName, nil
-
+	klog.Infof("target volume %s volumeHandle %s", pv.Name, pv.Spec.CSI.VolumeHandle)
+	return pv.Spec.CSI.VolumeHandle, nil
 }
 
 func handleArgs() {
@@ -181,7 +195,7 @@ func handleArgs() {
 	flag.StringVar(&ownerName, "owner-name", "", "Owner Name, passed by the populator - the PVC Name")
 	flag.StringVar(&secretName, "secret-name", "", "Secret name the populator controller uses it to mount env vars from it. Not for use internally")
 	flag.StringVar(&sourceVMDKFile, "source-vmdk", "", "File name to populate")
-	flag.StringVar(&storageVendor, "storage-vendor", "ontap", "The storage vendor to work with. Current values: [ontap, primera3par]")
+	flag.StringVar(&storageVendor, "storage-vendor", "vantara", "The storage vendor to work with. Current values: [vantara, ontap, primera3par]")
 	flag.StringVar(&targetNamespace, "target-namespace", "", "Contents to populate file with")
 	flag.StringVar(&storageHostname, "storage-hostname", os.Getenv("STORAGE_HOSTNAME"), "The storage vendor api hostname")
 	flag.StringVar(&storageUsername, "storage-username", os.Getenv("STORAGE_USERNAME"), "The storage vendor api username")
