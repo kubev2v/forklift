@@ -1,0 +1,61 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vib-installer
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      initContainers:
+      - name: files-extractor
+        image: quay.io/rgolangh/vsphere-xcopy-volume-populator:devel
+        command: ["sh", "-c"]
+        args:
+        - |
+          set -ex
+          cp -v /bin/vmkfstools-wrapper.vib /copy-offload
+          cp -v /bin/vib-install-playbook.yaml /copy-offload
+          cp -v /bin/esxi_hosts.yaml /copy-offload
+        volumeMounts:
+        - name: shared-data
+          mountPath: /copy-offload
+      containers:
+      - name: playbook-runner 
+        image: ghcr.io/ansible-community/community-ee-base:2.18.3-1
+        envFrom:
+        - secretRef:
+            # a secret with vsphere credentials
+            name: eco-vsphere-fc4xh
+        command: ["bash", "-c"]
+        args:
+        - |
+          set -ex
+          env
+          cp -v /copy-offload/* .
+          ls -la
+          export ANSIBLE_LOCAL_TEMP=/tmp/.ansible
+          export CONNECTION_PASSWORD_FILE=/ssh-keys/esx_password_file
+          ansible-playbook vib-install-playbook.yaml -i esxi_hosts.yaml
+        volumeMounts:
+          - name: shared-data
+            mountPath: /copy-offload
+          - name: ssh-keys 
+            mountPath: /ssh-keys
+            readOnly: true
+      volumes:
+          # a shared space for the vib artifact and playbooks
+        - name: shared-data
+          emptyDir: {}
+        - name: ssh-keys
+          secret:
+            secretName: esx-ssh
+  backoffLimit: 1
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: esx-ssh
+  namespace: openshift-mtv
+data:
+  esx_password_file: 
+type: Opaque
