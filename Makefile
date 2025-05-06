@@ -295,7 +295,7 @@ push-all-images:  push-api-image \
                   push-populator-controller-image \
                   push-ovirt-populator-image \
                   push-openstack-populator-image\
-                  push-vsphere-xcoy-volume-populator-image\
+                  push-vsphere-xcopy-volume-populator-image\
                   push-ova-provider-server-image \
                   push-operator-bundle-image \
                   push-operator-index-image
