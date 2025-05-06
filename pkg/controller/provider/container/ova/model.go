@@ -210,6 +210,9 @@ func (r *VMAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 			} else if vm.OvaPath != m.OvaPath {
 				vm.ApplyTo(m)
 				err = tx.Update(m)
+			} else if vm.OvaSource != m.OvaSource {
+				vm.ApplyTo(m)
+				err = tx.Update(m)
 			}
 			return
 		}
