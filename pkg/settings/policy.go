@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"errors"
 	"os"
 )
 
@@ -38,7 +39,7 @@ func (r *PolicyAgent) Load() (err error) {
 	// TLS
 	if s, found := os.LookupEnv(PolicyAgentCA); found {
 		r.TLS.CA = s
-	} else {
+	} else if _, err := os.Stat(ServiceCAFile); !errors.Is(err, os.ErrNotExist) {
 		r.TLS.CA = ServiceCAFile
 	}
 	r.Limit.Worker, err = getPositiveEnvLimit(PolicyAgentWorkerLimit, 10)
