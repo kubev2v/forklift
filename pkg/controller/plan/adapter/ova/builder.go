@@ -494,6 +494,9 @@ func getDiskSourcePath(filePath string) string {
 }
 
 func getResourceCapacity(capacity int64, units string) (int64, error) {
+	if strings.ToLower(units) == "megabytes" {
+		return capacity * (1 << 20), nil
+	}
 	items := strings.Split(units, "*")
 	for i := range items {
 		item := strings.TrimSpace(items[i])
