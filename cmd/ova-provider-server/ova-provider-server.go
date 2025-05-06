@@ -435,8 +435,8 @@ const (
 	Unknown    = "Unknown"
 	VMware     = "VMware"
 	VirtualBox = "VirtualBox"
-	RHV        = "RHV"
 	Xen        = "Xen"
+	Ovirt      = "oVirt"
 )
 
 // Check the OVF XML for any markers that might cause import problems later on.
@@ -447,6 +447,7 @@ func guessOvaSource(envelope Envelope) string {
 		"http://schemas.citrix.com/ovf/envelope/1": Xen,
 		"http://www.citrix.com/xenclient/ovf/1":    Xen,
 		"http://www.virtualbox.org/ovf/machine":    VirtualBox,
+		"http://www.ovirt.org/ovf":                 Ovirt,
 	}
 
 	foundVMware := false
