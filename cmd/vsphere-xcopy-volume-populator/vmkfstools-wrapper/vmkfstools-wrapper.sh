@@ -1,5 +1,7 @@
 #!/bin/sh
 
+trap 'log' INT TERM HUP QUIT
+
 # This tool must return the output in xml format that complies with the
 # definitions set in esxcli-vmkfstools.xml
 reply() {
@@ -20,6 +22,17 @@ EOF
 # Function to display usage instructions
 usage() {
     reply 1 "Usage: $0 -s <source-vmdk> -t <target-lun>"
+}
+
+log() {
+    # log statements in 2 forms:
+    # 1. log this is my log message
+    # 2. echo this is my log message | log
+    # if the argument list is empty try to use stdin
+    file="/var/log/vmkfstools-wrapper.log"
+    message="${*:-$(cat <&0)}"
+    # format is [year-month-day:time] [shell ID] MESSAGE
+    printf "%s [%s] INFO: %s\n" "$(date +%Y-%m-%dT%H:%M:%S%z)" "${$}" "${message}" >> $file 2>&1
 }
 
 # Initialize variables for the flags
@@ -52,12 +65,12 @@ exit_code=$?
 # Squeeze all to a single line, otherwise the output parsing in the xml will fail
 output=$(/bin/echo $output | /bin/sed -e ':a;N;$!ba;s/\n/ /g')
 
-echo "cleaning the resulting rdm file $resulting_rdm_file" >> /var/log/vmkfstools-wrapper.log 2>&1
+log "cleaning the resulting rdm file $resulting_rdm_file"
 # cleanup the resulting rdm file, it is not needed
-rm -f "$resulting_rdm_file" >> /var/log/vmkfstools-wrapper.log 2>&1
+rm -f "$resulting_rdm_file" 2>&1 | log
 
-echo "check the file $resulting_rdm_file doesn't exists" >> /var/log/vmkfstools-wrapper.log 2>&1
-ls -la "$resulting_rdm_file" >> /var/log/vmkfstools-wrapper.log 2>&1
+log "check the file $resulting_rdm_file doesn't exists"
+find "$resulting_rdm_file" 2>&1 | log
 
 reply $exit_code "$output"
 
