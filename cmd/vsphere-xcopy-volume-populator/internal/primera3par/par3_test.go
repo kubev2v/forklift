@@ -20,7 +20,7 @@ func TestPrimera3ParClonner(t *testing.T) {
 	mockClient.Volumes[targetLUN.Name] = targetLUN
 
 	t.Run("Ensure Clonner Igroup", func(t *testing.T) {
-		_, err := clonner.EnsureClonnerIgroup(initiatorGroup, targetLUN.IQN)
+		_, err := clonner.EnsureClonnerIgroup(initiatorGroup, []string{targetLUN.IQN})
 		assert.NoError(t, err, "Expected no error when ensuring Clonner Igroup")
 		_, hostExists := mockClient.Hosts["mock-host-"+targetLUN.IQN]
 		assert.True(t, hostExists, "Expected host to exist")

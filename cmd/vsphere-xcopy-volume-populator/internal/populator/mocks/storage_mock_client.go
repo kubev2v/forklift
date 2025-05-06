@@ -56,7 +56,7 @@ func (mr *MockStorageApiMockRecorder) CurrentMappedGroups(targetLUN, context any
 }
 
 // EnsureClonnerIgroup mocks base method.
-func (m *MockStorageApi) EnsureClonnerIgroup(initiatorGroup, clonnerIqn string) (populator.MappingContext, error) {
+func (m *MockStorageApi) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn []string) (populator.MappingContext, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "EnsureClonnerIgroup", initiatorGroup, clonnerIqn)
 	ret0, _ := ret[0].(populator.MappingContext)

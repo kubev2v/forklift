@@ -17,10 +17,6 @@ type Populator interface {
 type LUN struct {
 	//Name is the volume name or just name in the storage system
 	Name string
-	// target's IQN
-	IQN string
-	// the volume handle as set by the CSI driver field spec.volumeHandle
-	VolumeHandle string
 	// naa
 	NAA string
 	// SerialNumber is a representation of the disk. With combination of the
@@ -28,6 +24,18 @@ type LUN struct {
 	// under /dev/disk/by-id/ with some prefix or postfix, depending on the udev rule
 	// and can also be found by lsblk -o name,serial
 	SerialNumber string
+	// target's IQN
+	IQN string
+	// Storage provider ID in hex
+	ProviderID string
+	// the volume handle as set by the CSI driver field spec.volumeHandle
+	VolumeHandle string
+	//  Logical device ID of the volume
+	LDeviceID string
+	// Storage device Serial Number
+	StorageSerialNumber string
+	// Storage Protocol
+	Protocol string
 }
 
 // VMDisk is the target VMDisk in vmware
@@ -35,10 +43,11 @@ type VMDisk struct {
 	VMName     string
 	Datacenter string
 	VmdkFile   string
+	VmnameDir  string
 }
 
 func (d *VMDisk) Path() string {
-	return fmt.Sprintf("/vmfs/volumes/%s/%s/%s", d.Datacenter, d.VMName, d.VmdkFile)
+	return fmt.Sprintf("/vmfs/volumes/%s/%s/%s", d.Datacenter, d.VmnameDir, d.VmdkFile)
 }
 
 func ParseVmdkPath(vmdkPath string) (VMDisk, error) {
@@ -48,10 +57,14 @@ func ParseVmdkPath(vmdkPath string) (VMDisk, error) {
 	}
 	datastore := strings.TrimPrefix(parts[0], "[")
 	pathParts := strings.SplitN(parts[1], "/", 2)
+
 	if len(pathParts) != 2 {
 		return VMDisk{}, fmt.Errorf("Invalid vmdkPath %q, should be '[datastore] vmname/vmname.vmdk'", vmdkPath)
 	}
-	vmname := pathParts[0]
+
+	vmname_dir := pathParts[0]
 	vmdk := pathParts[1]
-	return VMDisk{VMName: vmname, Datacenter: datastore, VmdkFile: vmdk}, nil
+	vmdkParts := strings.SplitN(vmdk, ".", 2)
+	vmname_sub := vmdkParts[0]
+	return VMDisk{VMName: vmname_sub, Datacenter: datastore, VmdkFile: vmdk, VmnameDir: vmname_dir}, nil
 }
