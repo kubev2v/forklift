@@ -2,6 +2,7 @@ package vsphere
 
 import (
 	"fmt"
+
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
@@ -296,7 +297,8 @@ func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, m
 	return true, "", "", nil
 }
 
-// Validate that we have information about static IPs for every virtual NIC
+// Validate that we have information about static IPs for every guest network.
+// Virtual nics are not required to have a static IP.
 func (r *Validator) StaticIPs(vmRef ref.Ref) (ok bool, err error) {
 	if !r.plan.Spec.PreserveStaticIPs {
 		return true, nil
@@ -308,9 +310,9 @@ func (r *Validator) StaticIPs(vmRef ref.Ref) (ok bool, err error) {
 		return
 	}
 
-	for _, nic := range vm.NICs {
+	for _, guestNetwork := range vm.GuestNetworks {
 		found := false
-		for _, guestNetwork := range vm.GuestNetworks {
+		for _, nic := range vm.NICs {
 			if nic.MAC == guestNetwork.MAC {
 				found = true
 				break

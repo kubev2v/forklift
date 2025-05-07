@@ -100,12 +100,12 @@ var _ = Describe("vsphere validation tests", func() {
 			},
 
 			// Directly declare entries here
-			Entry("when the vm doesn't have static ips, and the plan set with static ip", "test", true, true),
+			Entry("when the vm doesn't have static ips, and the plan set with static ip", "test", true, false),
 			Entry("when the vm doesn't have static ips, and the plan set without static ip", "test", false, false),
 			Entry("when the vm have static ips, and the plan set with static ip", "full_guest_network", true, false),
 			Entry("when the vm have static ips, and the plan set without static ip", "test", false, false),
 			Entry("when the vm doesn't have static ips, and the plan set without static ip, vm is non-windows", "not_windows_guest", false, false),
-			Entry("when the vm doesn't have static ips, and the plan set with static ip, vm is non-windows", "not_windows_guest", true, true),
+			Entry("when the vm doesn't have static ips, and the plan set with static ip, vm is non-windows", "not_windows_guest", true, false),
 			Entry("when the vm doesn't exist", "missing_from_invetory", true, true),
 		)
 	})
