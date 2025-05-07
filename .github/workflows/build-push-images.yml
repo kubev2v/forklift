@@ -97,6 +97,7 @@ jobs:
           tags: ${{ env.REGISTRY }}/${{ env.REGISTRY_ORG }}/forklift-operator-bundle:${{ env.REGISTRY_TAG }}
           build-args: |
             VERSION=${{ env.VERSION }}
+            STREAM=dev
 
   build_push_index:
     runs-on: ubuntu-latest
