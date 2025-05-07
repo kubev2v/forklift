@@ -1,0 +1,10 @@
+packages:
+  - python3-ovirt-engine-sdk4
+  - ovirt-imageio-client
+contentOrigin:
+  repofiles:
+    - ./redhat.repo
+context:
+  containerfile:
+    file: ../../build/ovirt-populator/Containerfile-downstream
+arches: [x86_64]
