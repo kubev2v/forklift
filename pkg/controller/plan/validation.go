@@ -9,7 +9,6 @@ import (
 	"net"
 	"path"
 	"strconv"
-	"strings"
 
 	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
@@ -75,7 +74,15 @@ const (
 	ValidatingVDDK                = "ValidatingVDDK"
 	VDDKInitImageNotReady         = "VDDKInitImageNotReady"
 	VDDKInitImageUnavailable      = "VDDKInitImageUnavailable"
-	NetMapOrder                   = "NetworkMapUnordered"
+)
+
+// Categories
+const (
+	Required = libcnd.Required
+	Advisory = libcnd.Advisory
+	Critical = libcnd.Critical
+	Error    = libcnd.Error
+	Warn     = libcnd.Warn
 )
 
 // Reasons
@@ -553,24 +560,6 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Items:    []string{},
 	}
 	var sharedDisksConditions []libcnd.Condition
-
-	unorderedNics := libcnd.Condition{
-		Type:     NetMapOrder,
-		Status:   True,
-		Reason:   NotValid,
-		Category: api.CategoryWarn,
-		Message:  "VM network mapping is unordered, this can cause the interface names to be different after migration.",
-		Items:    []string{},
-	}
-	unEvenNicsToNetwork := libcnd.Condition{
-		Type:     NetMapOrder,
-		Status:   True,
-		Reason:   NotValid,
-		Category: api.CategoryWarn,
-		Message:  "VM nics number per plan's network number are unequal, names might not be preserved.",
-		Items:    []string{},
-	}
-
 	setOf := map[string]bool{}
 	setOfTargetName := map[string]bool{}
 	//
@@ -656,21 +645,6 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			}
 			if !ok {
 				multiplePodNetworkMappings.Items = append(multiplePodNetworkMappings.Items, ref.String())
-			}
-			if len(plan.Spec.VMs) == 1 {
-
-				ok, correctOrder, err := validator.NetworkMappingOrder(*ref)
-				if err != nil {
-					return err
-				}
-				if !ok {
-					if len(correctOrder) == 0 {
-						unEvenNicsToNetwork.Items = append(unEvenNicsToNetwork.Items, ref.String())
-					} else {
-						unorderedNics.Message = fmt.Sprintf("%s\n Expected order: %s", unorderedNics.Message, strings.Join(correctOrder, ", "))
-						unorderedNics.Items = append(unorderedNics.Items, ref.String())
-					}
-				}
 			}
 		}
 		if plan.Referenced.Map.Storage != nil {
@@ -846,12 +820,6 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(targetNameNotUnique.Items) > 0 {
 		plan.Status.SetCondition(targetNameNotUnique)
-	}
-	if len(unorderedNics.Items) > 0 {
-		plan.Status.SetCondition(unorderedNics)
-	}
-	if len(unEvenNicsToNetwork.Items) > 0 {
-		plan.Status.SetCondition(unEvenNicsToNetwork)
 	}
 
 	return nil
