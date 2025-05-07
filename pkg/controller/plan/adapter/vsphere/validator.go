@@ -2,8 +2,6 @@ package vsphere
 
 import (
 	"fmt"
-	"sort"
-
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
@@ -33,57 +31,6 @@ func (r *Validator) Load() (err error) {
 func (r *Validator) WarmMigration() (ok bool) {
 	ok = true
 	return
-}
-
-// Validate the VM's network mapping order.
-func (r *Validator) NetworkMappingOrder(vmRef ref.Ref) (ok bool, correctOrder []string, err error) {
-	if !r.plan.Spec.PreserveStaticIPs {
-		return true, nil, nil
-	}
-	if r.plan.Referenced.Map.Network == nil {
-		return false, nil, nil
-	}
-
-	vm := &model.VM{}
-	err = r.inventory.Find(vm, vmRef)
-	if err != nil {
-		return false, nil, liberr.Wrap(err, "vm", vmRef.String())
-	}
-
-	mapping := r.plan.Referenced.Map.Network.Spec.Map
-
-	// Ensure both lists are of equal length
-	if len(vm.NICs) != len(mapping) {
-		return false, []string{}, nil
-	}
-	// Sorting NICs by Order
-	sort.Slice(vm.NICs, func(i, j int) bool {
-		return vm.NICs[i].Index < vm.NICs[j].Index
-	})
-
-	// Create a slice to store the correct order of network IDs
-	correctOrder = make([]string, len(vm.NICs))
-	for i, nic := range vm.NICs {
-		correctOrder[i] = nic.Network.ID
-	}
-
-	// Iterate by index to ensure one-to-one mapping
-	for i := range mapping {
-		mapped := &mapping[i]
-		network := &model.Network{}
-		// Fetch the network at the corresponding index
-		fErr := r.inventory.Find(network, mapped.Source)
-		if fErr != nil {
-			return false, nil, fErr
-		}
-
-		// Ensure NIC and network IDs match exactly at the same index
-		if vm.NICs[i].Network.ID != network.ID {
-			return false, correctOrder, nil // Mismatch found, return the failing NIC
-		}
-	}
-
-	return true, nil, nil
 }
 
 // Validate that a VM's networks have been mapped.
