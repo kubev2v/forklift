@@ -142,8 +142,6 @@ type Validator interface {
 	DirectStorage(vmRef ref.Ref) (bool, error)
 	// Validate that a VM's networks have been mapped.
 	NetworksMapped(vmRef ref.Ref) (bool, error)
-	// Validate the network mapping order.
-	NetworkMappingOrder(vmRef ref.Ref) (bool, []string, error)
 	// Validate that a VM's Host isn't in maintenance mode.
 	MaintenanceMode(vmRef ref.Ref) (bool, error)
 	// Validate whether warm migration is supported from this provider type.
