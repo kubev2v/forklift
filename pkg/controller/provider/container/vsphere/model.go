@@ -551,6 +551,35 @@ func (v *VmAdapter) Model() model.Model {
 	return &v.model
 }
 
+// SortNICsByGuestNetworkOrder reorders vm.NICs to match the MAC address order of vm.GuestNetworks.
+func SortNICsByGuestNetworkOrder(vm *model.VM) {
+	// Create a map from MAC address to its first index in GuestNetworks
+	macToDevice := make(map[string]int)
+	for _, gn := range vm.GuestNetworks {
+		if _, exists := macToDevice[gn.MAC]; !exists {
+			macToDevice[gn.MAC], _ = strconv.Atoi(gn.Device)
+		}
+	}
+
+	// Sort NICs based on the order in GuestNetworks
+	sort.SliceStable(vm.NICs, func(i, j int) bool {
+		iIdx, iOk := macToDevice[vm.NICs[i].MAC]
+		jIdx, jOk := macToDevice[vm.NICs[j].MAC]
+
+		switch {
+		case iOk && jOk:
+			return iIdx < jIdx
+		case iOk:
+			return true
+		case jOk:
+			return false
+		default:
+			// Fall back to NIC.Index if neither is in GuestNetworks
+			return vm.NICs[i].Index < vm.NICs[j].Index
+		}
+	})
+}
+
 // Apply the update to the model.
 func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 	// ctkPerDisk map - CBT enabled disks, we need this here to update the model.Disks
@@ -741,6 +770,10 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 					// when the vm goes down, we get an update with empty values - the following check keeps the previously reported data.
 					if len(guestNetworksList) > 0 {
 						v.model.GuestNetworks = guestNetworksList
+
+						if len(v.model.NICs) > 0 {
+							SortNICsByGuestNetworkOrder(&v.model)
+						}
 					}
 				}
 			case fGuestIpStack:
@@ -773,6 +806,7 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				if devArray, cast := p.Val.(types.ArrayOfVirtualDevice); cast {
 					devList := []model.Device{}
 					nicList := []model.NIC{}
+					nicsIndex := 0
 					for _, dev := range devArray.VirtualDevice {
 						var nic *types.VirtualEthernetCard
 						switch device := dev.(type) {
@@ -819,12 +853,14 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 							nicList = append(
 								nicList,
 								model.NIC{
-									MAC: strings.ToLower(nic.MacAddress),
+									MAC:   strings.ToLower(nic.MacAddress),
+									Index: nicsIndex,
 									Network: model.Ref{
 										Kind: model.NetKind,
 										ID:   network,
 									},
 								})
+							nicsIndex++
 						}
 					}
 					v.model.Devices = devList
@@ -834,6 +870,9 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 
 					if len(ctkPerDisk) > 0 {
 						isCBTEnabledForDisks(ctkPerDisk, v.model.Disks)
+					}
+					if len(v.model.GuestNetworks) > 0 {
+						SortNICsByGuestNetworkOrder(&v.model)
 					}
 				}
 			}
