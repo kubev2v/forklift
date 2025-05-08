@@ -48,7 +48,7 @@ type EsxCli interface {
 
 type RemoteEsxcliPopulator struct {
 	VSphereClient vmware.Client
-	StorageApi    StorageApi
+	StorageApi    VMDKCapable
 	// SSH-related fields (only used when using SSH method)
 	SSHPrivateKey []byte
 	SSHPublicKey  []byte
@@ -56,7 +56,7 @@ type RemoteEsxcliPopulator struct {
 	SSHTimeout    time.Duration
 }
 
-func NewWithRemoteEsxcli(storageApi StorageApi, vsphereHostname, vsphereUsername, vspherePassword string) (Populator, error) {
+func NewWithRemoteEsxcli(storageApi VMDKCapable, vsphereHostname, vsphereUsername, vspherePassword string) (Populator, error) {
 	c, err := vmware.NewClient(vsphereHostname, vsphereUsername, vspherePassword)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create vmware client: %w", err)
@@ -69,7 +69,7 @@ func NewWithRemoteEsxcli(storageApi StorageApi, vsphereHostname, vsphereUsername
 	}, nil
 }
 
-func NewWithRemoteEsxcliSSH(storageApi StorageApi, vsphereHostname, vsphereUsername, vspherePassword string, sshPrivateKey, sshPublicKey []byte, sshTimeoutSeconds int) (Populator, error) {
+func NewWithRemoteEsxcliSSH(storageApi VMDKCapable, vsphereHostname, vsphereUsername, vspherePassword string, sshPrivateKey, sshPublicKey []byte, sshTimeoutSeconds int) (Populator, error) {
 	c, err := vmware.NewClient(vsphereHostname, vsphereUsername, vspherePassword)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create vmware client: %w", err)

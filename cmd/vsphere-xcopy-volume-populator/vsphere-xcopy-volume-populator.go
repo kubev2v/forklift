@@ -149,46 +149,49 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	var p populator.Populator
+	// Load populator settings from environment
+	settings := populator.NewPopulatorSettingsFromEnv()
 
-	// Determine clone method - default to VIB unless SSH is explicitly set
-	methodStr := strings.ToLower(strings.TrimSpace(esxiCloneMethod))
-	var method populator.CloneMethod
-
-	switch methodStr {
-	case "", string(populator.CloneMethodVIB):
-		method = populator.CloneMethodVIB
-	case string(populator.CloneMethodSSH):
-		method = populator.CloneMethodSSH
-	default:
-		klog.Fatalf("Invalid ESXI_CLONE_METHOD: '%s'. Valid values are: '' (default), '%s', '%s'", methodStr, populator.CloneMethodVIB, populator.CloneMethodSSH)
+	// Create populator selector
+	selector, err := populator.NewPopulatorSelector(
+		storageApi,
+		settings,
+		vsphereHostname,
+		vsphereUsername,
+		vspherePassword,
+	)
+	if err != nil {
+		klog.Fatalf("Failed to create populator selector: %s", err)
 	}
 
-	useVibMethod := method != populator.CloneMethodSSH
-
-	if useVibMethod {
-		klog.Infof("Using %s method for ESXi cloning", method)
-		vibP, err := populator.NewWithRemoteEsxcli(storageApi, vsphereHostname, vsphereUsername, vspherePassword)
-		if err != nil {
-			klog.Fatalf("Failed to create %s-based remote esxcli populator: %s", method, err)
-		}
-		p = vibP
-	} else {
-		klog.Infof("Using %s method for ESXi cloning", method)
-		// Get SSH keys from environment variables set by provider controller
+	// Prepare SSH config if needed
+	var sshConfig *populator.SSHConfig
+	methodStr := strings.ToLower(strings.TrimSpace(esxiCloneMethod))
+	if methodStr == string(populator.CloneMethodSSH) {
 		sshPrivateKey, sshPublicKey, err := getSSHKeysFromEnvironment()
 		if err != nil {
 			klog.Fatalf("Failed to get SSH keys from environment: %s", err)
 		}
-		klog.Infof("Debug: SSH keys retrieved, private key length: %d, public key length: %d", len(sshPrivateKey), len(sshPublicKey))
-
-		sshP, err := populator.NewWithRemoteEsxcliSSH(storageApi, vsphereHostname, vsphereUsername, vspherePassword, sshPrivateKey, sshPublicKey, sshTimeoutSeconds)
-		if err != nil {
-			klog.Fatalf("Failed to create %s-based remote esxcli populator: %s", method, err)
+		klog.Infof("SSH keys retrieved, private key length: %d, public key length: %d", len(sshPrivateKey), len(sshPublicKey))
+		sshConfig = &populator.SSHConfig{
+			UseSSH:         true,
+			PrivateKey:     sshPrivateKey,
+			PublicKey:      sshPublicKey,
+			TimeoutSeconds: sshTimeoutSeconds,
 		}
-		klog.Infof("Debug: SSH populator created successfully")
-		p = sshP
 	}
+
+	// Select the appropriate populator based on disk type
+	p, selectedDiskType, err := selector.SelectPopulator(
+		context.Background(),
+		sourceVmId,
+		sourceVMDKFile,
+		sshConfig,
+	)
+	if err != nil {
+		klog.Fatalf("Failed to select populator: %s", err)
+	}
+	klog.Infof("Selected populator for disk type: %s", selectedDiskType)
 
 	pv, err := getPv(clientSet, targetNamespace, ownerName)
 	if err != nil {

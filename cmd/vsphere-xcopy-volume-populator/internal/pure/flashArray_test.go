@@ -3,6 +3,8 @@ package pure
 import (
 	"strings"
 	"testing"
+
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
 )
 
 func TestFcUIDToWWPN(t *testing.T) {
@@ -79,6 +81,114 @@ func TestFcUIDToWWPN(t *testing.T) {
 				if wwpn != tc.expectedWwpn {
 					t.Errorf("expected wwpn %q, but got %q", tc.expectedWwpn, wwpn)
 				}
+			}
+		})
+	}
+}
+
+func TestExtractSerialFromNAA(t *testing.T) {
+	testCases := []struct {
+		name           string
+		naa            string
+		expectedSerial string
+		expectError    bool
+		errorContains  string
+	}{
+		{
+			name:           "valid NAA with naa. prefix",
+			naa:            "naa.624a9370abcd1234efgh5678",
+			expectedSerial: "ABCD1234EFGH5678",
+			expectError:    false,
+		},
+		{
+			name:           "valid NAA without prefix",
+			naa:            "624a9370abcd1234efgh5678",
+			expectedSerial: "ABCD1234EFGH5678",
+			expectError:    false,
+		},
+		{
+			name:           "uppercase NAA",
+			naa:            "NAA.624A9370ABCD1234EFGH5678",
+			expectedSerial: "ABCD1234EFGH5678",
+			expectError:    false,
+		},
+		{
+			name:          "wrong provider ID",
+			naa:           "naa.600a0980abcd1234efgh5678",
+			expectError:   true,
+			errorContains: "does not appear to be a Pure FlashArray device",
+		},
+		{
+			name:          "empty serial",
+			naa:           "naa.624a9370",
+			expectError:   true,
+			errorContains: "could not extract serial",
+		},
+		{
+			name:          "empty string",
+			naa:           "",
+			expectError:   true,
+			errorContains: "does not appear to be a Pure FlashArray device",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			serial, err := extractSerialFromNAA(tc.naa)
+
+			if tc.expectError {
+				if err == nil {
+					t.Errorf("expected an error but got none")
+				} else if !strings.Contains(err.Error(), tc.errorContains) {
+					t.Errorf("expected error to contain %q, but got %q", tc.errorContains, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if serial != tc.expectedSerial {
+					t.Errorf("expected serial %q, but got %q", tc.expectedSerial, serial)
+				}
+			}
+		})
+	}
+}
+
+func TestSupportsDiskType(t *testing.T) {
+	clonner := &FlashArrayClonner{}
+
+	testCases := []struct {
+		name     string
+		diskType populator.DiskType
+		expected bool
+	}{
+		{
+			name:     "supports RDM",
+			diskType: populator.DiskTypeRDM,
+			expected: true,
+		},
+		{
+			name:     "supports VVol",
+			diskType: populator.DiskTypeVVol,
+			expected: true,
+		},
+		{
+			name:     "supports VMDK",
+			diskType: populator.DiskTypeVMDK,
+			expected: true,
+		},
+		{
+			name:     "unsupported type",
+			diskType: populator.DiskType("unknown"),
+			expected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := clonner.SupportsDiskType(tc.diskType)
+			if result != tc.expected {
+				t.Errorf("SupportsDiskType(%s) = %v, want %v", tc.diskType, result, tc.expected)
 			}
 		})
 	}
