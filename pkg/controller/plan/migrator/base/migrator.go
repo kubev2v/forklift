@@ -310,6 +310,8 @@ func (r *BasePredicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 		allowed = r.context.Plan.IsSourceProviderOpenstack()
 	case VSphere:
 		allowed = r.context.Plan.IsSourceProviderVSphere()
+	case SupportsCopyOffload:
+		allowed = r.context.Plan.SupportsCopyOffload()
 	}
 
 	return
