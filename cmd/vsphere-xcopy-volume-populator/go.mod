@@ -6,13 +6,14 @@ toolchain go1.24.4
 
 require (
 	github.com/dell/gopowermax/v2 v2.9.0
-	github.com/dell/goscaleio v1.19.1
+	github.com/dell/goscaleio v1.19.0
 	github.com/devans10/pugo/flasharray v0.0.0-20241116160615-6bb8c469c9a0
 	github.com/kubev2v/forklift v0.0.0-20250620125157-d13e1d020ae9
 	github.com/netapp/trident v0.0.0-20240628081112-cb68cb389d9d
 	github.com/stretchr/testify v1.10.0
 	github.com/vmware/govmomi v0.50.0
 	go.uber.org/mock v0.5.2
+	golang.org/x/crypto v0.36.0
 	k8s.io/apimachinery v0.32.5
 	k8s.io/client-go v0.32.5
 	k8s.io/klog/v2 v2.130.1
@@ -34,7 +35,6 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/oauth2 v0.23.0 // indirect
 	golang.org/x/time v0.7.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240826202546-f6391c0de4c7 // indirect

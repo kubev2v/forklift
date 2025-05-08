@@ -136,20 +136,37 @@ spec:
 
 # Secret with storage provider credentials
 
-Create a secret where the migration provider is setup, usually openshift-mtv
-and put the credentials of the storage system. All of the provider are required
-to have a secret with those required fields
+The secret with storage provider credentials must contain the following environment variables:
 
+## vSphere Provider Settings
+| Key | Required/Optional | Description |
+|-----|-------------------|-------------|
+| GOVMOMI_HOSTNAME | Required | vSphere's API hostname |
+| GOVMOMI_USERNAME | Required | vSphere's API username |
+| GOVMOMI_PASSWORD | Required | vSphere's API password |
+| ESXI_CLONE_METHOD | Optional | ESXi clone method: 'ssh' (default) or 'vib' |
+
+The `ESXI_CLONE_METHOD` setting can be configured in the Provider settings using the `esxiCloneMethod` key:
+
+```yaml
+apiVersion: forklift.konveyor.io/v1beta1
+kind: Provider
+metadata:
+  name: my-vsphere-provider
+  namespace: openshift-mtv
+spec:
+  type: vsphere
+  url: https://vcenter.example.com
+  secret:
+    name: vsphere-credentials
+    namespace: openshift-mtv
+  settings:
+    `esxiCloneMethod`: "ssh"  # or "vib".
 ```
-STORAGE_HOSTNAME
-STORAGE_USERNAME
-STORAGE_PASSWORD
-STORAGE_SKIP_SSL_VERIFICATION
-```
 
-Provider specific entries in the secret shall be documented below:
+## Storage Vendor Specific Settings
 
-## Hitachi Vantara
+### Hitachi Vantara
 - see [README](internal/vantara/README.md)
 
 ## NetApp ONTAP
@@ -197,15 +214,6 @@ from the ConfigMap under the 'powermax' namespace, which the CSI driver uses.
   Since VSphere is invoking some SOAP/Rest endpoints on the ESXi, those can fail because of 
   standard error reasons and vanish after the next try. If the popoulator fails the migration
   can be restarted. We may want to restart/retry that populator or restart the migration.
-
-- VIB issues
-  If the vib is installed but the /etc/init.d/hostd did not restart then the vmkfstools namespace in esxcli is either not updated or doesn't exist. If it doesn't exist, it means that is the first time usage, probably right after the first use.
-  The error returned by the remote esxcli invocation is:
-  ```
-  CLI Fault: The object or item referred to could not be found. <obj xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="urn:vim25" versionId="5.0" xsi:type="LocalizedMethodFault"><fault xsi:type="NotFound"></fault><localizedMessage>The object or item referred to could not be found.</localizedMessage></obj>
-  ```
-  
-    resolution: ssh into the ESXi and run `/etc/init.d/hostd restart`. Wait for few seconds till the ESX renews the connection with vSphere.
 
 ## NetApp
 - Error `cannot derive SVM to use; please specify SVM in config file`
