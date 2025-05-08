@@ -12,18 +12,19 @@ type MountPath string
 
 // Enviroment variables
 const (
-	EnvLibvirtUrlName     = "V2V_libvirtURL"
-	EnvFingerprintName    = "V2V_fingerprint"
-	EnvInPlaceName        = "V2V_inPlace"
-	EnvExtraArgsName      = "V2V_extra_args"
-	EnvNewNameName        = "V2V_NewName"
-	EnvVmNameName         = "V2V_vmName"
-	EnvRootDiskName       = "V2V_RootDisk"
-	EnvStaticIPsName      = "V2V_staticIPs"
-	EnvSourceName         = "V2V_source"
-	EnvDiskPathName       = "V2V_diskPath"
-	EnvSecretKeyName      = "V2V_secretKey"
-	EnvLocalMigrationName = "LOCAL_MIGRATION"
+	EnvLibvirtUrlName             = "V2V_libvirtURL"
+	EnvFingerprintName            = "V2V_fingerprint"
+	EnvInPlaceName                = "V2V_inPlace"
+	EnvExtraArgsName              = "V2V_extra_args"
+	EnvNewNameName                = "V2V_NewName"
+	EnvVmNameName                 = "V2V_vmName"
+	EnvRootDiskName               = "V2V_RootDisk"
+	EnvStaticIPsName              = "V2V_staticIPs"
+	EnvSourceName                 = "V2V_source"
+	EnvDiskPathName               = "V2V_diskPath"
+	EnvSecretKeyName              = "V2V_secretKey"
+	EnvLocalMigrationName         = "LOCAL_MIGRATION"
+	EnvVirtIoWinLegacyDriversName = "VIRTIO_WIN"
 )
 
 const (
@@ -76,6 +77,8 @@ type AppConfig struct {
 	DiskPath string
 	// V2V_secretKey
 	SecretKey string
+	// V2V_virtIoWinDrivers
+	VirtIoWinLegacyDrivers string
 
 	// Paths
 	VddkConfFile         string
@@ -107,6 +110,7 @@ func (s *AppConfig) Load() (err error) {
 	flag.StringVar(&s.VddkConfFile, "vddk-conf-file", VddkConfFile, "Path for additional vddk configuration")
 	flag.StringVar(&s.InspectionOutputFile, "inspection-output-file", InspectionOutputFile, "Path where the virt-v2v-inspector will output the metadata")
 	flag.StringVar(&s.LibvirtDomainFile, "libvirt-domain-file", V2vInPlaceLibvirtDomain, "Path to the libvirt domain used in the in-place conversion")
+	flag.StringVar(&s.VirtIoWinLegacyDrivers, "virtio-win-legacy-drivers", os.Getenv(EnvVirtIoWinLegacyDriversName), "Path to the virtio-win legacy drivers ISO")
 	flag.Parse()
 
 	return s.validate()
@@ -160,6 +164,16 @@ func (s *AppConfig) validate() error {
 			}
 			if s.SecretKey == "" {
 				return s.envMissingError(SecretKey)
+			}
+			if s.VirtIoWinLegacyDrivers != "" {
+				if _, err := os.Stat(s.VirtIoWinLegacyDrivers); os.IsNotExist(err) {
+					if unsetErr := os.Unsetenv(EnvVirtIoWinLegacyDriversName); unsetErr != nil {
+						return fmt.Errorf("legacy drivers ISO not found at %s and failed to unset %s: %v",
+							s.VirtIoWinLegacyDrivers, EnvVirtIoWinLegacyDriversName, unsetErr)
+					}
+					fmt.Fprintf(os.Stderr, "legacy drivers ISO not found at %s; environment variable %s unset\n",
+						s.VirtIoWinLegacyDrivers, EnvVirtIoWinLegacyDriversName)
+				}
 			} else {
 				if _, err := os.Stat(s.SecretKey); os.IsNotExist(err) {
 					return err
