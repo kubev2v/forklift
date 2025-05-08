@@ -19,14 +19,15 @@ var (
 
 // Steps.
 const (
-	Initialize      = "Initialize"
-	Cutover         = "Cutover"
-	DiskAllocation  = "DiskAllocation"
-	DiskTransfer    = "DiskTransfer"
-	ImageConversion = "ImageConversion"
-	DiskTransferV2v = "DiskTransferV2v"
-	VMCreation      = "VirtualMachineCreation"
-	Unknown         = "Unknown"
+	Initialize        = "Initialize"
+	Cutover           = "Cutover"
+	DiskAllocation    = "DiskAllocation"
+	DiskTransfer      = "DiskTransfer"
+	ImageConversion   = "ImageConversion"
+	DiskTransferV2v   = "DiskTransferV2v"
+	VMCreation        = "VirtualMachineCreation"
+	VirtV2vInspection = "VirtV2vInspection"
+	Unknown           = "Unknown"
 )
 
 var (
@@ -58,6 +59,7 @@ var (
 			{Name: api.PhaseCreateInitialSnapshot},
 			{Name: api.PhaseWaitForInitialSnapshot},
 			{Name: api.PhaseStoreInitialSnapshotDeltas, All: VSphere},
+			{Name: api.PhaseVirtV2vInspection, All: RequiresConversion},
 			{Name: api.PhaseCreateDataVolumes},
 			// Precopy loop start
 			{Name: api.PhaseWaitForDataVolumesStatus},

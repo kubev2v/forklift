@@ -956,6 +956,45 @@ func (r *KubeVirt) getListOptionsNamespaced() (listOptions *client.ListOptions) 
 }
 
 // Ensure the guest conversion (virt-v2v) pod exists on the destination.
+func (r *KubeVirt) EnsureGuestInspectionPod(vm *plan.VMStatus) (err error) {
+	labels := r.inspectionLabels(vm.Ref, false)
+	v2vSecret, err := r.ensureSecret(vm.Ref, r.secretDataSetterForCDI(vm.Ref), labels)
+	if err != nil {
+		return
+	}
+
+	newPod, err := r.guestInspectionPod(vm, v2vSecret)
+	if err != nil {
+		return
+	}
+
+	list, err := r.GetPodsWithLabels(r.inspectionLabels(vm.Ref, true))
+	if err != nil {
+		return
+	}
+
+	pod := &core.Pod{}
+	if len(list.Items) == 0 {
+		pod = newPod
+		err = r.Destination.Client.Create(context.TODO(), pod)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+		r.Log.Info(
+			"Created virt-v2v pod.",
+			"pod",
+			path.Join(
+				pod.Namespace,
+				pod.Name),
+			"vm",
+			vm.String())
+	}
+
+	return
+}
+
+// Ensure the guest conversion (virt-v2v) pod exists on the destination.
 func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, vmCr *VirtualMachine, pvcs []*core.PersistentVolumeClaim) (err error) {
 	labels := r.vmLabels(vm.Ref)
 	v2vSecret, err := r.ensureSecret(vm.Ref, r.secretDataSetterForCDI(vm.Ref), labels)
@@ -1078,6 +1117,26 @@ func (r *KubeVirt) GetGuestConversionPod(vm *plan.VMStatus) (pod *core.Pod, err 
 	return
 }
 
+// Get the guest conversion pod for the VM.
+func (r *KubeVirt) GetGuestInspectionPod(vm *plan.VMStatus) (pod *core.Pod, err error) {
+	list := &core.PodList{}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(r.inspectionLabels(vm.Ref, false)),
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		})
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	if len(list.Items) > 0 {
+		pod = &list.Items[0]
+	}
+	return
+}
+
 func (r *KubeVirt) getInspectionXml(pod *core.Pod) (string, error) {
 	if pod == nil {
 		return "", liberr.New("no pod found to get the inspection")
@@ -1171,7 +1230,7 @@ func (r *KubeVirt) DeletePVCConsumerPod(vm *plan.VMStatus) (err error) {
 
 // Delete the guest conversion pod on the destination cluster.
 func (r *KubeVirt) DeleteGuestConversionPod(vm *plan.VMStatus) (err error) {
-	list, err := r.GetPodsWithLabels(r.conversionLabels(vm.Ref, true))
+	list, err := r.GetPodsWithLabels(r.vmAllButMigrationLabels(vm.Ref))
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -1182,11 +1241,6 @@ func (r *KubeVirt) DeleteGuestConversionPod(vm *plan.VMStatus) (err error) {
 		}
 	}
 	return
-}
-
-// Gets pods associated with the VM.
-func (r *KubeVirt) GetPods(vm *plan.VMStatus) (pods *core.PodList, err error) {
-	return r.GetPodsWithLabels(r.vmAllButMigrationLabels(vm.Ref))
 }
 
 // Gets pods associated with the VM.
@@ -1400,6 +1454,16 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 	err = r.createLunDisks(vm.Ref)
 
 	return
+}
+
+// Return the generated name for a specific VM and plan.
+func (r *KubeVirt) getGeneratedInspectionName(vm *plan.VMStatus) string {
+	return strings.Join(
+		[]string{
+			"inspection",
+			r.Plan.Name,
+			vm.ID},
+		"-") + "-"
 }
 
 // Return the generated name for a specific VM and plan.
@@ -1816,7 +1880,95 @@ func (r *KubeVirt) findTemplate(vm *plan.VMStatus) (tmpl *template.Template, err
 	return
 }
 
-func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, libvirtConfigMap *core.ConfigMap, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, v2vSecret *core.Secret) (pod *core.Pod, err error) {
+func (r *KubeVirt) guestInspectionPod(vm *plan.VMStatus, v2vSecret *core.Secret) (pod *core.Pod, err error) {
+	var volumeMounts = []core.VolumeMount{
+		{
+			Name:      "vddk-vol-mount",
+			MountPath: "/opt",
+		},
+		{
+			Name:      "secret-volume",
+			ReadOnly:  true,
+			MountPath: "/etc/secret",
+		},
+	}
+	var volumes = []core.Volume{
+		{
+			Name: VddkVolumeName,
+			VolumeSource: core.VolumeSource{
+				EmptyDir: &core.EmptyDirVolumeSource{},
+			},
+		},
+		// mount the secret for the password and CA certificate
+		{
+			Name: "secret-volume",
+			VolumeSource: core.VolumeSource{
+				Secret: &core.SecretVolumeSource{
+					SecretName: v2vSecret.Name,
+				},
+			},
+		},
+	}
+	// Add LUKS keys
+	if vm.LUKS.Name != "" {
+		labels := r.vmLabels(vm.Ref)
+		labels[kLUKS] = "true"
+		var secret *core.Secret
+		if secret, err = r.ensureSecret(vm.Ref, r.secretLUKS(vm.LUKS.Name, r.Plan.Namespace), labels); err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+		volumes = append(volumes, core.Volume{
+			Name: "luks",
+			VolumeSource: core.VolumeSource{
+				Secret: &core.SecretVolumeSource{
+					SecretName: secret.Name,
+				},
+			},
+		})
+		volumeMounts = append(volumeMounts,
+			core.VolumeMount{
+				Name:      "luks",
+				MountPath: "/etc/luks",
+				ReadOnly:  true,
+			})
+	}
+	// pod environment
+	environment, err := r.Builder.PodEnvironment(vm.Ref, r.Source.Secret)
+	if err != nil {
+		return
+	}
+	environment = append(environment, core.EnvVar{
+		Name:  "INSPECTION",
+		Value: "true",
+	})
+	// Add previous snapshot disks so they are not locked by the VMware
+	for i, disk := range vm.Warm.Precopies[0].Deltas {
+		environment = append(environment, core.EnvVar{
+			Name:  fmt.Sprintf("INSPECTION_DISK_%d", i),
+			Value: disk.Disk,
+		})
+	}
+	return r.virtV2vPodSpec(
+		vm,
+		environment,
+		v2vSecret,
+		volumes,
+		volumeMounts,
+		[]core.VolumeDevice{},
+		r.inspectionLabels(vm.Ref, false),
+		r.getGeneratedInspectionName(vm),
+	)
+}
+
+func (r *KubeVirt) guestConversionPod(
+	vm *plan.VMStatus,
+	vmVolumes []cnv.Volume,
+	libvirtConfigMap *core.ConfigMap,
+	vddkConfigmap *core.ConfigMap,
+	pvcs []*core.PersistentVolumeClaim,
+	v2vSecret *core.Secret,
+) (pod *core.Pod, err error) {
 	volumes, volumeMounts, volumeDevices, err := r.podVolumeMounts(vmVolumes, libvirtConfigMap, vddkConfigmap, pvcs, vm)
 	if err != nil {
 		return
@@ -1828,11 +1980,6 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 		return
 	}
 
-	// qemu group
-	fsGroup := qemuGroup
-	user := qemuUser
-	nonRoot := true
-	allowPrivilageEscalation := false
 	// virt-v2v image
 	useV2vForTransfer, vErr := r.Context.Plan.ShouldUseV2vForTransfer()
 	if vErr != nil {
@@ -1861,8 +2008,36 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 				Value: "1",
 			})
 	}
+	return r.virtV2vPodSpec(
+		vm,
+		environment,
+		v2vSecret,
+		volumes,
+		volumeMounts,
+		volumeDevices,
+		r.conversionLabels(vm.Ref, false),
+		r.getGeneratedName(vm),
+	)
+}
+
+func (r *KubeVirt) virtV2vPodSpec(
+	vm *plan.VMStatus,
+	environment []core.EnvVar,
+	v2vSecret *core.Secret,
+	volumes []core.Volume,
+	volumeMounts []core.VolumeMount,
+	volumeDevices []core.VolumeDevice,
+	labels map[string]string,
+	vmGenName string,
+) (pod *core.Pod, err error) {
+
 	// VDDK image
 	var initContainers []core.Container
+	// qemu group
+	fsGroup := qemuGroup
+	user := qemuUser
+	nonRoot := true
+	allowPrivilageEscalation := false
 
 	vddkImage := settings.GetVDDKImage(r.Source.Provider.Spec.Settings)
 	if vddkImage != "" {
@@ -1930,8 +2105,8 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 		ObjectMeta: meta.ObjectMeta{
 			Namespace:    r.Plan.Spec.TargetNamespace,
 			Annotations:  annotations,
-			Labels:       r.conversionLabels(vm.Ref, false),
-			GenerateName: r.getGeneratedName(vm),
+			Labels:       labels,
+			GenerateName: vmGenName,
 		},
 		Spec: core.PodSpec{
 			SecurityContext: &core.PodSecurityContext{
@@ -2019,11 +2194,21 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	// That is to ensure the appliance virt-v2v uses would not
 	// run in emulation mode, which is significantly slower
 	r.setKvmOnPodSpec(&pod.Spec)
-
-	return
+	return pod, nil
 }
 
-func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, libvirtConfigMap *core.ConfigMap, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, vm *plan.VMStatus) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice, err error) {
+func (r *KubeVirt) podVolumeMounts(
+	vmVolumes []cnv.Volume,
+	libvirtConfigMap *core.ConfigMap,
+	vddkConfigmap *core.ConfigMap,
+	pvcs []*core.PersistentVolumeClaim,
+	vm *plan.VMStatus,
+) (
+	volumes []core.Volume,
+	mounts []core.VolumeMount,
+	devices []core.VolumeDevice,
+	err error,
+) {
 	pvcsByName := make(map[string]*core.PersistentVolumeClaim)
 	for _, pvc := range pvcs {
 		pvcsByName[pvc.Name] = pvc
@@ -2548,6 +2733,13 @@ func (r *KubeVirt) conversionLabels(vmRef ref.Ref, filterOutMigrationLabel bool)
 		labels = r.vmLabels(vmRef)
 	}
 	labels[kApp] = "virt-v2v"
+	return
+}
+
+// Label for a conversion pod.
+func (r *KubeVirt) inspectionLabels(vmRef ref.Ref, filterOutMigrationLabel bool) (labels map[string]string) {
+	labels = r.conversionLabels(vmRef, filterOutMigrationLabel)
+	labels[kApp] = "virt-v2v-inspector"
 	return
 }
 
