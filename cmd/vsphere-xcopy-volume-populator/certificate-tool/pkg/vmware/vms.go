@@ -468,7 +468,7 @@ func CreateVM(vmName, vsphereUrl, vsphereUser, vspherePassword, dataCenter,
 	if err := attachCDROM(ctx, vm, remoteIsoPath); err != nil {
 		return "", err
 	}
-	if err := attachNetwork(ctx, client, vm, "VM Network"); err != nil {
+	if err := attachNetwork(ctx, client, vm, "VM Network (.101)"); err != nil {
 		log.Fatalf("add NIC: %v", err)
 	}
 
