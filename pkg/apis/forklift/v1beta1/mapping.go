@@ -61,6 +61,7 @@ type OffloadPlugin struct {
 type StorageVendorProduct string
 
 const (
+	StorageVendorProductFlashSystem    StorageVendorProduct = "flashsystem"
 	StorageVendorProductVantara        StorageVendorProduct = "vantara"
 	StorageVendorProductOntap          StorageVendorProduct = "ontap"
 	StorageVendorProductPrimera3Par    StorageVendorProduct = "primera3par"
@@ -72,6 +73,7 @@ const (
 
 func StorageVendorProducts() []StorageVendorProduct {
 	return []StorageVendorProduct{
+		StorageVendorProductFlashSystem,
 		StorageVendorProductVantara,
 		StorageVendorProductOntap,
 		StorageVendorProductPrimera3Par,
@@ -89,7 +91,7 @@ type VSphereXcopyPluginConfig struct {
 	// The secret should reside in the same namespace where the source provider is.
 	SecretRef string `json:"secretRef"`
 	// StorageVendorProduct the string identifier of the storage vendor product
-	// +kubebuilder:validation:Enum=vantara;ontap;primera3par;pureFlashArray;powerflex;powermax;powerstore
+	// +kubebuilder:validation:Enum=flashsystem;vantara;ontap;primera3par;pureFlashArray;powerflex;powermax;powerstore;infinibox
 	StorageVendorProduct StorageVendorProduct `json:"storageVendorProduct"`
 }
 

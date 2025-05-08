@@ -32,9 +32,9 @@
 package obj
 
 import (
-	"fmt"
 	"github.com/twitchyliquid64/golang-asm/goobj"
 	"github.com/twitchyliquid64/golang-asm/objabi"
+	"fmt"
 	"log"
 	"math"
 	"sort"
