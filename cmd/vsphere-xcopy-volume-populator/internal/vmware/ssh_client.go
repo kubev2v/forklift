@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubev2v/forklift/pkg/lib/sshkeys"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/types"
 	"golang.org/x/crypto/ssh"
@@ -303,7 +304,7 @@ func parseTaskResponse(xmlOutput string) (*VmkfstoolsTask, error) {
 }
 
 // EnableSSHAccess enables SSH service on ESXi host and handles SSH key installation based on ESXi version
-func EnableSSHAccess(ctx context.Context, vmwareClient Client, host *object.HostSystem, privateKey, publicKey []byte, scriptPath string) error {
+func EnableSSHAccess(ctx context.Context, vmwareClient Client, host *object.HostSystem, privateKey, publicKey []byte, scriptPath string, autoKeyInstall bool) error {
 	publicKeyStr := strings.TrimSpace(string(publicKey))
 
 	klog.Infof("Enabling SSH access on ESXi host %s", host.Name())
@@ -334,8 +335,20 @@ func EnableSSHAccess(ctx context.Context, vmwareClient Client, host *object.Host
 		klog.Warningf("Failed to configure SSH firewall: %v", err)
 	}
 
+	// Step 5: Suppress shell warning
+	err = suppressShellWarning(host, ctx)
+	if err != nil {
+		klog.Warningf("Failed to suppress shell warning: %v", err)
+	}
 	// Step 6: Create SSH command with Python interpreter and restricted access
-	pythonCommand := fmt.Sprintf("python %s", scriptPath)
+	// Use the shared version constant to ensure consistency
+	datastoreName, err := extractDatastoreFromPath(scriptPath)
+	if err != nil {
+		return fmt.Errorf("failed to extract datastore from script path: %w", err)
+	}
+	predictableScriptPath := fmt.Sprintf("/vmfs/volumes/%s/secure-vmkfstools-wrapper-%s.py",
+		datastoreName, sshkeys.SecureScriptVersion)
+	pythonCommand := fmt.Sprintf("python %s", predictableScriptPath)
 	restrictedPublicKey := fmt.Sprintf(`command="%s",no-port-forwarding,no-agent-forwarding,no-X11-forwarding %s`,
 		pythonCommand, publicKeyStr)
 
@@ -345,14 +358,27 @@ func EnableSSHAccess(ctx context.Context, vmwareClient Client, host *object.Host
 		return nil
 	}
 
-	// Step 8: Handle SSH key installation based on ESXi version
-	if isESXi8OrNewer(version) {
-		klog.Infof("ESXi %s detected - attempting automatic SSH key installation", version)
+	// Step 8: Handle SSH key installation based on ESXi version and auto key install setting
+	if isESXi8OrNewer(version) && autoKeyInstall {
+		klog.Infof("ESXi %s detected and automatic key installation enabled - attempting automatic SSH key installation", version)
 		err = installSSHKey(vmwareClient, host, restrictedPublicKey)
 		if err != nil {
 			return fmt.Errorf("failed to install restricted SSH key: %w", err)
 		}
 		klog.Infof("SSH key installed automatically for ESXi %s", version)
+	} else if isESXi8OrNewer(version) && !autoKeyInstall {
+		klog.Errorf("ESXi %s detected but automatic key installation is disabled", version)
+		klog.Errorf("Manual SSH key installation required. Please add the following line to /etc/ssh/keys-root/authorized_keys on the ESXi host:")
+		klog.Errorf("")
+		klog.Errorf("  %s", restrictedPublicKey)
+		klog.Errorf("")
+		klog.Errorf("Steps to manually configure SSH key:")
+		klog.Errorf("1. SSH to the ESXi host: ssh root@%s", hostIP)
+		klog.Errorf("2. Edit the authorized_keys file: vi /etc/ssh/keys-root/authorized_keys")
+		klog.Errorf("3. Add the above line to the file")
+		klog.Errorf("4. Save and exit")
+		klog.Errorf("5. Restart the operation")
+		return fmt.Errorf("manual SSH key configuration required for ESXi %s (automatic installation disabled) - see logs for instructions", version)
 	} else {
 		klog.Errorf("ESXi %s detected - automatic SSH key installation not supported", version)
 		klog.Errorf("Manual SSH key installation required. Please add the following line to /etc/ssh/keys-root/authorized_keys on the ESXi host:")
@@ -369,7 +395,7 @@ func EnableSSHAccess(ctx context.Context, vmwareClient Client, host *object.Host
 	}
 
 	// Step 9: Test connectivity after installation (ESXi 8 only) - using private key
-	if !testSSHConnectivity(ctx, hostIP, privateKey, "test") {
+	if isESXi8OrNewer(version) && autoKeyInstall && !testSSHConnectivity(ctx, hostIP, privateKey, "test") {
 		return fmt.Errorf("SSH connectivity test failed after key installation")
 	}
 
@@ -381,60 +407,32 @@ func EnableSSHAccess(ctx context.Context, vmwareClient Client, host *object.Host
 func testSSHConnectivity(ctx context.Context, hostIP string, privateKey []byte, testCommand string) bool {
 	klog.Infof("Testing SSH connectivity to %s", hostIP)
 
-	client := NewSSHClient()
-	// Use a short timeout for connectivity testing to avoid indefinite hangs
-	testCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	err := client.Connect(testCtx, hostIP, "root", privateKey)
-	if err != nil {
-		klog.Infof("SSH connectivity test failed to connect: %v", err)
-		return false
-	}
-	defer client.Close()
+	// Test SSH connectivity by attempting to connect and execute a simple command
+	result := testSSHConnectivityDirect(hostIP, privateKey)
 
-	// Try to execute a simple test command - this will test if the restricted command setup is working
-	// We expect this to fail with a "task not found" type error, which indicates SSH restrictions are working correctly
-	output, err := client.(*ESXiSSHClient).executeCommand("status", "test-task-id", "")
-
-	klog.Infof("SSH test command output: '%s'", output)
-	klog.Infof("SSH test command error: %v", err)
-
-	if err != nil {
-		// Analyze the error to determine if it's a connectivity issue or expected script behavior
-		errorStr := strings.ToLower(err.Error())
-
-		// These errors indicate SSH key/connectivity problems
-		if strings.Contains(errorStr, "permission denied") ||
-			strings.Contains(errorStr, "connection refused") ||
-			strings.Contains(errorStr, "host key verification failed") ||
-			strings.Contains(errorStr, "authentication failed") {
-			klog.Infof("SSH connectivity issue detected: %v", err)
-			return false
-		}
-
-		// These errors indicate the script is running but failing as expected
-		if strings.Contains(errorStr, "task") && strings.Contains(errorStr, "not found") ||
-			strings.Contains(errorStr, "operation failed") ||
-			strings.Contains(output, "Error getting status") ||
-			strings.Contains(output, "Task test-task-id not found") {
-			klog.Infof("Script executed successfully (expected task not found error): %v", err)
-			return true
-		}
-
-		// Check if we got XML output indicating the script ran
-		if strings.Contains(output, "<?xml") || strings.Contains(output, "<o>") {
-			klog.Infof("Received XML response from script - SSH working correctly")
-			return true
-		}
-
-		// For any other error, assume it's a script execution issue but SSH is working
-		klog.Infof("Script executed with error (SSH working): %v", err)
-		return true
+	if result {
+		klog.Infof("SSH connectivity test passed for %s", hostIP)
+	} else {
+		klog.Infof("SSH connectivity test failed for %s", hostIP)
 	}
 
-	// If no error, that's also good - SSH is working
-	klog.Infof("SSH test completed successfully")
-	return true
+	return result
+}
+
+// testSSHConnectivityDirect tests SSH connectivity by attempting to connect and execute a simple command
+func testSSHConnectivityDirect(hostIP string, privateKey []byte) bool {
+	// Use the shared SSH connectivity test function
+	return sshkeys.TestSSHConnectivity(hostIP, privateKey)
+}
+
+// extractDatastoreFromPath extracts the datastore name from a script path
+func extractDatastoreFromPath(scriptPath string) (string, error) {
+	// scriptPath format: /vmfs/volumes/datastore1/secure-vmkfstools-wrapper-<version>.py
+	parts := strings.Split(scriptPath, "/")
+	if len(parts) >= 4 && parts[1] == "vmfs" && parts[2] == "volumes" {
+		return parts[3], nil
+	}
+	return "", fmt.Errorf("invalid script path format: %s, expected /vmfs/volumes/datastore/...", scriptPath)
 }
 
 // getESXiVersion retrieves the ESXi version from the host

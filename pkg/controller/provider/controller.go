@@ -150,6 +150,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		names.SimpleNameGenerator.GenerateName(Name+"|"),
 		"provider",
 		request)
+	r.Log.Info(">>>>>>>>>>>>>>>>>> RECONCILE STARTED", "provider", request.Name)
 	r.Started()
 	defer func() {
 		result.RequeueAfter = r.Ended(
@@ -483,15 +484,15 @@ func (r *Reconciler) ensureSSHKeys(provider *api.Provider) error {
 		return nil
 	}
 
-	// Extract hostname from provider URL for naming
-	providerHostname := provider.Spec.URL
-	if providerHostname == "" {
-		return fmt.Errorf("provider URL is empty")
+	// Use provider name for SSH key naming (simpler and more consistent)
+	providerName := provider.Name
+	if providerName == "" {
+		return fmt.Errorf("provider name is empty")
 	}
 
 	// Check if SSH keys already exist
-	privateSecretName := sshkeys.GenerateSSHPrivateSecretName(providerHostname)
-	publicSecretName := sshkeys.GenerateSSHPublicSecretName(providerHostname)
+	privateSecretName := sshkeys.GenerateSSHPrivateSecretName(providerName)
+	publicSecretName := sshkeys.GenerateSSHPublicSecretName(providerName)
 
 	_, err := r.getSSHKeySecret(provider.Namespace, privateSecretName)
 	if err == nil {
@@ -561,7 +562,7 @@ func (r *Reconciler) storeSSHKeySecret(namespace, secretName, keyName string, ke
 				"app.kubernetes.io/name":        "forklift",
 				"app.kubernetes.io/component":   "ssh-keys",
 				"app.kubernetes.io/managed-by":  "forklift-controller",
-				"forklift.konveyor.io/provider": sshkeys.SanitizeProviderName(provider.Spec.URL),
+				"forklift.konveyor.io/provider": sshkeys.SanitizeProviderName(provider.Name),
 			},
 			OwnerReferences: []metav1.OwnerReference{
 				{

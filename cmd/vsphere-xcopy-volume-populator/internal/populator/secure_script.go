@@ -5,9 +5,9 @@ import (
 	_ "embed"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
+	"github.com/kubev2v/forklift/pkg/lib/sshkeys"
 	"github.com/vmware/govmomi/object"
 	"k8s.io/klog/v2"
 )
@@ -15,9 +15,6 @@ import (
 const (
 	secureScriptName = "secure-vmkfstools-wrapper"
 )
-
-// SecureScriptVersion is set by ldflags - should match the script version
-var SecureScriptVersion = "1.0.0"
 
 // embeddedSecureScript contains the Python script content from the embedded file
 //
@@ -43,10 +40,10 @@ func writeSecureScriptToTemp() (string, error) {
 
 // ensureSecureScript ensures the secure script is uploaded and available on the target ESX
 func ensureSecureScript(ctx context.Context, client vmware.Client, esx *object.HostSystem, datastore string, desiredVersion string) (string, error) {
-	klog.Infof("ensuring secure script version on ESXi %s: %s", esx.Name(), SecureScriptVersion)
+	klog.Infof("ensuring secure script version on ESXi %s: %s", esx.Name(), sshkeys.SecureScriptVersion)
 
 	// ALWAYS force re-upload for now to ensure latest version
-	klog.Infof("Force uploading secure script to ensure latest version %s", SecureScriptVersion)
+	klog.Infof("Force uploading secure script to ensure latest version %s", sshkeys.SecureScriptVersion)
 
 	dc, err := getHostDC(esx)
 	if err != nil {
@@ -81,20 +78,19 @@ func uploadScript(ctx context.Context, client vmware.Client, dc *object.Datacent
 	}
 	defer os.Remove(tempScriptPath) // Clean up temp file
 
-	// Create a unique filename to avoid caching issues
-	timestamp := time.Now().Unix()
-	uniqueScriptName := fmt.Sprintf("%s-%s-%d.py", secureScriptName, SecureScriptVersion, timestamp)
+	// Create a predictable filename based on version only
+	predictableScriptName := fmt.Sprintf("%s-%s.py", secureScriptName, sshkeys.SecureScriptVersion)
 
-	klog.Infof("Uploading embedded script (version %s) to datastore as %s", SecureScriptVersion, uniqueScriptName)
+	klog.Infof("Uploading embedded script (version %s) to datastore as %s", sshkeys.SecureScriptVersion, predictableScriptName)
 
 	// Upload the file with timeout
 	upCtx, upCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer upCancel()
-	if err = ds.UploadFile(upCtx, tempScriptPath, uniqueScriptName, nil); err != nil {
+	if err = ds.UploadFile(upCtx, tempScriptPath, predictableScriptName, nil); err != nil {
 		return "", fmt.Errorf("failed to upload embedded script: %w", err)
 	}
 
-	datastorePath := fmt.Sprintf("/vmfs/volumes/%s/%s", datastore, uniqueScriptName)
+	datastorePath := fmt.Sprintf("/vmfs/volumes/%s/%s", datastore, predictableScriptName)
 	klog.Infof("Successfully uploaded embedded script to datastore path: %s", datastorePath)
 	return datastorePath, nil
 }

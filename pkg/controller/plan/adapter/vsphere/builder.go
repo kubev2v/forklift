@@ -1657,6 +1657,11 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 		dst.Data["ESXI_CLONE_METHOD"] = []byte(esxiCloneMethod)
 	}
 
+	// Add ESXi auto key installation setting
+	if esxiAutoKeyInstall, ok := r.Source.Provider.Spec.Settings[api.ESXiAutoKeyInstall]; ok {
+		dst.Data["ESXI_AUTO_KEY_INSTALL"] = []byte(esxiAutoKeyInstall)
+	}
+
 	// Add SSH keys for vSphere providers
 	if r.Source.Provider.Type() == api.VSphere {
 		err := r.addSSHKeysToSecret(dst)
@@ -1665,7 +1670,6 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 			// Continue without SSH keys - this will fall back to VIB method or fail gracefully
 		}
 	}
-
 	// Update secret1 with the merged data.
 	if err := r.Destination.Update(context.Background(), dst); err != nil {
 		return fmt.Errorf("failed to update secret1: %w", err)

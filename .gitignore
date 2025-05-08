@@ -7,6 +7,12 @@
 *.dylib
 bin
 
+# Specific binary executables that should never be committed
+vsphere-xcopy-volume-populator
+forklift-controller
+*/vsphere-xcopy-volume-populator
+*/forklift-controller
+
 # Test binary, build with `go test -c`
 *.test
 

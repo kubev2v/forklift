@@ -55,6 +55,7 @@ var (
 	vsphereUsername            string
 	vspherePassword            string
 	esxiCloneMethod            string
+	esxiAutoKeyInstall         string
 
 	// kube args
 	httpEndpoint string
@@ -145,7 +146,13 @@ func main() {
 			klog.Fatalf("Failed to get SSH keys from environment: %s", err)
 		}
 
-		sshP, err := populator.NewWithRemoteEsxcliSSH(storageApi, vsphereHostname, vsphereUsername, vspherePassword, sshPrivateKey, sshPublicKey)
+		// Parse the auto key install setting - default to true if not set
+		autoKeyInstall := true
+		if esxiAutoKeyInstall == "false" {
+			autoKeyInstall = false
+		}
+
+		sshP, err := populator.NewWithRemoteEsxcliSSH(storageApi, vsphereHostname, vsphereUsername, vspherePassword, sshPrivateKey, sshPublicKey, autoKeyInstall)
 		if err != nil {
 			klog.Fatalf("Failed to create SSH-based remote esxcli populator: %s", err)
 		}
@@ -258,6 +265,7 @@ func handleArgs() {
 	flag.StringVar(&vsphereUsername, "vsphere-username", os.Getenv("GOVMOMI_USERNAME"), "vSphere's API username")
 	flag.StringVar(&vspherePassword, "vsphere-password", os.Getenv("GOVMOMI_PASSWORD"), "vSphere's API password")
 	flag.StringVar(&esxiCloneMethod, "esxi-clone-method", os.Getenv("ESXI_CLONE_METHOD"), "ESXi clone method: 'vib' (default) or 'ssh'")
+	flag.StringVar(&esxiAutoKeyInstall, "esxi-auto-key-install", os.Getenv("ESXI_AUTO_KEY_INSTALL"), "ESXi automatic SSH key installation: 'true' (default) or 'false'")
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 	// Metrics args

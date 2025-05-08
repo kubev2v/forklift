@@ -69,6 +69,7 @@ const (
 	UseVddkAioOptimization = "useVddkAioOptimization"
 	VddkConfig             = "vddkConfig"
 	ESXiCloneMethod        = "esxiCloneMethod"
+	ESXiAutoKeyInstall     = "esxiAutoKeyInstall"
 )
 
 const OvaProviderFinalizer = "forklift/ova-provider"

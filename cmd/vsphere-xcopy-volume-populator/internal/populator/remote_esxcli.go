@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
+	"github.com/kubev2v/forklift/pkg/lib/sshkeys"
 	"github.com/vmware/govmomi/object"
 	"k8s.io/klog/v2"
 )
@@ -42,9 +43,10 @@ type RemoteEsxcliPopulator struct {
 	VSphereClient vmware.Client
 	StorageApi    StorageApi
 	// SSH-related fields (only used when using SSH method)
-	SSHPrivateKey []byte
-	SSHPublicKey  []byte
-	UseSSHMethod  bool
+	SSHPrivateKey  []byte
+	SSHPublicKey   []byte
+	UseSSHMethod   bool
+	AutoKeyInstall bool
 }
 
 func NewWithRemoteEsxcli(storageApi StorageApi, vsphereHostname, vsphereUsername, vspherePassword string) (Populator, error) {
@@ -59,7 +61,7 @@ func NewWithRemoteEsxcli(storageApi StorageApi, vsphereHostname, vsphereUsername
 	}, nil
 }
 
-func NewWithRemoteEsxcliSSH(storageApi StorageApi, vsphereHostname, vsphereUsername, vspherePassword string, sshPrivateKey, sshPublicKey []byte) (Populator, error) {
+func NewWithRemoteEsxcliSSH(storageApi StorageApi, vsphereHostname, vsphereUsername, vspherePassword string, sshPrivateKey, sshPublicKey []byte, autoKeyInstall bool) (Populator, error) {
 	c, err := vmware.NewClient(vsphereHostname, vsphereUsername, vspherePassword)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create vmware client: %w", err)
@@ -68,11 +70,12 @@ func NewWithRemoteEsxcliSSH(storageApi StorageApi, vsphereHostname, vsphereUsern
 		return nil, fmt.Errorf("ssh key material must be non-empty")
 	}
 	return &RemoteEsxcliPopulator{
-		VSphereClient: c,
-		StorageApi:    storageApi,
-		SSHPrivateKey: sshPrivateKey,
-		SSHPublicKey:  sshPublicKey,
-		UseSSHMethod:  true,
+		VSphereClient:  c,
+		StorageApi:     storageApi,
+		SSHPrivateKey:  sshPrivateKey,
+		SSHPublicKey:   sshPublicKey,
+		UseSSHMethod:   true,
+		AutoKeyInstall: autoKeyInstall,
 	}, nil
 }
 
@@ -98,7 +101,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	}
 
 	klog.Infof(
-		"Starting populate via remote esxcli vmkfstools (%s), source vmdk=%s, pv=%v",
+		"Starting to populate using remote esxcli vmkfstools (%s method), source vmdk %s target LUN %s",
 		cloneMethodStr,
 		sourceVMDKFile,
 		pv)
@@ -339,16 +342,16 @@ func (p *RemoteEsxcliPopulator) executeSSHClone(host *object.HostSystem, vmDisk 
 	defer cancel()
 
 	// Setup secure script
-	finalScriptPath, err := ensureSecureScript(ctx, p.VSphereClient, host, vmDisk.Datastore, SecureScriptVersion)
+	finalScriptPath, err := ensureSecureScript(ctx, p.VSphereClient, host, vmDisk.Datastore, sshkeys.SecureScriptVersion)
 	if err != nil {
 		return fmt.Errorf("failed to ensure secure script: %w", err)
 	}
 	klog.V(2).Infof("Secure script ready at path: %s", finalScriptPath)
 
 	// Enable SSH access
-	err = vmware.EnableSSHAccess(ctx, p.VSphereClient, host, p.SSHPrivateKey, p.SSHPublicKey, finalScriptPath)
+	err = vmware.EnableSecureSSHAccess(ctx, p.VSphereClient, host, p.SSHPrivateKey, p.SSHPublicKey, finalScriptPath, p.AutoKeyInstall)
 	if err != nil {
-		return fmt.Errorf("failed to enable SSH access: %w", err)
+		return fmt.Errorf("failed to enable secure SSH access: %w", err)
 	}
 
 	// Get host IP
@@ -359,7 +362,7 @@ func (p *RemoteEsxcliPopulator) executeSSHClone(host *object.HostSystem, vmDisk 
 
 	// Create SSH client
 	sshClient := vmware.NewSSHClient()
-	err = sshClient.Connect(ctx, hostIP, "root", p.SSHPrivateKey)
+	err = sshClient.Connect(hostIP, "root", p.SSHPrivateKey)
 	if err != nil {
 		return fmt.Errorf("failed to connect via SSH: %w", err)
 	}
