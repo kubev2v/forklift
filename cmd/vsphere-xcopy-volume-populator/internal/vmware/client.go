@@ -24,6 +24,18 @@ type Client interface {
 	GetEsxByVm(ctx context.Context, vmName string) (*object.HostSystem, error)
 	RunEsxCommand(ctx context.Context, host *object.HostSystem, command []string) ([]esx.Values, error)
 	GetDatastore(ctx context.Context, dc *object.Datacenter, datastore string) (*object.Datastore, error)
+	// GetVMDiskBacking returns disk backing information for detecting disk type (VVol, RDM, VMDK)
+	GetVMDiskBacking(ctx context.Context, vmId string, vmdkPath string) (*DiskBacking, error)
+}
+
+// DiskBacking contains information about the disk backing type
+type DiskBacking struct {
+	// VVolId is set if the disk is VVol-backed
+	VVolId string
+	// IsRDM is true if the disk is a Raw Device Mapping
+	IsRDM bool
+	// DeviceName is the underlying device name
+	DeviceName string
 }
 
 type VSphereClient struct {
@@ -130,6 +142,125 @@ func (c *VSphereClient) GetDatastore(ctx context.Context, dc *object.Datacenter,
 	}
 
 	return ds, nil
+}
+
+// GetVMDiskBacking retrieves disk backing information to determine disk type
+func (c *VSphereClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkPath string) (*DiskBacking, error) {
+	finder := find.NewFinder(c.Client.Client, true)
+	datacenters, err := finder.DatacenterList(ctx, "*")
+	if err != nil {
+		return nil, fmt.Errorf("failed getting datacenters: %w", err)
+	}
+
+	var vm *object.VirtualMachine
+	for _, dc := range datacenters {
+		finder.SetDatacenter(dc)
+		result, err := finder.VirtualMachine(ctx, vmId)
+		if err != nil {
+			if _, ok := err.(*find.NotFoundError); !ok {
+				return nil, fmt.Errorf("error searching for VM in Datacenter '%s': %w", dc.Name(), err)
+			}
+		} else {
+			vm = result
+			break
+		}
+	}
+	if vm == nil {
+		moref := types.ManagedObjectReference{Type: "VirtualMachine", Value: vmId}
+		vm = object.NewVirtualMachine(c.Client.Client, moref)
+	}
+	if vm == nil {
+		return nil, fmt.Errorf("failed to find VM with ID %s", vmId)
+	}
+
+	// Get VM configuration to inspect disk devices
+	var vmProps mo.VirtualMachine
+	err = vm.Properties(ctx, vm.Reference(), []string{"config.hardware.device"}, &vmProps)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get VM properties: %w", err)
+	}
+
+	// Normalize vmdkPath for comparison (remove brackets and spaces)
+	normalizedPath := strings.ToLower(vmdkPath)
+
+	// Find the disk matching the vmdkPath
+	for _, device := range vmProps.Config.Hardware.Device {
+		disk, ok := device.(*types.VirtualDisk)
+		if !ok {
+			continue
+		}
+
+		// Check different backing types
+		switch backing := disk.Backing.(type) {
+		case *types.VirtualDiskFlatVer2BackingInfo:
+			// Check if this disk matches the requested path
+			if !strings.Contains(strings.ToLower(backing.FileName), normalizedPath) &&
+				!strings.Contains(normalizedPath, strings.ToLower(backing.FileName)) {
+				// Try to match by extracting datastore and path
+				if !diskPathMatches(backing.FileName, vmdkPath) {
+					continue
+				}
+			}
+
+			// Check for VVol backing
+			if backing.BackingObjectId != "" {
+				klog.V(2).Infof("Disk %s is VVol-backed (BackingObjectId: %s)", vmdkPath, backing.BackingObjectId)
+				return &DiskBacking{
+					VVolId:     backing.BackingObjectId,
+					IsRDM:      false,
+					DeviceName: backing.FileName,
+				}, nil
+			}
+
+			// Regular VMDK
+			klog.V(2).Infof("Disk %s is VMDK-backed", vmdkPath)
+			return &DiskBacking{
+				VVolId:     "",
+				IsRDM:      false,
+				DeviceName: backing.FileName,
+			}, nil
+
+		case *types.VirtualDiskRawDiskMappingVer1BackingInfo:
+			// Check if this disk matches
+			if !strings.Contains(strings.ToLower(backing.FileName), normalizedPath) &&
+				!strings.Contains(normalizedPath, strings.ToLower(backing.FileName)) {
+				if !diskPathMatches(backing.FileName, vmdkPath) {
+					continue
+				}
+			}
+
+			klog.V(2).Infof("Disk %s is RDM-backed (DeviceName: %s)", vmdkPath, backing.DeviceName)
+			return &DiskBacking{
+				VVolId:     "",
+				IsRDM:      true,
+				DeviceName: backing.DeviceName,
+			}, nil
+		}
+	}
+
+	// If we couldn't find the disk, return default VMDK type
+	klog.V(2).Infof("Could not find specific disk %s, assuming VMDK type", vmdkPath)
+	return &DiskBacking{
+		VVolId:     "",
+		IsRDM:      false,
+		DeviceName: "",
+	}, nil
+}
+
+// diskPathMatches compares two VMDK paths accounting for different formats
+func diskPathMatches(path1, path2 string) bool {
+	// Extract datastore and filename from both paths
+	// Format: "[datastore] folder/file.vmdk"
+	normalize := func(p string) string {
+		p = strings.TrimSpace(p)
+		p = strings.ToLower(p)
+		// Remove brackets from datastore
+		p = strings.ReplaceAll(p, "[", "")
+		p = strings.ReplaceAll(p, "]", "")
+		return p
+	}
+
+	return normalize(path1) == normalize(path2)
 }
 
 type Obj struct {
