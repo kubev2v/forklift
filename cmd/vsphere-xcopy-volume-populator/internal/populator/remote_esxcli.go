@@ -40,10 +40,10 @@ type EsxCli interface {
 
 type RemoteEsxcliPopulator struct {
 	VSphereClient vmware.Client
-	StorageApi    StorageApi
+	StorageApi    EsxiStorageApi
 }
 
-func NewWithRemoteEsxcli(storageApi StorageApi, vsphereHostname, vsphereUsername, vspherePassword string) (Populator, error) {
+func NewWithRemoteEsxcli(storageApi EsxiStorageApi, vsphereHostname, vsphereUsername, vspherePassword string) (Populator, error) {
 	c, err := vmware.NewClient(vsphereHostname, vsphereUsername, vspherePassword)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create vmware client: %w", err)
