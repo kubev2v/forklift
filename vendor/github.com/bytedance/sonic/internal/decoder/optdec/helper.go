@@ -5,9 +5,10 @@ import (
 	"strconv"
 
 	"github.com/bytedance/sonic/internal/native"
-	"github.com/bytedance/sonic/internal/native/types"
 	"github.com/bytedance/sonic/internal/utils"
+	"github.com/bytedance/sonic/internal/native/types"
 )
+
 
 func SkipNumberFast(json string, start int) (int, bool) {
 	// find the number ending, we parsed in native, it always valid
@@ -27,8 +28,9 @@ func SkipNumberFast(json string, start int) (int, bool) {
 	return pos, true
 }
 
+
 func isSpace(c byte) bool {
-	return c == ' ' || c == '\t' || c == '\n' || c == '\r'
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r'
 }
 
 // pos is the start index of the raw
