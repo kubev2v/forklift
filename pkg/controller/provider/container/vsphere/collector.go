@@ -86,6 +86,7 @@ const (
 	fThumbprint     = "summary.config.sslThumbprint"
 	fMgtServerIp    = "summary.managementServerIp"
 	fScsiLun        = "config.storageDevice.scsiLun"
+	fHostBusAdapter = "config.storageDevice.hostBusAdapter"
 	fAdvancedOption = "configManager.advancedOption"
 	// Network
 	fTag     = "tag"
@@ -727,6 +728,7 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 				fVNIC,
 				fScsiLun,
 				fAdvancedOption,
+				fHostBusAdapter,
 			},
 		},
 		{ // Network

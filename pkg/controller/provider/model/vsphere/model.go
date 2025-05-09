@@ -5,6 +5,8 @@ import (
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 )
 
+type ProtocolType string
+
 // Variants.
 const (
 	// Network.
@@ -14,6 +16,16 @@ const (
 	NetDvSwitch    = "DvSwitch"
 	// Cluster.
 	ComputeResource = "ComputeResource"
+	// Storage Protocol Type
+	ProtocolUnknown      ProtocolType = "Unknown"      // Unrecognized or unsupported
+	ProtocolFibreChannel ProtocolType = "FibreChannel" // High-speed network tech
+	ProtocolFCoE         ProtocolType = "FCoE"         // Fibre Channel over Ethernet
+	ProtocolISCSI        ProtocolType = "iSCSI"        // Internet Small Computer Systems Interface
+	ProtocolSCSI         ProtocolType = "ParallelSCSI" // Legacy parallel SCSI interface
+	ProtocolSAS          ProtocolType = "SAS"          // Serial Attached SCSI
+	ProtocolPCIe         ProtocolType = "PCIe"         // PCI Express storage interface
+	ProtocolRDMA         ProtocolType = "RDMA"         // Remote Direct Memory Access
+	ProtocolTCP          ProtocolType = "TCP"          // Generic TCP-based adapter
 )
 
 // Errors
@@ -141,6 +153,7 @@ type Host struct {
 	Datastores         []Ref          `sql:""`
 	HostScsiDisks      []HostScsiDisk `sql:""`
 	AdvancedOptions    Ref            `sql:""`
+	StorageProtocols   []ProtocolType `sql:""`
 }
 
 type HostScsiDisk struct {

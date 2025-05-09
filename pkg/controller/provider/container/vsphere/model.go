@@ -385,6 +385,32 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 			case fAdvancedOption:
 				v.model.AdvancedOptions = v.Ref(p.Val)
 			}
+		case fHostBusAdapter:
+			if array, cast := p.Val.(types.ArrayOfHostHostBusAdapter); cast {
+				v.model.StorageProtocols = nil
+				for _, hba := range array.HostHostBusAdapter {
+					protocolType := model.ProtocolUnknown
+					switch hba.(type) {
+					case *types.HostFibreChannelHba:
+						protocolType = model.ProtocolFibreChannel
+					case *types.HostFibreChannelOverEthernetHba:
+						protocolType = model.ProtocolFCoE
+					case *types.HostInternetScsiHba:
+						protocolType = model.ProtocolISCSI
+					case *types.HostParallelScsiHba:
+						protocolType = model.ProtocolSCSI
+					case *types.HostSerialAttachedHba:
+						protocolType = model.ProtocolSAS
+					case *types.HostPcieHba:
+						protocolType = model.ProtocolPCIe
+					case *types.HostRdmaHba:
+						protocolType = model.ProtocolRDMA
+					case *types.HostTcpHba:
+						protocolType = model.ProtocolTCP
+					}
+					v.model.StorageProtocols = append(v.model.StorageProtocols, protocolType)
+				}
+			}
 		}
 	}
 }
