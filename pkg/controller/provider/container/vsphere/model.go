@@ -376,14 +376,58 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 					v.model.HostScsiDisks = nil
 					for _, iScsiLun := range array.ScsiLun {
 						hostScsiDisk := model.HostScsiDisk{}
-						scsiLun := iScsiLun.GetScsiLun()
-						hostScsiDisk.CanonicalName = scsiLun.CanonicalName
-						hostScsiDisk.Vendor = strings.TrimSpace(scsiLun.Vendor)
-						v.model.HostScsiDisks = append(v.model.HostScsiDisks, hostScsiDisk)
+						if disk, ok := iScsiLun.(*types.HostScsiDisk); ok {
+							hostScsiDisk.CanonicalName = disk.CanonicalName
+							hostScsiDisk.Vendor = strings.TrimSpace(disk.Vendor)
+							hostScsiDisk.Key = strings.TrimSpace(disk.Key)
+							v.model.HostScsiDisks = append(v.model.HostScsiDisks, hostScsiDisk)
+						}
 					}
 				}
 			case fAdvancedOption:
 				v.model.AdvancedOptions = v.Ref(p.Val)
+			case fHostBusAdapter:
+				if array, cast := p.Val.(types.ArrayOfHostHostBusAdapter); cast {
+					for _, hba := range array.HostHostBusAdapter {
+						hbaDiskInfo := model.HbaDiskInfo{}
+						protocolType := model.ProtocolUnknown
+						switch hba.(type) {
+						case *types.HostFibreChannelHba:
+							protocolType = model.ProtocolFibreChannel
+						case *types.HostFibreChannelOverEthernetHba:
+							protocolType = model.ProtocolFCoE
+						case *types.HostInternetScsiHba:
+							protocolType = model.ProtocolISCSI
+						case *types.HostParallelScsiHba:
+							protocolType = model.ProtocolSCSI
+						case *types.HostSerialAttachedHba:
+							protocolType = model.ProtocolSAS
+						case *types.HostPcieHba:
+							protocolType = model.ProtocolPCIe
+						case *types.HostRdmaHba:
+							protocolType = model.ProtocolRDMA
+						case *types.HostTcpHba:
+							protocolType = model.ProtocolTCP
+						}
+						hostHba := hba.GetHostHostBusAdapter()
+						hbaDiskInfo.Device = hostHba.Device
+						hbaDiskInfo.Model = hostHba.Model
+						hbaDiskInfo.Key = hostHba.Key
+						hbaDiskInfo.Protocol = string(protocolType)
+						v.model.HbaDiskInfo = append(v.model.HbaDiskInfo, hbaDiskInfo)
+					}
+				}
+			case fScsiTopology:
+				if array, cast := p.Val.(types.ArrayOfHostScsiTopologyInterface); cast {
+					for _, scsiTopologyInterface := range array.HostScsiTopologyInterface {
+						hostScsiTopology := model.HostScsiTopology{}
+						hostScsiTopology.HbaKey = scsiTopologyInterface.Adapter
+						for _, scsiTopologyTarget := range scsiTopologyInterface.Target {
+							hostScsiTopology.ScsiDiskKeys = append(hostScsiTopology.ScsiDiskKeys, scsiTopologyTarget.Lun[0].ScsiLun)
+						}
+						v.model.HostScsiTopology = append(v.model.HostScsiTopology, hostScsiTopology)
+					}
+				}
 			}
 		}
 	}
