@@ -1,6 +1,6 @@
 FROM registry.redhat.io/ubi9/go-toolset:1.21.13-2.1729776560 AS envsubst
 
-FROM registry.redhat.io/openshift4/ose-operator-sdk-rhel9@sha256:4e59ce6570325c0cba001b4dd95f7af9e0a8d87bc6e5d27ea2714155fb964699 AS builder
+FROM registry.redhat.io/openshift4/ose-operator-sdk-rhel9@sha256:5fd2a8e6292eec798ac107a0a0d885e1f1c874c2a360291ba4a3bdd0c0a2a52b AS builder
 
 ARG VERSION="2.9.0"
 ARG CHANNEL="tech-preview"
