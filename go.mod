@@ -18,6 +18,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.13.2
 	github.com/onsi/gomega v1.30.0
 	github.com/openshift/api v0.0.0-20230613151523-ba04973d3ed1
+	github.com/openshift/client-go v0.0.0-20230503144108-75015d2347cb
 	github.com/openshift/library-go v0.0.0-20230626162119-954ade536d6d
 	github.com/ovirt/go-ovirt v0.0.0-20230808190322-9fd1992199b2
 	github.com/pkg/errors v0.9.1

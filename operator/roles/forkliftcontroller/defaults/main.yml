@@ -123,7 +123,9 @@ virt_v2v_container_limits_memory: "8Gi"
 virt_v2v_container_requests_cpu: "1000m"
 virt_v2v_container_requests_memory: "1Gi"
 
-vddk_image: "{{ lookup( 'env', 'VDDK_IMAGE')"
+vddk_image: "{{ lookup( 'env', 'VDDK_IMAGE') }}"
+vddk_build_config_name: "vddk"
+vddk_image_stream_name: "vddk"
 
 hooks_container_limits_cpu: "1000m"
 hooks_container_limits_memory: "1Gi"
