@@ -31,17 +31,17 @@ func (m *MockPrimera3ParClient) GetSessionKey() (string, error) {
 	return m.SessionKey, nil
 }
 
-func (m *MockPrimera3ParClient) EnsureHostWithIqn(iqn string) (string, error) {
+func (m *MockPrimera3ParClient) EnsureHostsWithIds(iqn []string) ([]string, error) {
 	for hostName, existingIQN := range m.Hosts {
-		if existingIQN == iqn {
-			return hostName, nil
+		if existingIQN == iqn[0] {
+			return []string{hostName}, nil
 		}
 	}
 
 	hostName := fmt.Sprintf("mock-host-%s", iqn)
-	m.Hosts[hostName] = iqn
+	m.Hosts[hostName] = iqn[0]
 	log.Printf("Mock: Created host %s with IQN %s", hostName, iqn)
-	return hostName, nil
+	return []string{hostName}, nil
 }
 
 func (m *MockPrimera3ParClient) EnsureHostSetExists(hostSetName string) error {
@@ -84,7 +84,7 @@ func (m *MockPrimera3ParClient) EnsureLunMapped(initiatorGroup string, targetLUN
 	return targetLUN, nil
 }
 
-func (m *MockPrimera3ParClient) LunUnmap(ctx context.Context, initiatorGroupName, lunName string) error {
+func (m *MockPrimera3ParClient) LunUnmap(ctx context.Context, initiatorGroupName string, lunName string) error {
 	vluns, exists := m.VLUNs[initiatorGroupName]
 	if !exists {
 		return fmt.Errorf("mock: no VLUNs found for initiator group %s", initiatorGroupName)
