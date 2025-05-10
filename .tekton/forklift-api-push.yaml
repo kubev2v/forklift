@@ -2,19 +2,17 @@ apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
   annotations:
-    build.appstudio.openshift.io/build-nudge-files: ".*Dockerfile.*, .*.yaml, .*Containerfile.*,
-      operator/export-vars.sh"
+    build.appstudio.openshift.io/build-nudge-files: .*Dockerfile.*, .*.yaml, .*Containerfile.*,
+      operator/export-vars.sh
     build.appstudio.openshift.io/repo: https://github.com/kubev2v/forklift?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "main" && ( ".tekton/forklift-api-pull-request.yaml".pathChanged() ||
-      ".tekton/forklift-api-push.yaml".pathChanged() ||
-      ".konflux/forklift-api/rpms.lock.yaml".pathChanged() ||
-      "build/forklift-api/Containerfile-downstream".pathChanged() ||
-      "pkg/forklift-api/***".pathChanged() ||
-      "cmd/forklift-api/***".pathChanged() )
+      == "main" && ( ".tekton/forklift-api-pull-request.yaml".pathChanged() || ".tekton/forklift-api-push.yaml".pathChanged()
+      || ".konflux/forklift-api/rpms.lock.yaml".pathChanged() || "build/forklift-api/Containerfile-downstream".pathChanged()
+      || "pkg/forklift-api/***".pathChanged() || "cmd/forklift-api/***".pathChanged()
+      )
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: forklift-operator
@@ -185,7 +183,7 @@ spec:
         value: $(params.output-image).prefetch
       - name: ociArtifactExpiresAfter
         value: $(params.image-expires-after)
-      - name: dev-package-managers 
+      - name: dev-package-managers
         value: "true"
       - name: ACTIVATION_KEY
         value: activation-key-rhel9
@@ -363,7 +361,7 @@ spec:
           value: quay.io/konflux-ci/tekton-catalog/task-rpms-signature-scan:0.2@sha256:7592da3c98a58a8990352e07272c28e7f9305395ee91ffc0dd7acdd32f0bc1e6
         - name: kind
           value: task
-        resolver: bundles    
+        resolver: bundles
     - name: ecosystem-cert-preflight-checks
       params:
       - name: image-url
@@ -475,7 +473,8 @@ spec:
       optional: true
     - name: netrc
       optional: true
-  taskRunTemplate: {}
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-forklift-api
   workspaces:
   - name: git-auth
     secret:
