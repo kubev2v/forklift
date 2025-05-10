@@ -2,18 +2,17 @@ apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
   annotations:
-    build.appstudio.openshift.io/build-nudge-files: ".*Dockerfile.*, .*.yaml, .*Containerfile.*,
-      operator/export-vars.sh"
+    build.appstudio.openshift.io/build-nudge-files: .*Dockerfile.*, .*.yaml, .*Containerfile.*,
+      operator/export-vars.sh
     build.appstudio.openshift.io/repo: https://github.com/kubev2v/forklift?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
       == "main" && ( ".tekton/forklift-operator-pull-request.yaml".pathChanged() ||
-      ".tekton/forklift-operator-push.yaml".pathChanged() ||
-      "build/forklift-operator/Containerfile-downstream".pathChanged() ||
-      "operator/roles/***".pathChanged() ||
-      "operator/watches.yaml".pathChanged() )
+      ".tekton/forklift-operator-push.yaml".pathChanged() || "build/forklift-operator/Containerfile-downstream".pathChanged()
+      || "operator/roles/***".pathChanged() || "operator/watches.yaml".pathChanged()
+      )
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: forklift-operator
@@ -356,7 +355,7 @@ spec:
           value: quay.io/konflux-ci/tekton-catalog/task-rpms-signature-scan:0.2@sha256:7592da3c98a58a8990352e07272c28e7f9305395ee91ffc0dd7acdd32f0bc1e6
         - name: kind
           value: task
-        resolver: bundles    
+        resolver: bundles
     - name: ecosystem-cert-preflight-checks
       params:
       - name: image-url
@@ -468,7 +467,8 @@ spec:
       optional: true
     - name: netrc
       optional: true
-  taskRunTemplate: {}
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-forklift-operator
   workspaces:
   - name: git-auth
     secret:
