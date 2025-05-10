@@ -2,18 +2,17 @@ apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
   annotations:
-    build.appstudio.openshift.io/build-nudge-files: ".*Dockerfile.*, .*.yaml, .*Containerfile.*,
-      operator/export-vars.sh"
+    build.appstudio.openshift.io/build-nudge-files: .*Dockerfile.*, .*.yaml, .*Containerfile.*,
+      operator/export-vars.sh
     build.appstudio.openshift.io/repo: https://github.com/kubev2v/forklift?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
       == "main" && ( ".tekton/ovirt-populator-pull-request.yaml".pathChanged() ||
-      ".tekton/ovirt-populator-push.yaml".pathChanged() ||
-      ".konflux/ovirt-populator/rpms.lock.yaml".pathChanged() ||
-      "build/ovirt-populator/Containerfile-downstream".pathChanged() ||
-      "cmd/ovirt-populator/***".pathChanged() )
+      ".tekton/ovirt-populator-push.yaml".pathChanged() || ".konflux/ovirt-populator/rpms.lock.yaml".pathChanged()
+      || "build/ovirt-populator/Containerfile-downstream".pathChanged() || "cmd/ovirt-populator/***".pathChanged()
+      )
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: forklift-operator
@@ -184,7 +183,7 @@ spec:
         value: $(params.output-image).prefetch
       - name: ociArtifactExpiresAfter
         value: $(params.image-expires-after)
-      - name: dev-package-managers 
+      - name: dev-package-managers
         value: "true"
       - name: ACTIVATION_KEY
         value: activation-key-rhel8
@@ -476,7 +475,8 @@ spec:
       optional: true
     - name: netrc
       optional: true
-  taskRunTemplate: {}
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-ovirt-populator
   workspaces:
   - name: git-auth
     secret:
