@@ -9,10 +9,9 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
       == "main" && ( ".tekton/ovirt-populator-pull-request.yaml".pathChanged() ||
-      ".tekton/ovirt-populator-push.yaml".pathChanged() ||
-      ".konflux/ovirt-populator/rpms.lock.yaml".pathChanged() ||
-      "build/ovirt-populator/Containerfile-downstream".pathChanged() ||
-      "cmd/ovirt-populator/***".pathChanged() )
+      ".tekton/ovirt-populator-push.yaml".pathChanged() || ".konflux/ovirt-populator/rpms.lock.yaml".pathChanged()
+      || "build/ovirt-populator/Containerfile-downstream".pathChanged() || "cmd/ovirt-populator/***".pathChanged()
+      )
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: forklift-operator
@@ -185,7 +184,7 @@ spec:
         value: $(params.output-image).prefetch
       - name: ociArtifactExpiresAfter
         value: $(params.image-expires-after)
-      - name: dev-package-managers 
+      - name: dev-package-managers
         value: "true"
       - name: ACTIVATION_KEY
         value: activation-key-rhel8
@@ -365,7 +364,7 @@ spec:
           value: quay.io/konflux-ci/tekton-catalog/task-rpms-signature-scan:0.2@sha256:7592da3c98a58a8990352e07272c28e7f9305395ee91ffc0dd7acdd32f0bc1e6
         - name: kind
           value: task
-        resolver: bundles      
+        resolver: bundles
     - name: ecosystem-cert-preflight-checks
       params:
       - name: image-url
@@ -477,7 +476,8 @@ spec:
       optional: true
     - name: netrc
       optional: true
-  taskRunTemplate: {}
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-ovirt-populator
   workspaces:
   - name: git-auth
     secret:
