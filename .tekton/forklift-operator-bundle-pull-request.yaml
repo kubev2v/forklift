@@ -8,11 +8,9 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
-      == "main" && ( "operator/config/manifests/***".pathChanged() || 
-      ".tekton/forklift-operator-bundle-pull-request.yaml".pathChanged() ||
-      ".tekton/forklift-operator-bundle-push.yaml".pathChanged() ||
-      "build/forklift-operator-bundle/Containerfile-downstream".pathChanged() ||
-      "operator/export-vars.sh".pathChanged() )
+      == "main" && ( "operator/config/manifests/***".pathChanged() || ".tekton/forklift-operator-bundle-pull-request.yaml".pathChanged()
+      || ".tekton/forklift-operator-bundle-push.yaml".pathChanged() || "build/forklift-operator-bundle/Containerfile-downstream".pathChanged()
+      || "operator/export-vars.sh".pathChanged() )
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: forklift-operator
@@ -359,7 +357,7 @@ spec:
           value: quay.io/konflux-ci/tekton-catalog/task-rpms-signature-scan:0.2@sha256:7592da3c98a58a8990352e07272c28e7f9305395ee91ffc0dd7acdd32f0bc1e6
         - name: kind
           value: task
-        resolver: bundles    
+        resolver: bundles
     - name: sast-snyk-check
       params:
       - name: image-digest
@@ -451,7 +449,8 @@ spec:
       optional: true
     - name: netrc
       optional: true
-  taskRunTemplate: {}
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-forklift-operator-bundle
   workspaces:
   - name: git-auth
     secret:
