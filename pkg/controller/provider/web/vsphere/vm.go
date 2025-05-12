@@ -235,6 +235,7 @@ type VM struct {
 	CoresPerSocket        int32                `json:"coresPerSocket"`
 	MemoryMB              int32                `json:"memoryMB"`
 	GuestName             string               `json:"guestName"`
+	HostName              string               `json:"hostName"`
 	GuestID               string               `json:"guestId"`
 	BalloonedMemory       int32                `json:"balloonedMemory"`
 	IpAddress             string               `json:"ipAddress"`
@@ -267,6 +268,7 @@ func (r *VM) With(m *model.VM) {
 	r.CoresPerSocket = m.CoresPerSocket
 	r.MemoryMB = m.MemoryMB
 	r.GuestName = m.GuestName
+	r.HostName = m.HostName
 	r.GuestID = m.GuestID
 	r.BalloonedMemory = m.BalloonedMemory
 	r.IpAddress = m.IpAddress

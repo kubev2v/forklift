@@ -25,6 +25,7 @@ const (
 	EnvSecretKeyName              = "V2V_secretKey"
 	EnvLocalMigrationName         = "LOCAL_MIGRATION"
 	EnvVirtIoWinLegacyDriversName = "VIRTIO_WIN"
+	EnvHostName                   = "V2V_HOSTNAME"
 )
 
 const (
@@ -79,6 +80,8 @@ type AppConfig struct {
 	SecretKey string
 	// V2V_virtIoWinDrivers
 	VirtIoWinLegacyDrivers string
+	// hostname
+	HostName string
 
 	// Paths
 	VddkConfFile         string
@@ -111,6 +114,7 @@ func (s *AppConfig) Load() (err error) {
 	flag.StringVar(&s.InspectionOutputFile, "inspection-output-file", InspectionOutputFile, "Path where the virt-v2v-inspector will output the metadata")
 	flag.StringVar(&s.LibvirtDomainFile, "libvirt-domain-file", V2vInPlaceLibvirtDomain, "Path to the libvirt domain used in the in-place conversion")
 	flag.StringVar(&s.VirtIoWinLegacyDrivers, "virtio-win-legacy-drivers", os.Getenv(EnvVirtIoWinLegacyDriversName), "Path to the virtio-win legacy drivers ISO")
+	flag.StringVar(&s.HostName, "hostname", os.Getenv(EnvHostName), "Hostname of the vm")
 	flag.Parse()
 
 	return s.validate()
