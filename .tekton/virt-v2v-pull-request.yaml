@@ -8,13 +8,10 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
-      == "main" && ( ".tekton/virt-v2v-pull-request.yaml".pathChanged() ||
-      ".tekton/virt-v2v-push.yaml".pathChanged() ||
-      ".konflux/virt-v2v/rpms.lock.yaml".pathChanged() ||
-      "build/virt-v2v/Containerfile-downstream".pathChanged() ||
-      "pkg/virt-v2v/***".pathChanged() ||
-      "cmd/virt-v2v/***".pathChanged() ||
-      "cmd/virt-v2v-monitor/***".pathChanged() )
+      == "main" && ( ".tekton/virt-v2v-pull-request.yaml".pathChanged() || ".tekton/virt-v2v-push.yaml".pathChanged()
+      || ".konflux/virt-v2v/rpms.lock.yaml".pathChanged() || "build/virt-v2v/Containerfile-downstream".pathChanged()
+      || "pkg/virt-v2v/***".pathChanged() || "cmd/virt-v2v/***".pathChanged() || "cmd/virt-v2v-monitor/***".pathChanged()
+      )
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: forklift-operator
@@ -187,7 +184,7 @@ spec:
         value: $(params.output-image).prefetch
       - name: ociArtifactExpiresAfter
         value: $(params.image-expires-after)
-      - name: dev-package-managers 
+      - name: dev-package-managers
         value: "true"
       - name: ACTIVATION_KEY
         value: activation-key-rhel9
@@ -479,7 +476,8 @@ spec:
       optional: true
     - name: netrc
       optional: true
-  taskRunTemplate: {}
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-virt-v2v
   workspaces:
   - name: git-auth
     secret:
