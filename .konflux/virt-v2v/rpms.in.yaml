@@ -1,0 +1,14 @@
+packages:
+  - qemu-img
+  - libguestfs-devel
+  - libguestfs-winsupport
+  - libguestfs-xfs
+  - virt-v2v
+  - virtio-win
+contentOrigin:
+  repofiles:
+    - ./redhat.repo
+context:
+  containerfile:
+    file: ../../build/virt-v2v/Containerfile-downstream
+arches: [x86_64]
