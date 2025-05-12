@@ -1,14 +1,21 @@
 ## test values
 ### cluster config
 pod-namespace: pop
-test-namespace: vsphere-populator-test
-kubeconfig: "/home/amit/.kube/config"
+test-namespace: ontap-vsphere-populator-test
+kubeconfig: "/home/obengali/.kube/config"
 secret-name: populator-secret
 controller-path: assets/manifests/xcopy-setup/controller.yaml
 test-labels: vsphere-populator
 ### images
 test-image-label:  0.47
-test-populator-image: quay.io/amitos/vsphere-xcopy-volume-populator
+test-populator-image: quay.io/rh-ee-obengali/vsphere-xcopy-volume-populator
 ### storage
-storage-vendor: primera3par
+storage-vendor: ontap
+storage-password: lc0syf1VvyjZMyZvPx6lERzWsVLIu3poOGstlQ2jFuILAffG1O6jDQX60YbxtlJ1
+storage-user: robot
+storage-url: ntap-assisted-installer.mgmt.lab.eng.tlv2.redhat.com
+### vsphere
+vsphere-password: '!*T8!n*JSk3S'
+vsphere-user: rgolan@ecosystem.content.vsphere
+vsphere-url: eco-vcenter-server.lab.eng.tlv2.redhat.com
 storage-class-name: xcopy-storage-class
