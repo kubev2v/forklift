@@ -8,7 +8,9 @@ metadata:
     pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "main"
+      == "main" && ( ".tekton/validation-dev-preview-*.yaml".pathChanged() ||
+      "build/validation/Containerfile-downstream".pathChanged() ||
+      "validation/***".pathChanged() )
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: forklift-operator-dev-preview
@@ -28,6 +30,8 @@ spec:
     value: build/validation/Containerfile-downstream
   - name: path-context
     value: .
+  - name: prefetch-input
+    value: '[{"type": "gomod", "path": ".konflux/validation"}]'
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
@@ -77,7 +81,7 @@ spec:
       description: Skip checks against built image
       name: skip-checks
       type: string
-    - default: "false"
+    - default: "true"
       description: Execute the build with network isolation
       name: hermetic
       type: string
