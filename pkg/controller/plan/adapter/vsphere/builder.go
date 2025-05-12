@@ -273,6 +273,13 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		})
 	}
 
+	if vm.HostName != "" {
+		env = append(env, core.EnvVar{
+			Name:  "V2V_HOSTNAME",
+			Value: vm.HostName,
+		})
+	}
+
 	libvirtURL, fingerprint, err := r.getSourceDetails(vm, sourceSecret)
 	if err != nil {
 		return
