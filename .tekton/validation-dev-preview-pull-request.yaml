@@ -33,6 +33,8 @@ spec:
     value: build/validation/Containerfile-downstream
   - name: path-context
     value: .
+  - name: build-source-image
+    value: "true"
   - name: prefetch-input
     value: '[{"type": "gomod", "path": ".konflux/validation"}]'
   pipelineSpec:
