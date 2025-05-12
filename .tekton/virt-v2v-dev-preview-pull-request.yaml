@@ -36,6 +36,8 @@ spec:
     value: build/virt-v2v/Containerfile-downstream
   - name: path-context
     value: .
+  - name: build-source-image
+    value: "true"
   - name: prefetch-input
     value: '[{"type": "rpm", "path": ".konflux/virt-v2v"}]'
   pipelineSpec:
