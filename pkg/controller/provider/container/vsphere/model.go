@@ -638,6 +638,10 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				if s, cast := p.Val.(string); cast {
 					v.model.GuestName = s
 				}
+			case fHostName:
+				if s, cast := p.Val.(string); cast {
+					v.model.HostName = s
+				}
 			case fTpmPresent:
 				if b, cast := p.Val.(bool); cast {
 					v.model.TpmEnabled = b

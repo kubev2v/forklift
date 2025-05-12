@@ -149,7 +149,9 @@ func (c *Conversion) addVirtV2vArgs(cmd utils.CommandBuilder) (err error) {
 func (c *Conversion) addVirtV2vVsphereArgs(cmd utils.CommandBuilder) (err error) {
 	cmd.AddArg("-i", "libvirt").
 		AddArg("-ic", c.LibvirtUrl).
-		AddArg("-ip", c.SecretKey)
+		AddArg("-ip", c.SecretKey).
+		AddArg("--hostname", c.HostName)
+
 	err = c.addCommonArgs(cmd)
 	if err != nil {
 		return err
