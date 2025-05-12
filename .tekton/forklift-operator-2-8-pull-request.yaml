@@ -9,7 +9,10 @@ metadata:
     pipelinesascode.tekton.dev/cancel-in-progress: "true"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
-      == "release-2.8"
+      == "release-2.8" && ( ".tekton/forklift-operator-2-8-*.yaml".pathChanged() ||
+      "build/forklift-operator/Containerfile-downstream".pathChanged() ||
+      "operator/roles/***".pathChanged() ||
+      "operator/watches.yaml".pathChanged() )
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: forklift-operator-2-8
@@ -31,6 +34,8 @@ spec:
     value: build/forklift-operator/Containerfile-downstream
   - name: path-context
     value: .
+  - name: build-source-image
+    value: "true"
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
@@ -80,7 +85,7 @@ spec:
       description: Skip checks against built image
       name: skip-checks
       type: string
-    - default: "false"
+    - default: "true"
       description: Execute the build with network isolation
       name: hermetic
       type: string
