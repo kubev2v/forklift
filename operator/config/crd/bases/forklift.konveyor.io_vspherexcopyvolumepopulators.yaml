@@ -46,7 +46,7 @@ spec:
               storageVendorProduct:
                 description: |-
                   StorageVendorProduct is the storage vendor the target disk and PVC are connected to
-                  Supported values [ontap, primera3par]
+                  Supported values [vantara, ontap, primera3par]
                 type: string
               vmdkPath:
                 description: |-

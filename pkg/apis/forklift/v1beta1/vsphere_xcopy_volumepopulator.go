@@ -27,7 +27,7 @@ type VSphereXcopyVolumePopulatorSpec struct {
 	// The secret name with vsphere and storage credentials
 	SecretName string `json:"secretName"`
 	// StorageVendorProduct is the storage vendor the target disk and PVC are connected to
-	// Supported values [ontap, primera3par]
+	// Supported values [vantara, ontap, primera3par]
 	StorageVendorProduct string `json:"storageVendorProduct"`
 }
 
