@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"net/http"
 	"os"
@@ -117,4 +120,20 @@ func ApplyResource[T any](
 		return fmt.Errorf("ensuring %T : %w", obj, err)
 	}
 	return nil
+}
+
+func ApplyPVCFromTemplate(clientset *kubernetes.Clientset, namespace, pvcName, size, storageClassName, yamlPath string) error {
+	data, err := ioutil.ReadFile(yamlPath)
+	if err != nil {
+		return fmt.Errorf("read PVC template: %w", err)
+	}
+	var pvc corev1.PersistentVolumeClaim
+	if err := yaml.Unmarshal(data, &pvc); err != nil {
+		return fmt.Errorf("unmarshal PVC template: %w", err)
+	}
+	pvc.Name = pvcName
+	pvc.Namespace = namespace
+	pvc.Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse(size)
+	pvc.Spec.StorageClassName = &storageClassName
+	return EnsurePersistentVolumeClaim(clientset, namespace, &pvc)
 }

@@ -1,0 +1,9 @@
+image: fedora-vm:latest
+storage-vendor-product: "ontap"
+tests:
+  - name: test-1
+    success:
+      max_time_seconds: 300
+    vms:
+      - name_prefix: testvm1
+        size: 10Gi

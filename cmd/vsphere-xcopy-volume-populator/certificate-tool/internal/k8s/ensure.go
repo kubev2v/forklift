@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"certificate-tool/internal/utils"
 	"context"
 	"fmt"
 
@@ -169,5 +170,85 @@ func EnsurePersistentVolumeClaim(clientset *kubernetes.Clientset, namespace stri
 		return fmt.Errorf("failed to get PVC %q: %w", pvc.Name, err)
 	}
 	klog.Infof("PVC %q already exists", existing.Name)
+	return nil
+}
+
+//func ensurePVC(ctx context.Context, clientset *kubernetes.Clientset, namespace, pvcName, yamlPath string) error {
+//	data, err := ioutil.ReadFile(yamlPath)
+//	if err != nil {
+//		return fmt.Errorf("read PVC YAML: %w", err)
+//	}
+//	var pvc corev1.PersistentVolumeClaim
+//	if err := yaml.Unmarshal(data, &pvc); err != nil {
+//		return fmt.Errorf("unmarshal PVC: %w", err)
+//	}
+//	pvc.Namespace = namespace
+//	pvc.Name = pvcName
+//	client := clientset.CoreV1().PersistentVolumeClaims(namespace)
+//	_, err = client.Get(ctx, pvcName, metav1.GetOptions{})
+//	if apierrors.IsNotFound(err) {
+//		if _, err := client.Create(ctx, &pvc, metav1.CreateOptions{}); err != nil {
+//			return fmt.Errorf("create PVC: %w", err)
+//		}
+//		klog.Infof("Created PVC %s", pvcName)
+//		return nil
+//	} else if err != nil {
+//		return fmt.Errorf("get PVC: %w", err)
+//	}
+//	klog.Infof("PVC %s exists", pvcName)
+//	return nil
+//}
+
+// EnsurePopulatorPod creates or reapplies a populator Pod mounting its PVC.
+func EnsurePopulatorPod(ctx context.Context, clientset *kubernetes.Clientset, namespace, podName, image, testLabel string, vm utils.VM, storageVendorProduct, pvcName string) error {
+	pods := clientset.CoreV1().Pods(namespace)
+	_, err := pods.Get(ctx, podName, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		mustBeDefined := false
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      podName,
+				Namespace: namespace,
+				Labels:    map[string]string{"test": testLabel},
+			},
+			Spec: corev1.PodSpec{
+				RestartPolicy:      corev1.RestartPolicyNever,
+				ServiceAccountName: "populator",
+				Volumes: []corev1.Volume{
+					{Name: "target", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvcName}}},
+				},
+				Containers: []corev1.Container{{
+					Name:                   "populate",
+					Image:                  image,
+					ImagePullPolicy:        corev1.PullAlways,
+					TerminationMessagePath: corev1.TerminationMessagePathDefault,
+					Resources:              corev1.ResourceRequirements{},
+					VolumeDevices:          []corev1.VolumeDevice{{Name: "target", DevicePath: "/dev/block"}},
+					Ports:                  []corev1.ContainerPort{{Name: "metrics", ContainerPort: 8443, Protocol: corev1.ProtocolTCP}},
+					EnvFrom:                []corev1.EnvFromSource{{SecretRef: &corev1.SecretEnvSource{corev1.LocalObjectReference{Name: "populator-secret"}, &mustBeDefined}}},
+					Args: []string{
+						fmt.Sprintf("--source-vmdk=%s", vm.VmdkPath),
+						fmt.Sprintf("--target-namespace=%s", namespace),
+						fmt.Sprintf("--cr-name=%s", "notrequired"),
+						fmt.Sprintf("--cr-namespace=%s", "notrequired"),
+						fmt.Sprintf("--owner-name=%s", pvcName),
+						fmt.Sprintf("--secret-name=%s-secret", "notrequired"),
+						fmt.Sprintf("--pvc-size=%s", vm.Size),
+						fmt.Sprintf("--owner-uid=%s", "notrequired"),
+						fmt.Sprintf("--storage-vendor-product=%s", storageVendorProduct),
+					},
+				}},
+			},
+		}
+		if _, err := pods.Create(ctx, pod, metav1.CreateOptions{}); err != nil {
+			return fmt.Errorf("failed to create populator pod %s: %w", podName, err)
+		}
+		klog.Infof("Created populator pod %s", podName)
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("error getting pod %s: %w", podName, err)
+	}
+	klog.Infof("Populator pod %s already exists", podName)
 	return nil
 }
