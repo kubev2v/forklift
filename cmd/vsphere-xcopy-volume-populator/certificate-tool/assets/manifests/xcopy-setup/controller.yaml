@@ -30,7 +30,7 @@ spec:
               value: registry.redhat.io/migration-toolkit-virtualization/mtv-openstack-populator-rhel9@sha256:500943bfc5642810b75ae64da758b4eed079c4d5fff0f5090b5b0b6e550831dd
             - name: VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE
               value: ${.TEST_POPULATOR_IMAGE}:${.TEST_IMAGE_LABEL}
-          image: quay.io/amitos/populator-controller:${.TEST_IMAGE_LABEL}
+          image: quay.io/rgolangh/populator-controller:${.TEST_IMAGE_LABEL}
           imagePullPolicy: Always
           name: forklift-populator-controller
           ports:

@@ -1,0 +1,38 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: populator-pod
+  namespace: ${.TEST_NAMESPACE}
+spec:
+  restartPolicy: Never
+  serviceAccountName: populator
+  containers:
+    - volumeDevices:
+        - name: target
+          devicePath: /dev/block
+      resources: {}
+      terminationMessagePath: /dev/termination-log
+      name: populate
+      ports:
+        - name: metrics
+          containerPort: 8443
+          protocol: TCP
+      imagePullPolicy: Always
+      envFrom:
+        - secretRef:
+            name: populator-secret
+      image: ${.TEST_POPULATOR_IMAGE}
+      args:
+        - '--source-vmdk=[eco-iscsi-ds3] largevm01-1tb/largevm01-1tb.vmdk'
+        - '--target-namespace=migmig'
+        - '--cr-name=copy-of-largest-largevm01-1tb-0f1c063e'
+        - '--cr-namespace=migmig'
+        - '--owner-name=copy-of-largest-largevm01-1tb-0f1c063e'
+        - '--secret-name=copy-of-largest-vm-109753-sr6f6'
+        - '--pvc-size=1099511627776'
+        - '--owner-uid=8f16338b-36b2-4e35-8c1a-7b7ba509e39c'
+  serviceAccount: populator
+  volumes:
+    - name: target
+      persistentVolumeClaim:
+        claimName: xcopy-pvc

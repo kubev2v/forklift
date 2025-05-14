@@ -5,11 +5,10 @@ ENV_FILE ?= assets/config/.env
 -include $(ENV_FILE)
 GOPATH ?= `go env GOPATH`
 GOBIN ?= $(GOPATH)/bin
-SHELL := /usr/bin/env bash
 # By default use the kubectl installed by the
 # 'kubectl' target
 DEFAULT_KUBECTL = $(GOBIN)/kubectl
-KUBECTL ?= $(DEFAULT_KUBECTL)
+KUBECTL ?= /usr/bin/kubectl
 
 
 TEST_NAMESPACE = $(shell yq e '.test-namespace' $(CONFIG_FILE))
@@ -21,6 +20,7 @@ TEST_LABELS      = $(shell yq e '.test-labels' $(CONFIG_FILE))
 TEST_POPULATOR_IMAGE = $(shell yq e '.test-populator-image' $(CONFIG_FILE))
 CONTROLLER_PATH  = $(shell yq e '.controller-path' $(CONFIG_FILE))
 STORAGE_CLASS_NAME  = $(shell yq e '.storage-class-name' $(CONFIG_FILE))
+SECRET_NAME =  $(shell yq e '.secret-name' $(CONFIG_FILE))
 
 REQUIRED_VARS := STORAGE_USER STORAGE_PASSWORD STORAGE_URL VSPHERE_USER VSPHERE_PASSWORD VSPHERE_URL STORAGE_CLASS_NAME
 
@@ -92,20 +92,21 @@ create-vm: build ## Run certificate-tool create-vm subcommand.
 test-xcopy: build prepare
 	@echo "Running test-xcopy..."
 	@./$(BINARY) test-xcopy \
-		--kubeconfig          $(KUBECONFIG) \
-		--pvc-yaml           "assets/manifests/xcopy-setup/xcopy-pvc.yaml"\
-		--cr-yaml            "assets/manifests/xcopy-setup/cr-test-xcopy.yaml" \
-		--vmdk-path          "[$(DATA_STORE)] $(VM_NAME)/fedora.vmdk"  \
-		--storage-vendor     $(STORAGE_VENDOR) \
-		--storage-class-name $(STORAGE_CLASS_NAME)
+		--kubeconfig         	$(KUBECONFIG) \
+		--pvc-yaml           	"assets/manifests/xcopy-setup/xcopy-pvc.yaml"\
+		--populator-yaml     	"assets/manifests/xcopy-setup/populator.yaml" \
+		--vmdk-path          	"[$(DATA_STORE)] $(VM_NAME)/fedora.vmdk"  \
+		--storage-vendor     	$(STORAGE_VENDOR) \
+		--storage-class-name 	$(STORAGE_CLASS_NAME) \
+		--test-populator-image  $(TEST_POPULATOR_IMAGE)
 
 
 all: create-vm test-xcopy ## Run all steps in sequence.
 
 clean: ## Clean built artifacts.
 	@rm -f $(BINARY)
-	@kubectl delete vspherexcopyvolumepopulators.forklift.konveyor.io -n pop test-xcopy
-	@kubectl delete pods --all -n pop
-	@kubectl patch pvc xcopy-pvc -n pop -p '{"metadata":{"finalizers":[]}}' --type=merge
-	@kubectl delete pvc --all -n pop
+	@$(KUBECTL) delete vspherexcopyvolumepopulators.forklift.konveyor.io -n $(POD_NAMESPACE) test-xcopy
+	@$(KUBECTL) delete pods --all -n $(POD_NAMESPACE)
+	@$(KUBECTL) patch pvc xcopy-pvc -n $(POD_NAMESPACE) -p '{"metadata":{"finalizers":[]}}' --type=merge
+	@$(KUBECTL) delete pvc --all -n $(POD_NAMESPACE)
 
