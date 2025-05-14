@@ -7,6 +7,12 @@ ENV GOEXPERIMENT=strictfipsruntime
 
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o bin/vsphere-xcopy-volume-populator
 
+# We need python for running a test during build process
+# This is not used for actually running the populator in production
+USER root
+RUN dnf install -y python
+USER 1001
+
 RUN make vmkfstools-wrapper
 
 FROM registry.redhat.io/ubi9-minimal:9.5-1742914212
