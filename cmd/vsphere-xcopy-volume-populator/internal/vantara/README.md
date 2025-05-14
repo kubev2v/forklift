@@ -1,6 +1,6 @@
 # Secret with storage provider credentials
 The secret with the storage provider credentials must be created in the same namespace
-as the `StorageMap` object. The secret must contain the following
+as the `StorageMap` object. The secret contains the following
 
 ## data:
 |key|required or optional|value|
@@ -11,7 +11,6 @@ as the `StorageMap` object. The secret must contain the following
 |STORAGE_HOSTNAME|required|The storage vendor api hostname, URL|
 |STORAGE_USERNAME|required|The storage vendor api username|
 |STORAGE_PASSWORD|required|The storage vendor api password|
-|STORAGE_SKIP_SSL_VERIFICATION|optional|true or false|
 |STORAGE_PORT|required|The storage vendor api port|
 |STORAGE_ID|required|storage array serial number|
-|HOSTGROUP_ID_LIST|required|comma separated list of host group IDs|
+|HOSTGROUP_ID_LIST|required|list of IO ports and host group IDs, (e.g. CL1-A,1:CL2-B,2:CL4-A,1:CL6-A,1) |
