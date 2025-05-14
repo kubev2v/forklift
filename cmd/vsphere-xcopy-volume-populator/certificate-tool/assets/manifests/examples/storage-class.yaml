@@ -2,26 +2,25 @@ apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: xcopy-storage-class
-provisioner: csi.hpe.com
+provisioner: csi.trident.netapp.io
 parameters:
   volumeMode: Block
   allowMultiplePods: 'true'
-  csi.storage.k8s.io/controller-expand-secret-name: hpe-3par-backend
-  csi.storage.k8s.io/controller-expand-secret-namespace: kube-system
-  csi.storage.k8s.io/controller-publish-secret-name: hpe-3par-backend
-  csi.storage.k8s.io/controller-publish-secret-namespace: kube-system
-  csi.storage.k8s.io/node-publish-secret-name: hpe-3par-backend
-  csi.storage.k8s.io/node-publish-secret-namespace: kube-system
-  csi.storage.k8s.io/node-stage-secret-name: hpe-3par-backend
-  csi.storage.k8s.io/node-stage-secret-namespace: kube-system
-  csi.storage.k8s.io/provisioner-secret-name: hpe-3par-backend
-  csi.storage.k8s.io/provisioner-secret-namespace: kube-system
+  csi.storage.k8s.io/controller-expand-secret-name: rhosqe-netapp-c250-secret
+  csi.storage.k8s.io/controller-expand-secret-namespace: default
+  csi.storage.k8s.io/controller-publish-secret-name: rhosqe-netapp-c250-secret
+  csi.storage.k8s.io/controller-publish-secret-namespace: default
+  csi.storage.k8s.io/node-publish-secret-name: rhosqe-netapp-c250-secret
+  csi.storage.k8s.io/node-publish-secret-namespace: default
+  csi.storage.k8s.io/node-stage-secret-name: rhosqe-netapp-c250-secret
+  csi.storage.k8s.io/node-stage-secret-namespace: default
+  csi.storage.k8s.io/provisioner-secret-name: rhosqe-netapp-c250-secret
+  csi.storage.k8s.io/provisioner-secret-namespace: default
   accessProtocol: iscsi
 
-  description: "iscsi RWX Block volume by HPE CSI Driver"
+  description: "iscsi RWX Block volume by Ontap CSI Driver"
   hostSeesVLUN: 'true'
 
 reclaimPolicy: Delete
 allowVolumeExpansion: true
 volumeBindingMode: Immediate
-

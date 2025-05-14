@@ -2,13 +2,13 @@
 ### cluster config
 pod-namespace: pop
 test-namespace: ontap-vsphere-populator-test
-kubeconfig: "/home/obengali/.kube/config"
+kubeconfig: "/home/bodnopoz/work/kubeconfig3par.yaml"
 secret-name: populator-secret
 controller-path: assets/manifests/xcopy-setup/controller.yaml
 test-labels: vsphere-populator
 ### images
-test-image-label:  0.47
-test-populator-image: quay.io/rh-ee-obengali/vsphere-xcopy-volume-populator
+test-image-label:  devel
+test-populator-image: quay.io/kubev2v/vsphere-xcopy-volume-populator
 ### storage
 storage-vendor: ontap
 storage-password: lc0syf1VvyjZMyZvPx6lERzWsVLIu3poOGstlQ2jFuILAffG1O6jDQX60YbxtlJ1
@@ -18,4 +18,4 @@ storage-url: ntap-assisted-installer.mgmt.lab.eng.tlv2.redhat.com
 vsphere-password: '!*T8!n*JSk3S'
 vsphere-user: rgolan@ecosystem.content.vsphere
 vsphere-url: eco-vcenter-server.lab.eng.tlv2.redhat.com
-storage-class-name: xcopy-storage-class
+storage-class-name: rhosqe-ontap-san-block

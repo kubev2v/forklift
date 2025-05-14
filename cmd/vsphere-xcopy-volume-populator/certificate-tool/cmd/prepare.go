@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"certificate-tool/internal/k8s"
-	appsv1 "k8s.io/api/apps/v1"
+	// appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/klog/v2"
 
 	"github.com/spf13/cobra"
@@ -27,14 +27,14 @@ var prepare = &cobra.Command{
 	Short: "Creates the controller environment (deployment, clusterRole and role bindings) ",
 	Run: func(cmd *cobra.Command, args []string) {
 		klog.Infof("Creating controller environment...")
-		params := &k8s.TemplateParams{
-			TestNamespace:      testNamespace,
-			TestImageLabel:     testImageLabel,
-			TestLabels:         testLabels,
-			TestPopulatorImage: testPopulatorImage,
-			PodNamespace:       podNamespace,
-			StorageClassName:   storageClassName,
-		}
+		// params := &k8s.TemplateParams{
+		// 	TestNamespace:      testNamespace,
+		// 	TestImageLabel:     testImageLabel,
+		// 	TestLabels:         testLabels,
+		// 	TestPopulatorImage: testPopulatorImage,
+		// 	PodNamespace:       podNamespace,
+		// 	StorageClassName:   storageClassName,
+		// }
 		config, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
 		if err != nil {
 			panic(err)
@@ -61,10 +61,10 @@ var prepare = &cobra.Command{
 			panic(err)
 		}
 
-		cobra.CheckErr(k8s.ApplyResource[appsv1.Deployment](
-			controllerPath, params, "${", "}",
-			k8s.EnsureDeployment, clientset, testNamespace,
-		))
+		// cobra.CheckErr(k8s.ApplyResource[appsv1.Deployment](
+		// 	controllerPath, params, "${", "}",
+		// 	k8s.EnsureDeployment, clientset, testNamespace,
+		// ))
 
 		klog.Infof("Controller namespace created successfully.")
 		if err := k8s.EnsureNamespace(clientset, podNamespace); err != nil {
