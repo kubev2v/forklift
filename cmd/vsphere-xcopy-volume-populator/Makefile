@@ -40,7 +40,7 @@ test-copy-using-cli: build
 		--source-vmdk="[eco-iscsi-ds2] vm-1/vm-1.vmdk" \
 		--owner-name=test-cli \
 		--target-namespace=default \
-		--storage-vendor-product=ontap \
+		--storage-vendor=ontap \
 		--secret-name=populator-secret \
 		--owner-uid=test-cli \
 		--kubeconfig=$$KUBECONFIG
@@ -48,16 +48,7 @@ test-copy-using-cli: build
 test-copy-using-cli-3par: build
 	bin/vsphere-xcopy-volume-populator \
 		--source-vmdk="[eco-iscsi-ds1] boris01/boris01.vmdk" \
-	    --target-pvc=test1\
-		--target-namespace=default \
-		--storage-vendor-product=primera3par \
-		--secret-name=populator-secret \
-		--kubeconfig=$$KUBECONFIG
-
-test-copy-using-cli-primera: build
-	bin/vsphere-xcopy-volume-populator \
-		--source-vmdk="[primera-iscsi-vmfs1] fedora/fedora.vmdk" \
-	    --target-pvc=boris-block\
+	    --owner-name=test1\
 		--target-namespace=default \
 		--storage-vendor-product=primera3par \
 		--secret-name=populator-secret \
