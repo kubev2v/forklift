@@ -505,3 +505,7 @@ dev-controller: generate fmt vet build-controller
 	API_HOST="forklift-inventory-openshift-mtv.apps.ocp-edge-cluster-0.qe.lab.redhat.com" \
 	./bin/forklift-controller
 	#dlv --listen=:5432 --headless=true --api-version=2 exec ./bin/forklift-controller \
+
+.PHONY: kustomized-manifests
+kustomized-manifests: kubectl
+	kubectl kustomize operator/config/manifests > operator/.kustomized_manifests
