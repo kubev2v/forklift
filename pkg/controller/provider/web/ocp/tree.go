@@ -1,7 +1,6 @@
 package ocp
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -9,8 +8,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
-	cnv "kubevirt.io/api/core/v1"
-	ocpclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Routes.
@@ -53,7 +50,13 @@ func (h *TreeHandler) Prepare(ctx *gin.Context) int {
 		base.SetForkliftError(ctx, err)
 		return status
 	}
-	vms, err := h.VMs(ctx)
+	db := h.Collector.DB()
+	vms := []model.VM{}
+	err = db.List(
+		&vms,
+		model.ListOptions{
+			Detail: libmodel.DefaultDetail,
+		})
 	if err != nil {
 		log.Trace(
 			err,
@@ -68,7 +71,11 @@ func (h *TreeHandler) Prepare(ctx *gin.Context) int {
 		namespaceSet[vm.Namespace] = struct{}{}
 	}
 
-	h.namespaces, err = h.Namespaces(ctx)
+	err = db.List(
+		&h.namespaces,
+		model.ListOptions{
+			Detail: libmodel.DefaultDetail,
+		})
 	if err != nil {
 		log.Trace(
 			err,
@@ -102,12 +109,8 @@ func (h TreeHandler) Tree(ctx *gin.Context) {
 		ctx.Status(http.StatusBadRequest)
 		return
 	}
-
-	client, err := h.UserClient(ctx)
-	if err != nil {
-		return
-	}
-	pb := PathBuilder{Client: client}
+	db := h.Collector.DB()
+	pb := PathBuilder{DB: db}
 	content := TreeNode{}
 	for _, ns := range h.namespaces {
 		tr := Tree{
@@ -122,8 +125,8 @@ func (h TreeHandler) Tree(ctx *gin.Context) {
 		branch, err := tr.Build(
 			&ns,
 			&BranchNavigator{
-				client: client,
 				detail: h.Detail,
+				db:     db,
 			})
 		if err != nil {
 			log.Trace(
@@ -147,29 +150,45 @@ func (h TreeHandler) Tree(ctx *gin.Context) {
 
 // Tree (branch) navigator.
 type BranchNavigator struct {
-	client ocpclient.Client
+	db     libmodel.DB
 	detail int
 }
 
 // Next (children) on the branch.
-func (n *BranchNavigator) Next(p libmodel.Model) (models []model.Model, err error) {
+func (n *BranchNavigator) Next(p libmodel.Model) ([]model.Model, error) {
 	switch ns := p.(type) {
 	case *model.Namespace:
-		l := cnv.VirtualMachineList{}
-		err = n.client.List(context.TODO(), &l, ocpclient.InNamespace(ns.Name))
+		vmList, err := n.listVM(ns.Name)
 		if err != nil {
-			return
+			return nil, err
 		}
 
-		for _, obj := range l.Items {
-			m := &model.VM{}
-			m.With(&obj)
-			models = append(models, m)
+		models := make([]model.Model, len(vmList))
+		for i := range vmList {
+			models[i] = &vmList[i]
 		}
-		return
+
+		return models, nil
 	}
 
 	return nil, nil
+}
+
+func (n *BranchNavigator) listVM(namespace string) (list []model.VM, err error) {
+	detail := 0
+	if n.detail > 0 {
+		detail = model.MaxDetail
+	}
+
+	list = []model.VM{}
+	err = n.db.List(
+		&list,
+		model.ListOptions{
+			Predicate: libmodel.Eq("Namespace", namespace),
+			Detail:    detail,
+		})
+
+	return
 }
 
 // Tree node builder.

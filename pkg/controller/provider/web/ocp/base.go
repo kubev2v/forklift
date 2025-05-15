@@ -55,10 +55,9 @@ func (h Handler) ListOptions(ctx *gin.Context) (options []ocpclient.ListOption) 
 }
 
 // Path builder.
-
 type PathBuilder struct {
-	// client
-	ocpclient.Client
+	// Database.
+	DB libmodel.DB
 	// Cached resources.
 	cache map[string]string
 }
@@ -91,16 +90,22 @@ func (r *PathBuilder) Path(m model.Model) (path string) {
 func (r *PathBuilder) forNamespace(id, leaf string) (path string, err error) {
 	name, cached := r.cache[id]
 	if !cached {
-		list := core.NamespaceList{}
-		err = r.Client.List(context.TODO(), &list,
-			ocpclient.MatchingFieldsSelector{
-				Selector: fields.OneTermEqualSelector(metav1.ObjectNameField, id),
-			},
-		)
-		if len(list.Items) > 0 {
-			name = id
+		m := &model.Namespace{
+			Base: model.Base{Name: id},
+		}
+
+		it, ferr := r.DB.Find(m, libmodel.ListOptions{Predicate: libmodel.Eq("name", id)})
+		if ferr != nil {
+			err = ferr
+			return
+		}
+
+		_, ok := it.Next()
+		if ok {
+			name = m.Name
 			r.cache[id] = name
 		}
+
 	}
 
 	path = pathlib.Join(name, leaf)
