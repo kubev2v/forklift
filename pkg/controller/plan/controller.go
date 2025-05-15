@@ -189,7 +189,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	}()
 
 	// Don't reconcile if the plan is archived.
-	if plan.Spec.Archived && plan.Status.HasCondition(Archived) {
+	if r.shouldAbortArchived(plan) {
 		r.Log.Info("Aborting reconcile of archived plan.")
 		return
 	}
@@ -210,9 +210,12 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	// Validations.
 	err = r.validate(plan)
 	if err != nil {
+		if r.isDanglingArchivedPlan(plan) {
+			r.Log.Info("Dangling Plan - Aborting reconcile of plan without source provider.")
+			r.archiveAndUpdate(plan)
+		}
 		return
 	}
-
 	// Set PopulatorDataSource with labels when needed
 	// must be after Referenced data is set (in 'validate')
 	if _, ok := plan.Annotations[AnnPopulatorLabels]; !ok {
@@ -237,19 +240,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	// End staging conditions.
 	plan.Status.EndStagingConditions()
 
-	// Record events.
-	r.Record(plan, plan.Status.Conditions)
-
-	// Apply changes.
-	plan.Status.ObservedGeneration = plan.Generation
-	// At this point, the plan contains data that is not persisted by design, like the Referenced data
-	// and the staged flags in the status, and more data that has been loaded in the validate function,
-	// like the name of the VMs in the spec section, therefore we don't want the plan to be overridden
-	// by data from the server (even the spec section is overridden) and so we pass a copy of the plan
-	err = r.Status().Update(context.TODO(), plan.DeepCopy())
-	if err != nil {
-		return
-	}
+	r.updatePlanStatus(plan)
 
 	//
 	// Execute.
@@ -261,6 +252,33 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 
 	// Done.
 	return
+}
+
+func (r *Reconciler) archiveAndUpdate(plan *api.Plan) {
+	r.archive(plan)
+	r.updatePlanStatus(plan)
+}
+
+func (r *Reconciler) shouldAbortArchived(plan *api.Plan) bool {
+	return plan.Spec.Archived && plan.Status.HasCondition(Archived)
+}
+
+func (r *Reconciler) isDanglingArchivedPlan(plan *api.Plan) bool {
+	return plan.Spec.Archived && plan.Referenced.Provider.Source == nil
+}
+
+func (r *Reconciler) updatePlanStatus(plan *api.Plan) {
+	// Record status conditions as events.
+	r.Record(plan, plan.Status.Conditions)
+
+	// Ensure observed generation is current.
+	plan.Status.ObservedGeneration = plan.Generation
+
+	// Update status via the Kubernetes API.
+	if err := r.Status().Update(context.TODO(), plan.DeepCopy()); err != nil {
+		r.Log.Error(err, "failed to update plan status")
+	}
+
 }
 
 func (r *Reconciler) setPopulatorDataSourceLabels(plan *api.Plan) {

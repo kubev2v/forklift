@@ -129,9 +129,15 @@ func (admitter *PlanAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv
 			Name:      admitter.plan.Spec.Provider.Source.Name,
 		},
 		&admitter.sourceProvider)
+
 	if err != nil {
-		log.Error(err, "Failed to get source provider, can't determine permissions")
-		return util.ToAdmissionResponseError(err)
+		if admitter.plan.Spec.Archived {
+			log.Info("Plan is archived, skipping validation")
+			return util.ToAdmissionResponseAllow()
+		} else {
+			log.Error(err, "Failed to get source provider, can't determine permissions")
+			return util.ToAdmissionResponseError(err)
+		}
 	}
 
 	providerGR, err := api.GetGroupResource(&api.Provider{})
