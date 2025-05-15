@@ -3,12 +3,10 @@ package populator
 import (
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 

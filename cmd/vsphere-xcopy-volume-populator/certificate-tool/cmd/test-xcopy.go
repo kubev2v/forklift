@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"certificate-tool/internal/testplan"
-	"io/ioutil"
+	"os"
 
 	// "certificate-tool/internal/utils/yaml"
 	"context"
@@ -23,13 +23,13 @@ var createTestCmd = &cobra.Command{
 	Use:   "test-xcopy",
 	Short: "Creates the test environment: PVC and CR instance",
 	Run: func(cmd *cobra.Command, args []string) {
-		data, err := ioutil.ReadFile(planYamlPath)
+		data, err := os.ReadFile(planYamlPath)
 		if err != nil {
 			fmt.Printf("failed reading plan file: %w", err)
 		}
 		tp, err := testplan.Parse(data)
 		if err != nil {
-			fmt.Printf("failed parsing plan: %w", err)
+			fmt.Printf("failed parsing plan: %w\n", err)
 		}
 
 		config, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
@@ -60,9 +60,10 @@ var createTestCmd = &cobra.Command{
 func init() {
 	RootCmd.AddCommand(createTestCmd)
 	createTestCmd.Flags().StringVar(&pvcYamlPath, "pvc-yaml", "assets/manifests/xcopy-setup/xcopy-pvc.yaml", "Path to the PVC YAML file")
+	createTestCmd.Flags().StringVar(&planYamlPath, "plan-yaml-path", "assets/manifests/examples/example-test-plan.yaml", "Path to the PVC YAML file")
 	//createTestCmd.Flags().StringVar(&populatorYamlPath, "populator-yaml", "assets/manifests/xcopy-setup/populator.yaml", "Path to the CR instance YAML file")
 	//createTestCmd.Flags().StringVar(&vmdkPath, "vmdk-path", "", "Vmdk path in vsphere")
 	createTestCmd.Flags().StringVar(&storageVendorProduct, "storage-vendor-product", "cr.yaml", "Name of storage vendor product to use")
 	createTestCmd.Flags().StringVar(&testPopulatorImage, "test-populator-image", "quay.io/kubev2v/vsphere-xcopy-volume-populator", "Name of storage vendor to use")
-	createTestCmd.Flags().StringVar(&testPopulatorImage, "test-namespace", "pop", "namespace to run the tests in")
+	createTestCmd.Flags().StringVar(&namespace, "test-namespace", "pop", "namespace to run the tests in")
 }
