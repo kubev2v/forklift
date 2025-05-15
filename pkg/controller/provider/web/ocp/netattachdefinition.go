@@ -42,7 +42,7 @@ func (h NadHandler) List(ctx *gin.Context) {
 		return
 	}
 	if h.WatchRequest {
-		ctx.Status(http.StatusNotImplemented)
+		h.watch(ctx)
 		return
 	}
 	nads, err := h.NetworkAttachmentDefinitions(ctx)

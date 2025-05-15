@@ -99,7 +99,7 @@ func (h TreeHandler) Tree(ctx *gin.Context) {
 		return
 	}
 	if h.WatchRequest {
-		ctx.Status(http.StatusNotImplemented)
+		ctx.Status(http.StatusBadRequest)
 		return
 	}
 

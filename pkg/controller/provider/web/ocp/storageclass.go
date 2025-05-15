@@ -42,7 +42,7 @@ func (h StorageClassHandler) List(ctx *gin.Context) {
 		return
 	}
 	if h.WatchRequest {
-		ctx.Status(http.StatusNotImplemented)
+		h.watch(ctx)
 		return
 	}
 	storageclasses, err := h.StorageClasses(ctx)
