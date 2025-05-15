@@ -1,6 +1,7 @@
 package ocp
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -45,7 +46,9 @@ func (h ClusterInstanceHandler) List(ctx *gin.Context) {
 		h.watch(ctx)
 		return
 	}
-	clusterinstances, err := h.ClusterInstanceTypes(ctx)
+	db := h.Collector.DB()
+	list := []model.ClusterInstanceType{}
+	err = db.List(&list, h.ListOptions(ctx))
 	if err != nil {
 		log.Trace(
 			err,
@@ -54,15 +57,13 @@ func (h ClusterInstanceHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-
 	content := []interface{}{}
-	for _, m := range clusterinstances {
+	for _, m := range list {
 		r := &ClusterInstanceType{}
 		r.With(&m)
 		r.Link(h.Provider)
 		content = append(content, r.Content(h.Detail))
 	}
-	h.Page.Slice(&content)
 
 	ctx.JSON(http.StatusOK, content)
 }
@@ -75,7 +76,17 @@ func (h ClusterInstanceHandler) Get(ctx *gin.Context) {
 		base.SetForkliftError(ctx, err)
 		return
 	}
-	clusterinstances, err := h.ClusterInstanceTypes(ctx)
+	m := &model.ClusterInstanceType{
+		Base: model.Base{
+			UID: ctx.Param(ClusterInstanceParam),
+		},
+	}
+	db := h.Collector.DB()
+	err = db.Get(m)
+	if errors.Is(err, model.NotFound) {
+		ctx.Status(http.StatusNotFound)
+		return
+	}
 	if err != nil {
 		log.Trace(
 			err,
@@ -84,20 +95,12 @@ func (h ClusterInstanceHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	for _, m := range clusterinstances {
-		if m.UID == ctx.Param(ClusterInstanceParam) {
-			r := &ClusterInstanceType{}
-			r.With(&m)
-			r.Link(h.Provider)
-			content := r.Content(model.MaxDetail)
+	r := &ClusterInstanceType{}
+	r.With(m)
+	r.Link(h.Provider)
+	content := r.Content(model.MaxDetail)
 
-			ctx.JSON(http.StatusOK, content)
-			return
-
-		}
-	}
-	ctx.Status(http.StatusNotFound)
-	return
+	ctx.JSON(http.StatusOK, content)
 }
 
 // Watch.
