@@ -25,6 +25,6 @@ jobs:
             echo "File .kustomized_manifests corresponds to the operator/ directory."
             exit 0
           else
-            echo "File .kustomized_manifests does not correspond to the latest changes in operator/ directory. Run 'kustomize build config/manifests > .kustomized_manifests' inside 'operator/' directory."
+            echo "File .kustomized_manifests does not correspond to the latest changes in operator/ directory. Run 'make kustomized-manifests'.
             exit 1
           fi;
