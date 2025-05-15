@@ -19,7 +19,7 @@ const (
 
 // Provider handler.
 type ProviderHandler struct {
-	Handler
+	base.Handler
 }
 
 // Add routes to the `gin` router.
