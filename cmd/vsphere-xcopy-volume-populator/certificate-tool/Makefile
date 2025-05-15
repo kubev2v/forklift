@@ -89,7 +89,7 @@ create-vm: build ## Run certificate-tool create-vm subcommand.
 		--local-vmdk-path        $(VMDK_PATH) \
 		--data-store             $(DATA_STORE)
 
-test-xcopy: build prepare
+test-xcopy: build #prepare
 	@echo "Running test-xcopy..."
 	@./$(BINARY) test-xcopy \
 		--kubeconfig         	$(KUBECONFIG) \
@@ -104,8 +104,8 @@ all: create-vm test-xcopy ## Run all steps in sequence.
 
 clean: ## Clean built artifacts.
 	@rm -f $(BINARY)
-	@$(KUBECTL) delete vspherexcopyvolumepopulators.forklift.konveyor.io -n $(POD_NAMESPACE) test-xcopy
+	@#$(KUBECTL) delete vspherexcopyvolumepopulators.forklift.konveyor.io -n $(POD_NAMESPACE) test-xcopy
 	@$(KUBECTL) delete pods --all -n $(POD_NAMESPACE)
-	@$(KUBECTL) patch pvc xcopy-pvc -n $(POD_NAMESPACE) -p '{"metadata":{"finalizers":[]}}' --type=merge
+	@#$(KUBECTL) patch pvc xcopy-pvc -n $(POD_NAMESPACE) -p '{"metadata":{"finalizers":[]}}' --type=merge
 	@$(KUBECTL) delete pvc --all -n $(POD_NAMESPACE)
 
