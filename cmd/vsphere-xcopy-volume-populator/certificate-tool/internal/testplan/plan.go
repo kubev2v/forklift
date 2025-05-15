@@ -4,7 +4,7 @@ import (
 	"certificate-tool/internal/utils"
 	"context"
 	"fmt"
-	"sigs.k8s.io/yaml"
+	"gopkg.in/yaml.v3"
 	"time"
 
 	"k8s.io/client-go/kubernetes"

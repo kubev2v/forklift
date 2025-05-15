@@ -94,12 +94,10 @@ test-xcopy: build prepare
 	@./$(BINARY) test-xcopy \
 		--kubeconfig         	$(KUBECONFIG) \
 		--pvc-yaml           	"assets/manifests/xcopy-setup/xcopy-pvc.yaml"\
-		--populator-yaml     	"assets/manifests/xcopy-setup/populator.yaml" \
-#		--vmdk-path          	"[$(DATA_STORE)] $(VM_NAME)/fedora.vmdk"  \
 		--storage-vendor-product     	$(STORAGE_VENDOR) \
 		--storage-class-name 	$(STORAGE_CLASS_NAME) \
-		--test-populator-image  $(TEST_POPULATOR_IMAGE)
-		--test-plan-yaml  $(TEST_PLAN_YAML)
+		--test-populator-image  $(TEST_POPULATOR_IMAGE) \
+		--plan-yaml-path  "assets/manifests/examples/example-test-plan.yaml"
 
 
 all: create-vm test-xcopy ## Run all steps in sequence.
