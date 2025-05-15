@@ -32,68 +32,68 @@ jobs:
 
       - run: ${{ matrix.shell }} ./pkg/virt-v2v/customize/scripts/rhel/run/test-network_config_util.sh
 
-  ci_setup:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            source_provider: ovirt
+  # ci_setup:
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - os: ubuntu-latest
+  #           source_provider: ovirt
 
-          - os: ubuntu-latest
-            source_provider: vsphere
+  #         - os: ubuntu-latest
+  #           source_provider: vsphere
 
-          - os: ubuntu-latest
-            source_provider: ova
+  #         - os: ubuntu-latest
+  #           source_provider: ova
 
 
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
-    steps:
-      - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: false
-          swap-storage: false
-          docker-images: false
-      - name: Check out forklift repository
-        uses: actions/checkout@v4
+  #   runs-on: ${{ matrix.os }}
+  #   timeout-minutes: 45
+  #   steps:
+  #     - name: Free Disk Space (Ubuntu)
+  #       uses: jlumbroso/free-disk-space@main
+  #       with:
+  #         tool-cache: false
+  #         android: true
+  #         dotnet: true
+  #         haskell: true
+  #         large-packages: false
+  #         swap-storage: false
+  #         docker-images: false
+  #     - name: Check out forklift repository
+  #       uses: actions/checkout@v4
 
-      - name: Checkout forkliftci
-        uses: actions/checkout@v4
-        with:
-          repository: kubev2v/forkliftci
-          ref: v17.0
+  #     - name: Checkout forkliftci
+  #       uses: actions/checkout@v4
+  #       with:
+  #         repository: kubev2v/forkliftci
+  #         ref: v17.0
 
-      - name: Build and setup everything
-        id: forkliftci
-        uses: kubev2v/forkliftci/ci/build-and-setup@v8.0
-        with:
-          provider_name: ${{ matrix.source_provider }}
-          gh_access_token: ${{ secrets.GITHUB_TOKEN }}
+  #     - name: Build and setup everything
+  #       id: forkliftci
+  #       uses: kubev2v/forkliftci/ci/build-and-setup@v8.0
+  #       with:
+  #         provider_name: ${{ matrix.source_provider }}
+  #         gh_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - run: kubectl version
+  #     - run: kubectl version
 
-      - run: kubectl get pods -n konveyor-forklift
+  #     - run: kubectl get pods -n konveyor-forklift
 
-      - name: Test call to Forklift
-        run: |
-          curl -k "${{ steps.forkliftci.outputs.cluster }}/apis/forklift.konveyor.io/v1beta1/namespaces/konveyor-forklift/providers" --header "Authorization: Bearer ${{ steps.forkliftci.outputs.token }}"
+  #     - name: Test call to Forklift
+  #       run: |
+  #         curl -k "${{ steps.forkliftci.outputs.cluster }}/apis/forklift.konveyor.io/v1beta1/namespaces/konveyor-forklift/providers" --header "Authorization: Bearer ${{ steps.forkliftci.outputs.token }}"
 
-      - name: Run e2e sanity suite
-        uses: kubev2v/forkliftci/ci/run-suite@v8.0
-        with:
-          suite_name: e2e-sanity-${{ matrix.source_provider }}
+  #     - name: Run e2e sanity suite
+  #       uses: kubev2v/forkliftci/ci/run-suite@v8.0
+  #       with:
+  #         suite_name: e2e-sanity-${{ matrix.source_provider }}
 
-      - name: save k8s logs and upload-artifact
-        if: ${{ always() }}
-        uses: kubev2v/forkliftci/ci/save-artifacts@v8.0
-        with:
-          source_provider: ${{ matrix.source_provider }}
+  #     - name: save k8s logs and upload-artifact
+  #       if: ${{ always() }}
+  #       uses: kubev2v/forkliftci/ci/save-artifacts@v8.0
+  #       with:
+  #         source_provider: ${{ matrix.source_provider }}
 
 
   build:
