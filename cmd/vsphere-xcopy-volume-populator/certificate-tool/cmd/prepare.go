@@ -11,15 +11,14 @@ import (
 )
 
 var (
-	testNamespace      string
-	testImageLabel     string
-	testLabels         string
-	testPopulatorImage string
-	podNamespace       string
-	controllerPath     string
-	saName             string
-	roleName           string
-	secretName         string
+	testNamespace  string
+	testImageLabel string
+	testLabels     string
+	podNamespace   string
+	controllerPath string
+	saName         string
+	roleName       string
+	secretName     string
 )
 
 var prepare = &cobra.Command{
@@ -105,6 +104,5 @@ func init() {
 	prepare.Flags().StringVar(&roleName, "cluster-role-name", "populator", "ClusterRole name to create/use")
 	prepare.Flags().StringVar(&testImageLabel, "test-image-label", "0.38", "Image tag for test pods")
 	prepare.Flags().StringVar(&testLabels, "test-labels", "vsphere-populator", "Labels for test objects")
-	prepare.Flags().StringVar(&testPopulatorImage, "test-populator-image", "quay.io/amitos/vsphere-xcopy-volume-populator", "Populator image")
 	prepare.Flags().StringVar(&secretName, "secret-name", "populator-secret", "Name of the secret to create")
 }
