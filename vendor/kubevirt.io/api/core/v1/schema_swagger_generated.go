@@ -92,7 +92,8 @@ func (DomainSpec) SwaggerDoc() map[string]string {
 		"clock":           "Clock sets the clock and timers of the vmi.\n+optional",
 		"features":        "Features like acpi, apic, hyperv, smm.\n+optional",
 		"devices":         "Devices allows adding disks, network interfaces, and others",
-		"ioThreadsPolicy": "Controls whether or not disks will share IOThreads.\nOmitting IOThreadsPolicy disables use of IOThreads.\nOne of: shared, auto\n+optional",
+		"ioThreadsPolicy": "Controls whether or not disks will share IOThreads.\nOmitting IOThreadsPolicy disables use of IOThreads.\nOne of: shared, auto, supplementalPool\n+optional",
+		"ioThreads":       "IOThreads specifies the IOThreads options.\n+optional",
 		"chassis":         "Chassis specifies the chassis info passed to the domain.\n+optional",
 		"launchSecurity":  "Launch Security setting of the vmi.\n+optional",
 	}
@@ -233,6 +234,13 @@ func (Firmware) SwaggerDoc() map[string]string {
 		"bootloader": "Settings to control the bootloader that is used.\n+optional",
 		"serial":     "The system-serial-number in SMBIOS",
 		"kernelBoot": "Settings to set the kernel for booting.\n+optional",
+		"acpi":       "Information that can be set in the ACPI table",
+	}
+}
+
+func (ACPI) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"slicNameRef": "SlicNameRef should match the volume name of a secret object. The data in the secret should\nbe a binary blob that follows the ACPI SLIC standard, see:\nhttps://learn.microsoft.com/en-us/previous-versions/windows/hardware/design/dn653305(v=vs.85)",
 	}
 }
 
@@ -240,9 +248,9 @@ func (Devices) SwaggerDoc() map[string]string {
 	return map[string]string{
 		"useVirtioTransitional":      "Fall back to legacy virtio 0.9 support if virtio bus is selected on devices.\nThis is helpful for old machines like CentOS6 or RHEL6 which\ndo not understand virtio_non_transitional (virtio 1.0).",
 		"disableHotplug":             "DisableHotplug disabled the ability to hotplug disks.",
-		"disks":                      "Disks describes disks, cdroms and luns which are connected to the vmi.",
+		"disks":                      "Disks describes disks, cdroms and luns which are connected to the vmi.\n+kubebuilder:validation:MaxItems:=256",
 		"watchdog":                   "Watchdog describes a watchdog device which can be added to the vmi.",
-		"interfaces":                 "Interfaces describe network interfaces which are added to the vmi.",
+		"interfaces":                 "Interfaces describe network interfaces which are added to the vmi.\n+kubebuilder:validation:MaxItems:=256",
 		"inputs":                     "Inputs describe input devices",
 		"autoattachPodInterface":     "Whether to attach a pod network interface. Defaults to true.",
 		"autoattachGraphicsDevice":   "Whether to attach the default graphics device or not.\nVNC will not be available if set to false. Defaults to true.",
@@ -280,6 +288,7 @@ func (SoundDevice) SwaggerDoc() map[string]string {
 
 func (TPMDevice) SwaggerDoc() map[string]string {
 	return map[string]string{
+		"enabled":    "Enabled allows a user to explictly disable the vTPM even when one is enabled by a preference referenced by the VirtualMachine\nDefaults to True",
 		"persistent": "Persistent indicates the state of the TPM device should be kept accross reboots\nDefaults to false",
 	}
 }
@@ -455,7 +464,7 @@ func (HotplugVolumeSource) SwaggerDoc() map[string]string {
 
 func (DataVolumeSource) SwaggerDoc() map[string]string {
 	return map[string]string{
-		"name":         "Name of both the DataVolume and the PVC in the same namespace.\nAfter PVC population the DataVolume is garbage collected by default.",
+		"name":         "Name of both the DataVolume and the PVC in the same namespace.",
 		"hotpluggable": "Hotpluggable indicates whether the volume can be hotplugged and hotunplugged.\n+optional",
 	}
 }
@@ -561,14 +570,21 @@ func (HypervTimer) SwaggerDoc() map[string]string {
 	}
 }
 
+func (HyperVPassthrough) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"enabled": "+optional",
+	}
+}
+
 func (Features) SwaggerDoc() map[string]string {
 	return map[string]string{
-		"acpi":       "ACPI enables/disables ACPI inside the guest.\nDefaults to enabled.\n+optional",
-		"apic":       "Defaults to the machine type setting.\n+optional",
-		"hyperv":     "Defaults to the machine type setting.\n+optional",
-		"smm":        "SMM enables/disables System Management Mode.\nTSEG not yet implemented.\n+optional",
-		"kvm":        "Configure how KVM presence is exposed to the guest.\n+optional",
-		"pvspinlock": "Notify the guest that the host supports paravirtual spinlocks.\nFor older kernels this feature should be explicitly disabled.\n+optional",
+		"acpi":              "ACPI enables/disables ACPI inside the guest.\nDefaults to enabled.\n+optional",
+		"apic":              "Defaults to the machine type setting.\n+optional",
+		"hypervPassthrough": "This enables all supported hyperv flags automatically.\nBear in mind that if this enabled hyperV features cannot\nbe enabled explicitly. In addition, a Virtual Machine\nusing it will be non-migratable.\n+optional",
+		"hyperv":            "Defaults to the machine type setting.\n+optional",
+		"smm":               "SMM enables/disables System Management Mode.\nTSEG not yet implemented.\n+optional",
+		"kvm":               "Configure how KVM presence is exposed to the guest.\n+optional",
+		"pvspinlock":        "Notify the guest that the host supports paravirtual spinlocks.\nFor older kernels this feature should be explicitly disabled.\n+optional",
 	}
 }
 
@@ -641,6 +657,7 @@ func (WatchdogDevice) SwaggerDoc() map[string]string {
 	return map[string]string{
 		"":         "Hardware watchdog device.\nExactly one of its members must be set.",
 		"i6300esb": "i6300esb watchdog device.\n+optional",
+		"diag288":  "diag288 watchdog device (specific to s390x architecture).\n+optional",
 	}
 }
 
@@ -651,10 +668,17 @@ func (I6300ESBWatchdog) SwaggerDoc() map[string]string {
 	}
 }
 
+func (Diag288Watchdog) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"":       "diag288 watchdog device.",
+		"action": "The action to take. Valid values are poweroff, reset, shutdown.\nDefaults to reset.",
+	}
+}
+
 func (Interface) SwaggerDoc() map[string]string {
 	return map[string]string{
 		"name":        "Logical name of the interface as well as a reference to the associated networks.\nMust match the Name of a Network.",
-		"model":       "Interface model.\nOne of: e1000, e1000e, ne2k_pci, pcnet, rtl8139, virtio.\nDefaults to virtio.",
+		"model":       "Interface model.\nOne of: e1000, e1000e, igb, ne2k_pci, pcnet, rtl8139, virtio.\nDefaults to virtio.",
 		"binding":     "Binding specifies the binding plugin that will be used to connect the interface to the guest.\nIt provides an alternative to InterfaceBindingMethod.\nversion: 1alphav1",
 		"ports":       "List of ports to be forwarded to the virtual machine.",
 		"macAddress":  "Interface MAC address. For example: de:ad:00:00:be:af or DE-AD-00-00-BE-AF.",
@@ -663,7 +687,7 @@ func (Interface) SwaggerDoc() map[string]string {
 		"dhcpOptions": "If specified the network interface will pass additional DHCP options to the VMI\n+optional",
 		"tag":         "If specified, the virtual network interface address and its tag will be provided to the guest via config drive\n+optional",
 		"acpiIndex":   "If specified, the ACPI index is used to provide network interface device naming, that is stable across changes\nin PCI addresses assigned to the device.\nThis value is required to be unique across all devices and be between 1 and (16*1024-1).\n+optional",
-		"state":       "State represents the requested operational state of the interface.\nThe (only) value supported is `absent`, expressing a request to remove the interface.\n+optional",
+		"state":       "State represents the requested operational state of the interface.\nThe supported values are:\n`absent`, expressing a request to remove the interface.\n`down`, expressing a request to set the link down.\n`up`, expressing a request to set the link up.\nEmpty value functions as `up`.\n+optional",
 	}
 }
 
@@ -687,7 +711,10 @@ func (DHCPPrivateOptions) SwaggerDoc() map[string]string {
 
 func (InterfaceBindingMethod) SwaggerDoc() map[string]string {
 	return map[string]string{
-		"": "Represents the method which will be used to connect the interface to the guest.\nOnly one of its members may be specified.",
+		"":        "Represents the method which will be used to connect the interface to the guest.\nOnly one of its members may be specified.",
+		"slirp":   "DeprecatedSlirp is an alias to the deprecated Slirp interface\nDeprecated: Removed in v1.3",
+		"macvtap": "DeprecatedMacvtap is an alias to the deprecated Macvtap interface,\nplease refer to Kubevirt user guide for alternatives.\nDeprecated: Removed in v1.3\n+optional",
+		"passt":   "DeprecatedPasst is an alias to the deprecated Passt interface,\nplease refer to Kubevirt user guide for alternatives.\nDeprecated: Removed in v1.3\n+optional",
 	}
 }
 
@@ -697,9 +724,9 @@ func (InterfaceBridge) SwaggerDoc() map[string]string {
 	}
 }
 
-func (InterfaceSlirp) SwaggerDoc() map[string]string {
+func (DeprecatedInterfaceSlirp) SwaggerDoc() map[string]string {
 	return map[string]string{
-		"": "InterfaceSlirp connects to a given network using QEMU user networking mode.",
+		"": "DeprecatedInterfaceSlirp is an alias to the deprecated InterfaceSlirp\nthat connects to a given network using QEMU user networking mode.\nDeprecated: Removed in v1.3",
 	}
 }
 
@@ -715,15 +742,15 @@ func (InterfaceSRIOV) SwaggerDoc() map[string]string {
 	}
 }
 
-func (InterfaceMacvtap) SwaggerDoc() map[string]string {
+func (DeprecatedInterfaceMacvtap) SwaggerDoc() map[string]string {
 	return map[string]string{
-		"": "InterfaceMacvtap connects to a given network by extending the Kubernetes node's L2 networks via a macvtap interface.",
+		"": "DeprecatedInterfaceMacvtap is an alias to the deprecated InterfaceMacvtap\nthat connects to a given network by extending the Kubernetes node's L2 networks via a macvtap interface.\nDeprecated: Removed in v1.3",
 	}
 }
 
-func (InterfacePasst) SwaggerDoc() map[string]string {
+func (DeprecatedInterfacePasst) SwaggerDoc() map[string]string {
 	return map[string]string{
-		"": "InterfacePasst connects to a given network.",
+		"": "DeprecatedInterfacePasst is an alias to the deprecated InterfacePasst\nDeprecated: Removed in v1.3",
 	}
 }
 
@@ -869,5 +896,11 @@ func (CPUTopology) SwaggerDoc() map[string]string {
 		"cores":   "Cores specifies the number of cores inside the vmi.\nMust be a value greater or equal 1.",
 		"sockets": "Sockets specifies the number of sockets inside the vmi.\nMust be a value greater or equal 1.",
 		"threads": "Threads specifies the number of threads inside the vmi.\nMust be a value greater or equal 1.",
+	}
+}
+
+func (DiskIOThreads) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"supplementalPoolThreadCount": "SupplementalPoolThreadCount specifies how many iothreads are allocated for the supplementalPool policy.\n+optional",
 	}
 }
