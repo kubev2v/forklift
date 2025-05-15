@@ -53,6 +53,11 @@ CONTROLLER_GEN ?= $(DEFAULT_CONTROLLER_GEN)
 DEFAULT_KUBECTL = $(GOBIN)/kubectl
 KUBECTL ?= $(DEFAULT_KUBECTL)
 
+# By default use the kustomize installed by the
+# 'kustomize' target
+DEFAULT_KUSTOMIZE = $(GOBIN)/kustomize
+KUSTOMIZE ?= $(DEFAULT_KUSTOMIZE)
+
 # Image URLs to use all building/pushing image targets
 # Each build image target overrides the variable of that image
 # This is used for the bundle build so we don't need to build all images
@@ -316,12 +321,17 @@ check_container_runtime:
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN)
 $(DEFAULT_CONTROLLER_GEN):
-	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.15.0
+	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.18.0
 
 .PHONY: kubectl
 kubectl: $(KUBECTL)
 $(DEFAULT_KUBECTL):
 	curl -L https://dl.k8s.io/release/v1.25.10/bin/linux/amd64/kubectl -o $(GOBIN)/kubectl && chmod +x $(GOBIN)/kubectl
+
+.PHONY: kustomize
+kustomize: $(KUSTOMIZE)
+$(DEFAULT_KUSTOMIZE):
+	go install sigs.k8s.io/kustomize/kustomize/v5@v5.3.0
 
 validation-test: opa-bin
 	ENVIRONMENT=test ${OPA} test validation/policies --explain fails
