@@ -7,6 +7,7 @@ import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
+	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -98,6 +99,30 @@ func (h NamespaceHandler) Get(ctx *gin.Context) {
 
 	ctx.Status(http.StatusNotFound)
 	return
+}
+
+// Watch.
+func (h NamespaceHandler) watch(ctx *gin.Context) {
+	db := h.Collector.DB()
+	err := h.Watch(
+		ctx,
+		db,
+		&model.Namespace{},
+		func(in libmodel.Model) (r interface{}) {
+			m := in.(*model.Namespace)
+			vm := &Namespace{}
+			vm.With(m)
+			vm.Link(h.Provider)
+			r = vm
+			return
+		})
+	if err != nil {
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
+		ctx.Status(http.StatusInternalServerError)
+	}
 }
 
 // REST Resource.

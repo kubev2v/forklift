@@ -7,6 +7,7 @@ import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
+	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	storage "k8s.io/api/storage/v1"
 )
 
@@ -93,6 +94,30 @@ func (h StorageClassHandler) Get(ctx *gin.Context) {
 		}
 	}
 	ctx.Status(http.StatusNotFound)
+}
+
+// Watch.
+func (h StorageClassHandler) watch(ctx *gin.Context) {
+	db := h.Collector.DB()
+	err := h.Watch(
+		ctx,
+		db,
+		&model.StorageClass{},
+		func(in libmodel.Model) (r interface{}) {
+			m := in.(*model.StorageClass)
+			sc := &StorageClass{}
+			sc.With(m)
+			sc.Link(h.Provider)
+			r = sc
+			return
+		})
+	if err != nil {
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
+		ctx.Status(http.StatusInternalServerError)
+	}
 }
 
 // REST Resource.
