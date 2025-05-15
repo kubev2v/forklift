@@ -27,11 +27,11 @@ func Parse(yamlData []byte) (*TestPlan, error) {
 }
 
 // Start runs all test cases sequentially, creating PVCs and pods, recording results.
-func (tp *TestPlan) Start(ctx context.Context, clientset *kubernetes.Clientset, namespace, storageClassName, pvcYamlPath string) error {
+func (tp *TestPlan) Start(ctx context.Context, clientset *kubernetes.Clientset, namespace, podImage, storageClassName, pvcYamlPath string) error {
 	for i := range tp.TestCases {
 		tc := &tp.TestCases[i]
 		start := time.Now()
-		if err := tc.Run(ctx, clientset, namespace, tp.Image, storageClassName, pvcYamlPath, tp.StorageVendorProduct); err != nil {
+		if err := tc.Run(ctx, clientset, namespace, podImage, tp.Image, storageClassName, pvcYamlPath, tp.StorageVendorProduct); err != nil {
 			tc.Results = utils.TestResult{false, int64(time.Since(start).Seconds()), err.Error()}
 			return fmt.Errorf("test %s failed: %w", tc.Name, err)
 		}

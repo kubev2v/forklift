@@ -17,6 +17,7 @@ var (
 	storageVendorProduct string
 	planYamlPath         string
 	namespace            string
+	testPopulatorImage   string
 )
 
 var createTestCmd = &cobra.Command{
@@ -42,7 +43,7 @@ var createTestCmd = &cobra.Command{
 		}
 
 		ctx := context.Background()
-		if err := tp.Start(ctx, clientset, namespace, storageClassName, pvcYamlPath); err != nil {
+		if err := tp.Start(ctx, clientset, namespace, testPopulatorImage, storageClassName, pvcYamlPath); err != nil {
 			fmt.Printf("test plan execution failed: %w", err)
 		}
 
@@ -61,9 +62,7 @@ func init() {
 	RootCmd.AddCommand(createTestCmd)
 	createTestCmd.Flags().StringVar(&pvcYamlPath, "pvc-yaml", "assets/manifests/xcopy-setup/xcopy-pvc.yaml", "Path to the PVC YAML file")
 	createTestCmd.Flags().StringVar(&planYamlPath, "plan-yaml-path", "assets/manifests/examples/example-test-plan.yaml", "Path to the PVC YAML file")
-	//createTestCmd.Flags().StringVar(&populatorYamlPath, "populator-yaml", "assets/manifests/xcopy-setup/populator.yaml", "Path to the CR instance YAML file")
-	//createTestCmd.Flags().StringVar(&vmdkPath, "vmdk-path", "", "Vmdk path in vsphere")
 	createTestCmd.Flags().StringVar(&storageVendorProduct, "storage-vendor-product", "cr.yaml", "Name of storage vendor product to use")
-	createTestCmd.Flags().StringVar(&testPopulatorImage, "test-populator-image", "quay.io/kubev2v/vsphere-xcopy-volume-populator", "Name of storage vendor to use")
+	createTestCmd.Flags().StringVar(&testPopulatorImage, "test-populator-image", "quay.io/rgolangh/vsphere-xcopy-volume-populator:devel", "Name of storage vendor to use")
 	createTestCmd.Flags().StringVar(&namespace, "test-namespace", "pop", "namespace to run the tests in")
 }
