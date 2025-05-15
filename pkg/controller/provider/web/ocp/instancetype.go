@@ -1,12 +1,14 @@
 package ocp
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
+	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	instancetype "kubevirt.io/api/instancetype/v1beta1"
 )
 
@@ -41,10 +43,12 @@ func (h InstanceHandler) List(ctx *gin.Context) {
 		return
 	}
 	if h.WatchRequest {
-		ctx.Status(http.StatusNotImplemented)
+		h.watch(ctx)
 		return
 	}
-	instancetypes, err := h.InstanceTypes(ctx)
+	db := h.Collector.DB()
+	list := []model.InstanceType{}
+	err = db.List(&list, h.ListOptions(ctx))
 	if err != nil {
 		log.Trace(
 			err,
@@ -54,13 +58,12 @@ func (h InstanceHandler) List(ctx *gin.Context) {
 		return
 	}
 	content := []interface{}{}
-	for _, m := range instancetypes {
+	for _, m := range list {
 		r := &InstanceType{}
 		r.With(&m)
 		r.Link(h.Provider)
 		content = append(content, r.Content(h.Detail))
 	}
-	h.Page.Slice(&content)
 
 	ctx.JSON(http.StatusOK, content)
 }
@@ -73,7 +76,17 @@ func (h InstanceHandler) Get(ctx *gin.Context) {
 		base.SetForkliftError(ctx, err)
 		return
 	}
-	instancetypes, err := h.InstanceTypes(ctx)
+	m := &model.InstanceType{
+		Base: model.Base{
+			UID: ctx.Param(InstanceParam),
+		},
+	}
+	db := h.Collector.DB()
+	err = db.Get(m)
+	if errors.Is(err, model.NotFound) {
+		ctx.Status(http.StatusNotFound)
+		return
+	}
 	if err != nil {
 		log.Trace(
 			err,
@@ -82,18 +95,36 @@ func (h InstanceHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	for _, m := range instancetypes {
-		if ctx.Param(InstanceParam) == m.UID {
-			r := &InstanceType{}
-			r.With(&m)
-			r.Link(h.Provider)
-			content := r.Content(model.MaxDetail)
-			ctx.JSON(http.StatusOK, content)
+	r := &InstanceType{}
+	r.With(m)
+	r.Link(h.Provider)
+	content := r.Content(model.MaxDetail)
+
+	ctx.JSON(http.StatusOK, content)
+}
+
+// Watch.
+func (h InstanceHandler) watch(ctx *gin.Context) {
+	db := h.Collector.DB()
+	err := h.Watch(
+		ctx,
+		db,
+		&model.InstanceType{},
+		func(in libmodel.Model) (r interface{}) {
+			m := in.(*model.InstanceType)
+			it := &InstanceType{}
+			it.With(m)
+			it.Link(h.Provider)
+			r = it
 			return
-		}
+		})
+	if err != nil {
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
+		ctx.Status(http.StatusInternalServerError)
 	}
-	ctx.Status(http.StatusNotFound)
-	return
 }
 
 // REST Resource.

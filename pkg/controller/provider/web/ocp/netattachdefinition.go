@@ -1,6 +1,7 @@
 package ocp
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -8,6 +9,7 @@ import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
+	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 )
 
 // Routes.
@@ -41,10 +43,12 @@ func (h NadHandler) List(ctx *gin.Context) {
 		return
 	}
 	if h.WatchRequest {
-		ctx.Status(http.StatusNotImplemented)
+		h.watch(ctx)
 		return
 	}
-	nads, err := h.NetworkAttachmentDefinitions(ctx)
+	db := h.Collector.DB()
+	list := []model.NetworkAttachmentDefinition{}
+	err = db.List(&list, h.ListOptions(ctx))
 	if err != nil {
 		log.Trace(
 			err,
@@ -53,15 +57,13 @@ func (h NadHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-
 	content := []interface{}{}
-	for _, m := range nads {
+	for _, m := range list {
 		r := &NetworkAttachmentDefinition{}
 		r.With(&m)
 		r.Link(h.Provider)
 		content = append(content, r.Content(h.Detail))
 	}
-	h.Page.Slice(&content)
 
 	ctx.JSON(http.StatusOK, content)
 }
@@ -74,7 +76,17 @@ func (h NadHandler) Get(ctx *gin.Context) {
 		base.SetForkliftError(ctx, err)
 		return
 	}
-	nads, err := h.NetworkAttachmentDefinitions(ctx)
+	m := &model.NetworkAttachmentDefinition{
+		Base: model.Base{
+			UID: ctx.Param(NadParam),
+		},
+	}
+	db := h.Collector.DB()
+	err = db.Get(m)
+	if errors.Is(err, model.NotFound) {
+		ctx.Status(http.StatusNotFound)
+		return
+	}
 	if err != nil {
 		log.Trace(
 			err,
@@ -83,19 +95,36 @@ func (h NadHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	for _, m := range nads {
-		if ctx.Param(NadParam) == m.UID {
-			r := &NetworkAttachmentDefinition{}
-			r.With(&m)
-			r.Link(h.Provider)
-			content := r.Content(model.MaxDetail)
+	r := &NetworkAttachmentDefinition{}
+	r.With(m)
+	r.Link(h.Provider)
+	content := r.Content(model.MaxDetail)
 
-			ctx.JSON(http.StatusOK, content)
+	ctx.JSON(http.StatusOK, content)
+}
+
+// Watch.
+func (h NadHandler) watch(ctx *gin.Context) {
+	db := h.Collector.DB()
+	err := h.Watch(
+		ctx,
+		db,
+		&model.NetworkAttachmentDefinition{},
+		func(in libmodel.Model) (r interface{}) {
+			m := in.(*model.NetworkAttachmentDefinition)
+			nad := &NetworkAttachmentDefinition{}
+			nad.With(m)
+			nad.Link(h.Provider)
+			r = nad
 			return
-		}
+		})
+	if err != nil {
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
+		ctx.Status(http.StatusInternalServerError)
 	}
-	ctx.Status(http.StatusNotFound)
-	return
 }
 
 // REST Resource.
