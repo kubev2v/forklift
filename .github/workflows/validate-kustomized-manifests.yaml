@@ -13,7 +13,7 @@ jobs:
       - name: Install kustomize
         uses: alexellis/arkade-get@master
         with:
-          kustomize: latest
+          kustomize: v5.3.0
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Generate .kustomized_manifests_tmp
@@ -25,6 +25,6 @@ jobs:
             echo "File .kustomized_manifests corresponds to the operator/ directory."
             exit 0
           else
-            echo "File .kustomized_manifests does not correspond to the latest changes in operator/ directory. Run 'make kustomized-manifests'.
+            echo "File .kustomized_manifests does not correspond to the latest changes in operator/ directory. Run 'make kustomized-manifests'."
             exit 1
           fi;
