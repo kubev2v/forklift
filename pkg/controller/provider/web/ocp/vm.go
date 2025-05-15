@@ -1,6 +1,7 @@
 package ocp
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -45,21 +46,24 @@ func (h VMHandler) List(ctx *gin.Context) {
 		h.watch(ctx)
 		return
 	}
-	vms, err := h.VMs(ctx)
+	db := h.Collector.DB()
+	list := []model.VM{}
+	err = db.List(&list, h.ListOptions(ctx))
 	if err != nil {
-		log.Trace(err, "url", ctx.Request.URL)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-
 	content := []interface{}{}
-	for _, m := range vms {
+	for _, m := range list {
 		r := &VM{}
-		r.With(m)
+		r.With(&m)
 		r.Link(h.Provider)
 		content = append(content, r.Content(h.Detail))
 	}
-	h.Page.Slice(&content)
 
 	ctx.JSON(http.StatusOK, content)
 }
@@ -72,25 +76,31 @@ func (h VMHandler) Get(ctx *gin.Context) {
 		base.SetForkliftError(ctx, err)
 		return
 	}
-	vms, err := h.VMs(ctx)
+	m := &model.VM{
+		Base: model.Base{
+			UID: ctx.Param(VmParam),
+		},
+	}
+	db := h.Collector.DB()
+	err = db.Get(m)
+	if errors.Is(err, model.NotFound) {
+		ctx.Status(http.StatusNotFound)
+		return
+	}
 	if err != nil {
-		log.Trace(err, "url", ctx.Request.URL)
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
+	r := &VM{}
+	r.With(m)
+	r.Link(h.Provider)
+	content := r.Content(model.MaxDetail)
 
-	for _, m := range vms {
-		if m.UID == ctx.Param(VmParam) {
-			r := &VM{}
-			r.With(m)
-			r.Link(h.Provider)
-			content := r.Content(model.MaxDetail)
-			ctx.JSON(http.StatusOK, content)
-			return
-		}
-	}
-	ctx.Status(http.StatusNotFound)
-	return
+	ctx.JSON(http.StatusOK, content)
 }
 
 // Watch.
