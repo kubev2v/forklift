@@ -15,8 +15,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	cnv "kubevirt.io/api/core/v1"
@@ -40,18 +38,44 @@ type Handler struct {
 	base.Handler
 }
 
-// Build list options.
-func (h Handler) ListOptions(ctx *gin.Context) (options []ocpclient.ListOption) {
+// Build list predicate.
+func (h Handler) Predicate(ctx *gin.Context) (p libmodel.Predicate) {
 	q := ctx.Request.URL.Query()
 	ns := q.Get(NsParam)
-	name := q.Get(NameParam)
+	and := libmodel.And()
 	if len(ns) > 0 {
-		options = append(options, ocpclient.InNamespace(ns))
+		and.Predicates = append(
+			and.Predicates,
+			libmodel.Eq(NsParam, ns))
 	}
+	name := q.Get(NameParam)
 	if len(name) > 0 {
-		options = append(options, ocpclient.MatchingFieldsSelector{Selector: fields.OneTermEqualSelector(metav1.ObjectNameField, name)})
+		and.Predicates = append(
+			and.Predicates,
+			libmodel.Eq(NameParam, name))
 	}
+	switch len(and.Predicates) {
+	case 0: // All.
+	case 1:
+		p = and.Predicates[0]
+	default:
+		p = and
+	}
+
 	return
+}
+
+// Build list options.
+func (h Handler) ListOptions(ctx *gin.Context) libmodel.ListOptions {
+	detail := h.Detail
+	if detail > 0 {
+		detail = model.MaxDetail
+	}
+	return libmodel.ListOptions{
+		Predicate: h.Predicate(ctx),
+		Detail:    detail,
+		Page:      &h.Page,
+	}
 }
 
 // Path builder.
@@ -161,7 +185,8 @@ func (h Handler) VMs(ctx *gin.Context) (vms []*model.VM, err error) {
 		return
 	}
 	l := cnv.VirtualMachineList{}
-	err = client.List(context.TODO(), &l, h.ListOptions(ctx)...)
+	// FIXME: consider list options
+	err = client.List(context.TODO(), &l)
 	if err != nil {
 		return
 	}
@@ -181,7 +206,8 @@ func (h *Handler) Namespaces(ctx *gin.Context) (namespaces []model.Namespace, er
 	}
 
 	list := core.NamespaceList{}
-	err = client.List(context.TODO(), &list, h.ListOptions(ctx)...)
+	// FIXME: consider list options
+	err = client.List(context.TODO(), &list)
 	if err != nil {
 		return
 	}
@@ -199,7 +225,8 @@ func (h Handler) StorageClasses(ctx *gin.Context) (storageclasses []model.Storag
 		return
 	}
 	list := storage.StorageClassList{}
-	err = client.List(context.TODO(), &list, h.ListOptions(ctx)...)
+	// FIXME: consider list options
+	err = client.List(context.TODO(), &list)
 	if err != nil {
 		return
 	}
@@ -218,7 +245,8 @@ func (h *NadHandler) NetworkAttachmentDefinitions(ctx *gin.Context) (nets []mode
 		return
 	}
 	list := net.NetworkAttachmentDefinitionList{}
-	err = client.List(context.TODO(), &list, h.ListOptions(ctx)...)
+	// FIXME: consider ListOptions
+	err = client.List(context.TODO(), &list)
 	if err != nil {
 		return
 	}
@@ -237,7 +265,8 @@ func (h Handler) InstanceTypes(ctx *gin.Context) (instancetypes []model.Instance
 	}
 
 	list := instancetype.VirtualMachineInstancetypeList{}
-	err = client.List(context.TODO(), &list, h.ListOptions(ctx)...)
+	// FIXME: consider list options
+	err = client.List(context.TODO(), &list)
 	if err != nil {
 		return
 	}
@@ -256,7 +285,8 @@ func (h ClusterInstanceHandler) ClusterInstanceTypes(ctx *gin.Context) (clusteri
 		return
 	}
 	list := instancetype.VirtualMachineClusterInstancetypeList{}
-	err = client.List(context.TODO(), &list, h.ListOptions(ctx)...)
+	// FIXME: consider ListOptions
+	err = client.List(context.TODO(), &list)
 	for _, cit := range list.Items {
 		m := model.ClusterInstanceType{}
 		m.With(&cit)
