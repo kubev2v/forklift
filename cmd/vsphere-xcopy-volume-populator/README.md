@@ -132,6 +132,11 @@ spec:
 6. vsphere provider name
 7. vsphere provider id
 
+# Secret with storage provider credentials
+
+## Hitachi Vantara
+- see [README](internal/vantara/README.md)
+
 # Troubleshooting
 
 ## vSphere/ESXi
