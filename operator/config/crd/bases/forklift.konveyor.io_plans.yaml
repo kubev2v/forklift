@@ -334,6 +334,10 @@ spec:
                   but will be more predictable.
                   **DANGER** When set to false, the generated PVC name may not be unique and may cause conflicts.
                 type: boolean
+              skipGuestConversion:
+                default: false
+                description: Determines if the plan should skip the guest conversion.
+                type: boolean
               targetNamespace:
                 description: Target namespace.
                 type: string
