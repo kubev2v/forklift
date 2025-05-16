@@ -14,14 +14,16 @@ RUN microdnf -y install tar && microdnf clean all
 
 COPY --from=builder /app/openstack-populator /usr/local/bin/openstack-populator
 ENTRYPOINT ["/usr/local/bin/openstack-populator"]
+
 LABEL \
-        com.redhat.component="mtv-openstack-populator-container" \
-        name="migration-toolkit-virtualization/mtv-openstack-populator-rhel9" \
-        license="Apache License 2.0" \
-        io.k8s.display-name="Migration Toolkit for Virtualization" \
-        io.k8s.description="Migration Toolkit for Virtualization - OpenStack Populator" \
-        io.openshift.tags="migration,mtv,forklift" \
-        summary="Migration Toolkit for Virtualization - OpenStack Populator" \
-        description="Migration Toolkit for Virtualization - OpenStack Populator" \
-        vendor="Red Hat, Inc." \
-        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>"
+    com.redhat.component="mtv-openstack-populator-container" \
+    name="${REGISTRY}/mtv-openstack-populator-rhel9" \
+    license="Apache License 2.0" \
+    io.k8s.display-name="Migration Toolkit for Virtualization" \
+    io.k8s.description="Migration Toolkit for Virtualization - OpenStack Populator" \
+    io.openshift.tags="migration,mtv,forklift" \
+    summary="Migration Toolkit for Virtualization - OpenStack Populator" \
+    description="Migration Toolkit for Virtualization - OpenStack Populator" \
+    vendor="Red Hat, Inc." \
+    maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
+    version="$VERSION"
