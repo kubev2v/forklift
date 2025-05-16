@@ -15,13 +15,14 @@ COPY --from=builder /app/forklift-api /usr/local/bin/forklift-api
 
 ENTRYPOINT ["/usr/local/bin/forklift-api"]
 LABEL \
-        com.redhat.component="mtv-api-container" \
-        name="migration-toolkit-virtualization/mtv-api-rhel9" \
-        license="Apache License 2.0" \
-        io.k8s.display-name="Migration Toolkit for Virtualization" \
-        io.k8s.description="Migration Toolkit for Virtualization - API" \
-        io.openshift.tags="migration,mtv,forklift" \
-        description="Migration Toolkit for Virtualization - API" \
-        summary="Migration Toolkit for Virtualization - API" \
-        vendor="Red Hat, Inc." \
-        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>"
+    com.redhat.component="mtv-api-container" \
+    name="${REGISTRY}/mtv-api-rhel9" \
+    license="Apache License 2.0" \
+    io.k8s.display-name="Migration Toolkit for Virtualization" \
+    io.k8s.description="Migration Toolkit for Virtualization - API" \
+    io.openshift.tags="migration,mtv,forklift" \
+    description="Migration Toolkit for Virtualization - API" \
+    summary="Migration Toolkit for Virtualization - API" \
+    vendor="Red Hat, Inc." \
+    maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
+    version="$VERSION"
