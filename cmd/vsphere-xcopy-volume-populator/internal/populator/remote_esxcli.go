@@ -3,10 +3,12 @@ package populator
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -208,11 +210,55 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 		response += l.Value("message")
 	}
 
-	go func() {
-		// TODO need to process the vmkfstools stderr(probably) and to write the
-		// progress to a file, and then continuously read and report on the channel
-		progress <- 100
-		quit <- nil
-	}()
-	return nil
+	v := vmkfstoolsClone{}
+	err = json.Unmarshal([]byte(response), &v)
+	if err != nil {
+		return
+	}
+
+	if v.TaskId != "" {
+		defer func() {
+			klog.Info("cleaning up task artifacts")
+			r, err = p.VSphereClient.RunEsxCommand(context.Background(),
+				host, []string{"vmkfstools", "taskClean", "-i", v.TaskId})
+			if err != nil {
+				klog.Errorf("failed cleaning up task artifacts %v", r)
+			}
+		}()
+	}
+	for {
+		r, err = p.VSphereClient.RunEsxCommand(context.Background(),
+			host, []string{"vmkfstools", "taskGet", "-i", v.TaskId})
+		if err != nil {
+			return
+		}
+		response := ""
+		klog.Info("respose from esxcli ", r)
+		for _, l := range r {
+			response += l.Value("message")
+		}
+		v := vmkfstoolsTask{}
+		err = json.Unmarshal([]byte(response), &v)
+		if err != nil {
+			return
+		}
+
+		// exmple output - Clone: 20% done.
+		match := progressPattern.FindStringSubmatch(v.LastLine)
+		if len(match) > 1 {
+			i, _ := strconv.Atoi(match[1])
+			progress <- uint(i)
+		}
+
+		if v.ExitCode != "" {
+			if v.ExitCode == "0" {
+				err = nil
+			} else {
+				err = fmt.Errorf("failed with exit code %s with stderr: %s", v.ExitCode, v.Stderr)
+			}
+			return
+		}
+
+		time.Sleep(taskPollingInterval)
+	}
 }
