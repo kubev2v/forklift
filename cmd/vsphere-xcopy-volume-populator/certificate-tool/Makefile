@@ -26,13 +26,6 @@ REQUIRED_VARS := STORAGE_USER STORAGE_PASSWORD STORAGE_URL VSPHERE_USER VSPHERE_
 $(foreach var,$(REQUIRED_VARS),\
   $(if $(value $(var)),,$(error Environment variable $(var) is required)))
 
-
-# TODO: pin the exact commit
-OPENSTACK_POPULATOR ?= https://raw.githubusercontent.com/kubev2v/forklift/main/operator/config/crd/bases/forklift.konveyor.io_ovirtvolumepopulators.yaml
-OVIRT_POPULATOR     ?= https://raw.githubusercontent.com/kubev2v/forklift/main/operator/config/crd/bases/forklift.konveyor.io_openstackvolumepopulators.yaml
-VSPHERE_POPULATOR   ?= https://raw.githubusercontent.com/kubev2v/forklift/main/operator/config/crd/bases/forklift.konveyor.io_vspherexcopyvolumepopulators.yaml
-CLUSTER_ROLE   ?= https://raw.githubusercontent.com/kubev2v/forklift/main/operator/config/rbac/populator-controller/role.yaml
-ROLE_BINDING   ?= https://raw.githubusercontent.com/kubev2v/forklift/main/operator/config/rbac/populator-controller/role_binding.yaml
 VM_NAME      ?= xcopy-popualtor-compliance-test-vm
 DATA_STORE   ?= eco-iscsi-ds1
 BINARY = certificate-tool
@@ -53,11 +46,6 @@ build: ## Build the certificate-tool CLI binary.
 	go build -o $(BINARY) .
 
 prepare: check-tools build ## Run certificate-tool create-env subcommand.
-	$(KUBECTL) apply -f $(OPENSTACK_POPULATOR)
-	$(KUBECTL) apply -f $(OVIRT_POPULATOR)
-	$(KUBECTL) apply -f $(VSPHERE_POPULATOR)
-	$(KUBECTL) apply -f $(CLUSTER_ROLE)
-	$(KUBECTL) apply -f $(ROLE_BINDING)
 	@echo "running prepare..."
 	@./$(BINARY) prepare \
 			 --kubeconfig            "$(KUBECONFIG)" \
