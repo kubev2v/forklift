@@ -12,7 +12,6 @@ KUBECTL ?= /usr/bin/kubectl
 
 
 TEST_NAMESPACE = $(shell yq e '.test-namespace' $(CONFIG_FILE))
-POD_NAMESPACE = $(shell yq e '.pod-namespace' $(CONFIG_FILE))
 STORAGE_VENDOR   = $(shell yq e '.storage-vendor' $(CONFIG_FILE))
 KUBECONFIG       = $(shell yq e '.kubeconfig' $(CONFIG_FILE))
 TEST_IMAGE_LABEL = $(shell yq e '.test-image-label' $(CONFIG_FILE))
@@ -67,7 +66,6 @@ prepare: check-tools build ## Run certificate-tool create-env subcommand.
 			--test-labels           "$(TEST_LABELS)" \
 			--test-populator-image  "$(TEST_POPULATOR_IMAGE)" \
 			--controller-path       "$(CONTROLLER_PATH)" \
-			--pod-namespace         "$(POD_NAMESPACE)" \
 			--test-image-label      "$(TEST_IMAGE_LABEL)" \
 			--storage-user          "$(STORAGE_USER)" \
 			--storage-password      "$(STORAGE_PASSWORD)" \
