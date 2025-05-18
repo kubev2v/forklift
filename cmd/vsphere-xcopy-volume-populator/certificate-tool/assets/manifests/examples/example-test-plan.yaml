@@ -1,5 +1,5 @@
 image: fedora-vm:latest
-storageVendorProduct: "ontap"
+storageVendorProduct: "primera3par"
 tests:
   - name: test-1
     success:

@@ -37,7 +37,7 @@ func (tc *TestCase) Run(ctx context.Context, clientset *kubernetes.Clientset, na
 		}
 	}
 
-	newCtx, _ := context.WithTimeout(ctx, 30*time.Second)
+	newCtx, _ := context.WithTimeout(ctx, 10*time.Minute)
 	results, totalTime, err := k8s.PollPodsAndCheck(newCtx, clientset, namespace, fmt.Sprintf("test=%s", tc.Name), tc.Success.MaxTimeSeconds, 5*time.Second, time.Duration(tc.Success.MaxTimeSeconds)*time.Second)
 	if err != nil {
 		return fmt.Errorf("failed polling pods: %w", err)
@@ -57,5 +57,8 @@ func (tc *TestCase) Run(ctx context.Context, clientset *kubernetes.Clientset, na
 func ensureVMs(testName, vmImage string, vms []*utils.VM) error {
 	klog.Infof("Ensuring VMs for test %s", testName)
 	// TODO: implement actual clone/create
+	for _, vm := range vms {
+		vm.VmdkPath = "[eco-iscsi-ds1] vmtemptest/vmtemptest.vmdk"
+	}
 	return nil
 }
