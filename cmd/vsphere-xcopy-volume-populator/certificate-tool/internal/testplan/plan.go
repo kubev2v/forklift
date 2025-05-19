@@ -45,9 +45,9 @@ func (tp *TestPlan) FormatOutput() ([]byte, error) {
 	output := struct {
 		Metadata struct {
 			Storage struct {
-				Name           string `yaml:"name"`
-				Type           string `yaml:"type"`
-				ConnectionType string `yaml:"connection_type"`
+				Name                 string `yaml:"name"`
+				StorageVendorProduct string `yaml:"storageVendorProduct"`
+				ConnectionType       string `yaml:"connectionType"`
 			} `yaml:"storage"`
 		} `yaml:"metadata"`
 		Image string     `yaml:"image"`
@@ -57,7 +57,7 @@ func (tp *TestPlan) FormatOutput() ([]byte, error) {
 		Tests: tp.TestCases,
 	}
 	output.Metadata.Storage.Name = "TODO"
-	output.Metadata.Storage.Type = "TODO"
+	output.Metadata.Storage.StorageVendorProduct = "TODO"
 	output.Metadata.Storage.ConnectionType = "TODOTODOOOOTODOTODDO"
 	return yaml.Marshal(output)
 }
