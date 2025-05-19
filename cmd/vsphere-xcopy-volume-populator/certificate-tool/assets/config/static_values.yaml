@@ -1,7 +1,6 @@
 ## test values
 ### cluster config
-pod-namespace: pop
-test-namespace: ontap-vsphere-populator-test
+test-namespace: vsphere-populator-test
 kubeconfig: "/home/bodnopoz/work/kubeconfig3par.yaml"
 secret-name: populator-secret
 controller-path: assets/manifests/xcopy-setup/controller.yaml

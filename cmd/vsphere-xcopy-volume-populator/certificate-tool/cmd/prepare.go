@@ -11,14 +11,14 @@ import (
 )
 
 var (
-	testNamespace  string
-	testImageLabel string
-	testLabels     string
-	podNamespace   string
-	controllerPath string
-	saName         string
-	roleName       string
-	secretName     string
+	testNamespace  				string
+	testImageLabel 				string
+	testLabels     				string
+	controllerPath 				string
+	saName         				string
+	roleName       				string
+	secretName     				string
+	storageSkipSSLVerification  string
 )
 
 var prepare = &cobra.Command{
@@ -66,18 +66,18 @@ var prepare = &cobra.Command{
 		// ))
 
 		klog.Infof("Controller namespace created successfully.")
-		if err := k8s.EnsureNamespace(clientset, podNamespace); err != nil {
+		if err := k8s.EnsureNamespace(clientset, testNamespace); err != nil {
 			panic(err)
 		}
-		if err := k8s.EnsureServiceAccount(clientset, podNamespace, saName); err != nil {
+		if err := k8s.EnsureServiceAccount(clientset, testNamespace, saName); err != nil {
 			panic(err)
 		}
-		populatorRole := k8s.NewRole(roleName, podNamespace)
+		populatorRole := k8s.NewRole(roleName, testNamespace)
 		if err := k8s.EnsureRole(clientset, populatorRole); err != nil {
 			panic(err)
 		}
 
-		populatorRoleBinding := k8s.NewRoleBinding(podNamespace, saName, roleName)
+		populatorRoleBinding := k8s.NewRoleBinding(testNamespace, saName, roleName)
 		if err := k8s.EnsureRoleBinding(clientset, populatorRoleBinding); err != nil {
 			panic(err)
 		}
@@ -86,7 +86,7 @@ var prepare = &cobra.Command{
 			panic(err)
 		}
 		klog.Infof("Ensuring secret:", kubeconfigPath)
-		Secret := k8s.NewPopulatorSecret(podNamespace, storagePassword, storageUser, storageUrl, vspherePassword, vsphereUser, vsphereUrl, secretName)
+		Secret := k8s.NewPopulatorSecret(testNamespace, storagePassword, storageUser, storageUrl, vspherePassword, vsphereUser, vsphereUrl, storageSkipSSLVerification, secretName)
 		if err := k8s.EnsureSecret(clientset, Secret); err != nil {
 			panic(err)
 		}
@@ -98,11 +98,11 @@ func init() {
 	RootCmd.AddCommand(prepare)
 	prepare.Flags().StringVar(&kubeconfigPath, "kubeconfig", "", "Path to kubeconfig")
 	prepare.Flags().StringVar(&testNamespace, "test-namespace", "vsphere-populator-test", "Testing namespace")
-	prepare.Flags().StringVar(&podNamespace, "pod-namespace", "pop", "Namespace where populator runs")
 	prepare.Flags().StringVar(&controllerPath, "controller-path", "assets/manifests/xcopy-setup/controller.yaml", "Controller manifest (Go template)")
 	prepare.Flags().StringVar(&saName, "service-account", "populator", "ServiceAccount name to create/use")
 	prepare.Flags().StringVar(&roleName, "cluster-role-name", "populator", "ClusterRole name to create/use")
 	prepare.Flags().StringVar(&testImageLabel, "test-image-label", "0.38", "Image tag for test pods")
 	prepare.Flags().StringVar(&testLabels, "test-labels", "vsphere-populator", "Labels for test objects")
 	prepare.Flags().StringVar(&secretName, "secret-name", "populator-secret", "Name of the secret to create")
+	prepare.Flags().StringVar(&storageSkipSSLVerification, "storage-skip-ssl-verification", "true", "skip the storage ssl verification")
 }
