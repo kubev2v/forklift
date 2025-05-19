@@ -18,6 +18,7 @@ import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
+	basecontroller "github.com/konveyor/forklift-controller/pkg/controller/base"
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	utils "github.com/konveyor/forklift-controller/pkg/controller/plan/util"
@@ -378,7 +379,7 @@ func (r *Builder) getSourceDetails(vm *model.VM, sourceSecret *core.Secret) (lib
 	}
 
 	sslVerify := ""
-	if container.GetInsecureSkipVerifyFlag(sourceSecret) {
+	if basecontroller.GetInsecureSkipVerifyFlag(sourceSecret) {
 		sslVerify = "no_verify=1"
 	}
 
