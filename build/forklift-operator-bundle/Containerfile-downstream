@@ -6,18 +6,18 @@ ARG VERSION
 ARG CHANNEL
 ARG DEFAULT_CHANNEL
 
-ARG CONTROLLER_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-controller-dev-preview:on-pr-1c7c93b3ccea5a94c050793b9e9cdfa116f3e001"
-ARG API_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-api-dev-preview:on-pr-1c7c93b3ccea5a94c050793b9e9cdfa116f3e001"
-ARG VIRT_V2V_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/virt-v2v-dev-preview:on-pr-1c7c93b3ccea5a94c050793b9e9cdfa116f3e001"
-ARG OPERATOR_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-operator-dev-preview:on-pr-1c7c93b3ccea5a94c050793b9e9cdfa116f3e001"
-ARG POPULATOR_CONTROLLER_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/populator-controller-dev-preview:on-pr-1c7c93b3ccea5a94c050793b9e9cdfa116f3e001"
-ARG OVIRT_POPULATOR_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/ovirt-populator-dev-preview:on-pr-1c7c93b3ccea5a94c050793b9e9cdfa116f3e001"
-ARG OPENSTACK_POPULATOR_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/openstack-populator-dev-preview:on-pr-1c7c93b3ccea5a94c050793b9e9cdfa116f3e001"
-ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/vsphere-xcopy-volume-populator-dev-preview:on-pr-1c7c93b3ccea5a94c050793b9e9cdfa116f3e001"
-ARG MUST_GATHER_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-must-gather-dev-preview:on-pr-e17d26814f552655e32cdb02bfa2410222f4118b"
-ARG UI_PLUGIN_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-console-plugin-dev-preview:on-pr-9337f1652ccfa359ca1d995f00b961aabcbb930e"
-ARG OVA_PROVIDER_SERVER_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/ova-provider-server-dev-preview:on-pr-1c7c93b3ccea5a94c050793b9e9cdfa116f3e001"
-ARG VALIDATION_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/validation-dev-preview:on-pr-1c7c93b3ccea5a94c050793b9e9cdfa116f3e001"
+ARG CONTROLLER_IMAGE="registry.stage.redhat.io/mtv-candidate/mtv-controller-rhel9:2.9.0"
+ARG API_IMAGE="registry.stage.redhat.io/mtv-candidate/mtv-api-rhel9:2.9.0"
+ARG VIRT_V2V_IMAGE="registry.stage.redhat.io/mtv-candidate/mtv-virt-v2v-rhel9:2.9.0"
+ARG OPERATOR_IMAGE="registry.stage.redhat.io/mtv-candidate/mtv-rhel9-operator:2.9.0"
+ARG POPULATOR_CONTROLLER_IMAGE="registry.stage.redhat.io/mtv-candidate/mtv-populator-controller-rhel9:2.9.0"
+ARG OVIRT_POPULATOR_IMAGE="registry.stage.redhat.io/mtv-candidate/mtv-rhv-populator-rhel8:2.9.0"
+ARG OPENSTACK_POPULATOR_IMAGE="registry.stage.redhat.io/mtv-candidate/mtv-openstack-populator-rhel9:2.9.0"
+ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.stage.redhat.io/mtv-candidate/mtv-vsphere-xcopy-volume-populator-rhel9:2.9.0"
+ARG MUST_GATHER_IMAGE="registry.stage.redhat.io/mtv-candidate/mtv-must-gather-rhel8:2.9.0"
+ARG UI_PLUGIN_IMAGE="registry.stage.redhat.io/mtv-candidate/mtv-console-plugin-rhel9:2.9.0"
+ARG OVA_PROVIDER_SERVER_IMAGE="registry.stage.redhat.io/mtv-candidate/mtv-ova-provider-server-rhel9:2.9.0"
+ARG VALIDATION_IMAGE="registry.stage.redhat.io/mtv-candidate/mtv-validation-rhel9:2.9.0"
 
 USER root
 
@@ -28,13 +28,13 @@ WORKDIR /repo
 RUN cat .kustomized_manifests \
     | envsubst \
     | operator-sdk generate bundle \
-        -q \
-        --overwrite \
-        --extra-service-accounts forklift-controller,forklift-api,forklift-populator-controller \
-        --version $VERSION \
-        --channels $CHANNEL \
-        --default-channel $DEFAULT_CHANNEL \
-        --output-dir build
+    -q \
+    --overwrite \
+    --extra-service-accounts forklift-controller,forklift-api,forklift-populator-controller \
+    --version $VERSION \
+    --channels $CHANNEL \
+    --default-channel $DEFAULT_CHANNEL \
+    --output-dir build
 
 USER 1001
 
