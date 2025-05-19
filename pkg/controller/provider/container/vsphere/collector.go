@@ -11,6 +11,7 @@ import (
 	"time"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	"github.com/konveyor/forklift-controller/pkg/controller/base"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
@@ -581,7 +582,7 @@ func (r *Collector) buildClient(ctx context.Context) (*govmomi.Client, error) {
 	url.User = liburl.UserPassword(
 		r.user(),
 		r.password())
-	soapClient := soap.NewClient(url, r.getInsecureSkipVerifyFlag())
+	soapClient := soap.NewClient(url, base.GetInsecureSkipVerifyFlag(r.secret))
 	soapClient.SetThumbprint(url.Host, r.thumbprint())
 	vimClient, err := vim25.NewClient(ctx, soapClient)
 	if err != nil {
@@ -626,22 +627,6 @@ func (r *Collector) password() string {
 // Thumbprint.
 func (r *Collector) thumbprint() string {
 	return r.provider.Status.Fingerprint
-}
-
-// getInsecureSkipVerifyFlag gets the insecureSkipVerify boolean flag
-// value from the provider connection secret.
-func (r *Collector) getInsecureSkipVerifyFlag() bool {
-	insecure, found := r.secret.Data["insecureSkipVerify"]
-	if !found {
-		return false
-	}
-
-	insecureSkipVerify, err := strconv.ParseBool(string(insecure))
-	if err != nil {
-		return false
-	}
-
-	return insecureSkipVerify
 }
 
 // Build the object Spec filter.
@@ -1064,20 +1049,4 @@ func (r Collector) applyLeave(tx *libmodel.Tx, u types.ObjectUpdate) error {
 	}
 
 	return nil
-}
-
-// GetInsecureSkipVerifyFlag gets the insecureSkipVerify boolean flag
-// value from the VSphere connection secret.
-func GetInsecureSkipVerifyFlag(secret *core.Secret) bool {
-	insecure, found := secret.Data["insecureSkipVerify"]
-	if !found {
-		return false
-	}
-
-	insecureSkipVerify, err := strconv.ParseBool(string(insecure))
-	if err != nil {
-		return false
-	}
-
-	return insecureSkipVerify
 }

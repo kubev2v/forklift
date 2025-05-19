@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"strconv"
 	"time"
 
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
@@ -111,24 +111,36 @@ func (r *Reconciler) Record(object runtime.Object, cnd libcnd.Conditions) {
 	}
 }
 
-func (r *Reconciler) VerifyTLSConnection(rawURL string, secret *core.Secret) error {
+// GetInsecureSkipVerifyFlag gets the insecureSkipVerify boolean flag
+// value from the provider connection secret.
+func GetInsecureSkipVerifyFlag(secret *core.Secret) bool {
+	insecure, found := secret.Data["insecureSkipVerify"]
+	if !found {
+		return false
+	}
+
+	insecureSkipVerify, err := strconv.ParseBool(string(insecure))
+	if err != nil {
+		return false
+	}
+
+	return insecureSkipVerify
+}
+
+func (r *Reconciler) VerifyTLSConnection(rawURL string, secret *core.Secret) (*x509.Certificate, error) {
 	parsedURL, err := url.Parse(rawURL)
 	if err != nil {
-		return fmt.Errorf("invalid URL: %w", err)
+		return nil, fmt.Errorf("invalid URL: %w", err)
 	}
 
 	// Attempt to get certificate
 	cert, err := util.GetTlsCertificate(parsedURL, secret)
 	if err != nil {
-		if vsphere.GetInsecureSkipVerifyFlag(secret) {
-			r.Log.Error(err, "failed to connect to provider", "url", parsedURL)
-			return fmt.Errorf("failed to connect to provider: %w", err)
-		}
 		r.Log.Error(err, "failed to get TLS certificate", "url", parsedURL)
-		return fmt.Errorf("failed to get TLS certificate: %w", err)
+		return nil, fmt.Errorf("failed to get TLS certificate: %w", err)
 	}
 	if cert == nil {
-		return fmt.Errorf("received nil certificate from GetTlsCertificate")
+		return nil, fmt.Errorf("received nil certificate from GetTlsCertificate")
 	}
 
 	// Create cert pool
@@ -147,9 +159,9 @@ func (r *Reconciler) VerifyTLSConnection(rawURL string, secret *core.Secret) err
 	conn, err := tls.Dial("tcp", host, tlsConfig)
 	if err != nil {
 		r.Log.Error(err, "failed to create a secure connection to server")
-		return fmt.Errorf("failed to create a secure TLS connection: %w", err)
+		return nil, fmt.Errorf("failed to create a secure TLS connection: %w", err)
 	}
 	defer conn.Close()
 
-	return nil
+	return cert, nil
 }
