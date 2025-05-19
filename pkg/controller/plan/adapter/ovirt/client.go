@@ -10,9 +10,9 @@ import (
 
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
+	"github.com/konveyor/forklift-controller/pkg/controller/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/util"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/ovirt"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
@@ -388,7 +388,7 @@ func (r *Client) connect() (err error) {
 		Username(r.user()).
 		Password(r.password()).
 		CACert(r.cacert()).
-		Insecure(ovirt.GetInsecureSkipVerifyFlag(r.Source.Secret)).
+		Insecure(base.GetInsecureSkipVerifyFlag(r.Source.Secret)).
 		Build()
 	if err != nil {
 		err = liberr.Wrap(err)

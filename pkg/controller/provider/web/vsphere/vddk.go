@@ -3,6 +3,13 @@ package vsphere
 import (
 	"context"
 	"fmt"
+	"io"
+	"mime/multipart"
+	"net/http"
+	"os"
+	"path/filepath"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -11,16 +18,10 @@ import (
 	buildv1 "github.com/openshift/api/build/v1"
 	buildclientset "github.com/openshift/client-go/build/clientset/versioned"
 	imagev1client "github.com/openshift/client-go/image/clientset/versioned/typed/image/v1"
-	"io"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
-	"mime/multipart"
-	"net/http"
-	"os"
-	"path/filepath"
-	"time"
 )
 
 const (
@@ -198,8 +199,12 @@ func saveFile(filePath string, file *multipart.FileHeader) error {
 		return fmt.Errorf("error copy to the local file: %v", err)
 	}
 
-	go cleanOldFiles(uploadDir, time.Hour) // background cleanup: remove files older than 1 hour
-
+	// background cleanup: remove files older than 1 hour
+	go func() {
+		if err := cleanOldFiles(uploadDir, time.Hour); err != nil {
+			fmt.Printf("error cleaning old files: %v\n", err)
+		}
+	}()
 	return nil
 }
 
