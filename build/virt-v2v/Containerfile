@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9:9.5-1739449058 AS appliance
+FROM registry.access.redhat.com/ubi9:9.6-1747219013 AS appliance
 
 ENV LIBGUESTFS_BACKEND direct
 
@@ -26,7 +26,7 @@ RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-monitor github
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o image-converter github.com/konveyor/forklift-controller/cmd/image-converter
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-wrapper virt-v2v/cmd/entrypoint.go
 
-FROM registry.access.redhat.com/ubi9:9.5-1739449058
+FROM registry.access.redhat.com/ubi9:9.6-1747219013
 
 # RUN rm /etc/pki/tls/fips_local.cnf && \
 #     echo -e '[fips_sect]\ntls1-prf-ems-check = 0\nactivate = 1' > /etc/pki/tls/fips_local.cnf && \
