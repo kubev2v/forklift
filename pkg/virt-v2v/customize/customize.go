@@ -1,12 +1,14 @@
 package customize
 
 import (
+	"bytes"
 	"embed"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"text/template"
 
 	"github.com/konveyor/forklift-controller/pkg/virt-v2v/config"
 	"github.com/konveyor/forklift-controller/pkg/virt-v2v/utils"
@@ -113,6 +115,35 @@ func (c *Customize) addDisksToCustomize(cmdBuilder utils.CommandBuilder) {
 	}
 }
 
+func (c *Customize) injectStaticIPTemplate(templatePath, outputPath string) error {
+	tmplContent, err := os.ReadFile(templatePath)
+	if err != nil {
+		return fmt.Errorf("failed to read template: %w", err)
+	}
+
+	tmpl, err := template.New("netConfigScript").Parse(string(tmplContent))
+	if err != nil {
+		return fmt.Errorf("failed to parse template: %w", err)
+	}
+
+	data := struct {
+		InputString string
+	}{
+		InputString: c.appConfig.StaticIPs,
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return fmt.Errorf("failed to render template: %w", err)
+	}
+
+	if err := os.WriteFile(outputPath, buf.Bytes(), 0644); err != nil {
+		return fmt.Errorf("failed to write output script: %w", err)
+	}
+
+	return nil
+}
+
 func (c *Customize) runCmd(builder utils.CommandBuilder) error {
 	customizeCmd := builder.Build()
 
@@ -133,11 +164,26 @@ func (c *Customize) addWinFirstbootScripts(cmdBuilder utils.CommandBuilder) {
 	firstbootPath := filepath.Join(windowsScriptsPath, "firstboot.bat")
 
 	// Upload scripts to the windows
+	uploadPreserveIpPath := ""
+	if c.appConfig.VirtIoWinLegacyDrivers != "" {
+		restoreScriptPath = filepath.Join(windowsScriptsPath, "9999-restore_config-legacy.ps1")
+
+		if c.appConfig.StaticIPs != "" {
+			networkConfigtemplate := filepath.Join(windowsScriptsPath, "9999-network-config.ps1.tmpl")
+			networkConfigScript := filepath.Join(windowsScriptsPath, "9999-network-config.ps1")
+
+			err := c.injectStaticIPTemplate(networkConfigtemplate, networkConfigScript)
+			if err != nil {
+				fmt.Printf("Error injecting static IP template: %v", err)
+			}
+			uploadPreserveIpPath = c.formatUpload(networkConfigScript, WinFirstbootScriptsPath)
+		}
+	}
+
 	uploadScriptPath := c.formatUpload(restoreScriptPath, WinFirstbootScriptsPath)
 	uploadInitPath := c.formatUpload(initPath, WinFirstbootScriptsPath)
 	uploadFirstbootPath := c.formatUpload(firstbootPath, WinFirstbootPath)
-
-	cmdBuilder.AddArgs("--upload", uploadScriptPath, uploadInitPath, uploadFirstbootPath)
+	cmdBuilder.AddArgs("--upload", uploadScriptPath, uploadPreserveIpPath, uploadInitPath, uploadFirstbootPath)
 }
 
 func (c *Customize) addWinDynamicScripts(cmdBuilder utils.CommandBuilder, dir string) error {
