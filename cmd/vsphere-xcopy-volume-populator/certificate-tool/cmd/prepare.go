@@ -104,4 +104,5 @@ func init() {
 	prepare.Flags().StringVar(&testImageLabel, "test-image-label", "0.38", "Image tag for test pods")
 	prepare.Flags().StringVar(&testLabels, "test-labels", "vsphere-populator", "Labels for test objects")
 	prepare.Flags().StringVar(&secretName, "secret-name", "populator-secret", "Name of the secret to create")
+	prepare.Flags().StringVar(&storageSkipSSLVerification, "storage-skip-ssl-verification", "true", "skip the storage ssl verification")
 }
