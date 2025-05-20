@@ -50,7 +50,6 @@ func (m *Model) Labels() model.Labels {
 // Watch (event) handler.
 type EventHandler struct {
 	options web.WatchOptions
-	name    string
 	started bool
 	parity  bool
 	created []int

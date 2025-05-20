@@ -59,7 +59,6 @@ func (r *BaseMigrator) Reset(status *plan.VMStatus, pipeline []*plan.Step) {
 	if r.Context.Plan.Spec.Warm {
 		status.Warm = &plan.Warm{}
 	}
-	return
 }
 
 func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
