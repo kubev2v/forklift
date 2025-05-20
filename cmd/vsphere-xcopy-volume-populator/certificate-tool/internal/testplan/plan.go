@@ -12,9 +12,12 @@ import (
 
 // TestPlan aggregates multiple test cases under a VM image.
 type TestPlan struct {
-	Image                string     `yaml:"image"`
+	VMImage                string     `yaml:"image"`
 	StorageVendorProduct string     `yaml:"storageVendorProduct"`
 	TestCases            []TestCase `yaml:"tests"`
+	Namespace            string
+	StorageClass         string
+	ClientSet            *kubernetes.Clientset
 }
 
 // Parse unmarshals YAML data into a TestPlan.
@@ -27,15 +30,23 @@ func Parse(yamlData []byte) (*TestPlan, error) {
 }
 
 // Start runs all test cases sequentially, creating PVCs and pods, recording results.
-func (tp *TestPlan) Start(ctx context.Context, clientset *kubernetes.Clientset, namespace, podImage, storageClassName, pvcYamlPath string) error {
+func (tp *TestPlan) Start(ctx context.Context, podImage, pvcYamlPath string) error {
 	for i := range tp.TestCases {
 		tc := &tp.TestCases[i]
 		start := time.Now()
-		if err := tc.Run(ctx, clientset, namespace, podImage, tp.Image, storageClassName, pvcYamlPath, tp.StorageVendorProduct); err != nil {
-			tc.Results = utils.TestResult{false, int64(time.Since(start).Seconds()), err.Error()}
+		if err := tc.Run(ctx, podImage, tp.VMImage, pvcYamlPath, tp.StorageVendorProduct); err != nil {
+			tc.Results = utils.TestResult{
+				Success: false,
+				ElapsedTime: int64(time.Since(start).Seconds()),
+				FailureReason: err.Error(),
+			}
 			return fmt.Errorf("test %s failed: %w", tc.Name, err)
 		}
-		tc.Results = utils.TestResult{true, int64(time.Since(start).Seconds()), ""}
+		tc.Results = utils.TestResult{
+			Success: true,
+			ElapsedTime: int64(time.Since(start).Seconds()),
+			FailureReason: "",
+		}
 	}
 	return nil
 }
@@ -53,7 +64,7 @@ func (tp *TestPlan) FormatOutput() ([]byte, error) {
 		Image string     `yaml:"image"`
 		Tests []TestCase `yaml:"tests"`
 	}{
-		Image: tp.Image,
+		Image: tp.VMImage,
 		Tests: tp.TestCases,
 	}
 	output.Metadata.Storage.Name = "TODO"
