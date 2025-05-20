@@ -1,7 +1,6 @@
 package ova
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"path"
@@ -520,7 +519,7 @@ func getResourceCapacity(capacity int64, units string) (int64, error) {
 	for i := range items {
 		item := strings.TrimSpace(items[i])
 		if i == 0 && len(item) > 0 && item != "byte" {
-			return 0, errors.New(fmt.Sprintf("units '%s' are invalid, only 'byte' is supported", units))
+			return 0, fmt.Errorf("units '%s' are invalid, only 'byte' is supported", units)
 		}
 		if i == 0 {
 			continue
@@ -532,15 +531,15 @@ func getResourceCapacity(capacity int64, units string) (int64, error) {
 		}
 		nums := strings.Split(item, "^")
 		if len(nums) != 2 {
-			return 0, errors.New(fmt.Sprintf("units '%s' are invalid, item is invalid: %s", units, item))
+			return 0, fmt.Errorf("units '%s' are invalid, item is invalid: %s", units, item)
 		}
 		base, err := strconv.Atoi(nums[0])
 		if err != nil {
-			return 0, errors.New(fmt.Sprintf("units '%s' are invalid, base component is invalid: %s", units, item))
+			return 0, fmt.Errorf("units '%s' are invalid, base component is invalid: %s", units, item)
 		}
 		pow, err := strconv.Atoi(nums[1])
 		if err != nil {
-			return 0, errors.New(fmt.Sprintf("units '%s' are invalid, pow component is invalid: %s", units, item))
+			return 0, fmt.Errorf("units '%s' are invalid, pow component is invalid: %s", units, item)
 		}
 		capacity = capacity * int64(math.Pow(float64(base), float64(pow)))
 	}

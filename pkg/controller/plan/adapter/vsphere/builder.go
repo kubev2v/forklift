@@ -1483,7 +1483,7 @@ func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.Persi
 
 func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error) {
 	// copy-offload only
-	taskName, _ = pvc.Annotations[planbase.AnnDiskSource]
+	taskName = pvc.Annotations[planbase.AnnDiskSource]
 	return
 }
 
