@@ -190,7 +190,12 @@ func (r *Collector) start(ctx context.Context) (err error) {
 	if err != nil {
 		return
 	}
-	go r.manager.Start(ctx)
+	go func() {
+		if err := r.manager.Start(ctx); err != nil {
+			r.log.V(3).Error(err, "manager failed.")
+		}
+	}()
+
 	err = r.reconcileCollections(ctx)
 	if err != nil {
 		return
