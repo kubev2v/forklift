@@ -1087,7 +1087,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 		vm.RemoveSharedDisks()
 	}
 	for _, disk := range vm.Disks {
-		mB := disk.Capacity / 0x100000
+		mB := utils.RoundUp(disk.Capacity, 0x100000) / 0x100000
 		list = append(
 			list,
 			&plan.Task{
