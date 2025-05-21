@@ -667,6 +667,10 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				if s, cast := p.Val.(string); cast {
 					v.model.GuestName = s
 				}
+			case fGuestNameFromVmwareTools:
+				if s, cast := p.Val.(string); cast {
+					v.model.GuestNameFromVmwareTools = s
+				}
 			case fHostName:
 				if s, cast := p.Val.(string); cast {
 					v.model.HostName = s
