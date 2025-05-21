@@ -124,6 +124,7 @@ func (h Handler) UserClient(ctx *gin.Context) (cl ocpclient.Client, err error) {
 		if err != nil {
 			return
 		}
+		cfg.BearerTokenFile = "" // clear the service account token
 		cfg.BearerToken = h.Token(ctx)
 
 		log.Info("Creating a new ocp client with user token")
