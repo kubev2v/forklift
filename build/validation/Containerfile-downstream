@@ -19,6 +19,9 @@ COPY --from=mtv-opa /tmp/opa /usr/bin/opa
 
 ENTRYPOINT ["/usr/bin/entrypoint.sh"]
 
+ARG VERSION
+ARG REGISTRY
+
 LABEL \
     com.redhat.component="mtv-validation-container" \
     name="${REGISTRY}/mtv-validation-rhel9" \

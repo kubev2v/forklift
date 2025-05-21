@@ -47,6 +47,9 @@ COPY --from=builder /app/virt-v2v-wrapper /usr/bin/virt-v2v-wrapper
 
 ENTRYPOINT ["/usr/bin/virt-v2v-wrapper"]
 
+ARG VERSION
+ARG REGISTRY
+
 LABEL \
     com.redhat.component="mtv-virt-v2v-container" \
     name="${REGISTRY}/mtv-virt-v2v-rhel9" \

@@ -15,6 +15,9 @@ RUN microdnf install -y python3-ovirt-engine-sdk4 ovirt-imageio-client
 
 ENTRYPOINT ["/usr/local/bin/ovirt-populator"]
 
+ARG VERSION
+ARG REGISTRY
+
 LABEL \
     com.redhat.component="mtv-rhv-populator-container" \
     name="${REGISTRY}/mtv-rhv-populator-rhel8" \
