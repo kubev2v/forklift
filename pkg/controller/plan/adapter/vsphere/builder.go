@@ -567,12 +567,13 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 				},
 			}
 		}
+		alignedCapacity := utils.RoundUp(disk.Capacity, utils.DefaultAlignBlockSize)
 		dvSpec := cdi.DataVolumeSpec{
 			Source: &dvSource,
 			Storage: &cdi.StorageSpec{
 				Resources: core.ResourceRequirements{
 					Requests: core.ResourceList{
-						core.ResourceStorage: *resource.NewQuantity(disk.Capacity, resource.BinarySI),
+						core.ResourceStorage: *resource.NewQuantity(alignedCapacity, resource.BinarySI),
 					},
 				},
 				StorageClassName: &storageClass,
