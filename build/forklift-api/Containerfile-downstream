@@ -14,6 +14,10 @@ RUN microdnf -y install tar && microdnf clean all
 COPY --from=builder /app/forklift-api /usr/local/bin/forklift-api
 
 ENTRYPOINT ["/usr/local/bin/forklift-api"]
+
+ARG VERSION
+ARG REGISTRY
+
 LABEL \
     com.redhat.component="mtv-api-container" \
     name="${REGISTRY}/mtv-api-rhel9" \

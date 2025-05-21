@@ -15,6 +15,9 @@ RUN microdnf -y install tar && microdnf clean all
 COPY --from=builder /app/openstack-populator /usr/local/bin/openstack-populator
 ENTRYPOINT ["/usr/local/bin/openstack-populator"]
 
+ARG VERSION
+ARG REGISTRY
+
 LABEL \
     com.redhat.component="mtv-openstack-populator-container" \
     name="${REGISTRY}/mtv-openstack-populator-rhel9" \

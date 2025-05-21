@@ -5,6 +5,9 @@ WORKDIR /app
 COPY operator/watches.yaml watches.yaml
 COPY operator/roles roles
 
+ARG VERSION
+ARG RELEASE
+
 LABEL \
     com.redhat.component="mtv-operator-container" \
     name="${REGISTRY}/mtv-rhel9-operator" \

@@ -3,21 +3,24 @@ FROM registry.redhat.io/ubi9/go-toolset:1.23.6-1745588370 AS envsubst
 FROM registry.redhat.io/openshift4/ose-operator-sdk-rhel9@sha256:5fd2a8e6292eec798ac107a0a0d885e1f1c874c2a360291ba4a3bdd0c0a2a52b AS builder
 
 ARG VERSION
+ARG RELEASE
 ARG CHANNEL
 ARG DEFAULT_CHANNEL
+ARG REGISTRY
+ARG OCP_VERSIONS
 
-ARG CONTROLLER_IMAGE="registry.stage.redhat.io/mtv-candidate/mtv-controller-rhel9:2.9.0"
-ARG API_IMAGE="registry.stage.redhat.io/mtv-candidate/mtv-api-rhel9:2.9.0"
-ARG VIRT_V2V_IMAGE="registry.stage.redhat.io/mtv-candidate/mtv-virt-v2v-rhel9:2.9.0"
-ARG OPERATOR_IMAGE="registry.stage.redhat.io/mtv-candidate/mtv-rhel9-operator:2.9.0"
-ARG POPULATOR_CONTROLLER_IMAGE="registry.stage.redhat.io/mtv-candidate/mtv-populator-controller-rhel9:2.9.0"
-ARG OVIRT_POPULATOR_IMAGE="registry.stage.redhat.io/mtv-candidate/mtv-rhv-populator-rhel8:2.9.0"
-ARG OPENSTACK_POPULATOR_IMAGE="registry.stage.redhat.io/mtv-candidate/mtv-openstack-populator-rhel9:2.9.0"
-ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.stage.redhat.io/mtv-candidate/mtv-vsphere-xcopy-volume-populator-rhel9:2.9.0"
-ARG MUST_GATHER_IMAGE="registry.stage.redhat.io/mtv-candidate/mtv-must-gather-rhel8:2.9.0"
-ARG UI_PLUGIN_IMAGE="registry.stage.redhat.io/mtv-candidate/mtv-console-plugin-rhel9:2.9.0"
-ARG OVA_PROVIDER_SERVER_IMAGE="registry.stage.redhat.io/mtv-candidate/mtv-ova-provider-server-rhel9:2.9.0"
-ARG VALIDATION_IMAGE="registry.stage.redhat.io/mtv-candidate/mtv-validation-rhel9:2.9.0"
+ARG CONTROLLER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-controller-rhel8@sha256:3a70be74984ec0530496c7a1d66fecda41216a2afa36803eaaa422a832677a23"
+ARG API_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-api-rhel9@sha256:35f0675e518528d911fcc3d36b343ededd9782fe0a5b7284a229dd9a0afc9656"
+ARG VIRT_V2V_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel8@sha256:9a8548cf4439121ceaa7a8d626d6c6f1f9280f63b2daf471d24fd62c8185a3f4"
+ARG OPERATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-rhel8-operator@sha256:3e54959b60651873c7410a10dfaa8537d064d304cf34f47680bdaccfc6f3aeba"
+ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-populator-controller-rhel9@sha256:c127768d14d9c56d487e2356a315f634278a412a9a50ab9c3eda447d5e3d0f2d"
+ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-rhv-populator-rhel8@sha256:c2e933d4ec5c94e7721d2835d71a91d0bd7451af2cffd2860c4dd86e40a0bdfc"
+ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-openstack-populator-rhel9@sha256:f7bbdd2504f4e8441a9be58ee780b6c6ca3b4285ba4020b8958575dc5ecf9026"
+ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-vsphere-xcopy-volume-populator-rhel9"
+ARG MUST_GATHER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-must-gather-rhel8@sha256:3ff09dbc5ca4c0dd196eab5da46a98da7deaa4e71de010cd52684ca2eaaa0d7a"
+ARG UI_PLUGIN_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-console-plugin-rhel9@sha256:86d33a87e4e96858af57c9a574dfc7357b5e97aa78e269de39aa3d7b7c3423d9"
+ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-ova-provider-server-rhel9@sha256:fea2945986e40914f615438497b478dee5d3adbcb0e4729c177dee21772e4342"
+ARG VALIDATION_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-validation-rhel8@sha256:58edf1e9d49c33bdd62abcd632a61ba61e68b8977f3f57e9feb93c1dd4f07fb6"
 
 USER root
 
@@ -41,10 +44,10 @@ USER 1001
 FROM scratch
 
 ARG VERSION
+ARG RELEASE
 ARG CHANNEL
 ARG DEFAULT_CHANNEL
 ARG REGISTRY
-ARG RELEASE
 ARG OCP_VERSIONS
 
 COPY --from=builder /repo/build/manifests /manifests/

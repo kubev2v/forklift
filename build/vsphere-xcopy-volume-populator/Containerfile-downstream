@@ -29,6 +29,9 @@ COPY --from=builder /src/cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper/e
 
 ENTRYPOINT ["/bin/vsphere-xcopy-volume-populator"]
 
+ARG VERSION
+ARG REGISTRY
+
 LABEL \
     com.redhat.component="mtv-vsphere-xcopy-volume-populator-container" \
     name="${REGISTRY}/mtv-vsphere-xcopy-volume-populator-rhel9" \
