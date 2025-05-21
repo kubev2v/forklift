@@ -41,9 +41,12 @@ var createTestCmd = &cobra.Command{
 		if err != nil {
 			fmt.Printf("k8s client error: %w", err)
 		}
+		tp.ClientSet = clientset
+		tp.StorageClass = storageClassName
+		tp.Namespace = namespace
 
 		ctx := context.Background()
-		if err := tp.Start(ctx, clientset, namespace, testPopulatorImage, storageClassName, pvcYamlPath); err != nil {
+		if err := tp.Start(ctx, testPopulatorImage, pvcYamlPath); err != nil {
 			fmt.Printf("test plan execution failed: %w", err)
 		}
 
