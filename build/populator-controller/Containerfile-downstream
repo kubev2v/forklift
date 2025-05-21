@@ -17,13 +17,14 @@ COPY --from=builder /app/controller /usr/local/bin/populator-controller
 ENTRYPOINT ["/usr/local/bin/populator-controller"]
 
 LABEL \
-        com.redhat.component="mtv-populator-controller-container" \
-        name="migration-toolkit-virtualization/mtv-populator-controller-rhel9" \
-        license="Apache License 2.0" \
-        io.k8s.display-name="Migration Toolkit for Virtualization" \
-        io.k8s.description="Migration Toolkit for Virtualization - Populator Controller" \
-        io.openshift.tags="migration,mtv,forklift" \
-        summary="Migration Toolkit for Virtualization - Populator Controller" \
-        description="Migration Toolkit for Virtualization - Populator Controller" \
-        vendor="Red Hat, Inc." \
-        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>"
+    com.redhat.component="mtv-populator-controller-container" \
+    name="${REGISTRY}/mtv-populator-controller-rhel9" \
+    license="Apache License 2.0" \
+    io.k8s.display-name="Migration Toolkit for Virtualization" \
+    io.k8s.description="Migration Toolkit for Virtualization - Populator Controller" \
+    io.openshift.tags="migration,mtv,forklift" \
+    summary="Migration Toolkit for Virtualization - Populator Controller" \
+    description="Migration Toolkit for Virtualization - Populator Controller" \
+    vendor="Red Hat, Inc." \
+    maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
+    version="$VERSION"
