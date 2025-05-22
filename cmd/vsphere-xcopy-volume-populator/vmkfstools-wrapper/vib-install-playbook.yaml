@@ -38,9 +38,6 @@
     - name: Install Red Hat's vmkfstools-wrapper
       shell: esxcli software vib install -v {{ dest_location }}{{ src_vib }} -f
 
-    - name: restart /etc/init.d/hosts restart
-      shell: /etc/init.d/hostd restart
-
     - name: Confirm VIB is installed
       shell: esxcli software vib list | grep vmkfstools-wrapper
       register: vibs
@@ -50,5 +47,4 @@
       delay: 10
 
     - debug: var=vibs.stdout
-
 
