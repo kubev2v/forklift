@@ -44,7 +44,7 @@ func (h InstanceHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusNotImplemented)
 		return
 	}
-	instancetypes, err := h.InstanceTypes(ctx)
+	instancetypes, err := h.InstanceTypes(ctx, h.Provider)
 	if err != nil {
 		log.Trace(
 			err,
@@ -73,7 +73,7 @@ func (h InstanceHandler) Get(ctx *gin.Context) {
 		base.SetForkliftError(ctx, err)
 		return
 	}
-	instancetypes, err := h.InstanceTypes(ctx)
+	instancetypes, err := h.InstanceTypes(ctx, h.Provider)
 	if err != nil {
 		log.Trace(
 			err,

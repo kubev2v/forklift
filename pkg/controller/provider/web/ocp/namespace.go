@@ -45,7 +45,7 @@ func (h NamespaceHandler) List(ctx *gin.Context) {
 		return
 	}
 
-	namespaces, err := h.Namespaces(ctx)
+	namespaces, err := h.Namespaces(ctx, h.Provider)
 	if err != nil {
 		log.Trace(
 			err,
@@ -75,7 +75,7 @@ func (h NamespaceHandler) Get(ctx *gin.Context) {
 		base.SetForkliftError(ctx, err)
 		return
 	}
-	namespaces, err := h.Namespaces(ctx)
+	namespaces, err := h.Namespaces(ctx, h.Provider)
 	if err != nil {
 		log.Trace(
 			err,

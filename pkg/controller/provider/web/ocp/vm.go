@@ -44,7 +44,7 @@ func (h VMHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusNotImplemented)
 		return
 	}
-	vms, err := h.VMs(ctx)
+	vms, err := h.VMs(ctx, h.Provider)
 	if err != nil {
 		log.Trace(err, "url", ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
@@ -71,7 +71,7 @@ func (h VMHandler) Get(ctx *gin.Context) {
 		base.SetForkliftError(ctx, err)
 		return
 	}
-	vms, err := h.VMs(ctx)
+	vms, err := h.VMs(ctx, h.Provider)
 	if err != nil {
 		log.Trace(err, "url", ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
