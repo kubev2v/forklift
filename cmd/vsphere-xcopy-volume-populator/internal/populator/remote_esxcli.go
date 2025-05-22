@@ -77,6 +77,10 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 	}
 	klog.Infof("Got ESXI host: %s", host)
 
+	err = ensureVib(p.VSphereClient, host, vmDisk.Datastore, VibVersion)
+	if err != nil {
+		return fmt.Errorf("failed to ensure VIB is installed: %w", err)
+	}
 	// for iSCSI add the host to the group using IQN. Is there something else for FC?
 	r, err := p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "adapter", "list"})
 	if err != nil {
