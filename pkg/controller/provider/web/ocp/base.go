@@ -17,6 +17,7 @@ import (
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	cnv "kubevirt.io/api/core/v1"
@@ -118,16 +119,26 @@ func (h Handler) UserClient(ctx *gin.Context) (cl ocpclient.Client, err error) {
 		err = liberr.New("Unable to get provider for request")
 		return
 	}
-	if provider.IsHost() {
+	if provider.IsRestrictedHost() {
+		// this is not the cluster-wide provider. Only the cluster-wide host provider
+		// should use the controller service account which essentially has access to the
+		// whole cluster. Any 'host' providers created in other namespaces are limited to
+		// accessing resources within their namespace
 		var cfg *rest.Config
 		cfg, err = config.GetConfig()
 		if err != nil {
 			return
 		}
-		cfg.BearerTokenFile = "" // clear the service account token
-		cfg.BearerToken = h.Token(ctx)
 
 		log.Info("Creating a new ocp client with user token")
+
+		// clear the service account token and use the token provided with the http request.
+		cfg.BearerTokenFile = ""
+		cfg.BearerToken = h.Token(ctx)
+		if cfg.BearerToken == "" {
+			err = liberr.New("No authentication token found")
+			return
+		}
 		// build a new client with the user's token from the http request
 		if cl, err = ocpclient.New(
 			cfg,
@@ -153,13 +164,20 @@ func (h Handler) UserClient(ctx *gin.Context) (cl ocpclient.Client, err error) {
 	return
 }
 
-func (h Handler) VMs(ctx *gin.Context) (vms []*model.VM, err error) {
+func (h Handler) VMs(ctx *gin.Context, provider *api.Provider) (vms []*model.VM, err error) {
 	client, err := h.UserClient(ctx)
 	if err != nil {
 		return
 	}
 	l := cnv.VirtualMachineList{}
-	err = client.List(context.TODO(), &l, h.ListOptions(ctx)...)
+	options := h.ListOptions(ctx)
+	if provider != nil && provider.IsRestrictedHost() {
+		// a local host provider that is not in the operator namespace ('openshift-mtv' or
+		// 'konveyor-forklift' by default) should be namespace-restricted, so only list
+		// resources within the namespace of the provider
+		options = append(options, ocpclient.InNamespace(provider.GetNamespace()))
+	}
+	err = client.List(context.TODO(), &l, options...)
 	if err != nil {
 		return
 	}
@@ -172,18 +190,33 @@ func (h Handler) VMs(ctx *gin.Context) (vms []*model.VM, err error) {
 	return
 }
 
-func (h Handler) Namespaces(ctx *gin.Context) (namespaces []model.Namespace, err error) {
+func (h Handler) Namespaces(ctx *gin.Context, provider *api.Provider) (namespaces []model.Namespace, err error) {
+	var nsitems []core.Namespace
 	client, err := h.UserClient(ctx)
 	if err != nil {
 		return
 	}
 
-	list := core.NamespaceList{}
-	err = client.List(context.TODO(), &list, h.ListOptions(ctx)...)
-	if err != nil {
-		return
+	if provider != nil && provider.IsRestrictedHost() {
+		// If this is a restricted host provider, we only return the namespace of the
+		// provider. A limited user may not have permissions to list all namespaces anyway.
+		ns := &core.Namespace{}
+		err = client.Get(context.TODO(), types.NamespacedName{Name: provider.GetNamespace()}, ns)
+		if err != nil {
+			return
+		}
+		nsitems = []core.Namespace{*ns}
+	} else {
+		list := core.NamespaceList{}
+		err = client.List(context.TODO(), &list, h.ListOptions(ctx)...)
+		if err != nil {
+			return
+		}
+
+		nsitems = list.Items
 	}
-	for _, ns := range list.Items {
+
+	for _, ns := range nsitems {
 		m := model.Namespace{}
 		m.With(&ns)
 		namespaces = append(namespaces, m)
@@ -197,6 +230,8 @@ func (h Handler) StorageClasses(ctx *gin.Context) (storageclasses []model.Storag
 		return
 	}
 	list := storage.StorageClassList{}
+	// storage classes are listable by any authenticated user, so no need to limit
+	// the query for restricted host providers.
 	err = client.List(context.TODO(), &list, h.ListOptions(ctx)...)
 	if err != nil {
 		return
@@ -210,13 +245,17 @@ func (h Handler) StorageClasses(ctx *gin.Context) (storageclasses []model.Storag
 	return
 }
 
-func (h Handler) NetworkAttachmentDefinitions(ctx *gin.Context) (nets []model.NetworkAttachmentDefinition, err error) {
+func (h Handler) NetworkAttachmentDefinitions(ctx *gin.Context, provider *api.Provider) (nets []model.NetworkAttachmentDefinition, err error) {
 	client, err := h.UserClient(ctx)
 	if err != nil {
 		return
 	}
 	list := net.NetworkAttachmentDefinitionList{}
-	err = client.List(context.TODO(), &list, h.ListOptions(ctx)...)
+	options := h.ListOptions(ctx)
+	if provider != nil && provider.IsRestrictedHost() {
+		options = append(options, ocpclient.InNamespace(provider.GetNamespace()))
+	}
+	err = client.List(context.TODO(), &list, options...)
 	if err != nil {
 		return
 	}
@@ -228,14 +267,18 @@ func (h Handler) NetworkAttachmentDefinitions(ctx *gin.Context) (nets []model.Ne
 	return
 }
 
-func (h Handler) InstanceTypes(ctx *gin.Context) (instancetypes []model.InstanceType, err error) {
+func (h Handler) InstanceTypes(ctx *gin.Context, provider *api.Provider) (instancetypes []model.InstanceType, err error) {
 	client, err := h.UserClient(ctx)
 	if err != nil {
 		return
 	}
 
 	list := instancetype.VirtualMachineInstancetypeList{}
-	err = client.List(context.TODO(), &list, h.ListOptions(ctx)...)
+	options := h.ListOptions(ctx)
+	if provider != nil && provider.IsRestrictedHost() {
+		options = append(options, ocpclient.InNamespace(provider.GetNamespace()))
+	}
+	err = client.List(context.TODO(), &list, options...)
 	if err != nil {
 		return
 	}
@@ -254,6 +297,8 @@ func (h Handler) ClusterInstanceTypes(ctx *gin.Context) (clusterinstances []mode
 		return
 	}
 	list := instancetype.VirtualMachineClusterInstancetypeList{}
+	// clusterinstancetypes are listable by any authenticated user, so no need to
+	// pass the 'provider' to ListOptions even for restricted host providers.
 	err = client.List(context.TODO(), &list, h.ListOptions(ctx)...)
 	for _, cit := range list.Items {
 		m := model.ClusterInstanceType{}

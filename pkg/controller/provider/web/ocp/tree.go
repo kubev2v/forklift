@@ -53,7 +53,7 @@ func (h *TreeHandler) Prepare(ctx *gin.Context) int {
 		base.SetForkliftError(ctx, err)
 		return status
 	}
-	vms, err := h.VMs(ctx)
+	vms, err := h.VMs(ctx, h.Provider)
 	if err != nil {
 		log.Trace(
 			err,
@@ -68,7 +68,7 @@ func (h *TreeHandler) Prepare(ctx *gin.Context) int {
 		namespaceSet[vm.Namespace] = struct{}{}
 	}
 
-	h.namespaces, err = h.Namespaces(ctx)
+	h.namespaces, err = h.Namespaces(ctx, h.Provider)
 	if err != nil {
 		log.Trace(
 			err,
