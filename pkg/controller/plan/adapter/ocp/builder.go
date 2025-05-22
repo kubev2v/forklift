@@ -287,8 +287,28 @@ func (r *Builder) mapDisks(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.Virtu
 	targetVmSpec.Template.Spec.Volumes = []cnv.Volume{}
 
 	r.mapPVCsToTarget(targetVmSpec, persistentVolumeClaims, diskMap)
-	r.mapConfigMapsToTarget(targetVmSpec, configMaps, diskMap)
-	r.mapSecretsToTarget(targetVmSpec, secrets, diskMap)
+	r.mapConfigMapsToTarget(targetVmSpec, configMaps)
+	r.mapSecretsToTarget(targetVmSpec, secrets)
+	r.mapDeviceDisks(targetVmSpec, sourceVm, diskMap)
+}
+
+// FIXME: The map does not contain all possible disk configuration
+// We should go through the missing and implement them or warn around them
+func (r *Builder) isDiskInDiskMap(disk *cnv.Disk, diskMap map[string]*cnv.Disk) bool {
+	for _, val := range diskMap {
+		if disk.Name == val.Name {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *Builder) mapDeviceDisks(targetVmSpec *cnv.VirtualMachineSpec, sourceVm *cnv.VirtualMachine, diskMap map[string]*cnv.Disk) {
+	for _, disk := range sourceVm.Spec.Template.Spec.Domain.Devices.Disks {
+		if r.isDiskInDiskMap(&disk, diskMap) {
+			targetVmSpec.Template.Spec.Domain.Devices.Disks = append(targetVmSpec.Template.Spec.Domain.Devices.Disks, *disk.DeepCopy())
+		}
+	}
 }
 
 func createDiskMap(sourceVm *cnv.VirtualMachine, pvcMap map[string]*core.PersistentVolumeClaim, vmRef ref.Ref) map[string]*cnv.Disk {
@@ -335,7 +355,6 @@ func (r *Builder) mapPVCsToTarget(targetVmSpec *cnv.VirtualMachineSpec, persiste
 				},
 			}
 			targetVmSpec.Template.Spec.Volumes = append(targetVmSpec.Template.Spec.Volumes, targetVolume)
-			targetVmSpec.Template.Spec.Domain.Devices.Disks = append(targetVmSpec.Template.Spec.Domain.Devices.Disks, *disk.DeepCopy())
 		}
 	}
 }
@@ -380,7 +399,7 @@ func (r *Builder) createEnvMaps(sourceVm *cnv.VirtualMachine, vmRef ref.Ref) (ma
 	return configMaps, secrets
 }
 
-func (r *Builder) mapConfigMapsToTarget(targetVmSpec *cnv.VirtualMachineSpec, configMaps map[string]*envMap, diskMap map[string]*cnv.Disk) {
+func (r *Builder) mapConfigMapsToTarget(targetVmSpec *cnv.VirtualMachineSpec, configMaps map[string]*envMap) {
 	for _, configMap := range configMaps {
 		// Create configmap on destination cluster
 		sourceConfigMap := configMap.envResource.(*core.ConfigMap)
@@ -412,17 +431,11 @@ func (r *Builder) mapConfigMapsToTarget(targetVmSpec *cnv.VirtualMachineSpec, co
 			},
 		}
 
-		if disk, ok := diskMap[sourceConfigMap.Name]; ok {
-			targetVmSpec.Template.Spec.Domain.Devices.Disks = append(targetVmSpec.Template.Spec.Domain.Devices.Disks, *disk.DeepCopy())
-		} else {
-			r.Log.Info("ConfigMap disk not found in diskMap, should never happen", "configMap", sourceConfigMap.Name)
-		}
-
 		targetVmSpec.Template.Spec.Volumes = append(targetVmSpec.Template.Spec.Volumes, configMapVolume)
 	}
 }
 
-func (r *Builder) mapSecretsToTarget(targetVmSpec *cnv.VirtualMachineSpec, secrets map[string]*envMap, diskMap map[string]*cnv.Disk) {
+func (r *Builder) mapSecretsToTarget(targetVmSpec *cnv.VirtualMachineSpec, secrets map[string]*envMap) {
 	for _, secret := range secrets {
 		// Create secret on destination cluster
 		sourceSecret := secret.envResource.(*core.Secret)
@@ -450,12 +463,6 @@ func (r *Builder) mapSecretsToTarget(targetVmSpec *cnv.VirtualMachineSpec, secre
 					SecretName: targetSecret.Name,
 				},
 			},
-		}
-
-		if disk, ok := diskMap[sourceSecret.Name]; ok {
-			targetVmSpec.Template.Spec.Domain.Devices.Disks = append(targetVmSpec.Template.Spec.Domain.Devices.Disks, *disk.DeepCopy())
-		} else {
-			r.Log.Info("Secret disk not found in diskMap, should never happen", "secret", sourceSecret.Name)
 		}
 
 		targetVmSpec.Template.Spec.Volumes = append(targetVmSpec.Template.Spec.Volumes, secretVolume)
