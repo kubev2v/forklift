@@ -3694,6 +3694,8 @@ rules:
   resources:
   - roles
   - rolebindings
+  - clusterroles
+  - clusterrolebindings
   verbs:
   - create
 - apiGroups:

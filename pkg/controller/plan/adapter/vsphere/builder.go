@@ -1720,5 +1720,46 @@ func (r *Builder) ensurePopulatorServiceAccount(namespace string) error {
 	if err != nil && !k8serr.IsAlreadyExists(err) {
 		return err
 	}
+
+	clusterRole := rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "populator-pv-reader",
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{""},
+				Resources: []string{"persistentvolumes"},
+				Verbs:     []string{"get"},
+			},
+		},
+	}
+
+	err = r.Destination.Client.Create(context.TODO(), &clusterRole, &client.CreateOptions{})
+	if err != nil && !k8serr.IsAlreadyExists(err) {
+		return err
+	}
+	crBinding := rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "populator-pv-reader-binding",
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      "populator",
+				Namespace: namespace,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			Kind:     "ClusterRole",
+			Name:     "populator-pv-reader",
+			APIGroup: "rbac.authorization.k8s.io",
+		},
+	}
+
+	err = r.Destination.Client.Create(context.TODO(), &crBinding, &client.CreateOptions{})
+	if err != nil && !k8serr.IsAlreadyExists(err) {
+		return err
+	}
+
 	return nil
 }

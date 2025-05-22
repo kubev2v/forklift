@@ -2,6 +2,7 @@ package vmware
 
 import (
 	"context"
+	"encoding/xml"
 	"reflect"
 	"strings"
 
@@ -20,6 +21,7 @@ import (
 type Client interface {
 	GetEsxByVm(ctx context.Context, vmName string) (*object.HostSystem, error)
 	RunEsxCommand(ctx context.Context, host *object.HostSystem, command []string) ([]esx.Values, error)
+	GetDatastore(ctx context.Context, datastore string) (*object.Datastore, error)
 }
 
 type VSphereClient struct {
@@ -104,4 +106,49 @@ func (c *VSphereClient) GetEsxByVm(ctx context.Context, vmName string) (*object.
 		return nil, err
 	}
 	return host, nil
+}
+
+func (c *VSphereClient) GetDatastore(ctx context.Context, datastore string) (*object.Datastore, error) {
+	finder := find.NewFinder(c.Client.Client, true)
+	dc, err := finder.DefaultDatacenter(ctx)
+	if err != nil {
+		klog.Errorf("Failed to find default datacenter: %s", err)
+		return nil, err
+	}
+	finder.SetDatacenter(dc)
+
+	// Find the virtual machine by name
+	ds, err := finder.Datastore(ctx, datastore)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to find datastore %s: %v", datastore, err)
+	}
+
+	return ds, nil
+}
+
+type Obj struct {
+	XMLName          xml.Name `xml:"urn:vim25 obj"`
+	VersionID        string   `xml:"versionId,attr"`
+	Type             string   `xml:"http://www.w3.org/2001/XMLSchema-instance type,attr"`
+	Fault            Fault    `xml:"fault"`
+	LocalizedMessage string   `xml:"localizedMessage"`
+}
+
+type Fault struct {
+	Type    string   `xml:"http://www.w3.org/2001/XMLSchema-instance type,attr"`
+	ErrMsgs []string `xml:"errMsg"`
+}
+
+func ErrToFault(err error) (*Fault, error) {
+	f, ok := err.(*esx.Fault)
+	if ok {
+		var obj Obj
+		decoder := xml.NewDecoder(strings.NewReader(f.Detail))
+		err := decoder.Decode(&obj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode from xml to fault: %w", err)
+		}
+		return &obj.Fault, nil
+	}
+	return nil, fmt.Errorf("error is not of type esx.Fault")
 }

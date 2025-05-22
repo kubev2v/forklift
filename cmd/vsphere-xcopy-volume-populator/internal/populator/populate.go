@@ -40,14 +40,14 @@ type LUN struct {
 
 // VMDisk is the target VMDisk in vmware
 type VMDisk struct {
-	VMName     string
-	Datacenter string
-	VmdkFile   string
-	VmnameDir  string
+	VMName    string
+	Datastore string
+	VmdkFile  string
+	VmnameDir string
 }
 
 func (d *VMDisk) Path() string {
-	return fmt.Sprintf("/vmfs/volumes/%s/%s/%s", d.Datacenter, d.VmnameDir, d.VmdkFile)
+	return fmt.Sprintf("/vmfs/volumes/%s/%s/%s", d.Datastore, d.VmnameDir, d.VmdkFile)
 }
 
 func ParseVmdkPath(vmdkPath string) (VMDisk, error) {
@@ -66,5 +66,5 @@ func ParseVmdkPath(vmdkPath string) (VMDisk, error) {
 	vmdk := pathParts[1]
 	vmdkParts := strings.SplitN(vmdk, ".", 2)
 	vmname_sub := vmdkParts[0]
-	return VMDisk{VMName: vmname_sub, Datacenter: datastore, VmdkFile: vmdk, VmnameDir: vmname_dir}, nil
+	return VMDisk{VMName: vmname_sub, Datastore: datastore, VmdkFile: vmdk, VmnameDir: vmname_dir}, nil
 }
