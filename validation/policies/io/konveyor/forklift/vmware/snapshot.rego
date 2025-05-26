@@ -9,6 +9,6 @@ concerns[flag] {
     flag := {
         "category": "Information",
         "label": "VM snapshot detected",
-        "assessment": "Online snapshots are not currently supported by OpenShift Virtualization."
+        "assessment": "Online snapshots are not currently supported by OpenShift Virtualization. VM will be migrated with current snapshot."
     }
 }
