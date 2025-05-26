@@ -1,16 +1,16 @@
 domain: konveyor.io
 layout:
-- ansible.sdk.operatorframework.io/v1
+  - ansible.sdk.operatorframework.io/v1
 plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
-projectName: forklift-operator
+projectName: ${PROJECT_NAME}
 resources:
-- api:
-    crdVersion: v1
-    namespaced: true
-  domain: konveyor.io
-  group: forklift
-  kind: ForkliftController
-  version: v1beta1
+  - api:
+      crdVersion: v1
+      namespaced: true
+    domain: konveyor.io
+    group: forklift
+    kind: ForkliftController
+    version: v1beta1
 version: "3"

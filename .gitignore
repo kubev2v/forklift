@@ -42,3 +42,7 @@ vendor/**/Dockerfile.govc
 cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper/vmkfstools-wrapper.vib
 .github/workflows/build-push-images-hal.yml
 __pycache__
+
+# ignore intermediate manifests
+operator/streams/**/upstream_manifests
+operator/streams/**/downstream_manifests
