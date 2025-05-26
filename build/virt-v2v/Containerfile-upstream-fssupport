@@ -25,7 +25,7 @@ RUN mkdir /disks && \
         virtio-win && \
     dnf clean all
 
-RUN dnf install --setopt=sslverify=false -y https://kojihub.stream.rdu2.redhat.com/kojifiles/vol/koji02/packages/virt-v2v/2.7.15/3.el10/x86_64/virt-v2v-2.7.15-3.el10.x86_64.rpm \
+RUN dnf install --setopt=sslverify=false -y https://kojihub.stream.centos.org/kojifiles/vol/koji02/packages/virt-v2v/2.7.15/3.el10/x86_64/virt-v2v-2.7.15-3.el10.x86_64.rpm \
     https://kojihub.stream.centos.org/kojifiles/vol/koji02/packages/libguestfs/1.55.11/1.el10/x86_64/libguestfs-1.55.11-1.el10.x86_64.rpm \
     https://kojihub.stream.centos.org/kojifiles/vol/koji02/packages/libguestfs/1.55.11/1.el10/x86_64/libguestfs-appliance-1.55.11-1.el10.x86_64.rpm \
     https://kojihub.stream.centos.org/kojifiles/vol/koji02/packages/libguestfs/1.55.11/1.el10/x86_64/libguestfs-xfs-1.55.11-1.el10.x86_64.rpm
@@ -38,7 +38,7 @@ RUN dnf install -y  https://kojihub.stream.centos.org/kojifiles/vol/koji02/packa
     https://kojihub.stream.centos.org/kojifiles/vol/koji02/packages/kernel/6.12.0/84.el10/x86_64/kernel-core-6.12.0-84.el10.x86_64.rpm \
     https://kojihub.stream.centos.org/kojifiles/vol/koji02/packages/kernel/6.12.0/84.el10/x86_64/kernel-modules-6.12.0-84.el10.x86_64.rpm
 
-RUN dnf install --setopt=sslverify=false -y https://kojihub.stream.rdu2.redhat.com/kojifiles/work/tasks/3821/5793821/libguestfs-fssupport-10.0-1.el10.x86_64.rpm
+RUN dnf install --setopt=sslverify=false -y https://kojihub.stream.centos.org/kojifiles/work/tasks/3821/5793821/libguestfs-fssupport-10.0-1.el10.x86_64.rpm
 
 RUN test "$(rpm -q kernel)" = "kernel-6.12.0-84.el10.x86_64"
 
