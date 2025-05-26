@@ -1332,7 +1332,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				namespace := r.Plan.Spec.TargetNamespace
 				// pvs names needs to be less than 63, this leaves 53 chars
 				// for the plan and vm name (2 dashes and 8 chars uuid)
-				commonName := fmt.Sprintf("%s-%s-%s", r.Plan.Name, vm.Name, uuid.New().String()[:8])
+				commonName := fmt.Sprintf("%s-%s-%s", r.Plan.Name, r.getPlenVMSafeName(vm), uuid.New().String()[:8])
 				labels := map[string]string{
 					"migration": string(r.Migration.UID),
 					// we need uniqness and a value which is less than 64 chars, hence using vmRef.id + disk.key
