@@ -11,6 +11,6 @@ concerns[flag] {
     flag := {
         "category": "Warning",
         "label": "Independent disk detected",
-        "assessment": "Independent disks cannot be transferred using recent versions of VDDK. It is recommended to change them in vSphere to 'Dependent' mode, or alternatively, to export the VM to an OVA."
+        "assessment": "Independent disks cannot be transferred using recent versions of VDDK. The VM cannot be migrated unless disks are changed to 'Dependent' mode in VMware."
     }
 }

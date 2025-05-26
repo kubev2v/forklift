@@ -10,6 +10,6 @@ concerns[flag] {
     flag := {
         "category": "Critical",
         "label": "Raw Device Mapped disk detected",
-        "assessment": "RDM disks are not currently supported by OpenShift Virtualization. The VM cannot be migrated"
+        "assessment": "RDM disks are not currently supported by Migration Toolkit for Virtualization. The VM cannot be migrated unless the RDM disks are removed. You can reattach them to the VM after migration."
     }
 }

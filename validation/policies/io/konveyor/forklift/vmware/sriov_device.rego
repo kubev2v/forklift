@@ -10,6 +10,6 @@ concerns[flag] {
     flag := {
         "category": "Critical",
         "label": "SR-IOV passthrough adapter configuration detected",
-        "assessment": "SR-IOV passthrough adapter configuration is not currently supported by OpenShift Virtualization."
+        "assessment": "SR-IOV passthrough adapter configuration is not currently supported by Migration Toolkit for Virtualization. Administrators can configure this after migration."
     }
 }
