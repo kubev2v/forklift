@@ -13,17 +13,16 @@ endif
 .PHONY: all
 all: build
 
-##@ Development
 .PHONY: fmt
-fmt: ## Run go fmt against code.
+fmt:
 	go fmt ./...
 
 .PHONY: vet
-vet: ## Run go vet against code.
+vet:
 	go vet ./...
 
 .PHONY: test
-test: fmt vet ## Run tests.
+test: fmt vet
 	go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
 
 .PHONY: generate 
@@ -31,10 +30,10 @@ generate:
 	go generate ./...
 
 .PHONY: build
-build: generate fmt vet ## Build manager binary.
+build: generate fmt vet
 	go build -o bin/vsphere-xcopy-volume-populator
 
-# prerequisits: ensure a PVC exists.
+# pre-requisits: ensure a PVC exists.
 test-copy-using-cli: build
 	bin/vsphere-xcopy-volume-populator \
 		--source-vmdk="[eco-iscsi-ds2] vm-1/vm-1.vmdk" \
