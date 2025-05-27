@@ -8,7 +8,11 @@ metadata:
     pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "release-2.8"
+      == "release-2.8" && ( ".tekton/forklift-controller-2-8-*.yaml".pathChanged() ||
+      ".konflux/forklift-controller/rpms.lock.yaml".pathChanged() ||
+      "build/forklift-controller/Containerfile-downstream".pathChanged() ||
+      "pkg/controller/***".pathChanged() ||
+      "cmd/forklift-controller/***".pathChanged() )
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: forklift-operator-2-8
@@ -28,6 +32,10 @@ spec:
     value: build/forklift-controller/Containerfile-downstream
   - name: path-context
     value: .
+  - name: build-source-image
+    value: "true"
+  - name: prefetch-input
+    value: '[{"type": "rpm", "path": ".konflux/forklift-controller"}]'
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
@@ -77,7 +85,7 @@ spec:
       description: Skip checks against built image
       name: skip-checks
       type: string
-    - default: "false"
+    - default: "true"
       description: Execute the build with network isolation
       name: hermetic
       type: string
@@ -180,6 +188,10 @@ spec:
         value: $(params.output-image).prefetch
       - name: ociArtifactExpiresAfter
         value: $(params.image-expires-after)
+      - name: dev-package-managers 
+        value: "true"
+      - name: ACTIVATION_KEY
+        value: activation-key-rhel9
       runAfter:
       - clone-repository
       taskRef:

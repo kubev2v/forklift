@@ -1,0 +1,159 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: https://cdn.redhat.com/content/dist/layered/rhel8/x86_64/rhv-tools/4/os/Packages/o/ovirt-imageio-client-2.4.8-1.el8ev.x86_64.rpm
+    repoid: rhv-4-tools-for-rhel-8-x86_64-rpms
+    size: 52356
+    checksum: sha256:71d2c5623bce46119465b27751af356073a90534e5fde2f5273fad54fc5df21e
+    name: ovirt-imageio-client
+    evr: 2.4.8-1.el8ev
+    sourcerpm: ovirt-imageio-2.4.8-1.el8ev.src.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel8/x86_64/rhv-tools/4/os/Packages/o/ovirt-imageio-common-2.4.8-1.el8ev.x86_64.rpm
+    repoid: rhv-4-tools-for-rhel-8-x86_64-rpms
+    size: 167964
+    checksum: sha256:f4c41680285eeea3f051a82e98dc5e9af3132d7c9ec268e52795754f6eee4c8c
+    name: ovirt-imageio-common
+    evr: 2.4.8-1.el8ev
+    sourcerpm: ovirt-imageio-2.4.8-1.el8ev.src.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel8/x86_64/rhv-tools/4/os/Packages/p/python3-ovirt-engine-sdk4-4.5.1-1.el8ev.x86_64.rpm
+    repoid: rhv-4-tools-for-rhel-8-x86_64-rpms
+    size: 596572
+    checksum: sha256:e521e1e532251edf5490eabfa28598983a177f4792a9917996531111790c83b8
+    name: python3-ovirt-engine-sdk4
+    evr: 4.5.1-1.el8ev
+    sourcerpm: python-ovirt-engine-sdk4-4.5.1-1.el8ev.src.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel8/x86_64/rhv-tools/4/os/Packages/p/python3-pycurl-7.43.0.2-4.1.el8ev.x86_64.rpm
+    repoid: rhv-4-tools-for-rhel-8-x86_64-rpms
+    size: 183836
+    checksum: sha256:63bf905cb619bbf68737b01e64fc7425b59df2ab28239b7794954755860c38bf
+    name: python3-pycurl
+    evr: 7.43.0.2-4.1.el8ev
+    sourcerpm: python-pycurl-7.43.0.2-4.1.el8ev.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8.10/x86_64/appstream/os/Packages/p/python3-pip-9.0.3-24.el8.noarch.rpm
+    repoid: rhel-8-for-x86_64-appstream-rpms
+    size: 20864
+    checksum: sha256:483d2fcaa3ff602bc9eacc6b6f12370212d4eff6c3cc5fbd6cbc3bb9774f7bc0
+    name: python3-pip
+    evr: 9.0.3-24.el8
+    sourcerpm: python-pip-9.0.3-24.el8.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8.10/x86_64/appstream/os/Packages/p/python36-3.6.8-39.module+el8.10.0+20784+edafcd43.x86_64.rpm
+    repoid: rhel-8-for-x86_64-appstream-rpms
+    size: 20010
+    checksum: sha256:ae70c3563e01ae72274faa79215cd6b8d1aecec126a7ee598277998f64c4c804
+    name: python36
+    evr: 3.6.8-39.module+el8.10.0+20784+edafcd43
+    sourcerpm: python36-3.6.8-39.module+el8.10.0+20784+edafcd43.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8.10/x86_64/appstream/os/Packages/q/qemu-img-6.2.0-53.module+el8.10.0+22375+ea5e8167.2.x86_64.rpm
+    repoid: rhel-8-for-x86_64-appstream-rpms
+    size: 2286139
+    checksum: sha256:20d55f94f85b017259f378f9debe239b44c74767fc9985d194a296c9c75ff5a9
+    name: qemu-img
+    evr: 15:6.2.0-53.module+el8.10.0+22375+ea5e8167.2
+    sourcerpm: qemu-kvm-6.2.0-53.module+el8.10.0+22375+ea5e8167.2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8.10/x86_64/baseos/os/Packages/e/expat-2.2.5-17.el8_10.x86_64.rpm
+    repoid: rhel-8-for-x86_64-baseos-rpms
+    size: 117960
+    checksum: sha256:d01df6f542762d94bd73a87f61d19fb98a6304eb9a2eb114a872a91d3312ea34
+    name: expat
+    evr: 2.2.5-17.el8_10
+    sourcerpm: expat-2.2.5-17.el8_10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8.10/x86_64/baseos/os/Packages/g/gdbm-1.18-2.el8.x86_64.rpm
+    repoid: rhel-8-for-x86_64-baseos-rpms
+    size: 132820
+    checksum: sha256:a8e1839ca386b258656d4a4108049857a257fbd4cf7520d698e0bfa9edd9c4c1
+    name: gdbm
+    evr: 1:1.18-2.el8
+    sourcerpm: gdbm-1.18-2.el8.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8.10/x86_64/baseos/os/Packages/g/gdbm-libs-1.18-2.el8.x86_64.rpm
+    repoid: rhel-8-for-x86_64-baseos-rpms
+    size: 61820
+    checksum: sha256:cfa6bd007cf38a40166de803c4aa0ccae2a6f5ffc756efa6e14a2cab228ec22b
+    name: gdbm-libs
+    evr: 1:1.18-2.el8
+    sourcerpm: gdbm-1.18-2.el8.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8.10/x86_64/baseos/os/Packages/l/libaio-0.3.112-1.el8.x86_64.rpm
+    repoid: rhel-8-for-x86_64-baseos-rpms
+    size: 33392
+    checksum: sha256:d8f93540a6a7329a5158d3e543f77110104f30494f4d6f187427e5010d8df379
+    name: libaio
+    evr: 0.3.112-1.el8
+    sourcerpm: libaio-0.3.112-1.el8.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8.10/x86_64/baseos/os/Packages/l/libnsl2-1.2.0-2.20180605git4a062cf.el8.x86_64.rpm
+    repoid: rhel-8-for-x86_64-baseos-rpms
+    size: 59120
+    checksum: sha256:f7e60c8a5eaf056a9c67834671561196b961fba7bc763568f1c01c3ab998bb46
+    name: libnsl2
+    evr: 1.2.0-2.20180605git4a062cf.el8
+    sourcerpm: libnsl2-1.2.0-2.20180605git4a062cf.el8.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8.10/x86_64/baseos/os/Packages/l/libtirpc-1.1.4-12.el8_10.x86_64.rpm
+    repoid: rhel-8-for-x86_64-baseos-rpms
+    size: 116808
+    checksum: sha256:d35b01a79f17bcaca9a774fa78136acadabf6f627db43b7dca43a83a63afffa4
+    name: libtirpc
+    evr: 1.1.4-12.el8_10
+    sourcerpm: libtirpc-1.1.4-12.el8_10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8.10/x86_64/baseos/os/Packages/p/platform-python-3.6.8-69.el8_10.x86_64.rpm
+    repoid: rhel-8-for-x86_64-baseos-rpms
+    size: 90592
+    checksum: sha256:43e2eac6440b86c1ec9eec337abed72a2878adc0ec11aecc506de59963c47fb9
+    name: platform-python
+    evr: 3.6.8-69.el8_10
+    sourcerpm: python3-3.6.8-69.el8_10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8.10/x86_64/baseos/os/Packages/p/platform-python-pip-9.0.3-24.el8.noarch.rpm
+    repoid: rhel-8-for-x86_64-baseos-rpms
+    size: 1633024
+    checksum: sha256:a9104ca3388b74f665c2648cde81043cc7748bf1ca5a7f2a4148b86013206fc8
+    name: platform-python-pip
+    evr: 9.0.3-24.el8
+    sourcerpm: python-pip-9.0.3-24.el8.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8.10/x86_64/baseos/os/Packages/p/platform-python-setuptools-39.2.0-8.el8_10.noarch.rpm
+    repoid: rhel-8-for-x86_64-baseos-rpms
+    size: 647476
+    checksum: sha256:8f330a8602613473b6e4c0bc57cb3012932a9a9399ea7a3fa65175453a6580ab
+    name: platform-python-setuptools
+    evr: 39.2.0-8.el8_10
+    sourcerpm: python-setuptools-39.2.0-8.el8_10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8.10/x86_64/baseos/os/Packages/p/python3-libs-3.6.8-69.el8_10.x86_64.rpm
+    repoid: rhel-8-for-x86_64-baseos-rpms
+    size: 8251108
+    checksum: sha256:6dcf5dcbb3000fe90877bafbb4e8bb9f9a170b262c12f7ae8033e649227cf1b0
+    name: python3-libs
+    evr: 3.6.8-69.el8_10
+    sourcerpm: python3-3.6.8-69.el8_10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8.10/x86_64/baseos/os/Packages/p/python3-pip-wheel-9.0.3-24.el8.noarch.rpm
+    repoid: rhel-8-for-x86_64-baseos-rpms
+    size: 886996
+    checksum: sha256:9bf511b12174637c1163f224deb28a0ea7f8f4565231e3a0e8eb64f37ce27d08
+    name: python3-pip-wheel
+    evr: 9.0.3-24.el8
+    sourcerpm: python-pip-9.0.3-24.el8.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8.10/x86_64/baseos/os/Packages/p/python3-setuptools-39.2.0-8.el8_10.noarch.rpm
+    repoid: rhel-8-for-x86_64-baseos-rpms
+    size: 166796
+    checksum: sha256:6bc3a23645fe60bcd5d1ec3072ac521b54f2bc18652e35e91acf56ade1722a26
+    name: python3-setuptools
+    evr: 39.2.0-8.el8_10
+    sourcerpm: python-setuptools-39.2.0-8.el8_10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8.10/x86_64/baseos/os/Packages/p/python3-setuptools-wheel-39.2.0-8.el8_10.noarch.rpm
+    repoid: rhel-8-for-x86_64-baseos-rpms
+    size: 296040
+    checksum: sha256:833dcb68b1eea48bfb8853886236753647743258fd74cc538ffa72408aab9213
+    name: python3-setuptools-wheel
+    evr: 39.2.0-8.el8_10
+    sourcerpm: python-setuptools-39.2.0-8.el8_10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8.10/x86_64/baseos/os/Packages/p/python3-six-1.11.0-8.el8.noarch.rpm
+    repoid: rhel-8-for-x86_64-baseos-rpms
+    size: 39408
+    checksum: sha256:932cca0b2aa28d64538fca0401acc35bec34f14bfe99d3e22ea8452b79890eac
+    name: python3-six
+    evr: 1.11.0-8.el8
+    sourcerpm: python-six-1.11.0-8.el8.src.rpm
+  source: []
+  module_metadata:
+  - url: https://cdn.redhat.com/content/dist/rhel8/8.10/x86_64/appstream/os/repodata/9309fe60f0773f7fe7faa2d89fc8cda4b4b7f325af0fb1972e5d004c23749bec-modules.yaml.gz
+    repoid: rhel-8-for-x86_64-appstream-rpms
+    size: 727191
+    checksum: sha256:9309fe60f0773f7fe7faa2d89fc8cda4b4b7f325af0fb1972e5d004c23749bec
