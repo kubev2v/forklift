@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"crypto/x509"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -183,7 +184,7 @@ func (r *Reconciler) validateConnectionStatus(provider *api.Provider, secret *co
 			Message:  "TLS is susceptible to machine-in-the-middle attacks when certificate verification is skipped.",
 		})
 	} else {
-		crt, err := r.VerifyTLSConnection(provider.Spec.URL, secret)
+		_, err := r.VerifyTLSConnection(provider.Spec.URL, secret)
 		if err != nil {
 			provider.Status.SetCondition(libcnd.Condition{
 				Type:     ConnectionTestFailed,
@@ -192,12 +193,6 @@ func (r *Reconciler) validateConnectionStatus(provider *api.Provider, secret *co
 				Category: Critical,
 				Message:  err.Error(),
 			})
-			return
-		}
-
-		// Only set fingerprint for vSphere providers
-		if provider.Type() == api.VSphere {
-			provider.Status.Fingerprint = util.Fingerprint(crt)
 		}
 	}
 }
@@ -255,6 +250,18 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 		}
 
 		r.validateConnectionStatus(provider, secret)
+
+		var providerUrl *url.URL
+		providerUrl, err = url.Parse(provider.Spec.URL)
+		if err != nil {
+			return
+		}
+		var crt *x509.Certificate
+		crt, err = util.GetTlsCertificate(providerUrl, secret)
+		if err != nil {
+			return
+		}
+		provider.Status.Fingerprint = util.Fingerprint(crt)
 	case api.OVirt:
 		keyList = []string{
 			"user",
