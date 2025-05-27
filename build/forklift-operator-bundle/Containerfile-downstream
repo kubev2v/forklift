@@ -2,6 +2,8 @@ FROM registry.redhat.io/ubi9/go-toolset:1.23.6-1745588370 AS envsubst
 
 FROM registry.redhat.io/openshift4/ose-operator-sdk-rhel9@sha256:5fd2a8e6292eec798ac107a0a0d885e1f1c874c2a360291ba4a3bdd0c0a2a52b AS builder
 
+ARG LABELS
+
 ARG VERSION
 ARG RELEASE
 ARG CHANNEL
@@ -9,29 +11,18 @@ ARG DEFAULT_CHANNEL
 ARG REGISTRY
 ARG OCP_VERSIONS
 
-ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:e87e27ecc8d85dbb10c8a0305bc0069e48546779ff59853369b13e52d733536a"
-ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:35f0675e518528d911fcc3d36b343ededd9782fe0a5b7284a229dd9a0afc9656"
-ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel9@sha256:3d77a189622c9969817d59a7c7e780b03f8f9e0468d2a976946164aa328ce893"
-ARG OPERATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhel9-operator@sha256:8601a266a795635ebfc379d94cc67c5e14a520576491e8f2cce2c5a6116ad504"
-ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-populator-controller-rhel9@sha256:031d3bd4925c38a27bea7d94257669d2004f09330834fee7feb1489f0839782e"
-ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhv-populator-rhel8@sha256:6d2e7e253ea9de541001a552b97eeb4de8e745fc927ebe866607d33dadc4b253"
-ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-openstack-populator-rhel9@sha256:09661fdb1805515dc3ab7743bd156a592ab4a84ac4c88d646599617c6db371ea"
-ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-vsphere-xcopy-volume-populator-rhel9@sha256:9a7289458f347098ea159fb27c19b6dc7c2ea9ad50466b649da39d3744c87b4e"
-ARG MUST_GATHER_IMAGE="registry.redhat.io/mtv-candidate/mtv-must-gather-rhel8@sha256:b4ca6968f86b8ed23f360b325036fa813e3c21483b5487a81c5583fd3327d99b"
-ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:743e63715f83df1cf7e428c8020c05b2924f2a55a133aa81cab55ae19c408fdd"
-ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/mtv-candidate/mtv-ova-provider-server-rhel9@sha256:27abd135cc0cec6bac353b03773fbf5d0c4d844a5a4b40421f6fefb51888c568"
-ARG VALIDATION_IMAGE="registry.redhat.io/mtv-candidate/mtv-validation-rhel9@sha256:320304c7b9ebbbebf6aac3c916ad3ae2fbf8ca8c2039a3bbbfa64894ae5ae0e3"
-
 USER root
 
 COPY --from=envsubst /usr/bin/envsubst /usr/bin/envsubst
 
 COPY ./operator /repo
+COPY ./build/forklift-operator-bundle/images.conf /repo/images.conf
 WORKDIR /repo
 
 # Set project name to mtv-operator so operator-sdk can successfully generate resources
 RUN cp PROJECT PROJECT.template && PROJECT_NAME=mtv-operator envsubst < PROJECT.template > PROJECT
-RUN cat .downstream_manifests \
+RUN source ./images.conf && \
+    cat .downstream_manifests \
     | envsubst \
     | operator-sdk generate bundle \
     -q \
