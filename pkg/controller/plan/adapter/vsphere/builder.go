@@ -1313,7 +1313,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 		}
 
 		pvblock := core.PersistentVolumeBlock
-		for _, disk := range vm.Disks {
+		for diskIndex, disk := range vm.Disks {
 			if disk.Datastore.ID == ds.ID {
 				storageClass := mapped.Destination.StorageClass
 
@@ -1332,7 +1332,56 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				namespace := r.Plan.Spec.TargetNamespace
 				// pvs names needs to be less than 63, this leaves 53 chars
 				// for the plan and vm name (2 dashes and 8 chars uuid)
-				commonName := fmt.Sprintf("%s-%s-%s", r.Plan.Name, r.getPlenVMSafeName(vm), uuid.New().String()[:8])
+				generatedName := ""
+				pvcNameTemplate := r.getPVCNameTemplate(vm)
+				if pvcNameTemplate != "" {
+					// Get the VM root disk index
+					planVM := r.getPlanVM(vm)
+					rootDiskIndex := 0
+					if planVM != nil {
+						rootDiskIndex = utils.GetBootDiskNumber(planVM.RootDisk)
+					}
+					templateData := api.PVCNameTemplateData{
+						VmName:        r.getPlenVMSafeName(vm),
+						PlanName:      r.Plan.Name,
+						DiskIndex:     diskIndex,
+						RootDiskIndex: rootDiskIndex,
+						Shared:        disk.Shared,
+					}
+
+					generatedName, err = r.executeTemplate(pvcNameTemplate, &templateData)
+					useGenerateName := r.Plan.Spec.PVCNameTemplateUseGenerateName
+
+					// Validate that template output is a valid k8s label
+					errs := k8svalidation.IsDNS1123Label(generatedName)
+					if len(errs) > 0 {
+						// Raise an error if the generated name is not valid
+						err = errors.New("generated PVC name is not valid")
+
+						// Failed to generate PVC name using template
+						r.Log.Info("Failed to generate PVC name using template", "template", pvcNameTemplate, "error", err)
+					}
+
+					if err == nil && generatedName != "" {
+						if useGenerateName {
+							// Ensure generatedName ends with "-"
+							if !strings.HasSuffix(generatedName, "-") {
+								generatedName = generatedName + "-"
+							}
+						} else {
+							// Ensure generatedName does not end with "-"
+							if strings.HasSuffix(generatedName, "-") {
+								generatedName = strings.Trim(generatedName, "-")
+							}
+						}
+					} else {
+						// Failed to generate PVC name using template
+						r.Log.Info("Failed to generate PVC name using template", "template", pvcNameTemplate, "error", err)
+					}
+				} else {
+					generatedName = fmt.Sprintf("%s-%s-%s", r.Plan.Name, r.getPlenVMSafeName(vm), uuid.New().String()[:8])
+				}
+
 				labels := map[string]string{
 					"migration": string(r.Migration.UID),
 					// we need uniqness and a value which is less than 64 chars, hence using vmRef.id + disk.key
@@ -1342,7 +1391,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				r.Log.Info("target namespace for migration", "namespace", namespace)
 				pvc := core.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:        commonName,
+						Name:        generatedName,
 						Namespace:   namespace,
 						Labels:      labels,
 						Annotations: annotations,
@@ -1358,7 +1407,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 						DataSourceRef: &core.TypedObjectReference{
 							APIGroup: &api.SchemeGroupVersion.Group,
 							Kind:     api.VSphereXcopyVolumePopulatorKind,
-							Name:     commonName,
+							Name:     generatedName,
 						},
 					},
 				}
@@ -1379,7 +1428,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 
 				vp := api.VSphereXcopyVolumePopulator{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      commonName,
+						Name:      generatedName,
 						Namespace: namespace,
 						Labels:    labels,
 					},
