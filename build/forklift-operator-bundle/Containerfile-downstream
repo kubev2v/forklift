@@ -11,7 +11,7 @@ ARG OCP_VERSIONS
 
 ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:e87e27ecc8d85dbb10c8a0305bc0069e48546779ff59853369b13e52d733536a"
 ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:35f0675e518528d911fcc3d36b343ededd9782fe0a5b7284a229dd9a0afc9656"
-ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel9@sha256:3d77a189622c9969817d59a7c7e780b03f8f9e0468d2a976946164aa328ce893"
+ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel9@sha256:bc96fb8453931bcc2b932f3b1c7108dc4c40e592698e0fa341e6903426158f30"
 ARG OPERATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhel9-operator@sha256:8601a266a795635ebfc379d94cc67c5e14a520576491e8f2cce2c5a6116ad504"
 ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-populator-controller-rhel9@sha256:031d3bd4925c38a27bea7d94257669d2004f09330834fee7feb1489f0839782e"
 ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhv-populator-rhel8@sha256:6d2e7e253ea9de541001a552b97eeb4de8e745fc927ebe866607d33dadc4b253"
