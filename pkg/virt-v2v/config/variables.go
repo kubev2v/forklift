@@ -26,6 +26,7 @@ const (
 	EnvLocalMigrationName         = "LOCAL_MIGRATION"
 	EnvVirtIoWinLegacyDriversName = "VIRTIO_WIN"
 	EnvHostName                   = "V2V_HOSTNAME"
+	EnvMultipleIpsPerNicName      = "V2V_multipleIPsPerNic"
 )
 
 const (
@@ -83,6 +84,8 @@ type AppConfig struct {
 	// hostname
 	HostName string
 
+	// V2V_multipleIPsPerNic
+	MultipleIpsPerNicName string
 	// Paths
 	VddkConfFile         string
 	InspectionOutputFile string
@@ -115,6 +118,7 @@ func (s *AppConfig) Load() (err error) {
 	flag.StringVar(&s.LibvirtDomainFile, "libvirt-domain-file", V2vInPlaceLibvirtDomain, "Path to the libvirt domain used in the in-place conversion")
 	flag.StringVar(&s.VirtIoWinLegacyDrivers, "virtio-win-legacy-drivers", os.Getenv(EnvVirtIoWinLegacyDriversName), "Path to the virtio-win legacy drivers ISO")
 	flag.StringVar(&s.HostName, "hostname", os.Getenv(EnvHostName), "Hostname of the vm")
+	flag.StringVar(&s.MultipleIpsPerNicName, "multiple-ips-per-nic", os.Getenv(EnvMultipleIpsPerNicName), "Multiple IPs per NIC")
 	flag.Parse()
 
 	return s.validate()
