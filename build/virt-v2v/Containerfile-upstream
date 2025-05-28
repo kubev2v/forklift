@@ -26,7 +26,7 @@ RUN mkdir /disks && \
     dnf clean all
 
 # TODO: This should be replaced with `dnf install -y virtio-win` from centos-stream10
-RUN dnf install -y https://kojihub.stream.centos.org/kojifiles/packages/virtio-win/1.9.40/1.el9/noarch/virtio-win-1.9.40-1.el9.noarch.rpm
+#RUN dnf install -y https://kojihub.stream.centos.org/kojifiles/packages/virtio-win/1.9.40/1.el9/noarch/virtio-win-1.9.40-1.el9.noarch.rpm
 
 RUN ( [ "$(rpm -q glibc)" == "glibc-2.34-66.el9.x86_64" ] && dnf -y downgrade glibc-2.34-65.el9.x86_64 || true ) && \
 dnf -y install libguestfs libguestfs-appliance libguestfs-xfs libguestfs-winsupport qemu-img supermin && \
@@ -39,6 +39,8 @@ RUN mkdir -p /usr/lib64/guestfs/appliance && \
         qemu-img convert -c -O qcow2 root root.qcow2 && \
         mv -vf root.qcow2 root && \
         tar -cvf /libguestfs-appliance.tar /usr/lib64/guestfs/appliance
+
+RUN mkdir -p /etc/pki/CA/ && chown qemu:qemu /etc/pki/CA/
 
 COPY --from=builder /app/virt-v2v-monitor /usr/local/bin/virt-v2v-monitor
 
