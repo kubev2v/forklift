@@ -41,6 +41,9 @@ spec:
     value: '[{"type": "gomod", "path": ".konflux/forklift-operator-bundle"}]'
   - name: build-args-file
     value: build/release.conf
+  - name: build-args
+    value:
+    - EVENT_TITLE={{body.pull_request.title}}
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
@@ -110,7 +113,7 @@ spec:
       description: Add built image into an OCI image index
       name: build-image-index
       type: string
-    - default: ["LABELS={{ pull_request_labels }}"]
+    - default: []
       description: Array of --build-arg values ("arg=value" strings) for buildah
       name: build-args
       type: array
