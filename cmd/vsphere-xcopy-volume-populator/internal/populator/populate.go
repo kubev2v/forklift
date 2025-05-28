@@ -40,31 +40,30 @@ type LUN struct {
 
 // VMDisk is the target VMDisk in vmware
 type VMDisk struct {
+	Datasource string
 	VMName     string
-	Datacenter string
 	VmdkFile   string
-	VmnameDir  string
 }
 
 func (d *VMDisk) Path() string {
-	return fmt.Sprintf("/vmfs/volumes/%s/%s/%s", d.Datacenter, d.VmnameDir, d.VmdkFile)
+	return fmt.Sprintf("/vmfs/volumes/%s/%s/%s", d.Datasource, d.VMName, d.VmdkFile)
 }
 
 func ParseVmdkPath(vmdkPath string) (VMDisk, error) {
 	parts := strings.SplitN(vmdkPath, "] ", 2)
 	if len(parts) != 2 {
-		return VMDisk{}, fmt.Errorf("Invalid vmdkPath %q, should be '[datastore] vmname/vmname.vmdk'", vmdkPath)
+		return VMDisk{}, fmt.Errorf("Invalid vmdkPath %q, should be '[datastore] vmname/xyz.vmdk'", vmdkPath)
 	}
 	datastore := strings.TrimPrefix(parts[0], "[")
-	pathParts := strings.SplitN(parts[1], "/", 2)
+	pathParts := strings.Split(parts[1], "/")
 
 	if len(pathParts) != 2 {
-		return VMDisk{}, fmt.Errorf("Invalid vmdkPath %q, should be '[datastore] vmname/vmname.vmdk'", vmdkPath)
+		return VMDisk{}, fmt.Errorf("Invalid vmdkPath %q, should be '[datastore] vmname/xyz.vmdk'", vmdkPath)
 	}
 
-	vmname_dir := pathParts[0]
-	vmdk := pathParts[1]
-	vmdkParts := strings.SplitN(vmdk, ".", 2)
-	vmname_sub := vmdkParts[0]
-	return VMDisk{VMName: vmname_sub, Datacenter: datastore, VmdkFile: vmdk, VmnameDir: vmname_dir}, nil
+	return VMDisk{
+		Datasource: datastore,
+		VMName:     pathParts[0],
+		VmdkFile:   pathParts[1],
+	}, nil
 }
