@@ -40,7 +40,7 @@ spec:
     value: build/release.conf
   - name: build-args
     value:
-    - EVENT_TITLE={{body.push.head_commit.message}}
+    - EVENT_TITLE={{push.head_commit.message}}
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
