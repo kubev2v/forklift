@@ -10,7 +10,7 @@ ARG REGISTRY
 ARG OCP_VERSIONS
 
 ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:e87e27ecc8d85dbb10c8a0305bc0069e48546779ff59853369b13e52d733536a"
-ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:35f0675e518528d911fcc3d36b343ededd9782fe0a5b7284a229dd9a0afc9656"
+ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:52e1c7160d3a5f07d2aaaa67cc6e8dc6b864bbf20d1a94c5f44059e74f4b3372"
 ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel9@sha256:3d77a189622c9969817d59a7c7e780b03f8f9e0468d2a976946164aa328ce893"
 ARG OPERATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhel9-operator@sha256:8601a266a795635ebfc379d94cc67c5e14a520576491e8f2cce2c5a6116ad504"
 ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-populator-controller-rhel9@sha256:031d3bd4925c38a27bea7d94257669d2004f09330834fee7feb1489f0839782e"
