@@ -137,7 +137,7 @@ type controller struct {
 	mu                sync.Mutex
 	notifyMap         map[string]*stringSet
 	cleanupMap        map[string]*stringSet
-	workqueue         workqueue.RateLimitingInterface
+	workqueue         workqueue.TypedRateLimitingInterface[string]
 	populatorArgs     func(bool, *unstructured.Unstructured, corev1.PersistentVolumeClaim) ([]string, error)
 	gk                schema.GroupKind
 	metrics           *metricsManager
@@ -205,7 +205,7 @@ func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, 
 		unstSynced:        unstInformer.HasSynced,
 		notifyMap:         make(map[string]*stringSet),
 		cleanupMap:        make(map[string]*stringSet),
-		workqueue:         workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		workqueue:         workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
 		populatorArgs:     populatorArgs,
 		gk:                gk,
 		metrics:           initMetrics(),
@@ -434,13 +434,11 @@ func (c *controller) run(stopCh <-chan struct{}) error {
 }
 
 func (c *controller) runWorker() {
-	processNextWorkItem := func(obj interface{}) error {
+	processNextWorkItem := func(obj string) error {
 		defer c.workqueue.Done(obj)
 		var key string
-		var ok bool
-		if key, ok = obj.(string); !ok {
-			c.workqueue.Forget(obj)
-			utilruntime.HandleError(fmt.Errorf("expected string in workqueue but got %#v", obj))
+		if key = obj; key == "" {
+			utilruntime.HandleError(fmt.Errorf("expected valid string in workqueue but got empty string"))
 			return nil
 		}
 		var err error
