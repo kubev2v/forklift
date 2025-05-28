@@ -12,9 +12,6 @@ concerns[flag] {
     flag := {
         "category":   "Warning",
         "label":      "Unsupported operating system detected",
-        "assessment": sprintf(
-            "The guest operating system (%s) is not currently supported by the Migration Toolkit for Virtualization",
-            [ input.guestId ]
-          )
+        "assessment": "The guest operating system is not currently supported by the Migration Toolkit for Virtualization"
     }
 }
