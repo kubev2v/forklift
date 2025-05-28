@@ -213,7 +213,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 						},
 					},
 					Storage: &cdi.StorageSpec{
-						Resources: core.ResourceRequirements{
+						Resources: core.VolumeResourceRequirements{
 							Requests: core.ResourceList{
 								core.ResourceStorage: *resource.NewQuantity(size, resource.BinarySI),
 							},
@@ -696,7 +696,7 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 					},
 					StorageClassName: &sc,
 					VolumeMode:       &volMode,
-					Resources: core.ResourceRequirements{
+					Resources: core.VolumeResourceRequirements{
 						Requests: core.ResourceList{
 							core.ResourceStorage: *resource.NewQuantity(da.Disk.Lun.LogicalUnits.LogicalUnit[0].Size, resource.BinarySI),
 						},
@@ -896,7 +896,7 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(diskAttachment model.XDiskA
 		},
 		Spec: core.PersistentVolumeClaimSpec{
 			AccessModes: accessModes,
-			Resources: core.ResourceRequirements{
+			Resources: core.VolumeResourceRequirements{
 				Requests: map[core.ResourceName]resource.Quantity{
 					core.ResourceStorage: *resource.NewQuantity(diskSize, resource.BinarySI)},
 			},
