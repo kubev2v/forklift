@@ -12,6 +12,7 @@ metadata:
       == "main" && ( "operator/config/manifests/***".pathChanged() || 
       ".tekton/forklift-operator-bundle-*.yaml".pathChanged() ||
       "build/forklift-operator-bundle/Containerfile-downstream".pathChanged() ||
+      "build/forklift-operator-bundle/images.conf".pathChanged() ||
       "operator/export-vars.sh".pathChanged() )
   creationTimestamp: null
   labels:
