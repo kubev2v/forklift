@@ -11,6 +11,7 @@ metadata:
       == "main" && ( "operator/config/manifests/***".pathChanged() || 
       ".tekton/forklift-operator-bundle-*.yaml".pathChanged() ||
       "build/forklift-operator-bundle/Containerfile-downstream".pathChanged() ||
+      "build/forklift-operator-bundle/images.conf".pathChanged() ||
       "operator/export-vars.sh".pathChanged() )
   creationTimestamp: null
   labels:
@@ -106,7 +107,7 @@ spec:
       description: Add built image into an OCI image index
       name: build-image-index
       type: string
-    - default: []
+    - default: ["LABELS={{ pull_request_labels }}"]
       description: Array of --build-arg values ("arg=value" strings) for buildah
       name: build-args
       type: array
