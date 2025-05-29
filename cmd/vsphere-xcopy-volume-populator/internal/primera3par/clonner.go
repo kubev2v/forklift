@@ -66,9 +66,9 @@ func (p *Primera3ParClonner) CurrentMappedGroups(targetLUN populator.LUN, mappin
 	return res, nil
 }
 
-func (c *Primera3ParClonner) ResolveVolumeHandleToLUN(volumeHandle string) (populator.LUN, error) {
-	lun := populator.LUN{VolumeHandle: volumeHandle}
-	lun, err := c.client.GetLunDetailsByVolumeName(volumeHandle, lun)
+func (c *Primera3ParClonner) ResolvePVToLUN(pv populator.PersistentVolume) (populator.LUN, error) {
+	lun := populator.LUN{VolumeHandle: pv.VolumeHandle}
+	lun, err := c.client.GetLunDetailsByVolumeName(pv.VolumeHandle, lun)
 	if err != nil {
 		return populator.LUN{}, err
 	}
