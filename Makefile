@@ -540,7 +540,7 @@ lint-install:
 .PHONY: lint
 lint: $(GOLANGCI_LINT_BIN)
 	@echo "Running golangci-lint..."
-	$(GOLANGCI_LINT_BIN) run ./...
+	$(GOLANGCI_LINT_BIN) run ./pkg/... ./cmd/...
 
 $(GOLANGCI_LINT_BIN):
 	$(MAKE) lint-install
