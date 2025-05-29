@@ -170,25 +170,6 @@ func getExistingVMDKPath(ctx context.Context, vm *object.VirtualMachine, ds *obj
 	if len(parts) != 2 {
 		return "", fmt.Errorf("invalid VMDK path format: %q", vmdkPath)
 	}
-	datastoreName := strings.TrimPrefix(parts[0], "[")
-	remainingPath := parts[1]
-
-	dir := filepath.Dir(remainingPath)
-	baseFileName := filepath.Base(remainingPath)
-
-	flatFileName := strings.TrimSuffix(baseFileName, ".vmdk") + "-flat.vmdk"
-	flatPathOnDatastore := filepath.Join(dir, flatFileName)
-
-	existFlat, err := fileExist(ctx, ds, flatPathOnDatastore)
-	if err != nil {
-		return "", fmt.Errorf("error checking flat VMDK existence for %q: %w", flatPathOnDatastore, err)
-	}
-
-	if existFlat {
-		fullFlatPath := fmt.Sprintf("[%s] %s", datastoreName, flatPathOnDatastore)
-		klog.Infof("Found existing flat VMDK for VM %q: %s", vm.Name(), fullFlatPath)
-		return fullFlatPath, nil
-	}
 
 	klog.Infof("Found existing regular VMDK for VM %q: %s", vm.Name(), vmdkPath)
 	return vmdkPath, nil
