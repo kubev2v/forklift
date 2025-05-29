@@ -5,6 +5,8 @@ go 1.23
 toolchain go1.23.10
 
 require (
+	github.com/devans10/pugo/flasharray v0.0.0-20241116160615-6bb8c469c9a0
+	github.com/konveyor/forklift-controller v0.0.0
 	github.com/netapp/trident v0.0.0-20240628081112-cb68cb389d9d
 	github.com/stretchr/testify v1.10.0
 	github.com/vmware/govmomi v0.48.0
@@ -26,6 +28,9 @@ require (
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
+	github.com/openshift/api v0.0.0-20230925155749-4c26c14d9ebb // indirect
+	github.com/openshift/custom-resource-status v1.1.2 // indirect
+	github.com/pborman/uuid v1.2.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
@@ -39,7 +44,12 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/api v0.28.10 // indirect
+	k8s.io/apiextensions-apiserver v0.28.10 // indirect
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
+	kubevirt.io/api v1.1.1 // indirect
+	kubevirt.io/containerized-data-importer-api v1.59.0 // indirect
+	kubevirt.io/controller-lifecycle-operator-sdk/api v0.0.0-20220329064328-f3cc58c6ed90 // indirect
+	sigs.k8s.io/controller-runtime v0.16.3 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
@@ -109,3 +119,5 @@ require (
 	k8s.io/mount-utils v0.31.1 // indirect
 	k8s.io/utils v0.0.0-20240921022957-49e7df575cb6 // indirect
 )
+
+replace github.com/konveyor/forklift-controller => ../../

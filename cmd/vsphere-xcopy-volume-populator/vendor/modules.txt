@@ -21,6 +21,9 @@ github.com/coreos/go-systemd/v22/dbus
 # github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 ## explicit
 github.com/davecgh/go-spew/spew
+# github.com/devans10/pugo/flasharray v0.0.0-20241116160615-6bb8c469c9a0
+## explicit; go 1.12
+github.com/devans10/pugo/flasharray
 # github.com/elastic/go-sysinfo v1.14.2
 ## explicit; go 1.21
 github.com/elastic/go-sysinfo
@@ -140,6 +143,15 @@ github.com/klauspost/compress/internal/le
 github.com/klauspost/compress/internal/snapref
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
+# github.com/konveyor/forklift-controller v0.0.0 => ../../
+## explicit; go 1.23
+github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1
+github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan
+github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/provider
+github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref
+github.com/konveyor/forklift-controller/pkg/lib/condition
+github.com/konveyor/forklift-controller/pkg/lib/error
+github.com/konveyor/forklift-controller/pkg/lib/itinerary
 # github.com/kubernetes-csi/csi-proxy/client v1.1.3
 ## explicit; go 1.16
 github.com/kubernetes-csi/csi-proxy/client
@@ -224,11 +236,20 @@ github.com/opencontainers/runc/libcontainer/userns
 # github.com/opencontainers/runtime-spec v1.0.3-0.20220909204839-494a5a6aca78
 ## explicit
 github.com/opencontainers/runtime-spec/specs-go
+# github.com/openshift/api v0.0.0-20230925155749-4c26c14d9ebb
+## explicit; go 1.20
+github.com/openshift/api/config/v1
+# github.com/openshift/custom-resource-status v1.1.2
+## explicit; go 1.12
+github.com/openshift/custom-resource-status/conditions/v1
 # github.com/opentracing/opentracing-go v1.2.0
 ## explicit; go 1.14
 github.com/opentracing/opentracing-go
 github.com/opentracing/opentracing-go/ext
 github.com/opentracing/opentracing-go/log
+# github.com/pborman/uuid v1.2.1
+## explicit
+github.com/pborman/uuid
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
@@ -578,6 +599,10 @@ k8s.io/api/scheduling/v1beta1
 k8s.io/api/storage/v1
 k8s.io/api/storage/v1alpha1
 k8s.io/api/storage/v1beta1
+# k8s.io/apiextensions-apiserver v0.28.10
+## explicit; go 1.20
+k8s.io/apiextensions-apiserver/pkg/apis/apiextensions
+k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1
 # k8s.io/apimachinery v0.31.3
 ## explicit; go 1.22.0
 k8s.io/apimachinery/pkg/api/equality
@@ -782,8 +807,23 @@ k8s.io/utils/internal/third_party/forked/golang/net
 k8s.io/utils/io
 k8s.io/utils/keymutex
 k8s.io/utils/net
+k8s.io/utils/pointer
 k8s.io/utils/ptr
 k8s.io/utils/strings/slices
+# kubevirt.io/api v1.1.1
+## explicit; go 1.17
+kubevirt.io/api/core
+kubevirt.io/api/core/v1
+# kubevirt.io/containerized-data-importer-api v1.59.0
+## explicit; go 1.21
+kubevirt.io/containerized-data-importer-api/pkg/apis/core
+kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1
+# kubevirt.io/controller-lifecycle-operator-sdk/api v0.0.0-20220329064328-f3cc58c6ed90
+## explicit; go 1.17
+kubevirt.io/controller-lifecycle-operator-sdk/api
+# sigs.k8s.io/controller-runtime v0.16.3
+## explicit; go 1.20
+sigs.k8s.io/controller-runtime/pkg/scheme
 # sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd
 ## explicit; go 1.18
 sigs.k8s.io/json
@@ -799,3 +839,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 ## explicit; go 1.12
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
+# github.com/konveyor/forklift-controller => ../../

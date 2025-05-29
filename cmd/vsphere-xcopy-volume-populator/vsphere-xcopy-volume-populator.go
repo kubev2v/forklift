@@ -15,8 +15,10 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/ontap"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/primera3par"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/pure"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vantara"
 
+	forklift "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 
@@ -63,28 +65,36 @@ func main() {
 	handleArgs()
 
 	var storageApi populator.StorageApi
-	switch storageVendor {
-	case "vantara":
+	product := forklift.StorageVendorProduct(storageVendor)
+	switch product {
+	case forklift.StorageVendorProductVantara:
 		sm, err := vantara.NewVantaraClonner(storageHostname, storageUsername, storagePassword)
 		if err != nil {
-			klog.Fatalf("failed to initialize vantara storage mapper with %s", err)
+			klog.Fatalf("failed to initialize Vantara storage mapper with %s", err)
 		}
 		storageApi = &sm
-	case "ontap":
+	case forklift.StorageVendorProductOntap:
 		sm, err := ontap.NewNetappClonner(storageHostname, storageUsername, storagePassword)
 		if err != nil {
-			klog.Fatalf("failed to initialize ontap storage mapper with %s", err)
+			klog.Fatalf("failed to initialize Ontap storage mapper with %s", err)
 		}
 		storageApi = &sm
-	case "primera3par":
+	case forklift.StorageVendorProductPrimera3Par:
 		sm, err := primera3par.NewPrimera3ParClonner(
 			storageHostname, storageUsername, storagePassword, storageSkipSSLVerification == "true")
 		if err != nil {
 			klog.Fatalf("failed to initialize primera3par clonner with %s", err)
 		}
 		storageApi = &sm
+	case forklift.StorageVendorProductPureFlashArray:
+		sm, err := pure.NewFlashArrayClonner(
+			storageHostname, storageUsername, storagePassword, storageSkipSSLVerification == "true")
+		if err != nil {
+			klog.Fatalf("failed to initialize Pure FlashArray clonner with %s", err)
+		}
+		storageApi = &sm
 	default:
-		klog.Fatalf("Unsupported storage vendor %s use one of [ontap,]", storageVendor)
+		klog.Fatalf("Unsupported storage vendor %s use one of [vantara,ontap,]", storageVendor)
 	}
 
 	// validations
@@ -219,7 +229,7 @@ func handleArgs() {
 	flag.Parse()
 
 	if showVersion {
-		fmt.Println(os.Args[0], version)
+		fmt.Printf("VIB Version: %s", populator.VibVersion)
 		os.Exit(0)
 	}
 
