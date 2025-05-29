@@ -143,6 +143,57 @@ func uploadVmdk(
 	return remoteVmdkPath, nil
 }
 
+// getExistingVMDKPath queries an existing VM for its primary VMDK path.
+// It prioritizes finding the "-flat.vmdk" version if it exists, otherwise, returns the regular VMDK path.
+func getExistingVMDKPath(ctx context.Context, vm *object.VirtualMachine, ds *object.Datastore) (string, error) {
+	devices, err := vm.Device(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get VM devices: %w", err)
+	}
+
+	var vmdkPath string
+	for _, device := range devices {
+		// Correct way to check for a VirtualDisk and its backing
+		if disk, ok := device.(*types.VirtualDisk); ok { // Assert to the concrete type *types.VirtualDisk
+			if backing, ok := disk.Backing.(*types.VirtualDiskFlatVer2BackingInfo); ok {
+				vmdkPath = backing.FileName
+				break
+			}
+		}
+	}
+
+	if vmdkPath == "" {
+		return "", fmt.Errorf("no VMDK found for VM %q", vm.Name())
+	}
+
+	parts := strings.SplitN(vmdkPath, "] ", 2)
+	if len(parts) != 2 {
+		return "", fmt.Errorf("invalid VMDK path format: %q", vmdkPath)
+	}
+	datastoreName := strings.TrimPrefix(parts[0], "[")
+	remainingPath := parts[1]
+
+	dir := filepath.Dir(remainingPath)
+	baseFileName := filepath.Base(remainingPath)
+
+	flatFileName := strings.TrimSuffix(baseFileName, ".vmdk") + "-flat.vmdk"
+	flatPathOnDatastore := filepath.Join(dir, flatFileName)
+
+	existFlat, err := fileExist(ctx, ds, flatPathOnDatastore)
+	if err != nil {
+		return "", fmt.Errorf("error checking flat VMDK existence for %q: %w", flatPathOnDatastore, err)
+	}
+
+	if existFlat {
+		fullFlatPath := fmt.Sprintf("[%s] %s", datastoreName, flatPathOnDatastore)
+		klog.Infof("Found existing flat VMDK for VM %q: %s", vm.Name(), fullFlatPath)
+		return fullFlatPath, nil
+	}
+
+	klog.Infof("Found existing regular VMDK for VM %q: %s", vm.Name(), vmdkPath)
+	return vmdkPath, nil
+}
+
 func createVM(ctx context.Context, cli *govmomi.Client,
 	dc *object.Datacenter, rp *object.ResourcePool, host *object.HostSystem, // Add host parameter
 	vmName, vmdkPath, dsName string) (*object.VirtualMachine, error) {
@@ -401,11 +452,13 @@ func CreateVM(vmName, vsphereUrl, vsphereUser, vspherePassword, dataCenter,
 		}
 	}
 
-	vmFileName := filepath.Base(localVmdkPath)
 	if vm != nil {
-		log.Println("VM already exists")
-		remoteVmdkPath := fmt.Sprintf("[%s] %s/%s", ds.Name(), vmName, vmFileName)
-		return remoteVmdkPath, nil
+		log.Printf("VM %q already exists. Attempting to retrieve its VMDK path from vSphere.", vmName)
+		existingVmdkPath, err := getExistingVMDKPath(ctx, vm, ds)
+		if err != nil {
+			return "", fmt.Errorf("failed to get VMDK path for existing VM %q: %w", vmName, err)
+		}
+		return existingVmdkPath, nil
 	}
 
 	vmdkToUpload, err := ensureVmdk(downloadVmdkURL, localVmdkPath)
@@ -418,6 +471,11 @@ func CreateVM(vmName, vsphereUrl, vsphereUser, vspherePassword, dataCenter,
 		return "", err
 	}
 	fmt.Printf("\nremote vmdk path %s\n", remoteVmdkPath)
+
+	// After upload, the `remoteVmdkPath` should correctly point to the descriptor VMDK.
+	// We don't need a separate findVMDKPath after upload because uploadVmdk already handles it.
+	// The `createVM` function will then use this `remoteVmdkPath`.
+
 	remoteIsoPath, err := uploadFile(ctx, ds, vmName, isoPath)
 	if err != nil {
 		return "", err
