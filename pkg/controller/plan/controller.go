@@ -345,7 +345,7 @@ func (r *Reconciler) archive(plan *api.Plan) {
 func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	conditionRequiresReQ := plan.Status.HasReQCondition()
 	if plan.Status.HasBlockerCondition() || plan.Status.HasCondition(Archived) || conditionRequiresReQ {
-		if conditionRequiresReQ {
+		if conditionRequiresReQ || plan.Status.HasBlockerCondition() {
 			r.Log.Info(
 				"Found a condition requiring re-reconcile.",
 				"plan",
@@ -444,7 +444,7 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	if migration == nil {
 		r.Log.Info("No pending migrations found.")
 		plan.Status.DeleteCondition(Executing)
-		reQ = NoReQ
+		reQ = base.SlowReQ
 		return
 	}
 
