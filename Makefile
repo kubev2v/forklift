@@ -542,5 +542,9 @@ lint: $(GOLANGCI_LINT_BIN)
 	@echo "Running golangci-lint..."
 	$(GOLANGCI_LINT_BIN) run ./...
 
+.PHONY: update-tekton
+update-tekton:
+	SKIP_UPDATE=false ./update-tekton.sh .tekton/*.yaml
+
 $(GOLANGCI_LINT_BIN):
 	$(MAKE) lint-install
