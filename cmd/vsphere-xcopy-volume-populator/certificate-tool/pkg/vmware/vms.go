@@ -153,10 +153,10 @@ func getExistingVMDKPath(ctx context.Context, vm *object.VirtualMachine, ds *obj
 
 	var vmdkPath string
 	for _, device := range devices {
-		// Correct way to check for a VirtualDisk and its backing
-		if disk, ok := device.(*types.VirtualDisk); ok { // Assert to the concrete type *types.VirtualDisk
+		if disk, ok := device.(*types.VirtualDisk); ok {
 			if backing, ok := disk.Backing.(*types.VirtualDiskFlatVer2BackingInfo); ok {
 				vmdkPath = backing.FileName
+				klog.Infof("Found existing VMDK at %s", vmdkPath)
 				break
 			}
 		}
