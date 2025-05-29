@@ -1,10 +1,12 @@
 SHELL := /bin/bash
 
+include version.mk
+
 test:
 	python vmkfstools_wrapper_test.py
 
 build: test
-	./create-vib.sh
+	VIB_VERSION=${VIB_VERSION} ./create-vib.sh 
 
 install: build
 	ANSIBLE_HOST_KEY_CHECKING=false \

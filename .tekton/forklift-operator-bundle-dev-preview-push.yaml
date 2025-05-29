@@ -11,6 +11,7 @@ metadata:
       == "main" && ( "operator/config/manifests/***".pathChanged() || 
       ".tekton/forklift-operator-bundle-*.yaml".pathChanged() ||
       "build/forklift-operator-bundle/Containerfile-downstream".pathChanged() ||
+      "build/forklift-operator-bundle/images.conf".pathChanged() ||
       "operator/export-vars.sh".pathChanged() )
   creationTimestamp: null
   labels:
@@ -37,6 +38,15 @@ spec:
     value: '[{"type": "gomod", "path": ".konflux/forklift-operator-bundle"}]'
   - name: build-args-file
     value: build/release.conf
+  - name: build-args
+    value:
+    - EVENT_TITLE={{body.pull_request.title}}
+    - EVENT_TITLE2={{body.head_commit.message}}
+    - EVENT_TITLE3={{body.push.head_commit.message}}
+    - EVENT_TITLE4={{pac.event_title}}
+    - EVENT_TITLE5={{event_title}}
+    - EVENT_TITLE6={{push.head_commit.message}}
+    - EVENT_TITLE7={{head_commit.message}}
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
