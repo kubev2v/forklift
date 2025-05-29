@@ -431,8 +431,7 @@ func (r *Collector) getUpdates(ctx context.Context) error {
 	}()
 
 	filter := r.filter(pc)
-	filter.Options.MaxObjectUpdates = MaxObjectUpdates
-	err = pc.CreateFilter(ctx, filter.CreateFilter)
+	_, err = pc.CreateFilter(ctx, filter.CreateFilter)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -644,7 +643,8 @@ func (r *Collector) filter(pc *property.Collector) *property.WaitFilter {
 				PropSet: r.propertySpec(),
 			},
 		},
-		Options: &types.WaitOptions{},
+		WaitOptions: property.WaitOptions{Options: &types.WaitOptions{
+			MaxObjectUpdates: MaxObjectUpdates}},
 	}
 }
 
