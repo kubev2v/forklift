@@ -1271,7 +1271,7 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image,
 		},
 		Spec: core.PersistentVolumeClaimSpec{
 			AccessModes: accessModes,
-			Resources: core.ResourceRequirements{
+			Resources: core.VolumeResourceRequirements{
 				Requests: map[core.ResourceName]resource.Quantity{
 					core.ResourceStorage: *resource.NewQuantity(virtualSize, resource.BinarySI)},
 			},

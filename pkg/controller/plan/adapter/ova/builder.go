@@ -192,7 +192,7 @@ func (r *Builder) mapDataVolume(disk ova.Disk, destination v1beta1.DestinationSt
 	dvSpec := cdi.DataVolumeSpec{
 		Source: &dvSource,
 		Storage: &cdi.StorageSpec{
-			Resources: core.ResourceRequirements{
+			Resources: core.VolumeResourceRequirements{
 				Requests: core.ResourceList{
 					core.ResourceStorage: *resource.NewQuantity(diskSize, resource.BinarySI),
 				},
