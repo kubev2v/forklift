@@ -30,7 +30,7 @@ type LUN struct {
 	ProviderID string
 	// the volume handle as set by the CSI driver field spec.volumeHandle
 	VolumeHandle string
-	//  Logical device ID of the volume
+	// Logical device ID of the volume
 	LDeviceID string
 	// Storage device Serial Number
 	StorageSerialNumber string
@@ -82,15 +82,15 @@ func ParseVmdkPath(vmdkPath string) (VMDisk, error) {
 		return VMDisk{}, fmt.Errorf("invalid vmdkPath %q: VMDK file name cannot be empty", vmdkPath)
 	}
 
-	//vmdkParts := strings.SplitN(vmdkFile, ".", 2)
-	//vmName := vmdkParts[0]
-
 	if !strings.HasSuffix(vmdkFile, ".vmdk") {
 		return VMDisk{}, fmt.Errorf("invalid vmdkPath %q: vmdk file name must end with '.vmdk'", vmdkPath)
 	}
 
+	vmName := strings.TrimSuffix(vmdkFile, ".vmdk")
+	vmName = strings.TrimSuffix(vmName, "-flat")
+
 	return VMDisk{
-		VMName:    vmnameDir,
+		VMName:    vmName,
 		Datastore: datastore,
 		VmdkFile:  vmdkFile,
 		VmnameDir: vmnameDir,
