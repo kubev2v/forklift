@@ -117,7 +117,7 @@ func (r *Reconciler) createPvcForNfs(provider *api.Provider, ctx context.Context
 			Labels:          labels,
 		},
 		Spec: core.PersistentVolumeClaimSpec{
-			Resources: core.ResourceRequirements{
+			Resources: core.VolumeResourceRequirements{
 				Requests: core.ResourceList{
 					core.ResourceStorage: resource.MustParse(pvSize),
 				},

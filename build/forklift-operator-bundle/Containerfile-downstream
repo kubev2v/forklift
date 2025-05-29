@@ -3,6 +3,13 @@ FROM registry.redhat.io/ubi9/go-toolset:1.23.6-1745588370 AS envsubst
 FROM registry.redhat.io/openshift4/ose-operator-sdk-rhel9@sha256:5fd2a8e6292eec798ac107a0a0d885e1f1c874c2a360291ba4a3bdd0c0a2a52b AS builder
 
 ARG EVENT_TITLE
+ARG EVENT_TITLE2
+ARG EVENT_TITLE3
+ARG EVENT_TITLE4
+ARG EVENT_TITLE5
+ARG EVENT_TITLE6
+ARG EVENT_TITLE7
+
 
 ARG VERSION
 ARG RELEASE
@@ -11,7 +18,7 @@ ARG DEFAULT_CHANNEL
 ARG REGISTRY
 ARG OCP_VERSIONS
 
-ARG API_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-api-dev-preview@sha256:2e86855ae3bf055b10f62df6269a93fc095a6c499edeb56b02e36c46a92b9083"
+ARG API_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-api-dev-preview@sha256:ec639d80a6f7387ee05b2715fa38d287c52b1f8d008382ec48477e2c12db661c"
 ARG CONTROLLER_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-controller-dev-preview@sha256:785d88a649e2e10e298f8bb78fb365533e2d5296d0e766c7b840e7b3a0ca0c98"
 ARG MUST_GATHER_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-must-gather-dev-preview@sha256:b4ca6968f86b8ed23f360b325036fa813e3c21483b5487a81c5583fd3327d99b"
 ARG OPENSTACK_POPULATOR_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/openstack-populator-dev-preview@sha256:09661fdb1805515dc3ab7743bd156a592ab4a84ac4c88d646599617c6db371ea"
