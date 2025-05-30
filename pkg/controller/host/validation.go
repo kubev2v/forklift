@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	"github.com/konveyor/forklift-controller/pkg/controller/base"
 	adapter "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
@@ -236,12 +237,13 @@ func (r *Reconciler) validateSecret(host *api.Host) (err error) {
 				"user",
 				"password",
 			}
-
-			_, err := r.VerifyTLSConnection(host.Spec.IpAddress, secret)
-			if err != nil {
-				cnd.Message = err.Error()
-				cnd.Reason = DataErr
-				host.Status.SetCondition(cnd)
+			if base.GetInsecureSkipVerifyFlag(secret) {
+				_, err := r.VerifyTLSConnection(host.Spec.IpAddress, secret)
+				if err != nil {
+					cnd.Message = err.Error()
+					cnd.Reason = DataErr
+					host.Status.SetCondition(cnd)
+				}
 			}
 		}
 	}
