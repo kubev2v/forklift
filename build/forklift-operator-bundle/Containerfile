@@ -17,6 +17,9 @@ ARG VALIDATION_IMAGE="quay.io/kubev2v/forklift-validation:latest"
 
 COPY ./operator /repo
 WORKDIR /repo
+
+# Set project name to forklift-operator so operator-sdk can successfully generate resources
+RUN cp PROJECT PROJECT.template && PROJECT_NAME=forklift-operator envsubst < PROJECT.template > PROJECT
 RUN source ./export-vars-${STREAM}.sh && \
     kustomize build config/manifests/ \
     | envsubst \
