@@ -19,7 +19,7 @@ ARG REGISTRY
 ARG OCP_VERSIONS
 
 ARG API_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-api-dev-preview@sha256:4180c0dbd242866c86c927afdcafaab83396f57ab1a972c8effb3fb156f52790"
-ARG CONTROLLER_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-controller-dev-preview@sha256:785d88a649e2e10e298f8bb78fb365533e2d5296d0e766c7b840e7b3a0ca0c98"
+ARG CONTROLLER_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-controller-dev-preview@sha256:3e65d638d006ba3597455d12325abcaf91fd147c2c27ac15dcf08d0ba87205ea"
 ARG MUST_GATHER_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-must-gather-dev-preview@sha256:b4ca6968f86b8ed23f360b325036fa813e3c21483b5487a81c5583fd3327d99b"
 ARG OPENSTACK_POPULATOR_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/openstack-populator-dev-preview@sha256:09661fdb1805515dc3ab7743bd156a592ab4a84ac4c88d646599617c6db371ea"
 ARG OPERATOR_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-operator-dev-preview@sha256:8601a266a795635ebfc379d94cc67c5e14a520576491e8f2cce2c5a6116ad504"
