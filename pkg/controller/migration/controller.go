@@ -69,18 +69,18 @@ func Add(mgr manager.Manager) error {
 	}
 	// Primary CR.
 	err = cnt.Watch(
-		source.Kind(mgr.GetCache(), &api.Migration{}),
-		&handler.EnqueueRequestForObject{},
-		&MigrationPredicate{})
+		source.Kind(mgr.GetCache(), &api.Migration{},
+			&handler.TypedEnqueueRequestForObject[*api.Migration]{},
+			&MigrationPredicate{}))
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
 	// References.
 	err = cnt.Watch(
-		source.Kind(mgr.GetCache(), &api.Plan{}),
-		libref.Handler(&api.Migration{}),
-		&PlanPredicate{})
+		source.Kind(mgr.GetCache(), &api.Plan{},
+			libref.TypedHandler[*api.Plan](&api.Migration{}),
+			&PlanPredicate{}))
 	if err != nil {
 		log.Trace(err)
 		return err

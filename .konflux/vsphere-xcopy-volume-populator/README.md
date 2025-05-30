@@ -1,1 +1,0 @@
-This is just a placeholder directory as vsphere-xcopy-volume-populator container does not need RPM prefetch

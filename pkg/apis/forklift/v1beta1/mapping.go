@@ -61,8 +61,9 @@ type OffloadPlugin struct {
 type StorageVendorProduct string
 
 const (
-	StorageVendorProductVantara StorageVendorProduct = "vantara"
-	StorageVendorProductOntap   StorageVendorProduct = "ontap"
+	StorageVendorProductVantara     StorageVendorProduct = "vantara"
+	StorageVendorProductOntap       StorageVendorProduct = "ontap"
+	StorageVendorProductPrimera3Par StorageVendorProduct = "primera3par"
 )
 
 // VSphereXcopyPluginConfig works with the Vsphere Xcopy Volume Populator

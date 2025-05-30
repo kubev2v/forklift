@@ -146,6 +146,7 @@ func getVXPopulatorPodArgs(_ bool, u *unstructured.Unstructured, pvc corev1.Pers
 		"--cr-namespace=" + xcopy.Namespace,
 		"--owner-name=" + pvc.Name,
 		"--secret-name=" + xcopy.Spec.SecretName,
+		"--storage-vendor-product=" + xcopy.Spec.StorageVendorProduct,
 	}
 	return args, nil
 }

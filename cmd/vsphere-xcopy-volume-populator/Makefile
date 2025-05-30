@@ -10,6 +10,8 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
+include vmkfstools-wrapper/version.mk
+
 .PHONY: all
 all: build
 
@@ -31,35 +33,26 @@ generate:
 	go generate ./...
 
 .PHONY: build
-build: generate fmt vet ## Build manager binary.
-	go build -o bin/vsphere-xcopy-volume-populator
+build: generate fmt vet
+	go build -ldflags="-X github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator.VibVersion=$(VIB_VERSION)" -o bin/vsphere-xcopy-volume-populator
 
 # prerequisits: ensure a PVC exists.
 test-copy-using-cli: build
 	bin/vsphere-xcopy-volume-populator \
-		--source-vmdk="[eco-iscsi-ds2] vm-1/vm-1.vmdk" \
-		--target-pvc=test-cli \
+		--source-vmdk="[eco-iscsi-ds3] vm-6/vm-6.vmdk" \
+		--owner-name=test-cli \
 		--target-namespace=default \
-		--storage-vendor=ontap \
+		--storage-vendor-product=ontap \
 		--secret-name=populator-secret \
 		--owner-uid=test-cli \
 		--kubeconfig=$$KUBECONFIG
 
 test-copy-using-cli-3par: build
 	bin/vsphere-xcopy-volume-populator \
-		--source-vmdk="[eco-iscsi-ds1] boris01/boris01.vmdk" \
-	    --target-pvc=test1\
+		--source-vmdk="[eco-iscsi-ds1] vm-6/vm-6.vmdk" \
+	    --owner-name=test1\
 		--target-namespace=default \
-		--storage-vendor=primera3par \
-		--secret-name=populator-secret \
-		--kubeconfig=$$KUBECONFIG
-
-test-copy-using-cli-primera: build
-	bin/vsphere-xcopy-volume-populator \
-		--source-vmdk="[primera-iscsi-vmfs1] fedora/fedora.vmdk" \
-	    --target-pvc=boris-block\
-		--target-namespace=default \
-		--storage-vendor=primera3par \
+		--storage-vendor-product=primera3par \
 		--secret-name=populator-secret \
 		--kubeconfig=$$KUBECONFIG
 

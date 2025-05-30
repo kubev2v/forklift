@@ -2,10 +2,11 @@ package populator
 
 import (
 	"context"
-	"crypto/rand"
+	"encoding/json"
 	"fmt"
-	"math/big"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +15,22 @@ import (
 )
 
 const xcopyInitiatorGroup = "xcopy-esxs"
+const taskPollingInterval = 5 * time.Second
+
+var progressPattern = regexp.MustCompile(`\s(\d+)\%`)
+
+type vmkfstoolsClone struct {
+	Pid    int    `json:"pid"`
+	TaskId string `json:"taskId"`
+}
+
+type vmkfstoolsTask struct {
+	Pid      int    `json:"pid"`
+	ExitCode string `json:"exitCode"`
+	Stderr   string `json:"stdErr"`
+	LastLine string `json:"lastLine"`
+	TaskId   string `json:"taskId"`
+}
 
 type EsxCli interface {
 	ListVibs() ([]string, error)
@@ -37,26 +54,35 @@ func NewWithRemoteEsxcli(storageApi StorageApi, vsphereHostname, vsphereUsername
 
 }
 
-func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle string, progress chan int, quit chan error) (err error) {
+func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle string, progress chan<- uint, quit chan error) (errFinal error) {
 	// isn't it better to not call close the channel from the caller?
 	defer func() {
-		if err != nil {
-			quit <- err
+		r := recover()
+		if r != nil {
+			klog.Infof("recovered %v", r)
 		}
+		quit <- errFinal
 	}()
 	vmDisk, err := ParseVmdkPath(sourceVMDKFile)
 	if err != nil {
 		return err
 	}
-	klog.Infof("Starting to populate using remote esxcli vmkfstools, source vmdk %s target LUN %s", sourceVMDKFile, volumeHandle)
-	host, err := p.VSphereClient.GetEsxByVm(context.Background(), vmDisk.VMName)
+	klog.Infof(
+		"Starting to populate using remote esxcli vmkfstools, source vmdk %s target LUN %s",
+		sourceVMDKFile,
+		volumeHandle)
+	host, err := p.VSphereClient.GetEsxByVm(context.Background(), vmDisk.VmnameDir)
 	if err != nil {
 		return err
 	}
 	klog.Infof("Got ESXI host: %s", host)
 
+	err = ensureVib(p.VSphereClient, host, vmDisk.Datastore, VibVersion)
+	if err != nil {
+		return fmt.Errorf("failed to ensure VIB is installed: %w", err)
+	}
 	// for iSCSI add the host to the group using IQN. Is there something else for FC?
-	r, err := p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"iscsi", "adapter", "list"})
+	r, err := p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "adapter", "list"})
 	if err != nil {
 		return err
 	}
@@ -73,6 +99,8 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 
 	for _, a := range r {
 		driver, hasDriver := a["Driver"]
+		// 'esxcli storage core adapter list' returns LinkState field
+		// 'esxcli iscsi adapater list' returns State field
 		linkState, hasLink := a["LinkState"]
 		uid, hasUID := a["UID"]
 
@@ -87,7 +115,7 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 		// Check if the UID is FC, iSCSI or NVMe-oF
 		isTargetUID := strings.HasPrefix(id, "fc.") || strings.HasPrefix(id, "iqn.") || strings.HasPrefix(id, "nqn.")
 
-		if link == "link-up" && isTargetUID {
+		if (link == "link-up" || link == "online") && isTargetUID {
 			if _, exists := uniqueUIDs[id]; !exists {
 				uniqueUIDs[id] = true
 				hbaUIDs = append(hbaUIDs, id)
@@ -107,11 +135,6 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 		return err
 	}
 
-	lun, err = p.StorageApi.Map(xcopyInitiatorGroup, lun, mappingContext)
-	if err != nil {
-		return fmt.Errorf("failed to map lun %s to initiator group %s: %w", lun, xcopyInitiatorGroup, err)
-	}
-
 	originalInitiatorGroups, err := p.StorageApi.CurrentMappedGroups(lun, nil)
 	if err != nil {
 		return fmt.Errorf("failed to fetch the current initiator groups of the lun %s: %w", lun.Name, err)
@@ -123,6 +146,12 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 			p.StorageApi.UnMap(xcopyInitiatorGroup, lun, mappingContext)
 		}
 	}()
+
+	lun, err = p.StorageApi.Map(xcopyInitiatorGroup, lun, mappingContext)
+	if err != nil {
+		return fmt.Errorf("failed to map lun %s to initiator group %s: %w", lun, xcopyInitiatorGroup, err)
+	}
+
 	esxNaa := fmt.Sprintf("naa.%s", lun.NAA)
 
 	targetLUN := fmt.Sprintf("/vmfs/devices/disks/%s", esxNaa)
@@ -135,14 +164,11 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 			klog.Infof("found device %s", esxNaa)
 			break
 		} else {
-			_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "adapter", "rescan", "-t", "add", "-a", "1"})
+			_, err = p.VSphereClient.RunEsxCommand(
+				context.Background(), host, []string{"storage", "core", "adapter", "rescan", "-t", "add", "-a", "1"})
 			if err != nil {
 				klog.Errorf("failed to rescan for adapters, atepmt %d/%d due to: %s", i, retries, err)
-				i, err := rand.Int(rand.Reader, big.NewInt(10))
-				if err != nil {
-					return fmt.Errorf("failed to randomize a sleep interval: %w", err)
-				}
-				time.Sleep(time.Duration(i.Int64()) * time.Second)
+				time.Sleep(5 * time.Second)
 			}
 		}
 	}
@@ -151,10 +177,22 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 	}
 
 	defer func() {
+		klog.Infof("cleaning up - unmap and rescan to clean dead devices")
 		p.StorageApi.UnMap(xcopyInitiatorGroup, lun, mappingContext)
 		// map the LUN back to the original OCP worker
 		for _, group := range originalInitiatorGroups {
 			p.StorageApi.Map(group, lun, mappingContext)
+		}
+		// unmap devices appear dead in ESX right after they are unmapped, now
+		// clean them
+		_, errClean := p.VSphereClient.RunEsxCommand(
+			context.Background(),
+			host,
+			[]string{"storage", "core", "adapter", "rescan", "-t", "delete", "-a", "1"})
+		if errClean != nil {
+			klog.Errorf("failed to delete dead devices: %s", err)
+		} else {
+			klog.Info("rescan to delete dead devices completed")
 		}
 	}()
 
@@ -170,11 +208,58 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 		response += l.Value("message")
 	}
 
-	go func() {
-		// TODO need to process the vmkfstools stderr(probably) and to write the
-		// progress to a file, and then continuously read and report on the channel
-		progress <- 100
-		quit <- nil
-	}()
-	return nil
+	v := vmkfstoolsClone{}
+	err = json.Unmarshal([]byte(response), &v)
+	if err != nil {
+		return err
+	}
+
+	if v.TaskId != "" {
+		defer func() {
+			klog.Info("cleaning up task artifacts")
+			r, errClean := p.VSphereClient.RunEsxCommand(context.Background(),
+				host, []string{"vmkfstools", "taskClean", "-i", v.TaskId})
+			if errClean != nil {
+				klog.Errorf("failed cleaning up task artifacts %v", r)
+			}
+		}()
+	}
+	for {
+		r, err = p.VSphereClient.RunEsxCommand(context.Background(),
+			host, []string{"vmkfstools", "taskGet", "-i", v.TaskId})
+		if err != nil {
+			return err
+		}
+		response := ""
+		klog.Info("respose from esxcli ", r)
+		for _, l := range r {
+			response += l.Value("message")
+		}
+		v := vmkfstoolsTask{}
+		err = json.Unmarshal([]byte(response), &v)
+		if err != nil {
+			klog.Errorf("failed to unmarshal response from esxcli %+v", r)
+			return err
+		}
+
+		klog.Infof("respose from esxcli %+v", v)
+
+		// exmple output - Clone: 20% done.
+		match := progressPattern.FindStringSubmatch(v.LastLine)
+		if len(match) > 1 {
+			i, _ := strconv.Atoi(match[1])
+			progress <- uint(i)
+		}
+
+		if v.ExitCode != "" {
+			if v.ExitCode == "0" {
+				err = nil
+			} else {
+				err = fmt.Errorf("failed with exit code %s with stderr: %s", v.ExitCode, v.Stderr)
+			}
+			return err
+		}
+
+		time.Sleep(taskPollingInterval)
+	}
 }

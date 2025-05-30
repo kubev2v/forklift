@@ -376,14 +376,58 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 					v.model.HostScsiDisks = nil
 					for _, iScsiLun := range array.ScsiLun {
 						hostScsiDisk := model.HostScsiDisk{}
-						scsiLun := iScsiLun.GetScsiLun()
-						hostScsiDisk.CanonicalName = scsiLun.CanonicalName
-						hostScsiDisk.Vendor = strings.TrimSpace(scsiLun.Vendor)
-						v.model.HostScsiDisks = append(v.model.HostScsiDisks, hostScsiDisk)
+						if disk, ok := iScsiLun.(*types.HostScsiDisk); ok {
+							hostScsiDisk.CanonicalName = disk.CanonicalName
+							hostScsiDisk.Vendor = strings.TrimSpace(disk.Vendor)
+							hostScsiDisk.Key = strings.TrimSpace(disk.Key)
+							v.model.HostScsiDisks = append(v.model.HostScsiDisks, hostScsiDisk)
+						}
 					}
 				}
 			case fAdvancedOption:
 				v.model.AdvancedOptions = v.Ref(p.Val)
+			case fHostBusAdapter:
+				if array, cast := p.Val.(types.ArrayOfHostHostBusAdapter); cast {
+					for _, hba := range array.HostHostBusAdapter {
+						hbaDiskInfo := model.HbaDiskInfo{}
+						protocolType := model.ProtocolUnknown
+						switch hba.(type) {
+						case *types.HostFibreChannelHba:
+							protocolType = model.ProtocolFibreChannel
+						case *types.HostFibreChannelOverEthernetHba:
+							protocolType = model.ProtocolFCoE
+						case *types.HostInternetScsiHba:
+							protocolType = model.ProtocolISCSI
+						case *types.HostParallelScsiHba:
+							protocolType = model.ProtocolSCSI
+						case *types.HostSerialAttachedHba:
+							protocolType = model.ProtocolSAS
+						case *types.HostPcieHba:
+							protocolType = model.ProtocolPCIe
+						case *types.HostRdmaHba:
+							protocolType = model.ProtocolRDMA
+						case *types.HostTcpHba:
+							protocolType = model.ProtocolTCP
+						}
+						hostHba := hba.GetHostHostBusAdapter()
+						hbaDiskInfo.Device = hostHba.Device
+						hbaDiskInfo.Model = hostHba.Model
+						hbaDiskInfo.Key = hostHba.Key
+						hbaDiskInfo.Protocol = string(protocolType)
+						v.model.HbaDiskInfo = append(v.model.HbaDiskInfo, hbaDiskInfo)
+					}
+				}
+			case fScsiTopology:
+				if array, cast := p.Val.(types.ArrayOfHostScsiTopologyInterface); cast {
+					for _, scsiTopologyInterface := range array.HostScsiTopologyInterface {
+						hostScsiTopology := model.HostScsiTopology{}
+						hostScsiTopology.HbaKey = scsiTopologyInterface.Adapter
+						for _, scsiTopologyTarget := range scsiTopologyInterface.Target {
+							hostScsiTopology.ScsiDiskKeys = append(hostScsiTopology.ScsiDiskKeys, scsiTopologyTarget.Lun[0].ScsiLun)
+						}
+						v.model.HostScsiTopology = append(v.model.HostScsiTopology, hostScsiTopology)
+					}
+				}
 			}
 		}
 	}
@@ -551,6 +595,35 @@ func (v *VmAdapter) Model() model.Model {
 	return &v.model
 }
 
+// SortNICsByGuestNetworkOrder reorders vm.NICs to match the MAC address order of vm.GuestNetworks.
+func SortNICsByGuestNetworkOrder(vm *model.VM) {
+	// Create a map from MAC address to its first index in GuestNetworks
+	macToDevice := make(map[string]int)
+	for _, gn := range vm.GuestNetworks {
+		if _, exists := macToDevice[gn.MAC]; !exists {
+			macToDevice[gn.MAC], _ = strconv.Atoi(gn.Device)
+		}
+	}
+
+	// Sort NICs based on the order in GuestNetworks
+	sort.SliceStable(vm.NICs, func(i, j int) bool {
+		iIdx, iOk := macToDevice[vm.NICs[i].MAC]
+		jIdx, jOk := macToDevice[vm.NICs[j].MAC]
+
+		switch {
+		case iOk && jOk:
+			return iIdx < jIdx
+		case iOk:
+			return true
+		case jOk:
+			return false
+		default:
+			// Fall back to NIC.Index if neither is in GuestNetworks
+			return vm.NICs[i].Index < vm.NICs[j].Index
+		}
+	})
+}
+
 // Apply the update to the model.
 func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 	// ctkPerDisk map - CBT enabled disks, we need this here to update the model.Disks
@@ -637,6 +710,14 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 			case fGuestName:
 				if s, cast := p.Val.(string); cast {
 					v.model.GuestName = s
+				}
+			case fGuestNameFromVmwareTools:
+				if s, cast := p.Val.(string); cast {
+					v.model.GuestNameFromVmwareTools = s
+				}
+			case fHostName:
+				if s, cast := p.Val.(string); cast {
+					v.model.HostName = s
 				}
 			case fTpmPresent:
 				if b, cast := p.Val.(bool); cast {
@@ -741,6 +822,10 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 					// when the vm goes down, we get an update with empty values - the following check keeps the previously reported data.
 					if len(guestNetworksList) > 0 {
 						v.model.GuestNetworks = guestNetworksList
+
+						if len(v.model.NICs) > 0 {
+							SortNICsByGuestNetworkOrder(&v.model)
+						}
 					}
 				}
 			case fGuestIpStack:
@@ -773,6 +858,7 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				if devArray, cast := p.Val.(types.ArrayOfVirtualDevice); cast {
 					devList := []model.Device{}
 					nicList := []model.NIC{}
+					nicsIndex := 0
 					for _, dev := range devArray.VirtualDevice {
 						var nic *types.VirtualEthernetCard
 						switch device := dev.(type) {
@@ -819,12 +905,14 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 							nicList = append(
 								nicList,
 								model.NIC{
-									MAC: strings.ToLower(nic.MacAddress),
+									MAC:   strings.ToLower(nic.MacAddress),
+									Index: nicsIndex,
 									Network: model.Ref{
 										Kind: model.NetKind,
 										ID:   network,
 									},
 								})
+							nicsIndex++
 						}
 					}
 					v.model.Devices = devList
@@ -834,6 +922,9 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 
 					if len(ctkPerDisk) > 0 {
 						isCBTEnabledForDisks(ctkPerDisk, v.model.Disks)
+					}
+					if len(v.model.GuestNetworks) > 0 {
+						SortNICsByGuestNetworkOrder(&v.model)
 					}
 				}
 			}

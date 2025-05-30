@@ -110,7 +110,7 @@ func (v *VantaraStorageAPI) VantaraStorage(actionType string) (map[string]interf
 
 	api := NewBlockStorageAPI(decodedIp, v.RestSvrPort, v.StorageID)
 
-	klog.Infof("API object", api)
+	klog.Infof("API object %v", api)
 
 	// Check API version
 	url := api.APIVersion()

@@ -60,7 +60,13 @@ func main() {
 	// Start prometheus metrics HTTP handler
 	fmt.Println("virt-v2v monitoring: Setting up prometheus endpoint :2112/metrics")
 	http.Handle("/metrics", promhttp.Handler())
-	go http.ListenAndServe(":2112", nil)
+	go func() {
+		err := http.ListenAndServe(":2112", nil)
+		if err != nil {
+			fmt.Println("virt-v2v monitoring: prometheus endpoint failed to start:", err)
+			os.Exit(1)
+		}
+	}()
 
 	progressCounter := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -80,7 +86,7 @@ func main() {
 
 	var diskNumber uint64 = 0
 	var disks uint64 = 0
-	var progress uint64 = 0
+	var progress uint64
 
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Split(LimitedScanLines)
@@ -116,9 +122,10 @@ func main() {
 		if err != nil {
 			// Don't make processing errors fatal.
 			fmt.Println("virt-v2v monitoring: Error updating progress: ", err)
-			err = nil
 		}
 	}
+
+	// Check for errors after the loop
 	err := scanner.Err()
 	if err != nil {
 		fmt.Println("virt-v2v monitoring: Output monitoring failed! ", err)

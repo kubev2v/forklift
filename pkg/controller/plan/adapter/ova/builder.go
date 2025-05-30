@@ -1,7 +1,6 @@
 package ova
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"path"
@@ -10,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
@@ -155,45 +155,63 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 		return
 	}
 
-	// For OVA provider we are assuming a single storage mapping.
-	dsMapIn := r.Context.Map.Storage.Spec.Map
-	for _, mapped := range dsMapIn {
+	storageMapIn := r.Context.Map.Storage.Spec.Map
+	for i := range storageMapIn {
+		mapped := &storageMapIn[i]
+		ref := mapped.Source
+		storage := &model.Storage{}
+		fErr := r.Source.Inventory.Find(storage, ref)
+		if fErr != nil {
+			err = fErr
+			return
+		}
 		for _, disk := range vm.Disks {
-			diskSize, err := getResourceCapacity(disk.Capacity, disk.CapacityAllocationUnits)
-			if err != nil {
-				return nil, err
+			if disk.ID == storage.ID {
+				var dv *cdi.DataVolume
+				dv, err = r.mapDataVolume(disk, mapped.Destination, dvTemplate)
+				if err != nil {
+					return
+				}
+				dvs = append(dvs, *dv)
 			}
-			storageClass := mapped.Destination.StorageClass
-			dvSource := cdi.DataVolumeSource{
-				Blank: &cdi.DataVolumeBlankImage{},
-			}
-			dvSpec := cdi.DataVolumeSpec{
-				Source: &dvSource,
-				Storage: &cdi.StorageSpec{
-					Resources: core.ResourceRequirements{
-						Requests: core.ResourceList{
-							core.ResourceStorage: *resource.NewQuantity(diskSize, resource.BinarySI),
-						},
-					},
-					StorageClassName: &storageClass,
-				},
-			}
-			// set the access mode and volume mode if they were specified in the storage map.
-			// otherwise, let the storage profile decide the default values.
-			if mapped.Destination.AccessMode != "" {
-				dvSpec.Storage.AccessModes = []core.PersistentVolumeAccessMode{mapped.Destination.AccessMode}
-			}
-			if mapped.Destination.VolumeMode != "" {
-				dvSpec.Storage.VolumeMode = &mapped.Destination.VolumeMode
-			}
-
-			dv := dvTemplate.DeepCopy()
-			dv.Spec = dvSpec
-			updateDataVolumeAnnotations(dv, &disk)
-			dvs = append(dvs, *dv)
 		}
 	}
 
+	return
+}
+
+func (r *Builder) mapDataVolume(disk ova.Disk, destination v1beta1.DestinationStorage, dvTemplate *cdi.DataVolume) (dv *cdi.DataVolume, err error) {
+	diskSize, err := getResourceCapacity(disk.Capacity, disk.CapacityAllocationUnits)
+	if err != nil {
+		return
+	}
+	storageClass := destination.StorageClass
+	dvSource := cdi.DataVolumeSource{
+		Blank: &cdi.DataVolumeBlankImage{},
+	}
+	dvSpec := cdi.DataVolumeSpec{
+		Source: &dvSource,
+		Storage: &cdi.StorageSpec{
+			Resources: core.VolumeResourceRequirements{
+				Requests: core.ResourceList{
+					core.ResourceStorage: *resource.NewQuantity(diskSize, resource.BinarySI),
+				},
+			},
+			StorageClassName: &storageClass,
+		},
+	}
+	// set the access mode and volume mode if they were specified in the storage map.
+	// otherwise, let the storage profile decide the default values.
+	if destination.AccessMode != "" {
+		dvSpec.Storage.AccessModes = []core.PersistentVolumeAccessMode{destination.AccessMode}
+	}
+	if destination.VolumeMode != "" {
+		dvSpec.Storage.VolumeMode = &destination.VolumeMode
+	}
+
+	dv = dvTemplate.DeepCopy()
+	dv.Spec = dvSpec
+	updateDataVolumeAnnotations(dv, &disk)
 	return
 }
 
@@ -501,7 +519,7 @@ func getResourceCapacity(capacity int64, units string) (int64, error) {
 	for i := range items {
 		item := strings.TrimSpace(items[i])
 		if i == 0 && len(item) > 0 && item != "byte" {
-			return 0, errors.New(fmt.Sprintf("units '%s' are invalid, only 'byte' is supported", units))
+			return 0, fmt.Errorf("units '%s' are invalid, only 'byte' is supported", units)
 		}
 		if i == 0 {
 			continue
@@ -513,15 +531,15 @@ func getResourceCapacity(capacity int64, units string) (int64, error) {
 		}
 		nums := strings.Split(item, "^")
 		if len(nums) != 2 {
-			return 0, errors.New(fmt.Sprintf("units '%s' are invalid, item is invalid: %s", units, item))
+			return 0, fmt.Errorf("units '%s' are invalid, item is invalid: %s", units, item)
 		}
 		base, err := strconv.Atoi(nums[0])
 		if err != nil {
-			return 0, errors.New(fmt.Sprintf("units '%s' are invalid, base component is invalid: %s", units, item))
+			return 0, fmt.Errorf("units '%s' are invalid, base component is invalid: %s", units, item)
 		}
 		pow, err := strconv.Atoi(nums[1])
 		if err != nil {
-			return 0, errors.New(fmt.Sprintf("units '%s' are invalid, pow component is invalid: %s", units, item))
+			return 0, fmt.Errorf("units '%s' are invalid, pow component is invalid: %s", units, item)
 		}
 		capacity = capacity * int64(math.Pow(float64(base), float64(pow)))
 	}

@@ -11,6 +11,6 @@ concerns[flag] {
     flag := {
         "category": "Warning",
         "label": "TPM detected",
-        "assessment": "The VM is configured with a TPM device. TPM data is not transferred during the migration."
+        "assessment": "The VM is configured with a TPM device. TPM data will not be transferred during the migration."
     }
 }
