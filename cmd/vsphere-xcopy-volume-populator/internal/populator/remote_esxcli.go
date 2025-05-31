@@ -71,7 +71,7 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 		"Starting to populate using remote esxcli vmkfstools, source vmdk %s target LUN %s",
 		sourceVMDKFile,
 		volumeHandle)
-	host, err := p.VSphereClient.GetEsxByVm(context.Background(), vmDisk.VmnameDir)
+	host, err := p.VSphereClient.GetEsxByVm(context.Background(), vmDisk.VMName)
 	if err != nil {
 		return err
 	}

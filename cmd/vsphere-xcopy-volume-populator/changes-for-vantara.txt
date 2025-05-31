@@ -1,6 +1,0 @@
-
-- make ensureclonner returns a list of storageadapterids
-
-- add an argumjent to Map with the list of ids
-
-- generify the iscsi info to storageAdapterid because it can be 
