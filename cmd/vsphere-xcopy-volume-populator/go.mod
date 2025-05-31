@@ -3,6 +3,7 @@ module github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator
 go 1.22.0
 
 require (
+	github.com/devans10/pugo/flasharray v0.0.0-20241116160615-6bb8c469c9a0
 	github.com/netapp/trident v0.0.0-20240628081112-cb68cb389d9d
 	github.com/stretchr/testify v1.10.0
 	github.com/vmware/govmomi v0.48.0
