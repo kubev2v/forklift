@@ -46,7 +46,7 @@ func (r *Auth) Permit(ctx *gin.Context, p *api.Provider) (int, error) {
 		r.cache = make(map[string]time.Time)
 	}
 	r.prune()
-	token := r.token(ctx)
+	token := r.Token(ctx)
 	if token == "" {
 		return http.StatusUnauthorized, nil
 	}
@@ -138,15 +138,15 @@ func (r *Auth) permit(token string, ns string, p *api.Provider) (int, error) {
 	}
 
 	if !review.Status.Allowed {
-		err = fmt.Errorf("%s is forbidden: User %q cannot %s resource %q in API group %q in the namespace %q",
-			gr, user.Username, verb, gr.Resource, gr.Group, namespace)
+		err = fmt.Errorf("%s is forbidden: User %q cannot %s resource %q in API group %q in the namespace %q (%v)",
+			gr, user.Username, verb, gr.Resource, gr.Group, namespace, p)
 		return http.StatusForbidden, liberr.Wrap(err)
 	}
 	return http.StatusOK, nil
 }
 
 // Extract token.
-func (r *Auth) token(ctx *gin.Context) (token string) {
+func (r *Auth) Token(ctx *gin.Context) (token string) {
 	header := ctx.GetHeader("Authorization")
 	fields := strings.Fields(header)
 	if len(fields) == 2 && fields[0] == "Bearer" {

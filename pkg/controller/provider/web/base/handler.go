@@ -142,6 +142,10 @@ func (h *Handler) setDetail(ctx *gin.Context) (status int) {
 	return
 }
 
+func (h *Handler) Token(ctx *gin.Context) string {
+	return DefaultAuth.Token(ctx)
+}
+
 // Permit request - Authorization.
 func (h *Handler) permit(ctx *gin.Context) (status int, err error) {
 	status = http.StatusOK

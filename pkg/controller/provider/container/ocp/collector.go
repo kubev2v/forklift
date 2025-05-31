@@ -15,7 +15,6 @@ import (
 func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) libcontainer.Collector {
 	return &Collector{
 		Collector: libocp.New(
-			db,
 			provider,
 			secret,
 			&Namespace{
