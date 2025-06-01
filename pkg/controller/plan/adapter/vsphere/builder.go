@@ -1074,6 +1074,12 @@ func (r *Builder) mapTpm(vm *model.VM, object *cnv.VirtualMachineSpec) {
 		persistData := true
 		object.Template.Spec.Domain.Devices.TPM = &cnv.TPMDevice{Persistent: &persistData}
 	}
+
+	// Disable the vTPM on non UEFI
+	// MTV-2014 - win 2022 fails to boot with vTPM enabled
+	if vm.Firmware == BIOS {
+		object.Template.Spec.Domain.Devices.TPM = &cnv.TPMDevice{Enabled: ptr.To(false)}
+	}
 }
 
 // Build tasks.
