@@ -274,8 +274,15 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 			}
 			switch mapped.Destination.Type {
 			case Pod:
-				kNetwork.Pod = &cnv.PodNetwork{}
-				kInterface.Masquerade = &cnv.InterfaceMasquerade{}
+				if r.Plan.DestinationHasUdnNetwork(r.Destination) {
+					kNetwork.Pod = &cnv.PodNetwork{}
+					kInterface.Binding = &cnv.PluginBinding{
+						Name: "l2bridge",
+					}
+				} else {
+					kNetwork.Pod = &cnv.PodNetwork{}
+					kInterface.Masquerade = &cnv.InterfaceMasquerade{}
+				}
 			case Multus:
 				kNetwork.Multus = &cnv.MultusNetwork{
 					NetworkName: path.Join(mapped.Destination.Namespace, mapped.Destination.Name),

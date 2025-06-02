@@ -1958,8 +1958,11 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 
 	environment = append(environment,
 		core.EnvVar{
-			Name:  "LOCAL_MIGRATION",
-			Value: strconv.FormatBool(r.Destination.Provider.IsHost()),
+			Name: "LOCAL_MIGRATION",
+			Value: strconv.FormatBool(
+				r.Destination.Provider.IsHost() &&
+					!r.Plan.DestinationHasUdnNetwork(r.Destination),
+			),
 		},
 	)
 	// pod annotations
