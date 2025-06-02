@@ -1150,7 +1150,9 @@ func (r *Reconciler) ensureVddkImageValidationJob(plan *api.Plan) (*batchv1.Job,
 		return nil, liberr.Wrap(err)
 	}
 
-	r.cancelOtherActiveVddkCheckJobs(ctx.Plan)
+	if err := r.cancelOtherActiveVddkCheckJobs(ctx.Plan); err != nil {
+		return nil, liberr.Wrap(err)
+	}
 
 	jobLabels := getVddkImageValidationJobLabels(ctx.Plan)
 	jobs := &batchv1.JobList{}

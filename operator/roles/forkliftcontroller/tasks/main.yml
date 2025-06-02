@@ -85,7 +85,7 @@
       k8s:
         state: present
         definition: "{{ lookup('template', 'monitor/service-metrics.yml.j2') }}"
-      
+        
     - name: "Setup metrics service monitor"
       k8s:
         state: present
@@ -95,7 +95,7 @@
       k8s:
         state: present
         definition: "{{ lookup('template', 'monitor/recordingrole-migrations.yml.j2') }}"
-    
+
     - name: "Add monitoring label to namespace"
       k8s:
         state: present
@@ -220,6 +220,21 @@
             plugins: "{{ console_plugins + [ui_plugin_console_name] }}"
       when: ui_plugin_console_name not in console_plugins
 
+  - name: "Create controller service-account token Secret for download vddk tar"
+    k8s:
+      state: present
+      definition: "{{ lookup('template', 'controller/secret-forklift-controller-token.yml.j2') }}"
+
+  - name: "Create VDDK BuildConfig"
+    k8s:
+      state: present
+      definition: "{{ lookup('template', 'controller/buildconfig-vddk.yml.j2') }}"
+
+  - name: "Create VDDK ImageStream"
+    k8s:
+      state: present
+      definition: "{{ lookup('template', 'controller/imagestream-vddk.yml.j2') }}"
+
   - when: not feature_ui_plugin|bool
     name: "Cleanup {{ ui_plugin_service_name }} if disabled"
     include_tasks: cleanup.yml
@@ -245,7 +260,7 @@
       namespace: "{{ app_namespace }}"
       name: forklift-must-gather-api
       state: absent
-  when: finalize is not defined
+    when: finalize is not defined
 
 - block:
   - name: "Remove webhook configuration"

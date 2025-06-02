@@ -68,9 +68,8 @@ func Add(mgr manager.Manager) error {
 		source.Kind(
 			mgr.GetCache(),
 			&api.Hook{},
-		),
-		&handler.EnqueueRequestForObject{},
-		&HookPredicate{})
+			&handler.TypedEnqueueRequestForObject[*api.Hook]{},
+			&HookPredicate{}))
 	if err != nil {
 		log.Trace(err)
 		return err

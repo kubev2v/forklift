@@ -1,0 +1,55 @@
+#This script configures static IP settings on legacy Windows network interfaces
+#based on input that maps MAC addresses to IP configuration details.
+#Input string will be added to the script while creating the virt-v2v pod
+#Input string format: MAC:ip:IP,Gateway,Prefix,DNS1,DNS2
+
+# Input string
+$inputString = "{{.InputString}}"
+
+
+function Convert-PrefixToMask($prefix) {
+    $bin = ("1" * $prefix).PadRight(32, "0")
+    $bytes = ($bin.ToCharArray() -join "") -split "(.{8})" | Where-Object { $_ }
+    return ($bytes | ForEach-Object { [Convert]::ToInt32($_, 2) }) -join "."
+}
+
+# Split entries by '_'
+$entries = $inputString -split '_'
+
+# Extract parts
+foreach ($entry in $entries) {
+    if ($entry -match '^([0-9A-Fa-f:\-]+):ip:([^,]+),([^,]+),([^,]+),([^,]+),([^,]+)$'){
+        $mac = $matches[1].ToUpper().Replace(":", "-")
+        $ip = $matches[2]
+        $gw = $matches[3]
+        $prefix = [int]$matches[4]
+        $dns1 = $matches[5]
+        $dns2 = $matches[6]
+        $mask = Convert-PrefixToMask $prefix
+
+        Write-Host "Searching for MAC: $mac`n"
+
+        $adapter = Get-WmiObject Win32_NetworkAdapter | Where-Object {
+        $_.MACAddress -and ($_.MACAddress.ToUpper().Replace(":", "-") -eq $mac) -and $_.NetConnectionID
+        }
+
+        if (-not $adapter) {
+            Write-Warning "Adapter with MAC $mac not found!`n"
+            exit 1
+        }
+
+        $iface = $adapter.NetConnectionID
+        Write-Host "Using interface: $iface`n"
+
+        Start-Process -FilePath "netsh" -ArgumentList "interface ipv4 set address name=`"$iface`" static $ip $mask $gw" -Wait -Verb RunAs
+        Start-Process -FilePath "netsh" -ArgumentList "interface ipv4 set dnsservers name=`"$iface`" static $dns1" -Wait -Verb RunAs
+         if ($dns2 -and $dns2 -ne "") {
+            Start-Process -FilePath "netsh" -ArgumentList "interface ipv4 add dnsservers name=`"$iface`" $dns2 index=2" -Wait -Verb RunAs
+        }
+
+        Write-Host "IP configuration applied`n"
+    } else {
+        Write-Warning "Input string format is invalid`n"
+    }
+}
+
