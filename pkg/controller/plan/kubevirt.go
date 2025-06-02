@@ -1941,7 +1941,18 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 			return
 		}
 	}
-	unshare := "profiles/unshare.json"
+	var seccompProfile core.SeccompProfile
+	if settings.Settings.OpenShift {
+		unshare := "profiles/unshare.json"
+		seccompProfile = core.SeccompProfile{
+			Type:             core.SeccompProfileTypeLocalhost,
+			LocalhostProfile: &unshare,
+		}
+	} else {
+		seccompProfile = core.SeccompProfile{
+			Type: core.SeccompProfileTypeRuntimeDefault,
+		}
+	}
 	// pod
 	pod = &core.Pod{
 		ObjectMeta: meta.ObjectMeta{
@@ -1952,13 +1963,10 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 		},
 		Spec: core.PodSpec{
 			SecurityContext: &core.PodSecurityContext{
-				FSGroup:      &fsGroup,
-				RunAsUser:    &user,
-				RunAsNonRoot: &nonRoot,
-				SeccompProfile: &core.SeccompProfile{
-					Type:             core.SeccompProfileTypeLocalhost,
-					LocalhostProfile: &unshare,
-				},
+				FSGroup:        &fsGroup,
+				RunAsUser:      &user,
+				RunAsNonRoot:   &nonRoot,
+				SeccompProfile: &seccompProfile,
 			},
 			Affinity: &core.Affinity{
 				PodAntiAffinity: &core.PodAntiAffinity{
