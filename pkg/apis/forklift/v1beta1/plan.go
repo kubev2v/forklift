@@ -17,6 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
+
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/provider"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
@@ -25,6 +27,7 @@ import (
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cnv "kubevirt.io/api/core/v1"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // MigrationType defines the type of migration to perform
@@ -262,6 +265,32 @@ func (p *Plan) ShouldUseV2vForTransfer() (bool, error) {
 	default:
 		return false, nil
 	}
+}
+
+func (r *Plan) DestinationHasUdnNetwork(client k8sclient.Client) bool {
+	key := k8sclient.ObjectKey{
+		Name: r.Spec.TargetNamespace,
+	}
+	namespace := &core.Namespace{}
+	err := client.Get(context.TODO(), key, namespace)
+	if err != nil {
+		return false
+	}
+	_, hasUdnLabel := namespace.ObjectMeta.Labels["k8s.ovn.org/primary-user-defined-network"]
+	if !hasUdnLabel {
+		return false
+	}
+	// TODO: mnecas not sure if we should check also the NAD or only namespace
+	key = k8sclient.ObjectKey{
+		Namespace: r.Spec.TargetNamespace,
+		Name:      "primary-udn",
+	}
+	netAttachDef := &k8snet.NetworkAttachmentDefinition{}
+	err = client.Get(context.TODO(), key, netAttachDef)
+	if err != nil {
+		return false
+	}
+	return true
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
