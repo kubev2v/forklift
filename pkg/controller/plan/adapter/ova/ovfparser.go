@@ -3,17 +3,12 @@ package ova
 import (
 	"encoding/xml"
 	"strings"
-
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
 )
 
 const (
 	// Name.
 	Name = "virt-v2v-parser"
 )
-
-// Package logger.
-var log = logging.WithName(Name)
 
 type OvaVmconfig struct {
 	XMLName  xml.Name `xml:"domain"`

@@ -22,8 +22,6 @@ const (
 // Datacenter handler.
 type DatacenterHandler struct {
 	Handler
-	// Selected Datacenter.
-	datacenter *model.Datacenter
 }
 
 // Add routes to the `gin` router.

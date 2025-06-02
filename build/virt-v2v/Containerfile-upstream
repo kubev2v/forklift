@@ -40,6 +40,8 @@ RUN mkdir -p /usr/lib64/guestfs/appliance && \
         mv -vf root.qcow2 root && \
         tar -cvf /libguestfs-appliance.tar /usr/lib64/guestfs/appliance
 
+RUN mkdir -p /etc/pki/CA/ && chown qemu:qemu /etc/pki/CA/
+
 COPY --from=builder /app/virt-v2v-monitor /usr/local/bin/virt-v2v-monitor
 
 COPY --from=builder /app/image-converter /usr/local/bin/image-converter

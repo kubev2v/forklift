@@ -85,7 +85,11 @@ OPERATOR_INDEX_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-index:$(RE
 MUST_GATHER_IMAGE ?= quay.io/kubev2v/forklift-must-gather:latest
 UI_PLUGIN_IMAGE ?= quay.io/kubev2v/forklift-console-plugin:latest
 
-ci: all tidy vendor generate-verify
+# Golangci-lint version
+GOLANGCI_LINT_VERSION ?= v1.64.2
+GOLANGCI_LINT_BIN ?= $(GOBIN)/golangci-lint
+
+ci: all tidy vendor generate-verify lint
 
 all: test forklift-controller
 
@@ -519,3 +523,28 @@ dev-controller: generate fmt vet build-controller
 .PHONY: kustomized-manifests
 kustomized-manifests: kubectl
 	kubectl kustomize operator/config/manifests > operator/.kustomized_manifests
+
+.PHONY: generate-manifests
+generate-manifests: kubectl
+	kubectl kustomize operator/streams/upstream > operator/streams/upstream/upstream_manifests
+	kubectl kustomize operator/streams/downstream > operator/streams/downstream/downstream_manifests
+	STREAM=upstream bash operator/streams/prepare-vars.sh
+	STREAM=downstream bash operator/streams/prepare-vars.sh
+
+.PHONY: lint-install
+lint-install:
+	@echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."
+	GOBIN=$(GOBIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+	@echo "golangci-lint installed successfully."
+
+.PHONY: lint
+lint: $(GOLANGCI_LINT_BIN)
+	@echo "Running golangci-lint..."
+	$(GOLANGCI_LINT_BIN) run ./pkg/... ./cmd/...
+
+.PHONY: update-tekton
+update-tekton:
+	SKIP_UPDATE=false ./update-tekton.sh .tekton/*.yaml
+
+$(GOLANGCI_LINT_BIN):
+	$(MAKE) lint-install

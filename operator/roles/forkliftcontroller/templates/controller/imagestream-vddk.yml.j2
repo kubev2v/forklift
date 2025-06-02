@@ -1,0 +1,15 @@
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: "{{ vddk_image_stream_name }}"
+  namespace: "{{ app_namespace }}"
+spec:
+  lookupPolicy:
+    local: true
+  tags:
+    - name: latest
+      importPolicy:
+        importMode: Legacy
+      referencePolicy:
+        type: Source

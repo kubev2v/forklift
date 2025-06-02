@@ -382,7 +382,6 @@ func (r *Migration) NextPhase(vm *plan.VMStatus) {
 			currentStep.Phase = api.StepCompleted
 		}
 	}
-	return
 }
 
 func markStartedStepsCompleted(vm *plan.VMStatus) {

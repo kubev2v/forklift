@@ -9,6 +9,6 @@ concerns[flag] {
     flag := {
         "category": "Warning",
         "label": "Changed Block Tracking (CBT) not enabled",
-        "assessment": "Changed Block Tracking (CBT) has not been enabled on this VM. This feature is a prerequisite for VM warm migration."
+        "assessment": "For VM warm migration, Changed Block Tracking (CBT) must be enabled in VMware."
     }
 }

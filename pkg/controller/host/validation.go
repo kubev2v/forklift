@@ -237,7 +237,7 @@ func (r *Reconciler) validateSecret(host *api.Host) (err error) {
 				"password",
 			}
 
-			err := r.VerifyTLSConnection(host.Spec.IpAddress, secret)
+			_, err := r.VerifyTLSConnection(host.Spec.IpAddress, secret)
 			if err != nil {
 				cnd.Message = err.Error()
 				cnd.Reason = DataErr

@@ -300,7 +300,7 @@ func makeScratchDV(pvc *v1.PersistentVolumeClaim) *cdi.DataVolume {
 				VolumeMode:       pvc.Spec.VolumeMode,
 				AccessModes:      pvc.Spec.AccessModes,
 				StorageClassName: pvc.Spec.StorageClassName,
-				Resources: v1.ResourceRequirements{
+				Resources: v1.VolumeResourceRequirements{
 					Requests: v1.ResourceList{
 						v1.ResourceStorage: size,
 					},

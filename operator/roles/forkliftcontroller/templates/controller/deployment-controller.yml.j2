@@ -235,6 +235,12 @@ spec:
         - name: LOG_LEVEL
           value: "{{ controller_log_level }}"
 {% endif %}
+        - name: OPENSHIFT
+{% if k8s_cluster|bool %}
+          value: "false"
+{% else %}
+          value: "true"
+{% endif %}
 {% if controller_profile_kind is defined and controller_profile_path is defined and controller_profile_duration is defined %}
         - name: PROFILE_KIND
           value: "{{ controller_profile_kind }}"

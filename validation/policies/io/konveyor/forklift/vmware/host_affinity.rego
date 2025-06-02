@@ -10,6 +10,6 @@ concerns[flag] {
     flag := {
         "category": "Warning",
         "label": "VM-Host affinity detected",
-        "assessment": "VM-Host affinity is not currently supported by OpenShift Virtualization. The VM can be migrated but it will not have this feature in the target environment."
+        "assessment": "The VM will be migrated without node affinity, but administrators can set it after migration."
     }
 }

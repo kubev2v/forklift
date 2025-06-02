@@ -15,6 +15,9 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/.cache/go-build \
     go build -o bin/vsphere-xcopy-volume-populator
 
+RUN dnf install -y \
+    # install python for vmkfstools-wrapper tests \
+    python
 RUN make vmkfstools-wrapper
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal
