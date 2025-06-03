@@ -19,12 +19,22 @@ func GetTlsCertificate(url *liburl.URL, secret *core.Secret) (crt *x509.Certific
 	if err != nil {
 		return
 	}
+	host := ""
+	if url.Host == "" {
+		//There are cases where the URL is provided without a host, e.g. "https://path/to/resource"
+		url.Host = url.Path
+	}
+	host = url.Host
 
-	host := url.Host
+	if host == "" {
+		err = liberr.New("URL host or path is empty")
+		return
+	}
 	if url.Port() == "" {
 		host += ":443"
 	}
-
+	// disable verification since we don't trust it yet
+	cfg.InsecureSkipVerify = true
 	conn, err := tls.Dial("tcp", host, cfg)
 	if err == nil && len(conn.ConnectionState().PeerCertificates) > 0 {
 		crt = conn.ConnectionState().PeerCertificates[0]
