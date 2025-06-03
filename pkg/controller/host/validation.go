@@ -237,12 +237,13 @@ func (r *Reconciler) validateSecret(host *api.Host) (err error) {
 				"user",
 				"password",
 			}
-			if base.GetInsecureSkipVerifyFlag(secret) {
-				_, err := r.VerifyTLSConnection(host.Spec.IpAddress, secret)
+			if !base.GetInsecureSkipVerifyFlag(secret) {
+				_, err = base.VerifyTLSConnection(host.Spec.IpAddress, secret)
 				if err != nil {
 					cnd.Message = err.Error()
 					cnd.Reason = DataErr
 					host.Status.SetCondition(cnd)
+					return
 				}
 			}
 		}

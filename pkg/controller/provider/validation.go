@@ -184,7 +184,7 @@ func (r *Reconciler) validateConnectionStatus(provider *api.Provider, secret *co
 			Message:  "TLS is susceptible to machine-in-the-middle attacks when certificate verification is skipped.",
 		})
 	} else {
-		_, err := r.VerifyTLSConnection(provider.Spec.URL, secret)
+		_, err := base.VerifyTLSConnection(provider.Spec.URL, secret)
 		if err != nil {
 			provider.Status.SetCondition(libcnd.Condition{
 				Type:     ConnectionTestFailed,

@@ -8,6 +8,7 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/base"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	"github.com/konveyor/forklift-controller/pkg/lib/util"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/session"
@@ -73,8 +74,19 @@ func (r *EsxHost) connect(ctx context.Context) (err error) {
 	url.User = liburl.UserPassword(
 		r.user(),
 		r.password())
-	soapClient := soap.NewClient(url, base.GetInsecureSkipVerifyFlag(r.Secret))
-	soapClient.SetThumbprint(url.Host, r.thumbprint())
+	thumbprint := r.thumbprint()
+	skipVerifying := base.GetInsecureSkipVerifyFlag(r.Secret)
+
+	if !skipVerifying {
+		cert, errtls := base.VerifyTLSConnection(r.URL, r.Secret)
+		if errtls != nil {
+			return liberr.Wrap(errtls)
+		}
+		thumbprint = util.Fingerprint(cert)
+	}
+
+	soapClient := soap.NewClient(url, skipVerifying)
+	soapClient.SetThumbprint(url.Host, thumbprint)
 	vimClient, err := vim25.NewClient(ctx, soapClient)
 	if err != nil {
 		return liberr.Wrap(err)
