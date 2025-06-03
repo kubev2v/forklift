@@ -127,7 +127,7 @@ func GetInsecureSkipVerifyFlag(secret *core.Secret) bool {
 	return insecureSkipVerify
 }
 
-func (r *Reconciler) VerifyTLSConnection(rawURL string, secret *core.Secret) (*x509.Certificate, error) {
+func VerifyTLSConnection(rawURL string, secret *core.Secret) (*x509.Certificate, error) {
 	parsedURL, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid URL: %w", err)
@@ -136,7 +136,6 @@ func (r *Reconciler) VerifyTLSConnection(rawURL string, secret *core.Secret) (*x
 	// Attempt to get certificate
 	cert, err := util.GetTlsCertificate(parsedURL, secret)
 	if err != nil {
-		r.Log.Error(err, "failed to get TLS certificate", "url", parsedURL)
 		return nil, fmt.Errorf("failed to get TLS certificate: %w", err)
 	}
 	if cert == nil {
@@ -158,7 +157,6 @@ func (r *Reconciler) VerifyTLSConnection(rawURL string, secret *core.Secret) (*x
 	// Dial TLS
 	conn, err := tls.Dial("tcp", host, tlsConfig)
 	if err != nil {
-		r.Log.Error(err, "failed to create a secure connection to server")
 		return nil, fmt.Errorf("failed to create a secure TLS connection: %w", err)
 	}
 	defer conn.Close()

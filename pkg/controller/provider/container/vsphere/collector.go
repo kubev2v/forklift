@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/konveyor/forklift-controller/pkg/lib/util"
+
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/base"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
@@ -584,8 +586,19 @@ func (r *Collector) buildClient(ctx context.Context) (*govmomi.Client, error) {
 	url.User = liburl.UserPassword(
 		r.user(),
 		r.password())
-	soapClient := soap.NewClient(url, base.GetInsecureSkipVerifyFlag(r.secret))
-	soapClient.SetThumbprint(url.Host, r.thumbprint())
+	thumbprint := r.thumbprint()
+	skipVerifying := base.GetInsecureSkipVerifyFlag(r.secret)
+
+	if !skipVerifying {
+		cert, errtls := base.VerifyTLSConnection(r.url, r.secret)
+		if errtls != nil {
+			return nil, liberr.Wrap(errtls)
+		}
+		thumbprint = util.Fingerprint(cert)
+	}
+
+	soapClient := soap.NewClient(url, skipVerifying)
+	soapClient.SetThumbprint(url.Host, thumbprint)
 	vimClient, err := vim25.NewClient(ctx, soapClient)
 	if err != nil {
 		return nil, liberr.Wrap(err)
