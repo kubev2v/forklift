@@ -10,6 +10,9 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
+MOCKGEN := $(shell which mockgen 2>/dev/null)
+PATH := $(shell go env GOPATH)/bin:$(PATH)
+
 include vmkfstools-wrapper/version.mk
 
 .PHONY: all
@@ -29,12 +32,19 @@ test: fmt vet ## Run tests.
 	go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
 
 .PHONY: generate 
-generate:
+generate: install-gomock
 	go generate ./...
+
+.PHONY: install-gomock 
+install-gomock:
+	[ -z $(MOCKGEN) ] && go install go.uber.org/mock/mockgen@latest || true
 
 .PHONY: build
 build: generate fmt vet
-	go build -ldflags="-X github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator.VibVersion=$(VIB_VERSION)" -o bin/vsphere-xcopy-volume-populator
+	PATH=$(PATH) \
+	go build \
+	-ldflags="w -s -X github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator.VibVersion=$(VIB_VERSION)" \
+	-o bin/vsphere-xcopy-volume-populator
 
 # prerequisits: ensure a PVC exists.
 test-copy-using-cli: build
