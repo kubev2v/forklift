@@ -10,6 +10,8 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
+PATH := $(shell go env GOPATH)/bin:$(PATH)
+
 include vmkfstools-wrapper/version.mk
 
 .PHONY: all
@@ -32,8 +34,15 @@ generate:
 	go generate ./...
 
 .PHONY: build
-build: generate fmt vet
-	go build -ldflags="-X github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator.VibVersion=$(VIB_VERSION)" -o bin/vsphere-xcopy-volume-populator
+build: fmt vet
+	PATH=$(PATH) \
+	go build \
+	-ldflags="w -s -X github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator.VibVersion=$(VIB_VERSION)" \
+	-o bin/vsphere-xcopy-volume-populator
+
+MOCKGEN := $(shell which mockgen 2>/dev/null)
+install-mockgen:
+	[ -z "$(MOCKGEN)" ] && go install go.uber.org/mock/mockgen@latest || true
 
 # pre-requisits: ensure a PVC exists.
 test-copy-using-cli: build

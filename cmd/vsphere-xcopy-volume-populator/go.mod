@@ -1,12 +1,14 @@
 module github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator
 
-go 1.22.0
+go 1.23
+
+toolchain go1.23.10
 
 require (
 	github.com/netapp/trident v0.0.0-20240628081112-cb68cb389d9d
 	github.com/stretchr/testify v1.10.0
 	github.com/vmware/govmomi v0.48.0
-	go.uber.org/mock v0.5.0
+	go.uber.org/mock v0.5.2
 	k8s.io/apimachinery v0.31.3
 	k8s.io/client-go v0.28.10
 	k8s.io/klog/v2 v2.130.1
