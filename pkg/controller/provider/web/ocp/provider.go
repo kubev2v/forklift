@@ -107,8 +107,8 @@ func (h *ProviderHandler) ListContent(ctx *gin.Context) (content []interface{}, 
 			r.With(m)
 			aErr := h.AddCount(&r)
 			if aErr != nil {
-				err = aErr
-				return
+				log.Error(aErr, "Failed to get count for provider", "provider", p.Name, "url", ctx.Request.URL)
+				continue
 			}
 			r.Link()
 			content = append(content, r.Content(h.Detail))
