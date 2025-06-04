@@ -30,7 +30,7 @@ type VSphereClient struct {
 
 func NewClient(hostname, username, password string) (Client, error) {
 	ctx := context.Background()
-	vcenterUrl := fmt.Sprintf("https://%s:%s@%s/sdk", username, password, hostname)
+	vcenterUrl := fmt.Sprintf("%s:%s@%s", username, password, hostname)
 	u, err := soap.ParseURL(vcenterUrl)
 	if err != nil {
 		return nil, fmt.Errorf("Failed parsing vCenter URL: %w", err)
