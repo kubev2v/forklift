@@ -428,6 +428,14 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 						v.model.HostScsiTopology = append(v.model.HostScsiTopology, hostScsiTopology)
 					}
 				}
+			case fmodel:
+				if b, cast := p.Val.(string); cast {
+					v.model.Model = b
+				}
+			case fvendor:
+				if b, cast := p.Val.(string); cast {
+					v.model.Vendor = b
+				}
 			}
 		}
 	}

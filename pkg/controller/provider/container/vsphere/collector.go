@@ -92,6 +92,8 @@ const (
 	fHostBusAdapter = "config.storageDevice.hostBusAdapter"
 	fScsiTopology   = "config.storageDevice.scsiTopology.adapter"
 	fAdvancedOption = "configManager.advancedOption"
+	fmodel          = "hardware.systemInfo.model"
+	fvendor         = "hardware.systemInfo.vendor"
 	// Network
 	fTag     = "tag"
 	fSummary = "summary"
@@ -741,6 +743,8 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 				fAdvancedOption,
 				fHostBusAdapter,
 				fScsiTopology,
+				fmodel,
+				fvendor,
 			},
 		},
 		{ // Network
