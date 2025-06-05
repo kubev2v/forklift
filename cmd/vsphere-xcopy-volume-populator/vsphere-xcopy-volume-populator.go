@@ -98,7 +98,7 @@ func main() {
 		klog.Fatalf("Failed to create a remote esxcli populator: %s", err)
 	}
 
-	volumeHandle, err := getVolumeHandle(clientSet, targetNamespace, ownerName)
+	volumeHandle, err := getVolumeHandle(clientSet, storageVendor, targetNamespace, ownerName)
 	if err != nil {
 		klog.Fatalf("Failed to fetch the volume handle details from the target pvc %s: %s", ownerName, err)
 	}
@@ -149,7 +149,7 @@ func newKubeClient(masterURL string, kubeconfig string) (*kubernetes.Clientset, 
 // to locate the created volume on the PVC. There is a  chance where the volume details are listed on the
 // "prime-{ORIG_PVC_NAME}" PVC because when the controller pod is handling it, the pvc prime should be bounded
 // to popoulator pod. However it is not guarnteed to be bounded at that stage and it may take time
-func getVolumeHandle(kubeClient *kubernetes.Clientset, targetNamespace, targetPVC string) (string, error) {
+func getVolumeHandle(kubeClient *kubernetes.Clientset, product string, targetNamespace, targetPVC string) (string, error) {
 	pvc, err := kubeClient.CoreV1().PersistentVolumeClaims(targetNamespace).Get(context.Background(), targetPVC, metav1.GetOptions{})
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch the the target persistent volume claim %q %w", pvc.Name, err)
@@ -177,7 +177,16 @@ func getVolumeHandle(kubeClient *kubernetes.Clientset, targetNamespace, targetPV
 		return "", fmt.Errorf("failed to fetch the the target volume details %w", err)
 	}
 	klog.Infof("target volume %s volumeHandle %s", pv.Name, pv.Spec.CSI.VolumeHandle)
-	return pv.Spec.CSI.VolumeHandle, nil
+	switch product {
+	case "ontap":
+		if internalName, ok := pv.Spec.CSI.VolumeAttributes["internalName"]; ok {
+			return internalName, nil
+		} else {
+			return pv.Spec.CSI.VolumeHandle, nil
+		}
+	default:
+		return pv.Spec.CSI.VolumeHandle, nil
+	}
 }
 
 func handleArgs() {
