@@ -259,6 +259,14 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 		var crt *x509.Certificate
 		crt, err = util.GetTlsCertificate(providerUrl, secret)
 		if err != nil {
+			provider.Status.Phase = ConnectionFailed
+			provider.Status.SetCondition(libcnd.Condition{
+				Type:     ConnectionTestFailed,
+				Status:   True,
+				Reason:   Tested,
+				Category: Critical,
+				Message:  err.Error(),
+			})
 			return
 		}
 		provider.Status.Fingerprint = util.Fingerprint(crt)

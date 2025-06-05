@@ -6,13 +6,34 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"net"
 	liburl "net/url"
 	"strconv"
+	"time"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	"github.com/konveyor/forklift-controller/pkg/settings"
 	core "k8s.io/api/core/v1"
 )
+
+func dialTLSWithTimeout(host string, cfg *tls.Config, timeout time.Duration) (*tls.Conn, error) {
+	conn, err := net.DialTimeout("tcp", host, timeout)
+	if err != nil {
+		return nil, err
+	}
+
+	tlsConn := tls.Client(conn, cfg)
+
+	// Set handshake timeout
+	err = tlsConn.Handshake()
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
+
+	return tlsConn, nil
+}
 
 func GetTlsCertificate(url *liburl.URL, secret *core.Secret) (crt *x509.Certificate, err error) {
 	cfg, err := tlsConfig(secret)
@@ -35,7 +56,7 @@ func GetTlsCertificate(url *liburl.URL, secret *core.Secret) (crt *x509.Certific
 	}
 	// disable verification since we don't trust it yet
 	cfg.InsecureSkipVerify = true
-	conn, err := tls.Dial("tcp", host, cfg)
+	conn, err := dialTLSWithTimeout(host, cfg, time.Duration(settings.Settings.TlsConnectionTimeout)*time.Second)
 	if err == nil && len(conn.ConnectionState().PeerCertificates) > 0 {
 		crt = conn.ConnectionState().PeerCertificates[0]
 	} else {
