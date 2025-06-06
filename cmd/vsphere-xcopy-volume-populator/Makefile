@@ -39,7 +39,7 @@ build: generate fmt vet
 # prerequisits: ensure a PVC exists.
 test-copy-using-cli: build
 	bin/vsphere-xcopy-volume-populator \
-		--source-vmdk="[eco-iscsi-ds3] vm-6/vm-6.vmdk" \
+		--source-vmdk="[eco-iscsi-ds2] vm-2/vm-2.vmdk" \
 		--owner-name=test-cli \
 		--target-namespace=default \
 		--storage-vendor-product=ontap \
