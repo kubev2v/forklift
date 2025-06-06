@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"os"
 	"strconv"
 
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
@@ -140,6 +141,13 @@ func (p *Provider) Type() ProviderType {
 // This provider is the `host` cluster.
 func (p *Provider) IsHost() bool {
 	return p.Type() == OpenShift && p.Spec.URL == ""
+}
+
+// This provider is a `host` provider but it is not within the main forklift
+// namespace (e.g. generally 'konveyor-forklift' or 'openshift-mtv'). All other
+// 'host' providers are namespace-scoped and should use limited credentials
+func (p *Provider) IsRestrictedHost() bool {
+	return p.IsHost() && p.GetNamespace() != os.Getenv("POD_NAMESPACE")
 }
 
 // Current generation has been reconciled.
