@@ -2,8 +2,6 @@ module github.com/kubev2v/forklift
 
 go 1.24.4
 
-toolchain go1.23.8
-
 require github.com/open-policy-agent/opa v0.70.0
 
 require (

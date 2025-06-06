@@ -2,8 +2,6 @@ module github.com/kubev2v/forklift
 
 go 1.24.4
 
-toolchain go1.23.8
-
 require sigs.k8s.io/kustomize/kustomize/v5 v5.4.3
 
 require (

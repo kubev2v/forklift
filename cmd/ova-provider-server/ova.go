@@ -9,7 +9,6 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -194,24 +193,6 @@ type VmNetwork struct {
 var vmIDMap *UUIDMap
 var diskIDMap *UUIDMap
 var networkIDMap *UUIDMap
-
-func main() {
-
-	vmIDMap = NewUUIDMap()
-	diskIDMap = NewUUIDMap()
-	networkIDMap = NewUUIDMap()
-
-	http.HandleFunc("/vms", vmHandler)
-	http.HandleFunc("/disks", diskHandler)
-	http.HandleFunc("/networks", networkHandler)
-	http.HandleFunc("/watch", watchdHandler)
-	http.HandleFunc("/test_connection", connHandler)
-
-	err := http.ListenAndServe(":8080", nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
 
 func connHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
@@ -668,7 +649,8 @@ func (um *UUIDMap) GetUUID(object interface{}, key string) string {
 		enc := gob.NewEncoder(&buf)
 
 		if err := enc.Encode(object); err != nil {
-			log.Fatal(err)
+			log.Error(err, "Failed to encode object", "object", object)
+			panic(err)
 		}
 
 		hash := sha256.Sum256(buf.Bytes())

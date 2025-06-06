@@ -3917,6 +3917,22 @@ spec:
                   type: string
                 description: Provider settings.
                 type: object
+              sources:
+                description: Remote sources
+                items:
+                  description: |-
+                    Source defines a remote VM source for the provider.
+                    (Typically, an appliance URL for an OVA provider.)
+                  properties:
+                    kind:
+                      type: string
+                    url:
+                      type: string
+                  required:
+                  - kind
+                  - url
+                  type: object
+                type: array
               type:
                 description: Provider type.
                 type: string
@@ -3932,6 +3948,36 @@ spec:
           status:
             description: ProviderStatus defines the observed state of Provider
             properties:
+              appliances:
+                description: Status of appliances for OVA provider.
+                items:
+                  description: |-
+                    ApplianceStatus defines the status of an appliance that
+                    the OVA provider server has been requested to download
+                    and store in its catalog.
+                  properties:
+                    error:
+                      type: string
+                    modified:
+                      format: date-time
+                      type: string
+                    progress:
+                      format: int64
+                      type: integer
+                    size:
+                      format: int64
+                      type: integer
+                    status:
+                      type: string
+                    url:
+                      type: string
+                  required:
+                  - progress
+                  - size
+                  - status
+                  - url
+                  type: object
+                type: array
               conditions:
                 description: List of conditions.
                 items:
