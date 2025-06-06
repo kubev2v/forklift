@@ -2,11 +2,12 @@ package migration
 
 import (
 	"context"
+	"reflect"
+	"testing"
+
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/controller/base"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"testing"
 )
 
 func TestReconciler_Reconcile(t *testing.T) {

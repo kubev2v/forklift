@@ -18,6 +18,7 @@ import (
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
+	basecontroller "github.com/konveyor/forklift-controller/pkg/controller/base"
 	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	utils "github.com/konveyor/forklift-controller/pkg/controller/plan/util"
@@ -57,6 +58,7 @@ const (
 // Bus types
 const (
 	Virtio = "virtio"
+	E1000e = "e1000e"
 )
 
 // Input types
@@ -377,7 +379,7 @@ func (r *Builder) getSourceDetails(vm *model.VM, sourceSecret *core.Secret) (lib
 	}
 
 	sslVerify := ""
-	if container.GetInsecureSkipVerifyFlag(sourceSecret) {
+	if basecontroller.GetInsecureSkipVerifyFlag(sourceSecret) {
 		sslVerify = "no_verify=1"
 	}
 
@@ -565,12 +567,13 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 				},
 			}
 		}
+		alignedCapacity := utils.RoundUp(disk.Capacity, utils.DefaultAlignBlockSize)
 		dvSpec := cdi.DataVolumeSpec{
 			Source: &dvSource,
 			Storage: &cdi.StorageSpec{
-				Resources: core.ResourceRequirements{
+				Resources: core.VolumeResourceRequirements{
 					Requests: core.ResourceList{
-						core.ResourceStorage: *resource.NewQuantity(disk.Capacity, resource.BinarySI),
+						core.ResourceStorage: *resource.NewQuantity(alignedCapacity, resource.BinarySI),
 					},
 				},
 				StorageClassName: &storageClass,
@@ -780,12 +783,15 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 				r.Log.Info("Failed to generate network name using template, using default", "template", networkNameTemplate, "error", err)
 			}
 		}
-
 		numNetworks++
 		kNetwork := cnv.Network{Name: networkName}
+		interfaceModel := Virtio
+		if r.Plan.Spec.SkipGuestConversion {
+			interfaceModel = E1000e
+		}
 		kInterface := cnv.Interface{
 			Name:       networkName,
-			Model:      Virtio,
+			Model:      interfaceModel,
 			MacAddress: nic.MAC,
 		}
 
@@ -826,10 +832,14 @@ func (r *Builder) findNetworkMapping(nic vsphere.NIC, netMap []api.NetworkPair) 
 }
 
 func (r *Builder) mapInput(object *cnv.VirtualMachineSpec) {
+	bus := cnv.InputBusVirtio
+	if r.Plan.Spec.SkipGuestConversion {
+		bus = cnv.InputBusUSB
+	}
 	tablet := cnv.Input{
 		Type: Tablet,
 		Name: Tablet,
-		Bus:  Virtio,
+		Bus:  bus,
 	}
 	object.Template.Spec.Domain.Devices.Inputs = []cnv.Input{tablet}
 }
@@ -1010,11 +1020,15 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 				},
 			},
 		}
+		bus := cnv.DiskBusVirtio
+		if r.Plan.Spec.SkipGuestConversion {
+			bus = cnv.DiskBusSATA
+		}
 		kubevirtDisk := cnv.Disk{
 			Name: volumeName,
 			DiskDevice: cnv.DiskDevice{
 				Disk: &cnv.DiskTarget{
-					Bus: cnv.DiskBusVirtio,
+					Bus: bus,
 				},
 			},
 		}
@@ -1060,6 +1074,12 @@ func (r *Builder) mapTpm(vm *model.VM, object *cnv.VirtualMachineSpec) {
 		persistData := true
 		object.Template.Spec.Domain.Devices.TPM = &cnv.TPMDevice{Persistent: &persistData}
 	}
+
+	// Disable the vTPM on non UEFI
+	// MTV-2014 - win 2022 fails to boot with vTPM enabled
+	if vm.Firmware == BIOS {
+		object.Template.Spec.Domain.Devices.TPM = &cnv.TPMDevice{Enabled: ptr.To(false)}
+	}
 }
 
 // Build tasks.
@@ -1074,7 +1094,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 		vm.RemoveSharedDisks()
 	}
 	for _, disk := range vm.Disks {
-		mB := disk.Capacity / 0x100000
+		mB := utils.RoundUp(disk.Capacity, 0x100000) / 0x100000
 		list = append(
 			list,
 			&plan.Task{
@@ -1336,7 +1356,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					Spec: core.PersistentVolumeClaimSpec{
 						StorageClassName: &storageClass,
 						VolumeMode:       &pvblock,
-						Resources: core.ResourceRequirements{
+						Resources: core.VolumeResourceRequirements{
 							Requests: core.ResourceList{
 								core.ResourceStorage: *resource.NewQuantity(disk.Capacity, resource.BinarySI),
 							},
@@ -1471,7 +1491,7 @@ func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.Persi
 
 func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error) {
 	// copy-offload only
-	taskName, _ = pvc.Annotations[planbase.AnnDiskSource]
+	taskName = pvc.Annotations[planbase.AnnDiskSource]
 	return
 }
 
@@ -1706,5 +1726,46 @@ func (r *Builder) ensurePopulatorServiceAccount(namespace string) error {
 	if err != nil && !k8serr.IsAlreadyExists(err) {
 		return err
 	}
+
+	clusterRole := rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "populator-pv-reader",
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{""},
+				Resources: []string{"persistentvolumes"},
+				Verbs:     []string{"get"},
+			},
+		},
+	}
+
+	err = r.Destination.Client.Create(context.TODO(), &clusterRole, &client.CreateOptions{})
+	if err != nil && !k8serr.IsAlreadyExists(err) {
+		return err
+	}
+	crBinding := rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "populator-pv-reader-binding",
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      "populator",
+				Namespace: namespace,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			Kind:     "ClusterRole",
+			Name:     "populator-pv-reader",
+			APIGroup: "rbac.authorization.k8s.io",
+		},
+	}
+
+	err = r.Destination.Client.Create(context.TODO(), &crBinding, &client.CreateOptions{})
+	if err != nil && !k8serr.IsAlreadyExists(err) {
+		return err
+	}
+
 	return nil
 }

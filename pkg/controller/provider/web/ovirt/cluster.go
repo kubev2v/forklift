@@ -23,8 +23,6 @@ const (
 // Cluster handler.
 type ClusterHandler struct {
 	Handler
-	// Selected cluster.
-	cluster *model.Cluster
 }
 
 // Add routes to the `gin` router.

@@ -9,6 +9,6 @@ concerns[flag] {
     flag := {
         "category": "Warning",
         "label": "CPU affinity detected",
-        "assessment": "CPU affinity is not currently supported by OpenShift Virtualization. The VM can be migrated but it will not have this feature in the target environment."
+        "assessment": "The VM will be migrated without CPU affinity, but administrators can set it after migration."
     }
 }

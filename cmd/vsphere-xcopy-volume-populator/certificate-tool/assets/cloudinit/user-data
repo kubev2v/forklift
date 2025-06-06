@@ -1,0 +1,19 @@
+#cloud-config
+hostname: fedora-vm
+users:
+  - name: fedora
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    passwd: $6$UPpTAXKws.Fg.1dQ$d2ALJGLSYXsuHMBw94iV5NajQL3AtbxE2jIFzkwbCbz0mw7eOopuz2tjSXNWzmf16iuHqi0D9lZLOBJjUW.DU1
+    lock_passwd: false
+
+chpasswd:
+  expire: false
+  
+packages:
+  - open-vm-tools
+
+runcmd:
+  - sudo touch /tmp/cloud-init-ran
+  - sudo echo "Cloud-Init Worked" > /tmp/cloud-init-test.txt
+  - sudo systemctl enable --now vmtoolsd

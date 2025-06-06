@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 	liburl "net/url"
-	"strconv"
 
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
+	"github.com/konveyor/forklift-controller/pkg/controller/base"
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	"github.com/konveyor/forklift-controller/pkg/controller/plan/util"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
@@ -394,7 +394,7 @@ func (r *Client) getHostClient(hostDef *v1beta1.Host, host *model.Host) (client 
 	}
 
 	url.User = liburl.UserPassword(string(secret.Data["user"]), string(secret.Data["password"]))
-	soapClient := soap.NewClient(url, r.getInsecureSkipVerifyFlag())
+	soapClient := soap.NewClient(url, base.GetInsecureSkipVerifyFlag(r.Source.Secret))
 	soapClient.SetThumbprint(url.Host, host.Thumbprint)
 	vimClient, err := vim25.NewClient(context.TODO(), soapClient)
 	if err != nil {
@@ -479,7 +479,7 @@ func (r *Client) connect() error {
 		return liberr.Wrap(err)
 	}
 	url.User = liburl.UserPassword(r.user(), r.password())
-	soapClient := soap.NewClient(url, r.getInsecureSkipVerifyFlag())
+	soapClient := soap.NewClient(url, base.GetInsecureSkipVerifyFlag(r.Source.Secret))
 	soapClient.SetThumbprint(url.Host, r.thumbprint())
 	vimClient, err := vim25.NewClient(context.TODO(), soapClient)
 	if err != nil {
@@ -513,22 +513,6 @@ func (r *Client) password() string {
 
 func (r *Client) thumbprint() string {
 	return r.Source.Provider.Status.Fingerprint
-}
-
-// getInsecureSkipVerifyFlag gets the insecureSkipVerify boolean flag
-// value from the provider connection secret.
-func (r *Client) getInsecureSkipVerifyFlag() bool {
-	insecure, found := r.Source.Secret.Data["insecureSkipVerify"]
-	if !found {
-		return false
-	}
-
-	insecureSkipVerify, err := strconv.ParseBool(string(insecure))
-	if err != nil {
-		return false
-	}
-
-	return insecureSkipVerify
 }
 
 func (r *Client) DetachDisks(vmRef ref.Ref) (err error) {

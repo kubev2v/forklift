@@ -129,6 +129,9 @@ type PlanSpec struct {
 	// When enabled, legacy drivers are exposed to the virt-v2v conversion process via the VIRTIO_WIN environment variable,
 	// which points to the legacy ISO at /usr/local/virtio-win.iso.
 	InstallLegacyDrivers *bool `json:"installLegacyDrivers,omitempty"`
+	// Determines if the plan should skip the guest conversion.
+	// +kubebuilder:default:=false
+	SkipGuestConversion bool `json:"skipGuestConversion,omitempty"`
 }
 
 // Find a planned VM.
@@ -192,7 +195,7 @@ func (p *Plan) ShouldUseV2vForTransfer() (bool, error) {
 	case VSphere:
 		// The virt-v2v transferes all disks attached to the VM. If we want to skip the shared disks so we don't transfer
 		// them multiple times we need to manage the transfer using KubeVirt CDI DataVolumes and v2v-in-place.
-		return !p.Spec.Warm && destination.IsHost() && p.Spec.MigrateSharedDisks, nil
+		return !p.Spec.Warm && destination.IsHost() && p.Spec.MigrateSharedDisks && !p.Spec.SkipGuestConversion, nil
 	case Ova:
 		return true, nil
 	default:

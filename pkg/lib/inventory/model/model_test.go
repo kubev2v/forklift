@@ -1025,26 +1025,14 @@ func TestWatch(t *testing.T) {
 	// 5. Handler C created.  handler C should get (N) CREATE events.
 	// 6. (N) models deleted. handler A,B,C should get (N) DELETE events.
 	all := []TestEvent{}
-	created := []TestEvent{}
-	updated := []TestEvent{}
 	deleted := []TestEvent{}
 	for _, action := range []uint8{Created, Updated, Deleted} {
 		for i := 0; i < N; i++ {
 			switch action {
 			case Created:
-				created = append(
-					created,
-					TestEvent{
-						action: action,
-						model:  &TestObject{ID: i},
-					})
+				// Created.
 			case Updated:
-				updated = append(
-					updated,
-					TestEvent{
-						action: action,
-						model:  &TestObject{ID: i},
-					})
+				// Updated.
 			case Deleted:
 				deleted = append(
 					deleted,
@@ -1167,6 +1155,9 @@ func TestCloseDB(t *testing.T) {
 		name:    "A",
 	}
 	watch, err := DB.Watch(&TestObject{}, handler)
+	if err != nil {
+		t.Fatalf("Failed to create watch: %v", err)
+	}
 	for i := 0; i < 10; i++ {
 		if !watch.started {
 			time.Sleep(50 * time.Millisecond)

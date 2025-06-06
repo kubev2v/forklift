@@ -20,7 +20,7 @@ func Build(
 	//
 	switch provider.Type() {
 	case api.OpenShift:
-		return ocp.New(nil, provider, secret)
+		return ocp.New(db, provider, secret)
 	case api.VSphere:
 		return vsphere.New(db, provider, secret)
 	case api.OVirt:
