@@ -40,14 +40,13 @@ type LUN struct {
 
 // VMDisk is the target VMDisk in vmware
 type VMDisk struct {
-	VMName    string
 	Datastore string
+	VmHomeDir string
 	VmdkFile  string
-	VmnameDir string
 }
 
 func (d *VMDisk) Path() string {
-	return fmt.Sprintf("/vmfs/volumes/%s/%s/%s", d.Datastore, d.VmnameDir, d.VmdkFile)
+	return fmt.Sprintf("/vmfs/volumes/%s/%s/%s", d.Datastore, d.VmHomeDir, d.VmdkFile)
 }
 
 func ParseVmdkPath(vmdkPath string) (VMDisk, error) {
@@ -57,42 +56,19 @@ func ParseVmdkPath(vmdkPath string) (VMDisk, error) {
 
 	parts := strings.SplitN(vmdkPath, "] ", 2)
 	if len(parts) != 2 {
-		return VMDisk{}, fmt.Errorf("invalid vmdkPath %q: missing closing bracket and space after datastore, expected '[datastore] vmname/vmname.vmdk'", vmdkPath)
+		return VMDisk{}, fmt.Errorf("Invalid vmdkPath %q, should be '[datastore] vmname/xyz.vmdk'", vmdkPath)
 	}
 
 	datastore := strings.TrimPrefix(parts[0], "[")
-	if datastore == "" {
-		return VMDisk{}, fmt.Errorf("invalid vmdkPath %q: datastore name cannot be empty", vmdkPath)
-	}
-
-	pathAndFile := parts[1]
-	pathParts := strings.SplitN(pathAndFile, "/", 2)
+	pathParts := strings.Split(parts[1], "/")
 
 	if len(pathParts) != 2 {
-		return VMDisk{}, fmt.Errorf("invalid vmdkPath %q: missing slash between vmname directory and vmdk file, expected '[datastore] vmname/vmname.vmdk'", vmdkPath)
+		return VMDisk{}, fmt.Errorf("Invalid vmdkPath %q, should be '[datastore] vmname/xyz.vmdk'", vmdkPath)
 	}
-
-	vmnameDir := pathParts[0]
-	if vmnameDir == "" {
-		return VMDisk{}, fmt.Errorf("invalid vmdkPath %q: VM directory name cannot be empty", vmdkPath)
-	}
-
-	vmdkFile := pathParts[1]
-	if vmdkFile == "" {
-		return VMDisk{}, fmt.Errorf("invalid vmdkPath %q: VMDK file name cannot be empty", vmdkPath)
-	}
-
-	if !strings.HasSuffix(vmdkFile, ".vmdk") {
-		return VMDisk{}, fmt.Errorf("invalid vmdkPath %q: vmdk file name must end with '.vmdk'", vmdkPath)
-	}
-
-	vmName := strings.TrimSuffix(vmdkFile, ".vmdk")
-	vmName = strings.TrimSuffix(vmName, "-flat")
 
 	return VMDisk{
-		VMName:    vmName,
 		Datastore: datastore,
-		VmdkFile:  vmdkFile,
-		VmnameDir: vmnameDir,
+		VmHomeDir: pathParts[0],
+		VmdkFile:  pathParts[1],
 	}, nil
 }
