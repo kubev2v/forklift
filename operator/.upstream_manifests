@@ -3694,6 +3694,8 @@ rules:
   resources:
   - roles
   - rolebindings
+  - clusterroles
+  - clusterrolebindings
   verbs:
   - create
 - apiGroups:
@@ -4074,6 +4076,8 @@ spec:
           value: ${VSPHERE_OS_MAP}
         - name: VIRT_CUSTOMIZE_MAP
           value: ${VIRT_CUSTOMIZE_MAP}
+        - name: VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE
+          value: ${VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE}
         image: ${OPERATOR_IMAGE}
         imagePullPolicy: Always
         livenessProbe:
@@ -4550,7 +4554,7 @@ spec:
   - name: Forklift Documentation
     url: https://konveyor.github.io/forklift
   - name: Forklift Operator
-    url: http://github.com/kubev2v/forklift
+    url: https://github.com/kubev2v/forklift
   maintainers:
   - email: forklift-dev@googlegroups.com
     name: Forklift by Konveyor Community
