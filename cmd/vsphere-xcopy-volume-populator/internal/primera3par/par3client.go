@@ -194,7 +194,7 @@ func (p *Primera3ParClientWsImpl) createHost(hostname, adapterId string) error {
 
 	body := map[string]interface{}{
 		"name":    hostname,
-		"persona": 2,
+		"persona": 11,
 	}
 
 	if strings.HasPrefix(adapterId, "fc.") {

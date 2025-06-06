@@ -202,11 +202,8 @@ func (r *Client) Begin(labels ...string) (tx *Tx, error error) {
 	session := r.pool.Writer()
 	realTx, err := session.Begin()
 	if err != nil {
-		err = liberr.Wrap(
-			err,
-			"db",
-			r.path)
-		return
+		r.log.V(3).Error(err, "begin transaction failed.")
+		return nil, err
 	}
 	tx = &Tx{
 		session: session,

@@ -1459,6 +1459,11 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) 
 	// Set the 'app' label for identification of the virtual machine instance(s)
 	object.Spec.Template.ObjectMeta.Labels["app"] = vm.Name
 
+	err = r.setVmLabels(object)
+	if err != nil {
+		return
+	}
+
 	//Add the original name and ID info to the VM annotations
 	if len(originalName) > 0 {
 		annotations := make(map[string]string)
@@ -1520,6 +1525,18 @@ func (r *KubeVirt) setInstanceType(vm *plan.VMStatus, object *cnv.VirtualMachine
 		return
 	}
 	object.Spec.Instancetype = &cnv.InstancetypeMatcher{Name: vm.InstanceType, Kind: kind}
+	return
+}
+
+func (r *KubeVirt) setVmLabels(object *cnv.VirtualMachine) (err error) {
+	labels := object.ObjectMeta.Labels
+	if labels == nil {
+		object.ObjectMeta.Labels = map[string]string{}
+	}
+	if r.Plan.Provider.Source.RequiresConversion() {
+		labels["guestConverted"] = strconv.FormatBool(!r.Plan.Spec.SkipGuestConversion)
+	}
+	object.ObjectMeta.Labels = labels
 	return
 }
 
@@ -2856,7 +2873,7 @@ func (r *KubeVirt) CreatePvcForNfs(pvcNamePrefix, pvName, vmID string) (pvcName 
 			Labels:       labels,
 		},
 		Spec: core.PersistentVolumeClaimSpec{
-			Resources: core.ResourceRequirements{
+			Resources: core.VolumeResourceRequirements{
 				Requests: core.ResourceList{
 					core.ResourceStorage: resource.MustParse("1Gi"),
 				},

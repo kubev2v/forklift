@@ -1,17 +1,13 @@
 package ocp
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	storage "k8s.io/api/storage/v1"
-	cnv "kubevirt.io/api/core/v1"
 )
 
 // Routes.
@@ -23,7 +19,7 @@ const (
 
 // Provider handler.
 type ProviderHandler struct {
-	Handler
+	base.Handler
 }
 
 // Add routes to the `gin` router.
@@ -71,7 +67,7 @@ func (h ProviderHandler) Get(ctx *gin.Context) {
 	m.With(h.Provider)
 	r := Provider{}
 	r.With(m)
-	err = h.AddCount(ctx, &r)
+	err = h.AddCount(&r)
 	if err != nil {
 		log.Trace(
 			err,
@@ -109,7 +105,7 @@ func (h *ProviderHandler) ListContent(ctx *gin.Context) (content []interface{}, 
 			m.With(p)
 			r := Provider{}
 			r.With(m)
-			aErr := h.AddCount(ctx, &r)
+			aErr := h.AddCount(&r)
 			if aErr != nil {
 				err = aErr
 				return
@@ -125,32 +121,29 @@ func (h *ProviderHandler) ListContent(ctx *gin.Context) (content []interface{}, 
 }
 
 // Add counts.
-func (h ProviderHandler) AddCount(ctx *gin.Context, r *Provider) (err error) {
+func (h ProviderHandler) AddCount(r *Provider) (err error) {
 	if h.Detail == 0 {
 		return nil
 	}
-	ocpclient, err := h.UserClient(ctx)
-
+	db := h.Collector.DB()
 	// VM
-	vms := cnv.VirtualMachineList{}
-	if err = ocpclient.List(context.TODO(), &vms); err != nil {
+	n, err := db.Count(&model.VM{}, nil)
+	if err != nil {
 		return liberr.Wrap(err)
 	}
-	r.VMCount = int64(len(vms.Items))
-
+	r.VMCount = n
 	// Network
-	nets := net.NetworkAttachmentDefinitionList{}
-	if err = ocpclient.List(context.TODO(), &nets); err != nil {
+	n, err = db.Count(&model.NetworkAttachmentDefinition{}, nil)
+	if err != nil {
 		return liberr.Wrap(err)
 	}
-	r.NetworkCount = int64(len(nets.Items)) + 1
-
+	r.NetworkCount = n + 1
 	// StorageClass
-	storageclasses := storage.StorageClassList{}
-	if err = ocpclient.List(context.TODO(), &storageclasses); err != nil {
+	n, err = db.Count(&model.StorageClass{}, nil)
+	if err != nil {
 		return liberr.Wrap(err)
 	}
-	r.StorageClassCount = int64(len(storageclasses.Items))
+	r.StorageClassCount = n
 
 	return nil
 }

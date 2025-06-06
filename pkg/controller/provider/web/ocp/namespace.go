@@ -1,14 +1,15 @@
 package ocp
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
+	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	core "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 // Routes.
@@ -41,11 +42,12 @@ func (h NamespaceHandler) List(ctx *gin.Context) {
 		return
 	}
 	if h.WatchRequest {
-		ctx.Status(http.StatusNotImplemented)
+		h.watch(ctx)
 		return
 	}
-
-	namespaces, err := h.Namespaces(ctx)
+	db := h.Collector.DB()
+	list := []model.Namespace{}
+	err = db.List(&list, h.ListOptions(ctx))
 	if err != nil {
 		log.Trace(
 			err,
@@ -54,15 +56,13 @@ func (h NamespaceHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-
 	content := []interface{}{}
-	for _, m := range namespaces {
-		r := Namespace{}
+	for _, m := range list {
+		r := &Namespace{}
 		r.With(&m)
 		r.Link(h.Provider)
 		content = append(content, r.Content(h.Detail))
 	}
-	h.Page.Slice(&content)
 
 	ctx.JSON(http.StatusOK, content)
 }
@@ -75,7 +75,17 @@ func (h NamespaceHandler) Get(ctx *gin.Context) {
 		base.SetForkliftError(ctx, err)
 		return
 	}
-	namespaces, err := h.Namespaces(ctx)
+	m := &model.Namespace{
+		Base: model.Base{
+			UID: ctx.Param(NsParam),
+		},
+	}
+	db := h.Collector.DB()
+	err = db.Get(m)
+	if errors.Is(err, model.NotFound) {
+		ctx.Status(http.StatusNotFound)
+		return
+	}
 	if err != nil {
 		log.Trace(
 			err,
@@ -84,20 +94,36 @@ func (h NamespaceHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	uid := types.UID(ctx.Param(NsParam))
-	for _, ns := range namespaces {
-		if ns.Object.ObjectMeta.UID == uid {
-			r := Namespace{}
-			r.With(&ns)
-			r.Link(h.Provider)
-			content := r.Content(model.MaxDetail)
-			ctx.JSON(http.StatusOK, content)
-			return
-		}
-	}
+	r := &Namespace{}
+	r.With(m)
+	r.Link(h.Provider)
+	content := r.Content(model.MaxDetail)
 
-	ctx.Status(http.StatusNotFound)
-	return
+	ctx.JSON(http.StatusOK, content)
+}
+
+// Watch.
+func (h NamespaceHandler) watch(ctx *gin.Context) {
+	db := h.Collector.DB()
+	err := h.Watch(
+		ctx,
+		db,
+		&model.Namespace{},
+		func(in libmodel.Model) (r interface{}) {
+			m := in.(*model.Namespace)
+			vm := &Namespace{}
+			vm.With(m)
+			vm.Link(h.Provider)
+			r = vm
+			return
+		})
+	if err != nil {
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
+		ctx.Status(http.StatusInternalServerError)
+	}
 }
 
 // REST Resource.

@@ -98,7 +98,7 @@ func main() {
 		klog.Fatalf("Failed to create a remote esxcli populator: %s", err)
 	}
 
-	volumeHandle, err := getVolumeHandle(clientSet, targetNamespace, ownerName)
+	volumeHandle, err := getVolumeHandle(clientSet, storageVendor, targetNamespace, ownerName)
 	if err != nil {
 		klog.Fatalf("Failed to fetch the volume handle details from the target pvc %s: %s", ownerName, err)
 	}
@@ -149,7 +149,7 @@ func newKubeClient(masterURL string, kubeconfig string) (*kubernetes.Clientset, 
 // to locate the created volume on the PVC. There is a  chance where the volume details are listed on the
 // "prime-{ORIG_PVC_NAME}" PVC because when the controller pod is handling it, the pvc prime should be bounded
 // to popoulator pod. However it is not guarnteed to be bounded at that stage and it may take time
-func getVolumeHandle(kubeClient *kubernetes.Clientset, targetNamespace, targetPVC string) (string, error) {
+func getVolumeHandle(kubeClient *kubernetes.Clientset, product string, targetNamespace, targetPVC string) (string, error) {
 	pvc, err := kubeClient.CoreV1().PersistentVolumeClaims(targetNamespace).Get(context.Background(), targetPVC, metav1.GetOptions{})
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch the the target persistent volume claim %q %w", pvc.Name, err)
@@ -177,7 +177,16 @@ func getVolumeHandle(kubeClient *kubernetes.Clientset, targetNamespace, targetPV
 		return "", fmt.Errorf("failed to fetch the the target volume details %w", err)
 	}
 	klog.Infof("target volume %s volumeHandle %s", pv.Name, pv.Spec.CSI.VolumeHandle)
-	return pv.Spec.CSI.VolumeHandle, nil
+	switch product {
+	case "ontap":
+		if internalName, ok := pv.Spec.CSI.VolumeAttributes["internalName"]; ok {
+			return internalName, nil
+		} else {
+			return pv.Spec.CSI.VolumeHandle, nil
+		}
+	default:
+		return pv.Spec.CSI.VolumeHandle, nil
+	}
 }
 
 func handleArgs() {
@@ -191,7 +200,7 @@ func handleArgs() {
 	flag.StringVar(&ownerName, "owner-name", "", "Owner Name, passed by the populator - the PVC Name")
 	flag.StringVar(&secretName, "secret-name", "", "Secret name the populator controller uses it to mount env vars from it. Not for use internally")
 	flag.StringVar(&sourceVMDKFile, "source-vmdk", "", "File name to populate")
-	flag.StringVar(&storageVendor, "storage-vendor-product", "", "The storage vendor to work with. Current values: [vantara, ontap, primera3par]")
+	flag.StringVar(&storageVendor, "storage-vendor-product", os.Getenv("STORAGE_VENDOR"), "The storage vendor to work with. Current values: [vantara, ontap, primera3par]")
 	flag.StringVar(&targetNamespace, "target-namespace", "", "Contents to populate file with")
 	flag.StringVar(&storageHostname, "storage-hostname", os.Getenv("STORAGE_HOSTNAME"), "The storage vendor api hostname")
 	flag.StringVar(&storageUsername, "storage-username", os.Getenv("STORAGE_USERNAME"), "The storage vendor api username")
@@ -200,7 +209,6 @@ func handleArgs() {
 	flag.StringVar(&vsphereHostname, "vsphere-hostname", os.Getenv("GOVMOMI_HOSTNAME"), "vSphere's API hostname")
 	flag.StringVar(&vsphereUsername, "vsphere-username", os.Getenv("GOVMOMI_USERNAME"), "vSphere's API username")
 	flag.StringVar(&vspherePassword, "vsphere-password", os.Getenv("GOVMOMI_PASSWORD"), "vSphere's API password")
-
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 	// Metrics args

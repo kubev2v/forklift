@@ -5,6 +5,8 @@ import (
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 )
 
+type ProtocolType string
+
 // Variants.
 const (
 	// Network.
@@ -14,6 +16,16 @@ const (
 	NetDvSwitch    = "DvSwitch"
 	// Cluster.
 	ComputeResource = "ComputeResource"
+	// Storage Protocol Type
+	ProtocolUnknown      ProtocolType = "Unknown"      // Unrecognized or unsupported
+	ProtocolFibreChannel ProtocolType = "FibreChannel" // High-speed network tech
+	ProtocolFCoE         ProtocolType = "FCoE"         // Fibre Channel over Ethernet
+	ProtocolISCSI        ProtocolType = "iSCSI"        // Internet Small Computer Systems Interface
+	ProtocolSCSI         ProtocolType = "ParallelSCSI" // Legacy parallel SCSI interface
+	ProtocolSAS          ProtocolType = "SAS"          // Serial Attached SCSI
+	ProtocolPCIe         ProtocolType = "PCIe"         // PCI Express storage interface
+	ProtocolRDMA         ProtocolType = "RDMA"         // Remote Direct Memory Access
+	ProtocolTCP          ProtocolType = "TCP"          // Generic TCP-based adapter
 )
 
 // Errors
@@ -126,21 +138,23 @@ type Cluster struct {
 
 type Host struct {
 	Base
-	Cluster            string         `sql:"d0,index(cluster)"`
-	Status             string         `sql:""`
-	InMaintenanceMode  bool           `sql:""`
-	ManagementServerIp string         `sql:""`
-	Thumbprint         string         `sql:""`
-	Timezone           string         `sql:""`
-	CpuSockets         int16          `sql:""`
-	CpuCores           int16          `sql:""`
-	ProductName        string         `sql:""`
-	ProductVersion     string         `sql:""`
-	Network            HostNetwork    `sql:""`
-	Networks           []Ref          `sql:""`
-	Datastores         []Ref          `sql:""`
-	HostScsiDisks      []HostScsiDisk `sql:""`
-	AdvancedOptions    Ref            `sql:""`
+	Cluster            string             `sql:"d0,index(cluster)"`
+	Status             string             `sql:""`
+	InMaintenanceMode  bool               `sql:""`
+	ManagementServerIp string             `sql:""`
+	Thumbprint         string             `sql:""`
+	Timezone           string             `sql:""`
+	CpuSockets         int16              `sql:""`
+	CpuCores           int16              `sql:""`
+	ProductName        string             `sql:""`
+	ProductVersion     string             `sql:""`
+	Network            HostNetwork        `sql:""`
+	Networks           []Ref              `sql:""`
+	Datastores         []Ref              `sql:""`
+	HostScsiDisks      []HostScsiDisk     `sql:""`
+	AdvancedOptions    Ref                `sql:""`
+	HbaDiskInfo        []HbaDiskInfo      `sql:""`
+	HostScsiTopology   []HostScsiTopology `sql:""`
 }
 
 type HostScsiDisk struct {
@@ -152,6 +166,28 @@ type HostScsiDisk struct {
 	CanonicalName string `json:"canonicalName"`
 	// The vendor of the SCSI device.
 	Vendor string `json:"vendor"`
+	// The model of the scsi device
+	Model string `json:"model"`
+	// The key of the scsi device
+	Key string `json:"key"`
+}
+
+type HbaDiskInfo struct {
+	// The device name of host bus adapter.
+	Device string `json:"hbaDevice"`
+	// The supported protocol by this device
+	Protocol string `json:"protocol"`
+	// The model name of the host bus adapter.
+	Model string `json:"model"`
+	// The linkable identifier.
+	Key string `json:"key"`
+}
+
+type HostScsiTopology struct {
+	// The identifier for the SCSI interface (HBA)
+	HbaKey string `json:"key"`
+	// List of identifiers for the SCSI targets
+	ScsiDiskKeys []string `json:"scsiDiskKeys"`
 }
 
 type HostNetwork struct {
@@ -249,44 +285,45 @@ type Datastore struct {
 
 type VM struct {
 	Base
-	Folder                string         `sql:"d0,index(folder)"`
-	Host                  string         `sql:"d0,index(host)"`
-	RevisionValidated     int64          `sql:"d0,index(revisionValidated)"`
-	PolicyVersion         int            `sql:"d0,index(policyVersion)"`
-	UUID                  string         `sql:""`
-	Firmware              string         `sql:""`
-	PowerState            string         `sql:""`
-	ConnectionState       string         `sql:""`
-	CpuAffinity           []int32        `sql:""`
-	CpuHotAddEnabled      bool           `sql:""`
-	CpuHotRemoveEnabled   bool           `sql:""`
-	MemoryHotAddEnabled   bool           `sql:""`
-	FaultToleranceEnabled bool           `sql:""`
-	CpuCount              int32          `sql:""`
-	CoresPerSocket        int32          `sql:""`
-	MemoryMB              int32          `sql:""`
-	GuestName             string         `sql:""`
-	HostName              string         `sql:""`
-	GuestID               string         `sql:""`
-	BalloonedMemory       int32          `sql:""`
-	IpAddress             string         `sql:""`
-	NumaNodeAffinity      []string       `sql:""`
-	StorageUsed           int64          `sql:""`
-	Snapshot              Ref            `sql:""`
-	IsTemplate            bool           `sql:""`
-	ChangeTrackingEnabled bool           `sql:""`
-	TpmEnabled            bool           `sql:""`
-	Devices               []Device       `sql:""`
-	NICs                  []NIC          `sql:""`
-	Disks                 []Disk         `sql:""`
-	Controllers           []Controller   `sql:""`
-	Networks              []Ref          `sql:""`
-	Concerns              []Concern      `sql:""`
-	GuestNetworks         []GuestNetwork `sql:""`
-	GuestIpStacks         []GuestIpStack `sql:""`
-	SecureBoot            bool           `sql:""`
-	DiskEnableUuid        bool           `sql:""`
-	NestedHVEnabled       bool           `sql:""`
+	Folder                   string         `sql:"d0,index(folder)"`
+	Host                     string         `sql:"d0,index(host)"`
+	RevisionValidated        int64          `sql:"d0,index(revisionValidated)"`
+	PolicyVersion            int            `sql:"d0,index(policyVersion)"`
+	UUID                     string         `sql:""`
+	Firmware                 string         `sql:""`
+	PowerState               string         `sql:""`
+	ConnectionState          string         `sql:""`
+	CpuAffinity              []int32        `sql:""`
+	CpuHotAddEnabled         bool           `sql:""`
+	CpuHotRemoveEnabled      bool           `sql:""`
+	MemoryHotAddEnabled      bool           `sql:""`
+	FaultToleranceEnabled    bool           `sql:""`
+	CpuCount                 int32          `sql:""`
+	CoresPerSocket           int32          `sql:""`
+	MemoryMB                 int32          `sql:""`
+	GuestName                string         `sql:""`
+	GuestNameFromVmwareTools string         `sql:""`
+	HostName                 string         `sql:""`
+	GuestID                  string         `sql:""`
+	BalloonedMemory          int32          `sql:""`
+	IpAddress                string         `sql:""`
+	NumaNodeAffinity         []string       `sql:""`
+	StorageUsed              int64          `sql:""`
+	Snapshot                 Ref            `sql:""`
+	IsTemplate               bool           `sql:""`
+	ChangeTrackingEnabled    bool           `sql:""`
+	TpmEnabled               bool           `sql:""`
+	Devices                  []Device       `sql:""`
+	NICs                     []NIC          `sql:""`
+	Disks                    []Disk         `sql:""`
+	Controllers              []Controller   `sql:""`
+	Networks                 []Ref          `sql:""`
+	Concerns                 []Concern      `sql:""`
+	GuestNetworks            []GuestNetwork `sql:""`
+	GuestIpStacks            []GuestIpStack `sql:""`
+	SecureBoot               bool           `sql:""`
+	DiskEnableUuid           bool           `sql:""`
+	NestedHVEnabled          bool           `sql:""`
 }
 
 // Determine if current revision has been validated.

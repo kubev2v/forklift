@@ -41,6 +41,28 @@ func Handler(owner interface{}) handler.EventHandler {
 		})
 }
 
+// TypedHandler creates a typed handler for reference mapping
+func TypedHandler[T client.Object](owner interface{}) handler.TypedEventHandler[T, reconcile.Request] {
+	log := logging.WithName("ref|handler")
+	ownerKind := ToKind(owner)
+	return handler.TypedEnqueueRequestsFromMapFunc(
+		func(ctx context.Context, a T) []reconcile.Request {
+			refKind := ToKind(a)
+			list := GetRequests(ownerKind, a)
+			if len(list) > 0 {
+				log.V(4).Info(
+					"handler: request list.",
+					"referenced",
+					refKind,
+					"owner",
+					ownerKind,
+					"list",
+					list)
+			}
+			return list
+		})
+}
+
 // Impl the handler interface.
 func GetRequests(kind string, a client.Object) []reconcile.Request {
 	target := Target{

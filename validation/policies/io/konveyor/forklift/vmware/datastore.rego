@@ -10,6 +10,6 @@ concerns[flag] {
     flag := {
         "category": "Critical",
         "label": "Disk is not located on a datastore",
-        "assessment": "The VM is configured with a disk that is not located on a datastore. The VM cannot be migrated"
+        "assessment": "The VM is configured with a disk that is not located on a datastore. The VM cannot be migrated."
     }
 }
