@@ -1,4 +1,4 @@
-FROM registry.redhat.io/ubi9:9.5-1745854298 AS appliance
+FROM registry.redhat.io/ubi9:9.6-1747219013 AS appliance
 
 ENV LIBGUESTFS_BACKEND=direct
 
@@ -26,7 +26,7 @@ RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-monitor github
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o image-converter github.com/konveyor/forklift-controller/cmd/image-converter
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-wrapper github.com/konveyor/forklift-controller/cmd/virt-v2v
 
-FROM registry.redhat.io/ubi9:9.5-1745854298
+FROM registry.redhat.io/ubi9:9.6-1747219013
 RUN mkdir /disks && \
     source /etc/os-release && \
     dnf update -y && \
@@ -34,6 +34,7 @@ RUN mkdir /disks && \
     virt-v2v \
     virtio-win
 
+ENV PATH="$PATH:/usr/libexec"
 ENV LIBGUESTFS_BACKEND=direct
 
 RUN mkdir -p /usr/lib64/guestfs/appliance
@@ -47,13 +48,17 @@ COPY --from=builder /app/virt-v2v-wrapper /usr/bin/virt-v2v-wrapper
 
 ENTRYPOINT ["/usr/bin/virt-v2v-wrapper"]
 
+ARG VERSION
+ARG REGISTRY
+
 LABEL \
     com.redhat.component="mtv-virt-v2v-container" \
-    name="migration-toolkit-virtualization/mtv-virt-v2v-rhel9" \
+    name="${REGISTRY}/mtv-virt-v2v-rhel9" \
     license="Apache License 2.0" \
     io.k8s.display-name="Migration Toolkit for Virtualization" \
     io.k8s.description="Migration Toolkit for Virtualization - Virt-V2V" \
     io.openshift.tags="migration,mtv,forklift" \
     summary="Migration Toolkit for Virtualization - Virt-V2V" \
     description="Migration Toolkit for Virtualization - Virt-V2V" \
-    maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>"
+    maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
+    version="$VERSION"

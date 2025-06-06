@@ -524,6 +524,13 @@ dev-controller: generate fmt vet build-controller
 kustomized-manifests: kubectl
 	kubectl kustomize operator/config/manifests > operator/.kustomized_manifests
 
+.PHONY: generate-manifests
+generate-manifests: kubectl
+	kubectl kustomize operator/streams/upstream > operator/streams/upstream/upstream_manifests
+	kubectl kustomize operator/streams/downstream > operator/streams/downstream/downstream_manifests
+	STREAM=upstream bash operator/streams/prepare-vars.sh
+	STREAM=downstream bash operator/streams/prepare-vars.sh
+
 .PHONY: lint-install
 lint-install:
 	@echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."
@@ -533,7 +540,11 @@ lint-install:
 .PHONY: lint
 lint: $(GOLANGCI_LINT_BIN)
 	@echo "Running golangci-lint..."
-	$(GOLANGCI_LINT_BIN) run ./...
+	$(GOLANGCI_LINT_BIN) run ./pkg/... ./cmd/...
+
+.PHONY: update-tekton
+update-tekton:
+	SKIP_UPDATE=false ./update-tekton.sh .tekton/*.yaml
 
 $(GOLANGCI_LINT_BIN):
 	$(MAKE) lint-install

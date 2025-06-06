@@ -78,7 +78,8 @@ disk file, to a target PVC.
 The way it works is by performing the XCOPY using vmkfstools on the target ESXi.
 
 
-## Matching PVC with DataStores to deduce copy-offload support:
+<a id="matching-pvc"></a>
+## Matching PVC with DataStores to deduce copy-offload support
 For XCOPY to be supported a source VMDK disk backing LUN (iSCSI or FC) must co exist
 with the target PVC (backed by a LUN) on the same storage array.
 When a user is picking a VM to migrate to OpenShift there is no direct indication
@@ -136,6 +137,29 @@ spec:
 
 ## Hitachi Vantara
 - see [README](internal/vantara/README.md)
+
+# Setup copy offload
+- Set the feature flag
+  `oc patch forkliftcontrollers.forklift.konveyor.io forklift-controller --type merge -p '{"spec": {"feature_copy_offload": "true"}}' -n openshift-mtv`
+- Set the volume-populator image (should be unnecessary in 2.8.5)
+  `oc set env -n openshift-mtv deployment forklift-volume-populator-controller --all VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE=quay.io/kubev2v/vsphere-xcopy-volume-populator`
+- Create a `StorageMap` according to [this section](#matching-pvc)
+- Create a plan and make sure to edit the mapping section and set the name to the `StorageMap` previously created
+  Here is how the mapping part looks in a `Plan`:
+  ```yaml
+
+    apiVersion: forklift.konveyor.io/v1beta1
+    kind: Plan
+    metadata:
+      name: my-plan
+    spec:
+      map:
+        storage:
+          apiVersion: forklift.konveyor.io/v1beta1
+          kind: StorageMap
+          name: copy-offload  # <-- This points to the StorageMap configured previously
+          namespace: openshift-mtv
+  ```
 
 # Troubleshooting
 

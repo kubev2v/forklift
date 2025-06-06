@@ -67,9 +67,9 @@ func Add(mgr manager.Manager) error {
 	}
 	// Primary CR.
 	err = cnt.Watch(
-		source.Kind(mgr.GetCache(), &api.NetworkMap{}),
-		&handler.EnqueueRequestForObject{},
-		&MapPredicate{})
+		source.Kind(mgr.GetCache(), &api.NetworkMap{},
+			&handler.TypedEnqueueRequestForObject[*api.NetworkMap]{},
+			&MapPredicate{}))
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -79,20 +79,19 @@ func Add(mgr manager.Manager) error {
 	// events when changes to the provider inventory are detected.
 	channel := make(chan event.GenericEvent, 10)
 	err = cnt.Watch(
-		&source.Channel{Source: channel},
-		&handler.EnqueueRequestForObject{})
+		source.Channel(channel, &handler.EnqueueRequestForObject{}))
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
 	// References.
 	err = cnt.Watch(
-		source.Kind(mgr.GetCache(), &api.Provider{}),
-		libref.Handler(&api.NetworkMap{}),
-		&ProviderPredicate{
-			client:  mgr.GetClient(),
-			channel: channel,
-		})
+		source.Kind(mgr.GetCache(), &api.Provider{},
+			libref.TypedHandler[*api.Provider](&api.NetworkMap{}),
+			&ProviderPredicate{
+				client:  mgr.GetClient(),
+				channel: channel,
+			}))
 	if err != nil {
 		log.Trace(err)
 		return err

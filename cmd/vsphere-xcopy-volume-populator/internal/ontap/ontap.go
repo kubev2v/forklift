@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
 	drivers "github.com/netapp/trident/storage_drivers"
@@ -77,9 +76,8 @@ func NewNetappClonner(hostname, username, password string) (NetappClonner, error
 }
 
 func (c *NetappClonner) ResolveVolumeHandleToLUN(volumeHandle string) (populator.LUN, error) {
-	// for trident we need convert the dashes to underscores so pvc-123-456 becomes pvc_123_456
-	volumeHandle = strings.ReplaceAll(volumeHandle, "-", "_")
-	l, err := c.api.LunGetByName(context.Background(), fmt.Sprintf("/vol/trident_%s/lun0", volumeHandle))
+	// trident sets internalName attribute on a volume, and that is the real volume name in the system
+	l, err := c.api.LunGetByName(context.Background(), fmt.Sprintf("/vol/%s/lun0", volumeHandle))
 	if err != nil {
 		return populator.LUN{}, err
 	}

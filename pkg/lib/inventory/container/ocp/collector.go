@@ -320,9 +320,8 @@ func (r *Collector) buildManager() (err error) {
 			source.Kind(
 				r.manager.GetCache(),
 				collection.Object(),
-			),
-			&handler.EnqueueRequestForObject{},
-			collection)
+				&handler.EnqueueRequestForObject{},
+				collection))
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
