@@ -9,6 +9,6 @@ concerns[flag] {
     flag := {
         "category": "Warning",
         "label": "NUMA node affinity detected",
-        "assessment": "NUMA node affinity is not currently supported by OpenShift Virtualization. The VM can be migrated but it will not have this feature in the target environment."
+        "assessment": "NUMA node affinity is not currently supported by Migration Toolkit for Virtualization. The VM can be migrated but it will not have this feature in the target environment."
     }
 }

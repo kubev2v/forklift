@@ -1,6 +1,6 @@
 module github.com/konveyor/forklift-controller
 
-go 1.21.13
+go 1.23.6
 
 toolchain go1.23.8
 

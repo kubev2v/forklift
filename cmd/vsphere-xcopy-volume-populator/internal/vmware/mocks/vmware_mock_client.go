@@ -42,6 +42,21 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 	return m.recorder
 }
 
+// GetDatastore mocks base method.
+func (m *MockClient) GetDatastore(ctx context.Context, datastore string) (*object.Datastore, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDatastore", ctx, datastore)
+	ret0, _ := ret[0].(*object.Datastore)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDatastore indicates an expected call of GetDatastore.
+func (mr *MockClientMockRecorder) GetDatastore(ctx, datastore any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDatastore", reflect.TypeOf((*MockClient)(nil).GetDatastore), ctx, datastore)
+}
+
 // GetEsxByVm mocks base method.
 func (m *MockClient) GetEsxByVm(ctx context.Context, vmName string) (*object.HostSystem, error) {
 	m.ctrl.T.Helper()

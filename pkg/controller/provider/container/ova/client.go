@@ -88,31 +88,3 @@ func (r *Client) list(path string, list interface{}) (err error) {
 
 	return
 }
-
-// Get a resource.
-func (r *Client) get(path string, object interface{}) (err error) {
-	url, err := liburl.Parse(r.serviceURL)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	url.Path = path
-	defer func() {
-		if err != nil {
-			err = liberr.Wrap(err, "url", url.String())
-		}
-	}()
-	status, err := r.client.Get(url.String(), object)
-	if err != nil {
-		return
-	}
-	switch status {
-	case http.StatusOK:
-	case http.StatusNotFound:
-		err = &NotFound{}
-	default:
-		err = liberr.New(http.StatusText(status))
-	}
-
-	return
-}

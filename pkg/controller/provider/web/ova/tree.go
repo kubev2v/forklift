@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ova"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
 )
 
@@ -119,8 +118,6 @@ func (h TreeHandler) Tree(ctx *gin.Context) {
 
 // Tree (branch) navigator.
 type BranchNavigator struct {
-	db     libmodel.DB
-	detail int
 }
 
 // Tree node builder.

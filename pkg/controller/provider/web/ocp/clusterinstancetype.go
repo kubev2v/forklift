@@ -1,12 +1,14 @@
 package ocp
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
+	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	instancetype "kubevirt.io/api/instancetype/v1beta1"
 )
 
@@ -41,10 +43,12 @@ func (h ClusterInstanceHandler) List(ctx *gin.Context) {
 		return
 	}
 	if h.WatchRequest {
-		ctx.Status(http.StatusNotImplemented)
+		h.watch(ctx)
 		return
 	}
-	clusterinstances, err := h.ClusterInstanceTypes(ctx)
+	db := h.Collector.DB()
+	list := []model.ClusterInstanceType{}
+	err = db.List(&list, h.ListOptions(ctx))
 	if err != nil {
 		log.Trace(
 			err,
@@ -53,15 +57,13 @@ func (h ClusterInstanceHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-
 	content := []interface{}{}
-	for _, m := range clusterinstances {
+	for _, m := range list {
 		r := &ClusterInstanceType{}
 		r.With(&m)
 		r.Link(h.Provider)
 		content = append(content, r.Content(h.Detail))
 	}
-	h.Page.Slice(&content)
 
 	ctx.JSON(http.StatusOK, content)
 }
@@ -74,7 +76,17 @@ func (h ClusterInstanceHandler) Get(ctx *gin.Context) {
 		base.SetForkliftError(ctx, err)
 		return
 	}
-	clusterinstances, err := h.ClusterInstanceTypes(ctx)
+	m := &model.ClusterInstanceType{
+		Base: model.Base{
+			UID: ctx.Param(ClusterInstanceParam),
+		},
+	}
+	db := h.Collector.DB()
+	err = db.Get(m)
+	if errors.Is(err, model.NotFound) {
+		ctx.Status(http.StatusNotFound)
+		return
+	}
 	if err != nil {
 		log.Trace(
 			err,
@@ -83,20 +95,36 @@ func (h ClusterInstanceHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	for _, m := range clusterinstances {
-		if m.UID == ctx.Param(ClusterInstanceParam) {
-			r := &ClusterInstanceType{}
-			r.With(&m)
-			r.Link(h.Provider)
-			content := r.Content(model.MaxDetail)
+	r := &ClusterInstanceType{}
+	r.With(m)
+	r.Link(h.Provider)
+	content := r.Content(model.MaxDetail)
 
-			ctx.JSON(http.StatusOK, content)
+	ctx.JSON(http.StatusOK, content)
+}
+
+// Watch.
+func (h ClusterInstanceHandler) watch(ctx *gin.Context) {
+	db := h.Collector.DB()
+	err := h.Watch(
+		ctx,
+		db,
+		&model.ClusterInstanceType{},
+		func(in libmodel.Model) (r interface{}) {
+			m := in.(*model.ClusterInstanceType)
+			it := &ClusterInstanceType{}
+			it.With(m)
+			it.Link(h.Provider)
+			r = it
 			return
-
-		}
+		})
+	if err != nil {
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
+		ctx.Status(http.StatusInternalServerError)
 	}
-	ctx.Status(http.StatusNotFound)
-	return
 }
 
 // REST Resource.

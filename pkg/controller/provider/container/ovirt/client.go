@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/konveyor/forklift-controller/pkg/controller/base"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
 	"github.com/konveyor/forklift-controller/pkg/lib/logging"
@@ -61,7 +62,7 @@ func (r *Client) connect() (status int, err error) {
 		return
 	}
 
-	if GetInsecureSkipVerifyFlag(r.secret) {
+	if base.GetInsecureSkipVerifyFlag(r.secret) {
 		TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	} else {
 		cacert := r.secret.Data["cacert"]
@@ -201,20 +202,4 @@ func (r *Client) system() (system *System, status int, err error) {
 	}
 
 	return
-}
-
-// GetInsecureSkipVerifyFlag gets the insecureSkipVerify boolean flag
-// value from the ovirt connection secret.
-func GetInsecureSkipVerifyFlag(secret *core.Secret) bool {
-	insecure, found := secret.Data["insecureSkipVerify"]
-	if !found {
-		return false
-	}
-
-	insecureSkipVerify, err := strconv.ParseBool(string(insecure))
-	if err != nil {
-		return false
-	}
-
-	return insecureSkipVerify
 }

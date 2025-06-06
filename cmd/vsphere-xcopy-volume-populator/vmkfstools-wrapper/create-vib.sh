@@ -7,7 +7,7 @@ pushd "$SCRIPT_DIR"
 
 CUSTOM_VIB_TEMP_DIR=/tmp/vib-temp-rgo
 CUSTOM_VIB_NAME=vmkfstools-wrapper
-CUSTOM_VIB_VERSION="0.0.86"
+CUSTOM_VIB_VERSION="${VIB_VERSION}"
 CUSTOM_VIB_VENDOR="REDHAT"
 CUSTOM_VIB_VENDOR_URL="https://redhat.com"
 CUSTOM_VIB_SUMMARY="Custom VIB to wrap vmkfstools as esxcli plugin"
@@ -27,7 +27,7 @@ mkdir -p ${CUSTOM_VIB_TEMP_DIR}
 mkdir -p ${VIB_PAYLOAD_DIR}
 
 # Create ESXi folder structure for file(s) placement
-CUSTOM_VIB_BIN_DIR=${VIB_PAYLOAD_DIR}/bin
+CUSTOM_VIB_BIN_DIR=${VIB_PAYLOAD_DIR}/opt/redhat
 ESXCLI_PLUGINS_DIR=${VIB_PAYLOAD_DIR}/usr/lib/vmware/esxcli/ext/
 mkdir -p ${CUSTOM_VIB_BIN_DIR}
 mkdir -p ${ESXCLI_PLUGINS_DIR}
@@ -41,7 +41,7 @@ cp -v vmkfstools_wrapper.py ${CUSTOM_VIB_BIN_DIR}/vmkfstools-wrapper
 chmod +x ${CUSTOM_VIB_BIN_DIR}/vmkfstools-wrapper
 
 # Create tgz with payload
-tar czvf ${CUSTOM_VIB_TEMP_DIR}/payload1 -C ${VIB_PAYLOAD_DIR} bin usr
+tar czvf ${CUSTOM_VIB_TEMP_DIR}/payload1 -C ${VIB_PAYLOAD_DIR} opt usr
 
 # Calculate payload size/hash
 PAYLOAD_FILES=$(tar tf ${CUSTOM_VIB_TEMP_DIR}/payload1 | grep -v -E '/$' | sed -e 's/^/    <file>/' -e 's/$/<\/file>/')

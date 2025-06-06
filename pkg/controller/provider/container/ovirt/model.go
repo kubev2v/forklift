@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 
 	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
@@ -154,20 +153,6 @@ type Adapter interface {
 
 // Base adapter.
 type BaseAdapter struct {
-}
-
-// Build page parameter.
-func (r *BaseAdapter) page(page, max int) []libweb.Param {
-	return []libweb.Param{
-		{
-			Key:   "search",
-			Value: fmt.Sprintf("page %d", page),
-		},
-		{
-			Key:   "max",
-			Value: strconv.Itoa(max),
-		},
-	}
 }
 
 // Build follow parameter.
@@ -716,7 +701,7 @@ func (r *ServerCPUAdapter) List(ctx *Context) (itr fb.Iterator, err error) {
 func (r *ServerCPUAdapter) Apply(ctx *Context, event *Event) (updater Updater, err error) {
 	defer func() {
 		if errors.Is(err, &NotFound{}) {
-			updater = func(tx *libmodel.Tx) (err error) {
+			updater = func(_ *libmodel.Tx) (err error) {
 				ctx.log.V(3).Info(
 					"ServerCPU not found; event ignored.",
 					"event",
