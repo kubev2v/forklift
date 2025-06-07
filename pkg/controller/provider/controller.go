@@ -252,6 +252,9 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	// Validations.
 	err = r.validate(provider)
 	if err != nil {
+		if err = r.updateProviderStatus(provider); err != nil {
+			r.Log.Error(err, "failed to update provider status")
+		}
 		return
 	}
 
@@ -277,13 +280,8 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	// End staging conditions.
 	provider.Status.EndStagingConditions()
 
-	// Record events.
-	r.Record(provider, provider.Status.Conditions)
-
-	// Apply changes.
-	provider.Status.ObservedGeneration = provider.Generation
-	err = r.Status().Update(context.TODO(), provider)
-	if err != nil {
+	if err = r.updateProviderStatus(provider); err != nil {
+		r.Log.Error(err, "failed to update provider status")
 		return
 	}
 
@@ -302,6 +300,20 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 
 	// Done
 	return
+}
+
+func (r *Reconciler) updateProviderStatus(provider *api.Provider) error {
+	// Record events.
+	r.Record(provider, provider.Status.Conditions)
+
+	// Apply changes.
+	provider.Status.ObservedGeneration = provider.Generation
+
+	if err := r.Status().Update(context.TODO(), provider); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Update the provider.
