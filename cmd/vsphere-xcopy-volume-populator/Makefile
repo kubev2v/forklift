@@ -56,6 +56,15 @@ test-copy-using-cli-3par: build
 		--secret-name=populator-secret \
 		--kubeconfig=$$KUBECONFIG
 
+test-copy-using-cli-pureflasharray: build
+	bin/vsphere-xcopy-volume-populator \
+		--source-vmdk="[eco-iscsi-pure] vm-6/vm-6.vmdk" \
+	    --owner-name=test-copy-offload \
+		--target-namespace=default \
+		--storage-vendor-product=pureFlashArray \
+		--secret-name=populator-secret \
+		--kubeconfig=$$KUBECONFIG
+
 .PHONY: vmkfstools-wrapper
 vmkfstools-wrapper:
 	$(MAKE) -C vmkfstools-wrapper build
