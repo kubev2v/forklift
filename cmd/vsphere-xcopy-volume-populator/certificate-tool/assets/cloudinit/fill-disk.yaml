@@ -1,0 +1,30 @@
+#cloud-config
+growpart:
+  mode: auto
+  devices: ['/']
+  ignore_growroot_disabled: false
+
+resize_rootfs: true
+
+write_files:
+  - path: /usr/local/bin/fill-disk.sh
+    permissions: '0755'
+    owner: root:root
+    content: |
+      #!/bin/bash
+      TARGET_USAGE=95
+      FILE=/var/tmp/fillfile
+
+      echo "Starting disk fill to ${TARGET_USAGE}%..."
+
+      while true; do
+        USAGE=$(df --output=pcent / | tail -1 | tr -dc '0-9')
+        if [ "$USAGE" -ge "$TARGET_USAGE" ]; then
+          echo "Disk is ${USAGE}% full. Stopping fill."
+          break
+        fi
+        dd if=/dev/urandom of=${FILE} bs=10M count=10 oflag=append conv=notrunc status=none
+      done
+
+runcmd:
+  - bash /usr/local/bin/fill-disk.sh
