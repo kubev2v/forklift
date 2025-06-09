@@ -45,6 +45,7 @@ const (
 	OvaContainerLimitsMemory       = "OVA_CONTAINER_LIMITS_MEMORY"
 	OvaContainerRequestsCpu        = "OVA_CONTAINER_REQUESTS_CPU"
 	OvaContainerRequestsMemory     = "OVA_CONTAINER_REQUESTS_MEMORY"
+	TlsConnectionTimeout           = "TLS_CONNECTION_TIMEOUT"
 )
 
 // Migration settings
@@ -103,6 +104,8 @@ type Migration struct {
 	OvaContainerRequestsMemory     string
 	// VDDK image for guest conversion
 	VddkImage string
+	// TlsConnectionTimeout is the timeout for TLS connections in seconds
+	TlsConnectionTimeout int
 }
 
 // Load settings.
@@ -176,6 +179,9 @@ func (r *Migration) Load() (err error) {
 		return liberr.Wrap(fmt.Errorf("failed to find environment variable %s", VsphereOsConfigMap))
 	}
 	if r.VddkJobActiveDeadline, err = getPositiveEnvLimit(VddkJobActiveDeadline, 300); err != nil {
+		return liberr.Wrap(err)
+	}
+	if r.TlsConnectionTimeout, err = getPositiveEnvLimit(TlsConnectionTimeout, 5); err != nil {
 		return liberr.Wrap(err)
 	}
 	r.VirtV2vExtraArgs = "[]"
