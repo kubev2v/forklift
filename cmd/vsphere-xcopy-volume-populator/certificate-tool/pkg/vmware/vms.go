@@ -568,8 +568,8 @@ func attachNetwork(
 }
 
 func CreateVM(vmName, vsphereUrl, vsphereUser, vspherePassword, dataCenter,
-	dataStore, pool, hostName, downloadVmdkURL, localVmdkPath, isoPath string, waitTimeout time.Duration) (string, error) { // Add hostName parameter
-	ctx, cancel, client, finder, dc, ds, rp, err := SetupVSphere(
+	dataStore, pool, hostName, templateName, isoPath string, waitTimeout time.Duration) error { // Add hostName parameter
+	ctx, cancel, client, finder, _, ds, _, err := SetupVSphere(
 		5*time.Minute, vsphereUrl, vsphereUser, vspherePassword, dataCenter, dataStore, pool)
 	if err != nil {
 		log.Fatalf("vSphere setup failed: %v", err)
@@ -580,7 +580,7 @@ func CreateVM(vmName, vsphereUrl, vsphereUser, vspherePassword, dataCenter,
 	if hostName != "" {
 		host, err = finder.HostSystem(ctx, hostName)
 		if err != nil {
-			return "", fmt.Errorf("failed to find host %q: %w", hostName, err)
+			return fmt.Errorf("failed to find host %q: %w", hostName, err)
 		}
 		klog.Infof("Using host: %s", host.Name())
 	}
@@ -588,29 +588,14 @@ func CreateVM(vmName, vsphereUrl, vsphereUser, vspherePassword, dataCenter,
 	vm, err := finder.VirtualMachine(context.Background(), vmName)
 	if err != nil {
 		if _, ok := err.(*find.NotFoundError); !ok {
-			return "", err
+			return err
 		}
 	}
 
 	if vm != nil {
 		log.Printf("VM %q already exists. Attempting to retrieve its VMDK path from vSphere.", vmName)
-		existingVmdkPath, err := getExistingVMDKPath(ctx, vm, ds)
-		if err != nil {
-			return "", fmt.Errorf("failed to get VMDK path for existing VM %q: %w", vmName, err)
-		}
-		return existingVmdkPath, nil
+		return nil
 	}
-
-	vmdkToUpload, err := ensureVmdk(downloadVmdkURL, localVmdkPath)
-	if err != nil {
-		return "", err
-	}
-	fmt.Printf("\nvmdk to upload %s\n", vmdkToUpload)
-	remoteVmdkPath, err := uploadVmdk(ctx, client, ds, dc, rp, host, vmName, vmdkToUpload)
-	if err != nil {
-		return "", err
-	}
-	fmt.Printf("\nremote vmdk path %s\n", remoteVmdkPath)
 
 	// After upload, the `remoteVmdkPath` should correctly point to the descriptor VMDK.
 	// We don't need a separate findVMDKPath after upload because uploadVmdk already handles it.
@@ -618,29 +603,29 @@ func CreateVM(vmName, vsphereUrl, vsphereUser, vspherePassword, dataCenter,
 
 	remoteIsoPath, err := uploadFile(ctx, ds, vmName, isoPath)
 	if err != nil {
-		return "", err
+		return err
 	}
-	vm, err = createVM(ctx, client, dc, rp, host, vmName, remoteVmdkPath, ds.Name())
+	vm, err = CloneVMWithDiskResize(ctx, client, templateName, vmName, 100)
 	if err != nil {
-		return "", err
+		return err
 	}
 	if err := attachCDROM(ctx, vm, remoteIsoPath); err != nil {
-		return "", err
+		return err
 	}
 	if err := attachNetwork(ctx, client, vm, "VM Network"); err != nil {
 		log.Fatalf("add NIC: %v", err)
 	}
 
 	if err := waitForVMRegistration(ctx, finder, vmName, waitTimeout); err != nil {
-		return "", err
+		return err
 	}
 
 	klog.Infof("VM %s is ready.", vmName)
-	return remoteVmdkPath, nil
+	return nil
 }
 
 func CreateTemplate(templateName, vsphereUrl, vsphereUser, vspherePassword, dataCenter,
-	dataStore, pool, hostName, downloadVmdkURL, localVmdkPath, isoPath, cloudInitYamlPath string, waitTimeout time.Duration) (string, error) { // Add hostName parameter
+	dataStore, pool, hostName, downloadVmdkURL, localVmdkPath, cloudInitYamlPath string, waitTimeout time.Duration) (string, error) { // Add hostName parameter
 	ctx, cancel, client, finder, dc, ds, rp, err := SetupVSphere(
 		5*time.Minute, vsphereUrl, vsphereUser, vspherePassword, dataCenter, dataStore, pool)
 	if err != nil {
@@ -697,7 +682,7 @@ func CreateTemplate(templateName, vsphereUrl, vsphereUser, vspherePassword, data
 		return "", err
 	}
 
-	klog.Infof("VM %s is ready.", templateName)
+	klog.Infof("Template %s is ready.", templateName)
 	return remoteVmdkPath, nil
 }
 
