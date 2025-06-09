@@ -996,6 +996,15 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 		}
 		err = r.validateVddkImageJob(job, plan)
 	}
+	if plan.Spec.Warm && vddkImage == "" {
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     VDDKInitImageUnavailable,
+			Status:   True,
+			Reason:   NotSet,
+			Category: api.CategoryCritical,
+			Message:  "VDDK image not set on the provider, this is required for the warm migration",
+		})
+	}
 
 	return
 }
