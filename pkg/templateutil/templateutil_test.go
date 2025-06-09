@@ -17,7 +17,7 @@ func TestAddStringFuncs(t *testing.T) {
 		"lower", "upper", "contains", "replace", "trim",
 		"trimAll", "trimSuffix", "trimPrefix", "title",
 		"untitle", "repeat", "substr", "nospace", "trunc",
-		"initials", "hasPrefix", "hasSuffix",
+		"initials", "hasPrefix", "hasSuffix", "mustRegexReplaceAll",
 	}
 
 	for _, funcName := range expectedFuncs {
@@ -124,6 +124,27 @@ func TestExecuteTemplate(t *testing.T) {
 			data:         map[string]interface{}{"Name": "World"},
 			expected:     "",
 			expectError:  true,
+		},
+		{
+			name:         "Using mustRegexReplaceAll function",
+			templateText: `{{mustRegexReplaceAll "a(x*)b" "-ab-axxb-" "${1}W"}}`,
+			data:         nil,
+			expected:     "-W-xxW-",
+			expectError:  false,
+		},
+		{
+			name:         "Complex regex replacement",
+			templateText: `{{mustRegexReplaceAll "([a-z]+)([0-9]+)" .Input "$2-$1"}}`,
+			data:         map[string]interface{}{"Input": "test123word456"},
+			expected:     "123-test456-word",
+			expectError:  false,
+		},
+		{
+			name:         "Drive letter extraction with formatting",
+			templateText: `disk-{{ mustRegexReplaceAll "([A-Za-z]+):.*" .Input "$1" | lower }}`,
+			data:         map[string]interface{}{"Input": "C:\\"},
+			expected:     "disk-c",
+			expectError:  false,
 		},
 	}
 
