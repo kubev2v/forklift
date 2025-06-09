@@ -235,6 +235,7 @@ type PVCNameTemplateData struct {
 	DiskIndex     int    `json:"diskIndex"`
 	RootDiskIndex int    `json:"rootDiskIndex"`
 	Shared        bool   `json:"shared,omitempty"`
+	FileName      string `json:"fileName,omitempty"`
 }
 
 // VolumeNameTemplateData contains fields used in naming templates.

@@ -1374,6 +1374,7 @@ func (r *Reconciler) IsValidPVCNameTemplate(pvcNameTemplate string) error {
 		DiskIndex:     0,
 		RootDiskIndex: 0,
 		Shared:        false,
+		FileName:      "[test07_ds1] test_sp/test-000001.vmdk",
 	}
 
 	result, err := r.IsValidTemplate(pvcNameTemplate, testData)
