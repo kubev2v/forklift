@@ -15,17 +15,16 @@ include vmkfstools-wrapper/version.mk
 .PHONY: all
 all: build
 
-##@ Development
 .PHONY: fmt
-fmt: ## Run go fmt against code.
+fmt:
 	go fmt ./...
 
 .PHONY: vet
-vet: ## Run go vet against code.
+vet:
 	go vet ./...
 
 .PHONY: test
-test: fmt vet ## Run tests.
+test: fmt vet
 	go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
 
 .PHONY: generate 
@@ -36,10 +35,10 @@ generate:
 build: generate fmt vet
 	go build -ldflags="-X github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator.VibVersion=$(VIB_VERSION)" -o bin/vsphere-xcopy-volume-populator
 
-# prerequisits: ensure a PVC exists.
+# pre-requisits: ensure a PVC exists.
 test-copy-using-cli: build
 	bin/vsphere-xcopy-volume-populator \
-		--source-vmdk="[eco-iscsi-ds3] vm-6/vm-6.vmdk" \
+		--source-vmdk="[eco-iscsi-ds2] vm-2/vm-2.vmdk" \
 		--owner-name=test-cli \
 		--target-namespace=default \
 		--storage-vendor-product=ontap \
