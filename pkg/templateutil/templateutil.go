@@ -34,6 +34,7 @@ func AddStringFuncs(funcMap template.FuncMap) template.FuncMap {
 	funcMap["initials"] = sprigFuncs["initials"]
 	funcMap["hasPrefix"] = sprigFuncs["hasPrefix"]
 	funcMap["hasSuffix"] = sprigFuncs["hasSuffix"]
+	funcMap["mustRegexReplaceAll"] = sprigFuncs["mustRegexReplaceAll"]
 
 	return funcMap
 }
