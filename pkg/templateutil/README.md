@@ -51,6 +51,7 @@ The following string functions are available for use in your templates:
 | `initials` | Extracts first letter of each word | `{{ initials "John Doe" }}` → `JD` |
 | `hasPrefix` | Checks if string starts with prefix | `{{ hasPrefix "go" "golang" }}` → `true` |
 | `hasSuffix` | Checks if string ends with suffix | `{{ hasSuffix "ing" "coding" }}` → `true` |
+| `mustRegexReplaceAll` | Replaces matches using regex with submatch expansion | `{{ mustRegexReplaceAll "a(x*)b" "-ab-axxb-" "${1}W" }}` → `-W-xxW-` |
 
 ### Math Functions
 
