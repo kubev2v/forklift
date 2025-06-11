@@ -176,7 +176,7 @@ spec:
             - name: name
               value: git-clone-oci-ta
             - name: bundle
-              value: quay.io/konflux-ci/tekton-catalog/task-git-clone-oci-ta:0.1@sha256:8ecf57d5a6697ce709bee65b62781efe79a10b0c2b95e05576442b67fbd61744
+              value: quay.io/konflux-ci/tekton-catalog/task-git-clone-oci-ta:0.1@sha256:0fea1e4bd2fdde46c5b7786629f423a51e357f681c32ceddd744a6e3d48b8327
             - name: kind
               value: task
           resolver: bundles
@@ -599,7 +599,7 @@ spec:
             - name: name
               value: rpms-signature-scan
             - name: bundle
-              value: quay.io/konflux-ci/tekton-catalog/task-rpms-signature-scan:0.2@sha256:80a4562d5f86eb6812f00d4e30e94c1ad27ec937735dc29f5a63e9335676b3dc
+              value: quay.io/konflux-ci/tekton-catalog/task-rpms-signature-scan:0.2@sha256:ec7f6de651458e4a5842b145e761b0d86b03b52bec1515d6d8a1b8cf107af95c
             - name: kind
               value: task
           resolver: bundles
