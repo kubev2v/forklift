@@ -47,6 +47,7 @@ import (
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // BIOS types
@@ -1767,8 +1768,19 @@ func (r *Builder) ensurePopulatorServiceAccount(namespace string) error {
 		},
 	}
 
-	err = r.Destination.Client.Create(context.TODO(), &crBinding, &client.CreateOptions{})
-	if err != nil && !k8serr.IsAlreadyExists(err) {
+	deploy := &rbacv1.ClusterRoleBinding{ObjectMeta: metav1.ObjectMeta{Name: crBinding.Name}}
+	_, err = controllerutil.CreateOrPatch(
+		context.TODO(),
+		r.Destination.Client,
+		deploy, func() error {
+			if deploy.CreationTimestamp.IsZero() {
+				deploy = &crBinding
+			} else {
+				deploy.Subjects = append(deploy.Subjects, crBinding.Subjects...)
+			}
+			return nil
+		})
+	if err != nil {
 		return err
 	}
 

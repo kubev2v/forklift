@@ -3697,6 +3697,8 @@ rules:
   - clusterroles
   - clusterrolebindings
   verbs:
+  - get
+  - patch
   - create
 - apiGroups:
   - build.openshift.io
