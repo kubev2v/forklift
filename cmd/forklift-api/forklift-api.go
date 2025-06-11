@@ -21,9 +21,9 @@ import (
 
 	"github.com/go-logr/logr"
 	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
-	"github.com/konveyor/forklift-controller/pkg/apis"
-	forklift_api "github.com/konveyor/forklift-controller/pkg/forklift-api"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/apis"
+	forklift_api "github.com/kubev2v/forklift/pkg/forklift-api"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 

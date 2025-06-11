@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	forkliftv1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	forkliftv1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/onsi/ginkgo"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"

@@ -5,8 +5,8 @@ import (
 	"os"
 	"strconv"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 )
 
 // Global

@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strconv"
 
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/ovirt"
 )
 
 // System.

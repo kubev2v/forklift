@@ -7,8 +7,8 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/lib/inventory/container"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 )
 
 // Package logger.

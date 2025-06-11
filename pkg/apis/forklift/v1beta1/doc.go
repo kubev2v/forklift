@@ -17,12 +17,12 @@ limitations under the License.
 // Package v1alpha1 contains API Schema definitions for the migration v1alpha1 API group
 // +k8s:openapi-gen=true
 // +k8s:deepcopy-gen=package,register
-// +k8s:conversion-gen=github.com/konveyor/forklift-controller/pkg/apis
+// +k8s:conversion-gen=github.com/kubev2v/forklift/pkg/apis
 // +k8s:defaulter-gen=TypeMeta
 // +groupName=forklift.konveyor.io
 package v1beta1
 
-import libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
+import libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 
 // GlanceSource represents an image of which the source is Glance, to be used in storage mapping
 const GlanceSource = "glance"

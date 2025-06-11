@@ -31,7 +31,7 @@ import (
 	"syscall"
 	"time"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"

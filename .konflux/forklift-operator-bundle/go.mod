@@ -1,4 +1,4 @@
-module github.com/konveyor/forklift-controller
+module github.com/kubev2v/forklift
 
 go 1.23.6
 

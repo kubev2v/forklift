@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	plancnt "github.com/konveyor/forklift-controller/pkg/controller/plan"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
-	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	plancnt "github.com/kubev2v/forklift/pkg/controller/plan"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web"
+	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	libref "github.com/kubev2v/forklift/pkg/lib/ref"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )

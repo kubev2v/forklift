@@ -5,7 +5,7 @@ import (
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 )
 
 // AddStringFuncs adds safe string manipulation functions to the provided FuncMap

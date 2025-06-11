@@ -11,11 +11,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	"github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
-	"github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
-	"github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	"github.com/kubev2v/forklift/pkg/lib/inventory/container"
+	"github.com/kubev2v/forklift/pkg/lib/inventory/model"
+	"github.com/kubev2v/forklift/pkg/lib/inventory/web"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

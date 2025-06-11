@@ -1,7 +1,7 @@
 package vsphere
 
 import (
-	modelVsphere "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
+	modelVsphere "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

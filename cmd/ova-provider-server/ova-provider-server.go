@@ -17,7 +17,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/konveyor/forklift-controller/pkg/lib/gob"
+	"github.com/kubev2v/forklift/pkg/lib/gob"
 
 	"github.com/google/uuid"
 )

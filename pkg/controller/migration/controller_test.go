@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"testing"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/controller/base"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/controller/base"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 

@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/konveyor/forklift-controller/pkg/virt-v2v/config"
+	"github.com/kubev2v/forklift/pkg/virt-v2v/config"
 )
 
 var (

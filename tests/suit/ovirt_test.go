@@ -4,9 +4,9 @@ import (
 	"strconv"
 	"time"
 
-	forkliftv1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/tests/suit/framework"
-	"github.com/konveyor/forklift-controller/tests/suit/utils"
+	forkliftv1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/tests/suit/framework"
+	"github.com/kubev2v/forklift/tests/suit/utils"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/types"

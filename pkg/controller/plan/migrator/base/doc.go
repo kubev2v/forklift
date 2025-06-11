@@ -1,9 +1,9 @@
 package base
 
 import (
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
-	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
 )
 
 // Predicates.

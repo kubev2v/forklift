@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"k8s.io/apimachinery/pkg/fields"
 	cnv "kubevirt.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"

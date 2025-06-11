@@ -3,13 +3,13 @@ package base
 import (
 	"fmt"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
-	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter"
-	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	"github.com/kubev2v/forklift/pkg/controller/plan/adapter"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 )
 
 // Package logger.

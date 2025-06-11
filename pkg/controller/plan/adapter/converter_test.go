@@ -3,9 +3,9 @@ package adapter
 import (
 	"context"
 
-	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
-	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	batchv1 "k8s.io/api/batch/v1"
