@@ -26,12 +26,14 @@ func TestPopulator(t *testing.T) {
 	var tests = []struct {
 		name       string
 		setup      func()
+		sourceVmId string
 		sourceVMDK string
 		targetPVC  string
 		want       error
 	}{
 		{
 			name:       "non valid vmdkPath source",
+			sourceVmId: "nonvalid.vmdk",
 			sourceVMDK: "nonvalid.vmdk",
 			targetPVC:  "pvc-12345",
 			setup:      func() {},
@@ -39,6 +41,7 @@ func TestPopulator(t *testing.T) {
 		},
 		{
 			name:       "fail resolution of the volumeHandle targetPVC",
+			sourceVmId: "my-vm",
 			sourceVMDK: "[my-ds] my-vm/vmdisk.vmdk",
 			targetPVC:  "pvc-12345",
 			setup: func() {
@@ -52,6 +55,7 @@ func TestPopulator(t *testing.T) {
 		},
 		{
 			name:       "fail get current mapping of targetPVC",
+			sourceVmId: "my-vm",
 			sourceVMDK: "[my-ds] my-vm/vmdisk.vmdk",
 			targetPVC:  "pvc-12345",
 			setup: func() {
@@ -66,6 +70,7 @@ func TestPopulator(t *testing.T) {
 		},
 		{
 			name:       "fail get current mapping of targetPVC",
+			sourceVmId: "my-vm",
 			sourceVMDK: "[my-ds] my-vm/vmdisk.vmdk",
 			targetPVC:  "pvc-12345",
 			setup: func() {
@@ -81,6 +86,7 @@ func TestPopulator(t *testing.T) {
 
 		{
 			name:       "fail to locate an ESX",
+			sourceVmId: "my-vm",
 			sourceVMDK: "[my-ds] my-vm/vmdisk.vmdk",
 			targetPVC:  "pvc-12345",
 			setup: func() {
@@ -107,6 +113,7 @@ func TestPopulator(t *testing.T) {
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(),
 					[]string{"vmkfstools", "clone", "-s", "/vmfs/volumes/my-ds/my-vm/vmdisk.vmdk", "-t", "/vmfs/devices/disks/naa.616263"})
 			},
+			sourceVmId: "my-vm",
 			sourceVMDK: "[my-ds] my-vm/vmdisk.vmdk",
 			targetPVC:  "pvc-12345",
 			want:       nil,
@@ -118,7 +125,7 @@ func TestPopulator(t *testing.T) {
 			progressCh := make(chan uint)
 			quitCh := make(chan error)
 			tcase.setup()
-			result := underTest.Populate(tcase.sourceVMDK, tcase.targetPVC, progressCh, quitCh)
+			result := underTest.Populate(tcase.sourceVmId, tcase.sourceVMDK, tcase.targetPVC, progressCh, quitCh)
 			assert.Equal(t, result, tcase.want)
 		})
 	}
