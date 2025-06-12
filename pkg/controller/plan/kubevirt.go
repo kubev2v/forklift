@@ -71,8 +71,8 @@ const (
 	AnnKubevirtValidations = "vm.kubevirt.io/validations"
 	// PVC annotation containing the name of the importer pod.
 	AnnImporterPodName = "cdi.kubevirt.io/storage.import.importPodName"
-	//  Original VM name on source (value=vmOriginalName)
-	AnnOriginalName = "original-name"
+	// Openshift display name annotation (value=vmName)
+	AnnDisplayName = "openshift.io/display-name"
 	//  Original VM name on source (value=vmOriginalID)
 	AnnOriginalID = "original-ID"
 	// DV deletion on completion
@@ -1411,24 +1411,25 @@ func (r *KubeVirt) getGeneratedName(vm *plan.VMStatus) string {
 		"-") + "-"
 }
 
+// Return the generated name for a specific VM and plan.
+// If the VM name is incompatible with DNS1123 RFC, use the new name,
+// otherwise use the original name.
+func (r *KubeVirt) getNewVMName(vm *plan.VMStatus) string {
+	if vm.NewName != "" {
+		r.Log.Info("VM name is incompatible with DNS1123 RFC, renaming",
+			"originalName", vm.Name, "newName", vm.NewName)
+		return vm.NewName
+	}
+
+	return vm.Name
+}
+
 // Build the Kubevirt VM CR.
 func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) (object *cnv.VirtualMachine, err error) {
 	pvcs, err := r.getPVCs(vm.Ref)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
-	}
-
-	//If the VM name is not valid according to DNS1123 labeling
-	//convention it will be automatically changed.
-	var originalName string
-
-	if vm.NewName != "" {
-		originalName = vm.Name
-		vm.Name = vm.NewName
-
-		r.Log.Info("VM name is incompatible with DNS1123 RFC, renaming",
-			"originalName", originalName, "newName", vm.Name)
 	}
 
 	var ok bool
@@ -1457,7 +1458,7 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) 
 		object.Spec.Template.ObjectMeta.Labels = map[string]string{}
 	}
 	// Set the 'app' label for identification of the virtual machine instance(s)
-	object.Spec.Template.ObjectMeta.Labels["app"] = vm.Name
+	object.Spec.Template.ObjectMeta.Labels["app"] = r.getNewVMName(vm)
 
 	err = r.setVmLabels(object)
 	if err != nil {
@@ -1465,9 +1466,9 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) 
 	}
 
 	//Add the original name and ID info to the VM annotations
-	if len(originalName) > 0 {
+	if len(vm.NewName) > 0 {
 		annotations := make(map[string]string)
-		annotations[AnnOriginalName] = originalName
+		annotations[AnnDisplayName] = vm.Name
 		annotations[AnnOriginalID] = vm.ID
 		object.ObjectMeta.Annotations = annotations
 	}
@@ -1711,7 +1712,7 @@ func (r *KubeVirt) vmTemplate(vm *plan.VMStatus) (virtualMachine *cnv.VirtualMac
 		virtualMachine.Spec.Template = &cnv.VirtualMachineInstanceTemplateSpec{}
 	}
 
-	virtualMachine.Name = vm.Name
+	virtualMachine.Name = r.getNewVMName(vm)
 	virtualMachine.Namespace = r.Plan.Spec.TargetNamespace
 	virtualMachine.Spec.Template.Spec.Volumes = []cnv.Volume{}
 	virtualMachine.Spec.Template.Spec.Networks = []cnv.Network{}
@@ -1732,7 +1733,7 @@ func (r *KubeVirt) emptyVm(vm *plan.VMStatus) (virtualMachine *cnv.VirtualMachin
 		ObjectMeta: meta.ObjectMeta{
 			Namespace: r.Plan.Spec.TargetNamespace,
 			Labels:    r.vmLabels(vm.Ref),
-			Name:      vm.Name,
+			Name:      r.getNewVMName(vm),
 		},
 		Spec: cnv.VirtualMachineSpec{
 			Template: &cnv.VirtualMachineInstanceTemplateSpec{},
