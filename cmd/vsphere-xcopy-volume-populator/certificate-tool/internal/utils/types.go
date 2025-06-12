@@ -2,10 +2,8 @@ package utils
 
 // VM represents a VM configuration to be provisioned.
 type VM struct {
-	NamePrefix    string `yaml:"namePrefix"`
-	Size          string `yaml:"size"`
-	VmdkPath      string `yaml:"vmdkPath"`
-	LocalVmdkPath string `yaml:"localVmdkPath"`
+	NamePrefix string `yaml:"namePrefix"`
+	Size       string `yaml:"size"`
 }
 
 // SuccessCriteria indicates the max allowed run time for a test case.

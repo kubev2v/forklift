@@ -30,6 +30,7 @@ type Config struct {
 	Name            string      `yaml:"name"`
 
 	IsoPath                    string `yaml:"iso-path"`
+	CloudInitYamlPath          string `yaml:"cloud-init-yaml-path"`
 	DataStore                  string `yaml:"vsphere-datastore"`
 	DataCenter                 string `yaml:"data-center"`
 	WaitTimeout                string `yaml:"wait-timeout"` // Will be parsed to time.Duration

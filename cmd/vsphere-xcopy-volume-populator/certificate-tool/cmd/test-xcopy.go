@@ -42,17 +42,18 @@ var createTestCmd = &cobra.Command{
 			os.Exit(1)
 		}
 		tp.ClientSet = clientset
-		tp.StorageClass = appConfig.StorageClassName   // Use StorageClassName from appConfig
-		tp.Namespace = appConfig.TestNamespace         // Use TestNamespace from appConfig
-		tp.VSphereURL = appConfig.VsphereURL           // Use VsphereURL from appConfig
-		tp.VSphereUser = appConfig.VsphereUser         // Use VsphereUser from appConfig
-		tp.VSpherePassword = appConfig.VspherePassword // Use VspherePassword from appConfig
-		tp.Datacenter = appConfig.DataCenter           // Use DataCenter from appConfig
-		tp.Datastore = appConfig.DataStore             // Use DataStore from appConfig
-		tp.ResourcePool = appConfig.Pool               // Use Pool from appConfig
-		tp.VmdkDownloadURL = appConfig.DownloadVmdkURL // Use DownloadVmdkURL from appConfig
-		tp.LocalVmdkPath = appConfig.LocalVmdkPath     // Use LocalVmdkPath from appConfig
-		tp.IsoPath = appConfig.IsoPath                 // Use IsoPath from appConfig
+		tp.StorageClass = appConfig.StorageClassName       // Use StorageClassName from appConfig
+		tp.Namespace = appConfig.TestNamespace             // Use TestNamespace from appConfig
+		tp.VSphereURL = appConfig.VsphereURL               // Use VsphereURL from appConfig
+		tp.VSphereUser = appConfig.VsphereUser             // Use VsphereUser from appConfig
+		tp.VSpherePassword = appConfig.VspherePassword     // Use VspherePassword from appConfig
+		tp.Datacenter = appConfig.DataCenter               // Use DataCenter from appConfig
+		tp.Datastore = appConfig.DataStore                 // Use DataStore from appConfig
+		tp.ResourcePool = appConfig.Pool                   // Use Pool from appConfig
+		tp.VmdkDownloadURL = appConfig.DownloadVmdkURL     // Use DownloadVmdkURL from appConfig
+		tp.LocalVmdkPath = appConfig.LocalVmdkPath         // Use LocalVmdkPath from appConfig
+		tp.CloudInitYamlPath = appConfig.CloudInitYamlPath // Use CloudInitYamlPath from appConfig
+		tp.IsoPath = appConfig.IsoPath                     // Use IsoPath from appConfig
 		tp.AppConfig = appConfig
 		ctx := context.Background()
 		if err := tp.Start(ctx, appConfig.TestPopulatorImage, appConfig.PvcYamlPath); err != nil {
