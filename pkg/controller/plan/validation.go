@@ -198,6 +198,8 @@ func (r *Reconciler) validatePVCNameTemplate(plan *api.Plan) error {
 		}
 
 		plan.Status.SetCondition(invalidPVCNameTemplate)
+
+		r.Log.Info("PVC name template is invalid", "error", err.Error(), "plan", plan.Name, "namespace", plan.Namespace)
 	}
 
 	return nil
@@ -214,6 +216,8 @@ func (r *Reconciler) validateVolumeNameTemplate(plan *api.Plan) error {
 		}
 
 		plan.Status.SetCondition(invalidPVCNameTemplate)
+
+		r.Log.Info("Volume name template is invalid", "error", err.Error(), "plan", plan.Name, "namespace", plan.Namespace)
 	}
 
 	return nil
@@ -230,6 +234,8 @@ func (r *Reconciler) validateNetworkNameTemplate(plan *api.Plan) error {
 		}
 
 		plan.Status.SetCondition(invalidPVCNameTemplate)
+
+		r.Log.Info("Network name template is invalid", "error", err.Error(), "plan", plan.Name, "namespace", plan.Namespace)
 	}
 
 	return nil
@@ -1385,7 +1391,8 @@ func (r *Reconciler) IsValidPVCNameTemplate(pvcNameTemplate string) error {
 	// Validate that template output is a valid k8s label
 	errs := k8svalidation.IsDNS1123Label(result)
 	if len(errs) > 0 {
-		return liberr.New("Template output is not a valid k8s label", "errors", errs)
+		errMsg := fmt.Sprintf("Template output is not a valid k8s label [%s]", result)
+		return liberr.New(errMsg, errs)
 	}
 
 	return nil
@@ -1409,7 +1416,8 @@ func (r *Reconciler) IsValidVolumeNameTemplate(volumeNameTemplate string) error 
 	// Validate that template output is a valid k8s label
 	errs := k8svalidation.IsDNS1123Label(result)
 	if len(errs) > 0 {
-		return liberr.New("Template output is not a valid k8s label", "errors", errs)
+		errMsg := fmt.Sprintf("Template output is not a valid k8s label [%s]", result)
+		return liberr.New(errMsg, errs)
 	}
 
 	return nil
@@ -1435,7 +1443,8 @@ func (r *Reconciler) IsValidNetworkNameTemplate(networkNameTemplate string) erro
 	// Validate that template output is a valid k8s label
 	errs := k8svalidation.IsDNS1123Label(result)
 	if len(errs) > 0 {
-		return liberr.New("Template output is not a valid k8s label", "errors", errs)
+		errMsg := fmt.Sprintf("Template output is not a valid k8s label [%s]", result)
+		return liberr.New(errMsg, errs)
 	}
 
 	return nil

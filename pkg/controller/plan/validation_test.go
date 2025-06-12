@@ -114,7 +114,11 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 		var reconciler *Reconciler
 
 		ginkgo.BeforeEach(func() {
-			reconciler = &Reconciler{}
+			reconciler = &Reconciler{
+				Reconciler: base.Reconciler{
+					Log: planValidationLog,
+				},
+			}
 		})
 
 		source := createProvider(sourceName, sourceNamespace, "", v1beta1.OpenShift, &core.ObjectReference{Name: sourceSecretName, Namespace: sourceNamespace})
@@ -141,7 +145,6 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 				if shouldBeValid {
 					gomega.Expect(hasInvalidCondition).To(gomega.BeFalse())
 				} else {
-
 					gomega.Expect(hasInvalidCondition).To(gomega.BeTrue())
 				}
 			},
@@ -164,7 +167,11 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 		var reconciler *Reconciler
 
 		ginkgo.BeforeEach(func() {
-			reconciler = &Reconciler{}
+			reconciler = &Reconciler{
+				Reconciler: base.Reconciler{
+					Log: planValidationLog,
+				},
+			}
 		})
 
 		ginkgo.DescribeTable("should validate PVC name template correctly",
