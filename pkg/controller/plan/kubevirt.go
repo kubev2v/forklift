@@ -1482,6 +1482,7 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) 
 
 	// Assign the determined run strategy to the object
 	object.Spec.RunStrategy = &runStrategy
+	object.Spec.Running = nil // Ensure running is not set
 
 	err = r.Builder.VirtualMachine(vm.Ref, &object.Spec, pvcs, vm.InstanceType != "", sortVolumesByLibvirt)
 	if err != nil {
