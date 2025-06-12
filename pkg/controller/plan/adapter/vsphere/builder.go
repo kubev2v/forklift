@@ -1414,6 +1414,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 						Labels:    labels,
 					},
 					Spec: api.VSphereXcopyVolumePopulatorSpec{
+						VmId:                 vmRef.ID,
 						VmdkPath:             disk.File,
 						SecretName:           secretName,
 						StorageVendorProduct: string(storageVendorProduct),

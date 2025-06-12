@@ -111,7 +111,7 @@ func (tc *TestCase) Run(ctx context.Context, podImage, pvcYamlPath, storageVendo
 func (tc *TestCase) ensureVMs(testName string, vms []*utils.VM, downloadVmdkURL, tcLocalVmdkPath, isoPath string) error {
 	klog.Infof("Ensuring VMs for test %s", testName)
 	for _, vm := range vms {
-		fullVMName := fmt.Sprintf("%s-%s", testName, vm.NamePrefix)
+		vm.Name = fmt.Sprintf("%s-%s", testName, vm.NamePrefix)
 		localVmdkPath := tcLocalVmdkPath
 		if vm.LocalVmdkPath != "" {
 			localVmdkPath = vm.LocalVmdkPath
@@ -119,7 +119,7 @@ func (tc *TestCase) ensureVMs(testName string, vms []*utils.VM, downloadVmdkURL,
 
 		klog.Infof("Creating VM %s with image %s, VMDK URL: %s, Local VMDK Path: %s, ISO Path: %s", fullVMName, downloadVmdkURL, localVmdkPath, isoPath)
 		remoteVmdkPath, err := vmware.CreateVM(
-			fullVMName,
+			vm.Name,
 			tc.VSphereURL,
 			tc.VSphereUser,
 			tc.VSpherePassword,
@@ -133,10 +133,10 @@ func (tc *TestCase) ensureVMs(testName string, vms []*utils.VM, downloadVmdkURL,
 			10*time.Minute,
 		)
 		if err != nil {
-			return fmt.Errorf("failed to create VM %s: %w", fullVMName, err)
+			return fmt.Errorf("failed to create VM %s: %w", vm.Name, err)
 		}
 		vm.VmdkPath = remoteVmdkPath
-		klog.Infof("VM %s created with VMDK path: %s", fullVMName, vm.VmdkPath)
+		klog.Infof("VM %s created with VMDK path: %s", vm.Name, vm.VmdkPath)
 	}
 	return nil
 }

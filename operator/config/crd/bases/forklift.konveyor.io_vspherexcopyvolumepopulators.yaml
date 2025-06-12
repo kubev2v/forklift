@@ -48,14 +48,18 @@ spec:
                   StorageVendorProduct is the storage vendor the target disk and PVC are connected to
                   Supported values [vantara, ontap, primera3par]
                 type: string
+              vmId:
+                description: VmId is the VM object id in vSphere
+                type: string
               vmdkPath:
                 description: |-
                   VmdkPath is the full path the vmdk disk. A valid path format is
-                  '[$DATASTORE_NAME] $VM_NAME/$DISK_NAME.vmdk'
+                  '[$DATASTORE_NAME] $VM_HOME/$DISK_NAME.vmdk'
                 type: string
             required:
             - secretName
             - storageVendorProduct
+            - vmId
             - vmdkPath
             type: object
           status:
