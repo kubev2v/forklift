@@ -37,7 +37,7 @@ generate:
 build: fmt vet
 	PATH=$(PATH) \
 	go build \
-	-ldflags="w -s -X github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator.VibVersion=$(VIB_VERSION)" \
+	-ldflags="-w -s -X github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator.VibVersion=$(VIB_VERSION)" \
 	-o bin/vsphere-xcopy-volume-populator
 
 MOCKGEN := $(shell which mockgen 2>/dev/null)
@@ -47,7 +47,8 @@ install-mockgen:
 # pre-requisits: ensure a PVC exists.
 test-copy-using-cli: build
 	bin/vsphere-xcopy-volume-populator \
-		--source-vmdk="[eco-iscsi-ds2] vm-2/vm-2.vmdk" \
+		--source-vm-id=vm-100838 \
+		--source-vmdk="[eco-iscsi-ds3] vm-1-1-test-rename/vm-1-1-test-rename_2.vmdk" \
 		--owner-name=test-cli \
 		--target-namespace=default \
 		--storage-vendor-product=ontap \

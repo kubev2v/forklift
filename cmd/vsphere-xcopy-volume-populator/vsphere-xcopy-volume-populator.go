@@ -37,6 +37,7 @@ var (
 	ownerUID                   string
 	ownerName                  string
 	secretName                 string
+	sourceVmId                 string
 	sourceVMDKFile             string
 	targetNamespace            string
 	storageVendor              string
@@ -111,7 +112,7 @@ func main() {
 	progressCh := make(chan uint)
 	quitCh := make(chan error)
 
-	go p.Populate(sourceVMDKFile, volumeHandle, progressCh, quitCh)
+	go p.Populate(sourceVmId, sourceVMDKFile, volumeHandle, progressCh, quitCh)
 
 	for {
 		select {
@@ -199,6 +200,7 @@ func handleArgs() {
 	flag.StringVar(&ownerUID, "owner-uid", "", "Owner UID, passed by the populator - the PVC ID")
 	flag.StringVar(&ownerName, "owner-name", "", "Owner Name, passed by the populator - the PVC Name")
 	flag.StringVar(&secretName, "secret-name", "", "Secret name the populator controller uses it to mount env vars from it. Not for use internally")
+	flag.StringVar(&sourceVmId, "source-vm-id", "", "VM object id in vsphere")
 	flag.StringVar(&sourceVMDKFile, "source-vmdk", "", "File name to populate")
 	flag.StringVar(&storageVendor, "storage-vendor-product", os.Getenv("STORAGE_VENDOR"), "The storage vendor to work with. Current values: [vantara, ontap, primera3par]")
 	flag.StringVar(&targetNamespace, "target-namespace", "", "Contents to populate file with")
@@ -220,6 +222,7 @@ func handleArgs() {
 
 	if showVersion {
 		fmt.Println(os.Args[0], version)
+		fmt.Printf("VIB version: %s\n", populator.VibVersion)
 		os.Exit(0)
 	}
 
@@ -232,7 +235,7 @@ func handleArgs() {
 	missingFlags := false
 	flag.VisitAll(func(f *flag.Flag) {
 		switch f.Name {
-		case "source-vmdk", "target-pvc", "storage-vendor":
+		case "source-vm-id", "source-vmdk", "target-pvc", "storage-vendor":
 			if f.Value.String() == "" {
 				missingFlags = true
 				klog.Errorf("missing value for mandatory flag --%s", f.Name)
