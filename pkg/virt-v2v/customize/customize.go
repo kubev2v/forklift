@@ -165,6 +165,7 @@ func (c *Customize) addWinFirstbootScripts(cmdBuilder utils.CommandBuilder) {
 
 	// Upload scripts to the windows
 	uploadPreserveIpPath := ""
+	uploadRemoveDuplicatesPath := ""
 	if c.appConfig.VirtIoWinLegacyDrivers != "" {
 		restoreScriptPath = filepath.Join(windowsScriptsPath, "9999-restore_config-legacy.ps1")
 
@@ -180,10 +181,15 @@ func (c *Customize) addWinFirstbootScripts(cmdBuilder utils.CommandBuilder) {
 		}
 	}
 
+	if c.appConfig.StaticIPs != "" {
+		removeDuplicatesPersistentRoutesPath := filepath.Join(windowsScriptsPath, "9999-remove_duplicate_persistent_routes.ps1")
+		uploadRemoveDuplicatesPath = c.formatUpload(removeDuplicatesPersistentRoutesPath, WinFirstbootScriptsPath)
+
+	}
 	uploadScriptPath := c.formatUpload(restoreScriptPath, WinFirstbootScriptsPath)
 	uploadInitPath := c.formatUpload(initPath, WinFirstbootScriptsPath)
 	uploadFirstbootPath := c.formatUpload(firstbootPath, WinFirstbootPath)
-	cmdBuilder.AddArgs("--upload", uploadScriptPath, uploadPreserveIpPath, uploadInitPath, uploadFirstbootPath)
+	cmdBuilder.AddArgs("--upload", uploadScriptPath, uploadPreserveIpPath, uploadInitPath, uploadRemoveDuplicatesPath, uploadFirstbootPath)
 }
 
 func (c *Customize) addWinDynamicScripts(cmdBuilder utils.CommandBuilder, dir string) error {
