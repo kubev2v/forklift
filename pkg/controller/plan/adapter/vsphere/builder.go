@@ -274,6 +274,25 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 			Name:  "VIRTIO_WIN",
 			Value: "/usr/local/virtio-win.iso",
 		})
+	} else if isWindows(vm) { // We check for multiple IPs per NIC only on Windows VMs
+		macIPCount := make(map[string]int)
+
+		for _, gn := range vm.GuestNetworks {
+			//IS ipv4
+			if net.IP.To4(net.ParseIP(gn.IP)) != nil {
+				macIPCount[gn.MAC]++
+			}
+		}
+
+		for _, count := range macIPCount {
+			if count > 1 {
+				env = append(env, core.EnvVar{
+					Name:  "V2V_multipleIPsPerNic",
+					Value: "true",
+				})
+				break // stop after the first match
+			}
+		}
 	}
 
 	if vm.HostName != "" {
