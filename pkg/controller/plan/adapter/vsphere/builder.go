@@ -8,6 +8,7 @@ import (
 	liburl "net/url"
 	"path"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -1793,9 +1794,12 @@ func (r *Builder) ensurePopulatorServiceAccount(namespace string) error {
 		r.Destination.Client,
 		deploy, func() error {
 			if deploy.CreationTimestamp.IsZero() {
-				deploy = &crBinding
+				deploy.Subjects = crBinding.Subjects
+				deploy.RoleRef = crBinding.RoleRef
 			} else {
-				deploy.Subjects = append(deploy.Subjects, crBinding.Subjects...)
+				if !slices.Contains(deploy.Subjects, crBinding.Subjects[0]) {
+					deploy.Subjects = append(deploy.Subjects, crBinding.Subjects[0])
+				}
 			}
 			return nil
 		})
