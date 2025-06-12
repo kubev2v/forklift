@@ -2,6 +2,9 @@ package utils
 
 // VM represents a VM configuration to be provisioned.
 type VM struct {
+	// this name is known during the test case execution and is not serializable
+	// perhaps we set that in the test case yaml to specify existing VMs?
+	Name          string
 	NamePrefix    string `yaml:"namePrefix"`
 	Size          string `yaml:"size"`
 	VmdkPath      string `yaml:"vmdkPath"`
