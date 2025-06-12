@@ -140,6 +140,7 @@ func getVXPopulatorPodArgs(_ bool, u *unstructured.Unstructured, pvc corev1.Pers
 		return nil, err
 	}
 	args := []string{
+		"--source-vm-id=" + xcopy.Spec.VmId,
 		"--source-vmdk=" + xcopy.Spec.VmdkPath,
 		"--target-namespace=" + xcopy.GetNamespace(),
 		"--cr-name=" + xcopy.Name,

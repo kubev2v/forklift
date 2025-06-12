@@ -181,6 +181,8 @@ func EnsurePopulatorPod(ctx context.Context, clientset *kubernetes.Clientset, na
 					Ports:           []corev1.ContainerPort{{Name: "metrics", ContainerPort: 8443, Protocol: corev1.ProtocolTCP}},
 					EnvFrom:         []corev1.EnvFromSource{{SecretRef: &corev1.SecretEnvSource{corev1.LocalObjectReference{Name: "populator-secret"}, &mustBeDefined}}},
 					Args: []string{
+						// name or id is fine, the govmomi code uses a finder
+						fmt.Sprintf("--source-vm-id=%s", vm.Name),
 						fmt.Sprintf("--source-vmdk=%s", vm.VmdkPath),
 						fmt.Sprintf("--target-namespace=%s", namespace),
 						fmt.Sprintf("--cr-name=%s", "notrequired"),
