@@ -4,10 +4,10 @@ import (
 	"context"
 	"sync"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
-	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 )
 
 // Package level mutex to ensure that

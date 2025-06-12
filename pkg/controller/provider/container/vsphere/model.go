@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
-	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	libref "github.com/kubev2v/forklift/pkg/lib/ref"
 	"github.com/vmware/govmomi/vim25/types"
 )
 

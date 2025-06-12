@@ -3,7 +3,7 @@ package vsphere
 import (
 	"testing"
 
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	. "github.com/onsi/gomega"
 )
 

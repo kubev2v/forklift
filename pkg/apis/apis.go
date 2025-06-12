@@ -21,7 +21,7 @@ limitations under the License.
 package apis
 
 import (
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 

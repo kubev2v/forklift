@@ -3,8 +3,8 @@ package webhooks
 import (
 	"net/http"
 
-	validating_webhooks "github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/validating-webhook"
-	"github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/validating-webhook/admitters"
+	validating_webhooks "github.com/kubev2v/forklift/pkg/forklift-api/webhooks/validating-webhook"
+	"github.com/kubev2v/forklift/pkg/forklift-api/webhooks/validating-webhook/admitters"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 

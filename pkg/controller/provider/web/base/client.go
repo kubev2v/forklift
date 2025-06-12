@@ -11,11 +11,11 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
-	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
-	"github.com/konveyor/forklift-controller/pkg/settings"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
+	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
+	"github.com/kubev2v/forklift/pkg/settings"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 

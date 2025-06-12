@@ -1,7 +1,7 @@
 package ocp
 
 import (
-	"github.com/konveyor/forklift-controller/pkg/controller/watch/handler"
+	"github.com/kubev2v/forklift/pkg/controller/watch/handler"
 )
 
 // Provider watch event handler.

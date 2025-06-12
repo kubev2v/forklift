@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 )
 
 func TestHttpsCA(url string, caCert string, isInsecure bool) (err error) {

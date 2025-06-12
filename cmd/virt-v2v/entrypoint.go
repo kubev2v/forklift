@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/konveyor/forklift-controller/pkg/virt-v2v/config"
-	"github.com/konveyor/forklift-controller/pkg/virt-v2v/conversion"
-	"github.com/konveyor/forklift-controller/pkg/virt-v2v/server"
-	utils "github.com/konveyor/forklift-controller/pkg/virt-v2v/utils"
+	"github.com/kubev2v/forklift/pkg/virt-v2v/config"
+	"github.com/kubev2v/forklift/pkg/virt-v2v/conversion"
+	"github.com/kubev2v/forklift/pkg/virt-v2v/server"
+	utils "github.com/kubev2v/forklift/pkg/virt-v2v/utils"
 )
 
 func main() {

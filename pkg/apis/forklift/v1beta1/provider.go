@@ -20,7 +20,7 @@ import (
 	"os"
 	"strconv"
 
-	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
+	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

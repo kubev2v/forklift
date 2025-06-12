@@ -2,8 +2,8 @@ package ocp
 
 import (
 	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
-	libocp "github.com/konveyor/forklift-controller/pkg/lib/inventory/container/ocp"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	libocp "github.com/kubev2v/forklift/pkg/lib/inventory/container/ocp"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	cnv "kubevirt.io/api/core/v1"

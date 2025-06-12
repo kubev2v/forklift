@@ -1,7 +1,7 @@
 package openstack
 
 import (
-	libclient "github.com/konveyor/forklift-controller/pkg/lib/client/openstack"
+	libclient "github.com/kubev2v/forklift/pkg/lib/client/openstack"
 )
 
 // Client struct

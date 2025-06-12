@@ -19,10 +19,10 @@ export GOPATH="$HOME/go"
 
 # Running 'go get -d' will clone the forklift-controller repo into the proper
 # location on your $GOPATH
-go get -d github.com/konveyor/forklift-controller
+go get -d github.com/kubev2v/forklift
 
 # Take a peek at the newly cloned files
-ls -Fal $GOPATH/src/github.com/konveyor/forklift-controller
+ls -Fal $GOPATH/src/github.com/kubev2v/forklift
 ```
 
 __5. Login __

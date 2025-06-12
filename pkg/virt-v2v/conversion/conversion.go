@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/konveyor/forklift-controller/pkg/virt-v2v/config"
-	"github.com/konveyor/forklift-controller/pkg/virt-v2v/customize"
-	"github.com/konveyor/forklift-controller/pkg/virt-v2v/utils"
+	"github.com/kubev2v/forklift/pkg/virt-v2v/config"
+	"github.com/kubev2v/forklift/pkg/virt-v2v/customize"
+	"github.com/kubev2v/forklift/pkg/virt-v2v/utils"
 )
 
 type Conversion struct {

@@ -19,9 +19,9 @@ package v1beta1
 import (
 	"fmt"
 
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/provider"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
-	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/provider"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

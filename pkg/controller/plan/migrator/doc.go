@@ -3,9 +3,9 @@ package migrator
 import (
 	"path"
 
-	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	"github.com/konveyor/forklift-controller/pkg/controller/plan/migrator/base"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/controller/plan/migrator/base"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 )
 
 type Migrator = base.Migrator

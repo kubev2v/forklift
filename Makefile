@@ -124,7 +124,7 @@ e2e-sanity-ova:
 
 # Build forklift-controller binary
 forklift-controller: generate fmt vet
-	go build -o bin/forklift-controller github.com/konveyor/forklift-controller/cmd/forklift-controller
+	go build -o bin/forklift-controller github.com/kubev2v/forklift/cmd/forklift-controller
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 .PHONY: run
