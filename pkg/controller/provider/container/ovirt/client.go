@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/konveyor/forklift-controller/pkg/controller/base"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/controller/base"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
 )
 

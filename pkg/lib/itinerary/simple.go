@@ -3,7 +3,7 @@ package itinerary
 import (
 	"errors"
 
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 )
 
 // List of steps.

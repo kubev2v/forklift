@@ -2,13 +2,13 @@
 package vsphere
 
 import (
-	v1beta1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
+	v1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -1,7 +1,7 @@
 package openstack
 
 import (
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/openstack"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/openstack"
 )
 
 // REST Resource.

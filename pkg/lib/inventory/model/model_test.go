@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	"github.com/konveyor/forklift-controller/pkg/lib/ref"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	"github.com/kubev2v/forklift/pkg/lib/ref"
 	"github.com/onsi/gomega"
 )
 

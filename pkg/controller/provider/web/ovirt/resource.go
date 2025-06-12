@@ -1,7 +1,7 @@
 package ovirt
 
 import (
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/ovirt"
 )
 
 // REST Resource.

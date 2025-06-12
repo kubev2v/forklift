@@ -31,8 +31,8 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	"github.com/gophercloud/gophercloud/pagination"
 	"github.com/gophercloud/utils/openstack/clientconfig"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
 )
 

@@ -1,14 +1,14 @@
 package handler
 
 import (
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/controller/plan/handler/ocp"
-	"github.com/konveyor/forklift-controller/pkg/controller/plan/handler/openstack"
-	"github.com/konveyor/forklift-controller/pkg/controller/plan/handler/ova"
-	"github.com/konveyor/forklift-controller/pkg/controller/plan/handler/ovirt"
-	"github.com/konveyor/forklift-controller/pkg/controller/plan/handler/vsphere"
-	"github.com/konveyor/forklift-controller/pkg/controller/watch/handler"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/controller/plan/handler/ocp"
+	"github.com/kubev2v/forklift/pkg/controller/plan/handler/openstack"
+	"github.com/kubev2v/forklift/pkg/controller/plan/handler/ova"
+	"github.com/kubev2v/forklift/pkg/controller/plan/handler/ovirt"
+	"github.com/kubev2v/forklift/pkg/controller/plan/handler/vsphere"
+	"github.com/kubev2v/forklift/pkg/controller/watch/handler"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )

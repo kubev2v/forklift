@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	auth "k8s.io/api/authentication/v1"
 	auth2 "k8s.io/api/authorization/v1"
 	"k8s.io/client-go/kubernetes/scheme"

@@ -9,7 +9,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/util"
+	"github.com/kubev2v/forklift/pkg/forklift-api/webhooks/util"
 )
 
 type Admitter interface {

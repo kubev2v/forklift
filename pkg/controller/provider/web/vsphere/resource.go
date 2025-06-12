@@ -1,7 +1,7 @@
 package vsphere
 
 import (
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 )
 
 // REST Resource.

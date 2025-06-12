@@ -6,8 +6,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	populator_machinery "github.com/konveyor/forklift-controller/pkg/lib-volume-populator/populator-machinery"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	populator_machinery "github.com/kubev2v/forklift/pkg/lib-volume-populator/populator-machinery"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"

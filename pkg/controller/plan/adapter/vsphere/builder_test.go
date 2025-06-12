@@ -1,12 +1,12 @@
 package vsphere
 
 import (
-	v1beta1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	container "github.com/konveyor/forklift-controller/pkg/controller/provider/container/vsphere"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	v1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	container "github.com/kubev2v/forklift/pkg/controller/provider/container/vsphere"
+	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/vmware/govmomi/vim25/types"

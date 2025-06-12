@@ -1,12 +1,12 @@
 package model
 
 import (
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/openstack"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/ova"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/controller/provider/model/ocp"
+	"github.com/kubev2v/forklift/pkg/controller/provider/model/openstack"
+	"github.com/kubev2v/forklift/pkg/controller/provider/model/ova"
+	"github.com/kubev2v/forklift/pkg/controller/provider/model/ovirt"
+	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 )
 
 // All models.

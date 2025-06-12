@@ -10,7 +10,7 @@ import (
 	"os/exec"
 	"strconv"
 
-	"github.com/konveyor/forklift-controller/pkg/metrics"
+	"github.com/kubev2v/forklift/pkg/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"k8s.io/klog/v2"

@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"strings"
 
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	fb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
-	libcnt "github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
-	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/ovirt"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	fb "github.com/kubev2v/forklift/pkg/lib/filebacked"
+	libcnt "github.com/kubev2v/forklift/pkg/lib/inventory/container"
+	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
+	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 )
 
 // Event codes.

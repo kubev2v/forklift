@@ -21,8 +21,8 @@ limitations under the License.
 package v1beta1
 
 import (
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )

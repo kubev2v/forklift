@@ -3,9 +3,9 @@ package suit_test
 import (
 	"time"
 
-	forkliftv1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/tests/suit/framework"
-	"github.com/konveyor/forklift-controller/tests/suit/utils"
+	forkliftv1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/tests/suit/framework"
+	"github.com/kubev2v/forklift/tests/suit/utils"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"

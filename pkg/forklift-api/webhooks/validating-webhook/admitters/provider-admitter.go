@@ -3,9 +3,9 @@ package admitters
 import (
 	"encoding/json"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/util"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/forklift-api/webhooks/util"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	admissionv1 "k8s.io/api/admission/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
