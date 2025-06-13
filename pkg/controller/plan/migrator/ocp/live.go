@@ -5,8 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
-	"strings"
-	"time"
+	"strconv"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
@@ -34,6 +33,7 @@ const (
 	AnnDiskSource            = "forklift.konveyor.io/disk-source"
 	AnnVolumeName            = "forklift.konveyor.io/volume"
 	AnnSource                = "forklift.konveyor.io/source"
+	AnnRunStrategy           = "forklift.konveyor.io/run-strategy"
 	AnnBindImmediate         = "cdi.kubevirt.io/storage.bind.immediate.requested"
 	AnnDeleteAfterCompletion = "cdi.kubevirt.io/storage.deleteAfterCompletion"
 )
@@ -51,6 +51,7 @@ const (
 	CreateTarget                           = "CreateTarget"
 	CreateVirtualMachineInstanceMigrations = "CreateVirtualMachineInstanceMigrations"
 	WaitForStateTransfer                   = "WaitForStateTransfer"
+	SyncRunStrategy                        = "SyncRunStrategy"
 	PostHook                               = "PostHook"
 	Completed                              = "Completed"
 )
@@ -153,17 +154,18 @@ func (r *LiveMigrator) Itinerary() (itinerary *libitr.Itinerary) {
 		Name: "ocp-live",
 		Pipeline: libitr.Pipeline{
 			{Name: Started},
-			{Name: PreHook},
+			{Name: PreHook, All: FlagPreHook},
 			{Name: SynchronizeCertificates},
 			{Name: CreateSecrets},
 			{Name: CreateConfigMaps},
 			{Name: EnsurePreference},
 			{Name: EnsureInstanceType},
 			{Name: CreateTarget},
-			{Name: CreateServiceExports},
+			{Name: CreateServiceExports, All: FlagSubmariner},
 			{Name: CreateVirtualMachineInstanceMigrations},
 			{Name: WaitForStateTransfer},
-			{Name: PostHook},
+			{Name: SyncRunStrategy},
+			{Name: PostHook, All: FlagPostHook},
 			{Name: Completed},
 		},
 	}
@@ -193,7 +195,7 @@ func (r *LiveMigrator) Step(status *planapi.VMStatus) (step string) {
 		step = status.Phase
 	case CreateSecrets, CreateConfigMaps, EnsurePreference, EnsureInstanceType, CreateTarget, SynchronizeCertificates, CreateServiceExports:
 		step = PrepareTarget
-	case CreateVirtualMachineInstanceMigrations, WaitForStateTransfer:
+	case CreateVirtualMachineInstanceMigrations, WaitForStateTransfer, SyncRunStrategy:
 		step = Synchronization
 	default:
 		step = base.Unknown
@@ -517,7 +519,6 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 		if !r.TargetVMIMReady(target) {
 			return
 		}
-		time.Sleep(2 * time.Second)
 		err = r.EnsureSourceMigration(vm, target)
 		if err != nil {
 			if !errors.As(err, &web.ProviderNotReadyError{}) {
@@ -545,6 +546,26 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 		if !done {
 			return
 		}
+		vm.Phase = r.Next(vm)
+	case SyncRunStrategy:
+		step, found := vm.FindStep(r.Step(vm))
+		if !found {
+			vm.AddError(fmt.Sprintf("Step '%s' not found", r.Step(vm)))
+			return
+		}
+		var target *cnv.VirtualMachine
+		target, err = r.GetTargetVM(vm)
+		if err != nil {
+			step.AddError(err.Error())
+			err = nil
+			break
+		}
+		err = r.SyncRunStrategy(target)
+		if err != nil {
+			step.AddError(err.Error())
+			err = nil
+			break
+		}
 		step.MarkCompleted()
 		step.Phase = Completed
 		vm.Phase = r.Next(vm)
@@ -556,6 +577,21 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 			vm,
 			"phase",
 			vm.Phase)
+	}
+	return
+}
+
+func (r *LiveMigrator) SyncRunStrategy(vm *cnv.VirtualMachine) (err error) {
+	runStrategy := cnv.RunStrategyAlways
+	storedStrategy, ok := vm.Annotations[AnnRunStrategy]
+	if ok && storedStrategy != "" {
+		runStrategy = cnv.VirtualMachineRunStrategy(storedStrategy)
+	}
+	vm.Spec.RunStrategy = &runStrategy
+	err = r.Client.Update(context.TODO(), vm)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
 	}
 	return
 }
@@ -795,7 +831,7 @@ func (r *LiveMigrator) EnsureServiceExports(vm *planapi.VMStatus, target *cnv.Vi
 }
 
 func (r *LiveMigrator) TargetVMIMReady(vmim *cnv.VirtualMachineInstanceMigration) (ready bool) {
-	ready = vmim.Status.SyncEndpoint != nil && *vmim.Status.SyncEndpoint != ""
+	ready = vmim.Status.SynchronizationAddress != nil && *vmim.Status.SynchronizationAddress != ""
 	return
 }
 
@@ -810,8 +846,9 @@ func (r *LiveMigrator) targetVMIM(vm *planapi.VMStatus) (vmim *cnv.VirtualMachin
 	vmim.GenerateName = fmt.Sprintf("forklift-")
 	vmim.Namespace = r.Context.Plan.Spec.TargetNamespace
 	vmim.Labels = r.Labeler.VMLabels(vm.Ref)
-	operation := cnv.MigrationTarget
-	vmim.Spec.Operation = &operation
+	//operation := cnv.MigrationTarget
+	//vmim.Spec.Operation = &operation
+	vmim.Spec.Receive.MigrationID = vm.ID
 	vmim.Spec.VMIName = target.Name
 	return
 }
@@ -829,12 +866,13 @@ func (r *LiveMigrator) sourceVMIM(vm *planapi.VMStatus, target *cnv.VirtualMachi
 	vmim.GenerateName = fmt.Sprintf("forklift-")
 	vmim.Namespace = inventoryVm.Namespace
 	vmim.Labels = r.Labeler.VMLabels(vm.Ref)
-	operation := cnv.MigrationSource
-	vmim.Spec.Operation = &operation
+	//operation := cnv.MigrationSource
+	//vmim.Spec.Operation = &operation
 	vmim.Spec.VMIName = inventoryVm.Name
-	if target.Status.SyncEndpoint != nil {
-		connectUrl := strings.ReplaceAll(*target.Status.SyncEndpoint, ".svc:", ".svc.clusterset.local:")
-		vmim.Spec.ConnectURL = &connectUrl
+	vmim.Spec.SendTo.MigrationID = vm.ID
+	if target.Status.SynchronizationAddress != nil {
+		//connectUrl := strings.ReplaceAll(*target.Status.SyncEndpoint, ".svc:", ".svc.clusterset.local:")
+		vmim.Spec.SendTo.ConnectURL = *target.Status.SynchronizationAddress
 	}
 	return
 }
@@ -1163,6 +1201,19 @@ func (r *Builder) VirtualMachine(vm *planapi.VMStatus, dvs []cdi.DataVolume) (ob
 			RunStrategy:  &halted,
 		},
 	}
+	key := types.NamespacedName{Namespace: vm.Namespace, Name: source.Name}
+	object.Name = source.Name
+	object.Namespace = r.Plan.Spec.TargetNamespace
+	r.Labeler.SetLabels(object, r.Labeler.VMLabels(vm.Ref))
+	r.Labeler.SetAnnotations(object, r.Labeler.VMLabels(vm.Ref))
+	r.Labeler.SetAnnotation(object, AnnSource, key.String())
+
+	// preserve the original runstrategy so that it can be applied
+	// once the migration is complete.
+	runStrategy, _ := source.Object.RunStrategy()
+	if source.Object.Spec.RunStrategy != nil {
+		r.Labeler.SetAnnotation(object, AnnRunStrategy, string(runStrategy))
+	}
 	r.mapNetworks(object)
 	return
 }
@@ -1336,7 +1387,7 @@ func (r *Builder) targetDataVolume(source *model.DataVolume, pvc *model.Persiste
 			Blank: &cdi.DataVolumeBlankImage{},
 		},
 		Storage: &cdi.StorageSpec{
-			Resources: core.ResourceRequirements{
+			Resources: core.VolumeResourceRequirements{
 				Requests: core.ResourceList{
 					core.ResourceStorage: size,
 				},
@@ -1516,5 +1567,41 @@ func (r *Builder) Secrets(vm *planapi.VMStatus) (list []core.Secret, err error) 
 		r.Labeler.SetAnnotation(&target, AnnSource, key.String())
 		list = append(list, target)
 	}
+	return
+}
+
+const (
+	FlagPreHook    libitr.Flag = 0x01
+	FlagPostHook   libitr.Flag = 0x02
+	FlagSubmariner libitr.Flag = 0x04
+)
+
+// Step predicate.
+type Predicate struct {
+	// VM listed on the plan.
+	vm *planapi.VM
+	// Plan context
+	context *plancontext.Context
+}
+
+// Evaluate predicate flags.
+func (r *Predicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
+	switch flag {
+	case FlagPreHook:
+		_, allowed = r.vm.FindHook(PreHook)
+	case FlagPostHook:
+		_, allowed = r.vm.FindHook(PostHook)
+	case FlagSubmariner:
+		allowed = Submariner(r.context)
+	}
+	return
+}
+
+func (r *Predicate) Count() int {
+	return 0x04
+}
+
+func Submariner(context *plancontext.Context) (submariner bool) {
+	submariner, _ = strconv.ParseBool(context.Source.Provider.Spec.Settings["submariner"])
 	return
 }
