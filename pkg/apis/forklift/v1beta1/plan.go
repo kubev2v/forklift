@@ -233,6 +233,7 @@ type PVCNameTemplateData struct {
 	VmName        string `json:"vmName"`
 	PlanName      string `json:"planName"`
 	DiskIndex     int    `json:"diskIndex"`
+	DiskPath      string `json:"diskPath,omitempty"`
 	RootDiskIndex int    `json:"rootDiskIndex"`
 	Shared        bool   `json:"shared,omitempty"`
 	FileName      string `json:"fileName,omitempty"`
