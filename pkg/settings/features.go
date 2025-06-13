@@ -5,6 +5,7 @@ const (
 	FeatureOvirtWarmMigration        = "FEATURE_OVIRT_WARM_MIGRATION"
 	FeatureRetainPrecopyImporterPods = "FEATURE_RETAIN_PRECOPY_IMPORTER_PODS"
 	FeatureVsphereIncrementalBackup  = "FEATURE_VSPHERE_INCREMENTAL_BACKUP"
+	FeatureOCPLiveMigration          = "FEATURE_OCP_LIVE_MIGRATION"
 )
 
 // Feature gates.
@@ -16,6 +17,8 @@ type Features struct {
 	RetainPrecopyImporterPods bool
 	// Whether to use changeID-based incremental backup workflow (with a version of CDI that supports it)
 	VsphereIncrementalBackup bool
+	// Whether to enable support for OCP cross-cluster live migration.
+	OCPLiveMigration bool
 }
 
 // Load settings.
@@ -23,5 +26,6 @@ func (r *Features) Load() (err error) {
 	r.OvirtWarmMigration = getEnvBool(FeatureOvirtWarmMigration, false)
 	r.RetainPrecopyImporterPods = getEnvBool(FeatureRetainPrecopyImporterPods, false)
 	r.VsphereIncrementalBackup = getEnvBool(FeatureVsphereIncrementalBackup, false)
+	r.OCPLiveMigration = getEnvBool(FeatureOCPLiveMigration, false)
 	return
 }

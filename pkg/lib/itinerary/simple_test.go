@@ -29,6 +29,10 @@ func (p *TestPredicate) Evaluate(f Flag) (bool, error) {
 	return true, nil
 }
 
+func (p *TestPredicate) Count() int {
+	return 0x04
+}
+
 func TestGet(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 

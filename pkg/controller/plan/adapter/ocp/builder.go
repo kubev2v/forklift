@@ -608,7 +608,7 @@ func createDataVolumeSpec(size resource.Quantity, storageClassName, url, configM
 			},
 		},
 		Storage: &cdi.StorageSpec{
-			Resources: core.ResourceRequirements{
+			Resources: core.VolumeResourceRequirements{
 				Requests: core.ResourceList{
 					core.ResourceStorage: size,
 				},
