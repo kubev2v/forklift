@@ -9,6 +9,7 @@ vnic_has_custom_properties = true {
 concerns[flag] {
     vnic_has_custom_properties
     flag := {
+        "id": "ovirt.nic.custom_properties.detected",
         "category": "Warning",
         "label": "vNIC custom properties detected",
         "assessment": "The VM's vNIC Profile is configured with custom properties, which are not currently supported by OpenShift Virtualization."

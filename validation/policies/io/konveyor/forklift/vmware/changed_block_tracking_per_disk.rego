@@ -18,6 +18,7 @@ concerns[flag] {
     deviceKey := sprintf("%s%d:%d", [disk.bus, controllerIndex, disk.unitNumber])
 
     flag := {
+        "id": "vmware.changed_block_tracking.disk.disabled",
         "category": "Warning",
         "label": sprintf("Disk - %s does not have CBT enabled", [deviceKey]),
         "assessment": "Changed Block Tracking (CBT) has not been enabled for this device. This feature is a prerequisite for VM warm migration."

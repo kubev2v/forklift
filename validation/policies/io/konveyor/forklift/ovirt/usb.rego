@@ -9,6 +9,7 @@ has_usb_enabled = value {
 concerns[flag] {
     has_usb_enabled
     flag := {
+        "id": "ovirt.usb.enabled",
         "category": "Warning",
         "label": "USB support enabled",
         "assessment": "The VM has USB support enabled, but USB device attachment is not currently supported by OpenShift Virtualization."

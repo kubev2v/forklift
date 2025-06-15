@@ -9,6 +9,7 @@ has_cpu_affinity = true {
 concerns[flag] {
     has_cpu_affinity
     flag := {
+        "id": "ovirt.cpu.tuning.detected",
         "category": "Warning",
         "label": "CPU tuning detected",
         "assessment": "CPU tuning other than 1 vCPU - 1 pCPU is not currently supported by OpenShift Virtualization. The VM can be migrated but it will not have this feature in the target environment."

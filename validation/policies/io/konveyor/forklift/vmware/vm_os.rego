@@ -10,6 +10,7 @@ has_unsupported_os = true {
 concerns[flag] {
     has_unsupported_os
     flag := {
+        "id": "vmware.os.unsupported",
         "category":   "Warning",
         "label":      "Unsupported operating system detected",
         "assessment": "The guest operating system is not currently supported by the Migration Toolkit for Virtualization"
