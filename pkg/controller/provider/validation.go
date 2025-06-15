@@ -242,7 +242,6 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 	case api.OpenShift:
 		keyList = []string{"token"}
 
-		r.validateConnectionStatus(provider, secret)
 	case api.VSphere:
 		keyList = []string{
 			"user",
