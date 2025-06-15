@@ -9,6 +9,7 @@ has_spice_display_enabled = true {
 concerns[flag] {
     has_spice_display_enabled
     flag := {
+        "id": "ovirt.display_type.spice.enabled",
         "category": "Information",
         "label": "VM Display Type",
         "assessment": "The VM is using the SPICE protocol for video display. This is not supported by OpenShift Virtualization."

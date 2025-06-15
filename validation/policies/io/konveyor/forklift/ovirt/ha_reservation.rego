@@ -9,6 +9,7 @@ has_ha_reservation = value {
 concerns[flag] {
     has_ha_reservation
     flag := {
+        "id": "ovirt.ha.reservation.enabled",
         "category": "Warning",
         "label": "Cluster has HA reservation",
         "assessment": "The cluster running the source VM has a resource reservation to allow highly available VMs to be started. This feature is not currently supported by OpenShift Virtualization."
