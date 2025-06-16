@@ -1,0 +1,42 @@
+# Wait for the netkvm (virtio-net) driver to become active.
+$startdate = Get-Date
+$adapters = @()
+While (-Not $adapters -and $startdate.AddMinutes(5) -gt (Get-Date)) {
+    Start-Sleep -Seconds 5
+    $adapters = Get-NetAdapter -Physical | Where DriverFileName -eq "netkvm.sys"
+    Write-Host "Waiting for netkvm.sys adapters..."
+}
+
+# Define MACs and IPs for each adapter
+$networkConfigs = @(
+{{- range $i, $cfg := . }}
+    @{
+        MAC = '{{ lower $cfg.MAC }}'
+        IPs = @{{ formatIPs $cfg.IPs }}
+        PrefixLength = {{ (index $cfg.IPs 0).PrefixLength }}
+        DNS = @{{ formatDNS $cfg }}
+    }{{ if ne (add $i 1) (len $) }},{{ end }}
+{{- end }}
+)
+
+
+
+
+# Apply settings
+foreach ($config in $networkConfigs) {
+    $adapter = Get-NetAdapter -Physical | Where-Object { $_.MacAddress -eq $config.MAC }
+
+    if ($adapter) {
+        $ifindex = $adapter.ifIndex
+        $name = $adapter.Name
+        Write-Host "Configuring adapter '$name' ($($config.MAC))"
+
+        foreach ($ip in $config.IPs) {
+            Write-Host "Setting IP $ip on '$name'"
+            New-NetIPAddress -InterfaceIndex $ifindex -IPAddress $ip -PrefixLength $config.PrefixLength
+            Set-DnsClientServerAddress -InterfaceIndex $ifindex -ServerAddresses $config.DNS
+        }
+    } else {
+        Write-Warning "Adapter with MAC $($config.MAC) not found"
+    }
+}
