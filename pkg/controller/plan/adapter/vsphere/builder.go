@@ -640,12 +640,13 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 
 			// Create template data
 			templateData := api.PVCNameTemplateData{
-				VmName:        r.getPlenVMSafeName(vm),
-				PlanName:      r.Plan.Name,
-				DiskIndex:     diskIndex,
-				RootDiskIndex: rootDiskIndex,
-				Shared:        disk.Shared,
-				FileName:      disk.File,
+				VmName:         r.getPlenVMSafeName(vm),
+				PlanName:       r.Plan.Name,
+				DiskIndex:      diskIndex,
+				RootDiskIndex:  rootDiskIndex,
+				Shared:         disk.Shared,
+				FileName:       disk.File,
+				WinDriveLetter: disk.WinDriveLetter,
 			}
 
 			generatedName, err := r.executeTemplate(pvcNameTemplate, &templateData)
