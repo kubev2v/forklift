@@ -3,13 +3,6 @@ FROM registry.redhat.io/ubi9/go-toolset:1.23.6-1745588370 AS envsubst
 FROM registry.redhat.io/openshift4/ose-operator-sdk-rhel9@sha256:2a659b5ec1c8510f224dd6aadee896c2f4e4396cd72a719fb6688c411ca7be21 AS builder
 
 ARG EVENT_TITLE
-ARG EVENT_TITLE2
-ARG EVENT_TITLE3
-ARG EVENT_TITLE4
-ARG EVENT_TITLE5
-ARG EVENT_TITLE6
-ARG EVENT_TITLE7
-
 
 ARG VERSION
 ARG RELEASE
@@ -19,16 +12,27 @@ ARG REGISTRY
 ARG OCP_VERSIONS
 
 ARG API_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-api-dev-preview@sha256:f16ba2eac5ee656956774e381f457dbdb63217d93564fd506cd7f4926b3dc1e7"
+
 ARG CONTROLLER_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-controller-dev-preview@sha256:df5013a31ba90adaf16e09bc2b885f0a1d3d1d166b77287fb9f9367dcb16aa40"
+
 ARG MUST_GATHER_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-must-gather-dev-preview@sha256:6a6eb36268a1b3790ac1be812d4b452e8b3399c8e1e7c88fd8d1228302f08834"
+
 ARG OPENSTACK_POPULATOR_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/openstack-populator-dev-preview@sha256:53a63c34c936e5672f57fb4360120f20575ed180e67ce66720ff4dd347856d57"
+
 ARG OPERATOR_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-operator-dev-preview@sha256:637f6020166ebd563fd704e8679de5f14f1ce27efc8b95dedc7e168224657017"
+
 ARG OVA_PROVIDER_SERVER_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/ova-provider-server-dev-preview@sha256:d9f14c15383b2bbe94ce24b2b97fa0bac0b423a18a7dcc0a60592a8b2196e9d9"
+
 ARG OVIRT_POPULATOR_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/ovirt-populator-dev-preview@sha256:ca4c5a7f6f0cb079fef781e92d9ac91349d1e3eefa9b1c15029750827daef438"
+
 ARG POPULATOR_CONTROLLER_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/populator-controller-dev-preview@sha256:999176ef5551c6267330e95922dafdd8f07cbeb729f801de8977b07c76347f12"
+
 ARG UI_PLUGIN_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-console-plugin-dev-preview@sha256:07eda056f92aae36d8d0f3b80a34b68ed819f1158984e928b51c3eb586a5ce5e"
+
 ARG VALIDATION_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/validation-dev-preview@sha256:ce03bd45d1cbbbb9702c29f80eb27b181aef0b1594a236230e9e449ed75ad92e"
+
 ARG VIRT_V2V_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/virt-v2v-dev-preview@sha256:d49cd031bfd456991a1016ba615eb186744ddf896d4b1b35fbac0a2202555462"
+
 ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/vsphere-xcopy-volume-populator-dev-preview@sha256:f075ac0c73cc466a84e840ca9ca3541565d2834c58d3915ff6696d761f8ea4ed"
 
 USER root
