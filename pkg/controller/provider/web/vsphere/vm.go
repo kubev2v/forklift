@@ -246,6 +246,7 @@ type VM struct {
 	Devices                  []model.Device       `json:"devices"`
 	NICs                     []model.NIC          `json:"nics"`
 	GuestNetworks            []model.GuestNetwork `json:"guestNetworks"`
+	GuestDisks               []model.GuestDisk    `json:"guestDisks"`
 	GuestIpStacks            []model.GuestIpStack `json:"guestIpStacks"`
 	SecureBoot               bool                 `json:"secureBoot"`
 	DiskEnableUuid           bool                 `json:"diskEnableUuid"`
@@ -281,6 +282,7 @@ func (r *VM) With(m *model.VM) {
 	r.NumaNodeAffinity = m.NumaNodeAffinity
 	r.NICs = m.NICs
 	r.GuestNetworks = m.GuestNetworks
+	r.GuestDisks = m.GuestDisks
 	r.GuestIpStacks = m.GuestIpStacks
 	r.SecureBoot = m.SecureBoot
 	r.DiskEnableUuid = m.DiskEnableUuid

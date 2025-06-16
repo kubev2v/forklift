@@ -56,8 +56,10 @@ type PlanSpec struct {
 	//   - .VmName: name of the VM
 	//   - .PlanName: name of the migration plan
 	//   - .DiskIndex: initial volume index of the disk
+	//   - .WinDriveLetter: Windows drive letter (lower case, if applicable, e.g. "c", require guest agent)
 	//   - .RootDiskIndex: index of the root disk
 	//   - .Shared: true if the volume is shared by multiple VMs, false otherwise
+	//   - .FileName: name of the file in the source provider (vmWare only, require guest agent)
 	// Note:
 	//   This template can be overridden at the individual VM level.
 	// Examples:
@@ -230,12 +232,13 @@ func (r *Plan) IsSourceProviderVSphere() bool { return r.Provider.Source.Type() 
 
 // PVCNameTemplateData contains fields used in naming templates.
 type PVCNameTemplateData struct {
-	VmName        string `json:"vmName"`
-	PlanName      string `json:"planName"`
-	DiskIndex     int    `json:"diskIndex"`
-	RootDiskIndex int    `json:"rootDiskIndex"`
-	Shared        bool   `json:"shared,omitempty"`
-	FileName      string `json:"fileName,omitempty"`
+	VmName         string `json:"vmName"`
+	PlanName       string `json:"planName"`
+	DiskIndex      int    `json:"diskIndex"`
+	WinDriveLetter string `json:"winDriveLetter,omitempty"`
+	RootDiskIndex  int    `json:"rootDiskIndex"`
+	Shared         bool   `json:"shared,omitempty"`
+	FileName       string `json:"fileName,omitempty"`
 }
 
 // VolumeNameTemplateData contains fields used in naming templates.

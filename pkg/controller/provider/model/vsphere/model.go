@@ -320,6 +320,7 @@ type VM struct {
 	Networks                 []Ref          `sql:""`
 	Concerns                 []Concern      `sql:""`
 	GuestNetworks            []GuestNetwork `sql:""`
+	GuestDisks               []GuestDisk    `sql:""`
 	GuestIpStacks            []GuestIpStack `sql:""`
 	SecureBoot               bool           `sql:""`
 	DiskEnableUuid           bool           `sql:""`
@@ -351,6 +352,7 @@ type Disk struct {
 	Bus                   string `json:"bus"`
 	Mode                  string `json:"mode,omitempty"`
 	Serial                string `json:"serial,omitempty"`
+	WinDriveLetter        string `json:"winDriveLetter,omitempty"`
 	ChangeTrackingEnabled bool   `json:"changeTrackingEnabled"`
 }
 
@@ -383,4 +385,29 @@ type GuestIpStack struct {
 	Network      string   `json:"network"`
 	PrefixLength int32    `json:"prefix"`
 	DNS          []string `json:"dns"`
+}
+
+// Guest disk.
+type GuestDisk struct {
+	// The key of the VirtualDevice.
+	//
+	// `VirtualDevice.key`
+	Key int32 `xml:"key" json:"key"`
+
+	// Name of the virtual disk in the guest operating system.
+	//
+	// For example: C:\\ ( in linux it can by a path like /home ).
+	DiskPath string `xml:"diskPath,omitempty" json:"diskPath,omitempty"`
+	// Total capacity of the disk, in bytes.
+	//
+	// This is part of the virtual machine configuration.
+	Capacity int64 `xml:"capacity,omitempty" json:"capacity,omitempty"`
+	// Free space on the disk, in bytes.
+	//
+	// This is retrieved by VMware Tools.
+	FreeSpace int64 `xml:"freeSpace,omitempty" json:"freeSpace,omitempty"`
+	// Filesystem type, if known.
+	//
+	// For example NTFS or ext3.
+	FilesystemType string `xml:"filesystemType,omitempty" json:"filesystemType,omitempty"`
 }
