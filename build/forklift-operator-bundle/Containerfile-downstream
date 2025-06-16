@@ -11,7 +11,7 @@ ARG DEFAULT_CHANNEL
 ARG REGISTRY
 ARG OCP_VERSIONS
 
-ARG API_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-api-dev-preview@sha256:f16ba2eac5ee656956774e381f457dbdb63217d93564fd506cd7f4926b3dc1e7"
+ARG API_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-api-dev-preview@sha256:1fba0efc504f9506b99cc16bf713dff893357c0825ac103186ec5930a77701ba"
 
 ARG CONTROLLER_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-controller-dev-preview@sha256:df5013a31ba90adaf16e09bc2b885f0a1d3d1d166b77287fb9f9367dcb16aa40"
 
