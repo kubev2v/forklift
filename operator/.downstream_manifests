@@ -4231,7 +4231,7 @@ metadata:
           "kind": "ForkliftController",
           "metadata": {
             "name": "forklift-controller",
-            "namespace": openshift-mtv
+            "namespace": "openshift-mtv"
           },
           "spec": {
             "feature_ui_plugin": "true",
@@ -4244,7 +4244,7 @@ metadata:
           "kind": "Hook",
           "metadata": {
             "name": "example-hook",
-            "namespace": openshift-mtv
+            "namespace": "openshift-mtv"
           },
           "spec": {
             "image": "quay.io/konveyor/hook-runner",
@@ -4256,7 +4256,7 @@ metadata:
           "kind": "Host",
           "metadata": {
             "name": "example-host",
-            "namespace": openshift-mtv
+            "namespace": "openshift-mtv"
           },
           "spec": {
             "id": "",
@@ -4272,12 +4272,12 @@ metadata:
           "kind": "Migration",
           "metadata": {
             "name": "example-migration",
-            "namespace": openshift-mtv
+            "namespace": "openshift-mtv"
           },
           "spec": {
             "plan": {
               "name": "example-plan",
-              "namespace": openshift-mtv
+              "namespace": "openshift-mtv"
             }
           }
         },
@@ -4286,7 +4286,7 @@ metadata:
           "kind": "NetworkMap",
           "metadata": {
             "name": "example-networkmap",
-            "namespace": openshift-mtv
+            "namespace": "openshift-mtv"
           },
           "spec": {
             "map": [
@@ -4312,7 +4312,7 @@ metadata:
           "kind": "OpenstackVolumePopulator",
           "metadata": {
             "name": "example-openstack",
-            "namespace": openshift-mtv
+            "namespace": "openshift-mtv"
           },
           "spec": {
             "identityUrl": "",
@@ -4325,7 +4325,7 @@ metadata:
           "kind": "OvirtVolumePopulator",
           "metadata": {
             "name": "example-ovirt-imageio",
-            "namespace": openshift-mtv
+            "namespace": "openshift-mtv"
           },
           "spec": {
             "diskId": "",
@@ -4338,7 +4338,7 @@ metadata:
           "kind": "Plan",
           "metadata": {
             "name": "example-plan",
-            "namespace": openshift-mtv
+            "namespace": "openshift-mtv"
           },
           "spec": {
             "provider": {
@@ -4358,7 +4358,7 @@ metadata:
           "kind": "Provider",
           "metadata": {
             "name": "example-provider",
-            "namespace": openshift-mtv
+            "namespace": "openshift-mtv"
           },
           "spec": {
             "secret": {
@@ -4374,7 +4374,7 @@ metadata:
           "kind": "StorageMap",
           "metadata": {
             "name": "example-storagemap",
-            "namespace": openshift-mtv
+            "namespace": "openshift-mtv"
           },
           "spec": {
             "map": [
@@ -4417,7 +4417,7 @@ metadata:
         "kind": "ForkliftController",
         "metadata": {
           "name": "forklift-controller",
-          "namespace": openshift-mtv
+          "namespace": "openshift-mtv"
         },
         "spec": {
           "feature_ui_plugin": "true",

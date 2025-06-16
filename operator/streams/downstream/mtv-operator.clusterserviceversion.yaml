@@ -31,7 +31,7 @@ metadata:
         "kind": "ForkliftController",
         "metadata": {
           "name": "forklift-controller",
-          "namespace": ${CSV_NAMESPACE}
+          "namespace": "${CSV_NAMESPACE}"
         },
         "spec": {
           "feature_ui_plugin": "true",
@@ -46,7 +46,7 @@ metadata:
           "kind": "ForkliftController",
           "metadata": {
             "name": "forklift-controller",
-            "namespace": ${CSV_NAMESPACE}
+            "namespace": "${CSV_NAMESPACE}"
           },
           "spec": {
             "feature_ui_plugin": "true",
@@ -59,7 +59,7 @@ metadata:
           "kind": "Hook",
           "metadata": {
             "name": "example-hook",
-            "namespace": ${CSV_NAMESPACE}
+            "namespace": "${CSV_NAMESPACE}"
           },
           "spec": {
             "image": "quay.io/konveyor/hook-runner",
@@ -71,7 +71,7 @@ metadata:
           "kind": "Host",
           "metadata": {
             "name": "example-host",
-            "namespace": ${CSV_NAMESPACE}
+            "namespace": "${CSV_NAMESPACE}"
           },
           "spec": {
             "id": "",
@@ -87,12 +87,12 @@ metadata:
           "kind": "Migration",
           "metadata": {
             "name": "example-migration",
-            "namespace": ${CSV_NAMESPACE}
+            "namespace": "${CSV_NAMESPACE}"
           },
           "spec": {
             "plan": {
               "name": "example-plan",
-              "namespace": ${CSV_NAMESPACE}
+              "namespace": "${CSV_NAMESPACE}"
             }
           }
         },
@@ -101,7 +101,7 @@ metadata:
           "kind": "NetworkMap",
           "metadata": {
             "name": "example-networkmap",
-            "namespace": ${CSV_NAMESPACE}
+            "namespace": "${CSV_NAMESPACE}"
           },
           "spec": {
             "map": [
@@ -127,7 +127,7 @@ metadata:
           "kind": "OpenstackVolumePopulator",
           "metadata": {
             "name": "example-openstack",
-            "namespace": ${CSV_NAMESPACE}
+            "namespace": "${CSV_NAMESPACE}"
           },
           "spec": {
             "identityUrl": "",
@@ -140,7 +140,7 @@ metadata:
           "kind": "OvirtVolumePopulator",
           "metadata": {
             "name": "example-ovirt-imageio",
-            "namespace": ${CSV_NAMESPACE}
+            "namespace": "${CSV_NAMESPACE}"
           },
           "spec": {
             "diskId": "",
@@ -153,7 +153,7 @@ metadata:
           "kind": "Plan",
           "metadata": {
             "name": "example-plan",
-            "namespace": ${CSV_NAMESPACE}
+            "namespace": "${CSV_NAMESPACE}"
           },
           "spec": {
             "provider": {
@@ -173,7 +173,7 @@ metadata:
           "kind": "Provider",
           "metadata": {
             "name": "example-provider",
-            "namespace": ${CSV_NAMESPACE}
+            "namespace": "${CSV_NAMESPACE}"
           },
           "spec": {
             "secret": {
@@ -189,7 +189,7 @@ metadata:
           "kind": "StorageMap",
           "metadata": {
             "name": "example-storagemap",
-            "namespace": ${CSV_NAMESPACE}
+            "namespace": "${CSV_NAMESPACE}"
           },
           "spec": {
             "map": [
