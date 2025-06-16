@@ -138,6 +138,7 @@ const (
 	fSnapshot                 = "snapshot"
 	fIsTemplate               = "config.template"
 	fGuestNet                 = "guest.net"
+	fGuestDisk                = "guest.disk"
 	fGuestIpStack             = "guest.ipStack"
 	fHostName                 = "guest.hostName"
 )
@@ -814,6 +815,7 @@ func (r *Collector) vmPathSet() []string {
 		fMemorySize,
 		fDevices,
 		fGuestNet,
+		fGuestDisk,
 		fExtraConfig,
 		fNestedHVEnabled,
 		fGuestName,

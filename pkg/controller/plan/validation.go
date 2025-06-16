@@ -1375,12 +1375,13 @@ func (r *Reconciler) IsValidPVCNameTemplate(pvcNameTemplate string) error {
 
 	// Test template with sample data
 	testData := api.PVCNameTemplateData{
-		VmName:        "test-vm",
-		PlanName:      "test-plan",
-		DiskIndex:     0,
-		RootDiskIndex: 0,
-		Shared:        false,
-		FileName:      "[test07_ds1] test_sp/test-000001.vmdk",
+		VmName:         "test-vm",
+		PlanName:       "test-plan",
+		DiskIndex:      0,
+		RootDiskIndex:  0,
+		Shared:         false,
+		FileName:       "[test07_ds1] test_sp/test-000001.vmdk",
+		WinDriveLetter: "c",
 	}
 
 	result, err := r.IsValidTemplate(pvcNameTemplate, testData)
