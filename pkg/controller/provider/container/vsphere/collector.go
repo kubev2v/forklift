@@ -363,6 +363,11 @@ func (r *Collector) Version() (_, _, _, _ string, err error) {
 	return
 }
 
+// returns runtime errors - not supported by vsphere collector
+func (r *Collector) GetRuntimeErrors() map[string]error {
+	return nil
+}
+
 // Start the collector.
 func (r *Collector) Start() error {
 	ctx := context.Background()

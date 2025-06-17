@@ -46,6 +46,8 @@ type Collector struct {
 	client client.Client
 	// cancel function.
 	cancel func()
+	//
+	errors map[string]error
 }
 
 // New collector.
@@ -64,6 +66,7 @@ func New(
 		cluster:     cluster,
 		secret:      secret,
 		log:         log,
+		errors:      make(map[string]error),
 	}
 }
 
@@ -222,4 +225,21 @@ func (r *Collector) buildClient() (err error) {
 		})
 
 	return
+}
+
+func (r *Collector) ClearError(kind string) {
+	delete(r.errors, kind)
+}
+
+func (r *Collector) SetError(kind string, err error) {
+	r.errors[kind] = err
+}
+
+// returns a copy of all current errors that were encountered while querying the inventory
+func (r *Collector) GetRuntimeErrors() map[string]error {
+	errors := make(map[string]error)
+	for k, v := range r.errors {
+		errors[k] = v
+	}
+	return errors
 }
