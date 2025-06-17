@@ -846,9 +846,7 @@ func (r *LiveMigrator) targetVMIM(vm *planapi.VMStatus) (vmim *cnv.VirtualMachin
 	vmim.GenerateName = fmt.Sprintf("forklift-")
 	vmim.Namespace = r.Context.Plan.Spec.TargetNamespace
 	vmim.Labels = r.Labeler.VMLabels(vm.Ref)
-	//operation := cnv.MigrationTarget
-	//vmim.Spec.Operation = &operation
-	vmim.Spec.Receive.MigrationID = vm.ID
+	vmim.Spec.Receive.MigrationID = r.KubevirtMigrationID(vm)
 	vmim.Spec.VMIName = target.Name
 	return
 }
@@ -866,15 +864,16 @@ func (r *LiveMigrator) sourceVMIM(vm *planapi.VMStatus, target *cnv.VirtualMachi
 	vmim.GenerateName = fmt.Sprintf("forklift-")
 	vmim.Namespace = inventoryVm.Namespace
 	vmim.Labels = r.Labeler.VMLabels(vm.Ref)
-	//operation := cnv.MigrationSource
-	//vmim.Spec.Operation = &operation
 	vmim.Spec.VMIName = inventoryVm.Name
-	vmim.Spec.SendTo.MigrationID = vm.ID
+	vmim.Spec.SendTo.MigrationID = r.KubevirtMigrationID(vm)
 	if target.Status.SynchronizationAddress != nil {
-		//connectUrl := strings.ReplaceAll(*target.Status.SyncEndpoint, ".svc:", ".svc.clusterset.local:")
 		vmim.Spec.SendTo.ConnectURL = *target.Status.SynchronizationAddress
 	}
 	return
+}
+
+func (r *LiveMigrator) KubevirtMigrationID(vm *planapi.VMStatus) string {
+	return fmt.Sprintf("%s-%s", vm.ID, r.Migration.UID)
 }
 
 // DeleteServiceExports deletes the ServiceExports that were created to expose the sync endpooints on
