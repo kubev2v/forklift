@@ -1,14 +1,12 @@
 package ocp
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/ocp"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
 
@@ -43,22 +41,18 @@ func (h DataVolumeHandler) List(ctx *gin.Context) {
 		return
 	}
 	if h.WatchRequest {
-		h.watch(ctx)
+		ctx.Status(http.StatusNotImplemented)
 		return
 	}
-	db := h.Collector.DB()
-	list := []model.DataVolume{}
-	err = db.List(&list, h.ListOptions(ctx))
+	dvs, err := h.DataVolumes(ctx, h.Provider)
 	if err != nil {
-		log.Trace(
-			err,
-			"url",
-			ctx.Request.URL)
+		log.Trace(err, "url", ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
+
 	content := []interface{}{}
-	for _, m := range list {
+	for _, m := range dvs {
 		r := &DataVolume{}
 		r.With(&m)
 		r.Link(h.Provider)
@@ -76,55 +70,23 @@ func (h DataVolumeHandler) Get(ctx *gin.Context) {
 		base.SetForkliftError(ctx, err)
 		return
 	}
-	m := &model.DataVolume{
-		Base: model.Base{
-			UID: ctx.Param(DataVolumeParam),
-		},
-	}
-	db := h.Collector.DB()
-	err = db.Get(m)
-	if errors.Is(err, model.NotFound) {
-		ctx.Status(http.StatusNotFound)
-		return
-	}
+	dvs, err := h.DataVolumes(ctx, h.Provider)
 	if err != nil {
-		log.Trace(
-			err,
-			"url",
-			ctx.Request.URL)
+		log.Trace(err, "url", ctx.Request.URL)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	r := &DataVolume{}
-	r.With(m)
-	r.Link(h.Provider)
-	content := r.Content(model.MaxDetail)
-
-	ctx.JSON(http.StatusOK, content)
-}
-
-// Watch.
-func (h DataVolumeHandler) watch(ctx *gin.Context) {
-	db := h.Collector.DB()
-	err := h.Watch(
-		ctx,
-		db,
-		&model.DataVolume{},
-		func(in libmodel.Model) (r interface{}) {
-			m := in.(*model.DataVolume)
-			sc := &DataVolume{}
-			sc.With(m)
-			sc.Link(h.Provider)
-			r = sc
+	for _, m := range dvs {
+		if m.UID == ctx.Param(DataVolumeParam) {
+			r := &DataVolume{}
+			r.With(&m)
+			r.Link(h.Provider)
+			content := r.Content(model.MaxDetail)
+			ctx.JSON(http.StatusOK, content)
 			return
-		})
-	if err != nil {
-		log.Trace(
-			err,
-			"url",
-			ctx.Request.URL)
-		ctx.Status(http.StatusInternalServerError)
+		}
 	}
+	ctx.Status(http.StatusNotFound)
 }
 
 // REST Resource.

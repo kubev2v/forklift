@@ -7,15 +7,15 @@ import (
 	"path"
 	"strconv"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
-	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	"github.com/konveyor/forklift-controller/pkg/controller/plan/migrator/base"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/controller/plan/migrator/base"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	k8slabels "k8s.io/apimachinery/pkg/labels"
@@ -60,11 +60,6 @@ const (
 const (
 	PrepareTarget   = "PrepareTarget"
 	Synchronization = "Synchronization"
-)
-
-// Conditions
-const (
-	Running = "Running"
 )
 
 func New(context *plancontext.Context) (migrator base.Migrator, err error) {
@@ -138,7 +133,7 @@ func (r *LiveMigrator) Status(vm planapi.VM) (status *planapi.VMStatus) {
 }
 
 func (r *LiveMigrator) Reset(status *planapi.VMStatus, pipeline []*planapi.Step) {
-	status.DeleteCondition(base.Canceled, base.Failed)
+	status.DeleteCondition(api.ConditionCanceled, api.ConditionFailed)
 	status.MarkReset()
 	itr := r.Itinerary()
 	step, _ := itr.First()
@@ -216,7 +211,7 @@ func (r *LiveMigrator) Pipeline(vm planapi.VM) (pipeline []*planapi.Step, err er
 						Name:        base.Initialize,
 						Description: "Initialize migration.",
 						Progress:    libitr.Progress{Total: 1},
-						Phase:       base.Pending,
+						Phase:       api.StepPending,
 					},
 				})
 		case PreHook:
@@ -227,7 +222,7 @@ func (r *LiveMigrator) Pipeline(vm planapi.VM) (pipeline []*planapi.Step, err er
 						Name:        PreHook,
 						Description: "Run pre-migration hook.",
 						Progress:    libitr.Progress{Total: 1},
-						Phase:       base.Pending,
+						Phase:       api.StepPending,
 					},
 				})
 		case PostHook:
@@ -238,7 +233,7 @@ func (r *LiveMigrator) Pipeline(vm planapi.VM) (pipeline []*planapi.Step, err er
 						Name:        PostHook,
 						Description: "Run post-migration hook.",
 						Progress:    libitr.Progress{Total: 1},
-						Phase:       base.Pending,
+						Phase:       api.StepPending,
 					},
 				})
 		case CreateSecrets:
@@ -249,7 +244,7 @@ func (r *LiveMigrator) Pipeline(vm planapi.VM) (pipeline []*planapi.Step, err er
 						Name:        PrepareTarget,
 						Description: "Prepare target namespace.",
 						Progress:    libitr.Progress{Total: 1},
-						Phase:       base.Pending,
+						Phase:       api.StepPending,
 					},
 				})
 		case CreateVirtualMachineInstanceMigrations:
@@ -260,7 +255,7 @@ func (r *LiveMigrator) Pipeline(vm planapi.VM) (pipeline []*planapi.Step, err er
 						Name:        Synchronization,
 						Description: "Synchronize source and target VMs.",
 						Progress:    libitr.Progress{Total: 1},
-						Phase:       base.Pending,
+						Phase:       api.StepPending,
 					},
 				})
 		}
@@ -290,7 +285,7 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 			return
 		}
 		vm.MarkedStarted()
-		step.Phase = Completed
+		step.Phase = api.StepCompleted
 		vm.Phase = r.Next(vm)
 	case PreHook, PostHook:
 		// delegate to common pipeline
@@ -302,7 +297,7 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 			return
 		}
 		step.MarkedStarted()
-		step.Phase = Running
+		step.Phase = api.StepRunning
 		vm.Phase = r.Next(vm)
 	case CreateSecrets:
 		step, found := vm.FindStep(r.Step(vm))
@@ -497,7 +492,7 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 			break
 		}
 		step.MarkCompleted()
-		step.Phase = Completed
+		step.Phase = api.StepCompleted
 		vm.Phase = r.Next(vm)
 	case CreateVirtualMachineInstanceMigrations:
 		step, found := vm.FindStep(r.Step(vm))
@@ -506,7 +501,7 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 			return
 		}
 		step.MarkStarted()
-		step.Phase = Running
+		step.Phase = api.StepRunning
 		var target *cnv.VirtualMachineInstanceMigration
 		target, err = r.EnsureTargetMigration(vm)
 		if err != nil {
@@ -567,7 +562,7 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 			break
 		}
 		step.MarkCompleted()
-		step.Phase = Completed
+		step.Phase = api.StepCompleted
 		vm.Phase = r.Next(vm)
 	default:
 		ok = false

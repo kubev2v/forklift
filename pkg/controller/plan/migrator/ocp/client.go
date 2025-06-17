@@ -3,8 +3,8 @@ package ocp
 import (
 	"context"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	ocp "github.com/konveyor/forklift-controller/pkg/lib/client/openshift"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	ocp "github.com/kubev2v/forklift/pkg/lib/client/openshift"
 	core "k8s.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"

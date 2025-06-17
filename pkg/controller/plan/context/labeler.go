@@ -1,7 +1,7 @@
 package context
 
 import (
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cnv "kubevirt.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
