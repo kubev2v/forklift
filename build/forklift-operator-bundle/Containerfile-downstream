@@ -13,7 +13,7 @@ ARG OCP_VERSIONS
 
 ARG API_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-api-dev-preview@sha256:1fba0efc504f9506b99cc16bf713dff893357c0825ac103186ec5930a77701ba"
 
-ARG CONTROLLER_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-controller-dev-preview@sha256:c64fc81acebea525daba6297b2657467dbe00686ce2aa0cbfd4ffe9d27315177"
+ARG CONTROLLER_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-controller-dev-preview@sha256:a5286ef67b08ce940f5da814f554676e62e3c6b0f1bc478a9c2ad7c0435d5c6b"
 
 ARG MUST_GATHER_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-must-gather-dev-preview@sha256:6a6eb36268a1b3790ac1be812d4b452e8b3399c8e1e7c88fd8d1228302f08834"
 
