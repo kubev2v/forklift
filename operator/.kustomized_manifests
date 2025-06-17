@@ -54,7 +54,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.18.0
+    controller-gen.kubebuilder.io/version: v0.17.0
   name: hooks.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
@@ -173,7 +173,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.18.0
+    controller-gen.kubebuilder.io/version: v0.17.0
   name: hosts.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
@@ -389,7 +389,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.18.0
+    controller-gen.kubebuilder.io/version: v0.17.0
   name: migrations.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
@@ -1022,7 +1022,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.18.0
+    controller-gen.kubebuilder.io/version: v0.17.0
   name: networkmaps.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
@@ -1304,7 +1304,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.18.0
+    controller-gen.kubebuilder.io/version: v0.17.0
   name: openstackvolumepopulators.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
@@ -1411,7 +1411,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.18.0
+    controller-gen.kubebuilder.io/version: v0.17.0
   name: ovirtvolumepopulators.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
@@ -1518,7 +1518,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.18.0
+    controller-gen.kubebuilder.io/version: v0.17.0
   name: plans.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
@@ -2808,7 +2808,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.18.0
+    controller-gen.kubebuilder.io/version: v0.17.0
   name: providers.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
@@ -2990,7 +2990,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.18.0
+    controller-gen.kubebuilder.io/version: v0.17.0
   name: storagemaps.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
@@ -3297,7 +3297,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.18.0
+    controller-gen.kubebuilder.io/version: v0.17.0
   name: vspherexcopyvolumepopulators.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
