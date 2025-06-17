@@ -1824,8 +1824,10 @@ spec:
                     - .VmName: name of the VM
                     - .PlanName: name of the migration plan
                     - .DiskIndex: initial volume index of the disk
+                    - .WinDriveLetter: Windows drive letter (lower case, if applicable, e.g. "c", require guest agent)
                     - .RootDiskIndex: index of the root disk
                     - .Shared: true if the volume is shared by multiple VMs, false otherwise
+                    - .FileName: name of the file in the source provider (vmWare only, require guest agent)
                   Note:
                     This template can be overridden at the individual VM level.
                   Examples:
@@ -4105,7 +4107,7 @@ apiVersion: forklift.konveyor.io/v1beta1
 kind: ForkliftController
 metadata:
   name: forklift-controller
-  namespace: ${NAMESPACE}
+  namespace: openshift-mtv
 spec:
   feature_ui_plugin: "true"
   feature_validation: "true"
@@ -4115,7 +4117,7 @@ apiVersion: forklift.konveyor.io/v1beta1
 kind: Hook
 metadata:
   name: example-hook
-  namespace: ${NAMESPACE}
+  namespace: openshift-mtv
 spec:
   image: quay.io/konveyor/hook-runner
   playbook: <base64-encoded-playbook>
@@ -4124,7 +4126,7 @@ apiVersion: forklift.konveyor.io/v1beta1
 kind: Host
 metadata:
   name: example-host
-  namespace: ${NAMESPACE}
+  namespace: openshift-mtv
 spec:
   id: ""
   ipAddress: ""
@@ -4136,17 +4138,17 @@ apiVersion: forklift.konveyor.io/v1beta1
 kind: Migration
 metadata:
   name: example-migration
-  namespace: ${NAMESPACE}
+  namespace: openshift-mtv
 spec:
   plan:
     name: example-plan
-    namespace: konveyor-forklift
+    namespace: openshift-mtv
 ---
 apiVersion: forklift.konveyor.io/v1beta1
 kind: NetworkMap
 metadata:
   name: example-networkmap
-  namespace: ${NAMESPACE}
+  namespace: openshift-mtv
 spec:
   map:
   - destination:
@@ -4163,7 +4165,7 @@ apiVersion: forklift.konveyor.io/v1beta1
 kind: OpenstackVolumePopulator
 metadata:
   name: example-openstack
-  namespace: ${NAMESPACE}
+  namespace: openshift-mtv
 spec:
   identityUrl: ""
   imageId: ""
@@ -4173,7 +4175,7 @@ apiVersion: forklift.konveyor.io/v1beta1
 kind: OvirtVolumePopulator
 metadata:
   name: example-ovirt-imageio
-  namespace: ${NAMESPACE}
+  namespace: openshift-mtv
 spec:
   diskId: ""
   engineSecretName: ""
@@ -4183,7 +4185,7 @@ apiVersion: forklift.konveyor.io/v1beta1
 kind: Plan
 metadata:
   name: example-plan
-  namespace: ${NAMESPACE}
+  namespace: openshift-mtv
 spec:
   provider:
     destination:
@@ -4197,7 +4199,7 @@ apiVersion: forklift.konveyor.io/v1beta1
 kind: Provider
 metadata:
   name: example-provider
-  namespace: ${NAMESPACE}
+  namespace: openshift-mtv
 spec:
   secret:
     name: ""
@@ -4209,7 +4211,7 @@ apiVersion: forklift.konveyor.io/v1beta1
 kind: StorageMap
 metadata:
   name: example-storagemap
-  namespace: ${NAMESPACE}
+  namespace: openshift-mtv
 spec:
   map:
   - destination:
@@ -4224,176 +4226,6 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
   annotations:
-    alm-examples: |-
-      [
-        {
-          "apiVersion": "forklift.konveyor.io/v1beta1",
-          "kind": "ForkliftController",
-          "metadata": {
-            "name": "forklift-controller",
-            "namespace": "openshift-mtv"
-          },
-          "spec": {
-            "feature_ui_plugin": "true",
-            "feature_validation": "true",
-            "feature_volume_populator": "true"
-          }
-        },
-        {
-          "apiVersion": "forklift.konveyor.io/v1beta1",
-          "kind": "Hook",
-          "metadata": {
-            "name": "example-hook",
-            "namespace": "openshift-mtv"
-          },
-          "spec": {
-            "image": "quay.io/konveyor/hook-runner",
-            "playbook": "<base64-encoded-playbook>"
-          }
-        },
-        {
-          "apiVersion": "forklift.konveyor.io/v1beta1",
-          "kind": "Host",
-          "metadata": {
-            "name": "example-host",
-            "namespace": "openshift-mtv"
-          },
-          "spec": {
-            "id": "",
-            "ipAddress": "",
-            "provider": {
-              "name": "",
-              "namespace": ""
-            }
-          }
-        },
-        {
-          "apiVersion": "forklift.konveyor.io/v1beta1",
-          "kind": "Migration",
-          "metadata": {
-            "name": "example-migration",
-            "namespace": "openshift-mtv"
-          },
-          "spec": {
-            "plan": {
-              "name": "example-plan",
-              "namespace": "openshift-mtv"
-            }
-          }
-        },
-        {
-          "apiVersion": "forklift.konveyor.io/v1beta1",
-          "kind": "NetworkMap",
-          "metadata": {
-            "name": "example-networkmap",
-            "namespace": "openshift-mtv"
-          },
-          "spec": {
-            "map": [
-              {
-                "destination": {
-                  "name": "",
-                  "namespace": "",
-                  "type": "pod"
-                },
-                "source": {
-                  "id": ""
-                }
-              }
-            ],
-            "provider": {
-              "name": "",
-              "namespace": ""
-            }
-          }
-        },
-        {
-          "apiVersion": "forklift.konveyor.io/v1beta1",
-          "kind": "OpenstackVolumePopulator",
-          "metadata": {
-            "name": "example-openstack",
-            "namespace": "openshift-mtv"
-          },
-          "spec": {
-            "identityUrl": "",
-            "imageId": "",
-            "secretName": ""
-          }
-        },
-        {
-          "apiVersion": "forklift.konveyor.io/v1beta1",
-          "kind": "OvirtVolumePopulator",
-          "metadata": {
-            "name": "example-ovirt-imageio",
-            "namespace": "openshift-mtv"
-          },
-          "spec": {
-            "diskId": "",
-            "engineSecretName": "",
-            "engineUrl": ""
-          }
-        },
-        {
-          "apiVersion": "forklift.konveyor.io/v1beta1",
-          "kind": "Plan",
-          "metadata": {
-            "name": "example-plan",
-            "namespace": "openshift-mtv"
-          },
-          "spec": {
-            "provider": {
-              "destination": {
-                "name": "",
-                "namespace": ""
-              },
-              "source": {
-                "name": "",
-                "namespace": ""
-              }
-            }
-          }
-        },
-        {
-          "apiVersion": "forklift.konveyor.io/v1beta1",
-          "kind": "Provider",
-          "metadata": {
-            "name": "example-provider",
-            "namespace": "openshift-mtv"
-          },
-          "spec": {
-            "secret": {
-              "name": "",
-              "namespace": ""
-            },
-            "type": "vmware",
-            "url": ""
-          }
-        },
-        {
-          "apiVersion": "forklift.konveyor.io/v1beta1",
-          "kind": "StorageMap",
-          "metadata": {
-            "name": "example-storagemap",
-            "namespace": "openshift-mtv"
-          },
-          "spec": {
-            "map": [
-              {
-                "destination": {
-                  "storageClass": ""
-                },
-                "source": {
-                  "id": ""
-                }
-              }
-            ],
-            "provider": {
-              "name": "",
-              "namespace": ""
-            }
-          }
-        }
-      ]
     capabilities: Seamless Upgrades
     categories: OpenShift Optional
     certified: true

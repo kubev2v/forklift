@@ -4,6 +4,6 @@ metadata:
   name: example-openstack
   namespace: ${NAMESPACE}
 spec:
-  identityUrl: ''
-  secretName: ''
-  imageId: ''
+  identityUrl: ""
+  secretName: ""
+  imageId: ""
