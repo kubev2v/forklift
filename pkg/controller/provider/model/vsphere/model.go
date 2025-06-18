@@ -148,6 +148,8 @@ type Host struct {
 	CpuCores           int16              `sql:""`
 	ProductName        string             `sql:""`
 	ProductVersion     string             `sql:""`
+	Model              string             `sql:""`
+	Vendor             string             `sql:""`
 	Network            HostNetwork        `sql:""`
 	Networks           []Ref              `sql:""`
 	Datastores         []Ref              `sql:""`
