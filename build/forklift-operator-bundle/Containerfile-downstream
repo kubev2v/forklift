@@ -67,6 +67,7 @@ ARG CHANNEL
 ARG DEFAULT_CHANNEL
 ARG REGISTRY
 ARG OCP_VERSIONS
+ARG REVISION
 
 COPY --from=builder /repo/build/manifests /manifests/
 COPY --from=builder /repo/build/metadata /metadata/
@@ -116,4 +117,5 @@ LABEL \
     url="https://github.com/kubev2v/forklift" \
     distribution-scope="public" \
     release=$RELEASE \
-    version=$VERSION
+    version=$VERSION \
+    revision="$REVISION"

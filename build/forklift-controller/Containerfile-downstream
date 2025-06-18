@@ -18,6 +18,7 @@ ENTRYPOINT ["/usr/local/bin/forklift-controller"]
 
 ARG VERSION
 ARG REGISTRY
+ARG REVISION
 
 LABEL \
     com.redhat.component="mtv-controller-container" \
@@ -30,4 +31,5 @@ LABEL \
     summary="Migration Toolkit for Virtualization - Controller" \
     vendor="Red Hat, Inc." \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
-    version="$VERSION"
+    version="$VERSION" \
+    revision="$REVISION"
