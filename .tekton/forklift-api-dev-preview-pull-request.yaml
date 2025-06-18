@@ -42,6 +42,9 @@ spec:
       value: '[{"type": "rpm", "path": ".konflux/forklift-api"}]'
     - name: build-args-file
       value: build/release.conf
+    - name: build-args
+      value:
+        - "REVISION={{revision}}"
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
@@ -198,7 +201,7 @@ spec:
             value: $(params.output-image).prefetch
           - name: ociArtifactExpiresAfter
             value: $(params.image-expires-after)
-          - name: dev-package-managers 
+          - name: dev-package-managers
             value: "true"
           - name: ACTIVATION_KEY
             value: activation-key-rhel9

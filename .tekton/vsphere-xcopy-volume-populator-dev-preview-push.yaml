@@ -37,6 +37,9 @@ spec:
     value: '[{"type": "rpm", "path": ".konflux/vsphere-xcopy-volume-populator"}]'
   - name: build-args-file
     value: build/release.conf
+  - name: build-args
+    value:
+      - "REVISION={{revision}}"
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
