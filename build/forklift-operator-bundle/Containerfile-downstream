@@ -25,7 +25,7 @@ ARG OVA_PROVIDER_SERVER_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/for
 
 ARG OVIRT_POPULATOR_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/ovirt-populator-dev-preview@sha256:63af1638d64c57345f22adb423cb25220f09644f6223b81bbf55aa7344ea74ef"
 
-ARG POPULATOR_CONTROLLER_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/populator-controller-dev-preview@sha256:5347bbb1c51891a563d1de6d9ee43b65072f7b86aacd134b3a30cf2666a1bdaa"
+ARG POPULATOR_CONTROLLER_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/populator-controller-dev-preview@sha256:d6debb665cf7137c8d11a7b680ccf854f093c2ac6f5a34a6af005c126cfdfde8"
 
 ARG UI_PLUGIN_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-console-plugin-dev-preview@sha256:297e429d4f077c7557f844f514e134e2505caef76517b0f3f5600c14d70e2204"
 
