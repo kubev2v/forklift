@@ -285,6 +285,12 @@ func (r *Client) Watch(url string, resource interface{}, h EventHandler) (status
 	}
 	status, err = post(reader)
 	if err != nil || status != http.StatusOK {
+		if err != nil {
+			err = liberr.Wrap(err, "status", status, "url", url)
+		} else {
+			err = liberr.New(
+				"inventory client watch return with none StatusOK", "status", status, "url", url)
+		}
 		return
 	}
 	w = &Watch{reader: reader}
