@@ -17,6 +17,7 @@ ENTRYPOINT ["/usr/local/bin/openstack-populator"]
 
 ARG VERSION
 ARG REGISTRY
+ARG REVISION
 
 LABEL \
     com.redhat.component="mtv-openstack-populator-container" \
@@ -29,4 +30,5 @@ LABEL \
     description="Migration Toolkit for Virtualization - OpenStack Populator" \
     vendor="Red Hat, Inc." \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
-    version="$VERSION"
+    version="$VERSION" \
+    revision="$REVISION"

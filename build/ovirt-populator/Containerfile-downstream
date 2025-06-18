@@ -17,6 +17,7 @@ ENTRYPOINT ["/usr/local/bin/ovirt-populator"]
 
 ARG VERSION
 ARG REGISTRY
+ARG REVISION
 
 LABEL \
     com.redhat.component="mtv-rhv-populator-container" \
@@ -29,5 +30,6 @@ LABEL \
     description="Migration Toolkit for Virtualization - RHV Populator" \
     vendor="Red Hat, Inc." \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
-    version="$VERSION"
+    version="$VERSION" \
+    revision="$REVISION"
 
