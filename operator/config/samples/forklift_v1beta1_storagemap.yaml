@@ -6,10 +6,10 @@ metadata:
   namespace: ${NAMESPACE}
 spec:
   provider:
-    namespace: ''
-    name: ''
+    namespace: ""
+    name: ""
   map:
-  - source:
-      id: ''
-    destination:
-      storageClass: ''
+    - source:
+        id: ""
+      destination:
+        storageClass: ""
