@@ -2,7 +2,7 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
   name: ${CSV_NAME}.v${VERSION}
-  namespace: ${CSV_NAMESPACE}
+  namespace: ${NAMESPACE}
   annotations:
     capabilities: Seamless Upgrades
     description: Facilitates migration of VM workloads to OpenShift Virtualization
@@ -24,14 +24,14 @@ metadata:
     features.operators.openshift.io/cnf: "false"
     features.operators.openshift.io/cni: "false"
     features.operators.openshift.io/csi: "false"
-    operatorframework.io/suggested-namespace: ${CSV_NAMESPACE}
+    operatorframework.io/suggested-namespace: ${NAMESPACE}
     operatorframework.io/initialization-resource: |-
       {
         "apiVersion": "forklift.konveyor.io/v1beta1",
         "kind": "ForkliftController",
         "metadata": {
           "name": "forklift-controller",
-          "namespace": "${CSV_NAMESPACE}"
+          "namespace": "${NAMESPACE}"
         },
         "spec": {
           "feature_ui_plugin": "true",
@@ -39,176 +39,6 @@ metadata:
           "feature_volume_populator": "true"
         }
       }
-    alm-examples: |-
-      [
-        {
-          "apiVersion": "forklift.konveyor.io/v1beta1",
-          "kind": "ForkliftController",
-          "metadata": {
-            "name": "forklift-controller",
-            "namespace": "${CSV_NAMESPACE}"
-          },
-          "spec": {
-            "feature_ui_plugin": "true",
-            "feature_validation": "true",
-            "feature_volume_populator": "true"
-          }
-        },
-        {
-          "apiVersion": "forklift.konveyor.io/v1beta1",
-          "kind": "Hook",
-          "metadata": {
-            "name": "example-hook",
-            "namespace": "${CSV_NAMESPACE}"
-          },
-          "spec": {
-            "image": "quay.io/konveyor/hook-runner",
-            "playbook": "<base64-encoded-playbook>"
-          }
-        },
-        {
-          "apiVersion": "forklift.konveyor.io/v1beta1",
-          "kind": "Host",
-          "metadata": {
-            "name": "example-host",
-            "namespace": "${CSV_NAMESPACE}"
-          },
-          "spec": {
-            "id": "",
-            "ipAddress": "",
-            "provider": {
-              "name": "",
-              "namespace": ""
-            }
-          }
-        },
-        {
-          "apiVersion": "forklift.konveyor.io/v1beta1",
-          "kind": "Migration",
-          "metadata": {
-            "name": "example-migration",
-            "namespace": "${CSV_NAMESPACE}"
-          },
-          "spec": {
-            "plan": {
-              "name": "example-plan",
-              "namespace": "${CSV_NAMESPACE}"
-            }
-          }
-        },
-        {
-          "apiVersion": "forklift.konveyor.io/v1beta1",
-          "kind": "NetworkMap",
-          "metadata": {
-            "name": "example-networkmap",
-            "namespace": "${CSV_NAMESPACE}"
-          },
-          "spec": {
-            "map": [
-              {
-                "destination": {
-                  "name": "",
-                  "namespace": "",
-                  "type": "pod"
-                },
-                "source": {
-                  "id": ""
-                }
-              }
-            ],
-            "provider": {
-              "name": "",
-              "namespace": ""
-            }
-          }
-        },
-        {
-          "apiVersion": "forklift.konveyor.io/v1beta1",
-          "kind": "OpenstackVolumePopulator",
-          "metadata": {
-            "name": "example-openstack",
-            "namespace": "${CSV_NAMESPACE}"
-          },
-          "spec": {
-            "identityUrl": "",
-            "imageId": "",
-            "secretName": ""
-          }
-        },
-        {
-          "apiVersion": "forklift.konveyor.io/v1beta1",
-          "kind": "OvirtVolumePopulator",
-          "metadata": {
-            "name": "example-ovirt-imageio",
-            "namespace": "${CSV_NAMESPACE}"
-          },
-          "spec": {
-            "diskId": "",
-            "engineSecretName": "",
-            "engineUrl": ""
-          }
-        },
-        {
-          "apiVersion": "forklift.konveyor.io/v1beta1",
-          "kind": "Plan",
-          "metadata": {
-            "name": "example-plan",
-            "namespace": "${CSV_NAMESPACE}"
-          },
-          "spec": {
-            "provider": {
-              "destination": {
-                "name": "",
-                "namespace": ""
-              },
-              "source": {
-                "name": "",
-                "namespace": ""
-              }
-            }
-          }
-        },
-        {
-          "apiVersion": "forklift.konveyor.io/v1beta1",
-          "kind": "Provider",
-          "metadata": {
-            "name": "example-provider",
-            "namespace": "${CSV_NAMESPACE}"
-          },
-          "spec": {
-            "secret": {
-              "name": "",
-              "namespace": ""
-            },
-            "type": "vmware",
-            "url": ""
-          }
-        },
-        {
-          "apiVersion": "forklift.konveyor.io/v1beta1",
-          "kind": "StorageMap",
-          "metadata": {
-            "name": "example-storagemap",
-            "namespace": "${CSV_NAMESPACE}"
-          },
-          "spec": {
-            "map": [
-              {
-                "destination": {
-                  "storageClass": ""
-                },
-                "source": {
-                  "id": ""
-                }
-              }
-            ],
-            "provider": {
-              "name": "",
-              "namespace": ""
-            }
-          }
-        }
-      ]
 spec:
   displayName: ${CSV_DISPLAYNAME}
   description: |

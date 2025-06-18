@@ -5,7 +5,7 @@ source operator/streams/${STREAM}/operator.conf
 cat operator/streams/${STREAM}/${STREAM}_manifests | envsubst '
 ${CSV_NAME}
 ${CSV_DISPLAYNAME}
-${CSV_NAMESPACE}
+${NAMESPACE}
 ${CSV_CERTIFIED}
 ${CSV_SUPPORT}
 ${MAINTAINER_NAME}

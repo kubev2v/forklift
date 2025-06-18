@@ -525,7 +525,7 @@ kustomized-manifests: kubectl
 	kubectl kustomize operator/config/manifests > operator/.kustomized_manifests
 
 .PHONY: generate-manifests
-generate-manifests: kubectl
+generate-manifests: kubectl manifests
 	kubectl kustomize operator/streams/upstream > operator/streams/upstream/upstream_manifests
 	kubectl kustomize operator/streams/downstream > operator/streams/downstream/downstream_manifests
 	STREAM=upstream bash operator/streams/prepare-vars.sh

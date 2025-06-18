@@ -4,6 +4,6 @@ metadata:
   name: example-ovirt-imageio
   namespace: ${NAMESPACE}
 spec:
-  engineUrl: ''
-  engineSecretName: ''
-  diskId: ''
+  engineUrl: ""
+  engineSecretName: ""
+  diskId: ""

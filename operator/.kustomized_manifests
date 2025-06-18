@@ -4142,7 +4142,7 @@ metadata:
 spec:
   plan:
     name: example-plan
-    namespace: konveyor-forklift
+    namespace: ${NAMESPACE}
 ---
 apiVersion: forklift.konveyor.io/v1beta1
 kind: NetworkMap
