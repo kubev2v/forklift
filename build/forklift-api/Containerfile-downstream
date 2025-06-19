@@ -17,6 +17,7 @@ ENTRYPOINT ["/usr/local/bin/forklift-api"]
 
 ARG VERSION
 ARG REGISTRY
+ARG REVISION
 
 LABEL \
     com.redhat.component="mtv-api-container" \
@@ -29,4 +30,5 @@ LABEL \
     summary="Migration Toolkit for Virtualization - API" \
     vendor="Red Hat, Inc." \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
-    version="$VERSION"
+    version="$VERSION" \
+    revision="$REVISION"

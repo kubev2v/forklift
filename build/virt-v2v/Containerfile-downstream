@@ -50,6 +50,7 @@ ENTRYPOINT ["/usr/bin/virt-v2v-wrapper"]
 
 ARG VERSION
 ARG REGISTRY
+ARG REVISION
 
 LABEL \
     com.redhat.component="mtv-virt-v2v-container" \
@@ -61,4 +62,5 @@ LABEL \
     summary="Migration Toolkit for Virtualization - Virt-V2V" \
     description="Migration Toolkit for Virtualization - Virt-V2V" \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
-    version="$VERSION"
+    version="$VERSION" \
+    revision="$REVISION"
