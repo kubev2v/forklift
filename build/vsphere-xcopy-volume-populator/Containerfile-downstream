@@ -31,6 +31,7 @@ ENTRYPOINT ["/bin/vsphere-xcopy-volume-populator"]
 
 ARG VERSION
 ARG REGISTRY
+ARG REVISION
 
 LABEL \
     com.redhat.component="mtv-vsphere-xcopy-volume-populator-container" \
@@ -43,4 +44,5 @@ LABEL \
     description="Migration Toolkit for Virtualization - vSphere XCOPY Volume Populator" \
     vendor="Red Hat, Inc." \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
-    version="$VERSION"
+    version="$VERSION" \
+    revision="$REVISION"

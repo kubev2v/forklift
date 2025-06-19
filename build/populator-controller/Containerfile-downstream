@@ -18,6 +18,7 @@ ENTRYPOINT ["/usr/local/bin/populator-controller"]
 
 ARG VERSION
 ARG REGISTRY
+ARG REVISION
 
 LABEL \
     com.redhat.component="mtv-populator-controller-container" \
@@ -30,4 +31,5 @@ LABEL \
     description="Migration Toolkit for Virtualization - Populator Controller" \
     vendor="Red Hat, Inc." \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
-    version="$VERSION"
+    version="$VERSION" \
+    revision="$REVISION"

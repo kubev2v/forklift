@@ -11,29 +11,29 @@ ARG DEFAULT_CHANNEL
 ARG REGISTRY
 ARG OCP_VERSIONS
 
-ARG API_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-api-dev-preview@sha256:1fba0efc504f9506b99cc16bf713dff893357c0825ac103186ec5930a77701ba"
+ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:1fba0efc504f9506b99cc16bf713dff893357c0825ac103186ec5930a77701ba"
 
-ARG CONTROLLER_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-controller-dev-preview@sha256:1a54f2eaca687310df50721281c53ccffc9bf34ee61eda0dd9c5facc8b101344"
+ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:1a54f2eaca687310df50721281c53ccffc9bf34ee61eda0dd9c5facc8b101344"
 
-ARG MUST_GATHER_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-must-gather-dev-preview@sha256:6a6eb36268a1b3790ac1be812d4b452e8b3399c8e1e7c88fd8d1228302f08834"
+ARG MUST_GATHER_IMAGE="registry.redhat.io/mtv-candidate/mtv-must-gather-rhel8@sha256:6a6eb36268a1b3790ac1be812d4b452e8b3399c8e1e7c88fd8d1228302f08834"
 
-ARG OPENSTACK_POPULATOR_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/openstack-populator-dev-preview@sha256:8b3234703d67bf72fff482b83d5a98acd32f276b6539307298c919f9f2c2e504"
+ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-openstack-populator-rhel9@sha256:a817ad7806c3b3a52c3d18b6b398f2b8d0dab72cb32d8ae73aa9096e74447219"
 
-ARG OPERATOR_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-operator-dev-preview@sha256:17c81e6d8c93889cbad9652106aed1bcbd32d5a1d7b4044c6fbb36b9f71aa776"
+ARG OPERATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhel9-operator@sha256:17c81e6d8c93889cbad9652106aed1bcbd32d5a1d7b4044c6fbb36b9f71aa776"
 
-ARG OVA_PROVIDER_SERVER_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/ova-provider-server-dev-preview@sha256:a682322d00bfd67a309886c4b32ea29b01af4891650ad3ae55bbcbbeef2bf5cc"
+ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/mtv-candidate/mtv-ova-provider-server-rhel9@sha256:a682322d00bfd67a309886c4b32ea29b01af4891650ad3ae55bbcbbeef2bf5cc"
 
-ARG OVIRT_POPULATOR_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/ovirt-populator-dev-preview@sha256:63af1638d64c57345f22adb423cb25220f09644f6223b81bbf55aa7344ea74ef"
+ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhv-populator-rhel8@sha256:63af1638d64c57345f22adb423cb25220f09644f6223b81bbf55aa7344ea74ef"
 
-ARG POPULATOR_CONTROLLER_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/populator-controller-dev-preview@sha256:5347bbb1c51891a563d1de6d9ee43b65072f7b86aacd134b3a30cf2666a1bdaa"
+ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-populator-controller-rhel9@sha256:5347bbb1c51891a563d1de6d9ee43b65072f7b86aacd134b3a30cf2666a1bdaa"
 
-ARG UI_PLUGIN_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-console-plugin-dev-preview@sha256:297e429d4f077c7557f844f514e134e2505caef76517b0f3f5600c14d70e2204"
+ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:297e429d4f077c7557f844f514e134e2505caef76517b0f3f5600c14d70e2204"
 
-ARG VALIDATION_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/validation-dev-preview@sha256:0f0157c4328cfaead74478126914be93edeeb74788f55e682e668695bfd7ca7a"
+ARG VALIDATION_IMAGE="registry.redhat.io/mtv-candidate/mtv-validation-rhel9@sha256:0f0157c4328cfaead74478126914be93edeeb74788f55e682e668695bfd7ca7a"
 
-ARG VIRT_V2V_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/virt-v2v-dev-preview@sha256:6787fe4af5d6411b9d438979b364dbb452d72f6c965f1d7ab7b8e45aa3376e2d"
+ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel9@sha256:6787fe4af5d6411b9d438979b364dbb452d72f6c965f1d7ab7b8e45aa3376e2d"
 
-ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/vsphere-xcopy-volume-populator-dev-preview@sha256:f075ac0c73cc466a84e840ca9ca3541565d2834c58d3915ff6696d761f8ea4ed"
+ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-vsphere-xcopy-volume-populator-rhel9@sha256:f075ac0c73cc466a84e840ca9ca3541565d2834c58d3915ff6696d761f8ea4ed"
 
 USER root
 
@@ -67,6 +67,7 @@ ARG CHANNEL
 ARG DEFAULT_CHANNEL
 ARG REGISTRY
 ARG OCP_VERSIONS
+ARG REVISION
 
 COPY --from=builder /repo/build/manifests /manifests/
 COPY --from=builder /repo/build/metadata /metadata/
@@ -116,4 +117,5 @@ LABEL \
     url="https://github.com/kubev2v/forklift" \
     distribution-scope="public" \
     release=$RELEASE \
-    version=$VERSION
+    version=$VERSION \
+    revision="$REVISION"

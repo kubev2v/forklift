@@ -41,6 +41,7 @@ spec:
   - name: build-args
     value:
     - 'EVENT_TITLE={{body.head_commit.message}}'
+    - 'REVISION={{revision}}'
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
