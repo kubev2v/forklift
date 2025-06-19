@@ -91,6 +91,7 @@ spec:
                               enum:
                               - vantara
                               - ontap
+                              - primera3par
                               type: string
                           required:
                           - secretRef
