@@ -73,7 +73,7 @@ type VSphereXcopyPluginConfig struct {
 	// The secret should reside in the same namespace where the source provider is.
 	SecretRef string `json:"secretRef"`
 	// StorageVendorProduct the string identifier of the storage vendor product
-	// +kubebuilder:validation:Enum=vantara;ontap
+	// +kubebuilder:validation:Enum=vantara;ontap;primera3par
 	StorageVendorProduct StorageVendorProduct `json:"storageVendorProduct"`
 }
 
