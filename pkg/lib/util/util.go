@@ -9,6 +9,7 @@ import (
 	"net"
 	liburl "net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -35,6 +36,15 @@ func dialTLSWithTimeout(host string, cfg *tls.Config, timeout time.Duration) (*t
 	return tlsConn, nil
 }
 
+func extractServerName(address string) string {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		// If SplitHostPort fails (likely no port is present), fallback
+		return strings.Split(address, ":")[0]
+	}
+	return host
+}
+
 func GetTlsCertificate(url *liburl.URL, secret *core.Secret) (crt *x509.Certificate, err error) {
 	cfg, err := tlsConfig(secret)
 	if err != nil {
@@ -54,6 +64,9 @@ func GetTlsCertificate(url *liburl.URL, secret *core.Secret) (crt *x509.Certific
 	if url.Port() == "" {
 		host += ":443"
 	}
+
+	//cfg.ServerName ensures the TLS handshake checks the correct hostname is in the server’s certificate
+	cfg.ServerName = extractServerName(host)
 	// disable verification since we don't trust it yet
 	cfg.InsecureSkipVerify = true
 	conn, err := dialTLSWithTimeout(host, cfg, time.Duration(settings.Settings.TlsConnectionTimeout)*time.Second)
