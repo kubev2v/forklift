@@ -488,6 +488,7 @@ func (r *Builder) mapNetworks(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.Vi
 
 		kInterface = interfacesMap[network.Name]
 		kInterface.Name = network.Name
+		kInterface.MacAddress = ""
 
 		switch {
 		case network.Multus != nil:
