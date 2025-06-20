@@ -11,6 +11,7 @@ invalid_vif_model if {
 concerns[flag] {
 	invalid_vif_model
 	flag := {
+	    "id": "openstack.network.vif_model.unsupported",
 		"category": "Warning",
 		"label": "Unsupported VIF model detected",
 		"assessment": "The VIF model is not supported by OpenShift Virtualization (only e1000, e1000e, rtl8139, ne2k_pci, pcnet and virtio VIF models are currently supported). The migrated VM will be given a virtio VIF model.",

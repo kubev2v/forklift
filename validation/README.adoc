@@ -30,6 +30,7 @@ has_drs_enabled {
 concerns[flag] {
     has_drs_enabled
     flag := {
+        "id": "vmware.drs.enabled",
         "category": "Information",
         "label": "VM running in a DRS-enabled cluster",
         "assessment": "Distributed resource scheduling is not currently supported by OpenShift Virtualization. The VM can be migrated but it will not have this feature in the target environment."
@@ -122,6 +123,7 @@ data:
     concerns[flag] {
       has_multiple_disks
         flag := {
+          "id": "custom.multiple_disk.detected",
           "category": "Information",
           "label": "Multiple disks detected",
           "assessment": "Example user-supplied extra validation rule - multiple disks have been detected on this VM."
@@ -220,36 +222,43 @@ The JSON body output from the validation service is a _result_ hash whose value 
    "result": {
        "concerns": [
            {
+               "id": "vmware.drs.enabled",
                "assessment": "Distributed resource scheduling is not currently supported by OpenShift Virtualization. The VM can be migrated but it will not have this feature in the target environment.",
                "category": "Information",
                "label": "VM running in a DRS-enabled cluster"
            },
            {
+               "id": "vmware.cpu_memory.hotplug.enabled",
                "assessment": "Hot pluggable CPU or memory is not currently supported by OpenShift Virtualization. Review CPU or memory configuration after migration.",
                "category": "Warning",
                "label": "CPU/Memory hotplug detected"
            },
            {
+               "id": "vmware.multiple_disk",
                "assessment": "Multiple disks have been detected on this VM.",
                "category": "Information",
                "label": "Multiple disks detected"
            },
            {
+               "id": "vmware.numa_affinity.detected",
                "assessment": "NUMA node affinity is not currently supported by OpenShift Virtualization. The VM can be migrated but it will not have this feature in the target environment.",
                "category": "Warning",
                "label": "NUMA node affinity detected"
            },
            {
+               "id":"vmware.snapshot.detected",
                "assessment": "Online snapshots are not currently supported by OpenShift Virtualization.",
                "category": "Information",
                "label": "VM snapshot detected"
            },
            {
+               "id": "vmware.cpu_affinity.detected",
                "assessment": "CPU affinity is not currently supported by OpenShift Virtualization. The VM can be migrated but it will not have this feature in the target environment.",
                "category": "Warning",
                "label": "CPU affinity detected"
            },
            {
+               "id": "vmware.changed_block_tracking.disabled",
                "assessment": "Changed Block Tracking (CBT) has not been enabled on this VM. This feature is a prerequisite for VM warm migration.",
                "category": "Warning",
                "label": "Changed Block Tracking (CBT) not enabled"
