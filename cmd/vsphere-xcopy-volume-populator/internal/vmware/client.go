@@ -72,7 +72,7 @@ func (c *VSphereClient) RunEsxCommand(ctx context.Context, host *object.HostSyst
 	return res.Values, nil
 }
 
-func (c *VSphereClient) GetEsxByVm(ctx context.Context, vmName string) (*object.HostSystem, error) {
+func (c *VSphereClient) GetEsxByVm(ctx context.Context, vmId string) (*object.HostSystem, error) {
 	finder := find.NewFinder(c.Client.Client, true)
 
 	//FIXME - need to trace the VM by the datastore, which we should have because
@@ -86,9 +86,9 @@ func (c *VSphereClient) GetEsxByVm(ctx context.Context, vmName string) (*object.
 	finder.SetDatacenter(dc)
 
 	// Find the virtual machine by name
-	vm, err := finder.VirtualMachine(ctx, vmName)
+	vm, err := finder.VirtualMachine(ctx, vmId)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to find VM %s: %v", vmName, err)
+		return nil, fmt.Errorf("Failed to find VM %s: %v", vmId, err)
 	}
 
 	// Retrieve VM properties to get its host

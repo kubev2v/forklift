@@ -21,8 +21,10 @@ type VSphereXcopyVolumePopulator struct {
 }
 
 type VSphereXcopyVolumePopulatorSpec struct {
+	// VmId is the VM object id in vSphere
+	VmId string `json:"vmId"`
 	// VmdkPath is the full path the vmdk disk. A valid path format is
-	// '[$DATASTORE_NAME] $VM_NAME/$DISK_NAME.vmdk'
+	// '[$DATASTORE_NAME] $VM_HOME/$DISK_NAME.vmdk'
 	VmdkPath string `json:"vmdkPath"`
 	// The secret name with vsphere and storage credentials
 	SecretName string `json:"secretName"`
