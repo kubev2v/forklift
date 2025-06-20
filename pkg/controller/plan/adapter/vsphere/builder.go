@@ -1097,13 +1097,11 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 
 func (r *Builder) mapTpm(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	if vm.TpmEnabled {
-		persistData := true
-		object.Template.Spec.Domain.Devices.TPM = &cnv.TPMDevice{Persistent: &persistData}
-	}
-
-	// Disable the vTPM on non UEFI
-	// MTV-2014 - win 2022 fails to boot with vTPM enabled
-	if vm.Firmware == BIOS {
+		// If the VM has vTPM enabled, we need to set Persistent in the VM spec.
+		object.Template.Spec.Domain.Devices.TPM = &cnv.TPMDevice{Persistent: ptr.To(true)}
+	} else {
+		// Force disable the vTPM
+		// MTV-2014 - win 2022 fails to boot with vTPM enabled
 		object.Template.Spec.Domain.Devices.TPM = &cnv.TPMDevice{Enabled: ptr.To(false)}
 	}
 }
