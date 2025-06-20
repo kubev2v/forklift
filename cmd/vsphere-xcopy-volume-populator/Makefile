@@ -55,12 +55,24 @@ test-copy-using-cli: build
 		--owner-uid=test-cli \
 		--kubeconfig=$$KUBECONFIG
 
+
 test-copy-using-cli-3par: build
 	bin/vsphere-xcopy-volume-populator \
-		--source-vmdk="[eco-iscsi-ds1] vm-6/vm-6.vmdk" \
-	    --owner-name=test1\
+		--source-vmdk="[eco-iscsi-ds1] vm-8/vm-8.vmdk" \
+		--owner-name=3par-test-100g \
+		--owner-uid=3par-test-100g \
 		--target-namespace=default \
 		--storage-vendor-product=primera3par \
+		--secret-name=populator-secret \
+		--storage-skip-ssl-verification=true \
+		--kubeconfig=$$KUBECONFIG
+
+test-copy-using-cli-pureflasharray: build
+	bin/vsphere-xcopy-volume-populator \
+		--source-vmdk="[eco-iscsi-pure] vm-6/vm-6.vmdk" \
+	    --owner-name=test-copy-offload \
+		--target-namespace=default \
+		--storage-vendor-product=pureFlashArray \
 		--secret-name=populator-secret \
 		--kubeconfig=$$KUBECONFIG
 
