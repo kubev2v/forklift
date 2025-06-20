@@ -3,6 +3,7 @@ package vmware
 import (
 	"certificate-tool/internal/utils/osutils"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"log"
 	"net/url"
@@ -173,6 +174,164 @@ func getExistingVMDKPath(ctx context.Context, vm *object.VirtualMachine, ds *obj
 
 	klog.Infof("Found existing regular VMDK for VM %q: %s", vm.Name(), vmdkPath)
 	return vmdkPath, nil
+}
+
+func CreateTemplateFromCloudInitYaml(ctx context.Context, client *govmomi.Client, dc *object.Datacenter, rp *object.ResourcePool, host *object.HostSystem, vmdkPath, dsName, cloudInitYamlPath, templateName string) error {
+	yamlBytes, err := os.ReadFile(cloudInitYamlPath)
+	if err != nil {
+		log.Fatalf("failed to read cloud-init YAML file: %v", err)
+	}
+	cloudInitYaml := string(yamlBytes)
+	userDataB64 := base64.StdEncoding.EncodeToString([]byte(cloudInitYaml))
+	vmxPath := fmt.Sprintf("[%s] %s/%s.vmx", dsName, templateName, templateName)
+	finder := find.NewFinder(client.Client, true)
+
+	vmConfig := types.VirtualMachineConfigSpec{
+		Name:    templateName,
+		GuestId: "fedora64Guest",
+		Files: &types.VirtualMachineFileInfo{
+			VmPathName: vmxPath,
+		},
+		NumCPUs:  2,
+		MemoryMB: 2048,
+		VAppConfig: &types.VmConfigSpec{
+			Property: []types.VAppPropertySpec{
+				{
+					ArrayUpdateSpec: types.ArrayUpdateSpec{
+						Operation: types.ArrayUpdateOperationAdd,
+					},
+					Info: &types.VAppPropertyInfo{
+						Key:              0,
+						Id:               "user-data",
+						Label:            "user-data",
+						Type:             "string",
+						Value:            userDataB64,
+						UserConfigurable: types.NewBool(true),
+					},
+				},
+			},
+		},
+	}
+
+	isciController := addDefaultSCSIController(&vmConfig)
+	diskBacking := &types.VirtualDiskFlatVer2BackingInfo{}
+	diskBacking.FileName = vmdkPath
+	diskBacking.DiskMode = string(types.VirtualDiskModePersistent)
+	diskBacking.ThinProvisioned = types.NewBool(true)
+	unit := int32(0)
+
+	disk := &types.VirtualDisk{
+		CapacityInKB:    0,
+		CapacityInBytes: 0,
+		VirtualDevice: types.VirtualDevice{
+			ControllerKey: isciController.Key,
+			UnitNumber:    &unit,
+			Backing:       diskBacking,
+		},
+	}
+
+	deviceConfigSpec := &types.VirtualDeviceConfigSpec{
+		Operation: types.VirtualDeviceConfigSpecOperationAdd,
+		Device:    disk,
+	}
+	vmConfig.DeviceChange = append(vmConfig.DeviceChange, deviceConfigSpec)
+
+	log.Printf("Creating template %s...", templateName)
+	folders, err := dc.Folders(context.TODO())
+	if err != nil {
+		panic(err)
+	}
+	task, err := folders.VmFolder.CreateVM(ctx, vmConfig, rp, host)
+	if err != nil {
+		return err
+	}
+	err = task.Wait(ctx)
+	if err != nil {
+		return err
+	}
+
+	vm, err := finder.VirtualMachine(ctx, templateName)
+	if err != nil {
+		return err
+	}
+
+	// Power off before marking as template
+	state, _ := vm.PowerState(ctx)
+	if state == types.VirtualMachinePowerStatePoweredOn {
+		offTask, _ := vm.PowerOff(ctx)
+		err = offTask.Wait(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	return vm.MarkAsTemplate(ctx)
+}
+
+func CloneVMWithDiskResize(ctx context.Context, client *govmomi.Client, templateName, newVMName string, newDiskSizeGB int64) (*object.VirtualMachine, error) {
+	finder := find.NewFinder(client.Client, true)
+	dc, _ := finder.DefaultDatacenter(ctx)
+	finder.SetDatacenter(dc)
+
+	templateVM, err := finder.VirtualMachine(ctx, templateName)
+	if err != nil {
+		return nil, err
+	}
+
+	devices, err := templateVM.Device(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var diskDevice types.BaseVirtualDevice
+	for _, device := range devices {
+		if disk, ok := device.(*types.VirtualDisk); ok {
+			diskDevice = disk
+			break
+		}
+	}
+	if diskDevice == nil {
+		return nil, fmt.Errorf("no virtual disk found on template")
+	}
+
+	originalDisk := diskDevice.(*types.VirtualDisk)
+	newDisk := *originalDisk
+	newDisk.CapacityInKB = newDiskSizeGB * 1024 * 1024
+	newDisk.CapacityInKB = newDiskSizeGB * 1024 * 1024 // GB → KB
+
+	deviceChange := &types.VirtualDeviceConfigSpec{
+		Operation: types.VirtualDeviceConfigSpecOperationEdit,
+		Device:    &newDisk,
+	}
+
+	folder, _ := finder.DefaultFolder(ctx)
+	rp, _ := finder.DefaultResourcePool(ctx)
+
+	cloneSpec := types.VirtualMachineCloneSpec{
+		Location: types.VirtualMachineRelocateSpec{
+			Pool: types.NewReference(rp.Reference()),
+		},
+		PowerOn:  false,
+		Template: false,
+		Config: &types.VirtualMachineConfigSpec{
+			DeviceChange: []types.BaseVirtualDeviceConfigSpec{
+				deviceChange,
+			},
+		},
+	}
+
+	task, err := templateVM.Clone(ctx, folder, newVMName, cloneSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	info, err := task.WaitForResult(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("created VM %s...", newVMName)
+	return object.NewVirtualMachine(client.Client, info.Result.(types.ManagedObjectReference)), nil
 }
 
 func createVM(ctx context.Context, cli *govmomi.Client,
@@ -409,7 +568,64 @@ func attachNetwork(
 }
 
 func CreateVM(vmName, vsphereUrl, vsphereUser, vspherePassword, dataCenter,
-	dataStore, pool, hostName, downloadVmdkURL, localVmdkPath, isoPath string, waitTimeout time.Duration) (string, error) { // Add hostName parameter
+	dataStore, pool, hostName, templateName, isoPath string, waitTimeout time.Duration) error { // Add hostName parameter
+	ctx, cancel, client, finder, _, ds, _, err := SetupVSphere(
+		5*time.Minute, vsphereUrl, vsphereUser, vspherePassword, dataCenter, dataStore, pool)
+	if err != nil {
+		log.Fatalf("vSphere setup failed: %v", err)
+	}
+	defer cancel()
+
+	var host *object.HostSystem
+	if hostName != "" {
+		host, err = finder.HostSystem(ctx, hostName)
+		if err != nil {
+			return fmt.Errorf("failed to find host %q: %w", hostName, err)
+		}
+		klog.Infof("Using host: %s", host.Name())
+	}
+
+	vm, err := finder.VirtualMachine(context.Background(), vmName)
+	if err != nil {
+		if _, ok := err.(*find.NotFoundError); !ok {
+			return err
+		}
+	}
+
+	if vm != nil {
+		log.Printf("VM %q already exists. Attempting to retrieve its VMDK path from vSphere.", vmName)
+		return nil
+	}
+
+	// After upload, the `remoteVmdkPath` should correctly point to the descriptor VMDK.
+	// We don't need a separate findVMDKPath after upload because uploadVmdk already handles it.
+	// The `createVM` function will then use this `remoteVmdkPath`.
+
+	remoteIsoPath, err := uploadFile(ctx, ds, vmName, isoPath)
+	if err != nil {
+		return err
+	}
+	vm, err = CloneVMWithDiskResize(ctx, client, templateName, vmName, 100)
+	if err != nil {
+		return err
+	}
+	if err := attachCDROM(ctx, vm, remoteIsoPath); err != nil {
+		return err
+	}
+	if err := attachNetwork(ctx, client, vm, "VM Network"); err != nil {
+		log.Fatalf("add NIC: %v", err)
+	}
+
+	if err := waitForVMRegistration(ctx, finder, vmName, waitTimeout); err != nil {
+		return err
+	}
+
+	klog.Infof("VM %s is ready.", vmName)
+	return nil
+}
+
+func CreateTemplate(templateName, vsphereUrl, vsphereUser, vspherePassword, dataCenter,
+	dataStore, pool, hostName, downloadVmdkURL, localVmdkPath, cloudInitYamlPath string, waitTimeout time.Duration) (string, error) { // Add hostName parameter
 	ctx, cancel, client, finder, dc, ds, rp, err := SetupVSphere(
 		5*time.Minute, vsphereUrl, vsphereUser, vspherePassword, dataCenter, dataStore, pool)
 	if err != nil {
@@ -426,7 +642,7 @@ func CreateVM(vmName, vsphereUrl, vsphereUser, vspherePassword, dataCenter,
 		klog.Infof("Using host: %s", host.Name())
 	}
 
-	vm, err := finder.VirtualMachine(context.Background(), vmName)
+	vm, err := finder.VirtualMachine(context.Background(), templateName)
 	if err != nil {
 		if _, ok := err.(*find.NotFoundError); !ok {
 			return "", err
@@ -434,10 +650,10 @@ func CreateVM(vmName, vsphereUrl, vsphereUser, vspherePassword, dataCenter,
 	}
 
 	if vm != nil {
-		log.Printf("VM %q already exists. Attempting to retrieve its VMDK path from vSphere.", vmName)
+		log.Printf("VM %q already exists. Attempting to retrieve its VMDK path from vSphere.", templateName)
 		existingVmdkPath, err := getExistingVMDKPath(ctx, vm, ds)
 		if err != nil {
-			return "", fmt.Errorf("failed to get VMDK path for existing VM %q: %w", vmName, err)
+			return "", fmt.Errorf("failed to get VMDK path for existing VM %q: %w", templateName, err)
 		}
 		return existingVmdkPath, nil
 	}
@@ -447,7 +663,7 @@ func CreateVM(vmName, vsphereUrl, vsphereUser, vspherePassword, dataCenter,
 		return "", err
 	}
 	fmt.Printf("\nvmdk to upload %s\n", vmdkToUpload)
-	remoteVmdkPath, err := uploadVmdk(ctx, client, ds, dc, rp, host, vmName, vmdkToUpload)
+	remoteVmdkPath, err := uploadVmdk(ctx, client, ds, dc, rp, host, templateName, vmdkToUpload)
 	if err != nil {
 		return "", err
 	}
@@ -457,26 +673,16 @@ func CreateVM(vmName, vsphereUrl, vsphereUser, vspherePassword, dataCenter,
 	// We don't need a separate findVMDKPath after upload because uploadVmdk already handles it.
 	// The `createVM` function will then use this `remoteVmdkPath`.
 
-	remoteIsoPath, err := uploadFile(ctx, ds, vmName, isoPath)
+	err = CreateTemplateFromCloudInitYaml(ctx, client, dc, rp, host, remoteVmdkPath, ds.Name(), cloudInitYamlPath, templateName)
 	if err != nil {
 		return "", err
 	}
-	vm, err = createVM(ctx, client, dc, rp, host, vmName, remoteVmdkPath, ds.Name())
-	if err != nil {
-		return "", err
-	}
-	if err := attachCDROM(ctx, vm, remoteIsoPath); err != nil {
-		return "", err
-	}
-	if err := attachNetwork(ctx, client, vm, "VM Network"); err != nil {
-		log.Fatalf("add NIC: %v", err)
-	}
 
-	if err := waitForVMRegistration(ctx, finder, vmName, waitTimeout); err != nil {
+	if err := waitForVMRegistration(ctx, finder, templateName, waitTimeout); err != nil {
 		return "", err
 	}
 
-	klog.Infof("VM %s is ready.", vmName)
+	klog.Infof("Template %s is ready.", templateName)
 	return remoteVmdkPath, nil
 }
 
