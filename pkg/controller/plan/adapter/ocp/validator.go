@@ -7,6 +7,7 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/settings"
 
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
@@ -17,6 +18,8 @@ import (
 )
 
 const VM_NOT_FOUND = "VM not found."
+
+var Settings = settings.Settings
 
 // Validator
 type Validator struct {
@@ -63,6 +66,19 @@ func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
 // WarmMigration implements base.Validator
 func (r *Validator) WarmMigration() bool {
 	return false
+}
+
+// MigrationType indicates whether the plan's migration type
+// is supported by this provider.
+func (r *Validator) MigrationType() bool {
+	switch r.plan.Spec.Type {
+	case api.MigrationCold, "":
+		return true
+	case api.MigrationLive:
+		return Settings.OCPLiveMigration
+	default:
+		return false
+	}
 }
 
 // NOOP
