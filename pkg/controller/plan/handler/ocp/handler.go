@@ -1,6 +1,7 @@
 package ocp
 
 import (
+	"context"
 	"path"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -9,7 +10,6 @@ import (
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
-	"golang.org/x/net/context"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
