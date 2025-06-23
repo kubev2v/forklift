@@ -70,6 +70,11 @@ func (r *Inventory) Load() error {
 			}
 		}
 	}
+	consoleOrigin, err := getOpenshiftConsoleOrigin()
+	if err != nil {
+		return err
+	}
+	r.CORS.AllowedOrigins = append(r.CORS.AllowedOrigins, consoleOrigin)
 	// WorkingDir
 	if s, found := os.LookupEnv(WorkingDir); found {
 		r.WorkingDir = s

@@ -1,12 +1,18 @@
 package settings
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
 )
 
 // Global
@@ -131,4 +137,41 @@ func GetVDDKImage(providerSpecSettings map[string]string) string {
 	}
 
 	return vddkImage
+}
+
+func getOpenshiftConsoleOrigin() (string, error) {
+	cfg, err := rest.InClusterConfig()
+	if err != nil {
+		return "", err
+	}
+
+	dynClient, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		return "", err
+	}
+
+	routeGVR := schema.GroupVersionResource{
+		Group:    "route.openshift.io",
+		Version:  "v1",
+		Resource: "routes",
+	}
+
+	obj, err := dynClient.
+		Resource(routeGVR).
+		Namespace("openshift-console").
+		Get(context.Background(), "console", metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to get console Route: %w", err)
+	}
+
+	host, found, err := unstructured.NestedString(obj.UnstructuredContent(), "spec", "host")
+	if err != nil {
+		return "", err
+	}
+
+	if !found {
+		return "", fmt.Errorf("console Route is missing spec.host")
+	}
+
+	return host, nil
 }
