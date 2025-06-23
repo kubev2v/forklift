@@ -43,7 +43,7 @@ spec:
     value: build/release.conf
   - name: build-args
     value:
-    - 'EVENT_TITLE={{body.pull_request.title}}'
+    - "EVENT_TITLE={{body.pull_request.title}}"
     - "REVISION={{revision}}"
   pipelineSpec:
     description: |
