@@ -28,11 +28,11 @@ type TestPlan struct {
 	Datastore            string                `yaml:"-"`
 	ResourcePool         string                `yaml:"-"`
 	HostName             string                `yaml:"hostName"`
-	// New fields for VMDK download URL, local VMDK path, and ISO path
-	VmdkDownloadURL string
-	LocalVmdkPath   string
-	IsoPath         string
-	AppConfig       *config.Config
+	VmdkDownloadURL      string
+	LocalVmdkPath        string
+	CloudInitYamlPath    string
+	IsoPath              string
+	AppConfig            *config.Config
 }
 
 // Parse unmarshals YAML data into a TestPlan.
@@ -58,6 +58,7 @@ func (tp *TestPlan) Start(ctx context.Context, podImage, pvcYamlPath string) err
 		tc.ResourcePool = tp.ResourcePool
 		tc.HostName = tp.HostName
 		tc.VmdkDownloadURL = tp.VmdkDownloadURL
+		tc.CloudInitYamlPath = tp.CloudInitYamlPath
 		tc.IsoPath = tp.IsoPath
 		tc.StorageClass = tp.StorageClass
 		if tc.LocalVmdkPath == "" {
