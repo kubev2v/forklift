@@ -9,6 +9,7 @@ custom_cpu_model = true {
 concerns[flag] {
     custom_cpu_model
     flag := {
+        "id": "ovirt.cpu.custom_model.detected",
         "category": "Warning",
         "label": "Custom CPU Model detected",
         "assessment": "The VM is configured with a custom CPU model. This configuration will apply to the migrated VM and may not be supported by OpenShift Virtualization."

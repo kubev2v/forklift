@@ -9,6 +9,7 @@ independent_disk {
 concerns[flag] {
     independent_disk
     flag := {
+        "id": "vmware.disk_mode.independent",
         "category": "Critical",
         "label": "Independent disk detected",
         "assessment": "Independent disks cannot be transferred using recent versions of VDDK. The VM cannot be migrated unless disks are changed to 'Dependent' mode in VMware."
