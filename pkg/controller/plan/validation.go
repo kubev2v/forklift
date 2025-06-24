@@ -642,7 +642,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		if ova, ok := v.(*ova.VM); ok {
 			for _, concern := range ova.Concerns {
 				// match label from ova/export_source.rego
-				if concern.Label == "Unsupported OVA source" {
+				if concern.Id == "ova.source.unsupported" {
 					unsupportedOvaSource.Items = append(unsupportedOvaSource.Items, ref.String())
 				}
 			}
