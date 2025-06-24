@@ -14,6 +14,8 @@ metadata:
       ".konflux/forklift-api/rpms.lock.yaml".pathChanged() ||
       "build/forklift-api/Containerfile-downstream".pathChanged() ||
       "pkg/forklift-api/***".pathChanged() ||
+      "pkg/controller/***".pathChanged() ||
+      "pkg/lib/***".pathChanged() ||
       "cmd/forklift-api/***".pathChanged() )
   creationTimestamp: null
   labels:
