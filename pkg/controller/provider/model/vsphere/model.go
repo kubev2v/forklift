@@ -391,11 +391,6 @@ type GuestIpStack struct {
 
 // Guest disk.
 type GuestDisk struct {
-	// The key of the VirtualDevice.
-	//
-	// `VirtualDevice.key`
-	Key int32 `xml:"key" json:"key"`
-
 	// Name of the virtual disk in the guest operating system.
 	//
 	// For example: C:\\ ( in linux it can by a path like /home ).
