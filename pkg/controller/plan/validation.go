@@ -16,6 +16,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/ova"
 	"github.com/kubev2v/forklift/pkg/controller/validation"
 	ocp "github.com/kubev2v/forklift/pkg/lib/client/openshift"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
@@ -74,6 +75,7 @@ const (
 	ValidatingVDDK                = "ValidatingVDDK"
 	VDDKInitImageNotReady         = "VDDKInitImageNotReady"
 	VDDKInitImageUnavailable      = "VDDKInitImageUnavailable"
+	UnsupportedOvaSource          = "UnsupportedOvaSource"
 )
 
 // Categories
@@ -565,6 +567,13 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "Duplicate targetName.",
 		Items:    []string{},
 	}
+	unsupportedOvaSource := libcnd.Condition{
+		Type:     UnsupportedOvaSource,
+		Status:   True,
+		Category: api.CategoryWarn,
+		Message:  "OVA appears to have been exported from an unsupported source, and may have issues during import.",
+		Items:    []string{},
+	}
 	var sharedDisksConditions []libcnd.Condition
 	setOf := map[string]bool{}
 	setOfTargetName := map[string]bool{}
@@ -592,7 +601,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		if pErr != nil {
 			return liberr.Wrap(pErr)
 		}
-		_, pErr = inventory.VM(ref)
+		v, pErr := inventory.VM(ref)
 		if pErr != nil {
 			if errors.As(pErr, &web.NotFoundError{}) {
 				notFound.Items = append(notFound.Items, ref.String())
@@ -627,6 +636,15 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 				targetNameNotUnique.Items = append(targetNameNotUnique.Items, ref.String())
 			} else {
 				setOfTargetName[vm.TargetName] = true
+			}
+		}
+		// check for supported OVA source
+		if ova, ok := v.(*ova.VM); ok {
+			for _, concern := range ova.Concerns {
+				// match label from ova/export_source.rego
+				if concern.Label == "Unsupported OVA source" {
+					unsupportedOvaSource.Items = append(unsupportedOvaSource.Items, ref.String())
+				}
 			}
 		}
 		pAdapter, err := adapter.New(provider)
@@ -826,6 +844,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(targetNameNotUnique.Items) > 0 {
 		plan.Status.SetCondition(targetNameNotUnique)
+	}
+	if len(unsupportedOvaSource.Items) > 0 {
+		plan.Status.SetCondition(unsupportedOvaSource)
 	}
 
 	return nil
