@@ -5,8 +5,10 @@ import (
 	liburl "net/url"
 	"time"
 
+	"github.com/kubev2v/forklift/pkg/controller/base"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	"github.com/kubev2v/forklift/pkg/lib/util"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/session"
@@ -73,9 +75,20 @@ func (r *EsxHost) connect(ctx context.Context) (err error) {
 		r.user(),
 		r.password())
 
-	// Always use insecure skip verify for ESX hosts.
-	soapClient := soap.NewClient(url, true)
-	soapClient.SetThumbprint(url.Host, r.thumbprint())
+	thumbprint := r.thumbprint()
+	skipVerifying := base.GetInsecureSkipVerifyFlag(r.Secret)
+
+	// If thumbprint is not provided, verify the TLS connection to get it.
+	if !skipVerifying && thumbprint == "" {
+		cert, errtls := base.VerifyTLSConnection(r.URL, r.Secret)
+		if errtls != nil {
+			return liberr.Wrap(errtls)
+		}
+		thumbprint = util.Fingerprint(cert)
+	}
+
+	soapClient := soap.NewClient(url, skipVerifying)
+	soapClient.SetThumbprint(url.Host, thumbprint)
 
 	vimClient, err := vim25.NewClient(ctx, soapClient)
 	if err != nil {
