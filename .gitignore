@@ -40,6 +40,8 @@ vendor/**/Dockerfile.vcsim
 vendor/**/Dockerfile.govc
 
 cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper/vmkfstools-wrapper.vib
+cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper/.passwords/
+
 .github/workflows/build-push-images-hal.yml
 __pycache__
 
