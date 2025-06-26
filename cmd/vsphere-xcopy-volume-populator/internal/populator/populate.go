@@ -8,9 +8,15 @@ import (
 type Populator interface {
 	// Populate will populate the volume identified by volumeHanle with the content of
 	// the sourceVMDKFile.
-	// volumeHanle is the the PVC.Spec.Csi.VolumeHandle field, which by the CSI spec, represents
-	// the volume in the storage system and is set by the CSI driver
-	Populate(vmId string, sourceVMDKFile string, volumeHanle string, progress chan<- uint, quit chan error) error
+	// persistentVolume is a slim version of k8s PersistentVolume created by the CSI driver,
+	// to help identify its underlying LUN in the storage system.
+	Populate(vmId string, sourceVMDKFile string, persistentVolume PersistentVolume, progress chan<- uint, quit chan error) error
+}
+
+type PersistentVolume struct {
+	Name             string
+	VolumeHandle     string
+	VolumeAttributes map[string]string
 }
 
 // LUN describes the object in the storage system
