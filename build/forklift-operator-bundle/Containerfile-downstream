@@ -25,7 +25,7 @@ ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/mtv-candidate/mtv-ova-provider
 
 ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhv-populator-rhel8@sha256:eea56d89a584aa9e247b7b7b1a764e60d254bca5904ac04c9baeb7104e94328b"
 
-ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-populator-controller-rhel9@sha256:6e4fb32a2ba0db8c3da9cf2cb49b7f0f732fc16b60c7f84a454dfe2f620ad2a3"
+ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-populator-controller-rhel9@sha256:086a438694a11d42773f8d02935e2bd298e9d1f9de29f59e61e7743af206a928"
 
 ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:4848fb4ccc36a825d7b3527bd2ef2c3e651e5ddc6f96cd7513566212fe1adb00"
 
