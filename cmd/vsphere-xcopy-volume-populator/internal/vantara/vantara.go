@@ -105,11 +105,11 @@ func (v *VantaraCloner) CurrentMappedGroups(lun populator.LUN, context populator
 	return hgids, nil
 }
 
-func (v *VantaraCloner) ResolveVolumeHandleToLUN(volumeHandle string) (populator.LUN, error) {
-	parts := strings.Split(volumeHandle, "--")
+func (v *VantaraCloner) ResolvePVToLUN(pv populator.PersistentVolume) (populator.LUN, error) {
+	parts := strings.Split(pv.VolumeHandle, "--")
 	lun := populator.LUN{}
 	if len(parts) != 5 || parts[0] != "01" {
-		return lun, fmt.Errorf("invalid volume handle: %s", volumeHandle)
+		return lun, fmt.Errorf("invalid volume handle: %s", pv.VolumeHandle)
 	}
 	ioProtocol := parts[1]
 	storageDeviceID := parts[2]
@@ -125,7 +125,7 @@ func (v *VantaraCloner) ResolveVolumeHandleToLUN(volumeHandle string) (populator
 	lun.Protocol = ioProtocol
 	//	lun.ProviderID = ldevnaaid[:6]
 	//	lun.SerialNumber = ldevnaaid[6:]
-	lun.VolumeHandle = volumeHandle
+	lun.VolumeHandle = pv.VolumeHandle
 	lun.Name = ldevNickName
 	klog.Infof("Resolved LUN: %+v", lun)
 	return lun, nil
