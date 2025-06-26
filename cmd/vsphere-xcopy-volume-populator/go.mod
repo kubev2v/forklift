@@ -5,6 +5,7 @@ go 1.23.0
 toolchain go1.23.10
 
 require (
+	github.com/dell/gopowermax/v2 v2.9.0
 	github.com/devans10/pugo/flasharray v0.0.0-20241116160615-6bb8c469c9a0
 	github.com/konveyor/forklift-controller v0.0.0
 	github.com/netapp/trident v0.0.0-20240628081112-cb68cb389d9d
