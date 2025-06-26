@@ -5,6 +5,7 @@ go 1.23
 toolchain go1.23.10
 
 require (
+	github.com/dell/goscaleio v1.19.1
 	github.com/netapp/trident v0.0.0-20240628081112-cb68cb389d9d
 	github.com/stretchr/testify v1.10.0
 	github.com/vmware/govmomi v0.48.0

@@ -89,7 +89,7 @@ func (c *NetappClonner) ResolvePVToLUN(pv populator.PersistentVolume) (populator
 	klog.Infof("found lun %s with serial %s", l.Name, l.SerialNumber)
 	// in RHEL lsblk needs that swap. In fedora it doesn't
 	//serialNumber :=  strings.ReplaceAll(l.SerialNumber, "?", "\\\\x3f")
-	naa := fmt.Sprintf("%s%x", OntapProviderID, l.SerialNumber)
+	naa := fmt.Sprintf("naa.%s%x", OntapProviderID, l.SerialNumber)
 	lun := populator.LUN{Name: l.Name, VolumeHandle: pv.VolumeHandle, SerialNumber: l.SerialNumber, NAA: naa}
 	return lun, nil
 }

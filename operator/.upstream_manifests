@@ -3079,6 +3079,7 @@ spec:
                               - vantara
                               - ontap
                               - primera3par
+                              - powerflex
                               type: string
                           required:
                           - secretRef
