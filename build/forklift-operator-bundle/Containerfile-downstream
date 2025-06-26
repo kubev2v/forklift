@@ -13,7 +13,7 @@ ARG OCP_VERSIONS
 
 ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:ac4eeb3ffe22472ac3f11633f3a9a21b616b84b3752804125cbe622375de654b"
 
-ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:4f83f6020ef357fe9d4518e38d0c6fb62680f77ffed548fdb55f9d906ebde979"
+ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:9b8668e5573bcdfaf84feeba5af261d605bab0389c6c3a6de5d52c30bdab6f10"
 
 ARG MUST_GATHER_IMAGE="registry.redhat.io/mtv-candidate/mtv-must-gather-rhel8@sha256:86306f75fcf091b87ee9f82cf5edb056e03e630359b4a6434a327c77a6d1ef1d"
 
