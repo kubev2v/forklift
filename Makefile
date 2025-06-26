@@ -1,5 +1,5 @@
-GOOS ?= `go env GOOS`
-GOPATH ?= `go env GOPATH`
+GOOS ?= $(shell go env GOOS)
+GOPATH ?= $(shell go env GOPATH)
 GOBIN ?= $(GOPATH)/bin
 GO111MODULE = auto
 
