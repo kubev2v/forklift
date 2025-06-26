@@ -14,6 +14,7 @@ import (
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/ontap"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/powermax"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/primera3par"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vantara"
 
@@ -82,6 +83,13 @@ func main() {
 			storageHostname, storageUsername, storagePassword, storageSkipSSLVerification == "true")
 		if err != nil {
 			klog.Fatalf("failed to initialize primera3par clonner with %s", err)
+		}
+		storageApi = &sm
+	case "powermax":
+		sm, err := powermax.NewPowermaxClonner(
+			storageHostname, storageUsername, storagePassword, storageSkipSSLVerification == "true")
+		if err != nil {
+			klog.Fatalf("failed to initialize Powermax clonner with %s", err)
 		}
 		storageApi = &sm
 	default:

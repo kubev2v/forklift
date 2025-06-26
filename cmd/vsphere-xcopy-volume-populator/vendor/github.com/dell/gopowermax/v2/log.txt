@@ -1,0 +1,8 @@
+api/api.go:159:5: G402: TLS InsecureSkipVerify set true. (gosec)
+				InsecureSkipVerify: true,
+				^
+api/api.go:170:22: G402: TLS MinVersion too low. (gosec)
+			TLSClientConfig: &tls.Config{
+				RootCAs:            pool,
+				InsecureSkipVerify: false,
+			},
