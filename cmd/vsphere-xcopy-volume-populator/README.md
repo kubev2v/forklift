@@ -136,8 +136,36 @@ spec:
 
 # Secret with storage provider credentials
 
+Create a secret where the migration provider is setup, usually openshift-mtv
+and put the credentials of the storage system. All of the provider are required
+to have a secret with those required fields
+
+```
+STORAGE_HOSTNAME
+STORAGE_USERNAME
+STORAGE_PASSWORD
+STORAGE_SKIP_SSL_VERIFICATION
+```
+
+Provider specific entries in the secret shall be documented below:
+
 ## Hitachi Vantara
 - see [README](internal/vantara/README.md)
+
+## NetApp ONTAP
+
+Add these keys to the secret mentioned in the storage map:
+
+`ONTAP_SVM` - the SVM to use in all the client interactions. Can be taken from 
+trident.netapp.io/v1/TridentBackend.config.ontap_config.svm resource field.
+
+## Dell PowerMax
+
+Add these keys to the secret mentioned in the storage map:
+
+`POWERMAX_SYMMETRIX_ID` - the symmetrix id of the storage array. Can be taken
+from the ConfigMap under the 'powermax' namespace, which the CSI driver uses.
+
 
 # Setup copy offload
 - Set the feature flag
@@ -169,6 +197,15 @@ spec:
   Since VSphere is invoking some SOAP/Rest endpoints on the ESXi, those can fail because of 
   standard error reasons and vanish after the next try. If the popoulator fails the migration
   can be restarted. We may want to restart/retry that populator or restart the migration.
+
+- VIB issues
+  If the vib is installed but the /etc/init.d/hostd did not restart then the vmkfstools namespace in esxcli is either not updated or doesn't exist. If it doesn't exist, it means that is the first time usage, probably right after the first use.
+  The error returned by the remote esxcli invocation is:
+  ```
+  CLI Fault: The object or item referred to could not be found. <obj xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="urn:vim25" versionId="5.0" xsi:type="LocalizedMethodFault"><fault xsi:type="NotFound"></fault><localizedMessage>The object or item referred to could not be found.</localizedMessage></obj>
+  ```
+  
+    resolution: ssh into the ESXi and run `/etc/init.d/hostd restart`. Wait for few seconds till the ESX renews the connection with vSphere.
 
 ## NetApp
 - Error `cannot derive SVM to use; please specify SVM in config file`
