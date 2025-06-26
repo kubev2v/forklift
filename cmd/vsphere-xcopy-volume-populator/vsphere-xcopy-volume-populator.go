@@ -15,8 +15,10 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/ontap"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/primera3par"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/pure"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vantara"
 
+	forklift "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 
@@ -64,28 +66,36 @@ func main() {
 	handleArgs()
 
 	var storageApi populator.StorageApi
-	switch storageVendor {
-	case "vantara":
+	product := forklift.StorageVendorProduct(storageVendor)
+	switch product {
+	case forklift.StorageVendorProductVantara:
 		sm, err := vantara.NewVantaraClonner(storageHostname, storageUsername, storagePassword)
 		if err != nil {
-			klog.Fatalf("failed to initialize vantara storage mapper with %s", err)
+			klog.Fatalf("failed to initialize Vantara storage mapper with %s", err)
 		}
 		storageApi = &sm
-	case "ontap":
+	case forklift.StorageVendorProductOntap:
 		sm, err := ontap.NewNetappClonner(storageHostname, storageUsername, storagePassword)
 		if err != nil {
-			klog.Fatalf("failed to initialize ontap storage mapper with %s", err)
+			klog.Fatalf("failed to initialize Ontap storage mapper with %s", err)
 		}
 		storageApi = &sm
-	case "primera3par":
+	case forklift.StorageVendorProductPrimera3Par:
 		sm, err := primera3par.NewPrimera3ParClonner(
 			storageHostname, storageUsername, storagePassword, storageSkipSSLVerification == "true")
 		if err != nil {
 			klog.Fatalf("failed to initialize primera3par clonner with %s", err)
 		}
 		storageApi = &sm
+	case forklift.StorageVendorProductPureFlashArray:
+		sm, err := pure.NewFlashArrayClonner(
+			storageHostname, storageUsername, storagePassword, storageSkipSSLVerification == "true", os.Getenv(pure.ClusterPrefixEnv))
+		if err != nil {
+			klog.Fatalf("failed to initialize Pure FlashArray clonner with %s", err)
+		}
+		storageApi = &sm
 	default:
-		klog.Fatalf("Unsupported storage vendor %s use one of [ontap,]", storageVendor)
+		klog.Fatalf("Unsupported storage vendor %s use one of [vantara, ontap, primera3par, pureFlashArray]", storageVendor)
 	}
 
 	// validations
@@ -99,7 +109,7 @@ func main() {
 		klog.Fatalf("Failed to create a remote esxcli populator: %s", err)
 	}
 
-	volumeHandle, err := getVolumeHandle(clientSet, storageVendor, targetNamespace, ownerName)
+	pv, err := getPv(clientSet, targetNamespace, ownerName)
 	if err != nil {
 		klog.Fatalf("Failed to fetch the volume handle details from the target pvc %s: %s", ownerName, err)
 	}
@@ -112,7 +122,7 @@ func main() {
 	progressCh := make(chan uint)
 	quitCh := make(chan error)
 
-	go p.Populate(sourceVmId, sourceVMDKFile, volumeHandle, progressCh, quitCh)
+	go p.Populate(sourceVmId, sourceVMDKFile, pv, progressCh, quitCh)
 
 	for {
 		select {
@@ -146,14 +156,14 @@ func newKubeClient(masterURL string, kubeconfig string) (*kubernetes.Clientset, 
 	return kubernetes.NewForConfig(coreCfg)
 }
 
-// getVolumeHandle extract the volume handle from the PVC. To detect the volume of the said targetPVC we need
+// getPv extract the volume handle from the PVC. To detect the volume of the said targetPVC we need
 // to locate the created volume on the PVC. There is a  chance where the volume details are listed on the
 // "prime-{ORIG_PVC_NAME}" PVC because when the controller pod is handling it, the pvc prime should be bounded
 // to popoulator pod. However it is not guarnteed to be bounded at that stage and it may take time
-func getVolumeHandle(kubeClient *kubernetes.Clientset, product string, targetNamespace, targetPVC string) (string, error) {
+func getPv(kubeClient *kubernetes.Clientset, targetNamespace, targetPVC string) (populator.PersistentVolume, error) {
 	pvc, err := kubeClient.CoreV1().PersistentVolumeClaims(targetNamespace).Get(context.Background(), targetPVC, metav1.GetOptions{})
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch the the target persistent volume claim %q %w", pvc.Name, err)
+		return populator.PersistentVolume{}, fmt.Errorf("failed to fetch the the target persistent volume claim %q %w", pvc.Name, err)
 	}
 	var volumeName string
 	if pvc.Spec.VolumeName != "" {
@@ -164,30 +174,23 @@ func getVolumeHandle(kubeClient *kubernetes.Clientset, product string, targetNam
 		// try pvc with postfix "prime" that the populator copies. The prime volume is created in the namespace where the populator controller runs.
 		primePVC, err := kubeClient.CoreV1().PersistentVolumeClaims(targetNamespace).Get(context.Background(), string(primePVCName), metav1.GetOptions{})
 		if err != nil {
-			return "", fmt.Errorf("failed to fetch the the target persistent volume claim %q %w", primePVC.Name, err)
+			return populator.PersistentVolume{}, fmt.Errorf("failed to fetch the the target persistent volume claim %q %w", primePVC.Name, err)
 		}
 
 		if primePVC.Spec.VolumeName == "" {
-			return "", fmt.Errorf("the volume name is not found on the prime volume claim %q", primePVC.Name)
+			return populator.PersistentVolume{}, fmt.Errorf("the volume name is not found on the prime volume claim %q", primePVC.Name)
 		}
 		volumeName = primePVC.Spec.VolumeName
 	}
 
 	pv, err := kubeClient.CoreV1().PersistentVolumes().Get(context.Background(), volumeName, metav1.GetOptions{})
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch the the target volume details %w", err)
+		return populator.PersistentVolume{}, fmt.Errorf("failed to fetch the target volume details %w", err)
 	}
-	klog.Infof("target volume %s volumeHandle %s", pv.Name, pv.Spec.CSI.VolumeHandle)
-	switch product {
-	case "ontap":
-		if internalName, ok := pv.Spec.CSI.VolumeAttributes["internalName"]; ok {
-			return internalName, nil
-		} else {
-			return pv.Spec.CSI.VolumeHandle, nil
-		}
-	default:
-		return pv.Spec.CSI.VolumeHandle, nil
-	}
+	return populator.PersistentVolume{
+		Name:             pv.Name,
+		VolumeHandle:     pv.Spec.CSI.VolumeHandle,
+		VolumeAttributes: pv.Spec.CSI.VolumeAttributes}, nil
 }
 
 func handleArgs() {
