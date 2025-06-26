@@ -75,9 +75,13 @@ func NewNetappClonner(hostname, username, password string) (NetappClonner, error
 	return nc, nil
 }
 
-func (c *NetappClonner) ResolveVolumeHandleToLUN(volumeHandle string) (populator.LUN, error) {
+func (c *NetappClonner) ResolvePVToLUN(pv populator.PersistentVolume) (populator.LUN, error) {
 	// trident sets internalName attribute on a volume, and that is the real volume name in the system
-	l, err := c.api.LunGetByName(context.Background(), fmt.Sprintf("/vol/%s/lun0", volumeHandle))
+	internalName, ok := pv.VolumeAttributes["internalName"]
+	if !ok {
+		return populator.LUN{}, fmt.Errorf("intenalName attribute is missing on the PersistentVolume %s", pv.Name)
+	}
+	l, err := c.api.LunGetByName(context.Background(), fmt.Sprintf("/vol/%s/lun0", internalName))
 	if err != nil {
 		return populator.LUN{}, err
 	}
@@ -86,7 +90,7 @@ func (c *NetappClonner) ResolveVolumeHandleToLUN(volumeHandle string) (populator
 	// in RHEL lsblk needs that swap. In fedora it doesn't
 	//serialNumber :=  strings.ReplaceAll(l.SerialNumber, "?", "\\\\x3f")
 	naa := fmt.Sprintf("%s%x", OntapProviderID, l.SerialNumber)
-	lun := populator.LUN{Name: l.Name, VolumeHandle: volumeHandle, SerialNumber: l.SerialNumber, NAA: naa}
+	lun := populator.LUN{Name: l.Name, VolumeHandle: pv.VolumeHandle, SerialNumber: l.SerialNumber, NAA: naa}
 	return lun, nil
 }
 
