@@ -32,6 +32,10 @@ func (r *BaseMigrator) Init() (err error) {
 	return
 }
 
+func (r *BaseMigrator) Begin() (err error) {
+	return
+}
+
 func (r *BaseMigrator) Complete(status *plan.VMStatus) {
 }
 
