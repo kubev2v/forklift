@@ -102,6 +102,7 @@ type Migrator interface {
 	Step(*plan.VMStatus) string
 	Next(status *plan.VMStatus) (next string)
 	Complete(status *plan.VMStatus)
+	Begin() error
 }
 
 // NextPhase transitions the VM to the next migration phase.
