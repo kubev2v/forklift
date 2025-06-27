@@ -312,7 +312,7 @@ func (r *KubeVirt) FeatureGate(feature string) (enabled bool) {
 		return
 	}
 	for _, gate := range r.Spec.Configuration.DeveloperConfiguration.FeatureGates {
-		if strings.ToLower(gate) == strings.ToLower(feature) {
+		if strings.EqualFold(gate, feature) {
 			enabled = true
 			return
 		}

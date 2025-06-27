@@ -33,7 +33,6 @@ func (r *BaseMigrator) Init() (err error) {
 }
 
 func (r *BaseMigrator) Complete(status *plan.VMStatus) {
-	return
 }
 
 func (r *BaseMigrator) Status(vm plan.VM) (status *plan.VMStatus) {
