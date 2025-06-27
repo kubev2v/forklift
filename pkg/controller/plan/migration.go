@@ -237,6 +237,12 @@ func (r *Migration) begin() (err error) {
 
 	r.Plan.Status.Migration.VMs = list
 
+	err = r.migrator.Begin()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
 	r.Log.Info("Migration [STARTED]")
 
 	return

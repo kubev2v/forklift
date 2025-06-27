@@ -45,7 +45,6 @@ const (
 	Started                                = "Started"
 	PreHook                                = "PreHook"
 	CreateServiceExports                   = "CreateServiceExports"
-	SynchronizeCertificates                = "SynchronizeCertificates"
 	CreateSecrets                          = "CreateSecrets"
 	CreateConfigMaps                       = "CreateConfigMaps"
 	EnsurePreference                       = "EnsurePreference"
@@ -113,6 +112,16 @@ func (r *LiveMigrator) Init() (err error) {
 	return
 }
 
+// Begin the migration process. This is called once at the beginning
+// of a migration plan, before any of the VMs begin to migrate.
+func (r *LiveMigrator) Begin() (err error) {
+	if r.Source.Provider.UID != r.Destination.Provider.UID {
+		err = r.SynchronizeCertificateBundles()
+		return
+	}
+	return
+}
+
 func (r *LiveMigrator) Complete(vm *planapi.VMStatus) {
 	err := r.DeleteTargetVMIM(vm)
 	if err != nil {
@@ -171,7 +180,6 @@ func (r *LiveMigrator) Itinerary(vm planapi.VM) (itinerary *libitr.Itinerary) {
 		Pipeline: libitr.Pipeline{
 			{Name: Started},
 			{Name: PreHook, All: FlagPreHook},
-			{Name: SynchronizeCertificates, All: FlagIntercluster},
 			{Name: CreateSecrets},
 			{Name: CreateConfigMaps},
 			{Name: EnsurePreference},
@@ -206,7 +214,7 @@ func (r *LiveMigrator) Next(vm *planapi.VMStatus) (next string) {
 
 func (r *LiveMigrator) Step(vm *planapi.VMStatus) (step string) {
 	switch vm.Phase {
-	case Started, SynchronizeCertificates:
+	case Started:
 		step = base.Initialize
 	case PreHook, PostHook:
 		step = vm.Phase
@@ -321,14 +329,6 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 		// delegate to common pipeline
 		ok = false
 		return
-	case SynchronizeCertificates:
-		err = r.SynchronizeCertificateBundles()
-		if err != nil {
-			r.StepError(vm, err)
-			err = nil
-			break
-		}
-		r.NextPhase(vm)
 	case CreateSecrets:
 		step, found := vm.FindStep(r.Step(vm))
 		if !found {
