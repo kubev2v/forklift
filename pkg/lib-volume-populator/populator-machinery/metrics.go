@@ -68,7 +68,9 @@ func initMetrics() *metricsManager {
 		},
 	)
 
-	k8smetrics.RegisterProcessStartTime(m.registry.Register)
+	if err := k8smetrics.RegisterProcessStartTime(m.registry.Register); err != nil {
+		klog.Errorf("Failed to register process start time metric: %v", err)
+	}
 	m.registry.MustRegister(m.opLatencyMetrics)
 	m.registry.MustRegister(m.opInFlight)
 
@@ -142,14 +144,6 @@ func (m *metricsManager) operationStart(pvcUID types.UID) {
 	if _, exists := m.cache[pvcUID]; !exists {
 		m.cache[pvcUID] = time.Now()
 	}
-	m.opInFlight.Set(float64(len(m.cache)))
-}
-
-// dropOperation drops an operation
-func (m *metricsManager) dropOperation(pvcUID types.UID) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	delete(m.cache, pvcUID)
 	m.opInFlight.Set(float64(len(m.cache)))
 }
 

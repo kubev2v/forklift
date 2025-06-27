@@ -1,7 +1,7 @@
 package ova
 
 import (
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ova"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/ova"
 )
 
 // REST Resource.

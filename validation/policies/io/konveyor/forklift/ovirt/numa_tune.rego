@@ -9,6 +9,7 @@ has_numa_affinity = true {
 concerns[flag] {
     has_numa_affinity
     flag := {
+        "id": "ovirt.numa.tuning.detected",
         "category": "Warning",
         "label": "NUMA tuning detected",
         "assessment": "NUMA tuning is not currently supported by OpenShift Virtualization. The VM can be migrated but it will not have this NUMA mapping in the target environment."

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	libclient "github.com/konveyor/forklift-controller/pkg/lib/client/openstack"
-	"github.com/konveyor/forklift-controller/pkg/metrics"
+	libclient "github.com/kubev2v/forklift/pkg/lib/client/openstack"
+	"github.com/kubev2v/forklift/pkg/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"k8s.io/klog/v2"

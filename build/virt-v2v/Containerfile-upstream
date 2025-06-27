@@ -1,5 +1,5 @@
 # Build virt-v2v binary
-FROM registry.access.redhat.com/ubi9/go-toolset:1.21.11-9.1726696856 AS builder
+FROM registry.access.redhat.com/ubi9/go-toolset:1.23.6-1747333074 AS builder
 WORKDIR /app
 COPY --chown=1001:0 ./ ./
 ENV GOFLAGS "-mod=vendor -tags=strictfipsruntime"
@@ -15,6 +15,8 @@ RUN rm /etc/pki/tls/fips_local.cnf && \
     echo -e '[fips_sect]\ntls1-prf-ems-check = 0\nactivate = 1' > /etc/pki/tls/fips_local.cnf && \
     sed -i '/^\\[ crypto_policy \\]/a Options=RHNoEnforceEMSinFIPS' /etc/pki/tls/openssl.cnf
 
+# The virt-v2v-in-place in centos is not in the bin directory and is not accessible via PATH
+ENV PATH="$PATH:/usr/libexec"
 ENV LIBGUESTFS_BACKEND=direct LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1
 
 RUN mkdir /disks && \
@@ -23,6 +25,7 @@ RUN mkdir /disks && \
         virt-v2v && \
     dnf clean all
 
+# TODO: This should be replaced with `dnf install -y virtio-win` from centos-stream10
 RUN dnf install -y https://kojihub.stream.centos.org/kojifiles/packages/virtio-win/1.9.40/1.el9/noarch/virtio-win-1.9.40-1.el9.noarch.rpm
 
 RUN ( [ "$(rpm -q glibc)" == "glibc-2.34-66.el9.x86_64" ] && dnf -y downgrade glibc-2.34-65.el9.x86_64 || true ) && \
@@ -36,6 +39,8 @@ RUN mkdir -p /usr/lib64/guestfs/appliance && \
         qemu-img convert -c -O qcow2 root root.qcow2 && \
         mv -vf root.qcow2 root && \
         tar -cvf /libguestfs-appliance.tar /usr/lib64/guestfs/appliance
+
+RUN mkdir -p /etc/pki/CA/ && chown qemu:qemu /etc/pki/CA/
 
 COPY --from=builder /app/virt-v2v-monitor /usr/local/bin/virt-v2v-monitor
 

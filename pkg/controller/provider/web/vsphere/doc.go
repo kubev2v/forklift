@@ -1,10 +1,11 @@
 package vsphere
 
 import (
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	"github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
-	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
+	"github.com/kubev2v/forklift/pkg/lib/inventory/container"
+	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
+	"github.com/kubev2v/forklift/pkg/settings"
 )
 
 // Routes
@@ -14,7 +15,7 @@ const (
 
 // Build all handlers.
 func Handlers(container *container.Container) []libweb.RequestHandler {
-	return []libweb.RequestHandler{
+	handlers := []libweb.RequestHandler{
 		&ProviderHandler{
 			Handler: base.Handler{
 				Container: container,
@@ -66,4 +67,17 @@ func Handlers(container *container.Container) []libweb.RequestHandler {
 			},
 		},
 	}
+
+	if settings.Settings.OpenShift {
+		handlers = append(
+			handlers,
+			&VddkHandler{
+				Handler: base.Handler{
+					Container: container,
+				},
+			},
+		)
+	}
+
+	return handlers
 }

@@ -4,15 +4,15 @@ import (
 	"context"
 	"fmt"
 	liburl "net/url"
-	"strconv"
 
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
-	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	"github.com/konveyor/forklift-controller/pkg/controller/plan/util"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	"github.com/kubev2v/forklift/pkg/controller/base"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/controller/plan/util"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
@@ -237,9 +237,9 @@ func (r *Client) GetSnapshotDeltas(vmRef ref.Ref, snapshotId string, hosts util.
 }
 
 // Check if a snapshot is removed
-func (r *Client) CheckSnapshotRemove(vmRef ref.Ref, precopy planapi.Precopy, hosts util.HostsFunc) (bool, error) {
-	r.Log.Info("Check Snapshot Remove", "vmRef", vmRef, "precopy", precopy)
-	taskInfo, err := r.getTaskById(vmRef, precopy.RemoveTaskId, hosts)
+func (r *Client) CheckSnapshotRemove(vmRef ref.Ref, snapshotRemoveTaskId string, hosts util.HostsFunc) (bool, error) {
+	r.Log.Info("Check Snapshot Remove", "vmRef", vmRef, "snapshotRemoveTaskId", snapshotRemoveTaskId)
+	taskInfo, err := r.getTaskById(vmRef, snapshotRemoveTaskId, hosts)
 	if err != nil {
 		return false, liberr.Wrap(err)
 	}
@@ -247,9 +247,9 @@ func (r *Client) CheckSnapshotRemove(vmRef ref.Ref, precopy planapi.Precopy, hos
 }
 
 // Check if a snapshot is ready to transfer.
-func (r *Client) CheckSnapshotReady(vmRef ref.Ref, precopy planapi.Precopy, hosts util.HostsFunc) (ready bool, snapshotId string, err error) {
-	r.Log.Info("Check Snapshot Ready", "vmRef", vmRef, "precopy", precopy)
-	taskInfo, err := r.getTaskById(vmRef, precopy.CreateTaskId, hosts)
+func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshotCreateTaskId string, hosts util.HostsFunc) (ready bool, snapshotId string, err error) {
+	r.Log.Info("Check Snapshot Ready", "vmRef", vmRef, "snapshotCreateTaskId", snapshotCreateTaskId)
+	taskInfo, err := r.getTaskById(vmRef, snapshotCreateTaskId, hosts)
 	if err != nil {
 		return false, "", liberr.Wrap(err)
 	}
@@ -331,7 +331,7 @@ func (r *Client) getTaskById(vmRef ref.Ref, taskId string, hosts util.HostsFunc)
 }
 
 func (r *Client) getClient(vm *model.VM, hosts util.HostsFunc) (client *vim25.Client, err error) {
-	if coldLocal, vErr := r.Plan.VSphereColdLocal(); vErr == nil && coldLocal {
+	if useV2vForTransfer, vErr := r.Plan.ShouldUseV2vForTransfer(); vErr == nil && useV2vForTransfer {
 		// when virt-v2v runs the migration, forklift-controller should interact only
 		// with the component that serves the SDK endpoint of the provider
 		client = r.client.Client
@@ -394,7 +394,7 @@ func (r *Client) getHostClient(hostDef *v1beta1.Host, host *model.Host) (client 
 	}
 
 	url.User = liburl.UserPassword(string(secret.Data["user"]), string(secret.Data["password"]))
-	soapClient := soap.NewClient(url, r.getInsecureSkipVerifyFlag())
+	soapClient := soap.NewClient(url, base.GetInsecureSkipVerifyFlag(r.Source.Secret))
 	soapClient.SetThumbprint(url.Host, host.Thumbprint)
 	vimClient, err := vim25.NewClient(context.TODO(), soapClient)
 	if err != nil {
@@ -479,7 +479,7 @@ func (r *Client) connect() error {
 		return liberr.Wrap(err)
 	}
 	url.User = liburl.UserPassword(r.user(), r.password())
-	soapClient := soap.NewClient(url, r.getInsecureSkipVerifyFlag())
+	soapClient := soap.NewClient(url, base.GetInsecureSkipVerifyFlag(r.Source.Secret))
 	soapClient.SetThumbprint(url.Host, r.thumbprint())
 	vimClient, err := vim25.NewClient(context.TODO(), soapClient)
 	if err != nil {
@@ -513,22 +513,6 @@ func (r *Client) password() string {
 
 func (r *Client) thumbprint() string {
 	return r.Source.Provider.Status.Fingerprint
-}
-
-// getInsecureSkipVerifyFlag gets the insecureSkipVerify boolean flag
-// value from the provider connection secret.
-func (r *Client) getInsecureSkipVerifyFlag() bool {
-	insecure, found := r.Source.Secret.Data["insecureSkipVerify"]
-	if !found {
-		return false
-	}
-
-	insecureSkipVerify, err := strconv.ParseBool(string(insecure))
-	if err != nil {
-		return false
-	}
-
-	return insecureSkipVerify
 }
 
 func (r *Client) DetachDisks(vmRef ref.Ref) (err error) {

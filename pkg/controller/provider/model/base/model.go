@@ -3,7 +3,7 @@ package base
 import (
 	"fmt"
 
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
+	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
 )
 
 type Model = libmodel.Model
@@ -45,6 +45,7 @@ func (r InvalidKindError) Error() string {
 
 // VM concerns.
 type Concern struct {
+	Id         string `json:"id"`
 	Label      string `json:"label"`
 	Category   string `json:"category"`
 	Assessment string `json:"assessment"`

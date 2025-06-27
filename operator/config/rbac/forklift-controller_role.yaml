@@ -146,3 +146,41 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  verbs:
+  - create
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - roles
+  - rolebindings
+  - clusterroles
+  - clusterrolebindings
+  verbs:
+  - get
+  - patch
+  - create
+- apiGroups:
+    - build.openshift.io
+  resources:
+    - builds
+    - buildconfigs
+    - buildconfigs/instantiate
+  verbs:
+    - create
+    - get
+    - list
+    - watch
+    - update
+- apiGroups:
+    - image.openshift.io
+  resources:
+    - imagestreamtags
+    - imagestreams
+  verbs:
+    - get
+    - list
+    - watch

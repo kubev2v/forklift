@@ -50,6 +50,15 @@ jobs:
           - name: virt-v2v
             file: build/virt-v2v/Containerfile-upstream
             repo: forklift-virt-v2v
+          - name: virt-v2v
+            file: build/virt-v2v/Containerfile-upstream-fedora
+            repo: forklift-virt-v2v-fedora
+          - name: virt-v2v
+            file: build/virt-v2v/Containerfile-upstream-fssupport
+            repo: forklift-virt-v2v-fssupport
+          - name: vsphere-xcopy-volume-populator
+            file: build/vsphere-xcopy-volume-populator/Containerfile
+            repo: vsphere-xcopy-volume-populator
     runs-on: ubuntu-latest
     steps:
       - name: Checkout forklift
@@ -91,6 +100,7 @@ jobs:
           tags: ${{ env.REGISTRY }}/${{ env.REGISTRY_ORG }}/forklift-operator-bundle:${{ env.REGISTRY_TAG }}
           build-args: |
             VERSION=${{ env.VERSION }}
+            STREAM=dev
 
   build_push_index:
     runs-on: ubuntu-latest
@@ -115,3 +125,4 @@ jobs:
           build-args: |
             OPERATOR_BUNDLE_IMAGE=${{ env.REGISTRY }}/${{ env.REGISTRY_ORG }}/forklift-operator-bundle:${{ env.REGISTRY_TAG }}
             STREAM=dev
+            VERSION=${{ env.VERSION }}

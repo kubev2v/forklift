@@ -17,3 +17,6 @@ data:
 {% if controller_max_vm_inflight is number %}
   MAX_VM_INFLIGHT: "{{ controller_max_vm_inflight }}"
 {% endif %}
+{% if vddk_image is string and vddk_image|length > 0 %}
+  VDDK_IMAGE: "{{ vddk_image }}"
+{% endif %}

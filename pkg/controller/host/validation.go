@@ -5,14 +5,15 @@ import (
 	"errors"
 	"fmt"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	adapter "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/vsphere"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
-	"github.com/konveyor/forklift-controller/pkg/controller/validation"
-	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/controller/base"
+	adapter "github.com/kubev2v/forklift/pkg/controller/plan/adapter/vsphere"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
+	"github.com/kubev2v/forklift/pkg/controller/validation"
+	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	libref "github.com/kubev2v/forklift/pkg/lib/ref"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -235,6 +236,15 @@ func (r *Reconciler) validateSecret(host *api.Host) (err error) {
 			keyList = []string{
 				"user",
 				"password",
+			}
+			if !base.GetInsecureSkipVerifyFlag(secret) {
+				_, err = base.VerifyTLSConnection(host.Spec.IpAddress, secret)
+				if err != nil {
+					cnd.Message = err.Error()
+					cnd.Reason = DataErr
+					host.Status.SetCondition(cnd)
+					return
+				}
 			}
 		}
 	}

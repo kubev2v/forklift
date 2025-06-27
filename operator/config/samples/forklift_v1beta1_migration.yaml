@@ -7,4 +7,4 @@ metadata:
 spec:
   plan:
     name: example-plan
-    namespace: konveyor-forklift
+    namespace: ${NAMESPACE}

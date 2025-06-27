@@ -1,0 +1,38 @@
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: {{ api_deployment_name }}-migrations
+  namespace: ""
+  annotations:
+{% if k8s_cluster|bool %}
+    cert-manager.io/inject-ca-from: {{ app_namespace }}/{{ api_certificate_name }}
+{% else %}
+    service.beta.openshift.io/inject-cabundle: "true"
+{% endif %}
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ api_service_name }}
+      namespace: {{ app_namespace }}
+      path: /migration-validate
+      port: 443
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: migrations.forklift.konveyor
+  namespaceSelector: {}
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - forklift.konveyor.io
+    resources:
+    - migrations
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+  sideEffects: None
+  timeoutSeconds: 30

@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	"github.com/konveyor/forklift-controller/pkg/lib/ref"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/lib/ref"
 )
 
 // Header.
@@ -285,6 +285,12 @@ func (r *Client) Watch(url string, resource interface{}, h EventHandler) (status
 	}
 	status, err = post(reader)
 	if err != nil || status != http.StatusOK {
+		if err != nil {
+			err = liberr.Wrap(err, "status", status, "url", url)
+		} else {
+			err = liberr.New(
+				"inventory client watch return with none StatusOK", "status", status, "url", url)
+		}
 		return
 	}
 	w = &Watch{reader: reader}

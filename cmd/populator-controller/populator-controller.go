@@ -6,8 +6,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	populator_machinery "github.com/konveyor/forklift-controller/pkg/lib-volume-populator/populator-machinery"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	populator_machinery "github.com/kubev2v/forklift/pkg/lib-volume-populator/populator-machinery"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -25,7 +26,7 @@ const (
 type populator struct {
 	kind            string
 	resource        string
-	controllerFunc  func(bool, *unstructured.Unstructured) ([]string, error)
+	controllerFunc  func(bool, *unstructured.Unstructured, corev1.PersistentVolumeClaim) ([]string, error)
 	imageVar        string
 	metricsEndpoint string
 }
@@ -45,6 +46,13 @@ var populators = map[string]populator{
 		imageVar:        "OPENSTACK_POPULATOR_IMAGE",
 		metricsEndpoint: ":8081",
 	},
+	"vsphere-xcopy": {
+		kind:            "VSphereXcopyVolumePopulator",
+		resource:        "vspherexcopyvolumepopulators",
+		controllerFunc:  getVXPopulatorPodArgs,
+		imageVar:        "VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE",
+		metricsEndpoint: ":8082",
+	},
 }
 
 func main() {
@@ -60,6 +68,7 @@ func main() {
 	// Metrics args
 	flag.StringVar(&metricsPath, "metrics-path", "/metrics", "The HTTP path where prometheus metrics will be exposed. Default is `/metrics`.")
 
+	klog.InitFlags(nil)
 	flag.Parse()
 
 	sigs := make(chan os.Signal, 1)
@@ -89,7 +98,7 @@ func main() {
 	<-stop
 }
 
-func getOvirtPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured) ([]string, error) {
+func getOvirtPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured, _ corev1.PersistentVolumeClaim) ([]string, error) {
 	var ovirtVolumePopulator v1beta1.OvirtVolumePopulator
 	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &ovirtVolumePopulator)
 	if err != nil {
@@ -107,7 +116,7 @@ func getOvirtPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured) ([]st
 	return args, nil
 }
 
-func getOpenstackPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured) ([]string, error) {
+func getOpenstackPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured, _ corev1.PersistentVolumeClaim) ([]string, error) {
 	var openstackPopulator v1beta1.OpenstackVolumePopulator
 	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &openstackPopulator)
 	if nil != err {
@@ -121,6 +130,25 @@ func getOpenstackPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured) (
 	args = append(args, "--cr-name="+openstackPopulator.Name)
 	args = append(args, "--cr-namespace="+openstackPopulator.Namespace)
 
+	return args, nil
+}
+
+func getVXPopulatorPodArgs(_ bool, u *unstructured.Unstructured, pvc corev1.PersistentVolumeClaim) ([]string, error) {
+	var xcopy v1beta1.VSphereXcopyVolumePopulator
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &xcopy)
+	if nil != err {
+		return nil, err
+	}
+	args := []string{
+		"--source-vm-id=" + xcopy.Spec.VmId,
+		"--source-vmdk=" + xcopy.Spec.VmdkPath,
+		"--target-namespace=" + xcopy.GetNamespace(),
+		"--cr-name=" + xcopy.Name,
+		"--cr-namespace=" + xcopy.Namespace,
+		"--owner-name=" + pvc.Name,
+		"--secret-name=" + xcopy.Spec.SecretName,
+		"--storage-vendor-product=" + xcopy.Spec.StorageVendorProduct,
+	}
 	return args, nil
 }
 

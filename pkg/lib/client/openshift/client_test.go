@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	core "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -92,11 +92,11 @@ func TestRestCfg(t *testing.T) {
 				t.Fatalf("Expected non-nil config")
 			}
 
-			if config.TLSClientConfig.Insecure != tc.expectedInsecure {
+			if config != nil && config.TLSClientConfig.Insecure != tc.expectedInsecure {
 				t.Errorf("Expected TLSClientConfig.Insecure to be %v, got %v", tc.expectedInsecure, config.TLSClientConfig.Insecure)
 			}
 
-			if string(config.TLSClientConfig.CAData) != string(tc.expectedCAData) {
+			if config != nil && string(config.TLSClientConfig.CAData) != string(tc.expectedCAData) {
 				t.Errorf("Expected TLSClientConfig.CAData to be %s, got %s", string(tc.expectedCAData), string(config.TLSClientConfig.CAData))
 			}
 		})

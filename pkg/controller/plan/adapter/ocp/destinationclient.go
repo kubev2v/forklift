@@ -1,8 +1,8 @@
 package ocp
 
 import (
-	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
-	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 )
 
 type DestinationClient struct {

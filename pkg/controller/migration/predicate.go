@@ -1,84 +1,61 @@
 package migration
 
 import (
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	libref "github.com/kubev2v/forklift/pkg/lib/ref"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 type MigrationPredicate struct {
-	predicate.Funcs
+	predicate.TypedFuncs[*api.Migration]
 }
 
-func (r MigrationPredicate) Create(e event.CreateEvent) bool {
-	_, cast := e.Object.(*api.Migration)
-	if cast {
-		libref.Mapper.Create(e)
-		return true
-	}
-
-	return false
+func (r MigrationPredicate) Create(e event.TypedCreateEvent[*api.Migration]) bool {
+	libref.Mapper.Create(event.CreateEvent{Object: e.Object})
+	return true
 }
 
-func (r MigrationPredicate) Update(e event.UpdateEvent) bool {
-	object, cast := e.ObjectNew.(*api.Migration)
-	if !cast {
-		return false
-	}
+func (r MigrationPredicate) Update(e event.TypedUpdateEvent[*api.Migration]) bool {
+	object := e.ObjectNew
 	changed := object.Status.ObservedGeneration < object.Generation
 	if changed {
-		libref.Mapper.Update(e)
+		libref.Mapper.Update(event.UpdateEvent{
+			ObjectOld: e.ObjectOld,
+			ObjectNew: e.ObjectNew,
+		})
 	}
 
 	return changed
 }
 
-func (r MigrationPredicate) Delete(e event.DeleteEvent) bool {
-	_, cast := e.Object.(*api.Migration)
-	if cast {
-		libref.Mapper.Delete(e)
-		return true
-	}
-
-	return false
+func (r MigrationPredicate) Delete(e event.TypedDeleteEvent[*api.Migration]) bool {
+	libref.Mapper.Delete(event.DeleteEvent{Object: e.Object})
+	return true
 }
 
 type PlanPredicate struct {
-	predicate.Funcs
+	predicate.TypedFuncs[*api.Plan]
 }
 
-func (r PlanPredicate) Create(e event.CreateEvent) bool {
-	p, cast := e.Object.(*api.Plan)
-	if cast {
-		reconciled := p.Status.ObservedGeneration == p.Generation
-		return reconciled
-	}
-
-	return false
+func (r PlanPredicate) Create(e event.TypedCreateEvent[*api.Plan]) bool {
+	p := e.Object
+	reconciled := p.Status.ObservedGeneration == p.Generation
+	return reconciled
 }
 
-func (r PlanPredicate) Update(e event.UpdateEvent) bool {
-	p, cast := e.ObjectNew.(*api.Plan)
-	if cast {
-		reconciled := p.Status.ObservedGeneration == p.Generation
-		return reconciled
-	}
-
-	return false
+func (r PlanPredicate) Update(e event.TypedUpdateEvent[*api.Plan]) bool {
+	p := e.ObjectNew
+	reconciled := p.Status.ObservedGeneration == p.Generation
+	return reconciled
 }
 
-func (r PlanPredicate) Delete(e event.DeleteEvent) bool {
-	_, cast := e.Object.(*api.Plan)
-	return cast
+func (r PlanPredicate) Delete(e event.TypedDeleteEvent[*api.Plan]) bool {
+	return true
 }
 
-func (r PlanPredicate) Generic(e event.GenericEvent) bool {
-	p, cast := e.Object.(*api.Plan)
-	if cast {
-		reconciled := p.Status.ObservedGeneration == p.Generation
-		return reconciled
-	}
-
-	return false
+func (r PlanPredicate) Generic(e event.TypedGenericEvent[*api.Plan]) bool {
+	p := e.Object
+	reconciled := p.Status.ObservedGeneration == p.Generation
+	return reconciled
 }

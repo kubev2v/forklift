@@ -13,7 +13,7 @@ valid_vm = true {
 }
 
 valid_vm_name = true {
-    regex.match("^[a-z0-9][a-z0-9-]*[a-z0-9]$", input.name)
+    regex.match("^(([A-Za-z0-9][-A-Za-z0-9.]*)?[A-Za-z0-9])?$", input.name)
     count(input.name) < 64
 }
 
@@ -22,8 +22,9 @@ concerns[flag] {
     valid_vm
     not valid_vm_name
     flag := {
+        "id": "ova.name.invalid",
         "category": "Warning",
         "label": "Invalid VM Name",
-        "assessment": "The VM name must comply with the DNS subdomain name format defined in RFC 1123. The name can contain lowercase letters (a-z), numbers (0-9), and hyphens (-), up to a maximum of 63 characters. The first and last characters must be alphanumeric. The name must not contain uppercase letters, spaces, periods (.), or special characters. The VM will be renamed automatically during the migration to meet the RFC convention."
+        "assessment": "The VM name does not comply with the DNS subdomain name format. Edit the name or it will be renamed automatically during the migration to meet RFC 1123. The VM name must be a maximum of 63 characters containing lowercase letters (a-z), numbers (0-9), periods (.), and hyphens (-). The first and last character must be a letter or number. The name cannot contain uppercase letters, spaces or special characters."
     }
 }

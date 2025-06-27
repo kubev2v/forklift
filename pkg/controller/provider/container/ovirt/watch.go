@@ -24,15 +24,15 @@ import (
 	"errors"
 	"time"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	refapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
-	web "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
-	"github.com/konveyor/forklift-controller/pkg/controller/validation/policy"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	"github.com/konveyor/forklift-controller/pkg/settings"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	refapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/ovirt"
+	web "github.com/kubev2v/forklift/pkg/controller/provider/web/ovirt"
+	"github.com/kubev2v/forklift/pkg/controller/validation/policy"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/settings"
 )
 
 const (
@@ -301,7 +301,11 @@ func (r *VMEventHandler) validated(batch []*policy.Task) {
 		if task.Error != nil {
 			r.log.Error(
 				task.Error, "VM validation failed.")
-			continue
+
+			if len(task.Concerns) == 0 {
+				continue
+			}
+			// If there are concerns we need to update and commit the changes
 		}
 		latest := &model.VM{Base: model.Base{ID: task.Ref.ID}}
 		err = tx.Get(latest)
@@ -324,14 +328,16 @@ func (r *VMEventHandler) validated(batch []*policy.Task) {
 			r.log.Error(err, "VM update failed.")
 			continue
 		}
-		r.log.V(3).Info(
-			"VM validated.",
-			"vmID",
-			latest.ID,
-			"revision",
-			latest.Revision,
-			"duration",
-			task.Duration())
+		if task.Error == nil {
+			r.log.V(3).Info(
+				"VM validated.",
+				"vmID",
+				latest.ID,
+				"revision",
+				latest.Revision,
+				"duration",
+				task.Duration())
+		}
 	}
 	err = tx.Commit()
 	if err != nil {

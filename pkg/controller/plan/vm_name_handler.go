@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"k8s.io/apimachinery/pkg/fields"
 	cnv "kubevirt.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,23 +33,39 @@ func (r *KubeVirt) changeVmNameDNS1123(vmName string, vmNamespace string) (gener
 
 // changes VM name to match DNS1123 RFC convention.
 func changeVmName(currName string) string {
-	var underscoreExcluded = regexp.MustCompile("[_.]")
-	var nameExcludeChars = regexp.MustCompile("[^a-z0-9-]")
-
 	newName := strings.ToLower(currName)
+	newName = strings.Trim(newName, ".-")
+
+	parts := strings.Split(newName, ".")
+	var validParts []string
+
+	for _, part := range parts {
+		part = strings.ReplaceAll(part, "_", "-")
+
+		notAllowedChars := regexp.MustCompile("[^a-z0-9-]")
+		part = notAllowedChars.ReplaceAllString(part, "")
+
+		part = strings.Trim(part, "-.")
+
+		// Add part only if not empty
+		if part != "" {
+			validParts = append(validParts, part)
+		}
+	}
+
+	// Join valid parts with dots
+	newName = strings.Join(validParts, ".")
+
+	// Ensure length does not exceed max
 	if len(newName) > NameMaxLength {
 		newName = newName[0:NameMaxLength]
 	}
-	if underscoreExcluded.MatchString(newName) {
-		newName = underscoreExcluded.ReplaceAllString(newName, "-")
-	}
-	if nameExcludeChars.MatchString(newName) {
-		newName = nameExcludeChars.ReplaceAllString(newName, "")
-	}
-	newName = strings.Trim(newName, "-")
-	if len(newName) == 0 {
+
+	// Handle case where name is empty after all processing
+	if newName == "" {
 		newName = "vm-" + generateRandVmNameSuffix()
 	}
+
 	return newName
 }
 

@@ -1,15 +1,15 @@
 package ocp
 
 import (
+	"context"
 	"path"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
-	"github.com/konveyor/forklift-controller/pkg/controller/watch/handler"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	"golang.org/x/net/context"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
+	"github.com/kubev2v/forklift/pkg/controller/watch/handler"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
@@ -22,51 +22,45 @@ type Handler struct {
 }
 
 // Ensure watch on networks.
+// OCP inventory doesn't support watches. Instead, a generic event is sent to
+// the channel periodically to trigger reconciliation.
 func (r *Handler) Watch(watch *handler.WatchManager) (err error) {
-	w, err := watch.Ensure(
+	watch.EnsurePeriodicEvents(
 		r.Provider(),
 		&ocp.NetworkAttachmentDefinition{},
-		r)
-	if err != nil {
-		return
-	}
-
+		handler.DefaultEventInterval,
+		r.generateEvents)
 	log.Info(
-		"Inventory watch ensured.",
+		"Periodic Inventory events ensured.",
 		"provider",
 		path.Join(
 			r.Provider().Namespace,
-			r.Provider().Name),
-		"watch",
-		w.ID())
+			r.Provider().Name))
 
 	return
 }
 
 // Resource created.
 func (r *Handler) Created(e libweb.Event) {
-	if network, cast := e.Resource.(*ocp.NetworkAttachmentDefinition); cast {
-		r.changed(network)
-	}
+	log.Info("OCP doesn't support web watches, this should not be called",
+		"provider",
+		path.Join(
+			r.Provider().Namespace,
+			r.Provider().Name))
 }
 
 // Resource deleted.
 func (r *Handler) Deleted(e libweb.Event) {
-	if network, cast := e.Resource.(*ocp.NetworkAttachmentDefinition); cast {
-		r.changed(network)
-	}
+	log.Info("OCP doesn't support web watches, this should not be called",
+		"provider",
+		path.Join(
+			r.Provider().Namespace,
+			r.Provider().Name))
+
 }
 
-// Network changed.
-// Find all of the NetworkMap CRs the reference both the
-// provider and the changed network and enqueue reconcile events.
-func (r *Handler) changed(network *ocp.NetworkAttachmentDefinition) {
-	log.V(3).Info(
-		"Network (NAD) changed.",
-		"name",
-		path.Join(
-			network.Namespace,
-			network.Name))
+// Send a generic event to the channel for all associated CRs.
+func (r *Handler) generateEvents() {
 	list := api.NetworkMapList{}
 	err := r.List(context.TODO(), &list)
 	if err != nil {
@@ -76,23 +70,10 @@ func (r *Handler) changed(network *ocp.NetworkAttachmentDefinition) {
 	}
 	for i := range list.Items {
 		mp := &list.Items[i]
-		ref := mp.Spec.Provider.Destination
-		if !r.MatchProvider(ref) {
-			continue
-		}
-		for _, pair := range mp.Spec.Map {
-			ref := pair.Destination
-			if ref.Namespace == network.Namespace && ref.Name == network.Name {
-				log.V(3).Info(
-					"Queue reconcile event.",
-					"map",
-					path.Join(
-						mp.Namespace,
-						mp.Name))
-				r.Enqueue(event.GenericEvent{
-					Object: mp,
-				})
-			}
+		if r.MatchProvider(mp.Spec.Provider.Source) || r.MatchProvider(mp.Spec.Provider.Destination) {
+			r.Enqueue(event.GenericEvent{
+				Object: mp,
+			})
 		}
 	}
 }

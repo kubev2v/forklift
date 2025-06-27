@@ -3,7 +3,7 @@ package ocp
 import (
 	"strings"
 
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 )
 
 func GetNetworkNameAndNamespace(networkName string, vmRef *ref.Ref) (name, namespace string) {

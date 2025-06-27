@@ -2,15 +2,20 @@ package vsphere
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"sort"
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	"github.com/vmware/govmomi/vim25/types"
+
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
+	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
+
+	"github.com/vmware/govmomi/vim25/mo"
 )
 
 // Routes
@@ -124,11 +129,37 @@ func (h HostHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
+
+	// Parse advancedOption query parameter
+	h.parseAdvancedOptions(ctx, r, m)
+
 	r.Link(h.Provider)
 	r.Path = pb.Path(m)
 	content := r.Content(h.Detail)
 
 	ctx.JSON(http.StatusOK, content)
+}
+
+func (h *HostHandler) parseAdvancedOptions(ctx *gin.Context, r *Host, m *model.Host) {
+	// Check the advanced option is passed
+	advancedOption := ctx.Query("advancedOption")
+	if advancedOption == "" {
+		return
+	}
+
+	// Get settings of option manager
+	optManagers := mo.OptionManager{}
+	moRef := types.ManagedObjectReference{Type: m.AdvancedOptions.Kind, Value: m.AdvancedOptions.ID}
+	if err := h.Collector.Follow(moRef, []string{"setting"}, &optManagers); err != nil {
+		return
+	}
+
+	// Find the option we are interested in:
+	for _, option := range optManagers.Setting {
+		if option.GetOptionValue().Key == advancedOption {
+			r.AdvancedOptions = []AdvancedOptions{{Key: advancedOption, Value: fmt.Sprintf("%v", option.GetOptionValue().Value)}}
+		}
+	}
 }
 
 // Watch.
@@ -203,21 +234,28 @@ func (h *HostHandler) buildAdapters(host *Host) (err error) {
 // REST Resource.
 type Host struct {
 	Resource
-	Cluster            string            `json:"cluster"`
-	Status             string            `json:"status"`
-	InMaintenanceMode  bool              `json:"inMaintenance"`
-	ManagementServerIp string            `json:"managementServerIp"`
-	Thumbprint         string            `json:"thumbprint"`
-	Timezone           string            `json:"timezone"`
-	CpuSockets         int16             `json:"cpuSockets"`
-	CpuCores           int16             `json:"cpuCores"`
-	ProductName        string            `json:"productName"`
-	ProductVersion     string            `json:"productVersion"`
-	Network            model.HostNetwork `json:"networking"`
-	Networks           []model.Ref       `json:"networks"`
-	Datastores         []model.Ref       `json:"datastores"`
-	VMs                []model.Ref       `json:"vms"`
-	NetworkAdapters    []NetworkAdapter  `json:"networkAdapters"`
+	Cluster            string               `json:"cluster"`
+	Status             string               `json:"status"`
+	InMaintenanceMode  bool                 `json:"inMaintenance"`
+	ManagementServerIp string               `json:"managementServerIp"`
+	Thumbprint         string               `json:"thumbprint"`
+	Timezone           string               `json:"timezone"`
+	CpuSockets         int16                `json:"cpuSockets"`
+	CpuCores           int16                `json:"cpuCores"`
+	ProductName        string               `json:"productName"`
+	ProductVersion     string               `json:"productVersion"`
+	Network            model.HostNetwork    `json:"networking"`
+	Networks           []model.Ref          `json:"networks"`
+	Datastores         []model.Ref          `json:"datastores"`
+	VMs                []model.Ref          `json:"vms"`
+	NetworkAdapters    []NetworkAdapter     `json:"networkAdapters"`
+	HostScsiDisks      []model.HostScsiDisk `json:"hostScsiDisks"`
+	AdvancedOptions    []AdvancedOptions    `json:"advancedOptions"`
+}
+
+type AdvancedOptions struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
 // Build the resource using the model.
@@ -237,6 +275,7 @@ func (r *Host) With(m *model.Host) {
 	r.Networks = m.Networks
 	r.Datastores = m.Datastores
 	r.NetworkAdapters = []NetworkAdapter{}
+	r.HostScsiDisks = append(r.HostScsiDisks, m.HostScsiDisks...)
 }
 
 // Build self link (URI).

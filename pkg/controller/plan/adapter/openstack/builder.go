@@ -8,17 +8,17 @@ import (
 	"strconv"
 	"strings"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
-	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
-	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	utils "github.com/konveyor/forklift-controller/pkg/controller/plan/util"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	utils "github.com/kubev2v/forklift/pkg/controller/plan/util"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/web/openstack"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -230,8 +230,9 @@ const (
 
 // Network types
 const (
-	Pod    = "pod"
-	Multus = "multus"
+	Pod     = "pod"
+	Multus  = "multus"
+	Ignored = "ignored"
 )
 
 // Default properties
@@ -250,7 +251,7 @@ var DefaultProperties = map[string]string{
 }
 
 // Create the destination Kubevirt VM.
-func (r *Builder) VirtualMachine(vmRef ref.Ref, vmSpec *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim, usesInstanceType bool) (err error) {
+func (r *Builder) VirtualMachine(vmRef ref.Ref, vmSpec *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim, usesInstanceType bool, sortVolumesByLibvirt bool) (err error) {
 	vm := &model.Workload{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
@@ -597,6 +598,34 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 	for vmNetworkName, vmAddresses := range vm.Addresses {
 		if nics, ok := vmAddresses.([]interface{}); ok {
 			for _, nic := range nics {
+				// Look for the network map for the source network
+				var vmNetworkID string
+				for _, vmNetwork := range vm.Networks {
+					if vmNetwork.Name == vmNetworkName {
+						vmNetworkID = vmNetwork.ID
+						break
+					}
+				}
+				var networkPair *api.NetworkPair
+				networkMaps := r.Context.Map.Network.Spec.Map
+				found := false
+				for i := range networkMaps {
+					networkPair = &networkMaps[i]
+					if networkPair.Source.ID == vmNetworkID {
+						found = true
+						break
+					}
+				}
+				if !found {
+					err = liberr.New("no network map for vm network", "network", vmNetworkID)
+					return
+				}
+
+				// Skip network mappings with destination type 'Ignored'
+				if networkPair.Destination.Type == Ignored {
+					continue
+				}
+
 				networkName := fmt.Sprintf("net-%v", numNetworks)
 				kNetwork := cnv.Network{
 					Name: networkName,
@@ -633,27 +662,6 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 					}
 				}
 
-				var vmNetworkID string
-				for _, vmNetwork := range vm.Networks {
-					if vmNetwork.Name == vmNetworkName {
-						vmNetworkID = vmNetwork.ID
-						break
-					}
-				}
-				var networkPair *api.NetworkPair
-				networkMaps := r.Context.Map.Network.Spec.Map
-				found := false
-				for i := range networkMaps {
-					networkPair = &networkMaps[i]
-					if networkPair.Source.ID == vmNetworkID {
-						found = true
-						break
-					}
-				}
-				if !found {
-					err = liberr.New("no network map for vm network", "network", vmNetworkID)
-					return
-				}
 				switch networkPair.Destination.Type {
 				case Pod:
 					kNetwork.Pod = &cnv.PodNetwork{}
@@ -748,7 +756,7 @@ func (r *Builder) ConfigMap(_ ref.Ref, in *core.Secret, object *core.ConfigMap) 
 	return
 }
 
-func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume) (dvs []cdi.DataVolume, err error) {
+func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume, vddkConfigMap *core.ConfigMap) (dvs []cdi.DataVolume, err error) {
 	return nil, nil
 }
 
@@ -1263,7 +1271,7 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image,
 		},
 		Spec: core.PersistentVolumeClaimSpec{
 			AccessModes: accessModes,
-			Resources: core.ResourceRequirements{
+			Resources: core.VolumeResourceRequirements{
 				Requests: map[core.ResourceName]resource.Quantity{
 					core.ResourceStorage: *resource.NewQuantity(virtualSize, resource.BinarySI)},
 			},

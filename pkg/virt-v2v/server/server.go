@@ -8,22 +8,25 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/konveyor/forklift-controller/pkg/virt-v2v/global"
-	"github.com/konveyor/forklift-controller/pkg/virt-v2v/utils"
+	"github.com/kubev2v/forklift/pkg/virt-v2v/config"
 )
 
 var (
 	server *http.Server
 )
 
+type Server struct {
+	AppConfig *config.AppConfig
+}
+
 // Start creates a webserver which is exposing information about the guest.
 // The controller is periodically trying to request the server to get the information.
 // This information is later used in the vm creation step such as the firmware for the OVA or
 // Operating System for the VM creation.
-func Start() error {
-	http.HandleFunc("/vm", vmHandler)
-	http.HandleFunc("/inspection", inspectorHandler)
-	http.HandleFunc("/shutdown", shutdownHandler)
+func (s Server) Start() error {
+	http.HandleFunc("/vm", s.vmHandler)
+	http.HandleFunc("/inspection", s.inspectorHandler)
+	http.HandleFunc("/shutdown", s.shutdownHandler)
 	server = &http.Server{Addr: ":8080"}
 
 	fmt.Println("Starting server on :8080")
@@ -34,8 +37,8 @@ func Start() error {
 	return nil
 }
 
-func vmHandler(w http.ResponseWriter, r *http.Request) {
-	yamlFilePath, err := GetVmYamlFile(global.DIR)
+func (s Server) vmHandler(w http.ResponseWriter, r *http.Request) {
+	yamlFilePath, err := s.getVmYamlFile(s.AppConfig.Workdir)
 	if yamlFilePath == "" {
 		fmt.Println("Error: YAML file path is empty.")
 		http.Error(w, "YAML file path is empty", http.StatusInternalServerError)
@@ -61,8 +64,8 @@ func vmHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func inspectorHandler(w http.ResponseWriter, r *http.Request) {
-	xmlData, err := os.ReadFile(global.INSPECTION)
+func (s Server) inspectorHandler(w http.ResponseWriter, r *http.Request) {
+	xmlData, err := os.ReadFile(s.AppConfig.InspectionOutputFile)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -79,7 +82,7 @@ func inspectorHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func shutdownHandler(w http.ResponseWriter, r *http.Request) {
+func (s Server) shutdownHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Shutdown request received. Shutting down server.")
 	w.WriteHeader(http.StatusNoContent)
 	if err := server.Shutdown(context.Background()); err != nil {
@@ -87,8 +90,8 @@ func shutdownHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func GetVmYamlFile(dir string) (string, error) {
-	files, err := filepath.Glob(filepath.Join(dir, fmt.Sprintf("%s.%s", utils.GetDiskName(), "yaml")))
+func (s Server) getVmYamlFile(dir string) (string, error) {
+	files, err := filepath.Glob(filepath.Join(dir, "*.yaml"))
 	if err != nil {
 		return "", err
 	}

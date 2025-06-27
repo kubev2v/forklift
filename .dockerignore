@@ -4,7 +4,6 @@
 
 # Ignore all test-related files
 **/test
-**/*.md
 
 # Ignore build artifacts
 **/bin

@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
-	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	"github.com/konveyor/forklift-controller/pkg/controller/plan/util"
-	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
+	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/controller/plan/util"
+	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
 	core "k8s.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
@@ -61,12 +61,12 @@ func (r *Client) GetSnapshotDeltas(vmRef ref.Ref, snapshot string, hostsFunc uti
 }
 
 // Check if a snapshot is ready to transfer, to avoid importer restarts.
-func (r *Client) CheckSnapshotReady(vmRef ref.Ref, precopy planapi.Precopy, hosts util.HostsFunc) (ready bool, snapshotId string, err error) {
+func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshotCreateTaskId string, hosts util.HostsFunc) (ready bool, snapshotId string, err error) {
 	return
 }
 
 // CheckSnapshotRemove implements base.Client
-func (r *Client) CheckSnapshotRemove(vmRef ref.Ref, precopy planapi.Precopy, hosts util.HostsFunc) (bool, error) {
+func (r *Client) CheckSnapshotRemove(vmRef ref.Ref, snapshotRemoveTaskId string, hosts util.HostsFunc) (bool, error) {
 	return false, nil
 }
 

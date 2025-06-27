@@ -19,17 +19,21 @@ package v1beta1
 import (
 	"fmt"
 
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/provider"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
-	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/provider"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Mapped network destination.
 type DestinationNetwork struct {
-	// The network type.
-	// +kubebuilder:validation:Enum=pod;multus
+	// Type of network to use for the destination.
+	// Valid values:
+	// - pod: Use the Kubernetes pod network
+	// - multus: Use a Multus additional network
+	// - ignored: Network is excluded from mapping
+	// +kubebuilder:validation:Enum=pod;multus;ignored
 	Type string `json:"type"`
 	// The namespace (multus only).
 	Namespace string `json:"namespace,omitempty"`
@@ -45,12 +49,42 @@ type NetworkPair struct {
 	Destination DestinationNetwork `json:"destination"`
 }
 
+// OffloadPlugin is a storage plugin that acts on the storage allocation and copying
+// phase of the migration. There can be more than one available but currently only
+// one will be supported
+type OffloadPlugin struct {
+	VSphereXcopyPluginConfig *VSphereXcopyPluginConfig `json:"vsphereXcopyConfig"`
+}
+
+// StorageVendorProduct is an identifier of the product used for XCOPY.
+// NOTE - Update the kubebuilder:validation line for every change to this enum
+type StorageVendorProduct string
+
+const (
+	StorageVendorProductVantara     StorageVendorProduct = "vantara"
+	StorageVendorProductOntap       StorageVendorProduct = "ontap"
+	StorageVendorProductPrimera3Par StorageVendorProduct = "primera3par"
+)
+
+// VSphereXcopyPluginConfig works with the Vsphere Xcopy Volume Populator
+// to offload the copy to Vsphere and the storage array.
+type VSphereXcopyPluginConfig struct {
+	// SecretRef is the name of the secret with the storage credentials for the plugin.
+	// The secret should reside in the same namespace where the source provider is.
+	SecretRef string `json:"secretRef"`
+	// StorageVendorProduct the string identifier of the storage vendor product
+	// +kubebuilder:validation:Enum=vantara;ontap;primera3par
+	StorageVendorProduct StorageVendorProduct `json:"storageVendorProduct"`
+}
+
 // Mapped storage.
 type StoragePair struct {
 	// Source storage.
 	Source ref.Ref `json:"source"`
 	// Destination storage.
 	Destination DestinationStorage `json:"destination"`
+	// Offload Plugin
+	OffloadPlugin *OffloadPlugin `json:"offloadPlugin,omitempty"`
 }
 
 // Mapped storage destination.

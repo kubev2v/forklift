@@ -6,7 +6,7 @@ metadata:
   namespace: ${NAMESPACE}
 spec:
   provider:
-    namespace: ''
-    name: ''
-  id: ''
-  ipAddress: ''
+    namespace: ""
+    name: ""
+  id: ""
+  ipAddress: ""

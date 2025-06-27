@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<plugin xmlns="http://www.vmware.com/Products/ESX/5.0/esxcli/">
+   <version>1.0.0</version>
+
+   <namespaces>
+      <namespace path="vmkfstools">
+         <description>vmkfstools operations</description>
+      </namespace>
+   </namespaces>
+
+   <commands>
+      <command path="vmkfstools.clone">
+         <description>Clone VMDK to RDM</description>
+         <output-spec>
+            <structure typeName="result">
+               <field name="status"> <string/></field>
+               <field name="message"> <string/></field>
+            </structure>
+         </output-spec>
+         <format-parameters>
+            <formatter>simple</formatter>
+         </format-parameters>
+         <execute>/opt/redhat/vmkfstools-wrapper</execute>
+      </command>
+
+   </commands>
+
+</plugin>

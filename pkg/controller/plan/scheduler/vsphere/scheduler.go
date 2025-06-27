@@ -5,13 +5,13 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
-	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 )
 
 // Phases.
@@ -22,6 +22,7 @@ const (
 	CreateVM                 = "CreateVM"
 	PostHook                 = "PostHook"
 	Completed                = "Completed"
+	Canceled                 = "Canceled"
 )
 
 // Steps.
@@ -185,6 +186,9 @@ func (r *Scheduler) buildPending() (err error) {
 		if err != nil {
 			return
 		}
+		if vmStatus.HasCondition(Canceled) {
+			continue
+		}
 		if !vmStatus.MarkedStarted() && !vmStatus.MarkedCompleted() {
 			pending := &pendingVM{
 				status: vmStatus,
@@ -197,8 +201,8 @@ func (r *Scheduler) buildPending() (err error) {
 }
 
 func (r *Scheduler) cost(vm *model.VM, vmStatus *plan.VMStatus) int {
-	coldLocal, _ := r.Plan.VSphereColdLocal()
-	if coldLocal {
+	useV2vForTransfer, _ := r.Plan.ShouldUseV2vForTransfer()
+	if useV2vForTransfer {
 		switch vmStatus.Phase {
 		case CreateVM, PostHook, Completed:
 			// In these phases we already have the disk transferred and are left only to create the VM

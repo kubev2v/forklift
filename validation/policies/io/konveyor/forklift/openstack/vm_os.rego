@@ -37,6 +37,7 @@ has_unsupported_guest_os if {
 concerns[flag] {
 	has_unsupported_guest_os
 	flag := {
+	    "id": "openstack.os.unsupported",
 		"category": "Warning",
 		"label": "Unsupported operative system detected",
 		"assessment": "The VM is running an operative system that is not currently supported by OpenShift Virtualization.",

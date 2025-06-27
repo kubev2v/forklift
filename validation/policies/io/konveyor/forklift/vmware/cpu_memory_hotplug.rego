@@ -17,8 +17,9 @@ has_hotplug_enabled = true {
 concerns[flag] {
     has_hotplug_enabled
     flag := {
+        "id": "vmware.cpu_memory.hotplug.enabled",
         "category": "Warning",
         "label": "CPU/Memory hotplug detected",
-        "assessment": "Hot pluggable CPU or memory is not currently supported by OpenShift Virtualization. Review CPU or memory configuration after migration."
+        "assessment": "Hot pluggable CPU or memory is not currently supported by Migration Toolkit for Virtualization. You can reconfigure CPU or memory after migration."
     }
 }

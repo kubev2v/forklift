@@ -1,8 +1,8 @@
 package ova
 
 import (
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/base"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
+	"github.com/kubev2v/forklift/pkg/controller/provider/model/base"
+	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
 )
 
 // Errors
@@ -69,6 +69,7 @@ type Network struct {
 type VM struct {
 	Base
 	OvaPath               string    `sql:""`
+	OvaSource             string    `sql:""`
 	RevisionValidated     int64     `sql:"d0,index(revisionValidated)"`
 	PolicyVersion         int       `sql:"d0,index(policyVersion)"`
 	UUID                  string    `sql:""`

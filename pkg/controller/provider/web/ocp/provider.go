@@ -4,10 +4,10 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/ocp"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 )
 
 // Routes.
@@ -19,7 +19,7 @@ const (
 
 // Provider handler.
 type ProviderHandler struct {
-	base.Handler
+	Handler
 }
 
 // Add routes to the `gin` router.
@@ -67,7 +67,7 @@ func (h ProviderHandler) Get(ctx *gin.Context) {
 	m.With(h.Provider)
 	r := Provider{}
 	r.With(m)
-	err = h.AddCount(&r)
+	err = h.AddCount(ctx, &r)
 	if err != nil {
 		log.Trace(
 			err,
@@ -105,10 +105,10 @@ func (h *ProviderHandler) ListContent(ctx *gin.Context) (content []interface{}, 
 			m.With(p)
 			r := Provider{}
 			r.With(m)
-			aErr := h.AddCount(&r)
+			aErr := h.AddCount(ctx, &r)
 			if aErr != nil {
-				err = aErr
-				return
+				log.Error(aErr, "Failed to get count for provider", "provider", p.Name, "url", ctx.Request.URL)
+				continue
 			}
 			r.Link()
 			content = append(content, r.Content(h.Detail))
@@ -121,29 +121,31 @@ func (h *ProviderHandler) ListContent(ctx *gin.Context) (content []interface{}, 
 }
 
 // Add counts.
-func (h ProviderHandler) AddCount(r *Provider) (err error) {
+func (h ProviderHandler) AddCount(ctx *gin.Context, r *Provider) (err error) {
 	if h.Detail == 0 {
 		return nil
 	}
-	db := h.Collector.DB()
+
 	// VM
-	n, err := db.Count(&model.VM{}, nil)
+	vms, err := h.VMs(ctx, &r.Object)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	r.VMCount = n
+	r.VMCount = int64(len(vms))
+
 	// Network
-	n, err = db.Count(&model.NetworkAttachmentDefinition{}, nil)
+	nets, err := h.NetworkAttachmentDefinitions(ctx, &r.Object)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	r.NetworkCount = n + 1
+	r.NetworkCount = int64(len(nets)) + 1
+
 	// StorageClass
-	n, err = db.Count(&model.StorageClass{}, nil)
+	storageclasses, err := h.StorageClasses(ctx)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	r.StorageClassCount = n
+	r.StorageClassCount = int64(len(storageclasses))
 
 	return nil
 }

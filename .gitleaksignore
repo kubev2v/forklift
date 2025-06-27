@@ -1,0 +1,6 @@
+# Ignores for the LeakTK pattern set: https://github.com/leaktk/patterns
+docs/hooks.md:ePK9whPQPpY:75
+
+# Ignores for the Gitleaks pattern set: https://github.com/gitleaks/gitleaks/blob/master/config/gitleaks.toml
+vendor/cloud.google.com/go/storage/testdata/dummy_rsa:private-key:1
+vendor/cloud.google.com/go/storage/testdata/dummy_pem:private-key:5

@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -16,6 +16,7 @@ const (
 	HookRetry                      = "HOOK_RETRY"
 	ImporterRetry                  = "IMPORTER_RETRY"
 	VirtV2vImage                   = "VIRT_V2V_IMAGE"
+	vddkImage                      = "VDDK_IMAGE"
 	PrecopyInterval                = "PRECOPY_INTERVAL"
 	VirtV2vDontRequestKVM          = "VIRT_V2V_DONT_REQUEST_KVM"
 	SnapshotRemovalTimeout         = "SNAPSHOT_REMOVAL_TIMEOUT"
@@ -44,6 +45,7 @@ const (
 	OvaContainerLimitsMemory       = "OVA_CONTAINER_LIMITS_MEMORY"
 	OvaContainerRequestsCpu        = "OVA_CONTAINER_REQUESTS_CPU"
 	OvaContainerRequestsMemory     = "OVA_CONTAINER_REQUESTS_MEMORY"
+	TlsConnectionTimeout           = "TLS_CONNECTION_TIMEOUT"
 )
 
 // Migration settings
@@ -100,6 +102,10 @@ type Migration struct {
 	OvaContainerLimitsMemory       string
 	OvaContainerRequestsCpu        string
 	OvaContainerRequestsMemory     string
+	// VDDK image for guest conversion
+	VddkImage string
+	// TlsConnectionTimeout is the timeout for TLS connections in seconds
+	TlsConnectionTimeout int
 }
 
 // Load settings.
@@ -143,6 +149,11 @@ func (r *Migration) Load() (err error) {
 	}
 	r.VirtV2vDontRequestKVM = getEnvBool(VirtV2vDontRequestKVM, false)
 
+	// VDDK image for guest conversion
+	if vddkImage, ok := os.LookupEnv(vddkImage); ok {
+		r.VddkImage = vddkImage
+	}
+
 	// Set timeout to 12 hours instead of the default 2
 	if r.CDIExportTokenTTL, err = getPositiveEnvLimit(CDIExportTokenTTL, 720); err != nil {
 		return liberr.Wrap(err)
@@ -168,6 +179,9 @@ func (r *Migration) Load() (err error) {
 		return liberr.Wrap(fmt.Errorf("failed to find environment variable %s", VsphereOsConfigMap))
 	}
 	if r.VddkJobActiveDeadline, err = getPositiveEnvLimit(VddkJobActiveDeadline, 300); err != nil {
+		return liberr.Wrap(err)
+	}
+	if r.TlsConnectionTimeout, err = getPositiveEnvLimit(TlsConnectionTimeout, 5); err != nil {
 		return liberr.Wrap(err)
 	}
 	r.VirtV2vExtraArgs = "[]"

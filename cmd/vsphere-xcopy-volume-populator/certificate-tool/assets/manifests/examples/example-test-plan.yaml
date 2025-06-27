@@ -1,0 +1,10 @@
+storageVendorProduct: "ontap"
+hostName: host-3078
+tests:
+  - name: test-1
+    success:
+      maxTimeSeconds: 300
+    vms:
+      - namePrefix: testvm1
+        size: 10Gi
+        localVmdkPath: 'assets/cloudinit/fedora.vmdk'

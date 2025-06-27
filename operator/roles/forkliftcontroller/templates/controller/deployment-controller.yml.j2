@@ -93,6 +93,14 @@ spec:
         - name: MAX_VM_INFLIGHT
           value: "{{ controller_max_vm_inflight }}"
 {% endif %}
+{% if vddk_image is string and vddk_image|length > 0 %}
+        - name: VDDK_IMAGE
+          value: "{{ vddk_image }}"
+{% endif %}
+{% if controller_tls_connection_timeout_sec is number %}
+        - name: TLS_CONNECTION_TIMEOUT
+          value: "{{ controller_tls_connection_timeout_sec }}"
+{% endif %}
 {% if controller_cdi_export_token_ttl is number %}
         - name: CDI_EXPORT_TOKEN_TTL
           value: "{{ controller_cdi_export_token_ttl }}"
@@ -107,6 +115,11 @@ spec:
         - name: FEATURE_VSPHERE_INCREMENTAL_BACKUP
           value: "true"
 {% endif %}
+{% if feature_copy_offload|bool %}
+        - name: FEATURE_COPY_OFFLOAD
+          value: "true"
+{% endif %}
+
 {% if controller_ovirt_warm_migration|bool %}
         - name: FEATURE_OVIRT_WARM_MIGRATION
           value: "true"
@@ -225,6 +238,12 @@ spec:
 {% if controller_log_level is defined and controller_log_level is number %}
         - name: LOG_LEVEL
           value: "{{ controller_log_level }}"
+{% endif %}
+        - name: OPENSHIFT
+{% if k8s_cluster|bool %}
+          value: "false"
+{% else %}
+          value: "true"
 {% endif %}
 {% if controller_profile_kind is defined and controller_profile_path is defined and controller_profile_duration is defined %}
         - name: PROFILE_KIND

@@ -2,10 +2,10 @@
 package suit_test
 
 import (
-	"github.com/konveyor/forklift-controller/pkg/lib/client/openstack"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	"github.com/konveyor/forklift-controller/tests/suit/framework"
-	"github.com/konveyor/forklift-controller/tests/suit/utils"
+	"github.com/kubev2v/forklift/pkg/lib/client/openstack"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
+	"github.com/kubev2v/forklift/tests/suit/framework"
+	"github.com/kubev2v/forklift/tests/suit/utils"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

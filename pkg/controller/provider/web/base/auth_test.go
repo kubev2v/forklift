@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/onsi/gomega"
 	auth "k8s.io/api/authentication/v1"
 	auth2 "k8s.io/api/authorization/v1"
@@ -98,7 +98,7 @@ func TestAuth(t *testing.T) {
 		},
 	}
 	// token.
-	g.Expect(auth.token(ctx)).To(gomega.Equal(token))
+	g.Expect(auth.Token(ctx)).To(gomega.Equal(token))
 	// First call with no cached token.
 	status, _ := auth.Permit(ctx, provider)
 	g.Expect(auth.cache[token]).ToNot(gomega.BeNil())

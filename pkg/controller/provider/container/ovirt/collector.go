@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ovirt"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
-	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/ovirt"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
+	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -126,6 +126,11 @@ func (r *Collector) Reset() {
 // Reset.
 func (r *Collector) HasParity() bool {
 	return r.parity
+}
+
+// Follow link
+func (r *Collector) Follow(moRef interface{}, p []string, dst interface{}) error {
+	return fmt.Errorf("not implemented")
 }
 
 // Test connect/logout.

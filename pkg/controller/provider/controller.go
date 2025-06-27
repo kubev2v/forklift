@@ -24,21 +24,21 @@ import (
 	"sync"
 	"time"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/controller/base"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/container"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/model"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
-	"github.com/konveyor/forklift-controller/pkg/controller/validation/policy"
-	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libfb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
-	libcontainer "github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
-	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
-	"github.com/konveyor/forklift-controller/pkg/settings"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/controller/base"
+	"github.com/kubev2v/forklift/pkg/controller/provider/container"
+	"github.com/kubev2v/forklift/pkg/controller/provider/model"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web"
+	"github.com/kubev2v/forklift/pkg/controller/validation/policy"
+	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	libfb "github.com/kubev2v/forklift/pkg/lib/filebacked"
+	libcontainer "github.com/kubev2v/forklift/pkg/lib/inventory/container"
+	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
+	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
+	libref "github.com/kubev2v/forklift/pkg/lib/ref"
+	"github.com/kubev2v/forklift/pkg/settings"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -106,17 +106,17 @@ func Add(mgr manager.Manager) error {
 	}
 	// Primary CR.
 	err = cnt.Watch(
-		source.Kind(mgr.GetCache(), &api.Provider{}),
-		&handler.EnqueueRequestForObject{},
-		&ProviderPredicate{})
+		source.Kind(mgr.GetCache(), &api.Provider{},
+			&handler.TypedEnqueueRequestForObject[*api.Provider]{},
+			&ProviderPredicate{}))
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
 	// References.
 	err = cnt.Watch(
-		source.Kind(mgr.GetCache(), &v1.Secret{}),
-		libref.Handler(&api.Provider{}))
+		source.Kind(mgr.GetCache(), &v1.Secret{},
+			libref.TypedHandler[*v1.Secret](&api.Provider{})))
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -252,6 +252,9 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	// Validations.
 	err = r.validate(provider)
 	if err != nil {
+		if err = r.updateProviderStatus(provider); err != nil {
+			r.Log.Error(err, "failed to update provider status")
+		}
 		return
 	}
 
@@ -277,13 +280,8 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	// End staging conditions.
 	provider.Status.EndStagingConditions()
 
-	// Record events.
-	r.Record(provider, provider.Status.Conditions)
-
-	// Apply changes.
-	provider.Status.ObservedGeneration = provider.Generation
-	err = r.Status().Update(context.TODO(), provider)
-	if err != nil {
+	if err = r.updateProviderStatus(provider); err != nil {
+		r.Log.Error(err, "failed to update provider status")
 		return
 	}
 
@@ -302,6 +300,20 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 
 	// Done
 	return
+}
+
+func (r *Reconciler) updateProviderStatus(provider *api.Provider) error {
+	// Record events.
+	r.Record(provider, provider.Status.Conditions)
+
+	// Apply changes.
+	provider.Status.ObservedGeneration = provider.Generation
+
+	if err := r.Status().Update(context.TODO(), provider); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Update the provider.

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"unicode"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/settings"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/settings"
 	core "k8s.io/api/core/v1"
 )
 
@@ -21,7 +21,7 @@ const (
 	diskPrefix = "/dev/sd"
 )
 
-func roundUp(requestedSpace, multiple int64) int64 {
+func RoundUp(requestedSpace, multiple int64) int64 {
 	if multiple == 0 {
 		return requestedSpace
 	}
@@ -30,7 +30,7 @@ func roundUp(requestedSpace, multiple int64) int64 {
 }
 
 func CalculateSpaceWithOverhead(requestedSpace int64, volumeMode *core.PersistentVolumeMode) int64 {
-	alignedSize := roundUp(requestedSpace, DefaultAlignBlockSize)
+	alignedSize := RoundUp(requestedSpace, DefaultAlignBlockSize)
 	var spaceWithOverhead int64
 	if *volumeMode == core.PersistentVolumeFilesystem {
 		spaceWithOverhead = int64(math.Ceil(float64(alignedSize) / (1 - float64(settings.Settings.FileSystemOverhead)/100)))
@@ -38,6 +38,15 @@ func CalculateSpaceWithOverhead(requestedSpace int64, volumeMode *core.Persisten
 		spaceWithOverhead = alignedSize + settings.Settings.BlockOverhead
 	}
 	return spaceWithOverhead
+}
+
+func GetBootDiskNumber(deviceString string) int {
+	deviceNumber := GetDeviceNumber(deviceString)
+	if deviceNumber == 0 {
+		return 0
+	} else {
+		return deviceNumber - 1
+	}
 }
 
 func GetDeviceNumber(deviceString string) int {

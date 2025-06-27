@@ -5,13 +5,17 @@ import (
 	"os"
 	"strconv"
 
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 )
 
 // Global
 var Settings = ControllerSettings{}
 
-const OpenShift = "OPENSHIFT"
+const (
+	OpenShift   = "OPENSHIFT"
+	Development = "DEVELOPMENT"
+)
 
 // Settings
 type ControllerSettings struct {
@@ -31,7 +35,8 @@ type ControllerSettings struct {
 	Profiler
 	// Feature gates.
 	Features
-	OpenShift bool
+	OpenShift   bool
+	Development bool
 }
 
 // Load settings.
@@ -69,7 +74,7 @@ func (r *ControllerSettings) Load() error {
 		return err
 	}
 	r.OpenShift = getEnvBool(OpenShift, false)
-
+	r.Development = getEnvBool(Development, false)
 	return nil
 }
 
@@ -116,4 +121,14 @@ func getEnvBool(name string, def bool) bool {
 	}
 
 	return boolean
+}
+
+// GetVDDKImage gets the VDDK image from provider spec settings with fall back to global settings.
+func GetVDDKImage(providerSpecSettings map[string]string) string {
+	vddkImage := providerSpecSettings[api.VDDK]
+	if vddkImage == "" && Settings.Migration.VddkImage != "" {
+		vddkImage = Settings.Migration.VddkImage
+	}
+
+	return vddkImage
 }

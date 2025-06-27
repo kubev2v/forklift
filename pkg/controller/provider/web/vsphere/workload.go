@@ -2,13 +2,14 @@ package vsphere
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
+	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
 )
 
 // Routes.
@@ -57,7 +58,7 @@ func (h WorkloadHandler) Get(ctx *gin.Context) {
 				err,
 				"url",
 				ctx.Request.URL)
-			ctx.Status(http.StatusInternalServerError)
+			ctx.JSON(http.StatusInternalServerError, err.Error())
 		}
 	}()
 	if err != nil {
@@ -112,7 +113,7 @@ func (r *Workload) Expand(db libmodel.DB) (err error) {
 	}
 	err = db.Get(host)
 	if err != nil {
-		return
+		return fmt.Errorf("error from %w: For VM '%s', host id '%s' not found - probably due to permissions issue", err, r.VM.ID, r.Host.ID)
 	}
 	r.Host.Host.With(host)
 	cluster := &model.Cluster{
@@ -120,7 +121,7 @@ func (r *Workload) Expand(db libmodel.DB) (err error) {
 	}
 	err = db.Get(cluster)
 	if err != nil {
-		return
+		return fmt.Errorf("error from %w: For VM '%s' cluster id '%s' not found - probably due to permissions issue", err, r.VM.ID, host.Cluster)
 	}
 	r.Host.Cluster.Cluster.With(cluster)
 

@@ -19,11 +19,11 @@ package hook
 import (
 	"context"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/controller/base"
-	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	"github.com/konveyor/forklift-controller/pkg/settings"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/controller/base"
+	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/settings"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/storage/names"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -68,9 +68,8 @@ func Add(mgr manager.Manager) error {
 		source.Kind(
 			mgr.GetCache(),
 			&api.Hook{},
-		),
-		&handler.EnqueueRequestForObject{},
-		&HookPredicate{})
+			&handler.TypedEnqueueRequestForObject[*api.Hook]{},
+			&HookPredicate{}))
 	if err != nil {
 		log.Trace(err)
 		return err

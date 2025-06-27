@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
-	ocpclient "github.com/konveyor/forklift-controller/pkg/lib/client/openshift"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web"
+	ocpclient "github.com/kubev2v/forklift/pkg/lib/client/openshift"
 	core "k8s.io/api/core/v1"
 	cnv "kubevirt.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -63,6 +63,12 @@ func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
 // WarmMigration implements base.Validator
 func (r *Validator) WarmMigration() bool {
 	return false
+}
+
+// NOOP
+func (r *Validator) SharedDisks(vmRef ref.Ref, client k8sclient.Client) (ok bool, s string, s2 string, err error) {
+	ok = true
+	return
 }
 
 // Load.

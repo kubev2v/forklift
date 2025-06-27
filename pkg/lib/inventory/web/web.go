@@ -7,8 +7,8 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/lib/inventory/container"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 )
 
 // Package logger.
@@ -55,9 +55,17 @@ func (w *WebServer) Start(middleware ...gin.HandlerFunc) {
 	w.buildOrigins()
 	w.addRoutes(router)
 	if w.TLS.Enabled {
-		go router.RunTLS(w.address(), w.TLS.Certificate, w.TLS.Key)
+		go func() {
+			if err := router.RunTLS(w.address(), w.TLS.Certificate, w.TLS.Key); err != nil {
+				log.Error(err, "web: failed to start TLS server")
+			}
+		}()
 	} else {
-		go router.Run(w.address())
+		go func() {
+			if err := router.Run(w.address()); err != nil {
+				log.Error(err, "web: failed to start server")
+			}
+		}()
 	}
 
 	log.V(3).Info(

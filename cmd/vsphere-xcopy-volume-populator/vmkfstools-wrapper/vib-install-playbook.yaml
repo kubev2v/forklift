@@ -1,0 +1,50 @@
+---
+- hosts: poweredOn
+  gather_facts: false
+  user: root
+  vars:
+    src_vib: vmkfstools-wrapper.vib
+    src_location: ./
+    dest_location: /tmp/
+    maintenance_needed: no
+    copy_ssh_key: false
+    # uncomment when you need to connect using password
+    #ansible_ssh_common_args: '-o PreferredAuthentications=keyboard-interactive'
+
+  tasks:
+    - name: Copy SSH public key
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/keys-root/authorized_keys
+        line: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+        create: true
+      when: copy_ssh_key | bool
+         
+    - name: Copy {{ src_vib }} to ESXI Host
+      copy: 
+        src="{{ src_location }}{{ src_vib }}"
+        dest="{{ dest_location }}{{src_vib}}"
+
+    - name: Search for existing VIB installation
+      shell: esxcli software vib list | grep vmkfstools-wrapper 
+      register: vibs
+      changed_when: false
+      ignore_errors: yes
+
+    - debug: var=vibs.stdout
+
+    - name: Remove Red Hat's vmkfstools-wrapper
+      shell: esxcli software vib -n vmkfstools-wrapper
+
+    - name: Install Red Hat's vmkfstools-wrapper
+      shell: esxcli software vib install -v {{ dest_location }}{{ src_vib }} -f
+
+    - name: Confirm VIB is installed
+      shell: esxcli software vib list | grep vmkfstools-wrapper
+      register: vibs
+      changed_when: false
+      ignore_errors: yes
+      retries: 3
+      delay: 10
+
+    - debug: var=vibs.stdout
+

@@ -3,9 +3,9 @@ package suit_test
 import (
 	"time"
 
-	forkliftv1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/tests/suit/framework"
-	"github.com/konveyor/forklift-controller/tests/suit/utils"
+	forkliftv1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/tests/suit/framework"
+	"github.com/kubev2v/forklift/tests/suit/utils"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -67,7 +67,7 @@ var _ = Describe("[level:component]Migration tests for OVA provider", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Creating plan")
-		planDef := utils.NewPlanWithVmId(*provider, namespace, test_plan_name, test_storage_map_name, networkMapName, targetNS.Name, []string{vmData.GetVmId()})
+		planDef := utils.NewPlanWithVmName(*provider, namespace, test_plan_name, test_storage_map_name, networkMapName, []string{vmData.GetVmName()}, targetNS.Name)
 
 		err = utils.CreatePlanFromDefinition(f.CrClient, planDef)
 		Expect(err).ToNot(HaveOccurred())
@@ -80,6 +80,5 @@ var _ = Describe("[level:component]Migration tests for OVA provider", func() {
 		Expect(err).ToNot(HaveOccurred())
 		err = utils.WaitForMigrationSucceededWithTimeout(f.CrClient, provider.Namespace, test_migration_name, 900*time.Second)
 		Expect(err).ToNot(HaveOccurred())
-
 	})
 })

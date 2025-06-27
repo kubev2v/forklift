@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
-	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -39,6 +39,53 @@ type VM struct {
 	// Selected InstanceType that will override the VM properties.
 	// +optional
 	InstanceType string `json:"instanceType,omitempty"`
+	// PVCNameTemplate is a template for generating PVC names for VM disks.
+	// It follows Go template syntax and has access to the following variables:
+	//   - .VmName: name of the VM
+	//   - .PlanName: name of the migration plan
+	//   - .DiskIndex: initial volume index of the disk
+	//   - .RootDiskIndex: index of the root disk
+	//   - .Shared: true if the volume is shared by multiple VMs, false otherwise
+	// Note:
+	//   This template overrides the plan level template.
+	// Examples:
+	//   "{{.VmName}}-disk-{{.DiskIndex}}"
+	//   "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
+	//   "{{if .Shared}}shared-{{end}}{{.VmName}}-{{.DiskIndex}}"
+	// +optional
+	PVCNameTemplate string `json:"pvcNameTemplate,omitempty"`
+	// VolumeNameTemplate is a template for generating volume interface names in the target virtual machine.
+	// It follows Go template syntax and has access to the following variables:
+	//   - .PVCName: name of the PVC mounted to the VM using this volume
+	//   - .VolumeIndex: sequential index of the volume interface (0-based)
+	// Note:
+	//   - This template will override at the plan level template
+	//   - If not specified on VM level and on Plan leverl, default naming conventions will be used
+	// Examples:
+	//   "disk-{{.VolumeIndex}}"
+	//   "pvc-{{.PVCName}}"
+	// +optional
+	VolumeNameTemplate string `json:"volumeNameTemplate,omitempty"`
+	// NetworkNameTemplate is a template for generating network interface names in the target virtual machine.
+	// It follows Go template syntax and has access to the following variables:
+	//   - .NetworkName: If target network is multus, name of the Multus network attachment definition, empty otherwise.
+	//   - .NetworkNamespace: If target network is multus, namespace where the network attachment definition is located.
+	//   - .NetworkType: type of the network ("Multus" or "Pod")
+	//   - .NetworkIndex: sequential index of the network interface (0-based)
+	// The template can be used to customize network interface names based on target network configuration.
+	// Note:
+	//   - This template will override at the plan level template
+	//   - If not specified on VM level and on Plan leverl, default naming conventions will be used
+	// Examples:
+	//   "net-{{.NetworkIndex}}"
+	//   "{{if eq .NetworkType "Pod"}}pod{{else}}multus-{{.NetworkIndex}}{{end}}"
+	// +optional
+	NetworkNameTemplate string `json:"networkNameTemplate,omitempty"`
+	// TargetName specifies a custom name for the VM in the target cluster.
+	// If not provided, the original VM name will be used and automatically adjusted to meet k8s DNS1123 requirements.
+	// If provided, this exact name will be used instead. The migration will fail if the name is not unique or already in use.
+	// +optional
+	TargetName string `json:"targetName,omitempty"`
 }
 
 // Find a Hook for the specified step.
@@ -66,6 +113,8 @@ type VMStatus struct {
 	Error *Error `json:"error,omitempty"`
 	// Warm migration status
 	Warm *Warm `json:"warm,omitempty"`
+	// OffloadSnapshot shows snapshot creation and deletion task ID which MTV will monitor and snapshot name
+	OffloadSnapshot *OffloadSnapshot `json:"offloadSnapshot,omitempty"`
 	// Source VM power state before migration.
 	RestorePowerState VMPowerState `json:"restorePowerState,omitempty"`
 	// The firmware type detected from the OVF file produced by virt-v2v.
@@ -86,6 +135,13 @@ type Warm struct {
 	ConsecutiveFailures int        `json:"consecutiveFailures"`
 	NextPrecopyAt       *meta.Time `json:"nextPrecopyAt,omitempty"`
 	Precopies           []Precopy  `json:"precopies,omitempty"`
+}
+
+// OffloadSnapshot status
+type OffloadSnapshot struct {
+	Snapshot     string `json:"snapshot,omitempty"`
+	CreateTaskId string `json:"createTaskId,omitempty"`
+	RemoveTaskId string `json:"removeTaskId,omitempty"`
 }
 
 type VMPowerState string

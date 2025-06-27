@@ -6,10 +6,10 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
+	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
 )
 
 // Routes.
@@ -174,10 +174,11 @@ func (h *DatastoreHandler) filter(ctx *gin.Context, list *[]model.Datastore) (er
 // REST Resource.
 type Datastore struct {
 	Resource
-	Type            string `json:"type"`
-	Capacity        int64  `json:"capacity"`
-	Free            int64  `json:"free"`
-	MaintenanceMode string `json:"maintenance"`
+	Type                string   `json:"type"`
+	Capacity            int64    `json:"capacity"`
+	Free                int64    `json:"free"`
+	MaintenanceMode     string   `json:"maintenance"`
+	BackingDevicesNames []string `json:"backingDevicesNames"`
 }
 
 // Build the resource using the model.
@@ -187,6 +188,7 @@ func (r *Datastore) With(m *model.Datastore) {
 	r.Capacity = m.Capacity
 	r.Free = m.Free
 	r.MaintenanceMode = m.MaintenanceMode
+	r.BackingDevicesNames = m.BackingDevicesNames
 }
 
 // Build self link (URI).

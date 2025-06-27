@@ -2,14 +2,14 @@ package web
 
 import (
 	"github.com/gin-gonic/gin"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ova"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/openstack"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/ova"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/ovirt"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 
 	"net/http"
 )
@@ -43,9 +43,9 @@ func (h ProviderHandler) List(ctx *gin.Context) {
 	}
 	// OCP
 	ocpHandler := &ocp.ProviderHandler{
-		Handler: base.Handler{
+		Handler: ocp.Handler{Handler: base.Handler{
 			Container: h.Container,
-		},
+		}},
 	}
 	status, err = ocpHandler.Prepare(ctx)
 	if status != http.StatusOK {

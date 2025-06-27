@@ -3,9 +3,9 @@ package base
 import (
 	"time"
 
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/base"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/base"
+	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 )
 
 var log = logging.WithName("web|tree")

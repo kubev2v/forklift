@@ -31,6 +31,7 @@ import (
 	"syscall"
 	"time"
 
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -99,6 +100,11 @@ var (
 			resource:           "openstackvolumepopulators",
 			regexKey:           "openstack_volume_populator",
 		},
+		api.VSphereXcopyVolumePopulatorKind: {
+			storageResourceKey: "source_vmdk",
+			resource:           api.VSphereXcopyVolumePopulatorResource,
+			regexKey:           "vsphere_xcopy_volume_populator",
+		},
 	}
 
 	monitoredPVCs = map[string]interface{}{}
@@ -131,8 +137,8 @@ type controller struct {
 	mu                sync.Mutex
 	notifyMap         map[string]*stringSet
 	cleanupMap        map[string]*stringSet
-	workqueue         workqueue.RateLimitingInterface
-	populatorArgs     func(bool, *unstructured.Unstructured) ([]string, error)
+	workqueue         workqueue.TypedRateLimitingInterface[string]
+	populatorArgs     func(bool, *unstructured.Unstructured, corev1.PersistentVolumeClaim) ([]string, error)
 	gk                schema.GroupKind
 	metrics           *metricsManager
 	recorder          record.EventRecorder
@@ -141,7 +147,7 @@ type controller struct {
 
 func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, prefix string,
 	gk schema.GroupKind, gvr schema.GroupVersionResource, mountPath, devicePath string,
-	populatorArgs func(bool, *unstructured.Unstructured) ([]string, error),
+	populatorArgs func(bool, *unstructured.Unstructured, corev1.PersistentVolumeClaim) ([]string, error),
 ) {
 	klog.Infof("Starting populator controller for %s", gk)
 
@@ -199,7 +205,7 @@ func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, 
 		unstSynced:        unstInformer.HasSynced,
 		notifyMap:         make(map[string]*stringSet),
 		cleanupMap:        make(map[string]*stringSet),
-		workqueue:         workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		workqueue:         workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
 		populatorArgs:     populatorArgs,
 		gk:                gk,
 		metrics:           initMetrics(),
@@ -209,7 +215,7 @@ func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, 
 	c.metrics.startListener(httpEndpoint, metricsPath)
 	defer c.metrics.stopListener()
 
-	pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: c.handlePVC,
 		UpdateFunc: func(old, new interface{}) {
 			newPvc := new.(*corev1.PersistentVolumeClaim)
@@ -221,8 +227,11 @@ func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, 
 		},
 		DeleteFunc: c.handlePVC,
 	})
+	if err != nil {
+		klog.Fatalf("Failed to add event handler for pvc: %v", err)
+	}
 
-	pvInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = pvInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: c.handlePV,
 		UpdateFunc: func(old, new interface{}) {
 			newPv := new.(*corev1.PersistentVolume)
@@ -234,8 +243,11 @@ func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, 
 		},
 		DeleteFunc: c.handlePV,
 	})
+	if err != nil {
+		klog.Fatalf("Failed to add event handler for pv: %v", err)
+	}
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: c.handlePod,
 		UpdateFunc: func(old, new interface{}) {
 			newPod := new.(*corev1.Pod)
@@ -247,8 +259,11 @@ func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, 
 		},
 		DeleteFunc: c.handlePod,
 	})
+	if err != nil {
+		klog.Fatalf("Failed to add event handler for pod: %v", err)
+	}
 
-	scInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = scInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: c.handleSC,
 		UpdateFunc: func(old, new interface{}) {
 			newSc := new.(*storagev1.StorageClass)
@@ -260,8 +275,11 @@ func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, 
 		},
 		DeleteFunc: c.handleSC,
 	})
+	if err != nil {
+		klog.Fatalf("Failed to add event handler for sc: %v", err)
+	}
 
-	unstInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = unstInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: c.handleUnstructured,
 		UpdateFunc: func(old, new interface{}) {
 			newUnstructured := new.(*unstructured.Unstructured)
@@ -273,6 +291,9 @@ func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, 
 		},
 		DeleteFunc: c.handleUnstructured,
 	})
+	if err != nil {
+		klog.Fatalf("Failed to add event handler for unstructured: %v", err)
+	}
 
 	kubeInformerFactory.Start(stopCh)
 	dynInformerFactory.Start(stopCh)
@@ -413,13 +434,11 @@ func (c *controller) run(stopCh <-chan struct{}) error {
 }
 
 func (c *controller) runWorker() {
-	processNextWorkItem := func(obj interface{}) error {
+	processNextWorkItem := func(obj string) error {
 		defer c.workqueue.Done(obj)
 		var key string
-		var ok bool
-		if key, ok = obj.(string); !ok {
-			c.workqueue.Forget(obj)
-			utilruntime.HandleError(fmt.Errorf("expected string in workqueue but got %#v", obj))
+		if key = obj; key == "" {
+			utilruntime.HandleError(fmt.Errorf("expected valid string in workqueue but got empty string"))
 			return nil
 		}
 		var err error
@@ -499,7 +518,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 	}
 
 	// Set the args for the populator pod
-	args, err := c.populatorArgs(rawBlock, crInstance)
+	args, err := c.populatorArgs(rawBlock, crInstance, *pvc)
 	if err != nil {
 		return err
 	}
@@ -614,6 +633,9 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 					Labels:      labels,
 				},
 				Spec: makePopulatePodSpec(pvcPrimeName, secretName),
+			}
+			if c.gk.Kind == api.VSphereXcopyVolumePopulatorKind {
+				pod.Spec.ServiceAccountName = "populator"
 			}
 			pod.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName = pvcPrimeName
 			con := &pod.Spec.Containers[0]
