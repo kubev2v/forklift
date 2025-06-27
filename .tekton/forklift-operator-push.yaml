@@ -9,7 +9,7 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "main" && ( ".tekton/forklift-operator-pull-request.yaml".pathChanged() ||
+      == "release-2.9" && ( ".tekton/forklift-operator-pull-request.yaml".pathChanged() ||
       ".tekton/forklift-operator-push.yaml".pathChanged() ||
       "build/forklift-operator/Containerfile-downstream".pathChanged() ||
       "operator/roles/***".pathChanged() ||

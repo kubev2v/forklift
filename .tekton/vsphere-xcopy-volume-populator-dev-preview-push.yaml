@@ -8,7 +8,7 @@ metadata:
     pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "main" && ( ".tekton/vsphere-xcopy-volume-populator-dev-preview-*.yaml".pathChanged() ||
+      == "release-2.9" && ( ".tekton/vsphere-xcopy-volume-populator-dev-preview-*.yaml".pathChanged() ||
       ".konflux/vsphere-xcopy-volume-populator/rpms.lock.yaml".pathChanged() ||
       "build/vsphere-xcopy-volume-populator/Containerfile-downstream".pathChanged() ||
       "cmd/vsphere-xcopy-volume-populator/***".pathChanged() )

@@ -9,7 +9,7 @@ metadata:
     pipelinesascode.tekton.dev/cancel-in-progress: "true"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
-      == "main" && ( ".tekton/openstack-populator-dev-preview-*.yaml".pathChanged() ||
+      == "release-2.9" && ( ".tekton/openstack-populator-dev-preview-*.yaml".pathChanged() ||
       ".konflux/openstack-populator/rpms.lock.yaml".pathChanged() ||
       "build/openstack-populator/Containerfile-downstream".pathChanged() )
   creationTimestamp: null
