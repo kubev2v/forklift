@@ -8,16 +8,18 @@ metadata:
     pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "release-2.9" && ( ".tekton/ovirt-populator-dev-preview-*.yaml".pathChanged() ||
-      ".konflux/ovirt-populator/rpms.lock.yaml".pathChanged() ||
-      "build/ovirt-populator/Containerfile-downstream".pathChanged() ||
-      "cmd/ovirt-populator/***".pathChanged() )
+      == "release-2.9" && ( ".tekton/virt-v2v-2-9-*.yaml".pathChanged() ||
+      ".konflux/virt-v2v/rpms.lock.yaml".pathChanged() ||
+      "build/virt-v2v/Containerfile-downstream".pathChanged() ||
+      "pkg/virt-v2v/***".pathChanged() ||
+      "cmd/virt-v2v/***".pathChanged() ||
+      "cmd/virt-v2v-monitor/***".pathChanged() )
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: forklift-operator-dev-preview
-    appstudio.openshift.io/component: ovirt-populator-dev-preview
+    appstudio.openshift.io/application: forklift-operator-2-9
+    appstudio.openshift.io/component: virt-v2v-2-9
     pipelines.appstudio.openshift.io/type: build
-  name: ovirt-populator-dev-preview-on-push
+  name: virt-v2v-2-9-on-push
   namespace: rh-mtv-1-tenant
 spec:
   params:
@@ -26,15 +28,15 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/ovirt-populator-dev-preview:{{revision}}
+    value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-2-9/virt-v2v-2-9:{{revision}}
   - name: dockerfile
-    value: build/ovirt-populator/Containerfile-downstream
+    value: build/virt-v2v/Containerfile-downstream
   - name: path-context
     value: .
   - name: build-source-image
     value: "true"
   - name: prefetch-input
-    value: '[{"type": "rpm", "path": ".konflux/ovirt-populator"}]'
+    value: '[{"type": "rpm", "path": ".konflux/virt-v2v"}]'
   - name: build-args-file
     value: build/release.conf
   - name: build-args
@@ -192,10 +194,10 @@ spec:
         value: $(params.output-image).prefetch
       - name: ociArtifactExpiresAfter
         value: $(params.image-expires-after)
-      - name: dev-package-managers 
+      - name: dev-package-managers
         value: "true"
       - name: ACTIVATION_KEY
-        value: activation-key-rhel8
+        value: activation-key-rhel9
       runAfter:
       - clone-repository
       taskRef:
@@ -608,7 +610,7 @@ spec:
     - name: netrc
       optional: true
   taskRunTemplate:
-    serviceAccountName: build-pipeline-ovirt-populator-dev-preview
+    serviceAccountName: build-pipeline-virt-v2v-2-9
   workspaces:
   - name: git-auth
     secret:

@@ -4,23 +4,20 @@ metadata:
   annotations:
     build.appstudio.openshift.io/repo: https://github.com/kubev2v/forklift?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
-    build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
-    pipelinesascode.tekton.dev/cancel-in-progress: "true"
+    pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
-      == "release-2.9" && ( ".tekton/virt-v2v-dev-preview-*.yaml".pathChanged() ||
-      ".konflux/virt-v2v/rpms.lock.yaml".pathChanged() ||
-      "build/virt-v2v/Containerfile-downstream".pathChanged() ||
-      "pkg/virt-v2v/***".pathChanged() ||
-      "cmd/virt-v2v/***".pathChanged() ||
-      "cmd/virt-v2v-monitor/***".pathChanged() )
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
+      == "release-2.9" && ( ".tekton/ova-provider-server-2-9-*.yaml".pathChanged() ||
+      ".konflux/ova-provider-server/rpms.lock.yaml".pathChanged() ||
+      "build/ova-provider-server/Containerfile-downstream".pathChanged() ||
+      "cmd/ova-provider-server/***".pathChanged() )
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: forklift-operator-dev-preview
-    appstudio.openshift.io/component: virt-v2v-dev-preview
+    appstudio.openshift.io/application: forklift-operator-2-9
+    appstudio.openshift.io/component: ova-provider-server-2-9
     pipelines.appstudio.openshift.io/type: build
-  name: virt-v2v-dev-preview-on-pull-request
+  name: ova-provider-server-2-9-on-push
   namespace: rh-mtv-1-tenant
 spec:
   params:
@@ -29,17 +26,15 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/virt-v2v-dev-preview:on-pr-{{revision}}
-  - name: image-expires-after
-    value: 5d
+    value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-2-9/ova-provider-server-2-9:{{revision}}
   - name: dockerfile
-    value: build/virt-v2v/Containerfile-downstream
+    value: build/ova-provider-server/Containerfile-downstream
   - name: path-context
     value: .
   - name: build-source-image
     value: "true"
   - name: prefetch-input
-    value: '[{"type": "rpm", "path": ".konflux/virt-v2v"}]'
+    value: '[{"type": "rpm", "path": ".konflux/ova-provider-server"}]'
   - name: build-args-file
     value: build/release.conf
   - name: build-args
@@ -197,7 +192,7 @@ spec:
         value: $(params.output-image).prefetch
       - name: ociArtifactExpiresAfter
         value: $(params.image-expires-after)
-      - name: dev-package-managers
+      - name: dev-package-managers 
         value: "true"
       - name: ACTIVATION_KEY
         value: activation-key-rhel9
@@ -613,7 +608,7 @@ spec:
     - name: netrc
       optional: true
   taskRunTemplate:
-    serviceAccountName: build-pipeline-virt-v2v-dev-preview
+    serviceAccountName: build-pipeline-ova-provider-server-2-9
   workspaces:
   - name: git-auth
     secret:
