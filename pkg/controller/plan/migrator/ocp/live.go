@@ -140,7 +140,6 @@ func (r *LiveMigrator) Complete(vm *planapi.VMStatus) {
 			r.Log.Error(err, "Unable to clean up target VM.", "vm", vm.String())
 		}
 	}
-	return
 }
 
 func (r *LiveMigrator) Status(vm planapi.VM) (status *planapi.VMStatus) {
@@ -164,7 +163,6 @@ func (r *LiveMigrator) Reset(vm *planapi.VMStatus, pipeline []*planapi.Step) {
 	vm.Pipeline = pipeline
 	vm.Error = nil
 	vm.Warm = nil
-	return
 }
 
 func (r *LiveMigrator) Itinerary(vm planapi.VM) (itinerary *libitr.Itinerary) {
@@ -1040,8 +1038,6 @@ func (r *Ensurer) EnsureSourceVMIM(vm *planapi.VMStatus, source *cnv.VirtualMach
 				source.Name),
 			"vm",
 			vm.String())
-	} else {
-		source = &list.Items[0]
 	}
 	return
 }
@@ -1257,8 +1253,6 @@ func (r *Ensurer) EnsureVirtualMachine(vm *planapi.VMStatus, target *cnv.Virtual
 				target.Name),
 			"source",
 			vm.String())
-	} else {
-		target = &vms.Items[0]
 	}
 	return
 }
@@ -1697,7 +1691,7 @@ func (r *Builder) TargetVMIM(vm *planapi.VMStatus) (vmim *cnv.VirtualMachineInst
 	}
 
 	vmim = &cnv.VirtualMachineInstanceMigration{}
-	vmim.GenerateName = fmt.Sprintf("forklift-")
+	vmim.GenerateName = "forklift-"
 	vmim.Namespace = r.Context.Plan.Spec.TargetNamespace
 	vmim.Labels = r.Labeler.VMLabels(vm.Ref)
 	vmim.Spec.VMIName = inventoryVm.Name
@@ -1716,7 +1710,7 @@ func (r *Builder) SourceVMIM(vm *planapi.VMStatus, syncAddress string) (vmim *cn
 	}
 
 	vmim = &cnv.VirtualMachineInstanceMigration{}
-	vmim.GenerateName = fmt.Sprintf("forklift-")
+	vmim.GenerateName = "forklift-"
 	vmim.Namespace = inventoryVm.Namespace
 	vmim.Labels = r.Labeler.VMLabels(vm.Ref)
 	vmim.Spec.VMIName = inventoryVm.Name
