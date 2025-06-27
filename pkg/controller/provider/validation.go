@@ -32,6 +32,7 @@ const (
 	ConnectionTestFailed    = "ConnectionTestFailed"
 	InventoryCreated        = "InventoryCreated"
 	LoadInventory           = "LoadInventory"
+	InventoryError          = "InventoryError"
 	ConnectionInsecure      = "ConnectionInsecure"
 )
 
@@ -366,6 +367,24 @@ func (r *Reconciler) inventoryCreated(provider *api.Provider) error {
 		return nil
 	}
 	if r, found := r.container.Get(provider); found {
+		// Check for runtime errors from any collector that supports them
+		if errors := r.GetRuntimeErrors(); len(errors) > 0 {
+			// Set inventory error condition for any runtime errors
+			var errorMessages []string
+			for kind, err := range errors {
+				errorMessages = append(errorMessages, fmt.Sprintf("%s: %s", kind, err.Error()))
+			}
+			provider.Status.SetCondition(
+				libcnd.Condition{
+					Type:     InventoryError,
+					Status:   True,
+					Reason:   "RuntimeError",
+					Category: Error,
+					Message:  fmt.Sprintf("Inventory runtime errors: %v", errorMessages),
+				})
+			return nil
+		}
+
 		if r.HasParity() {
 			provider.Status.SetCondition(
 				libcnd.Condition{
@@ -385,6 +404,8 @@ func (r *Reconciler) inventoryCreated(provider *api.Provider) error {
 					Message:  "Loading the inventory.",
 				})
 		}
+	} else {
+		log.Info("No collector found", "provider", provider)
 	}
 
 	return nil

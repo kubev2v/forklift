@@ -152,4 +152,6 @@ type Collector interface {
 	Reset()
 	// Get the system version - currently, ovirt-only
 	Version() (string, string, string, string, error)
+	// Get runtime errors - returns map of resource kind to error
+	GetRuntimeErrors() map[string]error
 }
