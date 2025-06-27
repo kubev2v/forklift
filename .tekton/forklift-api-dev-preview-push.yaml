@@ -8,7 +8,7 @@ metadata:
     pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "main" && ( ".tekton/forklift-api-dev-preview-*.yaml".pathChanged() ||
+      == "release-2.9" && ( ".tekton/forklift-api-dev-preview-*.yaml".pathChanged() ||
       ".konflux/forklift-api/rpms.lock.yaml".pathChanged() ||
       "build/forklift-api/Containerfile-downstream".pathChanged() ||
       "pkg/forklift-api/***".pathChanged() ||
