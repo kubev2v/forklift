@@ -41,11 +41,26 @@ func changeVmName(currName string) string {
 
 	for _, part := range parts {
 		part = strings.ReplaceAll(part, "_", "-")
+		part = strings.ReplaceAll(part, "+", "-")
+		part = strings.ReplaceAll(part, "*", "-")
+		part = strings.ReplaceAll(part, " ", "-")
+		part = strings.ReplaceAll(part, "/", "-")
+		part = strings.ReplaceAll(part, "\\", "-")
 
 		notAllowedChars := regexp.MustCompile("[^a-z0-9-]")
 		part = notAllowedChars.ReplaceAllString(part, "")
 
 		part = strings.Trim(part, "-.")
+
+		// Remove multiple dashes
+		partsByDashes := strings.Split(part, "-")
+		var cleanedParts []string
+		for _, p := range partsByDashes {
+			if p != "" {
+				cleanedParts = append(cleanedParts, p)
+			}
+		}
+		part = strings.Join(cleanedParts, "-")
 
 		// Add part only if not empty
 		if part != "" {
