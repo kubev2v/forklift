@@ -96,7 +96,7 @@ func (b *Base) RefList(in types.AnyType) (list []model.Ref) {
 func (b *Base) Decoded(in types.AnyType) (s string) {
 	var cast bool
 	if s, cast = in.(string); cast {
-		decoded, err := url.QueryUnescape(s)
+		decoded, err := url.PathUnescape(s)
 		if err == nil {
 			s = decoded
 		}
