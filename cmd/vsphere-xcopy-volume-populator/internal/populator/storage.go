@@ -20,5 +20,5 @@ type StorageMapper interface {
 }
 
 type StorageResolver interface {
-	ResolveVolumeHandleToLUN(volumeHandle string) (LUN, error)
+	ResolvePVToLUN(persistentVolume PersistentVolume) (LUN, error)
 }

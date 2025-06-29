@@ -85,19 +85,19 @@ func (mr *MockStorageApiMockRecorder) Map(initatorGroup, targetLUN, context any)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Map", reflect.TypeOf((*MockStorageApi)(nil).Map), initatorGroup, targetLUN, context)
 }
 
-// ResolveVolumeHandleToLUN mocks base method.
-func (m *MockStorageApi) ResolveVolumeHandleToLUN(volumeHandle string) (populator.LUN, error) {
+// ResolvePVToLUN mocks base method.
+func (m *MockStorageApi) ResolvePVToLUN(persistentVolume populator.PersistentVolume) (populator.LUN, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ResolveVolumeHandleToLUN", volumeHandle)
+	ret := m.ctrl.Call(m, "ResolvePVToLUN", persistentVolume)
 	ret0, _ := ret[0].(populator.LUN)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ResolveVolumeHandleToLUN indicates an expected call of ResolveVolumeHandleToLUN.
-func (mr *MockStorageApiMockRecorder) ResolveVolumeHandleToLUN(volumeHandle any) *gomock.Call {
+// ResolvePVToLUN indicates an expected call of ResolvePVToLUN.
+func (mr *MockStorageApiMockRecorder) ResolvePVToLUN(persistentVolume any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResolveVolumeHandleToLUN", reflect.TypeOf((*MockStorageApi)(nil).ResolveVolumeHandleToLUN), volumeHandle)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResolvePVToLUN", reflect.TypeOf((*MockStorageApi)(nil).ResolvePVToLUN), persistentVolume)
 }
 
 // UnMap mocks base method.
