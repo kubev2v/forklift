@@ -8,6 +8,7 @@ import (
 	storage "k8s.io/api/storage/v1"
 	cnv "kubevirt.io/api/core/v1"
 	instancetype "kubevirt.io/api/instancetype/v1beta1"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -75,4 +76,31 @@ type ClusterInstanceType struct {
 // Get the kubernetes object being collected.
 func (r *ClusterInstanceType) Object() client.Object {
 	return &instancetype.VirtualMachineClusterInstancetype{}
+}
+
+type PersistentVolumeClaim struct {
+	libocp.BaseCollection
+	log logging.LevelLogger
+}
+
+func (r *PersistentVolumeClaim) Object() client.Object {
+	return &core.PersistentVolumeClaim{}
+}
+
+type DataVolume struct {
+	libocp.BaseCollection
+	log logging.LevelLogger
+}
+
+func (r *DataVolume) Object() client.Object {
+	return &cdi.DataVolume{}
+}
+
+type KubeVirt struct {
+	libocp.BaseCollection
+	log logging.LevelLogger
+}
+
+func (r *KubeVirt) Object() client.Object {
+	return &cnv.KubeVirt{}
 }

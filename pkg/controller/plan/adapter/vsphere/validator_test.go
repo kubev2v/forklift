@@ -5,6 +5,7 @@ import (
 	v1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
@@ -89,10 +90,13 @@ var _ = Describe("vsphere validation tests", func() {
 		DescribeTable("should validate Static IPs correctly",
 			func(vmName string, staticIPs, shouldError bool) {
 				plan := createPlan()
+				ctx := plancontext.Context{
+					Plan:   plan,
+					Source: plancontext.Source{Inventory: &mockInventory{}},
+				}
 				plan.Spec.PreserveStaticIPs = staticIPs
 				validator := &Validator{
-					plan:      plan,
-					inventory: &mockInventory{},
+					Context: &ctx,
 				}
 				ok, err := validator.StaticIPs(ref.Ref{Name: vmName})
 				if shouldError {

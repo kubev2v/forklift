@@ -32,8 +32,11 @@ func (r *BaseMigrator) Init() (err error) {
 	return
 }
 
-func (r *BaseMigrator) Cleanup(status *plan.VMStatus, successful bool) (err error) {
+func (r *BaseMigrator) Begin() (err error) {
 	return
+}
+
+func (r *BaseMigrator) Complete(status *plan.VMStatus) {
 }
 
 func (r *BaseMigrator) Status(vm plan.VM) (status *plan.VMStatus) {
