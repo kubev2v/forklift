@@ -61,9 +61,10 @@ type OffloadPlugin struct {
 type StorageVendorProduct string
 
 const (
-	StorageVendorProductVantara     StorageVendorProduct = "vantara"
-	StorageVendorProductOntap       StorageVendorProduct = "ontap"
-	StorageVendorProductPrimera3Par StorageVendorProduct = "primera3par"
+	StorageVendorProductVantara        StorageVendorProduct = "vantara"
+	StorageVendorProductOntap          StorageVendorProduct = "ontap"
+	StorageVendorProductPrimera3Par    StorageVendorProduct = "primera3par"
+	StorageVendorProductPureFlashArray StorageVendorProduct = "pureFlashArray"
 )
 
 // VSphereXcopyPluginConfig works with the Vsphere Xcopy Volume Populator
@@ -73,7 +74,7 @@ type VSphereXcopyPluginConfig struct {
 	// The secret should reside in the same namespace where the source provider is.
 	SecretRef string `json:"secretRef"`
 	// StorageVendorProduct the string identifier of the storage vendor product
-	// +kubebuilder:validation:Enum=vantara;ontap;primera3par
+	// +kubebuilder:validation:Enum=vantara;ontap;primera3par;pureFlashArray
 	StorageVendorProduct StorageVendorProduct `json:"storageVendorProduct"`
 }
 
