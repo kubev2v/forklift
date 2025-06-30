@@ -29,7 +29,11 @@ func (m *mockInventory) Find(resource interface{}, ref ref.Ref) error {
 				GuestNetworks: []vsphere.GuestNetwork{
 					{MAC: "mac1"},
 				},
-				GuestID: "windows7Guest"},
+				GuestID: "windows7Guest",
+				VM1: model.VM1{
+					PowerState: "poweredOn", // default state
+				},
+			},
 		}
 		if ref.Name == "full_guest_network" {
 			res.VM.GuestNetworks = append(res.VM.GuestNetworks, vsphere.GuestNetwork{MAC: "mac2"})
