@@ -257,7 +257,7 @@ spec:
             - name: name
               value: buildah-oci-ta
             - name: bundle
-              value: quay.io/konflux-ci/tekton-catalog/task-buildah-oci-ta:0.4@sha256:65864bd7623b8819707ffc0949c390152f99f24308803e773000009f71ed2d6b
+              value: quay.io/konflux-ci/tekton-catalog/task-buildah-oci-ta:0.4@sha256:48b99ad18fd3bde2d22ec2c397d36c55e45ca90ddf1620c9e00bdee518e297bf
             - name: kind
               value: task
           resolver: bundles
@@ -471,7 +471,7 @@ spec:
             - name: name
               value: sast-coverity-check-oci-ta
             - name: bundle
-              value: quay.io/konflux-ci/tekton-catalog/task-sast-coverity-check-oci-ta:0.3@sha256:f81ade665c725616b918356c8c2fb2d4ed972e822a1a3181933cd0ada728a231
+              value: quay.io/konflux-ci/tekton-catalog/task-sast-coverity-check-oci-ta:0.3@sha256:f9ed979367665223d0539b11542ac174c37cc7fe85d88f05168d9a7a3177475e
             - name: kind
               value: task
           resolver: bundles
@@ -555,8 +555,10 @@ spec:
               - "false"
       - name: apply-tags
         params:
-          - name: IMAGE
+          - name: IMAGE_URL
             value: $(tasks.build-image-index.results.IMAGE_URL)
+          - name: IMAGE_DIGEST
+            value: $(tasks.build-image-index.results.IMAGE_DIGEST)
         runAfter:
           - build-image-index
         taskRef:
@@ -564,7 +566,7 @@ spec:
             - name: name
               value: apply-tags
             - name: bundle
-              value: quay.io/konflux-ci/tekton-catalog/task-apply-tags:0.1@sha256:1c6f673fe100a49f58aaef62580c8adf0c397790964f4e7bac7fcd3f4d07c92e
+              value: quay.io/konflux-ci/tekton-catalog/task-apply-tags:0.2@sha256:517a51e260c0b59654a9d7b842e1ab07d76bce15ca7ce9c8fd2489a19be6463d
             - name: kind
               value: task
           resolver: bundles
