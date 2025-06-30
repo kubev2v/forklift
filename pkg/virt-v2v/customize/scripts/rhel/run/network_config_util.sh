@@ -4,6 +4,8 @@
 V2V_MAP_FILE="${V2V_MAP_FILE:-/tmp/macToIP}"
 NETWORK_SCRIPTS_DIR="${NETWORK_SCRIPTS_DIR:-/etc/sysconfig/network-scripts}"
 NETWORK_CONNECTIONS_DIR="${NETWORK_CONNECTIONS_DIR:-/etc/NetworkManager/system-connections}"
+NM_LEASES_DIR="${NM_LEASES_DIR:-/var/lib/NetworkManager}"
+DHCLIENT_LEASES_DIR="${DHCLIENT_LEASES_DIR:-/var/lib/dhclient}"
 NETWORK_INTERFACES_DIR="${NETWORK_INTERFACES_DIR:-/etc/network/interfaces}"
 IFQUERY_CMD="${IFQUERY_CMD:-ifquery}"
 SYSTEMD_NETWORK_DIR="${SYSTEMD_NETWORK_DIR:-/run/systemd/network}"
@@ -13,7 +15,7 @@ NETPLAN_DIR="${NETPLAN_DIR:-/}"
 # Dump debug strings into a new file descriptor and redirect it to stdout.
 exec 3>&1
 log() {
-    echo $@ >&3
+    echo "$@" >&3
 }
 
 # Sanity checks
@@ -84,7 +86,7 @@ udev_from_ifcfg() {
     fi
 
     # Read the mapping file line by line
-    cat "$V2V_MAP_FILE" | while read line;
+    cat "$V2V_MAP_FILE" | while read -r line;
     do
         # Extract S_HW and S_IP
         extract_mac_ip "$line"
@@ -122,7 +124,7 @@ udev_from_nm() {
     fi
 
     # Read the mapping file line by line
-    cat "$V2V_MAP_FILE" | while read line;
+    cat "$V2V_MAP_FILE" | while read -r line;
     do
         # Extract S_HW and S_IP
         extract_mac_ip "$line"
@@ -149,6 +151,181 @@ udev_from_nm() {
 
         echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"$(remove_quotes "$DEVICE")\""
     done
+}
+
+# Attempt to parse the `timestamps` file and find a matching timestamp for the
+# given UUID. The `timestamps` file is an 'ini'-like file with a format like:
+#   [timestamps]
+#   UUID1=TIMESTAMP1
+#   UUID2=TIMESTAMP2
+#   ...
+#
+get_timestamp_for_uuid() {
+    TIMESTAMPS_FILE="$NM_LEASES_DIR/timestamps"
+
+    if [ ! -f "$TIMESTAMPS_FILE" ]; then
+        log "Warning: Timestamps file '$TIMESTAMPS_FILE' not found."
+        echo "" # Return empty string
+        return
+    fi
+
+    # Read the timestamps file line by line
+    # Expected format: uuid=timestamp
+    while IFS='=' read -r UUID TIMESTAMP; do
+        # Skip header lines like "[timestamps]"
+        [ "$UUID" = "[timestamps]" ] && continue
+        # Skip empty lines or lines not in the expected key=value format
+        [ -z "$UUID" ] || [ -z "$TIMESTAMP" ] && continue
+
+        if [ "$UUID" = "$1" ]; then
+            echo "$TIMESTAMP"
+            break # UUID found, no need to read further
+        fi
+    done < "$TIMESTAMPS_FILE"
+}
+
+udev_from_nm_dhcp_lease() {
+    if [ ! -d "$NM_LEASES_DIR" ]; then
+        log "Warning: Directory $NM_LEASES_DIR does not exist."
+        return 0
+    fi
+
+    # Read the mapping file line by line
+    while read -r line;
+    do
+        # Extract S_HW and S_IP
+        extract_mac_ip "$line"
+
+        # If S_HW and S_IP were not extracted, skip the line
+        if [ -z "$S_HW" ] || [ -z "$S_IP" ]; then
+            log "Warning: invalid mac to ip line: $line."
+            continue
+        fi
+
+        # find all lease files that mention the given address
+        LEASE_FILES=$(grep -El "ADDRESS=$S_IP$" "$NM_LEASES_DIR"/*.lease)
+        if [ -z "$LEASE_FILES" ]; then
+            log "Warning: No lease files found containing address $S_IP"
+            continue
+        fi
+
+        # parse the filenames of the matching lease files and grab the device name of
+        # the most recent one
+        DEVICE=$(for FILENAME in $LEASE_FILES;
+        do
+            log "Checking $FILENAME"
+            # Filenames are of the form 'prefix-$(UUID)-$(INTERFACE_NAME).lease'
+            FILENAME_PARTS=$(echo "$FILENAME" | sed -n 's|^.*-\([0-9a-f]\{8\}-[0-9a-f]\{4\}-[0-9a-f]\{4\}-[0-9a-f]\{4\}-[0-9a-f]\{12\}\)-\(.*\)\.lease$|\1 \2|p')
+            if [ -n "$FILENAME_PARTS" ]; then
+                UUID=$(echo "$FILENAME_PARTS" | cut -d' ' -f1)
+                INTERFACE=$(echo "$FILENAME_PARTS" | cut -d' ' -f2)
+                TIMESTAMP=$(get_timestamp_for_uuid "$UUID")
+                if [ -n "$TIMESTAMP" ]; then
+                    echo "$TIMESTAMP $INTERFACE"
+                else
+                    log "Warning: No timestamp found for UUID '$UUID' from file '$FILENAME'"
+                    echo "0 $INTERFACE"
+                fi
+            else
+                log "Warning: Could not parse UUID/Interface from filename '$FILENAME'"
+            fi
+        done |sort -nr |head -1 |cut -d' ' -f2)
+
+        if [ -z "$DEVICE" ]; then
+            log "Warning: No device found for $S_IP"
+            continue
+        fi
+
+        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"$(remove_quotes "$DEVICE")\""
+    done < "$V2V_MAP_FILE"
+}
+
+udev_from_dhclient_lease() {
+    if [ ! -d "$DHCLIENT_LEASES_DIR" ]; then
+        log "Warning: Directory $DHCLIENT_LEASES_DIR does not exist."
+        return 0
+    fi
+
+    # Read the mapping file line by line
+    while read -r line; do
+        # Extract S_HW and S_IP
+        extract_mac_ip "$line"
+
+        # If S_HW and S_IP were not extracted, skip the line
+        if [ -z "$S_HW" ] || [ -z "$S_IP" ]; then
+            log "Warning: invalid mac to ip line: $line."
+            continue
+        fi
+
+        LATEST_EPOCH=0
+        DEVICE=""
+
+        # lease files in the dhclient are of the format:
+        # lease {
+        #   interface "eth0";
+        #   fixed-address 192.168.122.82;
+        #   ...
+        #   expire <DAYOFWEEK> <DATE:Y/M/D> <TIME:H:M:S>;
+        # }
+        # Loop over each lease file and find the interface name associated with
+        # S_IP that has the latest expiration date
+        local CURRENT_INTERFACE=""
+        local CURRENT_IP=""
+        local CURRENT_EXPIRE=""
+        local LATEST_EPOCH=0
+        local DEVICE=""
+        for FILE in "$DHCLIENT_LEASES_DIR"/*; do
+            while IFS= read -r line || [ -n "$line" ]; do
+                # Remove leading spaces
+                line=$(echo "$line" | sed -e 's/^[[:space:]]*//' -e 's/;[[:space:]]*$//')
+                # log "Processing line $line"
+                case "$line" in
+                    'interface'*)
+                        # Extract interface name
+                        CURRENT_INTERFACE=$(echo "$line" | sed -n 's/.*"\(.*\)".*/\1/p')
+                        # log "Found device $CURRENT_DEVICE"
+                        ;;
+                    'expire'*)
+                        # Extract and convert the date to epoch time
+                        CURRENT_EXPIRE=$(echo "$line" | awk '{print $3, $4}')
+                        # log "Found expire $EXPIRE"
+                        ;;
+                    'fixed-address'*)
+                        # Extract and convert the date to epoch time
+                        CURRENT_IP=$(echo "$line" | awk '{print $2}')
+                        # log "Found expire $EXPIRE"
+                        ;;
+                    '}')
+                        log "Processing block: $CURRENT_INTERFACE $CURRENT_EXPIRE"
+                        if [ -n "$CURRENT_IP" ] && [ -n "$CURRENT_INTERFACE" ] && [ -n "$CURRENT_EXPIRE" ]; then
+                            if [ "$S_IP" = "$CURRENT_IP" ]; then
+                                epoch=$(date -d "$CURRENT_EXPIRE" +%s 2>/dev/null)
+                                log "Found epoch $epoch"
+                                if [ -n "$epoch" ] && [ "$epoch" -gt "$LATEST_EPOCH" ]; then
+                                    log "$CURRENT_INTERFACE has the current latest epoch"
+                                    LATEST_EPOCH=$epoch
+                                    DEVICE=$CURRENT_INTERFACE
+                                fi
+                            else
+                                log "Skipping block because $CURRENT_IP != $S_IP"
+                            fi
+                        fi
+                        # reset for next block
+                        CURRENT_IP=""
+                        CURRENT_INTERFACE=""
+                        CURRENT_EXPIRE=""
+                        ;;
+                esac
+            done < "$FILE"
+        done
+
+        if [ -z "$DEVICE" ]; then
+            log "WARNING: No lease found for IP $S_IP"
+            continue
+        fi
+
+        echo "SUBSYSTEM==\"net\",ACTION==\"add\",ATTR{address}==\"$(remove_quotes "$S_HW")\",NAME=\"$(remove_quotes "$DEVICE")\""
+    done < "$V2V_MAP_FILE"
 }
 
 # Create udev rules based on the macToIP mapping + output from parse_netplan_file
@@ -178,7 +355,7 @@ udev_from_netplan() {
         target_ip="$1"
         if netplan_supports_get; then
           # Loop through all interfaces and check for the given IP address
-          netplan_get ethernets | grep -Eo "^[^[:space:]]+[^:]" | while read IFNAME; do
+          netplan_get ethernets | grep -Eo "^[^[:space:]]+[^:]" | while read -r IFNAME; do
               if netplan_get ethernets."$IFNAME".addresses | grep -q "$target_ip"; then
                   echo "$IFNAME"
                   return
@@ -205,7 +382,7 @@ udev_from_netplan() {
     }
 
     # Read the mapping file line by line
-    cat "$V2V_MAP_FILE" | while read line;
+    cat "$V2V_MAP_FILE" | while read -r line;
     do
         # Extract S_HW and S_IP from the current line in the mapping file
         extract_mac_ip "$line"
@@ -247,7 +424,7 @@ udev_from_ifquery() {
     find_interface_by_ip() {
         target_ip="$1"
         # Loop through all interfaces and check for the given IP address
-        ifquery_get -l | while read IFNAME; do
+        ifquery_get -l | while read -r IFNAME; do
             if ifquery_get $IFNAME | grep -q "$target_ip"; then
                 echo "$IFNAME"
                 return
@@ -256,7 +433,7 @@ udev_from_ifquery() {
     }
 
     # Read the mapping file line by line
-    cat "$V2V_MAP_FILE" | while read line;
+    cat "$V2V_MAP_FILE" | while read -r line;
     do
         # Extract S_HW and S_IP from the current line in the mapping file
         extract_mac_ip "$line"
@@ -305,6 +482,8 @@ main() {
     {
         udev_from_ifcfg
         udev_from_nm
+        udev_from_nm_dhcp_lease
+        udev_from_dhclient_lease
         udev_from_netplan
         udev_from_ifquery
     } | check_dupe_hws > "$UDEV_RULES_FILE" 2>/dev/null
