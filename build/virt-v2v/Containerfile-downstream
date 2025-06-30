@@ -1,3 +1,8 @@
+FROM registry.redhat.io/ubi9:9.6-1747219013 AS win2008iso
+
+RUN rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+RUN yum install -y --setopt=install_weak_deps=False virtio-win-1.9.4-2.el7.2
+
 FROM registry.redhat.io/ubi9:9.6-1747219013 AS appliance
 
 ENV LIBGUESTFS_BACKEND=direct
@@ -26,7 +31,7 @@ RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-monitor github
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o image-converter github.com/kubev2v/forklift/cmd/image-converter
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-wrapper github.com/kubev2v/forklift/cmd/virt-v2v
 
-FROM registry.redhat.io/ubi9:9.6-1747219013
+FROM registry.redhat.io/ubi9:9.6-1747219013 AS runtime
 RUN mkdir /disks && \
     source /etc/os-release && \
     dnf update -y && \
@@ -45,6 +50,8 @@ COPY --from=builder /app/virt-v2v-monitor /usr/local/bin/virt-v2v-monitor
 COPY --from=builder /app/image-converter /usr/local/bin/image-converter
 
 COPY --from=builder /app/virt-v2v-wrapper /usr/bin/virt-v2v-wrapper
+
+COPY --from=win2008iso /usr/share/virtio-win/virtio-win.iso /usr/share/virtio-win/virtio-win-2008.iso
 
 ENTRYPOINT ["/usr/bin/virt-v2v-wrapper"]
 

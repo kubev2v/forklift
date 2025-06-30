@@ -1,0 +1,21 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: https://cdn.redhat.com/content/dist/rhel/server/7/7.6/x86_64/supplementary/os/Packages/v/virtio-win-1.9.4-2.el7.2.noarch.rpm
+    repoid: rhel-7-server-supplementary-rpms
+    size: 56787344
+    checksum: sha1:1427a49a69d9e047edc751dcb03d55b889ec24d8
+    name: virtio-win
+    evr: 1.9.4-2.el7.2
+    sourcerpm: virtio-win-1.9.4-2.el7.2.src.rpm
+  source:
+  - url: https://cdn.redhat.com/content/dist/rhel/server/7/7.6/x86_64/supplementary/source/SRPMS/Packages/v/virtio-win-1.9.4-2.el7.2.src.rpm
+    repoid: rhel-7-server-supplementary-source-rpms
+    size: 124992704
+    checksum: sha256:6c70a0502a6d15b14058d28e6e329916d39d41801b8a430ac17a9f96b398cc43
+    name: virtio-win
+    evr: 1.9.4-2.el7.2
+  module_metadata: []
