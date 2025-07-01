@@ -7,6 +7,7 @@ feature_ui_plugin: true
 feature_validation: true
 feature_volume_populator: true
 feature_copy_offload: false
+feature_ocp_live_migration: false
 
 k8s_cluster: false
 feature_auth_required: true
@@ -40,7 +41,6 @@ controller_snapshot_removal_check_retries: 20
 controller_vsphere_incremental_backup: true
 controller_ovirt_warm_migration: true
 controller_retain_precopy_importer_pods: false
-controller_ocp_live_migration: false
 controller_max_vm_inflight: 20
 controller_filesystem_overhead: 10
 controller_block_overhead: 0

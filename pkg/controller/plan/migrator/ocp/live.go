@@ -12,11 +12,13 @@ import (
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/controller/plan/ensurer"
 	"github.com/kubev2v/forklift/pkg/controller/plan/migrator/base"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -42,8 +44,8 @@ const (
 
 // Phases
 const (
-	Started                                = "Started"
-	PreHook                                = "PreHook"
+	Started                                = api.PhaseStarted
+	PreHook                                = api.PhasePreHook
 	CreateServiceExports                   = "CreateServiceExports"
 	CreateSecrets                          = "CreateSecrets"
 	CreateConfigMaps                       = "CreateConfigMaps"
@@ -53,8 +55,8 @@ const (
 	CreateTarget                           = "CreateTarget"
 	CreateVirtualMachineInstanceMigrations = "CreateVirtualMachineInstanceMigrations"
 	WaitForStateTransfer                   = "WaitForStateTransfer"
-	PostHook                               = "PostHook"
-	Completed                              = "Completed"
+	PostHook                               = api.PhasePostHook
+	Completed                              = api.PhaseCompleted
 )
 
 // Pipeline
@@ -108,8 +110,15 @@ func (r *LiveMigrator) Init() (err error) {
 		Context:      r.Context,
 		sourceClient: r.sourceClient,
 	}
-	r.ensurer = Ensurer{Context: r.Context, SourceClient: r.sourceClient}
+	r.ensurer = Ensurer{
+		Ensurer:      &ensurer.Ensurer{Context: r.Context},
+		SourceClient: r.sourceClient,
+	}
 	return
+}
+
+func (r *LiveMigrator) Logger() (logger logging.LevelLogger) {
+	return r.Log
 }
 
 // Begin the migration process. This is called once at the beginning
@@ -154,9 +163,6 @@ func (r *LiveMigrator) Complete(vm *planapi.VMStatus) {
 func (r *LiveMigrator) Status(vm planapi.VM) (status *planapi.VMStatus) {
 	if current, found := r.Context.Plan.Status.Migration.FindVM(vm.Ref); !found {
 		status = &planapi.VMStatus{VM: vm}
-		if r.Context.Plan.Spec.Warm {
-			status.Warm = &planapi.Warm{}
-		}
 	} else {
 		status = current
 	}
@@ -326,17 +332,10 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 		vm.MarkedStarted()
 		r.NextPhase(vm)
 	case PreHook, PostHook:
-		// delegate to common pipeline
+		// delegate to the common pipeline
 		ok = false
 		return
 	case CreateSecrets:
-		step, found := vm.FindStep(r.Step(vm))
-		if !found {
-			vm.AddError(fmt.Sprintf("Step '%s' not found", r.Step(vm)))
-			return
-		}
-		step.MarkedStarted()
-		step.Phase = api.StepRunning
 		var secrets []core.Secret
 		secrets, err = r.builder.Secrets(vm)
 		if err != nil {
@@ -347,7 +346,7 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 			}
 			break
 		}
-		err = r.ensurer.EnsureSecrets(vm, secrets)
+		err = r.ensurer.SharedSecrets(vm, secrets)
 		if err != nil {
 			if !errors.As(err, &web.ProviderNotReadyError{}) {
 				r.Log.Error(err, "error ensuring secrets", "vm", vm.Name)
@@ -368,7 +367,7 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 			}
 			break
 		}
-		err = r.ensurer.EnsureConfigMaps(vm, configmaps)
+		err = r.ensurer.SharedConfigMaps(vm, configmaps)
 		if err != nil {
 			if !errors.As(err, &web.ProviderNotReadyError{}) {
 				r.Log.Error(err, "error ensuring configmaps", "vm", vm.Name)
@@ -455,7 +454,7 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 			}
 			break
 		}
-		err = r.ensurer.EnsureDataVolumes(vm, dataVolumes)
+		err = r.ensurer.DataVolumes(vm, dataVolumes)
 		if err != nil {
 			if !errors.As(err, &web.ProviderNotReadyError{}) {
 				r.StepError(vm, err)
@@ -474,7 +473,7 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 			}
 			break
 		}
-		err = r.ensurer.EnsureVirtualMachine(vm, target)
+		err = r.ensurer.VirtualMachine(vm, target)
 		if err != nil {
 			if !errors.As(err, &web.ProviderNotReadyError{}) {
 				r.StepError(vm, err)
@@ -509,13 +508,6 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 		}
 		r.NextPhase(vm)
 	case CreateVirtualMachineInstanceMigrations:
-		step, found := vm.FindStep(r.Step(vm))
-		if !found {
-			vm.AddError(fmt.Sprintf("Step '%s' not found", r.Step(vm)))
-			return
-		}
-		step.MarkStarted()
-		step.Phase = api.StepRunning
 		var target *cnv.VirtualMachineInstanceMigration
 		target, err = r.builder.TargetVMIM(vm)
 		if err != nil {
@@ -967,7 +959,7 @@ func (r *LiveMigrator) DeleteJobs(vm *planapi.VMStatus) (err error) {
 // Ensurer has the limited responsibility of ensuring resources
 // are present in the destination cluster and namespace.
 type Ensurer struct {
-	*plancontext.Context
+	*ensurer.Ensurer
 	SourceClient client.Client
 }
 
@@ -1042,122 +1034,6 @@ func (r *Ensurer) EnsureSourceVMIM(vm *planapi.VMStatus, source *cnv.VirtualMach
 	return
 }
 
-// EnsureDataVolumes have been created on the destination cluster. Although we build DataVolumes with the same
-// names they had on the source cluster, we search by label so that we notice conflicts with existing DVs.
-func (r *Ensurer) EnsureDataVolumes(vm *planapi.VMStatus, dvs []cdi.DataVolume) (err error) {
-	list := &cdi.DataVolumeList{}
-	err = r.Destination.Client.List(
-		context.TODO(),
-		list,
-		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
-			Namespace:     r.Plan.Spec.TargetNamespace,
-		})
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-
-	exists := make(map[string]bool)
-	for _, dv := range list.Items {
-		exists[dv.Annotations[AnnDiskSource]] = true
-	}
-
-	for _, dv := range dvs {
-		if !exists[dv.Annotations[AnnDiskSource]] {
-			err = r.Destination.Client.Create(context.TODO(), &dv)
-			if err != nil {
-				err = liberr.Wrap(err)
-				return
-			}
-			r.Log.Info("Created DataVolume.",
-				"dv",
-				path.Join(
-					dv.Namespace,
-					dv.Name),
-				"vm",
-				vm.String())
-		}
-	}
-	return
-}
-
-// EnsureConfigMaps exist in the destination cluster's target namespace. We attempt to create ConfigMaps
-// with the same name that they have on the source cluster because they are likely to be shared between
-// multiple VMs. If one with a matching name already exists, we assume it's the intended ConfigMap for
-// the VM to mount.
-// TODO: consider raising a concern at the VM or plan level if a configmap with the desired
-// name already exists but does not have the annotation indicating that Forklift created it.
-func (r *Ensurer) EnsureConfigMaps(vm *planapi.VMStatus, configMaps []core.ConfigMap) (err error) {
-	for _, configMap := range configMaps {
-		err = r.Destination.Client.Create(context.Background(), &configMap)
-		if err != nil {
-			if k8serr.IsAlreadyExists(err) {
-				_, found := configMap.Annotations[AnnSource]
-				if !found {
-					r.Log.Info("Matching ConfigMap already present in destination namespace.", "configMap",
-						path.Join(
-							configMap.Namespace,
-							configMap.Name),
-						"forklift-created", false)
-				}
-				continue
-			}
-			err = liberr.Wrap(err, "Failed to create ConfigMap.", "configMap",
-				path.Join(
-					configMap.Namespace,
-					configMap.Name))
-			return
-		}
-		r.Log.Info("Created ConfigMap.",
-			"configMap",
-			path.Join(
-				configMap.Namespace,
-				configMap.Name),
-			"vm",
-			vm.String())
-	}
-	return
-}
-
-// EnsureSecrets exist in the destination cluster's target namespace. We attempt to create Secrets
-// with the same name that they have on the source cluster because they are likely to be shared between
-// multiple VMs. If one with a matching name already exists, we assume it's the intended Secret for
-// the VM to mount.
-// TODO: consider raising a concern at the VM or plan level if a secret with the desired
-// name already exists but does not have the annotation indicating that Forklift created it.
-func (r *Ensurer) EnsureSecrets(vm *planapi.VMStatus, secrets []core.Secret) (err error) {
-	for _, secret := range secrets {
-		err = r.Destination.Client.Create(context.Background(), &secret)
-		if err != nil {
-			if k8serr.IsAlreadyExists(err) {
-				_, found := secret.Annotations[AnnSource]
-				if !found {
-					r.Log.Info("Matching Secret already present in destination namespace.", "secret",
-						path.Join(
-							secret.Namespace,
-							secret.Name),
-						"forklift-created", false)
-				}
-				continue
-			}
-			err = liberr.Wrap(err, "Failed to create Secret.", "secret",
-				path.Join(
-					secret.Namespace,
-					secret.Name))
-			return
-		}
-		r.Log.Info("Created Secret.",
-			"secret",
-			path.Join(
-				secret.Namespace,
-				secret.Name),
-			"vm",
-			vm.String())
-	}
-	return
-}
-
 // EnsureLocalPreference ensures that the target local Preference has been created in the destination cluster.
 // If one already exists, we assume it's the intended preference to use.
 func (r *Ensurer) EnsureLocalPreference(vm *planapi.VMStatus, target *instancetype.VirtualMachinePreference) (err error) {
@@ -1219,41 +1095,6 @@ func (r *Ensurer) EnsureLocalInstanceType(vm *planapi.VMStatus, target *instance
 			target.Name),
 		"vm",
 		vm.String())
-	return
-}
-
-// EnsureVirtualMachine ensures that the target VirtualMachine has been created in the destination cluster.
-// Labels are used to search for the VM in order to be sure that Forklift is what created it.
-func (r *Ensurer) EnsureVirtualMachine(vm *planapi.VMStatus, target *cnv.VirtualMachine) (err error) {
-	vms := &cnv.VirtualMachineList{}
-	err = r.Destination.Client.List(
-		context.TODO(),
-		vms,
-		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
-			Namespace:     r.Plan.Spec.TargetNamespace,
-		},
-	)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-
-	if len(vms.Items) == 0 {
-		err = r.Destination.Client.Create(context.TODO(), target)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-		r.Log.Info(
-			"Created destination VM.",
-			"vm",
-			path.Join(
-				target.Namespace,
-				target.Name),
-			"source",
-			vm.String())
-	}
 	return
 }
 
