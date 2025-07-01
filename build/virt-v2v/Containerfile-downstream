@@ -32,6 +32,11 @@ RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o image-converter github.
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-wrapper github.com/kubev2v/forklift/cmd/virt-v2v
 
 FROM registry.redhat.io/ubi9:9.6-1747219013 AS runtime
+
+RUN rm /etc/pki/tls/fips_local.cnf && \
+    echo -e '[fips_sect]\ntls1-prf-ems-check = 0\nactivate = 1' > /etc/pki/tls/fips_local.cnf && \
+    sed -i '/^\\[ crypto_policy \\]/a Options=RHNoEnforceEMSinFIPS' /etc/pki/tls/openssl.cnf
+
 RUN mkdir /disks && \
     source /etc/os-release && \
     dnf update -y && \
