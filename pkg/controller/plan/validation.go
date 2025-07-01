@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"path"
 	"strconv"
 
 	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
@@ -739,16 +738,16 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		if pErr != nil {
 			return liberr.Wrap(pErr)
 		}
-		id := path.Join(
-			plan.Spec.TargetNamespace,
-			ref.Name)
+		vmName := ref.Name
 		if vm.TargetName != "" {
 			// if target name is provided, use it to look for existing VMs
-			id = path.Join(
-				plan.Spec.TargetNamespace,
-				vm.TargetName)
+			vmName = vm.TargetName
 		}
-		_, pErr = inventory.VM(&refapi.Ref{Name: id})
+		vmRef := &refapi.Ref{
+			Name:      vmName,
+			Namespace: plan.Spec.TargetNamespace,
+		}
+		_, pErr = inventory.VM(vmRef)
 		if pErr == nil {
 			if _, found := plan.Status.Migration.FindVM(*ref); !found {
 				// This VM is preexisting or is being managed by a
