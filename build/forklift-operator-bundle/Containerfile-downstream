@@ -11,29 +11,29 @@ ARG DEFAULT_CHANNEL
 ARG REGISTRY
 ARG OCP_VERSIONS
 
-ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:d777b4c132d5ddc97af238b1c9df4bb4e3238f8368ec40906fe49f9621763e99"
+ARG API_IMAGE="registry.stage.redhat.io/migration-toolkit-virtualization/mtv-api-rhel9@sha256:d777b4c132d5ddc97af238b1c9df4bb4e3238f8368ec40906fe49f9621763e99"
 
-ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:9b8668e5573bcdfaf84feeba5af261d605bab0389c6c3a6de5d52c30bdab6f10"
+ARG CONTROLLER_IMAGE="registry.stage.redhat.io/migration-toolkit-virtualization/mtv-controller-rhel9@sha256:9b8668e5573bcdfaf84feeba5af261d605bab0389c6c3a6de5d52c30bdab6f10"
 
-ARG MUST_GATHER_IMAGE="registry.redhat.io/mtv-candidate/mtv-must-gather-rhel8@sha256:86306f75fcf091b87ee9f82cf5edb056e03e630359b4a6434a327c77a6d1ef1d"
+ARG MUST_GATHER_IMAGE="registry.stage.redhat.io/migration-toolkit-virtualization/mtv-must-gather-rhel8@sha256:86306f75fcf091b87ee9f82cf5edb056e03e630359b4a6434a327c77a6d1ef1d"
 
-ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-openstack-populator-rhel9@sha256:6525b74cacdcdeb748bdcecf6e4e10d9d7ab8b25a040ee74a2b154d775672399"
+ARG OPENSTACK_POPULATOR_IMAGE="registry.stage.redhat.io/migration-toolkit-virtualization/mtv-openstack-populator-rhel9@sha256:6525b74cacdcdeb748bdcecf6e4e10d9d7ab8b25a040ee74a2b154d775672399"
 
-ARG OPERATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhel9-operator@sha256:9f02168fb37f885bcde3a79623893c41f06de258c3ed0180e68e6733467b8ad4"
+ARG OPERATOR_IMAGE="registry.stage.redhat.io/migration-toolkit-virtualization/mtv-rhel9-operator@sha256:9f02168fb37f885bcde3a79623893c41f06de258c3ed0180e68e6733467b8ad4"
 
-ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/mtv-candidate/mtv-ova-provider-server-rhel9@sha256:87706635fe97893c77dfa9bc54866d7c0ada18e14cb48c3b867f7f0f3bb0946c"
+ARG OVA_PROVIDER_SERVER_IMAGE="registry.stage.redhat.io/migration-toolkit-virtualization/mtv-ova-provider-server-rhel9@sha256:87706635fe97893c77dfa9bc54866d7c0ada18e14cb48c3b867f7f0f3bb0946c"
 
-ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhv-populator-rhel8@sha256:eea56d89a584aa9e247b7b7b1a764e60d254bca5904ac04c9baeb7104e94328b"
+ARG OVIRT_POPULATOR_IMAGE="registry.stage.redhat.io/migration-toolkit-virtualization/mtv-rhv-populator-rhel8@sha256:eea56d89a584aa9e247b7b7b1a764e60d254bca5904ac04c9baeb7104e94328b"
 
-ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-populator-controller-rhel9@sha256:086a438694a11d42773f8d02935e2bd298e9d1f9de29f59e61e7743af206a928"
+ARG POPULATOR_CONTROLLER_IMAGE="registry.stage.redhat.io/migration-toolkit-virtualization/mtv-populator-controller-rhel9@sha256:086a438694a11d42773f8d02935e2bd298e9d1f9de29f59e61e7743af206a928"
 
-ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:ed35be338b08edabbaa246db0f4e134ebce071dba34a80db9c9b0e2a01992c55"
+ARG UI_PLUGIN_IMAGE="registry.stage.redhat.io/migration-toolkit-virtualization/mtv-console-plugin-rhel9@sha256:ed35be338b08edabbaa246db0f4e134ebce071dba34a80db9c9b0e2a01992c55"
 
-ARG VALIDATION_IMAGE="registry.redhat.io/mtv-candidate/mtv-validation-rhel9@sha256:c5efec26bdd4cf760e3f864b1f11a51bc6f7760811ae17a14986f9baed6020e1"
+ARG VALIDATION_IMAGE="registry.stage.redhat.io/migration-toolkit-virtualization/mtv-validation-rhel9@sha256:c5efec26bdd4cf760e3f864b1f11a51bc6f7760811ae17a14986f9baed6020e1"
 
-ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel9@sha256:34622e6215524b8347cabf0161d842678e7c3cf0d80365f638e4f86f08311d23"
+ARG VIRT_V2V_IMAGE="registry.stage.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel9@sha256:34622e6215524b8347cabf0161d842678e7c3cf0d80365f638e4f86f08311d23"
 
-ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-vsphere-xcopy-volume-populator-rhel9@sha256:474aec7f503b4c3def8e685db86e46c5407f55c95783dd1a1763be0d0901587b"
+ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.stage.redhat.io/migration-toolkit-virtualization/mtv-vsphere-xcopy-volume-populator-rhel9@sha256:474aec7f503b4c3def8e685db86e46c5407f55c95783dd1a1763be0d0901587b"
 
 USER root
 
