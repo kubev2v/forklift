@@ -128,7 +128,7 @@ spec:
         - name: FEATURE_RETAIN_PRECOPY_IMPORTER_PODS
           value: "true"
 {% endif %}
-{% if controller_ocp_live_migration|bool %}
+{% if feature_ocp_live_migration|bool %}
         - name: FEATURE_OCP_LIVE_MIGRATION
           value: "true"
 {% endif %}
