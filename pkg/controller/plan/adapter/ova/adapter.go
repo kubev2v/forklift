@@ -18,10 +18,6 @@ func (r *Adapter) Builder(ctx *plancontext.Context) (builder base.Builder, err e
 // Constructs a OVA validator.
 func (r *Adapter) Validator(ctx *plancontext.Context) (validator base.Validator, err error) {
 	v := &Validator{Context: ctx}
-	//err = v.Load()
-	//if err != nil {
-	//	return
-	//}
 	validator = v
 	return
 }

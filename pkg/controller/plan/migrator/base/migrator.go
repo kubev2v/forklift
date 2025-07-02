@@ -12,9 +12,6 @@ import (
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 )
 
-// Package logger.
-var log = logging.WithName("migrator|base")
-
 type BaseMigrator struct {
 	*plancontext.Context
 	builder adapter.Builder
