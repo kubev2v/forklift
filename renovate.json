@@ -1,5 +1,4 @@
 {
-    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
     "dockerfile": {
         "matchBaseBranches": [
             "main"
@@ -14,5 +13,13 @@
         "matchBaseBranches": [
             "main"
         ]
+    },
+    "autoApprove": true,
+    "tekton": {
+        "automerge": true,
+        "automergeStrategy": "rebase",
+        "automergeType": "pr",
+        "enabled": true,
+        "platformAutomerge": true
     }
 }
