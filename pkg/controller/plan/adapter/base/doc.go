@@ -51,6 +51,7 @@ const (
 	UdnL2bridge = "l2bridge"
 )
 
+var LibvirtVersionInsufficient = errors.New("The installed libvirt library version is not new enough")
 var DomainXMLNotImplementedError = errors.New("provider does not support DomainXML")
 var VolumePopulatorNotSupportedError = liberr.New("provider does not support volume populators")
 

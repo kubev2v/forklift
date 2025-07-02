@@ -2330,9 +2330,11 @@ func (r *KubeVirt) libvirtDomain(vmRef ref.Ref, vmCr *VirtualMachine, pvcs []*co
 			// disk sources to point to the converted disk locations
 			domain.Devices.Disks = r.generateLibvirtDisks(vmCr, pvcs)
 		}
-	} else if errors.Is(err, planbase.DomainXMLNotImplementedError) {
+	} else if errors.Is(err, planbase.DomainXMLNotImplementedError) || errors.Is(err, planbase.LibvirtVersionInsufficient) {
+		r.Log.Info("Falling back to generating libvirt xml because it's not supported by this provider type or libvirt version")
 		// fall back to generating our own libvirt domain xml when not implemented
 		domain = r.generateLibvirtDomain(vmCr, pvcs)
+		err = nil
 	}
 	return
 }
