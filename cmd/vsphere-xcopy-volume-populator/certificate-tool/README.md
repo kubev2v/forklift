@@ -80,6 +80,53 @@ Set the VMDK_PATH variable in your Makefile (or environment) to point to this fi
   VMDK_PATH = ./fedora.vmdk
 ```
 
+### Password Configuration
+
+The certificate-tool supports flexible password management with three options:
+
+#### Option 1: Password Files (Recommended for Production)
+Specify paths to password files in your configuration:
+
+```yaml
+# Storage configuration
+storage-password-file: #/path/to/storage-password.txt
+storage-user: admin
+storage-url: https://storage.example.com
+
+# vSphere configuration  
+vsphere-password-file: #/path/to/vsphere-password.txt
+vsphere-user: administrator@vsphere.local
+vsphere-url: https://vcenter.example.com
+```
+
+**Password File Format**: Each password file should contain only the password as plain text. Only trailing line breaks (newlines and carriage returns) will be automatically trimmed - spaces and tabs are preserved as they may be part of the password.
+
+#### Option 2: Interactive Password Prompts (Recommended for Development)
+If you leave the password file paths empty or unspecified, the tool will:
+
+1. **Check for saved passwords**: Look for previously saved passwords in the `.passwords/` directory
+2. **Prompt interactively**: Securely prompt you to enter passwords (input is hidden)
+3. **Offer to save**: Ask if you want to save the password for future use
+
+```yaml
+# Leave password file paths empty for interactive prompts
+storage-password-file: ""  # or omit entirely
+vsphere-password-file: ""  # or omit entirely
+```
+
+When you run the tool, you'll see prompts like:
+```
+Enter storage password: [hidden input]
+Would you like to save the storage password to .passwords for future use? (y/N): y
+Password saved to .passwords/storage-password.txt
+
+Enter vSphere password: [hidden input]
+Would you like to save the vSphere password to .passwords for future use? (y/N): y
+Password saved to .passwords/vsphere-password.txt
+```
+
+#### Option 3: Using Saved Passwords
+Once passwords are saved in the `.passwords/` directory, the tool will detect and reuse them.
 
 ## Usage Example
 
@@ -98,6 +145,42 @@ You are now ready to run the tests.
    ```
 
 Runs the complete xcopy test workflow.
+
+## Commands
+
+- `prepare`: Sets up the Kubernetes environment (namespace, RBAC, secrets)
+- `test-xcopy`: Runs the test according to the test plan yaml.
+
+## Security Best Practices
+
+1. **For Production**: Use explicit password files in secure locations with restricted permissions:
+   ```bash
+   chmod 600 /path/to/password-file.txt
+   chown root:root /path/to/password-file.txt
+   ```
+
+2. **For Development**: Use interactive prompts with saved passwords in `.passwords/` directory:
+   - The tool automatically sets secure permissions (0600 for files, 0700 for directory)
+   - Add `.passwords/` to your `.gitignore` file
+
+3. **Never commit password files to version control**:
+   ```bash
+   echo ".passwords/" >> .gitignore
+   echo "*.password.txt" >> .gitignore
+   ```
+
+4. **Use different password storage methods for different environments**:
+   - **Dev/Test**: Interactive prompts with local `.passwords/` storage
+   - **CI/CD**: Environment variables or secure secret management
+   - **Production**: Dedicated password files in secure locations
+
+5. **Regularly rotate passwords** and update the corresponding files or saved passwords
+
+New format:
+```yaml
+storage-password-file: .passwords/storage-password.txt
+vsphere-password-file: .passwords/vsphere-password.txt
+```
 
 
 
