@@ -716,9 +716,9 @@ func (r *LiveMigrator) RequiresClusterInstanceType(vm *planapi.VMStatus) (requir
 
 // SynchronizationAddressReady reports when the synchronization address is available in the target VMIM status.
 func (r *LiveMigrator) SynchronizationAddressReady(vmim *cnv.VirtualMachineInstanceMigration) (address string, ready bool) {
-	if vmim.Status.SynchronizationAddress != nil && *vmim.Status.SynchronizationAddress != "" {
+	if len(vmim.Status.SynchronizationAddresses) > 0 {
 		ready = true
-		address = *vmim.Status.SynchronizationAddress
+		address = vmim.Status.SynchronizationAddresses[0]
 	}
 	return
 }
