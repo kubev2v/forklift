@@ -9,14 +9,14 @@ test-labels: vsphere-populator
 test-image-label:  latest
 test-populator-image: quay.io/kubev2v/vsphere-xcopy-volume-populator
 ### storage
-storage-password: ####
+storage-password-file: #### # Path to file containing storage password
 storage-user: #######
 storage-url: #######
 storage-class-name: ########
 storage-skip-ssl-verification: "true"
 
 ### vsphere
-vsphere-password: #########
+vsphere-password-file: ######### # Path to file containing vSphere password
 vsphere-user: ########
 vsphere-url: #########
 vsphere-datastore: ##########
