@@ -1123,8 +1123,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 		list = append(
 			list,
 			&plan.Task{
-				// When we create the task at the beginning of migration, we might create a snapshot and that will change the disk name.
-				Name: baseVolume(disk.File, true),
+				Name: baseVolume(disk.File, r.Plan.Spec.Warm),
 				Progress: libitr.Progress{
 					Total: mB,
 				},
@@ -1181,12 +1180,12 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 
 // Return a stable identifier for a VDDK DataVolume.
 func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
-	return baseVolume(dv.ObjectMeta.Annotations[planbase.AnnDiskSource], true)
+	return baseVolume(dv.ObjectMeta.Annotations[planbase.AnnDiskSource], r.Plan.Spec.Warm)
 }
 
 // Return a stable identifier for a PersistentDataVolume.
 func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string {
-	return baseVolume(pvc.Annotations[AnnImportBackingFile], true)
+	return baseVolume(pvc.Annotations[AnnImportBackingFile], r.Plan.Spec.Warm)
 }
 
 // Load

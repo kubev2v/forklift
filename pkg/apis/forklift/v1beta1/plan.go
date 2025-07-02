@@ -230,22 +230,6 @@ func (r *Plan) IsSourceProviderOCP() bool {
 
 func (r *Plan) IsSourceProviderVSphere() bool { return r.Provider.Source.Type() == VSphere }
 
-func (r *Plan) SupportsCopyOffload() bool {
-	if !r.IsSourceProviderVSphere() {
-		return false
-	}
-	if r.Spec.Warm {
-		return false
-	}
-	dsMapIn := r.Map.Storage.Spec.Map
-	for _, m := range dsMapIn {
-		if m.OffloadPlugin != nil && m.OffloadPlugin.VSphereXcopyPluginConfig != nil {
-			return true
-		}
-	}
-	return false
-}
-
 // PVCNameTemplateData contains fields used in naming templates.
 type PVCNameTemplateData struct {
 	VmName         string `json:"vmName"`
