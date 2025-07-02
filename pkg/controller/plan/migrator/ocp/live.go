@@ -639,19 +639,15 @@ func (r *LiveMigrator) SynchronizeCertificateBundles() (err error) {
 // migration has succeeded. Success is defined as both VMIMs reporting MigrationSucceeded,
 // and a failure is reported if either VMIM reports MigrationFailed.
 func (r *LiveMigrator) WaitForStateTransfer(vm *planapi.VMStatus) (done bool, err error) {
-	source, err := r.GetSourceVMIM(vm)
-	if err != nil {
-		return
-	}
 	target, err := r.GetTargetVMIM(vm)
 	if err != nil {
 		return
 	}
-	if (source.Status.Phase == cnv.MigrationFailed) || (target.Status.Phase == cnv.MigrationFailed) {
+	if target.Status.Phase == cnv.MigrationFailed {
 		err = liberr.New("Migration failed, check VMIM status for details.", "vm", vm.String())
 		return
 	}
-	if (source.Status.Phase == cnv.MigrationSucceeded) && (target.Status.Phase == cnv.MigrationSucceeded) {
+	if target.Status.Phase == cnv.MigrationSucceeded {
 		done = true
 	}
 	return
