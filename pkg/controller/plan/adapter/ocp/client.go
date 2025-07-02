@@ -25,12 +25,12 @@ type Client struct {
 }
 
 // CheckSnapshotReady implements base.Client
-func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshotCreateTaskId string, hosts util.HostsFunc) (bool, string, error) {
+func (r *Client) CheckSnapshotReady(vmRef ref.Ref, precopy planapi.Precopy, hosts util.HostsFunc) (bool, string, error) {
 	return false, "", nil
 }
 
 // CheckSnapshotRemove implements base.Client
-func (r *Client) CheckSnapshotRemove(vmRef ref.Ref, snapshotRemoveTaskId string, hosts util.HostsFunc) (bool, error) {
+func (r *Client) CheckSnapshotRemove(vmRef ref.Ref, precopy planapi.Precopy, hosts util.HostsFunc) (bool, error) {
 	return false, nil
 }
 
