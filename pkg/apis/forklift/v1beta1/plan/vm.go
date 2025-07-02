@@ -113,8 +113,6 @@ type VMStatus struct {
 	Error *Error `json:"error,omitempty"`
 	// Warm migration status
 	Warm *Warm `json:"warm,omitempty"`
-	// OffloadSnapshot shows snapshot creation and deletion task ID which MTV will monitor and snapshot name
-	OffloadSnapshot *OffloadSnapshot `json:"offloadSnapshot,omitempty"`
 	// Source VM power state before migration.
 	RestorePowerState VMPowerState `json:"restorePowerState,omitempty"`
 	// The firmware type detected from the OVF file produced by virt-v2v.
@@ -135,13 +133,6 @@ type Warm struct {
 	ConsecutiveFailures int        `json:"consecutiveFailures"`
 	NextPrecopyAt       *meta.Time `json:"nextPrecopyAt,omitempty"`
 	Precopies           []Precopy  `json:"precopies,omitempty"`
-}
-
-// OffloadSnapshot status
-type OffloadSnapshot struct {
-	Snapshot     string `json:"snapshot,omitempty"`
-	CreateTaskId string `json:"createTaskId,omitempty"`
-	RemoveTaskId string `json:"removeTaskId,omitempty"`
 }
 
 type VMPowerState string

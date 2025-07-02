@@ -237,9 +237,9 @@ func (r *Client) GetSnapshotDeltas(vmRef ref.Ref, snapshotId string, hosts util.
 }
 
 // Check if a snapshot is removed
-func (r *Client) CheckSnapshotRemove(vmRef ref.Ref, snapshotRemoveTaskId string, hosts util.HostsFunc) (bool, error) {
-	r.Log.Info("Check Snapshot Remove", "vmRef", vmRef, "snapshotRemoveTaskId", snapshotRemoveTaskId)
-	taskInfo, err := r.getTaskById(vmRef, snapshotRemoveTaskId, hosts)
+func (r *Client) CheckSnapshotRemove(vmRef ref.Ref, precopy planapi.Precopy, hosts util.HostsFunc) (bool, error) {
+	r.Log.Info("Check Snapshot Remove", "vmRef", vmRef, "precopy", precopy)
+	taskInfo, err := r.getTaskById(vmRef, precopy.RemoveTaskId, hosts)
 	if err != nil {
 		return false, liberr.Wrap(err)
 	}
@@ -247,9 +247,9 @@ func (r *Client) CheckSnapshotRemove(vmRef ref.Ref, snapshotRemoveTaskId string,
 }
 
 // Check if a snapshot is ready to transfer.
-func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshotCreateTaskId string, hosts util.HostsFunc) (ready bool, snapshotId string, err error) {
-	r.Log.Info("Check Snapshot Ready", "vmRef", vmRef, "snapshotCreateTaskId", snapshotCreateTaskId)
-	taskInfo, err := r.getTaskById(vmRef, snapshotCreateTaskId, hosts)
+func (r *Client) CheckSnapshotReady(vmRef ref.Ref, precopy planapi.Precopy, hosts util.HostsFunc) (ready bool, snapshotId string, err error) {
+	r.Log.Info("Check Snapshot Ready", "vmRef", vmRef, "precopy", precopy)
+	taskInfo, err := r.getTaskById(vmRef, precopy.CreateTaskId, hosts)
 	if err != nil {
 		return false, "", liberr.Wrap(err)
 	}

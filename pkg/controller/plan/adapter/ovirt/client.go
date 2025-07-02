@@ -75,13 +75,13 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (snapsh
 }
 
 // CheckSnapshotRemove implements base.Client
-func (r *Client) CheckSnapshotRemove(vmRef ref.Ref, snapshotRemoveTaskId string, hosts util.HostsFunc) (bool, error) {
+func (r *Client) CheckSnapshotRemove(vmRef ref.Ref, precopy planapi.Precopy, hosts util.HostsFunc) (bool, error) {
 	return false, nil
 }
 
 // Check if a snapshot is ready to transfer, to avoid importer restarts.
-func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshotCreateTaskId string, hosts util.HostsFunc) (ready bool, snapshotId string, err error) {
-	correlationID, err := r.getSnapshotCorrelationID(vmRef, &snapshotCreateTaskId)
+func (r *Client) CheckSnapshotReady(vmRef ref.Ref, precopy planapi.Precopy, hosts util.HostsFunc) (ready bool, snapshotId string, err error) {
+	correlationID, err := r.getSnapshotCorrelationID(vmRef, &precopy.Snapshot)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
