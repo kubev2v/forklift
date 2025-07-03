@@ -77,14 +77,14 @@ if (-not $groupedRoutes) {
         # Fallback to route.exe if New-NetRoute failed
         if (-not $reAddSucceeded) {
             # Re-add one preserved route using legacy route.exe
-            $command = "route -p ADD $network MASK $netmask $gateway"
+            $command = "route -p ADD $network MASK $netmask $gateway IF $interfaceIndex"
             if ($metricStr -ne "") {
                 $command += " $metricStr"
             }
 
             try {
                 cmd /c $command
-                Write-Host "  Re-added: $dest via $gateway metric $metric" -ForegroundColor Green
+                Write-Host "  Re-added with route.exe: $dest via $gateway metric $metric on IF $interfaceIndex" -ForegroundColor Green
             } catch {
                 Write-Host "    Failed to re-add route: $($_.Exception.Message)" -ForegroundColor Red
             }
