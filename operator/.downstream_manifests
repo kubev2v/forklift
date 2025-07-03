@@ -779,17 +779,6 @@ spec:
                     newName:
                       description: The new name of the VM after matching DNS1123 requirements.
                       type: string
-                    offloadSnapshot:
-                      description: OffloadSnapshot shows snapshot creation and deletion
-                        task ID which MTV will monitor and snapshot name
-                      properties:
-                        createTaskId:
-                          type: string
-                        removeTaskId:
-                          type: string
-                        snapshot:
-                          type: string
-                      type: object
                     operatingSystem:
                       description: The Operating System detected by virt-v2v.
                       type: string
@@ -2571,17 +2560,6 @@ spec:
                           description: The new name of the VM after matching DNS1123
                             requirements.
                           type: string
-                        offloadSnapshot:
-                          description: OffloadSnapshot shows snapshot creation and
-                            deletion task ID which MTV will monitor and snapshot name
-                          properties:
-                            createTaskId:
-                              type: string
-                            removeTaskId:
-                              type: string
-                            snapshot:
-                              type: string
-                          type: object
                         operatingSystem:
                           description: The Operating System detected by virt-v2v.
                           type: string
@@ -4367,9 +4345,9 @@ spec:
 
     ### Compatibility
 
-    Migration Toolkit for Virtualization 2.7 is supported on OpenShift 4.15, 4.16 and 4.17
-
     Migration Toolkit for Virtualization 2.8 is supported on OpenShift 4.16, 4.17 and 4.18
+
+    Migration Toolkit for Virtualization 2.9 is supported on OpenShift 4.17, 4.18 and 4.19
 
     More information on compatibility in the [MTV Lifecycle document](https://access.redhat.com/support/policy/updates/migration-toolkit-for-virtualization).
 
@@ -4419,6 +4397,31 @@ spec:
   minKubeVersion: 1.27.0
   provider:
     name: Red Hat
+  relatedImages:
+  - image: ${OPERATOR_IMAGE}
+    name: forklift-operator
+  - image: ${CONTROLLER_IMAGE}
+    name: controller
+  - image: ${MUST_GATHER_IMAGE}
+    name: must_gather
+  - image: ${VALIDATION_IMAGE}
+    name: validation
+  - image: ${API_IMAGE}
+    name: api
+  - image: ${POPULATOR_CONTROLLER_IMAGE}
+    name: populator_controller
+  - image: ${OVIRT_POPULATOR_IMAGE}
+    name: rhv_populator
+  - image: ${VIRT_V2V_IMAGE}
+    name: virt_v2v
+  - image: ${OPENSTACK_POPULATOR_IMAGE}
+    name: openstack_populator
+  - image: ${UI_PLUGIN_IMAGE}
+    name: ui_plugin
+  - image: ${OVA_PROVIDER_SERVER_IMAGE}
+    name: ova_provider_server
+  - image: ${VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE}
+    name: vsphere_xcopy_volume_populator
   version: ${VERSION}
 ---
 apiVersion: scorecard.operatorframework.io/v1alpha3
