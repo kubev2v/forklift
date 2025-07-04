@@ -163,12 +163,12 @@ type FlashSystemClonner struct {
 }
 
 // NewFlashSystemClonner creates a new FlashSystemClonner.
-func NewFlashSystemClonner(managementIP, username, password string, sslSkipVerify bool) (*FlashSystemClonner, error) {
+func NewFlashSystemClonner(managementIP, username, password string, sslSkipVerify bool) (FlashSystemClonner, error) {
 	client, err := NewFlashSystemAPIClient(managementIP, username, password, sslSkipVerify)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create FlashSystem API client: %w", err)
+		return FlashSystemClonner{}, fmt.Errorf("failed to create FlashSystem API client: %w", err)
 	}
-	return &FlashSystemClonner{api: client}, nil
+	return FlashSystemClonner{api: client}, nil
 }
 
 // EnsureClonnerIgroup creates or finds a host with the given IQNs.
