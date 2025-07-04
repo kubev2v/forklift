@@ -78,8 +78,7 @@ func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
 			return
 		}
 		for _, nic := range vm.NICs {
-			// TODO move from NIC name to NIC ID? ID should be unique
-			if nic.Name == network.Name && mapped.Destination.Type == Pod {
+			if nic.Network == network.Name && mapped.Destination.Type == Pod {
 				podMapped++
 			}
 		}
