@@ -56,6 +56,17 @@ test-copy-using-cli: build
 		--owner-uid=test-cli \
 		--kubeconfig=$$KUBECONFIG
 
+test-flashsystem: build
+	bin/vsphere-xcopy-volume-populator \
+		--source-vm-id=vm-1018 \
+		--source-vmdk="[TEST_DS] test1-vm1/test1-vm1.vmdk" \
+		--owner-name=test-cli \
+		--target-namespace=default \
+		--storage-vendor-product=flashsystem \
+		--secret-name=populator-secret \
+		--owner-uid=test-cli \
+		--kubeconfig=$$KUBECONFIG
+
 test-copy-using-cli-3par: build
 	bin/vsphere-xcopy-volume-populator \
 		--source-vmdk="[eco-iscsi-ds1] vm-6/vm-6.vmdk" \
