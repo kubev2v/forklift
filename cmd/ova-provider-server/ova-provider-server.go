@@ -195,24 +195,6 @@ var vmIDMap *UUIDMap
 var diskIDMap *UUIDMap
 var networkIDMap *UUIDMap
 
-func main() {
-
-	vmIDMap = NewUUIDMap()
-	diskIDMap = NewUUIDMap()
-	networkIDMap = NewUUIDMap()
-
-	http.HandleFunc("/vms", vmHandler)
-	http.HandleFunc("/disks", diskHandler)
-	http.HandleFunc("/networks", networkHandler)
-	http.HandleFunc("/watch", watchdHandler)
-	http.HandleFunc("/test_connection", connHandler)
-
-	err := http.ListenAndServe(":8080", nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
 func connHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	err := json.NewEncoder(w).Encode("Test connection successful")
