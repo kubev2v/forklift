@@ -39,6 +39,7 @@ import (
 // Types
 const (
 	WarmMigrationNotReady         = "WarmMigrationNotReady"
+	MigrationTypeNotValid         = "MigrationTypeNotValid"
 	NamespaceNotValid             = "NamespaceNotValid"
 	TransferNetNotValid           = "TransferNetworkNotValid"
 	NetRefNotValid                = "NetworkMapRefNotValid"
@@ -75,6 +76,8 @@ const (
 	VDDKInitImageNotReady         = "VDDKInitImageNotReady"
 	VDDKInitImageUnavailable      = "VDDKInitImageUnavailable"
 	UnsupportedOvaSource          = "UnsupportedOvaSource"
+	VMPowerStateUnsupported       = "VMPowerStateUnsupported"
+	VMMigrationTypeUnsupported    = "VMMigrationTypeUnsupported"
 )
 
 // Categories
@@ -129,59 +132,69 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	plan.Referenced.Provider.Source = pv.Referenced.Source
 	plan.Referenced.Provider.Destination = pv.Referenced.Destination
 
-	if err := r.ensureSecretForProvider(plan); err != nil {
+	if err = r.ensureSecretForProvider(plan); err != nil {
 		return err
 	}
 
-	if err := r.validateTargetNamespace(plan); err != nil {
+	if err = r.validateTargetNamespace(plan); err != nil {
 		return err
 	}
 
-	if err := r.validateNetworkMap(plan); err != nil {
+	if err = r.validateNetworkMap(plan); err != nil {
 		return err
 	}
 
-	if err := r.validateStorageMap(plan); err != nil {
+	if err = r.validateStorageMap(plan); err != nil {
 		return err
 	}
 
-	if err := r.validateWarmMigration(plan); err != nil {
+	var ctx *plancontext.Context
+	ctx, err = plancontext.New(r, plan, r.Log)
+	if err != nil {
 		return err
 	}
 
-	if err := r.validateVM(plan); err != nil {
+	if err = r.validateWarmMigration(ctx); err != nil {
 		return err
 	}
 
-	if err := r.validateTransferNetwork(plan); err != nil {
+	if err = r.validateMigrationType(ctx); err != nil {
 		return err
 	}
 
-	if err := r.validateHooks(plan); err != nil {
+	if err = r.validateVM(plan); err != nil {
 		return err
 	}
 
-	if err := r.validateVddkImage(plan); err != nil {
+	if err = r.validateTransferNetwork(plan); err != nil {
+		return err
+	}
+
+	if err = r.validateHooks(plan); err != nil {
+		return err
+	}
+
+	if err = r.validateVddkImage(plan); err != nil {
 		return err
 	}
 
 	// Validate version only if migration is OCP to OCP
-	if err := r.validateOpenShiftVersion(plan); err != nil {
+	if err = r.validateOpenShiftVersion(plan); err != nil {
 		return err
 	}
 
 	// Validate PVC name template
-	if err := r.validatePVCNameTemplate(plan); err != nil {
+	if err = r.validatePVCNameTemplate(plan); err != nil {
 		return err
 	}
 
 	// Validate volume name template
-	if err := r.validateVolumeNameTemplate(plan); err != nil {
+	if err = r.validateVolumeNameTemplate(plan); err != nil {
 		return err
 	}
 
 	// Validate network name template
-	if err := r.validateNetworkNameTemplate(plan); err != nil {
+	if err = r.validateNetworkNameTemplate(plan); err != nil {
 		return err
 	}
 
@@ -293,11 +306,11 @@ func (r *Reconciler) ensureSecretForProvider(plan *api.Plan) error {
 }
 
 // Validate that warm migration is supported from the source provider.
-func (r *Reconciler) validateWarmMigration(plan *api.Plan) (err error) {
-	if !plan.Spec.Warm {
+func (r *Reconciler) validateWarmMigration(ctx *plancontext.Context) (err error) {
+	if !ctx.Plan.Spec.Warm {
 		return
 	}
-	provider := plan.Referenced.Provider.Source
+	provider := ctx.Plan.Referenced.Provider.Source
 	if provider == nil {
 		return nil
 	}
@@ -305,17 +318,42 @@ func (r *Reconciler) validateWarmMigration(plan *api.Plan) (err error) {
 	if err != nil {
 		return err
 	}
-	validator, err := pAdapter.Validator(plan)
+	validator, err := pAdapter.Validator(ctx)
 	if err != nil {
 		return err
 	}
 	if !validator.WarmMigration() {
-		plan.Status.SetCondition(libcnd.Condition{
+		ctx.Plan.Status.SetCondition(libcnd.Condition{
 			Type:     WarmMigrationNotReady,
 			Status:   True,
 			Category: api.CategoryCritical,
 			Reason:   NotSupported,
 			Message:  "Warm migration from the source provider is not supported.",
+		})
+	}
+	return
+}
+
+func (r *Reconciler) validateMigrationType(ctx *plancontext.Context) (err error) {
+	provider := ctx.Plan.Referenced.Provider.Source
+	if provider == nil {
+		return nil
+	}
+	pAdapter, err := adapter.New(provider)
+	if err != nil {
+		return err
+	}
+	validator, err := pAdapter.Validator(ctx)
+	if err != nil {
+		return err
+	}
+	if !validator.MigrationType() {
+		ctx.Plan.Status.SetCondition(libcnd.Condition{
+			Type:     MigrationTypeNotValid,
+			Status:   True,
+			Category: Critical,
+			Reason:   NotSupported,
+			Message:  fmt.Sprintf("`%s` migration from the source provider is not supported.", ctx.Plan.Spec.Type),
 		})
 	}
 	return
@@ -573,6 +611,22 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "OVA appears to have been exported from an unsupported source, and may have issues during import.",
 		Items:    []string{},
 	}
+	powerStateUnsupported := libcnd.Condition{
+		Type:     VMPowerStateUnsupported,
+		Status:   True,
+		Reason:   NotSupported,
+		Category: api.CategoryCritical,
+		Message:  "VM power state is incompatible with the selected migration type.",
+		Items:    []string{},
+	}
+	vmMigrationTypeUnsupported := libcnd.Condition{
+		Type:     VMMigrationTypeUnsupported,
+		Status:   True,
+		Reason:   NotSupported,
+		Category: api.CategoryCritical,
+		Message:  "VM is incompatible with the selected migration type.",
+		Items:    []string{},
+	}
 	var sharedDisksConditions []libcnd.Condition
 	setOf := map[string]bool{}
 	setOfTargetName := map[string]bool{}
@@ -650,7 +704,12 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		if err != nil {
 			return err
 		}
-		validator, err := pAdapter.Validator(plan)
+		var ctx *plancontext.Context
+		ctx, err = plancontext.New(r, plan, r.Log)
+		if err != nil {
+			return err
+		}
+		validator, err := pAdapter.Validator(ctx)
 		if err != nil {
 			return err
 		}
@@ -700,11 +759,19 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		if !ok {
 			missingStaticIPs.Items = append(missingStaticIPs.Items, ref.String())
 		}
-
-		var ctx *plancontext.Context
-		ctx, err = plancontext.New(r, plan, r.Log)
+		ok, err = validator.PowerState(*ref)
 		if err != nil {
 			return err
+		}
+		if !ok {
+			powerStateUnsupported.Items = append(powerStateUnsupported.Items, ref.String())
+		}
+		ok, err = validator.VMMigrationType(*ref)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			vmMigrationTypeUnsupported.Items = append(vmMigrationTypeUnsupported.Items, ref.String())
 		}
 		ok, msg, category, err := validator.SharedDisks(*ref, ctx.Destination.Client)
 		if err != nil {

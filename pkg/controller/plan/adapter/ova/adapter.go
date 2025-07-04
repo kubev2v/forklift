@@ -1,7 +1,6 @@
 package ova
 
 import (
-	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 )
@@ -17,12 +16,8 @@ func (r *Adapter) Builder(ctx *plancontext.Context) (builder base.Builder, err e
 }
 
 // Constructs a OVA validator.
-func (r *Adapter) Validator(plan *api.Plan) (validator base.Validator, err error) {
-	v := &Validator{plan: plan}
-	err = v.Load()
-	if err != nil {
-		return
-	}
+func (r *Adapter) Validator(ctx *plancontext.Context) (validator base.Validator, err error) {
+	v := &Validator{Context: ctx}
 	validator = v
 	return
 }
