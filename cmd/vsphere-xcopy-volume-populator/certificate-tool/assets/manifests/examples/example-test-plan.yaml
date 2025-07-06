@@ -1,5 +1,5 @@
-storageVendorProduct: "ontap"
-hostName: host-3078
+storageVendorProduct: "flashsystem"
+hostName: host-1007
 tests:
   - name: test-1
     success:

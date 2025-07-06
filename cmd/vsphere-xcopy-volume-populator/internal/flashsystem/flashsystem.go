@@ -18,7 +18,6 @@ import (
 // FlashSystemProviderIDPrefix is the standard NAA prefix for IBM LUNs.
 const FlashSystemProviderIDPrefix = "naa.6005076"
 
-// APIVersion is the API version specified in the provided documentation (RESTfulAPIv2.pdf).
 const APIVersion = "1.0"
 
 // AuthResponse models the JSON response from the /auth endpoint.
@@ -26,7 +25,6 @@ type AuthResponse struct {
 	Token string `json:"token"`
 }
 
-// FlashSystemHost models the JSON object for a host (see Table 22, page 28).
 type FlashSystemHost struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
@@ -34,10 +32,8 @@ type FlashSystemHost struct {
 	PortCount int    `json:"port_count"`
 	Type      string `json:"type"`
 	WWPN      string `json:"wwpn"`
-	// Other fields like WWPN, node_logged_in_count, etc., are available but not used in this implementation.
 }
 
-// FlashSystemVolume models the JSON object for a VDisk (see Table 16, page 18).
 type FlashSystemVolume struct {
 	ID     string `json:"id"`
 	Name   string `json:"name"`
@@ -46,7 +42,6 @@ type FlashSystemVolume struct {
 	Size   string `json:"size"`
 }
 
-// FlashSystemVolumeHostMapping models the JSON object for a host-vdisk mapping (see Table 24, page 29).
 type FlashSystemVolumeHostMapping struct {
 	HostID      string `json:"id"` // This is the Host ID
 	HostName    string `json:"name"`
@@ -66,7 +61,6 @@ type FlashSystemAPIClient struct {
 }
 
 // NewFlashSystemAPIClient creates and authenticates a new API client.
-// Authentication follows the procedure on pages 8 and 53 of the documentation.
 func NewFlashSystemAPIClient(managementIP, username, password string, sslSkipVerify bool) (*FlashSystemAPIClient, error) {
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: sslSkipVerify},
@@ -172,7 +166,6 @@ func NewFlashSystemClonner(managementIP, username, password string, sslSkipVerif
 }
 
 // EnsureClonnerIgroup creates or finds a host with the given IQNs.
-// This implements creating a Host object as described on page 28 of the documentation.
 func (c *FlashSystemClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerIqns []string) (populator.MappingContext, error) {
 	klog.Infof("Ensuring initiator group (Host) '%s' exists with IQNs: %v", initiatorGroup, clonnerIqns)
 	ctx := make(populator.MappingContext)
@@ -198,9 +191,6 @@ func (c *FlashSystemClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerI
 	} else if statusCode == http.StatusNotFound || statusCode == http.StatusBadRequest { // 400 can mean not found too
 		klog.Infof("Host '%s' does not exist, creating it.", initiatorGroup)
 
-		// Step 2: Create the host using `POST /host`
-		// Per Table 23, page 28, 'login_string' provides the initiator name for iSCSI.
-		// The example for WWPNs is colon-separated, we apply the same logic for IQNs.
 		loginString := strings.Join(clonnerIqns, ":")
 		payload := map[string]string{
 			"name":         initiatorGroup,
@@ -263,7 +253,6 @@ func (c *FlashSystemClonner) Map(initiatorGroup string, targetLUN populator.LUN,
 		}
 	}
 
-	// Step 2: Create the mapping using `POST /hostvdiskmap` (Table 25, page 29).
 	payload := map[string]string{
 		"host_id":  hostID,
 		"vdisk_id": vdiskID,
@@ -284,7 +273,6 @@ func (c *FlashSystemClonner) Map(initiatorGroup string, targetLUN populator.LUN,
 	return targetLUN, nil
 }
 
-// UnMap unmaps a VDisk from a Host. Implements `DELETE /hostvdiskmap` with a body, as per Table 26, page 29.
 func (c *FlashSystemClonner) UnMap(initiatorGroup string, targetLUN populator.LUN, context populator.MappingContext) error {
 	hostID, ok := context["host_id"].(string)
 	if !ok || hostID == "" {
@@ -294,7 +282,6 @@ func (c *FlashSystemClonner) UnMap(initiatorGroup string, targetLUN populator.LU
 
 	klog.Infof("Unmapping LUN (VDisk ID '%s') from Host '%s' (Host ID '%s')", vdiskID, initiatorGroup, hostID)
 
-	// Per Table 26, page 29, the DELETE operation requires a body with host_id and vdisk_id.
 	payload := map[string]string{
 		"host_id":  hostID,
 		"vdisk_id": vdiskID,
@@ -355,49 +342,48 @@ func (c *FlashSystemClonner) CurrentMappedGroups(targetLUN populator.LUN, contex
 	return uniqueGroups, nil
 }
 
-// ResolveVolumeHandleToLUN resolves a volumeHandle (VDisk name or ID) to a LUN object.
-// Implements `GET /vdisk/<id_or_name>` from page 18.
 func (c *FlashSystemClonner) ResolveVolumeHandleToLUN(volumeHandle string) (populator.LUN, error) {
 	klog.Infof("Resolving volume handle '%s' to LUN details", volumeHandle)
 
-	// The API allows getting a vdisk by its ID or name.
-	path := fmt.Sprintf("/vdisk/%s", volumeHandle)
-	bodyBytes, statusCode, err := c.api.makeRequest("GET", path, nil)
-	if err != nil {
-		return populator.LUN{}, err
+	allVDisksBytes, allVDisksStatus, allVDisksErr := c.api.makeRequest("GET", "/vdisk", nil)
+	if allVDisksErr != nil {
+		return populator.LUN{}, fmt.Errorf("failed to get all vdisks: %w", allVDisksErr)
+	}
+	if allVDisksStatus != http.StatusOK {
+		return populator.LUN{}, fmt.Errorf("failed to get all vdisks, status: %d, body: %s", allVDisksStatus, string(allVDisksBytes))
 	}
 
-	if statusCode == http.StatusNotFound || statusCode == http.StatusBadRequest { // API might return 400 for not found
-		return populator.LUN{}, fmt.Errorf("volume with handle '%s' not found", volumeHandle)
-	}
-	if statusCode != http.StatusOK {
-		return populator.LUN{}, fmt.Errorf("failed to get volume '%s', status: %d, body: %s", volumeHandle, statusCode, string(bodyBytes))
+	var allVDisks []FlashSystemVolume
+	if err := json.Unmarshal(allVDisksBytes, &allVDisks); err != nil {
+		return populator.LUN{}, fmt.Errorf("failed to unmarshal all vdisks response: %w. Body: %s", err, string(allVDisksBytes))
 	}
 
-	var vdisks []FlashSystemVolume // API returns a list even for a specific query
-	if err := json.Unmarshal(bodyBytes, &vdisks); err != nil || len(vdisks) == 0 {
-		return populator.LUN{}, fmt.Errorf("failed to unmarshal volume response for '%s': %w. Body: %s", volumeHandle, err, string(bodyBytes))
+	for _, vdisk := range allVDisks {
+		if strings.HasSuffix(vdisk.Name, "_"+volumeHandle) {
+			klog.Infof("Found matching volume: '%s' for handle '%s'", vdisk.Name, volumeHandle)
+			return c.createLUNFromVDisk(vdisk, volumeHandle)
+		}
 	}
 
-	vdiskDetails := vdisks[0]
+	return populator.LUN{}, fmt.Errorf("volume with handle '%s' not found", volumeHandle)
+}
 
-	// Construct NAA identifier from the VDisk UID (see Table 16, page 18).
+// createLUNFromVDisk creates a LUN object from a FlashSystemVolume
+func (c *FlashSystemClonner) createLUNFromVDisk(vdiskDetails FlashSystemVolume, volumeHandle string) (populator.LUN, error) {
 	vdiskUID := strings.ToLower(vdiskDetails.UID)
 	if vdiskUID == "" {
 		return populator.LUN{}, fmt.Errorf("resolved volume '%s' has an empty UID", vdiskDetails.Name)
 	}
 	naaDeviceID := FlashSystemProviderIDPrefix + vdiskUID
 
-	// For this provider, we store the VDisk ID in the LUN.Name field,
-	// as it's needed for Map/Unmap operations.
 	lun := populator.LUN{
-		Name:         vdiskDetails.ID,  // VDisk ID, required for mapping.
-		VolumeHandle: volumeHandle,     // The original input handle.
-		SerialNumber: vdiskDetails.UID, // VDisk UID, which is the unique serial.
+		Name:         vdiskDetails.ID,
+		VolumeHandle: vdiskDetails.Name,
+		SerialNumber: vdiskDetails.UID,
 		NAA:          naaDeviceID,
 	}
 
-	klog.Infof("Resolved volume handle '%s' to LUN: Name(ID)=%s, SN(UID)=%s, NAA=%s",
-		volumeHandle, lun.Name, lun.SerialNumber, lun.NAA)
+	klog.Infof("Resolved volume handle '%s' to LUN: Name(ID)=%s, SN(UID)=%s, NAA=%s, VDisk Name=%s",
+		volumeHandle, lun.Name, lun.SerialNumber, lun.NAA, vdiskDetails.Name)
 	return lun, nil
 }

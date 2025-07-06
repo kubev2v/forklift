@@ -117,7 +117,7 @@ func (tc *TestCase) ensureVMs(testName string, vms []*utils.VM, downloadVmdkURL,
 			localVmdkPath = vm.LocalVmdkPath
 		}
 
-		klog.Infof("Creating VM %s with image %s, VMDK URL: %s, Local VMDK Path: %s, ISO Path: %s", fullVMName, downloadVmdkURL, localVmdkPath, isoPath)
+		klog.Infof("Creating VM %s with image %s, VMDK URL: %s, Local VMDK Path: %s, ISO Path: %s", vm.Name, downloadVmdkURL, localVmdkPath, isoPath)
 		remoteVmdkPath, err := vmware.CreateVM(
 			vm.Name,
 			tc.VSphereURL,
