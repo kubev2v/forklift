@@ -3087,6 +3087,7 @@ spec:
                               - vantara
                               - ontap
                               - primera3par
+                              - pureFlashArray
                               type: string
                           required:
                           - secretRef
