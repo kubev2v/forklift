@@ -5,12 +5,12 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/kubev2v/forklift/pkg/controller/provider/web"
-
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
+	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 )
 
@@ -28,6 +28,7 @@ const (
 // Steps.
 const (
 	DiskTransfer = "DiskTransfer"
+	NotFound     = "NotFound"
 )
 
 // Package level mutex to ensure that
@@ -117,9 +118,22 @@ func (r *Scheduler) buildInFlight() (err error) {
 	// we need to use the plan from the context rather
 	// than from the list of plans that are retrieved below.
 	for _, vmStatus := range r.Plan.Status.Migration.VMs {
+		if vmStatus.HasCondition(Canceled) {
+			continue
+		}
 		vm := &model.VM{}
 		err = r.Source.Inventory.Find(vm, vmStatus.Ref)
 		if err != nil {
+			if errors.As(err, &web.NotFoundError{}) {
+				vmStatus.SetCondition(libcnd.Condition{
+					Type:     api.ConditionCanceled,
+					Status:   libcnd.True,
+					Category: api.CategoryAdvisory,
+					Reason:   NotFound,
+					Message:  "VM was not found in inventory.",
+					Durable:  true,
+				})
+			}
 			return
 		}
 		if vmStatus.Running() {
@@ -181,14 +195,15 @@ func (r *Scheduler) buildPending() (err error) {
 	r.pending = make(map[string][]*pendingVM)
 
 	for _, vmStatus := range r.Plan.Status.Migration.VMs {
+		if vmStatus.HasCondition(Canceled) {
+			continue
+		}
 		vm := &model.VM{}
 		err = r.Source.Inventory.Find(vm, vmStatus.Ref)
 		if err != nil {
 			return
 		}
-		if vmStatus.HasCondition(Canceled) {
-			continue
-		}
+
 		if !vmStatus.MarkedStarted() && !vmStatus.MarkedCompleted() {
 			pending := &pendingVM{
 				status: vmStatus,

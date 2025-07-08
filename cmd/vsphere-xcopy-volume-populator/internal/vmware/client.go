@@ -21,7 +21,7 @@ import (
 type Client interface {
 	GetEsxByVm(ctx context.Context, vmName string) (*object.HostSystem, error)
 	RunEsxCommand(ctx context.Context, host *object.HostSystem, command []string) ([]esx.Values, error)
-	GetDatastore(ctx context.Context, datastore string) (*object.Datastore, error)
+	GetDatastore(ctx context.Context, dc *object.Datacenter, datastore string) (*object.Datastore, error)
 }
 
 type VSphereClient struct {
@@ -72,55 +72,52 @@ func (c *VSphereClient) RunEsxCommand(ctx context.Context, host *object.HostSyst
 	return res.Values, nil
 }
 
-func (c *VSphereClient) GetEsxByVm(ctx context.Context, vmName string) (*object.HostSystem, error) {
+func (c *VSphereClient) GetEsxByVm(ctx context.Context, vmId string) (*object.HostSystem, error) {
 	finder := find.NewFinder(c.Client.Client, true)
-
-	//FIXME - need to trace the VM by the datastore, which we should have because
-	// of the vmdkPath and then run a finder of vms on a datastore.
-	// Get the default datacenter
-	dc, err := finder.DefaultDatacenter(ctx)
+	datacenters, err := finder.DatacenterList(ctx, "*")
 	if err != nil {
-		klog.Errorf("Failed to find default datacenter: %s", err)
-		return nil, err
-	}
-	finder.SetDatacenter(dc)
-
-	// Find the virtual machine by name
-	vm, err := finder.VirtualMachine(ctx, vmName)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to find VM %s: %v", vmName, err)
+		return nil, fmt.Errorf("failed getting datacenters: %w", err)
 	}
 
-	// Retrieve VM properties to get its host
+	var vm *object.VirtualMachine
+	for _, dc := range datacenters {
+		finder.SetDatacenter(dc)
+		result, err := finder.VirtualMachine(ctx, vmId)
+		if err != nil {
+			if _, ok := err.(*find.NotFoundError); !ok {
+				return nil, fmt.Errorf("error searching for VM in Datacenter '%s': %w", dc.Name(), err)
+			}
+		} else {
+			vm = result
+			fmt.Printf("found vm %v\n", vm)
+			break
+		}
+	}
+	if vm == nil {
+		return nil, fmt.Errorf("failed to find VM with ID %s", vmId)
+	}
+
 	var vmProps mo.VirtualMachine
 	err = vm.Properties(ctx, vm.Reference(), []string{"runtime.host"}, &vmProps)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get VM properties: %v", err)
+		return nil, fmt.Errorf("failed to get VM properties: %w", err)
 	}
 
 	hostRef := vmProps.Runtime.Host
-	// Find host system
-	host := object.NewHostSystem(c.Client.Client, *hostRef) // Adjust host query as needed
+	host := object.NewHostSystem(c.Client.Client, *hostRef)
 	if host == nil {
-		klog.Error("Failed to find host:", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to find host: %w", err)
 	}
 	return host, nil
 }
 
-func (c *VSphereClient) GetDatastore(ctx context.Context, datastore string) (*object.Datastore, error) {
-	finder := find.NewFinder(c.Client.Client, true)
-	dc, err := finder.DefaultDatacenter(ctx)
-	if err != nil {
-		klog.Errorf("Failed to find default datacenter: %s", err)
-		return nil, err
-	}
+func (c *VSphereClient) GetDatastore(ctx context.Context, dc *object.Datacenter, datastore string) (*object.Datastore, error) {
+	finder := find.NewFinder(c.Client.Client, false)
 	finder.SetDatacenter(dc)
 
-	// Find the virtual machine by name
 	ds, err := finder.Datastore(ctx, datastore)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to find datastore %s: %v", datastore, err)
+		return nil, fmt.Errorf("Failed to find datastore %s: %w", datastore, err)
 	}
 
 	return ds, nil

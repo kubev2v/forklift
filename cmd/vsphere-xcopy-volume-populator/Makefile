@@ -37,7 +37,7 @@ generate:
 build: fmt vet
 	PATH=$(PATH) \
 	go build \
-	-ldflags="w -s -X github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator.VibVersion=$(VIB_VERSION)" \
+	-ldflags="-w -s -X github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator.VibVersion=$(VIB_VERSION)" \
 	-o bin/vsphere-xcopy-volume-populator
 
 MOCKGEN := $(shell which mockgen 2>/dev/null)
@@ -47,7 +47,8 @@ install-mockgen:
 # pre-requisits: ensure a PVC exists.
 test-copy-using-cli: build
 	bin/vsphere-xcopy-volume-populator \
-		--source-vmdk="[eco-iscsi-ds2] vm-2/vm-2.vmdk" \
+		--source-vm-id=vm-100838 \
+		--source-vmdk="[eco-iscsi-ds3] vm-1-1-test-rename/vm-1-1-test-rename_2.vmdk" \
 		--owner-name=test-cli \
 		--target-namespace=default \
 		--storage-vendor-product=ontap \
@@ -55,12 +56,26 @@ test-copy-using-cli: build
 		--owner-uid=test-cli \
 		--kubeconfig=$$KUBECONFIG
 
+
 test-copy-using-cli-3par: build
 	bin/vsphere-xcopy-volume-populator \
-		--source-vmdk="[eco-iscsi-ds1] vm-6/vm-6.vmdk" \
-	    --owner-name=test1\
+		--source-vmdk="[eco-iscsi-ds1] vm-8/vm-8.vmdk" \
+		--owner-name=3par-test-100g \
+		--owner-uid=3par-test-100g \
 		--target-namespace=default \
 		--storage-vendor-product=primera3par \
+		--secret-name=populator-secret \
+		--storage-skip-ssl-verification=true \
+		--kubeconfig=$$KUBECONFIG
+
+test-copy-using-cli-pureflasharray: build
+	bin/vsphere-xcopy-volume-populator \
+		--source-vm-id="vm-67218" \
+		--source-vmdk="[eco-iscsi-pure] vm-6/vm-6.vmdk" \
+		--owner-name=test-pure-vm-6-22ab1d65 \
+		--owner-uid=test-pure-vm-6-22ab1d65 \
+		--target-namespace=default \
+		--storage-vendor-product=pureFlashArray \
 		--secret-name=populator-secret \
 		--kubeconfig=$$KUBECONFIG
 

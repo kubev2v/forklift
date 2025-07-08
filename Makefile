@@ -1,5 +1,5 @@
-GOOS ?= `go env GOOS`
-GOPATH ?= `go env GOPATH`
+GOOS ?= $(shell go env GOOS)
+GOPATH ?= $(shell go env GOPATH)
 GOBIN ?= $(GOPATH)/bin
 GO111MODULE = auto
 
@@ -325,7 +325,7 @@ check_container_runtime:
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN)
 $(DEFAULT_CONTROLLER_GEN):
-	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.17.0
+	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.17.3
 
 .PHONY: kubectl
 kubectl: $(KUBECTL)

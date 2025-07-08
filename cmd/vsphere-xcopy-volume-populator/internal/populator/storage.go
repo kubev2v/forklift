@@ -1,6 +1,6 @@
 package populator
 
-//go:generate go mockgen -destination=mocks/storage_mock_client.go -package=storage_mocks . StorageApi
+//go:generate mockgen -destination=mocks/storage_mock_client.go -package=storage_mocks . StorageApi
 type StorageApi interface {
 	StorageMapper
 	StorageResolver
@@ -20,5 +20,5 @@ type StorageMapper interface {
 }
 
 type StorageResolver interface {
-	ResolveVolumeHandleToLUN(volumeHandle string) (LUN, error)
+	ResolvePVToLUN(persistentVolume PersistentVolume) (LUN, error)
 }

@@ -54,7 +54,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.0
+    controller-gen.kubebuilder.io/version: v0.17.3
   name: hooks.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
@@ -173,7 +173,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.0
+    controller-gen.kubebuilder.io/version: v0.17.3
   name: hosts.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
@@ -389,7 +389,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.0
+    controller-gen.kubebuilder.io/version: v0.17.3
   name: migrations.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
@@ -1022,7 +1022,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.0
+    controller-gen.kubebuilder.io/version: v0.17.3
   name: networkmaps.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
@@ -1304,7 +1304,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.0
+    controller-gen.kubebuilder.io/version: v0.17.3
   name: openstackvolumepopulators.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
@@ -1411,7 +1411,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.0
+    controller-gen.kubebuilder.io/version: v0.17.3
   name: ovirtvolumepopulators.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
@@ -1518,7 +1518,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.0
+    controller-gen.kubebuilder.io/version: v0.17.3
   name: plans.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
@@ -1897,6 +1897,14 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+              type:
+                description: Migration type. e.g. "cold", "warm", "live". Supersedes
+                  the `warm` boolean if set.
+                enum:
+                - cold
+                - warm
+                - live
+                type: string
               vms:
                 description: List of VMs.
                 items:
@@ -2808,7 +2816,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.0
+    controller-gen.kubebuilder.io/version: v0.17.3
   name: providers.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
@@ -2990,7 +2998,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.0
+    controller-gen.kubebuilder.io/version: v0.17.3
   name: storagemaps.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
@@ -3078,6 +3086,8 @@ spec:
                               enum:
                               - vantara
                               - ontap
+                              - primera3par
+                              - pureFlashArray
                               type: string
                           required:
                           - secretRef
@@ -3297,7 +3307,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.0
+    controller-gen.kubebuilder.io/version: v0.17.3
   name: vspherexcopyvolumepopulators.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
@@ -3342,14 +3352,18 @@ spec:
                   StorageVendorProduct is the storage vendor the target disk and PVC are connected to
                   Supported values [vantara, ontap, primera3par]
                 type: string
+              vmId:
+                description: VmId is the VM object id in vSphere
+                type: string
               vmdkPath:
                 description: |-
                   VmdkPath is the full path the vmdk disk. A valid path format is
-                  '[$DATASTORE_NAME] $VM_NAME/$DISK_NAME.vmdk'
+                  '[$DATASTORE_NAME] $VM_HOME/$DISK_NAME.vmdk'
                 type: string
             required:
             - secretName
             - storageVendorProduct
+            - vmId
             - vmdkPath
             type: object
           status:
@@ -3623,6 +3637,14 @@ rules:
   - patch
   - delete
 - apiGroups:
+  - kubevirt.io
+  resources:
+  - kubevirts
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - cdi.kubevirt.io
   resources:
   - datavolumes
@@ -3677,14 +3699,25 @@ rules:
 - apiGroups:
   - instancetype.kubevirt.io
   resources:
-  - virtualmachinepreferences
   - virtualmachineclusterpreferences
-  - virtualmachineinstancetypes
   - virtualmachineclusterinstancetypes
   verbs:
   - get
   - list
   - watch
+- apiGroups:
+  - instancetype.kubevirt.io
+  resources:
+  - virtualmachinepreferences
+  - virtualmachineinstancetypes
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
 - apiGroups:
   - ""
   resources:
@@ -4396,6 +4429,31 @@ spec:
   minKubeVersion: 1.27.0
   provider:
     name: Konveyor
+  relatedImages:
+  - image: ${OPERATOR_IMAGE}
+    name: forklift-operator
+  - image: ${CONTROLLER_IMAGE}
+    name: controller
+  - image: ${MUST_GATHER_IMAGE}
+    name: must_gather
+  - image: ${VALIDATION_IMAGE}
+    name: validation
+  - image: ${API_IMAGE}
+    name: api
+  - image: ${POPULATOR_CONTROLLER_IMAGE}
+    name: populator_controller
+  - image: ${OVIRT_POPULATOR_IMAGE}
+    name: rhv_populator
+  - image: ${VIRT_V2V_IMAGE}
+    name: virt_v2v
+  - image: ${OPENSTACK_POPULATOR_IMAGE}
+    name: openstack_populator
+  - image: ${UI_PLUGIN_IMAGE}
+    name: ui_plugin
+  - image: ${OVA_PROVIDER_SERVER_IMAGE}
+    name: ova_provider_server
+  - image: ${VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE}
+    name: vsphere_xcopy_volume_populator
   version: ${VERSION}
 ---
 apiVersion: scorecard.operatorframework.io/v1alpha3

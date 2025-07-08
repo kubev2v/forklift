@@ -10,6 +10,7 @@ not_supported_cpu_policy = true {
 concerns[flag] {
     not_supported_cpu_policy
     flag := {
+        "id": "ovirt.cpu.pinning_policy.unsupported",
         "category": "Warning",
         "label": "Unsupported CPU pinning policy detected",
         "assessment": "Resize and Pin NUMA and Isolated Threads are not supported by OpenShift Virtualization. Some functionality may be missing after the VM is migrated."

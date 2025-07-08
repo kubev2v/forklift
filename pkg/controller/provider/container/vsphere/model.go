@@ -96,7 +96,7 @@ func (b *Base) RefList(in types.AnyType) (list []model.Ref) {
 func (b *Base) Decoded(in types.AnyType) (s string) {
 	var cast bool
 	if s, cast = in.(string); cast {
-		decoded, err := url.QueryUnescape(s)
+		decoded, err := url.PathUnescape(s)
 		if err == nil {
 			s = decoded
 		}
@@ -807,24 +807,22 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				}
 			case fGuestDisk:
 				if disks, cast := p.Val.(types.ArrayOfGuestDiskInfo); cast {
-					for _, info := range disks.GuestDiskInfo {
-						var guestDiskKey int32
-						if len(info.Mappings) == 0 {
-							continue // Skip if no mappings are available
-						}
-
-						// This assumes that the first mapping is the primary one
-						guestDiskKey = info.Mappings[0].Key
-
-						newGuestDisk := model.GuestDisk{
+					v.model.GuestDisks = make([]model.GuestDisk, len(disks.GuestDiskInfo))
+					for i, info := range disks.GuestDiskInfo {
+						v.model.GuestDisks[i] = model.GuestDisk{
 							DiskPath:       info.DiskPath,
 							Capacity:       info.Capacity,
 							FreeSpace:      info.FreeSpace,
 							FilesystemType: info.FilesystemType,
-							Key:            guestDiskKey,
 						}
+					}
 
-						v.updateOrAppendGuestDisk(newGuestDisk)
+					// Update matching disk items with Windows drive letters based on index
+					for i, guestDisk := range v.model.GuestDisks {
+						if i < len(v.model.Disks) {
+							winDriveLetter := v.extractWinDriveLetter(guestDisk.DiskPath)
+							v.model.Disks[i].WinDriveLetter = winDriveLetter
+						}
 					}
 				}
 			case fGuestNet:
@@ -1057,17 +1055,6 @@ func (v *VmAdapter) getDiskController(key int32) *model.Controller {
 	return nil
 }
 
-// getDiskGuestInfo retrieves the guest disk information for a given device key.
-func (v *VmAdapter) getDiskGuestInfo(deviceKey int32) *model.GuestDisk {
-	for _, guestDisk := range v.model.GuestDisks {
-		if guestDisk.Key == deviceKey {
-			return &guestDisk
-		}
-	}
-
-	return nil
-}
-
 // Update virtual disk devices.
 func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 	disks := []model.Disk{}
@@ -1076,32 +1063,17 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 		case *types.VirtualDisk:
 			disk := dev.(*types.VirtualDisk)
 			controller := v.getDiskController(disk.ControllerKey)
-			guestDiskInfo := v.getDiskGuestInfo(disk.Key)
-
-			// Try to extract the Windows drive letter from the guest disk info
-			winDriveLetter := ""
-			if guestDiskInfo != nil {
-				winDriveLetter = guestDiskInfo.DiskPath
-				// Check if this looks like a Windows drive letter (e.g., "C:\\")
-				if len(winDriveLetter) == 3 && winDriveLetter[1] == ':' && winDriveLetter[2] == '\\' {
-					// Extract the drive letter and convert to lowercase
-					winDriveLetter = strings.ToLower(string(winDriveLetter[0]))
-				} else {
-					winDriveLetter = ""
-				}
-			}
 
 			switch backing := disk.Backing.(type) {
 			case *types.VirtualDiskFlatVer1BackingInfo:
 				md := model.Disk{
-					Key:            disk.Key,
-					UnitNumber:     *disk.UnitNumber,
-					ControllerKey:  disk.ControllerKey,
-					File:           backing.FileName,
-					Capacity:       disk.CapacityInBytes,
-					Mode:           backing.DiskMode,
-					Bus:            controller.Bus,
-					WinDriveLetter: winDriveLetter,
+					Key:           disk.Key,
+					UnitNumber:    *disk.UnitNumber,
+					ControllerKey: disk.ControllerKey,
+					File:          backing.FileName,
+					Capacity:      disk.CapacityInBytes,
+					Mode:          backing.DiskMode,
+					Bus:           controller.Bus,
 				}
 				if backing.Datastore != nil {
 					datastoreId, _ := sanitize(backing.Datastore.Value)
@@ -1113,16 +1085,15 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 				disks = append(disks, md)
 			case *types.VirtualDiskFlatVer2BackingInfo:
 				md := model.Disk{
-					Key:            disk.Key,
-					UnitNumber:     *disk.UnitNumber,
-					ControllerKey:  disk.ControllerKey,
-					File:           backing.FileName,
-					Capacity:       disk.CapacityInBytes,
-					Shared:         backing.Sharing != "sharingNone" && backing.Sharing != "",
-					Mode:           backing.DiskMode,
-					Bus:            controller.Bus,
-					Serial:         backing.Uuid,
-					WinDriveLetter: winDriveLetter,
+					Key:           disk.Key,
+					UnitNumber:    *disk.UnitNumber,
+					ControllerKey: disk.ControllerKey,
+					File:          backing.FileName,
+					Capacity:      disk.CapacityInBytes,
+					Shared:        backing.Sharing != "sharingNone" && backing.Sharing != "",
+					Mode:          backing.DiskMode,
+					Bus:           controller.Bus,
+					Serial:        backing.Uuid,
 				}
 				if backing.Datastore != nil {
 					datastoreId, _ := sanitize(backing.Datastore.Value)
@@ -1134,17 +1105,16 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 				disks = append(disks, md)
 			case *types.VirtualDiskRawDiskMappingVer1BackingInfo:
 				md := model.Disk{
-					Key:            disk.Key,
-					UnitNumber:     *disk.UnitNumber,
-					ControllerKey:  disk.ControllerKey,
-					File:           backing.FileName,
-					Capacity:       disk.CapacityInBytes,
-					Shared:         backing.Sharing != "sharingNone" && backing.Sharing != "",
-					Mode:           backing.DiskMode,
-					RDM:            true,
-					Bus:            controller.Bus,
-					Serial:         backing.Uuid,
-					WinDriveLetter: winDriveLetter,
+					Key:           disk.Key,
+					UnitNumber:    *disk.UnitNumber,
+					ControllerKey: disk.ControllerKey,
+					File:          backing.FileName,
+					Capacity:      disk.CapacityInBytes,
+					Shared:        backing.Sharing != "sharingNone" && backing.Sharing != "",
+					Mode:          backing.DiskMode,
+					RDM:           true,
+					Bus:           controller.Bus,
+					Serial:        backing.Uuid,
 				}
 				if backing.Datastore != nil {
 					datastoreId, _ := sanitize(backing.Datastore.Value)
@@ -1156,61 +1126,38 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 				disks = append(disks, md)
 			case *types.VirtualDiskRawDiskVer2BackingInfo:
 				md := model.Disk{
-					Key:            disk.Key,
-					UnitNumber:     *disk.UnitNumber,
-					ControllerKey:  disk.ControllerKey,
-					File:           backing.DescriptorFileName,
-					Capacity:       disk.CapacityInBytes,
-					Shared:         backing.Sharing != "sharingNone" && backing.Sharing != "",
-					RDM:            true,
-					Bus:            controller.Bus,
-					WinDriveLetter: winDriveLetter,
+					Key:           disk.Key,
+					UnitNumber:    *disk.UnitNumber,
+					ControllerKey: disk.ControllerKey,
+					File:          backing.DescriptorFileName,
+					Capacity:      disk.CapacityInBytes,
+					Shared:        backing.Sharing != "sharingNone" && backing.Sharing != "",
+					RDM:           true,
+					Bus:           controller.Bus,
 				}
 				disks = append(disks, md)
 			}
 		}
 	}
 
+	// Update Windows drive letters for all disks based on guest disk information
+	for i := range disks {
+		if i < len(v.model.GuestDisks) {
+			winDriveLetter := v.extractWinDriveLetter(v.model.GuestDisks[i].DiskPath)
+			disks[i].WinDriveLetter = winDriveLetter
+		}
+	}
+
 	v.model.Disks = disks
 }
 
-// updateOrAppendGuestDisk updates an existing guest disk with the same key or appends a new one
-func (v *VmAdapter) updateOrAppendGuestDisk(newDisk model.GuestDisk) {
-	fountExistingDisk := false
-
-	// Find existing disk with the same key
-	for i, existingDisk := range v.model.GuestDisks {
-		if existingDisk.Key == newDisk.Key {
-			// Replace existing disk
-			v.model.GuestDisks[i] = newDisk
-
-			fountExistingDisk = true
-			break // Exit the loop when found
-		}
+// extractWinDriveLetter extracts the Windows drive letter from a disk path.
+// For example: "C:\\" returns "c", "/home" returns ""
+func (v *VmAdapter) extractWinDriveLetter(diskPath string) string {
+	// Check if this looks like a Windows drive letter (e.g., "C:\\")
+	if len(diskPath) >= 3 && diskPath[1] == ':' && diskPath[2] == '\\' {
+		// Extract the drive letter and convert to lowercase
+		return strings.ToLower(string(diskPath[0]))
 	}
-
-	// No existing disk found, append new one
-	if !fountExistingDisk {
-		v.model.GuestDisks = append(v.model.GuestDisks, newDisk)
-	}
-
-	// Check for m.model.Disks with the same key
-	for i, disk := range v.model.Disks {
-		if disk.Key == newDisk.Key {
-			// Try to extract the Windows drive letter from the new GuestDisk's DiskPath
-			winDriveLetter := newDisk.DiskPath
-
-			// Check if this looks like a Windows drive letter (e.g., "C:\\")
-			if len(winDriveLetter) == 3 && winDriveLetter[1] == ':' && winDriveLetter[2] == '\\' {
-				// Extract the drive letter and convert to lowercase
-				winDriveLetter = strings.ToLower(string(winDriveLetter[0]))
-			} else {
-				winDriveLetter = ""
-			}
-
-			// Update the Disk's WinDriveLetter using the new GuestDisk's DiskPath
-			v.model.Disks[i].WinDriveLetter = winDriveLetter
-			return
-		}
-	}
+	return ""
 }

@@ -54,7 +54,7 @@ func NewWithRemoteEsxcli(storageApi StorageApi, vsphereHostname, vsphereUsername
 
 }
 
-func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle string, progress chan<- uint, quit chan error) (errFinal error) {
+func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, progress chan<- uint, quit chan error) (errFinal error) {
 	// isn't it better to not call close the channel from the caller?
 	defer func() {
 		r := recover()
@@ -70,12 +70,12 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 	klog.Infof(
 		"Starting to populate using remote esxcli vmkfstools, source vmdk %s target LUN %s",
 		sourceVMDKFile,
-		volumeHandle)
-	host, err := p.VSphereClient.GetEsxByVm(context.Background(), vmDisk.VmHomeDir)
+		pv)
+	host, err := p.VSphereClient.GetEsxByVm(context.Background(), vmId)
 	if err != nil {
 		return err
 	}
-	klog.Infof("Got ESXI host: %s", host)
+	klog.Infof("Got ESXi host: %s", host)
 
 	err = ensureVib(p.VSphereClient, host, vmDisk.Datastore, VibVersion)
 	if err != nil {
@@ -130,7 +130,7 @@ func (p *RemoteEsxcliPopulator) Populate(sourceVMDKFile string, volumeHandle str
 		return fmt.Errorf("failed to add the ESX HBA UID %s to the initiator group %w", hbaUIDs, err)
 	}
 
-	lun, err := p.StorageApi.ResolveVolumeHandleToLUN(volumeHandle)
+	lun, err := p.StorageApi.ResolvePVToLUN(pv)
 	if err != nil {
 		return err
 	}

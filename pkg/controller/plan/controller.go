@@ -257,6 +257,9 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	// The plan is updated as needed to reflect status.
 	result.RequeueAfter, err = r.execute(plan)
 	if err != nil {
+		if updateErr := r.updatePlanStatus(plan); updateErr != nil {
+			r.Log.Error(err, "failed to update plan status")
+		}
 		return
 	}
 

@@ -12,9 +12,6 @@ import (
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 )
 
-// Package logger.
-var log = logging.WithName("migrator|base")
-
 type BaseMigrator struct {
 	*plancontext.Context
 	builder adapter.Builder
@@ -32,8 +29,15 @@ func (r *BaseMigrator) Init() (err error) {
 	return
 }
 
-func (r *BaseMigrator) Cleanup(status *plan.VMStatus, successful bool) (err error) {
+func (r *BaseMigrator) Logger() (logger logging.LevelLogger) {
+	return r.Log
+}
+
+func (r *BaseMigrator) Begin() (err error) {
 	return
+}
+
+func (r *BaseMigrator) Complete(vm *plan.VMStatus) {
 }
 
 func (r *BaseMigrator) Status(vm plan.VM) (status *plan.VMStatus) {
@@ -48,21 +52,21 @@ func (r *BaseMigrator) Status(vm plan.VM) (status *plan.VMStatus) {
 	return
 }
 
-func (r *BaseMigrator) Reset(status *plan.VMStatus, pipeline []*plan.Step) {
-	status.DeleteCondition(api.ConditionCanceled, api.ConditionFailed)
-	status.MarkReset()
-	itr := r.Itinerary(&BasePredicate{vm: &status.VM, context: r.Context})
+func (r *BaseMigrator) Reset(vm *plan.VMStatus, pipeline []*plan.Step) {
+	vm.DeleteCondition(api.ConditionCanceled, api.ConditionFailed)
+	vm.MarkReset()
+	itr := r.Itinerary(vm.VM)
 	step, _ := itr.First()
-	status.Phase = step.Name
-	status.Pipeline = pipeline
-	status.Error = nil
+	vm.Phase = step.Name
+	vm.Pipeline = pipeline
+	vm.Error = nil
 	if r.Context.Plan.Spec.Warm {
-		status.Warm = &plan.Warm{}
+		vm.Warm = &plan.Warm{}
 	}
 }
 
 func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
-	itinerary := r.Itinerary(&BasePredicate{vm: &vm, context: r.Context})
+	itinerary := r.Itinerary(vm)
 	step, _ := itinerary.First()
 	for {
 		switch step.Name {
@@ -211,28 +215,13 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 	return
 }
 
-func (r *BaseMigrator) Itinerary(predicate libitr.Predicate) (itinerary libitr.Itinerary) {
+func (r *BaseMigrator) Itinerary(vm plan.VM) (itinerary *libitr.Itinerary) {
 	if r.Context.Plan.Spec.Warm {
-		itinerary = WarmItinerary
+		itinerary = r.warmItinerary()
 	} else {
-		itinerary = ColdItinerary
+		itinerary = r.coldItinerary()
 	}
-	itinerary.Predicate = predicate
-	return
-}
-
-func (r *BaseMigrator) Next(status *plan.VMStatus) (next string) {
-	itinerary := r.Itinerary(&BasePredicate{vm: &status.VM, context: r.Context})
-	step, done, err := itinerary.Next(status.Phase)
-	if done || err != nil {
-		next = api.PhaseCompleted
-		if err != nil {
-			log.Error(err, "Next phase failed.")
-		}
-	} else {
-		next = step.Name
-	}
-	r.Log.Info("Itinerary transition", "current phase", status.Phase, "next phase", next)
+	itinerary.Predicate = &BasePredicate{vm: &vm, context: r.Context}
 	return
 }
 
@@ -276,6 +265,71 @@ func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 		step = Unknown
 	}
 	return
+}
+
+func (r *BaseMigrator) warmItinerary() *libitr.Itinerary {
+	return &libitr.Itinerary{
+		Name: "Warm",
+		Pipeline: libitr.Pipeline{
+			{Name: api.PhaseStarted},
+			{Name: api.PhasePreHook, All: HasPreHook},
+			{Name: api.PhaseCreateInitialSnapshot},
+			{Name: api.PhaseWaitForInitialSnapshot},
+			{Name: api.PhaseStoreInitialSnapshotDeltas, All: VSphere},
+			{Name: api.PhaseCreateDataVolumes},
+			// Precopy loop start
+			{Name: api.PhaseWaitForDataVolumesStatus},
+			{Name: api.PhaseCopyDisks},
+			{Name: api.PhaseCopyingPaused},
+			{Name: api.PhaseRemovePreviousSnapshot, All: VSphere},
+			{Name: api.PhaseWaitForPreviousSnapshotRemoval, All: VSphere},
+			{Name: api.PhaseCreateSnapshot},
+			{Name: api.PhaseWaitForSnapshot},
+			{Name: api.PhaseStoreSnapshotDeltas, All: VSphere},
+			{Name: api.PhaseAddCheckpoint},
+			// Precopy loop end
+			{Name: api.PhaseStorePowerState},
+			{Name: api.PhasePowerOffSource},
+			{Name: api.PhaseWaitForPowerOff},
+			{Name: api.PhaseRemovePenultimateSnapshot, All: VSphere},
+			{Name: api.PhaseWaitForPenultimateSnapshotRemoval, All: VSphere},
+			{Name: api.PhaseCreateFinalSnapshot},
+			{Name: api.PhaseWaitForFinalSnapshot},
+			{Name: api.PhaseAddFinalCheckpoint},
+			{Name: api.PhaseWaitForFinalDataVolumesStatus},
+			{Name: api.PhaseFinalize},
+			{Name: api.PhaseRemoveFinalSnapshot, All: VSphere},
+			{Name: api.PhaseWaitForFinalSnapshotRemoval, All: VSphere},
+			{Name: api.PhaseCreateGuestConversionPod, All: RequiresConversion},
+			{Name: api.PhaseConvertGuest, All: RequiresConversion},
+			{Name: api.PhaseCreateVM},
+			{Name: api.PhasePostHook, All: HasPostHook},
+			{Name: api.PhaseCompleted},
+		},
+	}
+}
+
+func (r *BaseMigrator) coldItinerary() *libitr.Itinerary {
+	return &libitr.Itinerary{
+		Name: "",
+		Pipeline: libitr.Pipeline{
+			{Name: api.PhaseStarted},
+			{Name: api.PhasePreHook, All: HasPreHook},
+			{Name: api.PhaseStorePowerState},
+			{Name: api.PhasePowerOffSource},
+			{Name: api.PhaseWaitForPowerOff},
+			{Name: api.PhaseCreateDataVolumes},
+			{Name: api.PhaseCopyDisks, All: CDIDiskCopy},
+			{Name: api.PhaseAllocateDisks, All: VirtV2vDiskCopy},
+			{Name: api.PhaseCreateGuestConversionPod, All: RequiresConversion},
+			{Name: api.PhaseConvertGuest, All: RequiresConversion},
+			{Name: api.PhaseCopyDisksVirtV2V, All: RequiresConversion},
+			{Name: api.PhaseConvertOpenstackSnapshot, All: OpenstackImageMigration},
+			{Name: api.PhaseCreateVM},
+			{Name: api.PhasePostHook, All: HasPostHook},
+			{Name: api.PhaseCompleted},
+		},
+	}
 }
 
 // Step predicate.

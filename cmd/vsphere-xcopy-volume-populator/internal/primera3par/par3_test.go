@@ -40,7 +40,7 @@ func TestPrimera3ParClonner(t *testing.T) {
 	})
 
 	t.Run("Resolve Volume Handle to LUN", func(t *testing.T) {
-		_, err := clonner.ResolveVolumeHandleToLUN(targetLUN.Name)
+		_, err := clonner.ResolvePVToLUN(populator.PersistentVolume{Name: targetLUN.Name})
 		assert.NoError(t, err, "Expected no error when resolving LUN details")
 	})
 

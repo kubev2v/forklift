@@ -128,6 +128,10 @@ spec:
         - name: FEATURE_RETAIN_PRECOPY_IMPORTER_PODS
           value: "true"
 {% endif %}
+{% if feature_ocp_live_migration|bool %}
+        - name: FEATURE_OCP_LIVE_MIGRATION
+          value: "true"
+{% endif %}
 {% if ovirt_osmap_configmap_name is defined %}
         - name: OVIRT_OS_MAP
           value: {{ ovirt_osmap_configmap_name }}
