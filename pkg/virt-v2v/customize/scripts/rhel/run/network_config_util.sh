@@ -43,11 +43,12 @@ remove_quotes() {
 extract_mac_ip() {
     S_HW=""
     S_IP=""
-    if echo "$1" | grep -qE '^([0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}):ip:([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}).*$'; then
-        S_HW=$(echo "$1" | sed -nE 's/^([0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}):ip:.*$/\1/p')
-        S_IP=$(echo "$1" | sed -nE 's/^.*:ip:([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}).*$/\1/p')
-    fi
+    line="$1"
+    S_HW=$(echo "$line" | sed -n 's/^\([0-9a-fA-F:]\{17\}\):ip:.*/\1/p')
+    S_IP=$(echo "$line" | sed -n 's/^.*:ip:\([^,]*\).*/\1/p')
 }
+
+
 
 # Network infrastructure reading functions
 # ----------------------------------------
@@ -286,19 +287,26 @@ udev_from_ifquery() {
 
 # Checks for duplicate hardware addresses 
 check_dupe_hws() {
-    input=$(cat)
-
-    # Extract MAC addresses, convert to uppercase, sort them, and find duplicates
-    dupes=$(echo "$input" | grep -ioE "[0-9A-F:]{17}" | tr 'a-f' 'A-F' | sort | uniq -d)
-
-    # If duplicates are found, print an error and exit
-    if [ -n "$dupes" ]; then
-        log "Warning: Duplicate hw: $dupes"
-        return 0
-    fi
-
-    echo "$input"
+    awk '
+    {
+        print
+        mac = ""
+        name = ""
+        if (match($0, /ATTR\{address\}=="([0-9a-f:]+)"/, m)) mac = tolower(m[1])
+        if (match($0, /NAME=="([^"]+)"/, n)) name = n[1]
+        if (mac && name) {
+            if ((mac in seen) && seen[mac] != name) {
+                printf "Error: MAC %s assigned to multiple interface names: %s and %s\n", mac, seen[mac], name > "/dev/stderr"
+                exit_code = 1
+            } else {
+                seen[mac] = name
+            }
+        }
+    }
+    END { exit(exit_code) }
+    ' 
 }
+
 
 # Create udev rules check for duplicates and write them to udev file
 main() {
@@ -307,7 +315,8 @@ main() {
         udev_from_nm
         udev_from_netplan
         udev_from_ifquery
-    } | check_dupe_hws > "$UDEV_RULES_FILE" 2>/dev/null
+    } | awk '!seen[$0]++' | check_dupe_hws > "$UDEV_RULES_FILE" 2>/dev/null
+
     echo "New udev rule:"
     cat $UDEV_RULES_FILE
 }
