@@ -287,6 +287,7 @@ func (c *Customize) addWinFirstbootScripts(cmdBuilder utils.CommandBuilder) {
 	uploadRemoveDuplicatesPath := ""
 	uploadPreserveMultipleIpPath := ""
 	if c.appConfig.VirtIoWinLegacyDrivers != "" {
+		initPath = filepath.Join(windowsScriptsPath, "9999-run-mtv-ps-scripts-legacy.bat")
 		restoreScriptPath = filepath.Join(windowsScriptsPath, "9999-restore_config-legacy.ps1")
 
 		if c.appConfig.StaticIPs != "" {
