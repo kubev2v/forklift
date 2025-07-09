@@ -160,6 +160,7 @@ func (mutator *SecretMutator) mutateHostSecret() *admissionv1.AdmissionResponse 
 	if _, ok := mutator.secret.GetLabels()["createdForResource"]; ok { // checking this just because there's no point in mutating an invalid secret
 		var secretChanged bool
 		if user, ok := mutator.secret.Data["user"]; !ok || string(user) == "" {
+			// Fetch the provider secret if the user is not set
 			provider := &api.Provider{}
 			providerName := string(mutator.secret.Data["provider"])
 			providerNamespace := mutator.secret.Namespace
@@ -179,9 +180,36 @@ func (mutator *SecretMutator) mutateHostSecret() *admissionv1.AdmissionResponse 
 				secretChanged = true
 				log.Info("copied credentials from ESXi provider to its Host")
 			}
-			if secretChanged {
-				return mutator.patchSecret()
+		}
+
+		if _, hasInsecureSkipVerify := mutator.secret.Data["insecureSkipVerify"]; !hasInsecureSkipVerify {
+			// Fetch the provider to get the insecureSkipVerify setting
+			provider := &api.Provider{}
+			providerName := string(mutator.secret.Data["provider"])
+			providerNamespace := mutator.secret.Namespace
+			if err := mutator.Client.Get(context.TODO(), client.ObjectKey{Namespace: providerNamespace, Name: providerName}, provider); err != nil {
+				log.Error(err, "failed to find provider for insecureSkipVerify setting")
+				return util.ToAdmissionResponseError(err)
 			}
+
+			// Fetch the provider secret
+			ref := provider.Spec.Secret
+			providerSecret := &core.Secret{}
+			if err := mutator.Client.Get(context.TODO(), client.ObjectKey{Namespace: ref.Namespace, Name: ref.Name}, providerSecret); err != nil {
+				log.Error(err, "failed to get provider secret for insecureSkipVerify setting")
+				return util.ToAdmissionResponseError(err)
+			}
+
+			// Copy the skip verify setting from the provider secret if it exists
+			if insecureSkipVerify, ok := providerSecret.Data["insecureSkipVerify"]; ok {
+				mutator.secret.Data["insecureSkipVerify"] = insecureSkipVerify
+				secretChanged = true
+				log.Info("copied insecureSkipVerify setting from provider secret to host secret")
+			}
+		}
+
+		if secretChanged {
+			return mutator.patchSecret()
 		}
 	}
 	return util.ToAdmissionResponseAllow()
