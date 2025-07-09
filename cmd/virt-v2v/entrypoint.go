@@ -42,7 +42,22 @@ func main() {
 	} else {
 		// virt-v2v or virt-v2v-in-place
 		if convert.IsInPlace {
-			err = convert.RunVirtV2vInPlace()
+			// fetch xml description of the guest from libvirt to help virt-v2v make the conversion
+			err = func() error {
+				domainXML, err := convert.GetDomainXML()
+				if err != nil {
+					return fmt.Errorf("failed to get domain XML: %v", err)
+				}
+
+				err = os.WriteFile(convert.LibvirtDomainFile, []byte(domainXML), 0644)
+				if err != nil {
+					return fmt.Errorf("failed to write domain XML file: %v", err)
+				}
+				return nil
+			}()
+			if err == nil {
+				err = convert.RunVirtV2vInPlace()
+			}
 		} else {
 			err = convert.RunVirtV2v()
 		}

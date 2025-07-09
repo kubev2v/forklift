@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,8 @@ import (
 	"github.com/kubev2v/forklift/pkg/virt-v2v/config"
 	"github.com/kubev2v/forklift/pkg/virt-v2v/customize"
 	"github.com/kubev2v/forklift/pkg/virt-v2v/utils"
+	"libvirt.org/go/libvirt"
+	libvirtxml "libvirt.org/libvirt-go-xml"
 )
 
 type Conversion struct {
@@ -120,7 +123,6 @@ func (c *Conversion) RunVirtV2vInPlace() error {
 		return err
 	}
 	v2vCmdBuilder.AddPositional(c.LibvirtDomainFile)
-
 	v2vCmd := v2vCmdBuilder.Build()
 	v2vCmd.SetStdout(os.Stdout)
 	v2vCmd.SetStderr(os.Stderr)
@@ -254,4 +256,111 @@ func (c *Conversion) addVirtV2vRemoteInspectionArgs(cmd utils.CommandBuilder) (e
 		cmd.AddArg("-io", fmt.Sprintf("vddk-file=%s", disk))
 	}
 	return
+}
+
+// retrieve and modify the domain XML from libvirt
+func (c *Conversion) GetDomainXML() (string, error) {
+	libvirtURL, err := url.Parse(c.LibvirtUrl)
+
+	if err != nil {
+		return "", fmt.Errorf("failed to parse libvirt URL: %w", err)
+	}
+
+	usernameData, err := os.ReadFile(c.AccessKeyId)
+	if err != nil {
+		return "", fmt.Errorf("failed to read username from secret: %w", err)
+	}
+	username := string(usernameData)
+
+	passwordData, err := os.ReadFile(c.SecretKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to read password from secret: %w", err)
+	}
+	password := string(passwordData)
+
+	auth := &libvirt.ConnectAuth{
+		CredType: []libvirt.ConnectCredentialType{
+			libvirt.CRED_AUTHNAME,
+			libvirt.CRED_PASSPHRASE,
+		},
+		Callback: func(creds []*libvirt.ConnectCredential) {
+			for _, cred := range creds {
+				switch cred.Type {
+				case libvirt.CRED_AUTHNAME:
+					cred.Result = username
+					cred.ResultLen = len(username)
+				case libvirt.CRED_PASSPHRASE:
+					cred.Result = password
+					cred.ResultLen = len(password)
+				}
+			}
+		},
+	}
+
+	conn, err := libvirt.NewConnectWithAuth(libvirtURL.String(), auth, 0)
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+
+	domain, err := conn.LookupDomainByName(c.VmName)
+	if err != nil {
+		return "", fmt.Errorf("failed to lookup domain %s: %w", c.VmName, err)
+	}
+	defer func() {
+		if err := domain.Free(); err != nil {
+			fmt.Printf("Failed to free libvirt domain: %s", err)
+		}
+	}()
+
+	domainXML, err := domain.GetXMLDesc(0)
+	if err != nil {
+		return "", fmt.Errorf("failed to get domain XML: %w", err)
+	}
+
+	modifiedXML, err := c.updateDiskPaths(domainXML)
+	if err != nil {
+		return "", fmt.Errorf("failed to update disk paths in domain XML: %w", err)
+	}
+
+	return modifiedXML, nil
+}
+
+// modify the domain XML to use the local disk paths for in-place conversions
+func (c *Conversion) updateDiskPaths(domainXML string) (string, error) {
+	fmt.Printf("Updating disk paths: found %d disks\n", len(c.Disks))
+	domain := &libvirtxml.Domain{}
+	err := domain.Unmarshal(domainXML)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse domain XML: %w", err)
+	}
+
+	for i, domainDisk := range domain.Devices.Disks {
+		if i >= len(c.Disks) {
+			fmt.Printf("WARNING: disk %d in domain XML but only %d disks available\n", i, len(c.Disks))
+			continue
+		}
+
+		if domainDisk.Source == nil {
+			fmt.Printf("skipping disk %d: no source defined\n", i)
+			continue
+		}
+
+		if domainDisk.Source.File != nil {
+			domainDisk.Source.File.File = c.Disks[i].Link
+			fmt.Printf("Updated disk %d file source to: %s\n", i, c.Disks[i].Link)
+		} else if domainDisk.Source.Block != nil {
+			domainDisk.Source.Block.Dev = c.Disks[i].Link
+			fmt.Printf("Updated disk %d block source to: %s\n", i, c.Disks[i].Link)
+		} else {
+			fmt.Printf("WARNING: skipping disk %d: unsupported source type\n", i)
+		}
+	}
+
+	modifiedXML, err := domain.Marshal()
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal modified domain XML: %w", err)
+	}
+
+	return modifiedXML, nil
 }

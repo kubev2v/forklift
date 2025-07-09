@@ -53,9 +53,10 @@ const (
 	VddkConfFile            = "/mnt/vddk-conf/vddk-config-file"
 	DynamicScriptsMountPath = "/mnt/dynamic_scripts"
 
-	SecretKey = "/etc/secret/secretKey"
+	AccessKeyId = "/etc/secret/accessKeyId"
+	SecretKey   = "/etc/secret/secretKey"
 
-	V2vInPlaceLibvirtDomain = "/mnt/v2v/input.xml"
+	V2vInPlaceLibvirtDomain = "/tmp/input.xml"
 )
 
 type AppConfig struct {
@@ -83,6 +84,8 @@ type AppConfig struct {
 	DiskPath string
 	// V2V_secretKey
 	SecretKey string
+	// V2V_AccessKeyId
+	AccessKeyId string
 	// V2V_virtIoWinDrivers
 	VirtIoWinLegacyDrivers string
 	// hostname
@@ -119,6 +122,7 @@ func (s *AppConfig) Load() (err error) {
 	flag.StringVar(&s.RootDisk, "root-disk", os.Getenv(EnvRootDiskName), "Specify which disk should be converted (default \"first\")")
 	flag.StringVar(&s.StaticIPs, "static-ips", os.Getenv(EnvStaticIPsName), "Preserve static IPs, format <mac:network|bridge|ip:out>_<mac:network|bridge|ip:out>")
 	flag.StringVar(&s.DiskPath, "disk-path", os.Getenv(EnvDiskPathName), "Path to the OVA disk")
+	flag.StringVar(&s.AccessKeyId, "access-key", AccessKeyId, "Path to the Username for the vSphere")
 	flag.StringVar(&s.SecretKey, "secret-key", SecretKey, "Path to the secret to the vSphere")
 	flag.StringVar(&s.Luksdir, "luks-dir", Luksdir, "Directory path containing the luks keys")
 	flag.StringVar(&s.DynamicScriptsDir, "dynamic-scripts-dir", DynamicScriptsMountPath, "Directory path to specify dynamic scripts which will edit the guest")
