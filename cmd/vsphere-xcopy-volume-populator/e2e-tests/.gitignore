@@ -1,0 +1,3 @@
+config/test-config.env
+logs/
+vm_info_*.env
