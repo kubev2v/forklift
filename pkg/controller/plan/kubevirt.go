@@ -2250,19 +2250,28 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, libvirtConfigMap *cor
 	return
 }
 
-func (r *KubeVirt) libvirtDomain(vmCr *VirtualMachine, pvcs []*core.PersistentVolumeClaim) (domain *libvirtxml.Domain) {
+func (r *KubeVirt) libvirtDomain(vmRef ref.Ref, vmCr *VirtualMachine, pvcs []*core.PersistentVolumeClaim) (domain *libvirtxml.Domain, err error) {
+	domainXML, err := r.Builder.DomainXML(vmRef)
+	if err == nil {
+		domain = &libvirtxml.Domain{}
+		if err = xml.Unmarshal([]byte(domainXML), domain); err == nil {
+			// the libvirt xml contains disk paths from the source vm. We need to update the
+			// disk sources to point to the converted disk locations
+			domain.Devices.Disks = r.generateLibvirtDisks(vmCr, pvcs)
+		}
+	} else if errors.Is(err, planbase.DomainXMLNotImplementedError) {
+		// fall back to generating our own libvirt domain xml when not implemented
+		domain = r.generateLibvirtDomain(vmCr, pvcs)
+	}
+	return
+}
+
+func (r *KubeVirt) generateLibvirtDisks(vmCr *VirtualMachine, pvcs []*core.PersistentVolumeClaim) []libvirtxml.DomainDisk {
 	pvcsByName := make(map[string]*core.PersistentVolumeClaim)
 	for _, pvc := range pvcs {
 		pvcsByName[pvc.Name] = pvc
 	}
 
-	// FIXME: this should really be as complete an XML domain definition as possible
-	// to give virt-v2v the best chance of converting the disk correctly. Things
-	// like block device name translation and network translation may not work properly
-	// without the full metadata, so we may see weird things happening in some
-	// conversions. For now, this xml definition is just a minimal domain XML file
-	// with the locations of each disk on the VM that is to be converted, but it
-	// should be fixed properly in the future.
 	libvirtDisks := make([]libvirtxml.DomainDisk, 0)
 	for i, vol := range vmCr.Spec.Template.Spec.Volumes {
 		diskSource := libvirtxml.DomainDiskSource{}
@@ -2303,7 +2312,10 @@ func (r *KubeVirt) libvirtDomain(vmCr *VirtualMachine, pvcs []*core.PersistentVo
 		}
 		libvirtDisks = append(libvirtDisks, libvirtDisk)
 	}
+	return libvirtDisks
+}
 
+func (r *KubeVirt) generateLibvirtDomain(vmCr *VirtualMachine, pvcs []*core.PersistentVolumeClaim) (domain *libvirtxml.Domain) {
 	kDomain := vmCr.Spec.Template.Spec.Domain
 	domain = &libvirtxml.Domain{
 		Type: "kvm",
@@ -2328,7 +2340,7 @@ func (r *KubeVirt) libvirtDomain(vmCr *VirtualMachine, pvcs []*core.PersistentVo
 			},
 		},
 		Devices: &libvirtxml.DomainDeviceList{
-			Disks: libvirtDisks,
+			Disks: r.generateLibvirtDisks(vmCr, pvcs),
 		},
 	}
 
@@ -2401,7 +2413,12 @@ func (r *KubeVirt) ensureLibvirtConfigMap(vmRef ref.Ref, vmCr *VirtualMachine, p
 	if err != nil {
 		return
 	}
-	domain := r.libvirtDomain(vmCr, pvcs)
+	domain, err := r.libvirtDomain(vmRef, vmCr, pvcs)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
 	domainXML, err := xml.Marshal(domain)
 	if err != nil {
 		err = liberr.Wrap(err)

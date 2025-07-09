@@ -73,6 +73,11 @@ type Builder struct {
 	macConflictsMap map[string]string
 }
 
+// DomainXML implements base.Builder.
+func (r *Builder) DomainXML(vmRef ref.Ref) (xml string, err error) {
+	return "", planbase.DomainXMLNotImplementedError
+}
+
 // Get list of destination VMs with mac addresses that would
 // conflict with this VM, if any exist.
 func (r *Builder) macConflicts(vm *model.VM) (conflictingVMs []string, err error) {
