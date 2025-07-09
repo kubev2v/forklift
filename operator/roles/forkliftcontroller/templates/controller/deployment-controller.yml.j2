@@ -132,6 +132,10 @@ spec:
         - name: FEATURE_OCP_LIVE_MIGRATION
           value: "true"
 {% endif %}
+{% if feature_vmware_system_serial_number|bool %}
+        - name: FEATURE_VMWARE_SYSTEM_SERIAL_NUMBER
+          value: "true"
+{% endif %}
 {% if ovirt_osmap_configmap_name is defined %}
         - name: OVIRT_OS_MAP
           value: {{ ovirt_osmap_configmap_name }}
