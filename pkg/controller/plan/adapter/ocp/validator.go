@@ -23,6 +23,7 @@ import (
 const VM_NOT_FOUND = "VM not found."
 const FeatureDecentralizedLiveMigration = "DecentralizedLiveMigration"
 const ConditionStorageLiveMigratable = "StorageLiveMigratable"
+const ConditionLiveMigratable = "LiveMigratable"
 const True = "True"
 
 var Settings = &settings.Settings
@@ -71,9 +72,11 @@ func (r *Validator) VMMigrationType(vmRef ref.Ref) (ok bool, err error) {
 			return
 		}
 		for _, cnd := range vm.Status.Conditions {
-			if cnd.Type == ConditionStorageLiveMigratable {
-				ok = cnd.Status == True
-				return
+			if cnd.Type == ConditionStorageLiveMigratable || cnd.Type == ConditionLiveMigratable {
+				if cnd.Status != True {
+					ok = false
+					return
+				}
 			}
 		}
 	default:
