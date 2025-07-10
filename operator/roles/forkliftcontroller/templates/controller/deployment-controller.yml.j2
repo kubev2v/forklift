@@ -4,7 +4,7 @@ kind: Deployment
 metadata:
   labels:
     app: {{ app_name }}
-    control-plane: forklift-operator
+    control-plane: controller-manager
     controller-tools.k8s.io: "1.0"
   name: {{ controller_deployment_name }}
   namespace: {{ app_namespace }}
@@ -12,14 +12,14 @@ spec:
   selector:
     matchLabels:
       app: {{ app_name }}
-      control-plane: forklift-operator
+      control-plane: controller-manager
       controller-tools.k8s.io: "1.0"
   serviceName: {{ controller_service_name }}
   template:
     metadata:
       labels:
         app: {{ app_name }}
-        control-plane: forklift-operator
+        control-plane: controller-manager
         controller-tools.k8s.io: "1.0"
         prometheus.forklift.konveyor.io: "true" 
       annotations:
