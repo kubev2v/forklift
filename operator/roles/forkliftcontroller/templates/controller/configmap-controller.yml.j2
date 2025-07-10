@@ -5,7 +5,7 @@ metadata:
   labels:
     app: {{ app_name }}
     service: {{ controller_service_name }}
-    control-plane: controller-manager
+    control-plane: forklift-operator
     controller-tools.k8s.io: "1.0"
   name: {{ controller_configmap_name }}
   namespace: {{ app_namespace }}

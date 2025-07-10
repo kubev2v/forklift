@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Namespace
 metadata:
   labels:
-    control-plane: controller-manager
+    control-plane: forklift-operator
   name: system
 ---
 apiVersion: apps/v1
@@ -11,18 +11,18 @@ metadata:
   name: forklift-operator
   namespace: system
   labels:
-    control-plane: controller-manager
+    control-plane: forklift-operator
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: forklift
-      name: controller-manager
+      name: forklift-operator
   template:
     metadata:
       labels:
         app: forklift
-        name: controller-manager
+        name: forklift-operator
     spec:
       serviceAccountName: forklift-operator
       containers:
