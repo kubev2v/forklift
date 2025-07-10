@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Namespace
 metadata:
   labels:
-    control-plane: controller-manager
+    control-plane: forklift-operator
   name: forklift-operator-system
 ---
 apiVersion: apiextensions.k8s.io/v1
@@ -4017,7 +4017,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    control-plane: controller-manager
+    control-plane: forklift-operator
   name: forklift-operator
   namespace: forklift-operator-system
 spec:
@@ -4025,12 +4025,12 @@ spec:
   selector:
     matchLabels:
       app: forklift
-      name: controller-manager
+      name: forklift-operator
   template:
     metadata:
       labels:
         app: forklift
-        name: controller-manager
+        name: forklift-operator
     spec:
       containers:
       - args:
