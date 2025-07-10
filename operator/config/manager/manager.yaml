@@ -8,7 +8,7 @@ metadata:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: forklift-operator
+  name: forklift-operator-ansible
   namespace: system
   labels:
     control-plane: controller-manager
@@ -16,12 +16,12 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app: forklift-operator
+      app: forklift
       name: controller-manager
   template:
     metadata:
       labels:
-        app: forklift-operator
+        app: forklift
         name: controller-manager
     spec:
       serviceAccountName: forklift-operator
