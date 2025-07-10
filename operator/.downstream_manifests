@@ -4018,18 +4018,18 @@ kind: Deployment
 metadata:
   labels:
     control-plane: controller-manager
-  name: forklift-operator
+  name: forklift-operator-ansible
   namespace: forklift-operator-system
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: forklift-operator
+      app: forklift
       name: controller-manager
   template:
     metadata:
       labels:
-        app: forklift-operator
+        app: forklift
         name: controller-manager
     spec:
       containers:
