@@ -6,7 +6,7 @@ metadata:
     app: {{ app_name }}
     service: {{ metric_service_name }}
     prometheus.forklift.konveyor.io: "true"
-    control-plane: forklift-operator
+    control-plane: controller-manager
     controller-tools.k8s.io: "1.0"
   name: {{ metric_service_name }}
   namespace: {{ app_namespace }}
