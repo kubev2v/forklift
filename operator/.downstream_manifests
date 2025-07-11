@@ -3640,6 +3640,7 @@ rules:
   - kubevirt.io
   resources:
   - kubevirts
+  - virtualmachineinstances
   verbs:
   - get
   - list
