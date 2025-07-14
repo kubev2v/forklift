@@ -1,0 +1,35 @@
+FROM registry.redhat.io/ubi8/go-toolset:1.23.6-2.1747189110 AS builder
+
+ENV GOPATH=$APP_ROOT
+WORKDIR /app
+COPY --chown=1001:0 ./ ./
+ENV GOFLAGS="-mod=vendor -tags=strictfipsruntime"
+ENV GOEXPERIMENT=strictfipsruntime
+ENV GOCACHE=/go-build/cache
+RUN --mount=type=cache,target=${GOCACHE},uid=1001 GOOS=linux GOARCH=amd64 go build -o ovirt-populator github.com/kubev2v/forklift/cmd/ovirt-populator
+
+FROM registry.redhat.io/ubi8-minimal:8.10-1255
+
+COPY --from=builder /app/ovirt-populator /usr/local/bin/ovirt-populator
+RUN microdnf install -y python3-ovirt-engine-sdk4 ovirt-imageio-client
+
+ENTRYPOINT ["/usr/local/bin/ovirt-populator"]
+
+ARG VERSION
+ARG REGISTRY
+ARG REVISION
+
+LABEL \
+    com.redhat.component="mtv-rhv-populator-container" \
+    name="${REGISTRY}/mtv-rhv-populator-rhel8" \
+    license="Apache License 2.0" \
+    io.k8s.display-name="Migration Toolkit for Virtualization" \
+    io.k8s.description="Migration Toolkit for Virtualization - RHV Populator" \
+    io.openshift.tags="migration,mtv,forklift" \
+    summary="Migration Toolkit for Virtualization - RHV Populator" \
+    description="Migration Toolkit for Virtualization - RHV Populator" \
+    vendor="Red Hat, Inc." \
+    maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
+    version="$VERSION" \
+    revision="$REVISION"
+
