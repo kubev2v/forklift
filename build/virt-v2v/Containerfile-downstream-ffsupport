@@ -10,6 +10,8 @@ RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-wrapper github
 
 FROM registry.redhat.io/ubi10:10.0-1747220028
 
+RUN subscription-manager refresh
+
 ENV PATH="$PATH:/usr/libexec"
 
 ENV LIBGUESTFS_BACKEND=direct
