@@ -1,5 +1,5 @@
-GOOS ?= `go env GOOS`
-GOPATH ?= `go env GOPATH`
+GOOS ?= $(shell go env GOOS)
+GOPATH ?= $(shell go env GOPATH)
 GOBIN ?= $(GOPATH)/bin
 GO111MODULE = auto
 
@@ -53,6 +53,11 @@ CONTROLLER_GEN ?= $(DEFAULT_CONTROLLER_GEN)
 DEFAULT_KUBECTL = $(GOBIN)/kubectl
 KUBECTL ?= $(DEFAULT_KUBECTL)
 
+# By default use the kustomize installed by the
+# 'kustomize' target
+DEFAULT_KUSTOMIZE = $(GOBIN)/kustomize
+KUSTOMIZE ?= $(DEFAULT_KUSTOMIZE)
+
 # Image URLs to use all building/pushing image targets
 # Each build image target overrides the variable of that image
 # This is used for the bundle build so we don't need to build all images
@@ -80,7 +85,11 @@ OPERATOR_INDEX_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-index:$(RE
 MUST_GATHER_IMAGE ?= quay.io/kubev2v/forklift-must-gather:latest
 UI_PLUGIN_IMAGE ?= quay.io/kubev2v/forklift-console-plugin:latest
 
-ci: all tidy vendor generate-verify
+# Golangci-lint version
+GOLANGCI_LINT_VERSION ?= v1.64.2
+GOLANGCI_LINT_BIN ?= $(GOBIN)/golangci-lint
+
+ci: all tidy vendor generate-verify lint
 
 all: test forklift-controller
 
@@ -115,7 +124,7 @@ e2e-sanity-ova:
 
 # Build forklift-controller binary
 forklift-controller: generate fmt vet
-	go build -o bin/forklift-controller github.com/konveyor/forklift-controller/cmd/forklift-controller
+	go build -o bin/forklift-controller github.com/kubev2v/forklift/cmd/forklift-controller
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 .PHONY: run
@@ -262,7 +271,7 @@ push-openstack-populator-image: build-openstack-populator-image
 
 build-vsphere-xcopy-volume-populator-image: check_container_runtime
 	$(eval VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/vsphere-xcopy-volume-populator:$(REGISTRY_TAG))
-	$(CONTAINER_CMD) build -t $(VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE) -f build/vsphere-xcopy-volume-populator/Containerfile cmd/vsphere-xcopy-volume-populator
+	$(CONTAINER_CMD) build -t $(VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE) -f build/vsphere-xcopy-volume-populator/Containerfile .
 
 push-vsphere-xcopy-volume-populator-image: build-vsphere-xcopy-volume-populator-image
 	$(CONTAINER_CMD) push $(VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE)
@@ -295,7 +304,7 @@ push-all-images:  push-api-image \
                   push-populator-controller-image \
                   push-ovirt-populator-image \
                   push-openstack-populator-image\
-                  push-vsphere-xcoy-volume-populator-image\
+                  push-vsphere-xcopy-volume-populator-image\
                   push-ova-provider-server-image \
                   push-operator-bundle-image \
                   push-operator-index-image
@@ -316,12 +325,17 @@ check_container_runtime:
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN)
 $(DEFAULT_CONTROLLER_GEN):
-	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.15.0
+	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.17.0
 
 .PHONY: kubectl
 kubectl: $(KUBECTL)
 $(DEFAULT_KUBECTL):
 	curl -L https://dl.k8s.io/release/v1.25.10/bin/linux/amd64/kubectl -o $(GOBIN)/kubectl && chmod +x $(GOBIN)/kubectl
+
+.PHONY: kustomize
+kustomize: $(KUSTOMIZE)
+$(DEFAULT_KUSTOMIZE):
+	go install sigs.k8s.io/kustomize/kustomize/v5@v5.3.0
 
 validation-test: opa-bin
 	ENVIRONMENT=test ${OPA} test validation/policies --explain fails
@@ -505,3 +519,32 @@ dev-controller: generate fmt vet build-controller
 	API_HOST="forklift-inventory-openshift-mtv.apps.ocp-edge-cluster-0.qe.lab.redhat.com" \
 	./bin/forklift-controller
 	#dlv --listen=:5432 --headless=true --api-version=2 exec ./bin/forklift-controller \
+
+.PHONY: kustomized-manifests
+kustomized-manifests: kubectl
+	kubectl kustomize operator/config/manifests > operator/.kustomized_manifests
+
+.PHONY: generate-manifests
+generate-manifests: kubectl manifests
+	kubectl kustomize operator/streams/upstream > operator/streams/upstream/upstream_manifests
+	kubectl kustomize operator/streams/downstream > operator/streams/downstream/downstream_manifests
+	STREAM=upstream bash operator/streams/prepare-vars.sh
+	STREAM=downstream bash operator/streams/prepare-vars.sh
+
+.PHONY: lint-install
+lint-install:
+	@echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."
+	GOBIN=$(GOBIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+	@echo "golangci-lint installed successfully."
+
+.PHONY: lint
+lint: $(GOLANGCI_LINT_BIN)
+	@echo "Running golangci-lint..."
+	$(GOLANGCI_LINT_BIN) run ./pkg/... ./cmd/...
+
+.PHONY: update-tekton
+update-tekton:
+	SKIP_UPDATE=false ./update-tekton.sh .tekton/*.yaml
+
+$(GOLANGCI_LINT_BIN):
+	$(MAKE) lint-install
