@@ -53,6 +53,7 @@ const (
 	EnsureInstanceType                     = "EnsureInstanceType"
 	EnsureDataVolumes                      = "EnsureDataVolumes"
 	CreateTarget                           = "CreateTarget"
+	WaitForTargetVMI                       = "WaitForTargetVMI"
 	CreateVirtualMachineInstanceMigrations = "CreateVirtualMachineInstanceMigrations"
 	WaitForStateTransfer                   = "WaitForStateTransfer"
 	PostHook                               = api.PhasePostHook
@@ -193,6 +194,7 @@ func (r *LiveMigrator) Itinerary(vm planapi.VM) (itinerary *libitr.Itinerary) {
 			{Name: EnsureDataVolumes},
 			{Name: CreateTarget},
 			{Name: CreateServiceExports, All: FlagSubmariner | FlagIntercluster},
+			{Name: WaitForTargetVMI},
 			{Name: CreateVirtualMachineInstanceMigrations},
 			{Name: WaitForStateTransfer},
 			{Name: PostHook, All: FlagPostHook},
@@ -226,7 +228,7 @@ func (r *LiveMigrator) Step(vm *planapi.VMStatus) (step string) {
 		step = vm.Phase
 	case CreateSecrets, CreateConfigMaps, EnsurePreference, EnsureInstanceType, EnsureDataVolumes, CreateTarget, CreateServiceExports:
 		step = PrepareTarget
-	case CreateVirtualMachineInstanceMigrations, WaitForStateTransfer:
+	case WaitForTargetVMI, CreateVirtualMachineInstanceMigrations, WaitForStateTransfer:
 		step = Synchronization
 	default:
 		step = base.Unknown
@@ -505,6 +507,18 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 			r.StepError(vm, err)
 			err = nil
 			break
+		}
+		r.NextPhase(vm)
+	case WaitForTargetVMI:
+		var ready bool
+		ready, err = r.WaitForTargetVMI(vm)
+		if err != nil {
+			r.StepError(vm, err)
+			err = nil
+			break
+		}
+		if !ready {
+			return
 		}
 		r.NextPhase(vm)
 	case CreateVirtualMachineInstanceMigrations:
@@ -809,6 +823,25 @@ func (r *LiveMigrator) GetSourceVMIM(vm *planapi.VMStatus) (vmim *cnv.VirtualMac
 	} else {
 		vmim = &vmims.Items[0]
 	}
+	return
+}
+
+// WaitForTargetVMI waits for the target to indicate that it is ready to receive
+// the source state. The target VMIM cannot be created until the VMI exists and
+// is waiting for sync.
+func (r *LiveMigrator) WaitForTargetVMI(vm *planapi.VMStatus) (ready bool, err error) {
+	key := types.NamespacedName{Namespace: r.Plan.Spec.TargetNamespace, Name: vm.Name}
+	vmi := &cnv.VirtualMachineInstance{}
+	err = r.Destination.Client.Get(context.TODO(), key, vmi)
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			err = nil
+			return
+		}
+		err = liberr.Wrap(err)
+		return
+	}
+	ready = vmi.Status.Phase == cnv.WaitingForSync
 	return
 }
 

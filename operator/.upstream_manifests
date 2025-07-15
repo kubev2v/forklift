@@ -3628,6 +3628,7 @@ rules:
   resources:
   - virtualmachines
   - virtualmachines/finalizers
+  - virtualmachineinstancemigrations
   verbs:
   - get
   - list
