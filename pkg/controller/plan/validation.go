@@ -654,6 +654,20 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		if pErr != nil {
 			return liberr.Wrap(pErr)
 		}
+		pAdapter, err := adapter.New(provider)
+		if err != nil {
+			return liberr.Wrap(pErr)
+		}
+		var ctx *plancontext.Context
+		ctx, err = plancontext.New(r, plan, r.Log)
+		if err != nil {
+			return liberr.Wrap(pErr)
+		}
+		validator, err := pAdapter.Validator(ctx)
+		if err != nil {
+			return liberr.Wrap(pErr)
+		}
+
 		v, pErr := inventory.VM(ref)
 		if pErr != nil {
 			if errors.As(pErr, &web.NotFoundError{}) {
@@ -667,7 +681,11 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			return liberr.Wrap(pErr)
 		}
 		if vm.TargetName == "" {
-			if len(k8svalidation.IsDNS1123Subdomain(ref.Name)) > 0 {
+			ok, err := validator.ValidVmName(*ref)
+			if err != nil {
+				return err
+			}
+			if !ok {
 				// if source VM name is not valid
 				nameNotValid.Items = append(nameNotValid.Items, ref.String())
 			}
@@ -700,19 +718,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 				}
 			}
 		}
-		pAdapter, err := adapter.New(provider)
-		if err != nil {
-			return err
-		}
-		var ctx *plancontext.Context
-		ctx, err = plancontext.New(r, plan, r.Log)
-		if err != nil {
-			return err
-		}
-		validator, err := pAdapter.Validator(ctx)
-		if err != nil {
-			return err
-		}
+
 		if plan.Referenced.Map.Network != nil {
 			ok, err := validator.NetworksMapped(*ref)
 			if err != nil {
