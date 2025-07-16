@@ -444,7 +444,7 @@ func (r *Finder) Workload(ref *base.Ref) (object interface{}, err error) {
 	err = r.ByRef(vm, *ref)
 	if err == nil {
 		ref.ID = vm.UID
-		ref.Name = path.Join(vm.Namespace, vm.Name)
+		ref.Name = vm.Name
 		object = vm
 	}
 
@@ -463,7 +463,7 @@ func (r *Finder) Network(ref *base.Ref) (object interface{}, err error) {
 	err = r.ByRef(nad, *ref)
 	if err == nil {
 		ref.ID = nad.UID
-		ref.Name = path.Join(nad.Namespace, nad.Name)
+		ref.Name = nad.Name
 		object = nad
 	}
 
@@ -515,7 +515,7 @@ func (r *Finder) InstanceType(ref *base.Ref) (object interface{}, err error) {
 	err = r.ByRef(it, *ref)
 	if err == nil {
 		ref.ID = it.UID
-		ref.Name = path.Join(it.Namespace, it.Name)
+		ref.Name = it.Name
 		object = it
 	}
 
