@@ -100,3 +100,9 @@ const (
 	StepRunning   = "Running"
 	StepCompleted = "Completed"
 )
+
+// Annotations.
+const (
+	AnnDiskSource = "forklift.konveyor.io/disk-source"
+	AnnSource     = "forklift.konveyor.io/source"
+)
