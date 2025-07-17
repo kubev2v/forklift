@@ -21,7 +21,6 @@ import (
 	core "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -112,7 +111,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *v1.Secret, configMap *v1.Co
 
 		err = r.Destination.Client.Create(context.TODO(), dataVolume, &client.CreateOptions{})
 		if err != nil {
-			if !k8serr.IsAlreadyExists(err) {
+			if !errors.IsAlreadyExists(err) {
 				r.Log.Error(err, "Failed to create DataVolume")
 				return nil, liberr.Wrap(err)
 			}

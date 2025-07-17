@@ -10,7 +10,6 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	"github.com/kubev2v/forklift/pkg/forklift-api/webhooks/util"
 	ocp "github.com/kubev2v/forklift/pkg/lib/client/openshift"
-	ocpclient "github.com/kubev2v/forklift/pkg/lib/client/openshift"
 	admissionv1 "k8s.io/api/admission/v1beta1"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -80,7 +79,7 @@ func (mutator *PlanMutator) setTransferNetworkIfNotSet() (bool, error) {
 		}
 
 		if network := targetProvider.Annotations["forklift.konveyor.io/defaultTransferNetwork"]; network != "" {
-			name, namespace := ocpclient.GetNetworkNameAndNamespace(network, &ref.Ref{Name: network, Namespace: mutator.plan.Spec.TargetNamespace})
+			name, namespace := ocp.GetNetworkNameAndNamespace(network, &ref.Ref{Name: network, Namespace: mutator.plan.Spec.TargetNamespace})
 			key := client.ObjectKey{
 				Namespace: namespace,
 				Name:      name,

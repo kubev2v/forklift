@@ -25,7 +25,6 @@ import (
 	"github.com/kubev2v/forklift/pkg/templateutil"
 	batchv1 "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1412,7 +1411,7 @@ func (r *Reconciler) setupSecret(plan *api.Plan) (err error) {
 		Name:      plan.Referenced.Provider.Source.Spec.Secret.Name,
 	}
 
-	secret := v1.Secret{}
+	secret := core.Secret{}
 	err = r.Get(context.TODO(), key, &secret)
 	if err != nil {
 		return
