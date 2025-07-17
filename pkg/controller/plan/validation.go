@@ -914,6 +914,12 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	if len(unsupportedOvaSource.Items) > 0 {
 		plan.Status.SetCondition(unsupportedOvaSource)
 	}
+	if len(powerStateUnsupported.Items) > 0 {
+		plan.Status.SetCondition(powerStateUnsupported)
+	}
+	if len(vmMigrationTypeUnsupported.Items) > 0 {
+		plan.Status.SetCondition(vmMigrationTypeUnsupported)
+	}
 
 	return nil
 }
