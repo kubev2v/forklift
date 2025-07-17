@@ -1,0 +1,10 @@
+packages:
+  - virtio-win-1.9.4-2.el7.2
+contentOrigin:
+  repofiles:
+    - ./redhat.repo
+context:
+  containerfile:
+    file: ../../../build/virt-v2v/Containerfile-downstream
+    stageName: win2008iso
+arches: [x86_64]

@@ -1,0 +1,9 @@
+packages:
+  - tar
+contentOrigin:
+  repofiles:
+    - ./redhat.repo
+context:
+  containerfile:
+    file: ../../build/populator-controller/Containerfile-downstream
+arches: [x86_64]

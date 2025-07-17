@@ -1,0 +1,9 @@
+packages:
+  - tar
+contentOrigin:
+  repofiles:
+    - ./redhat.repo
+context:
+  containerfile:
+    file: ../../build/openstack-populator/Containerfile-downstream
+arches: [x86_64]

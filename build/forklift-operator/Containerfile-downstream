@@ -1,0 +1,26 @@
+FROM registry.redhat.io/openshift4/ose-ansible-rhel9-operator:v4.18.0-202504021503.p0.gbd5e2c9.assembly.stream.el9
+
+USER 1001
+WORKDIR /app
+COPY operator/watches.yaml watches.yaml
+COPY operator/roles roles
+
+ARG VERSION
+ARG RELEASE
+ARG REGISTRY
+ARG REVISION
+
+LABEL \
+    com.redhat.component="mtv-operator-container" \
+    name="${REGISTRY}/mtv-rhel9-operator" \
+    license="Apache License 2.0" \
+    io.k8s.display-name="Migration Toolkit for Virtualization" \
+    io.k8s.description="Migration Toolkit for Virtualization - Operator" \
+    io.openshift.tags="migration,mtv,forklift" \
+    summary="Migration Toolkit for Virtualization - Operator" \
+    description="Migration Toolkit for Virtualization - Operator" \
+    vendor="Red Hat, Inc." \
+    maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
+    version="$VERSION" \
+    revision="$REVISION"
+
