@@ -270,15 +270,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 }
 
 func (r *Builder) mapDisks(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim, vmRef ref.Ref) {
-	pvcMap := make(map[string]*core.PersistentVolumeClaim)
-	for i := range persistentVolumeClaims {
-		pvc := persistentVolumeClaims[i]
-		if source, ok := pvc.Annotations[planbase.AnnDiskSource]; ok {
-			pvcMap[source] = pvc
-		}
-	}
-
-	diskMap := createDiskMap(sourceVm, pvcMap, vmRef)
+	diskMap := createDiskMap(sourceVm, vmRef)
 	configMaps, secrets := r.createEnvMaps(sourceVm, vmRef)
 
 	// Clear original disks and volumes, will be required for other mapped devices later
@@ -310,7 +302,7 @@ func (r *Builder) mapDeviceDisks(targetVmSpec *cnv.VirtualMachineSpec, sourceVm 
 	}
 }
 
-func createDiskMap(sourceVm *cnv.VirtualMachine, pvcMap map[string]*core.PersistentVolumeClaim, vmRef ref.Ref) map[string]*cnv.Disk {
+func createDiskMap(sourceVm *cnv.VirtualMachine, vmRef ref.Ref) map[string]*cnv.Disk {
 	diskMap := make(map[string]*cnv.Disk)
 
 	for _, disk := range sourceVm.Spec.Template.Spec.Domain.Devices.Disks {
