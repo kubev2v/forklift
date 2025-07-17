@@ -1063,7 +1063,7 @@ func (r *Reconciler) validateHooks(plan *api.Plan) (err error) {
 			}
 		}
 	}
-	for _, cnd := range []libcnd.Condition{} {
+	for _, cnd := range []libcnd.Condition{notSet, notFound, notReady, stepNotValid} {
 		if len(cnd.Items) > 0 {
 			plan.Status.SetCondition(cnd)
 		}
