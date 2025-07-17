@@ -15,6 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install libvirt dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvirt-dev pkg-config
       - uses: actions/setup-go@v4
         with:
           go-version: '1.24'
