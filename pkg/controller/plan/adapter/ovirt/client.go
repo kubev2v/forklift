@@ -312,7 +312,7 @@ func (r *Client) getVM(vmRef ref.Ref) (ovirtVm *ovirtsdk.Vm, vmService *ovirtsdk
 // Get the disk snapshot for this disk and this snapshot ID.
 func (r *Client) getDiskSnapshot(diskID, targetSnapshotID string) (diskSnapshotID string, err error) {
 	response, rErr := r.connection.SystemService().DisksService().DiskService(diskID).Get().Query("correlation_id", r.Migration.Name).Send()
-	if err != nil {
+	if rErr != nil {
 		err = liberr.Wrap(rErr)
 		return
 	}
@@ -339,7 +339,7 @@ func (r *Client) getDiskSnapshot(diskID, targetSnapshotID string) (diskSnapshotI
 			return
 		}
 		snapshotsResponse, rErr := sdService.DiskSnapshotsService().List().Send()
-		if err != nil {
+		if rErr != nil {
 			err = liberr.Wrap(rErr, "storageDomain", sdID)
 			return
 		}

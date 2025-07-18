@@ -25,7 +25,6 @@ import (
 	"github.com/kubev2v/forklift/pkg/templateutil"
 	batchv1 "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -914,6 +913,12 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	if len(unsupportedOvaSource.Items) > 0 {
 		plan.Status.SetCondition(unsupportedOvaSource)
 	}
+	if len(powerStateUnsupported.Items) > 0 {
+		plan.Status.SetCondition(powerStateUnsupported)
+	}
+	if len(vmMigrationTypeUnsupported.Items) > 0 {
+		plan.Status.SetCondition(vmMigrationTypeUnsupported)
+	}
 
 	return nil
 }
@@ -1057,7 +1062,7 @@ func (r *Reconciler) validateHooks(plan *api.Plan) (err error) {
 			}
 		}
 	}
-	for _, cnd := range []libcnd.Condition{} {
+	for _, cnd := range []libcnd.Condition{notSet, notFound, notReady, stepNotValid} {
 		if len(cnd.Items) > 0 {
 			plan.Status.SetCondition(cnd)
 		}
@@ -1406,7 +1411,7 @@ func (r *Reconciler) setupSecret(plan *api.Plan) (err error) {
 		Name:      plan.Referenced.Provider.Source.Spec.Secret.Name,
 	}
 
-	secret := v1.Secret{}
+	secret := core.Secret{}
 	err = r.Get(context.TODO(), key, &secret)
 	if err != nil {
 		return
