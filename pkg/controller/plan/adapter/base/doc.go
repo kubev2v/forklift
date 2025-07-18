@@ -159,6 +159,8 @@ type Validator interface {
 	PowerState(vmRef ref.Ref) (bool, error)
 	// Validate that the VM is inherently compatible with the migration type.
 	VMMigrationType(vmRef ref.Ref) (bool, error)
+	// Validate that the VM name is valid.
+	ValidVmName(vmRef ref.Ref) (bool, error)
 }
 
 // DestinationClient API.
