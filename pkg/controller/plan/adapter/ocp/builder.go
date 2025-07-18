@@ -42,6 +42,11 @@ type Builder struct {
 	sourceClient client.Client
 }
 
+// DomainXML implements base.Builder.
+func (r *Builder) DomainXML(vmRef ref.Ref) (xml string, err error) {
+	return "", planbase.DomainXMLNotImplementedError
+}
+
 // ConfigMap implements base.Builder
 func (r *Builder) ConfigMap(vmRef ref.Ref, secret *core.Secret, object *core.ConfigMap) error {
 	vmExport := &export.VirtualMachineExport{}

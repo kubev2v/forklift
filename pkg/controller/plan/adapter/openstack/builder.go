@@ -38,6 +38,11 @@ type Builder struct {
 	macConflictsMap map[string]string
 }
 
+// DomainXML implements base.Builder.
+func (r *Builder) DomainXML(vmRef ref.Ref) (xml string, err error) {
+	return "", planbase.DomainXMLNotImplementedError
+}
+
 // Template labels
 const (
 	TemplateOSLabel                 = "os.template.kubevirt.io/%s"
