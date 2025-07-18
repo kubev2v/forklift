@@ -18,39 +18,37 @@ import (
 	"time"
 
 	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	"github.com/kubev2v/forklift/pkg/controller/plan/adapter"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
+	inspectionparser "github.com/kubev2v/forklift/pkg/controller/plan/adapter/vsphere"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/controller/plan/util"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
+	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libref "github.com/kubev2v/forklift/pkg/lib/ref"
 	"github.com/kubev2v/forklift/pkg/settings"
 	template "github.com/openshift/api/template/v1"
 	"github.com/openshift/library-go/pkg/template/generator"
 	"github.com/openshift/library-go/pkg/template/templateprocessing"
 	batch "k8s.io/api/batch/v1"
+	core "k8s.io/api/core/v1"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
+	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	cnv "kubevirt.io/api/core/v1"
 	instancetypeapi "kubevirt.io/api/instancetype"
 	instancetype "kubevirt.io/api/instancetype/v1beta1"
-	libvirtxml "libvirt.org/libvirt-go-xml"
-
-	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
-	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
-	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
-	"github.com/kubev2v/forklift/pkg/controller/plan/adapter"
-	inspectionparser "github.com/kubev2v/forklift/pkg/controller/plan/adapter/vsphere"
-	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
-	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
-	liberr "github.com/kubev2v/forklift/pkg/lib/error"
-	core "k8s.io/api/core/v1"
-	k8serr "k8s.io/apimachinery/pkg/api/errors"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	k8slabels "k8s.io/apimachinery/pkg/labels"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+	libvirtxml "libvirt.org/libvirt-go-xml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -676,7 +674,7 @@ func (r *KubeVirt) vddkConfigMap(labels map[string]string) (*core.ConfigMap, err
 	}
 	configMap := core.ConfigMap{
 		Data: data,
-		ObjectMeta: metav1.ObjectMeta{
+		ObjectMeta: meta.ObjectMeta{
 			GenerateName: genVddkConfConfigMapName(r.Plan),
 			Namespace:    r.Plan.Spec.TargetNamespace,
 			Labels:       labels,
@@ -1976,16 +1974,16 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 						{
 							Weight: 100,
 							PodAffinityTerm: core.PodAffinityTerm{
-								NamespaceSelector: &metav1.LabelSelector{},
+								NamespaceSelector: &meta.LabelSelector{},
 								TopologyKey:       "kubernetes.io/hostname",
-								LabelSelector: &metav1.LabelSelector{
-									MatchExpressions: []metav1.LabelSelectorRequirement{
+								LabelSelector: &meta.LabelSelector{
+									MatchExpressions: []meta.LabelSelectorRequirement{
 										{
 											Key: kApp,
 											Values: []string{
 												"virt-v2v",
 											},
-											Operator: metav1.LabelSelectorOpIn,
+											Operator: meta.LabelSelectorOpIn,
 										},
 									},
 								},

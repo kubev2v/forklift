@@ -8,11 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
@@ -26,6 +22,8 @@ import (
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
@@ -904,7 +902,7 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(diskAttachment model.XDiskA
 			VolumeMode:       volumeMode,
 			DataSourceRef: &core.TypedObjectReference{
 				APIGroup: &api.SchemeGroupVersion.Group,
-				Kind:     v1beta1.OvirtVolumePopulatorKind,
+				Kind:     api.OvirtVolumePopulatorKind,
 				Name:     populatorName,
 			},
 		},

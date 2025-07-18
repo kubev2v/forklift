@@ -298,12 +298,10 @@ func (r *Client) getVolume(volumeRef ref.Ref) (volume *libclient.Volume, err err
 		volume = &libclient.Volume{}
 		err = r.Get(volume, volumeRef.ID)
 		if err != nil {
-			if err != nil {
-				if r.IsNotFound(err) {
-					err = ResourceNotFoundError
-				}
-				return
+			if r.IsNotFound(err) {
+				err = ResourceNotFoundError
 			}
+			return
 		}
 	}
 	if volumeRef.Name != "" {
