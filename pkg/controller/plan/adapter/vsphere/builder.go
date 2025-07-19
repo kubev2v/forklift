@@ -903,9 +903,20 @@ func (r *Builder) mapCPU(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	}
 }
 
+func (r *Builder) getSystemSerial(vm *model.VM) string {
+	// On deployments where VMware serial number formtting is enabled,
+	if settings.Settings.VmwareSystemSerialNumber {
+		// we use the UUID to generate a VMware serial number.
+		return UUIDToVMwareSerial(vm.UUID)
+	}
+
+	// Default to using .config.uuid as the system serial number
+	return vm.UUID
+}
+
 func (r *Builder) mapFirmware(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	firmware := &cnv.Firmware{
-		Serial: vm.UUID,
+		Serial: r.getSystemSerial(vm),
 	}
 	switch vm.Firmware {
 	case Efi:
