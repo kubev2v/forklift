@@ -275,7 +275,7 @@ func (r *Client) checkTaskStatus(taskInfo *types.TaskInfo) (ready bool, err erro
 	case types.TaskInfoStateSuccess:
 		return true, nil
 	case types.TaskInfoStateError:
-		return false, fmt.Errorf(taskInfo.Error.LocalizedMessage)
+		return false, fmt.Errorf("error cheking task status: %s", taskInfo.Error.LocalizedMessage)
 	default:
 		return false, nil
 	}
