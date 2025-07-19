@@ -2,9 +2,9 @@
 $startdate = Get-Date
 $adapters = @()
 While (-Not $adapters -and $startdate.AddMinutes(5) -gt (Get-Date)) {
-    Start-Sleep -Seconds 5
-    $adapters = Get-NetAdapter -Physical | Where DriverFileName -eq "netkvm.sys"
-    Write-Host "Waiting for netkvm.sys adapters..."
+	Start-Sleep -Seconds 5
+	$adapters = Get-NetAdapter -Physical | Where DriverFileName -eq "netkvm.sys"
+	Write-Host "Waiting for netkvm.sys adapters..."
 }
 
 # Define MACs and IPs for each adapter
@@ -13,13 +13,10 @@ $networkConfigs = @(
     @{
         MAC = '{{ lower $cfg.MAC }}'
         IPs = @{{ formatIPs $cfg.IPs }}
-        PrefixLength = {{ (index $cfg.IPs 0).PrefixLength }}
         DNS = @{{ formatDNS $cfg }}
     }{{ if ne (add $i 1) (len $) }},{{ end }}
 {{- end }}
 )
-
-
 
 
 # Apply settings
@@ -31,11 +28,31 @@ foreach ($config in $networkConfigs) {
         $name = $adapter.Name
         Write-Host "Configuring adapter '$name' ($($config.MAC))"
 
+        $addedGateways = @{}
+
         foreach ($ip in $config.IPs) {
-            Write-Host "Setting IP $ip on '$name'"
-            New-NetIPAddress -InterfaceIndex $ifindex -IPAddress $ip -PrefixLength $config.PrefixLength
-            Set-DnsClientServerAddress -InterfaceIndex $ifindex -ServerAddresses $config.DNS
+            Write-Host "Setting IP $($ip.IPAddress) on '$name'"
+            $existing = Get-NetIPAddress -IPAddress $ip.IPAddress -InterfaceIndex $ifindex -ErrorAction SilentlyContinue
+            if (-not $existing) {
+                New-NetIPAddress -InterfaceIndex $ifindex -IPAddress $ip.IPAddress -PrefixLength $ip.PrefixLength
+            }
+
+            if ($ip.Gateway -and $ip.Gateway -ne '') {
+                $gw = $ip.Gateway
+
+                 if (-not $addedGateways.ContainsKey($gw)) {
+                    Write-Host "Adding default route via $gw"
+                   if ($gw -match '^(\d{1,3}\.){3}\d{1,3}$') {
+						New-NetRoute -DestinationPrefix "0.0.0.0/0" -InterfaceIndex $ifindex -NextHop $gw
+					} elseif ($gw -match ':') {
+						New-NetRoute -DestinationPrefix "::/0" -InterfaceIndex $ifindex -NextHop $gw
+					}
+                    $addedGateways[$gw] = $true
+                }
+            }
         }
+
+        Set-DnsClientServerAddress -InterfaceIndex $ifindex -ServerAddresses $config.DNS
     } else {
         Write-Warning "Adapter with MAC $($config.MAC) not found"
     }

@@ -52,7 +52,7 @@ func formatIPs(ips []IPEntry) string {
 	var b strings.Builder
 	b.WriteString("(\n")
 	for i, ip := range ips {
-		b.WriteString("'" + ip.IP + "'")
+		b.WriteString(fmt.Sprintf("    @{ IPAddress = '%s'; Gateway = '%s'; PrefixLength = %s }", ip.IP, ip.Gateway, ip.PrefixLength))
 		if i < len(ips)-1 {
 			b.WriteString(",")
 		}
