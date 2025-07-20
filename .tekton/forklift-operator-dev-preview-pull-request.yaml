@@ -205,7 +205,7 @@ spec:
             - name: name
               value: prefetch-dependencies-oci-ta
             - name: bundle
-              value: quay.io/konflux-ci/tekton-catalog/task-prefetch-dependencies-oci-ta:0.2@sha256:f10a4841e6f75fbb314b1d8cbf14f652499c1fe7f59e59aed59f7431c680aa17
+              value: quay.io/konflux-ci/tekton-catalog/task-prefetch-dependencies-oci-ta:0.2@sha256:092491ac0f6e1009d10c58a1319d1029371bf637cc1293cceba53c6da5314ed1
             - name: kind
               value: task
           resolver: bundles
@@ -248,7 +248,7 @@ spec:
             - name: name
               value: buildah-oci-ta
             - name: bundle
-              value: quay.io/konflux-ci/tekton-catalog/task-buildah-oci-ta:0.4@sha256:06f604af4c29f08b02c36a8d9bc3dfa1606a5836fd8eeb1f6ef46048319afc38
+              value: quay.io/konflux-ci/tekton-catalog/task-buildah-oci-ta:0.4@sha256:9e9bac2044d6231b44114046b9d528c135388699365f0f210ee810c01bd4d702
             - name: kind
               value: task
           resolver: bundles
@@ -462,7 +462,7 @@ spec:
             - name: name
               value: sast-coverity-check-oci-ta
             - name: bundle
-              value: quay.io/konflux-ci/tekton-catalog/task-sast-coverity-check-oci-ta:0.3@sha256:6b4d1321219df88d2d709f2ec1566edfd017cae58015ac8f39f92e350f9747e1
+              value: quay.io/konflux-ci/tekton-catalog/task-sast-coverity-check-oci-ta:0.3@sha256:f9ca942208dc2e63b479384ccc56a611cc793397ecc837637b5b9f89c2ecbefe
             - name: kind
               value: task
           resolver: bundles
@@ -509,7 +509,7 @@ spec:
             - name: name
               value: sast-shell-check-oci-ta
             - name: bundle
-              value: quay.io/konflux-ci/tekton-catalog/task-sast-shell-check-oci-ta:0.1@sha256:437d1bc50cb0bcffb88345b75d2d119677d17d47f16fd67baf553a5e134a335e
+              value: quay.io/konflux-ci/tekton-catalog/task-sast-shell-check-oci-ta:0.1@sha256:bf7bdde00b7212f730c1356672290af6f38d070da2c8a316987b5c32fd49e0b9
             - name: kind
               value: task
           resolver: bundles
