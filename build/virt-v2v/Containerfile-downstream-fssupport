@@ -32,7 +32,6 @@ RUN \
       nbdkit:nbdkit-server-1.42.5-1.el10 \
       nbdkit:nbdkit-curl-plugin-1.42.5-1.el10 \
       nbdkit:nbdkit-nbd-plugin-1.42.5-1.el10 \
-      nbdkit:nbdkit-python-plugin-1.42.5-1.el10 \
       nbdkit:nbdkit-ssh-plugin-1.42.5-1.el10 \
       nbdkit:nbdkit-vddk-plugin-1.42.5-1.el10 \
       guestfs-tools:guestfs-tools-1.54.0-2.el10 \
