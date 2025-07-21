@@ -15,6 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install libvirt dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvirt-dev pkg-config
       - uses: actions/setup-go@v4
         with:
           go-version: '1.23'
@@ -36,7 +40,8 @@ jobs:
           args: --timeout=10m
 
           # Optional: show only new issues if it's a pull request. The default value is `false`.
-          only-new-issues: true
+          # Disabled to avoid GitHub API diff size limitations for large PRs
+          only-new-issues: false
 
           # Optional: if set to true, then all caching functionality will be completely disabled,
           #           takes precedence over all other caching options.
