@@ -43,9 +43,13 @@ RUN dnf install -y --setopt=sslverify=false \
     https://download-01.beak-001.prod.iad2.dc.redhat.com/brewroot/vol/rhel-10/packages/libguestfs-fssupport/10.1/3.el10/x86_64/libguestfs-fssupport-10.1-3.el10.x86_64.rpm
 
 # Create tarball for the appliance.
+#
+# LIBGUESTFS_BACKEND=direct is required to work around the following bug:
+# https://issues.redhat.com/browse/RHEL-104684
+# and it can be removed when that bug gets fixed.
 RUN mkdir -p /usr/local/lib/guestfs/appliance && \
     cd /usr/local/lib/guestfs/appliance && \
-    libguestfs-make-fixed-appliance . && \
+    LIBGUESTFS_BACKEND=direct libguestfs-make-fixed-appliance . && \
     qemu-img convert -c -O qcow2 root root.qcow2 && \
     mv -vf root.qcow2 root
 
