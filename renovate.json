@@ -1,25 +1,11 @@
 {
-    "dockerfile": {
-        "packageRules": {
-            "matchBaseBranches": [
-                "main"
-            ]
-        }
-    },
-    "rpm": {
-        "packageRules": {
-            "matchBaseBranches": [
-                "main"
-            ]
-        }
-    },
-    "gomod": {
-        "packageRules": {
-            "matchBaseBranches": [
-                "main"
-            ]
-        }
-    },
+    "packageRules": [
+      {
+        "matchBaseBranches": ["/^release/.*/"],
+        "matchManagers": ["dockerfile", "rpm", "gomod"],
+        "enabled": false
+      }
+    ],
     "autoApprove": true,
     "tekton": {
         "automerge": true,
