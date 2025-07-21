@@ -1,20 +1,20 @@
 {
     "dockerfile": {
-        "packageRule": {
+        "packageRules": {
             "matchBaseBranches": [
                 "main"
             ]
         }
     },
     "rpm": {
-        "packageRule": {
+        "packageRules": {
             "matchBaseBranches": [
                 "main"
             ]
         }
     },
     "gomod": {
-        "packageRule": {
+        "packageRules": {
             "matchBaseBranches": [
                 "main"
             ]
