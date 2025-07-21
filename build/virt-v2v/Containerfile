@@ -1,7 +1,5 @@
 FROM registry.access.redhat.com/ubi9:9.5-1747219013 AS appliance
 
-ENV LIBGUESTFS_BACKEND=direct
-
 RUN subscription-manager refresh && \
     dnf install -y --setopt=install_weak_deps=False \
         qemu-img \
@@ -42,8 +40,6 @@ RUN subscription-manager refresh && \
         virt-v2v \
         virtio-win && \
     dnf clean all
-
-ENV LIBGUESTFS_BACKEND=direct
 
 RUN mkdir -p /usr/lib64/guestfs/appliance
 COPY --from=appliance /usr/local/lib/guestfs/appliance /usr/lib64/guestfs/appliance

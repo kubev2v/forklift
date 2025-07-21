@@ -17,7 +17,7 @@ RUN rm /etc/pki/tls/fips_local.cnf && \
 
 # The virt-v2v-in-place in centos is not in the bin directory and is not accessible via PATH
 ENV PATH="$PATH:/usr/libexec"
-ENV LIBGUESTFS_BACKEND=direct LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1
+ENV LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1
 
 RUN mkdir /disks && \
     source /etc/os-release && \

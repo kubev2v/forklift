@@ -5,8 +5,6 @@ RUN yum install -y --setopt=install_weak_deps=False virtio-win-1.9.4-2.el7.2
 
 FROM registry.redhat.io/ubi9:9.6-1747219013 AS appliance
 
-ENV LIBGUESTFS_BACKEND=direct
-
 RUN dnf update -y && \
     dnf install -y --setopt=install_weak_deps=False \
     qemu-img \
@@ -45,7 +43,6 @@ RUN mkdir /disks && \
     virtio-win
 
 ENV PATH="$PATH:/usr/libexec"
-ENV LIBGUESTFS_BACKEND=direct
 
 RUN mkdir -p /usr/lib64/guestfs/appliance
 COPY --from=appliance /usr/local/lib/guestfs/appliance /usr/lib64/guestfs/appliance

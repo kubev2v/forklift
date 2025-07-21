@@ -16,8 +16,6 @@ RUN rm /etc/pki/tls/fips_local.cnf && \
 
 ENV PATH="$PATH:/usr/libexec"
 
-ENV LIBGUESTFS_BACKEND=direct
-
 # RHEL 10.1 virt-v2v and deps
 RUN yum install  -y --setopt=sslverify=false \
     https://download-01.beak-001.prod.iad2.dc.redhat.com/brewroot/vol/rhel-10/packages/virt-v2v/2.8.0/1.el10/x86_64/virt-v2v-2.8.0-1.el10.x86_64.rpm \
