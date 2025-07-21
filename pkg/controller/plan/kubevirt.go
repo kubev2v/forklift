@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"math/rand"
 	"net"
 	"net/http"
@@ -1455,6 +1456,22 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) 
 	if object.Spec.Template.ObjectMeta.Labels == nil {
 		object.Spec.Template.ObjectMeta.Labels = map[string]string{}
 	}
+
+	// Set the custom labels for the VM if specified in the plan
+	if len(r.Plan.Spec.TargetLabels) > 0 {
+		maps.Copy(object.Spec.Template.ObjectMeta.Labels, r.Plan.Spec.TargetLabels)
+	}
+
+	// Set the target node name if specified in the plan
+	if len(r.Plan.Spec.TargetNodeSelector) > 0 {
+		maps.Copy(object.Spec.Template.Spec.NodeSelector, r.Plan.Spec.TargetNodeSelector)
+	}
+
+	// Set the target affinity if specified in the plan
+	if r.Plan.Spec.TargetAffinity != nil {
+		object.Spec.Template.Spec.Affinity = r.Plan.Spec.TargetAffinity
+	}
+
 	// Set the 'app' label for identification of the virtual machine instance(s)
 	object.Spec.Template.ObjectMeta.Labels["app"] = r.getNewVMName(vm)
 
