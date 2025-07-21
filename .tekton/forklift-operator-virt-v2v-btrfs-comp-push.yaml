@@ -10,7 +10,7 @@ metadata:
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
       == "main" && ( ".tekton/forklift-operator-virt-v2v-btrfs-comp-*.yaml".pathChanged() ||
       ".konflux/virt-v2v/rpms.lock.yaml".pathChanged() ||
-      "build/virt-v2v/Containerfile-downstream-ffsupport".pathChanged() ||
+      "build/virt-v2v/Containerfile-downstream-fssupport".pathChanged() ||
       "pkg/virt-v2v/***".pathChanged() ||
       "cmd/virt-v2v/***".pathChanged() ||
       "cmd/virt-v2v-monitor/***".pathChanged() )
@@ -30,7 +30,7 @@ spec:
   - name: output-image
     value: quay.io/redhat-user-workloads/rh-mtv-btrfs-tenant/forklift-operator-virt-v2v-btrfs-comp:{{revision}}
   - name: dockerfile
-    value: build/virt-v2v/Containerfile-downstream-ffsupport
+    value: build/virt-v2v/Containerfile-downstream-fssupport
   - name: path-context
     value: .
   - name: build-source-image

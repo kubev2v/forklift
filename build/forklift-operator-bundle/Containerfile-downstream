@@ -1,4 +1,4 @@
-FROM registry.redhat.io/ubi9/go-toolset:1.23.6-1745588370 AS envsubst
+FROM registry.redhat.io/ubi9/go-toolset:1.24.4-1752083840 AS envsubst
 
 FROM registry.redhat.io/openshift4/ose-operator-sdk-rhel9@sha256:2a659b5ec1c8510f224dd6aadee896c2f4e4396cd72a719fb6688c411ca7be21 AS builder
 
@@ -11,27 +11,27 @@ ARG DEFAULT_CHANNEL
 ARG REGISTRY
 ARG OCP_VERSIONS
 
-ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:addef261f0b2e5d77447e644db3401a239d1cdafc5680a9f8d349ed56395e0c9"
+ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:158a153c53da4b4169391b5514bbaaaaae7469f26fd0245cf404e036ccf683eb"
 
-ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:410a228b310488e6ae17d1e05e06f7103c43f7504566d0d8e2b61df98301c4c7"
+ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:b44f041f49f77caf3e1f999658a3c942899f5e9e5451d709c6761fd4a810dcf2"
 
-ARG MUST_GATHER_IMAGE="registry.redhat.io/mtv-candidate/mtv-must-gather-rhel8@sha256:7b22b92289e7b857fb07b01fb654875b51e4a3432ecbb9559b568d7883b8c182"
+ARG MUST_GATHER_IMAGE="registry.redhat.io/mtv-candidate/mtv-must-gather-rhel8@sha256:b8bfa90e8fa456706263796a52b217ec7291e21f7190d516b4e8c810311da86b"
 
-ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-openstack-populator-rhel9@sha256:6e15ece0e6c75e3a98f36dde11c7d9a5b1439885276a2fcfe755618dae07f0ac"
+ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-openstack-populator-rhel9@sha256:2ed5d902bba875dc3a64ed63857de5ed7b7170b8bc09dc41c6ff3205542e023a"
 
-ARG OPERATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhel9-operator@sha256:6a83ddb246af46f297d5b77e2dfdde2ff99ee441b651ddbafc782d99387850d8"
+ARG OPERATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhel9-operator@sha256:f632a50d4359e5c78907b602eebee4a948e64d4956115e947ae5ebbb0a46e8e6"
 
-ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/mtv-candidate/mtv-ova-provider-server-rhel9@sha256:aeea77ee1edf083f05b4abc3394b073a94332c866217a93c1bf7b377dc6faaf3"
+ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/mtv-candidate/mtv-ova-provider-server-rhel9@sha256:56f5423325b0c9d66d8d895ebb651503c0f3457df3598a89e71493db44155002"
 
-ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhv-populator-rhel8@sha256:db30a90a6e9565b1d35619a391aa689f6c994b02760aaddd9704209c0344fdc7"
+ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhv-populator-rhel8@sha256:651ff0eb34f30957fc7cdc3e2b244ee2ec4607edd225e2c3da039ee87f61bfce"
 
-ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-populator-controller-rhel9@sha256:c58352441958b16a04d2032c06e89699ec400875ee644688e0e0285a214af0cd"
+ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-populator-controller-rhel9@sha256:079cdfc0e2c1cbcfe56ab53ff9d733ffc09f1d97f017ceb5c821548f9d981054"
 
-ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:c89169639bbc8d8dbe31881ce538f8f80b32203c0cf686389f065b83e2f8f898"
+ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:6768dcbf93ae13577cc332d39874923beef3d19f776235e68b48045f6c61d7fc"
 
-ARG VALIDATION_IMAGE="registry.redhat.io/mtv-candidate/mtv-validation-rhel9@sha256:15cca08d72f0663311edc1aa94afb7b378371679c1f23abe785acbd6174abc5b"
+ARG VALIDATION_IMAGE="registry.redhat.io/mtv-candidate/mtv-validation-rhel9@sha256:4c01766579de9235c8f8ad91f7c12de3c324f9a143d9fffa39666fca85e067e7"
 
-ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel9@sha256:f822aa04b0c94fc4e2047408d0a8c4054945bd1e9485ba66a341e7aef08198cb"
+ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel9@sha256:97524ff69fb0c0aa3179d4f35a1e86f961962d6d7037576337203d6f7880bd8e"
 
 ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-vsphere-xcopy-volume-populator-rhel9@sha256:474aec7f503b4c3def8e685db86e46c5407f55c95783dd1a1763be0d0901587b"
 

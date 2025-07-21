@@ -335,7 +335,7 @@ $(DEFAULT_KUBECTL):
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE)
 $(DEFAULT_KUSTOMIZE):
-	go install sigs.k8s.io/kustomize/kustomize/v5@v5.3.0
+	go install sigs.k8s.io/kustomize/kustomize/v5@v5.7.0
 
 validation-test: opa-bin
 	ENVIRONMENT=test ${OPA} test validation/policies --explain fails
