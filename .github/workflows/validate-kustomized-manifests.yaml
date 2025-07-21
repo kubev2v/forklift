@@ -13,7 +13,7 @@ jobs:
       - name: Install kustomize
         uses: alexellis/arkade-get@master
         with:
-          kustomize: v5.3.0
+          kustomize: v5.7.0
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Generate .kustomized_manifests_tmp
