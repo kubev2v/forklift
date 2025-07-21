@@ -8,9 +8,13 @@ RUN subscription-manager refresh && \
         libguestfs-xfs
 
 # Create tarball for the appliance.
+#
+# LIBGUESTFS_BACKEND=direct is required to work around the following bug:
+# https://issues.redhat.com/browse/RHEL-104684
+# and it can be removed when that bug gets fixed.
 RUN mkdir -p /usr/local/lib/guestfs/appliance && \
     cd /usr/local/lib/guestfs/appliance && \
-    libguestfs-make-fixed-appliance . && \
+    LIBGUESTFS_BACKEND=direct libguestfs-make-fixed-appliance . && \
     qemu-img convert -c -O qcow2 root root.qcow2 && \
     mv -vf root.qcow2 root
 
