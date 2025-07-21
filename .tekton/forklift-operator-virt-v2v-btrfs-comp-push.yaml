@@ -25,7 +25,7 @@ spec:
   - name: output-image
     value: quay.io/redhat-user-workloads/rh-mtv-btrfs-tenant/forklift-operator-virt-v2v-btrfs-comp:{{revision}}
   - name: dockerfile
-    value: build/virt-v2v/Containerfile-downstream-ffsupport
+    value: build/virt-v2v/Containerfile-downstream-fssupport
   - name: path-context
     value: .
   - name: build-source-image
