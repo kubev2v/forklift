@@ -809,7 +809,7 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 		numNetworks++
 		kNetwork := cnv.Network{Name: networkName}
 		interfaceModel := Virtio
-		if r.Plan.Spec.SkipGuestConversion {
+		if useCompatibilityModeBus(r.Plan) {
 			interfaceModel = E1000e
 		}
 		kInterface := cnv.Interface{
@@ -856,7 +856,7 @@ func (r *Builder) findNetworkMapping(nic vsphere.NIC, netMap []api.NetworkPair) 
 
 func (r *Builder) mapInput(object *cnv.VirtualMachineSpec) {
 	bus := cnv.InputBusVirtio
-	if r.Plan.Spec.SkipGuestConversion {
+	if useCompatibilityModeBus(r.Plan) {
 		bus = cnv.InputBusUSB
 	}
 	tablet := cnv.Input{
@@ -1055,7 +1055,7 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 			},
 		}
 		bus := cnv.DiskBusVirtio
-		if r.Plan.Spec.SkipGuestConversion {
+		if useCompatibilityModeBus(r.Plan) {
 			bus = cnv.DiskBusSATA
 		}
 		kubevirtDisk := cnv.Disk{
