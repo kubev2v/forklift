@@ -155,6 +155,12 @@ type PlanSpec struct {
 	// Determines if the plan should skip the guest conversion.
 	// +kubebuilder:default:=false
 	SkipGuestConversion bool `json:"skipGuestConversion,omitempty"`
+	// useCompatibilityMode controls whether to use VirtIO devices when skipGuestConversion is true (Raw Copy mode).
+	// This setting has no effect when skipGuestConversion is false (V2V Conversion always uses VirtIO).
+	// - true (default): Use compatibility devices (SATA bus, E1000E NIC) to ensure bootability
+	// - false: Use high-performance VirtIO devices (requires VirtIO drivers already installed in source VM)
+	// +kubebuilder:default:=true
+	UseCompatibilityMode bool `json:"useCompatibilityMode,omitempty"`
 	// Migration type. e.g. "cold", "warm", "live". Supersedes the `warm` boolean if set.
 	// +optional
 	// +kubebuilder:validation:Enum=cold;warm;live

@@ -2847,6 +2847,14 @@ spec:
                 - warm
                 - live
                 type: string
+              useCompatibilityMode:
+                default: true
+                description: |-
+                  useCompatibilityMode controls whether to use VirtIO devices when skipGuestConversion is true (Raw Copy mode).
+                  This setting has no effect when skipGuestConversion is false (V2V Conversion always uses VirtIO).
+                  - true (default): Use compatibility devices (SATA bus, E1000E NIC) to ensure bootability
+                  - false: Use high-performance VirtIO devices (requires VirtIO drivers already installed in source VM)
+                type: boolean
               vms:
                 description: List of VMs.
                 items:

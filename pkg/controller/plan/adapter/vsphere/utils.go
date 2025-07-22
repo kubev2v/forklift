@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
@@ -102,4 +103,8 @@ func findSharedPVCs(client client.Client, vm *model.VM, targetNamespace string) 
 		}
 	}
 	return pvcs, missingDiskPVCs, err
+}
+
+func useCompatibilityModeBus(plan *api.Plan) bool {
+	return plan.Spec.SkipGuestConversion && plan.Spec.UseCompatibilityMode
 }
