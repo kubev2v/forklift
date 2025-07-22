@@ -3924,7 +3924,7 @@ kind: Deployment
 metadata:
   labels:
     control-plane: controller-manager
-  name: forklift-operator
+  name: forklift-operator-ansible
   namespace: forklift-operator-system
 spec:
   replicas: 1
