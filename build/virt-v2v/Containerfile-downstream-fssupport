@@ -21,19 +21,19 @@ RUN \
     brewroot=https://download-01.beak-001.prod.iad2.dc.redhat.com/brewroot/vol/rhel-10/packages ; \
     arch=x86_64 ; \
     packages=' \
-      virt-v2v:virt-v2v-2.8.0-1.el10 \
+      virt-v2v:virt-v2v-2.8.1-3.el10 \
       libguestfs:libguestfs-1.56.0-1.el10.1 \
       libguestfs:libguestfs-appliance-1.56.0-1.el10.1 \
       libguestfs:libguestfs-xfs-1.56.0-1.el10.1 \
       libnbd:libnbd-1.22.2-1.el10 \
-      nbdkit:nbdkit-1.42.5-1.el10 \
-      nbdkit:nbdkit-basic-filters-1.42.5-1.el10 \
-      nbdkit:nbdkit-basic-plugins-1.42.5-1.el10 \
-      nbdkit:nbdkit-server-1.42.5-1.el10 \
-      nbdkit:nbdkit-curl-plugin-1.42.5-1.el10 \
-      nbdkit:nbdkit-nbd-plugin-1.42.5-1.el10 \
-      nbdkit:nbdkit-ssh-plugin-1.42.5-1.el10 \
-      nbdkit:nbdkit-vddk-plugin-1.42.5-1.el10 \
+      nbdkit:nbdkit-1.44.1-2.el10 \
+      nbdkit:nbdkit-basic-filters-1.44.1-2.el10 \
+      nbdkit:nbdkit-basic-plugins-1.44.1-2.el10 \
+      nbdkit:nbdkit-server-1.44.1-2.el10 \
+      nbdkit:nbdkit-curl-plugin-1.44.1-2.el10 \
+      nbdkit:nbdkit-nbd-plugin-1.44.1-2.el10 \
+      nbdkit:nbdkit-ssh-plugin-1.44.1-2.el10 \
+      nbdkit:nbdkit-vddk-plugin-1.44.1-2.el10 \
       guestfs-tools:guestfs-tools-1.54.0-2.el10 \
       kernel:kernel-6.12.0-95.el10 \
       kernel:kernel-modules-core-6.12.0-95.el10 \
