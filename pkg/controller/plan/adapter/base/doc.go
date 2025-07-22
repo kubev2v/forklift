@@ -159,6 +159,8 @@ type Validator interface {
 	PowerState(vmRef ref.Ref) (bool, error)
 	// Validate that the VM is inherently compatible with the migration type.
 	VMMigrationType(vmRef ref.Ref) (bool, error)
+	// Validate that the VM disks are supported.
+	UnSupportedDisks(vmRef ref.Ref) ([]string, error)
 }
 
 // DestinationClient API.

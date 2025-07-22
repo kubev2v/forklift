@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 
 	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -69,6 +70,7 @@ const (
 	Deleted                       = "Deleted"
 	Paused                        = "Paused"
 	Archived                      = "Archived"
+	UnsupportedDisks              = "UnsupportedDisks"
 	unsupportedVersion            = "UnsupportedVersion"
 	VDDKInvalid                   = "VDDKInvalid"
 	ValidatingVDDK                = "ValidatingVDDK"
@@ -626,6 +628,15 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "VM is incompatible with the selected migration type.",
 		Items:    []string{},
 	}
+	unsupportedDisks := libcnd.Condition{
+		Type:     UnsupportedDisks,
+		Status:   True,
+		Reason:   NotSupported,
+		Category: api.CategoryCritical,
+		Message:  "%s disks are not supported for migration.",
+		Items:    []string{},
+	}
+
 	var sharedDisksConditions []libcnd.Condition
 	setOf := map[string]bool{}
 	setOfTargetName := map[string]bool{}
@@ -772,6 +783,20 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		if !ok {
 			vmMigrationTypeUnsupported.Items = append(vmMigrationTypeUnsupported.Items, ref.String())
 		}
+		unsupported, err := validator.UnSupportedDisks(*ref)
+		if err != nil {
+			return err
+		}
+		if len(unsupported) > 0 {
+			unsupportedDisks.Items = append(unsupportedDisks.Items, ref.String())
+
+			// Append detailed message
+			unsupportedDisks.Message = fmt.Sprintf(
+				unsupportedDisks.Message,
+				strings.ToUpper(strings.Join(unsupported, ", ")),
+			)
+		}
+
 		ok, msg, category, err := validator.SharedDisks(*ref, ctx.Destination.Client)
 		if err != nil {
 			return err
@@ -918,6 +943,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(vmMigrationTypeUnsupported.Items) > 0 {
 		plan.Status.SetCondition(vmMigrationTypeUnsupported)
+	}
+	if len(unsupportedDisks.Items) > 0 {
+		plan.Status.SetCondition(unsupportedDisks)
 	}
 
 	return nil
