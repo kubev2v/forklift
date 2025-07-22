@@ -19,8 +19,8 @@ CONTAINER_CMD := $(shell type -P $(CONTAINER_RUNTIME))
 endif
 
 REGISTRY ?= quay.io
-REGISTRY_ORG ?= kubev2v
-REGISTRY_TAG ?= devel
+REGISTRY_ORG ?= bodnopoz
+REGISTRY_TAG ?= devel3
 
 VERSION ?= 99.0.0
 NAMESPACE ?= konveyor-forklift
@@ -66,15 +66,15 @@ KUSTOMIZE ?= $(DEFAULT_KUSTOMIZE)
 # This will build controller and bundle pointing to that controller
 
 ### Components
-CONTROLLER_IMAGE ?= quay.io/kubev2v/forklift-controller:latest
-API_IMAGE ?= quay.io/kubev2v/forklift-api:latest
-VALIDATION_IMAGE ?= quay.io/kubev2v/forklift-validation:latest
-VIRT_V2V_IMAGE ?= quay.io/kubev2v/forklift-virt-v2v:latest
-OPERATOR_IMAGE ?= quay.io/kubev2v/forklift-operator:latest
-POPULATOR_CONTROLLER_IMAGE ?= quay.io/kubev2v/populator-controller:latest
-OVIRT_POPULATOR_IMAGE ?= quay.io/kubev2v/ovirt-populator:latest
-OPENSTACK_POPULATOR_IMAGE ?= quay.io/kubev2v/openstack-populator:latest
-OVA_PROVIDER_SERVER_IMAGE ?= quay.io/kubev2v/forklift-ova-provider-server:latest
+CONTROLLER_IMAGE ?= quay.io/bodnopoz/forklift-controller:latest
+API_IMAGE ?= quay.io/bodnopoz/forklift-api:latest
+VALIDATION_IMAGE ?= quay.io/bodnopoz/forklift-validation:latest
+VIRT_V2V_IMAGE ?= quay.io/bodnopoz/forklift-virt-v2v:latest
+OPERATOR_IMAGE ?= quay.io/bodnopoz/forklift-operator:latest
+POPULATOR_CONTROLLER_IMAGE ?= quay.io/bodnopoz/populator-controller:latest
+OVIRT_POPULATOR_IMAGE ?= quay.io/bodnopoz/ovirt-populator:latest
+OPENSTACK_POPULATOR_IMAGE ?= quay.io/bodnopoz/openstack-populator:latest
+OVA_PROVIDER_SERVER_IMAGE ?= quay.io/bodnopoz/forklift-ova-provider-server:latest
 VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/vsphere-xcopy-volume-populator:$(REGISTRY_TAG)
 
 ### OLM
@@ -82,8 +82,8 @@ OPERATOR_BUNDLE_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-bundle:$(
 OPERATOR_INDEX_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-index:$(REGISTRY_TAG)
 
 ### External images
-MUST_GATHER_IMAGE ?= quay.io/kubev2v/forklift-must-gather:latest
-UI_PLUGIN_IMAGE ?= quay.io/kubev2v/forklift-console-plugin:latest
+MUST_GATHER_IMAGE ?= quay.io/bodnopoz/forklift-must-gather:latest
+UI_PLUGIN_IMAGE ?= quay.io/bodnopoz/forklift-console-plugin:latest
 
 # Golangci-lint version
 GOLANGCI_LINT_VERSION ?= v1.64.2
@@ -124,7 +124,7 @@ e2e-sanity-ova:
 
 # Build forklift-controller binary
 forklift-controller: generate fmt vet
-	go build -o bin/forklift-controller github.com/kubev2v/forklift/cmd/forklift-controller
+	go build -o bin/forklift-controller github.com/bodnopoz/forklift/cmd/forklift-controller
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 .PHONY: run
