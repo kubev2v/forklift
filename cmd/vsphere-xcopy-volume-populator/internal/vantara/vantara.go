@@ -136,7 +136,7 @@ func (v *VantaraCloner) GetNaaID(lun populator.LUN) populator.LUN {
 	ldevnaaid := LDEV["naaId"].(string)
 	lun.ProviderID = ldevnaaid[:6]
 	lun.SerialNumber = ldevnaaid[6:]
-	lun.NAA = ldevnaaid
+	lun.NAA = fmt.Sprintf("naa.%s", ldevnaaid)
 	return lun
 }
 

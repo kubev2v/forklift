@@ -14,6 +14,7 @@ import (
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/ontap"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/powerflex"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/primera3par"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/pure"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vantara"
@@ -94,8 +95,16 @@ func main() {
 			klog.Fatalf("failed to initialize Pure FlashArray clonner with %s", err)
 		}
 		storageApi = &sm
+	case forklift.StorageVendorProductPowerFlex:
+		sm, err := powerflex.NewPowerflexClonner(
+			storageHostname, storageUsername, storagePassword, storageSkipSSLVerification == "true")
+		if err != nil {
+			klog.Fatalf("failed to initialize PowerFlex clonner with %s", err)
+		}
+		storageApi = &sm
 	default:
-		klog.Fatalf("Unsupported storage vendor %s use one of [vantara, ontap, primera3par, pureFlashArray]", storageVendor)
+		klog.Fatalf("Unsupported storage vendor %s use one of %v",
+			storageVendor, forklift.StorageVendorProducts())
 	}
 
 	// validations
