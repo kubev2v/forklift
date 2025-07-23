@@ -1540,10 +1540,10 @@ rpm(
 )
 
 rpm(
-    name = "libvirt-daemon-driver-secret-0__10.10.0-7.el9.x86_64",
-    sha256 = "352440cecc12fc0f9c72d8c27fc110c98fa34707354200e982f50531ca80b99a",
+    name = "libvirt-daemon-driver-secret-0__10.10.0-9.el9.x86_64",
+    sha256 = "e4a85fb0c17f0ac5c0ce11180b4c415766c9c6a96b3cbdd43fcda983353b9ee1",
     urls = [
-        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libvirt-daemon-driver-secret-10.10.0-1.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libvirt-daemon-driver-secret-10.10.0-9.el9.x86_64.rpm",
     ],
 )
 
@@ -1556,18 +1556,18 @@ rpm(
 )
 
 rpm(
-    name = "libvirt-daemon-log-0__10.10.0-7.el9.x86_64",
-    sha256 = "796a51085f7e7a7bb7bbe5b0ad8d31762212b9b930f5b4e9078e13ade2f8a0b5",
+    name = "libvirt-daemon-log-0__10.10.0-9.el9.x86_64",
+    sha256 = "89c84907714cc4de85627208f39962309fcfd7afbadce59435d40b490bab80ec",
     urls = [
-        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libvirt-daemon-log-10.10.0-1.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libvirt-daemon-log-10.10.0-9.el9.x86_64.rpm",
     ],
 )
 
 rpm(
-    name = "libvirt-libs-0__10.10.0-7.el9.x86_64",
-    sha256 = "46d2e46af29a84e132272c7b4ea235e589637b5e7859b58bab8f73c2e5d74c44",
+    name = "libvirt-libs-0__10.10.0-9.el9.x86_64",
+    sha256 = "3e5f20a9a34807dcb4ac5e6ad18de4c8168d26512ab5b2bbe2375992ecb24da1",
     urls = [
-        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libvirt-libs-10.10.0-2.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libvirt-libs-10.10.0-9.el9.x86_64.rpm",
     ],
 )
 
@@ -2912,5 +2912,29 @@ rpm(
     sha256 = "1de29b9b5ea92ec28b2a8426c3645a33d715c93af6fd3f2c143bc02c7ddded85",
     urls = [
         "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/glibc-common-2.34-214.el9.x86_64.rpm",
+    ],
+)
+
+rpm(
+    name = "libvirt-client-0__10.10.0-9.el9.x86_64",
+    sha256 = "fdbee9483e0d6ce3a9f01133a1d7ff05c6f64b78a402fd749377f9a593593c24",
+    urls = [
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libvirt-client-10.10.0-9.el9.x86_64.rpm",
+    ],
+)
+
+rpm(
+    name = "libvirt-daemon-common-0__10.10.0-9.el9.x86_64",
+    sha256 = "2f9a8ccfe151ab621d4ffa6d39cb88c000e7ff8f114d8e8793edcd12e989eb2c",
+    urls = [
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libvirt-daemon-common-10.10.0-9.el9.x86_64.rpm",
+    ],
+)
+
+rpm(
+    name = "libvirt-daemon-driver-storage-core-0__10.10.0-9.el9.x86_64",
+    sha256 = "f7ace4105fa6b748cb072d8654ea3d0184045c45aa1b659ec14e3524bc097d44",
+    urls = [
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libvirt-daemon-driver-storage-core-10.10.0-9.el9.x86_64.rpm",
     ],
 )
