@@ -1532,10 +1532,10 @@ rpm(
 )
 
 rpm(
-    name = "libvirt-daemon-driver-qemu-0__10.10.0-7.el9.x86_64",
-    sha256 = "b5f6b8729fd04213b2cb0b47cf30961016665dcef9447a9441b154b439d464d3",
+    name = "libvirt-daemon-driver-qemu-0__10.10.0-9.el9.x86_64",
+    sha256 = "e6d7ec065be5c50c654b24f239cb5bdda1037e7387abcfec09dc5274d2254546",
     urls = [
-        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libvirt-daemon-driver-qemu-10.10.0-1.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libvirt-daemon-driver-qemu-10.10.0-9.el9.x86_64.rpm",
     ],
 )
 
