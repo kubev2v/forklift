@@ -501,7 +501,7 @@ func (p *Primera3ParClientWsImpl) GetLunDetailsByVolumeName(volumeName string, l
 
 	if response.Name != "" {
 		lun.Name = cutVolName
-		lun.NAA = strings.ToLower(response.WWN)
+		lun.NAA = fmt.Sprintf("naa.%s", strings.ToLower(response.WWN))
 		return lun, nil
 	}
 	return populator.LUN{}, fmt.Errorf("volume not found for volume: %s", cutVolName)
