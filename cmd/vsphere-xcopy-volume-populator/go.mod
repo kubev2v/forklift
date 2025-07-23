@@ -5,6 +5,7 @@ go 1.24.0
 toolchain go1.24.4
 
 require (
+	github.com/dell/goscaleio v1.19.1
 	github.com/devans10/pugo/flasharray v0.0.0-20241116160615-6bb8c469c9a0
 	github.com/konveyor/forklift-controller v0.0.0
 	github.com/netapp/trident v0.0.0-20240628081112-cb68cb389d9d

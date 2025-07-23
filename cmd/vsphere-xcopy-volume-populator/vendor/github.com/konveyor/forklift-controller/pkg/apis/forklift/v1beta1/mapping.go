@@ -65,7 +65,18 @@ const (
 	StorageVendorProductOntap          StorageVendorProduct = "ontap"
 	StorageVendorProductPrimera3Par    StorageVendorProduct = "primera3par"
 	StorageVendorProductPureFlashArray StorageVendorProduct = "pureFlashArray"
+	StorageVendorProductPowerFlex      StorageVendorProduct = "powerflex"
 )
+
+func StorageVendorProducts() []StorageVendorProduct {
+	return []StorageVendorProduct{
+		StorageVendorProductVantara,
+		StorageVendorProductOntap,
+		StorageVendorProductPrimera3Par,
+		StorageVendorProductPureFlashArray,
+		StorageVendorProductPowerFlex,
+	}
+}
 
 // VSphereXcopyPluginConfig works with the Vsphere Xcopy Volume Populator
 // to offload the copy to Vsphere and the storage array.
@@ -74,7 +85,7 @@ type VSphereXcopyPluginConfig struct {
 	// The secret should reside in the same namespace where the source provider is.
 	SecretRef string `json:"secretRef"`
 	// StorageVendorProduct the string identifier of the storage vendor product
-	// +kubebuilder:validation:Enum=vantara;ontap;primera3par;pureFlashArray
+	// +kubebuilder:validation:Enum=vantara;ontap;primera3par;pureFlashArray;powerflex
 	StorageVendorProduct StorageVendorProduct `json:"storageVendorProduct"`
 }
 

@@ -79,6 +79,16 @@ test-copy-using-cli-pureflasharray: build
 		--secret-name=populator-secret \
 		--kubeconfig=$$KUBECONFIG
 
+test-copy-using-cli-powerflex: build
+	GOSCALEIO_DEBUG=1 bin/vsphere-xcopy-volume-populator \
+		--source-vm-id=vm-122450 \
+		--source-vmdk="[eco-dellpf-01] vm-powerflex/vm-powerflex.vmdk" \
+		--owner-name=powerflex-4-8g \
+		--target-namespace=default \
+		--storage-vendor-product=powerflex \
+		--secret-name=populator-secret \
+		--kubeconfig=$$KUBECONFIG
+
 .PHONY: vmkfstools-wrapper
 vmkfstools-wrapper:
 	$(MAKE) -C vmkfstools-wrapper build
