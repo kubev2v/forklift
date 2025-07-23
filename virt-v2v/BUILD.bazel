@@ -276,7 +276,7 @@ rpmtree(
         "@libverto-libev-0__0.3.2-3.el9.x86_64//rpm",
         "@libvirt-client-0__10.10.0-7.el9.x86_64//rpm",
         "@libvirt-daemon-common-0__10.10.0-7.el9.x86_64//rpm",
-        "@libvirt-daemon-driver-qemu-0__10.10.0-7.el9.x86_64//rpm",
+        "@libvirt-daemon-driver-qemu-0__10.10.0-9.el9.x86_64//rpm",
         "@libvirt-daemon-driver-secret-0__10.10.0-7.el9.x86_64//rpm",
         "@libvirt-daemon-driver-storage-core-0__10.10.0-7.el9.x86_64//rpm",
         "@libvirt-daemon-log-0__10.10.0-7.el9.x86_64//rpm",
