@@ -113,7 +113,7 @@ func (f *FlashArrayClonner) UnMap(initatorGroup string, targetLUN populator.LUN,
 
 // CurrentMappedGroups returns the initiator groups the populator.LUN is mapped to
 func (f *FlashArrayClonner) CurrentMappedGroups(targetLUN populator.LUN, context populator.MappingContext) ([]string, error) {
-	// we don't use the host group feature, as a host in pure flasharray can not belong to two separate groups, and we 
+	// we don't use the host group feature, as a host in pure flasharray can not belong to two separate groups, and we
 	// definitely don't want to break host from their current groups. insted we'll just map/unmap the volume to individual hosts
 	return nil, nil
 }
