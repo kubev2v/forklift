@@ -2882,3 +2882,35 @@ rpm(
         "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/zstd-1.5.5-1.el9.x86_64.rpm",
     ],
 )
+
+rpm(
+    name = "centos-gpg-keys-0__9.0-30.el9.x86_64",
+    sha256 = "2e18189b53560eccc3ce6f987fd64decf8cda84fbd329340e7d2439a7544071a",
+    urls = [
+        "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/centos-gpg-keys-9.0-30.el9.noarch.rpm",
+    ],
+)
+
+rpm(
+    name = "openssl-libs-1__3.5.0-4.el9.x86_64",
+    sha256 = "f66719b4fed80a139cfcbc3f5ce57ece33fd37ec52ca3e45ea6e146a50fac3ae",
+    urls = [
+        "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/openssl-libs-3.5.0-4.el9.x86_64.rpm",
+    ],
+)
+
+rpm(
+    name = "centos-stream-repos-0__9.0-30.el9.x86_64",
+    sha256 = "ead13a28f2b8505a528a7305b52a593825fe6db9ea7eb8734b80cb3beb0f236a",
+    urls = [
+        "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/centos-stream-repos-9.0-30.el9.noarch.rpm",
+    ],
+)
+
+rpm(
+    name = "glibc-common-0__2.34-214.el9.x86_64",
+    sha256 = "1de29b9b5ea92ec28b2a8426c3645a33d715c93af6fd3f2c143bc02c7ddded85",
+    urls = [
+        "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/glibc-common-2.34-214.el9.x86_64.rpm",
+    ],
+)
