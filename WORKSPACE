@@ -3644,10 +3644,10 @@ rpm(
 )
 
 rpm(
-    name = "glibc-langpack-byn-0__2.34-144.el9.x86_64",
-    sha256 = "51591a54ccf43a12c504a620793126e2e1de2eb4ceeb08e9fc7adfe649d9542b",
+    name = "glibc-langpack-byn-0__2.34-214.el9.x86_64",
+    sha256 = "68549a205ccc46e73cc0d5be747880fc6e970366ac4ebd9bd4deb31315a1b7c9",
     urls = [
-        "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/glibc-langpack-byn-2.34-144.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/glibc-langpack-byn-2.34-214.el9.x86_64.rpm",
     ],
 )
 
