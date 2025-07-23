@@ -436,17 +436,17 @@ rpm(
 
 rpm(
     name = "device-mapper-0__1.02.202-2.el9.x86_64",
-    sha256 = "5bde7f5a746ebc9ca183f83060fbd74d7ebaccd1610669d7783bb6989f5e43c7",
+    sha256 = "dca7b6ad60c556111c6a2ab198fe7fa802cafb2733183cce831135fedad8a7e0",
     urls = [
-        "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/device-mapper-1.02.202-2.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/device-mapper-1.02.206-2.el9.x86_64.rpm",
     ],
 )
 
 rpm(
     name = "device-mapper-libs-0__1.02.202-2.el9.x86_64",
-    sha256 = "3b6c20582b1e53762aff22a22988b24dd777652a235d27d94498db53aa46f1e6",
+    sha256 = "2b6ab8f98bed43e79f71d4ac2aeb2ff4d303497f04addbfff74bd2dd6ad71796",
     urls = [
-        "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/device-mapper-libs-1.02.202-2.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/device-mapper-libs-1.02.206-2.el9.x86_64.rpm",
     ],
 )
 
@@ -876,7 +876,7 @@ rpm(
 
 rpm(
     name = "kernel-srpm-macros-0__1.0-13.el9.x86_64",
-    sha256 = "1a3565cb716827b756d35640a41978cfe78af8225a47955d7589cc0541260d14",
+    sha256 = "7763007cd44324a603abc95e05aa19e5339d20c9fdb6fa442d7a842d653b634f",
     urls = [
         "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/kernel-srpm-macros-1.0-13.el9.noarch.rpm",
     ],
@@ -1518,7 +1518,7 @@ rpm(
     name = "libvirt-client-0__10.10.0-7.el9.x86_64",
     sha256 = "ee19a563f22f7d66a3fca7d8c9ecdbcb1cdfedf025e5b52d0b6081c3436319fc",
     urls = [
-        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libvirt-client-10.10.0-7.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libvirt-client-10.10.0-2.el9.x86_64.rpm",
     ],
 )
 
@@ -1566,7 +1566,7 @@ rpm(
     name = "libvirt-libs-0__10.10.0-7.el9.x86_64",
     sha256 = "46d2e46af29a84e132272c7b4ea235e589637b5e7859b58bab8f73c2e5d74c44",
     urls = [
-        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libvirt-libs-10.10.0-7.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libvirt-libs-10.10.0-2.el9.x86_64.rpm",
     ],
 )
 
@@ -1772,7 +1772,7 @@ rpm(
 
 rpm(
     name = "ncurses-base-0__6.2-10.20210508.el9.x86_64",
-    sha256 = "3ccbaa39db3cc8ae78f9da42cab3859d0cdb302dd947cdebdb83a702e89074cf",
+    sha256 = "00ba56b28a3a85c3c03387bb7abeca92597c8a5fac7f53d48410ca2a20fd8065",
     urls = [
         "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/ncurses-base-6.2-10.20210508.el9.noarch.rpm",
     ],
@@ -2699,7 +2699,7 @@ rpm(
 )
 
 rpm(
-    name = "systemd-container-0__252-50.el9.x86_64",
+    name = "systemd-container-0__252-48.el9.x86_64",
     sha256 = "2e29c5ebd3b6ff325d003c9b5e3484b02a76b618e50bc888c0a6227a22aad370",
     urls = [
         "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/systemd-container-252-48.el9.x86_64.rpm",
@@ -2715,7 +2715,7 @@ rpm(
 )
 
 rpm(
-    name = "systemd-pam-0__252-50.el9.x86_64",
+    name = "systemd-pam-0__252-48.el9.x86_64",
     sha256 = "f3c1528ff5539825ca09bd6ffcef07a271460204c74ef5c0d677dd0111d1bce8",
     urls = [
         "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/systemd-pam-252-48.el9.x86_64.rpm",
