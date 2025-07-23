@@ -147,7 +147,7 @@ func (f *FlashArrayClonner) ResolvePVToLUN(pv populator.PersistentVolume) (popul
 	return l, nil
 }
 
-// CopyWithVSphere performs a direct copy operation using vSphere API to discover source volume
+// VvolCopy performs a direct copy operation using vSphere API to discover source volume
 func (f *FlashArrayClonner) VvolCopy(vsphereClient vmware.Client, vmId string, sourceVMDKFile string, persistentVolume populator.PersistentVolume, progress chan<- uint) error {
 	klog.Infof("Starting VVol copy operation for VM %s", vmId)
 
