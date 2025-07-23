@@ -7,8 +7,6 @@ import (
 type StorageApi interface{}
 
 type VvolStorageApi interface {
-	// Copy performs a direct copy operation from source VMDK to target volume for VVol storage
-	Copy(vmId string, sourceVMDKFile string, persistentVolume PersistentVolume, progress chan<- uint) error
 	// CopyWithVSphere performs a direct copy operation using vSphere API to discover source volume
 	CopyWithVSphere(vsphereClient vmware.Client, vmId string, sourceVMDKFile string, persistentVolume PersistentVolume, progress chan<- uint) error
 	// ResolvePVToLUN resolves PersistentVolume to LUN details
