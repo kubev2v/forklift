@@ -86,7 +86,7 @@ When a VM disk migration is planned for offload:
 
 ### Implementation Details/Notes/Constraints
 - The populator uses a configurable storage API (`storageVendorProduct`) to interact with the underlying storage array,
-  which is specified in the `StorageMap`. Specific storage vendors such as, Hitachi Vantara , NetApp's ontap,
+  which is specified in the `StorageMap`. Specific storage vendors such as, Hitachi Vantara , NetApp's ontap, Dell PowerFlex
   HP's Primera/3par/Aletra, require implementing vendor-specific logic within the populator.
 - A Kubernetes Secret containing storage provider credentials must be referenced in the StorageMap.
 - The vmkfstools-wrapper VIB must be installed on all ESXi hosts that are connected to the datastores holding the

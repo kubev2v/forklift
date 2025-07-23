@@ -14,7 +14,8 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const xcopyInitiatorGroup = "xcopy-esxs"
+var xcopyInitiatorGroup = "xcopy-esxs"
+
 const taskPollingInterval = 5 * time.Second
 
 var progressPattern = regexp.MustCompile(`\s(\d+)\%`)
@@ -89,16 +90,38 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	uniqueUIDs := make(map[string]bool)
 	hbaUIDs := []string{}
 
-	// Print the adapter information for debugging
-	for i, val := range r {
-		klog.Infof("Adapter [%d]: %+v", i, val)
-		for key, field := range val {
+	for i, a := range r {
+		klog.Infof("Adapter [%d]: %+v", i, a)
+		for key, field := range a {
 			klog.Infof("  %s: %v", key, field)
 		}
-	}
-
-	for _, a := range r {
 		driver, hasDriver := a["Driver"]
+		if !hasDriver {
+			// irrelevant adapter
+			continue
+		}
+		// powerflex handling - scini is the powerflex kernel module and is not
+		// using any iqn/wwn to identity the host. Instead extract the SdcGuid
+		// as the possible clonner identifier
+		if slices.Contains(driver, "scini") {
+			sciModule, err := p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"system", "module", "parameters", "list", "-m", "scini"})
+			if err != nil {
+				// TODO skip, but print the error. Perhaps this handling is better suited per-vendor?
+				klog.Infof("failed to fetch the scini module parameters %s: ", err)
+				continue
+			}
+			for _, moduleFields := range sciModule {
+
+				if slices.Contains(moduleFields["Name"], "IoctlIniGuidStr") {
+					klog.Infof("scini guid %v", moduleFields["Value"])
+					for _, s := range moduleFields["Value"] {
+						hbaUIDs = append(hbaUIDs, strings.ToUpper(s))
+					}
+					klog.Infof("hbas %+v", hbaUIDs)
+				}
+			}
+		}
+
 		// 'esxcli storage core adapter list' returns LinkState field
 		// 'esxcli iscsi adapater list' returns State field
 		linkState, hasLink := a["LinkState"]
@@ -135,7 +158,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		return err
 	}
 
-	originalInitiatorGroups, err := p.StorageApi.CurrentMappedGroups(lun, nil)
+	originalInitiatorGroups, err := p.StorageApi.CurrentMappedGroups(lun, mappingContext)
 	if err != nil {
 		return fmt.Errorf("failed to fetch the current initiator groups of the lun %s: %w", lun.Name, err)
 	}
@@ -152,16 +175,14 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		return fmt.Errorf("failed to map lun %s to initiator group %s: %w", lun, xcopyInitiatorGroup, err)
 	}
 
-	esxNaa := fmt.Sprintf("naa.%s", lun.NAA)
-
-	targetLUN := fmt.Sprintf("/vmfs/devices/disks/%s", esxNaa)
+	targetLUN := fmt.Sprintf("/vmfs/devices/disks/%s", lun.NAA)
 	klog.Infof("resolved lun with IQN %s to lun %s", lun.IQN, targetLUN)
 
 	retries := 5
 	for i := 1; i < retries; i++ {
-		_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "list", "-d", esxNaa})
+		_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "list", "-d", lun.NAA})
 		if err == nil {
-			klog.Infof("found device %s", esxNaa)
+			klog.Infof("found device %s", lun.NAA)
 			break
 		} else {
 			_, err = p.VSphereClient.RunEsxCommand(
@@ -173,7 +194,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		}
 	}
 	if err != nil {
-		return fmt.Errorf("failed to find the device %s after scanning: %w", esxNaa, err)
+		return fmt.Errorf("failed to find the device %s after scanning: %w", lun.NAA, err)
 	}
 
 	defer func() {
@@ -181,7 +202,8 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		p.StorageApi.UnMap(xcopyInitiatorGroup, lun, mappingContext)
 		// map the LUN back to the original OCP worker
 		for _, group := range originalInitiatorGroups {
-			p.StorageApi.Map(group, lun, mappingContext)
+			_, err := p.StorageApi.Map(group, lun, mappingContext)
+			klog.Warningf("failed to map the volume back the original holder - this may cause problems: %v", err)
 		}
 		// unmap devices appear dead in ESX right after they are unmapped, now
 		// clean them
