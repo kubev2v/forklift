@@ -817,13 +817,8 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 						}
 					}
 
-					// Update matching disk items with Windows drive letters based on index
-					for i, guestDisk := range v.model.GuestDisks {
-						if i < len(v.model.Disks) {
-							winDriveLetter := v.extractWinDriveLetter(guestDisk.DiskPath)
-							v.model.Disks[i].WinDriveLetter = winDriveLetter
-						}
-					}
+					// Update Windows drive letters for all disks based on guest disk information
+					v.updateWinDriveLetters()
 				}
 			case fGuestNet:
 				if nics, cast := p.Val.(types.ArrayOfGuestNicInfo); cast {
@@ -1140,15 +1135,10 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 		}
 	}
 
-	// Update Windows drive letters for all disks based on guest disk information
-	for i := range disks {
-		if i < len(v.model.GuestDisks) {
-			winDriveLetter := v.extractWinDriveLetter(v.model.GuestDisks[i].DiskPath)
-			disks[i].WinDriveLetter = winDriveLetter
-		}
-	}
-
 	v.model.Disks = disks
+
+	// Update Windows drive letters for all disks based on guest disk information
+	v.updateWinDriveLetters()
 }
 
 // extractWinDriveLetter extracts the Windows drive letter from a disk path.
@@ -1160,4 +1150,51 @@ func (v *VmAdapter) extractWinDriveLetter(diskPath string) string {
 		return strings.ToLower(string(diskPath[0]))
 	}
 	return ""
+}
+
+// updateWinDriveLetters updates the WinDriveLetter field for disks based on guest disk information.
+// It matches disks to guest disks by capacity (with tolerance for filesystem overhead) and index,
+// then extracts Windows drive letters from their paths.
+func (v *VmAdapter) updateWinDriveLetters() {
+	// First, try to match by capacity for more accurate matching
+	isGuestDiskMatched := make([]bool, len(v.model.GuestDisks))
+
+	for i := range v.model.Disks {
+		disk := &v.model.Disks[i]
+		bestMatch := -1
+
+		// Try to find a guest disk with similar capacity
+		// Since iner and outer loops start at 0, it will match the first guest disk with the same index
+		for j, guestDisk := range v.model.GuestDisks {
+			if isGuestDiskMatched[j] {
+				continue // Skip already matched guest disks
+			}
+
+			// Calculate if capacities are close enough (guest capacity should be smaller due to filesystem overhead)
+			// Allow up to 15% difference to account for filesystem overhead and rounding
+			tolerance := float64(disk.Capacity) * 0.15
+			capacityDiff := float64(disk.Capacity - guestDisk.Capacity)
+
+			// Guest capacity should be smaller or equal, and within tolerance
+			if capacityDiff >= 0 && capacityDiff <= tolerance {
+				if bestMatch == -1 || capacityDiff < float64(disk.Capacity-v.model.GuestDisks[bestMatch].Capacity) {
+					bestMatch = j
+				}
+			}
+		}
+
+		// If we found a capacity match, use it
+		if bestMatch != -1 {
+			isGuestDiskMatched[bestMatch] = true
+
+			winDriveLetter := v.extractWinDriveLetter(v.model.GuestDisks[bestMatch].DiskPath)
+			disk.WinDriveLetter = winDriveLetter
+		} else if i < len(v.model.GuestDisks) && !isGuestDiskMatched[i] {
+			// Fallback to index-based matching if capacity matching failed
+			isGuestDiskMatched[i] = true
+
+			winDriveLetter := v.extractWinDriveLetter(v.model.GuestDisks[i].DiskPath)
+			disk.WinDriveLetter = winDriveLetter
+		}
+	}
 }
