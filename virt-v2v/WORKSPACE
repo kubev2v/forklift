@@ -1147,8 +1147,8 @@ rpm(
 )
 
 rpm(
-    name = "libguestfs-0__1.54.0-3.el9.x86_64",
-    sha256 = "9102737dcb897b3c1279d4db53a31326ce7e57b2e428d28230c1e7a19bba649d",
+    name = "libguestfs-0__1.54.0-7.el9.x86_64",
+    sha256 = "1ae784f510b7cc73f45a4fa6d2fca87a80e4034fa588c47d2a13c642b20176a1",
     urls = [
         "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libguestfs-1.54.0-7.el9.x86_64.rpm",
     ],
@@ -1163,10 +1163,10 @@ rpm(
 )
 
 rpm(
-    name = "libguestfs-xfs-0__1.54.0-3.el9.x86_64",
-    sha256 = "e78c5274f416fb89337a368560ab3ba0ab252658b40ca2d8db1ebb0c448b0e92",
+    name = "libguestfs-xfs-0__1.54.0-7.el9.x86_64",
+    sha256 = "2ff669f895f6b7cc7179e0bbe121cdd3ab07bb76e95ae2b6950024b51f44420e",
     urls = [
-        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libguestfs-xfs-1.54.0-3.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libguestfs-xfs-1.54.0-7.el9.x86_64.rpm",
     ],
 )
 
@@ -1420,7 +1420,7 @@ rpm(
 
 rpm(
     name = "libssh-config-0__0.10.4-13.el9.x86_64",
-    sha256 = "8164abb5201d80698301d48e9c284c8ed01c6599b6f37c59faadb6482f6db76f",
+    sha256 = "bd86ac0962a7f517dd0ab4b963e08b6b7a2af1821df374746223ab9781ee9a20",
     urls = [
         "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/libssh-config-0.10.4-13.el9.noarch.rpm",
     ],
@@ -1867,16 +1867,16 @@ rpm(
 )
 
 rpm(
-    name = "openssl-0__3.2.2-6.el9.x86_64",
-    sha256 = "f9040a23e818b7bf0f3ff46c5e3f85eb92b7da50ae627a64cb2ef2022b5a8296",
+    name = "openssl-0__3.5.0-4.el9.x86_64",
+    sha256 = "f2675a074aaf4ed88cf3cbc6aeb872eafdf9de90ba54b80a3a5352c5d6d75ccd",
     urls = [
         "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/openssl-3.5.0-4.el9.x86_64.rpm",
     ],
 )
 
 rpm(
-    name = "openssl-libs-0__3.2.2-6.el9.x86_64",
-    sha256 = "41e49b8db457814f4935a92b874b3a379126bad665516335485c9477a41ebf8b",
+    name = "openssl-libs-0__3.5.0-4.el9.x86_64",
+    sha256 = "f66719b4fed80a139cfcbc3f5ce57ece33fd37ec52ca3e45ea6e146a50fac3ae",
     urls = [
         "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/openssl-libs-3.5.0-4.el9.x86_64.rpm",
     ],
@@ -2388,7 +2388,7 @@ rpm(
 
 rpm(
     name = "perl-srpm-macros-0__1-41.el9.x86_64",
-    sha256 = "42df5aedef9be295f80739a3ca105be003963b9f775f175f9edfba994e27661f",
+    sha256 = "22a4b51f8e870b4f8bde9ba671bc7386d9eab0cdd82c0b724d0de958fd6daab5",
     urls = [
         "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/perl-srpm-macros-1-41.el9.noarch.rpm",
     ],
@@ -2707,7 +2707,7 @@ rpm(
 )
 
 rpm(
-    name = "systemd-libs-0__252-48.el9.x86_64",
+    name = "systemd-libs-0__252-50.el9.x86_64",
     sha256 = "436ad19a03f082af553d0f245a98b234c456f2e1b800b340d79d7723b76014fe",
     urls = [
         "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/systemd-libs-252-50.el9.x86_64.rpm",
@@ -2723,7 +2723,7 @@ rpm(
 )
 
 rpm(
-    name = "systemd-rpm-macros-0__252-48.el9.x86_64",
+    name = "systemd-rpm-macros-0__252-50.el9.x86_64",
     sha256 = "c6137001ee681e20b54d294d10e7d6d6dc6f4ce63e18600f32c2ba0775102579",
     urls = [
         "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/systemd-rpm-macros-252-50.el9.noarch.rpm",
@@ -2731,7 +2731,7 @@ rpm(
 )
 
 rpm(
-    name = "systemd-udev-0__252-48.el9.x86_64",
+    name = "systemd-udev-0__252-50.el9.x86_64",
     sha256 = "99424794f2bb0f03e3a0fb5810bbdc769ec7f750f8bdbc85b4c519e03a4e0304",
     urls = [
         "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/systemd-udev-252-50.el9.x86_64.rpm",
