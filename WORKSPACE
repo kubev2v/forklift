@@ -3932,10 +3932,10 @@ rpm(
 )
 
 rpm(
-    name = "libxml2-devel-0__2.9.13-6.el9.x86_64",
-    sha256 = "e29caaa4ab1851eb05739895fa9706fa7d33dee3bae2dd03781257f7ffb98b74",
+    name = "libxml2-devel-0__2.9.13-10.el9.x86_64",
+    sha256 = "bd0353db865fd72d0f598a8c941f1b622b77bb43a1aa4151b48ab8d7e6a9094c",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/libxml2-devel-2.9.13-6.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libxml2-devel-2.9.13-10.el9.x86_64.rpm",
     ],
 )
 
