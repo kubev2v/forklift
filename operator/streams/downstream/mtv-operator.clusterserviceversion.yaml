@@ -1,0 +1,192 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  name: ${CSV_NAME}.v${VERSION}
+  namespace: ${NAMESPACE}
+  annotations:
+    capabilities: Seamless Upgrades
+    description: Facilitates migration of VM workloads to OpenShift Virtualization
+    categories: "OpenShift Optional"
+    containerImage: ${OPERATOR_IMAGE}
+    createdAt: ${DATE}
+    repository: https://github.com/kubev2v/forklift
+    operators.openshift.io/valid-subscription: '["OpenShift Kubernetes Engine", "OpenShift Container Platform", "OpenShift Platform Plus"]'
+    certified: ${CSV_CERTIFIED}
+    support: ${CSV_SUPPORT}
+    features.operators.openshift.io/disconnected: "false"
+    features.operators.openshift.io/fips-compliant: "true"
+    features.operators.openshift.io/fipsmode: "true"
+    features.operators.openshift.io/proxy-aware: "false"
+    features.operators.openshift.io/tls-profiles: "false"
+    features.operators.openshift.io/token-auth-aws: "false"
+    features.operators.openshift.io/token-auth-azure: "false"
+    features.operators.openshift.io/token-auth-gcp: "false"
+    features.operators.openshift.io/cnf: "false"
+    features.operators.openshift.io/cni: "false"
+    features.operators.openshift.io/csi: "false"
+    operatorframework.io/suggested-namespace: ${NAMESPACE}
+    operatorframework.io/initialization-resource: |-
+      {
+        "apiVersion": "forklift.konveyor.io/v1beta1",
+        "kind": "ForkliftController",
+        "metadata": {
+          "name": "forklift-controller",
+          "namespace": "${NAMESPACE}"
+        },
+        "spec": {
+          "feature_ui_plugin": "true",
+          "feature_validation": "true",
+          "feature_volume_populator": "true"
+        }
+      }
+spec:
+  displayName: ${CSV_DISPLAYNAME}
+  description: |
+    The Migration Toolkit for Virtualization Operator manages the deployment and life cycle of Migration Toolkit for Virtualization on [OpenShift](https://www.openshift.com/) Container Platform.
+
+    ### Installation
+
+    OpenShift Virtualization must be installed on an OpenShift migration target cluster before you can use MTV to transfer any VMs to that cluster
+
+    Once you have successfully installed the Operator, proceed to deploy components by creating the required ForkliftController CR.
+
+    By default, the Operator installs the following components on a target cluster:
+
+    * Controller, to coordinate migration processes.
+    * UI, the web console to manage migrations.
+    * Validation, a service to validate migration workflows.
+
+    ### Compatibility
+
+    Migration Toolkit for Virtualization 2.8 is supported on OpenShift 4.16, 4.17 and 4.18
+
+    Migration Toolkit for Virtualization 2.9 is supported on OpenShift 4.17, 4.18 and 4.19
+
+    More information on compatibility in the [MTV Lifecycle document](https://access.redhat.com/support/policy/updates/migration-toolkit-for-virtualization).
+
+    ### Documentation
+    Documentation can be found on the [Red Hat Customer Portal](https://access.redhat.com/documentation/en-us/migration_toolkit_for_virtualization/).
+
+    ### Getting help
+    If you encounter any issues while using Migration Toolkit for Virtualization Operator, create a [support case](https://access.redhat.com/support/cases/) for bugs, enhancements, or other requests.
+
+    ### Contributing
+    You can contribute by:
+
+    * Creating a case in the [Red Hat Customer Portal](https://access.redhat.com/support/cases/) with any issues you find using Migration Toolkit for Application and its Operator.
+    * Fixing issues by opening Pull Requests in the [KubeV2V](https://github.com/kubev2v/) under Forklift Projects.
+    * Improving Forklift upstream [documentation](https://github.com/kubev2v/forklift-documentation/).
+
+  keywords: ["migration", "forklift", "konveyor", "mtv"]
+  icon:
+    - base64data: PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzOCIgaGVpZ2h0PSIzOCIgdmlld0JveD0iMCAwIDM4IDM4Ij48ZGVmcz48c3R5bGU+LmF7ZmlsbDojZTAwO308L3N0eWxlPjwvZGVmcz48cGF0aCBkPSJNMjgsMi4yNUE3Ljc1ODcsNy43NTg3LDAsMCwxLDM1Ljc1LDEwVjI4QTcuNzU4Nyw3Ljc1ODcsMCwwLDEsMjgsMzUuNzVIMTBBNy43NTg3LDcuNzU4NywwLDAsMSwyLjI1LDI4VjEwQTcuNzU4Nyw3Ljc1ODcsMCwwLDEsMTAsMi4yNUgyOE0yOCwxSDEwYTksOSwwLDAsMC05LDlWMjhhOSw5LDAsMCwwLDksOUgyOGE5LDksMCwwLDAsOS05VjEwYTksOSwwLDAsMC05LTlaIi8+PHBhdGggZD0iTTI3LDE1LjkxMzFIMTYuODE3OGwuNzc4OS0uNzc4M2EuNjI1Ni42MjU2LDAsMSwwLS44ODQ4LS44ODQ4bC0xLjg0NjcsMS44NDY3YS42MjU5LjYyNTksMCwwLDAsLjAwMS44ODQ3bDEuODQ2NywxLjg0NTdhLjYyNDkuNjI0OSwwLDEsMCwuODgyOC0uODg0N2wtLjc4LS43NzkzSDI2LjM3NVYyNi4zNzVIMTcuMTYzMVYyNC44OWEuNjI1LjYyNSwwLDAsMC0xLjI1LDBWMjdhLjYyNTYuNjI1NiwwLDAsMCwuNjI1LjYyNUgyN0EuNjI1Ni42MjU2LDAsMCwwLDI3LjYyNSwyN1YxNi41MzgxQS42MjU2LjYyNTYsMCwwLDAsMjcsMTUuOTEzMVoiLz48cGF0aCBjbGFzcz0iYSIgZD0iTTIzLjEzMzgsMjEuMDE4NmwtMS44NDY3LTEuODQ1N2EuNjI0OS42MjQ5LDAsMSwwLS44ODI4Ljg4NDdsLjc4Ljc3OTNIMTEuNjI1VjExLjYyNWg5LjIxMTlWMTMuMTFhLjYyNS42MjUsMCwwLDAsMS4yNSwwVjExYS42MjU2LjYyNTYsMCwwLDAtLjYyNS0uNjI1SDExYS42MjU2LjYyNTYsMCwwLDAtLjYyNS42MjVWMjEuNDYxOWEuNjI1Ni42MjU2LDAsMCwwLC42MjUuNjI1SDIxLjE4MjJsLS43Nzg5Ljc3ODNhLjYyNTYuNjI1NiwwLDAsMCwuODg0OC44ODQ4bDEuODQ2Ny0xLjg0NjdhLjYyNTkuNjI1OSwwLDAsMC0uMDAxLS44ODQ3WiIvPjwvc3ZnPg==
+      mediatype: "image/svg+xml"
+  install:
+    spec:
+      deployments: null
+    strategy: deployment
+  installModes:
+    - type: OwnNamespace
+      supported: true
+    - type: SingleNamespace
+      supported: false
+    - type: MultiNamespace
+      supported: false
+    - type: AllNamespaces
+      supported: false
+  maintainers:
+    - name: ${MAINTAINER_NAME}
+      email: ${MAINTAINER_EMAIL}
+  maturity: stable
+  provider:
+    name: ${PROVIDER}
+  links:
+    - name: ${DOCS_LINK_NAME}
+      url: ${DOCS_LINK_URL}
+    - name: Forklift Operator
+      url: https://github.com/kubev2v/forklift
+  version: ${VERSION}
+  minKubeVersion: 1.27.0
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+      - description: VM migration controller
+        displayName: ForkliftController
+        kind: ForkliftController
+        name: forkliftcontrollers.forklift.konveyor.io
+        version: v1beta1
+      - description: Hook schema for the hooks API
+        displayName: Hook
+        kind: Hook
+        name: hooks.forklift.konveyor.io
+        version: v1beta1
+      - description: VM host
+        displayName: Host
+        kind: Host
+        name: hosts.forklift.konveyor.io
+        version: v1beta1
+      - description: VM migration
+        displayName: Migration
+        kind: Migration
+        name: migrations.forklift.konveyor.io
+        version: v1beta1
+      - description: VM network map
+        displayName: NetworkMap
+        kind: NetworkMap
+        name: networkmaps.forklift.konveyor.io
+        version: v1beta1
+      - description: OpenStack Volume Populator
+        displayName: OpenstackVolumePopulator
+        kind: OpenstackVolumePopulator
+        name: openstackvolumepopulators.forklift.konveyor.io
+        version: v1beta1
+      - description: oVirt Volume Populator
+        displayName: OvirtVolumePopulator
+        kind: OvirtVolumePopulator
+        name: ovirtvolumepopulators.forklift.konveyor.io
+        version: v1beta1
+      - description: VM migration plan
+        displayName: Plan
+        kind: Plan
+        name: plans.forklift.konveyor.io
+        version: v1beta1
+      - description: VM provider
+        displayName: Provider
+        kind: Provider
+        name: providers.forklift.konveyor.io
+        version: v1beta1
+      - description: VM storage map
+        displayName: StorageMap
+        kind: StorageMap
+        name: storagemaps.forklift.konveyor.io
+        version: v1beta1
+      - description: VSphere Xcopy Volume Populator
+        displayName: VSphereXcopyVolumePopulator
+        kind: VSphereXcopyVolumePopulator
+        name: vspherexcopyvolumepopulators.forklift.konveyor.io
+        version: v1beta1
+  relatedImages:
+    - image: "${OPERATOR_IMAGE}"
+      name: forklift-operator
+    - image: "${CONTROLLER_IMAGE}"
+      name: controller
+    - image: "${MUST_GATHER_IMAGE}"
+      name: must_gather
+    - image: "${VALIDATION_IMAGE}"
+      name: validation
+    - image: "${API_IMAGE}"
+      name: api
+    - image: "${POPULATOR_CONTROLLER_IMAGE}"
+      name: populator_controller
+    - image: "${OVIRT_POPULATOR_IMAGE}"
+      name: rhv_populator
+    - image: "${VIRT_V2V_IMAGE}"
+      name: virt_v2v
+    - image: "${OPENSTACK_POPULATOR_IMAGE}"
+      name: openstack_populator
+    - image: "${UI_PLUGIN_IMAGE}"
+      name: ui_plugin
+    - image: "${OVA_PROVIDER_SERVER_IMAGE}"
+      name: ova_provider_server
+    - image: "${VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE}"
+      name: vsphere_xcopy_volume_populator
