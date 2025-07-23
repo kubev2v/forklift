@@ -307,12 +307,13 @@ rpm(
 )
 
 rpm(
-    name = "centos-stream-release-0__9.0-11.el9.x86_64",
+    name = "centos-stream-release-0__9.0-30.el9.x86_64",
     sha256 = "ddb1a9edc4732ca7f620ac119a5a4d985cadde22ac10a813fbcbb9f20deb43c4",
     urls = [
         "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/centos-stream-release-9.0-30.el9.noarch.rpm",
     ],
 )
+
 
 rpm(
     name = "centos-stream-repos-0__9.0-11.el9.x86_64",
