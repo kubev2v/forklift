@@ -248,12 +248,12 @@ func (r *Client) GetSnapshotDeltas(vmRef ref.Ref, snapshotId string, hosts util.
 }
 
 func (r *Client) getClient(vm *model.VM, hosts util.HostsFunc) (client *vim25.Client, err error) {
-	if coldLocal, vErr := r.Plan.VSphereColdLocal(); vErr == nil && coldLocal {
-		// when virt-v2v runs the migration, forklift-controller should interact only
-		// with the component that serves the SDK endpoint of the provider
-		client = r.client.Client
-		return
-	}
+	// if coldLocal, vErr := r.Plan.VSphereColdLocal(); vErr == nil && coldLocal {
+	// 	// when virt-v2v runs the migration, forklift-controller should interact only
+	// 	// with the component that serves the SDK endpoint of the provider
+	// 	client = r.client.Client
+	// 	return
+	// }
 
 	if r.Source.Provider.Spec.Settings[v1beta1.SDK] == v1beta1.ESXI {
 		// when migrating from ESXi host, we use the client of the SDK endpoint of the provider,

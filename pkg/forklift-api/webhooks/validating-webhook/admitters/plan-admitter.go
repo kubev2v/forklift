@@ -109,16 +109,16 @@ func (admitter *PlanAdmitter) validateLUKS() error {
 		return err
 	}
 
-	coldLocal, vErr := admitter.plan.VSphereColdLocal()
-	if vErr != nil {
-		log.Error(vErr, "Could not analyze plan, failing")
-		return vErr
-	}
-	if !coldLocal {
-		err := liberr.New("migration of encrypted disks is not supported for warm migrations or migrations to remote providers")
-		log.Error(err, "Warm migration does not support LUKS")
-		return err
-	}
+	// coldLocal, vErr := admitter.plan.VSphereColdLocal()
+	// if vErr != nil {
+	// 	log.Error(vErr, "Could not analyze plan, failing")
+	// 	return vErr
+	// }
+	// if !coldLocal {
+	// 	err := liberr.New("migration of encrypted disks is not supported for warm migrations or migrations to remote providers")
+	// 	log.Error(err, "Warm migration does not support LUKS")
+	// 	return err
+	// }
 	return nil
 }
 

@@ -434,35 +434,48 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 			if disk.Datastore.ID == ds.ID {
 				storageClass := mapped.Destination.StorageClass
 				var dvSource cdi.DataVolumeSource
-				coldLocal, vErr := r.Context.Plan.VSphereColdLocal()
-				if vErr != nil {
-					err = vErr
-					return
+				// coldLocal, vErr := r.Context.Plan.VSphereColdLocal()
+				// if vErr != nil {
+				// 	err = vErr
+				// 	return
+				// }
+				// if coldLocal {
+				// 	// Let virt-v2v do the copying
+				// 	dvSource = cdi.DataVolumeSource{
+				// 		Blank: &cdi.DataVolumeBlankImage{},
+				// 	}
+				// } else {
+				// 	// Let CDI do the copying
+				// 	dvSource = cdi.DataVolumeSource{
+				// 		VDDK: &cdi.DataVolumeSourceVDDK{
+				// 			BackingFile:  r.baseVolume(disk.File),
+				// 			UUID:         vm.UUID,
+				// 			URL:          url,
+				// 			SecretRef:    secret.Name,
+				// 			Thumbprint:   thumbprint,
+				// 			InitImageURL: r.Source.Provider.Spec.Settings[api.VDDK],
+				// 		},
+				// 	}
+				// Let CDI do the copying
+				dvSource = cdi.DataVolumeSource{
+					VDDK: &cdi.DataVolumeSourceVDDK{
+						BackingFile:  r.baseVolume(disk.File),
+						UUID:         vm.UUID,
+						URL:          url,
+						SecretRef:    secret.Name,
+						Thumbprint:   thumbprint,
+						InitImageURL: r.Source.Provider.Spec.Settings[api.VDDK],
+					},
 				}
-				if coldLocal {
-					// Let virt-v2v do the copying
-					dvSource = cdi.DataVolumeSource{
-						Blank: &cdi.DataVolumeBlankImage{},
-					}
-				} else {
-					// Let CDI do the copying
-					dvSource = cdi.DataVolumeSource{
-						VDDK: &cdi.DataVolumeSourceVDDK{
-							BackingFile:  r.baseVolume(disk.File),
-							UUID:         vm.UUID,
-							URL:          url,
-							SecretRef:    secret.Name,
-							Thumbprint:   thumbprint,
-							InitImageURL: r.Source.Provider.Spec.Settings[api.VDDK],
-						},
-					}
-				}
+				var capacity int64
+				overhead := 0.15
+				capacity = int64(float64(disk.Capacity) * (1.0 + overhead))
 				dvSpec := cdi.DataVolumeSpec{
 					Source: &dvSource,
 					Storage: &cdi.StorageSpec{
 						Resources: core.ResourceRequirements{
 							Requests: core.ResourceList{
-								core.ResourceStorage: *resource.NewQuantity(disk.Capacity, resource.BinarySI),
+								core.ResourceStorage: *resource.NewQuantity(capacity, resource.BinarySI),
 							},
 						},
 						StorageClassName: &storageClass,
@@ -734,6 +747,50 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 		kVolumes = append(kVolumes, volume)
 		kDisks = append(kDisks, kubevirtDisk)
 	}
+	// 	if !*r.Plan.Provider.Source.Spec.ConvertDisk {
+	// 		tempBootVolume := cnv.Volume{
+	// 			Name: "containerdisk",
+	// 			VolumeSource: cnv.VolumeSource{
+	// 				ContainerDisk: &cnv.ContainerDiskSource{
+	// 					Image: "quay.io/arturshadnik/vmidisk-fedora41:latest",
+	// 				},
+	// 			},
+	// 		}
+	// 		cloudInitVolume := cnv.Volume{
+	// 			Name: "cloudinitdisk",
+	// 			VolumeSource: cnv.VolumeSource{
+	// 				CloudInitNoCloud: &cnv.CloudInitNoCloudSource{
+	// 					UserData: `#cloud-config
+	// password: fedora
+	// chpasswd:
+	//   expire: False
+	// ssh_pwauth: True`,
+	// 				},
+	// 			},
+	// 		}
+
+	// 		tempBootDisk := cnv.Disk{
+	// 			Name: "containerdisk",
+	// 			DiskDevice: cnv.DiskDevice{
+	// 				Disk: &cnv.DiskTarget{
+	// 					Bus: Virtio,
+	// 				},
+	// 			},
+	// 			BootOrder: ptr.To(uint(1)),
+	// 		}
+
+	// 		cloudInitDisk := cnv.Disk{
+	// 			Name: "cloudinitdisk",
+	// 			DiskDevice: cnv.DiskDevice{
+	// 				Disk: &cnv.DiskTarget{
+	// 					Bus: Virtio,
+	// 				},
+	// 			},
+	// 		}
+	// kVolumes = append(kVolumes, tempBootVolume, cloudInitVolume)
+	// kDisks = append(kDisks, tempBootDisk, cloudInitDisk)
+	// }
+
 	object.Template.Spec.Volumes = kVolumes
 	object.Template.Spec.Domain.Devices.Disks = kDisks
 }
