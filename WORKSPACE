@@ -3636,10 +3636,10 @@ rpm(
 )
 
 rpm(
-    name = "glibc-headers-0__2.34-144.el9.x86_64",
-    sha256 = "094321d2e66362821222ea511ca17e74ad60d87a15af502e80ecef81f6386b87",
+    name = "glibc-headers-0__2.34-214.el9.x86_64",
+    sha256 = "a98b16336364c7bf3816650cf21154242760441ebb5c02dfd6e8812fab1f34bc",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/glibc-headers-2.34-144.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/glibc-headers-2.34-214.el9.x86_64.rpm",
     ],
 )
 
@@ -3996,10 +3996,10 @@ rpm(
 )
 
 rpm(
-    name = "openssl-devel-1__3.2.2-6.el9.x86_64",
-    sha256 = "20d466d1e8e98c5dcaf8f298e49fb22f7982c04cdbe8dc0608343f1c10de9efe",
+    name = "openssl-devel-1__3.5.0-4.el9.x86_64",
+    sha256 = "4c032d61f07fb4615ada6c4d44eadea2609baa398ba41e67148935544c4686d1",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/openssl-devel-3.2.2-6.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/openssl-devel-3.5.0-4.el9.x86_64.rpm",
     ],
 )
 
