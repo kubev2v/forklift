@@ -21,7 +21,6 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/provider"
 	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -93,29 +92,29 @@ type Plan struct {
 	Referenced `json:"-"`
 }
 
-// If the plan calls for the vm to be cold migrated to the local cluster, we can
-// just use virt-v2v directly to convert the vm while copying data over. In other
-// cases, we use CDI to transfer disks to the destination cluster and then use
-// virt-v2v-in-place to convert these disks after cutover.
-func (p *Plan) VSphereColdLocal() (bool, error) {
-	source := p.Referenced.Provider.Source
-	if source == nil {
-		return false, liberr.New("Cannot analyze plan, source provider is missing.")
-	}
-	destination := p.Referenced.Provider.Destination
-	if destination == nil {
-		return false, liberr.New("Cannot analyze plan, destination provider is missing.")
-	}
+// // If the plan calls for the vm to be cold migrated to the local cluster, we can
+// // just use virt-v2v directly to convert the vm while copying data over. In other
+// // cases, we use CDI to transfer disks to the destination cluster and then use
+// // virt-v2v-in-place to convert these disks after cutover.
+// func (p *Plan) VSphereColdLocal() (bool, error) {
+// 	source := p.Referenced.Provider.Source
+// 	if source == nil {
+// 		return false, liberr.New("Cannot analyze plan, source provider is missing.")
+// 	}
+// 	destination := p.Referenced.Provider.Destination
+// 	if destination == nil {
+// 		return false, liberr.New("Cannot analyze plan, destination provider is missing.")
+// 	}
 
-	switch source.Type() {
-	case VSphere:
-		return !p.Spec.Warm && destination.IsHost(), nil
-	case Ova:
-		return true, nil
-	default:
-		return false, nil
-	}
-}
+// 	switch source.Type() {
+// 	case VSphere:
+// 		return !p.Spec.Warm && destination.IsHost(), nil
+// 	case Ova:
+// 		return true, nil
+// 	default:
+// 		return false, nil
+// 	}
+// }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type PlanList struct {
@@ -141,3 +140,7 @@ func (r *Plan) IsSourceProviderOCP() bool {
 }
 
 func (r *Plan) IsSourceProviderVSphere() bool { return r.Provider.Source.Type() == VSphere }
+
+func (r *Plan) IsSourceProviderOVA() bool {
+	return r.Provider.Source.Type() == Ova
+}

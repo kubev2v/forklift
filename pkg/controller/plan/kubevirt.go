@@ -834,18 +834,19 @@ func (r *KubeVirt) getListOptionsNamespaced() (listOptions *client.ListOptions) 
 
 // Ensure the guest conversion (virt-v2v) pod exists on the destination.
 func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, vmCr *VirtualMachine, pvcs []*core.PersistentVolumeClaim) (err error) {
-	labels := r.vmLabels(vm.Ref)
-	v2vSecret, err := r.ensureSecret(vm.Ref, r.secretDataSetterForCDI(vm.Ref), labels)
-	if err != nil {
-		return
-	}
+	// labels := r.vmLabels(vm.Ref)
+	// v2vSecret, err := r.ensureSecret(vm.Ref, r.secretDataSetterForCDI(vm.Ref), labels)
+	// if err != nil {
+	// 	return
+	// }
 
 	configMap, err := r.ensureLibvirtConfigMap(vm.Ref, vmCr, pvcs)
 	if err != nil {
 		return
 	}
 
-	newPod, err := r.guestConversionPod(vm, vmCr.Spec.Template.Spec.Volumes, configMap, pvcs, v2vSecret)
+	// newPod, err := r.guestConversionPod(vm, vmCr.Spec.Template.Spec.Volumes, configMap, pvcs, v2vSecret)
+	newPod, err := r.guestConversionPod(vm, vmCr.Spec.Template.Spec.Volumes, configMap, pvcs)
 	if err != nil {
 		return
 	}
@@ -1680,7 +1681,7 @@ func (r *KubeVirt) findTemplate(vm *plan.VMStatus) (tmpl *template.Template, err
 	return
 }
 
-func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, configMap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, v2vSecret *core.Secret) (pod *core.Pod, err error) {
+func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, configMap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim) (pod *core.Pod, err error) {
 	volumes, volumeMounts, volumeDevices, err := r.podVolumeMounts(vmVolumes, configMap, pvcs, vm)
 	if err != nil {
 		return
@@ -1697,34 +1698,34 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	user := qemuUser
 	nonRoot := true
 	allowPrivilageEscalation := false
-	// virt-v2v image
-	coldLocal, vErr := r.Context.Plan.VSphereColdLocal()
-	if vErr != nil {
-		err = vErr
-		return
-	}
-	if coldLocal {
-		// mount the secret for the password and CA certificate
-		volumes = append(volumes, core.Volume{
-			Name: "secret-volume",
-			VolumeSource: core.VolumeSource{
-				Secret: &core.SecretVolumeSource{
-					SecretName: v2vSecret.Name,
-				},
-			},
-		})
-		volumeMounts = append(volumeMounts, core.VolumeMount{
-			Name:      "secret-volume",
-			ReadOnly:  true,
-			MountPath: "/etc/secret",
-		})
-	} else {
-		environment = append(environment,
-			core.EnvVar{
-				Name:  "V2V_inPlace",
-				Value: "1",
-			})
-	}
+	// // virt-v2v image
+	// coldLocal, vErr := r.Context.Plan.VSphereColdLocal()
+	// if vErr != nil {
+	// 	err = vErr
+	// 	return
+	// }
+	// if coldLocal {
+	// 	// mount the secret for the password and CA certificate
+	// 	volumes = append(volumes, core.Volume{
+	// 		Name: "secret-volume",
+	// 		VolumeSource: core.VolumeSource{
+	// 			Secret: &core.SecretVolumeSource{
+	// 				SecretName: v2vSecret.Name,
+	// 			},
+	// 		},
+	// 	})
+	// 	volumeMounts = append(volumeMounts, core.VolumeMount{
+	// 		Name:      "secret-volume",
+	// 		ReadOnly:  true,
+	// 		MountPath: "/etc/secret",
+	// 	})
+	// } else {
+	// 	environment = append(environment,
+	// 		core.EnvVar{
+	// 			Name:  "V2V_inPlace",
+	// 			Value: "1",
+	// 		})
+	// }
 	// VDDK image
 	var initContainers []core.Container
 	if vddkImage, found := r.Source.Provider.Spec.Settings[api.VDDK]; found {
@@ -1823,16 +1824,19 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 					Name:            "virt-v2v",
 					Env:             environment,
 					ImagePullPolicy: core.PullAlways,
-					EnvFrom: []core.EnvFromSource{
-						{
-							Prefix: "V2V_",
-							SecretRef: &core.SecretEnvSource{
-								LocalObjectReference: core.LocalObjectReference{
-									Name: v2vSecret.Name,
-								},
-							},
-						},
-					},
+					// EnvFrom: []core.EnvFromSource{
+					// 	{
+					// 		Prefix: "V2V_",
+					// 		SecretRef: &core.SecretEnvSource{
+					// 			LocalObjectReference: core.LocalObjectReference{
+					// 				Name: v2vSecret.Name,
+					// 			},
+					// 		},
+					// 	},
+					// },
+					// Image:         Settings.Migration.VirtV2vImage,
+					// VolumeMounts:  volumeMounts,
+					// VolumeDevices: volumeDevices,
 					Image:         Settings.Migration.VirtV2vImage,
 					VolumeMounts:  volumeMounts,
 					VolumeDevices: volumeDevices,

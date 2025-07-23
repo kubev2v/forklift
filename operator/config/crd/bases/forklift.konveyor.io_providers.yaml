@@ -60,6 +60,9 @@ spec:
           spec:
             description: Defines the desired state of Provider.
             properties:
+              convertDisk:
+                description: Whether or not the disk should be converted
+                type: boolean
               secret:
                 description: |-
                   References a secret containing credentials and

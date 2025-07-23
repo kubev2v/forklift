@@ -8,7 +8,7 @@ genrule(
     name = "kustomize_bin",
     srcs = ["@kustomize//file"],
     outs = ["kustomize"],
-    cmd = "tar -C $(@D) -xf $(location @kustomize//file)",
+    cmd = "tar --no-same-owner -C $(@D) -xf $(location @kustomize//file)",
 )
 
 # OPERATOR

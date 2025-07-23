@@ -197,27 +197,36 @@ func (r *Scheduler) buildPending() (err error) {
 }
 
 func (r *Scheduler) cost(vm *model.VM, vmStatus *plan.VMStatus) int {
-	coldLocal, _ := r.Plan.VSphereColdLocal()
-	if coldLocal {
-		switch vmStatus.Phase {
-		case CreateVM, PostHook, Completed:
-			// In these phases we already have the disk transferred and are left only to create the VM
-			// By setting the cost to 0 other VMs can start migrating
-			return 0
-		default:
-			return 1
-		}
-	} else {
-		switch vmStatus.Phase {
-		case CreateVM, PostHook, Completed, CopyingPaused, ConvertGuest, CreateGuestConversionPod:
-			// The warm/remote migrations this is done on already transferred disks,
-			// and we can start other VM migrations at these point.
-			// By setting the cost to 0 other VMs can start migrating
-			return 0
-		default:
-			// CDI transfers the disks in parallel by different pods
-			return len(vm.Disks) - r.finishedDisks(vmStatus)
-		}
+	// coldLocal, _ := r.Plan.VSphereColdLocal()
+	// if coldLocal {
+	// 	switch vmStatus.Phase {
+	// 	case CreateVM, PostHook, Completed:
+	// 		// In these phases we already have the disk transferred and are left only to create the VM
+	// 		// By setting the cost to 0 other VMs can start migrating
+	// 		return 0
+	// 	default:
+	// 		return 1
+	// 	}
+	// } else {
+	// 	switch vmStatus.Phase {
+	// 	case CreateVM, PostHook, Completed, CopyingPaused, ConvertGuest, CreateGuestConversionPod:
+	// 		// The warm/remote migrations this is done on already transferred disks,
+	// 		// and we can start other VM migrations at these point.
+	// 		// By setting the cost to 0 other VMs can start migrating
+	// 		return 0
+	// 	default:
+	// 		// CDI transfers the disks in parallel by different pods
+	// 		return len(vm.Disks) - r.finishedDisks(vmStatus)
+	// 	}
+	switch vmStatus.Phase {
+	case CreateVM, PostHook, Completed, CopyingPaused, ConvertGuest, CreateGuestConversionPod:
+		// The warm/remote migrations this is done on already transferred disks,
+		// and we can start other VM migrations at these point.
+		// By setting the cost to 0 other VMs can start migrating
+		return 0
+	default:
+		// CDI transfers the disks in parallel by different pods
+		return len(vm.Disks) - r.finishedDisks(vmStatus)
 	}
 }
 
