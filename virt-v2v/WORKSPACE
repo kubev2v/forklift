@@ -2620,17 +2620,17 @@ rpm(
 
 rpm(
     name = "selinux-policy-0__38.1.49-1.el9.noarch",
-    sha256 = "204f106e6478a7f21382b864fdae187c01c5e906d3c5c12324f160d79cb56f1e",
+    sha256 = "8cbe8d11391f327c533a66b28cbc8f61df8f99c0a7cd7181e8b0968c021da435",
     urls = [
-        "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/selinux-policy-38.1.49-1.el9.noarch.rpm",
+        "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/selinux-policy-38.1.55-2.el9.noarch.rpm",
     ],
 )
 
 rpm(
     name = "selinux-policy-targeted-0__38.1.49-1.el9.noarch",
-    sha256 = "3b5aa3e0740c208c9103f420a86d52f4ac063ba19b832e86f9b857a54cc699b1",
+    sha256 = "b85f385c53c5efe6703b93cab449ec655fd67ebc3c3a534194011d46e7619efa",
     urls = [
-        "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/selinux-policy-targeted-38.1.49-1.el9.noarch.rpm",
+        "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/selinux-policy-targeted-38.1.55-2.el9.noarch.rpm",
     ],
 )
 
@@ -2700,9 +2700,9 @@ rpm(
 
 rpm(
     name = "systemd-container-0__252-48.el9.x86_64",
-    sha256 = "2e29c5ebd3b6ff325d003c9b5e3484b02a76b618e50bc888c0a6227a22aad370",
+    sha256 = "f718cca99ef041eef6be25f628f27669094b6e70f3fb2a6ad93acdc83518ac3e",
     urls = [
-        "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/systemd-container-252-48.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/systemd-container-252-49.el9.x86_64.rpm",
     ],
 )
 
@@ -2716,9 +2716,9 @@ rpm(
 
 rpm(
     name = "systemd-pam-0__252-48.el9.x86_64",
-    sha256 = "f3c1528ff5539825ca09bd6ffcef07a271460204c74ef5c0d677dd0111d1bce8",
+    sha256 = "734ebe0849361e583084c2857a8c8b114ba39dde352bcb994fcb2711f7d64194",
     urls = [
-        "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/systemd-pam-252-48.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/systemd-pam-252-49.el9.x86_64.rpm",
     ],
 )
 
