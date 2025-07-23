@@ -1427,7 +1427,7 @@ rpm(
 )
 
 rpm(
-    name = "libstdc++-0__11.5.0-2.el9.x86_64",
+    name = "libstdc__plus____plus__-0__11.5.0-2.el9.x86_64",
     sha256 = "65e3a8674b62fade64c6d293caef93d694bace34d9e3e50014a1a11ce813dc00",
     urls = [
         "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/libstdc++-11.5.0-2.el9.x86_64.rpm",
@@ -1844,7 +1844,7 @@ rpm(
 
 rpm(
     name = "openldap-0__2.6.6-3.el9.x86_64",
-    sha256 = "24b73e92d8ed075a61cb8a9f0463f55130d0eecf1968b7109af65cdd4aaeabc6",
+    sha256 = "da4c54a99c4556ab6c95f91ac0f472e8e96509fd97a59f45e196c0f613a1dbab",
     urls = [
         "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/openldap-2.6.6-3.el9.x86_64.rpm",
     ],
@@ -2275,7 +2275,7 @@ rpm(
 )
 
 rpm(
-    name = "perl-Text-Tabs+Wrap-0__2013.0523-460.el9.noarch",
+    name = "perl-Text-Tabs__plus__Wrap-0__2013.0523-460.el9.noarch",
     sha256 = "ba097a3ff9627bfaf989cd89cfbb40bd5a32ee1a53969510494f950b5d6da47d",
     urls = [
         "https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/perl-Text-Tabs+Wrap-2013.0523-460.el9.noarch.rpm",
