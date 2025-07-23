@@ -66,6 +66,10 @@ func (r *Validator) MaintenanceMode(vmRef ref.Ref) (ok bool, err error) {
 }
 
 // NOOP
+func (r *Validator) UnSupportedDisks(vmRef ref.Ref) ([]string, error) {
+	return []string{}, nil
+}
+
 func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, s string, s2 string, err error) {
 	ok = true
 	return
