@@ -164,7 +164,7 @@ func (f *FlashArrayClonner) VvolCopy(vsphereClient vmware.Client, vmId string, s
 	}
 
 	// Try to get source volume from vSphere API
-	sourceVolume, err := f.getSourceVolumeFromVSphere(vsphereClient, vmId, vmDisk)
+	sourceVolume, err := f.getSourceVolume(vsphereClient, vmId, vmDisk)
 	if err != nil {
 		return fmt.Errorf("failed to get source volume from vSphere: %w", err)
 	}
@@ -181,8 +181,8 @@ func (f *FlashArrayClonner) VvolCopy(vsphereClient vmware.Client, vmId string, s
 	return nil
 }
 
-// getSourceVolumeFromVSphere uses vSphere API to find the Pure volume name for a VMDK
-func (f *FlashArrayClonner) getSourceVolumeFromVSphere(vsphereClient vmware.Client, vmId string, vmDisk populator.VMDisk) (string, error) {
+// getSourceVolume find the Pure volume name for a VMDK
+func (f *FlashArrayClonner) getSourceVolume(vsphereClient vmware.Client, vmId string, vmDisk populator.VMDisk) (string, error) {
 	ctx := context.Background()
 
 	// Get VM object from vSphere
