@@ -3503,7 +3503,7 @@ rpm(
     name = "cmake-filesystem-0__3.26.5-2.el9.x86_64",
     sha256 = "8e398dd9ccda66f1b64951593600553a753dd554295869c6bcc9b42a5d9ca5a3",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/cmake-filesystem-3.26.5-2.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/cmake-filesystem-3.26.5-2.el9.x86_64.rpm",
     ],
 )
 
@@ -3519,7 +3519,7 @@ rpm(
     name = "cpp-0__11.5.0-2.el9.x86_64",
     sha256 = "6d19aff72241ceefe83a3d029321b380b80f7d0267e1f8d28291b94b1daf7880",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/cpp-11.5.0-2.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/cpp-11.5.0-2.el9.x86_64.rpm",
     ],
 )
 
@@ -3591,7 +3591,7 @@ rpm(
     name = "gcc-0__11.5.0-2.el9.x86_64",
     sha256 = "ce12a9ca76e71fb4eecf4f5dd6b8f16528887b92e75405159cc7a0e93b6787c7",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/gcc-11.5.0-2.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/gcc-11.5.0-2.el9.x86_64.rpm",
     ],
 )
 
@@ -3631,7 +3631,7 @@ rpm(
     name = "glibc-devel-0__2.34-144.el9.x86_64",
     sha256 = "a3e36bd8355be3869ee9ed96a199182ccccf8756aab6705b9f22b8acb2613581",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/glibc-devel-2.34-144.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/glibc-devel-2.34-144.el9.x86_64.rpm",
     ],
 )
 
@@ -3687,7 +3687,7 @@ rpm(
     name = "kernel-headers-0__5.14.0-539.el9.x86_64",
     sha256 = "cbf6183c123c7ed39fe2199b0b9f70afec02483def1d55b140edb4b2b2478df3",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/kernel-headers-5.14.0-539.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/kernel-headers-5.14.0-539.el9.x86_64.rpm",
     ],
 )
 
@@ -3759,7 +3759,7 @@ rpm(
     name = "libcurl-devel-0__7.76.1-31.el9.x86_64",
     sha256 = "801b52f1a69bab444ff53cab2f5694768f0eef8bb2ba1e5615057e4637dc2b2b",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/libcurl-devel-7.76.1-31.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libcurl-devel-7.76.1-31.el9.x86_64.rpm",
     ],
 )
 
@@ -3815,7 +3815,7 @@ rpm(
     name = "libmpc-0__1.2.1-4.el9.x86_64",
     sha256 = "39e1496f4b848437043224fa9bc223a03733a7be3f4c7c9cc74eb1d8b81d9b06",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/libmpc-1.2.1-4.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libmpc-1.2.1-4.el9.x86_64.rpm",
     ],
 )
 
@@ -3887,7 +3887,7 @@ rpm(
     name = "liburing-0__2.5-1.el9.x86_64",
     sha256 = "dbeb30f4333754b3d7f16a984a3e663c3e20f2c2fc34717037aa9b875a4f2de6",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/liburing-2.5-1.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/liburing-2.5-1.el9.x86_64.rpm",
     ],
 )
 
@@ -3919,7 +3919,7 @@ rpm(
     name = "libxcrypt-devel-0__4.4.18-3.el9.x86_64",
     sha256 = "4289873ed55d6a000381ce1c904fdb0d4a0c7566d6119d950ed299c2626e1893",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/libxcrypt-devel-4.4.18-3.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libxcrypt-devel-4.4.18-3.el9.x86_64.rpm",
     ],
 )
 
@@ -4087,7 +4087,7 @@ rpm(
     name = "python3-devel-0__3.9.21-1.el9.x86_64",
     sha256 = "2dad694985c921d05fc07eb8dc779c59d9f6fe6196642255f0a0307dc1b1ca7f",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/python3-devel-3.9.21-1.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/python3-devel-3.9.21-1.el9.x86_64.rpm",
     ],
 )
 
@@ -4103,7 +4103,7 @@ rpm(
     name = "python3-pip-0__21.3.1-1.el9.x86_64",
     sha256 = "5c552404c6812cf6a2cdb130da36231a91b3924d5771d854f2489d429b1d04f9",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/python3-pip-21.3.1-1.el9.noarch.rpm",
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/python3-pip-21.3.1-1.el9.noarch.rpm",
     ],
 )
 
@@ -4127,7 +4127,7 @@ rpm(
     name = "qemu-img-17__9.1.0-6.el9.x86_64",
     sha256 = "3574c8e1d78052d2781745d27cbc52a4b8b5093154be803fb40a5a78a606aee4",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/qemu-img-9.1.0-6.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/qemu-img-9.1.0-6.el9.x86_64.rpm",
     ],
 )
 
@@ -4175,7 +4175,7 @@ rpm(
     name = "xz-devel-0__5.2.5-8.el9.x86_64",
     sha256 = "c9ba742f76b51daab90eb581de4c2a01623686fbbaaf87e59644b622d7e10fd7",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/xz-devel-5.2.5-8.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/xz-devel-5.2.5-8.el9.x86_64.rpm",
     ],
 )
 
@@ -4199,6 +4199,6 @@ rpm(
     name = "zlib-devel-0__1.2.11-40.el9.x86_64",
     sha256 = "862c0a619524e03926ae6778dfc06f802327035ad72a2dc2b58517d009f5b234",
     urls = [
-        "https://composes.stream.centos.org/development/latest-CentOS-Stream/compose/AppStream/x86_64/os/Packages/zlib-devel-1.2.11-40.el9.x86_64.rpm",
+        "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/zlib-devel-1.2.11-40.el9.x86_64.rpm",
     ],
 )
