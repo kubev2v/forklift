@@ -3917,7 +3917,7 @@ rpm(
 
 rpm(
     name = "libxcrypt-devel-0__4.4.18-3.el9.x86_64",
-    sha256 = "4289873ed55d6a000381ce1c904fdb0d4a0c7566d6119d950ed299c2626e1893",
+    sha256 = "162461e5f31f94907c91815370b545844cc9d33b1311e0063e23ae427241d1e0",
     urls = [
         "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libxcrypt-devel-4.4.18-3.el9.x86_64.rpm",
     ],
