@@ -1491,9 +1491,19 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) 
 	// Set the default run strategy to Halted
 	runStrategy := cnv.RunStrategyHalted
 
-	// If the source VM is powered on, set the destination VM to always run
-	if vm.RestorePowerState == plan.VMPowerStateOn {
+	// Determine the target power state based on plan configuration
+	switch r.Plan.Spec.TargetPowerState {
+	case api.TargetPowerStateOn:
+		// Force target VM to be powered on
 		runStrategy = cnv.RunStrategyAlways
+	case api.TargetPowerStateOff:
+		// Force target VM to be powered off
+		runStrategy = cnv.RunStrategyHalted
+	default:
+		// Default behavior: match the source VM's power state
+		if vm.RestorePowerState == plan.VMPowerStateOn {
+			runStrategy = cnv.RunStrategyAlways
+		}
 	}
 
 	// Assign the determined run strategy to the object
