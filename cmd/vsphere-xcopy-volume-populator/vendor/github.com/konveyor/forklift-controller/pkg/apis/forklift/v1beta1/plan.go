@@ -39,6 +39,21 @@ type PlanSpec struct {
 	Description string `json:"description,omitempty"`
 	// Target namespace.
 	TargetNamespace string `json:"targetNamespace"`
+	// TargetLabels are labels that should be applied to the target virtual machines.
+	// See Pod Labels documentation for more details,
+	// https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#labels
+	TargetLabels map[string]string `json:"targetLabels,omitempty"`
+	// TargetNodeSelector, constrains the scheduler to only schedule VMs on nodes,
+	// which contain the specified labels.
+	// See virtual machine instance NodeSelector documentation for more details,
+	// https://kubevirt.io/user-guide/compute/node_assignment/#nodeselector
+	TargetNodeSelector map[string]string `json:"targetNodeSelector,omitempty"`
+	// TargetAffinity allows specifying hard- and soft-affinity for VMs.
+	// it is possible to write matching rules against workloads (VMs and Pods) and Nodes.
+	// Since VMs are a workload type based on Pods, Pod-affinity affects VMs as well.
+	// See virtual machine instance Affinity documentation for more details,
+	// https://kubevirt.io/user-guide/compute/node_assignment/#affinity-and-anti-affinity
+	TargetAffinity *core.Affinity `json:"targetAffinity,omitempty"`
 	// Providers.
 	Provider provider.Pair `json:"provider"`
 	// Resource mapping.
@@ -140,6 +155,12 @@ type PlanSpec struct {
 	// Determines if the plan should skip the guest conversion.
 	// +kubebuilder:default:=false
 	SkipGuestConversion bool `json:"skipGuestConversion,omitempty"`
+	// useCompatibilityMode controls whether to use VirtIO devices when skipGuestConversion is true (Raw Copy mode).
+	// This setting has no effect when skipGuestConversion is false (V2V Conversion always uses VirtIO).
+	// - true (default): Use compatibility devices (SATA bus, E1000E NIC) to ensure bootability
+	// - false: Use high-performance VirtIO devices (requires VirtIO drivers already installed in source VM)
+	// +kubebuilder:default:=true
+	UseCompatibilityMode bool `json:"useCompatibilityMode,omitempty"`
 	// Migration type. e.g. "cold", "warm", "live". Supersedes the `warm` boolean if set.
 	// +optional
 	// +kubebuilder:validation:Enum=cold;warm;live
