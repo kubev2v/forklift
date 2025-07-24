@@ -27,10 +27,14 @@ import (
 	cnv "kubevirt.io/api/core/v1"
 )
 
+// MigrationType defines the type of migration to perform
+type MigrationType string
+
 const (
-	MigrationCold = "cold"
-	MigrationWarm = "warm"
-	MigrationLive = "live"
+	// Migration types
+	MigrationCold MigrationType = "cold"
+	MigrationWarm MigrationType = "warm"
+	MigrationLive MigrationType = "live"
 )
 
 // PlanSpec defines the desired state of Plan.
@@ -164,7 +168,14 @@ type PlanSpec struct {
 	// Migration type. e.g. "cold", "warm", "live". Supersedes the `warm` boolean if set.
 	// +optional
 	// +kubebuilder:validation:Enum=cold;warm;live
-	Type string `json:"type,omitempty"`
+	Type MigrationType `json:"type,omitempty"`
+	// TargetPowerState specifies the desired power state of the target VM after migration.
+	// - "on": Target VM will be powered on after migration
+	// - "off": Target VM will be powered off after migration
+	// - "auto" or nil (default): Target VM will match the source VM's power state
+	// +optional
+	// +kubebuilder:validation:Enum=on;off;auto
+	TargetPowerState plan.TargetPowerState `json:"targetPowerState,omitempty"`
 }
 
 // Find a planned VM.

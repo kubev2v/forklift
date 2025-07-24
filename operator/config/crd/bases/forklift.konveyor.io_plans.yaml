@@ -1280,6 +1280,17 @@ spec:
                   See virtual machine instance NodeSelector documentation for more details,
                   https://kubevirt.io/user-guide/compute/node_assignment/#nodeselector
                 type: object
+              targetPowerState:
+                description: |-
+                  TargetPowerState specifies the desired power state of the target VM after migration.
+                  - "on": Target VM will be powered on after migration
+                  - "off": Target VM will be powered off after migration
+                  - "auto" or nil (default): Target VM will match the source VM's power state
+                enum:
+                - "on"
+                - "off"
+                - auto
+                type: string
               transferNetwork:
                 description: The network attachment definition that should be used
                   for disk transfer.
@@ -1505,6 +1516,17 @@ spec:
                         TargetName specifies a custom name for the VM in the target cluster.
                         If not provided, the original VM name will be used and automatically adjusted to meet k8s DNS1123 requirements.
                         If provided, this exact name will be used instead. The migration will fail if the name is not unique or already in use.
+                      type: string
+                    targetPowerState:
+                      description: |-
+                        TargetPowerState specifies the desired power state of the target VM after migration.
+                        - "on": Target VM will be powered on after migration
+                        - "off": Target VM will be powered off after migration
+                        - "auto" or nil (default): Target VM will match the source VM's power state
+                      enum:
+                      - "on"
+                      - "off"
+                      - auto
                       type: string
                     type:
                       description: Type used to qualify the name.
@@ -2166,6 +2188,17 @@ spec:
                             TargetName specifies a custom name for the VM in the target cluster.
                             If not provided, the original VM name will be used and automatically adjusted to meet k8s DNS1123 requirements.
                             If provided, this exact name will be used instead. The migration will fail if the name is not unique or already in use.
+                          type: string
+                        targetPowerState:
+                          description: |-
+                            TargetPowerState specifies the desired power state of the target VM after migration.
+                            - "on": Target VM will be powered on after migration
+                            - "off": Target VM will be powered off after migration
+                            - "auto" or nil (default): Target VM will match the source VM's power state
+                          enum:
+                          - "on"
+                          - "off"
+                          - auto
                           type: string
                         type:
                           description: Type used to qualify the name.
