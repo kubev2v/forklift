@@ -3,6 +3,7 @@ package pure
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -215,7 +216,7 @@ func (f *FlashArrayClonner) getSourceVolume(vsphereClient vmware.Client, vmId st
 					// Use REST client to find the volume by VVol ID
 					volumeName, err := f.restClient.FindVolumeByVVolID(backing.BackingObjectId)
 					if err != nil {
-						klog.Warningf("Failed to find volume by VVol ID %s: %v", backing.BackingObjectId, err)
+						klog.Warningf("Failed to find volume by VVol ID %s: %w", backing.BackingObjectId, err)
 						continue
 					}
 
@@ -230,7 +231,9 @@ func (f *FlashArrayClonner) getSourceVolume(vsphereClient vmware.Client, vmId st
 
 // matchesVMDKPath checks if a vSphere VVol filename matches the target VMDK
 func (f *FlashArrayClonner) matchesVMDKPath(fileName string, vmDisk populator.VMDisk) bool {
-	return strings.Contains(fileName, vmDisk.VmdkFile)
+	fileBase := filepath.Base(fileName)
+	targetBase := filepath.Base(vmDisk.VmdkFile)
+	return fileBase == targetBase
 }
 
 // performVolumeCopy executes the volume copy operation on Pure FlashArray
