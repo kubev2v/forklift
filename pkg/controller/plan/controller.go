@@ -216,9 +216,16 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		if r.isDanglingArchivedPlan(plan) {
 			r.Log.Info("Dangling Plan - Aborting reconcile of plan without source provider.")
 			r.archive(plan)
-			if err = r.updatePlanStatus(plan); err != nil {
-				r.Log.Error(err, "failed to update plan status")
-			}
+		} else {
+			plan.Status.SetCondition(libcnd.Condition{
+				Type:     libcnd.Error,
+				Status:   True,
+				Category: Critical,
+				Message:  err.Error(),
+			})
+		}
+		if err = r.updatePlanStatus(plan); err != nil {
+			r.Log.Error(err, "failed to update plan status")
 		}
 		return
 	}

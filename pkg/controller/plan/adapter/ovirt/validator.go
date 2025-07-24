@@ -10,6 +10,7 @@ import (
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/ovirt"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/settings"
+	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -45,6 +46,16 @@ func (r *Validator) MigrationType() bool {
 	default:
 		return false
 	}
+}
+
+func (r *Validator) ValidVmName(vmRef ref.Ref) (ok bool, err error) {
+	// Check if the VM reference name is a valid DNS1123 subdomain
+	if len(k8svalidation.IsDNS1123Subdomain(vmRef.Name)) > 0 {
+		// Not valid
+		return false, nil
+	}
+	// Valid
+	return true, nil
 }
 
 // Validate that a VM's networks have been mapped.

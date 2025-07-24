@@ -16,6 +16,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/settings"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	cnv "kubevirt.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -237,6 +238,22 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 		}
 	}
 
+	return true, nil
+}
+
+// OCP-to-OCP VM migration requires names that are DNS_RFC_1035 compliant, unlike DNS_RFC_1123 where we modify the VM name as needed.
+func (r *Validator) ValidVmName(vmRef ref.Ref) (ok bool, err error) {
+	// Check if the VM reference name is a valid DNS1123 subdomain
+	if len(k8svalidation.IsDNS1123Subdomain(vmRef.Name)) > 0 {
+		// Not valid
+		return false, nil
+	} else if len(k8svalidation.IsDNS1035Label(vmRef.Name)) > 0 {
+		return false, liberr.Wrap(
+			fmt.Errorf("Invalid VM name %q: must be a valid DNS-1035 label", vmRef.Name),
+			"vm",
+			vmRef.String())
+	}
+	// Valid
 	return true, nil
 }
 
