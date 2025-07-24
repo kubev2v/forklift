@@ -1473,15 +1473,8 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) 
 		object.ObjectMeta.Annotations = annotations
 	}
 
-	// Set the default run strategy to Halted
-	runStrategy := cnv.RunStrategyHalted
-
-	// If the source VM is powered on, set the destination VM to always run
-	if vm.RestorePowerState == plan.VMPowerStateOn {
-		runStrategy = cnv.RunStrategyAlways
-	}
-
 	// Assign the determined run strategy to the object
+	runStrategy := r.determineRunStrategy(vm)
 	object.Spec.RunStrategy = &runStrategy
 	object.Spec.Running = nil // Ensure running is not set
 
@@ -3006,4 +2999,28 @@ func (r *KubeVirt) IsCopyOffload(pvcs []*core.PersistentVolumeClaim) bool {
 		}
 	}
 	return false
+}
+
+// determineRunStrategy determines the appropriate run strategy based on the target power state configuration
+func (r *KubeVirt) determineRunStrategy(vm *plan.VMStatus) cnv.VirtualMachineRunStrategy {
+	// Determine the target power state based on plan configuration
+	targetPowerState := vm.TargetPowerState
+	if targetPowerState == "" {
+		targetPowerState = r.Plan.Spec.TargetPowerState
+	}
+
+	switch targetPowerState {
+	case plan.TargetPowerStateOn:
+		// Force target VM to be powered on
+		return cnv.RunStrategyAlways
+	case plan.TargetPowerStateOff:
+		// Force target VM to be powered off
+		return cnv.RunStrategyHalted
+	default:
+		// Default behavior: match the source VM's power state
+		if vm.RestorePowerState == plan.VMPowerStateOn {
+			return cnv.RunStrategyAlways
+		}
+		return cnv.RunStrategyHalted
+	}
 }
