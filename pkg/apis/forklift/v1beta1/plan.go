@@ -140,6 +140,13 @@ type PlanSpec struct {
 	// - false: Use high-performance VirtIO devices (requires VirtIO drivers already installed in source VM)
 	// +kubebuilder:default:=true
 	UseCompatibilityMode bool `json:"useCompatibilityMode,omitempty"`
+	// TargetPowerState specifies the desired power state of the target VM after migration.
+	// - "on": Target VM will be powered on after migration
+	// - "off": Target VM will be powered off after migration
+	// - "auto" or nil (default): Target VM will match the source VM's power state
+	// +optional
+	// +kubebuilder:validation:Enum=on;off;auto
+	TargetPowerState plan.TargetPowerState `json:"targetPowerState,omitempty"`
 }
 
 // Find a planned VM.
