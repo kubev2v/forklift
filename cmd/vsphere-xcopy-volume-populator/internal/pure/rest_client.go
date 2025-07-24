@@ -101,14 +101,14 @@ type HostConnectionRequest struct {
 }
 
 // NewRestClient creates a new REST client for Pure FlashArray
-func NewRestClient(hostname, username, password string) (*RestClient, error) {
+func NewRestClient(hostname, username, password string, skipSSLVerify bool) (*RestClient, error) {
 	client := &RestClient{
 		hostname: hostname,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true,
+					InsecureSkipVerify: skipSSLVerify,
 				},
 			},
 		},

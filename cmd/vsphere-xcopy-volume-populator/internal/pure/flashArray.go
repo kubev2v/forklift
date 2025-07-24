@@ -33,7 +33,7 @@ func NewFlashArrayClonner(hostname, username, password string, skipSSLVerificati
 	}
 
 	// Create the REST client for all operations
-	restClient, err := NewRestClient(hostname, username, password)
+	restClient, err := NewRestClient(hostname, username, password, skipSSLVerification)
 	if err != nil {
 		return FlashArrayClonner{}, fmt.Errorf("failed to create REST client: %w", err)
 	}
