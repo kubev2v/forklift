@@ -62,20 +62,21 @@ are holds migratable VMs.
 See vmkfstools-wrapper/README.md for the installation of the tool using ansible
 
 ## Storage Provider
-If a storage provider wants to their storage to be supported they need
-to implement a go package named after their product, and mutate main so
-their specific code path is initialized. See
-cmd/vsphere-xcopy-volume-populator/internal/populator/storage.go
+If a storage provider wants their storage to be supported, they need
+to implement a go package named after their product, and mutate main
+package so their specific code path is initialized.
+See [internal/populator/storage.go](internal/populator/storage.go)
 
-# Limitation
-- currently a VM with single disk is supported
-- The source VMDK must sit on a LUN from the same storage array endpoint where
-the target LUN would be created.
-- Progress reporting is missing because of lack of underlying tooling support (vmkfstools)
+## Limitations
+- A migration plan cannot mix VDDK mappings with copy-offload mappings.
+  Because the migration controller copies disks **either** through CDI volumes
+  (VDDK) **or** through Volume Populators (copy-offload), all storage pairs
+  in the plan must **either** include copy-offload details (secret + product)
+  **or** none of them must; otherwise the plan will fail.
 
 This volume populator implementation is specific for performing XCOPY from a source vmdk 
-disk file, to a target PVC.
-The way it works is by performing the XCOPY using vmkfstools on the target ESXi.
+descriptor disk file to a target PVC; this also works if the underlying disk is
+vVol or RDM. The way it works is by performing the XCOPY using vmkfstools on the target ESXi.
 
 
 <a id="matching-pvc"></a>
