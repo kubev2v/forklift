@@ -37,7 +37,7 @@ func (p *VvolPopulator) Populate(vmId string, sourceVMDKFile string, pv Persiste
 	klog.Infof("VVol Populator: VM ID: %s, Source VMDK: %s, Target: %s", vmId, sourceVMDKFile, pv.Name)
 
 	// Try using vSphere API to discover source volume first (preferred method)
-	klog.Infof("VVol Populator: Attempting vSphere API discovery...")
+	klog.Infof("VVol Populator: Starting VVol copy operation...")
 	err := p.StorageApi.VvolCopy(p.VSphereClient, vmId, sourceVMDKFile, pv, progress)
 	if err != nil {
 		klog.Errorf("VVol Populator: discovery of source volume using vSphere API failed: %v", err)
