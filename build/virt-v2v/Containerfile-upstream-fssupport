@@ -17,7 +17,7 @@ RUN rm /etc/pki/tls/fips_local.cnf && \
 
 # The virt-v2v-in-place in centos is not in the bin directory and is not accessible via PATH
 ENV PATH="$PATH:/usr/libexec"
-ENV LIBGUESTFS_BACKEND=direct LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1
+ENV LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1
 
 RUN mkdir /disks && \
     source /etc/os-release && \
@@ -43,6 +43,15 @@ RUN dnf install --setopt=sslverify=false -y https://kojihub.stream.centos.org/ko
 RUN test "$(rpm -q kernel)" = "kernel-6.12.0-84.el10.x86_64"
 
 # Create tarball for the appliance.
+#
+# LIBGUESTFS_BACKEND=direct is required to work around the following bug:
+# https://issues.redhat.com/browse/RHEL-104684
+# and it can be removed when that bug gets fixed.
+#
+# It is also required during contianer runtime to work around the following bug:
+# https://issues.redhat.com/browse/RHEL-105490
+ENV LIBGUESTFS_BACKEND=direct
+
 RUN mkdir -p /usr/lib64/guestfs/appliance && \
         cd /usr/lib64/guestfs/appliance && \
         libguestfs-make-fixed-appliance . && \
