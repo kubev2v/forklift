@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.15.0
+    controller-gen.kubebuilder.io/version: v0.17.0
   name: plans.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
@@ -63,6 +63,25 @@ spec:
               diskBus:
                 description: 'Deprecated: this field will be deprecated in 2.8.'
                 type: string
+              installLegacyDrivers:
+                description: |-
+                  InstallLegacyDrivers determines whether to install legacy windows drivers in the VM.
+                  The following Vm's are lack of SHA-2 support and need legacy drivers:
+                  Windows XP (all)
+                  Windows Server 2003
+                  Windows Vista (all)
+                  Windows Server 2008
+                  Windows 7 (pre-SP1)
+                  Windows Server 2008 R2
+                  Behavior:
+                  - If set to nil (unset), the system will automatically detect whether the VM requires legacy drivers
+                    based on its guest OS type (using IsLegacyWindows).
+                  - If set to true, legacy drivers will be installed unconditionally by setting the VIRTIO_WIN environment variable.
+                  - If set to false, legacy drivers will be skipped, and the system will fall back to using the standard (SHA-2 signed) drivers.
+
+                  When enabled, legacy drivers are exposed to the virt-v2v conversion process via the VIRTIO_WIN environment variable,
+                  which points to the legacy ISO at /usr/local/virtio-win.iso.
+                type: boolean
               map:
                 description: Resource mapping.
                 properties:
@@ -81,7 +100,6 @@ spec:
                           the event) or if no container name is specified "spec.containers[2]" (container with
                           index 2 in this pod). This syntax is chosen only to have some well-defined way of
                           referencing a part of an object.
-                          TODO: this design is not final and this field is subject to change in the future.
                         type: string
                       kind:
                         description: |-
@@ -125,7 +143,6 @@ spec:
                           the event) or if no container name is specified "spec.containers[2]" (container with
                           index 2 in this pod). This syntax is chosen only to have some well-defined way of
                           referencing a part of an object.
-                          TODO: this design is not final and this field is subject to change in the future.
                         type: string
                       kind:
                         description: |-
@@ -203,7 +220,6 @@ spec:
                           the event) or if no container name is specified "spec.containers[2]" (container with
                           index 2 in this pod). This syntax is chosen only to have some well-defined way of
                           referencing a part of an object.
-                          TODO: this design is not final and this field is subject to change in the future.
                         type: string
                       kind:
                         description: |-
@@ -247,7 +263,6 @@ spec:
                           the event) or if no container name is specified "spec.containers[2]" (container with
                           index 2 in this pod). This syntax is chosen only to have some well-defined way of
                           referencing a part of an object.
-                          TODO: this design is not final and this field is subject to change in the future.
                         type: string
                       kind:
                         description: |-
@@ -324,7 +339,6 @@ spec:
                       the event) or if no container name is specified "spec.containers[2]" (container with
                       index 2 in this pod). This syntax is chosen only to have some well-defined way of
                       referencing a part of an object.
-                      TODO: this design is not final and this field is subject to change in the future.
                     type: string
                   kind:
                     description: |-
@@ -378,7 +392,6 @@ spec:
                                   the event) or if no container name is specified "spec.containers[2]" (container with
                                   index 2 in this pod). This syntax is chosen only to have some well-defined way of
                                   referencing a part of an object.
-                                  TODO: this design is not final and this field is subject to change in the future.
                                 type: string
                               kind:
                                 description: |-
@@ -440,7 +453,6 @@ spec:
                             the event) or if no container name is specified "spec.containers[2]" (container with
                             index 2 in this pod). This syntax is chosen only to have some well-defined way of
                             referencing a part of an object.
-                            TODO: this design is not final and this field is subject to change in the future.
                           type: string
                         kind:
                           description: |-
@@ -890,7 +902,6 @@ spec:
                                       the event) or if no container name is specified "spec.containers[2]" (container with
                                       index 2 in this pod). This syntax is chosen only to have some well-defined way of
                                       referencing a part of an object.
-                                      TODO: this design is not final and this field is subject to change in the future.
                                     type: string
                                   kind:
                                     description: |-
@@ -952,7 +963,6 @@ spec:
                                 the event) or if no container name is specified "spec.containers[2]" (container with
                                 index 2 in this pod). This syntax is chosen only to have some well-defined way of
                                 referencing a part of an object.
-                                TODO: this design is not final and this field is subject to change in the future.
                               type: string
                             kind:
                               description: |-
