@@ -37,9 +37,17 @@ dnf -y install libguestfs libguestfs-appliance libguestfs-xfs libguestfs-winsupp
 # LIBGUESTFS_BACKEND=direct is required to work around the following bug:
 # https://issues.redhat.com/browse/RHEL-104684
 # and it can be removed when that bug gets fixed.
+#
+# It is also required during contianer runtime to work around the following bug:
+# https://issues.redhat.com/browse/RHEL-105490 workaround is to set ENV HOME=/tmp
+#
+# Additional issue is that the virt-v2v will get stuck when destroying domain
+# https://issues.redhat.com/browse/RHEL-105529
+ENV LIBGUESTFS_BACKEND=direct
+
 RUN mkdir -p /usr/lib64/guestfs/appliance && \
         cd /usr/lib64/guestfs/appliance && \
-        LIBGUESTFS_BACKEND=direct libguestfs-make-fixed-appliance . && \
+        libguestfs-make-fixed-appliance . && \
         qemu-img convert -c -O qcow2 root root.qcow2 && \
         mv -vf root.qcow2 root && \
         tar -cvf /libguestfs-appliance.tar /usr/lib64/guestfs/appliance
