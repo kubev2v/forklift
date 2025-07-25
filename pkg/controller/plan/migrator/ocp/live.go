@@ -1186,7 +1186,9 @@ func (r *Builder) VirtualMachine(vm *planapi.VMStatus) (object *cnv.VirtualMachi
 	key := types.NamespacedName{Namespace: vm.Namespace, Name: source.Name}
 	object.Name = source.Name
 	object.Namespace = r.Plan.Spec.TargetNamespace
+	r.Labeler.SetLabels(object, source.Object.Labels)
 	r.Labeler.SetLabels(object, r.Labeler.VMLabels(vm.Ref))
+	r.Labeler.SetAnnotations(object, source.Object.Annotations)
 	r.Labeler.SetAnnotations(object, r.Labeler.VMLabels(vm.Ref))
 	r.Labeler.SetAnnotation(object, AnnSource, key.String())
 
