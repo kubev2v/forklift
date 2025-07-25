@@ -5,8 +5,6 @@ RUN yum install -y --setopt=install_weak_deps=False virtio-win-1.9.4-2.el7.2
 
 FROM registry.redhat.io/ubi9:9.6-1747219013 AS appliance
 
-ENV LIBGUESTFS_BACKEND=direct
-
 RUN dnf update -y && \
     dnf install -y --setopt=install_weak_deps=False \
     qemu-img \
@@ -15,6 +13,15 @@ RUN dnf update -y && \
     libguestfs-xfs
 
 # Create tarball for the appliance.
+#
+# LIBGUESTFS_BACKEND=direct is required to work around the following bug:
+# https://issues.redhat.com/browse/RHEL-104684
+# and it can be removed when that bug gets fixed.
+#
+# It is also required during contianer runtime to work around the following bug:
+# https://issues.redhat.com/browse/RHEL-105490
+ENV LIBGUESTFS_BACKEND=direct
+
 RUN mkdir -p /usr/local/lib/guestfs/appliance && \
     cd /usr/local/lib/guestfs/appliance && \
     libguestfs-make-fixed-appliance . && \
@@ -44,8 +51,11 @@ RUN mkdir /disks && \
     virt-v2v \
     virtio-win
 
-ENV PATH="$PATH:/usr/libexec"
+# It is required during contianer runtime to work around the following bug:
+# https://issues.redhat.com/browse/RHEL-105490
 ENV LIBGUESTFS_BACKEND=direct
+
+ENV PATH="$PATH:/usr/libexec"
 
 RUN mkdir -p /usr/lib64/guestfs/appliance
 COPY --from=appliance /usr/local/lib/guestfs/appliance /usr/lib64/guestfs/appliance

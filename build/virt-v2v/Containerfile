@@ -1,7 +1,5 @@
 FROM registry.access.redhat.com/ubi9:9.5-1747219013 AS appliance
 
-ENV LIBGUESTFS_BACKEND=direct
-
 RUN subscription-manager refresh && \
     dnf install -y --setopt=install_weak_deps=False \
         qemu-img \
@@ -10,6 +8,15 @@ RUN subscription-manager refresh && \
         libguestfs-xfs
 
 # Create tarball for the appliance.
+#
+# LIBGUESTFS_BACKEND=direct is required to work around the following bug:
+# https://issues.redhat.com/browse/RHEL-104684
+# and it can be removed when that bug gets fixed.
+#
+# It is also required during contianer runtime to work around the following bug:
+# https://issues.redhat.com/browse/RHEL-105490
+ENV LIBGUESTFS_BACKEND=direct
+
 RUN mkdir -p /usr/local/lib/guestfs/appliance && \
     cd /usr/local/lib/guestfs/appliance && \
     libguestfs-make-fixed-appliance . && \
@@ -43,6 +50,8 @@ RUN subscription-manager refresh && \
         virtio-win && \
     dnf clean all
 
+# It is required during contianer runtime to work around the following bug:
+# https://issues.redhat.com/browse/RHEL-105490
 ENV LIBGUESTFS_BACKEND=direct
 
 RUN mkdir -p /usr/lib64/guestfs/appliance

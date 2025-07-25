@@ -15,7 +15,7 @@ RUN rm /etc/pki/tls/fips_local.cnf && \
     echo -e '[fips_sect]\ntls1-prf-ems-check = 0\nactivate = 1' > /etc/pki/tls/fips_local.cnf && \
     sed -i '/^\\[ crypto_policy \\]/a Options=RHNoEnforceEMSinFIPS' /etc/pki/tls/openssl.cnf
 
-ENV LIBGUESTFS_BACKEND=direct LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1
+ENV LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1
 
 RUN mkdir /disks && \
     source /etc/os-release && \
@@ -31,6 +31,15 @@ RUN dnf -y install btrfs libguestfs libguestfs-appliance libguestfs-xfs qemu-img
         depmod $(ls /lib/modules/ |tail -n1)
 
 # Create tarball for the appliance.
+#
+# LIBGUESTFS_BACKEND=direct is required to work around the following bug:
+# https://issues.redhat.com/browse/RHEL-104684
+# and it can be removed when that bug gets fixed.
+#
+# It is also required during contianer runtime to work around the following bug:
+# https://issues.redhat.com/browse/RHEL-105490
+ENV LIBGUESTFS_BACKEND=direct
+
 RUN mkdir -p /usr/lib64/guestfs/appliance && \
         cd /usr/lib64/guestfs/appliance && \
         libguestfs-make-fixed-appliance . && \
