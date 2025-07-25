@@ -1280,6 +1280,22 @@ spec:
                   See virtual machine instance NodeSelector documentation for more details,
                   https://kubevirt.io/user-guide/compute/node_assignment/#nodeselector
                 type: object
+              targetPowerState:
+                allOf:
+                - enum:
+                  - "on"
+                  - "off"
+                  - auto
+                - enum:
+                  - "on"
+                  - "off"
+                  - auto
+                description: |-
+                  TargetPowerState specifies the desired power state of the target VM after migration.
+                  - "on": Target VM will be powered on after migration
+                  - "off": Target VM will be powered off after migration
+                  - "auto" or nil (default): Target VM will match the source VM's power state
+                type: string
               transferNetwork:
                 description: The network attachment definition that should be used
                   for disk transfer.
@@ -1325,12 +1341,17 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               type:
+                allOf:
+                - enum:
+                  - cold
+                  - warm
+                  - live
+                - enum:
+                  - cold
+                  - warm
+                  - live
                 description: Migration type. e.g. "cold", "warm", "live". Supersedes
                   the `warm` boolean if set.
-                enum:
-                - cold
-                - warm
-                - live
                 type: string
               useCompatibilityMode:
                 default: true
