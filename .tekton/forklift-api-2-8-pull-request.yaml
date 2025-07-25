@@ -50,8 +50,7 @@ spec:
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
-
-      _Uses `buildah` to create a container image leveraging [trusted artifacts](https://konflux-ci.dev/architecture/ADR/0036-trusted-artifacts.html). It also optionally creates a source image and runs some build-time tests. Information is shared between tasks using OCI artifacts instead of PVCs. EC will pass the [`trusted_task.trusted`](https://enterprisecontract.dev/docs/ec-policies/release_policy.html#trusted_task__trusted) policy as long as all data used to build the artifact is generated from trusted tasks.
+      _Uses `buildah` to create a container image leveraging [trusted artifacts](https://konflux-ci.dev/architecture/ADR/0036-trusted-artifacts.html). It also optionally creates a source image and runs some build-time tests. Information is shared between tasks using OCI artifacts instead of PVCs. EC will pass the [`trusted_task.trusted`](https://conforma.dev/docs/policy/packages/release_trusted_task.html#trusted_task__trusted) policy as long as all data used to build the artifact is generated from trusted tasks.
       This pipeline is pushed as a Tekton bundle to [quay.io](https://quay.io/repository/konflux-ci/tekton-catalog/pipeline-docker-build-oci-ta?tab=tags)_
     finally:
       - name: show-sbom
@@ -111,6 +110,7 @@ spec:
           Image tag expiration time, time values could be something like
           1h, 2d, 3w for hours, days, and weeks, respectively.
         name: image-expires-after
+        type: string
       - default: "false"
         description: Build a source image.
         name: build-source-image
@@ -298,7 +298,9 @@ spec:
       - name: build-source-image
         params:
           - name: BINARY_IMAGE
-            value: $(params.output-image)
+            value: $(tasks.build-image-index.results.IMAGE_URL)
+          - name: BINARY_IMAGE_DIGEST
+            value: $(tasks.build-image-index.results.IMAGE_DIGEST)
           - name: SOURCE_ARTIFACT
             value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
           - name: CACHI2_ARTIFACT
@@ -310,7 +312,7 @@ spec:
             - name: name
               value: source-build-oci-ta
             - name: bundle
-              value: quay.io/konflux-ci/tekton-catalog/task-source-build-oci-ta:0.2@sha256:24746d803f8a049b79b523a189d763ab1ff13cbf70d6d58e88c0f9f2a95437b0
+              value: quay.io/konflux-ci/tekton-catalog/task-source-build-oci-ta:0.3@sha256:b1eb49583b41872b27356fee20d5f0eb6ff7f5cdeacde7ffb39655f031104728
             - name: kind
               value: task
           resolver: bundles
