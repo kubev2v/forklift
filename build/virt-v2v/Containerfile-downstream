@@ -17,9 +17,17 @@ RUN dnf update -y && \
 # LIBGUESTFS_BACKEND=direct is required to work around the following bug:
 # https://issues.redhat.com/browse/RHEL-104684
 # and it can be removed when that bug gets fixed.
+#
+# It is also required during contianer runtime to work around the following bug:
+# https://issues.redhat.com/browse/RHEL-105490 workaround is to set ENV HOME=/tmp
+#
+# Additional issue is that the virt-v2v will get stuck when destroying domain
+# https://issues.redhat.com/browse/RHEL-105529
+ENV LIBGUESTFS_BACKEND=direct
+
 RUN mkdir -p /usr/local/lib/guestfs/appliance && \
     cd /usr/local/lib/guestfs/appliance && \
-    LIBGUESTFS_BACKEND=direct libguestfs-make-fixed-appliance . && \
+    libguestfs-make-fixed-appliance . && \
     qemu-img convert -c -O qcow2 root root.qcow2 && \
     mv -vf root.qcow2 root
 
@@ -45,6 +53,10 @@ RUN mkdir /disks && \
     dnf install -y --setopt=install_weak_deps=False \
     virt-v2v \
     virtio-win
+
+# It is required during contianer runtime to work around the following bug:
+# https://issues.redhat.com/browse/RHEL-105529
+ENV LIBGUESTFS_BACKEND=direct
 
 ENV PATH="$PATH:/usr/libexec"
 
