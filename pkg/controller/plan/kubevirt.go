@@ -818,11 +818,15 @@ func (r *KubeVirt) setKvmOnPodSpec(podSpec *core.PodSpec) {
 			container.Resources.Limits = make(map[core.ResourceName]resource.Quantity)
 		}
 		container.Resources.Limits["devices.kubevirt.io/kvm"] = resource.MustParse("1")
+		container.Resources.Limits["cpu"] = resource.MustParse("2")
+		container.Resources.Limits["memory"] = resource.MustParse("5Gi")
 		if container.Resources.Requests == nil {
 			container.Resources.Requests = make(map[core.ResourceName]resource.Quantity)
 		}
 		// Ensure that the pod is deployed on a node where /dev/kvm is present.
 		container.Resources.Requests["devices.kubevirt.io/kvm"] = resource.MustParse("1")
+		container.Resources.Requests["cpu"] = resource.MustParse("500m")
+		container.Resources.Requests["memory"] = resource.MustParse("1Gi")
 	}
 }
 
