@@ -28,9 +28,10 @@ import (
 )
 
 const (
-	snapshotName = "forklift-migration-precopy"
-	snapshotDesc = "Forklift Operator warm migration precopy"
-	taskType     = "Task"
+	snapshotName           = "forklift-migration-precopy"
+	snapshotDesc           = "Forklift Operator warm migration precopy"
+	taskType               = "Task"
+	createSnapshotTaskName = "CreateSnapshot_Task"
 )
 
 // vSphere VM Client
@@ -47,12 +48,62 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (snapsh
 	if err != nil {
 		return
 	}
+
+	// Check if there's already a running CreateSnapshot task - prevents duplicates
+	if existingTaskId := r.findRunningSnapshotTask(vmRef, vm, hostsFunc); existingTaskId != "" {
+		return "", existingTaskId, nil
+	}
+
 	task, err := vm.CreateSnapshot(context.TODO(), snapshotName, snapshotDesc, false, true)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
-	return "", task.Reference().Value, nil
+
+	creationTaskId = task.Reference().Value
+	return "", creationTaskId, nil
+}
+
+// Check if there's already a running CreateSnapshot task on the VM to prevent duplicates
+func (r *Client) findRunningSnapshotTask(vmRef ref.Ref, vm *object.VirtualMachine, hosts util.HostsFunc) string {
+	// Get the ESXi client
+	client, err := r.getClientFromVmRef(vmRef, hosts)
+	if err != nil {
+		return ""
+	}
+
+	// Create property collector
+	pc := property.DefaultCollector(client)
+	pc, err = pc.Create(context.TODO())
+	if err != nil {
+		return ""
+	}
+	//nolint:errcheck
+	defer pc.Destroy(context.TODO())
+
+	// Get VM recent tasks
+	var vmObj mo.VirtualMachine
+	err = pc.RetrieveOne(context.TODO(), vm.Reference(), []string{"recentTask"}, &vmObj)
+	if err != nil {
+		return ""
+	}
+
+	// Check for running CreateSnapshot tasks
+	for _, taskRef := range vmObj.RecentTask {
+		var task mo.Task
+		err = pc.RetrieveOne(context.TODO(), taskRef, []string{"info"}, &task)
+		if err != nil {
+			continue
+		}
+
+		// Check if this is a running CreateSnapshot task
+		if task.Info.Name == createSnapshotTaskName &&
+			(task.Info.State == types.TaskInfoStateRunning || task.Info.State == types.TaskInfoStateQueued) {
+			return taskRef.Value
+		}
+	}
+
+	return ""
 }
 
 // Remove a VM snapshot.
@@ -270,7 +321,6 @@ func (r *Client) CheckSnapshotReady(vmRef ref.Ref, precopy planapi.Precopy, host
 }
 
 func (r *Client) checkTaskStatus(taskInfo *types.TaskInfo) (ready bool, err error) {
-	r.Log.Info("Snapshot task", "task", taskInfo.Task.Value, "name", taskInfo.Name, "status", taskInfo.State)
 	switch taskInfo.State {
 	case types.TaskInfoStateSuccess:
 		return true, nil
