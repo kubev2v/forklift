@@ -21,6 +21,7 @@ const (
 	WindowsDynamicRegex     = `^([0-9]+_win_firstboot(([\w\-]*).ps1))$`
 	LinuxDynamicRegex       = `^([0-9]+_linux_(run|firstboot)(([\w\-]*).sh))$`
 	ShellSuffix             = ".sh"
+	UploadCmd               = "--upload"
 )
 
 //go:embed scripts
@@ -287,6 +288,7 @@ func (c *Customize) addWinFirstbootScripts(cmdBuilder utils.CommandBuilder) {
 	uploadRemoveDuplicatesPath := ""
 	uploadPreserveMultipleIpPath := ""
 	if c.appConfig.VirtIoWinLegacyDrivers != "" {
+		initPath = filepath.Join(windowsScriptsPath, "9999-run-mtv-ps-scripts-legacy.bat")
 		restoreScriptPath = filepath.Join(windowsScriptsPath, "9999-restore_config-legacy.ps1")
 
 		if c.appConfig.StaticIPs != "" {
@@ -329,7 +331,7 @@ func (c *Customize) addWinDynamicScripts(cmdBuilder utils.CommandBuilder, dir st
 	for _, script := range dynamicScripts {
 		fmt.Printf("Adding windows dynamic scripts '%s'\n", script)
 		upload := c.formatUpload(script, filepath.Join(WinFirstbootScriptsPath, filepath.Base(script)))
-		cmdBuilder.AddArg("--upload", upload)
+		cmdBuilder.AddArg(UploadCmd, upload)
 	}
 	return nil
 }
@@ -403,7 +405,7 @@ func (c *Customize) handleStaticIPConfiguration(cmdBuilder utils.CommandBuilder)
 		if err := c.fileSystem.WriteFile(macToIPFilePath, []byte(macToIPFileContent), 0755); err != nil {
 			return fmt.Errorf("failed to write MAC to IP mapping file: %w", err)
 		}
-		cmdBuilder.AddArg("--upload", fmt.Sprintf("%s:/tmp/macToIP", macToIPFilePath))
+		cmdBuilder.AddArg(UploadCmd, fmt.Sprintf("%s:/tmp/macToIP", macToIPFilePath))
 	}
 
 	return nil
