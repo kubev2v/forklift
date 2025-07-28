@@ -40,10 +40,19 @@
       state : present
       definition: "{{ lookup('template', 'controller/configmap-osmap-ovirt.yml.j2') }}"
 
+  - name: "Check if vSphere OS map configmap exists"
+    k8s_info:
+      api_version: v1
+      kind: ConfigMap
+      name: "forklift-vsphere-osmap"
+      namespace: "{{ app_namespace }}"
+    register: vsphere_osmap_cm
+
   - name: "Setup operating systems config map for vSphere"
     k8s:
       state : present
       definition: "{{ lookup('template', 'controller/configmap-osmap-vsphere.yml.j2') }}"
+    when: vsphere_osmap_cm.resources|length == 0
 
   - name: "Setup inventory service"
     k8s:
