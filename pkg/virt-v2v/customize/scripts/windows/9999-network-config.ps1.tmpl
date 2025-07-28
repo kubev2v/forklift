@@ -9,17 +9,27 @@ $inputString = "{{.InputString}}"
 
 function Convert-PrefixToMask($prefix) {
     $bin = ("1" * $prefix).PadRight(32, "0")
-    $bytes = ($bin.ToCharArray() -join "") -split "(.{8})" | Where-Object { $_ }
-    return ($bytes | ForEach-Object { [Convert]::ToInt32($_, 2) }) -join "."
+    $mask = ""
+    for ($i = 0; $i -lt 32; $i += 8) {
+        $chunk = $bin.Substring($i, 8)
+        $num = [Convert]::ToInt32($chunk, 2)
+        if ($mask -ne "") {
+            $mask = $mask + "."
+        }
+        $mask = $mask + $num
+    }
+    return $mask
 }
 
 # Split entries by '_'
-$entries = $inputString -split '_'
+$entries = $inputString.Split("_")
 
 # Extract parts
 foreach ($entry in $entries) {
-    if ($entry -match '^([0-9A-Fa-f:\-]+):ip:([^,]+),([^,]+),([^,]+),([^,]+),([^,]+)$'){
-        $mac = $matches[1].ToUpper().Replace(":", "-")
+    if ($entry -match "^([0-9A-Fa-f:\-]+):ip:([^,]+),([^,]+),([^,]+),([^,]+),([^,]+)$") {
+        $mac = $matches[1]
+        $mac = $mac.ToUpper()
+        $mac = $mac.Replace(":", "-")
         $ip = $matches[2]
         $gw = $matches[3]
         $prefix = [int]$matches[4]
@@ -29,11 +39,20 @@ foreach ($entry in $entries) {
 
         Write-Host "Searching for MAC: $mac`n"
 
-        $adapter = Get-WmiObject Win32_NetworkAdapter | Where-Object {
-        $_.MACAddress -and ($_.MACAddress.ToUpper().Replace(":", "-") -eq $mac) -and $_.NetConnectionID
+        $adapters = Get-WmiObject Win32_NetworkAdapter
+        $adapter = $null
+
+        foreach ($a in $adapters) {
+            if ($a.MACAddress -and $a.NetConnectionID) {
+                $aMac = $a.MACAddress.ToUpper().Replace(":", "-")
+                if ($aMac -eq $mac) {
+                    $adapter = $a
+                    break
+                }
+            }
         }
 
-        if (-not $adapter) {
+        if ($adapter -eq $null) {
             Write-Warning "Adapter with MAC $mac not found!`n"
             exit 1
         }
@@ -41,14 +60,24 @@ foreach ($entry in $entries) {
         $iface = $adapter.NetConnectionID
         Write-Host "Using interface: $iface`n"
 
-        Start-Process -FilePath "netsh" -ArgumentList "interface ipv4 set address name=`"$iface`" static $ip $mask $gw" -Wait -Verb RunAs
-        Start-Process -FilePath "netsh" -ArgumentList "interface ipv4 set dnsservers name=`"$iface`" static $dns1" -Wait -Verb RunAs
-         if ($dns2 -and $dns2 -ne "") {
-            Start-Process -FilePath "netsh" -ArgumentList "interface ipv4 add dnsservers name=`"$iface`" $dns2 index=2" -Wait -Verb RunAs
-        }
+       $cmd = "netsh interface ip set address name=`"$iface`" static $ip $mask $gw"
+       # Use WScript.Shell COM object to run netsh commands:
+       # - The '0' parameter hides the command window (runs silently)
+       # - The '$true' parameter ensures the script waits for the command to finish before continuing
+       $wshell = New-Object -ComObject WScript.Shell
+       $wshell.Run($cmd, 0, $true)
 
+       $cmd = "netsh interface ip set dns name=`"$iface`" static $dns1"
+       $wshell.Run($cmd, 0, $true)
+        
+        if ($dns2 -ne "") {
+            $cmd = "netsh interface ip add dns name=`"$iface`" $dns2 index=2"
+            $wshell.Run($cmd, 0, $true)
+        } 
+        
         Write-Host "IP configuration applied`n"
-    } else {
+    }
+    else {
         Write-Warning "Input string format is invalid`n"
     }
 }
