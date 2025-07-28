@@ -35,20 +35,28 @@ RUN dnf -y install btrfs libguestfs libguestfs-appliance libguestfs-xfs qemu-img
 # LIBGUESTFS_BACKEND=direct is required to work around the following bug:
 # https://issues.redhat.com/browse/RHEL-104684
 # and it can be removed when that bug gets fixed.
-#
-# It is also required during contianer runtime to work around the following bug:
-# https://issues.redhat.com/browse/RHEL-105490 workaround is to set ENV HOME=/tmp
-#
-# Additional issue is that the virt-v2v will get stuck when destroying domain
-# https://issues.redhat.com/browse/RHEL-105529
-ENV LIBGUESTFS_BACKEND=direct
-
 RUN mkdir -p /usr/lib64/guestfs/appliance && \
         cd /usr/lib64/guestfs/appliance && \
-        libguestfs-make-fixed-appliance . && \
+        LIBGUESTFS_BACKEND=direct libguestfs-make-fixed-appliance . && \
         qemu-img convert -c -O qcow2 root root.qcow2 && \
         mv -vf root.qcow2 root && \
         tar -cvf /libguestfs-appliance.tar /usr/lib64/guestfs/appliance
+
+# This prevents libvirt from attempting to create files in the root directory,
+# which would lead to permission errors.
+# Refer to: https://issues.redhat.com/browse/RHEL-105490
+RUN mkdir /home/qemu && chown qemu:qemu /home/qemu
+ENV HOME=/home/qemu
+
+# The 'virt-v2v' tool can hang when destroying libguestfs domains due to the
+# absence of an init process to clean up zombie processes. 'catatonit' acts
+# as PID 1 to resolve this.
+# Refer to: https://issues.redhat.com/browse/RHEL-105529
+RUN dnf install -y catatonit
+
+# This ensures that the 'libvirt:qemu:///session' connection method, which is
+# the officially tested and supported flow, is utilized instead of direct connections.
+ENV LIBGUESTFS_BACKEND=libvirt:qemu:///session
 
 COPY --from=builder /app/virt-v2v-monitor /usr/local/bin/virt-v2v-monitor
 
@@ -56,7 +64,7 @@ COPY --from=builder /app/image-converter /usr/local/bin/image-converter
 
 COPY --from=builder /app/virt-v2v-wrapper /usr/bin/virt-v2v-wrapper
 
-ENTRYPOINT ["/usr/bin/virt-v2v-wrapper"]
+ENTRYPOINT ["/usr/libexec/catatonit/catatonit", "/usr/bin/virt-v2v-wrapper"]
 
 LABEL \
         com.redhat.component="forklift-virt-v2v-container" \
