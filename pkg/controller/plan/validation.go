@@ -71,6 +71,7 @@ const (
 	Paused                        = "Paused"
 	Archived                      = "Archived"
 	UnsupportedDisks              = "UnsupportedDisks"
+	InvalidDiskSizes              = "InvalidDiskSizes"
 	unsupportedVersion            = "UnsupportedVersion"
 	VDDKInvalid                   = "VDDKInvalid"
 	ValidatingVDDK                = "ValidatingVDDK"
@@ -636,6 +637,14 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "%s disks are not supported for migration.",
 		Items:    []string{},
 	}
+	invalidDiskSizes := libcnd.Condition{
+		Type:     InvalidDiskSizes,
+		Status:   True,
+		Reason:   NotValid,
+		Category: api.CategoryCritical,
+		Message:  "VM has disks with invalid sizes.",
+		Items:    []string{},
+	}
 
 	var sharedDisksConditions []libcnd.Condition
 	setOf := map[string]bool{}
@@ -797,6 +806,14 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			)
 		}
 
+		invalidSizes, err := validator.InvalidDiskSizes(*ref)
+		if err != nil {
+			return err
+		}
+		if len(invalidSizes) > 0 {
+			invalidDiskSizes.Items = append(invalidDiskSizes.Items, ref.String())
+		}
+
 		ok, msg, category, err := validator.SharedDisks(*ref, ctx.Destination.Client)
 		if err != nil {
 			return err
@@ -946,6 +963,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(unsupportedDisks.Items) > 0 {
 		plan.Status.SetCondition(unsupportedDisks)
+	}
+	if len(invalidDiskSizes.Items) > 0 {
+		plan.Status.SetCondition(invalidDiskSizes)
 	}
 
 	return nil

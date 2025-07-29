@@ -173,6 +173,11 @@ func (r *Validator) UnSupportedDisks(vmRef ref.Ref) ([]string, error) {
 	return []string{}, nil
 }
 
+// NOOP
+func (r *Validator) InvalidDiskSizes(vmRef ref.Ref) ([]string, error) {
+	return []string{}, nil
+}
+
 func (r *Validator) SharedDisks(vmRef ref.Ref, client k8sclient.Client) (ok bool, s string, s2 string, err error) {
 	ok = true
 	return

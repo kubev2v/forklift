@@ -23,6 +23,23 @@ func (r *Validator) UnSupportedDisks(vmRef ref.Ref) ([]string, error) {
 	return []string{}, nil
 }
 
+func (r *Validator) InvalidDiskSizes(vmRef ref.Ref) ([]string, error) {
+	vm := &model.Workload{}
+	err := r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		return nil, liberr.Wrap(err, "vm", vmRef.String())
+	}
+
+	invalidDisks := []string{}
+	for _, da := range vm.DiskAttachments {
+		if da.Disk.ProvisionedSize <= 0 {
+			invalidDisks = append(invalidDisks, da.Disk.ID)
+		}
+	}
+
+	return invalidDisks, nil
+}
+
 func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, s string, s2 string, err error) {
 	ok = true
 	return
