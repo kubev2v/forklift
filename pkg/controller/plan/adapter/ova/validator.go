@@ -36,6 +36,23 @@ func (r *Validator) UnSupportedDisks(vmRef ref.Ref) ([]string, error) {
 	return []string{}, nil
 }
 
+func (r *Validator) InvalidDiskSizes(vmRef ref.Ref) ([]string, error) {
+	vm := &model.VM{}
+	err := r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		return nil, liberr.Wrap(err, "vm", vmRef.String())
+	}
+
+	invalidDisks := []string{}
+	for _, disk := range vm.Disks {
+		if disk.Capacity <= 0 {
+			invalidDisks = append(invalidDisks, disk.FilePath)
+		}
+	}
+
+	return invalidDisks, nil
+}
+
 func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, s string, s2 string, err error) {
 	ok = true
 	return

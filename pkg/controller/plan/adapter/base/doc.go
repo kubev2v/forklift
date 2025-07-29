@@ -161,6 +161,8 @@ type Validator interface {
 	VMMigrationType(vmRef ref.Ref) (bool, error)
 	// Validate that the VM disks are supported.
 	UnSupportedDisks(vmRef ref.Ref) ([]string, error)
+	// Validate that the VM disks have valid sizes (> 0).
+	InvalidDiskSizes(vmRef ref.Ref) ([]string, error)
 }
 
 // DestinationClient API.
