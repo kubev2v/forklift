@@ -18,7 +18,7 @@ package v1beta1
 
 import (
 	"context"
-
+	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/provider"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
@@ -280,17 +280,22 @@ func (r *Plan) DestinationHasUdnNetwork(client k8sclient.Client) bool {
 	if !hasUdnLabel {
 		return false
 	}
-	// TODO: mnecas not sure if we should check also the NAD or only namespace
-	key = k8sclient.ObjectKey{
-		Namespace: r.Spec.TargetNamespace,
-		Name:      "primary-udn",
+
+	nadList := &k8snet.NetworkAttachmentDefinitionList{}
+	listOpts := []k8sclient.ListOption{
+		k8sclient.InNamespace(r.Spec.TargetNamespace),
+		k8sclient.MatchingLabels{"k8s.ovn.org/user-defined-network": ""},
 	}
-	netAttachDef := &k8snet.NetworkAttachmentDefinition{}
-	err = client.Get(context.TODO(), key, netAttachDef)
+
+	err = client.List(context.TODO(), nadList, listOpts...)
 	if err != nil {
 		return false
 	}
-	return true
+
+	if len(nadList.Items) > 0 {
+		return true
+	}
+	return false
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
