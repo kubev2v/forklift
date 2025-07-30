@@ -704,11 +704,13 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 			interfaceModel = E1000e
 		}
 		kInterface := cnv.Interface{
-			Name:       networkName,
-			Model:      interfaceModel,
-			MacAddress: nic.MAC,
+			Name:  networkName,
+			Model: interfaceModel,
 		}
 
+		if !r.Plan.DestinationHasUdnNetwork(r.Destination) || settings.Settings.UdnSupportsMac {
+			kInterface.MacAddress = nic.MAC
+		}
 		switch mapped.Destination.Type {
 		case Pod:
 			if r.Plan.DestinationHasUdnNetwork(r.Destination) {
