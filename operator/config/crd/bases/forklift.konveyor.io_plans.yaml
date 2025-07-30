@@ -1560,7 +1560,9 @@ spec:
                     "pvc-{{.PVCName}}"
                 type: string
               warm:
-                description: Whether this is a warm migration.
+                description: |-
+                  Whether this is a warm migration.
+                  Deprecated: this field will be deprecated in 2.10. Use Type instead.
                 type: boolean
             required:
             - map
