@@ -18,6 +18,8 @@ import (
 	"strings"
 	"time"
 
+	"gopkg.in/yaml.v3"
+
 	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
@@ -1862,6 +1864,12 @@ func (r *KubeVirt) findTemplate(vm *plan.VMStatus) (tmpl *template.Template, err
 	return
 }
 
+type OpenPort struct {
+	// valid values are tcp, udp, sctp, icmp
+	Protocol string `yaml:"protocol"`
+	Port     int    `yaml:"port,omitempty"`
+}
+
 func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, libvirtConfigMap *core.ConfigMap, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, v2vSecret *core.Secret) (pod *core.Pod, err error) {
 	volumes, volumeMounts, volumeDevices, err := r.podVolumeMounts(vmVolumes, libvirtConfigMap, vddkConfigmap, pvcs, vm)
 	if err != nil {
@@ -1972,6 +1980,17 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 		if err != nil {
 			return
 		}
+	}
+	if r.Plan.DestinationHasUdnNetwork(r.Destination) {
+		metricsPort := OpenPort{Protocol: "tcp", Port: 2112}
+		dataServerPort := OpenPort{Protocol: "tcp", Port: 8080}
+		ports := []OpenPort{metricsPort, dataServerPort}
+		var yamlPorts []byte
+		yamlPorts, err = yaml.Marshal(ports)
+		if err != nil {
+			return
+		}
+		annotations["k8s.ovn.org/open-default-ports"] = string(yamlPorts)
 	}
 	var seccompProfile core.SeccompProfile
 	if settings.Settings.OpenShift {

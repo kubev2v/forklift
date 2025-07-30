@@ -18,6 +18,7 @@ import (
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/ova"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
+	"github.com/kubev2v/forklift/pkg/settings"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
@@ -250,9 +251,11 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 				Name: networkName,
 			}
 			kInterface := cnv.Interface{
-				Name:       networkName,
-				Model:      Virtio,
-				MacAddress: nic.MAC,
+				Name:  networkName,
+				Model: Virtio,
+			}
+			if !r.Plan.DestinationHasUdnNetwork(r.Destination) || settings.Settings.UdnSupportsMac {
+				kInterface.MacAddress = nic.MAC
 			}
 			switch mapped.Destination.Type {
 			case Pod:
