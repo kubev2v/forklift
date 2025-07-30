@@ -89,20 +89,27 @@ func (r *Builder) macConflicts(vm *model.VM) (conflictingVMs []string, err error
 		r.macConflictsMap = make(map[string]string)
 		for _, kVM := range list {
 			for _, iface := range kVM.Object.Spec.Template.Spec.Domain.Devices.Interfaces {
-				r.macConflictsMap[iface.MacAddress] = path.Join(kVM.Namespace, kVM.Name)
+				// Skip empty MAC addresses when building conflict map - these will be auto-generated
+				if iface.MacAddress != "" {
+					r.macConflictsMap[iface.MacAddress] = path.Join(kVM.Namespace, kVM.Name)
+				}
 			}
 		}
 	}
 
 	for _, nic := range vm.NICs {
-		if conflictingVm, found := r.macConflictsMap[nic.MAC]; found {
-			for i := range conflictingVMs {
-				// ignore duplicates
-				if conflictingVMs[i] == conflictingVm {
-					continue
+		// Skip empty MAC addresses in OVA - OVF files often have empty MACs by default
+		// KubeVirt will auto-generate unique MACs for these interfaces
+		if nic.MAC != "" {
+			if conflictingVm, found := r.macConflictsMap[nic.MAC]; found {
+				for i := range conflictingVMs {
+					// ignore duplicates
+					if conflictingVMs[i] == conflictingVm {
+						continue
+					}
 				}
+				conflictingVMs = append(conflictingVMs, conflictingVm)
 			}
-			conflictingVMs = append(conflictingVMs, conflictingVm)
 		}
 	}
 
