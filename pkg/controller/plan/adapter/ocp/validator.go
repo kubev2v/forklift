@@ -7,6 +7,7 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	inventory "github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
@@ -176,6 +177,35 @@ func (r *Validator) UnSupportedDisks(vmRef ref.Ref) ([]string, error) {
 // NOOP
 func (r *Validator) InvalidDiskSizes(vmRef ref.Ref) ([]string, error) {
 	return []string{}, nil
+}
+
+func (r *Validator) MacConflicts(vmRef ref.Ref) ([]planbase.MacConflict, error) {
+	// Get source VM using common helper
+	vm, err := planbase.FindSourceVM[inventory.VM](r.Source.Inventory, vmRef)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get destination VMs and extract their MACs using common helper
+	destinationVMs, err := planbase.GetDestinationVMsFromInventory(r.Destination.Inventory, web.Param{
+		Key:   web.DetailParam,
+		Value: "all",
+	})
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
+	// Extract source VM MACs
+	var sourceMacs []string
+	if vm.Object.Spec.Template != nil {
+		for _, iface := range vm.Object.Spec.Template.Spec.Domain.Devices.Interfaces {
+			// Include all MACs, even empty ones - the helper function will handle filtering
+			sourceMacs = append(sourceMacs, iface.MacAddress)
+		}
+	}
+
+	// Use common helper to detect conflicts
+	return planbase.CheckMacConflicts(sourceMacs, destinationVMs), nil
 }
 
 func (r *Validator) SharedDisks(vmRef ref.Ref, client k8sclient.Client) (ok bool, s string, s2 string, err error) {
