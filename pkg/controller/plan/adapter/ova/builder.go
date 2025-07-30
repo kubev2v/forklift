@@ -15,8 +15,6 @@ import (
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/ova"
-	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
-	"github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/ova"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
@@ -69,51 +67,6 @@ var backingFilePattern = regexp.MustCompile(`-\d\d\d\d\d\d.vmdk`)
 // OVA builder.
 type Builder struct {
 	*plancontext.Context
-	// MAC addresses already in use on the destination cluster. k=mac, v=vmName
-	macConflictsMap map[string]string
-}
-
-// Get list of destination VMs with mac addresses that would
-// conflict with this VM, if any exist.
-func (r *Builder) macConflicts(vm *model.VM) (conflictingVMs []string, err error) {
-	if r.macConflictsMap == nil {
-		list := []ocp.VM{}
-		err = r.Destination.Inventory.List(&list, base.Param{
-			Key:   base.DetailParam,
-			Value: "all",
-		})
-		if err != nil {
-			return
-		}
-
-		r.macConflictsMap = make(map[string]string)
-		for _, kVM := range list {
-			for _, iface := range kVM.Object.Spec.Template.Spec.Domain.Devices.Interfaces {
-				// Skip empty MAC addresses when building conflict map - these will be auto-generated
-				if iface.MacAddress != "" {
-					r.macConflictsMap[iface.MacAddress] = path.Join(kVM.Namespace, kVM.Name)
-				}
-			}
-		}
-	}
-
-	for _, nic := range vm.NICs {
-		// Skip empty MAC addresses in OVA - OVF files often have empty MACs by default
-		// KubeVirt will auto-generate unique MACs for these interfaces
-		if nic.MAC != "" {
-			if conflictingVm, found := r.macConflictsMap[nic.MAC]; found {
-				for i := range conflictingVMs {
-					// ignore duplicates
-					if conflictingVMs[i] == conflictingVm {
-						continue
-					}
-				}
-				conflictingVMs = append(conflictingVMs, conflictingVm)
-			}
-		}
-	}
-
-	return
 }
 
 // Create DataVolume certificate configmap.
@@ -235,17 +188,6 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
 		err = liberr.Wrap(err, "vm", vmRef.String())
-		return
-	}
-
-	var conflicts []string
-	conflicts, err = r.macConflicts(vm)
-	if err != nil {
-		return
-	}
-	if len(conflicts) > 0 {
-		err = liberr.New(
-			fmt.Sprintf("Source VM has a mac address conflict with one or more destination VMs: %s", conflicts))
 		return
 	}
 

@@ -26,8 +26,6 @@ import (
 	container "github.com/kubev2v/forklift/pkg/controller/provider/container/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
-	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
-	"github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
@@ -181,44 +179,6 @@ type Builder struct {
 	*plancontext.Context
 	// Host CRs.
 	hosts map[string]*api.Host
-	// MAC addresses already in use on the destination cluster. k=mac, v=vmName
-	macConflictsMap map[string]string
-}
-
-// Get list of destination VMs with mac addresses that would
-// conflict with this VM, if any exist.
-func (r *Builder) macConflicts(vm *model.VM) (conflictingVMs []string, err error) {
-	if r.macConflictsMap == nil {
-		list := []ocp.VM{}
-		err = r.Destination.Inventory.List(&list, base.Param{
-			Key:   base.DetailParam,
-			Value: "all",
-		})
-		if err != nil {
-			return
-		}
-
-		r.macConflictsMap = make(map[string]string)
-		for _, kVM := range list {
-			for _, iface := range kVM.Object.Spec.Template.Spec.Domain.Devices.Interfaces {
-				r.macConflictsMap[iface.MacAddress] = path.Join(kVM.Namespace, kVM.Name)
-			}
-		}
-	}
-
-	for _, nic := range vm.NICs {
-		if conflictingVm, found := r.macConflictsMap[nic.MAC]; found {
-			for i := range conflictingVMs {
-				// ignore duplicates
-				if conflictingVMs[i] == conflictingVm {
-					continue
-				}
-			}
-			conflictingVMs = append(conflictingVMs, conflictingVm)
-		}
-	}
-
-	return
 }
 
 // Create DataVolume certificate configmap.
@@ -736,17 +696,6 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 		if sharedPVCs != nil {
 			persistentVolumeClaims = append(persistentVolumeClaims, sharedPVCs...)
 		}
-	}
-
-	var conflicts []string
-	conflicts, err = r.macConflicts(vm)
-	if err != nil {
-		return
-	}
-	if len(conflicts) > 0 {
-		err = liberr.New(
-			fmt.Sprintf("Source VM has a mac address conflict with one or more destination VMs: %s", conflicts))
-		return
 	}
 
 	host, err := r.host(vm.Host)
