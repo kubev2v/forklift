@@ -65,6 +65,7 @@ type PlanSpec struct {
 	// List of VMs.
 	VMs []plan.VM `json:"vms"`
 	// Whether this is a warm migration.
+	// Deprecated: this field will be deprecated in 2.10. Use Type instead.
 	Warm bool `json:"warm,omitempty"`
 	// The network attachment definition that should be used for disk transfer.
 	TransferNetwork *core.ObjectReference `json:"transferNetwork,omitempty"`
