@@ -1176,7 +1176,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 
 // updateOrAppendGuestDisk updates an existing guest disk with the same key or appends a new one
 func (v *VmAdapter) updateOrAppendGuestDisk(newDisk model.GuestDisk) {
-	fountExistingDisk := false
+	foundExistingDisk := false
 
 	// Find existing disk with the same key
 	for i, existingDisk := range v.model.GuestDisks {
@@ -1184,13 +1184,13 @@ func (v *VmAdapter) updateOrAppendGuestDisk(newDisk model.GuestDisk) {
 			// Replace existing disk
 			v.model.GuestDisks[i] = newDisk
 
-			fountExistingDisk = true
+			foundExistingDisk = true
 			break // Exit the loop when found
 		}
 	}
 
 	// No existing disk found, append new one
-	if !fountExistingDisk {
+	if !foundExistingDisk {
 		v.model.GuestDisks = append(v.model.GuestDisks, newDisk)
 	}
 
