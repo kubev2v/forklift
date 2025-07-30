@@ -73,6 +73,7 @@ const (
 	Archived                      = "Archived"
 	UnsupportedDisks              = "UnsupportedDisks"
 	InvalidDiskSizes              = "InvalidDiskSizes"
+	MacConflicts                  = "MacConflicts"
 	unsupportedVersion            = "UnsupportedVersion"
 	VDDKInvalid                   = "VDDKInvalid"
 	ValidatingVDDK                = "ValidatingVDDK"
@@ -654,6 +655,14 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "VM has disks with invalid sizes.",
 		Items:    []string{},
 	}
+	macConflicts := libcnd.Condition{
+		Type:     MacConflicts,
+		Status:   True,
+		Reason:   NotValid,
+		Category: api.CategoryCritical,
+		Message:  "",
+		Items:    []string{},
+	}
 
 	var sharedDisksConditions []libcnd.Condition
 	setOf := map[string]bool{}
@@ -821,6 +830,29 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		}
 		if len(invalidSizes) > 0 {
 			invalidDiskSizes.Items = append(invalidDiskSizes.Items, ref.String())
+		}
+
+		conflicts, err := validator.MacConflicts(*ref)
+		if err != nil {
+			return err
+		}
+		if len(conflicts) > 0 {
+			macConflicts.Items = append(macConflicts.Items, ref.String())
+			// Group conflicts by destination VM for this specific source VM
+			vmConflictsByVM := make(map[string][]string)
+			for _, conflict := range conflicts {
+				vmConflictsByVM[conflict.DestinationVM] = append(vmConflictsByVM[conflict.DestinationVM], conflict.MAC)
+			}
+
+			// Build detailed message with grouped conflicts
+			var conflictDetails []string
+			for destinationVM, macs := range vmConflictsByVM {
+				conflictDetails = append(conflictDetails, fmt.Sprintf("MACs %s conflict with destination VM %s", strings.Join(macs, ", "), destinationVM))
+			}
+			if macConflicts.Message != "" {
+				macConflicts.Message += "; "
+			}
+			macConflicts.Message += fmt.Sprintf("VM %s has MAC address conflicts: %s", ref.String(), strings.Join(conflictDetails, "; "))
 		}
 
 		ok, msg, category, err := validator.SharedDisks(*ref, ctx.Destination.Client)
@@ -991,6 +1023,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(invalidDiskSizes.Items) > 0 {
 		plan.Status.SetCondition(invalidDiskSizes)
+	}
+	if len(macConflicts.Items) > 0 {
+		plan.Status.SetCondition(macConflicts)
 	}
 
 	return nil

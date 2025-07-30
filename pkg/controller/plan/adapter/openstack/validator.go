@@ -3,7 +3,9 @@ package openstack
 import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/openstack"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -85,6 +87,45 @@ func (r *Validator) InvalidDiskSizes(vmRef ref.Ref) ([]string, error) {
 	}
 
 	return invalidDisks, nil
+}
+
+func (r *Validator) MacConflicts(vmRef ref.Ref) ([]planbase.MacConflict, error) {
+	// Get source VM using common helper
+	vm, err := planbase.FindSourceVM[model.Workload](r.Source.Inventory, vmRef)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get destination VMs and extract their MACs using common helper
+	destinationVMs, err := planbase.GetDestinationVMsFromInventory(r.Destination.Inventory, base.Param{
+		Key:   base.DetailParam,
+		Value: "all",
+	})
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
+	// Extract source VM MACs (OpenStack stores MACs in Addresses map)
+	var sourceMacs []string
+	for _, vmAddresses := range vm.Addresses {
+		if nics, ok := vmAddresses.([]interface{}); ok {
+			for _, nic := range nics {
+				if m, ok := nic.(map[string]interface{}); ok {
+					if macAddress, ok := m["OS-EXT-IPS-MAC:mac_addr"]; ok {
+						macStr, ok := macAddress.(string)
+						if !ok {
+							continue // Skip if MAC address is not a string
+						}
+						// Include all MACs, even empty ones - the helper function will handle filtering
+						sourceMacs = append(sourceMacs, macStr)
+					}
+				}
+			}
+		}
+	}
+
+	// Use common helper to detect conflicts
+	return planbase.CheckMacConflicts(sourceMacs, destinationVMs), nil
 }
 
 func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, s string, s2 string, err error) {

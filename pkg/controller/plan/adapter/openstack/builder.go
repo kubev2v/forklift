@@ -14,8 +14,6 @@ import (
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	utils "github.com/kubev2v/forklift/pkg/controller/plan/util"
-	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
-	"github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/openstack"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
@@ -34,8 +32,6 @@ import (
 // Openstack builder.
 type Builder struct {
 	*plancontext.Context
-	// MAC addresses already in use on the destination cluster. k=mac, v=vmName
-	macConflictsMap map[string]string
 }
 
 // Template labels
@@ -259,17 +255,6 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, vmSpec *cnv.VirtualMachineSpec, 
 		return
 	}
 
-	var conflicts []string
-	conflicts, err = r.macConflicts(vm)
-	if err != nil {
-		return
-	}
-	if len(conflicts) > 0 {
-		err = liberr.New(
-			fmt.Sprintf("Source VM has a mac address conflict with one or more destination VMs: %s", conflicts))
-		return
-	}
-
 	if vmSpec.Template == nil {
 		vmSpec.Template = &cnv.VirtualMachineInstanceTemplateSpec{}
 	}
@@ -284,50 +269,6 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, vmSpec *cnv.VirtualMachineSpec, 
 	if err != nil {
 		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
-	}
-
-	return
-}
-
-// Get list of destination VMs with mac addresses that would
-// conflict with this VM, if any exist.
-func (r *Builder) macConflicts(vm *model.Workload) (conflictingVMs []string, err error) {
-	if r.macConflictsMap == nil {
-		list := []ocp.VM{}
-		err = r.Destination.Inventory.List(&list, base.Param{
-			Key:   base.DetailParam,
-			Value: "all",
-		})
-		if err != nil {
-			return
-		}
-
-		r.macConflictsMap = make(map[string]string)
-		for _, kVM := range list {
-			for _, iface := range kVM.Object.Spec.Template.Spec.Domain.Devices.Interfaces {
-				r.macConflictsMap[iface.MacAddress] = path.Join(kVM.Namespace, kVM.Name)
-			}
-		}
-	}
-
-	for _, vmAddresses := range vm.Addresses {
-		if nics, ok := vmAddresses.([]interface{}); ok {
-			for _, nic := range nics {
-				if m, ok := nic.(map[string]interface{}); ok {
-					if macAddress, ok := m["OS-EXT-IPS-MAC:mac_addr"]; ok {
-						if conflictingVm, found := r.macConflictsMap[macAddress.(string)]; found {
-							for i := range conflictingVMs {
-								// ignore duplicates
-								if conflictingVMs[i] == conflictingVm {
-									continue
-								}
-							}
-							conflictingVMs = append(conflictingVMs, conflictingVm)
-						}
-					}
-				}
-			}
-		}
 	}
 
 	return
