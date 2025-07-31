@@ -3,6 +3,7 @@ package openstack
 import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/openstack"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
@@ -109,32 +110,30 @@ func (r *Validator) MigrationType() bool {
 	}
 }
 
-// Validate that no more than one of a VM's networks is mapped to the pod network.
-func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
-	if r.Plan.Referenced.Map.Network == nil {
-		return
-	}
-	vm := &model.Workload{}
-	err = r.Source.Inventory.Find(vm, vmRef)
-	if err != nil {
-		err = liberr.Wrap(err, "vm", vmRef.String())
-		return
+// Validate that no more than one of a VM's networks is mapped to the pod network,
+// and that Multus networks have unique names.
+func (r *Validator) NetworkMapping(vmRef ref.Ref) (ok bool, err error) {
+	// Create provider-specific VM retrieval function
+	retriever := func(vmRef ref.Ref) (interface{}, error) {
+		vm := &model.Workload{}
+		err := r.Source.Inventory.Find(vm, vmRef)
+		return vm, err
 	}
 
-	mapping := r.Plan.Referenced.Map.Network.Spec.Map
-	podMapped := 0
-	for i := range mapping {
-		mapped := &mapping[i]
-		ref := mapped.Source
+	// Create provider-specific network matching function
+	matcher := func(vmInterface interface{}, mapping *api.NetworkPair) (bool, error) {
+		vm := vmInterface.(*model.Workload)
+		ref := mapping.Source
 		for _, network := range vm.Networks {
-			if ref.ID == network.ID && mapped.Destination.Type == "Pod" {
-				podMapped++
+			if ref.ID == network.ID {
+				return true, nil
 			}
 		}
+		return false, nil
 	}
 
-	ok = podMapped <= 1
-	return
+	// Use shared validation logic
+	return planbase.ValidateNetworkMapping(r.Context, vmRef, retriever, matcher)
 }
 
 // NO-OP
