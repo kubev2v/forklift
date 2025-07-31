@@ -236,6 +236,12 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 				return
 			}
 		}
+
+		err = r.applianceStatus(provider)
+		if err != nil {
+			return
+		}
+		result.RequeueAfter = base.SlowReQ
 	}
 
 	if provider.DeletionTimestamp != nil && k8sutil.ContainsFinalizer(provider, api.OvaProviderFinalizer) {
