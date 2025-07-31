@@ -53,10 +53,10 @@ var _ = Describe("vSphere builder", func() {
 				},
 				{
 					MAC:          "00:50:56:83:25:47",
-					IP:           "fe80::5da:b7a5:e0a2:a097",
+					IP:           "2620:52:9:162e::97",
 					Origin:       ManualOrigin,
 					PrefixLength: 64,
-					DNS:          []string{"fec0:0:0:ffff::1", "fec0:0:0:ffff::2", "fec0:0:0:ffff::3"},
+					DNS:          []string{"2620:52:9:162e::1", "2620:52:9:162e::2", "2620:52:9:162e::3"},
 				},
 			},
 			GuestIpStacks: []vsphere.GuestIpStack{
@@ -65,11 +65,11 @@ var _ = Describe("vSphere builder", func() {
 					Network: "0.0.0.0",
 				},
 				{
-					Gateway: "fe80::5da:b7a5:e0a2:a095",
+					Gateway: "2620:52:9:162e::95",
 					Network: "0.0.0.0",
 				},
 			},
-		}, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,16,8.8.8.8_00:50:56:83:25:47:ip:fe80::5da:b7a5:e0a2:a097,fe80::5da:b7a5:e0a2:a095,64,fec0:0:0:ffff::1,fec0:0:0:ffff::2,fec0:0:0:ffff::3"),
+		}, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,16,8.8.8.8_00:50:56:83:25:47:ip:2620:52:9:162e::97,2620:52:9:162e::95,64,2620:52:9:162e::1,2620:52:9:162e::2,2620:52:9:162e::3"),
 		Entry("non-static ip", &model.VM{GuestID: "windows9Guest", GuestNetworks: []vsphere.GuestNetwork{{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: string(types.NetIpConfigInfoIpAddressOriginDhcp)}}}, ""),
 		Entry("non windows vm", &model.VM{GuestID: "other", GuestNetworks: []vsphere.GuestNetwork{{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin}}}, "00:50:56:83:25:47:ip:172.29.3.193,,0"),
 		Entry("no OS vm", &model.VM{GuestNetworks: []vsphere.GuestNetwork{{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin}}}, "00:50:56:83:25:47:ip:172.29.3.193,,0"),
@@ -77,6 +77,7 @@ var _ = Describe("vSphere builder", func() {
 			GuestID: "windows9Guest",
 			GuestNetworks: []vsphere.GuestNetwork{
 				{
+					Device:       "0",
 					MAC:          "00:50:56:83:25:47",
 					IP:           "172.29.3.193",
 					Origin:       ManualOrigin,
@@ -84,13 +85,15 @@ var _ = Describe("vSphere builder", func() {
 					DNS:          []string{"8.8.8.8"},
 				},
 				{
+					Device:       "0",
 					MAC:          "00:50:56:83:25:47",
-					IP:           "fe80::5da:b7a5:e0a2:a097",
+					IP:           "2620:52:9:162e::97",
 					Origin:       ManualOrigin,
 					PrefixLength: 64,
-					DNS:          []string{"fec0:0:0:ffff::1", "fec0:0:0:ffff::2", "fec0:0:0:ffff::3"},
+					DNS:          []string{"2620:52:9:162e::1", "2620:52:9:162e::2", "2620:52:9:162e::3"},
 				},
 				{
+					Device:       "1",
 					MAC:          "00:50:56:83:25:48",
 					IP:           "172.29.3.192",
 					Origin:       ManualOrigin,
@@ -98,32 +101,37 @@ var _ = Describe("vSphere builder", func() {
 					DNS:          []string{"4.4.4.4"},
 				},
 				{
+					Device:       "1",
 					MAC:          "00:50:56:83:25:48",
-					IP:           "fe80::5da:b7a5:e0a2:a090",
+					IP:           "2620:52:9:162e::90",
 					Origin:       ManualOrigin,
 					PrefixLength: 32,
-					DNS:          []string{"fec0:0:0:ffff::4", "fec0:0:0:ffff::5", "fec0:0:0:ffff::6"},
+					DNS:          []string{"2620:52:9:162e::4", "2620:52:9:162e::5", "2620:52:9:162e::6"},
 				},
 			},
 			GuestIpStacks: []vsphere.GuestIpStack{
 				{
 					Gateway: "172.29.3.2",
 					Network: "0.0.0.0",
+					Device:  "0",
 				},
 				{
-					Gateway: "fe80::5da:b7a5:e0a2:a098",
-					Network: "0.0.0.0",
+					Gateway: "2620:52:9:162e::98",
+					Network: "::",
+					Device:  "0",
 				},
 				{
 					Gateway: "172.29.3.1",
 					Network: "0.0.0.0",
+					Device:  "1",
 				},
 				{
-					Gateway: "fe80::5da:b7a5:e0a2:a095",
-					Network: "0.0.0.0",
+					Gateway: "2620:52:9:162e::95",
+					Network: "::",
+					Device:  "1",
 				},
 			},
-		}, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,16,8.8.8.8_00:50:56:83:25:47:ip:fe80::5da:b7a5:e0a2:a097,fe80::5da:b7a5:e0a2:a095,64,fec0:0:0:ffff::1,fec0:0:0:ffff::2,fec0:0:0:ffff::3_00:50:56:83:25:48:ip:172.29.3.192,172.29.3.1,24,4.4.4.4_00:50:56:83:25:48:ip:fe80::5da:b7a5:e0a2:a090,fe80::5da:b7a5:e0a2:a095,32,fec0:0:0:ffff::4,fec0:0:0:ffff::5,fec0:0:0:ffff::6"),
+		}, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.2,16,8.8.8.8_00:50:56:83:25:47:ip:2620:52:9:162e::97,2620:52:9:162e::98,64,2620:52:9:162e::1,2620:52:9:162e::2,2620:52:9:162e::3_00:50:56:83:25:48:ip:172.29.3.192,172.29.3.1,24,4.4.4.4_00:50:56:83:25:48:ip:2620:52:9:162e::90,2620:52:9:162e::95,32,2620:52:9:162e::4,2620:52:9:162e::5,2620:52:9:162e::6"),
 		Entry("single static ip without DNS", &model.VM{
 			GuestID: "windows9Guest",
 			GuestNetworks: []vsphere.GuestNetwork{
@@ -279,10 +287,8 @@ func createBuilder(objs ...runtime.Object) *Builder {
 			Destination: plancontext.Destination{
 				Client: client,
 			},
-			Plan: createPlan(),
-			Log:  builderLog,
-
-			// To make sure r.Scheme is not nil
+			Plan:   createPlan(),
+			Log:    builderLog,
 			Client: client,
 		},
 	}
