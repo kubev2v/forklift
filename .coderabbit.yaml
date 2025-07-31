@@ -1,0 +1,44 @@
+settings:
+  reviewer: "coderabbit"
+  mode: "auto"
+  summary: true
+  inline_comments: true
+  ignore_draft_pr: true
+
+path_filters:
+  - "!**/vendor/**"
+  - "!**/dist/**"
+  - "!**/*.bin"
+  - "!**/*.csv"
+  - "!**/*.zip"
+  - "!**/*.gz"
+  - "!**/*.tar"
+  - "!**/*.exe"
+
+rules:
+  - pattern: "**/*.md"
+    review: false
+  - pattern: "**/*.lock"
+    review: false
+
+file_path_instructions:
+  - path: "**/*_test.go"
+    instructions: |
+      For tests, review them as if you are a friendly but pedantic very senior developer in our team, we expect a high standard of quality:
+      - **Coverage**: Strive for high test coverage on critical logic paths.
+      - **Isolation**: Unit tests must be hermetic. Use mocks, stubs, or fakes to isolate dependencies. No external network or filesystem access unless it is an integration test.
+      - **Readability**: Use table-driven tests for multiple cases. Test names should clearly state their intent.
+      - **Parallelism**: Use `t.Parallel()` in your tests to speed up execution, ensuring tests are independent.
+      - **Cleanup**: Ensure resources are properly released after a test completes.
+      - **Assertions**: Assertions must be specific and provide informative messages on failure.
+  - path: "**/*.go"
+    instructions: |
+      Review the code as if you are a friendly but pedantic very senior developer in our team. We generally expect the following:
+      - **Clarity and Simplicity**: Write idiomatic Go. Code should be self-documenting. Complexity should be justified.
+      - **Concurrency**: Ensure goroutine safety. Use channels for communication and synchronization. Avoid race conditions.
+      - **Error Handling**: No silent failures. Errors must be checked, wrapped with context, and propagated. Use `errors.Is` and `errors.As`.
+      - **Resource Management**: Prevent resource leaks. Defer `close()` or `cleanup()` calls immediately after allocation. Manage goroutine lifecycles.
+      - **API Design**: APIs (REST, gRPC) must be well-defined, versioned, and backward-compatible. Input validation is mandatory.
+      - **Observability**: Instrument code with structured logging, metrics (e.g., Prometheus), and tracing. Logs should provide context, not just messages.
+      - **Security**: Be vigilant against vulnerabilities (e.g., injection, insecure direct object references). Sanitize inputs. Do not hardcode secrets.
+      - **Performance**: Write efficient code, but avoid premature optimization. Be mindful of algorithmic complexity and memory allocations.
