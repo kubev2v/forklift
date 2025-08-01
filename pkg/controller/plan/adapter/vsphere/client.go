@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	liburl "net/url"
+	"strings"
 
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
@@ -142,6 +143,15 @@ func (r *Client) PowerOff(vmRef ref.Ref) (err error) {
 	if err != nil {
 		return
 	}
+
+	// Get VM model to detect OS type using existing isWindows function
+	vmModel := &model.VM{}
+	err = r.Source.Inventory.Find(vmModel, vmRef)
+	if err != nil {
+		r.Log.Error(err, "Failed to get VM model for OS detection", "vmRef", vmRef)
+		// Continue with default behavior if we can't detect OS
+	}
+
 	powerState, err := vm.PowerState(context.TODO())
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -150,10 +160,30 @@ func (r *Client) PowerOff(vmRef ref.Ref) (err error) {
 	if powerState == types.VirtualMachinePowerStatePoweredOff {
 		return nil
 	}
+
+	// Check if this is Windows Server 2019
+	// Windows Server 2019 may enter hibernation instead of fully powering off when PowerOff() is called,
+	// causing virt-v2v to fail.
+	isWindows2019 := isWindows(vmModel) && strings.Contains(vmModel.GuestID, "2019")
+
 	err = vm.ShutdownGuest(context.TODO())
 	if err != nil {
-		err = liberr.Wrap(err)
-		return
+		if isWindows2019 {
+			// For Windows Server 2019, don't attempt hard power off - return the ShutdownGuest error
+			r.Log.Info("ShutdownGuest failed for Windows Server 2019, not attempting hard power off", "vmRef", vmRef, "error", err.Error())
+			err = liberr.Wrap(err, "ShutdownGuest failed for Windows Server 2019")
+			return
+		}
+
+		r.Log.Info("ShutdownGuest failed, attempting hard power off", "vmRef", vmRef, "error", err.Error())
+		// Fallback to asynchronous hard power off when VMware Tools aren't available
+		_, powerOffErr := vm.PowerOff(context.TODO())
+		if powerOffErr != nil {
+			err = liberr.Wrap(powerOffErr, "both ShutdownGuest and PowerOff failed")
+			return
+		}
+		err = nil
+		r.Log.Info("Hard power off completed successfully", "vmRef", vmRef)
 	}
 	return
 }
