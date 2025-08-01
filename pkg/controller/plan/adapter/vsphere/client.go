@@ -152,8 +152,15 @@ func (r *Client) PowerOff(vmRef ref.Ref) (err error) {
 	}
 	err = vm.ShutdownGuest(context.TODO())
 	if err != nil {
-		err = liberr.Wrap(err)
-		return
+		r.Log.Info("ShutdownGuest failed, attempting hard power off", "vmRef", vmRef, "error", err.Error())
+		// Fallback to asynchronous hard power off when VMware Tools aren't available
+		_, powerOffErr := vm.PowerOff(context.TODO())
+		if powerOffErr != nil {
+			err = liberr.Wrap(powerOffErr, "both ShutdownGuest and PowerOff failed")
+			return
+		}
+		err = nil
+		r.Log.Info("Hard power off completed successfully", "vmRef", vmRef)
 	}
 	return
 }
