@@ -4,7 +4,6 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"time"
 
@@ -28,7 +27,7 @@ var embeddedSecureScript []byte
 
 // writeSecureScriptToTemp writes the embedded script to a temporary file
 func writeSecureScriptToTemp() (string, error) {
-	tempFile, err := ioutil.TempFile("", "secure-vmkfstools-wrapper-*.py")
+	tempFile, err := os.CreateTemp("", "secure-vmkfstools-wrapper-*.py")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp file: %w", err)
 	}
@@ -55,7 +54,7 @@ func ensureSecureScript(client vmware.Client, esx *object.HostSystem, datastore 
 		return "", err
 	}
 
-	scriptPath, err := uploadSecureScript(client, dc, datastore)
+	scriptPath, err := uploadScript(client, dc, datastore)
 	if err != nil {
 		return "", fmt.Errorf("failed to upload the secure script to ESXi %s: %w", esx.Name(), err)
 	}
@@ -67,7 +66,7 @@ func ensureSecureScript(client vmware.Client, esx *object.HostSystem, datastore 
 	return scriptPath, nil
 }
 
-func uploadSecureScript(client vmware.Client, dc *object.Datacenter, datastore string) (string, error) {
+func uploadScript(client vmware.Client, dc *object.Datacenter, datastore string) (string, error) {
 	ds, err := client.GetDatastore(context.Background(), dc, datastore)
 	if err != nil {
 		return "", fmt.Errorf("failed to get datastore: %w", err)

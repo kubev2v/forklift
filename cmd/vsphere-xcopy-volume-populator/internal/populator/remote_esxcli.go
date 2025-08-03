@@ -339,9 +339,9 @@ func (p *RemoteEsxcliPopulator) executeSSHClone(host *object.HostSystem, vmDisk 
 	klog.V(2).Infof("Secure script ready at path: %s", finalScriptPath)
 
 	// Enable SSH access
-	err = vmware.EnableSecureSSHAccess(p.VSphereClient, host, p.SSHPrivateKey, p.SSHPublicKey, finalScriptPath)
+	err = vmware.EnableSSHAccess(p.VSphereClient, host, p.SSHPrivateKey, p.SSHPublicKey, finalScriptPath)
 	if err != nil {
-		return fmt.Errorf("failed to enable secure SSH access: %w", err)
+		return fmt.Errorf("failed to enable SSH access: %w", err)
 	}
 
 	// Get host IP
@@ -351,40 +351,40 @@ func (p *RemoteEsxcliPopulator) executeSSHClone(host *object.HostSystem, vmDisk 
 	}
 
 	// Create SSH client
-	secureSSHClient := vmware.NewSecureSSHClient()
-	err = secureSSHClient.Connect(hostIP, "root", p.SSHPrivateKey)
+	sshClient := vmware.NewSSHClient()
+	err = sshClient.Connect(hostIP, "root", p.SSHPrivateKey)
 	if err != nil {
-		return fmt.Errorf("failed to connect via secure SSH: %w", err)
+		return fmt.Errorf("failed to connect via SSH: %w", err)
 	}
-	defer secureSSHClient.Close()
+	defer sshClient.Close()
 
-	klog.V(2).Infof("Secure SSH connection established with restricted commands")
+	klog.V(2).Infof("SSH connection established with restricted commands")
 
 	// Start the clone task
-	task, err := secureSSHClient.StartSecureVmkfstoolsClone(vmDisk.Path(), targetLUN)
+	task, err := sshClient.StartVmkfstoolsClone(vmDisk.Path(), targetLUN)
 	if err != nil {
-		return fmt.Errorf("failed to start secure vmkfstools clone: %w", err)
+		return fmt.Errorf("failed to start vmkfstools clone: %w", err)
 	}
 
-	klog.Infof("Started secure vmkfstools clone task %s", task.TaskId)
+	klog.Infof("Started vmkfstools clone task %s", task.TaskId)
 
 	if task.TaskId != "" {
 		defer func() {
-			err := secureSSHClient.CleanupSecureTask(task.TaskId)
+			err := sshClient.CleanupTask(task.TaskId)
 			if err != nil {
-				klog.Errorf("Failed cleaning up secure task artifacts: %v", err)
+				klog.Errorf("Failed cleaning up task artifacts: %v", err)
 			}
 		}()
 	}
 
 	// Poll for task completion
 	for {
-		taskStatus, err := secureSSHClient.GetSecureTaskStatus(task.TaskId)
+		taskStatus, err := sshClient.GetTaskStatus(task.TaskId)
 		if err != nil {
-			return fmt.Errorf("failed to get secure task status: %w", err)
+			return fmt.Errorf("failed to get task status: %w", err)
 		}
 
-		klog.V(2).Infof("Secure task status: %+v", taskStatus)
+		klog.V(2).Infof("Task status: %+v", taskStatus)
 
 		if progressValue, hasProgress := vmware.ParseProgress(taskStatus.LastLine); hasProgress {
 			progress <- progressValue
@@ -392,10 +392,10 @@ func (p *RemoteEsxcliPopulator) executeSSHClone(host *object.HostSystem, vmDisk 
 
 		if taskStatus.ExitCode != "" {
 			if taskStatus.ExitCode == "0" {
-				klog.Infof("secure vmkfstools clone completed successfully")
+				klog.Infof("vmkfstools clone completed successfully")
 				return nil
 			} else {
-				return fmt.Errorf("secure vmkfstools clone failed with exit code %s, stderr: %s", taskStatus.ExitCode, taskStatus.Stderr)
+				return fmt.Errorf("vmkfstools clone failed with exit code %s, stderr: %s", taskStatus.ExitCode, taskStatus.Stderr)
 			}
 		}
 

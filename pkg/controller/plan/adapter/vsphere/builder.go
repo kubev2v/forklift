@@ -1697,6 +1697,12 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 			dst.Data["GOVMOMI_INSECURE"] = value
 		}
 	}
+
+	// Add provider settings to the secret
+	if esxiCloneMethod, ok := r.Source.Provider.Spec.Settings[api.ESXiCloneMethod]; ok {
+		dst.Data["ESXI_CLONE_METHOD"] = []byte(esxiCloneMethod)
+	}
+
 	// Update secret1 with the merged data.
 	if err := r.Destination.Update(context.Background(), dst); err != nil {
 		return fmt.Errorf("failed to update secret1: %w", err)
