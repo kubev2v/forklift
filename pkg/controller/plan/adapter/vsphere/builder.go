@@ -280,7 +280,7 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 
 		for _, gn := range vm.GuestNetworks {
 			//IS ipv4
-			if net.IP.To4(net.ParseIP(gn.IP)) != nil {
+			if gn.Origin == string(types.NetIpConfigInfoIpAddressOriginManual) && net.IP.To4(net.ParseIP(gn.IP)) != nil {
 				macIPCount[gn.MAC]++
 			}
 		}
