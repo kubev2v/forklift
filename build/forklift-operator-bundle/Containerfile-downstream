@@ -57,6 +57,9 @@ RUN source ./images.conf && \
     --default-channel $DEFAULT_CHANNEL \
     --output-dir build
 
+# Fixme: CSV from operator-sdk does not contain `relatedImages` which causes issues in diconnected environments.
+RUN DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') envsubst < mtv-csv.yml > build/manifests/mtv-operator.clusterserviceversion.yaml
+
 USER 1001
 
 FROM scratch
