@@ -55,6 +55,7 @@ const (
 	VMMultiplePodNetworkMappings  = "VMMultiplePodNetworkMappings"
 	VMMissingGuestIPs             = "VMMissingGuestIPs"
 	VMMissingChangedBlockTracking = "VMMissingChangedBlockTracking"
+	VMHasSnapshots                = "VMHasSnapshots"
 	HostNotReady                  = "HostNotReady"
 	DuplicateVM                   = "DuplicateVM"
 	SharedDisks                   = "SharedDisks"
@@ -570,6 +571,14 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "Changed Block Tracking (CBT) has not been enabled on some VM. This feature is a prerequisite for VM warm migration.",
 		Items:    []string{},
 	}
+	vmHasSnapshotsForWarm := libcnd.Condition{
+		Type:     VMHasSnapshots,
+		Status:   True,
+		Reason:   NotValid,
+		Category: api.CategoryCritical,
+		Message:  "VM has pre-existing snapshots which are incompatible with warm migration.",
+		Items:    []string{},
+	}
 	pvcNameInvalid := libcnd.Condition{
 		Type:     NotValid,
 		Status:   True,
@@ -870,13 +879,26 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			}
 		}
 		// Warm migration.
-		if plan.Spec.Warm {
+		isWarmMigration := plan.Spec.Warm || plan.Spec.Type == api.MigrationWarm
+		if isWarmMigration {
 			enabled, err := validator.ChangeTrackingEnabled(*ref)
 			if err != nil {
 				return err
 			}
 			if !enabled {
 				missingCbtForWarm.Items = append(missingCbtForWarm.Items, ref.String())
+			}
+
+			// Check for pre-existing snapshots
+			ok, msg, _, err := validator.HasSnapshot(*ref)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				vmHasSnapshotsForWarm.Items = append(vmHasSnapshotsForWarm.Items, ref.String())
+				if msg != "" {
+					vmHasSnapshotsForWarm.Message = msg
+				}
 			}
 		}
 		// is valid vm pvc name template
@@ -936,6 +958,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(missingCbtForWarm.Items) > 0 {
 		plan.Status.SetCondition(missingCbtForWarm)
+	}
+	if len(vmHasSnapshotsForWarm.Items) > 0 {
+		plan.Status.SetCondition(vmHasSnapshotsForWarm)
 	}
 	if len(pvcNameInvalid.Items) > 0 {
 		plan.Status.SetCondition(pvcNameInvalid)

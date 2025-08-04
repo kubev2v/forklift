@@ -92,6 +92,12 @@ func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, s
 	return
 }
 
+// HasSnapshot - OpenStack doesn't support warm migration, so no snapshot validation needed
+func (r *Validator) HasSnapshot(vmRef ref.Ref) (ok bool, msg string, category string, err error) {
+	ok = true
+	return
+}
+
 // Validate whether warm migration is supported from this provider type.
 func (r *Validator) WarmMigration() (ok bool) {
 	ok = false

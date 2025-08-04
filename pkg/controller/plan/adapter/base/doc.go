@@ -155,6 +155,8 @@ type Validator interface {
 	SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, msg string, category string, err error)
 	// Validate that the vm has the change tracking enabled
 	ChangeTrackingEnabled(vmRef ref.Ref) (bool, error)
+	// Validate that VM has no pre-existing snapshots for warm migration
+	HasSnapshot(vmRef ref.Ref) (ok bool, msg string, category string, err error)
 	// Validate that the VM power state is compatible with the migration type.
 	PowerState(vmRef ref.Ref) (bool, error)
 	// Validate that the VM is inherently compatible with the migration type.

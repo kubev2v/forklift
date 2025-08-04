@@ -373,7 +373,9 @@ func (r *Validator) StaticIPs(vmRef ref.Ref) (ok bool, err error) {
 
 // Validate that the vm has the change tracking enabled
 func (r *Validator) ChangeTrackingEnabled(vmRef ref.Ref) (bool, error) {
-	if !r.Plan.Spec.Warm {
+	// Check if this is a warm migration using both old and new fields for backward compatibility
+	isWarmMigration := r.Plan.Spec.Warm || r.Plan.Spec.Type == api.MigrationWarm
+	if !isWarmMigration {
 		return true, nil
 	}
 	vm := &model.Workload{}
@@ -382,6 +384,27 @@ func (r *Validator) ChangeTrackingEnabled(vmRef ref.Ref) (bool, error) {
 		return false, liberr.Wrap(err, "vm", vmRef)
 	}
 	return vm.ChangeTrackingEnabled, nil
+}
+
+// Validate that VM has no pre-existing snapshots for warm migration
+func (r *Validator) HasSnapshot(vmRef ref.Ref) (ok bool, msg string, category string, err error) {
+	// Check if this is a warm migration using both old and new fields for backward compatibility
+	isWarmMigration := r.Plan.Spec.Warm || r.Plan.Spec.Type == api.MigrationWarm
+	if !isWarmMigration {
+		return true, "", "", nil
+	}
+	vm := &model.VM{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		return false, "", "", liberr.Wrap(err, "vm", vmRef)
+	}
+
+	// Check if VM has pre-existing snapshots
+	if vm.Snapshot.ID != "" {
+		return false, "VM has pre-existing snapshots which are incompatible with warm migration", "", nil
+	}
+
+	return true, "", "", nil
 }
 
 func (r *Validator) PowerState(vmRef ref.Ref) (ok bool, err error) {
