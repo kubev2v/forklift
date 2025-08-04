@@ -1,6 +1,5 @@
 #!/usr/bin/python
 
-import argparse
 import json
 import logging
 import os

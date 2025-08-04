@@ -2,12 +2,8 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/base64"
-	"encoding/pem"
 	"flag"
 	"fmt"
 	"net/http"
@@ -16,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"golang.org/x/crypto/ssh"
 	"k8s.io/client-go/util/cert"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/ontap"
@@ -30,21 +25,15 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
-	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 )
 
 var version = "unknown"
-
-const (
-	sshKeysSecretPrefix = "offload-ssh-keys"
-)
 
 var (
 	crName                     string
@@ -141,10 +130,10 @@ func main() {
 		p = vibP
 	} else {
 		klog.Infof("Using SSH method for ESXi cloning")
-		// Get SSH keys from provider-specific secrets or generate if not present
-		sshPrivateKey, sshPublicKey, err := getOrGenerateProviderSSHKeys(vsphereHostname)
+		// Get SSH keys from environment variables set by provider controller
+		sshPrivateKey, sshPublicKey, err := getSSHKeysFromEnvironment()
 		if err != nil {
-			klog.Fatalf("Failed to get SSH keys for vSphere provider %s: %s", vsphereHostname, err)
+			klog.Fatalf("Failed to get SSH keys from environment: %s", err)
 		}
 
 		sshP, err := populator.NewWithRemoteEsxcliSSH(storageApi, vsphereHostname, vsphereUsername, vspherePassword, sshPrivateKey, sshPublicKey)
@@ -351,168 +340,25 @@ func setupTracing() (*prometheus.CounterVec, error) {
 
 }
 
-// getOrGenerateProviderSSHKeys retrieves SSH keys from provider-specific secrets, environment variables, or generates them if not present
-func getOrGenerateProviderSSHKeys(providerHostname string) ([]byte, []byte, error) {
-	if clientSet != nil {
-		privateKeyBytes, publicKeyBytes, err := getSSHKeysFromProviderSecret(clientSet, providerHostname)
-		if err == nil {
-			return privateKeyBytes, publicKeyBytes, nil
-		}
-		klog.V(2).Infof("SSH keys not found in secret for provider %s: %v", providerHostname, err)
+// getSSHKeysFromEnvironment retrieves SSH keys from environment variables set by the provider controller
+func getSSHKeysFromEnvironment() ([]byte, []byte, error) {
+	sshPrivateKeyEnv := os.Getenv("SSH_PRIVATE_KEY")
+	sshPublicKeyEnv := os.Getenv("SSH_PUBLIC_KEY")
+
+	if sshPrivateKeyEnv == "" || sshPublicKeyEnv == "" {
+		return nil, nil, fmt.Errorf("SSH keys not found in environment variables - ensure provider controller has set SSH_PRIVATE_KEY and SSH_PUBLIC_KEY")
 	}
 
-	sshPrivateKeyEnv := os.Getenv("SSH_PRIVATE_KEY_" + providerHostname)
-	sshPublicKeyEnv := os.Getenv("SSH_PUBLIC_KEY_" + providerHostname)
-
-	if sshPrivateKeyEnv != "" && sshPublicKeyEnv != "" {
-		privateKeyBytes, err := base64.StdEncoding.DecodeString(sshPrivateKeyEnv)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to decode SSH private key for provider %s: %w", providerHostname, err)
-		}
-
-		publicKeyBytes, err := base64.StdEncoding.DecodeString(sshPublicKeyEnv)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to decode SSH public key for provider %s: %w", providerHostname, err)
-		}
-
-		return privateKeyBytes, publicKeyBytes, nil
-	}
-
-	klog.Infof("Generating new SSH key pair for provider %s", providerHostname)
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	privateKeyBytes, err := base64.StdEncoding.DecodeString(sshPrivateKeyEnv)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to generate RSA key for provider %s: %w", providerHostname, err)
+		return nil, nil, fmt.Errorf("failed to decode SSH private key from environment: %w", err)
 	}
 
-	privateKeyPEM := &pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
-	}
-	privateKeyBytes := pem.EncodeToMemory(privateKeyPEM)
-
-	publicKey, err := ssh.NewPublicKey(&privateKey.PublicKey)
+	publicKeyBytes, err := base64.StdEncoding.DecodeString(sshPublicKeyEnv)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create SSH public key for provider %s: %w", providerHostname, err)
+		return nil, nil, fmt.Errorf("failed to decode SSH public key from environment: %w", err)
 	}
 
-	publicKeyBytes := ssh.MarshalAuthorizedKey(publicKey)
-
-	if err := storeSSHKeysInProviderSecret(clientSet, providerHostname, privateKeyBytes, publicKeyBytes); err != nil {
-		klog.V(2).Infof("Failed to store SSH keys in secret for provider %s: %v", providerHostname, err)
-	}
-
+	klog.Infof("Successfully retrieved SSH keys from environment variables")
 	return privateKeyBytes, publicKeyBytes, nil
-}
-
-func generateSSHPrivateSecretName(providerHostname string) string {
-	return fmt.Sprintf("%s-%s-private", sshKeysSecretPrefix, sanitizeProviderName(providerHostname))
-}
-
-func generateSSHPublicSecretName(providerHostname string) string {
-	return fmt.Sprintf("%s-%s-public", sshKeysSecretPrefix, sanitizeProviderName(providerHostname))
-}
-
-// getSSHKeysFromProviderSecret retrieves SSH keys from separate provider-specific secrets
-func getSSHKeysFromProviderSecret(kubeClient *kubernetes.Clientset, providerHostname string) ([]byte, []byte, error) {
-	if kubeClient == nil {
-		return nil, nil, fmt.Errorf("kubernetes client not initialized")
-	}
-
-	privateSecretName := generateSSHPrivateSecretName(providerHostname)
-	publicSecretName := generateSSHPublicSecretName(providerHostname)
-	secretsClient := kubeClient.CoreV1()
-
-	privateSecret, err := secretsClient.Secrets(targetNamespace).Get(context.Background(), privateSecretName, metav1.GetOptions{})
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get SSH private key secret %s: %w", privateSecretName, err)
-	}
-
-	publicSecret, err := secretsClient.Secrets(targetNamespace).Get(context.Background(), publicSecretName, metav1.GetOptions{})
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get SSH public key secret %s: %w", publicSecretName, err)
-	}
-
-	privateKeyBytes, hasPrivate := privateSecret.Data["private-key"]
-	publicKeyBytes, hasPublic := publicSecret.Data["public-key"]
-
-	if !hasPrivate {
-		return nil, nil, fmt.Errorf("SSH private key not found in secret %s", privateSecretName)
-	}
-
-	if !hasPublic {
-		return nil, nil, fmt.Errorf("SSH public key not found in secret %s", publicSecretName)
-	}
-
-	return privateKeyBytes, publicKeyBytes, nil
-}
-
-// storeSSHKeysInProviderSecret stores the SSH keys in separate provider-specific secrets
-func storeSSHKeysInProviderSecret(kubeClient *kubernetes.Clientset, providerHostname string, privateKey, publicKey []byte) error {
-	if kubeClient == nil {
-		return fmt.Errorf("kubernetes client not initialized")
-	}
-
-	privateSecretName := generateSSHPrivateSecretName(providerHostname)
-	publicSecretName := generateSSHPublicSecretName(providerHostname)
-	secretsClient := kubeClient.CoreV1()
-
-	err := storeKeyInSecret(secretsClient.Secrets(targetNamespace), privateSecretName, "private-key", privateKey, providerHostname)
-	if err != nil {
-		return fmt.Errorf("failed to store private key: %w", err)
-	}
-
-	err = storeKeyInSecret(secretsClient.Secrets(targetNamespace), publicSecretName, "public-key", publicKey, providerHostname)
-	if err != nil {
-		return fmt.Errorf("failed to store public key: %w", err)
-	}
-
-	return nil
-}
-
-func storeKeyInSecret(secretsClient typedcorev1.SecretInterface, secretName, keyName string, keyData []byte, providerHostname string) error {
-	secret, err := secretsClient.Get(context.Background(), secretName, metav1.GetOptions{})
-	if err != nil {
-		secret = &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      secretName,
-				Namespace: targetNamespace,
-				Labels: map[string]string{
-					"app.kubernetes.io/name":        "forklift",
-					"app.kubernetes.io/component":   "ssh-keys",
-					"app.kubernetes.io/managed-by":  "vsphere-xcopy-volume-populator",
-					"forklift.konveyor.io/provider": sanitizeProviderName(providerHostname),
-				},
-			},
-			Type: corev1.SecretTypeOpaque,
-			Data: map[string][]byte{
-				keyName: keyData,
-			},
-		}
-
-		_, err = secretsClient.Create(context.Background(), secret, metav1.CreateOptions{})
-		if err != nil {
-			return fmt.Errorf("failed to create secret %s: %w", secretName, err)
-		}
-	} else {
-		if secret.Data == nil {
-			secret.Data = make(map[string][]byte)
-		}
-		secret.Data[keyName] = keyData
-
-		_, err = secretsClient.Update(context.Background(), secret, metav1.UpdateOptions{})
-		if err != nil {
-			return fmt.Errorf("failed to update secret %s: %w", secretName, err)
-		}
-	}
-
-	return nil
-}
-
-// sanitizeProviderName converts provider hostname to a valid Kubernetes resource name
-func sanitizeProviderName(providerHostname string) string {
-	sanitized := strings.ReplaceAll(providerHostname, ".", "-")
-	sanitized = strings.ReplaceAll(sanitized, "_", "-")
-	sanitized = strings.ToLower(sanitized)
-	sanitized = strings.Trim(sanitized, "-")
-	return sanitized
 }

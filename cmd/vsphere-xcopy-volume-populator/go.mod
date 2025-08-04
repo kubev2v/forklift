@@ -5,7 +5,7 @@ go 1.24.0
 toolchain go1.24.4
 
 require (
-	github.com/dell/goscaleio v1.19.1
+	github.com/dell/goscaleio v1.20.0
 	github.com/devans10/pugo/flasharray v0.0.0-20241116160615-6bb8c469c9a0
 	github.com/konveyor/forklift-controller v0.0.0
 	github.com/netapp/trident v0.0.0-20240628081112-cb68cb389d9d
@@ -13,7 +13,6 @@ require (
 	github.com/vmware/govmomi v0.50.0
 	go.uber.org/mock v0.5.2
 	golang.org/x/crypto v0.36.0
-	k8s.io/api v0.32.5
 	k8s.io/apimachinery v0.32.5
 	k8s.io/client-go v0.32.5
 	k8s.io/klog/v2 v2.130.1
@@ -43,6 +42,7 @@ require (
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
+	k8s.io/api v0.32.5 // indirect
 	k8s.io/apiextensions-apiserver v0.32.5 // indirect
 	k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f // indirect
 	kubevirt.io/api v1.6.0-beta.0.0.20250702170314-dd941825f5d3 // indirect
