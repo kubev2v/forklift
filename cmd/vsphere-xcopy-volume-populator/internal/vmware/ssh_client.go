@@ -323,12 +323,6 @@ func EnableSSHAccess(vmwareClient Client, host *object.HostSystem, privateKey, p
 		klog.Warningf("Failed to configure SSH firewall: %v", err)
 	}
 
-	// Step 5: Suppress shell warning
-	err = suppressShellWarning(host, ctx)
-	if err != nil {
-		klog.Warningf("Failed to suppress shell warning: %v", err)
-	}
-
 	// Step 6: Create SSH command with Python interpreter and restricted access
 	pythonCommand := fmt.Sprintf("python %s", scriptPath)
 	restrictedPublicKey := fmt.Sprintf(`command="%s",no-port-forwarding,no-agent-forwarding,no-X11-forwarding %s`,
