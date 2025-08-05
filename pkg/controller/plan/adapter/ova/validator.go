@@ -58,6 +58,12 @@ func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, s
 	return
 }
 
+// HasSnapshot - OVA doesn't support warm migration, so no snapshot validation needed
+func (r *Validator) HasSnapshot(vmRef ref.Ref) (ok bool, msg string, category string, err error) {
+	ok = true
+	return
+}
+
 // Validate that a VM's networks have been mapped.
 func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 	if r.Plan.Referenced.Map.Network == nil {

@@ -183,6 +183,12 @@ func (r *Validator) SharedDisks(vmRef ref.Ref, client k8sclient.Client) (ok bool
 	return
 }
 
+// HasSnapshot - OCP live migration doesn't require snapshot validation
+func (r *Validator) HasSnapshot(vmRef ref.Ref) (ok bool, msg string, category string, err error) {
+	ok = true
+	return
+}
+
 func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 	if r.Plan.Referenced.Map.Storage == nil {
 		return
