@@ -41,6 +41,13 @@ const (
 	// Add extra vddk configmap, in the Forklift used to pass AIO configuration to the VDDK.
 	// Related to https://github.com/kubevirt/containerized-data-importer/pull/3572
 	AnnVddkExtraArgs = "cdi.kubevirt.io/storage.pod.vddk.extraargs"
+
+	// In the namespace with the UDN we can't directly ping the virt-v2v pod unless we specify to opnned ports on the
+	// pod network.
+	AnnOpenDefaultPorts = "k8s.ovn.org/open-default-ports"
+
+	// UDN L2 bridge binding, needed for the Kubevirt VMs with the UDN
+	UdnL2bridge = "l2bridge"
 )
 
 var VolumePopulatorNotSupportedError = liberr.New("provider does not support volume populators")
