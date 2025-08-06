@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/kubev2v/forklift/pkg/lib/gob"
@@ -312,9 +313,14 @@ func scanOVAsOnNFS() (envelopes []Envelope, ovaPaths []string) {
 	for _, ovaFile := range ovaFiles {
 		fmt.Println("Processing OVA file:", ovaFile)
 
+		if !isFileComplete(ovaFile) {
+			log.Printf("Skipping %s: file still being copied\n", ovaFile)
+			continue
+		}
+
 		xmlStruct, err := readOVFFromOVA(ovaFile)
 		if err != nil {
-			fmt.Println("Error processing OVF from OVA:", err)
+			log.Printf("Error processing OVF from OVA %s: %v\n", ovaFile, err)
 			continue
 		}
 		envelopes = append(envelopes, *xmlStruct)
@@ -324,14 +330,22 @@ func scanOVAsOnNFS() (envelopes []Envelope, ovaPaths []string) {
 	for _, ovfFile := range ovfFiles {
 		fmt.Println("Processing OVF file:", ovfFile)
 
+		if !isFileComplete(ovfFile) {
+			log.Printf("Skipping %s: file still being copied\n", ovfFile)
+			continue
+		}
+
 		xmlStruct, err := readOVF(ovfFile)
 		if err != nil {
-			fmt.Println("Error processing OVF:", err)
+			if strings.Contains(err.Error(), "still being copied") {
+				log.Printf("Skipping %s: %v\n", ovfFile, err)
+			} else {
+				log.Printf("Error processing OVF %s: %v\n", ovfFile, err)
+			}
 			continue
 		}
 		envelopes = append(envelopes, *xmlStruct)
 		filesPath = append(filesPath, ovfFile)
-
 	}
 	return envelopes, filesPath
 }
@@ -380,6 +394,18 @@ func isOvf(filename string) bool {
 // Checks if the given file has the desired extension
 func hasSuffixIgnoreCase(fileName, suffix string) bool {
 	return strings.HasSuffix(strings.ToLower(fileName), strings.ToLower(suffix))
+}
+
+// isFileComplete checks that the file was not modified in the last 30s
+func isFileComplete(filePath string) bool {
+	info, err := os.Stat(filePath)
+	if err != nil {
+		return false
+	}
+
+	// Exclude zero-byte files (common placeholder pattern)
+	age := time.Since(info.ModTime())
+	return age > 30*time.Second && info.Size() > 0
 }
 
 func readOVFFromOVA(ovaFile string) (*Envelope, error) {
