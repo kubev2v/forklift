@@ -153,7 +153,11 @@ func (r *NetworkAdapter) DeleteUnexisting(ctx *Context) (deletions []Updater, er
 			m := &model.Network{
 				Base: model.Base{ID: currentID},
 			}
-			return tx.Delete(m)
+			err = tx.Delete(m)
+			if err != nil && errors.Is(err, libmodel.NotFound) {
+				err = nil
+			}
+			return err
 		}
 		deletions = append(deletions, updater)
 	}
@@ -249,7 +253,11 @@ func (r *VMAdapter) DeleteUnexisting(ctx *Context) (deletions []Updater, err err
 			m := &model.VM{
 				Base: model.Base{ID: currentID},
 			}
-			return tx.Delete(m)
+			err = tx.Delete(m)
+			if err != nil && errors.Is(err, libmodel.NotFound) {
+				err = nil
+			}
+			return err
 		}
 		deletions = append(deletions, updater)
 	}
@@ -343,7 +351,11 @@ func (r *DiskAdapter) DeleteUnexisting(ctx *Context) (deletions []Updater, err e
 			m := &model.Disk{
 				Base: model.Base{ID: currentID},
 			}
-			return tx.Delete(m)
+			err = tx.Delete(m)
+			if err != nil && errors.Is(err, libmodel.NotFound) {
+				err = nil
+			}
+			return err
 		}
 		deletions = append(deletions, updater)
 	}
@@ -438,7 +450,11 @@ func (r *StorageAdapter) DeleteUnexisting(ctx *Context) (deletions []Updater, er
 			m := &model.Storage{
 				Base: model.Base{ID: id},
 			}
-			return tx.Delete(m)
+			err = tx.Delete(m)
+			if err != nil && errors.Is(err, libmodel.NotFound) {
+				err = nil
+			}
+			return err
 		}
 		deletions = append(deletions, updater)
 	}
