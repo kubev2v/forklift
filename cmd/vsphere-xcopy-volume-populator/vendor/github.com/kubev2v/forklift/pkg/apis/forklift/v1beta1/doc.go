@@ -75,6 +75,7 @@ const (
 	PhaseCreateSnapshot                    = "CreateSnapshot"
 	PhaseCreateVM                          = "CreateVM"
 	PhaseFinalize                          = "Finalize"
+	PhasePreflightInspection               = "PreflightInspection"
 	PhasePowerOffSource                    = "PowerOffSource"
 	PhaseRemoveFinalSnapshot               = "RemoveFinalSnapshot"
 	PhaseRemovePenultimateSnapshot         = "RemovePenultimateSnapshot"
