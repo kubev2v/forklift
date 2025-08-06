@@ -1990,7 +1990,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 		if err != nil {
 			return
 		}
-		annotations["k8s.ovn.org/open-default-ports"] = string(yamlPorts)
+		annotations[planbase.AnnOpenDefaultPorts] = string(yamlPorts)
 	}
 	var seccompProfile core.SeccompProfile
 	if settings.Settings.OpenShift {

@@ -611,7 +611,7 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 					if r.Plan.DestinationHasUdnNetwork(r.Destination) {
 						kNetwork.Pod = &cnv.PodNetwork{}
 						kInterface.Binding = &cnv.PluginBinding{
-							Name: "l2bridge",
+							Name: planbase.UdnL2bridge,
 						}
 					} else {
 						kNetwork.Pod = &cnv.PodNetwork{}
