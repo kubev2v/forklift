@@ -88,6 +88,7 @@ test-copy-using-cli-powerflex: build
 		--storage-vendor-product=powerflex \
 		--secret-name=populator-secret \
 		--kubeconfig=$$KUBECONFIG
+
 test-copy-using-cli-powermax: build
 	GOSCALEIO_DEBUG=1 bin/vsphere-xcopy-volume-populator \
 		--source-vm-id="vm-1060" \
@@ -97,6 +98,17 @@ test-copy-using-cli-powermax: build
 		--storage-vendor-product=powermax \
 		--secret-name=populator-secret \
 		--kubeconfig=$$KUBECONFIG
+
+test-copy-using-cli-infinibox: build
+	bin/vsphere-xcopy-volume-populator \
+		--source-vm-id="vm-143076" \
+		--source-vmdk="[eco-iscsi-ds3] test-infinidat/test-infinidat.vmdk" \
+		--owner-name=iscsi-block-pvc  \
+		--target-namespace=infinidat-testing \
+		--storage-vendor-product=infinibox \
+		--secret-name=populator-secret \
+		--kubeconfig=$$KUBECONFIG
+
 .PHONY: vmkfstools-wrapper
 vmkfstools-wrapper:
 	$(MAKE) -C vmkfstools-wrapper build

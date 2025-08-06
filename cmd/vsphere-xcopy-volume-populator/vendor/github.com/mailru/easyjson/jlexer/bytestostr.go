@@ -2,13 +2,12 @@
 // easyjson_nounsafe nor appengine build tag is set. See README notes
 // for more details.
 
-//go:build !easyjson_nounsafe && !appengine
-// +build !easyjson_nounsafe,!appengine
+//+build !easyjson_nounsafe
+//+build !appengine
 
 package jlexer
 
 import (
-	"reflect"
 	"unsafe"
 )
 
@@ -18,7 +17,5 @@ import (
 // chunk may be either blocked from being freed by GC because of a single string or the buffer.Data
 // may be garbage-collected even when the string exists.
 func bytesToStr(data []byte) string {
-	h := (*reflect.SliceHeader)(unsafe.Pointer(&data))
-	shdr := reflect.StringHeader{Data: h.Data, Len: h.Len}
-	return *(*string)(unsafe.Pointer(&shdr))
+	return *(*string)(unsafe.Pointer(&data))
 }
