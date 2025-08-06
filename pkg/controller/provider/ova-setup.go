@@ -2,9 +2,14 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	liburl "net/url"
 	"os"
 	"strings"
+	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
@@ -14,6 +19,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -21,6 +27,7 @@ const (
 	ovaImageVar            = "OVA_PROVIDER_SERVER_IMAGE"
 	nfsVolumeNamePrefix    = "nfs-volume"
 	mountPath              = "/ova"
+	configMountPath        = "/provider"
 	pvSize                 = "1Gi"
 	auditRestrictedLabel   = "pod-security.kubernetes.io/audit"
 	enforceRestrictedLabel = "pod-security.kubernetes.io/enforce"
@@ -50,9 +57,16 @@ func (r Reconciler) CreateOVAServerDeployment(provider *api.Provider, ctx contex
 		r.Log.Error(err, "Failed to create PVC for the OVA server")
 		return
 	}
-
 	labels := map[string]string{"provider": provider.Name, "app": "forklift", "subapp": ovaServer}
-	err = r.createServerDeployment(provider, ctx, ownerReference, pvc.Name, labels)
+
+	cm, err := r.createServerConfigMap(provider, ctx, ownerReference, labels)
+	if err != nil {
+		err = liberr.Wrap(err)
+		r.Log.Error(err, "Failed to create OVA server configmap.")
+		return
+	}
+
+	err = r.createServerDeployment(provider, ctx, ownerReference, pvc.Name, cm.Name, labels)
 	if err != nil {
 		err = liberr.Wrap(err)
 		r.Log.Error(err, "Failed to create OVA server deployment")
@@ -133,7 +147,27 @@ func (r *Reconciler) createPvcForNfs(provider *api.Provider, ctx context.Context
 	return
 }
 
-func (r *Reconciler) createServerDeployment(provider *api.Provider, ctx context.Context, ownerReference metav1.OwnerReference, pvcName string, labels map[string]string) (err error) {
+func (r *Reconciler) createServerConfigMap(provider *api.Provider, ctx context.Context, ownerReference metav1.OwnerReference, labels map[string]string) (cm *core.ConfigMap, err error) {
+	configmapName := fmt.Sprintf("%s-configmap-%s-", ovaServer, provider.Name)
+	data, err := yaml.Marshal(provider.Spec.Sources)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	cm = &core.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName:    configmapName,
+			Namespace:       provider.Namespace,
+			Labels:          labels,
+			OwnerReferences: []metav1.OwnerReference{ownerReference},
+		},
+		Data: map[string]string{"sources": string(data)},
+	}
+	err = r.Create(ctx, cm)
+	return
+}
+
+func (r *Reconciler) createServerDeployment(provider *api.Provider, ctx context.Context, ownerReference metav1.OwnerReference, pvcName string, cmName string, labels map[string]string) (err error) {
 	deploymentName := fmt.Sprintf("%s-deployment-%s", ovaServer, provider.Name)
 	annotations := make(map[string]string)
 	var replicas int32 = 1
@@ -155,7 +189,7 @@ func (r *Reconciler) createServerDeployment(provider *api.Provider, ctx context.
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 				},
-				Spec: r.makeOvaProviderPodSpec(pvcName, provider.Name, provider.Namespace),
+				Spec: r.makeOvaProviderPodSpec(pvcName, cmName, provider.Name, provider.Namespace),
 			},
 		},
 	}
@@ -191,7 +225,7 @@ func (r *Reconciler) createServerService(provider *api.Provider, ctx context.Con
 	return
 }
 
-func (r *Reconciler) makeOvaProviderPodSpec(pvcName, providerName, providerNamespace string) core.PodSpec {
+func (r *Reconciler) makeOvaProviderPodSpec(pvcName, cmName, providerName, providerNamespace string) core.PodSpec {
 	imageName, ok := os.LookupEnv(ovaImageVar)
 	if !ok {
 		r.Log.Info("Failed to find OVA server image")
@@ -230,6 +264,10 @@ func (r *Reconciler) makeOvaProviderPodSpec(pvcName, providerName, providerNames
 				Name:      nfsVolumeName,
 				MountPath: mountPath,
 			},
+			{
+				Name:      "sources",
+				MountPath: configMountPath,
+			},
 		},
 		Resources: core.ResourceRequirements{
 			Requests: core.ResourceList{
@@ -252,10 +290,21 @@ func (r *Reconciler) makeOvaProviderPodSpec(pvcName, providerName, providerNames
 			},
 		},
 	}
+	cmVolume := core.Volume{
+		Name: "sources",
+		VolumeSource: core.VolumeSource{
+			ConfigMap: &core.ConfigMapVolumeSource{
+				LocalObjectReference: core.LocalObjectReference{Name: cmName},
+				Items: []core.KeyToPath{
+					{Key: "sources", Path: "sources"},
+				},
+			},
+		},
+	}
 
 	podSpec := core.PodSpec{
 		Containers: []core.Container{container},
-		Volumes:    []core.Volume{volume},
+		Volumes:    []core.Volume{volume, cmVolume},
 	}
 	return podSpec
 }
@@ -272,4 +321,57 @@ func (r *Reconciler) isEnforcedRestrictionNamespace(namespaceName string) bool {
 	auditLabel, auditExists := ns.Labels[auditRestrictedLabel]
 
 	return enforceExists && enforceLabel == "restricted" && !(auditExists && auditLabel == "restricted")
+}
+
+func (r *Reconciler) applianceStatus(provider *api.Provider) (err error) {
+	if provider.Type() != api.Ova {
+		return
+	}
+	svc := fmt.Sprintf("ova-service-%s.%s.svc.cluster.local:8080", provider.Name, provider.Namespace)
+	url := liburl.URL{
+		Scheme: "http",
+		Host:   svc,
+		Path:   "/status",
+	}
+
+	httpclient := &http.Client{
+		Timeout: time.Minute,
+	}
+	response, err := httpclient.Get(url.String())
+	if err != nil {
+		err = liberr.Wrap(err, "Getting OVA catalog status failed.", "provider", provider.Name)
+		return
+	}
+	defer func() {
+		_ = response.Body.Close()
+	}()
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		err = liberr.Wrap(
+			err,
+			"Reading OVA catalog status failed.",
+			"provider",
+			provider.Name,
+		)
+		return
+	}
+	if response.StatusCode != http.StatusOK {
+		err = liberr.New(
+			fmt.Sprintf("OVA catalog returned unexpected status: %d", response.StatusCode),
+			"provider", provider.Name,
+			"url", url.String(),
+		)
+		return
+	}
+	provider.Status.Appliances = nil
+	err = json.Unmarshal(body, &provider.Status.Appliances)
+	if err != nil {
+		err = liberr.Wrap(
+			err,
+			"Unmarshalling OVA catalog status failed.",
+			"provider",
+			provider.Name)
+		return
+	}
+	return
 }
