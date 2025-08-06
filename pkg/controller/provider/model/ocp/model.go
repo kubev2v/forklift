@@ -188,3 +188,36 @@ func (m *KubeVirt) With(kv *cnv.KubeVirt) {
 	m.Base.With(kv)
 	m.Object = *kv
 }
+
+type TopologyType string
+type RoleType string
+type NadType string
+
+// Constants for the supported TopologyType values.
+const (
+	TopologyLayer2 TopologyType = "layer2"
+	TopologyLayer3 TopologyType = "layer3"
+	RolePrimary    RoleType     = "primary"
+	RoleSecondary  RoleType     = "secondary"
+	OvnOverlayType NadType      = "ovn-k8s-cni-overlay"
+)
+
+// NetworkConfig represents the structure of the OVN-Kubernetes CNI configuration JSON.
+// The `json:"..."` tags are used by the encoding/json package to map the JSON keys
+// to the struct fields during marshalling and unmarshalling.
+type NetworkConfig struct {
+	AllowPersistentIPs bool         `json:"allowPersistentIPs"`
+	CNIVersion         string       `json:"cniVersion"`
+	JoinSubnet         string       `json:"joinSubnet"`
+	Name               string       `json:"name"`
+	NetAttachDefName   string       `json:"netAttachDefName"`
+	Role               RoleType     `json:"role"`
+	Subnets            string       `json:"subnets"`
+	Topology           TopologyType `json:"topology"`
+	Type               NadType      `json:"type"`
+}
+
+func (m *NetworkConfig) IsUnsupportedUdn() bool {
+	return m.Type == OvnOverlayType &&
+		(m.Role == RolePrimary || m.Topology == TopologyLayer3)
+}

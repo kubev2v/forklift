@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -15,6 +16,7 @@ import (
 	refapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/ova"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
@@ -35,6 +37,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Types
@@ -76,6 +79,7 @@ const (
 	InvalidDiskSizes              = "InvalidDiskSizes"
 	MacConflicts                  = "MacConflicts"
 	MissingPvcForOnlyConversion   = "MissingPvcForOnlyConversion"
+	UnsupportedUdn                = "UnsupportedUserDefinedNetwork"
 	unsupportedVersion            = "UnsupportedVersion"
 	VDDKInvalid                   = "VDDKInvalid"
 	ValidatingVDDK                = "ValidatingVDDK"
@@ -157,6 +161,10 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	var ctx *plancontext.Context
 	ctx, err = plancontext.New(r, plan, r.Log)
 	if err != nil {
+		return err
+	}
+
+	if err = r.validateUserDefinedNetwork(ctx); err != nil {
 		return err
 	}
 
@@ -360,6 +368,51 @@ func (r *Reconciler) validateTargetNamespace(plan *api.Plan) (err error) {
 		plan.Status.SetCondition(newCnd)
 	}
 	return
+}
+
+// Validate the target namespace.
+func (r *Reconciler) validateUserDefinedNetwork(ctx *plancontext.Context) (err error) {
+	nads, err := r.getDestinationNamespaceNads(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, nad := range nads.Items {
+		var networkConfig model.NetworkConfig
+		err = json.Unmarshal([]byte(nad.Spec.Config), &networkConfig)
+		if err != nil {
+			fmt.Println("error unmarshalling network config, skipping", err)
+			continue
+		}
+		if networkConfig.Type != model.OvnOverlayType {
+			continue
+		}
+		if networkConfig.Topology == model.TopologyLayer3 {
+			// CNV does not support l3
+			ctx.Plan.Status.SetCondition(libcnd.Condition{
+				Type:     UnsupportedUdn,
+				Status:   True,
+				Reason:   NotSupported,
+				Category: api.CategoryCritical,
+				Message:  "UserDefinedNetwork Layer3 is not supported, please use Layer2",
+			})
+		}
+	}
+	return
+}
+
+func (r *Reconciler) getDestinationNamespaceNads(ctx *plancontext.Context) (*k8snet.NetworkAttachmentDefinitionList, error) {
+	nadList := &k8snet.NetworkAttachmentDefinitionList{}
+	listOpts := []k8sclient.ListOption{
+		k8sclient.InNamespace(ctx.Plan.Spec.TargetNamespace),
+		k8sclient.MatchingLabels{"k8s.ovn.org/user-defined-network": ""},
+	}
+
+	err := ctx.Destination.Client.List(context.TODO(), nadList, listOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return nadList, nil
 }
 
 // Validate network mapping ref.
