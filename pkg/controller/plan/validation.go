@@ -4,8 +4,10 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/ocp"
 	"net"
 	"strconv"
 	"strings"
@@ -34,6 +36,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Types
@@ -71,6 +74,7 @@ const (
 	Paused                        = "Paused"
 	Archived                      = "Archived"
 	UnsupportedDisks              = "UnsupportedDisks"
+	UnsupportedUdn                = "UnsupportedUserDefinedNetwork"
 	unsupportedVersion            = "UnsupportedVersion"
 	VDDKInvalid                   = "VDDKInvalid"
 	ValidatingVDDK                = "ValidatingVDDK"
@@ -138,6 +142,10 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	}
 
 	if err = r.validateTargetNamespace(plan); err != nil {
+		return err
+	}
+
+	if err = r.validateUserDefinedNetwork(plan); err != nil {
 		return err
 	}
 
@@ -378,6 +386,56 @@ func (r *Reconciler) validateTargetNamespace(plan *api.Plan) (err error) {
 		plan.Status.SetCondition(newCnd)
 	}
 	return
+}
+
+// Validate the target namespace.
+func (r *Reconciler) validateUserDefinedNetwork(plan *api.Plan) (err error) {
+	var ctx *plancontext.Context
+	ctx, err = plancontext.New(r, plan, r.Log)
+	if err != nil {
+		return err
+	}
+	nads, err := r.getDestinationNamespaceNads(ctx.Destination.Client, plan)
+	if err != nil {
+		return err
+	}
+
+	for _, nad := range nads.Items {
+		var networkConfig model.NetworkConfig
+		err = json.Unmarshal([]byte(nad.Spec.Config), &networkConfig)
+		if err != nil {
+			fmt.Println("error unmarshalling network config, skipping", err)
+			continue
+		}
+		if networkConfig.Type != model.OvnOverlayType {
+			continue
+		}
+		if networkConfig.Topology == model.TopologyLayer3 {
+			// CNV does not support l3
+			plan.Status.SetCondition(libcnd.Condition{
+				Type:     UnsupportedUdn,
+				Status:   True,
+				Reason:   NotSupported,
+				Category: api.CategoryCritical,
+				Message:  "UserDefinedNetwork Layer3 is not supported, please use Layer2",
+			})
+		}
+	}
+	return
+}
+
+func (r *Reconciler) getDestinationNamespaceNads(client client.Client, plan *api.Plan) (*k8snet.NetworkAttachmentDefinitionList, error) {
+	nadList := &k8snet.NetworkAttachmentDefinitionList{}
+	listOpts := []k8sclient.ListOption{
+		k8sclient.InNamespace(plan.Spec.TargetNamespace),
+		k8sclient.MatchingLabels{"k8s.ovn.org/user-defined-network": ""},
+	}
+
+	err := client.List(context.TODO(), nadList, listOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return nadList, nil
 }
 
 // Validate network mapping ref.
