@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/hashicorp/go-version"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 )
@@ -13,8 +14,9 @@ import (
 var Settings = ControllerSettings{}
 
 const (
-	OpenShift   = "OPENSHIFT"
-	Development = "DEVELOPMENT"
+	OpenShift        = "OPENSHIFT"
+	Development      = "DEVELOPMENT"
+	OpenShiftVersion = "OPENSHIFT_VERSION"
 )
 
 // Settings
@@ -35,8 +37,10 @@ type ControllerSettings struct {
 	Profiler
 	// Feature gates.
 	Features
-	OpenShift   bool
-	Development bool
+	OpenShift        bool
+	OpenShiftVersion string
+	UdnSupportsMac   bool
+	Development      bool
 }
 
 // Load settings.
@@ -75,6 +79,18 @@ func (r *ControllerSettings) Load() error {
 	}
 	r.OpenShift = getEnvBool(OpenShift, false)
 	r.Development = getEnvBool(Development, false)
+	if s, found := os.LookupEnv(OpenShiftVersion); found {
+		r.OpenShiftVersion = s
+		v1, err := version.NewVersion("4.20")
+		if err != nil {
+			return err
+		}
+		v2, err := version.NewVersion(s)
+		if err != nil {
+			return err
+		}
+		r.UdnSupportsMac = v2.GreaterThanOrEqual(v1)
+	}
 	return nil
 }
 
