@@ -399,9 +399,12 @@ func (r *Builder) getSourceDetails(vm *model.VM, sourceSecret *core.Secret) (lib
 		return
 	}
 
-	sslVerify := ""
+	var sslVerify string
 	if basecontroller.GetInsecureSkipVerifyFlag(sourceSecret) {
 		sslVerify = "no_verify=1"
+	} else {
+		// This path is created by linkCertificates in the v2v container containes either the provider cert or pod certs.
+		sslVerify = "cacert=/opt/ca-bundle.crt"
 	}
 
 	if hostDef, found := r.hosts[host.ID]; found {
