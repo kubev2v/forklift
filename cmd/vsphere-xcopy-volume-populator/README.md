@@ -136,7 +136,37 @@ spec:
 
 # Secret with storage provider credentials
 
-## Hitachi Vantara
+The secret with storage provider credentials must contain the following environment variables:
+
+## vSphere Provider Settings
+| Key | Required/Optional | Description |
+|-----|-------------------|-------------|
+| GOVMOMI_HOSTNAME | Required | vSphere's API hostname |
+| GOVMOMI_USERNAME | Required | vSphere's API username |
+| GOVMOMI_PASSWORD | Required | vSphere's API password |
+| ESXI_CLONE_METHOD | Optional | ESXi clone method: 'ssh' (default) or 'vib' |
+
+The `ESXI_CLONE_METHOD` setting can be configured in the Provider settings using the `esxiCloneMethod` key:
+
+```yaml
+apiVersion: forklift.konveyor.io/v1beta1
+kind: Provider
+metadata:
+  name: my-vsphere-provider
+  namespace: openshift-mtv
+spec:
+  type: vsphere
+  url: https://vcenter.example.com
+  secret:
+    name: vsphere-credentials
+    namespace: openshift-mtv
+  settings:
+    `esxiCloneMethod`: "ssh"  # or "vib".
+```
+
+## Storage Vendor Specific Settings
+
+### Hitachi Vantara
 - see [README](internal/vantara/README.md)
 
 # Setup copy offload
