@@ -88,7 +88,15 @@ test-copy-using-cli-powerflex: build
 		--storage-vendor-product=powerflex \
 		--secret-name=populator-secret \
 		--kubeconfig=$$KUBECONFIG
-
+test-copy-using-cli-powermax: build
+	GOSCALEIO_DEBUG=1 bin/vsphere-xcopy-volume-populator \
+		--source-vm-id="vm-1060" \
+		--source-vmdk="[dlqa0051] testraghucentoswarm50x4/testraghucentoswarm50x4.vmdk" \
+		--owner-name=test51g \
+		--target-namespace=default \
+		--storage-vendor-product=powermax \
+		--secret-name=populator-secret \
+		--kubeconfig=$$KUBECONFIG
 .PHONY: vmkfstools-wrapper
 vmkfstools-wrapper:
 	$(MAKE) -C vmkfstools-wrapper build

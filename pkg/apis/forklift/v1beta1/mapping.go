@@ -66,6 +66,7 @@ const (
 	StorageVendorProductPrimera3Par    StorageVendorProduct = "primera3par"
 	StorageVendorProductPureFlashArray StorageVendorProduct = "pureFlashArray"
 	StorageVendorProductPowerFlex      StorageVendorProduct = "powerflex"
+	StorageVendorProductPowerMax       StorageVendorProduct = "powermax"
 )
 
 func StorageVendorProducts() []StorageVendorProduct {
@@ -75,6 +76,7 @@ func StorageVendorProducts() []StorageVendorProduct {
 		StorageVendorProductPrimera3Par,
 		StorageVendorProductPureFlashArray,
 		StorageVendorProductPowerFlex,
+		StorageVendorProductPowerMax,
 	}
 }
 
@@ -85,7 +87,7 @@ type VSphereXcopyPluginConfig struct {
 	// The secret should reside in the same namespace where the source provider is.
 	SecretRef string `json:"secretRef"`
 	// StorageVendorProduct the string identifier of the storage vendor product
-	// +kubebuilder:validation:Enum=vantara;ontap;primera3par;pureFlashArray;powerflex
+	// +kubebuilder:validation:Enum=vantara;ontap;primera3par;pureFlashArray;powerflex;powermax
 	StorageVendorProduct StorageVendorProduct `json:"storageVendorProduct"`
 }
 
