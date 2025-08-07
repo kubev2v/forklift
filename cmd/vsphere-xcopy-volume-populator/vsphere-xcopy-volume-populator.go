@@ -20,7 +20,7 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/pure"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vantara"
 
-	forklift "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	forklift "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 

@@ -8,7 +8,7 @@ require (
 	github.com/dell/gopowermax/v2 v2.9.0
 	github.com/dell/goscaleio v1.19.1
 	github.com/devans10/pugo/flasharray v0.0.0-20241116160615-6bb8c469c9a0
-	github.com/konveyor/forklift-controller v0.0.0
+	github.com/kubev2v/forklift v0.0.0-20250620125157-d13e1d020ae9
 	github.com/netapp/trident v0.0.0-20240628081112-cb68cb389d9d
 	github.com/stretchr/testify v1.10.0
 	github.com/vmware/govmomi v0.50.0
@@ -28,7 +28,6 @@ require (
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
-	github.com/kubev2v/forklift v0.0.0-20250620125157-d13e1d020ae9 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/openshift/custom-resource-status v1.1.2 // indirect
@@ -120,4 +119,4 @@ require (
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 // indirect
 )
 
-replace github.com/konveyor/forklift-controller => ../../
+replace github.com/kubev2v/forklift => ../../
