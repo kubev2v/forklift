@@ -1,0 +1,108 @@
+{
+  "editStorageGroupActionParam" : {
+    "mergeStorageGroupParam" : {
+      "storageGroupId" : "..."
+    },
+    "splitStorageGroupVolumesParam" : {
+      "volumeId" : [ "...", ... ],
+      "storageGroupId" : "...",
+      "maskingViewId" : "..."
+    },
+    "splitChildStorageGroupParam" : {
+      "storageGroupId" : "...",
+      "maskingViewId" : "..."
+    },
+    "moveVolumeToStorageGroupParam" : {
+      "volumeId" : [ "...", ... ],
+      "storageGroupId" : "...",
+      "force" : false
+    },
+    "editCompressionParam" : {
+      "compression" : false
+    },
+    "setHostIOLimitsParam" : {
+      "host_io_limit_mb_sec" : "...",
+      "host_io_limit_io_sec" : "...",
+      "dynamicDistribution" : "Never"
+    },
+    "removeVolumeParam" : {
+      "volumeId" : [ "...", ... ]
+    },
+    "expandStorageGroupParam" : {
+      "addExistingStorageGroupParam" : {
+        "storageGroupId" : [ "...", ... ],
+        "enableComplianceAlerts" : false
+      },
+      "addNewStorageGroupParam" : {
+        "srpId" : "...",
+        "sloBasedStorageGroupParam" : [ {
+          "sloId" : "...",
+          "workloadSelection" : "...",
+          "num_of_vols" : ...,
+          "volumeAttribute" : {
+          },
+          "allocate_capacity_for_each_vol" : false,
+          "persist_preallocated_capacity_through_reclaim_or_copy" : false,
+          "noCompression" : false,
+          "volumeIdentifier" : {
+            "volumeIdentifierChoice" : "none",
+            "identifier_name" : "...",
+            "append_number" : "..."
+          },
+          "setHostIOLimitsParam" : {
+            "host_io_limit_mb_sec" : "...",
+            "host_io_limit_io_sec" : "...",
+            "dynamicDistribution" : "Never"
+          }
+        }, ... ],
+        "emulation" : "FBA",
+        "enableComplianceAlerts" : false
+      },
+      "expandVolumesParam" : {
+        "specificVolumeParam" : [ {
+          "volumeId" : [ "...", ... ],
+          "volumeAttribute" : {
+          },
+          "rdfGroupNumber" : ...
+        }, ... ],
+        "allVolumeParam" : {
+          "volumeAttribute" : {
+          },
+          "rdfGroupNumber" : ...
+        }
+      },
+      "addSpecificVolumeParam" : {
+        "volumeId" : [ "...", ... ]
+      },
+      "addVolumeParam" : {
+        "num_of_vols" : ...,
+        "volumeAttribute" : {
+        },
+        "create_new_volumes" : false,
+        "emulation" : "FBA",
+        "volumeIdentifier" : {
+          "volumeIdentifierChoice" : "none",
+          "identifier_name" : "...",
+          "append_number" : "..."
+        }
+      }
+    },
+    "editStorageGroupWorkloadParam" : {
+      "workloadSelection" : "..."
+    },
+    "editStorageGroupSLOParam" : {
+      "sloId" : "..."
+    },
+    "editStorageGroupSRPParam" : {
+      "srpId" : "..."
+    },
+    "removeStorageGroupParam" : {
+      "storageGroupId" : [ "...", ... ],
+      "force" : false
+    },
+    "renameStorageGroupParam" : {
+      "new_storage_Group_name" : "..."
+    }
+  },
+  "executionOption" : "SYNCHRONOUS"
+}
