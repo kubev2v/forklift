@@ -15,11 +15,12 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/ontap"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/powerflex"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/powermax"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/primera3par"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/pure"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vantara"
 
-	forklift "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	forklift "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 
@@ -100,6 +101,13 @@ func main() {
 			storageHostname, storageUsername, storagePassword, storageSkipSSLVerification == "true")
 		if err != nil {
 			klog.Fatalf("failed to initialize PowerFlex clonner with %s", err)
+		}
+		storageApi = &sm
+	case forklift.StorageVendorProductPowerMax:
+		sm, err := powermax.NewPowermaxClonner(
+			storageHostname, storageUsername, storagePassword, storageSkipSSLVerification == "true")
+		if err != nil {
+			klog.Fatalf("failed to initialize PowerMax clonner with %s", err)
 		}
 		storageApi = &sm
 	default:
