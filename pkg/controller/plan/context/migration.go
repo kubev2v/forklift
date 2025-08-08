@@ -74,7 +74,7 @@ func (r *Context) build() (err error) {
 		return
 	}
 	r.Map.Storage = r.Plan.Referenced.Map.Storage
-	if r.Map.Storage == nil {
+	if r.Map.Storage == nil && r.Plan.Spec.Type != api.MigrationOnlyConversion {
 		err = liberr.Wrap(NotEnoughDataError{})
 		return
 	}

@@ -54,6 +54,7 @@ func createKubeVirt(objs ...runtime.Object) *KubeVirt {
 			},
 			Log:       KubeVirtLog,
 			Migration: createMigration(),
+			Plan:      createPlanKubevirt(),
 			Client:    client,
 		},
 	}
@@ -65,6 +66,14 @@ func createMigration() *v1beta1.Migration {
 			Name:      "test",
 			Namespace: "test",
 			UID:       "test",
+		},
+	}
+}
+func createPlanKubevirt() *v1beta1.Plan {
+	return &v1beta1.Plan{
+		ObjectMeta: metav1.ObjectMeta{},
+		Spec: v1beta1.PlanSpec{
+			Type: "cold",
 		},
 	}
 }

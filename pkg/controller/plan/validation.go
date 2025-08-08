@@ -17,6 +17,7 @@ import (
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/ova"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/validation"
 	ocp "github.com/kubev2v/forklift/pkg/lib/client/openshift"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
@@ -74,6 +75,7 @@ const (
 	UnsupportedDisks              = "UnsupportedDisks"
 	InvalidDiskSizes              = "InvalidDiskSizes"
 	MacConflicts                  = "MacConflicts"
+	MissingPvcForOnlyConversion   = "MissingPvcForOnlyConversion"
 	unsupportedVersion            = "UnsupportedVersion"
 	VDDKInvalid                   = "VDDKInvalid"
 	ValidatingVDDK                = "ValidatingVDDK"
@@ -436,6 +438,10 @@ func (r *Reconciler) validateStorageMap(plan *api.Plan) (err error) {
 		Category: api.CategoryCritical,
 		Message:  "Map.Storage is not valid.",
 	}
+	// Ignore mapping for only conversion mode
+	if plan.Spec.Type == api.MigrationOnlyConversion {
+		return
+	}
 	if !libref.RefSet(&ref) {
 		newCnd.Reason = NotSet
 		plan.Status.SetCondition(newCnd)
@@ -661,6 +667,13 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Reason:   NotValid,
 		Category: api.CategoryCritical,
 		Message:  "",
+	}
+	missingPvcForOnlyConversion := libcnd.Condition{
+		Type:     MissingPvcForOnlyConversion,
+		Status:   True,
+		Reason:   NotValid,
+		Category: api.CategoryCritical,
+		Message:  "Missing required PVCs for conversion-only mode. Ensure vendor-provided PVCs exist in the target namespace and are labeled with vmID and vmUUID.",
 		Items:    []string{},
 	}
 
@@ -734,6 +747,17 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 				// match label from ova/export_source.rego
 				if concern.Id == "ova.source.unsupported" {
 					unsupportedOvaSource.Items = append(unsupportedOvaSource.Items, ref.String())
+				}
+			}
+		}
+		if plan.Spec.Type == api.MigrationOnlyConversion {
+			if vm, ok := v.(*vsphere.VM); ok {
+				pvcs, err := r.getVmPVCs(plan, vm)
+				if err != nil {
+					return err
+				}
+				if len(pvcs) != len(vm.Disks) {
+					missingPvcForOnlyConversion.Items = append(missingPvcForOnlyConversion.Items, ref.String())
 				}
 			}
 		}
@@ -1027,8 +1051,46 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	if len(macConflicts.Items) > 0 {
 		plan.Status.SetCondition(macConflicts)
 	}
-
+	if len(missingPvcForOnlyConversion.Items) > 0 {
+		plan.Status.SetCondition(missingPvcForOnlyConversion)
+	}
 	return nil
+}
+
+// Return PersistentVolumeClaims associated with a VM.
+func (r *Reconciler) getVmPVCs(plan *api.Plan, vm *vsphere.VM) (pvcs []*core.PersistentVolumeClaim, err error) {
+	// Add VM uuid
+	labelSelector := map[string]string{
+		kVM:     vm.ID,
+		kVmUuid: vm.UUID,
+	}
+	var ctx *plancontext.Context
+	ctx, err = plancontext.New(r, plan, r.Log)
+	if err != nil {
+		return
+	}
+	pvcsList := &core.PersistentVolumeClaimList{}
+	err = ctx.Destination.Client.List(
+		context.TODO(),
+		pvcsList,
+		&client.ListOptions{
+			LabelSelector: labels.SelectorFromSet(labelSelector),
+			Namespace:     plan.Spec.TargetNamespace,
+		},
+	)
+
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	pvcs = make([]*core.PersistentVolumeClaim, len(pvcsList.Items))
+	for i, pvc := range pvcsList.Items {
+		// loopvar
+		pvc := pvc
+		pvcs[i] = &pvc
+	}
+
+	return
 }
 
 // Validate transfer network selection.
