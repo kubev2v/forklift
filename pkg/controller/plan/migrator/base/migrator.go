@@ -216,7 +216,10 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 }
 
 func (r *BaseMigrator) Itinerary(vm plan.VM) (itinerary *libitr.Itinerary) {
-	if r.Context.Plan.Spec.Warm {
+	// Plan.Spec.Type supersedes the deprecated Warm boolean.
+	if r.Context.Plan.Spec.Type == api.MigrationOnlyConversion {
+		itinerary = r.onlyConversionItinerary()
+	} else if r.Context.Plan.Spec.Warm {
 		itinerary = r.warmItinerary()
 	} else {
 		itinerary = r.coldItinerary()
@@ -325,6 +328,24 @@ func (r *BaseMigrator) coldItinerary() *libitr.Itinerary {
 			{Name: api.PhaseConvertGuest, All: RequiresConversion},
 			{Name: api.PhaseCopyDisksVirtV2V, All: RequiresConversion},
 			{Name: api.PhaseConvertOpenstackSnapshot, All: OpenstackImageMigration},
+			{Name: api.PhaseCreateVM},
+			{Name: api.PhasePostHook, All: HasPostHook},
+			{Name: api.PhaseCompleted},
+		},
+	}
+}
+
+func (r *BaseMigrator) onlyConversionItinerary() *libitr.Itinerary {
+	return &libitr.Itinerary{
+		Name: "OnlyConversion",
+		Pipeline: libitr.Pipeline{
+			{Name: api.PhaseStarted},
+			{Name: api.PhasePreHook, All: HasPreHook},
+			{Name: api.PhaseStorePowerState},
+			{Name: api.PhasePowerOffSource},
+			{Name: api.PhaseWaitForPowerOff},
+			{Name: api.PhaseCreateGuestConversionPod, All: RequiresConversion},
+			{Name: api.PhaseConvertGuest, All: RequiresConversion},
 			{Name: api.PhaseCreateVM},
 			{Name: api.PhasePostHook, All: HasPostHook},
 			{Name: api.PhaseCompleted},

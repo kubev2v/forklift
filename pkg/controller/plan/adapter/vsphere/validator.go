@@ -31,7 +31,7 @@ func (r *Validator) WarmMigration() (ok bool) {
 // is supported by this provider.
 func (r *Validator) MigrationType() bool {
 	switch r.Plan.Spec.Type {
-	case api.MigrationCold, api.MigrationWarm, "":
+	case api.MigrationCold, api.MigrationWarm, api.MigrationOnlyConversion, "":
 		return true
 	default:
 		return false
