@@ -212,7 +212,10 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 }
 
 func (r *BaseMigrator) Itinerary(predicate libitr.Predicate) (itinerary libitr.Itinerary) {
-	if r.Context.Plan.Spec.Warm {
+	// Plan.Spec.Type supersedes the deprecated Warm boolean.
+	if r.Context.Plan.Spec.Type == api.MigrationOnlyConversion {
+		itinerary = OnlyConversionItinerary
+	} else if r.Context.Plan.Spec.Warm {
 		itinerary = WarmItinerary
 	} else {
 		itinerary = ColdItinerary

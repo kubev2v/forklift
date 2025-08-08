@@ -27,6 +27,16 @@ import (
 	cnv "kubevirt.io/api/core/v1"
 )
 
+// MigrationType defines the type of migration to perform
+type MigrationType string
+
+const (
+	// Migration types
+	MigrationCold           MigrationType = "cold"
+	MigrationWarm           MigrationType = "warm"
+	MigrationOnlyConversion MigrationType = "conversion"
+)
+
 // PlanSpec defines the desired state of Plan.
 type PlanSpec struct {
 	// Description
@@ -150,6 +160,10 @@ type PlanSpec struct {
 	// - false: Use high-performance VirtIO devices (requires VirtIO drivers already installed in source VM)
 	// +kubebuilder:default:=true
 	UseCompatibilityMode bool `json:"useCompatibilityMode,omitempty"`
+	// Migration type. e.g. "cold", "warm", "conversion". Supersedes the `warm` boolean if set.
+	// +optional
+	// +kubebuilder:validation:Enum=cold;warm;conversion
+	Type MigrationType `json:"type,omitempty"`
 	// TargetPowerState specifies the desired power state of the target VM after migration.
 	// - "on": Target VM will be powered on after migration
 	// - "off": Target VM will be powered off after migration
@@ -220,7 +234,12 @@ func (p *Plan) ShouldUseV2vForTransfer() (bool, error) {
 	case VSphere:
 		// The virt-v2v transferes all disks attached to the VM. If we want to skip the shared disks so we don't transfer
 		// them multiple times we need to manage the transfer using KubeVirt CDI DataVolumes and v2v-in-place.
-		return !p.Spec.Warm && destination.IsHost() && p.Spec.MigrateSharedDisks && !p.Spec.SkipGuestConversion, nil
+		return !p.Spec.Warm && // The Warm Migraiton needs to use CDI to manage the snapshot delta
+				destination.IsHost() && // We can't monitor progress from the guest converison pod on the remote clusters
+				p.Spec.MigrateSharedDisks && // virt-v2v migrates all disks, to skip shared we need to control the disk selection
+				!p.Spec.SkipGuestConversion && // virt-v2v always converts the guest, to perform RawCopyMode we need to copy just disks via CDI
+				p.Spec.Type != MigrationOnlyConversion, // For only v2v-in-place conversion, we don't want to populate disks by v2v
+			nil
 	case Ova:
 		return true, nil
 	default:
