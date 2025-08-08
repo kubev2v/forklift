@@ -240,6 +240,29 @@ func IsLegacyWindows(vm *model.VM) bool {
 	return false
 }
 
+func countIPsPerMac(macsToIps string) map[string]int {
+	macIPCount := make(map[string]int)
+
+	// Split entries by underscore `_`
+	entries := strings.Split(macsToIps, "_")
+
+	for _, entry := range entries {
+		// entry example:
+		// "00:50:56:be:67:bc:ip:192.168.1.100,192.168.1.1,24,8.8.8.8,8.8.4.4"
+
+		// Split by ":ip:" to separate MAC from rest
+		parts := strings.SplitN(entry, ":ip:", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		mac := parts[0]
+
+		// Here we increment count per mac for each entry found
+		macIPCount[mac]++
+	}
+
+	return macIPCount
+}
 func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env []core.EnvVar, err error) {
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
@@ -276,14 +299,7 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 			Value: "/usr/local/virtio-win.iso",
 		})
 	} else if isWindows(vm) { // We check for multiple IPs per NIC only on Windows VMs
-		macIPCount := make(map[string]int)
-
-		for _, gn := range vm.GuestNetworks {
-			//IS ipv4
-			if net.IP.To4(net.ParseIP(gn.IP)) != nil {
-				macIPCount[gn.MAC]++
-			}
-		}
+		macIPCount := countIPsPerMac(macsToIps)
 
 		for _, count := range macIPCount {
 			if count > 1 {
@@ -342,34 +358,105 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 	return
 }
 
-func (r *Builder) mapMacStaticIps(vm *model.VM) (ipMap string, err error) {
-	// on windows machines we check if the interface origin is manual
-	// on linux we collect all networks.
-	isWindowsFlag := isWindows(vm)
+func isNonGlobalIPv6(ipStr string) bool {
+	ip := net.ParseIP(ipStr)
+	if ip == nil || ip.To4() != nil {
+		return false // It's IPv4 or invalid, allow it
+	}
 
+	// Disallow IPv6 link-local, ULA, and other non-global
+	if ip.IsLinkLocalUnicast() || ip.IsInterfaceLocalMulticast() ||
+		strings.HasPrefix(ipStr, "fe80::") || // Link-local
+		strings.HasPrefix(ipStr, "fc") || strings.HasPrefix(ipStr, "fd") { // ULA
+		return true
+	}
+
+	return false // Considered global IPv6
+}
+
+func selectGateway(ip string, device string, stacks []vsphere.GuestIpStack, isWindows bool) string {
+	isIPv4 := net.ParseIP(ip).To4() != nil
+	var fallbackGW string
+	var hasGlobalIPv6 bool
+
+	// Local IP filtering only for Linux
+	if !isWindows && isNonGlobalIPv6(ip) {
+		return ""
+	}
+
+	// Determine if the interface has at least one global IPv6 address
+	if !isIPv4 {
+		for _, stack := range stacks {
+			if stack.Device != device {
+				continue
+			}
+			// Any non-link-local IPv6 gateway implies global address is present
+			if strings.HasPrefix(stack.Gateway, "fe80::") {
+				continue
+			}
+			if net.ParseIP(stack.Gateway) != nil && net.ParseIP(stack.Gateway).To4() == nil {
+				hasGlobalIPv6 = true
+				break
+			}
+		}
+	}
+
+	for _, stack := range stacks {
+		if stack.Device != device {
+			continue
+		}
+		gw := net.ParseIP(stack.Gateway)
+		if gw == nil {
+			continue
+		}
+		gwIPv4 := gw.To4() != nil
+		if isIPv4 != gwIPv4 {
+			continue
+		}
+		if stack.Network != "0.0.0.0" && stack.Network != "::" && stack.Network != "::/0" {
+			continue
+		}
+
+		if !isIPv4 {
+			if strings.HasPrefix(stack.Gateway, "fe80::") {
+				if fallbackGW == "" {
+					fallbackGW = stack.Gateway
+				}
+				continue
+			}
+			// Prefer global IPv6 gateway
+			return stack.Gateway
+		}
+
+		// IPv4: first valid match wins
+		return stack.Gateway
+	}
+
+	// Only return link-local if no global IPv6 gateway *and* global IP exists
+	if !isIPv4 && hasGlobalIPv6 {
+		return fallbackGW
+	}
+	return ""
+}
+
+func (r *Builder) mapMacStaticIps(vm *model.VM) (ipMap string, err error) {
+	isWindowsFlag := isWindows(vm)
 	var configurations []string
+
 	for _, guestNetwork := range vm.GuestNetworks {
 		if !isWindowsFlag || guestNetwork.Origin == string(types.NetIpConfigInfoIpAddressOriginManual) {
-			gateway := ""
-			isIpv4 := net.IP.To4(net.ParseIP(guestNetwork.IP)) != nil
-			for _, ipStack := range vm.GuestIpStacks {
-				gwIpv4 := net.IP.To4(net.ParseIP(ipStack.Gateway)) != nil
-				if gwIpv4 && !isIpv4 || !gwIpv4 && isIpv4 {
-					// not the right IPv4 / IPv6 correlation
-					continue
-				}
-				if ipStack.Device != guestNetwork.Device {
-					continue
-				}
-				if ipStack.Network != "0.0.0.0" {
-					continue
-				}
-				gateway = ipStack.Gateway
+			gateway := selectGateway(guestNetwork.IP, guestNetwork.Device, vm.GuestIpStacks, isWindowsFlag)
+			if isWindowsFlag && gateway == "" {
+				continue // Skip only Windows IPs with no gateway, linux allows empty gateways
 			}
 			dnsString := strings.Join(guestNetwork.DNS, ",")
-			configurationString := fmt.Sprintf("%s:ip:%s,%s,%d,%s", guestNetwork.MAC, guestNetwork.IP, gateway, guestNetwork.PrefixLength, dnsString)
-
-			// if DNS is "", we get configurationString with trailing comma, use TrimSuffix to remove it.
+			configurationString := fmt.Sprintf("%s:ip:%s,%s,%d,%s",
+				guestNetwork.MAC,
+				guestNetwork.IP,
+				gateway,
+				guestNetwork.PrefixLength,
+				dnsString,
+			)
 			configurations = append(configurations, strings.TrimSuffix(configurationString, ","))
 		}
 	}
