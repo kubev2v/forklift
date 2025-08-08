@@ -502,7 +502,9 @@ func (r *Reconciler) newSnapshot(ctx *plancontext.Context) *planapi.Snapshot {
 	snapshot.Provider.Source.With(plan.Referenced.Provider.Source)
 	snapshot.Provider.Destination.With(plan.Referenced.Provider.Destination)
 	snapshot.Map.Network.With(plan.Referenced.Map.Network)
-	snapshot.Map.Storage.With(plan.Referenced.Map.Storage)
+	if plan.Spec.Type != api.MigrationOnlyConversion {
+		snapshot.Map.Storage.With(plan.Referenced.Map.Storage)
+	}
 	plan.Status.Migration.NewSnapshot(snapshot)
 	log.V(1).Info(
 		"Snapshot created.",
@@ -549,7 +551,7 @@ func (r *Reconciler) matchSnapshot(ctx *plancontext.Context) (matched bool) {
 		log.Info("Snapshot: networkMap not matched.")
 		return false
 	}
-	if !snapshot.Map.Storage.Match(plan.Referenced.Map.Storage) {
+	if plan.Spec.Type != api.MigrationOnlyConversion && !snapshot.Map.Storage.Match(plan.Referenced.Map.Storage) {
 		log.Info("Snapshot: storageMap not matched.")
 		return false
 	}

@@ -403,6 +403,14 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+              type:
+                description: Migration type. e.g. "cold", "warm", "conversion". Supersedes
+                  the `warm` boolean if set.
+                enum:
+                - cold
+                - warm
+                - conversion
+                type: string
               useCompatibilityMode:
                 default: true
                 description: |-

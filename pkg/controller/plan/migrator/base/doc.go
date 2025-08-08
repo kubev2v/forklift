@@ -89,6 +89,21 @@ var (
 			{Name: api.PhaseCompleted},
 		},
 	}
+	OnlyConversionItinerary = libitr.Itinerary{
+		Name: "OnlyConversion",
+		Pipeline: libitr.Pipeline{
+			{Name: api.PhaseStarted},
+			{Name: api.PhasePreHook, All: HasPreHook},
+			{Name: api.PhaseStorePowerState},
+			{Name: api.PhasePowerOffSource},
+			{Name: api.PhaseWaitForPowerOff},
+			{Name: api.PhaseCreateGuestConversionPod, All: RequiresConversion},
+			{Name: api.PhaseConvertGuest, All: RequiresConversion},
+			{Name: api.PhaseCreateVM},
+			{Name: api.PhasePostHook, All: HasPostHook},
+			{Name: api.PhaseCompleted},
+		},
+	}
 )
 
 type Migrator interface {

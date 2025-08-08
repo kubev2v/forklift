@@ -92,6 +92,8 @@ const (
 	kPlan = "plan"
 	// VM label (value=vmID)
 	kVM = "vmID"
+	// VM UUID label
+	kVmUuid = "vmUUID"
 	// App label
 	kApp = "forklift.app"
 	// LUKS
@@ -798,14 +800,31 @@ func getDiskIndex(pvc *core.PersistentVolumeClaim) int {
 // Return PersistentVolumeClaims associated with a VM.
 func (r *KubeVirt) getPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, err error) {
 	pvcsList := &core.PersistentVolumeClaimList{}
+	// Add VM uuid
+	labelSelector := map[string]string{
+		kVM: vmRef.ID,
+	}
+	// We need to have this in getPVCs so we create VM with corect disks, this will also help us with the guest generation
+	if r.Plan.Spec.Type == api.MigrationOnlyConversion {
+		v, err := r.Source.Inventory.VM(&vmRef)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return nil, err
+		}
+		if vm, ok := v.(*model.VM); ok {
+			labelSelector[kVmUuid] = vm.UUID
+		} else {
+			return nil, fmt.Errorf("failed to parse the VM for only conversion mode, we need to UUID to prevent accidental overwrites, stopping migration")
+		}
+	} else {
+		labelSelector[kMigration] = string(r.Migration.UID)
+	}
 	err = r.Destination.Client.List(
 		context.TODO(),
 		pvcsList,
 		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(map[string]string{
-				"migration": string(r.Migration.UID),
-				kVM:         vmRef.ID,
-			}),
+			LabelSelector: k8slabels.SelectorFromSet(labelSelector),
+			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
 
