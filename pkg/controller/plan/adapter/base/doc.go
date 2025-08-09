@@ -165,6 +165,8 @@ type Validator interface {
 	UnSupportedDisks(vmRef ref.Ref) ([]string, error)
 	// Validate that the VM disks have valid sizes (> 0).
 	InvalidDiskSizes(vmRef ref.Ref) ([]string, error)
+	// Validate that the VM MAC addresses don't conflict with existing destination VMs.
+	MacConflicts(vmRef ref.Ref) ([]MacConflict, error)
 }
 
 // DestinationClient API.
