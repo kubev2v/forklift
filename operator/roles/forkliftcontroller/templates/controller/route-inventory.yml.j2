@@ -4,6 +4,8 @@ kind: Route
 metadata:
   name: {{ inventory_route_name }}
   namespace: {{ app_namespace }}
+  annotations:
+    haproxy.router.openshift.io/timeout: {{ inventory_route_timeout | default('360s', true) }}
   labels:
     control-plane: controller-manager
     controller-tools.k8s.io: "1.0"
