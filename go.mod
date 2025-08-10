@@ -27,7 +27,7 @@ require (
 	github.com/prometheus/client_model v0.6.1
 	github.com/prometheus/common v0.55.0
 	github.com/vmware/govmomi v0.50.0
-	go.uber.org/mock v0.4.0
+	go.uber.org/mock v0.5.2
 	go.uber.org/zap v1.27.0
 	golang.org/x/net v0.38.0
 	gopkg.in/yaml.v2 v2.4.0
