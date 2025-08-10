@@ -8,7 +8,7 @@ require (
 	github.com/dell/gopowermax/v2 v2.9.0
 	github.com/dell/goscaleio v1.19.1
 	github.com/devans10/pugo/flasharray v0.0.0-20241116160615-6bb8c469c9a0
-	github.com/kubev2v/forklift v0.0.0-20250620125157-d13e1d020ae9
+	github.com/kubev2v/forklift v0.0.0-20250809162806-161b22c07e3d
 	github.com/netapp/trident v0.0.0-20240628081112-cb68cb389d9d
 	github.com/stretchr/testify v1.10.0
 	github.com/vmware/govmomi v0.50.0
