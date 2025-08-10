@@ -1,6 +1,8 @@
 module github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator
 
-go 1.22.0
+go 1.23.0
+
+toolchain go1.24.4
 
 require (
 	github.com/netapp/trident v0.0.0-20240628081112-cb68cb389d9d
@@ -95,8 +97,8 @@ require (
 	golang.org/x/mod v0.20.0 // indirect
 	golang.org/x/net v0.30.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
-	golang.org/x/sys v0.26.0 // indirect
-	golang.org/x/term v0.25.0 // indirect
+	golang.org/x/sys v0.35.0 // indirect
+	golang.org/x/term v0.34.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/tools v0.24.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241007155032-5fefd90f89a9 // indirect
