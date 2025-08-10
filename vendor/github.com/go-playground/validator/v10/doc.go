@@ -188,11 +188,18 @@ Same as structonly tag except that any struct level validations will not run.
 
 # Omit Empty
 
-Allows conditional validation, for example if a field is not set with
+Allows conditional validation, for example, if a field is not set with
 a value (Determined by the "required" validator) then other validation
 such as min or max won't run, but if a value is set validation will run.
 
 	Usage: omitempty
+
+# Omit Nil
+
+Allows to skip the validation if the value is nil (same as omitempty, but
+only for the nil-values).
+
+	Usage: omitnil
 
 # Dive
 
@@ -246,8 +253,8 @@ Example #2
 
 This validates that the value is not the data types default zero value.
 For numbers ensures value is not zero. For strings ensures value is
-not "". For slices, maps, pointers, interfaces, channels and functions
-ensures the value is not nil.
+not "". For booleans ensures value is not false. For slices, maps, pointers, interfaces, channels and functions
+ensures the value is not nil. For structs ensures value is not the zero value when using WithRequiredStructEnabled.
 
 	Usage: required
 
@@ -256,7 +263,7 @@ ensures the value is not nil.
 The field under validation must be present and not empty only if all
 the other specified fields are equal to the value following the specified
 field. For strings ensures value is not "". For slices, maps, pointers,
-interfaces, channels and functions ensures the value is not nil.
+interfaces, channels and functions ensures the value is not nil. For structs ensures value is not the zero value.
 
 	Usage: required_if
 
@@ -273,7 +280,7 @@ Examples:
 The field under validation must be present and not empty unless all
 the other specified fields are equal to the value following the specified
 field. For strings ensures value is not "". For slices, maps, pointers,
-interfaces, channels and functions ensures the value is not nil.
+interfaces, channels and functions ensures the value is not nil. For structs ensures value is not the zero value.
 
 	Usage: required_unless
 
@@ -290,7 +297,7 @@ Examples:
 The field under validation must be present and not empty only if any
 of the other specified fields are present. For strings ensures value is
 not "". For slices, maps, pointers, interfaces, channels and functions
-ensures the value is not nil.
+ensures the value is not nil. For structs ensures value is not the zero value.
 
 	Usage: required_with
 
@@ -307,7 +314,7 @@ Examples:
 The field under validation must be present and not empty only if all
 of the other specified fields are present. For strings ensures value is
 not "". For slices, maps, pointers, interfaces, channels and functions
-ensures the value is not nil.
+ensures the value is not nil. For structs ensures value is not the zero value.
 
 	Usage: required_with_all
 
@@ -321,7 +328,7 @@ Example:
 The field under validation must be present and not empty only when any
 of the other specified fields are not present. For strings ensures value is
 not "". For slices, maps, pointers, interfaces, channels and functions
-ensures the value is not nil.
+ensures the value is not nil. For structs ensures value is not the zero value.
 
 	Usage: required_without
 
@@ -338,7 +345,7 @@ Examples:
 The field under validation must be present and not empty only when all
 of the other specified fields are not present. For strings ensures value is
 not "". For slices, maps, pointers, interfaces, channels and functions
-ensures the value is not nil.
+ensures the value is not nil. For structs ensures value is not the zero value.
 
 	Usage: required_without_all
 
@@ -352,7 +359,7 @@ Example:
 The field under validation must not be present or not empty only if all
 the other specified fields are equal to the value following the specified
 field. For strings ensures value is not "". For slices, maps, pointers,
-interfaces, channels and functions ensures the value is not nil.
+interfaces, channels and functions ensures the value is not nil. For structs ensures value is not the zero value.
 
 	Usage: excluded_if
 
@@ -369,7 +376,7 @@ Examples:
 The field under validation must not be present or empty unless all
 the other specified fields are equal to the value following the specified
 field. For strings ensures value is not "". For slices, maps, pointers,
-interfaces, channels and functions ensures the value is not nil.
+interfaces, channels and functions ensures the value is not nil. For structs ensures value is not the zero value.
 
 	Usage: excluded_unless
 
@@ -482,11 +489,18 @@ For strings, ints, and uints, oneof will ensure that the value
 is one of the values in the parameter.  The parameter should be
 a list of values separated by whitespace. Values may be
 strings or numbers. To match strings with spaces in them, include
-the target string between single quotes.
+the target string between single quotes. Kind of like an 'enum'.
 
 	Usage: oneof=red green
 	       oneof='red green' 'blue yellow'
 	       oneof=5 7 9
+
+# One Of Case Insensitive
+
+Works the same as oneof but is case insensitive and therefore only accepts strings.
+
+	Usage: oneofci=red green
+	       oneofci='red green' 'blue yellow'
 
 # Greater Than
 
@@ -742,6 +756,20 @@ in a field of the struct specified via a parameter.
 	// For slices of struct:
 	Usage: unique=field
 
+# ValidateFn
+
+This validates that an object responds to a method that can return error or bool.
+By default it expects an interface `Validate() error` and check that the method
+does not return an error. Other methods can be specified using two signatures:
+If the method returns an error, it check if the return value is nil.
+If the method returns a boolean, it checks if the value is true.
+
+	// to use the default method Validate() error
+	Usage: validateFn
+
+	// to use the custom method IsValid() bool (or error)
+	Usage: validateFn=IsValid
+
 # Alpha Only
 
 This validates that a string value contains ASCII alpha characters only
@@ -879,8 +907,6 @@ This is done using os.Stat and github.com/gabriel-vasile/mimetype
 
 	Usage: image
 
-# URL String
-
 # File Path
 
 This validates that a string value contains a valid file path but does not
@@ -906,10 +932,19 @@ This will accept any uri the golang request uri accepts
 
 # Urn RFC 2141 String
 
-This validataes that a string value contains a valid URN
+This validates that a string value contains a valid URN
 according to the RFC 2141 spec.
 
 	Usage: urn_rfc2141
+
+# Base32 String
+
+This validates that a string value contains a valid bas324 value.
+Although an empty string is valid base32 this will report an empty string
+as an error, if you wish to accept an empty string as valid you can use
+this with the omitempty tag.
+
+	Usage: base32
 
 # Base64 String
 
@@ -938,7 +973,7 @@ Although an empty string is a valid base64 URL safe value, this will report
 an empty string as an error, if you wish to accept an empty string as valid
 you can use this with the omitempty tag.
 
-	Usage: base64url
+	Usage: base64rawurl
 
 # Bitcoin Address
 
@@ -952,7 +987,7 @@ Bitcoin Bech32 Address (segwit)
 
 This validates that a string value contains a valid bitcoin Bech32 address as defined
 by bip-0173 (https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki)
-Special thanks to Pieter Wuille for providng reference implementations.
+Special thanks to Pieter Wuille for providing reference implementations.
 
 	Usage: btc_addr_bech32
 
@@ -1112,6 +1147,12 @@ This validates that a string value contains a valid latitude.
 This validates that a string value contains a valid longitude.
 
 	Usage: longitude
+
+# Employeer Identification Number EIN
+
+This validates that a string value contains a valid U.S. Employer Identification Number.
+
+	Usage: ein
 
 # Social Security Number SSN
 
@@ -1285,7 +1326,7 @@ may not exist at the time of validation.
 # HostPort
 
 This validates that a string value contains a valid DNS hostname and port that
-can be used to valiate fields typically passed to sockets and connections.
+can be used to validate fields typically passed to sockets and connections.
 
 	Usage: hostname_port
 
@@ -1372,17 +1413,31 @@ This validates that a string value contains a valid credit card number using Luh
 
 This validates that a string or (u)int value contains a valid checksum using the Luhn algorithm.
 
-# MongoDb ObjectID
+# MongoDB
 
-This validates that a string is a valid 24 character hexadecimal string.
+This validates that a string is a valid 24 character hexadecimal string or valid connection string.
 
 	Usage: mongodb
+	       mongodb_connection_string
+
+Example:
+
+	type Test struct {
+		ObjectIdField         string `validate:"mongodb"`
+		ConnectionStringField string `validate:"mongodb_connection_string"`
+	}
 
 # Cron
 
 This validates that a string value contains a valid cron expression.
 
 	Usage: cron
+
+# SpiceDb ObjectID/Permission/Object Type
+
+This validates that a string is valid for use with SpiceDb for the indicated purpose. If no purpose is given, a purpose of 'id' is assumed.
+
+	Usage: spicedb=id|permission|type
 
 # Alias Validators and Tags
 
