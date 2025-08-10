@@ -18,6 +18,16 @@ type HookRef struct {
 	Hook core.ObjectReference `json:"hook" ref:"Hook"`
 }
 
+// TargetPowerState defines the desired power state of the target VM after migration
+type TargetPowerState string
+
+const (
+	// Target power state constants
+	TargetPowerStateOn   TargetPowerState = "on"
+	TargetPowerStateOff  TargetPowerState = "off"
+	TargetPowerStateAuto TargetPowerState = "auto"
+)
+
 func (r *HookRef) String() string {
 	return fmt.Sprintf(
 		"%s @%s",
@@ -86,6 +96,13 @@ type VM struct {
 	// If provided, this exact name will be used instead. The migration will fail if the name is not unique or already in use.
 	// +optional
 	TargetName string `json:"targetName,omitempty"`
+	// TargetPowerState specifies the desired power state of the target VM after migration.
+	// - "on": Target VM will be powered on after migration
+	// - "off": Target VM will be powered off after migration
+	// - "auto" or nil (default): Target VM will match the source VM's power state
+	// +optional
+	// +kubebuilder:validation:Enum=on;off;auto
+	TargetPowerState TargetPowerState `json:"targetPowerState,omitempty"`
 }
 
 // Find a Hook for the specified step.
