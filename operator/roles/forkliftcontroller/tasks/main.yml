@@ -402,6 +402,37 @@
       definition: "{{ lookup('template', 'controller/imagestream-vddk.yml.j2') }}"
     when: not k8s_cluster|bool
 
+
+  - name: "Setup operator network policy"
+    k8s:
+      state: present
+      definition: "{{ lookup('template', 'security/networkpolicy-operator.yml.j2') }}"
+    when: feature_network_policies|bool
+
+  - name: "Setup controller network policy"
+    k8s:
+      state: present
+      definition: "{{ lookup('template', 'security/networkpolicy-controller.yml.j2') }}"
+    when: feature_network_policies|bool
+
+  - name: "Setup API network policy"
+    k8s:
+      state: present
+      definition: "{{ lookup('template', 'security/networkpolicy-api.yml.j2') }}"
+    when: feature_network_policies|bool
+
+  - name: "Setup migration workloads network policies"
+    k8s:
+      state: present
+      definition: "{{ lookup('template', 'security/networkpolicy-migration-workloads.yml.j2') }}"
+    when: feature_network_policies|bool
+
+  - name: "Setup validation network policies"
+    k8s:
+      state: present
+      definition: "{{ lookup('template', 'security/networkpolicy-validation.yml.j2') }}"
+    when: feature_network_policies|bool
+
   - when: not feature_ui_plugin|bool
     name: "Cleanup {{ ui_plugin_service_name }} if disabled"
     include_tasks: cleanup.yml
@@ -437,6 +468,30 @@
       name: forklift-must-gather-api
       state: absent
     when: finalize is not defined
+
+  - name: "Cleanup network policies if disabled"
+    k8s:
+      api_version: networking.k8s.io/v1
+      kind: NetworkPolicy
+      namespace: "{{ app_namespace }}"
+      name: "{{ item }}"
+      state: absent
+    loop:
+      - forklift-operator-policy
+      - forklift-controller-policy
+      - forklift-api-policy
+      - forklift-virt-v2v-policy
+      - forklift-ovirt-populator-policy
+      - forklift-openstack-populator-policy
+      - forklift-vsphere-xcopy-populator-policy
+      - forklift-vddk-validation-policy
+      - forklift-validation-service-policy
+      - forklift-image-converter-policy
+      - forklift-hooks-policy
+      - forklift-ova-server-policy
+      - forklift-ui-plugin-policy
+
+    when: not feature_network_policies|bool
 
 - block:
   - name: "Remove webhook configuration"
