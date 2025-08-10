@@ -338,6 +338,13 @@ spec:
                 - "true"
                 - "false"
                 type: string
+              feature_network_policies:
+                default: "false"
+                description: Enable network policies for Forklift components.
+                enum:
+                - "true"
+                - "false"
+                type: string
               feature_ocp_live_migration:
                 default: "true"
                 description: Enable OCP live migration.

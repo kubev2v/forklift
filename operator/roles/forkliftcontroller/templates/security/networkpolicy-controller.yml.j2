@@ -1,0 +1,47 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: forklift-controller-policy
+  namespace: {{ app_namespace }}
+  labels:
+    app: {{ app_name }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ app_name }}
+      control-plane: controller-manager
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow Forklift components to communicate with controller
+    - from:
+      - podSelector:
+          matchLabels:
+            app: {{ app_name }}
+      ports:
+      - protocol: TCP
+        port: 8443  # Controller inventory service
+    # Allow OpenShift Console to access controller
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: openshift-console
+      ports:
+      - protocol: TCP
+        port: 8443  # Controller inventory service
+    {% if not k8s_cluster|bool %}
+    # Allow monitoring to access controller metrics
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: openshift-monitoring
+      ports:
+      - protocol: TCP
+        port: 2112  # Conversion pod metrics
+    {% endif %}
+  egress:
+    # Allow all egress - controller needs to communicate with external providers
+    # and internal services for inventory collection and migration operations
+    - {}
