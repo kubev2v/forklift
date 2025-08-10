@@ -11,7 +11,7 @@ require (
 	github.com/kubev2v/forklift v0.0.0-20250620125157-d13e1d020ae9
 	github.com/netapp/trident v0.0.0-20240628081112-cb68cb389d9d
 	github.com/stretchr/testify v1.10.0
-	github.com/vmware/govmomi v0.50.0
+	github.com/vmware/govmomi v0.51.0
 	go.uber.org/mock v0.5.2
 	k8s.io/apimachinery v0.32.5
 	k8s.io/client-go v0.32.5
@@ -108,10 +108,10 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/mod v0.21.0 // indirect
 	golang.org/x/net v0.38.0 // indirect
-	golang.org/x/sync v0.13.0 // indirect
+	golang.org/x/sync v0.14.0 // indirect
 	golang.org/x/sys v0.31.0 // indirect
 	golang.org/x/term v0.30.0 // indirect
-	golang.org/x/text v0.24.0 // indirect
+	golang.org/x/text v0.25.0 // indirect
 	golang.org/x/tools v0.26.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	howett.net/plist v0.0.0-20181124034731-591f970eefbb // indirect
