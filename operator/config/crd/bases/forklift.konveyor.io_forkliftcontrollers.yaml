@@ -79,6 +79,10 @@ spec:
                 type: string
                 enum: ["true", "false"]
                 description: "Enable CLI download service (default: true)"
+              feature_network_policies:
+                type: string
+                enum: ["true", "false"]
+                description: "Enable network policies for security (default: false)"
 
               # Container Images
               controller_image_fqin:

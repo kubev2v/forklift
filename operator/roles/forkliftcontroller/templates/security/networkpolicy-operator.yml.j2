@@ -1,0 +1,48 @@
+# Network policy for Forklift Operator
+# Allows operator to manage cluster resources and NetworkPolicies
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: forklift-operator-policy
+  namespace: {{ app_namespace }}
+  labels:
+    app: {{ app_name }}
+spec:
+  podSelector:
+    matchLabels:
+      control-plane: controller-manager
+      app: forklift
+  policyTypes:
+  - Egress
+{% if not k8s_cluster|bool %}
+  - Ingress
+{% endif %}
+{% if not k8s_cluster|bool %}
+  ingress:
+  # Allow monitoring access
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-monitoring
+    ports:
+    - protocol: TCP
+      port: 2112  # Conversion pod metrics
+{% endif %}
+  egress:
+  # Allow Kubernetes API access (critical for operator functionality)
+  - ports:
+    - protocol: TCP
+      port: 6443
+    - protocol: TCP
+      port: 443
+  # Allow DNS resolution (both OpenShift and Kubernetes)
+  - ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow communication with Forklift components for management
+  - to:
+    - podSelector:
+        matchLabels:
+          app: {{ app_name }}
