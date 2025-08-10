@@ -11,11 +11,11 @@ import (
 	"time"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
+	"github.com/vmware/govmomi/object"
 	"k8s.io/klog/v2"
 )
 
-var xcopyInitiatorGroup = "xcopy-esxs"
-
+const xcopyInitiatorGroup = "xcopy-esxs"
 const taskPollingInterval = 5 * time.Second
 
 var progressPattern = regexp.MustCompile(`\s(\d+)\%`)
@@ -41,6 +41,10 @@ type EsxCli interface {
 type RemoteEsxcliPopulator struct {
 	VSphereClient vmware.Client
 	StorageApi    StorageApi
+	// SSH-related fields (only used when using SSH method)
+	SSHPrivateKey []byte
+	SSHPublicKey  []byte
+	UseSSHMethod  bool
 }
 
 func NewWithRemoteEsxcli(storageApi StorageApi, vsphereHostname, vsphereUsername, vspherePassword string) (Populator, error) {
@@ -51,8 +55,22 @@ func NewWithRemoteEsxcli(storageApi StorageApi, vsphereHostname, vsphereUsername
 	return &RemoteEsxcliPopulator{
 		VSphereClient: c,
 		StorageApi:    storageApi,
+		UseSSHMethod:  false, // VIB method
 	}, nil
+}
 
+func NewWithRemoteEsxcliSSH(storageApi StorageApi, vsphereHostname, vsphereUsername, vspherePassword string, sshPrivateKey, sshPublicKey []byte) (Populator, error) {
+	c, err := vmware.NewClient(vsphereHostname, vsphereUsername, vspherePassword)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create vmware client: %w", err)
+	}
+	return &RemoteEsxcliPopulator{
+		VSphereClient: c,
+		StorageApi:    storageApi,
+		SSHPrivateKey: sshPrivateKey,
+		SSHPublicKey:  sshPublicKey,
+		UseSSHMethod:  true, // SSH method
+	}, nil
 }
 
 func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, progress chan<- uint, quit chan error) (errFinal error) {
@@ -68,8 +86,17 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	if err != nil {
 		return err
 	}
+
+	var cloneMethodStr string
+	if p.UseSSHMethod {
+		cloneMethodStr = "SSH"
+	} else {
+		cloneMethodStr = "VIB"
+	}
+
 	klog.Infof(
-		"Starting to populate using remote esxcli vmkfstools, source vmdk %s target LUN %s",
+		"Starting to populate using remote esxcli vmkfstools (%s method), source vmdk %s target LUN %s",
+		cloneMethodStr,
 		sourceVMDKFile,
 		pv)
 	host, err := p.VSphereClient.GetEsxByVm(context.Background(), vmId)
@@ -78,10 +105,14 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	}
 	klog.Infof("Got ESXi host: %s", host)
 
-	err = ensureVib(p.VSphereClient, host, vmDisk.Datastore, VibVersion)
-	if err != nil {
-		return fmt.Errorf("failed to ensure VIB is installed: %w", err)
+	// Only ensure VIB if using VIB method
+	if !p.UseSSHMethod {
+		err = ensureVib(p.VSphereClient, host, vmDisk.Datastore, VibVersion)
+		if err != nil {
+			return fmt.Errorf("failed to ensure VIB is installed: %w", err)
+		}
 	}
+
 	// for iSCSI add the host to the group using IQN. Is there something else for FC?
 	r, err := p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "adapter", "list"})
 	if err != nil {
@@ -180,21 +211,21 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 
 	retries := 5
 	for i := 1; i < retries; i++ {
-		_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "list", "-d", lun.NAA})
+		_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "list", "-d", targetLUN})
 		if err == nil {
-			klog.Infof("found device %s", lun.NAA)
+			klog.Infof("found device %s", targetLUN)
 			break
 		} else {
 			_, err = p.VSphereClient.RunEsxCommand(
 				context.Background(), host, []string{"storage", "core", "adapter", "rescan", "-t", "add", "-a", "1"})
 			if err != nil {
-				klog.Errorf("failed to rescan for adapters, atepmt %d/%d due to: %s", i, retries, err)
+				klog.Errorf("failed to rescan for adapters, attempt %d/%d due to: %s", i, retries, err)
 				time.Sleep(5 * time.Second)
 			}
 		}
 	}
 	if err != nil {
-		return fmt.Errorf("failed to find the device %s after scanning: %w", lun.NAA, err)
+		return fmt.Errorf("failed to find the device %s after scanning: %w", targetLUN, err)
 	}
 
 	defer func() {
@@ -202,8 +233,10 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		p.StorageApi.UnMap(xcopyInitiatorGroup, lun, mappingContext)
 		// map the LUN back to the original OCP worker
 		for _, group := range originalInitiatorGroups {
-			_, err := p.StorageApi.Map(group, lun, mappingContext)
-			klog.Warningf("failed to map the volume back the original holder - this may cause problems: %v", err)
+			_, errMap := p.StorageApi.Map(group, lun, mappingContext)
+			if errMap != nil {
+				klog.Warningf("failed to map the volume back the original holder - this may cause problems: %v", err)
+			}
 		}
 		// unmap devices appear dead in ESX right after they are unmapped, now
 		// clean them
@@ -218,7 +251,17 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		}
 	}()
 
-	r, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"vmkfstools", "clone", "-s", vmDisk.Path(), "-t", targetLUN})
+	// Execute the clone using the appropriate method
+	if p.UseSSHMethod {
+		return p.executeSSHClone(host, vmDisk, targetLUN, progress)
+	} else {
+		return p.executeVIBClone(host, vmDisk, targetLUN, progress)
+	}
+}
+
+// executeVIBClone performs the clone using the original VIB method
+func (p *RemoteEsxcliPopulator) executeVIBClone(host *object.HostSystem, vmDisk VMDisk, targetLUN string, progress chan<- uint) error {
+	r, err := p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"vmkfstools", "clone", "-s", vmDisk.Path(), "-t", targetLUN})
 	if err != nil {
 		klog.Infof("error during copy, response from esxcli %+v", r)
 		return err
@@ -280,6 +323,80 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 				err = fmt.Errorf("failed with exit code %s with stderr: %s", v.ExitCode, v.Stderr)
 			}
 			return err
+		}
+
+		time.Sleep(taskPollingInterval)
+	}
+}
+
+// executeSSHClone performs the clone using the SSH method
+func (p *RemoteEsxcliPopulator) executeSSHClone(host *object.HostSystem, vmDisk VMDisk, targetLUN string, progress chan<- uint) error {
+	// Setup secure script
+	finalScriptPath, err := ensureSecureScript(p.VSphereClient, host, vmDisk.Datastore, SecureScriptVersion)
+	if err != nil {
+		return fmt.Errorf("failed to ensure secure script: %w", err)
+	}
+	klog.V(2).Infof("Secure script ready at path: %s", finalScriptPath)
+
+	// Enable SSH access
+	err = vmware.EnableSSHAccess(p.VSphereClient, host, p.SSHPrivateKey, p.SSHPublicKey, finalScriptPath)
+	if err != nil {
+		return fmt.Errorf("failed to enable SSH access: %w", err)
+	}
+
+	// Get host IP
+	hostIP, err := vmware.GetHostIPAddress(context.Background(), host)
+	if err != nil {
+		return fmt.Errorf("failed to get host IP address: %w", err)
+	}
+
+	// Create SSH client
+	sshClient := vmware.NewSSHClient()
+	err = sshClient.Connect(hostIP, "root", p.SSHPrivateKey)
+	if err != nil {
+		return fmt.Errorf("failed to connect via SSH: %w", err)
+	}
+	defer sshClient.Close()
+
+	klog.V(2).Infof("SSH connection established with restricted commands")
+
+	// Start the clone task
+	task, err := sshClient.StartVmkfstoolsClone(vmDisk.Path(), targetLUN)
+	if err != nil {
+		return fmt.Errorf("failed to start vmkfstools clone: %w", err)
+	}
+
+	klog.Infof("Started vmkfstools clone task %s", task.TaskId)
+
+	if task.TaskId != "" {
+		defer func() {
+			err := sshClient.CleanupTask(task.TaskId)
+			if err != nil {
+				klog.Errorf("Failed cleaning up task artifacts: %v", err)
+			}
+		}()
+	}
+
+	// Poll for task completion
+	for {
+		taskStatus, err := sshClient.GetTaskStatus(task.TaskId)
+		if err != nil {
+			return fmt.Errorf("failed to get task status: %w", err)
+		}
+
+		klog.V(2).Infof("Task status: %+v", taskStatus)
+
+		if progressValue, hasProgress := vmware.ParseProgress(taskStatus.LastLine); hasProgress {
+			progress <- progressValue
+		}
+
+		if taskStatus.ExitCode != "" {
+			if taskStatus.ExitCode == "0" {
+				klog.Infof("vmkfstools clone completed successfully")
+				return nil
+			} else {
+				return fmt.Errorf("vmkfstools clone failed with exit code %s, stderr: %s", taskStatus.ExitCode, taskStatus.Stderr)
+			}
 		}
 
 		time.Sleep(taskPollingInterval)

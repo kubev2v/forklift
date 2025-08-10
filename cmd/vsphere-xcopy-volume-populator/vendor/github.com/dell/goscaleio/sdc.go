@@ -30,6 +30,10 @@ type Sdc struct {
 	client *Client
 }
 
+var execCmd = func(cmd string, args ...string) ([]byte, error) {
+	return exec.Command(cmd, args...).Output()
+}
+
 // NewSdc returns a new Sdc
 func NewSdc(client *Client, sdc *types.Sdc) *Sdc {
 	return &Sdc{
@@ -217,7 +221,7 @@ func GetSdcLocalGUID() (string, error) {
 	// /bin/emc/scaleio/drv_cfg --query_guid
 	// sdcKernelGuid := "271bad82-08ee-44f2-a2b1-7e2787c27be1"
 
-	out, err := exec.Command("/opt/emc/scaleio/sdc/bin/drv_cfg", "--query_guid").Output()
+	out, err := execCmd("/opt/emc/scaleio/sdc/bin/drv_cfg", "--query_guid")
 	if err != nil {
 		return "", fmt.Errorf("GetSdcLocalGUID: query vols failed: %v", err)
 	}
