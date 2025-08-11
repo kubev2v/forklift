@@ -242,6 +242,7 @@ type Host struct {
 	Timezone           string               `json:"timezone"`
 	CpuSockets         int16                `json:"cpuSockets"`
 	CpuCores           int16                `json:"cpuCores"`
+	MemoryBytes        int64                `json:"memoryBytes"`
 	ProductName        string               `json:"productName"`
 	ProductVersion     string               `json:"productVersion"`
 	Network            model.HostNetwork    `json:"networking"`
@@ -269,6 +270,7 @@ func (r *Host) With(m *model.Host) {
 	r.Timezone = m.Timezone
 	r.CpuSockets = m.CpuSockets
 	r.CpuCores = m.CpuCores
+	r.MemoryBytes = m.MemoryBytes
 	r.ProductVersion = m.ProductVersion
 	r.ProductName = m.ProductName
 	r.Network = m.Network
