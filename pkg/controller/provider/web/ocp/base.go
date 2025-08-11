@@ -254,6 +254,7 @@ func (h Handler) NetworkAttachmentDefinitions(ctx *gin.Context, provider *api.Pr
 	options := h.ListOptions(ctx)
 	if provider != nil && provider.IsRestrictedHost() {
 		options = append(options, ocpclient.InNamespace(provider.GetNamespace()))
+		options = append(options, ocpclient.InNamespace(core.NamespaceDefault))
 	}
 	err = client.List(context.TODO(), &list, options...)
 	if err != nil {
