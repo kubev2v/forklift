@@ -121,9 +121,20 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	p, err := populator.NewWithRemoteEsxcli(storageApi, vsphereHostname, vsphereUsername, vspherePassword)
-	if err != nil {
-		klog.Fatalf("Failed to create a remote esxcli populator: %s", err)
+	var p populator.Populator
+	switch api := storageApi.(type) {
+	case populator.VvolStorageApi:
+		p, err = populator.NewVvolPopulator(api, vsphereHostname, vsphereUsername, vspherePassword)
+		if err != nil {
+			klog.Fatalf("Failed to create a VVol populator: %s", err)
+		}
+	case populator.EsxiStorageApi:
+		p, err = populator.NewWithRemoteEsxcli(api, vsphereHostname, vsphereUsername, vspherePassword)
+		if err != nil {
+			klog.Fatalf("Failed to create a remote esxcli populator: %s", err)
+		}
+	default:
+		klog.Fatalf("Storage API does not implement any supported populator interface")
 	}
 
 	pv, err := getPv(clientSet, targetNamespace, ownerName)

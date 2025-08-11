@@ -70,11 +70,11 @@ test-copy-using-cli-3par: build
 
 test-copy-using-cli-pureflasharray: build
 	bin/vsphere-xcopy-volume-populator \
-		--source-vm-id="vm-67218" \
-		--source-vmdk="[eco-iscsi-pure] vm-6/vm-6.vmdk" \
-		--owner-name=test-pure-vm-6-22ab1d65 \
-		--owner-uid=test-pure-vm-6-22ab1d65 \
-		--target-namespace=default \
+		--source-vm-id="vm-125748" \
+		--source-vmdk="[pure-vvol1] rfc4122.21dc925e-6450-434c-9d1a-7f723ec1f2bd/vm-12-100g.vmdk" \
+		--owner-name=100g-test-pvc-2 \
+		--owner-uid=100g-test-pvc-2 \
+		--target-namespace=vsphere-populator-test-1 \
 		--storage-vendor-product=pureFlashArray \
 		--secret-name=populator-secret \
 		--kubeconfig=$$KUBECONFIG

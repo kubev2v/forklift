@@ -1,7 +1,20 @@
 package populator
 
+import (
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
+)
+
+type StorageApi interface{}
+
+type VvolStorageApi interface {
+	// VvolCopy performs a direct copy operation using vSphere API to discover source volume
+	VvolCopy(vsphereClient vmware.Client, vmId string, sourceVMDKFile string, persistentVolume PersistentVolume, progress chan<- uint) error
+	// ResolvePVToLUN resolves PersistentVolume to LUN details
+	ResolvePVToLUN(persistentVolume PersistentVolume) (LUN, error)
+}
+
 //go:generate mockgen -destination=mocks/storage_mock_client.go -package=storage_mocks . StorageApi
-type StorageApi interface {
+type EsxiStorageApi interface {
 	StorageMapper
 	StorageResolver
 }
