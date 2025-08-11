@@ -1,0 +1,51 @@
+reviews:
+  profile: assertive
+  high_level_summary: true
+  review_status: true
+  commit_status: true
+  changed_files_summary: true
+  sequence_diagrams: true
+  estimate_code_review_effort: true
+  assess_linked_issues: true
+  related_issues: true
+  related_prs: true
+  suggested_labels: true
+  suggested_reviewers: true
+  path_filters:
+    - "!**/.tekton/*.yaml"
+    - "!**/vendor/**"
+    - "!**/dist/**"
+    - "!**/*.bin"
+    - "!**/*.csv"
+    - "!**/*.zip"
+    - "!**/*.gz"
+    - "!**/*.tar"
+    - "!**/*.exe"
+    - "!**/*.md"
+    - "!**/*.lock"
+  path_instructions:
+    - path: "**/*_test.go"
+      instructions: |
+        For tests, review them as if you are a friendly but pedantic very senior developer in our team, we expect a high standard of quality:
+        - **Coverage**: Strive for high test coverage on critical logic paths.
+        - **Isolation**: Unit tests must be hermetic. Use mocks, stubs, or fakes to isolate dependencies. No external network or filesystem access unless it is an integration test.
+        - **Readability**: Use table-driven tests for multiple cases. Test names should clearly state their intent.
+        - **Parallelism**: ensure tests are independent as much as possible.
+        - **Cleanup**: Ensure resources are properly released after a test completes.
+        - **Assertions**: Assertions must be specific and provide informative messages on failure.
+    - path: "**/*.go"
+      instructions: |
+        Review the code as if you are a friendly but pedantic very senior developer in our team. We generally expect the following:
+        - **Clarity and Simplicity**: Write idiomatic Go. Code should be self-documenting. Complexity should be justified.
+        - **Concurrency**: Ensure goroutine safety. Use channels for communication and synchronization. Avoid race conditions.
+        - **Error Handling**: No silent failures. Errors must be checked, wrapped with context, and propagated. Use `errors.Is` and `errors.As`.
+        - **Resource Management**: Prevent resource leaks. Defer `close()` or `cleanup()` calls immediately after allocation. Manage goroutine lifecycles.
+        - **API Design**: APIs (REST, gRPC) must be well-defined, versioned, and backward-compatible. Input validation is mandatory.
+        - **Observability**: Instrument code with structured logging, metrics (e.g., Prometheus), and tracing. Logs should provide context, not just messages.
+        - **Security**: Be vigilant against vulnerabilities (e.g., injection, insecure direct object references). Sanitize inputs. Do not hardcode secrets.
+        - **Performance**: Write efficient code, but avoid premature optimization. Be mindful of algorithmic complexity and memory allocations.
+        - **coverage**: Make sure that the code has unit tests.
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false  # ignore draft PRs
