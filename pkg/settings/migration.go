@@ -46,6 +46,7 @@ const (
 	OvaContainerRequestsCpu        = "OVA_CONTAINER_REQUESTS_CPU"
 	OvaContainerRequestsMemory     = "OVA_CONTAINER_REQUESTS_MEMORY"
 	TlsConnectionTimeout           = "TLS_CONNECTION_TIMEOUT"
+	MaxConcurrentReconciles        = "MAX_CONCURRENT_RECONCILES"
 )
 
 // Migration settings
@@ -106,6 +107,8 @@ type Migration struct {
 	VddkImage string
 	// TlsConnectionTimeout is the timeout for TLS connections in seconds
 	TlsConnectionTimeout int
+	// MaxConcurrentReconciles is the limit of how many reconciles can run at once
+	MaxConcurrentReconciles int
 }
 
 // Load settings.
@@ -255,6 +258,10 @@ func (r *Migration) Load() (err error) {
 		r.OvaContainerRequestsMemory = val
 	} else {
 		r.OvaContainerRequestsMemory = "150Mi"
+	}
+	r.MaxConcurrentReconciles, err = getPositiveEnvLimit(MaxConcurrentReconciles, 10)
+	if err != nil {
+		return liberr.Wrap(err)
 	}
 	return
 }

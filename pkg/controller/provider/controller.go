@@ -97,7 +97,7 @@ func Add(mgr manager.Manager) error {
 		Name,
 		mgr,
 		controller.Options{
-			MaxConcurrentReconciles: 10,
+			MaxConcurrentReconciles: Settings.MaxConcurrentReconciles,
 			Reconciler:              reconciler,
 		})
 	if err != nil {

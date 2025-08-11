@@ -101,6 +101,10 @@ spec:
         - name: TLS_CONNECTION_TIMEOUT
           value: "{{ controller_tls_connection_timeout_sec }}"
 {% endif %}
+{% if controller_max_concurrent_reconciles is number %}
+        - name: MAX_CONCURRENT_RECONCILES
+          value: "{{ controller_max_concurrent_reconciles }}"
+{% endif %}
 {% if controller_cdi_export_token_ttl is number %}
         - name: CDI_EXPORT_TOKEN_TTL
           value: "{{ controller_cdi_export_token_ttl }}"

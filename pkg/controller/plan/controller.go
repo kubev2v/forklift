@@ -69,7 +69,8 @@ func Add(mgr manager.Manager) error {
 		Name,
 		mgr,
 		controller.Options{
-			Reconciler: reconciler,
+			Reconciler:              reconciler,
+			MaxConcurrentReconciles: Settings.MaxConcurrentReconciles,
 		})
 	if err != nil {
 		log.Trace(err)
