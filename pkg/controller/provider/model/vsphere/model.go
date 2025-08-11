@@ -146,6 +146,7 @@ type Host struct {
 	Timezone           string             `sql:""`
 	CpuSockets         int16              `sql:""`
 	CpuCores           int16              `sql:""`
+	MemoryBytes        int64              `sql:""`
 	ProductName        string             `sql:""`
 	ProductVersion     string             `sql:""`
 	Model              string             `sql:""`
