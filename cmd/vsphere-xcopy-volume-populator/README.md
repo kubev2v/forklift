@@ -177,7 +177,7 @@ spec:
     name: vsphere-credentials
     namespace: openshift-mtv
   settings:
-    `esxiCloneMethod`: "ssh"  # or "vib".
+    `esxiCloneMethod`: "vib"  # or "ssh". The deafult is "vib"
 ```
 
 Provider specific entries in the secret shall be documented below:

@@ -27,7 +27,7 @@ type VmkfstoolsTask struct {
 
 // SSHClient interface for SSH operations
 type SSHClient interface {
-	Connect(hostname, username string, privateKey []byte) error
+	Connect(ctx context.Context, hostname, username string, privateKey []byte) error
 	StartVmkfstoolsClone(sourceVMDK, targetLUN string) (*VmkfstoolsTask, error)
 	GetTaskStatus(taskId string) (*VmkfstoolsTask, error)
 	CleanupTask(taskId string) error
@@ -45,7 +45,7 @@ func NewSSHClient() SSHClient {
 	return &ESXiSSHClient{}
 }
 
-func (c *ESXiSSHClient) Connect(hostname, username string, privateKey []byte) error {
+func (c *ESXiSSHClient) Connect(ctx context.Context, hostname, username string, privateKey []byte) error {
 	c.hostname = hostname
 	c.username = username
 	c.privateKey = privateKey
@@ -63,16 +63,28 @@ func (c *ESXiSSHClient) Connect(hostname, username string, privateKey []byte) er
 			ssh.PublicKeys(signer),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		Timeout:         30 * time.Second,
 	}
 
-	// Connect to the SSH server
-	conn, err := ssh.Dial("tcp", net.JoinHostPort(hostname, "22"), config)
+	// Establish TCP connection honoring context cancellation/deadline
+	addr := net.JoinHostPort(hostname, "22")
+	dialer := &net.Dialer{}
+	netConn, err := dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return fmt.Errorf("failed to connect to SSH server: %w", err)
 	}
 
-	c.sshClient = conn
+	// Ensure the SSH handshake also respects the context deadline
+	if deadline, ok := ctx.Deadline(); ok {
+		_ = netConn.SetDeadline(deadline)
+	}
+
+	// Perform SSH handshake on the established net.Conn
+	cc, chans, reqs, err := ssh.NewClientConn(netConn, addr, config)
+	if err != nil {
+		_ = netConn.Close()
+		return fmt.Errorf("failed to establish SSH client connection: %w", err)
+	}
+	c.sshClient = ssh.NewClient(cc, chans, reqs)
 	klog.Infof("Connected to SSH server %s", hostname)
 	return nil
 }
@@ -291,8 +303,7 @@ func parseTaskResponse(xmlOutput string) (*VmkfstoolsTask, error) {
 }
 
 // EnableSSHAccess enables SSH service on ESXi host and handles SSH key installation based on ESXi version
-func EnableSSHAccess(vmwareClient Client, host *object.HostSystem, privateKey, publicKey []byte, scriptPath string) error {
-	ctx := context.Background()
+func EnableSSHAccess(ctx context.Context, vmwareClient Client, host *object.HostSystem, privateKey, publicKey []byte, scriptPath string) error {
 	publicKeyStr := strings.TrimSpace(string(publicKey))
 
 	klog.Infof("Enabling SSH access on ESXi host %s", host.Name())
@@ -329,7 +340,7 @@ func EnableSSHAccess(vmwareClient Client, host *object.HostSystem, privateKey, p
 		pythonCommand, publicKeyStr)
 
 	// Step 7: Test SSH connectivity first (using private key for authentication)
-	if testSSHConnectivity(hostIP, privateKey, "test") {
+	if testSSHConnectivity(ctx, hostIP, privateKey, "test") {
 		klog.Infof("SSH connectivity test passed - keys already configured correctly")
 		return nil
 	}
@@ -358,7 +369,7 @@ func EnableSSHAccess(vmwareClient Client, host *object.HostSystem, privateKey, p
 	}
 
 	// Step 9: Test connectivity after installation (ESXi 8 only) - using private key
-	if !testSSHConnectivity(hostIP, privateKey, "test") {
+	if !testSSHConnectivity(ctx, hostIP, privateKey, "test") {
 		return fmt.Errorf("SSH connectivity test failed after key installation")
 	}
 
@@ -367,11 +378,14 @@ func EnableSSHAccess(vmwareClient Client, host *object.HostSystem, privateKey, p
 }
 
 // testSSHConnectivity tests if we can connect via SSH and execute a restricted command
-func testSSHConnectivity(hostIP string, privateKey []byte, testCommand string) bool {
+func testSSHConnectivity(ctx context.Context, hostIP string, privateKey []byte, testCommand string) bool {
 	klog.Infof("Testing SSH connectivity to %s", hostIP)
 
 	client := NewSSHClient()
-	err := client.Connect(hostIP, "root", privateKey)
+	// Use a short timeout for connectivity testing to avoid indefinite hangs
+	testCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	err := client.Connect(testCtx, hostIP, "root", privateKey)
 	if err != nil {
 		klog.Infof("SSH connectivity test failed to connect: %v", err)
 		return false

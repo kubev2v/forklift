@@ -38,8 +38,18 @@ def validate_path(path):
     """Validate that path is safe and within expected directories"""
     # Log which version is running for debugging
     logging.info(f"secure-vmkfstools-wrapper version {SCRIPT_VERSION} validating path: {path}")
-    
-    # Only allow paths in specific safe directories for ESXi operations
+
+    # Normalize the path to prevent bypasses
+    path = os.path.normpath(path)
+
+    # Resolve symbolic links
+    try:
+        path = os.path.realpath(path)
+    except (OSError, ValueError):
+        raise ValueError(f"Invalid path: {path}")
+
+
+# Only allow paths in specific safe directories for ESXi operations
     allowed_prefixes = [
         '/vmfs/volumes/',      # Datastore volumes (source VMDK files)
         '/vmfs/devices/disks/', # ESXi disk devices (target devices for cloning)
@@ -68,33 +78,42 @@ def clone_operation(source_vmdk, target_lun):
         logging.info("Validating target LUN path...")
         target_lun = validate_path(target_lun)
         logging.info("Target LUN path validation passed")
-        
+
+        # TODO: Think if there is a chance for a race here
         task_id = str(uuid.uuid4())
         tmp_dir = TMP_PREFIX.format(task_id)
         os.makedirs(tmp_dir, mode=0o750, exist_ok=True)
         rdmfile = f"{source_vmdk}-rdmdisk-{os.getpid()}"
 
-        stdout_file = open(os.path.join(tmp_dir, "out"), "w")
-        stderr_file = open(os.path.join(tmp_dir, "err"), "w")
-        
-        # Create the vmkfstools command with exit code capture
-        vmkfstools_cmdline = [
-            "/bin/sh", "-c",
-            f"trap 'echo -n $? > {tmp_dir}/exitcode' EXIT; "
-            f"/bin/vmkfstools -i {source_vmdk} -d rdm:{target_lun} {rdmfile}"
-        ]
-        
-        logging.info(f"Starting clone operation: source={source_vmdk}, target={target_lun}, task_id={task_id}")
-        
-        # Start the process
-        task = subprocess.Popen(
-            vmkfstools_cmdline,
-            stdout=stdout_file,
-            stderr=stderr_file,
-            text=True,
-            preexec_fn=os.setsid,
-            close_fds=True,
-        )
+        import shlex
+
+        with open(os.path.join(tmp_dir, "out"), "w") as stdout_file, \
+            open(os.path.join(tmp_dir, "err"), "w") as stderr_file:
+
+            # Properly escape shell arguments
+            escaped_source = shlex.quote(source_vmdk)
+            escaped_target = shlex.quote(target_lun)
+            escaped_rdmfile = shlex.quote(rdmfile)
+            escaped_exitcode_path = shlex.quote(f"{tmp_dir}/exitcode")
+
+            # Create the vmkfstools command with exit code capture
+            vmkfstools_cmdline = [
+                "/bin/sh", "-c",
+                f"trap 'echo -n $? > {escaped_exitcode_path}' EXIT; "
+                f"/bin/vmkfstools -i {escaped_source} -d rdm:{escaped_target} {escaped_rdmfile}"
+            ]
+
+            logging.info(f"Starting clone operation: source={source_vmdk}, target={target_lun}, task_id={task_id}")
+
+            # Start the process
+            task = subprocess.Popen(
+                vmkfstools_cmdline,
+                stdout=stdout_file,
+                stderr=stderr_file,
+                text=True,
+                preexec_fn=os.setsid,
+                close_fds=True,
+            )
 
         # Save task metadata
         with open(os.path.join(tmp_dir, "pid"), "w") as pid_file:
