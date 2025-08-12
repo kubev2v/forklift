@@ -7,6 +7,12 @@
 *.dylib
 bin
 
+# Specific binary executables that should never be committed
+vsphere-xcopy-volume-populator
+forklift-controller
+*/vsphere-xcopy-volume-populator
+*/forklift-controller
+
 # Test binary, build with `go test -c`
 *.test
 
@@ -74,3 +80,6 @@ operator/streams/**/downstream_manifests
 .tekton/virt-v2v-dev-preview-push.yaml-e
 .tekton/vsphere-xcopy-volume-populator-dev-preview-pull-request.yaml-e
 .tekton/vsphere-xcopy-volume-populator-dev-preview-push.yaml-e
+
+# passwords directories
+.passwords/

@@ -38,50 +38,51 @@ import (
 
 // Types
 const (
-	WarmMigrationNotReady         = "WarmMigrationNotReady"
-	MigrationTypeNotValid         = "MigrationTypeNotValid"
-	NamespaceNotValid             = "NamespaceNotValid"
-	TransferNetNotValid           = "TransferNetworkNotValid"
-	NetRefNotValid                = "NetworkMapRefNotValid"
-	NetMapNotReady                = "NetworkMapNotReady"
-	DsMapNotReady                 = "StorageMapNotReady"
-	DsRefNotValid                 = "StorageRefNotValid"
-	VMRefNotValid                 = "VMRefNotValid"
-	VMNotFound                    = "VMNotFound"
-	VMAlreadyExists               = "VMAlreadyExists"
-	VMNetworksNotMapped           = "VMNetworksNotMapped"
-	VMStorageNotMapped            = "VMStorageNotMapped"
-	VMStorageNotSupported         = "VMStorageNotSupported"
-	VMMultiplePodNetworkMappings  = "VMMultiplePodNetworkMappings"
-	VMMissingGuestIPs             = "VMMissingGuestIPs"
-	VMMissingChangedBlockTracking = "VMMissingChangedBlockTracking"
-	VMHasSnapshots                = "VMHasSnapshots"
-	HostNotReady                  = "HostNotReady"
-	DuplicateVM                   = "DuplicateVM"
-	SharedDisks                   = "SharedDisks"
-	SharedWarnDisks               = "SharedWarnDisks"
-	NameNotValid                  = "TargetNameNotValid"
-	HookNotValid                  = "HookNotValid"
-	HookNotReady                  = "HookNotReady"
-	HookStepNotValid              = "HookStepNotValid"
-	Executing                     = "Executing"
-	Succeeded                     = "Succeeded"
-	Failed                        = "Failed"
-	Canceled                      = "Canceled"
-	Deleted                       = "Deleted"
-	Paused                        = "Paused"
-	Archived                      = "Archived"
-	UnsupportedDisks              = "UnsupportedDisks"
-	InvalidDiskSizes              = "InvalidDiskSizes"
+	WarmMigrationNotReady          = "WarmMigrationNotReady"
+	MigrationTypeNotValid          = "MigrationTypeNotValid"
+	NamespaceNotValid              = "NamespaceNotValid"
+	TransferNetNotValid            = "TransferNetworkNotValid"
+	NetRefNotValid                 = "NetworkMapRefNotValid"
+	NetMapNotReady                 = "NetworkMapNotReady"
+	DsMapNotReady                  = "StorageMapNotReady"
+	DsRefNotValid                  = "StorageRefNotValid"
+	VMRefNotValid                  = "VMRefNotValid"
+	VMNotFound                     = "VMNotFound"
+	VMAlreadyExists                = "VMAlreadyExists"
+	VMNetworksNotMapped            = "VMNetworksNotMapped"
+	VMStorageNotMapped             = "VMStorageNotMapped"
+	VMStorageNotSupported          = "VMStorageNotSupported"
+	VMMultiplePodNetworkMappings   = "VMMultiplePodNetworkMappings"
+	VMMissingGuestIPs              = "VMMissingGuestIPs"
+	VMMissingChangedBlockTracking  = "VMMissingChangedBlockTracking"
+	VMHasSnapshots                 = "VMHasSnapshots"
+	HostNotReady                   = "HostNotReady"
+	DuplicateVM                    = "DuplicateVM"
+	SharedDisks                    = "SharedDisks"
+	SharedWarnDisks                = "SharedWarnDisks"
+	NameNotValid                   = "TargetNameNotValid"
+	HookNotValid                   = "HookNotValid"
+	HookNotReady                   = "HookNotReady"
+	HookStepNotValid               = "HookStepNotValid"
+	Executing                      = "Executing"
+	Succeeded                      = "Succeeded"
+	Failed                         = "Failed"
+	Canceled                       = "Canceled"
+	Deleted                        = "Deleted"
+	Paused                         = "Paused"
+	Archived                       = "Archived"
+	UnsupportedDisks               = "UnsupportedDisks"
+	InvalidDiskSizes               = "InvalidDiskSizes"
 	MacConflicts                  = "MacConflicts"
-	unsupportedVersion            = "UnsupportedVersion"
-	VDDKInvalid                   = "VDDKInvalid"
-	ValidatingVDDK                = "ValidatingVDDK"
-	VDDKInitImageNotReady         = "VDDKInitImageNotReady"
-	VDDKInitImageUnavailable      = "VDDKInitImageUnavailable"
-	UnsupportedOvaSource          = "UnsupportedOvaSource"
-	VMPowerStateUnsupported       = "VMPowerStateUnsupported"
-	VMMigrationTypeUnsupported    = "VMMigrationTypeUnsupported"
+	unsupportedVersion             = "UnsupportedVersion"
+	VDDKInvalid                    = "VDDKInvalid"
+	ValidatingVDDK                 = "ValidatingVDDK"
+	VDDKInitImageNotReady          = "VDDKInitImageNotReady"
+	VDDKInitImageUnavailable       = "VDDKInitImageUnavailable"
+	UnsupportedOvaSource           = "UnsupportedOvaSource"
+	VMPowerStateUnsupported        = "VMPowerStateUnsupported"
+	VMMigrationTypeUnsupported     = "VMMigrationTypeUnsupported"
+	StorageOffloadProviderNotReady = "StorageOffloadProviderNotReady"
 )
 
 // Categories
@@ -137,6 +138,10 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	plan.Referenced.Provider.Destination = pv.Referenced.Destination
 
 	if err = r.ensureSecretForProvider(plan); err != nil {
+		return err
+	}
+
+	if err = r.validateStorageOffloadProviderReadiness(plan); err != nil {
 		return err
 	}
 
@@ -1663,4 +1668,69 @@ func (r *Reconciler) IsValidTargetName(targetName string) error {
 	}
 
 	return nil
+}
+
+// Validate that if the plan uses storage-offload, the source provider is SSH ready.
+func (r *Reconciler) validateStorageOffloadProviderReadiness(plan *api.Plan) error {
+	usesStorageOffload := r.planUsesStorageOffload(plan)
+	if !usesStorageOffload {
+		// No storage-offload used, no need to check SSH readiness
+		return nil
+	}
+
+	sourceProvider := plan.Referenced.Provider.Source
+	if sourceProvider == nil {
+		// No source provider referenced, can't check SSH readiness
+		return nil
+	}
+
+	// Check if the source provider has a ready SSH condition
+	sshCondition := sourceProvider.Status.FindCondition("SSHReadiness")
+	if sshCondition == nil || sshCondition.Status != libcnd.True {
+		// Provider is not SSH ready - set the blocking condition
+		var message string
+		if sshCondition == nil {
+			message = fmt.Sprintf("Source provider %s does not have SSH readiness condition but plan uses storage-offload", sourceProvider.Name)
+		} else {
+			message = fmt.Sprintf("Source provider %s is not SSH ready (SSHReadiness: %s) but plan uses storage-offload. Reason: %s. %s",
+				sourceProvider.Name, sshCondition.Status, sshCondition.Reason, sshCondition.Message)
+		}
+
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     StorageOffloadProviderNotReady,
+			Status:   libcnd.True,
+			Reason:   "ProviderSSHNotReady",
+			Category: Error,
+			Message:  message,
+		})
+		return nil
+	}
+
+	// Provider is SSH ready - clear any existing blocking condition
+	plan.Status.DeleteCondition(StorageOffloadProviderNotReady)
+	return nil
+}
+
+// Check if the plan uses storage-offload by examining storage mappings for VSphereXcopyPluginConfig.
+func (r *Reconciler) planUsesStorageOffload(plan *api.Plan) bool {
+	// Check if plan has storage map reference
+	ref := plan.Spec.Map.Storage
+	if !libref.RefSet(&ref) {
+		return false
+	}
+
+	// Get the storage map
+	storageMap := plan.Referenced.Map.Storage
+	if storageMap == nil {
+		return false
+	}
+
+	// Check each storage mapping for offload plugin configuration
+	for _, storagePair := range storageMap.Spec.Map {
+		if storagePair.OffloadPlugin != nil && storagePair.OffloadPlugin.VSphereXcopyPluginConfig != nil {
+			return true
+		}
+	}
+
+	return false
 }

@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
+	"strings"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/base"
@@ -18,6 +20,10 @@ import (
 	core "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/kubev2v/forklift/pkg/controller/provider/web"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
+	"github.com/kubev2v/forklift/pkg/lib/sshkeys"
 )
 
 // Types
@@ -34,6 +40,7 @@ const (
 	LoadInventory           = "LoadInventory"
 	InventoryError          = "InventoryError"
 	ConnectionInsecure      = "ConnectionInsecure"
+	SSHReadiness            = "SSHReadiness"
 )
 
 // Categories
@@ -94,6 +101,13 @@ func (r *Reconciler) validate(provider *api.Provider) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+
+	// Validate SSH readiness for vSphere providers
+	err = r.validateSSHReadiness(provider, secret)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
 	if !provider.Status.HasBlockerCondition() {
 		provider.Status.SetCondition(
 			libcnd.Condition{
@@ -430,4 +444,402 @@ func isValidNFSPath(nfsPath string) bool {
 	nfsRegex := `^[^:]+:\/[^:].*$`
 	re := regexp.MustCompile(nfsRegex)
 	return re.MatchString(nfsPath)
+}
+
+// Validate SSH readiness for vSphere providers with ESXi 7 or lower hosts.
+// Uses the exact same SSH key management and connectivity patterns as vsphere-xcopy-volume-populator.
+func (r *Reconciler) validateSSHReadiness(provider *api.Provider, secret *core.Secret) error {
+	// CRITICAL: Only check for vSphere providers - return immediately for all others
+	if provider.Type() != api.VSphere {
+		return nil
+	}
+
+	sshMethodEnabled := !r.isSSHMethodEnabled(provider)
+	r.Log.Info(">>>>>>>>>>>>>>>>>> SSHMethodEnabled setting", "provider", provider.Name, "enabled", sshMethodEnabled)
+	if !sshMethodEnabled {
+		r.Log.V(1).Info("Skipping validation of SSH method since it is not enabled", "provider", provider.Name)
+		return nil
+	}
+
+	// Log with proper nil handling for secret
+	secretName := "<nil>"
+	if secret != nil {
+		secretName = secret.Name
+	}
+	r.Log.Info(">>>>>>>>>>>>>>>>>> validating SSHReadiness", "provider", provider.Name, "secret", secretName)
+
+	// Check if provider has ESXi hosts and their versions
+	hasOldESXiHosts, err := r.hasESXi7OrLowerHosts(provider, secret)
+	if err != nil {
+		// If we can't determine ESXi versions, set SSH readiness to false
+		r.Log.V(1).Info("Could not determine ESXi versions, setting SSH readiness to false", "error", err)
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     SSHReadiness,
+			Status:   False,
+			Reason:   "InventoryCheckFailed",
+			Category: Error,
+			Message:  fmt.Sprintf("Failed to check ESXi host versions from inventory: %v", err),
+		})
+		return nil
+	}
+
+	// Check if ESXiAutoKeyInstall is enabled (default is true)
+	autoKeyInstallEnabled := !r.isAutoKeyInstallDisabled(provider)
+	r.Log.Info(">>>>>>>>>>>>>>>>>> ESXiAutoKeyInstall setting", "provider", provider.Name, "enabled", autoKeyInstallEnabled)
+
+	if autoKeyInstallEnabled {
+		// ESXiAutoKeyInstall is true:
+		// If all ESXi version 7 hosts pass connectivity test, provider is ready
+		// because for ESXi version 8+ autoinstall will occur
+		if !hasOldESXiHosts {
+			// No ESXi 7 or lower hosts, SSH readiness is not required
+			provider.Status.SetCondition(libcnd.Condition{
+				Type:     SSHReadiness,
+				Status:   True,
+				Reason:   "NoOldESXiHosts",
+				Category: Advisory,
+				Message:  "No ESXi 7 or lower hosts detected, SSH not required.",
+			})
+			return nil
+		}
+
+		// Test SSH connectivity only for ESXi 7 or lower hosts
+		return r.validateSSHConnectivityForHosts(provider, secret, true)
+	} else {
+		// ESXiAutoKeyInstall is false:
+		// Treat all ESXi hosts equally - if any don't pass connectivity test, provider is not ready
+		return r.validateSSHConnectivityForHosts(provider, secret, false)
+	}
+}
+
+// validateSSHConnectivityForHosts validates SSH connectivity for ESXi hosts
+// oldHostsOnly: if true, only test ESXi 7 or lower hosts; if false, test all hosts
+func (r *Reconciler) validateSSHConnectivityForHosts(provider *api.Provider, secret *core.Secret, oldHostsOnly bool) error {
+	// Check if SSH keys are available using provider name pattern
+	privateKey, err := sshkeys.GetSSHPrivateKey(r.Client, provider.Name, provider.Namespace)
+	if err != nil {
+		var errorMessage string
+		if oldHostsOnly {
+			errorMessage = fmt.Sprintf("SSH keys not configured for provider with ESXi 7 or lower hosts: %v\n\n", err)
+		} else {
+			errorMessage = fmt.Sprintf("SSH keys not configured for provider: %v\n\n", err)
+		}
+		errorMessage += "To enable storage offload, SSH keys must be generated. The controller will automatically create SSH keys when the provider is ready.\n"
+		errorMessage += "If keys exist but this error persists, check that the secret name follows the pattern: offload-ssh-keys-<provider-name>-private"
+
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     SSHReadiness,
+			Status:   False,
+			Reason:   "SSHKeysNotConfigured",
+			Category: Error,
+			Message:  errorMessage,
+		})
+		return nil
+	}
+
+	// Test SSH connectivity
+	sshConnectivityOK, failedHosts, err := r.testSSHConnectivity(provider, privateKey, secret, oldHostsOnly)
+	if err != nil {
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     SSHReadiness,
+			Status:   False,
+			Reason:   "SSHTestError",
+			Category: Error,
+			Message:  fmt.Sprintf("SSH connectivity test failed: %v", err),
+		})
+		return nil
+	}
+
+	if !sshConnectivityOK {
+		hostDescription := "ESXi hosts"
+		if oldHostsOnly {
+			hostDescription = "ESXi 7 or lower hosts"
+		}
+		return r.setSSHConnectivityFailedCondition(provider, failedHosts, hostDescription)
+	}
+
+	// SSH connectivity test passed
+	var successMessage string
+	if oldHostsOnly {
+		successMessage = "SSH connectivity verified for ESXi 7 or lower hosts."
+	} else {
+		successMessage = "SSH connectivity verified for all ESXi hosts."
+	}
+
+	provider.Status.SetCondition(libcnd.Condition{
+		Type:     SSHReadiness,
+		Status:   True,
+		Reason:   "SSHTestSucceeded",
+		Category: Required,
+		Message:  successMessage,
+	})
+
+	return nil
+}
+
+// setSSHConnectivityFailedCondition sets the SSH connectivity failed condition with appropriate error message
+func (r *Reconciler) setSSHConnectivityFailedCondition(provider *api.Provider, failedHosts []string, hostDescription string) error {
+	// Get the public key to include in the error message
+	publicKeyContent := ""
+	publicSecretName := sshkeys.GenerateSSHPublicSecretName(provider.Name)
+	publicSecret := &core.Secret{}
+	err := r.Get(context.TODO(), client.ObjectKey{Name: publicSecretName, Namespace: provider.Namespace}, publicSecret)
+	if err == nil {
+		if pubKey, exists := publicSecret.Data["public-key"]; exists {
+			publicKeyContent = string(pubKey)
+		}
+	}
+
+	failedHostList := ""
+	if len(failedHosts) > 0 {
+		failedHostList = fmt.Sprintf(" Failed host IPs: %v.", failedHosts)
+	}
+
+	// Create error message with instructions
+	var errorMessage string
+	errorMessage = fmt.Sprintf("SSH connectivity test failed for %s.%s To enable storage offload, configure SSH access on your ESXi hosts:\n\n", hostDescription, failedHostList)
+	errorMessage += "1. SSH to each ESXi host as root\n"
+	errorMessage += "2. Add the SSH key using this 	d:\n"
+
+	if publicKeyContent != "" {
+		// Use shared version constant from sshkeys package
+		scriptPath := fmt.Sprintf("/vmfs/volumes/<DATASTORE>/secure-vmkfstools-wrapper-%s.py", sshkeys.SecureScriptVersion)
+		sshKeyLine := fmt.Sprintf("command=\"python %s\",no-port-forwarding,no-agent-forwarding,no-X11-forwarding %s", scriptPath, publicKeyContent)
+		errorMessage += fmt.Sprintf("   echo '%s' >> /etc/ssh/keys-root/authorized_keys\n", sshKeyLine)
+		errorMessage += "   (Replace <DATASTORE> with your actual datastore name)\n"
+	} else {
+		errorMessage += fmt.Sprintf("   echo 'command=\"python /vmfs/volumes/<DATASTORE>/secure-vmkfstools-wrapper-%s.py\",no-port-forwarding,no-agent-forwarding,no-X11-forwarding <PUBLIC_KEY_CONTENT>' >> /etc/ssh/keys-root/authorized_keys\n", sshkeys.SecureScriptVersion)
+		errorMessage += "   (Replace <DATASTORE> with your actual datastore name and <PUBLIC_KEY_CONTENT> with the actual public key)\n"
+	}
+
+	provider.Status.SetCondition(libcnd.Condition{
+		Type:     SSHReadiness,
+		Status:   False,
+		Reason:   "SSHTestFailed",
+		Category: Error,
+		Message:  errorMessage,
+	})
+	return nil
+}
+
+// Check if provider has ESXi 7 or lower hosts by querying Forklift inventory.
+func (r *Reconciler) hasESXi7OrLowerHosts(provider *api.Provider, secret *core.Secret) (bool, error) {
+	r.Log.Info(">>>>>>>>>>>>>>>>>> checking for ESXi hosts via Forklift inventory", "provider", provider.Name)
+	// Only check for vSphere providers
+	if provider.Type() != api.VSphere {
+		r.Log.Info(">>>>>>>>>>>>>>>>>> not vSphere provider, skipping", "type", provider.Type())
+		return false, nil
+	}
+
+	// Use Forklift inventory instead of direct vSphere API calls
+	hasOldHosts, err := r.checkESXiVersionsFromInventory(provider)
+	if err != nil {
+		r.Log.Info(">>>>>>>>>>>>>>>>>> Failed to check ESXi versions from inventory", "provider", provider.Name, "error", err)
+		return false, err
+	}
+
+	return hasOldHosts, nil
+}
+
+// checkESXiVersionsFromInventory checks ESXi host versions from Forklift inventory
+func (r *Reconciler) checkESXiVersionsFromInventory(provider *api.Provider) (bool, error) {
+	r.Log.Info(">>>>>>>>>>>>>>>>>> Getting ESXi host versions from Forklift inventory", "provider", provider.Name)
+
+	// Create inventory client to access the cached host data
+	inventory, err := web.NewClient(provider)
+	if err != nil {
+		return false, fmt.Errorf("failed to create inventory client: %w", err)
+	}
+
+	// List all hosts from the provider inventory
+	var hosts []vsphere.Host
+	err = inventory.List(&hosts)
+	if err != nil {
+		return false, fmt.Errorf("failed to list hosts from inventory: %w", err)
+	}
+
+	// Check each host's version
+	for _, host := range hosts {
+		if host.ProductVersion != "" {
+			r.Log.Info(">>>>>>>>>>>>>>>>>> Found host version", "host", host.Name, "version", host.ProductVersion)
+
+			if r.isESXi7OrLower(host.ProductVersion) {
+				r.Log.Info(">>>>>>>>>>>>>>>>>> Found ESXi 7 or lower host", "host", host.Name, "version", host.ProductVersion)
+				return true, nil
+			}
+		} else {
+			r.Log.Info(">>>>>>>>>>>>>>>>>> Host has no product info", "host", host.Name)
+		}
+	}
+
+	r.Log.Info(">>>>>>>>>>>>>>>>>> No ESXi 7 or lower hosts found", "provider", provider.Name)
+	return false, nil
+}
+
+// Check if the given version string represents ESXi 7 or lower.
+func (r *Reconciler) isESXi7OrLower(version string) bool {
+	if version == "" {
+		return false
+	}
+
+	parts := strings.Split(version, ".")
+	if len(parts) < 1 {
+		return false
+	}
+
+	majorVersion, err := strconv.Atoi(parts[0])
+	if err != nil {
+		r.Log.V(1).Info("Failed to parse ESXi version", "version", version, "error", err)
+		return false
+	}
+
+	return majorVersion <= 7
+}
+
+// Test SSH connectivity to ESXi hosts for the provider using robust connectivity testing.
+// oldHostsOnly: if true, only test ESXi 7 or lower hosts; if false, test all hosts
+func (r *Reconciler) testSSHConnectivity(provider *api.Provider, privateKey []byte, secret *core.Secret, oldHostsOnly bool) (bool, []string, error) {
+	// Get target hosts to test SSH connectivity
+	hostIPs, err := r.getESXiHostIPs(provider, secret, oldHostsOnly)
+	if err != nil {
+		if oldHostsOnly {
+			return false, nil, fmt.Errorf("failed to get ESXi 7 or lower host IPs: %w", err)
+		}
+		return false, nil, fmt.Errorf("failed to get ESXi host IPs: %w", err)
+	}
+
+	if len(hostIPs) == 0 {
+		if oldHostsOnly {
+			r.Log.V(1).Info("No ESXi 7 or lower host IPs found for SSH testing, skipping")
+		} else {
+			r.Log.V(1).Info("No ESXi host IPs found for SSH testing, skipping")
+		}
+		return true, nil, nil
+	}
+
+	var failedHosts []string
+	// Test SSH connectivity to at least one host using robust testing
+	for _, hostIP := range hostIPs {
+		if r.testSSHConnectivityToHost(hostIP, privateKey) {
+			if oldHostsOnly {
+				r.Log.V(1).Info("SSH connectivity test succeeded for ESXi 7 or lower host", "host", hostIP)
+			} else {
+				r.Log.V(1).Info("SSH connectivity test succeeded", "host", hostIP)
+			}
+			return true, nil, nil
+		}
+		if oldHostsOnly {
+			r.Log.V(1).Info("SSH connectivity test failed for ESXi 7 or lower host", "host", hostIP)
+		} else {
+			r.Log.V(1).Info("SSH connectivity test failed", "host", hostIP)
+		}
+		failedHosts = append(failedHosts, hostIP)
+	}
+
+	return false, failedHosts, nil
+}
+
+// Test SSH connectivity to a specific host using robust SSH testing logic.
+// This verifies that the SSH key actually works for authentication and command execution.
+func (r *Reconciler) testSSHConnectivityToHost(hostname string, privateKey []byte) bool {
+	r.Log.V(1).Info("Testing SSH connectivity and authentication", "host", hostname)
+
+	// Use the shared SSH connectivity test function
+	result := sshkeys.TestSSHConnectivity(hostname, privateKey)
+
+	if result {
+		r.Log.V(1).Info("SSH connectivity test passed", "host", hostname)
+	} else {
+		r.Log.V(1).Info("SSH connectivity test failed", "host", hostname)
+	}
+
+	return result
+}
+
+// Get ESXi host IP addresses from provider inventory.
+// oldHostsOnly: if true, only return ESXi 7 or lower hosts; if false, return all hosts
+func (r *Reconciler) getESXiHostIPs(provider *api.Provider, secret *core.Secret, oldHostsOnly bool) ([]string, error) {
+	if oldHostsOnly {
+		r.Log.Info(">>>>>>>>>>>>>>>>>> Getting ESXi 7 or lower host IPs from provider inventory", "provider", provider.Name)
+	} else {
+		r.Log.Info(">>>>>>>>>>>>>>>>>> Getting ESXi host IPs from provider inventory", "provider", provider.Name)
+	}
+
+	// Create inventory client to access the cached host data
+	inventory, err := web.NewClient(provider)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create inventory client: %w", err)
+	}
+
+	// List all hosts from the provider inventory
+	var hosts []vsphere.Host
+	err = inventory.List(&hosts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list hosts from inventory: %w", err)
+	}
+
+	var hostIPs []string
+	for _, host := range hosts {
+		// Filter hosts based on oldHostsOnly flag
+		if oldHostsOnly {
+			// Only include ESXi 7 or lower hosts
+			if host.ProductVersion != "" && r.isESXi7OrLower(host.ProductVersion) {
+				if host.ManagementServerIp != "" {
+					hostIPs = append(hostIPs, host.ManagementServerIp)
+					r.Log.Info(">>>>>>>>>>>>>>>>>> Found ESXi 7 or lower host IP from inventory", "host", host.Name, "version", host.ProductVersion, "ip", host.ManagementServerIp)
+				} else {
+					r.Log.V(1).Info(">>>>>>>>>>>>>>>>>> ESXi 7 or lower host has no ManagementServerIp", "host", host.Name, "version", host.ProductVersion)
+				}
+			} else {
+				r.Log.V(1).Info(">>>>>>>>>>>>>>>>>> Skipping ESXi 8+ or unknown version host", "host", host.Name, "version", host.ProductVersion)
+			}
+		} else {
+			// Include all hosts
+			if host.ManagementServerIp != "" {
+				hostIPs = append(hostIPs, host.ManagementServerIp)
+				r.Log.Info(">>>>>>>>>>>>>>>>>> Found ESXi host IP from inventory (using ManagementServerIp)", "host", host.Name, "ip", host.ManagementServerIp)
+			} else {
+				r.Log.V(1).Info(">>>>>>>>>>>>>>>>>> Host has no ManagementServerIp", "host", host.Name)
+			}
+		}
+	}
+
+	if oldHostsOnly {
+		r.Log.Info(">>>>>>>>>>>>>>>>>> Collected ESXi 7 or lower host IPs from inventory", "provider", provider.Name, "count", len(hostIPs))
+	} else {
+		r.Log.Info(">>>>>>>>>>>>>>>>>> Collected host IPs from inventory", "provider", provider.Name, "count", len(hostIPs))
+	}
+	return hostIPs, nil
+}
+
+// isAutoKeyInstallDisabled checks if automatic SSH key installation is disabled for this provider.
+// Returns true if disabled, false if enabled (default is enabled).
+func (r *Reconciler) isAutoKeyInstallDisabled(provider *api.Provider) bool {
+	// Check if the provider has the ESXiAutoKeyInstall setting
+	if provider.Spec.Settings != nil {
+		if autoKeyInstall, exists := provider.Spec.Settings[api.ESXiAutoKeyInstall]; exists {
+			// If the setting is explicitly set to "false", disable automatic installation
+			if autoKeyInstall == "false" {
+				r.Log.Info("Automatic SSH key installation disabled for provider", "provider", provider.Name)
+				return true
+			}
+		}
+	}
+
+	// Default behavior: automatic key installation is enabled
+	return false
+}
+
+func (r *Reconciler) isSSHMethodEnabled(provider *api.Provider) bool {
+	if provider.Spec.Settings != nil {
+		if esxiCloneMethod, exists := provider.Spec.Settings[api.ESXiCloneMethod]; exists {
+			if esxiCloneMethod != "ssh" {
+				r.Log.Info("SSH copy method is not enabled.", "provider", provider.Name)
+				return true
+			}
+		}
+	}
+
+	// Default behavior: ssh method installation is disabled
+	return false
 }

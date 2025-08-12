@@ -26,10 +26,11 @@ github.com/davecgh/go-spew/spew
 github.com/dell/gopowermax/v2
 github.com/dell/gopowermax/v2/api
 github.com/dell/gopowermax/v2/types/v100
-# github.com/dell/goscaleio v1.19.1
-## explicit; go 1.23
+# github.com/dell/goscaleio v1.20.0
+## explicit; go 1.24
 github.com/dell/goscaleio
 github.com/dell/goscaleio/api
+github.com/dell/goscaleio/log
 github.com/dell/goscaleio/types/v1
 # github.com/devans10/pugo/flasharray v0.0.0-20241116160615-6bb8c469c9a0
 ## explicit; go 1.12
@@ -51,6 +52,10 @@ github.com/elastic/go-windows
 ## explicit; go 1.13
 github.com/emicklei/go-restful/v3
 github.com/emicklei/go-restful/v3/log
+# github.com/evanphx/json-patch/v5 v5.9.11
+## explicit; go 1.18
+github.com/evanphx/json-patch/v5
+github.com/evanphx/json-patch/v5/internal/json
 # github.com/fxamacker/cbor/v2 v2.7.0
 ## explicit; go 1.17
 github.com/fxamacker/cbor/v2
@@ -176,6 +181,7 @@ github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref
 github.com/kubev2v/forklift/pkg/lib/condition
 github.com/kubev2v/forklift/pkg/lib/error
 github.com/kubev2v/forklift/pkg/lib/itinerary
+github.com/kubev2v/forklift/pkg/lib/sshkeys
 # github.com/mailru/easyjson v0.7.7
 ## explicit; go 1.12
 github.com/mailru/easyjson/buffer
@@ -378,13 +384,20 @@ go.uber.org/mock/gomock
 # go.uber.org/multierr v1.11.0
 ## explicit; go 1.19
 go.uber.org/multierr
-# golang.org/x/crypto v0.36.0
+# golang.org/x/crypto v0.40.0
 ## explicit; go 1.23.0
+golang.org/x/crypto/blowfish
+golang.org/x/crypto/chacha20
+golang.org/x/crypto/curve25519
+golang.org/x/crypto/internal/alias
+golang.org/x/crypto/internal/poly1305
+golang.org/x/crypto/ssh
+golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
 golang.org/x/crypto/ssh/terminal
-# golang.org/x/mod v0.21.0
-## explicit; go 1.22.0
+# golang.org/x/mod v0.25.0
+## explicit; go 1.23.0
 golang.org/x/mod/semver
-# golang.org/x/net v0.38.0
+# golang.org/x/net v0.41.0
 ## explicit; go 1.23.0
 golang.org/x/net/context
 golang.org/x/net/http/httpguts
@@ -398,19 +411,20 @@ golang.org/x/net/trace
 ## explicit; go 1.18
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
-# golang.org/x/sync v0.13.0
+# golang.org/x/sync v0.16.0
 ## explicit; go 1.23.0
 golang.org/x/sync/errgroup
-# golang.org/x/sys v0.31.0
+# golang.org/x/sys v0.34.0
 ## explicit; go 1.23.0
+golang.org/x/sys/cpu
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
-# golang.org/x/term v0.30.0
+# golang.org/x/term v0.33.0
 ## explicit; go 1.23.0
 golang.org/x/term
-# golang.org/x/text v0.24.0
+# golang.org/x/text v0.27.0
 ## explicit; go 1.23.0
 golang.org/x/text/cases
 golang.org/x/text/internal
@@ -426,8 +440,8 @@ golang.org/x/text/unicode/norm
 # golang.org/x/time v0.7.0
 ## explicit; go 1.18
 golang.org/x/time/rate
-# golang.org/x/tools v0.26.0
-## explicit; go 1.22.0
+# golang.org/x/tools v0.34.0
+## explicit; go 1.23.0
 golang.org/x/tools/cmd/stringer
 golang.org/x/tools/go/gcexportdata
 golang.org/x/tools/go/packages
@@ -625,6 +639,7 @@ k8s.io/apimachinery/pkg/api/meta/testrestmapper
 k8s.io/apimachinery/pkg/api/resource
 k8s.io/apimachinery/pkg/api/validation
 k8s.io/apimachinery/pkg/apis/meta/internalversion
+k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme
 k8s.io/apimachinery/pkg/apis/meta/internalversion/validation
 k8s.io/apimachinery/pkg/apis/meta/v1
 k8s.io/apimachinery/pkg/apis/meta/v1/unstructured
@@ -722,6 +737,7 @@ k8s.io/client-go/applyconfigurations/storage/v1alpha1
 k8s.io/client-go/applyconfigurations/storage/v1beta1
 k8s.io/client-go/applyconfigurations/storagemigration/v1alpha1
 k8s.io/client-go/discovery
+k8s.io/client-go/dynamic
 k8s.io/client-go/features
 k8s.io/client-go/gentype
 k8s.io/client-go/kubernetes
@@ -780,6 +796,7 @@ k8s.io/client-go/kubernetes/typed/storage/v1
 k8s.io/client-go/kubernetes/typed/storage/v1alpha1
 k8s.io/client-go/kubernetes/typed/storage/v1beta1
 k8s.io/client-go/kubernetes/typed/storagemigration/v1alpha1
+k8s.io/client-go/metadata
 k8s.io/client-go/openapi
 k8s.io/client-go/pkg/apis/clientauthentication
 k8s.io/client-go/pkg/apis/clientauthentication/install
@@ -789,6 +806,7 @@ k8s.io/client-go/pkg/version
 k8s.io/client-go/plugin/pkg/client/auth/exec
 k8s.io/client-go/rest
 k8s.io/client-go/rest/watch
+k8s.io/client-go/restmapper
 k8s.io/client-go/testing
 k8s.io/client-go/tools/auth
 k8s.io/client-go/tools/clientcmd
@@ -854,6 +872,9 @@ kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1
 kubevirt.io/controller-lifecycle-operator-sdk/api
 # sigs.k8s.io/controller-runtime v0.20.4
 ## explicit; go 1.23.0
+sigs.k8s.io/controller-runtime/pkg/client
+sigs.k8s.io/controller-runtime/pkg/client/apiutil
+sigs.k8s.io/controller-runtime/pkg/log
 sigs.k8s.io/controller-runtime/pkg/scheme
 # sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3
 ## explicit; go 1.21
