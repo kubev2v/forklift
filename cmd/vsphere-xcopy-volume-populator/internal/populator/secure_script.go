@@ -14,7 +14,6 @@ import (
 
 const (
 	secureScriptName = "secure-vmkfstools-wrapper"
-	secureScriptPath = "/tmp/secure-vmkfstools-wrapper.py"
 )
 
 // SecureScriptVersion is set by ldflags - should match the script version
@@ -43,7 +42,7 @@ func writeSecureScriptToTemp() (string, error) {
 }
 
 // ensureSecureScript ensures the secure script is uploaded and available on the target ESX
-func ensureSecureScript(client vmware.Client, esx *object.HostSystem, datastore string, desiredVersion string) (string, error) {
+func ensureSecureScript(ctx context.Context, client vmware.Client, esx *object.HostSystem, datastore string, desiredVersion string) (string, error) {
 	klog.Infof("ensuring secure script version on ESXi %s: %s", esx.Name(), SecureScriptVersion)
 
 	// ALWAYS force re-upload for now to ensure latest version
@@ -54,7 +53,7 @@ func ensureSecureScript(client vmware.Client, esx *object.HostSystem, datastore 
 		return "", err
 	}
 
-	scriptPath, err := uploadScript(client, dc, datastore)
+	scriptPath, err := uploadScript(ctx, client, dc, datastore)
 	if err != nil {
 		return "", fmt.Errorf("failed to upload the secure script to ESXi %s: %w", esx.Name(), err)
 	}
@@ -66,8 +65,11 @@ func ensureSecureScript(client vmware.Client, esx *object.HostSystem, datastore 
 	return scriptPath, nil
 }
 
-func uploadScript(client vmware.Client, dc *object.Datacenter, datastore string) (string, error) {
-	ds, err := client.GetDatastore(context.Background(), dc, datastore)
+func uploadScript(ctx context.Context, client vmware.Client, dc *object.Datacenter, datastore string) (string, error) {
+	// Lookup datastore with timeout
+	dsCtx, dsCancel := context.WithTimeout(ctx, 30*time.Second)
+	defer dsCancel()
+	ds, err := client.GetDatastore(dsCtx, dc, datastore)
 	if err != nil {
 		return "", fmt.Errorf("failed to get datastore: %w", err)
 	}
@@ -85,7 +87,10 @@ func uploadScript(client vmware.Client, dc *object.Datacenter, datastore string)
 
 	klog.Infof("Uploading embedded script (version %s) to datastore as %s", SecureScriptVersion, uniqueScriptName)
 
-	if err = ds.UploadFile(context.Background(), tempScriptPath, uniqueScriptName, nil); err != nil {
+	// Upload the file with timeout
+	upCtx, upCancel := context.WithTimeout(ctx, 30*time.Second)
+	defer upCancel()
+	if err = ds.UploadFile(upCtx, tempScriptPath, uniqueScriptName, nil); err != nil {
 		return "", fmt.Errorf("failed to upload embedded script: %w", err)
 	}
 

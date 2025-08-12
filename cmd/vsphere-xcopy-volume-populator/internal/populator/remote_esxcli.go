@@ -64,12 +64,15 @@ func NewWithRemoteEsxcliSSH(storageApi StorageApi, vsphereHostname, vsphereUsern
 	if err != nil {
 		return nil, fmt.Errorf("failed to create vmware client: %w", err)
 	}
+	if len(sshPrivateKey) == 0 || len(sshPublicKey) == 0 {
+		return nil, fmt.Errorf("ssh key material must be non-empty")
+	}
 	return &RemoteEsxcliPopulator{
 		VSphereClient: c,
 		StorageApi:    storageApi,
 		SSHPrivateKey: sshPrivateKey,
 		SSHPublicKey:  sshPublicKey,
-		UseSSHMethod:  true, // SSH method
+		UseSSHMethod:  true,
 	}, nil
 }
 
@@ -95,7 +98,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	}
 
 	klog.Infof(
-		"Starting to populate using remote esxcli vmkfstools (%s method), source vmdk %s target LUN %s",
+		"Starting populate via remote esxcli vmkfstools (%s), source vmdk=%s, pv=%v",
 		cloneMethodStr,
 		sourceVMDKFile,
 		pv)
@@ -210,7 +213,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	klog.Infof("resolved lun with IQN %s to lun %s", lun.IQN, targetLUN)
 
 	retries := 5
-	for i := 1; i < retries; i++ {
+	for i := 1; i <= retries; i++ {
 		_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "list", "-d", targetLUN})
 		if err == nil {
 			klog.Infof("found device %s", targetLUN)
@@ -235,7 +238,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		for _, group := range originalInitiatorGroups {
 			_, errMap := p.StorageApi.Map(group, lun, mappingContext)
 			if errMap != nil {
-				klog.Warningf("failed to map the volume back the original holder - this may cause problems: %v", err)
+				klog.Warningf("failed to map the volume back the original holder - this may cause problems: %v", errMap)
 			}
 		}
 		// unmap devices appear dead in ESX right after they are unmapped, now
@@ -331,28 +334,32 @@ func (p *RemoteEsxcliPopulator) executeVIBClone(host *object.HostSystem, vmDisk 
 
 // executeSSHClone performs the clone using the SSH method
 func (p *RemoteEsxcliPopulator) executeSSHClone(host *object.HostSystem, vmDisk VMDisk, targetLUN string, progress chan<- uint) error {
+	// Create a context with timeout to bound SSH enable/connect and script staging operations
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	// Setup secure script
-	finalScriptPath, err := ensureSecureScript(p.VSphereClient, host, vmDisk.Datastore, SecureScriptVersion)
+	finalScriptPath, err := ensureSecureScript(ctx, p.VSphereClient, host, vmDisk.Datastore, SecureScriptVersion)
 	if err != nil {
 		return fmt.Errorf("failed to ensure secure script: %w", err)
 	}
 	klog.V(2).Infof("Secure script ready at path: %s", finalScriptPath)
 
 	// Enable SSH access
-	err = vmware.EnableSSHAccess(p.VSphereClient, host, p.SSHPrivateKey, p.SSHPublicKey, finalScriptPath)
+	err = vmware.EnableSSHAccess(ctx, p.VSphereClient, host, p.SSHPrivateKey, p.SSHPublicKey, finalScriptPath)
 	if err != nil {
 		return fmt.Errorf("failed to enable SSH access: %w", err)
 	}
 
 	// Get host IP
-	hostIP, err := vmware.GetHostIPAddress(context.Background(), host)
+	hostIP, err := vmware.GetHostIPAddress(ctx, host)
 	if err != nil {
 		return fmt.Errorf("failed to get host IP address: %w", err)
 	}
 
 	// Create SSH client
 	sshClient := vmware.NewSSHClient()
-	err = sshClient.Connect(hostIP, "root", p.SSHPrivateKey)
+	err = sshClient.Connect(ctx, hostIP, "root", p.SSHPrivateKey)
 	if err != nil {
 		return fmt.Errorf("failed to connect via SSH: %w", err)
 	}
