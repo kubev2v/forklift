@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import subprocess
+import sys
 import uuid
 import re
 
@@ -84,9 +85,14 @@ def taskGet(args):
                   "exitCode": "1", "lastLine": line.rstrip(), "stdErr": e}
         print(XML.format("1", json.dumps(result)))
         return
+    if was_xcopy_used(args.target_lun):
+        xcopy_used = "XCopy was used"
+    else:
+        xcopy_used = "XCopy was not used"
 
     result = {"taskId": args.task_id[0], "pid": int(pid),
-              "exitCode": exitcode, "lastLine": line.rstrip(), "stdErr": ste}
+              "exitCode": exitcode, "lastLine": line.rstrip(),
+               "xcopyUsed": xcopy_used, "stdErr": ste}
     print(XML.format("0", json.dumps(result)))
 
 
@@ -121,6 +127,31 @@ def extract_rdmdisk_file(rdm_file):
     except Exception as e:
         logging.error(e)
     return ""
+
+def was_xcopy_used(target_lun):
+    stats_path = f"/storage/scsifw/devices/{target_lun}/stats"
+
+    try:
+        target_lun_stats = subprocess.run(
+            ["vsish", "-e", "cat", stats_path],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+    except subprocess.CalledProcessError:
+        print(f"Error: Unable to read stats for device {target_lun}")
+        sys.exit(2)
+
+    write_ops = 0
+    for statistic in target_lun_stats.stdout.splitlines():
+        if "total clone write ops" in statistic.lower():
+            try:
+                write_ops = int(statistic.strip().split()[-1])
+            except ValueError:
+                write_ops = 0
+            break
+
+    return write_ops > 0
 
 
 def main():
