@@ -97,8 +97,9 @@ func main() {
 		}
 		storageApi = &sm
 	case forklift.StorageVendorProductPowerFlex:
+		systemId := os.Getenv(powerflex.SYSTEM_ID_ENV_KEY)
 		sm, err := powerflex.NewPowerflexClonner(
-			storageHostname, storageUsername, storagePassword, storageSkipSSLVerification == "true")
+			storageHostname, storageUsername, storagePassword, storageSkipSSLVerification == "true", systemId)
 		if err != nil {
 			klog.Fatalf("failed to initialize PowerFlex clonner with %s", err)
 		}

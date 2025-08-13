@@ -165,6 +165,10 @@ Add these keys to the secret mentioned in the storage map:
 `POWERMAX_SYMMETRIX_ID` - the symmetrix id of the storage array. Can be taken
 from the ConfigMap under the 'powermax' namespace, which the CSI driver uses.
 
+## Dell PowerFlex
+
+`POWERFLEX_SYSTEM_ID` - the system id of the storage array. Can be taken from `vxflexos-config` from the `vxflexos` namespace
+or the openshift-operators namespace.
 
 # Setup copy offload
 - Set the feature flag
