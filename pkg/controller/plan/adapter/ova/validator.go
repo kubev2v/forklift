@@ -211,3 +211,9 @@ func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (ok b
 	ok = true
 	return
 }
+
+// NO-OP
+func (r *Validator) GuestToolsInstalled(vmRef ref.Ref) (ok bool, err error) {
+	ok = true
+	return
+}
