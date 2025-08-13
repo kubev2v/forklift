@@ -731,6 +731,12 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				if s, cast := p.Val.(string); cast {
 					v.model.HostName = s
 				}
+			case fToolsStatus:
+				v.model.ToolsStatus = fmt.Sprint(p.Val)
+			case fToolsRunningStatus:
+				v.model.ToolsRunningStatus = fmt.Sprint(p.Val)
+			case fToolsVersionStatus:
+				v.model.ToolsVersionStatus = fmt.Sprint(p.Val)
 			case fTpmPresent:
 				if b, cast := p.Val.(bool); cast {
 					v.model.TpmEnabled = b
