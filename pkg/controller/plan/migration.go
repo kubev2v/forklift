@@ -1591,8 +1591,8 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 
 func (r *Migration) updateConversionProgressV2vMonitor(pod *core.Pod, step *plan.Step) (err error) {
 	var diskRegex = regexp.MustCompile(`v2v_disk_transfers\{disk_id="(\d+)"\} (\d{1,3}\.?\d*)`)
-	serviceName := pod.Name + "-service"
-	url := fmt.Sprintf("http://%s.%s.svc.cluster.local:2112/metrics", serviceName, pod.Namespace)
+	serviceName := pod.Name + ServiceNameSuffix
+	url := fmt.Sprintf("http://%s.%s.svc.cluster.local:%d/metrics", serviceName, pod.Namespace, MetricsPort)
 	resp, err := http.Get(url)
 	switch {
 	case err == nil:
