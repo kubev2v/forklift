@@ -1989,6 +1989,14 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 			Annotations:  annotations,
 			Labels:       r.conversionLabels(vm.Ref, false),
 			GenerateName: r.getGeneratedName(vm),
+			OwnerReferences: []meta.OwnerReference{
+				{
+					APIVersion: "forklift.konveyor.io/v1beta1",
+					Kind:       "Migration",
+					Name:       r.Migration.Name,
+					UID:        r.Migration.UID,
+				},
+			},
 		},
 		Spec: core.PodSpec{
 			SecurityContext: &core.PodSecurityContext{
