@@ -85,6 +85,14 @@ func (r *Validator) VMMigrationType(vmRef ref.Ref) (ok bool, err error) {
 	return
 }
 
+// Guest tools validation is not applicable for OpenShift/KubeVirt (uses VirtIO drivers).
+func (r *Validator) GuestToolsInstalled(vmRef ref.Ref) (ok bool, msg string, category string, err error) {
+	// OpenShift/KubeVirt uses VirtIO drivers and QEMU guest agent
+	// No validation needed for guest tools in OpenShift
+	ok = true
+	return
+}
+
 // MaintenanceMode implements base.Validator
 func (r *Validator) MaintenanceMode(vmRef ref.Ref) (bool, error) {
 	return true, nil

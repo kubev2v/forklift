@@ -198,3 +198,11 @@ func (r *Validator) VMMigrationType(vmRef ref.Ref) (ok bool, err error) {
 	ok = true
 	return
 }
+
+// Guest tools validation is not applicable for OVA (static VM exports).
+func (r *Validator) GuestToolsInstalled(vmRef ref.Ref) (ok bool, msg string, category string, err error) {
+	// OVA files are static exports, guest tools status is not relevant for migration
+	// No validation needed for guest tools in OVA
+	ok = true
+	return
+}

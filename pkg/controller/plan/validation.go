@@ -84,6 +84,7 @@ const (
 	UnsupportedOvaSource          = "UnsupportedOvaSource"
 	VMPowerStateUnsupported       = "VMPowerStateUnsupported"
 	VMMigrationTypeUnsupported    = "VMMigrationTypeUnsupported"
+	GuestToolsIssue               = "GuestToolsIssue"
 )
 
 // Categories
@@ -645,6 +646,14 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "VM is incompatible with the selected migration type.",
 		Items:    []string{},
 	}
+	guestToolsIssue := libcnd.Condition{
+		Type:     GuestToolsIssue,
+		Status:   True,
+		Reason:   NotValid,
+		Category: api.CategoryCritical,
+		Message:  "VM has guest tools issues.",
+		Items:    []string{},
+	}
 	unsupportedDisks := libcnd.Condition{
 		Type:     UnsupportedDisks,
 		Status:   True,
@@ -833,6 +842,20 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		}
 		if !ok {
 			vmMigrationTypeUnsupported.Items = append(vmMigrationTypeUnsupported.Items, ref.String())
+		}
+
+		// Guest tools validation (provider-specific)
+		toolsOk, toolsMsg, toolsCategory, err := validator.GuestToolsInstalled(*ref)
+		if err != nil {
+			return err
+		}
+		if !toolsOk {
+			guestToolsIssue.Items = append(guestToolsIssue.Items, ref.String())
+			// Update category and message if this is the first issue found
+			if len(guestToolsIssue.Items) == 1 {
+				guestToolsIssue.Category = toolsCategory
+				guestToolsIssue.Message = toolsMsg
+			}
 		}
 		unsupported, err := validator.UnSupportedDisks(*ref)
 		if err != nil {
@@ -1041,6 +1064,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(vmMigrationTypeUnsupported.Items) > 0 {
 		plan.Status.SetCondition(vmMigrationTypeUnsupported)
+	}
+	if len(guestToolsIssue.Items) > 0 {
+		plan.Status.SetCondition(guestToolsIssue)
 	}
 	if len(unsupportedDisks.Items) > 0 {
 		plan.Status.SetCondition(unsupportedDisks)

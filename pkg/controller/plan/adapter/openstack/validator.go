@@ -207,3 +207,11 @@ func (r *Validator) VMMigrationType(vmRef ref.Ref) (ok bool, err error) {
 	ok = true
 	return
 }
+
+// Guest tools validation is not applicable for OpenStack (cloud-init/cloud-config).
+func (r *Validator) GuestToolsInstalled(vmRef ref.Ref) (ok bool, msg string, category string, err error) {
+	// OpenStack uses cloud-init/cloud-config for guest agent functionality
+	// No validation needed for guest tools in OpenStack
+	ok = true
+	return
+}

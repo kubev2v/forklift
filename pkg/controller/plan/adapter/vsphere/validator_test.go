@@ -10,6 +10,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
+	"github.com/kubev2v/forklift/pkg/controller/validation"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,6 +44,36 @@ func (m *mockInventory) Find(resource interface{}, ref ref.Ref) error {
 			res.VM.GuestID = "rhel8_64Guest"
 		}
 		if ref.Name == "missing_from_invetory" {
+			return base.NotFoundError{}
+		}
+	case *model.VM:
+		*res = model.VM{
+			ToolsStatus:        ToolsOk,           // default: tools installed
+			ToolsRunningStatus: GuestToolsRunning, // default: tools running
+			ToolsVersionStatus: GuestToolsCurrent, // default: tools current
+			VM1: model.VM1{
+				PowerState: "poweredOn", // default state
+			},
+		}
+		// Test cases for GuestToolsInstalled
+		switch ref.Name {
+		case "tools_not_installed":
+			res.ToolsStatus = ToolsNotInstalled
+		case "tools_not_running":
+			res.ToolsStatus = ToolsOk
+			res.ToolsRunningStatus = GuestToolsNotRunning
+		case "tools_status_unknown":
+			res.ToolsStatus = "" // Empty status (encrypted VM scenario)
+		case "tools_status_null":
+			res.ToolsStatus = "null" // Null status (encrypted VM scenario)
+		case "tools_status_nil":
+			res.ToolsStatus = "<nil>" // fmt.Sprint(nil) result (encrypted VM scenario)
+		case "vm_powered_off":
+			res.PowerState = "poweredOff"
+			res.ToolsStatus = ToolsNotInstalled // Should be ignored when powered off
+		case "tools_unmanaged":
+			res.ToolsVersionStatus = GuestToolsUnmanaged
+		case "missing_from_inventory":
 			return base.NotFoundError{}
 		}
 	}
@@ -115,6 +146,52 @@ var _ = Describe("vsphere validation tests", func() {
 			Entry("when the vm doesn't have static ips, and the plan set without static ip, vm is non-windows", "not_windows_guest", false, false),
 			Entry("when the vm doesn't have static ips, and the plan set with static ip, vm is non-windows", "not_windows_guest", true, false),
 			Entry("when the vm doesn't exist", "missing_from_invetory", true, true),
+		)
+	})
+
+	Describe("GuestToolsInstalled", func() {
+		DescribeTable("should validate VMware Tools status correctly",
+			func(vmName string, expectedOk bool, expectedCategory string, shouldError bool) {
+				provider := &v1beta1.Provider{Spec: v1beta1.ProviderSpec{Type: &[]v1beta1.ProviderType{v1beta1.VSphere}[0]}}
+				validator := &Validator{
+					Context: &plancontext.Context{},
+				}
+				validator.Source = plancontext.Source{Provider: provider}
+				validator.Source.Inventory = &mockInventory{}
+
+				vmRef := ref.Ref{Name: vmName}
+				ok, msg, category, err := validator.GuestToolsInstalled(vmRef)
+
+				if shouldError {
+					Expect(err).To(HaveOccurred())
+				} else {
+					Expect(err).NotTo(HaveOccurred())
+					Expect(ok).To(Equal(expectedOk))
+					if !expectedOk {
+						Expect(msg).NotTo(BeEmpty())
+						Expect(category).To(Equal(expectedCategory))
+					}
+				}
+			},
+
+			// Success cases
+			Entry("when VMware Tools are installed and running", "default_vm", true, "", false),
+
+			// Critical cases - powered on VMs with tools issues
+			Entry("when VMware Tools are not installed", "tools_not_installed", false, validation.Critical, false),
+			Entry("when VMware Tools are not running", "tools_not_running", false, validation.Critical, false),
+			Entry("when VMware Tools are unmanaged", "tools_unmanaged", false, validation.Critical, false),
+
+			// Encrypted/unknown tools status must block when VM is powered on
+			Entry("when VMware Tools status is empty (encrypted VM) -> block", "tools_status_unknown", false, validation.Critical, false),
+			Entry("when VMware Tools status is null (encrypted VM) -> block", "tools_status_null", false, validation.Critical, false),
+			Entry("when VMware Tools status is <nil> (encrypted VM) -> block", "tools_status_nil", false, validation.Critical, false),
+
+			// Powered off VMs should pass validation
+			Entry("when VM is powered off (tools status ignored)", "vm_powered_off", true, "", false),
+
+			// Error cases
+			Entry("when VM is missing from inventory", "missing_from_inventory", false, "", true),
 		)
 	})
 })

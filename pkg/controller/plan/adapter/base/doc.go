@@ -168,6 +168,8 @@ type Validator interface {
 	InvalidDiskSizes(vmRef ref.Ref) ([]string, error)
 	// Validate that the VM MAC addresses don't conflict with existing destination VMs.
 	MacConflicts(vmRef ref.Ref) ([]MacConflict, error)
+	// Validate guest tools installation and status (e.g., VMware Tools, VirtIO drivers).
+	GuestToolsInstalled(vmRef ref.Ref) (ok bool, msg string, category string, err error)
 }
 
 // DestinationClient API.
