@@ -1100,7 +1100,7 @@ func (r *KubeVirt) getInspectionXml(pod *core.Pod) (string, error) {
 	if pod == nil {
 		return "", liberr.New("no pod found to get the inspection")
 	}
-	inspectionUrl := fmt.Sprintf("http://%s:8080/inspection", pod.Status.PodIP)
+	inspectionUrl := r.guestConversionServiceURL(pod, 8080) + "/inspection"
 	resp, err := http.Get(inspectionUrl)
 	if err != nil {
 		return "", liberr.Wrap(err)
@@ -1114,12 +1114,12 @@ func (r *KubeVirt) getInspectionXml(pod *core.Pod) (string, error) {
 }
 
 func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, step *plan.Step) error {
-	if pod == nil || pod.Status.PodIP == "" {
-		//we need the IP for fetching the configuration of the convered VM.
+	if pod == nil {
+		//we need the pod for fetching the configuration of the converted VM.
 		return nil
 	}
 
-	url := fmt.Sprintf("http://%s:8080/vm", pod.Status.PodIP)
+	url := r.guestConversionServiceURL(pod, 8080) + "/vm"
 
 	/* Due to the virt-v2v operation, the ovf file is only available after the command's execution,
 	meaning it appears following the copydisks phase.
@@ -1157,7 +1157,7 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 		r.Log.Info("Setting the vm OS ", vm.OperatingSystem, "vmId", vm.ID)
 	}
 
-	shutdownURL := fmt.Sprintf("http://%s:8080/shutdown", pod.Status.PodIP)
+	shutdownURL := r.guestConversionServiceURL(pod, 8080) + "/shutdown"
 	resp, err = http.Post(shutdownURL, "application/json", nil)
 	if err == nil {
 		defer resp.Body.Close()
@@ -2116,6 +2116,12 @@ func (r *KubeVirt) guestConversionService(vm *plan.VMStatus, pod *core.Pod) *cor
 		},
 	}
 	return service
+}
+
+// guestConversionServiceURL generates the service URL for a given pod and port
+func (r *KubeVirt) guestConversionServiceURL(pod *core.Pod, port int) string {
+	serviceName := pod.Name + "-service"
+	return fmt.Sprintf("http://%s.%s.svc.cluster.local:%d", serviceName, pod.Namespace, port)
 }
 
 func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, libvirtConfigMap *core.ConfigMap, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, vm *plan.VMStatus) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice, err error) {
