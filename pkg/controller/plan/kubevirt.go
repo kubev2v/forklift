@@ -1001,6 +1001,25 @@ func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, vmCr *VirtualMach
 				pod.Name),
 			"vm",
 			vm.String())
+
+		// Create matching service for the pod
+		service := r.guestConversionService(vm, pod)
+		err = r.Destination.Client.Create(context.TODO(), service)
+		if err != nil {
+			r.Log.Error(err, "Failed to create service for virt-v2v pod",
+				"service", path.Join(service.Namespace, service.Name),
+				"pod", path.Join(pod.Namespace, pod.Name))
+			err = liberr.Wrap(err)
+			return
+		}
+		r.Log.Info(
+			"Created virt-v2v service.",
+			"service",
+			path.Join(
+				service.Namespace,
+				service.Name),
+			"vm",
+			vm.String())
 	}
 
 	return
@@ -2034,6 +2053,11 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 					VolumeDevices: volumeDevices,
 					Ports: []core.ContainerPort{
 						{
+							Name:          "http",
+							ContainerPort: 8080,
+							Protocol:      core.ProtocolTCP,
+						},
+						{
 							Name:          "metrics",
 							ContainerPort: 2112,
 							Protocol:      core.ProtocolTCP,
@@ -2056,6 +2080,42 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	r.setKvmOnPodSpec(&pod.Spec)
 
 	return
+}
+
+// guestConversionService creates a service for the guest conversion (virt-v2v) pod.
+func (r *KubeVirt) guestConversionService(vm *plan.VMStatus, pod *core.Pod) *core.Service {
+	labels := r.conversionLabels(vm.Ref, false)
+	service := &core.Service{
+		ObjectMeta: meta.ObjectMeta{
+			Namespace: pod.Namespace,
+			Labels:    labels,
+			Name:      pod.Name + "-service",
+			OwnerReferences: []meta.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       pod.Name,
+					UID:        pod.UID,
+				},
+			},
+		},
+		Spec: core.ServiceSpec{
+			Selector: labels,
+			Ports: []core.ServicePort{
+				{
+					Name:     "http",
+					Port:     8080,
+					Protocol: core.ProtocolTCP,
+				},
+				{
+					Name:     "metrics",
+					Port:     2112,
+					Protocol: core.ProtocolTCP,
+				},
+			},
+		},
+	}
+	return service
 }
 
 func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, libvirtConfigMap *core.ConfigMap, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, vm *plan.VMStatus) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice, err error) {
