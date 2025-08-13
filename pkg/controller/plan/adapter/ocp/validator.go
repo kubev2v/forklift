@@ -80,9 +80,8 @@ func (r *Validator) VMMigrationType(vmRef ref.Ref) (ok bool, err error) {
 				}
 			}
 		}
-	default:
-		ok = true
 	}
+	ok = true
 	return
 }
 
