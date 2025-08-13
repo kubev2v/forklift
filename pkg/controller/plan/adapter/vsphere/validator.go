@@ -19,6 +19,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	ToolsNotInstalled = string(types.VirtualMachineToolsStatusToolsNotInstalled)
+	ToolsNotRunning   = string(types.VirtualMachineToolsStatusToolsNotRunning)
+	ToolsOk           = string(types.VirtualMachineToolsStatusToolsOk)
+
+	GuestToolsNotRunning = string(types.VirtualMachineToolsRunningStatusGuestToolsNotRunning)
+	GuestToolsRunning    = string(types.VirtualMachineToolsRunningStatusGuestToolsRunning)
+
+	GuestToolsCurrent   = string(types.VirtualMachineToolsVersionStatusGuestToolsCurrent)
+	GuestToolsUnmanaged = string(types.VirtualMachineToolsVersionStatusGuestToolsUnmanaged)
+)
+
 // vSphere validator.
 type Validator struct {
 	*plancontext.Context
@@ -506,4 +518,44 @@ func (r *Validator) PowerState(vmRef ref.Ref) (ok bool, err error) {
 func (r *Validator) VMMigrationType(vmRef ref.Ref) (ok bool, err error) {
 	ok = true
 	return
+}
+
+// Validate guest tools (VMware Tools) status for the VM.
+func (r *Validator) GuestToolsInstalled(vmRef ref.Ref) (ok bool, msg string, err error) {
+	vm := &model.VM{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vmRef.String())
+		return
+	}
+
+	// Only check VMware Tools status if VM is powered on
+	if vm.PowerState == string(types.VirtualMachinePowerStatePoweredOn) {
+		// Treat missing/unknown Tools status as a critical issue on powered-on VMs.
+		// Common for encrypted VMs whose disks are locked and VMware Tools cannot start/report.
+		if isUnknownToolsStatus(vm.ToolsStatus) {
+			msg := "Unable to determine VMware Tools status for this powered-on VM. This commonly occurs when an encrypted VM is locked and VMware Tools cannot start. Power off the VM manually (or unlock the disks) before migration."
+			return false, msg, nil
+		}
+
+		// Check VMware Tools status - not installed, not running, or unmanaged
+		if vm.ToolsStatus == ToolsNotInstalled || vm.ToolsStatus == ToolsNotRunning || vm.ToolsRunningStatus == GuestToolsNotRunning || vm.ToolsVersionStatus == GuestToolsUnmanaged {
+			msg := "VMware Tools issues detected on this VM. This may impact migration performance, guest OS detection, and network configuration. " +
+				"Ensure VMware Tools are properly installed and running before migration. " +
+				"If this is an encrypted VM, please turn the VM off manually before migration."
+			return false, msg, nil
+		}
+	}
+
+	return true, "", nil
+}
+
+// isUnknownToolsStatus normalizes how we treat unreported/unknown statuses.
+func isUnknownToolsStatus(s string) bool {
+	switch s {
+	case "", "null", "<nil>":
+		return true
+	default:
+		return false
+	}
 }
