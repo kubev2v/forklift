@@ -1,6 +1,7 @@
 package ensurer
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -13,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	cnv "kubevirt.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -52,48 +54,6 @@ func TestEnsurer_LiveMigrationNamespaceExclusion(t *testing.T) {
 	t.Logf("Non-OCP live migration correctly bypasses namespace exclusion")
 }
 
-func TestEnsurer_NamespaceExclusionConsistency(t *testing.T) {
-	// Test that live migration namespace exclusion is consistent with cold migration approach
-
-	ensurer := createEnsurer(true, true)
-
-	// Both cold and live migrations should use the same detection logic
-	isSourceOCP := ensurer.Plan.IsSourceProviderOCP()
-	isDestHost := ensurer.Plan.Provider.Destination.IsHost()
-
-	if !isSourceOCP || !isDestHost {
-		t.Errorf("Detection logic should be consistent between cold and live migrations")
-	}
-
-	t.Logf("Consistent namespace exclusion across migration types:")
-	t.Logf("- Same provider type detection: OCP source + OCP destination")
-	t.Logf("- Same namespace label: %s=ignore", namespace.KubemacpoolIgnoreLabelKey)
-	t.Logf("- Same Red Hat OpenShift Virtualization best practices")
-	t.Logf("- Unified solution for production environments")
-	t.Logf("- Shared implementation: namespace.EnsureKubemacpoolExclusion()")
-}
-
-func TestEnsurer_ProductionReadySolution(t *testing.T) {
-	// Test that the ensurer implements the production-ready namespace solution
-
-	ensurer := createEnsurer(true, true)
-
-	// Verify the production solution detection logic
-	isSourceOCP := ensurer.Plan.IsSourceProviderOCP()
-	isDestHost := ensurer.Plan.Provider.Destination.IsHost()
-
-	if !isSourceOCP || !isDestHost {
-		t.Errorf("Production detection logic should identify OCP-to-OCP migrations")
-	}
-
-	t.Logf("Production-ready live migration solution:")
-	t.Logf("- Fully automated namespace exclusion")
-	t.Logf("- No manual intervention required")
-	t.Logf("- Prevents MAC address allocation conflicts")
-	t.Logf("- Consistent with cold migration approach")
-	t.Logf("- Reference: https://docs.redhat.com/en/documentation/openshift_container_platform/4.8/html-single/openshift_virtualization/index#virt-4-8-changes")
-}
-
 func TestEnsurer_EmptyNamespaceGuard(t *testing.T) {
 	t.Parallel()
 	// Test that the ensurer correctly fails fast when TargetNamespace is empty
@@ -118,51 +78,95 @@ func TestEnsurer_EmptyNamespaceGuard(t *testing.T) {
 }
 
 func TestEnsurer_CentralizedHelper(t *testing.T) {
+	t.Parallel()
 	// Test that the centralized namespace.EnsureKubemacpoolExclusion helper works correctly
 
-	// Test case 1: OCP-to-OCP migration should return applied=true
-	ensurer := createEnsurer(true, true)
-
-	applied, err := namespace.EnsureKubemacpoolExclusion(ensurer.Context)
-	if err != nil {
-		t.Errorf("Expected no error for OCP-to-OCP migration, got: %v", err)
+	tests := []struct {
+		name          string
+		namespaceName string
+		sourceIsOCP   bool
+		destIsHost    bool
+		expectApplied bool
+		expectLabel   bool
+		expectOwners  bool
+		description   string
+	}{
+		{
+			name:          "same-cluster OCP migration",
+			namespaceName: "same-cluster-test-ns",
+			sourceIsOCP:   true,
+			destIsHost:    true,
+			expectApplied: true,
+			expectLabel:   true,
+			expectOwners:  true,
+			description:   "OCP-to-OCP migration should apply kubemacpool exclusion",
+		},
+		{
+			name:          "VMware to OCP migration",
+			namespaceName: "vmware-test-ns",
+			sourceIsOCP:   false,
+			destIsHost:    true,
+			expectApplied: false,
+			expectLabel:   false,
+			expectOwners:  false,
+			description:   "Non-OCP source migration should not apply kubemacpool exclusion",
+		},
+		{
+			name:          "cross-cluster OCP migration",
+			namespaceName: "cross-cluster-test-ns",
+			sourceIsOCP:   true,
+			destIsHost:    false,
+			expectApplied: false,
+			expectLabel:   false,
+			expectOwners:  false,
+			description:   "OCP source to remote OCP destination should not apply kubemacpool exclusion",
+		},
 	}
-	if !applied {
-		t.Errorf("Expected applied=true for OCP-to-OCP migration")
-	}
 
-	// Test case 2: Non-OCP migration should return applied=false
-	ensurer2 := createEnsurer(false, true) // VMware to OCP
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ensurer := createEnsurerWithNamespace(tt.namespaceName, tt.sourceIsOCP, tt.destIsHost)
 
-	applied2, err2 := namespace.EnsureKubemacpoolExclusion(ensurer2.Context)
-	if err2 != nil {
-		t.Errorf("Expected no error for non-OCP migration, got: %v", err2)
-	}
-	if applied2 {
-		t.Errorf("Expected applied=false for non-OCP migration")
-	}
+			applied, err := namespace.EnsureKubemacpoolExclusion(ensurer.Context)
+			if err != nil {
+				t.Errorf("Expected no error for %s, got: %v", tt.description, err)
+			}
+			if applied != tt.expectApplied {
+				t.Errorf("Expected applied=%v for %s, got applied=%v", tt.expectApplied, tt.description, applied)
+			}
 
-	// Test case 3: Cross-cluster OCP migration should return applied=false
-	// (OCP source to non-OCP destination - MAC conflicts should be investigated)
-	ensurer3 := createEnsurer(true, false) // OCP source to VSphere destination
+			// Verify namespace state
+			testNamespace := &core.Namespace{}
+			err = ensurer.Context.Destination.Client.Get(context.TODO(), client.ObjectKey{Name: tt.namespaceName}, testNamespace)
+			if err != nil {
+				t.Fatalf("Failed to get namespace for verification: %v", err)
+			}
 
-	applied3, err3 := namespace.EnsureKubemacpoolExclusion(ensurer3.Context)
-	if err3 != nil {
-		t.Errorf("Expected no error for cross-cluster migration, got: %v", err3)
-	}
-	if applied3 {
-		t.Errorf("Expected applied=false for cross-cluster migration (OCP to VSphere)")
+			// Check kubemacpool ignore label
+			hasLabel := testNamespace.Labels[namespace.KubemacpoolIgnoreLabelKey] == namespace.KubemacpoolIgnoreLabelValue
+			if hasLabel != tt.expectLabel {
+				t.Errorf("Expected kubemacpool ignore label present=%v for %s, got present=%v", tt.expectLabel, tt.description, hasLabel)
+			}
+
+			// Check owners annotation (only for positive cases)
+			if tt.expectOwners {
+				// Owners annotation must include this plan UID.
+				owners := testNamespace.Annotations[namespace.KubemacpoolOwnersAnnotationKey]
+				if !strings.Contains(owners, string(ensurer.Context.Plan.GetUID())) {
+					t.Errorf("expected owners annotation to include plan UID %q, got: %q", ensurer.Context.Plan.GetUID(), owners)
+				}
+			}
+
+			t.Logf("%s: applied=%v, err=%v", tt.description, applied, err)
+		})
 	}
 
 	t.Logf("Centralized helper function working correctly:")
-	t.Logf("- Same-cluster OCP: applied=%v, err=%v", applied, err)
-	t.Logf("- VMware source: applied=%v, err=%v", applied2, err2)
-	t.Logf("- Cross-cluster OCP: applied=%v, err=%v", applied3, err3)
 	t.Logf("- Eliminates code duplication between kubevirt and ensurer")
 	t.Logf("- Prevents gate logic drift between migration types")
 }
 
-func createEnsurer(sourceIsOCP, destIsHost bool) *Ensurer {
+func createEnsurerWithNamespace(namespaceName string, sourceIsOCP, destIsHost bool) *Ensurer {
 	var sourceType, destType v1beta1.ProviderType
 
 	if sourceIsOCP {
@@ -171,11 +175,9 @@ func createEnsurer(sourceIsOCP, destIsHost bool) *Ensurer {
 		sourceType = v1beta1.VSphere
 	}
 
-	if destIsHost {
-		destType = v1beta1.OpenShift
-	} else {
-		destType = v1beta1.VSphere
-	}
+	// Always use OpenShift for destination in OCP tests
+	// Use destIsHost to control host vs remote cluster via URL
+	destType = v1beta1.OpenShift
 
 	// Create providers
 	sourceProvider := &v1beta1.Provider{
@@ -200,16 +202,20 @@ func createEnsurer(sourceIsOCP, destIsHost bool) *Ensurer {
 	if sourceIsOCP {
 		sourceProvider.Spec.URL = "" // OCP source is always host (same cluster)
 	}
-	if destIsHost && destType == v1beta1.OpenShift {
-		destProvider.Spec.URL = "" // Host provider has empty URL
-	} else if destType == v1beta1.OpenShift {
-		destProvider.Spec.URL = "https://remote-cluster.example.com" // Remote provider has URL
+	if destIsHost {
+		destProvider.Spec.URL = "" // Host provider has empty URL (same cluster)
+	} else {
+		destProvider.Spec.URL = "https://remote-cluster.example.com" // Remote provider has URL (different cluster)
 	}
 
 	// Create plan
 	plan := &v1beta1.Plan{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-plan",
+			UID:  "test-plan-uid",
+		},
 		Spec: v1beta1.PlanSpec{
-			TargetNamespace: "test-namespace",
+			TargetNamespace: namespaceName,
 			Provider: provider.Pair{
 				Source: core.ObjectReference{
 					Name: sourceProvider.Name,
@@ -222,9 +228,9 @@ func createEnsurer(sourceIsOCP, destIsHost bool) *Ensurer {
 	}
 
 	// Create namespace for testing
-	namespace := &core.Namespace{
+	ns := &core.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-namespace",
+			Name: namespaceName,
 		},
 	}
 
@@ -233,9 +239,9 @@ func createEnsurer(sourceIsOCP, destIsHost bool) *Ensurer {
 	_ = core.AddToScheme(scheme)
 	_ = cnv.AddToScheme(scheme)
 	_ = v1beta1.SchemeBuilder.AddToScheme(scheme)
-	client := fake.NewClientBuilder().
+	k8sClient := fake.NewClientBuilder().
 		WithScheme(scheme).
-		WithRuntimeObjects(plan, sourceProvider, destProvider, namespace).
+		WithRuntimeObjects(plan, sourceProvider, destProvider, ns).
 		Build()
 
 	// Create migration for labeler
@@ -250,10 +256,10 @@ func createEnsurer(sourceIsOCP, destIsHost bool) *Ensurer {
 	// Create context
 	ctx := &plancontext.Context{
 		Destination: plancontext.Destination{
-			Client: client,
+			Client: k8sClient,
 		},
 		Log:       logging.WithName("ensurer-test"),
-		Client:    client,
+		Client:    k8sClient,
 		Plan:      plan,
 		Migration: migration,
 	}
@@ -265,6 +271,10 @@ func createEnsurer(sourceIsOCP, destIsHost bool) *Ensurer {
 	return &Ensurer{
 		Context: ctx,
 	}
+}
+
+func createEnsurer(sourceIsOCP, destIsHost bool) *Ensurer {
+	return createEnsurerWithNamespace("test-namespace", sourceIsOCP, destIsHost)
 }
 
 func createEnsurerWithEmptyNamespace() *Ensurer {
@@ -292,6 +302,10 @@ func createEnsurerWithEmptyNamespace() *Ensurer {
 
 	// Create a plan with empty TargetNamespace to test the guard clause
 	plan := &v1beta1.Plan{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-plan-empty-ns",
+			UID:  "test-plan-empty-ns-uid",
+		},
 		Spec: v1beta1.PlanSpec{
 			// TargetNamespace is intentionally empty to test the guard
 			Provider: provider.Pair{
@@ -310,7 +324,7 @@ func createEnsurerWithEmptyNamespace() *Ensurer {
 	_ = core.AddToScheme(scheme)
 	_ = cnv.AddToScheme(scheme)
 	_ = v1beta1.SchemeBuilder.AddToScheme(scheme)
-	client := fake.NewClientBuilder().
+	k8sClient := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithRuntimeObjects(plan, sourceProvider, destProvider).
 		Build()
@@ -327,10 +341,10 @@ func createEnsurerWithEmptyNamespace() *Ensurer {
 	// Create context
 	ctx := &plancontext.Context{
 		Destination: plancontext.Destination{
-			Client: client,
+			Client: k8sClient,
 		},
 		Log:       logging.WithName("ensurer-test"),
-		Client:    client,
+		Client:    k8sClient,
 		Plan:      plan,
 		Migration: migration,
 	}

@@ -49,6 +49,10 @@ func (r *Ensurer) VirtualMachine(vm *planapi.VMStatus, target *cnv.VirtualMachin
 			r.Log.Info("Applied kubemacpool namespace exclusion for OCP live migration",
 				"vm", vm.Name,
 				"namespace", r.Plan.Spec.TargetNamespace)
+		} else if r.Plan.IsSourceProviderOCP() && (r.Source.Provider == nil || r.Destination.Provider == nil || !namespace.IsSameClusterMigration(r.Source.Provider, r.Destination.Provider)) {
+			r.Log.Info("Skipped kubemacpool exclusion — cross-cluster OCP migration; MAC address conflicts should be investigated",
+				"vm", vm.Name,
+				"namespace", r.Plan.Spec.TargetNamespace)
 		}
 
 		err = r.Destination.Client.Create(context.TODO(), target)
