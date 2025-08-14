@@ -90,32 +90,33 @@ func (r *Validator) MaintenanceMode(vmRef ref.Ref) (bool, error) {
 	return true, nil
 }
 
-// NetworkMapping implements base.Validator
-func (r *Validator) NetworkMapping(vmRef ref.Ref) (ok bool, err error) {
-	// Create provider-specific VM retrieval function
-	retriever := func(vmRef ref.Ref) (interface{}, error) {
-		vm := &cnv.VirtualMachine{}
-		err := r.sourceClient.Get(context.TODO(), k8sclient.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vm)
-		if err != nil {
-			err = liberr.Wrap(
-				err,
-				VM_NOT_FOUND,
-				"vm",
-				vmRef.String())
-			return nil, err
+// PodNetwork implements base.Validator
+func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
+	if r.Plan.Referenced.Map.Network == nil {
+		return
+	}
+
+	vm := &cnv.VirtualMachine{}
+	err = r.sourceClient.Get(context.TODO(), k8sclient.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vm)
+	if err != nil {
+		err = liberr.Wrap(
+			err,
+			VM_NOT_FOUND,
+			"vm",
+			vmRef.String())
+		return
+	}
+	mapping := r.Plan.Referenced.Map.Network.Spec.Map
+	podMapped := 0
+	for i := range mapping {
+		mapped := &mapping[i]
+		if mapped.Destination.Type == Pod {
+			podMapped++
 		}
-		return vm, nil
 	}
 
-	// Create provider-specific network matching function
-	// For OCP, we validate all mappings since we're migrating VMs within the cluster
-	matcher := func(vmInterface interface{}, mapping *api.NetworkPair) (bool, error) {
-		// For OCP provider, all mappings apply since we're validating intra-cluster migrations
-		return true, nil
-	}
-
-	// Use shared validation logic
-	return planbase.ValidateNetworkMapping(r.Context, vmRef, retriever, matcher)
+	ok = podMapped <= 1
+	return
 }
 
 // WarmMigration implements base.Validator

@@ -156,30 +156,32 @@ func (r *Validator) MigrationType() bool {
 	}
 }
 
-// Validate that no more than one of a VM's networks is mapped to the pod network,
-// and that Multus networks have unique names.
-func (r *Validator) NetworkMapping(vmRef ref.Ref) (ok bool, err error) {
-	// Create provider-specific VM retrieval function
-	retriever := func(vmRef ref.Ref) (interface{}, error) {
-		vm := &model.Workload{}
-		err := r.Source.Inventory.Find(vm, vmRef)
-		return vm, err
+// Validate that no more than one of a VM's networks is mapped to the pod network.
+func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
+	if r.Plan.Referenced.Map.Network == nil {
+		return
+	}
+	vm := &model.Workload{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vmRef.String())
+		return
 	}
 
-	// Create provider-specific network matching function
-	matcher := func(vmInterface interface{}, mapping *api.NetworkPair) (bool, error) {
-		vm := vmInterface.(*model.Workload)
-		ref := mapping.Source
+	mapping := r.Plan.Referenced.Map.Network.Spec.Map
+	podMapped := 0
+	for i := range mapping {
+		mapped := &mapping[i]
+		ref := mapped.Source
 		for _, network := range vm.Networks {
-			if ref.ID == network.ID {
-				return true, nil
+			if ref.ID == network.ID && mapped.Destination.Type == "Pod" {
+				podMapped++
 			}
 		}
-		return false, nil
 	}
 
-	// Use shared validation logic
-	return planbase.ValidateNetworkMapping(r.Context, vmRef, retriever, matcher)
+	ok = podMapped <= 1
+	return
 }
 
 // NO-OP
