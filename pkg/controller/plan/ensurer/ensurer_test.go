@@ -208,6 +208,10 @@ func createEnsurer(sourceIsOCP, destIsHost bool) *Ensurer {
 
 	// Create plan
 	plan := &v1beta1.Plan{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-plan",
+			UID:  "test-plan-uid",
+		},
 		Spec: v1beta1.PlanSpec{
 			TargetNamespace: "test-namespace",
 			Provider: provider.Pair{
@@ -292,6 +296,10 @@ func createEnsurerWithEmptyNamespace() *Ensurer {
 
 	// Create a plan with empty TargetNamespace to test the guard clause
 	plan := &v1beta1.Plan{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-plan-empty-ns",
+			UID:  "test-plan-empty-ns-uid",
+		},
 		Spec: v1beta1.PlanSpec{
 			// TargetNamespace is intentionally empty to test the guard
 			Provider: provider.Pair{

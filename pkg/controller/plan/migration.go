@@ -292,9 +292,9 @@ func (r *Migration) Archive() {
 
 	// Remove kubemacpool exclusion label (OCP source migrations only)
 	if removed, err := namespace.RemoveKubemacpoolExclusion(r.Context); err != nil {
-		r.Log.Error(err, "Failed to remove kubemacpool exclusion label during plan archival")
+		r.Log.Error(err, "Failed to remove kubemacpool exclusion label during plan archival", "namespace", r.Plan.Spec.TargetNamespace)
 	} else if removed {
-		r.Log.Info("Successfully removed kubemacpool exclusion label during plan archival")
+		r.Log.Info("Successfully removed kubemacpool exclusion label during plan archival", "namespace", r.Plan.Spec.TargetNamespace)
 	}
 }
 
@@ -368,9 +368,9 @@ func (r *Migration) Cancel() error {
 
 	// Remove kubemacpool exclusion label for canceled OCP source migrations
 	if removed, err := namespace.RemoveKubemacpoolExclusion(r.Context); err != nil {
-		r.Log.Error(err, "Failed to remove kubemacpool exclusion label during plan cancellation")
+		r.Log.Error(err, "Failed to remove kubemacpool exclusion label during plan cancellation", "namespace", r.Plan.Spec.TargetNamespace)
 	} else if removed {
-		r.Log.Info("Successfully removed kubemacpool exclusion label during plan cancellation")
+		r.Log.Info("Successfully removed kubemacpool exclusion label during plan cancellation", "namespace", r.Plan.Spec.TargetNamespace)
 	}
 
 	return nil
@@ -1352,9 +1352,9 @@ func (r *Migration) end() (completed bool, err error) {
 	// Remove kubemacpool exclusion label after migration completion
 	// (regardless of success, failure, or cancellation)
 	if removed, err := namespace.RemoveKubemacpoolExclusion(r.Context); err != nil {
-		r.Log.Error(err, "Failed to remove kubemacpool exclusion label after migration completion")
+		r.Log.Error(err, "Failed to remove kubemacpool exclusion label after migration completion", "namespace", r.Plan.Spec.TargetNamespace)
 	} else if removed {
-		r.Log.Info("Successfully removed kubemacpool exclusion label after migration completion")
+		r.Log.Info("Successfully removed kubemacpool exclusion label after migration completion", "namespace", r.Plan.Spec.TargetNamespace)
 	}
 
 	completed = true

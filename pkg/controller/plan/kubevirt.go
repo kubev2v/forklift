@@ -459,6 +459,10 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) error {
 			r.Log.Info("Applied kubemacpool namespace exclusion for OCP migration",
 				"vm", vm.Name,
 				"namespace", r.Plan.Spec.TargetNamespace)
+		} else if r.Plan.IsSourceProviderOCP() && (r.Source.Provider == nil || r.Destination.Provider == nil || !r.Source.Provider.IsHost() || !r.Destination.Provider.IsHost()) {
+			r.Log.Info("Skipped kubemacpool exclusion — cross-cluster OCP migration; MAC address conflicts should be investigated",
+				"vm", vm.Name,
+				"namespace", r.Plan.Spec.TargetNamespace)
 		}
 
 		if err = r.Destination.Client.Create(context.TODO(), virtualMachine); err != nil {
