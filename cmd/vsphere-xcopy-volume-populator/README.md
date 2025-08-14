@@ -14,7 +14,7 @@ Added a new populator controller for the resource VSPhereXcopyVolumePopulator
 ## VSphereXcopyVolumePopulator Resource
 A new populator implementation under cmd/vsphere-xcopy-volume-populator
 is a cli program that runs in a container that is responsible to perform
-XCOPY to effciently copy data from a VMDK to the target PVC. See the
+XCOPY to efficiently copy data from a VMDK to the target PVC. See the
 flow chart below.
 The populator uses the storage API (configurable) to map the PVC to an ESX 
 then uses Vsphere API to call functions on the ESX to perform the actual
@@ -133,6 +133,15 @@ spec:
 5. host provider ID
 6. vsphere provider name
 7. vsphere provider id
+
+# vSphere User Privileges
+
+The vSphere user requires a role with the following privileges (a role named `StorageOffloader` is recommended):
+
+* Global -> Settings
+* Host -> Configuration -> Advanced settings
+* Host -> Configuration -> Query patch
+* Host -> Configuration -> Storage partition configuration
 
 # Secret with storage provider credentials
 
