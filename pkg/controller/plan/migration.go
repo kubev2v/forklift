@@ -290,12 +290,7 @@ func (r *Migration) Archive() {
 		r.migrator.Complete(vm)
 	}
 
-	// Remove kubemacpool exclusion label (OCP source migrations only)
-	if removed, err := namespace.RemoveKubemacpoolExclusion(r.Context); err != nil {
-		r.Log.Error(err, "Failed to remove kubemacpool exclusion label during plan archival")
-	} else if removed {
-		r.Log.Info("Successfully removed kubemacpool exclusion label during plan archival")
-	}
+	r.cleanupKubemacpoolExclusion("plan archival")
 }
 
 func (r *Migration) SetPopulatorDataSourceLabels() {
@@ -366,12 +361,7 @@ func (r *Migration) Cancel() error {
 		}
 	}
 
-	// Remove kubemacpool exclusion label for canceled OCP source migrations
-	if removed, err := namespace.RemoveKubemacpoolExclusion(r.Context); err != nil {
-		r.Log.Error(err, "Failed to remove kubemacpool exclusion label during plan cancellation")
-	} else if removed {
-		r.Log.Info("Successfully removed kubemacpool exclusion label during plan cancellation")
-	}
+	r.cleanupKubemacpoolExclusion("plan cancellation")
 
 	return nil
 }
@@ -1354,11 +1344,7 @@ func (r *Migration) end() (completed bool, err error) {
 
 	// Remove kubemacpool exclusion label after migration completion
 	// (regardless of success, failure, or cancellation)
-	if removed, err := namespace.RemoveKubemacpoolExclusion(r.Context); err != nil {
-		r.Log.Error(err, "Failed to remove kubemacpool exclusion label after migration completion")
-	} else if removed {
-		r.Log.Info("Successfully removed kubemacpool exclusion label after migration completion")
-	}
+	r.cleanupKubemacpoolExclusion("migration completion")
 
 	completed = true
 	return
@@ -1783,6 +1769,15 @@ func (r *Migration) setPopulatorPodsWithLabels(vm *plan.VMStatus, migrationID st
 				}
 			}
 		}
+	}
+}
+
+// cleanupKubemacpoolExclusion removes kubemacpool exclusion label and logs the result.
+func (r *Migration) cleanupKubemacpoolExclusion(reason string) {
+	if removed, err := namespace.RemoveKubemacpoolExclusion(r.Context); err != nil {
+		r.Log.Error(err, "Failed to remove kubemacpool exclusion label", "namespace", r.Plan.Spec.TargetNamespace, "planUID", string(r.Plan.UID), "reason", reason)
+	} else if removed {
+		r.Log.V(1).Info("Successfully removed kubemacpool exclusion label", "namespace", r.Plan.Spec.TargetNamespace, "planUID", string(r.Plan.UID), "reason", reason)
 	}
 }
 

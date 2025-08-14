@@ -19,16 +19,22 @@ import (
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	ocpclient "github.com/kubev2v/forklift/pkg/lib/client/openshift"
 	core "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes/scheme"
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+// ensure KubeVirt types are known to client-go's global scheme
+func init() {
+	_ = cnv.AddToScheme(scheme.Scheme)
+}
 
 // Network types
 const (
@@ -70,7 +76,7 @@ func (r *Builder) ConfigMap(vmRef ref.Ref, secret *core.Secret, object *core.Con
 }
 
 // DataVolumes implements base.Builder
-func (r *Builder) DataVolumes(vmRef ref.Ref, secret *v1.Secret, configMap *v1.ConfigMap, dvTemplate *cdi.DataVolume, vddkConfigMap *v1.ConfigMap) (dvs []cdi.DataVolume, err error) {
+func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume, vddkConfigMap *core.ConfigMap) (dvs []cdi.DataVolume, err error) {
 	vmExport := &export.VirtualMachineExport{}
 	key := client.ObjectKey{
 		Namespace: vmRef.Namespace,
@@ -249,7 +255,7 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 }
 
 // VirtualMachine implements base.Builder
-func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []*v1.PersistentVolumeClaim, usesInstanceType bool, sortVolumesByLibvirt bool) error {
+func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim, usesInstanceType bool, sortVolumesByLibvirt bool) error {
 	vmExport := &export.VirtualMachineExport{}
 	err := r.sourceClient.Get(context.Background(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vmExport)
 	if err != nil {
@@ -540,6 +546,28 @@ func (r *Builder) mapNetworks(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.Vi
 	targetVmSpec.Template.Spec.Domain.Devices.Interfaces = interfaces
 }
 
+// findVMInManifestItems extracts the common logic for processing manifest items
+// regardless of whether they come from metav1.List or core.List.
+// Skips items that fail to decode and continues scanning. Returns (vm, nil) if found,
+// or (nil, error) only if no VirtualMachine is found after scanning all items.
+func (r *Builder) findVMInManifestItems(items []runtime.RawExtension, decode func([]byte, *schema.GroupVersionKind, runtime.Object) (runtime.Object, *schema.GroupVersionKind, error)) (*cnv.VirtualMachine, error) {
+	for i, item := range items {
+		decoded, gvk, err := decode(item.Raw, nil, nil)
+		if err != nil {
+			r.Log.V(1).Info("Skipping manifest item: decode failed", "index", i, "error", err)
+			continue
+		}
+
+		r.Log.Info("Decoded manifest item", "index", i, "kind", gvk.Kind, "type", fmt.Sprintf("%T", decoded))
+
+		if vm, ok := decoded.(*cnv.VirtualMachine); ok {
+			r.Log.Info("Found vm in manifest", "vm.name", vm.Name, "vm.namespace", vm.Namespace)
+			return vm, nil
+		}
+	}
+	return nil, liberr.New("no VirtualMachine found in manifest items")
+}
+
 func (r *Builder) getSourceVmFromDefinition(vme *export.VirtualMachineExport) (*cnv.VirtualMachine, error) {
 	var vmManifestUrl string
 	for _, manifest := range vme.Status.Links.External.Manifests {
@@ -578,6 +606,9 @@ func (r *Builder) getSourceVmFromDefinition(vme *export.VirtualMachineExport) (*
 	req.Header.Set("Accept", "application/json")
 
 	// Read token from secret
+	if vme.Status.TokenSecretRef == nil {
+		return nil, liberr.New("token secret reference is nil")
+	}
 	token := &core.Secret{}
 	key := client.ObjectKey{Namespace: vme.Namespace, Name: *vme.Status.TokenSecretRef}
 	err = r.sourceClient.Get(context.Background(), key, token)
@@ -603,28 +634,49 @@ func (r *Builder) getSourceVmFromDefinition(vme *export.VirtualMachineExport) (*
 		return nil, liberr.Wrap(err, "failed to read vm manifest body")
 	}
 
+	// Log the raw manifest content for debugging
+	r.Log.Info("Retrieved manifest content", "size", len(body), "url", vmManifestUrl)
+	r.Log.V(1).Info("Manifest body", "content", string(body))
+
 	decode := serializer.NewCodecFactory(scheme.Scheme).UniversalDeserializer().Decode
 	obj, _, err := decode(body, nil, nil)
 	if err != nil {
 		return nil, liberr.Wrap(err, "failed to decode vm manifest")
 	}
 
+	// Handle different manifest formats returned by VirtualMachineExport
+	// We need to support multiple List types because different Kubernetes/OpenShift versions
+	// and API configurations may return different serialization formats:
+	//
+	// *metav1.List: From k8s.io/apimachinery/pkg/apis/meta/v1 - used by older K8s versions
+	//               or when the API server uses meta API serialization
+	// *core.List:   From k8s.io/api/core/v1 - used by newer K8s versions or when the
+	//               API server uses core API serialization
+	//
+	// Both types have identical structure (Items []runtime.RawExtension) but are different
+	// Go types, so we must handle each explicitly for type safety.
+	//
+	// Note: We cannot use a single *v1.List case because metav1.List and core.List are
+	// distinct types from different packages, even though they have the same structure.
 	switch t := obj.(type) {
-	case *v1.List:
-		for _, item := range t.Items {
-			decoded, _, err := decode(item.Raw, nil, nil)
-			if err != nil {
-				return nil, liberr.Wrap(err, "failed to decode vm manifest")
-			}
-
-			switch vm := decoded.(type) {
-			case *cnv.VirtualMachine:
-				r.Log.Info("Found vm in manifest", "vm", vm)
-				return vm, nil
-			default:
-				continue
-			}
+	case *cnv.VirtualMachine:
+		return t, nil
+	case *metav1.List:
+		r.Log.Info("Found metav1.List in manifest", "itemCount", len(t.Items))
+		vm, err := r.findVMInManifestItems(t.Items, decode)
+		if err != nil {
+			return nil, liberr.Wrap(err, "failed to decode vm manifest")
 		}
+		return vm, nil
+	case *core.List:
+		r.Log.Info("Found core.List in manifest", "itemCount", len(t.Items))
+		vm, err := r.findVMInManifestItems(t.Items, decode)
+		if err != nil {
+			return nil, liberr.Wrap(err, "failed to decode vm manifest")
+		}
+		return vm, nil
+	default:
+		r.Log.V(1).Info("Unexpected object type in manifest", "type", fmt.Sprintf("%T", obj))
 	}
 
 	return nil, liberr.New("failed to find vm in manifest")
