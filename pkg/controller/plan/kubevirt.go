@@ -26,6 +26,7 @@ import (
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	inspectionparser "github.com/kubev2v/forklift/pkg/controller/plan/adapter/vsphere"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/controller/plan/namespace"
 	"github.com/kubev2v/forklift/pkg/controller/plan/util"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
@@ -463,6 +464,19 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) error {
 		if virtualMachine, err = r.virtualMachine(vm, false); err != nil {
 			return liberr.Wrap(err)
 		}
+
+		if applied, err2 := namespace.EnsureKubemacpoolExclusion(r.Context); err2 != nil {
+			r.Log.Error(err2, "Failed to set namespace kubemacpool exclusion", "vm", vm.Name)
+		} else if applied {
+			r.Log.Info("Applied kubemacpool namespace exclusion for OCP migration",
+				"vm", vm.Name,
+				"namespace", r.Plan.Spec.TargetNamespace)
+		} else if r.Plan.IsSourceProviderOCP() && (r.Source.Provider == nil || r.Destination.Provider == nil || !namespace.IsSameClusterMigration(r.Source.Provider, r.Destination.Provider)) {
+			r.Log.Info("Skipped kubemacpool exclusion — cross-cluster OCP migration; MAC address conflicts should be investigated",
+				"vm", vm.Name,
+				"namespace", r.Plan.Spec.TargetNamespace)
+		}
+
 		if err = r.Destination.Client.Create(context.TODO(), virtualMachine); err != nil {
 			return liberr.Wrap(err)
 		}
@@ -1543,11 +1557,32 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) 
 	}
 
 	//Add the original name and ID info to the VM annotations
+	annotations := make(map[string]string)
 	if len(vm.NewName) > 0 {
-		annotations := make(map[string]string)
+
 		annotations[AnnDisplayName] = vm.Name
 		annotations[AnnOriginalID] = vm.ID
-		object.ObjectMeta.Annotations = annotations
+	}
+
+	// MAC address conflicts are handled by namespace-level kubemacpool exclusion in EnsureVM()
+	// This follows Red Hat OpenShift Virtualization best practices for production environments
+	// Reference: https://docs.redhat.com/en/documentation/openshift_container_platform/4.8/html-single/openshift_virtualization/index#virt-4-8-changes
+
+	if len(annotations) > 0 {
+		// Merge annotations instead of overwriting to preserve existing ones
+		if object.ObjectMeta.Annotations == nil {
+			object.ObjectMeta.Annotations = make(map[string]string)
+		}
+		for k, v := range annotations {
+			object.ObjectMeta.Annotations[k] = v
+		}
+		r.Log.V(1).Info("Merged VM annotations",
+			"vm", vm.Name,
+			"added", len(annotations),
+			"total", len(object.ObjectMeta.Annotations),
+			"annotations", object.ObjectMeta.Annotations)
+	} else {
+		r.Log.V(1).Info("No annotations to merge on VM", "vm", vm.Name)
 	}
 
 	// Assign the determined run strategy to the object

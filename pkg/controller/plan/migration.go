@@ -20,6 +20,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/controller/plan/migrator"
+	"github.com/kubev2v/forklift/pkg/controller/plan/namespace"
 	"github.com/kubev2v/forklift/pkg/controller/plan/scheduler"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 
@@ -300,6 +301,8 @@ func (r *Migration) Archive() {
 		_ = r.cleanup(vm, dontFailOnError)
 		r.migrator.Complete(vm)
 	}
+
+	r.cleanupKubemacpoolExclusion("plan archival")
 }
 
 func (r *Migration) SetPopulatorDataSourceLabels() {
@@ -369,6 +372,8 @@ func (r *Migration) Cancel() error {
 			markStartedStepsCompleted(vm)
 		}
 	}
+
+	r.cleanupKubemacpoolExclusion("plan cancellation")
 
 	return nil
 }
@@ -1443,6 +1448,10 @@ func (r *Migration) end() (completed bool, err error) {
 			})
 	}
 
+	// Remove kubemacpool exclusion label after migration completion
+	// (regardless of success, failure, or cancellation)
+	r.cleanupKubemacpoolExclusion("migration completion")
+
 	completed = true
 	return
 }
@@ -1899,6 +1908,15 @@ func (r *Migration) setPopulatorPodsWithLabels(vm *plan.VMStatus, migrationID st
 				}
 			}
 		}
+	}
+}
+
+// cleanupKubemacpoolExclusion removes kubemacpool exclusion label and logs the result.
+func (r *Migration) cleanupKubemacpoolExclusion(reason string) {
+	if removed, err := namespace.RemoveKubemacpoolExclusion(r.Context); err != nil {
+		r.Log.Error(err, "Failed to remove kubemacpool exclusion label", "namespace", r.Plan.Spec.TargetNamespace, "planUID", string(r.Plan.UID), "reason", reason)
+	} else if removed {
+		r.Log.V(1).Info("Successfully removed kubemacpool exclusion label", "namespace", r.Plan.Spec.TargetNamespace, "planUID", string(r.Plan.UID), "reason", reason)
 	}
 }
 
