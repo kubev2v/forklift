@@ -145,20 +145,46 @@ The vSphere user requires a role with the following privileges (a role named `St
 
 # Secret with storage provider credentials
 
-Create a secret where the migration provider is setup, usually openshift-mtv
-and put the credentials of the storage system. All of the provider are required
-to have a secret with those required fields
+Create a secret in the namespace where the migration provider is setup, usually in openshift-mtv
+and put the credentials of the storage system. All the providers are required
+to have a secret with those required fields:
 
-```
 STORAGE_HOSTNAME
 STORAGE_USERNAME
 STORAGE_PASSWORD
 STORAGE_SKIP_SSL_VERIFICATION
+
+It must also contain the following environment variables:
+
+## vSphere Provider Settings
+| Key | Required/Optional | Description |
+|-----|-------------------|-------------|
+| GOVMOMI_HOSTNAME | Required | vSphere's API hostname |
+| GOVMOMI_USERNAME | Required | vSphere's API username |
+| GOVMOMI_PASSWORD | Required | vSphere's API password |
+| ESXI_CLONE_METHOD | Optional | ESXi clone method: 'ssh' (default) or 'vib' |
+
+The `ESXI_CLONE_METHOD` setting can be configured in the Provider settings using the `esxiCloneMethod` key:
+
+```yaml
+apiVersion: forklift.konveyor.io/v1beta1
+kind: Provider
+metadata:
+  name: my-vsphere-provider
+  namespace: openshift-mtv
+spec:
+  type: vsphere
+  url: https://vcenter.example.com
+  secret:
+    name: vsphere-credentials
+    namespace: openshift-mtv
+  settings:
+    `esxiCloneMethod`: "vib"  # or "ssh". The deafult is "vib"
 ```
 
-Provider specific entries in the secret shall be documented below:
+## Storage Vendor Specific Settings
 
-## Hitachi Vantara
+### Hitachi Vantara
 - see [README](internal/vantara/README.md)
 
 ## NetApp ONTAP
@@ -213,8 +239,9 @@ from the ConfigMap under the 'powermax' namespace, which the CSI driver uses.
   ```
   CLI Fault: The object or item referred to could not be found. <obj xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="urn:vim25" versionId="5.0" xsi:type="LocalizedMethodFault"><fault xsi:type="NotFound"></fault><localizedMessage>The object or item referred to could not be found.</localizedMessage></obj>
   ```
-  
-    resolution: ssh into the ESXi and run `/etc/init.d/hostd restart`. Wait for few seconds till the ESX renews the connection with vSphere.
+
+  resolution: ssh into the ESXi and run `/etc/init.d/hostd restart`. Wait for few seconds till the ESX renews the connection with vSphere.
+
 
 ## NetApp
 - Error `cannot derive SVM to use; please specify SVM in config file`

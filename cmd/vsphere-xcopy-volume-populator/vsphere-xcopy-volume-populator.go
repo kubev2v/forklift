@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/client-go/util/cert"
@@ -52,6 +54,7 @@ var (
 	vsphereHostname            string
 	vsphereUsername            string
 	vspherePassword            string
+	esxiCloneMethod            string
 
 	// kube args
 	httpEndpoint string
@@ -121,9 +124,32 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	p, err := populator.NewWithRemoteEsxcli(storageApi, vsphereHostname, vsphereUsername, vspherePassword)
-	if err != nil {
-		klog.Fatalf("Failed to create a remote esxcli populator: %s", err)
+	var p populator.Populator
+
+	// Determine clone method - default to VIB unless SSH is explicitly set
+	method := strings.ToLower(strings.TrimSpace(esxiCloneMethod))
+	useVibMethod := method == "" || method == "vib"
+
+	if useVibMethod {
+		klog.Infof("Using VIB method for ESXi cloning")
+		vibP, err := populator.NewWithRemoteEsxcli(storageApi, vsphereHostname, vsphereUsername, vspherePassword)
+		if err != nil {
+			klog.Fatalf("Failed to create VIB-based remote esxcli populator: %s", err)
+		}
+		p = vibP
+	} else {
+		klog.Infof("Using SSH method for ESXi cloning")
+		// Get SSH keys from environment variables set by provider controller
+		sshPrivateKey, sshPublicKey, err := getSSHKeysFromEnvironment()
+		if err != nil {
+			klog.Fatalf("Failed to get SSH keys from environment: %s", err)
+		}
+
+		sshP, err := populator.NewWithRemoteEsxcliSSH(storageApi, vsphereHostname, vsphereUsername, vspherePassword, sshPrivateKey, sshPublicKey)
+		if err != nil {
+			klog.Fatalf("Failed to create SSH-based remote esxcli populator: %s", err)
+		}
+		p = sshP
 	}
 
 	pv, err := getPv(clientSet, targetNamespace, ownerName)
@@ -231,6 +257,7 @@ func handleArgs() {
 	flag.StringVar(&vsphereHostname, "vsphere-hostname", os.Getenv("GOVMOMI_HOSTNAME"), "vSphere's API hostname")
 	flag.StringVar(&vsphereUsername, "vsphere-username", os.Getenv("GOVMOMI_USERNAME"), "vSphere's API username")
 	flag.StringVar(&vspherePassword, "vsphere-password", os.Getenv("GOVMOMI_PASSWORD"), "vSphere's API password")
+	flag.StringVar(&esxiCloneMethod, "esxi-clone-method", os.Getenv("ESXI_CLONE_METHOD"), "ESXi clone method: 'vib' (default) or 'ssh'")
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 	// Metrics args
@@ -320,4 +347,27 @@ func setupTracing() (*prometheus.CounterVec, error) {
 
 	return progressCounter, nil
 
+}
+
+// getSSHKeysFromEnvironment retrieves SSH keys from environment variables set by the provider controller
+func getSSHKeysFromEnvironment() ([]byte, []byte, error) {
+	sshPrivateKeyEnv := os.Getenv("SSH_PRIVATE_KEY")
+	sshPublicKeyEnv := os.Getenv("SSH_PUBLIC_KEY")
+
+	if sshPrivateKeyEnv == "" || sshPublicKeyEnv == "" {
+		return nil, nil, fmt.Errorf("SSH keys not found in environment variables - ensure provider controller has set SSH_PRIVATE_KEY and SSH_PUBLIC_KEY")
+	}
+
+	privateKeyBytes, err := base64.StdEncoding.DecodeString(sshPrivateKeyEnv)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to decode SSH private key from environment: %w", err)
+	}
+
+	publicKeyBytes, err := base64.StdEncoding.DecodeString(sshPublicKeyEnv)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to decode SSH public key from environment: %w", err)
+	}
+
+	klog.Infof("Successfully retrieved SSH keys from environment variables")
+	return privateKeyBytes, publicKeyBytes, nil
 }
