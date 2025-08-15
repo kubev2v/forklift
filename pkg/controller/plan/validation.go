@@ -171,11 +171,6 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 		return err
 	}
 
-	// Validate PVC name template
-	if err := r.validatePVCNameTemplate(plan); err != nil {
-		return err
-	}
-
 	// Validate volume name template
 	if err := r.validateVolumeNameTemplate(plan); err != nil {
 		return err
@@ -184,24 +179,6 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	// Validate network name template
 	if err := r.validateNetworkNameTemplate(plan); err != nil {
 		return err
-	}
-
-	return nil
-}
-
-func (r *Reconciler) validatePVCNameTemplate(plan *api.Plan) error {
-	if err := r.IsValidPVCNameTemplate(plan.Spec.PVCNameTemplate); err != nil {
-		invalidPVCNameTemplate := libcnd.Condition{
-			Type:     NotValid,
-			Status:   True,
-			Category: api.CategoryCritical,
-			Message:  "PVC name template is invalid.",
-			Items:    []string{},
-		}
-
-		plan.Status.SetCondition(invalidPVCNameTemplate)
-
-		r.Log.Info("PVC name template is invalid", "error", err.Error(), "plan", plan.Name, "namespace", plan.Namespace)
 	}
 
 	return nil
@@ -773,9 +750,19 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			}
 		}
 		// is valid vm pvc name template
-		if vm.PVCNameTemplate != "" {
-			if err := r.IsValidPVCNameTemplate(vm.PVCNameTemplate); err != nil {
-				pvcNameInvalid.Items = append(pvcNameInvalid.Items, ref.String())
+		if plan.Spec.PVCNameTemplate != "" || vm.PVCNameTemplate != "" {
+			// if vm level pvc name template is set, use it, otherwise use plan level pvc name template
+			pvcNameTemplate := plan.Spec.PVCNameTemplate
+			if vm.PVCNameTemplate != "" {
+				pvcNameTemplate = vm.PVCNameTemplate
+			}
+
+			// validate pvc name template for the vm
+			if _, err := validator.PVCNameTemplate(vm.Ref, pvcNameTemplate); err != nil {
+				r.Log.Info("PVC name template is invalid", "error", err.Error(), "template", pvcNameTemplate, "plan", plan.Name, "namespace", plan.Namespace)
+
+				conditionItem := fmt.Sprintf("%s template:%s error:%s", ref.String(), pvcNameTemplate, err.Error())
+				pvcNameInvalid.Items = append(pvcNameInvalid.Items, conditionItem)
 			}
 		}
 		// is valid vm pvc name template
@@ -1378,46 +1365,15 @@ func (r *Reconciler) IsValidTemplate(templateStr string, testData interface{}) (
 	// Execute the template with test data
 	result, err := templateutil.ExecuteTemplate(templateStr, testData)
 	if err != nil {
-		return "", liberr.Wrap(err, "Template execution failed")
+		return "", liberr.Wrap(err, "template", templateStr)
 	}
 
 	// Empty output is not valid
 	if result == "" {
-		return "", liberr.New("Template output is empty")
+		return "", liberr.New("Template output is empty", "template", templateStr)
 	}
 
 	return result, nil
-}
-
-func (r *Reconciler) IsValidPVCNameTemplate(pvcNameTemplate string) error {
-	if pvcNameTemplate == "" {
-		return nil
-	}
-
-	// Test template with sample data
-	testData := api.PVCNameTemplateData{
-		VmName:         "test-vm",
-		PlanName:       "test-plan",
-		DiskIndex:      0,
-		RootDiskIndex:  0,
-		Shared:         false,
-		FileName:       "[test07_ds1] test_sp/test-000001.vmdk",
-		WinDriveLetter: "c",
-	}
-
-	result, err := r.IsValidTemplate(pvcNameTemplate, testData)
-	if err != nil {
-		return err
-	}
-
-	// Validate that template output is a valid k8s label
-	errs := k8svalidation.IsDNS1123Label(result)
-	if len(errs) > 0 {
-		errMsg := fmt.Sprintf("Template output is not a valid k8s label [%s]", result)
-		return liberr.New(errMsg, errs)
-	}
-
-	return nil
 }
 
 func (r *Reconciler) IsValidVolumeNameTemplate(volumeNameTemplate string) error {
@@ -1439,7 +1395,7 @@ func (r *Reconciler) IsValidVolumeNameTemplate(volumeNameTemplate string) error 
 	errs := k8svalidation.IsDNS1123Label(result)
 	if len(errs) > 0 {
 		errMsg := fmt.Sprintf("Template output is not a valid k8s label [%s]", result)
-		return liberr.New(errMsg, errs)
+		return liberr.New(errMsg, "template", volumeNameTemplate, "errors", errs)
 	}
 
 	return nil
@@ -1466,7 +1422,7 @@ func (r *Reconciler) IsValidNetworkNameTemplate(networkNameTemplate string) erro
 	errs := k8svalidation.IsDNS1123Label(result)
 	if len(errs) > 0 {
 		errMsg := fmt.Sprintf("Template output is not a valid k8s label [%s]", result)
-		return liberr.New(errMsg, errs)
+		return liberr.New(errMsg, "template", networkNameTemplate, "errors", errs)
 	}
 
 	return nil

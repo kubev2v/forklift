@@ -154,6 +154,8 @@ type Validator interface {
 	SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, msg string, category string, err error)
 	// Validate that the vm has the change tracking enabled
 	ChangeTrackingEnabled(vmRef ref.Ref) (bool, error)
+	// Validate that the PVC name template is valid
+	PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (bool, error)
 }
 
 // DestinationClient API.

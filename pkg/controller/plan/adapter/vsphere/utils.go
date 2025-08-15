@@ -3,6 +3,7 @@ package vsphere
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -14,6 +15,40 @@ import (
 	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+// vSphere datastore path regex patterns
+var (
+	// Matches vSphere datastore format: [datastore]<opt-space>path
+	datastorePattern = regexp.MustCompile(`^\[([^\]]+)\]\s*(.*)$`)
+	// Matches filename at end of path (after last / or \)
+	filenamePattern = regexp.MustCompile(`[^/\\]*$`)
+)
+
+// extractDiskFileName extracts the filename from a vSphere disk file path.
+// Input:  "[datastore1] folder/vm-disk.vmdk"
+// Output: "vm-disk.vmdk"
+func extractDiskFileName(diskPath string) string {
+	if diskPath == "" {
+		return ""
+	}
+
+	path := diskPath
+
+	// Handle vSphere datastore format: [datastore] path
+	if matches := datastorePattern.FindStringSubmatch(diskPath); len(matches) == 3 {
+		path = matches[2] // Extract the path part after "[datastore]"
+		path = strings.TrimSpace(path)
+	}
+
+	// If path ends with separator, it's a directory - return empty
+	if strings.HasSuffix(path, "/") || strings.HasSuffix(path, "\\") {
+		return ""
+	}
+
+	// Extract filename using regex (everything after last / or \)
+	filename := filenamePattern.FindString(path)
+	return filename
+}
 
 // Return PersistentVolumeClaims associated with a VM.
 func getDisksPvc(disk vsphere.Disk, pvcs []*core.PersistentVolumeClaim, warm bool) *core.PersistentVolumeClaim {

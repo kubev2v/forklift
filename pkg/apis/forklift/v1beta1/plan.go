@@ -56,10 +56,10 @@ type PlanSpec struct {
 	//   - .VmName: name of the VM
 	//   - .PlanName: name of the migration plan
 	//   - .DiskIndex: initial volume index of the disk
-	//   - .WinDriveLetter: Windows drive letter (lower case, if applicable, e.g. "c", require guest agent)
+	//   - .WinDriveLetter: Windows drive letter (lowercase, if applicable, e.g. "c", requires guest agent)
 	//   - .RootDiskIndex: index of the root disk
 	//   - .Shared: true if the volume is shared by multiple VMs, false otherwise
-	//   - .FileName: name of the file in the source provider (vmWare only, require guest agent)
+	//   - .FileName: name of the file in the source provider (VMware only, filename includes the .vmdk suffix)
 	// Note:
 	//   This template can be overridden at the individual VM level.
 	// Examples:

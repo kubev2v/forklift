@@ -130,3 +130,9 @@ func (r *Validator) ChangeTrackingEnabled(vmRef ref.Ref) (bool, error) {
 	// Validate that the vm has the change tracking enabled
 	return true, nil
 }
+
+// NO-OP
+func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (ok bool, err error) {
+	ok = true
+	return
+}
