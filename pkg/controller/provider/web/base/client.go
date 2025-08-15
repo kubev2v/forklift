@@ -340,7 +340,7 @@ func (c *RestClient) url(path string) string {
 	path = (&Handler{}).Link(path, c.Params)
 	url, _ := liburl.Parse(path)
 	if url.Host == "" {
-		url.Scheme = "https"
+		url.Scheme = Settings.Inventory.Scheme
 		url.Host = c.Host
 	}
 

@@ -12,6 +12,11 @@ const (
 	ServiceCAFile = "/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt"
 )
 
+// DefaultScheme is the default scheme for the inventory service.
+const (
+	DefaultScheme = "https"
+)
+
 // Environment variables.
 const (
 	AllowedOrigins = "CORS_ALLOWED_ORIGINS"
@@ -20,6 +25,7 @@ const (
 	Host           = "API_HOST"
 	Namespace      = "POD_NAMESPACE"
 	Port           = "API_PORT"
+	Scheme         = "INVENTORY_SERVICE_SCHEME"
 	TLSCertificate = "API_TLS_CERTIFICATE"
 	TLSKey         = "API_TLS_KEY"
 	TLSCa          = "API_TLS_CA"
@@ -45,6 +51,8 @@ type Inventory struct {
 	Namespace string
 	// Port
 	Port int
+	// URL Scheme (http or https)
+	Scheme string
 	// TLS
 	TLS struct {
 		// Certificate path
@@ -93,6 +101,18 @@ func (r *Inventory) Load() error {
 		r.Port, _ = strconv.Atoi(s)
 	} else {
 		r.Port = 8080
+	}
+	// Scheme
+	if s, found := os.LookupEnv(Scheme); found {
+		s = strings.ToLower(strings.TrimSpace(s))
+		switch s {
+		case "http", "https":
+			r.Scheme = s
+		default:
+			r.Scheme = DefaultScheme
+		}
+	} else {
+		r.Scheme = DefaultScheme
 	}
 	// TLS
 	if s, found := os.LookupEnv(TLSCertificate); found {
