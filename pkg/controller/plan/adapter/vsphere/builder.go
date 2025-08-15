@@ -605,7 +605,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 				DiskIndex:      diskIndex,
 				RootDiskIndex:  rootDiskIndex,
 				Shared:         disk.Shared,
-				FileName:       disk.File,
+				FileName:       extractDiskFileName(disk.File),
 				WinDriveLetter: disk.WinDriveLetter,
 			}
 
