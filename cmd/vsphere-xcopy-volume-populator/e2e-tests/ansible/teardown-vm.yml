@@ -1,0 +1,264 @@
+---
+# Ansible playbook to teardown and remove test VMs for vSphere XCOPY testing
+
+- name: Teardown Test VM for vSphere XCOPY
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    ansible_python_interpreter: /opt/venv/bin/python
+    vm_name: "{{ lookup('env', 'VM_NAME') }}"
+    vsphere_host: "{{ lookup('env', 'VSPHERE_HOST') }}"
+    vsphere_username: "{{ lookup('env', 'VSPHERE_USERNAME') }}"
+    vsphere_password: "{{ lookup('env', 'VSPHERE_PASSWORD') }}"
+    datacenter: "{{ lookup('env', 'VSPHERE_DATACENTER') }}"
+    force_delete: "{{ lookup('env', 'FORCE_DELETE') | default('false') | bool }}"
+
+  tasks:
+    - name: Validate required environment variables
+      ansible.builtin.assert:
+        that:
+          - vm_name != ""
+          - vsphere_host != ""
+          - vsphere_username != ""
+          - vsphere_password != ""
+          - datacenter != ""
+        fail_msg: >
+          Required environment variables are not set. VM_NAME, VSPHERE_HOST, VSPHERE_USERNAME,
+          VSPHERE_PASSWORD, and VSPHERE_DATACENTER must be provided.
+
+    - name: Display teardown information
+      ansible.builtin.debug:
+        msg:
+          - "Tearing down VM: {{ vm_name }}"
+          - "vCenter: {{ vsphere_host }}"
+          - "Datacenter: {{ datacenter }}"
+          - "Force delete: {{ force_delete }}"
+
+    - name: Check if VM exists
+      community.vmware.vmware_guest_info:
+        hostname: "{{ vsphere_host }}"
+        username: "{{ vsphere_username }}"
+        password: "{{ vsphere_password }}"
+        validate_certs: false
+        name: "{{ vm_name }}"
+        datacenter: "{{ datacenter }}"
+      register: vm_info
+      ignore_errors: true
+
+    - name: VM not found
+      ansible.builtin.debug:
+        msg: "VM '{{ vm_name }}' not found or already deleted"
+      when: vm_info is failed
+
+    - name: Process VM deletion
+      when: vm_info is succeeded
+      block:
+        - name: Display VM information before deletion
+          ansible.builtin.debug:
+            msg:
+              - "VM found: {{ vm_name }}"
+              - "Power State: {{ vm_info.instance.hw_power_status }}"
+              - "IP Address: {{ vm_info.instance.ipv4 | default('N/A') }}"
+              - "UUID: {{ vm_info.instance.hw_product_uuid }}"
+
+        - name: Confirm deletion (interactive mode)
+          ansible.builtin.pause:
+            prompt: |
+              ============================================
+              WARNING: About to delete VM '{{ vm_name }}'
+              ============================================
+
+              VM Details:
+              - Name: {{ vm_name }}
+              - Power State: {{ vm_info.instance.hw_power_status }}
+              - IP: {{ vm_info.instance.ipv4 | default('N/A') }}
+
+              This action cannot be undone!
+
+              Do you want to continue? (yes/no)
+          register: deletion_confirmation
+          when: not force_delete
+
+        - name: Check deletion confirmation
+          ansible.builtin.fail:
+            msg: "VM deletion cancelled by user"
+          when: not force_delete and (deletion_confirmation.user_input | lower != 'yes')
+
+        - name: Power off VM (graceful shutdown first)
+          community.vmware.vmware_guest_powerstate:
+            hostname: "{{ vsphere_host }}"
+            username: "{{ vsphere_username }}"
+            password: "{{ vsphere_password }}"
+            validate_certs: false
+            name: "{{ vm_name }}"
+            state: shutdown-guest
+          register: graceful_shutdown
+          ignore_errors: true
+          when: vm_info.instance.hw_power_status == "poweredOn"
+
+        - name: Wait for graceful shutdown
+          ansible.builtin.wait_for:
+            timeout: 60
+          when: vm_info.instance.hw_power_status == "poweredOn" and not graceful_shutdown.failed
+
+        - name: Force power off VM if graceful shutdown failed
+          community.vmware.vmware_guest_powerstate:
+            hostname: "{{ vsphere_host }}"
+            username: "{{ vsphere_username }}"
+            password: "{{ vsphere_password }}"
+            validate_certs: false
+            name: "{{ vm_name }}"
+            state: powered-off
+          when: vm_info.instance.hw_power_status == "poweredOn"
+
+        - name: Verify VM is powered off
+          community.vmware.vmware_guest_info:
+            hostname: "{{ vsphere_host }}"
+            username: "{{ vsphere_username }}"
+            password: "{{ vsphere_password }}"
+            validate_certs: false
+            name: "{{ vm_name }}"
+            datacenter: "{{ datacenter }}"
+          register: vm_power_check
+          until: vm_power_check.instance.hw_power_status == "poweredOff"
+          retries: 10
+          delay: 10
+
+        - name: Delete VM and all associated files
+          community.vmware.vmware_guest:
+            hostname: "{{ vsphere_host }}"
+            username: "{{ vsphere_username }}"
+            password: "{{ vsphere_password }}"
+            validate_certs: false
+            name: "{{ vm_name }}"
+            datacenter: "{{ datacenter }}"
+            state: absent
+            force: true
+          register: vm_deletion
+
+        - name: Verify VM deletion
+          community.vmware.vmware_guest_info:
+            hostname: "{{ vsphere_host }}"
+            username: "{{ vsphere_username }}"
+            password: "{{ vsphere_password }}"
+            validate_certs: false
+            name: "{{ vm_name }}"
+            datacenter: "{{ datacenter }}"
+          register: vm_verify_deletion
+          ignore_errors: true
+
+        - name: Confirm successful deletion
+          ansible.builtin.debug:
+            msg: "VM '{{ vm_name }}' has been successfully deleted"
+          when: vm_verify_deletion.failed
+
+        - name: Warning if VM still exists
+          ansible.builtin.debug:
+            msg: "WARNING: VM '{{ vm_name }}' may still exist in vCenter"
+          when:
+            - not vm_verify_deletion.failed
+            - not vm_info.failed
+
+    - name: Clean up local VM info file
+      ansible.builtin.file:
+        path: "./vm_info_{{ vm_name }}.env"
+        state: absent
+      failed_when: false
+
+    - name: Clean up any test artifacts
+      ansible.builtin.find:
+        paths: "."
+        patterns: "*{{ vm_name }}*"
+        file_type: file
+      register: found_test_artifacts
+
+    - name: Delete found test artifacts
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ found_test_artifacts.files }}"
+      when: found_test_artifacts.matched > 0
+      failed_when: false
+
+    - name: Display completion message
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "VM Teardown Complete!"
+          - "VM Name: {{ vm_name }}"
+          - "Status: {{ 'Deleted' if not vm_info.failed else 'Not Found' }}"
+          - "Local files cleaned up"
+          - "=========================================="
+
+# Additional teardown tasks for cleanup
+- name: Cleanup Multiple VMs (if pattern provided)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    ansible_python_interpreter: /opt/venv/bin/python
+    vm_pattern: "{{ lookup('env', 'VM_PATTERN') }}"
+    vsphere_host: "{{ lookup('env', 'VSPHERE_HOST') }}"
+    vsphere_username: "{{ lookup('env', 'VSPHERE_USERNAME') }}"
+    vsphere_password: "{{ lookup('env', 'VSPHERE_PASSWORD') }}"
+    datacenter: "{{ lookup('env', 'VSPHERE_DATACENTER') }}"
+
+  tasks:
+    - name: Find VMs matching pattern
+      community.vmware.vmware_vm_info:
+        hostname: "{{ vsphere_host }}"
+        username: "{{ vsphere_username }}"
+        password: "{{ vsphere_password }}"
+        validate_certs: false
+      register: all_vms
+      when: vm_pattern != ""
+
+    - name: Filter VMs by pattern
+      ansible.builtin.set_fact:
+        matching_vms: "{{ all_vms.virtual_machines | selectattr('guest_name', 'match', '.*' + vm_pattern + '.*') | list }}"
+      when: all_vms.virtual_machines is defined and all_vms.virtual_machines
+
+    - name: Display matching VMs
+      ansible.builtin.debug:
+        msg: "Found {{ matching_vms | length }} VMs matching pattern '{{ vm_pattern }}'"
+      when: vm_pattern != "" and matching_vms is defined
+
+    - name: Confirm bulk deletion
+      ansible.builtin.pause:
+        prompt: |
+
+          ============================================
+          WARNING: Bulk VM Deletion
+          ============================================
+
+          Found {{ matching_vms | length }} VMs matching pattern '{{ vm_pattern }}'
+
+          VM Names:
+          {% for vm in matching_vms %}
+          - {{ vm.guest_name }}
+          {% endfor %}
+
+          This will DELETE ALL matching VMs!
+          This action cannot be undone!
+
+          Do you want to continue? (yes/no)
+      register: bulk_deletion_confirmation
+      when: vm_pattern != "" and matching_vms is defined and matching_vms | length > 0
+
+    - name: Delete matching VMs
+      community.vmware.vmware_guest:
+        hostname: "{{ vsphere_host }}"
+        username: "{{ vsphere_username }}"
+        password: "{{ vsphere_password }}"
+        validate_certs: false
+        name: "{{ item.guest_name }}"
+        datacenter: "{{ datacenter }}"
+        state: absent
+        force: true
+      loop: "{{ matching_vms }}"
+      when:
+        - vm_pattern != ""
+        - matching_vms is defined
+        - (matching_vms | length) > 0
+        - (bulk_deletion_confirmation.user_input | lower) == 'yes'
