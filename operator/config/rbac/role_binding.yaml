@@ -9,4 +9,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: forklift-operator
-  namespace: konveyor-forklift
+  namespace: system
