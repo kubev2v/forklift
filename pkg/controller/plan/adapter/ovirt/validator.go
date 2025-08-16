@@ -254,3 +254,11 @@ func (r *Validator) VMMigrationType(vmRef ref.Ref) (ok bool, err error) {
 	ok = true
 	return
 }
+
+// Guest tools validation is not applicable for oVirt (uses VirtIO drivers).
+func (r *Validator) GuestToolsInstalled(vmRef ref.Ref) (ok bool, msg string, category string, err error) {
+	// oVirt uses VirtIO drivers which are handled differently
+	// No validation needed for guest tools in oVirt
+	ok = true
+	return
+}

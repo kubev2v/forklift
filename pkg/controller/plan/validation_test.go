@@ -196,6 +196,7 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			ginkgo.Entry("template with uppercase characters (invalid K8s name)", "DISK-{{.VmName}}", false),
 		)
 	})
+
 })
 
 //nolint:errcheck
