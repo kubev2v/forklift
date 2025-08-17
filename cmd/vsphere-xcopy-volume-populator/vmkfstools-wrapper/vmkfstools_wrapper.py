@@ -85,7 +85,7 @@ def taskGet(args):
                   "exitCode": "1", "lastLine": line.rstrip(), "stdErr": e}
         print(XML.format("1", json.dumps(result)))
         return
-    if was_xcopy_used(args.target_lun):
+    if was_xcopy_used(os.path.basename(args.target_lun)):
         xcopy_used = "XCopy was used"
     else:
         xcopy_used = "XCopy was not used"
