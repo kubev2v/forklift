@@ -168,6 +168,8 @@ type Validator interface {
 	InvalidDiskSizes(vmRef ref.Ref) ([]string, error)
 	// Validate that the VM MAC addresses don't conflict with existing destination VMs.
 	MacConflicts(vmRef ref.Ref) ([]MacConflict, error)
+	// Validate that the PVC name template is valid
+	PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (bool, error)
 }
 
 // DestinationClient API.

@@ -254,3 +254,9 @@ func (r *Validator) VMMigrationType(vmRef ref.Ref) (ok bool, err error) {
 	ok = true
 	return
 }
+
+// NO-OP
+func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (ok bool, err error) {
+	ok = true
+	return
+}

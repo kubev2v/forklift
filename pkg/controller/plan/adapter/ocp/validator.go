@@ -384,3 +384,9 @@ func (r *KubeVirt) FeatureGate(feature string) (enabled bool) {
 	}
 	return
 }
+
+// NO-OP
+func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (ok bool, err error) {
+	ok = true
+	return
+}
