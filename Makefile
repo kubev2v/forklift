@@ -38,6 +38,7 @@ OVIRT_OS_MAP ?= forklift-ovirt-osmap
 VIRT_CUSTOMIZE_MAP ?= forklift-virt-customize
 METRICS_PORT ?= 8888
 METRICS_PORT_INVENTORY ?= 8889
+INVENTORY_SERVICE_SCHEME ?= http
 
 # Use OPM_OPTS="--use-http" when using a non HTTPS registry
 # Use OPM_OPTS="--skip-tls-verify" when using an HTTPS registry with self-signed certificate
@@ -126,20 +127,28 @@ e2e-sanity-ova:
 forklift-controller: generate fmt vet
 	go build -o bin/forklift-controller github.com/kubev2v/forklift/cmd/forklift-controller
 
+# Ensure temporary directories for forklift services
+.PHONY: ensure-temp-dirs
+ensure-temp-dirs:
+	install -d -m 700 /tmp/forklift-controller
+	install -d -m 700 /tmp/forklift-inventory
+
 # Run against the configured Kubernetes cluster in ~/.kube/config
 .PHONY: run
-run: generate fmt vet
+run: generate fmt vet ensure-temp-dirs
 	VSPHERE_OS_MAP=$(VSPHERE_OS_MAP) \
 	OVIRT_OS_MAP=$(OVIRT_OS_MAP) \
 	VIRT_V2V_IMAGE=$(VIRT_V2V_IMAGE) \
 	VIRT_CUSTOMIZE_MAP=$(VIRT_CUSTOMIZE_MAP) \
 	METRICS_PORT=$(METRICS_PORT) \
 	AUTH_REQUIRED=false \
+	INVENTORY_SERVICE_SCHEME=$(INVENTORY_SERVICE_SCHEME) \
+	WORKING_DIR=/tmp/forklift-controller \
 		KUBEVIRT_CLIENT_GO_SCHEME_REGISTRATION_VERSION=v1 go run ./cmd/forklift-controller/main.go
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 .PHONY: run-inventory
-run-inventory: generate fmt vet
+run-inventory: generate fmt vet ensure-temp-dirs
 	VSPHERE_OS_MAP=$(VSPHERE_OS_MAP) \
 	OVIRT_OS_MAP=$(OVIRT_OS_MAP) \
 	VIRT_V2V_IMAGE=$(VIRT_V2V_IMAGE) \
@@ -147,6 +156,8 @@ run-inventory: generate fmt vet
 	METRICS_PORT=$(METRICS_PORT_INVENTORY) \
 	ROLE=inventory \
 	AUTH_REQUIRED=false \
+	INVENTORY_SERVICE_SCHEME=$(INVENTORY_SERVICE_SCHEME) \
+	WORKING_DIR=/tmp/forklift-inventory \
 		KUBEVIRT_CLIENT_GO_SCHEME_REGISTRATION_VERSION=v1 go run ./cmd/forklift-controller/main.go
 
 # Install CRDs into a cluster
