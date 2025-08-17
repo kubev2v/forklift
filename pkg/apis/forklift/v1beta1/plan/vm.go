@@ -105,6 +105,16 @@ type VM struct {
 	// +optional
 	// +kubebuilder:validation:Enum=on;off;auto
 	TargetPowerState TargetPowerState `json:"targetPowerState,omitempty"`
+	// DeleteVmOnFailMigration controls whether the target VM created by this Plan is deleted when a migration fails.
+	// When true and the migration fails after the target VM has been created, the controller
+	// will delete the target VM (and related target-side resources) during failed-migration cleanup
+	// and when the Plan is deleted. When false (default), the target VM is preserved to aid
+	// troubleshooting. The source VM is never modified.
+	//
+	// Note: If the Plan-level option is set to true, the VM-level option will be ignored.
+	//
+	// +optional
+	DeleteVmOnFailMigration bool `json:"deleteVmOnFailMigration,omitempty"`
 }
 
 // Find a Hook for the specified step.
