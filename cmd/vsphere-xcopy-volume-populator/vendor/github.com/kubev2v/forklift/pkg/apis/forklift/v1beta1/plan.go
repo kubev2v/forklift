@@ -27,37 +27,12 @@ import (
 	cnv "kubevirt.io/api/core/v1"
 )
 
-// MigrationType defines the type of migration to perform
-type MigrationType string
-
-const (
-	// Migration types
-	MigrationCold MigrationType = "cold"
-	MigrationWarm MigrationType = "warm"
-	MigrationLive MigrationType = "live"
-)
-
 // PlanSpec defines the desired state of Plan.
 type PlanSpec struct {
 	// Description
 	Description string `json:"description,omitempty"`
 	// Target namespace.
 	TargetNamespace string `json:"targetNamespace"`
-	// TargetLabels are labels that should be applied to the target virtual machines.
-	// See Pod Labels documentation for more details,
-	// https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#labels
-	TargetLabels map[string]string `json:"targetLabels,omitempty"`
-	// TargetNodeSelector, constrains the scheduler to only schedule VMs on nodes,
-	// which contain the specified labels.
-	// See virtual machine instance NodeSelector documentation for more details,
-	// https://kubevirt.io/user-guide/compute/node_assignment/#nodeselector
-	TargetNodeSelector map[string]string `json:"targetNodeSelector,omitempty"`
-	// TargetAffinity allows specifying hard- and soft-affinity for VMs.
-	// it is possible to write matching rules against workloads (VMs and Pods) and Nodes.
-	// Since VMs are a workload type based on Pods, Pod-affinity affects VMs as well.
-	// See virtual machine instance Affinity documentation for more details,
-	// https://kubevirt.io/user-guide/compute/node_assignment/#affinity-and-anti-affinity
-	TargetAffinity *core.Affinity `json:"targetAffinity,omitempty"`
 	// Providers.
 	Provider provider.Pair `json:"provider"`
 	// Resource mapping.
@@ -65,7 +40,6 @@ type PlanSpec struct {
 	// List of VMs.
 	VMs []plan.VM `json:"vms"`
 	// Whether this is a warm migration.
-	// Deprecated: this field will be deprecated in 2.10. Use Type instead.
 	Warm bool `json:"warm,omitempty"`
 	// The network attachment definition that should be used for disk transfer.
 	TransferNetwork *core.ObjectReference `json:"transferNetwork,omitempty"`
@@ -82,10 +56,10 @@ type PlanSpec struct {
 	//   - .VmName: name of the VM
 	//   - .PlanName: name of the migration plan
 	//   - .DiskIndex: initial volume index of the disk
-	//   - .WinDriveLetter: Windows drive letter (lower case, if applicable, e.g. "c", require guest agent)
+	//   - .WinDriveLetter: Windows drive letter (lowercase, if applicable, e.g. "c", requires guest agent)
 	//   - .RootDiskIndex: index of the root disk
 	//   - .Shared: true if the volume is shared by multiple VMs, false otherwise
-	//   - .FileName: name of the file in the source provider (vmWare only, require guest agent)
+	//   - .FileName: name of the file in the source provider (VMware only, filename includes the .vmdk suffix)
 	// Note:
 	//   This template can be overridden at the individual VM level.
 	// Examples:
@@ -166,10 +140,6 @@ type PlanSpec struct {
 	// - false: Use high-performance VirtIO devices (requires VirtIO drivers already installed in source VM)
 	// +kubebuilder:default:=true
 	UseCompatibilityMode bool `json:"useCompatibilityMode,omitempty"`
-	// Migration type. e.g. "cold", "warm", "live". Supersedes the `warm` boolean if set.
-	// +optional
-	// +kubebuilder:validation:Enum=cold;warm;live
-	Type MigrationType `json:"type,omitempty"`
 	// TargetPowerState specifies the desired power state of the target VM after migration.
 	// - "on": Target VM will be powered on after migration
 	// - "off": Target VM will be powered off after migration
