@@ -127,3 +127,9 @@ func (r *Validator) StaticIPs(vmRef ref.Ref) (bool, error) {
 func (r *Validator) ChangeTrackingEnabled(vmRef ref.Ref) (bool, error) {
 	return true, nil
 }
+
+// NO-OP
+func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (ok bool, err error) {
+	ok = true
+	return
+}

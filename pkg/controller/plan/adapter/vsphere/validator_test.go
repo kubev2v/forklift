@@ -3,7 +3,7 @@ package vsphere
 
 import (
 	v1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
-	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
@@ -41,8 +41,35 @@ func (m *mockInventory) Find(resource interface{}, ref ref.Ref) error {
 		if ref.Name == "not_windows_guest" {
 			res.VM.GuestID = "rhel8_64Guest"
 		}
-		if ref.Name == "missing_from_invetory" {
+		if ref.Name == "missing_from_inventory" {
 			return base.NotFoundError{}
+		}
+	case *model.VM:
+		*res = model.VM{
+			VM1: model.VM1{
+				VM0: model.VM0{
+					ID:   "test-vm-id",
+					Name: "test-vm",
+				},
+				Disks: []vsphere.Disk{
+					{
+						File:           "[datastore1] VMs/test-vm/test-vm-disk1.vmdk",
+						WinDriveLetter: "c",
+						Capacity:       1024,
+					},
+					{
+						File:           "[datastore1] VMs/test-vm/test-vm-disk2.vmdk",
+						WinDriveLetter: "d",
+						Capacity:       2048,
+					},
+				},
+			},
+		}
+		if ref.Name == "missing_from_inventory" {
+			return base.NotFoundError{}
+		}
+		if ref.Name == "empty_disk_vm" {
+			res.VM1.Disks = []vsphere.Disk{}
 		}
 	}
 	return nil
@@ -110,7 +137,33 @@ var _ = Describe("vsphere validation tests", func() {
 			Entry("when the vm have static ips, and the plan set without static ip", "test", false, false),
 			Entry("when the vm doesn't have static ips, and the plan set without static ip, vm is non-windows", "not_windows_guest", false, false),
 			Entry("when the vm doesn't have static ips, and the plan set with static ip, vm is non-windows", "not_windows_guest", true, false),
-			Entry("when the vm doesn't exist", "missing_from_invetory", true, true),
+			Entry("when the vm doesn't exist", "missing_from_inventory", true, true),
+		)
+	})
+
+	Describe("extractDiskFileName", func() {
+		DescribeTable("should extract filename from vSphere disk path",
+			func(input, expected string) {
+				result := extractDiskFileName(input)
+				Expect(result).To(Equal(expected))
+			},
+
+			// Standard vSphere disk paths
+			Entry("datastore with folder", "[datastore1] folder/vm-disk.vmdk", "vm-disk.vmdk"),
+			Entry("datastore without folder", "[datastore1] vm-disk.vmdk", "vm-disk.vmdk"),
+			Entry("nested folders", "[datastore1] folder/subfolder/vm-disk.vmdk", "vm-disk.vmdk"),
+			Entry("windows-style paths", "[datastore1] folder\\vm-disk.vmdk", "vm-disk.vmdk"),
+			Entry("mixed separators", "[datastore1] folder\\subfolder/vm-disk.vmdk", "vm-disk.vmdk"),
+
+			// Edge cases
+			Entry("just filename", "vm-disk.vmdk", "vm-disk.vmdk"),
+			Entry("empty string", "", ""),
+			Entry("path ending with separator", "[datastore1] folder/", ""),
+			Entry("no separators", "vm-disk.vmdk", "vm-disk.vmdk"),
+
+			// Real-world examples
+			Entry("typical vSphere path", "[datastore1] VMs/test-vm/test-vm.vmdk", "test-vm.vmdk"),
+			Entry("shared disk path", "[shared-storage] shared/shared-disk.vmdk", "shared-disk.vmdk"),
 		)
 	})
 })
@@ -123,7 +176,7 @@ func createPlan() *v1beta1.Plan {
 		},
 		Spec: v1beta1.PlanSpec{
 			TargetNamespace: "test",
-			VMs:             []plan.VM{{Ref: ref.Ref{Name: "test"}}},
+			VMs:             []planapi.VM{{Ref: ref.Ref{Name: "test", ID: "test-vm-id"}}},
 		},
 	}
 }
