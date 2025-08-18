@@ -1567,9 +1567,6 @@ func (r *Builder) setPVCNameFromTemplate(objectMeta *metav1.ObjectMeta, vm *mode
 	}
 
 	isWarm := r.Plan.Spec.Warm
-	if r.Plan.Spec.Type == api.MigrationWarm {
-		isWarm = true
-	}
 
 	// Create template data
 	templateData := api.PVCNameTemplateData{
