@@ -15,7 +15,7 @@ import (
 
 const (
 	vibName     = "vmkfstools-wrapper"
-	vibLocation = "/tmp/vmkfstools-wrapper.vib"
+	vibLocation = "/bin/vmkfstools-wrapper.vib"
 )
 
 // VibVersion is set by ldflags
