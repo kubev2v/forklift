@@ -587,61 +587,9 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 		//       matching the disk and PVC index.
 		dv.ObjectMeta.Annotations[planbase.AnnDiskIndex] = fmt.Sprintf("%d", diskIndex)
 
-		// if exists, get the PVC generate name from the PlanSpec, generate the name
-		// and update the GenerateName field in the DataVolume object.
-		pvcNameTemplate := r.getPVCNameTemplate(vm)
-		if pvcNameTemplate != "" {
-			// Get the VM root disk index
-			planVM := r.getPlanVM(vm)
-			rootDiskIndex := 0
-			if planVM != nil {
-				rootDiskIndex = utils.GetBootDiskNumber(planVM.RootDisk)
-			}
-
-			// Create template data
-			templateData := api.PVCNameTemplateData{
-				VmName:         r.getPlenVMSafeName(vm),
-				PlanName:       r.Plan.Name,
-				DiskIndex:      diskIndex,
-				RootDiskIndex:  rootDiskIndex,
-				Shared:         disk.Shared,
-				FileName:       extractDiskFileName(disk.File),
-				WinDriveLetter: disk.WinDriveLetter,
-			}
-
-			generatedName, err := r.executeTemplate(pvcNameTemplate, &templateData)
-			useGenerateName := r.Plan.Spec.PVCNameTemplateUseGenerateName
-
-			// Validate that template output is a valid k8s label
-			errs := k8svalidation.IsDNS1123Label(generatedName)
-			if len(errs) > 0 {
-				// Raise an error if the generated name is not valid
-				err = errors.New("generated PVC name is not valid")
-
-				// Failed to generate PVC name using template
-				r.Log.Info("Failed to generate PVC name using template", "template", pvcNameTemplate, "error", err)
-			}
-
-			if err == nil && generatedName != "" {
-				if useGenerateName {
-					// Ensure generatedName ends with "-"
-					if !strings.HasSuffix(generatedName, "-") {
-						generatedName = generatedName + "-"
-					}
-					dv.ObjectMeta.GenerateName = generatedName
-				} else {
-					// Ensure generatedName does not end with "-"
-					if strings.HasSuffix(generatedName, "-") {
-						generatedName = strings.Trim(generatedName, "-")
-					}
-
-					// Use the generated name as the PVC name
-					dv.ObjectMeta.Name = generatedName
-				}
-			} else {
-				// Failed to generate PVC name using template
-				r.Log.Info("Failed to generate PVC name using template", "template", pvcNameTemplate, "error", err)
-			}
+		// Set PVC name/generateName using template if configured
+		if err := r.setPVCNameFromTemplate(&dv.ObjectMeta, vm, diskIndex, disk); err != nil {
+			r.Log.Info("Failed to set PVC name from template", "error", err)
 		}
 
 		if !useV2vForTransfer && vddkConfigMap != nil {
@@ -743,20 +691,11 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 
 		networkName := fmt.Sprintf("net-%v", numNetworks)
 
-		// If a name template is defined, try to use it
-		networkNameTemplate := r.getNetworkNameTemplate(vm)
-		if networkNameTemplate != "" {
-			templateData := api.NetworkNameTemplateData{
-				NetworkName:      mapped.Destination.Name,
-				NetworkNamespace: mapped.Destination.Namespace,
-				NetworkType:      mapped.Destination.Type,
-				NetworkIndex:     numNetworks,
-			}
-			if generated, err := r.executeTemplate(networkNameTemplate, &templateData); err == nil && generated != "" {
-				networkName = generated
-			} else {
-				r.Log.Info("Failed to generate network name using template, using default", "template", networkNameTemplate, "error", err)
-			}
+		// Generate network name using template if configured
+		if templatedName, templateErr := r.setNetworkNameFromTemplate(vm, mapped, numNetworks); templateErr != nil {
+			r.Log.Info("Failed to generate network name using template, using default", "error", templateErr)
+		} else if templatedName != "" {
+			networkName = templatedName
 		}
 		numNetworks++
 		kNetwork := cnv.Network{Name: networkName}
@@ -930,7 +869,6 @@ func (r *Builder) sortedDisksAsVmware(disks []vsphere.Disk) []vsphere.Disk {
 func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims []*core.PersistentVolumeClaim, object *cnv.VirtualMachineSpec, sortByLibvirt bool) error {
 	var kVolumes []cnv.Volume
 	var kDisks []cnv.Disk
-	var templateErr error
 	var disks []vsphere.Disk
 
 	if sortByLibvirt {
@@ -968,32 +906,21 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 		}
 		volumeName := fmt.Sprintf("vol-%v", i)
 
-		// If the volume name template is set, use it to generate the volume name.
-		volumeNameTemplate := r.getVolumeNameTemplate(vm)
-		if volumeNameTemplate != "" {
-			// Create template data
-			templateData := api.VolumeNameTemplateData{
-				PVCName:     pvc.Name,
-				VolumeIndex: i,
-			}
+		// Generate volume name using template if configured
+		if templatedName, templateErr := r.setVolumeNameFromTemplate(vm, pvc.Name, i); templateErr != nil {
+			// Failed to generate volume name using template
+			r.Log.Info("Failed to generate volume name using template, using default name", "error", templateErr)
+		} else if templatedName != "" {
+			volumeName = templatedName
+		}
 
-			volumeName, templateErr = r.executeTemplate(volumeNameTemplate, &templateData)
-			if templateErr != nil {
-				// Failed to generate volume name using template
-				r.Log.Info("Failed to generate volume name using template, using default name", "template", volumeNameTemplate, "error", templateErr)
+		// Check if the generated name is longer than 63 characters
+		if len(volumeName) > 63 {
+			// If the generated name is longer than 63 characters, trancate it
+			newVolumeName := volumeName[:63]
+			r.Log.Info("Generated volume name is longer than 63 characters, truncating", "volumeName", volumeName, "newVolumeName", newVolumeName)
 
-				// fallback to default name and reset error
-				volumeName = fmt.Sprintf("vol-%v", i)
-			}
-
-			// check if the generated name is longer then 63 characters
-			if len(volumeName) > 63 {
-				// if the generated name is longer then 63 characters, trancate it
-				newVolumeName := volumeName[:63]
-				r.Log.Info("Generated volume name is longer than 63 characters, sanitizing it", "volumeName", volumeName, "newVolumeName", newVolumeName)
-
-				volumeName = newVolumeName
-			}
+			volumeName = newVolumeName
 		}
 
 		volume := cnv.Volume{
@@ -1291,6 +1218,9 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 		return
 	}
 
+	// Get sorted disks to maintain consistent indexing with other parts of the system
+	sortedDisks := r.sortedDisksAsVmware(vm.Disks)
+
 	dsMapIn := r.Context.Map.Storage.Spec.Map
 	for i := range dsMapIn {
 		mapped := &dsMapIn[i]
@@ -1303,7 +1233,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 		}
 
 		pvblock := core.PersistentVolumeBlock
-		for _, disk := range vm.Disks {
+		for diskIndex, disk := range sortedDisks {
 			if disk.Datastore.ID == ds.ID {
 				storageClass := mapped.Destination.StorageClass
 
@@ -1316,13 +1246,10 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 
 				if vsphereInstance == "" || storageVendorProduct == "" || storageVendorSecretRef == "" {
 					return nil, fmt.Errorf(
-						"The offload pluging configuration has missing details. Can't continue with PVC and populator resources creation.")
+						"the offload plugin configuration has missing details, cannot continue with PVC and populator resource creation")
 				}
 
 				namespace := r.Plan.Spec.TargetNamespace
-				// pvs names needs to be less than 63, this leaves 53 chars
-				// for the plan and vm name (2 dashes and 8 chars uuid)
-				commonName := fmt.Sprintf("%s-%s-%s", r.Plan.Name, vm.Name, uuid.New().String()[:8])
 				labels := map[string]string{
 					"migration": string(r.Migration.UID),
 					// we need uniqness and a value which is less than 64 chars, hence using vmRef.id + disk.key
@@ -1332,7 +1259,6 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				r.Log.Info("target namespace for migration", "namespace", namespace)
 				pvc := core.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:        commonName,
 						Namespace:   namespace,
 						Labels:      labels,
 						Annotations: annotations,
@@ -1348,7 +1274,6 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 						DataSourceRef: &core.TypedObjectReference{
 							APIGroup: &api.SchemeGroupVersion.Group,
 							Kind:     api.VSphereXcopyVolumePopulatorKind,
-							Name:     commonName,
 						},
 					},
 				}
@@ -1365,11 +1290,31 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				}
 				pvc.Annotations[planbase.AnnDiskSource] = baseVolume(disk.File, false)
 				pvc.Annotations["copy-offload"] = baseVolume(disk.File, false)
+
+				// Apply PVC template naming if configured, replacing the commonName
+				if err := r.setPVCNameFromTemplate(&pvc.ObjectMeta, vm, diskIndex, disk); err != nil {
+					r.Log.Info("Failed to set PVC name from template for populator volume, using default name", "error", err)
+				}
+
+				// PVC name is the name of the populator, and we can't use generateName for the populator
+				// if generateName is used, we need to remove it and set a deterministic name
+				if pvc.ObjectMeta.GenerateName != "" {
+					// For GenerateName, use the generateName prefix as the populator name
+					pvc.ObjectMeta.Name = strings.TrimSuffix(pvc.ObjectMeta.GenerateName, "-") + "-" + uuid.New().String()[:8]
+					pvc.ObjectMeta.GenerateName = ""
+				}
+
+				// populator name is the name of the populator, and we can't use generateName for the populator
+				populatorName := pvc.ObjectMeta.Name
+
+				// Update DataSourceRef to point to the volume populator
+				pvc.Spec.DataSourceRef.Name = populatorName
+
 				pvcs = append(pvcs, &pvc)
 
 				vp := api.VSphereXcopyVolumePopulator{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      commonName,
+						Name:      populatorName,
 						Namespace: namespace,
 						Labels:    labels,
 					},
@@ -1506,6 +1451,136 @@ func (r *Builder) executeTemplate(templateText string, templateData any) (string
 	return templateutil.ExecuteTemplate(templateText, templateData)
 }
 
+// TemplateConfig defines configuration for template-based naming
+type TemplateConfig struct {
+	Template        string
+	UseGenerateName bool
+	TemplateType    string
+}
+
+// setObjectNameFromTemplate sets the Name or GenerateName field on an object's metadata
+// based on a template and template data. This refactors the common naming logic.
+func (r *Builder) setObjectNameFromTemplate(objectMeta *metav1.ObjectMeta, templateConfig TemplateConfig, templateData any) error {
+	if templateConfig.Template == "" {
+		return nil
+	}
+
+	generatedName, err := r.executeTemplate(templateConfig.Template, templateData)
+	if err != nil {
+		r.Log.Info("Failed to generate name using template",
+			"template", templateConfig.Template,
+			"templateType", templateConfig.TemplateType,
+			"error", err)
+		return err
+	}
+
+	if generatedName == "" {
+		return nil
+	}
+
+	// Validate that template output is a valid k8s label
+	errs := k8svalidation.IsDNS1123Label(generatedName)
+	if len(errs) > 0 {
+		err = errors.New("generated name is not valid")
+		r.Log.Info("Generated name is not a valid k8s label",
+			"template", templateConfig.Template,
+			"templateType", templateConfig.TemplateType,
+			"generatedName", generatedName,
+			"errors", errs,
+			"error", err)
+		return err
+	}
+
+	if templateConfig.UseGenerateName {
+		// Ensure generatedName ends with "-"
+		if !strings.HasSuffix(generatedName, "-") {
+			generatedName = generatedName + "-"
+		}
+		objectMeta.GenerateName = generatedName
+	} else {
+		// Ensure generatedName does not end with "-"
+		if strings.HasSuffix(generatedName, "-") {
+			generatedName = strings.Trim(generatedName, "-")
+		}
+		objectMeta.Name = generatedName
+	}
+
+	return nil
+}
+
+// setPVCNameFromTemplate sets PVC name/generateName using the PVC template
+func (r *Builder) setPVCNameFromTemplate(objectMeta *metav1.ObjectMeta, vm *model.VM, diskIndex int, disk vsphere.Disk) error {
+	pvcNameTemplate := r.getPVCNameTemplate(vm)
+	if pvcNameTemplate == "" {
+		return nil
+	}
+
+	// Get the VM root disk index
+	planVM := r.getPlanVM(vm)
+	rootDiskIndex := 0
+	if planVM != nil {
+		rootDiskIndex = utils.GetBootDiskNumber(planVM.RootDisk)
+	}
+
+	isWarm := r.Plan.Spec.Warm
+	if r.Plan.Spec.Type == api.MigrationWarm {
+		isWarm = true
+	}
+
+	// Create template data
+	templateData := api.PVCNameTemplateData{
+		VmName:         r.getPlanVMSafeName(vm),
+		PlanName:       r.Plan.Name,
+		DiskIndex:      diskIndex,
+		RootDiskIndex:  rootDiskIndex,
+		Shared:         disk.Shared,
+		FileName:       extractDiskFileName(baseVolume(disk.File, isWarm)),
+		WinDriveLetter: disk.WinDriveLetter,
+	}
+
+	templateConfig := TemplateConfig{
+		Template:        pvcNameTemplate,
+		UseGenerateName: r.Plan.Spec.PVCNameTemplateUseGenerateName,
+		TemplateType:    "PVC",
+	}
+
+	return r.setObjectNameFromTemplate(objectMeta, templateConfig, &templateData)
+}
+
+// setVolumeNameFromTemplate generates volume name using volume template
+func (r *Builder) setVolumeNameFromTemplate(vm *model.VM, pvcName string, volumeIndex int) (string, error) {
+	volumeNameTemplate := r.getVolumeNameTemplate(vm)
+	if volumeNameTemplate == "" {
+		return "", nil
+	}
+
+	// Create template data
+	templateData := api.VolumeNameTemplateData{
+		PVCName:     pvcName,
+		VolumeIndex: volumeIndex,
+	}
+
+	return r.executeTemplate(volumeNameTemplate, &templateData)
+}
+
+// setNetworkNameFromTemplate generates network name using network template
+func (r *Builder) setNetworkNameFromTemplate(vm *model.VM, mapped *api.NetworkPair, networkIndex int) (string, error) {
+	networkNameTemplate := r.getNetworkNameTemplate(vm)
+	if networkNameTemplate == "" {
+		return "", nil
+	}
+
+	// Create template data
+	templateData := api.NetworkNameTemplateData{
+		NetworkName:      mapped.Destination.Name,
+		NetworkNamespace: mapped.Destination.Namespace,
+		NetworkType:      mapped.Destination.Type,
+		NetworkIndex:     networkIndex,
+	}
+
+	return r.executeTemplate(networkNameTemplate, &templateData)
+}
+
 // GetPVCNameTemplate returns the PVC name template
 func (r *Builder) getPVCNameTemplate(vm *model.VM) string {
 	// Get plan VM
@@ -1527,10 +1602,10 @@ func (r *Builder) getPVCNameTemplate(vm *model.VM) string {
 	return ""
 }
 
-// getPlenVMSafeName returns a safe name for the VM
+// getPlanVMSafeName returns a safe name for the VM
 // that can be used in the template output
 // The name is sanitized to be a valid k8s label
-func (r *Builder) getPlenVMSafeName(vm *model.VM) string {
+func (r *Builder) getPlanVMSafeName(vm *model.VM) string {
 	// Default to vm name
 	newName := vm.Name
 
