@@ -10,10 +10,14 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const sdcIDContextKey string = "sdcId"
+const (
+	SYSTEM_ID_ENV_KEY        = "POWERFLEX_SYSTEM_ID"
+	sdcIDContextKey   string = "sdcId"
+)
 
 type PowerflexClonner struct {
-	Client *goscaleio.Client
+	Client   *goscaleio.Client
+	systemId string
 }
 
 // CurrentMappedGroups implements populator.StorageApi.
@@ -41,7 +45,7 @@ func (p *PowerflexClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn
 	klog.Infof("ensuring initiator group %s for clonners %v", initiatorGroup, clonnerIqn)
 
 	mappingContext := make(map[string]any)
-	system, err := p.Client.FindSystem("", "", "")
+	system, err := p.Client.FindSystem(p.systemId, "", "")
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +107,7 @@ func (p *PowerflexClonner) fetchSdcVolume(initatorGroup string, targetLUN popula
 
 	// TODO rgolan do we need an instanceID as part of the client?
 	// probably yes for multiple instances
-	system, err := p.Client.FindSystem("", "", "")
+	system, err := p.Client.FindSystem(p.systemId, "", "")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -173,7 +177,10 @@ func (p *PowerflexClonner) UnMap(initatorGroup string, targetLUN populator.LUN, 
 	return nil
 }
 
-func NewPowerflexClonner(hostname, username, password string, sslSkipVerify bool) (PowerflexClonner, error) {
+func NewPowerflexClonner(hostname, username, password string, sslSkipVerify bool, systemId string) (PowerflexClonner, error) {
+	if systemId == "" {
+		return PowerflexClonner{}, fmt.Errorf("systemId is empty. Make sure to pass systemId using the env variable %q. The value can be taken from the vxflexos-config secret under the powerflex CSI deployment", SYSTEM_ID_ENV_KEY)
+	}
 	client, err := goscaleio.NewClientWithArgs(hostname, "", 10000, sslSkipVerify, true)
 	if err != nil {
 		return PowerflexClonner{}, err
@@ -191,5 +198,5 @@ func NewPowerflexClonner(hostname, username, password string, sslSkipVerify bool
 
 	klog.Infof("successfuly logged in to ScaleIO Gateway at %s version %s", client.GetConfigConnect().Endpoint, client.GetConfigConnect().Version)
 
-	return PowerflexClonner{Client: client}, nil
+	return PowerflexClonner{Client: client, systemId: systemId}, nil
 }
