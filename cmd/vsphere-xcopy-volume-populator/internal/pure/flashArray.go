@@ -124,6 +124,6 @@ func (f *FlashArrayClonner) ResolvePVToLUN(pv populator.PersistentVolume) (popul
 		return populator.LUN{}, err
 	}
 	klog.Infof("volume %+v\n", v)
-	l := populator.LUN{Name: v.Name, SerialNumber: v.Serial, NAA: FlashProviderID + strings.ToLower(v.Serial)}
+	l := populator.LUN{Name: v.Name, SerialNumber: v.Serial, NAA: fmt.Sprintf("naa.%s%s", FlashProviderID, strings.ToLower(v.Serial))}
 	return l, nil
 }
