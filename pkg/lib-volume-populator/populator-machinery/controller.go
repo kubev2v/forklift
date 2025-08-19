@@ -726,18 +726,23 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 
 		if corev1.PodSucceeded != pod.Status.Phase {
 			if corev1.PodFailed == pod.Status.Phase {
-				restarts, ok := pvc.Annotations[AnnPopulatorReCreations]
-				if !ok {
-					return c.retryFailedPopulator(ctx, pvc, populatorNamespace, pod.Name, 1)
+				// Skip retry logic for VSphere xcopy populator - let it fail immediately
+				if c.gk.Kind == api.VSphereXcopyVolumePopulatorKind {
+					c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPodFailed, "VSphere xcopy populator failed (no retry): Please check the logs of the populator pod, %s/%s", populatorNamespace, pod.Name)
+				} else {
+					restarts, ok := pvc.Annotations[AnnPopulatorReCreations]
+					if !ok {
+						return c.retryFailedPopulator(ctx, pvc, populatorNamespace, pod.Name, 1)
+					}
+					restartsInteger, err := strconv.Atoi(restarts)
+					if err != nil {
+						return err
+					}
+					if restartsInteger < 3 {
+						return c.retryFailedPopulator(ctx, pvc, populatorNamespace, pod.Name, restartsInteger+1)
+					}
+					c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPodFailed, "Populator failed after few (3) attempts: Please check the logs of the populator pod, %s/%s", populatorNamespace, pod.Name)
 				}
-				restartsInteger, err := strconv.Atoi(restarts)
-				if err != nil {
-					return err
-				}
-				if restartsInteger < 3 {
-					return c.retryFailedPopulator(ctx, pvc, populatorNamespace, pod.Name, restartsInteger+1)
-				}
-				c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPodFailed, "Populator failed after few (3) attempts: Please check the logs of the populator pod, %s/%s", populatorNamespace, pod.Name)
 			}
 			// We'll get called again later when the pod succeeds
 			return nil
