@@ -1,7 +1,11 @@
 package vsphere
 
 import (
+	"context"
+	"fmt"
+
 	v1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	container "github.com/kubev2v/forklift/pkg/controller/provider/container/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
@@ -11,7 +15,13 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/vmware/govmomi/vim25/types"
 	v1 "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	k8stypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -20,6 +30,219 @@ var builderLog = logging.WithName("vsphere-builder-test")
 const ManualOrigin = string(types.NetIpConfigInfoIpAddressOriginManual)
 
 var _ = Describe("vSphere builder", func() {
+	Context("PopulatorVolumes", func() {
+		It("should merge the provider secret with the storage secret", func() {
+			builder := createBuilder(
+				&core.Secret{
+					ObjectMeta: meta.ObjectMeta{Name: "storage-test-secret", Namespace: "test"},
+					Data: map[string][]byte{
+						"storagekey": []byte("storageval"),
+					},
+				},
+				&core.Secret{
+					ObjectMeta: meta.ObjectMeta{Name: "migration-test-secret", Namespace: "test"},
+					Data: map[string][]byte{
+						"providerkey": []byte("providerval"),
+					},
+				},
+			)
+
+			// Execute
+			err := builder.mergeSecrets("migration-test-secret", "test", "storage-test-secret", "test")
+			underTest := core.Secret{}
+			errGet := builder.Destination.Get(context.Background(), client.ObjectKey{
+				Name:      "migration-test-secret",
+				Namespace: "test"}, &underTest)
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(errGet).NotTo(HaveOccurred())
+			Expect(underTest.Data).To(HaveLen(2))
+			Expect(underTest.Data).To(HaveKeyWithValue("storagekey", []byte("storageval")))
+			Expect(underTest.Data).To(HaveKeyWithValue("providerkey", []byte("providerval")))
+
+		})
+		It("should set default access mode to ReadWriteMany for block volumes", func() {
+			// Setup
+			builder := createBuilder(
+				&core.Secret{
+					ObjectMeta: meta.ObjectMeta{Name: "test-secret", Namespace: "test"},
+					Data: map[string][]byte{
+						"foo": []byte("bar"),
+					},
+				},
+			)
+			vm := model.VM{
+				VM1: model.VM1{
+					VM0: model.VM0{
+						ID:   "test-vm-id",
+						Name: "test",
+					},
+					Disks: []vsphere.Disk{
+						{
+							Datastore: vsphere.Ref{ID: "ds-1"},
+							File:      "[datastore1] vm-123/vm-123.vmdk",
+							Bus:       container.SCSI,
+							Capacity:  1024 * 1024 * 1024, // 1 GiB
+							Key:       2000,
+						},
+					},
+				},
+			}
+
+			dsMap := []v1beta1.StoragePair{
+				{
+					Source: ref.Ref{ID: "ds-1"},
+					Destination: v1beta1.DestinationStorage{
+						StorageClass: "test-sc",
+					},
+					OffloadPlugin: &v1beta1.OffloadPlugin{
+						VSphereXcopyPluginConfig: &v1beta1.VSphereXcopyPluginConfig{
+							StorageVendorProduct: "test-vendor",
+							SecretRef:            "test-secret",
+						},
+					},
+				},
+			}
+			storageMap := v1beta1.StorageMap{
+				Spec: v1beta1.StorageMapSpec{
+					Map: dsMap,
+				},
+			}
+			annotations := map[string]string{"test-annotation": "true"}
+			secretName := "test-secret"
+
+			// Mock inventory
+			inventory := &mockInventory{
+				ds: model.Datastore{Resource: model.Resource{ID: "ds-1"}},
+				vm: vm,
+			}
+			builder.Source.Inventory = inventory
+			builder.Context.Map.Storage = &storageMap
+
+			// Execute
+			pvcs, err := builder.PopulatorVolumes(ref.Ref{ID: vm.ID}, annotations, secretName)
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(pvcs).To(HaveLen(1))
+			pvc := pvcs[0]
+			Expect(pvc.Spec.AccessModes).To(ContainElement(core.ReadWriteMany))
+			Expect(pvc.Spec.VolumeMode).To(Equal(ptr.To(core.PersistentVolumeBlock)))
+		})
+		It("should set default PVC template name", func() {
+			// Setup
+			builder := createBuilder(
+				&core.Secret{
+					ObjectMeta: meta.ObjectMeta{Name: "test-secret", Namespace: "test"},
+					Data: map[string][]byte{
+						"foo": []byte("bar"),
+					},
+				},
+			)
+			vm := model.VM{
+				VM1: model.VM1{
+					VM0: model.VM0{
+						ID:   "test-vm-id",
+						Name: "customer-frontend-server",
+					},
+					Disks: []vsphere.Disk{
+						{
+							Datastore: vsphere.Ref{ID: "ds-1"},
+							File:      "[datastore1] vm-123/vm-123.vmdk",
+							Bus:       container.SCSI,
+							Capacity:  1024 * 1024 * 1024, // 1 GiB
+							Key:       2000,
+						},
+					},
+				},
+			}
+
+			dsMap := []v1beta1.StoragePair{
+				{
+					Source: ref.Ref{ID: "ds-1"},
+					Destination: v1beta1.DestinationStorage{
+						StorageClass: "test-sc",
+					},
+					OffloadPlugin: &v1beta1.OffloadPlugin{
+						VSphereXcopyPluginConfig: &v1beta1.VSphereXcopyPluginConfig{
+							StorageVendorProduct: "test-vendor",
+							SecretRef:            "test-secret",
+						},
+					},
+				},
+			}
+			storageMap := v1beta1.StorageMap{
+				Spec: v1beta1.StorageMapSpec{
+					Map: dsMap,
+				},
+			}
+			annotations := map[string]string{"test-annotation": "true"}
+			secretName := "test-secret"
+
+			// Mock inventory
+			inventory := &mockInventory{
+				ds: model.Datastore{Resource: model.Resource{ID: "ds-1"}},
+				vm: vm,
+			}
+			builder.Source.Inventory = inventory
+			builder.Context.Map.Storage = &storageMap
+
+			// Execute
+			pvcs, err := builder.PopulatorVolumes(ref.Ref{ID: vm.ID}, annotations, secretName)
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(pvcs).To(HaveLen(1))
+			pvc := pvcs[0]
+			Expect(pvc.Name).Should(HavePrefix(fmt.Sprintf("%s-%s-disk-", builder.Plan.Name, vm.Name)))
+			Expect(pvc.Spec.DataSourceRef.Kind).To(Equal(v1beta1.VSphereXcopyVolumePopulatorKind))
+			Expect(pvc.Spec.DataSourceRef.APIGroup).To(Equal(&v1beta1.SchemeGroupVersion.Group))
+			Expect(pvc.Spec.DataSourceRef.Name).To(Equal(pvc.Name))
+
+		})
+
+		It("should honor explicit AccessMode StorageMap and ignore VolumeMode from StorageMap", func() {
+			builder := createBuilder(&core.Secret{ObjectMeta: meta.ObjectMeta{Name: "test-secret", Namespace: "test"}})
+			vm := model.VM{
+				VM1: model.VM1{
+					VM0: model.VM0{ID: "vm-2", Name: "vm"},
+					Disks: []vsphere.Disk{
+						{
+							Datastore: vsphere.Ref{ID: "ds-2"},
+							File:      "[datastore2] vm-2/vm-2.vmdk",
+							Bus:       container.SCSI, Capacity: 1 << 20, Key: 2000,
+						},
+					},
+				},
+			}
+			builder.Source.Inventory = &mockInventory{ds: model.Datastore{Resource: model.Resource{ID: "ds-2"}}, vm: vm}
+			builder.Context.Map.Storage = &v1beta1.StorageMap{
+				Spec: v1beta1.StorageMapSpec{
+					Map: []v1beta1.StoragePair{{
+						Source: ref.Ref{ID: "ds-2"},
+						Destination: v1beta1.DestinationStorage{
+							StorageClass: "test-sc",
+							AccessMode:   core.ReadWriteOnce,
+							VolumeMode:   core.PersistentVolumeFilesystem,
+						},
+						OffloadPlugin: &v1beta1.OffloadPlugin{
+							VSphereXcopyPluginConfig: &v1beta1.VSphereXcopyPluginConfig{
+								StorageVendorProduct: "test-vendor",
+								SecretRef:            "test-secret",
+							},
+						},
+					}},
+				},
+			}
+			pvcs, err := builder.PopulatorVolumes(ref.Ref{ID: vm.ID}, nil, "test-secret")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(pvcs).To(HaveLen(1))
+			Expect(pvcs[0].Spec.AccessModes).To(ConsistOf(core.ReadWriteOnce))
+			Expect(pvcs[0].Spec.VolumeMode).To(Equal(ptr.To(core.PersistentVolumeBlock)))
+		})
+	})
+
 	builder := createBuilder()
 	DescribeTable("should", func(vm *model.VM, outputMap string) {
 		Expect(builder.mapMacStaticIps(vm)).Should(Equal(outputMap))
@@ -269,6 +492,8 @@ var _ = Describe("vSphere builder", func() {
 func createBuilder(objs ...runtime.Object) *Builder {
 	scheme := runtime.NewScheme()
 	_ = v1.AddToScheme(scheme)
+	_ = core.AddToScheme(scheme)
+	_ = rbacv1.AddToScheme(scheme)
 	v1beta1.SchemeBuilder.AddToScheme(scheme)
 	client := fake.NewClientBuilder().
 		WithScheme(scheme).
@@ -279,11 +504,19 @@ func createBuilder(objs ...runtime.Object) *Builder {
 			Destination: plancontext.Destination{
 				Client: client,
 			},
-			Plan: createPlan(),
-			Log:  builderLog,
-
-			// To make sure r.Scheme is not nil
-			Client: client,
+			Source: plancontext.Source{
+				Provider: &v1beta1.Provider{
+					ObjectMeta: meta.ObjectMeta{Name: "test-provider", Namespace: "test"},
+				},
+				Inventory: nil,
+				Secret: &core.Secret{
+					ObjectMeta: meta.ObjectMeta{Name: "test-provider-secret", Namespace: "test"},
+				},
+			},
+			Plan:      createPlan(),
+			Migration: &v1beta1.Migration{ObjectMeta: meta.ObjectMeta{UID: k8stypes.UID("123")}},
+			Log:       builderLog,
+			Client:    client,
 		},
 	}
 }

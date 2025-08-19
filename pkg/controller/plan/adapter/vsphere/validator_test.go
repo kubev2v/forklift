@@ -2,6 +2,8 @@
 package vsphere
 
 import (
+	"errors"
+
 	v1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
@@ -15,27 +17,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+var ErrNotImplemented = errors.New("not implemented")
+
 // Mock inventory struct and methods for testing
-type mockInventory struct{}
+type mockInventory struct {
+	ds model.Datastore
+	vm model.VM
+}
 
 func (m *mockInventory) Find(resource interface{}, ref ref.Ref) error {
 	switch res := resource.(type) {
+	case *model.Datastore:
+		*res = m.ds
 	case *model.Workload:
-		*res = model.Workload{
-			VM: model.VM{
-				NICs: []vsphere.NIC{
-					{MAC: "mac1"},
-					{MAC: "mac2"},
-				},
-				GuestNetworks: []vsphere.GuestNetwork{
-					{MAC: "mac1"},
-				},
-				GuestID: "windows7Guest",
-				VM1: model.VM1{
-					PowerState: "poweredOn", // default state
-				},
-			},
-		}
+		*res = model.Workload{VM: m.vm}
 		if ref.Name == "full_guest_network" {
 			res.VM.GuestNetworks = append(res.VM.GuestNetworks, vsphere.GuestNetwork{MAC: "mac2"})
 		}
@@ -46,26 +41,7 @@ func (m *mockInventory) Find(resource interface{}, ref ref.Ref) error {
 			return base.NotFoundError{}
 		}
 	case *model.VM:
-		*res = model.VM{
-			VM1: model.VM1{
-				VM0: model.VM0{
-					ID:   "test-vm-id",
-					Name: "test-vm",
-				},
-				Disks: []vsphere.Disk{
-					{
-						File:           "[datastore1] VMs/test-vm/test-vm-disk1.vmdk",
-						WinDriveLetter: "c",
-						Capacity:       1024,
-					},
-					{
-						File:           "[datastore1] VMs/test-vm/test-vm-disk2.vmdk",
-						WinDriveLetter: "d",
-						Capacity:       2048,
-					},
-				},
-			},
-		}
+		*res = m.vm
 		if ref.Name == "missing_from_inventory" {
 			return base.NotFoundError{}
 		}
@@ -93,23 +69,24 @@ func (m *mockInventory) List(list interface{}, param ...web.Param) error {
 }
 
 func (m *mockInventory) Network(ref *ref.Ref) (interface{}, error) {
-	return nil, nil
+	return nil, ErrNotImplemented
+
 }
 
 func (m *mockInventory) Storage(ref *ref.Ref) (interface{}, error) {
-	return nil, nil
+	return nil, ErrNotImplemented
 }
 
 func (m *mockInventory) VM(ref *ref.Ref) (interface{}, error) {
-	return nil, nil
+	return nil, ErrNotImplemented
 }
 
 func (m *mockInventory) Watch(resource interface{}, h web.EventHandler) (*web.Watch, error) {
-	return nil, nil
+	return nil, ErrNotImplemented
 }
 
 func (m *mockInventory) Workload(ref *ref.Ref) (interface{}, error) {
-	return nil, nil
+	return nil, ErrNotImplemented
 }
 
 var _ = Describe("vsphere validation tests", func() {
@@ -118,8 +95,26 @@ var _ = Describe("vsphere validation tests", func() {
 			func(vmName string, staticIPs, shouldError bool) {
 				plan := createPlan()
 				ctx := plancontext.Context{
-					Plan:   plan,
-					Source: plancontext.Source{Inventory: &mockInventory{}},
+					Plan: plan,
+					Source: plancontext.Source{Inventory: &mockInventory{
+						vm: model.VM{
+							VM1: model.VM1{
+								VM0: model.VM0{
+									ID:   "test-vm-id",
+									Name: "test",
+								},
+								PowerState: "poweredOn",
+							},
+							GuestNetworks: []vsphere.GuestNetwork{
+								{MAC: "mac1", Origin: "STATIC", IP: "192.168.1.5", PrefixLength: 24},
+								{MAC: "mac2", Origin: "DHCP", IP: ""},
+							},
+							NICs: []vsphere.NIC{
+								{MAC: "mac1"},
+								{MAC: "mac2"},
+							},
+						},
+					}},
 				}
 				plan.Spec.PreserveStaticIPs = staticIPs
 				validator := &Validator{
@@ -178,8 +173,30 @@ var _ = Describe("vsphere validation tests", func() {
 				plan.Spec.PVCNameTemplate = template
 				plan.Name = "test-plan"
 				ctx := plancontext.Context{
-					Plan:   plan,
-					Source: plancontext.Source{Inventory: &mockInventory{}},
+					Plan: plan,
+					Source: plancontext.Source{
+						Inventory: &mockInventory{
+							vm: model.VM{
+								VM1: model.VM1{
+									VM0: model.VM0{
+										ID:   "test-vm-id",
+										Name: "test",
+									},
+									Disks: []vsphere.Disk{
+										{
+											File:           "[datastore1] VMs/test-vm-test-vm-disk1.vmdk",
+											WinDriveLetter: "c",
+											Capacity:       1024,
+										},
+										{
+											File:           "[datastore1] VMs/test-vm-test-vm-disk2.vmdk",
+											WinDriveLetter: "d",
+											Capacity:       2048,
+										},
+									},
+								},
+							},
+						}},
 				}
 				validator := &Validator{
 					Context: &ctx,
@@ -269,12 +286,24 @@ var _ = Describe("vsphere validation tests", func() {
 func createPlan() *v1beta1.Plan {
 	return &v1beta1.Plan{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test",
+			Name:      "unit-test-plan-single-vm",
 			Namespace: "test",
 		},
 		Spec: v1beta1.PlanSpec{
 			TargetNamespace: "test",
-			VMs:             []planapi.VM{{Ref: ref.Ref{Name: "test", ID: "test-vm-id"}}},
+			VMs:             []planapi.VM{{Ref: ref.Ref{Name: "customer-db-linux-server", ID: "test-vm-id"}}},
+			// default by the k8s API
+			PVCNameTemplateUseGenerateName: true,
+		},
+		Referenced: v1beta1.Referenced{
+			Provider: struct {
+				Source      *v1beta1.Provider
+				Destination *v1beta1.Provider
+			}{
+				Source: &v1beta1.Provider{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-vsphere-provider"},
+				},
+				Destination: &v1beta1.Provider{}},
 		},
 	}
 }
