@@ -64,6 +64,16 @@ spec:
                     - If this option is enabled and migration succeeds then the pod will get deleted. However the VM could still not boot and the virt-v2v logs, with additional information, will be deleted alongside guest conversion pod.
                     - If migration fails the conversion pod will remain present even if this option is enabled.
                 type: boolean
+              deleteVmOnFailMigration:
+                description: |-
+                  DeleteVmOnFailMigration controls whether the target VM created by this Plan is deleted when a migration fails.
+                  When true and the migration fails after the target VM has been created, the controller
+                  will delete the target VM (and related target-side resources) during failed-migration cleanup
+                  and when the Plan is deleted. When false (default), the target VM is preserved to aid
+                  troubleshooting. The source VM is never modified.
+
+                  Note: If the Plan-level option is set to true, the VM-level option will be ignored.
+                type: boolean
               description:
                 description: Description
                 type: string
@@ -406,6 +416,16 @@ spec:
                 items:
                   description: A VM listed on the plan.
                   properties:
+                    deleteVmOnFailMigration:
+                      description: |-
+                        DeleteVmOnFailMigration controls whether the target VM created by this Plan is deleted when a migration fails.
+                        When true and the migration fails after the target VM has been created, the controller
+                        will delete the target VM (and related target-side resources) during failed-migration cleanup
+                        and when the Plan is deleted. When false (default), the target VM is preserved to aid
+                        troubleshooting. The source VM is never modified.
+
+                        Note: If the Plan-level option is set to true, the VM-level option will be ignored.
+                      type: boolean
                     hooks:
                       description: Enable hooks.
                       items:
@@ -920,6 +940,16 @@ spec:
                             - type
                             type: object
                           type: array
+                        deleteVmOnFailMigration:
+                          description: |-
+                            DeleteVmOnFailMigration controls whether the target VM created by this Plan is deleted when a migration fails.
+                            When true and the migration fails after the target VM has been created, the controller
+                            will delete the target VM (and related target-side resources) during failed-migration cleanup
+                            and when the Plan is deleted. When false (default), the target VM is preserved to aid
+                            troubleshooting. The source VM is never modified.
+
+                            Note: If the Plan-level option is set to true, the VM-level option will be ignored.
+                          type: boolean
                         error:
                           description: Errors
                           properties:
