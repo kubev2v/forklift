@@ -3,7 +3,7 @@ USER root
 WORKDIR /usr/src/app
 
 # Make python available in the builder image ( o/w only python3 is available )
-RUN dnf install python -y
+RUN dnf install -y python && dnf clean all && rm -rf /var/cache/dnf
 
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading
 # them in subsequent builds if they change
@@ -15,9 +15,6 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/.cache/go-build \
     make build
 
-RUN dnf install -y \
-    # install python for vmkfstools-wrapper tests \
-    python
 RUN make vmkfstools-wrapper
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal
