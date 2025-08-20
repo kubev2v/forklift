@@ -29,6 +29,8 @@ jobs:
 
       - name: Parse comment and validate inputs
         id: parse_comment
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
           set -euo pipefail
           
@@ -45,7 +47,7 @@ jobs:
           }
           
           # Parse comment body - we know it starts with '/backport' from workflow condition
-          comment_body="${{ github.event.comment.body }}"
+          comment_body="$COMMENT_BODY"
           pr_number="${{ github.event.issue.number }}"  # Always valid from GitHub
           
           echo "📝 Parsing comment: $comment_body"
@@ -107,23 +109,29 @@ jobs:
           
           # Check if PR exists and get its state
           echo "🔍 Verifying PR #$PR_NUMBER..."
-          pr_data=$(gh pr view "$PR_NUMBER" --json state,mergeable,title,headRefName 2>/dev/null || echo "null")
+          repo="${{ github.repository }}"
+          api="${{ github.api_url }}/repos/${repo}/pulls/${PR_NUMBER}"
+          pr_data=$(curl -sSf \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "$api" 2>/dev/null || echo "null")
           
           if [[ "$pr_data" == "null" ]]; then
             echo "::error::PR #$PR_NUMBER not found"
             exit 1
           fi
           
-          pr_state=$(echo "$pr_data" | jq -r '.state')
+          pr_merged=$(echo "$pr_data" | jq -r '.merged')
           pr_title=$(echo "$pr_data" | jq -r '.title')
-          pr_head_ref=$(echo "$pr_data" | jq -r '.headRefName')
+          pr_head_ref=$(echo "$pr_data" | jq -r '.head.ref')
           
-          echo "  - PR State: $pr_state"
+          echo "  - PR Merged: $pr_merged"
           echo "  - PR Title: $pr_title"
           echo "  - Head ref: $pr_head_ref"
           
-          if [[ "$pr_state" != "MERGED" && "$pr_state" != "CLOSED" ]]; then
-            echo "::warning::PR #$PR_NUMBER is still open ($pr_state). Consider waiting until it's merged."
+          if [[ "$pr_merged" != "true" ]]; then
+            echo "::error::PR #$PR_NUMBER is not merged (merged=$pr_merged). Aborting."
+            exit 1
           fi
           
           # Check if target branch exists on remote
@@ -137,7 +145,7 @@ jobs:
           
           # Set outputs for later use
           echo "pr_title=$pr_title" >> $GITHUB_OUTPUT
-          echo "pr_state=$pr_state" >> $GITHUB_OUTPUT
+          echo "pr_merged=$pr_merged" >> $GITHUB_OUTPUT
 
       - name: Post status comment (start)
         uses: actions/github-script@v7
@@ -166,9 +174,6 @@ jobs:
         id: backport
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ steps.parse_comment.outputs.pr_number }}
-          BRANCH_NAME: ${{ steps.parse_comment.outputs.branch_name }}
-          DRY_RUN: ${{ steps.parse_comment.outputs.dry_run }}
         uses: kiegroup/git-backporting@v4.8.5
         with:
           target-branch: ${{ steps.parse_comment.outputs.branch_name }}
