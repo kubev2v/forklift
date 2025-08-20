@@ -1,0 +1,250 @@
+name: Backport
+on:
+  issue_comment:
+    types:
+      - created
+
+concurrency:
+  group: backport-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  backport:
+    name: Backport
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write  # For posting feedback comments
+    if: |
+      github.event.issue.pull_request && 
+      startsWith(github.event.comment.body, '/backport') &&
+      contains(fromJSON('["OWNER", "MEMBER"]'), github.event.comment.author_association)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Parse comment and validate inputs
+        id: parse_comment
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          set -euo pipefail
+          
+          # Function to validate branch name - must be release-X.Y format
+          validate_branch_name() {
+            local branch="$1"
+            # Check for exact release-X.Y pattern where X and Y are digits
+            if [[ ! "$branch" =~ ^release-[0-9]+\.[0-9]+$ ]]; then
+              echo "Invalid branch name format: $branch"
+              echo "Branch name must follow pattern: release-X.Y (e.g., release-1.0, release-2.15)"
+              return 1
+            fi
+            return 0
+          }
+          
+          # Parse comment body - we know it starts with '/backport' from workflow condition
+          comment_body="$COMMENT_BODY"
+          pr_number="${{ github.event.issue.number }}"  # Always valid from GitHub
+          
+          echo "📝 Parsing comment: $comment_body"
+          
+          # Split comment into words and extract parameters
+          # Format: /backport <branch> [--dry-run]
+          read -ra words <<< "$comment_body"
+          
+          # Extract branch name (should be second word)
+          if [[ ${#words[@]} -lt 2 ]]; then
+            echo "::error::Missing branch name in command"
+            echo "::error::Usage: /backport release-X.Y [--dry-run]"
+            exit 1
+          fi
+          
+          branch_name="${words[1]}"
+          
+          # Check for dry-run flag (can be anywhere after the branch name)
+          dry_run="false"
+          for word in "${words[@]:2}"; do
+            if [[ "$word" == "--dry-run" ]]; then
+              dry_run="true"
+              break
+            fi
+          done
+          
+          # Validate inputs
+          if [[ -z "$branch_name" ]]; then
+            echo "::error::Target branch is required."
+            echo "::error::Usage: /backport release-X.Y [--dry-run]"
+            exit 1
+          fi
+          
+          if ! validate_branch_name "$branch_name"; then
+            echo "::error::Invalid branch name format: $branch_name"
+            echo "::error::Branch name must follow pattern: release-X.Y (e.g., release-1.0, release-2.15)"
+            exit 1
+          fi
+          
+          # Set outputs
+          echo "branch_name=$branch_name" >> $GITHUB_OUTPUT
+          echo "pr_number=$pr_number" >> $GITHUB_OUTPUT
+          echo "dry_run=$dry_run" >> $GITHUB_OUTPUT
+          
+          # Log parsed values for debugging
+          echo "✅ Parsed comment successfully:"
+          echo "  - Target branch: $branch_name"
+          echo "  - PR number: $pr_number (from GitHub context)"
+          echo "  - Dry run: $dry_run"
+
+      - name: Verify PR and target branch exist
+        id: verify_refs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.parse_comment.outputs.pr_number }}
+          BRANCH_NAME: ${{ steps.parse_comment.outputs.branch_name }}
+        run: |
+          set -euo pipefail
+          
+          # Check if PR exists and get its state
+          echo "🔍 Verifying PR #$PR_NUMBER..."
+          repo="${{ github.repository }}"
+          api="${{ github.api_url }}/repos/${repo}/pulls/${PR_NUMBER}"
+          pr_data=$(curl -sSf \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "$api" 2>/dev/null || echo "null")
+          
+          if [[ "$pr_data" == "null" ]]; then
+            echo "::error::PR #$PR_NUMBER not found"
+            exit 1
+          fi
+          
+          pr_merged=$(echo "$pr_data" | jq -r '.merged')
+          pr_title=$(echo "$pr_data" | jq -r '.title')
+          pr_head_ref=$(echo "$pr_data" | jq -r '.head.ref')
+          
+          echo "  - PR Merged: $pr_merged"
+          echo "  - PR Title: $pr_title"
+          echo "  - Head ref: $pr_head_ref"
+          
+          if [[ "$pr_merged" != "true" ]]; then
+            echo "::error::PR #$PR_NUMBER is not merged (merged=$pr_merged). Aborting."
+            exit 1
+          fi
+          
+          # Check if target branch exists on remote
+          echo "🔍 Verifying target branch '$BRANCH_NAME' on origin..."
+          if git ls-remote --exit-code --heads origin "$BRANCH_NAME" >/dev/null 2>&1; then
+            echo "  ✅ Target branch exists"
+          else
+            echo "::error::Target branch '$BRANCH_NAME' does not exist on remote 'origin'"
+            exit 1
+          fi
+          
+          # Set outputs for later use
+          echo "pr_title=$pr_title" >> $GITHUB_OUTPUT
+          echo "pr_merged=$pr_merged" >> $GITHUB_OUTPUT
+
+      - name: Post status comment (start)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const branch = '${{ steps.parse_comment.outputs.branch_name }}';
+            const dryRun = '${{ steps.parse_comment.outputs.dry_run }}' === 'true';
+            
+            const body = `🔄 **Backport Status**
+            
+            Starting backport of PR #${{ steps.parse_comment.outputs.pr_number }} to \`${branch}\`
+            ${dryRun ? '🧪 **Dry run mode** - No actual changes will be made' : '🚀 **Live mode** - Changes will be applied'}
+            
+            [View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
+            
+            github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number,
+              body
+            });
+
+      - name: Perform backport
+        id: backport
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: kiegroup/git-backporting@v4.8.5
+        with:
+          target-branch: ${{ steps.parse_comment.outputs.branch_name }}
+          pull-request: ${{ github.server_url }}/${{ github.repository }}/pull/${{ steps.parse_comment.outputs.pr_number }}
+          no-squash: true
+          auth: ${{ secrets.GITHUB_TOKEN }}
+          dry-run: ${{ steps.parse_comment.outputs.dry_run }}
+
+      - name: Post success comment
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const branch = '${{ steps.parse_comment.outputs.branch_name }}';
+            const dryRun = '${{ steps.parse_comment.outputs.dry_run }}' === 'true';
+            
+            let body;
+            if (dryRun) {
+              body = `✅ **Backport Dry Run Completed**
+              
+              The backport of PR #${{ steps.parse_comment.outputs.pr_number }} to \`${branch}\` was successful in dry-run mode.
+              
+              To perform the actual backport, run:
+              \`/backport ${branch}\` (without --dry-run flag)`;
+            } else {
+              body = `✅ **Backport Completed Successfully**
+              
+              PR #${{ steps.parse_comment.outputs.pr_number }} has been successfully backported to \`${branch}\`.
+              
+              A new pull request should have been created with the backported changes.`;
+            }
+            
+            github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number,
+              body
+            });
+
+      - name: Post failure comment
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const branch = '${{ steps.parse_comment.outputs.branch_name || 'unknown' }}';
+            
+            const body = `❌ **Backport Failed**
+            
+            The backport of PR #${{ steps.parse_comment.outputs.pr_number || github.event.issue.number }} to \`${branch}\` failed.
+            
+            Common causes:
+            - Merge conflicts that require manual resolution
+            - Target branch doesn't exist
+            - Invalid branch name format (must be release-X.Y, e.g., release-1.0)
+            - Invalid PR number
+            
+            Please check the [workflow logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.
+            
+            **Usage Examples:**
+            - \`/backport release-1.0\` - Live backport
+            - \`/backport release-2.5 --dry-run\` - Test backport without changes
+            
+            You may need to perform the backport manually or ask a maintainer for help.`;
+            
+            github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number,
+              body
+            });
