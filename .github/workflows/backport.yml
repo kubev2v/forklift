@@ -4,6 +4,10 @@ on:
     types:
       - created
 
+concurrency:
+  group: backport-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
 jobs:
   backport:
     name: Backport
@@ -165,7 +169,7 @@ jobs:
           PR_NUMBER: ${{ steps.parse_comment.outputs.pr_number }}
           BRANCH_NAME: ${{ steps.parse_comment.outputs.branch_name }}
           DRY_RUN: ${{ steps.parse_comment.outputs.dry_run }}
-        uses: kiegroup/git-backporting@main
+        uses: kiegroup/git-backporting@v4.8.5
         with:
           target-branch: ${{ steps.parse_comment.outputs.branch_name }}
           pull-request: ${{ github.server_url }}/${{ github.repository }}/pull/${{ steps.parse_comment.outputs.pr_number }}
