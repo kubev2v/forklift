@@ -22,3 +22,7 @@ type StorageMapper interface {
 type StorageResolver interface {
 	ResolvePVToLUN(persistentVolume PersistentVolume) (LUN, error)
 }
+
+type SciniAware interface {
+	SciniRequired() bool
+}

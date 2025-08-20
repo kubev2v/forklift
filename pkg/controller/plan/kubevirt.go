@@ -124,6 +124,13 @@ const (
 	VddkAioBufCountDefault = "4"
 )
 
+// Service and Port constants
+const (
+	ServiceNameSuffix = "-service"
+	HTTPPort          = 8080
+	MetricsPort       = 2112
+)
+
 // Map of VirtualMachines keyed by vmID.
 type VirtualMachineMap map[string]VirtualMachine
 
@@ -1020,6 +1027,36 @@ func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, vmCr *VirtualMach
 				pod.Name),
 			"vm",
 			vm.String())
+
+		// Create matching service for the pod
+		service := r.guestConversionService(vm, pod)
+		err = r.Destination.Client.Create(context.TODO(), service)
+		if err != nil {
+			r.Log.Error(err, "Failed to create service for virt-v2v pod",
+				"service", path.Join(service.Namespace, service.Name),
+				"pod", path.Join(pod.Namespace, pod.Name))
+
+			// Clean up the pod since service creation failed
+			deleteErr := r.Destination.Client.Delete(context.TODO(), pod)
+			if deleteErr != nil {
+				r.Log.Error(deleteErr, "Failed to cleanup pod after service creation failure",
+					"pod", path.Join(pod.Namespace, pod.Name))
+			} else {
+				r.Log.Info("Cleaned up pod after service creation failure",
+					"pod", path.Join(pod.Namespace, pod.Name))
+			}
+
+			err = liberr.Wrap(err)
+			return
+		}
+		r.Log.Info(
+			"Created virt-v2v service.",
+			"service",
+			path.Join(
+				service.Namespace,
+				service.Name),
+			"vm",
+			vm.String())
 	}
 
 	return
@@ -1100,7 +1137,7 @@ func (r *KubeVirt) getInspectionXml(pod *core.Pod) (string, error) {
 	if pod == nil {
 		return "", liberr.New("no pod found to get the inspection")
 	}
-	inspectionUrl := fmt.Sprintf("http://%s:8080/inspection", pod.Status.PodIP)
+	inspectionUrl := r.guestConversionServiceURL(pod, HTTPPort) + "/inspection"
 	resp, err := http.Get(inspectionUrl)
 	if err != nil {
 		return "", liberr.Wrap(err)
@@ -1114,12 +1151,12 @@ func (r *KubeVirt) getInspectionXml(pod *core.Pod) (string, error) {
 }
 
 func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, step *plan.Step) error {
-	if pod == nil || pod.Status.PodIP == "" {
-		//we need the IP for fetching the configuration of the convered VM.
+	if pod == nil {
+		//we need the pod for fetching the configuration of the converted VM.
 		return nil
 	}
 
-	url := fmt.Sprintf("http://%s:8080/vm", pod.Status.PodIP)
+	url := r.guestConversionServiceURL(pod, HTTPPort) + "/vm"
 
 	/* Due to the virt-v2v operation, the ovf file is only available after the command's execution,
 	meaning it appears following the copydisks phase.
@@ -1157,7 +1194,7 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 		r.Log.Info("Setting the vm OS ", vm.OperatingSystem, "vmId", vm.ID)
 	}
 
-	shutdownURL := fmt.Sprintf("http://%s:8080/shutdown", pod.Status.PodIP)
+	shutdownURL := r.guestConversionServiceURL(pod, HTTPPort) + "/shutdown"
 	resp, err = http.Post(shutdownURL, "application/json", nil)
 	if err == nil {
 		defer resp.Body.Close()
@@ -1989,6 +2026,14 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 			Annotations:  annotations,
 			Labels:       r.conversionLabels(vm.Ref, false),
 			GenerateName: r.getGeneratedName(vm),
+			OwnerReferences: []meta.OwnerReference{
+				{
+					APIVersion: "forklift.konveyor.io/v1beta1",
+					Kind:       "Migration",
+					Name:       r.Migration.Name,
+					UID:        r.Migration.UID,
+				},
+			},
 		},
 		Spec: core.PodSpec{
 			SecurityContext: &core.PodSecurityContext{
@@ -2053,8 +2098,13 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 					VolumeDevices: volumeDevices,
 					Ports: []core.ContainerPort{
 						{
+							Name:          "http",
+							ContainerPort: HTTPPort,
+							Protocol:      core.ProtocolTCP,
+						},
+						{
 							Name:          "metrics",
-							ContainerPort: 2112,
+							ContainerPort: MetricsPort,
 							Protocol:      core.ProtocolTCP,
 						},
 					},
@@ -2075,6 +2125,48 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	r.setKvmOnPodSpec(&pod.Spec)
 
 	return
+}
+
+// guestConversionService creates a service for the guest conversion (virt-v2v) pod.
+func (r *KubeVirt) guestConversionService(vm *plan.VMStatus, pod *core.Pod) *core.Service {
+	labels := r.conversionLabels(vm.Ref, false)
+	service := &core.Service{
+		ObjectMeta: meta.ObjectMeta{
+			Namespace: pod.Namespace,
+			Labels:    labels,
+			Name:      pod.Name + ServiceNameSuffix,
+			OwnerReferences: []meta.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       pod.Name,
+					UID:        pod.UID,
+				},
+			},
+		},
+		Spec: core.ServiceSpec{
+			Selector: labels,
+			Ports: []core.ServicePort{
+				{
+					Name:     "http",
+					Port:     HTTPPort,
+					Protocol: core.ProtocolTCP,
+				},
+				{
+					Name:     "metrics",
+					Port:     MetricsPort,
+					Protocol: core.ProtocolTCP,
+				},
+			},
+		},
+	}
+	return service
+}
+
+// guestConversionServiceURL generates the service URL for a given pod and port
+func (r *KubeVirt) guestConversionServiceURL(pod *core.Pod, port int) string {
+	serviceName := pod.Name + ServiceNameSuffix
+	return fmt.Sprintf("http://%s.%s.svc.cluster.local:%d", serviceName, pod.Namespace, port)
 }
 
 func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, libvirtConfigMap *core.ConfigMap, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, vm *plan.VMStatus) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice, err error) {

@@ -3,6 +3,7 @@ package powerflex
 import (
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/dell/goscaleio"
 	siotypes "github.com/dell/goscaleio/types/v1"
@@ -23,6 +24,8 @@ type PowerflexClonner struct {
 // CurrentMappedGroups implements populator.StorageApi.
 func (p *PowerflexClonner) CurrentMappedGroups(targetLUN populator.LUN, mappingContext populator.MappingContext) ([]string, error) {
 	klog.Infof("getting current mapping to volume %+v", targetLUN)
+	klog.Infof("going to sleep to give csi time")
+	time.Sleep(20 * time.Second)
 	v, err := p.Client.GetVolume("", "", "", targetLUN.Name, false)
 	if err != nil {
 		return nil, err
@@ -33,6 +36,10 @@ func (p *PowerflexClonner) CurrentMappedGroups(targetLUN populator.LUN, mappingC
 	}
 
 	klog.Infof("current mapping %+v", v[0].MappedSdcInfo)
+	if len(v[0].MappedSdcInfo) == 0 {
+		klog.Errorf("found 0 Mapped SDC Info for target volume %+v", targetLUN)
+		return []string{}, fmt.Errorf("found 0 Mapped SDC Info for target volume %+v", targetLUN)
+	}
 	for _, sdcInfo := range v[0].MappedSdcInfo {
 		currentMappedSdcs = append(currentMappedSdcs, sdcInfo.SdcID)
 	}
@@ -41,7 +48,6 @@ func (p *PowerflexClonner) CurrentMappedGroups(targetLUN populator.LUN, mappingC
 
 // EnsureClonnerIgroup implements populator.StorageApi.
 func (p *PowerflexClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn []string) (populator.MappingContext, error) {
-
 	klog.Infof("ensuring initiator group %s for clonners %v", initiatorGroup, clonnerIqn)
 
 	mappingContext := make(map[string]any)
@@ -58,40 +64,26 @@ func (p *PowerflexClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn
 		if sdc.OSType != "Esx" {
 			continue
 		}
-		klog.Infof("@@@@@@@@@@@ sdc %+v", sdc)
-		klog.Infof("@@@@@@@@@@@ clonnerIqn %+v", clonnerIqn)
-		klog.Infof("@@@@@@@@@@@ sdc.SdcGUID %+v", sdc.SdcGUID)
+		klog.Infof("Comparing with sdc %+v", sdc)
 		if slices.Contains(clonnerIqn, sdc.SdcGUID) {
-			klog.Infof("found SDC ID %+v", sdc)
+			klog.Infof("found compatible SDC: %+v", sdc)
 			mappingContext[sdcIDContextKey] = sdc.ID
 			return mappingContext, nil
 		}
 	}
-
-	// TODO it is possible that there is nothing to do here, only the map/unmap is needed
-	return nil, nil
+	return mappingContext, fmt.Errorf("could not find the SDC adapter on ESXI")
 }
 
 func (p *PowerflexClonner) Map(initiatorGroup string, targetLUN populator.LUN, mappingContext populator.MappingContext) (populator.LUN, error) {
-	sdcId, ok := mappingContext[sdcIDContextKey]
-	if ok {
-		initiatorGroup = sdcId.(string)
-	}
 	klog.Infof("mapping volume %s to initiator group %s with context %v", targetLUN.Name, initiatorGroup, mappingContext)
 	sdc, volume, err := p.fetchSdcVolume(initiatorGroup, targetLUN, mappingContext)
-
-	if len(volume.Volume.MappedSdcInfo) > 0 {
-		klog.Infof("unmapping the volume as it is mapped mapped already %+v", volume.Volume.MappedSdcInfo)
-		unmapParams := siotypes.UnmapVolumeSdcParam{
-			SdcID: volume.Volume.MappedSdcInfo[0].SdcID,
-		}
-		err := volume.UnmapVolumeSdc(&unmapParams)
-		if err != nil {
-			return targetLUN, fmt.Errorf("failed to unmap the volume from the former SDC %w", err)
-		}
+	if err != nil {
+		return targetLUN, err
 	}
+
 	mapParams := siotypes.MapVolumeSdcParam{
-		SdcID: sdc.Sdc.ID,
+		SdcID:                 sdc.Sdc.ID,
+		AllowMultipleMappings: "true",
 	}
 	err = volume.MapVolumeSdc(&mapParams)
 	if err != nil {
@@ -135,7 +127,7 @@ func (p *PowerflexClonner) ResolvePVToLUN(pv populator.PersistentVolume) (popula
 	name := pv.VolumeAttributes["Name"]
 	if name == "" {
 		return populator.LUN{},
-			fmt.Errorf("The PersistentVolume attribute 'Name' is empty and " +
+			fmt.Errorf("the PersistentVolume attribute 'Name' is empty and " +
 				"essential to locate the underlying volume in PowerFlex")
 	}
 	id, err := p.Client.FindVolumeID(name)
@@ -149,7 +141,7 @@ func (p *PowerflexClonner) ResolvePVToLUN(pv populator.PersistentVolume) (popula
 	}
 
 	if len(v) != 1 {
-		return populator.LUN{}, fmt.Errorf("failed to locate a single volume by name %s.", name)
+		return populator.LUN{}, fmt.Errorf("failed to locate a single volume by name %s", name)
 	}
 
 	klog.Infof("found volume %s", v[0].Name)
@@ -160,17 +152,36 @@ func (p *PowerflexClonner) ResolvePVToLUN(pv populator.PersistentVolume) (popula
 	}, nil
 }
 
+func (p *PowerflexClonner) SciniRequired() bool {
+	return true
+}
+
 // UnMap implements populator.StorageApi.
 func (p *PowerflexClonner) UnMap(initatorGroup string, targetLUN populator.LUN, mappingContext populator.MappingContext) error {
-	klog.Infof("unmapping volume %s from initiator group %s", targetLUN.Name, initatorGroup)
+	unmappingAll, _ := mappingContext["UnmapAllSdc"].(bool)
+
+	if unmappingAll {
+		klog.Infof("unmapping all from volume %s", targetLUN.Name)
+	} else {
+		klog.Infof("unmapping volume %s from initiator group %s", targetLUN.Name, initatorGroup)
+	}
+
 	sdc, volume, err := p.fetchSdcVolume(initatorGroup, targetLUN, mappingContext)
 	if err != nil {
 		return err
 	}
-	mapParams := siotypes.UnmapVolumeSdcParam{
-		SdcID: sdc.Sdc.ID,
+
+	unmapParams := siotypes.UnmapVolumeSdcParam{
+		AllSdcs: "true",
 	}
-	err = volume.UnmapVolumeSdc(&mapParams)
+
+	if !unmappingAll {
+		unmapParams = siotypes.UnmapVolumeSdcParam{
+			SdcID: sdc.Sdc.ID,
+		}
+	}
+
+	err = volume.UnmapVolumeSdc(&unmapParams)
 	if err != nil {
 		return err
 	}

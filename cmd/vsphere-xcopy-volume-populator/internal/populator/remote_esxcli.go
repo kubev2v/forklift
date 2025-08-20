@@ -90,63 +90,79 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	uniqueUIDs := make(map[string]bool)
 	hbaUIDs := []string{}
 
-	for i, a := range r {
-		klog.Infof("Adapter [%d]: %+v", i, a)
-		for key, field := range a {
-			klog.Infof("  %s: %v", key, field)
+	isSciniRequired := false
+	if sciniAware, ok := p.StorageApi.(SciniAware); ok {
+		if sciniAware.SciniRequired() {
+			isSciniRequired = true
 		}
-		driver, hasDriver := a["Driver"]
-		if !hasDriver {
-			// irrelevant adapter
-			continue
-		}
-		// powerflex handling - scini is the powerflex kernel module and is not
-		// using any iqn/wwn to identity the host. Instead extract the SdcGuid
-		// as the possible clonner identifier
-		if slices.Contains(driver, "scini") {
-			sciModule, err := p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"system", "module", "parameters", "list", "-m", "scini"})
-			if err != nil {
-				// TODO skip, but print the error. Perhaps this handling is better suited per-vendor?
-				klog.Infof("failed to fetch the scini module parameters %s: ", err)
-				continue
-			}
-			for _, moduleFields := range sciModule {
+	}
 
-				if slices.Contains(moduleFields["Name"], "IoctlIniGuidStr") {
-					klog.Infof("scini guid %v", moduleFields["Value"])
-					for _, s := range moduleFields["Value"] {
-						hbaUIDs = append(hbaUIDs, strings.ToUpper(s))
-					}
-					klog.Infof("hbas %+v", hbaUIDs)
+	// powerflex handling - scini is the powerflex kernel module and is not
+	// using any iqn/wwn to identity the host. Instead extract the SdcGuid
+	// as the possible clonner identifier
+	if isSciniRequired {
+		klog.Infof("scini is required for the storage api")
+		sciModule, err := p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"system", "module", "parameters", "list", "-m", "scini"})
+		if err != nil {
+			klog.Infof("failed to fetch the scini module parameters %s: ", err)
+			return err
+		}
+		for _, moduleFields := range sciModule {
+
+			if slices.Contains(moduleFields["Name"], "IoctlIniGuidStr") {
+				klog.Infof("scini guid %v", moduleFields["Value"])
+				for _, s := range moduleFields["Value"] {
+					hbaUIDs = append(hbaUIDs, strings.ToUpper(s))
 				}
-			}
-		}
-
-		// 'esxcli storage core adapter list' returns LinkState field
-		// 'esxcli iscsi adapater list' returns State field
-		linkState, hasLink := a["LinkState"]
-		uid, hasUID := a["UID"]
-
-		if !hasDriver || !hasLink || !hasUID || len(driver) == 0 || len(linkState) == 0 || len(uid) == 0 {
-			continue
-		}
-
-		drv := driver[0]
-		link := linkState[0]
-		id := uid[0]
-
-		// Check if the UID is FC, iSCSI or NVMe-oF
-		isTargetUID := strings.HasPrefix(id, "fc.") || strings.HasPrefix(id, "iqn.") || strings.HasPrefix(id, "nqn.")
-
-		if (link == "link-up" || link == "online") && isTargetUID {
-			if _, exists := uniqueUIDs[id]; !exists {
-				uniqueUIDs[id] = true
-				hbaUIDs = append(hbaUIDs, id)
-				klog.Infof("Storage Adapter UID: %s (Driver: %s)", id, drv)
+				klog.Infof("Scini hbas found: %+v", hbaUIDs)
 			}
 		}
 	}
 
+	if !isSciniRequired {
+		klog.Infof("scini is not required for the storage api")
+		for i, a := range r {
+			klog.Infof("Adapter [%d]: %+v", i, a)
+			for key, field := range a {
+				klog.Infof("  %s: %v", key, field)
+			}
+			driver, hasDriver := a["Driver"]
+			if !hasDriver {
+				// irrelevant adapter
+				continue
+			}
+
+			// 'esxcli storage core adapter list' returns LinkState field
+			// 'esxcli iscsi adapater list' returns State field
+			linkState, hasLink := a["LinkState"]
+			uid, hasUID := a["UID"]
+
+			if !hasDriver || !hasLink || !hasUID || len(driver) == 0 || len(linkState) == 0 || len(uid) == 0 {
+				continue
+			}
+
+			drv := driver[0]
+			link := linkState[0]
+			id := uid[0]
+
+			// Check if the UID is FC, iSCSI or NVMe-oF
+			isTargetUID := strings.HasPrefix(id, "fc.") || strings.HasPrefix(id, "iqn.") || strings.HasPrefix(id, "nqn.")
+
+			if (link == "link-up" || link == "online") && isTargetUID {
+				if _, exists := uniqueUIDs[id]; !exists {
+					uniqueUIDs[id] = true
+					hbaUIDs = append(hbaUIDs, id)
+					klog.Infof("Storage Adapter UID: %s (Driver: %s)", id, drv)
+				}
+			}
+		}
+		klog.Infof("HBA UIDs found: %+v", hbaUIDs)
+	}
+
+	if len(hbaUIDs) == 0 {
+		klog.Infof("no valid HBA UIDs found for host %s", host)
+		return fmt.Errorf("no valid HBA UIDs found for host %s", host)
+	}
 	mappingContext, err := p.StorageApi.EnsureClonnerIgroup(xcopyInitiatorGroup, hbaUIDs)
 
 	if err != nil {
@@ -164,9 +180,31 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	}
 	klog.Infof("Current initiator groups the LUN %s is mapped to %+v", lun.IQN, originalInitiatorGroups)
 
+	if isSciniRequired {
+		sdcId, ok := mappingContext["sdcId"]
+		if !ok {
+			klog.Infof("sdcId is required but not found in mappingContext")
+			return fmt.Errorf("sdcId is required but not found in mappingContext")
+		} else {
+			xcopyInitiatorGroup = sdcId.(string)
+			klog.Infof("sdcId found in mappingContext: %s", sdcId)
+		}
+	}
+
+	fullCleanUpAttempted := false
+
 	defer func() {
+		if fullCleanUpAttempted {
+			return
+		}
 		if !slices.Contains(originalInitiatorGroups, xcopyInitiatorGroup) {
-			p.StorageApi.UnMap(xcopyInitiatorGroup, lun, mappingContext)
+			if mappingContext != nil {
+				mappingContext["UnmapAllSdc"] = false
+			}
+			errUnmap := p.StorageApi.UnMap(xcopyInitiatorGroup, lun, mappingContext)
+			if errUnmap != nil {
+				klog.Infof("failed to unmap all initiator groups during partial cleanup: %s", errUnmap)
+			}
 		}
 	}()
 
@@ -199,11 +237,21 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 
 	defer func() {
 		klog.Infof("cleaning up - unmap and rescan to clean dead devices")
-		p.StorageApi.UnMap(xcopyInitiatorGroup, lun, mappingContext)
+		fullCleanUpAttempted = true
+		if mappingContext != nil {
+			mappingContext["UnmapAllSdc"] = true
+		}
+		errUnmap := p.StorageApi.UnMap(xcopyInitiatorGroup, lun, mappingContext)
+		if errUnmap != nil {
+			klog.Errorf("failed in unmap during cleanup, lun %s: %s", lun.Name, errUnmap)
+		}
 		// map the LUN back to the original OCP worker
+		klog.Infof("about to map the volume back to the originalInitiatorGroups, which are: %s", originalInitiatorGroups)
 		for _, group := range originalInitiatorGroups {
 			_, err := p.StorageApi.Map(group, lun, mappingContext)
-			klog.Warningf("failed to map the volume back the original holder - this may cause problems: %v", err)
+			if err != nil {
+				klog.Warningf("failed to map the volume back the original holder - this may cause problems: %v", err)
+			}
 		}
 		// unmap devices appear dead in ESX right after they are unmapped, now
 		// clean them
