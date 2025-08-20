@@ -161,7 +161,6 @@ func (c *Customize) addWinFirstbootScripts(cmdBuilder utils.CommandBuilder) {
 	windowsScriptsPath := filepath.Join(c.appConfig.Workdir, "scripts", "windows")
 	initPath := filepath.Join(windowsScriptsPath, "9999-run-mtv-ps-scripts.bat")
 	restoreScriptPath := filepath.Join(windowsScriptsPath, "9999-restore_config.ps1")
-	firstbootPath := filepath.Join(windowsScriptsPath, "firstboot.bat")
 
 	// Upload scripts to the windows
 	uploadPreserveIpPath := ""
@@ -182,8 +181,7 @@ func (c *Customize) addWinFirstbootScripts(cmdBuilder utils.CommandBuilder) {
 
 	uploadScriptPath := c.formatUpload(restoreScriptPath, WinFirstbootScriptsPath)
 	uploadInitPath := c.formatUpload(initPath, WinFirstbootScriptsPath)
-	uploadFirstbootPath := c.formatUpload(firstbootPath, WinFirstbootPath)
-	cmdBuilder.AddArgs("--upload", uploadScriptPath, uploadPreserveIpPath, uploadInitPath, uploadFirstbootPath)
+	cmdBuilder.AddArgs("--upload", uploadScriptPath, uploadPreserveIpPath, uploadInitPath)
 }
 
 func (c *Customize) addWinDynamicScripts(cmdBuilder utils.CommandBuilder, dir string) error {
