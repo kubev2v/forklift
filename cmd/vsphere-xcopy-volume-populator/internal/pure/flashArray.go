@@ -1,6 +1,7 @@
 package pure
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -18,13 +19,14 @@ type FlashArrayClonner struct {
 }
 
 const ClusterPrefixEnv = "PURE_CLUSTER_PREFIX"
-const helpMessage = `clusterPrefix is missing. Please copy the cluster uuid and pass it in the pure secret under PURE_CLUSTER_PREFIX. use that to help \
-oc get storagecluster -o yaml -A -o=jsonpath='{.items[?(@.spec.cloudStorage.provider=="pure")].status.clusterUid} | head -c 8'
+const helpMessage = `clusterPrefix is missing and PURE_CLUSTER_PREFIX is not set.
+Use this to extract the value:
+printf "px_%.8s" $(oc get storagecluster -A -o=jsonpath='{.items[?(@.spec.cloudStorage.provider=="pure")].status.clusterUid}')
 `
 
 func NewFlashArrayClonner(hostname, username, password string, skipSSLVerification bool, clusterPrefix string) (FlashArrayClonner, error) {
 	if clusterPrefix == "" {
-		return FlashArrayClonner{}, fmt.Errorf(helpMessage)
+		return FlashArrayClonner{}, errors.New(helpMessage)
 	}
 	client, err := flasharray.NewClient(
 		hostname, username, password, "", "", true, false, "", map[string]string{})

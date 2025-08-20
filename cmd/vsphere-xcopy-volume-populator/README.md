@@ -138,10 +138,16 @@ spec:
 
 The vSphere user requires a role with the following privileges (a role named `StorageOffloader` is recommended):
 
-* Global -> Settings
-* Host -> Configuration -> Advanced settings
-* Host -> Configuration -> Query patch
-* Host -> Configuration -> Storage partition configuration
+* Global
+  * Settings
+* Datastore
+  * Browse datastore
+  * Low level file operations
+* Host
+   Configuration
+     * Advanced settings
+     * Query patch
+     * Storage partition configuration
 
 # Secret with storage provider credentials
 
@@ -149,12 +155,13 @@ Create a secret where the migration provider is setup, usually openshift-mtv
 and put the credentials of the storage system. All of the provider are required
 to have a secret with those required fields
 
-```
-STORAGE_HOSTNAME
-STORAGE_USERNAME
-STORAGE_PASSWORD
-STORAGE_SKIP_SSL_VERIFICATION
-```
+| Key | Value | Mandatory |
+| --- | --- | --- |
+| STORAGE_HOSTNAME | ip/hostname | y |
+| STORAGE_USERNAME | string | y |
+| STORAGE_PASSWORD | string | y |
+| STORAGE_SKIP_SSL_VERIFICATION | true/false | n |
+
 
 Provider specific entries in the secret shall be documented below:
 
@@ -163,22 +170,31 @@ Provider specific entries in the secret shall be documented below:
 
 ## NetApp ONTAP
 
-Add these keys to the secret mentioned in the storage map:
+| Key | Value | Description |
+| --- | --- | --- |
+| ONTAP_SVM | string | the SVM to use in all the client interactions. Can be taken from trident.netapp.io/v1/TridentBackend.config.ontap_config.svm resource field. |
 
-`ONTAP_SVM` - the SVM to use in all the client interactions. Can be taken from 
-trident.netapp.io/v1/TridentBackend.config.ontap_config.svm resource field.
+
+## Pure FlashArray
+
+| Key | Value | Description |
+| --- | --- | --- |
+| PURE_CLUSTER_PREFIX | string | Cluster prefix is set in the StorageCluster resource. Get it with  `printf "px_%.8s" $(oc get storagecluster -A -o=jsonpath='{.items[?(@.spec.cloudStorage.provider=="pure")].status.clusterUid}')` |
+
 
 ## Dell PowerMax
 
-Add these keys to the secret mentioned in the storage map:
+| Key | Value | Description |
+| --- | --- | --- |
+| POWERMAX_SYMMETRIX_ID | string | the symmetrix id of the storage array. Can be taken from the ConfigMap under the 'powermax' namespace, which the CSI driver uses. |
 
-`POWERMAX_SYMMETRIX_ID` - the symmetrix id of the storage array. Can be taken
-from the ConfigMap under the 'powermax' namespace, which the CSI driver uses.
 
 ## Dell PowerFlex
 
-`POWERFLEX_SYSTEM_ID` - the system id of the storage array. Can be taken from `vxflexos-config` from the `vxflexos` namespace
-or the openshift-operators namespace.
+| Key | Value | Description |
+| --- | --- | --- |
+| POWERFLEX_SYSTEM_ID | string | the system id of the storage array. Can be taken from `vxflexos-config` from the `vxflexos` namespace or the openshift-operators namespace. |
+
 
 # Setup copy offload
 - Set the feature flag
