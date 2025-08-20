@@ -126,12 +126,12 @@ jobs:
             echo "::warning::PR #$PR_NUMBER is still open ($pr_state). Consider waiting until it's merged."
           fi
           
-          # Check if target branch exists
-          echo "🔍 Verifying target branch '$BRANCH_NAME'..."
-          if git show-ref --verify --quiet "refs/remotes/origin/$BRANCH_NAME"; then
+          # Check if target branch exists on remote
+          echo "🔍 Verifying target branch '$BRANCH_NAME' on origin..."
+          if git ls-remote --exit-code --heads origin "$BRANCH_NAME" >/dev/null 2>&1; then
             echo "  ✅ Target branch exists"
           else
-            echo "::error::Target branch '$BRANCH_NAME' does not exist"
+            echo "::error::Target branch '$BRANCH_NAME' does not exist on remote 'origin'"
             exit 1
           fi
           
