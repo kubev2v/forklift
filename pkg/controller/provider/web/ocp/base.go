@@ -2,6 +2,7 @@ package ocp
 
 import (
 	"context"
+	"encoding/json"
 	pathlib "path"
 
 	"github.com/gin-gonic/gin"
@@ -285,6 +286,13 @@ func (h Handler) NetworkAttachmentDefinitions(ctx *gin.Context, provider *api.Pr
 	h.clearError(ref.ToKind(&net.NetworkAttachmentDefinition{}))
 	for _, nad := range list.Items {
 		m := model.NetworkAttachmentDefinition{}
+		networkConfig := model.NetworkConfig{}
+		if err := json.Unmarshal([]byte(nad.Spec.Config), &networkConfig); err == nil {
+			if networkConfig.Type == model.OvnOverlayType &&
+				(networkConfig.Role == model.RolePrimary || networkConfig.Topology == model.TopologyLayer3) {
+				continue
+			}
+		}
 		m.With(&nad)
 		nets = append(nets, m)
 	}

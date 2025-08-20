@@ -17,6 +17,7 @@ import (
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/ovirt"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
+	"github.com/kubev2v/forklift/pkg/settings"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -268,14 +269,25 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 				Name: networkName,
 			}
 			kInterface := cnv.Interface{
-				Name:       networkName,
-				Model:      nic.Interface,
-				MacAddress: nic.MAC,
+				Name:  networkName,
+				Model: nic.Interface,
 			}
+			
+			if !r.Plan.DestinationHasUdnNetwork(r.Destination) || settings.Settings.UdnSupportsMac {
+				kInterface.MacAddress = nic.MAC
+			}
+
 			switch mapped.Destination.Type {
 			case Pod:
-				kNetwork.Pod = &cnv.PodNetwork{}
-				kInterface.Masquerade = &cnv.InterfaceMasquerade{}
+				if r.Plan.DestinationHasUdnNetwork(r.Destination) {
+					kNetwork.Pod = &cnv.PodNetwork{}
+					kInterface.Binding = &cnv.PluginBinding{
+						Name: "l2bridge",
+					}
+				} else {
+					kNetwork.Pod = &cnv.PodNetwork{}
+					kInterface.Masquerade = &cnv.InterfaceMasquerade{}
+				}
 			case Multus:
 				kNetwork.Multus = &cnv.MultusNetwork{
 					NetworkName: path.Join(mapped.Destination.Namespace, mapped.Destination.Name),
