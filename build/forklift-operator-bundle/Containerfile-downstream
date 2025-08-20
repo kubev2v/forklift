@@ -13,7 +13,7 @@ ARG OCP_VERSIONS
 
 ARG API_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-api-rhel9@sha256:b4a51d638fd05e64b22aeac095c6e5d118e902803bf2654766e7bc837518af91"
 
-ARG CONTROLLER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-controller-rhel9@sha256:8cd56ecd6dd0791b250c6799860270363d3f337b2f9acb4556de52ebf752321f"
+ARG CONTROLLER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-controller-rhel9@sha256:1e8ac84637c7e9a598031a3d45488d3d85a92f9ebeb727d7c68db5d38a494a6f"
 
 ARG MUST_GATHER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-must-gather-rhel8@sha256:155a21c93e7c3403e4ab9ec32e55e963602bfada61aa043c03b4d2baf0c9e1fc"
 
