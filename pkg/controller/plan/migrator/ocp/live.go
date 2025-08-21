@@ -1296,20 +1296,24 @@ func (r *Builder) VirtualMachine(vm *planapi.VMStatus) (object *cnv.VirtualMachi
 	if source.Object.Spec.RunStrategy != nil {
 		r.Labeler.SetAnnotation(object, AnnRestoreRunStrategy, string(runStrategy))
 	}
-	r.mapNetworks(object)
+	r.mapNetworks(source.Namespace, object)
 	return
 }
 
-func (r *Builder) mapNetworks(target *cnv.VirtualMachine) {
+func (r *Builder) mapNetworks(srcNS string, target *cnv.VirtualMachine) {
 	networkMap := make(map[string]api.DestinationNetwork)
 	for _, network := range r.Map.Network.Spec.Map {
-		networkMap[network.Source.Name] = network.Destination
+		networkMap[path.Join(network.Source.Namespace, network.Source.Name)] = network.Destination
 	}
 	for i := range target.Spec.Template.Spec.Networks {
 		network := &target.Spec.Template.Spec.Networks[i]
 		switch {
 		case network.Multus != nil:
-			destination := networkMap[network.Multus.NetworkName]
+			sourceNetwork := network.Multus.NetworkName
+			if len(strings.Split(sourceNetwork, "/")) == 1 {
+				sourceNetwork = path.Join(srcNS, sourceNetwork)
+			}
+			destination := networkMap[sourceNetwork]
 			network.Multus.NetworkName = path.Join(destination.Namespace, destination.Name)
 		case network.Pod != nil:
 		}
