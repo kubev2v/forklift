@@ -5,6 +5,7 @@ go 1.24.0
 toolchain go1.24.4
 
 require (
+	github.com/dell/gopowerstore v1.19.0
 	github.com/dell/goscaleio v1.19.1
 	github.com/devans10/pugo/flasharray v0.0.0-20241116160615-6bb8c469c9a0
 	github.com/konveyor/forklift-controller v0.0.0
@@ -27,7 +28,7 @@ require (
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
-	github.com/kubev2v/forklift v0.0.0-20250620125157-d13e1d020ae9 // indirect
+	github.com/kubev2v/forklift v0.0.0-20250813102318-c4b25b22d0b5 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/openshift/custom-resource-status v1.1.2 // indirect
@@ -101,7 +102,7 @@ require (
 	github.com/vishvananda/netlink v1.1.0 // indirect
 	github.com/vishvananda/netns v0.0.4 // indirect
 	github.com/zcalusic/sysinfo v1.1.2 // indirect
-	go.mongodb.org/mongo-driver v1.14.0 // indirect
+	go.mongodb.org/mongo-driver v1.17.2 // indirect
 	go.opentelemetry.io/otel v1.29.0 // indirect
 	go.opentelemetry.io/otel/metric v1.29.0 // indirect
 	go.opentelemetry.io/otel/trace v1.29.0 // indirect

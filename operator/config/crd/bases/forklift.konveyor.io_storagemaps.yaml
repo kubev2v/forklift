@@ -94,6 +94,7 @@ spec:
                               - primera3par
                               - pureFlashArray
                               - powerflex
+                              - powerstore
                               type: string
                           required:
                           - secretRef
