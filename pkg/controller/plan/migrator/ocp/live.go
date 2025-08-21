@@ -1198,11 +1198,11 @@ func (r *Builder) VirtualMachine(vm *planapi.VMStatus) (object *cnv.VirtualMachi
 	if source.Object.Spec.RunStrategy != nil {
 		r.Labeler.SetAnnotation(object, AnnRestoreRunStrategy, string(runStrategy))
 	}
-	r.mapNetworks(object)
+	r.mapNetworks(vm, object)
 	return
 }
 
-func (r *Builder) mapNetworks(target *cnv.VirtualMachine) {
+func (r *Builder) mapNetworks(vm *planapi.VMStatus, target *cnv.VirtualMachine) {
 	networkMap := make(map[string]api.DestinationNetwork)
 	for _, network := range r.Map.Network.Spec.Map {
 		networkMap[network.Source.Name] = network.Destination
@@ -1211,7 +1211,7 @@ func (r *Builder) mapNetworks(target *cnv.VirtualMachine) {
 		network := &target.Spec.Template.Spec.Networks[i]
 		switch {
 		case network.Multus != nil:
-			destination := networkMap[network.Multus.NetworkName]
+			destination := networkMap[path.Join(vm.Namespace, network.Multus.NetworkName)]
 			network.Multus.NetworkName = path.Join(destination.Namespace, destination.Name)
 		case network.Pod != nil:
 		}
