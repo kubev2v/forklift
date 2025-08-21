@@ -25,6 +25,11 @@ github.com/coreos/go-systemd/v22/dbus
 ## explicit
 github.com/davecgh/go-spew/spew
 # github.com/dell/gopowermax/v2 v2.9.0
+# github.com/dell/gopowerstore v1.19.0
+## explicit; go 1.24
+github.com/dell/gopowerstore
+github.com/dell/gopowerstore/api
+# github.com/dell/goscaleio v1.19.1
 ## explicit; go 1.23
 github.com/dell/gopowermax/v2
 github.com/dell/gopowermax/v2/api
@@ -398,7 +403,7 @@ github.com/x448/float16
 ## explicit; go 1.22
 github.com/zcalusic/sysinfo
 github.com/zcalusic/sysinfo/cpuid
-# go.mongodb.org/mongo-driver v1.14.0
+# go.mongodb.org/mongo-driver v1.17.2
 ## explicit; go 1.18
 go.mongodb.org/mongo-driver/bson
 go.mongodb.org/mongo-driver/bson/bsoncodec
