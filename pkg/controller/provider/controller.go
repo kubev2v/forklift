@@ -296,6 +296,9 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		r.Log.Info(
 			"Waiting connection tested or inventory created.")
 		result.RequeueAfter = base.SlowReQ
+	} else {
+		// requeue so that connections are re-tested periodically
+		result.RequeueAfter = base.LongReQ
 	}
 
 	// Done
