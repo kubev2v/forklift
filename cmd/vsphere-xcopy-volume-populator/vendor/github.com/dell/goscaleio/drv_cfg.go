@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -54,25 +55,48 @@ type ioctlGUID struct {
 	netIDTime  uint32
 }
 
+// Syscaller is an interface for syscall.Syscall
+type Syscaller interface {
+	Syscall(trap, a1, a2, a3 uintptr) (uintptr, uintptr, syscall.Errno)
+}
+
+// RealSyscall implements Syscaller using the real syscall.Syscall
+// Used in inttests
+type RealSyscall struct{}
+
+func (r RealSyscall) Syscall(trap, a1, a2, a3 uintptr) (uintptr, uintptr, syscall.Errno) {
+	return syscall.Syscall(trap, a1, a2, a3)
+}
+
 // DrvCfgIsSDCInstalled will check to see if the SDC kernel module is loaded
 func DrvCfgIsSDCInstalled() bool {
-	if SCINIMockMode == true {
+	if SCINIMockMode {
 		return true
 	}
 	// Check to see if the SDC device is available
-	info, err := os.Stat(SDCDevice)
+	info, err := statFileFunc(SDCDevice)
 	if err != nil {
 		return false
 	}
 	return !info.IsDir()
 }
 
+var statFileFunc = func(path string) (os.FileInfo, error) {
+	return os.Stat(path)
+}
+
+var openFileFunc = func(name string) (*os.File, error) {
+	return os.Open(filepath.Clean(name))
+}
+
+var syscaller Syscaller = RealSyscall{}
+
 // DrvCfgQueryGUID will return the GUID of the locally installed SDC
 func DrvCfgQueryGUID() (string, error) {
-	if SCINIMockMode == true {
+	if SCINIMockMode {
 		return mockGUID, nil
 	}
-	f, err := os.Open(SDCDevice)
+	f, err := openFileFunc(SDCDevice)
 	if err != nil {
 		return "", err
 	}
@@ -83,27 +107,33 @@ func DrvCfgQueryGUID() (string, error) {
 
 	opCode := _IO(_IOCTLBase, _IOCTLQueryGUID)
 
-	buf := [1]ioctlGUID{}
+	var buf ioctlGUID
 	// #nosec CWE-242, validated buffer is large enough to hold data
-	err = ioctl(f.Fd(), opCode, uintptr(unsafe.Pointer(&buf[0])))
+	err = ioctlWrapper(syscaller, f.Fd(), opCode, &buf)
 	if err != nil {
 		return "", fmt.Errorf("QueryGUID error: %v", err)
 	}
 
-	rc, err := strconv.ParseInt(hex.EncodeToString(buf[0].rc[0:1]), 16, 64)
+	rc, err := strconv.ParseInt(hex.EncodeToString(buf.rc[0:1]), 16, 64)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse return code: %v", err)
+	}
 	if rc != 65 {
-		return "", fmt.Errorf("Request to query GUID failed, RC=%d", rc)
+		return "", fmt.Errorf("request to query GUID failed, RC=%d", rc)
 	}
 
-	g := hex.EncodeToString(buf[0].uuid[:len(buf[0].uuid)])
+	g := hex.EncodeToString(buf.uuid[:len(buf.uuid)])
 	u, err := uuid.Parse(g)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse UUID: %v", err)
+	}
 	discoveredGUID := strings.ToUpper(u.String())
 	return discoveredGUID, nil
 }
 
 // DrvCfgQueryRescan preforms a rescan
 func DrvCfgQueryRescan() (string, error) {
-	f, err := os.Open(SDCDevice)
+	f, err := openFileFunc(SDCDevice)
 	if err != nil {
 		return "", fmt.Errorf("Powerflex SDC is not installed")
 	}
@@ -114,13 +144,13 @@ func DrvCfgQueryRescan() (string, error) {
 
 	opCode := _IO(_IOCTLBase, _IOCTLRescan)
 
-	var rc int64
+	var rcBuf ioctlGUID
 	// #nosec CWE-242, validated buffer is large enough to hold data
-	err = ioctl(f.Fd(), opCode, uintptr(unsafe.Pointer(&rc)))
+	err = ioctlWrapper(syscaller, f.Fd(), opCode, &rcBuf)
 	if err != nil {
-		return "", fmt.Errorf("Rescan error: %v", err)
+		return "", fmt.Errorf("rescan error: %v", err)
 	}
-	rcCode := strconv.FormatInt(rc, 10)
+	rcCode := strconv.FormatInt(int64(rcBuf.rc[0]), 10)
 
 	return rcCode, err
 }
@@ -137,7 +167,7 @@ type ConfiguredCluster struct {
 func DrvCfgQuerySystems() (*[]ConfiguredCluster, error) {
 	clusters := make([]ConfiguredCluster, 0)
 
-	if SCINIMockMode == true {
+	if SCINIMockMode {
 		systemID := mockSystem
 		sdcID := mockGUID
 		aCluster := ConfiguredCluster{
@@ -148,10 +178,9 @@ func DrvCfgQuerySystems() (*[]ConfiguredCluster, error) {
 		return &clusters, nil
 	}
 
-	cmd := exec.Command(drvCfg, "--query_mdm")
-	output, err := cmd.CombinedOutput()
+	output, err := executeFunc(drvCfg, "--query_mdm")
 	if err != nil {
-		return nil, fmt.Errorf("DrvCfgQuerySystems: Request to query MDM failed : %v", err)
+		return nil, fmt.Errorf("failed to query MDM: %v", err)
 	}
 
 	// Parse the output to extract MDM information
@@ -175,10 +204,15 @@ func DrvCfgQuerySystems() (*[]ConfiguredCluster, error) {
 	return &clusters, nil
 }
 
-func ioctl(fd, op, arg uintptr) error {
-	_, _, ep := syscall.Syscall(syscall.SYS_IOCTL, fd, op, arg)
-	if ep != 0 {
-		return syscall.Errno(ep)
+var executeFunc = func(name string, arg ...string) ([]byte, error) {
+	return exec.Command(name, arg...).CombinedOutput()
+}
+
+var ioctlWrapper = func(syscaller Syscaller, fd, op uintptr, arg *ioctlGUID) error {
+	// conversion of a Pointer to uintptr must appear in the call itself when calling syscall.Syscall
+	_, _, errno := syscaller.Syscall(syscall.SYS_IOCTL, fd, op, uintptr(unsafe.Pointer(arg))) // #nosec G103
+	if errno != 0 {
+		return errno
 	}
 	return nil
 }
