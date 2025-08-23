@@ -32,9 +32,10 @@ type MigrationType string
 
 const (
 	// Migration types
-	MigrationCold MigrationType = "cold"
-	MigrationWarm MigrationType = "warm"
-	MigrationLive MigrationType = "live"
+	MigrationCold           MigrationType = "cold"
+	MigrationWarm           MigrationType = "warm"
+	MigrationLive           MigrationType = "live"
+	MigrationOnlyConversion MigrationType = "conversion"
 )
 
 // PlanSpec defines the desired state of Plan.
@@ -82,10 +83,10 @@ type PlanSpec struct {
 	//   - .VmName: name of the VM
 	//   - .PlanName: name of the migration plan
 	//   - .DiskIndex: initial volume index of the disk
-	//   - .WinDriveLetter: Windows drive letter (lower case, if applicable, e.g. "c", require guest agent)
+	//   - .WinDriveLetter: Windows drive letter (lowercase, if applicable, e.g. "c", requires guest agent)
 	//   - .RootDiskIndex: index of the root disk
 	//   - .Shared: true if the volume is shared by multiple VMs, false otherwise
-	//   - .FileName: name of the file in the source provider (vmWare only, require guest agent)
+	//   - .FileName: name of the file in the source provider (VMware only, filename includes the .vmdk suffix)
 	// Note:
 	//   This template can be overridden at the individual VM level.
 	// Examples:
@@ -140,6 +141,16 @@ type PlanSpec struct {
 	//   - If migration fails the conversion pod will remain present even if this option is enabled.
 	// +optional
 	DeleteGuestConversionPod bool `json:"deleteGuestConversionPod,omitempty"`
+	// DeleteVmOnFailMigration controls whether the target VM created by this Plan is deleted when a migration fails.
+	// When true and the migration fails after the target VM has been created, the controller
+	// will delete the target VM (and related target-side resources) during failed-migration cleanup
+	// and when the Plan is deleted. When false (default), the target VM is preserved to aid
+	// troubleshooting. The source VM is never modified.
+	//
+	// Note: If the Plan-level option is set to true, the VM-level option will be ignored.
+	//
+	// +optional
+	DeleteVmOnFailMigration bool `json:"deleteVmOnFailMigration,omitempty"`
 	// InstallLegacyDrivers determines whether to install legacy windows drivers in the VM.
 	//The following Vm's are lack of SHA-2 support and need legacy drivers:
 	// Windows XP (all)
@@ -166,9 +177,9 @@ type PlanSpec struct {
 	// - false: Use high-performance VirtIO devices (requires VirtIO drivers already installed in source VM)
 	// +kubebuilder:default:=true
 	UseCompatibilityMode bool `json:"useCompatibilityMode,omitempty"`
-	// Migration type. e.g. "cold", "warm", "live". Supersedes the `warm` boolean if set.
+	// Migration type. e.g. "cold", "warm", "live", "conversion". Supersedes the `warm` boolean if set.
 	// +optional
-	// +kubebuilder:validation:Enum=cold;warm;live
+	// +kubebuilder:validation:Enum=cold;warm;live;conversion
 	Type MigrationType `json:"type,omitempty"`
 	// TargetPowerState specifies the desired power state of the target VM after migration.
 	// - "on": Target VM will be powered on after migration
@@ -240,7 +251,12 @@ func (p *Plan) ShouldUseV2vForTransfer() (bool, error) {
 	case VSphere:
 		// The virt-v2v transferes all disks attached to the VM. If we want to skip the shared disks so we don't transfer
 		// them multiple times we need to manage the transfer using KubeVirt CDI DataVolumes and v2v-in-place.
-		return !p.Spec.Warm && destination.IsHost() && p.Spec.MigrateSharedDisks && !p.Spec.SkipGuestConversion, nil
+		return !p.Spec.Warm && // The Warm Migraiton needs to use CDI to manage the snapshot delta
+				destination.IsHost() && // We can't monitor progress from the guest converison pod on the remote clusters
+				p.Spec.MigrateSharedDisks && // virt-v2v migrates all disks, to skip shared we need to control the disk selection
+				!p.Spec.SkipGuestConversion && // virt-v2v always converts the guest, to perform RawCopyMode we need to copy just disks via CDI
+				p.Spec.Type != MigrationOnlyConversion, // For only v2v-in-place conversion, we don't want to populate disks by v2v
+			nil
 	case Ova:
 		return true, nil
 	default:
