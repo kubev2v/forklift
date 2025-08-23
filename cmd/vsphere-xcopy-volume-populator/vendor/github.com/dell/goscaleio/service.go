@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/dell/goscaleio/log"
 	types "github.com/dell/goscaleio/types/v1"
 	"github.com/google/uuid"
 )
@@ -449,7 +450,7 @@ func (gc *GatewayClient) GetServiceDetailsByID(deploymentID string, newToken boo
 
 		defer func() {
 			if err := resp.Body.Close(); err != nil {
-				doLog(logger.Error, err.Error())
+				log.DoLog(log.Log.Error, err.Error())
 			}
 		}()
 
