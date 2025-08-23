@@ -13,7 +13,7 @@ RUN go mod download && go mod verify
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/.cache/go-build \
-    make build
+    make build test
 
 RUN make vmkfstools-wrapper
 
