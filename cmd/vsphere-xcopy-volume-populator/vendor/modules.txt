@@ -157,7 +157,6 @@ github.com/klauspost/compress/internal/le
 github.com/klauspost/compress/internal/snapref
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
-## explicit; go 1.23.0
 # github.com/kubernetes-csi/csi-proxy/client v1.1.3
 ## explicit; go 1.16
 github.com/kubernetes-csi/csi-proxy/client
@@ -846,8 +845,8 @@ k8s.io/utils/ptr
 ## explicit; go 1.22.0
 kubevirt.io/api/core
 kubevirt.io/api/core/v1
-# kubevirt.io/containerized-data-importer-api v1.60.3-0.20241105012228-50fbed985de9
-## explicit; go 1.22.0
+# kubevirt.io/containerized-data-importer-api v1.63.0
+## explicit; go 1.23.0
 kubevirt.io/containerized-data-importer-api/pkg/apis/core
 kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1
 # kubevirt.io/controller-lifecycle-operator-sdk/api v0.0.0-20220329064328-f3cc58c6ed90
