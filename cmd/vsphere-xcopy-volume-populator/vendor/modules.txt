@@ -15,8 +15,8 @@ github.com/cenkalti/backoff/v4
 # github.com/cespare/xxhash/v2 v2.3.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
-# github.com/coreos/go-systemd/v22 v22.5.0
-## explicit; go 1.12
+# github.com/coreos/go-systemd/v22 v22.6.0
+## explicit; go 1.23
 github.com/coreos/go-systemd/v22/dbus
 # github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 ## explicit
@@ -157,7 +157,6 @@ github.com/klauspost/compress/internal/le
 github.com/klauspost/compress/internal/snapref
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
-## explicit; go 1.23.0
 # github.com/kubernetes-csi/csi-proxy/client v1.1.3
 ## explicit; go 1.16
 github.com/kubernetes-csi/csi-proxy/client
