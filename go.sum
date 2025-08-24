@@ -253,8 +253,8 @@ github.com/openshift/library-go v0.0.0-20230626162119-954ade536d6d h1:RXJqcNJPjU
 github.com/openshift/library-go v0.0.0-20230626162119-954ade536d6d/go.mod h1:PegtilvJPBJXjJG3AV8uL1a0SAnBr6K67ShNiWVb40M=
 github.com/ovirt/go-ovirt v0.0.0-20230808190322-9fd1992199b2 h1:SGD34D2dmrTzqyLToETTuZnN+YxZF1QaXsvqrCOkIPo=
 github.com/ovirt/go-ovirt v0.0.0-20230808190322-9fd1992199b2/go.mod h1:Zkdj9/rW6eyuw0uOeEns6O3pP5G2ak+bI/tgkQ/tEZI=
-github.com/pelletier/go-toml/v2 v2.2.3 h1:YmeHyLY8mFWbdkNWwpr+qIL2bEqT0o95WSdkNHvL12M=
-github.com/pelletier/go-toml/v2 v2.2.3/go.mod h1:MfCQTFTvCcUyyvvwm1+G6H/jORL20Xlb6rzQu9GuUkc=
+github.com/pelletier/go-toml/v2 v2.2.4 h1:mye9XuhQ6gvn5h28+VilKrrPoQVanw5PMw/TB0t5Ec4=
+github.com/pelletier/go-toml/v2 v2.2.4/go.mod h1:2gIqNv+qfxSVS7cM2xJQKtLSTLUE9V8t9Stt+h56mCY=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkg/profile v1.7.0 h1:hnbDkaNWPCLMO9wGLdBFTIZvzDrDfBM2072E1S9gJkA=
