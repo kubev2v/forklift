@@ -389,7 +389,7 @@ github.com/openshift/library-go/pkg/template/templateprocessing
 # github.com/ovirt/go-ovirt v0.0.0-20230808190322-9fd1992199b2
 ## explicit; go 1.15
 github.com/ovirt/go-ovirt
-# github.com/pelletier/go-toml/v2 v2.2.3
+# github.com/pelletier/go-toml/v2 v2.2.4
 ## explicit; go 1.21.0
 github.com/pelletier/go-toml/v2
 github.com/pelletier/go-toml/v2/internal/characters
