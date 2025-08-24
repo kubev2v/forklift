@@ -157,7 +157,6 @@ github.com/klauspost/compress/internal/le
 github.com/klauspost/compress/internal/snapref
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
-## explicit; go 1.23.0
 # github.com/kubernetes-csi/csi-proxy/client v1.1.3
 ## explicit; go 1.16
 github.com/kubernetes-csi/csi-proxy/client
@@ -543,7 +542,7 @@ google.golang.org/protobuf/types/gofeaturespb
 google.golang.org/protobuf/types/known/anypb
 google.golang.org/protobuf/types/known/durationpb
 google.golang.org/protobuf/types/known/timestamppb
-# gopkg.in/evanphx/json-patch.v4 v4.12.0
+# gopkg.in/evanphx/json-patch.v4 v4.13.0
 ## explicit
 gopkg.in/evanphx/json-patch.v4
 # gopkg.in/inf.v0 v0.9.1
