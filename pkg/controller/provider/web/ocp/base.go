@@ -250,21 +250,38 @@ func (h Handler) NetworkAttachmentDefinitions(ctx *gin.Context, provider *api.Pr
 	if err != nil {
 		return
 	}
-	list := net.NetworkAttachmentDefinitionList{}
-	options := h.ListOptions(ctx)
+
+	// Determine which namespaces to query
+	var namespacesToQuery []string
 	if provider != nil && provider.IsRestrictedHost() {
-		options = append(options, ocpclient.InNamespace(provider.GetNamespace()))
-		options = append(options, ocpclient.InNamespace(core.NamespaceDefault))
+		// For restricted host providers, query specific namespaces
+		namespacesToQuery = []string{provider.GetNamespace(), core.NamespaceDefault}
+	} else {
+		// For non-restricted providers, query all namespaces (empty slice means no namespace restriction)
+		namespacesToQuery = []string{""}
 	}
-	err = client.List(context.TODO(), &list, options...)
-	if err != nil {
-		return
+
+	// Query each namespace and collect results, empty namespace means all namespaces
+	for _, ns := range namespacesToQuery {
+		list := net.NetworkAttachmentDefinitionList{}
+		options := h.ListOptions(ctx)
+		if ns != "" {
+			options = append(options, ocpclient.InNamespace(ns))
+		}
+
+		err = client.List(context.TODO(), &list, options...)
+		if err != nil {
+			return
+		}
+
+		// Convert items to model objects and append to results
+		for _, nad := range list.Items {
+			m := model.NetworkAttachmentDefinition{}
+			m.With(&nad)
+			nets = append(nets, m)
+		}
 	}
-	for _, nad := range list.Items {
-		m := model.NetworkAttachmentDefinition{}
-		m.With(&nad)
-		nets = append(nets, m)
-	}
+
 	return
 }
 
