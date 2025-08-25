@@ -121,6 +121,7 @@ func (r *Ensurer) SharedConfigMaps(vm *planapi.VMStatus, configMaps []core.Confi
 							configMap.Name),
 						"forklift-created", false)
 				}
+				err = nil
 				continue
 			}
 			err = liberr.Wrap(err, "Failed to create ConfigMap.", "configMap",
@@ -162,6 +163,7 @@ func (r *Ensurer) SharedSecrets(vm *planapi.VMStatus, secrets []core.Secret) (er
 							secret.Name),
 						"forklift-created", false)
 				}
+				err = nil
 				continue
 			}
 			err = liberr.Wrap(err, "Failed to create Secret.", "secret",

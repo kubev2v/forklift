@@ -1507,6 +1507,20 @@ func (r *Builder) Secrets(vm *planapi.VMStatus) (list []core.Secret, err error) 
 		return
 	}
 	sources := []types.NamespacedName{}
+	for _, cred := range virtualMachine.Object.Spec.Template.Spec.AccessCredentials {
+		switch {
+		case cred.SSHPublicKey != nil:
+			if cred.SSHPublicKey.Source.Secret != nil {
+				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: cred.SSHPublicKey.Source.Secret.SecretName}
+				sources = append(sources, key)
+			}
+		case cred.UserPassword != nil:
+			if cred.UserPassword.Source.Secret != nil {
+				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: cred.UserPassword.Source.Secret.SecretName}
+				sources = append(sources, key)
+			}
+		}
+	}
 	for _, vol := range virtualMachine.Object.Spec.Template.Spec.Volumes {
 		switch {
 		case vol.Secret != nil:
