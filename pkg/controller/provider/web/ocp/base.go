@@ -271,7 +271,6 @@ func (h Handler) NetworkAttachmentDefinitions(ctx *gin.Context, provider *api.Pr
 
 		err = client.List(context.TODO(), &list, options...)
 		if err != nil {
-			h.setError(ref.ToKind(&net.NetworkAttachmentDefinition{}), err)
 			return
 		}
 
@@ -283,7 +282,6 @@ func (h Handler) NetworkAttachmentDefinitions(ctx *gin.Context, provider *api.Pr
 		}
 	}
 
-	h.clearError(ref.ToKind(&net.NetworkAttachmentDefinition{}))
 	return
 }
 
