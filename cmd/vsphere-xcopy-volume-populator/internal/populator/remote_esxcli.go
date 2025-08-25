@@ -15,7 +15,8 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const xcopyInitiatorGroup = "xcopy-esxs"
+var xcopyInitiatorGroup = "xcopy-esxs"
+
 const taskPollingInterval = 5 * time.Second
 
 var progressPattern = regexp.MustCompile(`\s(\d+)\%`)
@@ -282,8 +283,8 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		// map the LUN back to the original OCP worker
 		klog.Infof("about to map the volume back to the originalInitiatorGroups, which are: %s", originalInitiatorGroups)
 		for _, group := range originalInitiatorGroups {
-			_, err := p.StorageApi.Map(group, lun, mappingContext)
-			if err != nil {
+			_, errMap := p.StorageApi.Map(group, lun, mappingContext)
+			if errMap != nil {
 				klog.Warningf("failed to map the volume back the original holder - this may cause problems: %v", errMap)
 			}
 		}
