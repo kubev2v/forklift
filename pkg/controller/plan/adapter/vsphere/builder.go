@@ -607,10 +607,6 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 		// otherwise, let the storage profile decide the default values.
 		if mapped.Destination.AccessMode != "" {
 			dvSpec.Storage.AccessModes = []core.PersistentVolumeAccessMode{mapped.Destination.AccessMode}
-		} else {
-			// we expect the storage class for migration to support RWX for live migration to work.
-			// In case the override is needed, set it in the StorageMap mapping
-			dvSpec.Storage.AccessModes = []core.PersistentVolumeAccessMode{core.ReadWriteMany}
 		}
 		if mapped.Destination.VolumeMode != "" {
 			dvSpec.Storage.VolumeMode = &mapped.Destination.VolumeMode
@@ -1321,10 +1317,10 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 						},
 					},
 				}
-				// set the access mode and volume mode if they were specified in the storage map.
-				// otherwise, let the storage profile decide the default values.
 				if mapped.Destination.AccessMode != "" {
 					pvc.Spec.AccessModes = []core.PersistentVolumeAccessMode{mapped.Destination.AccessMode}
+				} else {
+					pvc.Spec.AccessModes = []core.PersistentVolumeAccessMode{core.ReadWriteMany}
 				}
 
 				if annotations == nil {
