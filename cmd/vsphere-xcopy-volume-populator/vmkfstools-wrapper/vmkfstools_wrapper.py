@@ -52,6 +52,9 @@ def clone(args):
         with open(os.path.join(tmp_dir, "rdmfile"), "w") as rdmfile_file:
             rdmfile_file.write(f"{rdmfile}\n")
 
+        with open(os.path.join(tmp_dir, "targetLun"), "w") as target_lun_file:
+            target_lun_file.write(f"{os.path.basename(target)}\n")
+
         result = {"taskId": str(task_id),  "pid": int(task.pid)}
         print(XML.format("0", json.dumps(result)))
 
@@ -85,15 +88,22 @@ def taskGet(args):
                   "exitCode": "1", "lastLine": line.rstrip(), "stdErr": e}
         print(XML.format("1", json.dumps(result)))
         return
-    if was_xcopy_used(os.path.basename(args.target_lun)):
-        xcopy_used = "XCopy was used"
-    else:
-        xcopy_used = "XCopy was not used"
+    try:
+        with open(os.path.join(tmp_dir, "targetLun"), "r") as target_lun_file:
+            target_lun = target_lun_file.read()
+        if was_xcopy_used(target_lun):
+            xcopy_used = "XCopy was used"
+        else:
+            xcopy_used = "XCopy was not used"
 
-    result = {"taskId": args.task_id[0], "pid": int(pid),
-              "exitCode": exitcode, "lastLine": line.rstrip(),
-               "xcopyUsed": xcopy_used, "stdErr": ste}
-    print(XML.format("0", json.dumps(result)))
+        result = {"taskId": args.task_id[0], "pid": int(pid),
+                "exitCode": exitcode, "lastLine": line.rstrip(),
+                "xcopyUsed": xcopy_used, "stdErr": ste}
+        print(XML.format("0", json.dumps(result)))
+    except Exception as e:
+        result = {"taskId": args.task_id[0], "pid": int(pid),
+                  "exitCode": "1", "lastLine": line.rstrip(), "stdErr": e}
+        print(XML.format("1", json.dumps(result)))
 
 
 def taskClean(args):
@@ -129,7 +139,7 @@ def extract_rdmdisk_file(rdm_file):
     return ""
 
 def was_xcopy_used(target_lun):
-    stats_path = f"/storage/scsifw/devices/{target_lun}/stats"
+    stats_path = f"/storage/scsifw/devices/{target_lun.strip()}/stats"
 
     try:
         target_lun_stats = subprocess.run(
@@ -146,8 +156,9 @@ def was_xcopy_used(target_lun):
     for statistic in target_lun_stats.stdout.splitlines():
         if "total clone write ops" in statistic.lower():
             try:
-                write_ops = int(statistic.strip().split()[-1])
+                write_ops = int(statistic.split(':')[1])
             except ValueError:
+                logging.error(f"Error: Unable to parse statistic: {statistic.split(':')[1]}")
                 write_ops = 0
             break
 
