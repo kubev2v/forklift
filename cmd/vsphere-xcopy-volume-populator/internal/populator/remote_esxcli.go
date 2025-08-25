@@ -26,11 +26,12 @@ type vmkfstoolsClone struct {
 }
 
 type vmkfstoolsTask struct {
-	Pid      int    `json:"pid"`
-	ExitCode string `json:"exitCode"`
-	Stderr   string `json:"stdErr"`
-	LastLine string `json:"lastLine"`
-	TaskId   string `json:"taskId"`
+	Pid       int    `json:"pid"`
+	ExitCode  string `json:"exitCode"`
+	Stderr    string `json:"stdErr"`
+	LastLine  string `json:"lastLine"`
+	XcopyUsed string `json:"xcopyUsed"`
+	TaskId    string `json:"taskId"`
 }
 
 type EsxCli interface {
