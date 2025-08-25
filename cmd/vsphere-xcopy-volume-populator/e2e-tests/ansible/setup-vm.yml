@@ -1,0 +1,288 @@
+---
+# Optimized Ansible playbook to create and configure a test VM for vSphere XCOPY testing
+
+- name: Create and Configure Test VM for vSphere XCOPY
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    ansible_python_interpreter: /opt/venv/bin/python3
+    # Environment variables
+    vm_name: "{{ lookup('env', 'VM_NAME') | default('copyoffload-test-vm') }}"
+    vsphere_host: "{{ lookup('env', 'VSPHERE_HOST') }}"
+    vsphere_username: "{{ lookup('env', 'VSPHERE_USERNAME') }}"
+    vsphere_password: "{{ lookup('env', 'VSPHERE_PASSWORD') }}"
+    vsphere_validate_certs: "{{ lookup('env', 'VSPHERE_VALIDATE_CERTS') | default(false, true) }}"
+    datacenter: "{{ lookup('env', 'VSPHERE_DATACENTER') }}"
+    cluster: "{{ lookup('env', 'VSPHERE_CLUSTER') | default('') }}"
+    datastore: "{{ lookup('env', 'VSPHERE_DATASTORE') | trim }}"
+    network: "{{ lookup('env', 'VSPHERE_NETWORK') }}"
+    vm_folder: "{{ lookup('env', 'VSPHERE_FOLDER') | default('/vm') }}"
+    vm_template: "{{ lookup('env', 'VM_TEMPLATE') | default(lookup('env', 'VM_TEMPLATE_NAME'), true) | default('') }}"
+    vm_iso_path: "{{ lookup('env', 'VM_ISO_PATH') | default('') }}"
+    vm_os_type: "{{ lookup('env', 'VM_OS_TYPE') | default('linux-rhel8') }}"
+    vm_disk_size: "{{ lookup('env', 'VM_DISK_SIZE') | default(lookup('env', 'VM_DISK_SIZE_GB'), true) | default('20') | int }}"
+    vm_disk_type: "{{ lookup('env', 'VM_DISK_TYPE') | default('thin') }}"
+    vm_memory: "{{ lookup('env', 'VM_MEMORY') | default(lookup('env', 'VM_MEMORY_MB'), true) | default('4096') | int }}"
+    vm_cpu: "{{ lookup('env', 'VM_CPU') | default(lookup('env', 'VM_CPU_COUNT'), true) | default('2') | int }}"
+    vm_test_data_size_mb: "{{ lookup('env', 'VM_TEST_DATA_SIZE_MB') | default('1024') | int }}"
+
+    # OS configurations
+    os_configs:
+      linux-rhel8:
+        guest_id: "rhel8_64Guest"
+        is_linux: true
+      linux-rhel9:
+        guest_id: "rhel9_64Guest"
+        is_linux: true
+      linux-ubuntu2004:
+        guest_id: "ubuntu64Guest"
+        is_linux: true
+      linux-ubuntu2204:
+        guest_id: "ubuntu64Guest"
+        is_linux: true
+      windows-2019:
+        guest_id: "windows2019srv_64Guest"
+        is_linux: false
+      windows-2022:
+        guest_id: "windows2019srv_64Guest"
+        is_linux: false
+    current_os_config: "{{ os_configs[vm_os_type] | default(os_configs['linux-rhel8']) }}"
+    vm_guest_id: "{{ current_os_config.guest_id }}"
+    is_linux_os: "{{ current_os_config.is_linux }}"
+
+  tasks:
+    - name: Validate required environment variables
+      ansible.builtin.assert:
+        that:
+          - vsphere_host | mandatory
+          - vsphere_username | mandatory
+          - vsphere_password | mandatory
+          - datacenter | mandatory
+          - datastore | mandatory
+          - network | mandatory
+        fail_msg: "A required vSphere environment variable is not set or empty"
+
+    - name: Resolve datastore name and MoID
+      ansible.builtin.shell: |
+        python3 -c "
+        import os, ssl, json, sys
+        from pyVim.connect import SmartConnect, Disconnect
+        from pyVmomi import vim
+
+        vsphere_verify_ssl = os.environ.get('VSPHERE_VERIFY_SSL', 'true').lower()
+        if vsphere_verify_ssl in ['false', 'no', '0']:
+            context = ssl._create_unverified_context()
+        else:
+            context = ssl.create_default_context()
+
+        vsphere_password = os.environ.get('VSPHERE_PASSWORD')
+
+        try:
+            si = SmartConnect(host='{{ vsphere_host }}', user='{{ vsphere_username }}', pwd=vsphere_password, sslContext=context)
+            if not si:
+                print(json.dumps({'error': 'Failed to connect to vSphere'}), file=sys.stderr)
+                sys.exit(1)
+
+            content = si.content
+            datastore_obj = None
+            datastores = content.viewManager.CreateContainerView(
+                container=content.rootFolder,
+                type=[vim.Datastore],
+                recursive=True
+            ).view
+
+            for ds in datastores:
+                if ds.name == '{{ datastore }}' or ds._moId == '{{ datastore }}':
+                    datastore_obj = ds
+                    break
+
+            if datastore_obj:
+                print(json.dumps({'name': datastore_obj.name, 'id': datastore_obj._moId}))
+            else:
+                print(json.dumps({'error': 'Datastore not found'}), file=sys.stderr)
+                sys.exit(1)
+
+            Disconnect(si)
+
+        except Exception as e:
+            print(json.dumps({'error': str(e)}), file=sys.stderr)
+            sys.exit(1)
+        "
+      environment:
+        VSPHERE_PASSWORD: "{{ vsphere_password }}"
+        VSPHERE_VERIFY_SSL: "{{ lookup('env', 'VSPHERE_VERIFY_SSL') | default('true') }}"
+      register: datastore_info_result
+      changed_when: false
+
+    - name: Set datastore facts
+      ansible.builtin.set_fact:
+        datastore_name: "{{ (datastore_info_result.stdout | from_json).name }}"
+        datastore_id: "{{ (datastore_info_result.stdout | from_json).id }}"
+      when: datastore_info_result.rc == 0
+
+    - name: Fail if datastore not found
+      ansible.builtin.fail:
+        msg: "Failed to resolve datastore: {{ datastore_info_result.stderr | from_json | default({'error': 'Unknown error'}) }}"
+      when: datastore_info_result.rc != 0
+
+
+    - name: Create VM
+      community.vmware.vmware_guest:
+        hostname: "{{ vsphere_host }}"
+        username: "{{ vsphere_username }}"
+        password: "{{ vsphere_password }}"
+        validate_certs: "{{ vsphere_validate_certs }}"
+        datacenter: "{{ datacenter }}"
+        cluster: "{{ cluster | default(omit) }}"
+        folder: "{{ vm_folder }}"
+        name: "{{ vm_name }}"
+        state: present
+        template: "{{ vm_template if vm_template else omit }}"
+        guest_id: "{{ vm_guest_id if not vm_template else omit }}"
+        convert: "{{ vm_disk_type if vm_template else omit }}"
+        disk: "{{ disk_spec_no_template if not vm_template else omit }}"
+        hardware:
+          memory_mb: "{{ vm_memory }}"
+          num_cpus: "{{ vm_cpu }}"
+          boot_firmware: "{{ 'bios' if not vm_template else omit }}"
+        networks:
+          - name: "{{ network }}"
+            device_type: vmxnet3
+        cdrom: "{{ [{'controller_number': 0, 'unit_number': 0, 'type': 'iso', 'iso_path': vm_iso_path, 'state': 'present'}] if vm_iso_path else omit }}"
+      no_log: true
+      vars:
+        disk_spec_no_template:
+          - size_gb: "{{ vm_disk_size }}"
+            type: "{{ vm_disk_type }}"
+            datastore: "{{ datastore_name }}"
+
+    - name: Power on and get VM info
+      block:
+        - name: Power on VM
+          community.vmware.vmware_guest_powerstate:
+            hostname: "{{ vsphere_host }}"
+            username: "{{ vsphere_username }}"
+            password: "{{ vsphere_password }}"
+            validate_certs: "{{ vsphere_validate_certs }}"
+            name: "{{ vm_name }}"
+            state: powered-on
+          no_log: true
+
+        - name: Get VM info
+          community.vmware.vmware_guest_info:
+            hostname: "{{ vsphere_host }}"
+            username: "{{ vsphere_username }}"
+            password: "{{ vsphere_password }}"
+            validate_certs: "{{ vsphere_validate_certs }}"
+            name: "{{ vm_name }}"
+            datacenter: "{{ datacenter }}"
+          no_log: true
+          register: vm_info
+
+    - name: Wait for SSH to become available and add host key
+      when: is_linux_os and vm_template and vm_info.instance.ipv4 | default('')
+      block:
+        - name: Wait for SSH port
+          ansible.builtin.wait_for:
+            host: "{{ vm_info.instance.ipv4 }}"
+            port: 22
+            timeout: 300
+            delay: 10
+
+        - name: Scan for SSH host key
+          ansible.builtin.command:
+            argv:
+              - ssh-keyscan
+              - "-T"
+              - "10"
+              - "{{ vm_info.instance.ipv4 }}"
+          register: ssh_keyscan_result
+          changed_when: false
+
+        - name: Add SSH host key to known_hosts
+          ansible.builtin.known_hosts:
+            name: "{{ vm_info.instance.ipv4 }}"
+            key: "{{ ssh_keyscan_result.stdout }}"
+            state: present
+
+      rescue:
+        - name: Register SSH setup failure
+          ansible.builtin.set_fact:
+            ssh_setup_failed: true
+            ssh_failure_reason: "{{ ansible_failed_result.msg | default(ansible_failed_result) }}"
+
+        - name: Log SSH setup failure details
+          ansible.builtin.debug:
+            msg: |
+              SSH setup failed for VM: {{ vm_name }}
+              Host IP: {{ vm_info.instance.ipv4 | default('N/A') }}
+              Error: {{ ssh_failure_reason }}
+              This may indicate VM is not ready, network issues, or SSH service problems.
+
+        - name: Fail playbook due to SSH setup failure
+          ansible.builtin.fail:
+            msg: |
+              Critical failure: Unable to establish SSH connectivity to VM {{ vm_name }} at {{ vm_info.instance.ipv4 | default('N/A') }}.
+              Error details: {{ ssh_failure_reason }}
+              The VM may not be fully booted, SSH service may not be running, or there may be network connectivity issues.
+              Please check VM status and network configuration.
+
+      always:
+        - name: Report SSH setup status
+          ansible.builtin.debug:
+            msg: |
+              SSH setup phase completed for VM: {{ vm_name }}
+              Target IP: {{ vm_info.instance.ipv4 | default('N/A') }}
+              Status: {{ 'FAILED' if ssh_setup_failed | default(false) else 'SUCCESS' }}
+
+    - name: Check if test data already exists on Linux VM
+      ansible.builtin.command:
+        argv:
+          - ssh
+          - "root@{{ vm_info.instance.ipv4 }}"
+          - "test -f /home/test_data.bin && test -f /home/xcopy_test_marker.txt"
+      register: test_data_check
+      changed_when: false
+      failed_when: false
+
+    - name: Create test data on Linux VM
+      ansible.builtin.command:
+        argv:
+          - ssh
+          - "root@{{ vm_info.instance.ipv4 }}"
+          - |
+            dd if=/dev/urandom of=/home/test_data.bin bs=1M count={{ vm_test_data_size_mb }} 2>/dev/null && \
+            echo 'XCOPY_TEST_{{ vm_name }}' > /home/xcopy_test_marker.txt && \
+            sync
+      when:
+        - is_linux_os
+        - vm_template
+        - vm_info.instance.ipv4 | default('')
+        - test_data_check.rc != 0
+      changed_when: true
+      failed_when: false
+
+    - name: Save VM information and display results
+      block:
+        - name: Save VM environment file
+          ansible.builtin.copy:
+            content: |
+              export VM_NAME="{{ vm_name }}"
+              export VM_IP="{{ vm_info.instance.ipv4 | default('') }}"
+              export VM_UUID="{{ vm_info.instance.hw_product_uuid }}"
+              export VM_DATASTORE="{{ datastore_name }}"
+              export VM_DATASTORE_ID="{{ datastore_id }}"
+              export VM_DISK_PATH="[{{ datastore_name }}] {{ vm_name }}/{{ vm_name }}.vmdk"
+              export VM_STATUS="created"
+            dest: "./vm_info_{{ vm_name }}.env"
+            mode: '0644'
+
+        - name: Display completion summary
+          ansible.builtin.debug:
+            msg:
+              - "✅ VM {{ vm_name }} created successfully"
+              - "IP: {{ vm_info.instance.ipv4 | default('N/A') }}"
+              - "UUID: {{ vm_info.instance.hw_product_uuid }}"
+              - "Datastore: {{ datastore_name }} ({{ datastore_id }})"
+              - "Config saved to: vm_info_{{ vm_name }}.env"
