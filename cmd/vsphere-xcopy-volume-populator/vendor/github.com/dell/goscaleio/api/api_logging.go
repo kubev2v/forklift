@@ -21,6 +21,8 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"strings"
+
+	"github.com/dell/goscaleio/log"
 )
 
 func isBinOctetBody(h http.Header) bool {
@@ -48,7 +50,7 @@ func logRequest(
 		fmt.Printf("WriteIndented returned error: %s", err.Error())
 	}
 	if lf != nil {
-		lf(logger.Debug, w.String())
+		lf(log.Log.Debug, w.String())
 	}
 }
 
@@ -83,7 +85,7 @@ func logResponse(
 		fmt.Fprintln(w, scanner.Text())
 	}
 	if lf != nil {
-		lf(logger.Debug, w.String())
+		lf(log.Log.Debug, w.String())
 	}
 }
 
