@@ -266,7 +266,7 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 	if useLegacyDrivers {
 		env = append(env, core.EnvVar{
 			Name:  "VIRTIO_WIN",
-			Value: "/usr/local/virtio-win.iso",
+			Value: "/usr/local/virtio-win-legacy.iso",
 		})
 	}
 
