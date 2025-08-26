@@ -139,7 +139,7 @@ def was_xcopy_used(target_lun):
 
     try:
         target_lun_stats = subprocess.run(
-            ["vsish", "-e", "cat", stats_path],
+            ["vsish", "-r", "-e", "cat", stats_path],
             capture_output=True,
             text=True,
             check=True
@@ -150,9 +150,9 @@ def was_xcopy_used(target_lun):
 
     write_ops = 0
     for statistic in target_lun_stats.stdout.splitlines():
-        if "total clone write ops" in statistic.lower():
+        if "clonewriteops" in statistic.lower():
             try:
-                write_ops = int(statistic.split(':')[1])
+                write_ops = int(statistic.split(':')[1], 16)
             except ValueError:
                 logging.error(f"Error: Unable to parse statistic: {statistic.split(':')[1]}")
                 write_ops = 0
