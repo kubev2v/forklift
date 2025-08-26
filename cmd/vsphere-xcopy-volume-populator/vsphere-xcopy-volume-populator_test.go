@@ -123,9 +123,10 @@ func TestPopulator(t *testing.T) {
 	for _, tcase := range tests {
 		t.Run(tcase.name, func(t *testing.T) {
 			progressCh := make(chan uint)
+			cloneWriteBytes := make(chan uint)
 			quitCh := make(chan error)
 			tcase.setup()
-			result := underTest.Populate(tcase.sourceVmId, tcase.sourceVMDK, populator.PersistentVolume{Name: tcase.targetPVC}, progressCh, quitCh)
+			result := underTest.Populate(tcase.sourceVmId, tcase.sourceVMDK, populator.PersistentVolume{Name: tcase.targetPVC}, progressCh, quitCh, cloneWriteBytes)
 			assert.Equal(t, result, tcase.want)
 		})
 	}

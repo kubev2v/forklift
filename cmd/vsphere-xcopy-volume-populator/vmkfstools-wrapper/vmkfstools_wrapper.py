@@ -53,7 +53,7 @@ def clone(args):
             rdmfile_file.write(f"{rdmfile}\n")
 
         with open(os.path.join(tmp_dir, "targetLun"), "w") as target_lun_file:
-            target_lun_file.write(f"{os.path.basename(target)}\n")
+            target_lun_file.write(f"{os.path.basename(target)}")
 
         result = {"taskId": str(task_id),  "pid": int(task.pid)}
         print(XML.format("0", json.dumps(result)))
@@ -91,20 +91,16 @@ def taskGet(args):
     try:
         with open(os.path.join(tmp_dir, "targetLun"), "r") as target_lun_file:
             target_lun = target_lun_file.read()
-        if was_xcopy_used(target_lun):
-            xcopy_used = "XCopy was used"
-        else:
-            xcopy_used = "XCopy was not used"
-
-        result = {"taskId": args.task_id[0], "pid": int(pid),
-                "exitCode": exitcode, "lastLine": line.rstrip(),
-                "xcopyUsed": xcopy_used, "stdErr": ste}
-        print(XML.format("0", json.dumps(result)))
+        xcopy_used, xclone_writes = was_xcopy_used(target_lun)
     except Exception as e:
         result = {"taskId": args.task_id[0], "pid": int(pid),
                   "exitCode": "1", "lastLine": line.rstrip(), "stdErr": e}
         print(XML.format("1", json.dumps(result)))
 
+    result = {"taskId": args.task_id[0], "pid": int(pid),
+            "exitCode": exitcode, "lastLine": line.rstrip(),
+            "xcopyUsed": xcopy_used, "xcloneWrites": xclone_writes, "stdErr": ste}
+    print(XML.format("0", json.dumps(result)))
 
 def taskClean(args):
     tmp_dir = TMP_PREFIX.format(args.task_id[0])
@@ -148,9 +144,9 @@ def was_xcopy_used(target_lun):
             text=True,
             check=True
         )
-    except subprocess.CalledProcessError:
-        print(f"Error: Unable to read stats for device {target_lun}")
-        sys.exit(2)
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Error: Unable to read stats for device {target_lun}")
+        raise e
 
     write_ops = 0
     for statistic in target_lun_stats.stdout.splitlines():
@@ -162,7 +158,7 @@ def was_xcopy_used(target_lun):
                 write_ops = 0
             break
 
-    return write_ops > 0
+    return write_ops > 0, str(write_ops)
 
 
 def main():
