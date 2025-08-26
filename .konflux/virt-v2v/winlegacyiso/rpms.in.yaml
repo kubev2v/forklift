@@ -6,5 +6,5 @@ contentOrigin:
 context:
   containerfile:
     file: ../../../build/virt-v2v/Containerfile-downstream
-    stageName: win2008iso
+    stageName: winlegacyiso
 arches: [x86_64]
