@@ -8,7 +8,7 @@ feature_validation: true
 feature_volume_populator: true
 feature_copy_offload: false
 feature_ocp_live_migration: false
-feature_vmware_system_serial_number: false
+feature_vmware_system_serial_number: true
 
 k8s_cluster: false
 feature_auth_required: true

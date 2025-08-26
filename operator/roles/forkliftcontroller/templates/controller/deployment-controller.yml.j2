@@ -57,6 +57,10 @@ spec:
 {% else %}
           value: "true"
 {% endif %}
+{% if ocp_version is defined %}
+        - name: OPENSHIFT_VERSION
+          value: {{ ocp_version }}
+{% endif %}
 {% if controller_log_level is defined and controller_log_level is number %}
         - name: LOG_LEVEL
           value: "{{ controller_log_level }}"

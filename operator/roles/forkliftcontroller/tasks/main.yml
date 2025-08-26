@@ -30,6 +30,19 @@
       set_fact:
         k8s_cluster_version: "{{ lookup('k8s', cluster_info='version').kubernetes.gitVersion }}"
 
+  - when: "'route.openshift.io' in api_groups"
+    block:
+    - name: "Get cluster version information"
+      k8s_info:
+        api_version: config.openshift.io/v1
+        kind: ClusterVersion
+        name: version
+      register: cluster_version
+
+    - name: "Obtain ocp cluster version"
+      set_fact:
+        ocp_version: "{{ cluster_version.resources[0].status.history | selectattr('state', 'equalto', 'Completed') | map(attribute='version') | first }}"
+  
   - name: "Setup controller config map"
     k8s:
       state : present
