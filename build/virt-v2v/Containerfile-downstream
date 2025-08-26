@@ -1,4 +1,4 @@
-FROM registry.redhat.io/ubi9:9.6-1747219013 AS win2008iso
+FROM registry.redhat.io/ubi9:9.6-1747219013 AS winlegacyiso
 
 RUN rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
 RUN yum install -y --setopt=install_weak_deps=False virtio-win-1.9.4-2.el7.2
@@ -73,7 +73,7 @@ COPY --from=builder /app/image-converter /usr/local/bin/image-converter
 
 COPY --from=builder /app/virt-v2v-wrapper /usr/bin/virt-v2v-wrapper
 
-COPY --from=win2008iso /usr/share/virtio-win/virtio-win.iso /usr/share/virtio-win/virtio-win-2008.iso
+COPY --from=winlegacyiso /usr/share/virtio-win/virtio-win.iso /usr/local/virtio-win-legacy.iso
 
 ENTRYPOINT ["/usr/libexec/catatonit/catatonit", "/usr/bin/virt-v2v-wrapper"]
 
