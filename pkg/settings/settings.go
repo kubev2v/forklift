@@ -13,8 +13,9 @@ import (
 var Settings = ControllerSettings{}
 
 const (
-	OpenShift   = "OPENSHIFT"
-	Development = "DEVELOPMENT"
+	OpenShift        = "OPENSHIFT"
+	Development      = "DEVELOPMENT"
+	OpenShiftVersion = "OPENSHIFT_VERSION"
 )
 
 // Settings

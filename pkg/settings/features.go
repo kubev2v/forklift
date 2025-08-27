@@ -1,5 +1,11 @@
 package settings
 
+import (
+	"os"
+
+	"github.com/hashicorp/go-version"
+)
+
 // Environment Variables
 const (
 	FeatureOvirtWarmMigration        = "FEATURE_OVIRT_WARM_MIGRATION"
@@ -9,6 +15,11 @@ const (
 	FeatureOCPLiveMigration          = "FEATURE_OCP_LIVE_MIGRATION"
 	FeatureVmwareSystemSerialNumber  = "FEATURE_VMWARE_SYSTEM_SERIAL_NUMBER"
 )
+
+// OpenShift version where the FeatureVmwareSystemSerialNumber feature is supported:
+//   - https://issues.redhat.com/browse/CNV-64582
+//   - https://issues.redhat.com/browse/MTV-2988
+const ocpMinForVmwareSystemSerial = "4.20.0"
 
 // Feature gates.
 type Features struct {
@@ -27,6 +38,28 @@ type Features struct {
 	VmwareSystemSerialNumber bool
 }
 
+// isOpenShiftVersionAboveMinimum checks if OpenShift version is above or equal to minimum version using semantic versioning
+func (r *Features) isOpenShiftVersionAboveMinimum(minimumVersion string) bool {
+	openshiftVersionStr := os.Getenv(OpenShiftVersion)
+	if openshiftVersionStr == "" {
+		return false
+	}
+
+	// Parse the OpenShift version
+	openshiftVersion, err := version.NewVersion(openshiftVersionStr)
+	if err != nil {
+		return false
+	}
+
+	// Parse the minimum version
+	minVersion, err := version.NewVersion(minimumVersion)
+	if err != nil {
+		return false
+	}
+
+	return openshiftVersion.GreaterThanOrEqual(minVersion)
+}
+
 // Load settings.
 func (r *Features) Load() (err error) {
 	r.OvirtWarmMigration = getEnvBool(FeatureOvirtWarmMigration, false)
@@ -34,6 +67,6 @@ func (r *Features) Load() (err error) {
 	r.VsphereIncrementalBackup = getEnvBool(FeatureVsphereIncrementalBackup, false)
 	r.CopyOffload = getEnvBool(FeatureCopyOffload, false)
 	r.OCPLiveMigration = getEnvBool(FeatureOCPLiveMigration, false)
-	r.VmwareSystemSerialNumber = getEnvBool(FeatureVmwareSystemSerialNumber, false)
+	r.VmwareSystemSerialNumber = getEnvBool(FeatureVmwareSystemSerialNumber, true) && r.isOpenShiftVersionAboveMinimum(ocpMinForVmwareSystemSerial)
 	return
 }
