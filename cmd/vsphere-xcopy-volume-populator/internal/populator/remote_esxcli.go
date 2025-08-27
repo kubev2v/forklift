@@ -19,6 +19,7 @@ var xcopyInitiatorGroup = "xcopy-esxs"
 const taskPollingInterval = 5 * time.Second
 
 var progressPattern = regexp.MustCompile(`\s(\d+)\%`)
+var cloneProgressPattern = regexp.MustCompile(`(\d+)`)
 
 type vmkfstoolsClone struct {
 	Pid    int    `json:"pid"`
@@ -26,11 +27,13 @@ type vmkfstoolsClone struct {
 }
 
 type vmkfstoolsTask struct {
-	Pid      int    `json:"pid"`
-	ExitCode string `json:"exitCode"`
-	Stderr   string `json:"stdErr"`
-	LastLine string `json:"lastLine"`
-	TaskId   string `json:"taskId"`
+	Pid          int    `json:"pid"`
+	ExitCode     string `json:"exitCode"`
+	Stderr       string `json:"stdErr"`
+	LastLine     string `json:"lastLine"`
+	XcopyUsed    bool   `json:"xcopyUsed"`
+	XcloneWrites string `json:"xcloneWrites"`
+	TaskId       string `json:"taskId"`
 }
 
 type EsxCli interface {
@@ -55,7 +58,7 @@ func NewWithRemoteEsxcli(storageApi StorageApi, vsphereHostname, vsphereUsername
 
 }
 
-func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, progress chan<- uint, quit chan error) (errFinal error) {
+func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, progress chan<- uint, quit chan error, cloneProgressBytes chan<- uint) (errFinal error) {
 	// isn't it better to not call close the channel from the caller?
 	defer func() {
 		r := recover()
@@ -319,6 +322,12 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		if len(match) > 1 {
 			i, _ := strconv.Atoi(match[1])
 			progress <- uint(i)
+		}
+
+		xcloneWritesMatch := cloneProgressPattern.FindStringSubmatch(v.XcloneWrites)
+		if len(xcloneWritesMatch) > 1 {
+			i, _ := strconv.Atoi(xcloneWritesMatch[1])
+			cloneProgressBytes <- uint(i)
 		}
 
 		if v.ExitCode != "" {
