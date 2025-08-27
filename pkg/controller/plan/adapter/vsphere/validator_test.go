@@ -14,6 +14,7 @@ import (
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -96,25 +97,27 @@ var _ = Describe("vsphere validation tests", func() {
 				plan := createPlan()
 				ctx := plancontext.Context{
 					Plan: plan,
-					Source: plancontext.Source{Inventory: &mockInventory{
-						vm: model.VM{
-							VM1: model.VM1{
-								VM0: model.VM0{
-									ID:   "test-vm-id",
-									Name: "test",
+					Source: plancontext.Source{
+						Provider: createProvider(),
+						Inventory: &mockInventory{
+							vm: model.VM{
+								VM1: model.VM1{
+									VM0: model.VM0{
+										ID:   "test-vm-id",
+										Name: "test",
+									},
+									PowerState: "poweredOn",
 								},
-								PowerState: "poweredOn",
+								GuestNetworks: []vsphere.GuestNetwork{
+									{MAC: "mac1", Origin: "STATIC", IP: "192.168.1.5", PrefixLength: 24},
+									{MAC: "mac2", Origin: "DHCP", IP: ""},
+								},
+								NICs: []vsphere.NIC{
+									{MAC: "mac1"},
+									{MAC: "mac2"},
+								},
 							},
-							GuestNetworks: []vsphere.GuestNetwork{
-								{MAC: "mac1", Origin: "STATIC", IP: "192.168.1.5", PrefixLength: 24},
-								{MAC: "mac2", Origin: "DHCP", IP: ""},
-							},
-							NICs: []vsphere.NIC{
-								{MAC: "mac1"},
-								{MAC: "mac2"},
-							},
-						},
-					}},
+						}},
 				}
 				plan.Spec.PreserveStaticIPs = staticIPs
 				validator := &Validator{
@@ -267,8 +270,10 @@ var _ = Describe("vsphere validation tests", func() {
 			}
 
 			ctx := plancontext.Context{
-				Plan:   plan,
-				Source: plancontext.Source{Inventory: &mockInventory{}},
+				Plan: plan,
+				Source: plancontext.Source{
+					Provider:  createProvider(),
+					Inventory: &mockInventory{}},
 			}
 			validator := &Validator{
 				Context: &ctx,
@@ -304,6 +309,20 @@ func createPlan() *v1beta1.Plan {
 					ObjectMeta: metav1.ObjectMeta{Name: "test-vsphere-provider"},
 				},
 				Destination: &v1beta1.Provider{}},
+		},
+	}
+}
+
+var vsphereProviderType = v1beta1.VSphere
+
+func createProvider() *v1beta1.Provider {
+	return &v1beta1.Provider{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-provider", Namespace: "test"},
+		Spec: v1beta1.ProviderSpec{
+			Type:     &vsphereProviderType,
+			URL:      "https://127.0.0.1:443/sdk",
+			Secret:   core.ObjectReference{},
+			Settings: map[string]string{},
 		},
 	}
 }

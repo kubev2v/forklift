@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -243,7 +244,124 @@ var _ = Describe("vSphere builder", func() {
 		})
 	})
 
-	builder := createBuilder()
+	Context("Warm migration", func() {
+		It("should use the base disk for the backing file", func() {
+			// Setup
+			builder := createBuilder()
+			builder.Plan.Spec.Warm = true
+			vm := model.VM{
+				VM1: model.VM1{
+					VM0: model.VM0{
+						ID:   "test-vm-id",
+						Name: "test",
+					},
+					Disks: []vsphere.Disk{
+						{
+							Datastore: vsphere.Ref{ID: "ds-1"},
+							File:      "[datastore1] vm-123/vm-123-000001.vmdk",
+							Capacity:  1024 * 1024 * 1024, // 1 GiB
+							Bus:       container.SCSI,
+						},
+					},
+				},
+			}
+
+			dsMap := []v1beta1.StoragePair{
+				{
+					Source: ref.Ref{ID: "ds-1"},
+					Destination: v1beta1.DestinationStorage{
+						StorageClass: "test-sc",
+					},
+				},
+			}
+			storageMap := v1beta1.StorageMap{
+				Spec: v1beta1.StorageMapSpec{
+					Map: dsMap,
+				},
+			}
+
+			// Mock inventory
+			inventory := &mockInventory{
+				ds: model.Datastore{Resource: model.Resource{ID: "ds-1"}},
+				vm: vm,
+			}
+			builder.Source.Inventory = inventory
+			builder.Context.Map.Storage = &storageMap
+
+			dvTemplate := cdi.DataVolume{
+				ObjectMeta: meta.ObjectMeta{
+					Namespace:    "targetNS",
+					Annotations:  map[string]string{"foo/bar": "ff"},
+					GenerateName: vm.Name + "-123",
+				}}
+
+			// Execute
+			dvs, err := builder.DataVolumes(ref.Ref{ID: vm.ID}, &core.Secret{}, nil, &dvTemplate, nil)
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(dvs).To(HaveLen(1))
+			dv := dvs[0]
+			Expect(dv.Spec.Source.VDDK.BackingFile).To(Equal("[datastore1] vm-123/vm-123.vmdk"))
+		})
+	})
+
+	Context("Warm migration", func() {
+		It("should use the base disk for the backing file in DataVolumes", func() {
+			// Setup
+			builder := createBuilder()
+			builder.Plan.Spec.Warm = true
+			vm := model.VM{
+				VM1: model.VM1{
+					VM0: model.VM0{
+						ID:   "test-vm-id",
+						Name: "test",
+					},
+					Disks: []vsphere.Disk{
+						{
+							Datastore: vsphere.Ref{ID: "ds-1"},
+							File:      "[datastore1] vm-123/vm-123-000001.vmdk",
+							Capacity:  1024 * 1024 * 1024, // 1 GiB
+							Bus:       container.SCSI,
+						},
+					},
+				},
+			}
+
+			dsMap := []v1beta1.StoragePair{
+				{
+					Source: ref.Ref{ID: "ds-1"},
+					Destination: v1beta1.DestinationStorage{
+						StorageClass: "test-sc",
+					},
+				},
+			}
+			storageMap := v1beta1.StorageMap{
+				Spec: v1beta1.StorageMapSpec{
+					Map: dsMap,
+				},
+			}
+
+			// Mock inventory from validator_test.go
+			inventory := &mockInventory{
+				ds: model.Datastore{Resource: model.Resource{ID: "ds-1"}},
+				vm: vm,
+			}
+			builder.Source.Inventory = inventory
+			builder.Context.Map.Storage = &storageMap
+
+			// Execute
+			dvs, err := builder.DataVolumes(ref.Ref{ID: vm.ID}, &core.Secret{}, nil, &cdi.DataVolume{}, nil)
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(dvs).To(HaveLen(1))
+			dv := dvs[0]
+			Expect(dv.Spec.Source.VDDK.BackingFile).To(Equal("[datastore1] vm-123/vm-123.vmdk"))
+		})
+	})
+
+	var builder = createBuilder()
 	DescribeTable("should", func(vm *model.VM, outputMap string) {
 		Expect(builder.mapMacStaticIps(vm)).Should(Equal(outputMap))
 	},
@@ -505,9 +623,7 @@ func createBuilder(objs ...runtime.Object) *Builder {
 				Client: client,
 			},
 			Source: plancontext.Source{
-				Provider: &v1beta1.Provider{
-					ObjectMeta: meta.ObjectMeta{Name: "test-provider", Namespace: "test"},
-				},
+				Provider:  createProvider(),
 				Inventory: nil,
 				Secret: &core.Secret{
 					ObjectMeta: meta.ObjectMeta{Name: "test-provider-secret", Namespace: "test"},
