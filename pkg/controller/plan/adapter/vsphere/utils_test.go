@@ -1,19 +1,19 @@
-
 package vsphere
 
 import (
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"context"
+	"fmt"
+
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"context"
-	"fmt"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 type failingClient struct {
@@ -124,9 +124,9 @@ var _ = Describe("vsphere utils tests", func() {
 			}
 			pvc := &core.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "shared-pvc",
-					Namespace: "test",
-					Labels:    map[string]string{Shareable: "true"},
+					Name:        "shared-pvc",
+					Namespace:   "test",
+					Labels:      map[string]string{Shareable: "true"},
 					Annotations: map[string]string{"forklift.konveyor.io/disk-source": "[datastore1] vm/shared.vmdk"},
 				},
 			}
@@ -155,7 +155,7 @@ var _ = Describe("vsphere utils tests", func() {
 		It("should return true if SkipGuestConversion and UseCompatibilityMode are true", func() {
 			plan := &v1beta1.Plan{
 				Spec: v1beta1.PlanSpec{
-					SkipGuestConversion: true,
+					SkipGuestConversion:  true,
 					UseCompatibilityMode: true,
 				},
 			}
@@ -165,7 +165,7 @@ var _ = Describe("vsphere utils tests", func() {
 		It("should return false if SkipGuestConversion is false", func() {
 			plan := &v1beta1.Plan{
 				Spec: v1beta1.PlanSpec{
-					SkipGuestConversion: false,
+					SkipGuestConversion:  false,
 					UseCompatibilityMode: true,
 				},
 			}
@@ -175,7 +175,7 @@ var _ = Describe("vsphere utils tests", func() {
 		It("should return false if UseCompatibilityMode is false", func() {
 			plan := &v1beta1.Plan{
 				Spec: v1beta1.PlanSpec{
-					SkipGuestConversion: true,
+					SkipGuestConversion:  true,
 					UseCompatibilityMode: false,
 				},
 			}
