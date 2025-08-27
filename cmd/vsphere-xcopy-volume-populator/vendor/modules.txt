@@ -1,3 +1,6 @@
+# github.com/Masterminds/semver/v3 v3.4.0
+## explicit; go 1.21
+github.com/Masterminds/semver/v3
 # github.com/Microsoft/go-winio v0.6.0
 ## explicit; go 1.17
 github.com/Microsoft/go-winio
@@ -55,7 +58,7 @@ github.com/emicklei/go-restful/v3/log
 # github.com/fxamacker/cbor/v2 v2.7.0
 ## explicit; go 1.17
 github.com/fxamacker/cbor/v2
-# github.com/go-logr/logr v1.4.2
+# github.com/go-logr/logr v1.4.3
 ## explicit; go 1.18
 github.com/go-logr/logr
 github.com/go-logr/logr/funcr
@@ -107,6 +110,9 @@ github.com/go-openapi/swag
 # github.com/go-openapi/validate v0.24.0
 ## explicit; go 1.20
 github.com/go-openapi/validate
+# github.com/go-task/slim-sprig/v3 v3.0.0
+## explicit; go 1.20
+github.com/go-task/slim-sprig/v3
 # github.com/godbus/dbus/v5 v5.1.0
 ## explicit; go 1.12
 github.com/godbus/dbus/v5
@@ -139,6 +145,9 @@ github.com/google/go-cmp/cmp/internal/value
 ## explicit; go 1.12
 github.com/google/gofuzz
 github.com/google/gofuzz/bytesource
+# github.com/google/pprof v0.0.0-20250403155104-27863c87afa6
+## explicit; go 1.23
+github.com/google/pprof/profile
 # github.com/google/uuid v1.6.0
 ## explicit
 github.com/google/uuid
@@ -242,6 +251,41 @@ github.com/netapp/trident/utils/version
 # github.com/oklog/ulid v1.3.1
 ## explicit
 github.com/oklog/ulid
+# github.com/onsi/ginkgo/v2 v2.25.1
+## explicit; go 1.23.0
+github.com/onsi/ginkgo/v2
+github.com/onsi/ginkgo/v2/config
+github.com/onsi/ginkgo/v2/formatter
+github.com/onsi/ginkgo/v2/ginkgo
+github.com/onsi/ginkgo/v2/ginkgo/build
+github.com/onsi/ginkgo/v2/ginkgo/command
+github.com/onsi/ginkgo/v2/ginkgo/generators
+github.com/onsi/ginkgo/v2/ginkgo/internal
+github.com/onsi/ginkgo/v2/ginkgo/labels
+github.com/onsi/ginkgo/v2/ginkgo/outline
+github.com/onsi/ginkgo/v2/ginkgo/run
+github.com/onsi/ginkgo/v2/ginkgo/unfocus
+github.com/onsi/ginkgo/v2/ginkgo/watch
+github.com/onsi/ginkgo/v2/internal
+github.com/onsi/ginkgo/v2/internal/global
+github.com/onsi/ginkgo/v2/internal/interrupt_handler
+github.com/onsi/ginkgo/v2/internal/parallel_support
+github.com/onsi/ginkgo/v2/internal/testingtproxy
+github.com/onsi/ginkgo/v2/reporters
+github.com/onsi/ginkgo/v2/types
+# github.com/onsi/gomega v1.38.2
+## explicit; go 1.23.0
+github.com/onsi/gomega
+github.com/onsi/gomega/format
+github.com/onsi/gomega/internal
+github.com/onsi/gomega/internal/gutil
+github.com/onsi/gomega/matchers
+github.com/onsi/gomega/matchers/internal/miter
+github.com/onsi/gomega/matchers/support/goraph/bipartitegraph
+github.com/onsi/gomega/matchers/support/goraph/edge
+github.com/onsi/gomega/matchers/support/goraph/node
+github.com/onsi/gomega/matchers/support/goraph/util
+github.com/onsi/gomega/types
 # github.com/opencontainers/runc v1.1.13
 ## explicit; go 1.18
 github.com/opencontainers/runc/libcontainer/configs
@@ -311,6 +355,7 @@ github.com/vishvananda/netns
 ## explicit; go 1.23.0
 github.com/vmware/govmomi
 github.com/vmware/govmomi/cli/esx
+github.com/vmware/govmomi/crypto
 github.com/vmware/govmomi/fault
 github.com/vmware/govmomi/find
 github.com/vmware/govmomi/history
@@ -319,12 +364,23 @@ github.com/vmware/govmomi/internal/version
 github.com/vmware/govmomi/list
 github.com/vmware/govmomi/nfc
 github.com/vmware/govmomi/object
+github.com/vmware/govmomi/ovf
 github.com/vmware/govmomi/property
 github.com/vmware/govmomi/session
 github.com/vmware/govmomi/session/keepalive
+github.com/vmware/govmomi/simulator
+github.com/vmware/govmomi/simulator/esx
+github.com/vmware/govmomi/simulator/internal
+github.com/vmware/govmomi/simulator/vpx
 github.com/vmware/govmomi/task
+github.com/vmware/govmomi/toolbox/hgfs
+github.com/vmware/govmomi/toolbox/process
+github.com/vmware/govmomi/toolbox/vix
+github.com/vmware/govmomi/units
 github.com/vmware/govmomi/vapi/internal
 github.com/vmware/govmomi/vapi/rest
+github.com/vmware/govmomi/vapi/vm/dataset
+github.com/vmware/govmomi/vapi/vm/internal
 github.com/vmware/govmomi/view
 github.com/vmware/govmomi/vim25
 github.com/vmware/govmomi/vim25/debug
@@ -373,21 +429,33 @@ go.opentelemetry.io/otel/metric/embedded
 ## explicit; go 1.21
 go.opentelemetry.io/otel/trace
 go.opentelemetry.io/otel/trace/embedded
+# go.uber.org/automaxprocs v1.6.0
+## explicit; go 1.20
+go.uber.org/automaxprocs
+go.uber.org/automaxprocs/internal/cgroups
+go.uber.org/automaxprocs/internal/runtime
+go.uber.org/automaxprocs/maxprocs
 # go.uber.org/mock v0.5.2
 ## explicit; go 1.23
 go.uber.org/mock/gomock
 # go.uber.org/multierr v1.11.0
 ## explicit; go 1.19
 go.uber.org/multierr
-# golang.org/x/crypto v0.36.0
+# go.yaml.in/yaml/v3 v3.0.4
+## explicit; go 1.16
+go.yaml.in/yaml/v3
+# golang.org/x/crypto v0.41.0
 ## explicit; go 1.23.0
 golang.org/x/crypto/ssh/terminal
-# golang.org/x/mod v0.21.0
-## explicit; go 1.22.0
+# golang.org/x/mod v0.27.0
+## explicit; go 1.23.0
 golang.org/x/mod/semver
-# golang.org/x/net v0.38.0
+# golang.org/x/net v0.43.0
 ## explicit; go 1.23.0
 golang.org/x/net/context
+golang.org/x/net/html
+golang.org/x/net/html/atom
+golang.org/x/net/html/charset
 golang.org/x/net/http/httpguts
 golang.org/x/net/http2
 golang.org/x/net/http2/hpack
@@ -395,29 +463,40 @@ golang.org/x/net/idna
 golang.org/x/net/internal/httpcommon
 golang.org/x/net/internal/timeseries
 golang.org/x/net/trace
-# golang.org/x/oauth2 v0.23.0
-## explicit; go 1.18
+# golang.org/x/oauth2 v0.28.0
+## explicit; go 1.23.0
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
-# golang.org/x/sync v0.13.0
+# golang.org/x/sync v0.16.0
 ## explicit; go 1.23.0
 golang.org/x/sync/errgroup
-# golang.org/x/sys v0.31.0
+# golang.org/x/sys v0.35.0
 ## explicit; go 1.23.0
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
-# golang.org/x/term v0.30.0
+# golang.org/x/term v0.34.0
 ## explicit; go 1.23.0
 golang.org/x/term
-# golang.org/x/text v0.24.0
+# golang.org/x/text v0.28.0
 ## explicit; go 1.23.0
 golang.org/x/text/cases
+golang.org/x/text/encoding
+golang.org/x/text/encoding/charmap
+golang.org/x/text/encoding/htmlindex
+golang.org/x/text/encoding/internal
+golang.org/x/text/encoding/internal/identifier
+golang.org/x/text/encoding/japanese
+golang.org/x/text/encoding/korean
+golang.org/x/text/encoding/simplifiedchinese
+golang.org/x/text/encoding/traditionalchinese
+golang.org/x/text/encoding/unicode
 golang.org/x/text/internal
 golang.org/x/text/internal/language
 golang.org/x/text/internal/language/compact
 golang.org/x/text/internal/tag
+golang.org/x/text/internal/utf8internal
 golang.org/x/text/language
 golang.org/x/text/runes
 golang.org/x/text/secure/bidirule
@@ -427,9 +506,12 @@ golang.org/x/text/unicode/norm
 # golang.org/x/time v0.7.0
 ## explicit; go 1.18
 golang.org/x/time/rate
-# golang.org/x/tools v0.26.0
-## explicit; go 1.22.0
+# golang.org/x/tools v0.36.0
+## explicit; go 1.23.0
 golang.org/x/tools/cmd/stringer
+golang.org/x/tools/cover
+golang.org/x/tools/go/ast/edge
+golang.org/x/tools/go/ast/inspector
 golang.org/x/tools/go/gcexportdata
 golang.org/x/tools/go/packages
 golang.org/x/tools/go/types/objectpath
@@ -503,7 +585,7 @@ google.golang.org/grpc/serviceconfig
 google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
-# google.golang.org/protobuf v1.36.6
+# google.golang.org/protobuf v1.36.7
 ## explicit; go 1.22
 google.golang.org/protobuf/encoding/protodelim
 google.golang.org/protobuf/encoding/protojson
