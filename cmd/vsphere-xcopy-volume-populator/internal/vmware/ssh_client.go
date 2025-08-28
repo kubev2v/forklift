@@ -365,42 +365,18 @@ func testSSHConnectivity(ctx context.Context, hostIP string, privateKey []byte, 
 	klog.Infof("SSH test command output: '%s'", output)
 	klog.Infof("SSH test command error: %v", err)
 
-	if err != nil {
-		// Analyze the error to determine if it's a connectivity issue or expected script behavior
-		errorStr := strings.ToLower(err.Error())
-
-		// These errors indicate SSH key/connectivity problems
-		if strings.Contains(errorStr, "permission denied") ||
-			strings.Contains(errorStr, "connection refused") ||
-			strings.Contains(errorStr, "host key verification failed") ||
-			strings.Contains(errorStr, "authentication failed") {
-			klog.Infof("SSH connectivity issue detected: %v", err)
-			return false
-		}
-
-		// These errors indicate the script is running but failing as expected
-		if strings.Contains(errorStr, "task") && strings.Contains(errorStr, "not found") ||
-			strings.Contains(errorStr, "operation failed") ||
-			strings.Contains(output, "Error getting status") ||
-			strings.Contains(output, "Task test-task-id not found") {
-			klog.Infof("Script executed successfully (expected task not found error): %v", err)
-			return true
-		}
-
-		// Check if we got XML output indicating the script ran
-		if strings.Contains(output, "<?xml") || strings.Contains(output, "<o>") {
-			klog.Infof("Received XML response from script - SSH working correctly")
-			return true
-		}
-
-		// For any other error, assume it's a script execution issue but SSH is working
-		klog.Infof("Script executed with error (SSH working): %v", err)
+	if strings.Contains(output, "<?xml version=") {
+		klog.Infof("Received XML response from script - SSH working correctly")
 		return true
 	}
 
-	// If no error, that's also good - SSH is working
-	klog.Infof("SSH test completed successfully")
-	return true
+	if strings.Contains(output, "No such file or directory") && strings.Contains(output, ".py") {
+		klog.Infof("SSH working but script file not found - configuration issue")
+		return true
+	}
+
+	klog.Infof("SSH connectivity issue detected, none of the expecter responses were received: %v, err: %v", output, err)
+	return false
 }
 
 // getESXiVersion retrieves the ESXi version from the host
@@ -428,16 +404,22 @@ func getESXiVersion(vmwareClient Client, host *object.HostSystem, ctx context.Co
 }
 
 // ParseProgress extracts progress percentage from vmkfstools output
+// Example progress strings: "Clone: 15% done.", "Clone: 100% done."
 func ParseProgress(lastLine string) (uint, bool) {
-	allMatches := progressPattern.FindAllStringSubmatch(lastLine, -1)
-	if len(allMatches) > 0 {
-		lastMatch := allMatches[len(allMatches)-1]
-		if len(lastMatch) > 1 {
-			if progress, err := strconv.Atoi(lastMatch[1]); err == nil {
-				return uint(progress), true
-			}
+	klog.V(2).Infof("ParseProgress: parsing line: %q", lastLine)
+
+	// Use FindStringSubmatch since there should only be one progress pattern per line
+	match := progressPattern.FindStringSubmatch(lastLine)
+	if len(match) > 1 {
+		if progress, err := strconv.Atoi(match[1]); err == nil {
+			klog.V(2).Infof("ParseProgress: extracted progress: %d%%", progress)
+			return uint(progress), true
+		} else {
+			klog.Warningf("ParseProgress: failed to parse progress number from %q: %v", match[1], err)
 		}
 	}
+
+	klog.V(2).Infof("ParseProgress: no progress pattern found in line")
 	return 0, false
 }
 
