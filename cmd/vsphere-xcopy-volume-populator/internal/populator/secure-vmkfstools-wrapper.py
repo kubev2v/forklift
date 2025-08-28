@@ -53,7 +53,8 @@ def validate_path(path):
     allowed_prefixes = [
         '/vmfs/volumes/',      # Datastore volumes (source VMDK files)
         '/vmfs/devices/disks/', # ESXi disk devices (target devices for cloning)
-        '/tmp/'                # Temporary files
+        '/tmp/',
+        '/dev/disks/'                # Temporary files
     ]
     if not any(path.startswith(prefix) for prefix in allowed_prefixes):
         raise ValueError(f"Path not in allowed directories: {path}")

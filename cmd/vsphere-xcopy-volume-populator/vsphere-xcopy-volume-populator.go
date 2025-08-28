@@ -55,6 +55,7 @@ var (
 	vsphereUsername            string
 	vspherePassword            string
 	esxiCloneMethod            string
+	sshTimeoutSeconds          int
 
 	// kube args
 	httpEndpoint string
@@ -128,28 +129,41 @@ func main() {
 	var p populator.Populator
 
 	// Determine clone method - default to VIB unless SSH is explicitly set
-	method := strings.ToLower(strings.TrimSpace(esxiCloneMethod))
-	useVibMethod := method == "" || method == "vib"
+	methodStr := strings.ToLower(strings.TrimSpace(esxiCloneMethod))
+	var method populator.CloneMethod
+
+	switch methodStr {
+	case "", string(populator.CloneMethodVIB):
+		method = populator.CloneMethodVIB
+	case string(populator.CloneMethodSSH):
+		method = populator.CloneMethodSSH
+	default:
+		klog.Fatalf("Invalid ESXI_CLONE_METHOD: '%s'. Valid values are: '' (default), '%s', '%s'", methodStr, populator.CloneMethodVIB, populator.CloneMethodSSH)
+	}
+
+	useVibMethod := method != populator.CloneMethodSSH
 
 	if useVibMethod {
-		klog.Infof("Using VIB method for ESXi cloning")
+		klog.Infof("Using %s method for ESXi cloning", method)
 		vibP, err := populator.NewWithRemoteEsxcli(storageApi, vsphereHostname, vsphereUsername, vspherePassword)
 		if err != nil {
-			klog.Fatalf("Failed to create VIB-based remote esxcli populator: %s", err)
+			klog.Fatalf("Failed to create %s-based remote esxcli populator: %s", method, err)
 		}
 		p = vibP
 	} else {
-		klog.Infof("Using SSH method for ESXi cloning")
+		klog.Infof("Using %s method for ESXi cloning", method)
 		// Get SSH keys from environment variables set by provider controller
 		sshPrivateKey, sshPublicKey, err := getSSHKeysFromEnvironment()
 		if err != nil {
 			klog.Fatalf("Failed to get SSH keys from environment: %s", err)
 		}
+		klog.Infof("Debug: SSH keys retrieved, private key length: %d, public key length: %d", len(sshPrivateKey), len(sshPublicKey))
 
-		sshP, err := populator.NewWithRemoteEsxcliSSH(storageApi, vsphereHostname, vsphereUsername, vspherePassword, sshPrivateKey, sshPublicKey)
+		sshP, err := populator.NewWithRemoteEsxcliSSH(storageApi, vsphereHostname, vsphereUsername, vspherePassword, sshPrivateKey, sshPublicKey, sshTimeoutSeconds)
 		if err != nil {
-			klog.Fatalf("Failed to create SSH-based remote esxcli populator: %s", err)
+			klog.Fatalf("Failed to create %s-based remote esxcli populator: %s", method, err)
 		}
+		klog.Infof("Debug: SSH populator created successfully")
 		p = sshP
 	}
 
@@ -259,6 +273,7 @@ func handleArgs() {
 	flag.StringVar(&vsphereUsername, "vsphere-username", os.Getenv("GOVMOMI_USERNAME"), "vSphere's API username")
 	flag.StringVar(&vspherePassword, "vsphere-password", os.Getenv("GOVMOMI_PASSWORD"), "vSphere's API password")
 	flag.StringVar(&esxiCloneMethod, "esxi-clone-method", os.Getenv("ESXI_CLONE_METHOD"), "ESXi clone method: 'vib' (default) or 'ssh'")
+	flag.IntVar(&sshTimeoutSeconds, "ssh-timeout-seconds", 30, "SSH timeout in seconds for ESXi operations (default: 30)")
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 	// Metrics args

@@ -19,6 +19,16 @@ var xcopyInitiatorGroup = "xcopy-esxs"
 
 const taskPollingInterval = 5 * time.Second
 
+// CloneMethod represents the method used for cloning operations
+type CloneMethod string
+
+const (
+	// CloneMethodSSH uses SSH to perform cloning operations
+	CloneMethodSSH CloneMethod = "ssh"
+	// CloneMethodVIB uses VIB to perform cloning operations
+	CloneMethodVIB CloneMethod = "vib"
+)
+
 var progressPattern = regexp.MustCompile(`\s(\d+)\%`)
 
 type vmkfstoolsClone struct {
@@ -46,6 +56,7 @@ type RemoteEsxcliPopulator struct {
 	SSHPrivateKey []byte
 	SSHPublicKey  []byte
 	UseSSHMethod  bool
+	SSHTimeout    time.Duration
 }
 
 func NewWithRemoteEsxcli(storageApi StorageApi, vsphereHostname, vsphereUsername, vspherePassword string) (Populator, error) {
@@ -56,11 +67,12 @@ func NewWithRemoteEsxcli(storageApi StorageApi, vsphereHostname, vsphereUsername
 	return &RemoteEsxcliPopulator{
 		VSphereClient: c,
 		StorageApi:    storageApi,
-		UseSSHMethod:  false, // VIB method
+		UseSSHMethod:  false,            // VIB method
+		SSHTimeout:    30 * time.Second, // Default timeout (not used for VIB method)
 	}, nil
 }
 
-func NewWithRemoteEsxcliSSH(storageApi StorageApi, vsphereHostname, vsphereUsername, vspherePassword string, sshPrivateKey, sshPublicKey []byte) (Populator, error) {
+func NewWithRemoteEsxcliSSH(storageApi StorageApi, vsphereHostname, vsphereUsername, vspherePassword string, sshPrivateKey, sshPublicKey []byte, sshTimeoutSeconds int) (Populator, error) {
 	c, err := vmware.NewClient(vsphereHostname, vsphereUsername, vspherePassword)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create vmware client: %w", err)
@@ -74,6 +86,7 @@ func NewWithRemoteEsxcliSSH(storageApi StorageApi, vsphereHostname, vsphereUsern
 		SSHPrivateKey: sshPrivateKey,
 		SSHPublicKey:  sshPublicKey,
 		UseSSHMethod:  true,
+		SSHTimeout:    time.Duration(sshTimeoutSeconds) * time.Second,
 	}, nil
 }
 
@@ -91,16 +104,19 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		return err
 	}
 
-	var cloneMethodStr string
+	var cloneMethod CloneMethod
+	klog.Infof("Debug: UseSSHMethod field value: %t", p.UseSSHMethod)
 	if p.UseSSHMethod {
-		cloneMethodStr = "SSH"
+		cloneMethod = CloneMethodSSH
+		klog.Infof("Debug: Set cloneMethod to SSH")
 	} else {
-		cloneMethodStr = "VIB"
+		cloneMethod = CloneMethodVIB
+		klog.Infof("Debug: Set cloneMethod to VIB")
 	}
 
 	klog.Infof(
 		"Starting populate via remote esxcli vmkfstools (%s), source vmdk=%s, pv=%v",
-		cloneMethodStr,
+		cloneMethod,
 		sourceVMDKFile,
 		pv)
 	host, err := p.VSphereClient.GetEsxByVm(context.Background(), vmId)
@@ -382,11 +398,11 @@ func (p *RemoteEsxcliPopulator) executeVIBClone(host *object.HostSystem, vmDisk 
 // executeSSHClone performs the clone using the SSH method
 func (p *RemoteEsxcliPopulator) executeSSHClone(host *object.HostSystem, vmDisk VMDisk, targetLUN string, progress chan<- uint) error {
 	// Create a context with timeout to bound SSH enable/connect and script staging operations
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), p.SSHTimeout)
 	defer cancel()
 
 	// Setup secure script
-	finalScriptPath, err := ensureSecureScript(ctx, p.VSphereClient, host, vmDisk.Datastore, SecureScriptVersion)
+	finalScriptPath, err := ensureSecureScript(ctx, p.VSphereClient, host, vmDisk.Datastore)
 	if err != nil {
 		return fmt.Errorf("failed to ensure secure script: %w", err)
 	}
