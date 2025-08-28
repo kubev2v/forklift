@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/vmware/govmomi/object"
-	"github.com/vmware/govmomi/vim25/types"
 	"golang.org/x/crypto/ssh"
 	"k8s.io/klog/v2"
 )
@@ -425,71 +424,6 @@ func getESXiVersion(vmwareClient Client, host *object.HostSystem, ctx context.Co
 	}
 
 	return "", fmt.Errorf("could not parse ESXi version from command output")
-}
-
-// enableSSHService enables the SSH service on ESXi host using vSphere API
-func enableSSHService(vmwareClient Client, host *object.HostSystem, ctx context.Context) error {
-	hostServiceSystem, err := host.ConfigManager().ServiceSystem(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get service system: %w", err)
-	}
-
-	err = hostServiceSystem.Start(ctx, "TSM-SSH")
-	if err != nil {
-		services, listErr := hostServiceSystem.Service(ctx)
-		if listErr == nil {
-			for _, service := range services {
-				if service.Key == "TSM-SSH" {
-					if service.Running {
-						return nil
-					}
-					break
-				}
-			}
-		}
-		return fmt.Errorf("failed to start SSH service: %w", err)
-	}
-
-	return nil
-}
-
-// configureSSHFirewall enables the SSH firewall rule using vSphere API
-func configureSSHFirewall(host *object.HostSystem, ctx context.Context) error {
-	firewallSystem, err := host.ConfigManager().FirewallSystem(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get firewall system: %w", err)
-	}
-
-	err = firewallSystem.EnableRuleset(ctx, "sshServer")
-	if err != nil {
-		return fmt.Errorf("failed to enable SSH firewall ruleset: %w", err)
-	}
-
-	return nil
-}
-
-// suppressShellWarning disables the shell warning using vSphere API
-func suppressShellWarning(host *object.HostSystem, ctx context.Context) error {
-	configManager := host.ConfigManager()
-
-	optionManager, err := configManager.OptionManager(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get option manager: %w", err)
-	}
-
-	option := []types.BaseOptionValue{
-		&types.OptionValue{
-			Key:   "/UserVars/SuppressShellWarning",
-			Value: int32(1),
-		},
-	}
-
-	err = optionManager.Update(ctx, option)
-	if err != nil {
-		return fmt.Errorf("failed to suppress shell warning: %w", err)
-	}
-
-	return nil
 }
 
 // ParseProgress extracts progress percentage from vmkfstools output
