@@ -18,8 +18,6 @@ import (
 	"strings"
 	"time"
 
-	"gopkg.in/yaml.v3"
-
 	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
@@ -38,6 +36,7 @@ import (
 	template "github.com/openshift/api/template/v1"
 	"github.com/openshift/library-go/pkg/template/generator"
 	"github.com/openshift/library-go/pkg/template/templateprocessing"
+	"gopkg.in/yaml.v2"
 	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -1864,12 +1863,6 @@ func (r *KubeVirt) findTemplate(vm *plan.VMStatus) (tmpl *template.Template, err
 	return
 }
 
-type OpenPort struct {
-	// valid values are tcp, udp, sctp, icmp
-	Protocol string `yaml:"protocol"`
-	Port     int    `yaml:"port,omitempty"`
-}
-
 func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, libvirtConfigMap *core.ConfigMap, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, v2vSecret *core.Secret) (pod *core.Pod, err error) {
 	volumes, volumeMounts, volumeDevices, err := r.podVolumeMounts(vmVolumes, libvirtConfigMap, vddkConfigmap, pvcs, vm)
 	if err != nil {
@@ -1966,11 +1959,8 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 
 	environment = append(environment,
 		core.EnvVar{
-			Name: "LOCAL_MIGRATION",
-			Value: strconv.FormatBool(
-				r.Destination.Provider.IsHost() &&
-					!r.Plan.DestinationHasUdnNetwork(r.Destination),
-			),
+			Name:  "LOCAL_MIGRATION",
+			Value: strconv.FormatBool(r.Destination.Provider.IsHost()),
 		},
 	)
 	// pod annotations
@@ -1990,6 +1980,10 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 		if err != nil {
 			return
 		}
+		/*
+		   For the User Defined Networks we need to open some port so we can communicate with our metrics server inside the User Defined Network Namespace.
+		   Docs: https://docs.redhat.com/en/documentation/openshift_container_platform/4.19/html/multiple_networks/primary-networks#opening-default-network-ports-udn_about-user-defined-networks
+		*/
 		annotations[planbase.AnnOpenDefaultPorts] = string(yamlPorts)
 	}
 	var seccompProfile core.SeccompProfile
