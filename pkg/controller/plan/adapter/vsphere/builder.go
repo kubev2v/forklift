@@ -1902,12 +1902,17 @@ func (r *Builder) addSSHKeysToSecret(secret *core.Secret) error {
 		return fmt.Errorf("provider URL is empty")
 	}
 
-	privateSecretName := sshkeys.GenerateSSHPrivateSecretName(providerHostname)
-	publicSecretName := sshkeys.GenerateSSHPublicSecretName(providerHostname)
-
+	privateSecretName, err := sshkeys.GenerateSSHPrivateSecretName(providerHostname)
+	if err != nil {
+		return fmt.Errorf("error generating private ssh key %v", err)
+	}
+	publicSecretName, err := sshkeys.GenerateSSHPublicSecretName(providerHostname)
+	if err != nil {
+		return fmt.Errorf("error generating public ssh key %v", err)
+	}
 	// Get SSH private key
 	privateSecret := &core.Secret{}
-	err := r.Get(context.Background(), client.ObjectKey{
+	err = r.Get(context.Background(), client.ObjectKey{
 		Name:      privateSecretName,
 		Namespace: r.Source.Provider.Namespace,
 	}, privateSecret)

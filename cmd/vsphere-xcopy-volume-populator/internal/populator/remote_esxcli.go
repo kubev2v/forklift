@@ -2,16 +2,12 @@ package populator
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
-	"github.com/vmware/govmomi/object"
 	"k8s.io/klog/v2"
 )
 
@@ -28,8 +24,6 @@ const (
 	// CloneMethodVIB uses VIB to perform cloning operations
 	CloneMethodVIB CloneMethod = "vib"
 )
-
-var progressPattern = regexp.MustCompile(`\s(\d+)\%`)
 
 type vmkfstoolsClone struct {
 	Pid    int    `json:"pid"`
@@ -317,158 +311,46 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		}
 	}()
 
-	// Execute the clone using the appropriate method
+	// Execute the clone using the unified task handling approach
+	var executor TaskExecutor
 	if p.UseSSHMethod {
-		return p.executeSSHClone(host, vmDisk, targetLUN, progress)
+		// Setup SSH connection for SSH method
+		ctx, cancel := context.WithTimeout(context.Background(), p.SSHTimeout)
+		defer cancel()
+
+		// Setup secure script
+		finalScriptPath, err := ensureSecureScript(ctx, p.VSphereClient, host, vmDisk.Datastore)
+		if err != nil {
+			return fmt.Errorf("failed to ensure secure script: %w", err)
+		}
+		klog.V(2).Infof("Secure script ready at path: %s", finalScriptPath)
+
+		// Enable SSH access
+		err = vmware.EnableSSHAccess(ctx, p.VSphereClient, host, p.SSHPrivateKey, p.SSHPublicKey, finalScriptPath)
+		if err != nil {
+			return fmt.Errorf("failed to enable SSH access: %w", err)
+		}
+
+		// Get host IP
+		hostIP, err := vmware.GetHostIPAddress(ctx, host)
+		if err != nil {
+			return fmt.Errorf("failed to get host IP address: %w", err)
+		}
+
+		// Create SSH client
+		sshClient := vmware.NewSSHClient()
+		err = sshClient.Connect(ctx, hostIP, "root", p.SSHPrivateKey)
+		if err != nil {
+			return fmt.Errorf("failed to connect via SSH: %w", err)
+		}
+		defer sshClient.Close()
+
+		klog.V(2).Infof("SSH connection established with restricted commands")
+		executor = NewSSHTaskExecutor(sshClient)
 	} else {
-		return p.executeVIBClone(host, vmDisk, targetLUN, progress)
-	}
-}
-
-// executeVIBClone performs the clone using the original VIB method
-func (p *RemoteEsxcliPopulator) executeVIBClone(host *object.HostSystem, vmDisk VMDisk, targetLUN string, progress chan<- uint) error {
-	r, err := p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"vmkfstools", "clone", "-s", vmDisk.Path(), "-t", targetLUN})
-	if err != nil {
-		klog.Infof("error during copy, response from esxcli %+v", r)
-		return err
+		executor = NewVIBTaskExecutor(p.VSphereClient)
 	}
 
-	response := ""
-	klog.Info("respose from esxcli ", r)
-	for _, l := range r {
-		response += l.Value("message")
-	}
-
-	v := vmkfstoolsClone{}
-	err = json.Unmarshal([]byte(response), &v)
-	if err != nil {
-		return err
-	}
-
-	if v.TaskId != "" {
-		defer func() {
-			klog.Info("cleaning up task artifacts")
-			r, errClean := p.VSphereClient.RunEsxCommand(context.Background(),
-				host, []string{"vmkfstools", "taskClean", "-i", v.TaskId})
-			if errClean != nil {
-				klog.Errorf("failed cleaning up task artifacts %v", r)
-			}
-		}()
-	}
-	for {
-		r, err = p.VSphereClient.RunEsxCommand(context.Background(),
-			host, []string{"vmkfstools", "taskGet", "-i", v.TaskId})
-		if err != nil {
-			return err
-		}
-		response := ""
-		klog.Info("respose from esxcli ", r)
-		for _, l := range r {
-			response += l.Value("message")
-		}
-		v := vmkfstoolsTask{}
-		err = json.Unmarshal([]byte(response), &v)
-		if err != nil {
-			klog.Errorf("failed to unmarshal response from esxcli %+v", r)
-			return err
-		}
-
-		klog.Infof("respose from esxcli %+v", v)
-
-		// exmple output - Clone: 20% done.
-		match := progressPattern.FindStringSubmatch(v.LastLine)
-		if len(match) > 1 {
-			i, _ := strconv.Atoi(match[1])
-			progress <- uint(i)
-		}
-
-		if v.ExitCode != "" {
-			if v.ExitCode == "0" {
-				err = nil
-			} else {
-				err = fmt.Errorf("failed with exit code %s with stderr: %s", v.ExitCode, v.Stderr)
-			}
-			return err
-		}
-
-		time.Sleep(taskPollingInterval)
-	}
-}
-
-// executeSSHClone performs the clone using the SSH method
-func (p *RemoteEsxcliPopulator) executeSSHClone(host *object.HostSystem, vmDisk VMDisk, targetLUN string, progress chan<- uint) error {
-	// Create a context with timeout to bound SSH enable/connect and script staging operations
-	ctx, cancel := context.WithTimeout(context.Background(), p.SSHTimeout)
-	defer cancel()
-
-	// Setup secure script
-	finalScriptPath, err := ensureSecureScript(ctx, p.VSphereClient, host, vmDisk.Datastore)
-	if err != nil {
-		return fmt.Errorf("failed to ensure secure script: %w", err)
-	}
-	klog.V(2).Infof("Secure script ready at path: %s", finalScriptPath)
-
-	// Enable SSH access
-	err = vmware.EnableSSHAccess(ctx, p.VSphereClient, host, p.SSHPrivateKey, p.SSHPublicKey, finalScriptPath)
-	if err != nil {
-		return fmt.Errorf("failed to enable SSH access: %w", err)
-	}
-
-	// Get host IP
-	hostIP, err := vmware.GetHostIPAddress(ctx, host)
-	if err != nil {
-		return fmt.Errorf("failed to get host IP address: %w", err)
-	}
-
-	// Create SSH client
-	sshClient := vmware.NewSSHClient()
-	err = sshClient.Connect(ctx, hostIP, "root", p.SSHPrivateKey)
-	if err != nil {
-		return fmt.Errorf("failed to connect via SSH: %w", err)
-	}
-	defer sshClient.Close()
-
-	klog.V(2).Infof("SSH connection established with restricted commands")
-
-	// Start the clone task
-	task, err := sshClient.StartVmkfstoolsClone(vmDisk.Path(), targetLUN)
-	if err != nil {
-		return fmt.Errorf("failed to start vmkfstools clone: %w", err)
-	}
-
-	klog.Infof("Started vmkfstools clone task %s", task.TaskId)
-
-	if task.TaskId != "" {
-		defer func() {
-			err := sshClient.CleanupTask(task.TaskId)
-			if err != nil {
-				klog.Errorf("Failed cleaning up task artifacts: %v", err)
-			}
-		}()
-	}
-
-	// Poll for task completion
-	for {
-		taskStatus, err := sshClient.GetTaskStatus(task.TaskId)
-		if err != nil {
-			return fmt.Errorf("failed to get task status: %w", err)
-		}
-
-		klog.V(2).Infof("Task status: %+v", taskStatus)
-
-		if progressValue, hasProgress := vmware.ParseProgress(taskStatus.LastLine); hasProgress {
-			progress <- progressValue
-		}
-
-		if taskStatus.ExitCode != "" {
-			if taskStatus.ExitCode == "0" {
-				klog.Infof("vmkfstools clone completed successfully")
-				return nil
-			} else {
-				return fmt.Errorf("vmkfstools clone failed with exit code %s, stderr: %s", taskStatus.ExitCode, taskStatus.Stderr)
-			}
-		}
-
-		time.Sleep(taskPollingInterval)
-	}
+	// Use unified task execution
+	return ExecuteCloneTask(context.Background(), executor, host, vmDisk.Path(), targetLUN, progress)
 }

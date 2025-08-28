@@ -6,8 +6,6 @@ import (
 	"encoding/xml"
 	"fmt"
 	"net"
-	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -15,8 +13,6 @@ import (
 	"golang.org/x/crypto/ssh"
 	"k8s.io/klog/v2"
 )
-
-var progressPattern = regexp.MustCompile(`Clone:\s(\d+)%\sdone\.`)
 
 // SSHOperation represents the type of SSH operation
 type SSHOperation string
@@ -401,26 +397,6 @@ func getESXiVersion(vmwareClient Client, host *object.HostSystem, ctx context.Co
 	}
 
 	return "", fmt.Errorf("could not parse ESXi version from command output")
-}
-
-// ParseProgress extracts progress percentage from vmkfstools output
-// Example progress strings: "Clone: 15% done.", "Clone: 100% done."
-func ParseProgress(lastLine string) (uint, bool) {
-	klog.V(2).Infof("ParseProgress: parsing line: %q", lastLine)
-
-	// Use FindStringSubmatch since there should only be one progress pattern per line
-	match := progressPattern.FindStringSubmatch(lastLine)
-	if len(match) > 1 {
-		if progress, err := strconv.Atoi(match[1]); err == nil {
-			klog.V(2).Infof("ParseProgress: extracted progress: %d%%", progress)
-			return uint(progress), true
-		} else {
-			klog.Warningf("ParseProgress: failed to parse progress number from %q: %v", match[1], err)
-		}
-	}
-
-	klog.V(2).Infof("ParseProgress: no progress pattern found in line")
-	return 0, false
 }
 
 // GetHostIPAddress retrieves the management IP address of an ESXi host
