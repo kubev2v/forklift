@@ -18,6 +18,7 @@ func TestPrimera3ParClonner(t *testing.T) {
 	initiatorGroup := "TestInitiatorGroup"
 
 	mockClient.Volumes[targetLUN.Name] = targetLUN
+	mockClient.Hosts["mock-host-"+targetLUN.IQN] = "esxi-1000"
 
 	t.Run("Ensure Clonner Igroup", func(t *testing.T) {
 		_, err := clonner.EnsureClonnerIgroup(initiatorGroup, []string{targetLUN.IQN})
@@ -40,7 +41,7 @@ func TestPrimera3ParClonner(t *testing.T) {
 	})
 
 	t.Run("Resolve Volume Handle to LUN", func(t *testing.T) {
-		_, err := clonner.ResolvePVToLUN(populator.PersistentVolume{Name: targetLUN.Name})
+		_, err := clonner.ResolvePVToLUN(populator.PersistentVolume{VolumeHandle: targetLUN.Name})
 		assert.NoError(t, err, "Expected no error when resolving LUN details")
 	})
 
@@ -48,4 +49,9 @@ func TestPrimera3ParClonner(t *testing.T) {
 		err := clonner.UnMap(initiatorGroup, targetLUN, nil)
 		assert.NoError(t, err, "Expected no error when unmapping LUN")
 	})
+}
+
+func TestNewPrimera3ParClonner(t *testing.T) {
+	_, err := NewPrimera3ParClonner("hostname", "username", "password", false)
+	assert.NoError(t, err, "Expected no error when creating a new clonner")
 }

@@ -155,12 +155,12 @@ Create a secret where the migration provider is setup, usually openshift-mtv
 and put the credentials of the storage system. All of the provider are required
 to have a secret with those required fields
 
-| Key | Value | Mandatory |
-| --- | --- | --- |
-| STORAGE_HOSTNAME | ip/hostname | y |
-| STORAGE_USERNAME | string | y |
-| STORAGE_PASSWORD | string | y |
-| STORAGE_SKIP_SSL_VERIFICATION | true/false | n |
+| Key | Value | Mandatory | Default |
+| --- | --- | --- | --- |
+| STORAGE_HOSTNAME | ip/hostname | y | |
+| STORAGE_USERNAME | string | y | |
+| STORAGE_PASSWORD | string | y | |
+| STORAGE_SKIP_SSL_VERIFICATION | true/false | n | false |
 
 
 Provider specific entries in the secret shall be documented below:
