@@ -11,7 +11,7 @@ import sys
 TMP_PREFIX = "/tmp/vmkfstools-wrapper-{}"
 
 # Version information for debugging
-SCRIPT_VERSION = "1.0.0"
+SCRIPT_VERSION = "0.0.1"
 
 # Setup logging
 logging.basicConfig(
