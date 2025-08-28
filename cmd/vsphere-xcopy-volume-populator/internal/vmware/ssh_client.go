@@ -2,6 +2,8 @@ package vmware
 
 import (
 	"context"
+	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"net"
 	"regexp"
@@ -31,6 +33,24 @@ type VmkfstoolsTask struct {
 	ExitCode string `json:"exitCode"`
 	LastLine string `json:"lastLine"`
 	Stderr   string `json:"stdErr"`
+}
+
+// XMLResponse represents the XML response structure
+type XMLResponse struct {
+	XMLName   xml.Name  `xml:"o"`
+	Structure Structure `xml:"structure"`
+}
+
+// Structure represents the structure element in the XML response
+type Structure struct {
+	TypeName string  `xml:"typeName,attr"`
+	Fields   []Field `xml:"field"`
+}
+
+// Field represents a field in the XML response
+type Field struct {
+	Name   string `xml:"name,attr"`
+	String string `xml:"string"`
 }
 
 // SSHClient interface for SSH operations
@@ -232,33 +252,29 @@ func parseTaskResponse(xmlOutput string) (*VmkfstoolsTask, error) {
 	// Expected format: XML with status and message fields
 	// The message field contains JSON with task information
 
-	// Simple XML parsing for our specific format
-	lines := strings.Split(xmlOutput, "\n")
-	var statusLine, messageLine string
+	var response XMLResponse
+	if err := xml.Unmarshal([]byte(xmlOutput), &response); err != nil {
+		return nil, fmt.Errorf("failed to parse XML response: %w", err)
+	}
 
-	for _, line := range lines {
-		if strings.Contains(line, "<field name=\"status\">") {
-			statusLine = line
+	// Find status and message fields
+	var status, message string
+	for _, field := range response.Structure.Fields {
+		switch field.Name {
+		case "status":
+			status = field.String
+		case "message":
+			message = field.String
 		}
-		if strings.Contains(line, "<field name=\"message\">") {
-			messageLine = line
-		}
 	}
 
-	// Extract status
-	statusPattern := regexp.MustCompile(`<string>([^<]+)</string>`)
-	statusMatches := statusPattern.FindStringSubmatch(statusLine)
-	if len(statusMatches) < 2 {
-		return nil, fmt.Errorf("failed to parse status from response")
+	if status == "" {
+		return nil, fmt.Errorf("status field not found in XML response")
 	}
-	status := statusMatches[1]
 
-	// Extract message (JSON)
-	messageMatches := statusPattern.FindStringSubmatch(messageLine)
-	if len(messageMatches) < 2 {
-		return nil, fmt.Errorf("failed to parse message from response")
+	if message == "" {
+		return nil, fmt.Errorf("message field not found in XML response")
 	}
-	message := messageMatches[1]
 
 	// Check if operation was successful
 	if status != "success" {
@@ -266,34 +282,19 @@ func parseTaskResponse(xmlOutput string) (*VmkfstoolsTask, error) {
 	}
 
 	// Parse the JSON message to extract task information
-	// Simple JSON parsing for our specific format
 	task := &VmkfstoolsTask{}
 
-	// Extract taskId
-	if taskIdMatch := regexp.MustCompile(`"taskId":\s*"([^"]+)"`).FindStringSubmatch(message); len(taskIdMatch) > 1 {
-		task.TaskId = taskIdMatch[1]
-	}
+	// Try to parse as JSON first
+	if err := json.Unmarshal([]byte(message), task); err != nil {
+		// If JSON parsing fails, check if it's a simple text message (e.g., for cleanup operations)
+		// In this case, we return a minimal task structure
+		klog.V(2).Infof("Message is not JSON, treating as plain text: %s", message)
 
-	// Extract pid
-	if pidMatch := regexp.MustCompile(`"pid":\s*([0-9]+)`).FindStringSubmatch(message); len(pidMatch) > 1 {
-		if pid, err := strconv.Atoi(pidMatch[1]); err == nil {
-			task.Pid = pid
-		}
-	}
-
-	// Extract exitCode
-	if exitCodeMatch := regexp.MustCompile(`"exitCode":\s*"([^"]*)"`).FindStringSubmatch(message); len(exitCodeMatch) > 1 {
-		task.ExitCode = exitCodeMatch[1]
-	}
-
-	// Extract lastLine
-	if lastLineMatch := regexp.MustCompile(`"lastLine":\s*"([^"]*)"`).FindStringSubmatch(message); len(lastLineMatch) > 1 {
-		task.LastLine = lastLineMatch[1]
-	}
-
-	// Extract stderr
-	if stderrMatch := regexp.MustCompile(`"stdErr":\s*"([^"]*)"`).FindStringSubmatch(message); len(stderrMatch) > 1 {
-		task.Stderr = stderrMatch[1]
+		// For non-JSON messages (like cleanup confirmations), return a basic task
+		// The caller should check the original status for success/failure
+		return &VmkfstoolsTask{
+			LastLine: message, // Store the text message in LastLine for reference
+		}, nil
 	}
 
 	return task, nil
