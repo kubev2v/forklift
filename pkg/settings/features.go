@@ -21,6 +21,10 @@ const (
 //   - https://issues.redhat.com/browse/MTV-2988
 const ocpMinForVmwareSystemSerial = "4.20.0"
 
+// OpenShift version where the defined MAC address is supported in User Defined Network:
+//   - https://issues.redhat.com/browse/CNV-66820
+const ocpMinForUdnMacSupport = "4.20.0"
+
 // Feature gates.
 type Features struct {
 	// Whether migration is supported from oVirt sources.
@@ -36,6 +40,8 @@ type Features struct {
 	OCPLiveMigration bool
 	// Whether to use VMware system serial number for VM migration from VMware.
 	VmwareSystemSerialNumber bool
+	// Whether to create VMs with MAC address with the User Defined Network
+	UdnSupportsMac bool
 }
 
 // isOpenShiftVersionAboveMinimum checks if OpenShift version is above or equal to minimum version using semantic versioning
@@ -68,5 +74,6 @@ func (r *Features) Load() (err error) {
 	r.CopyOffload = getEnvBool(FeatureCopyOffload, false)
 	r.OCPLiveMigration = getEnvBool(FeatureOCPLiveMigration, false)
 	r.VmwareSystemSerialNumber = getEnvBool(FeatureVmwareSystemSerialNumber, true) && r.isOpenShiftVersionAboveMinimum(ocpMinForVmwareSystemSerial)
+	r.UdnSupportsMac = r.isOpenShiftVersionAboveMinimum(ocpMinForUdnMacSupport)
 	return
 }
