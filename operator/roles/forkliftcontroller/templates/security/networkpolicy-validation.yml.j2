@@ -1,10 +1,6 @@
 # Network policies for validation pods
 # Includes VDDK validation jobs and validation service
 #
-# NFS Configuration:
-# - Default: NFSv4 (port 2049 TCP/UDP only)
-# - NFSv3: Set nfs_v3_support=true to enable ports 111 (rpcbind) and 20048 (mountd)
-# - Note: NFSv3 mountd port may vary depending on server configuration
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -35,12 +31,7 @@ spec:
           control-plane: controller-manager
     # All ports allowed (ports omitted)
   # VDDK validation only checks local files - no external access needed
-  # Allow DNS resolution
-  - ports:
-    - protocol: UDP
-      port: 53
-    - protocol: TCP
-      port: 53
+  # No additional egress rules required
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -52,104 +43,25 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      service: forklift-validation
+      service: {{ validation_service_name }}
   policyTypes:
-  - Ingress
-  - Egress
+    - Ingress
   ingress:
-  # Allow controller communication
-  - from:
-    - podSelector:
-        matchLabels:
-          control-plane: controller-manager
-    # All ports allowed (ports omitted)
-  # Allow API access for validation requests
-  - from:
-    - podSelector:
-        matchLabels:
-          service: {{ api_service_name }}
-    ports:
-    - protocol: TCP
-      port: 8181  # OPA validation service port
-  egress:
-  # Allow communication with controller
-  - to:
-    - podSelector:
-        matchLabels:
-          control-plane: controller-manager
-    # All ports allowed (ports omitted)
-  # Allow Kubernetes API access
-  - ports:
-    - protocol: TCP
-      port: 6443
-    - protocol: TCP
-      port: 443
-  # Validation service only validates cached inventory data - no external provider access needed
-  # Allow DNS resolution
-  - ports:
-    - protocol: UDP
-      port: 53
-    - protocol: TCP
-      port: 53
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: forklift-image-converter-policy
-  namespace: {{ app_namespace }}
-  labels:
-    app: {{ app_name }}
-spec:
-  podSelector:
-    matchLabels:
-      forklift.app: image-converter
-  policyTypes:
-  - Ingress
-  - Egress
-  ingress:
-  # Allow controller communication
-  - from:
-    - podSelector:
-        matchLabels:
-          control-plane: controller-manager
-    # All ports allowed (ports omitted)
-  egress:
-  # Allow communication with controller
-  - to:
-    - podSelector:
-        matchLabels:
-          control-plane: controller-manager
-    # All ports allowed (ports omitted)
-  # Allow external source access
-  - ports:
-    - protocol: TCP
-      port: 443   # HTTPS
-    - protocol: TCP
-      port: 8443  # HTTPS Development
-    - protocol: TCP
-      port: 80    # HTTP
-  # Allow DNS resolution
-  - ports:
-    - protocol: UDP
-      port: 53
-    - protocol: TCP
-      port: 53
-  # Allow storage access
-  # NFSv4: Port 2049 TCP/UDP (default configuration)
-  # NFSv3: Add ports 111 (rpcbind) and mountd if needed
-  - ports:
-    - protocol: TCP
-      port: 2049  # NFS (NFSv4/NFSv3 data)
-    - protocol: UDP
-      port: 2049  # NFS (NFSv4/NFSv3 data)
-{% if nfs_v3_support|default(false)|bool %}
-    # NFSv3 additional ports (enable with nfs_v3_support: true)
-    - protocol: TCP
-      port: 111   # rpcbind
-    - protocol: UDP
-      port: 111   # rpcbind
-    - protocol: TCP
-      port: 20048 # mountd (default port, may vary)
-    - protocol: UDP
-      port: 20048 # mountd (default port, may vary)
-{% endif %}
+    # Allow controller-manager to communicate with validation service
+    - from:
+        - podSelector:
+            matchLabels:
+              control-plane: controller-manager
+      ports:
+        - protocol: TCP
+          port: 8181
+    # Allow forklift-api service to communicate with validation service
+    - from:
+        - podSelector:
+            matchLabels:
+              service: {{ api_service_name }}
+      ports:
+        - protocol: TCP
+          port: 8181
+  # No egress restrictions - validation service doesn't need outbound connections
+

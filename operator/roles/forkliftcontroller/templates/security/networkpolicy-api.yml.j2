@@ -1,5 +1,4 @@
-# Network policy for Forklift API Service
-# Handles webhooks, validation, and API requests
+---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -12,73 +11,54 @@ spec:
     matchLabels:
       service: {{ api_service_name }}
   policyTypes:
-  - Ingress
-  - Egress
+    - Ingress
+    - Egress
   ingress:
-  # Allow controller to communicate with API
-  - from:
-    - podSelector:
-        matchLabels:
-          control-plane: controller-manager
-    ports:
-    - protocol: TCP
-      port: 8443
-{% if not k8s_cluster|bool %}
-  # Allow OpenShift Console/UI access
-  - from:
-    - namespaceSelector:
-        matchLabels:
-          kubernetes.io/metadata.name: openshift-console
-    ports:
-    - protocol: TCP
-      port: 8443
-{% endif %}
-  # Allow Kubernetes API server for webhooks
-  - ports:
-    - protocol: TCP
-      port: 8443
-{% if not k8s_cluster|bool %}
-  # Allow monitoring
-  - from:
-    - namespaceSelector:
-        matchLabels:
-          kubernetes.io/metadata.name: openshift-monitoring
-    ports:
-    - protocol: TCP
-      port: 8444  # Services endpoint
-{% endif %}
+    # Allow controller to communicate with API webhooks
+    - from:
+      - podSelector:
+          matchLabels:
+            control-plane: controller-manager
+      ports:
+      - protocol: TCP
+        port: 8443
+    # Allow OpenShift Console to access API webhooks
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: openshift-console
+      ports:
+      - protocol: TCP
+        port: 8443
+    {% if not k8s_cluster|bool %}
+    # Allow monitoring to access API metrics
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: openshift-monitoring
+      ports:
+      - protocol: TCP
+        port: 8443
+    {% endif %}
+    # Allow 8443 from anywhere:
+    # Required because Kubernetes/OpenShift API server webhook calls do not
+    # originate from a Pod/Namespace that NetworkPolicy can match. Without
+    # this, admission webhooks (e.g. Forklift API validation) would be blocked.
+    - ports:
+      - protocol: TCP
+        port: 8443
+    # Allow ValidatingAdmissionWebhook and MutatingAdmissionWebhook access via service port 443
+    - ports:
+      - protocol: TCP
+        port: 443
+    # Allow internal cluster access to services endpoint (port 8444)
+    # UI plugin needs this for certificate retrieval service
+    - from:
+      - namespaceSelector: {}
+      ports:
+      - protocol: TCP
+        port: 8444
   egress:
-  # Allow DNS resolution
-  - ports:
-    - protocol: UDP
-      port: 53
-    - protocol: TCP
-      port: 53
-  # Allow HTTPS (certificates, OCSP, external validation)
-  - ports:
-    - protocol: TCP
-      port: 443
-  # Allow Kubernetes API access
-  - ports:
-    - protocol: TCP
-      port: 6443
-  # Allow communication with controller
-  - to:
-    - podSelector:
-        matchLabels:
-          control-plane: controller-manager
-    ports:
-    - protocol: TCP
-      port: 8081  # Controller metrics/status port
-  # Allow communication with validation service
-  - to:
-    - podSelector:
-        matchLabels:
-          service: forklift-validation
-    ports:
-    - protocol: TCP
-      port: 8181  # Validation service OPA port
-
-
-
-
+    # Allow all egress - API pod needs to reach external OCP clusters for validation
+    # and certificate retrieval from arbitrary endpoints
+    - {}
