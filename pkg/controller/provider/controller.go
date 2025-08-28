@@ -493,10 +493,16 @@ func (r *Reconciler) ensureSSHKeys(provider *api.Provider) error {
 	}
 
 	// Check if SSH keys already exist
-	privateSecretName := sshkeys.GenerateSSHPrivateSecretName(providerHostname)
-	publicSecretName := sshkeys.GenerateSSHPublicSecretName(providerHostname)
+	privateSecretName, err := sshkeys.GenerateSSHPrivateSecretName(providerHostname)
+	if err != nil {
+		return fmt.Errorf("failed to generate SSH private secret name: %w", err)
+	}
+	publicSecretName, err := sshkeys.GenerateSSHPublicSecretName(providerHostname)
+	if err != nil {
+		return fmt.Errorf("failed to generate SSH public secret name: %w", err)
+	}
 
-	_, err := r.getSSHKeySecret(provider.Namespace, privateSecretName)
+	_, err = r.getSSHKeySecret(provider.Namespace, privateSecretName)
 	if err == nil {
 		// SSH keys already exist, skip generation
 		r.Log.V(1).Info("SSH keys already exist for provider", "provider", provider.Name)
@@ -556,6 +562,11 @@ func (r *Reconciler) getSSHKeySecret(namespace, secretName string) (*v1.Secret, 
 
 // storeSSHKeySecret creates or updates an SSH key secret
 func (r *Reconciler) storeSSHKeySecret(namespace, secretName, keyName string, keyData []byte, provider *api.Provider) error {
+	providerLabel, err := sshkeys.SanitizeProviderName(provider.Spec.URL)
+	if err != nil {
+		return fmt.Errorf("failed to sanitize provider name for secret label: %w", err)
+	}
+
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
@@ -564,7 +575,7 @@ func (r *Reconciler) storeSSHKeySecret(namespace, secretName, keyName string, ke
 				"app.kubernetes.io/name":        "forklift",
 				"app.kubernetes.io/component":   "ssh-keys",
 				"app.kubernetes.io/managed-by":  "forklift-controller",
-				"forklift.konveyor.io/provider": sshkeys.SanitizeProviderName(provider.Spec.URL),
+				"forklift.konveyor.io/provider": providerLabel,
 			},
 			OwnerReferences: []metav1.OwnerReference{
 				{
@@ -583,7 +594,7 @@ func (r *Reconciler) storeSSHKeySecret(namespace, secretName, keyName string, ke
 		},
 	}
 
-	err := r.Create(context.TODO(), secret)
+	err = r.Create(context.TODO(), secret)
 	if err != nil && !k8serr.IsAlreadyExists(err) {
 		return fmt.Errorf("failed to create secret %s: %w", secretName, err)
 	}

@@ -54,10 +54,8 @@ func ensureSecureScript(ctx context.Context, client vmware.Client, esx *object.H
 	if err != nil {
 		return "", fmt.Errorf("failed to upload the secure script to ESXi %s: %w", esx.Name(), err)
 	}
-	klog.Infof("uploaded secure script to ESXi %s at %s", esx.Name(), scriptPath)
-
 	// Script will execute directly from datastore - no need for shell commands
-	klog.Infof("Script ready for execution from datastore path: %s", scriptPath)
+	klog.Infof("uploaded secure script to ESXi %s at %s - ready for execution", esx.Name(), scriptPath)
 
 	return scriptPath, nil
 }
