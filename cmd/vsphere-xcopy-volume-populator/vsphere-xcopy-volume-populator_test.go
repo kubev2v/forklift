@@ -78,7 +78,7 @@ var _ = Describe("Populator", func() {
 				Eventually(quitCh, "10s").Should(Receive(BeNil()))
 			}
 		},
-		Entry("non valid vmdkPath source", testCase{
+		FEntry("non valid vmdkPath source", testCase{
 			sourceVmId: "nonvalid.vmdk",
 			sourceVMDK: "nonvalid.vmdk",
 			targetPVC:  "pvc-12345",

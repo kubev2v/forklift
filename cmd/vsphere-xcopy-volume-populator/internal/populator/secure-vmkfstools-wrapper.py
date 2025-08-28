@@ -42,19 +42,11 @@ def validate_path(path):
     # Normalize the path to prevent bypasses
     path = os.path.normpath(path)
 
-    # Resolve symbolic links
-    try:
-        path = os.path.realpath(path)
-    except (OSError, ValueError):
-        raise ValueError(f"Invalid path: {path}")
-
-
-# Only allow paths in specific safe directories for ESXi operations
+    # Only allow paths in specific safe directories for ESXi operations
     allowed_prefixes = [
         '/vmfs/volumes/',      # Datastore volumes (source VMDK files)
         '/vmfs/devices/disks/', # ESXi disk devices (target devices for cloning)
-        '/tmp/',
-        '/dev/disks/'                # Temporary files
+        '/tmp/'
     ]
     if not any(path.startswith(prefix) for prefix in allowed_prefixes):
         raise ValueError(f"Path not in allowed directories: {path}")
